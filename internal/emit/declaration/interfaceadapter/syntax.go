@@ -1,7 +1,7 @@
 package interfaceadapter
 
 import (
-	"github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
+	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -67,7 +67,7 @@ func dynamicTypeProperty(
 ) tsgo.PropertyDeclaration {
 	return factory.PropertyDeclaration(
 		[]tsgo.ModifierLike{factory.ReadonlyKeyword()},
-		factory.Identifier(interfacevalue.DynamicTypeMember),
+		factory.Identifier(interfacecontract.DynamicTypeMember),
 		nil,
 		factory.KeywordTypeNode(
 			tsgo.KeywordTypeSyntaxKindObjectKeyword,
@@ -133,7 +133,7 @@ func guardMethod(
 								value,
 								nil,
 								factory.Identifier(
-									interfacevalue.DynamicTypeMember,
+									interfacecontract.DynamicTypeMember,
 								),
 								tsgo.NodeFlagsNone,
 							),
@@ -157,7 +157,7 @@ func methodSetProperty(
 ) tsgo.PropertyDeclaration {
 	return factory.PropertyDeclaration(
 		[]tsgo.ModifierLike{factory.ReadonlyKeyword()},
-		factory.Identifier(interfacevalue.MethodsMember),
+		factory.Identifier(interfacecontract.MethodsMember),
 		nil,
 		readonlySetType(factory),
 		factory.Identifier(name+"$methods"),
@@ -174,7 +174,7 @@ func implementsMethod(
 			factory.PropertyAccessExpression(
 				factory.ThisExpression(),
 				nil,
-				factory.Identifier(interfacevalue.MethodsMember),
+				factory.Identifier(interfacecontract.MethodsMember),
 				tsgo.NodeFlagsNone,
 			),
 			nil,
@@ -189,7 +189,7 @@ func implementsMethod(
 	return factory.MethodDeclaration(
 		nil,
 		nil,
-		factory.Identifier(interfacevalue.ImplementsMember),
+		factory.Identifier(interfacecontract.ImplementsMember),
 		nil,
 		nil,
 		[]tsgo.ParameterDeclaration{

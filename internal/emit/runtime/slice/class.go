@@ -302,6 +302,37 @@ func (b builder) throwBounds() tsgo.ExpressionStatement {
 	)
 }
 
+func (b builder) throwIndexBounds(
+	index tsgo.Expression,
+) tsgo.ExpressionStatement {
+	message := b.add(
+		b.add(
+			b.add(
+				b.factory.StringLiteral(
+					"runtime error: index out of range [",
+					tsgo.TokenFlagsNone,
+				),
+				b.globalCall("String", index),
+			),
+			b.factory.StringLiteral(
+				"] with length ",
+				tsgo.TokenFlagsNone,
+			),
+		),
+		b.globalCall(
+			"String",
+			b.thisProperty(MemberName(MemberLength)),
+		),
+	)
+	return b.factory.ExpressionStatement(
+		panicruntime.Call(
+			b.factory,
+			b.panicName,
+			message,
+		),
+	)
+}
+
 func (b builder) method(
 	modifiers []tsgo.ModifierLike,
 	name string,

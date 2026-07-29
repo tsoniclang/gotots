@@ -1,10 +1,12 @@
-package api
+package api_test
 
 import (
 	"errors"
 	"go/token"
 	"go/types"
 	"testing"
+
+	. "github.com/tsoniclang/gotots/internal/emit/api"
 )
 
 func TestNamedStructOperationRequestCarriesTypedDeclarationRequirement(t *testing.T) {

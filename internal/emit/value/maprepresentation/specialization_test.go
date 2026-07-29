@@ -83,7 +83,7 @@ func testStaticSpecialization(
     constructor(public x: ` + keyType + `, public y: ` + keyType + `) {}
 }
 class GoPanic {
-    static raise(message: string): never { throw new Error(message); }
+    static raiseRuntime(message: string): never { throw new Error(message); }
 }
 class Box {
     constructor(public value: number) {}

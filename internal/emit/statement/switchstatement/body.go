@@ -10,34 +10,42 @@ import (
 func emitClauseBody(
 	context api.Context,
 	children api.ChildEmitter,
-	source []ast.Stmt,
+	source *ast.CaseClause,
 	allowFallthrough bool,
+	targetLabel string,
 ) ([]api.StatementEmission, bool, error) {
-	fallthroughIndex := finalFallthrough(source)
+	if source == nil {
+		return nil, false,
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	fallthroughIndex := finalFallthrough(source.Body)
 	if fallthroughIndex >= 0 && !allowFallthrough {
 		return nil, false, api.Unsupported(
 			context.WithRole(api.RoleSwitchCaseStatement),
 			api.CategoryStatement,
-			source[fallthroughIndex],
+			source.Body[fallthroughIndex],
 		)
 	}
-	targets := make([]api.StatementEmission, 0, len(source))
-	for index, sourceStatement := range source {
+	statements := make([]ast.Stmt, 0, len(source.Body))
+	for index, sourceStatement := range source.Body {
 		if index == fallthroughIndex {
 			continue
 		}
-		target, err := children.Statement(
-			context.
-				WithRole(api.RoleSwitchCaseStatement).
-				EnterBreakable(),
-			sourceStatement,
-		)
-		if err != nil {
-			return nil, false, err
-		}
-		targets = append(targets, target)
+		statements = append(statements, sourceStatement)
 	}
-	return targets, fallthroughIndex >= 0, nil
+	bodyContext := context.
+		WithRole(api.RoleSwitchCaseStatement).
+		EnterBreakable()
+	if context.CallableControl().Goto() {
+		bodyContext = context.
+			WithRole(api.RoleSwitchCaseStatement).
+			EnterBreakableTarget(targetLabel)
+	}
+	target, err := children.Statements(bodyContext, source, statements)
+	if err != nil {
+		return nil, false, err
+	}
+	return []api.StatementEmission{target}, fallthroughIndex >= 0, nil
 }
 
 func finalFallthrough(source []ast.Stmt) int {

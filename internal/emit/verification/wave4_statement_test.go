@@ -257,7 +257,12 @@ func targetFunctionText(t *testing.T, printed, name string) string {
 	if start < 0 {
 		t.Fatalf("Wave 4 artifacts lack function %s", name)
 	}
-	end := strings.Index(printed[start+len(startMarker):], "\nexport function ")
+	remainder := printed[start+len(startMarker):]
+	end := strings.Index(remainder, "\nexport function ")
+	artifactEnd := strings.Index(remainder, "\n\n// ")
+	if end < 0 || artifactEnd >= 0 && artifactEnd < end {
+		end = artifactEnd
+	}
 	if end < 0 {
 		return printed[start:]
 	}

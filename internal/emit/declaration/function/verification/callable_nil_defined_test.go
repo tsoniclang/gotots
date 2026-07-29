@@ -26,7 +26,7 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 		"| undefined",
 		"new Transform(",
 		".$value(",
-		`GoPanic.raise("call of nil function")`,
+		`GoPanic.raiseRuntime("call of nil function")`,
 		"GoPointer.cell<",
 		"return value === void 0;",
 		"return !(value === void 0);",
@@ -53,7 +53,7 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	nilCall := printedFunction(t, printed, "NilCallOrder")
 	callee := strings.Index(nilCall, "const __gotots_callee_")
 	argument := strings.Index(nilCall, "const __gotots_argument_")
-	guard := strings.Index(nilCall, `GoPanic.raise("call of nil function")`)
+	guard := strings.Index(nilCall, `GoPanic.raiseRuntime("call of nil function")`)
 	call := strings.LastIndex(nilCall, "__gotots_callee_")
 	if callee < 0 || argument < 0 || guard < 0 || call < 0 ||
 		!(callee < argument && argument < guard && guard < call) {
@@ -65,7 +65,7 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	nilVoidCall := printedFunction(t, printed, "NilVoidCallOrder")
 	voidCallee := strings.Index(nilVoidCall, "const __gotots_callee_")
 	voidArgument := strings.Index(nilVoidCall, "const __gotots_argument_")
-	voidGuard := strings.Index(nilVoidCall, `GoPanic.raise("call of nil function")`)
+	voidGuard := strings.Index(nilVoidCall, `GoPanic.raiseRuntime("call of nil function")`)
 	voidCall := strings.LastIndex(nilVoidCall, "__gotots_callee_")
 	if voidCallee < 0 || voidArgument < 0 || voidGuard < 0 || voidCall < 0 ||
 		!(voidCallee < voidArgument &&

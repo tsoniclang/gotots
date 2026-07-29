@@ -100,7 +100,7 @@ func Build(
 				Reason:   "interface method signature is invalid",
 			}
 		}
-		target, err := callable.EmitAdapter(
+		target, err := callable.EmitABIAdapter(
 			context,
 			children,
 			source,

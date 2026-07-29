@@ -19,6 +19,9 @@ func Emit(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
+	if control, selected := context.ReturnControl(); selected {
+		return emitControlled(context, children, source, control)
+	}
 	results := context.FunctionResults()
 	resultCount := 0
 	if results != nil {

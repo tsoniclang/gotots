@@ -29,6 +29,10 @@ func Emit(
 	source *ast.TypeSwitchStmt,
 ) (api.StatementEmission, error) {
 	context, targetLabel := context.TakeStatementLabel()
+	targetLabel, err := context.SelectControlTarget(targetLabel)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
 	selected, ok := resolveGuard(context, source)
 	if !ok {
 		return api.StatementEmission{},
@@ -68,6 +72,7 @@ func Emit(
 		source,
 		selected,
 		value,
+		targetLabel,
 	)
 	if err != nil {
 		return api.StatementEmission{}, err

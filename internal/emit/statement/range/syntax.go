@@ -32,6 +32,7 @@ func body(
 	source *ast.RangeStmt,
 	key assignment.RangeIterationValue,
 	value assignment.RangeIterationValue,
+	targetLabel string,
 ) (api.BlockEmission, error) {
 	var bindings api.StatementEmission
 	var err error
@@ -48,7 +49,7 @@ func body(
 		}
 	}
 	sourceBody, err := children.Block(
-		context.WithRole(api.RoleRangeBody).EnterLoop(),
+		rangeBodyContext(context, targetLabel),
 		source.Body,
 	)
 	if err != nil {
@@ -63,6 +64,18 @@ func body(
 			sourceBody.Requests(),
 		)...,
 	), nil
+}
+
+func rangeBodyContext(
+	context api.Context,
+	targetLabel string,
+) api.Context {
+	if context.CallableControl().Goto() {
+		return context.
+			WithRole(api.RoleRangeBody).
+			EnterLoopTarget(targetLabel)
+	}
+	return context.WithRole(api.RoleRangeBody).EnterLoop()
 }
 
 func numericLoop(

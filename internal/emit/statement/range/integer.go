@@ -69,6 +69,7 @@ func emitInteger(
 		source,
 		key,
 		assignment.RangeIterationValue{},
+		targetLabel,
 	)
 	if err != nil {
 		return api.StatementEmission{}, err

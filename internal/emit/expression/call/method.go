@@ -306,6 +306,8 @@ func emitInterfaceMethod(
 	}
 	return ApplyInterfaceMethod(
 		context,
+		selector.X,
+		selection.Recv(),
 		receiver,
 		method,
 		arguments,

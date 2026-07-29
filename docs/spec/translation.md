@@ -197,6 +197,67 @@ then stores left-to-right. Labels and labeled branches use exact
 `*types.Label` definitions/uses. A loop label is attached to the actual target
 loop, not an enclosing prerequisite block.
 
+Function-exit control is assembled once by the exact callable owner. For
+example:
+
+```go
+func read() (result int) {
+	defer func() { result++ }()
+	result = source()
+	return result
+}
+```
+
+The defer statement first captures its function value. The explicit return
+stores a copied value into `result`, exits the lexical body, drains the
+invocation-local LIFO stack, and only then reads `result` for the target return.
+Ordinary functions with no `defer`, `recover`, or non-structural `goto` keep
+their existing direct body byte-for-byte.
+
+`panic(value)` converts a non-nil `value` to the represented empty interface
+and throws the one `GoPanic` carrier. `panic(nil)` creates a distinct
+runtime-error value with canonical `*runtime.PanicNilError` dynamic identity
+and payload; ordinary generated runtime faults retain their separate runtime
+dynamic identity. Both satisfy canonical `error`,
+`interface { Error() string }`, and `runtime.Error` contracts. Consequently,
+recovered concrete/interface assertions and `Error()` calls observe Go
+behavior rather than an empty-interface-only placeholder. `recover()` reads
+only an optional hidden
+`GoRecovery` parameter on the directly invoked deferred callable:
+
+```go
+func direct() any { return recover() }  // non-nil only when called by defer
+func indirect() any { return direct() } // nil: one call below
+```
+
+Deferred direct functions, receiver functions, function and method values,
+interface method adapters, and generic functions forward that parameter
+statically. Ordinary calls omit it. No global state or dynamic invocation is
+permitted.
+
+A defer-site call is not emitted as the original call expression. Its owner
+evaluates the callee, receiver, and arguments in Go order, applies the ordinary
+Go copy owner to value receivers and arguments, and stores one typed
+zero-argument closure. Invocation happens only during LIFO unwind. A deferred
+nil function therefore panics during unwind, while a nil pointer implicit
+dereference needed for a value receiver panics at registration.
+
+Exact label definitions and uses come from `go/types.Info.Defs` and `Uses`.
+Labeled `break`/`continue` and switch `fallthrough` retain their direct target
+forms. A forward edge representable by a target label and a backward edge
+representable by one target loop remain direct. Crossing or multi-entry goto
+regions select the smallest enclosing callable state machine: one numeric
+state, one linear switch, and no persisted CFG. Go's type checker has already
+rejected jumps into scopes; target assembly preserves source initialization
+boundaries and composes with defer and range.
+
+The same ordered-statement owner handles block, switch-clause, and
+type-switch-clause lists. If its generated dispatch is nested in a source loop,
+range, switch, or type switch, unlabeled source `break` and `continue` target a
+generated label on that source construct rather than the nearer dispatch
+loop/switch. A source `fallthrough` remains owned by the enclosing switch
+clause and executes after the clause-local state machine exits.
+
 A local `var` declaration is owned by its enclosing declaration statement:
 
 ```go
@@ -685,6 +746,14 @@ owner. JavaScript lexical capture directly represents admitted Go variable
 capture; no environment object, callback registry, hidden receiver, or callable
 side table is introduced. Copying an admitted function value is a direct
 reference-value copy.
+
+The generated callable ABI is canonical per exact signature, not per place
+that stores a callable. For example, `var f func(int)`, `box.F`, `pointer.F`,
+and `values[0]` all carry the same signature-owned target callable contract.
+An ordinary `f(1)` omits the optional recovery-authority facet; a captured
+`defer f(1)` invokes that same callable value with the authority. The field,
+pointer, and slice paths do not create recovery identities or a storage-flow
+model.
 
 An unnamed callable value that may contain Go nil has the static target type
 `((parameters) => results) | undefined`. Known non-nil declarations and
@@ -2214,13 +2283,13 @@ through a pointer nil-checks, dereferences, and copies once. Selection uses the
 exact `go/types.Selection`; target virtual dispatch is never substituted.
 
 Bounds failures, nil pointer dereference, nil map store, and BigInt
-divide-by-zero all enter the one generated `GoPanic<T>` carrier. Family
+divide-by-zero all enter the one generated non-generic `GoPanic` carrier. Family
 runtime modules import that carrier through the closed runtime dependency
 graph; they never throw `Error`/`RangeError` independently.
-Because source-level `recover` is not admitted in this checkpoint, the
-observable contract here is panic occurrence plus the shared carrier identity.
-Recovered runtime-fault payload equivalence is installed with the later
-`panic`/`recover` family rather than guessed now.
+The function-control family adds source `panic`/`recover` and preserves each
+runtime fault's represented dynamic value. A recovered `panic(nil)` therefore
+asserts to `*runtime.PanicNilError`; a generic runtime fault does not. Both
+retain the exact canonical error-method contracts.
 
 Array, slice, and map indexed stores use the same accessor-store transaction.
 For:

@@ -12,6 +12,8 @@ import (
 	mapbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/map"
 	newvalue "github.com/tsoniclang/gotots/internal/emit/expression/builtin/newvalue"
 	orderedbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/ordered"
+	panicbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/paniccall"
+	recoverbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/recovercall"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
@@ -37,6 +39,21 @@ func Emit(
 		source,
 		builtin,
 		discarded,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := panicbuiltin.Emit(
+		context,
+		children,
+		source,
+		builtin,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := recoverbuiltin.Emit(
+		context,
+		source,
+		builtin,
 	); handled {
 		return target, err
 	}
@@ -160,6 +177,46 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+}
+
+func EmitDeferred(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	builtin *types.Builtin,
+) (api.ExpressionEmission, bool, error) {
+	if source == nil || builtin == nil {
+		return api.ExpressionEmission{}, false, nil
+	}
+	if target, handled, err := panicbuiltin.EmitDeferred(
+		context,
+		children,
+		source,
+		builtin,
+	); handled {
+		return target, true, err
+	}
+	if target, handled, err := mapbuiltin.EmitDeferred(
+		context,
+		children,
+		source,
+		builtin,
+	); handled {
+		return target, true, err
+	}
+	if target, handled, err := clearbuiltin.EmitDeferred(
+		context,
+		children,
+		source,
+		builtin,
+	); handled {
+		return target, true, err
+	}
+	if types.Object(builtin) == types.Universe.Lookup("copy") {
+		target, err := emitDeferredCopy(context, children, source)
+		return target, true, err
+	}
+	return api.ExpressionEmission{}, false, nil
 }
 
 func emitConstantMeasure(

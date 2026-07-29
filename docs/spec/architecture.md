@@ -817,21 +817,91 @@ contextual family handler
     -> runtime/<family>.ts
 ```
 
-All generated runtime failures use one closed Go panic ABI:
+All generated runtime failures and source `panic` use one closed Go panic ABI:
 
 ```text
-family runtime guard
-    -> GoPanic.raise(typed value)
+family runtime guard or source panic(value)
+    -> GoPanic.raiseRuntime(message) or GoPanic.raise(value)
     -> one runtime/panic.ts owner
-    -> one thrown GoPanic<T> carrier
+    -> one statically typed thrown GoPanic carrier
 ```
 
 A family runtime must not throw a host `Error`/`RangeError` or depend on an
 implicit JavaScript exception for Go panic behavior. The panic module is the
-only generated runtime owner allowed to construct a target `ThrowStatement`.
-This boundary does not implement source-level `panic`/`recover`; it gives every
-already-admitted runtime guard one stable carrier that those later constructs
-can consume without replacing six family-specific exception protocols.
+only generated runtime owner allowed to create and initially throw a
+`GoPanic`. A callable unwind envelope may only rethrow an unrecognized caught
+host exception unchanged; it may not inspect, convert, or recover that value.
+The carrier owns one exact represented empty-interface payload. Runtime faults
+and `panic(nil)` enter through distinct GoToTS-owned runtime-error dynamic
+values. Both implement the canonical `error`, `interface { Error() string }`,
+and `runtime.Error` method contracts, while `panic(nil)` alone carries the
+canonical `*runtime.PanicNilError` dynamic identity and represented payload.
+Source non-nil values enter through ordinary represented-interface conversion.
+There is no generic or erased carrier payload.
+
+`recover` consumes an invocation-local `GoRecovery` authority. Only the direct
+call of a deferred function receives that optional, statically typed authority.
+An ordinary call, a call made by that deferred function, and `recover` outside
+deferred execution receive no authority and return nil. Function and method
+values consume one canonical generated callable ABI contract keyed by their
+exact `go/types.Signature`. Recovery is one optional final facet of that
+contract: direct ordinary calls omit it and deferred invocation supplies it.
+The ABI is not re-keyed for a variable, field, pointer, slice, map, interface
+adapter, defined callable wrapper, or other carrier. Those locations store the
+same callable value; they do not own recovery semantics. No per-storage
+recovery identity, storage/dataflow graph, ambient global, module flag,
+async-local store, dynamic property, cast, `.call`, `.apply`, or `.bind` may
+select recovery.
+
+Callable control is a demand-selected facet of the exact source function
+artifact. Encountering `defer`, `recover`, or non-structural `goto` requests
+reconstruction of that exact callable, including an independently anchored
+function literal. The final callable owner assembles typed TS-Go AST in this
+order:
+
+```text
+lexical declarations and addressable storage
+    -> optional goto control structure
+    -> return and named-result normalization
+    -> defer/panic unwind envelope
+    -> final typed TS-Go function body
+```
+
+This is target assembly in the existing declaration fixed point, not a source
+prewalk or retained control model. No CFG, lowering IR, semantic plan, source
+inventory, second checker, or second Go-AST traversal is retained. A callable
+without a selected control facet has byte-identical target AST.
+
+Emission context carries exactly one canonical `ArtifactOwner`. Addressable
+storage derives its `*types.Func` from that owner rather than retaining a second
+function-owner field. Callable-control requirements use the same owner and
+carry the exact enclosing source artifact plus callable anchor; both the start
+and end of a function literal must be contained by that enclosing artifact.
+The selected callable map and current callable/facets are ephemeral
+reconstruction facts only and are discarded with the emission context.
+
+A `defer f(x)` registration evaluates and captures the callee, selected
+receiver, and copied arguments immediately at the source statement. It pushes
+one typed closure onto an invocation-local stack. The callable envelope drains
+that stack LIFO on every normal return and panic exit. A later panic replaces
+the pending panic without skipping older deferred calls; a direct successful
+`recover` consumes the pending panic. Explicit returns in a named-result
+function assign copied values to the named result locations before unwind, and
+one trailing result read occurs after deferred mutation.
+
+Labels are keyed only by exact `*types.Label` definition/use identity. Native
+target labels own labeled `break` and `continue`, switch fallthrough remains at
+the switch-clause owner, and structurally representable goto edges use direct
+target labels. Only genuinely non-structural edges select a whole-function
+linear state machine assembled from the already-created TS-Go statements.
+State and generated size are linear in source statements and exact labels.
+Every ordered statement list, including a block and a switch or type-switch
+clause body, delegates to the same statement-sequence control owner. When a
+generated state machine is nested inside a source loop, range, switch, or type
+switch, that source construct receives a typed lexical target label so an
+unlabeled source `break` or `continue` cannot be captured by the generated
+dispatch loop or switch. This target is target-assembly context only; it is not
+a persisted source-control graph.
 
 Runtime classes may encapsulate JavaScript storage only when that storage is
 the smallest exact representation of a Go value family. They may expose

@@ -1,10 +1,12 @@
-package api
+package api_test
 
 import (
 	"errors"
 	"go/token"
 	"go/types"
 	"testing"
+
+	. "github.com/tsoniclang/gotots/internal/emit/api"
 )
 
 func TestAddressableStorageRequestCarriesExactFunctionAndVariableIdentity(
@@ -125,7 +127,8 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementInterfaceMethodToken != 10 ||
 		DeclarationRequirementInterfaceDynamicTypeToken != 11 ||
 		DeclarationRequirementGenericCapability != 12 ||
-		DeclarationRequirementKind(13).Valid() {
+		DeclarationRequirementCallableControl != 13 ||
+		DeclarationRequirementKind(14).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }
@@ -154,7 +157,7 @@ func TestAddressableStorageContextCopiesAndKeysExactVariables(t *testing.T) {
 	selections[first] = "mutated"
 	selections[second] = "forged"
 
-	if current, ok := context.FunctionArtifactOwner(); !ok || current != owner {
+	if context.ArtifactOwner() != MustSourceArtifactOwner(owner) {
 		t.Fatal("addressable storage lost its exact artifact owner")
 	}
 	if name, ok := context.AddressableStorageName(first); !ok ||

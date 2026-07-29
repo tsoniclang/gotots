@@ -2,6 +2,8 @@ package api
 
 import (
 	"fmt"
+	"go/ast"
+	"go/token"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -204,6 +206,55 @@ func NewAddressableStorageRequest(
 			declarationRequirement: requirement,
 		},
 	}, nil
+}
+
+func NewCallableControlRequest(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+	control CallableControlFacet,
+) (RootRequest, error) {
+	requirement, err := NewCallableControlRequirement(
+		owner,
+		enclosing,
+		callable,
+		control,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
+func NewGotoControlRequest(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+	label *types.Label,
+	position token.Pos,
+) (RootRequest, error) {
+	requirement, err := NewGotoControlRequirement(
+		owner,
+		enclosing,
+		callable,
+		label,
+		position,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
+func NewDirectCallableControlRequest(
+	owner *types.Func,
+	control CallableControlFacet,
+) (RootRequest, error) {
+	requirement, err := NewDirectCallableControlRequirement(owner, control)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
 func NewConstantProjectionRequest(

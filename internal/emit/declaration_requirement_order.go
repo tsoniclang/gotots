@@ -118,6 +118,40 @@ func compareDeclarationRequirements(
 		rightArtifact, _ := right.GeneratedArtifact()
 		return compareGeneratedArtifacts(leftArtifact, rightArtifact)
 	}
+	if left.Kind() == api.DeclarationRequirementCallableControl {
+		_, _, leftCallable, leftControl, leftOK := left.CallableControl()
+		_, _, rightCallable, rightControl, rightOK := right.CallableControl()
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		case !leftOK:
+			return 0
+		case leftCallable == nil && rightCallable != nil:
+			return -1
+		case leftCallable != nil && rightCallable == nil:
+			return 1
+		case leftCallable == nil:
+			return compareCallableControlRequirements(
+				left,
+				right,
+				leftControl,
+				rightControl,
+			)
+		case leftCallable.Pos() < rightCallable.Pos():
+			return -1
+		case leftCallable.Pos() > rightCallable.Pos():
+			return 1
+		default:
+			return compareCallableControlRequirements(
+				left,
+				right,
+				leftControl,
+				rightControl,
+			)
+		}
+	}
 	leftType, leftOperation, _ := left.NamedStructOperation()
 	rightType, rightOperation, _ := right.NamedStructOperation()
 	if order := compareObjects(leftType, rightType); order != 0 {
@@ -127,6 +161,43 @@ func compareDeclarationRequirements(
 	case leftOperation < rightOperation:
 		return -1
 	case leftOperation > rightOperation:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func compareCallableControlRequirements(
+	left api.DeclarationRequirement,
+	right api.DeclarationRequirement,
+	leftControl api.CallableControlFacet,
+	rightControl api.CallableControlFacet,
+) int {
+	switch {
+	case leftControl < rightControl:
+		return -1
+	case leftControl > rightControl:
+		return 1
+	case leftControl != api.CallableControlGoto:
+		return 0
+	}
+	leftLabel, leftPosition, leftOK := left.GotoControl()
+	rightLabel, rightPosition, rightOK := right.GotoControl()
+	switch {
+	case !leftOK && rightOK:
+		return -1
+	case leftOK && !rightOK:
+		return 1
+	case !leftOK:
+		return 0
+	}
+	if order := compareObjects(leftLabel, rightLabel); order != 0 {
+		return order
+	}
+	switch {
+	case leftPosition < rightPosition:
+		return -1
+	case leftPosition > rightPosition:
 		return 1
 	default:
 		return 0

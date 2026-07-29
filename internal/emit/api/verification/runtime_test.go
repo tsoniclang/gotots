@@ -40,8 +40,12 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeSliceClear, 308, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceClear", false, []api.RuntimeSymbol{api.RuntimeSlice}},
 		{api.RuntimeMap, 400, api.RuntimeModuleMap, "runtime/map.ts", "GoMap", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeMapHash, 401, api.RuntimeModuleMap, "runtime/map.ts", "GoMapHash", false, nil},
+		{api.RuntimeMapClear, 402, api.RuntimeModuleMap, "runtime/map.ts", "goMapClear", false, []api.RuntimeSymbol{api.RuntimeMap}},
+		{api.RuntimeMapKeys, 403, api.RuntimeModuleMap, "runtime/map.ts", "goMapKeys", false, []api.RuntimeSymbol{api.RuntimeMap}},
 		{api.RuntimeMapValue, 404, api.RuntimeModuleMap, "runtime/map.ts", "GoMapValue", true, nil},
-		{api.RuntimePanic, 500, api.RuntimeModulePanic, "runtime/panic.ts", "GoPanic", true, nil},
+		{api.RuntimePanic, 500, api.RuntimeModulePanic, "runtime/panic.ts", "GoPanic", true, []api.RuntimeSymbol{api.RuntimeInterfaceValue, api.RuntimePanicValue}},
+		{api.RuntimePanicValue, 501, api.RuntimeModulePanic, "runtime/panic.ts", "GoRuntimePanicValue", true, []api.RuntimeSymbol{api.RuntimeInterfaceValue, api.RuntimeErrorMethodToken, api.RuntimeRuntimeErrorToken}},
+		{api.RuntimeRecovery, 502, api.RuntimeModulePanic, "runtime/panic.ts", "GoRecovery", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeInterfaceValue}},
 		{api.RuntimeIntegerDivide, 600, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerDivide", false, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeIntegerRemainder, 601, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerRemainder", false, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeIntegerMax, 602, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerMax", false, nil},
@@ -63,9 +67,11 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeComplex128Neg, 824, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Negate", false, []api.RuntimeSymbol{api.RuntimeComplex128}},
 		{api.RuntimeComplex128Equal, 825, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Equal", false, []api.RuntimeSymbol{api.RuntimeComplex128}},
 		{api.RuntimeNumberToBigInt, 900, api.RuntimeModuleConversion, "runtime/conversion.ts", "goNumberToBigInt", false, nil},
-		{api.RuntimeInterfaceValue, 1000, api.RuntimeModuleInterface, "runtime/interface.ts", "GoInterfaceValue", true, nil},
+		{api.RuntimeInterfaceValue, 1000, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "GoInterfaceValue", true, nil},
 		{api.RuntimeInterfaceNonNil, 1001, api.RuntimeModuleInterface, "runtime/interface.ts", "goInterfaceNonNil", false, []api.RuntimeSymbol{api.RuntimeInterfaceValue, api.RuntimePanic}},
 		{api.RuntimeInterfaceEqual, 1002, api.RuntimeModuleInterface, "runtime/interface.ts", "goInterfaceEqual", false, []api.RuntimeSymbol{api.RuntimeInterfaceValue}},
+		{api.RuntimeErrorMethodToken, 1003, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "GoErrorMethodToken", false, nil},
+		{api.RuntimeRuntimeErrorToken, 1004, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "GoRuntimeErrorMethodToken", false, nil},
 	}
 	for _, test := range tests {
 		if uint16(test.symbol) != test.id {

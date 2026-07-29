@@ -14,7 +14,31 @@ func ArrangeOperands(
 	[]api.RootRequest,
 	error,
 ) {
-	capture := false
+	return arrangeOperands(context, operands, false)
+}
+
+func ArrangeCapturedOperands(
+	context api.Context,
+	operands []api.ExpressionEmission,
+) (
+	[]tsgo.Expression,
+	[]tsgo.Statement,
+	[]api.RootRequest,
+	error,
+) {
+	return arrangeOperands(context, operands, true)
+}
+
+func arrangeOperands(
+	context api.Context,
+	operands []api.ExpressionEmission,
+	capture bool,
+) (
+	[]tsgo.Expression,
+	[]tsgo.Statement,
+	[]api.RootRequest,
+	error,
+) {
 	for _, operand := range operands {
 		if len(operand.Before()) != 0 {
 			capture = true

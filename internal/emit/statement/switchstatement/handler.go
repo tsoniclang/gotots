@@ -35,6 +35,10 @@ func Emit(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
+	targetLabel, err := context.SelectControlTarget(targetLabel)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
 	initializer, err := emitInitializer(context, children, source)
 	if err != nil {
 		return api.StatementEmission{}, err
@@ -43,7 +47,13 @@ func Emit(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	clauses, err := emitClauses(context, children, source, tag)
+	clauses, err := emitClauses(
+		context,
+		children,
+		source,
+		tag,
+		targetLabel,
+	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
@@ -129,6 +139,7 @@ func emitClauses(
 	children api.ChildEmitter,
 	source *ast.SwitchStmt,
 	tag tagEmission,
+	targetLabel string,
 ) ([]clauseEmission, error) {
 	clauses := make([]clauseEmission, 0, len(source.Body.List))
 	defaultSeen := false
@@ -169,8 +180,9 @@ func emitClauses(
 		body, fallsThrough, err := emitClauseBody(
 			context,
 			children,
-			sourceClause.Body,
+			sourceClause,
 			index+1 < len(source.Body.List),
+			targetLabel,
 		)
 		if err != nil {
 			return nil, err

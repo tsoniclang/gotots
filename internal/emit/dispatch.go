@@ -35,6 +35,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	blockstatement "github.com/tsoniclang/gotots/internal/emit/statement/block"
 	branchstatement "github.com/tsoniclang/gotots/internal/emit/statement/branch"
+	deferstatement "github.com/tsoniclang/gotots/internal/emit/statement/deferstatement"
 	expressionstatement "github.com/tsoniclang/gotots/internal/emit/statement/expressionstatement"
 	forstatement "github.com/tsoniclang/gotots/internal/emit/statement/forstatement"
 	ifstatement "github.com/tsoniclang/gotots/internal/emit/statement/ifstatement"
@@ -45,6 +46,7 @@ import (
 	localtype "github.com/tsoniclang/gotots/internal/emit/statement/localtype"
 	rangestatement "github.com/tsoniclang/gotots/internal/emit/statement/range"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
+	statementsequence "github.com/tsoniclang/gotots/internal/emit/statement/sequence"
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 	typeswitchstatement "github.com/tsoniclang/gotots/internal/emit/statement/typeswitchstatement"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
@@ -53,6 +55,7 @@ import (
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	generictype "github.com/tsoniclang/gotots/internal/emit/type/generic"
+	goruntimetype "github.com/tsoniclang/gotots/internal/emit/type/goruntime"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	maptype "github.com/tsoniclang/gotots/internal/emit/type/map"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
@@ -67,14 +70,15 @@ import (
 )
 
 type emitter struct {
-	source  *load.Package
-	factory tsgo.Factory
-	names   *emitnaming.Owner
-	values  api.Values
-	integer api.IntegerRepresentation
-	order   api.EvaluationOrder
-	require func(types.Object) error
-	generic api.GenericCallableResolver
+	source    *load.Package
+	factory   tsgo.Factory
+	names     *emitnaming.Owner
+	values    api.Values
+	integer   api.IntegerRepresentation
+	order     api.EvaluationOrder
+	require   func(types.Object) error
+	generic   api.GenericCallableResolver
+	goRuntime api.GoRuntimeContract
 }
 
 func newEmitter(
@@ -85,6 +89,7 @@ func newEmitter(
 	order api.EvaluationOrder,
 	require func(types.Object) error,
 	generic api.GenericCallableResolver,
+	goRuntime api.GoRuntimeContract,
 ) *emitter {
 	var typesInfo *types.Info
 	var packageScope *types.Scope
@@ -93,55 +98,17 @@ func newEmitter(
 		packageScope = source.Types().Scope()
 	}
 	target := &emitter{
-		source:  source,
-		factory: factory,
-		names:   emitnaming.NewOwner(packageScope, typesInfo, registry),
-		integer: integer,
-		order:   order,
-		require: require,
-		generic: generic,
+		source:    source,
+		factory:   factory,
+		names:     emitnaming.NewOwner(packageScope, typesInfo, registry),
+		integer:   integer,
+		order:     order,
+		require:   require,
+		generic:   generic,
+		goRuntime: goRuntime,
 	}
 	target.values = representation.NewOwner(target)
 	return target
-}
-
-func (e *emitter) fileContext(
-	sourceFile *ast.File,
-	targetPath string,
-) (api.Context, error) {
-	return e.targetContext(sourceFile, targetPath)
-}
-
-func (e *emitter) targetContext(
-	sourceFile *ast.File,
-	targetPath string,
-) (api.Context, error) {
-	names := e.names.ForFile(
-		sourceFile,
-		e.source.Types().Scope(),
-		e.factory,
-		targetPath,
-		e.require,
-	)
-	return e.context(names)
-}
-
-func (e *emitter) generatedContext(
-	targetPath string,
-	registry *emitnaming.Registry,
-) (api.Context, error) {
-	names := emitnaming.NewOwner(
-		nil,
-		nil,
-		registry,
-	).ForFile(
-		nil,
-		nil,
-		e.factory,
-		targetPath,
-		e.require,
-	)
-	return e.context(names)
 }
 
 func (e *emitter) context(names api.Names) (api.Context, error) {
@@ -161,7 +128,9 @@ func (e *emitter) context(names api.Names) (api.Context, error) {
 	if err != nil {
 		return api.Context{}, err
 	}
-	return context.WithGenericCallableResolver(e.generic), nil
+	return context.
+		WithGenericCallableResolver(e.generic).
+		WithGoRuntimeContract(e.goRuntime), nil
 }
 
 func (e *emitter) declarationObject(
@@ -366,6 +335,14 @@ func (e *emitter) Block(
 	return blockstatement.Emit(context, e, source)
 }
 
+func (e *emitter) Statements(
+	context api.Context,
+	owner ast.Node,
+	source []ast.Stmt,
+) (api.StatementEmission, error) {
+	return statementsequence.Emit(context, e, owner, source)
+}
+
 func (e *emitter) Statement(
 	context api.Context,
 	source ast.Stmt,
@@ -398,6 +375,8 @@ func (e *emitter) Statement(
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
 		}
+	case *ast.DeferStmt:
+		return deferstatement.Emit(context, e, source)
 	case *ast.ExprStmt:
 		return expressionstatement.Emit(context, e, source)
 	case *ast.EmptyStmt:
@@ -453,6 +432,13 @@ func (e *emitter) Type(
 	source ast.Expr,
 ) (api.TypeEmission, error) {
 	if sourceType := context.TypesInfo().TypeOf(source); sourceType != nil {
+		if target, handled, err := goruntimetype.Emit(
+			context,
+			source,
+			sourceType,
+		); handled {
+			return target, err
+		}
 		if target, handled, err := generictype.Emit(
 			context,
 			e,
@@ -533,6 +519,13 @@ func (e *emitter) RepresentedType(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if target, handled, err := goruntimetype.Emit(
+		context,
+		source,
+		sourceType,
+	); handled {
+		return target, err
+	}
 	if target, handled, err := generictype.Emit(
 		context,
 		e,

@@ -7,7 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	runtimecomplex "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
-	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
+	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -36,6 +36,9 @@ func supportsHash(
 		return false
 	}
 	if _, ok := interfacetype.Resolve(sourceType); ok {
+		return true
+	}
+	if panicNilRuntimeValue(context, sourceType) {
 		return true
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
@@ -145,7 +148,7 @@ func (owner Owner) Hash(
 						value,
 						nil,
 						context.Factory().Identifier(
-							interfaceruntime.HashMember,
+							interfacecontract.HashMember,
 						),
 						tsgo.NodeFlagsNone,
 					),
@@ -156,6 +159,9 @@ func (owner Owner) Hash(
 				),
 			),
 		), nil
+	}
+	if panicNilRuntimeValue(context, sourceType) {
+		return panicNilHash(context), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		return (Owner{}).Hash(

@@ -1,7 +1,7 @@
 package interfacetype
 
 import (
-	"github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
+	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -101,7 +101,7 @@ func guardDeclaration(
 								value,
 								nil,
 								factory.Identifier(
-									interfacevalue.ImplementsMember,
+									interfacecontract.ImplementsMember,
 								),
 								tsgo.NodeFlagsNone,
 							),

@@ -4,7 +4,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
+	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -89,7 +89,7 @@ func equalMethod(
 	return context.Factory().MethodDeclaration(
 		nil,
 		nil,
-		context.Factory().Identifier(interfaceruntime.EqualMember),
+		context.Factory().Identifier(interfacecontract.EqualMember),
 		nil,
 		nil,
 		[]tsgo.ParameterDeclaration{
@@ -174,7 +174,7 @@ func hashMethod(
 	return context.Factory().MethodDeclaration(
 			nil,
 			nil,
-			context.Factory().Identifier(interfaceruntime.HashMember),
+			context.Factory().Identifier(interfacecontract.HashMember),
 			nil,
 			nil,
 			nil,
@@ -206,7 +206,7 @@ func panicHashMethod(
 	target := context.Factory().MethodDeclaration(
 		nil,
 		nil,
-		context.Factory().Identifier(interfaceruntime.HashMember),
+		context.Factory().Identifier(interfacecontract.HashMember),
 		nil,
 		nil,
 		nil,

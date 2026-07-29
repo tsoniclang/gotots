@@ -57,7 +57,7 @@ func (b builder) getMethod() tsgo.MethodDeclaration {
 				tsgo.BinaryOperatorBarBarToken,
 				b.boundsCondition(b.id("numericIndex")),
 			),
-			b.throwBounds(),
+			b.throwIndexBounds(b.id("numericIndex")),
 			nil,
 		),
 		b.returnStatement(
@@ -96,7 +96,7 @@ func (b builder) setMethod() tsgo.MethodDeclaration {
 				tsgo.BinaryOperatorBarBarToken,
 				b.boundsCondition(b.id("numericIndex")),
 			),
-			b.throwBounds(),
+			b.throwIndexBounds(b.id("numericIndex")),
 			nil,
 		),
 		b.factory.ExpressionStatement(

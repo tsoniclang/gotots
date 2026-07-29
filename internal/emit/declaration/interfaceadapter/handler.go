@@ -5,12 +5,13 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 const (
-	ValueMember = "$go$value"
+	ValueMember = interfacecontract.PayloadMember
 	GuardMember = "$is"
 )
 
@@ -170,7 +171,7 @@ func emitMethod(
 		sourceSignature.Results(),
 		sourceSignature.Variadic(),
 	)
-	target, err := callable.EmitAdapter(
+	target, err := callable.EmitABIAdapter(
 		context,
 		children,
 		nil,
@@ -203,6 +204,13 @@ func emitMethod(
 		}
 	}
 	reference, err := context.Names().Reference(method)
+	if err != nil {
+		return nil, nil, err
+	}
+	controlRequest, err := api.NewDirectCallableControlRequest(
+		method.Origin(),
+		api.CallableControlRecovery,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -244,5 +252,6 @@ func emitMethod(
 			target.Requests(),
 			receiver.Requests(),
 			reference.Requests(),
+			[]api.RootRequest{controlRequest},
 		), nil
 }

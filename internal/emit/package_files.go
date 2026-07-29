@@ -1,16 +1,57 @@
 package emit
 
 import (
+	"go/ast"
 	"go/types"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
+	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func (e *emitter) fileContext(
+	sourceFile *ast.File,
+	targetPath string,
+) (api.Context, error) {
+	return e.targetContext(sourceFile, targetPath)
+}
+
+func (e *emitter) targetContext(
+	sourceFile *ast.File,
+	targetPath string,
+) (api.Context, error) {
+	names := e.names.ForFile(
+		sourceFile,
+		e.source.Types().Scope(),
+		e.factory,
+		targetPath,
+		e.require,
+	)
+	return e.context(names)
+}
+
+func (e *emitter) generatedContext(
+	targetPath string,
+	registry *emitnaming.Registry,
+) (api.Context, error) {
+	names := emitnaming.NewOwner(
+		nil,
+		nil,
+		registry,
+	).ForFile(
+		nil,
+		nil,
+		e.factory,
+		targetPath,
+		e.require,
+	)
+	return e.context(names)
+}
 
 func (s *programSession) packageTargetFiles(
 	primitiveAliases map[api.PrimitiveAlias]struct{},

@@ -29,6 +29,26 @@ func Emit(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	target, err := EmitNonNil(context, source, sourceType)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return api.DirectType(
+		context.Factory().UnionTypeNode([]tsgo.TypeNode{
+			target.Value(),
+			context.Factory().KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+			),
+		}),
+		target.Requests()...,
+	), nil
+}
+
+func EmitNonNil(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+) (api.TypeEmission, error) {
 	if _, ok := Resolve(sourceType); !ok {
 		return api.TypeEmission{},
 			api.Unsupported(context, api.CategoryType, source)
@@ -38,15 +58,10 @@ func Emit(
 		return api.TypeEmission{}, err
 	}
 	return api.DirectType(
-		context.Factory().UnionTypeNode([]tsgo.TypeNode{
-			context.Factory().TypeReferenceNode(
-				context.Factory().Identifier(reference.Name()),
-				nil,
-			),
-			context.Factory().KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-			),
-		}),
+		context.Factory().TypeReferenceNode(
+			context.Factory().Identifier(reference.Name()),
+			nil,
+		),
 		reference.Requests()...,
 	), nil
 }

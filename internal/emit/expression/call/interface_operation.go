@@ -1,14 +1,19 @@
 package call
 
 import (
+	"go/ast"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	goruntimetype "github.com/tsoniclang/gotots/internal/emit/type/goruntime"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func ApplyInterfaceMethod(
 	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
 	receiver api.ExpressionEmission,
 	method *types.Func,
 	arguments []tsgo.Expression,
@@ -20,6 +25,14 @@ func ApplyInterfaceMethod(
 			Role:   context.Role(),
 			Reason: "interface method operation has no method identity",
 		}
+	}
+	receiverContract, err := emitNonNilInterfaceType(
+		context,
+		source,
+		sourceType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	receiverName, err := context.Names().Temporary(
 		api.TemporaryReceiverValue,
@@ -59,7 +72,7 @@ func ApplyInterfaceMethod(
 	guarded := context.Factory().CallExpression(
 		context.Factory().Identifier(nonNil.Name()),
 		nil,
-		nil,
+		[]tsgo.TypeNode{receiverContract.Value()},
 		[]tsgo.Expression{
 			context.Factory().Identifier(receiverName),
 		},
@@ -84,6 +97,22 @@ func ApplyInterfaceMethod(
 			receiver.Requests(),
 			argumentRequests,
 			nonNil.Requests(),
+			receiverContract.Requests(),
 		),
 	)
+}
+
+func emitNonNilInterfaceType(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+) (api.TypeEmission, error) {
+	if target, handled, err := goruntimetype.EmitNonNil(
+		context,
+		source,
+		sourceType,
+	); handled {
+		return target, err
+	}
+	return interfacetype.EmitNonNil(context, source, sourceType)
 }

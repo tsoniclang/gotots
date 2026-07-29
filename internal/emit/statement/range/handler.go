@@ -27,6 +27,10 @@ func Emit(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
+	targetLabel, err := context.SelectControlTarget(targetLabel)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
 	sourceType := context.TypesInfo().TypeOf(source.X)
 	if sourceType == nil {
 		return api.StatementEmission{},

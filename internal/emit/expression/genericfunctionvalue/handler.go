@@ -46,7 +46,12 @@ func Emit(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	target, err := callable.EmitAdapter(context, children, source, signature)
+	target, err := callable.EmitABIAdapter(
+		context,
+		children,
+		source,
+		signature,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
@@ -76,14 +81,30 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	recoveryAuthority, recoveryOK :=
+		target.RecoveryAuthorityReference(context.Factory())
+	if !recoveryOK {
+		return api.ExpressionEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic function value lacks recovery authority",
+		}
+	}
 	reference, err := context.Names().Reference(owner)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
 	arguments := append(
 		capabilityArguments,
-		target.ParameterReferences(context.Factory())...,
+		target.SourceParameterReferences(context.Factory())...,
 	)
+	arguments = append(arguments, recoveryAuthority)
+	controlRequest, err := api.NewDirectCallableControlRequest(
+		owner,
+		api.CallableControlRecovery,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	return api.DirectExpression(
 		context.Factory().ArrowFunction(
 			nil,
@@ -104,6 +125,7 @@ func Emit(
 			typeRequests,
 			capabilityRequests,
 			reference.Requests(),
+			[]api.RootRequest{controlRequest},
 		)...,
 	), true, nil
 }

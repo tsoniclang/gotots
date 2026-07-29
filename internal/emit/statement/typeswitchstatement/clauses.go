@@ -15,6 +15,7 @@ func emitClauses(
 	source *ast.TypeSwitchStmt,
 	selected guard,
 	value tsgo.Expression,
+	targetLabel string,
 ) ([]tsgo.CaseOrDefaultClause, []api.RootRequest, error) {
 	targets := make(
 		[]tsgo.CaseOrDefaultClause,
@@ -59,6 +60,7 @@ func emitClauses(
 			selected,
 			typesInCase,
 			value,
+			targetLabel,
 		)
 		if err != nil {
 			return nil, nil, err

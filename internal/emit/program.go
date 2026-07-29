@@ -11,6 +11,7 @@ import (
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	"github.com/tsoniclang/gotots/internal/emit/runtime/gocontract"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -52,6 +53,7 @@ type programSession struct {
 	packageBuilders        map[*load.Package]*packageTargetBuilder
 	packageInitializations *packageInitializationScheduler
 	genericOperations      map[genericOperationIdentity]*api.GenericOperationContract
+	goRuntime              *gocontract.Contract
 	sealed                 bool
 }
 
@@ -348,6 +350,10 @@ func newProgramSession(
 	if err := registry.IndexPackageTargets(source.Packages()); err != nil {
 		return nil, err
 	}
+	goRuntime, err := gocontract.Resolve(source)
+	if err != nil {
+		return nil, err
+	}
 	session := &programSession{
 		source:                 source,
 		factory:                tsgo.NewFactory(),
@@ -362,6 +368,7 @@ func newProgramSession(
 		packageBuilders:        make(map[*load.Package]*packageTargetBuilder),
 		packageInitializations: newPackageInitializationScheduler(),
 		genericOperations:      make(map[genericOperationIdentity]*api.GenericOperationContract),
+		goRuntime:              goRuntime,
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
@@ -372,6 +379,7 @@ func newProgramSession(
 			options.EvaluationOrder,
 			session.require,
 			session,
+			goRuntime,
 		)
 	}
 	orderedSites := make([]declarationSite, 0, len(sites))

@@ -13,6 +13,7 @@ import (
 	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	panicnilruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panicnil"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -300,21 +301,150 @@ func Build(
 		}
 		return definitions, nil
 	}
-	if module == api.RuntimeModulePanic &&
-		len(symbols) == 1 &&
-		symbols[0] == api.RuntimePanic {
-		contract, err := api.RuntimeContract(api.RuntimePanic)
+	if module == api.RuntimeModuleInterfaceValue {
+		contract, err := api.RuntimeContract(api.RuntimeInterfaceValue)
 		if err != nil {
 			return nil, err
 		}
-		definition, err := NewDefinition(
-			api.RuntimePanic,
-			panicruntime.Build(factory, contract.ExportedName()),
+		definitions := make([]Definition, 0, len(symbols))
+		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
+		for _, symbol := range symbols {
+			if _, duplicate := seen[symbol]; duplicate {
+				return nil, &AssemblyError{
+					Module: module,
+					Symbol: symbol,
+					Reason: "interface-value runtime symbol is duplicated",
+				}
+			}
+			seen[symbol] = struct{}{}
+			statement, err := interfaceruntime.BuildValue(
+				factory,
+				symbol,
+				contract.ExportedName(),
+			)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(symbol, statement)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
+	if module == api.RuntimeModulePanic {
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
+		valueContract, err := api.RuntimeContract(api.RuntimeInterfaceValue)
+		if err != nil {
+			return nil, err
+		}
+		runtimeValueContract, err := api.RuntimeContract(api.RuntimePanicValue)
+		if err != nil {
+			return nil, err
+		}
+		recoveryContract, err := api.RuntimeContract(api.RuntimeRecovery)
+		if err != nil {
+			return nil, err
+		}
+		errorTokenContract, err := api.RuntimeContract(
+			api.RuntimeErrorMethodToken,
 		)
 		if err != nil {
 			return nil, err
 		}
-		return []Definition{definition}, nil
+		runtimeErrorTokenContract, err := api.RuntimeContract(
+			api.RuntimeRuntimeErrorToken,
+		)
+		if err != nil {
+			return nil, err
+		}
+		definitions := make([]Definition, 0, len(symbols))
+		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
+		for _, symbol := range symbols {
+			if _, duplicate := seen[symbol]; duplicate {
+				return nil, &AssemblyError{
+					Module: module,
+					Symbol: symbol,
+					Reason: "panic runtime symbol is duplicated",
+				}
+			}
+			seen[symbol] = struct{}{}
+			statement, err := panicruntime.Build(
+				factory,
+				symbol,
+				panicContract.ExportedName(),
+				valueContract.ExportedName(),
+				runtimeValueContract.ExportedName(),
+				recoveryContract.ExportedName(),
+				errorTokenContract.ExportedName(),
+				runtimeErrorTokenContract.ExportedName(),
+			)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(symbol, statement)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
+	if module == api.RuntimeModulePanicNil {
+		errorContract, err := api.RuntimeContract(api.RuntimePanicNilError)
+		if err != nil {
+			return nil, err
+		}
+		valueContract, err := api.RuntimeContract(api.RuntimePanicNilValue)
+		if err != nil {
+			return nil, err
+		}
+		runtimeValueContract, err := api.RuntimeContract(api.RuntimePanicValue)
+		if err != nil {
+			return nil, err
+		}
+		interfaceValueContract, err := api.RuntimeContract(api.RuntimeInterfaceValue)
+		if err != nil {
+			return nil, err
+		}
+		pointerContract, err := api.RuntimeContract(api.RuntimePointer)
+		if err != nil {
+			return nil, err
+		}
+		definitions := make([]Definition, 0, len(symbols))
+		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
+		for _, symbol := range symbols {
+			if _, duplicate := seen[symbol]; duplicate {
+				return nil, &AssemblyError{
+					Module: module,
+					Symbol: symbol,
+					Reason: "panic-nil runtime symbol is duplicated",
+				}
+			}
+			seen[symbol] = struct{}{}
+			statement, err := panicnilruntime.Build(
+				factory,
+				symbol,
+				errorContract.ExportedName(),
+				valueContract.ExportedName(),
+				runtimeValueContract.ExportedName(),
+				interfaceValueContract.ExportedName(),
+				pointerContract.ExportedName(),
+			)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(symbol, statement)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
 	}
 	return nil, &AssemblyError{
 		Module: module,

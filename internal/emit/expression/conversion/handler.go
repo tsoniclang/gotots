@@ -123,6 +123,7 @@ func Emit(
 		context,
 		children,
 		source,
+		operand,
 		sourceType,
 		targetType,
 		operandValue,
@@ -141,6 +142,7 @@ func Apply(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CallExpr,
+	operandSource ast.Node,
 	sourceType types.Type,
 	targetType types.Type,
 	operandValue api.ExpressionEmission,
@@ -230,7 +232,7 @@ func Apply(
 		case directArrayConversion(sourceType, representedTargetType):
 			target, err = context.Values().Copy(
 				context.WithRole(api.RoleConversionOperand),
-				source,
+				operandSource,
 				sourceType,
 				operandValue,
 			)

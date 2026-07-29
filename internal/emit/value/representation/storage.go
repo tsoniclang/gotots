@@ -11,9 +11,12 @@ import (
 )
 
 func (owner Owner) RequiresStorageProjection(
-	_ api.Context,
+	context api.Context,
 	sourceType types.Type,
 ) bool {
+	if panicNilRuntimeValue(context, sourceType) {
+		return false
+	}
 	if _, ok := definedStorageModel(sourceType); ok {
 		return true
 	}
@@ -29,6 +32,13 @@ func (owner Owner) StorageType(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if panicNilRuntimeValue(context, sourceType) {
+		return owner.children.RepresentedType(
+			context,
+			source,
+			sourceType,
+		)
+	}
 	if defined, ok := definedStorageModel(sourceType); ok {
 		return owner.StorageType(
 			context.WithRole(api.RoleDefinedUnderlyingType),
@@ -99,6 +109,9 @@ func (owner Owner) ToStorage(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if panicNilRuntimeValue(context, sourceType) {
+		return value, nil
+	}
 	if defined, ok := definedStorageModel(sourceType); ok {
 		projected, err := defined.Project(context, value)
 		if err != nil {
@@ -153,6 +166,9 @@ func (owner Owner) FromStorage(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if panicNilRuntimeValue(context, sourceType) {
+		return value, nil
+	}
 	if defined, ok := definedStorageModel(sourceType); ok {
 		restored, err := owner.FromStorage(
 			context.WithRole(api.RoleDefinedUnderlyingType),

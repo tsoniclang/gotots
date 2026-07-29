@@ -374,7 +374,7 @@ func (c Context) WithGenericParameters(
 	names map[*types.TypeParam]string,
 ) (Context, error) {
 	owner = GenericDeclarationOrigin(owner)
-	sourceOwner, sourceOwned := c.currentArtifactOwner.Source()
+	sourceOwner, sourceOwned := c.artifactOwner.Source()
 	if owner == nil || !sourceOwned || sourceOwner != owner {
 		return Context{}, &ContextError{
 			Reason: "generic parameter owner differs from source artifact owner",
@@ -543,7 +543,7 @@ func genericParameterBelongsTo(
 }
 
 func (c Context) genericSourceOwner() (types.Object, bool) {
-	source, ok := c.currentArtifactOwner.Source()
+	source, ok := c.artifactOwner.Source()
 	if !ok {
 		return nil, false
 	}

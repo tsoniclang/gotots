@@ -174,7 +174,7 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		"static view<F, T, S>",
 		"get value(): S",
 		"set value(value: S)",
-		`GoPanic.raise("nil pointer dereference")`,
+		`GoPanic.raiseRuntime("nil pointer dereference")`,
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("pointer runtime lacks %q:\n%s", required, printed)

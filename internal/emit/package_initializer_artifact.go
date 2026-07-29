@@ -137,6 +137,14 @@ func (s *programSession) buildPackageInitializerRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	context, err = context.WithCallableControls(
+		owner,
+		initializer.Rhs,
+		requirements,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
 	emission, err := packagevariable.EmitInitializer(
 		context,
 		builder.emitter,

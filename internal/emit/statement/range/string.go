@@ -90,7 +90,7 @@ func emitString(
 		return api.StatementEmission{}, err
 	}
 	sourceBody, err := children.Block(
-		context.WithRole(api.RoleRangeBody).EnterLoop(),
+		rangeBodyContext(context, targetLabel),
 		source.Body,
 	)
 	if err != nil {

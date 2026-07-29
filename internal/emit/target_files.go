@@ -243,6 +243,9 @@ func (s *programSession) packageInitializationOrder() (
 			ready := true
 			for _, imported := range candidate.sourcePackage.Types().Imports() {
 				dependency := s.source.PackageForTypes(imported)
+				if dependency == nil && s.goRuntime.Owns(imported) {
+					continue
+				}
 				dependencyBuilder := s.packageBuilders[dependency]
 				if dependencyBuilder == nil {
 					return nil, &ScheduleError{

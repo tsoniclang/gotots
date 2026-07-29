@@ -100,6 +100,13 @@ func emitMultipleResults(
 				element = cell.Value()
 				requests = append(requests, cell.Requests()...)
 			}
+			if context.IsGotoLocal(target.object) {
+				statements = append(
+					statements,
+					assignmentStatement(context, target.name, element),
+				)
+				continue
+			}
 			targetType, typeRequests, err := pointerAnnotation(
 				context.WithRole(api.RoleLocalType),
 				children,

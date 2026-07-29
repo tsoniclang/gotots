@@ -1,4 +1,4 @@
-package api
+package api_test
 
 import (
 	"errors"
@@ -6,6 +6,8 @@ import (
 	"go/types"
 	"regexp"
 	"testing"
+
+	. "github.com/tsoniclang/gotots/internal/emit/api"
 )
 
 func TestGenericOperationIdentifiersAreTotalUniqueTargetIdentifiers(t *testing.T) {

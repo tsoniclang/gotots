@@ -273,7 +273,7 @@ func assertBoundsFailure(
 		Expression().(tsgo.CallExpression)
 	if !ok ||
 		call.Expression().(tsgo.PropertyAccessExpression).
-			Name().(tsgo.Identifier).Text() != "raise" {
+			Name().(tsgo.Identifier).Text() != "raiseRuntime" {
 		t.Fatalf(
 			"RuntimeArray.$check failure = %T, want shared panic call",
 			body.Statements()[0],

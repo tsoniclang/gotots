@@ -75,7 +75,14 @@ func emitArray(
 			return api.StatementEmission{}, err
 		}
 	}
-	targetBody, err := body(context, children, source, key, value)
+	targetBody, err := body(
+		context,
+		children,
+		source,
+		key,
+		value,
+		targetLabel,
+	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
@@ -165,7 +172,14 @@ func emitPointerArray(
 			return api.StatementEmission{}, err
 		}
 	}
-	targetBody, err := body(context, children, source, key, value)
+	targetBody, err := body(
+		context,
+		children,
+		source,
+		key,
+		value,
+		targetLabel,
+	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}

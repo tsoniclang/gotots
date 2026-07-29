@@ -4,7 +4,6 @@ import (
 	"go/ast"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -12,18 +11,20 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.BlockStmt,
 ) (api.BlockEmission, error) {
-	statements := make([]tsgo.Statement, 0, len(source.List))
-	var requests []api.RootRequest
-	for _, statement := range source.List {
-		target, err := children.Statement(context.WithRole(api.RoleBlockStatement), statement)
-		if err != nil {
-			return api.BlockEmission{}, err
-		}
-		statements = append(statements, target.Statements()...)
-		requests = append(requests, target.Requests()...)
+	if source == nil {
+		return api.BlockEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	target, err := children.Statements(
+		context.WithRole(api.RoleBlockStatement),
+		source,
+		source.List,
+	)
+	if err != nil {
+		return api.BlockEmission{}, err
 	}
 	return api.DirectBlock(
-		context.Factory().Block(statements, true),
-		requests...,
+		context.Factory().Block(target.Statements(), true),
+		target.Requests()...,
 	), nil
 }

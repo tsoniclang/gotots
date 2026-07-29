@@ -638,8 +638,10 @@ The cross-family owners have additional blocking proofs:
 1. the runtime dependency closure emits one `runtime/panic.ts`, and each
    demanded integer/string/pointer/array/slice/map module imports exactly one
    `GoPanic` binding through its contract;
-2. only the panic runtime owner constructs a target `ThrowStatement`; replacing
-   one family guard with a host exception or removing one dependency fails;
+2. only the panic runtime owner creates or initially throws a `GoPanic`;
+   replacing one family guard with a host exception or removing one dependency
+   fails; the only other admitted target throw is a callable envelope rethrowing
+   an unrecognized caught host exception unchanged;
 3. array, slice, and map stores all enter the same setter transaction, which
    differentially proves receiver/index/key/right-side order with both direct
    and prerequisite-bearing operands;
@@ -924,6 +926,65 @@ type spelling and scope shape, relocate one function across unrelated source
 lines, and pair a local type with a foreign function root. Exact
 owner-qualified keys must respectively differ, remain stable, and reject the
 foreign root.
+
+### Milestone 3G Function-Control Gate
+
+The integrated control fixture covers source `panic`, recover outside defer,
+direct deferred recover, recover one call below, nested and replacement
+panics, immediate callee/receiver/argument evaluation, value copies, LIFO
+order, ordinary and named results, receiver functions, function and method
+values, interface calls, generic functions, labels, fallthrough, labeled
+break/continue, forward and backward goto, non-structural goto, and
+goto/defer/range composition.
+
+Blocking evidence includes:
+
+1. the source call and every admitted runtime fault throw the same non-erased
+   `GoPanic` class; only `runtime/panic.ts` creates or initially throws that
+   carrier, while a callable envelope may only rethrow an unrecognized caught
+   host exception unchanged;
+2. recovered `panic(nil)` and generated runtime faults satisfy the canonical
+   `error`, `interface { Error() string }`, and `runtime.Error` contracts;
+   only `panic(nil)` has the canonical `*runtime.PanicNilError` dynamic identity
+   and represented payload;
+3. `recover` consumes one typed invocation-local authority only in the direct
+   deferred invocation; ordinary calls and one-call-below cases return nil;
+   every direct, function-value, method-value/expression, interface, generic,
+   field, pointer, and container transport consumes the same exact-signature
+   callable ABI rather than a carrier-specific recovery identity;
+4. defer registration evaluates the callee, selected receiver, and copied
+   arguments once and in source order, while invocation is LIFO at every exit;
+5. a deferred panic replaces the pending panic without skipping older
+   deferred calls, and named results are stored before and read after unwind;
+6. exact `*types.Label` identity survives spelling mutation and missing or
+   mismatched definition/use evidence fails at the label or branch owner;
+7. direct structural edges contain no state machine; genuinely
+   non-structural goto contains one callable-local linear machine and no
+   persisted source/control model;
+8. block, switch-clause, and type-switch-clause statement lists use the same
+   sequence owner; a nested state machine preserves source loop/range
+   `continue`, switch `break`, and switch `fallthrough` targets rather than
+   capturing them in its generated dispatch;
+9. a no-demand function's encoded TS-Go AST is byte-identical to its parent
+   checkpoint artifact; and
+10. TS-Go encode/print/reparse, strict TypeScript, and Go-versus-ESM behavior
+   and panic classes pass under both integer profiles.
+
+Mutation gates remove immediate capture, reverse the defer stack, shallow-copy
+an argument or value receiver, make recovery ambient, forward authority to an
+ordinary nested call, swallow or fail to replace a panic, return named results
+before unwind, alias panic-nil and generic-runtime dynamic identities, replace
+the canonical runtime method contract with spelling/signature matching, key a
+recovery contract by a variable/field/pointer/container identity, key a label
+by spelling, bypass the shared clause-sequence owner, let generated dispatch
+capture source `break`/`continue`, misroute a goto, force all functions through
+the envelope, or restore dynamic invocation. Each fails its owning shape, identity,
+strict-staticness, differential, byte-stability, or artifact gate.
+
+A 1x/2x/4x source fixture measures emitted bytes and TS-Go nodes for defer
+registrations, labels, and non-structural states. Growth is linear; one source
+statement is emitted once; runtime support remains constant. Inspect every
+runtime control declaration and the twenty largest changed functions.
 
 ## Heavy Runs
 

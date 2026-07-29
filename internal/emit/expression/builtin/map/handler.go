@@ -41,11 +41,33 @@ func Emit(
 		if !mapArgument(context, source, 0) {
 			return api.ExpressionEmission{}, false, nil
 		}
-		target, err := emitDelete(context, children, source, discarded)
+		target, err := emitDelete(
+			context,
+			children,
+			source,
+			discarded,
+			false,
+		)
 		return target, true, err
 	default:
 		return api.ExpressionEmission{}, false, nil
 	}
+}
+
+func EmitDeferred(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	builtin *types.Builtin,
+) (api.ExpressionEmission, bool, error) {
+	if source == nil ||
+		builtin == nil ||
+		types.Object(builtin) != types.Universe.Lookup("delete") ||
+		!mapArgument(context, source, 0) {
+		return api.ExpressionEmission{}, false, nil
+	}
+	target, err := emitDelete(context, children, source, true, true)
+	return target, true, err
 }
 
 func mapArgument(
@@ -240,6 +262,7 @@ func emitDelete(
 	children api.ChildEmitter,
 	source *ast.CallExpr,
 	discarded bool,
+	capture bool,
 ) (api.ExpressionEmission, error) {
 	if !discarded ||
 		source.Ellipsis.IsValid() ||
@@ -290,7 +313,11 @@ func emitDelete(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	values, before, requests, err := maprepresentation.ArrangeOperands(
+	arrange := maprepresentation.ArrangeOperands
+	if capture {
+		arrange = maprepresentation.ArrangeCapturedOperands
+	}
+	values, before, requests, err := arrange(
 		context,
 		[]api.ExpressionEmission{receiver, key},
 	)

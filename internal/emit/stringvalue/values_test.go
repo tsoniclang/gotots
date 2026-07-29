@@ -374,7 +374,7 @@ func hasPanicBoundsCheck(function tsgo.FunctionDeclaration) bool {
 			}
 			member, ok := call.Expression().(tsgo.PropertyAccessExpression)
 			if ok &&
-				member.Name().(tsgo.Identifier).Text() == "raise" {
+				member.Name().(tsgo.Identifier).Text() == "raiseRuntime" {
 				return true
 			}
 		}

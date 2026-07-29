@@ -56,7 +56,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	targetSignature, err := callable.EmitAdapter(
+	targetSignature, err := callable.EmitABIAdapter(
 		context,
 		children,
 		source,
@@ -134,6 +134,13 @@ func Emit(
 			return api.ExpressionEmission{}, err
 		}
 	}
+	controlRequest, err := api.NewDirectCallableControlRequest(
+		owner,
+		api.CallableControlRecovery,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	callArguments := append(
 		[]tsgo.Expression{
 			context.Factory().Identifier(receiverName),
@@ -141,6 +148,17 @@ func Emit(
 		arguments...,
 	)
 	if generic {
+		sourceArguments := targetSignature.SourceParameterReferences(
+			context.Factory(),
+		)
+		recoveryAuthority, recoveryOK :=
+			targetSignature.RecoveryAuthorityReference(context.Factory())
+		if !recoveryOK {
+			return api.ExpressionEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "generic method value lacks recovery authority",
+			}
+		}
 		receiverBinding, bindErr := genericabi.Receiver[tsgo.Expression](
 			owner,
 			context.Factory().Identifier(receiverName),
@@ -150,7 +168,7 @@ func Emit(
 		}
 		sourceBindings, bindErr := genericabi.SourceParameters(
 			owner,
-			arguments,
+			sourceArguments,
 		)
 		if bindErr != nil {
 			return api.ExpressionEmission{}, bindErr
@@ -164,6 +182,7 @@ func Emit(
 				sourceBindings,
 			),
 		)
+		callArguments = append(callArguments, recoveryAuthority)
 	}
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -191,6 +210,7 @@ func Emit(
 			typeRequests,
 			capabilityRequests,
 			reference.Requests(),
+			[]api.RootRequest{controlRequest},
 		),
 	)
 }
@@ -211,7 +231,7 @@ func emitInterface(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	targetSignature, err := callable.EmitAdapter(
+	targetSignature, err := callable.EmitABIAdapter(
 		context,
 		children,
 		source,

@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -16,6 +17,26 @@ func Emit(
 	if source.Label != nil {
 		label, ok := context.TypesInfo().Uses[source.Label].(*types.Label)
 		if !ok {
+			return api.StatementEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		if source.Tok == token.GOTO {
+			if target, selected := context.GotoTarget(label); selected {
+				return emitGoto(context, target)
+			}
+			if !context.CallableControl().Goto() {
+				request, err := context.GotoControlRequest(
+					label,
+					source.Label.Pos(),
+				)
+				if err != nil {
+					return api.StatementEmission{}, err
+				}
+				return api.NewStatementEmission(
+					nil,
+					[]api.RootRequest{request},
+				)
+			}
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
 		}
@@ -46,7 +67,9 @@ func Emit(
 	case token.BREAK:
 		if context.CanBreak() {
 			return api.DirectStatement(
-				context.Factory().BreakStatement(nil),
+				context.Factory().BreakStatement(
+					implicitTarget(context, context.BreakTarget()),
+				),
 			), nil
 		}
 		if control, ok := context.IteratorRangeControl(); ok {
@@ -60,7 +83,9 @@ func Emit(
 	case token.CONTINUE:
 		if context.CanContinue() {
 			return api.DirectStatement(
-				context.Factory().ContinueStatement(nil),
+				context.Factory().ContinueStatement(
+					implicitTarget(context, context.ContinueTarget()),
+				),
 			), nil
 		}
 		if control, ok := context.IteratorRangeControl(); ok {
@@ -71,6 +96,9 @@ func Emit(
 				true,
 			)
 		}
+	default:
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	return api.StatementEmission{},
 		api.Unsupported(context, api.CategoryStatement, source)
@@ -112,4 +140,59 @@ func iteratorBranch(
 		},
 		nil,
 	)
+}
+
+func implicitTarget(
+	context api.Context,
+	name string,
+) tsgo.Identifier {
+	if name == "" {
+		return nil
+	}
+	return context.Factory().Identifier(name)
+}
+
+func emitGoto(
+	context api.Context,
+	target api.GotoTarget,
+) (api.StatementEmission, error) {
+	label := context.Factory().Identifier(target.Label())
+	switch target.Kind() {
+	case api.GotoTargetBreak:
+		return api.DirectStatement(
+			context.Factory().BreakStatement(label),
+		), nil
+	case api.GotoTargetContinue:
+		return api.DirectStatement(
+			context.Factory().ContinueStatement(label),
+		), nil
+	case api.GotoTargetState:
+		return api.NewStatementEmission(
+			[]tsgo.Statement{
+				context.Factory().ExpressionStatement(
+					context.Factory().BinaryExpression(
+						nil,
+						context.Factory().Identifier(
+							target.StateName(),
+						),
+						nil,
+						context.Factory().BinaryOperatorToken(
+							tsgo.BinaryOperatorEqualsToken,
+						),
+						context.Factory().NumericLiteral(
+							strconv.Itoa(target.State()),
+							tsgo.TokenFlagsNone,
+						),
+					),
+				),
+				context.Factory().ContinueStatement(label),
+			},
+			nil,
+		)
+	default:
+		return api.StatementEmission{}, &api.InvariantError{
+			Role:   api.RoleLabelTarget,
+			Reason: "goto target kind is invalid",
+		}
+	}
 }

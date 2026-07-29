@@ -2,16 +2,9 @@ package interfacevalue
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
-)
-
-const (
-	DynamicTypeMember = "$go$type"
-	MethodsMember     = "$go$methods"
-	ImplementsMember  = "$go$implements"
-	EqualMember       = "$go$equal"
-	HashMember        = "$go$hash"
 )
 
 func Build(
@@ -21,8 +14,6 @@ func Build(
 	panicName string,
 ) (tsgo.Statement, error) {
 	switch symbol {
-	case api.RuntimeInterfaceValue:
-		return valueContract(factory, valueName), nil
 	case api.RuntimeInterfaceNonNil:
 		return nonNil(factory, valueName, panicName), nil
 	case api.RuntimeInterfaceEqual:
@@ -30,6 +21,146 @@ func Build(
 	default:
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}
+}
+
+func BuildValue(
+	factory tsgo.Factory,
+	symbol api.RuntimeSymbol,
+	valueName string,
+) (tsgo.Statement, error) {
+	switch symbol {
+	case api.RuntimeInterfaceValue:
+		return valueContract(factory, valueName), nil
+	case api.RuntimeErrorMethodToken:
+		return methodToken(factory, "GoErrorMethodToken"), nil
+	case api.RuntimeRuntimeErrorToken:
+		return methodToken(factory, "GoRuntimeErrorMethodToken"), nil
+	case api.RuntimeBuiltinErrorType:
+		return errorTypeDefinition(factory, false)
+	case api.RuntimeBuiltinErrorContract:
+		return errorContractDefinition(factory, false)
+	case api.RuntimeBuiltinErrorGuard:
+		return errorGuardDefinition(factory, false)
+	case api.RuntimeErrorType:
+		return errorTypeDefinition(factory, true)
+	case api.RuntimeErrorContract:
+		return errorContractDefinition(factory, true)
+	case api.RuntimeErrorGuard:
+		return errorGuardDefinition(factory, true)
+	default:
+		return nil, &api.RuntimeSymbolError{Symbol: symbol}
+	}
+}
+
+func errorTypeDefinition(
+	factory tsgo.Factory,
+	runtimeError bool,
+) (tsgo.Statement, error) {
+	symbol := api.RuntimeBuiltinErrorType
+	if runtimeError {
+		symbol = api.RuntimeErrorType
+	}
+	name, err := runtimeName(symbol)
+	if err != nil {
+		return nil, err
+	}
+	valueName, err := runtimeName(api.RuntimeInterfaceValue)
+	if err != nil {
+		return nil, err
+	}
+	return errorInterface(factory, name, valueName, runtimeError), nil
+}
+
+func errorContractDefinition(
+	factory tsgo.Factory,
+	runtimeError bool,
+) (tsgo.Statement, error) {
+	symbol := api.RuntimeBuiltinErrorContract
+	if runtimeError {
+		symbol = api.RuntimeErrorContract
+	}
+	name, err := runtimeName(symbol)
+	if err != nil {
+		return nil, err
+	}
+	errorToken, err := runtimeName(api.RuntimeErrorMethodToken)
+	if err != nil {
+		return nil, err
+	}
+	runtimeToken := ""
+	if runtimeError {
+		runtimeToken, err = runtimeName(api.RuntimeRuntimeErrorToken)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return errorContract(factory, name, errorToken, runtimeToken), nil
+}
+
+func errorGuardDefinition(
+	factory tsgo.Factory,
+	runtimeError bool,
+) (tsgo.Statement, error) {
+	guardSymbol := api.RuntimeBuiltinErrorGuard
+	typeSymbol := api.RuntimeBuiltinErrorType
+	contractSymbol := api.RuntimeBuiltinErrorContract
+	if runtimeError {
+		guardSymbol = api.RuntimeErrorGuard
+		typeSymbol = api.RuntimeErrorType
+		contractSymbol = api.RuntimeErrorContract
+	}
+	name, err := runtimeName(guardSymbol)
+	if err != nil {
+		return nil, err
+	}
+	typeName, err := runtimeName(typeSymbol)
+	if err != nil {
+		return nil, err
+	}
+	valueName, err := runtimeName(api.RuntimeInterfaceValue)
+	if err != nil {
+		return nil, err
+	}
+	contractName, err := runtimeName(contractSymbol)
+	if err != nil {
+		return nil, err
+	}
+	return errorGuard(factory, name, typeName, valueName, contractName), nil
+}
+
+func methodToken(
+	factory tsgo.Factory,
+	name string,
+) tsgo.VariableStatement {
+	return factory.VariableStatement(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		factory.VariableDeclarationList(
+			[]tsgo.VariableDeclaration{
+				factory.VariableDeclaration(
+					factory.Identifier(name),
+					nil,
+					factory.KeywordTypeNode(
+						tsgo.KeywordTypeSyntaxKindObjectKeyword,
+					),
+					factory.CallExpression(
+						factory.PropertyAccessExpression(
+							factory.Identifier("Object"),
+							nil,
+							factory.Identifier("freeze"),
+							tsgo.NodeFlagsNone,
+						),
+						nil,
+						nil,
+						[]tsgo.Expression{
+							factory.ObjectLiteralExpression(nil, false),
+						},
+						tsgo.NodeFlagsNone,
+					),
+				),
+			},
+			tsgo.NodeFlagsConst,
+		),
+	)
 }
 
 func equal(
@@ -78,7 +209,7 @@ func equal(
 								factory.PropertyAccessExpression(
 									left,
 									nil,
-									factory.Identifier(EqualMember),
+									factory.Identifier(interfacecontract.EqualMember),
 									tsgo.NodeFlagsNone,
 								),
 								nil,
@@ -143,7 +274,7 @@ func valueContract(
 					factory.AbstractKeyword(),
 					factory.ReadonlyKeyword(),
 				},
-				factory.Identifier(DynamicTypeMember),
+				factory.Identifier(interfacecontract.DynamicTypeMember),
 				nil,
 				factory.KeywordTypeNode(
 					tsgo.KeywordTypeSyntaxKindObjectKeyword,
@@ -155,7 +286,7 @@ func valueContract(
 					factory.AbstractKeyword(),
 					factory.ReadonlyKeyword(),
 				},
-				factory.Identifier(MethodsMember),
+				factory.Identifier(interfacecontract.MethodsMember),
 				nil,
 				readonlySetType(factory),
 				nil,
@@ -163,7 +294,7 @@ func valueContract(
 			factory.MethodDeclaration(
 				[]tsgo.ModifierLike{factory.AbstractKeyword()},
 				nil,
-				factory.Identifier(ImplementsMember),
+				factory.Identifier(interfacecontract.ImplementsMember),
 				nil,
 				nil,
 				[]tsgo.ParameterDeclaration{
@@ -181,7 +312,7 @@ func valueContract(
 			factory.MethodDeclaration(
 				[]tsgo.ModifierLike{factory.AbstractKeyword()},
 				nil,
-				factory.Identifier(EqualMember),
+				factory.Identifier(interfacecontract.EqualMember),
 				nil,
 				nil,
 				[]tsgo.ParameterDeclaration{
@@ -202,7 +333,7 @@ func valueContract(
 			factory.MethodDeclaration(
 				[]tsgo.ModifierLike{factory.AbstractKeyword()},
 				nil,
-				factory.Identifier(HashMember),
+				factory.Identifier(interfacecontract.HashMember),
 				nil,
 				nil,
 				nil,

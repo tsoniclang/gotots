@@ -36,6 +36,9 @@ func (Owner) RequiresCustomEquality(
 	if _, ok := interfacetype.Resolve(sourceType); ok {
 		return true
 	}
+	if panicNilRuntimeValue(context, sourceType) {
+		return true
+	}
 	if _, ok := definedtype.Resolve(sourceType); ok {
 		return true
 	}
@@ -68,6 +71,9 @@ func (Owner) RequiresExplicitType(
 	if _, ok := interfacetype.Resolve(sourceType); ok {
 		return true
 	}
+	if panicNilRuntimeValue(context, sourceType) {
+		return true
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		return defined.NilCapable()
 	}
@@ -79,6 +85,9 @@ func (Owner) RequiresStructuralCopy(
 	sourceType types.Type,
 ) bool {
 	if _, ok := api.GenericTypeParameter(sourceType); ok {
+		return true
+	}
+	if panicNilRuntimeValue(context, sourceType) {
 		return true
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
@@ -118,6 +127,9 @@ func (owner Owner) Zero(
 				),
 			),
 		), nil
+	}
+	if panicNilRuntimeValue(context, sourceType) {
+		return panicNilZero(context)
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		if defined.NilCapable() {
@@ -248,6 +260,9 @@ func (owner Owner) Copy(
 			value.Value(),
 			value.Requests(),
 		)
+	}
+	if panicNilRuntimeValue(context, sourceType) {
+		return panicNilCopy(context, value)
 	}
 	if target, ok := definedtype.ResolveCallable(sourceType); ok {
 		actual := expressionType(context, source)

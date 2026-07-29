@@ -35,14 +35,26 @@ type Context struct {
 	storage                  AddressableStorage
 	integer                  IntegerRepresentation
 	evaluationOrder          EvaluationOrder
+	goRuntime                GoRuntimeContract
 	expectedType             types.Type
 	expectedResults          *types.Tuple
 	functionResults          *types.Tuple
 	breakDepth               uint32
 	continueDepth            uint32
+	breakTarget              string
+	continueTarget           string
 	controlLabels            map[*types.Label]ControlLabel
 	statementLabel           string
-	currentArtifactOwner     ArtifactOwner
+	artifactOwner            ArtifactOwner
+	callableControls         map[ast.Node]CallableControlDemand
+	callableEnclosing        ast.Node
+	currentCallable          ast.Node
+	currentControl           CallableControlDemand
+	deferControl             DeferControl
+	returnControl            ReturnControl
+	gotoUses                 map[*types.Label][]token.Pos
+	gotoTargets              map[*types.Label]GotoTarget
+	gotoLocals               map[*types.Var]struct{}
 	storageNames             map[*types.Var]string
 	localConstantProjections map[*types.Const][]types.BasicKind
 	lexicalTypeRequirements  map[*types.TypeName][]DeclarationRequirement
@@ -108,6 +120,7 @@ func (c Context) WithLexicalTypeRequirements(
 	if !sourceOwned && !initializerOwned {
 		panic("lexical type-requirement owner has no source reconstruction")
 	}
+	c = c.withArtifactOwner(owner)
 	c.lexicalTypeRequirements = make(
 		map[*types.TypeName][]DeclarationRequirement,
 		len(requirements),
@@ -215,15 +228,33 @@ func (c Context) EnterFunction(results *types.Tuple) Context {
 	c.expectedResults = nil
 	c.breakDepth = 0
 	c.continueDepth = 0
+	c.breakTarget = ""
+	c.continueTarget = ""
 	c.controlLabels = nil
 	c.statementLabel = ""
 	c.iteratorRangeStateName = ""
+	c.currentCallable = nil
+	c.currentControl = CallableControlDemand{}
+	c.deferControl = DeferControl{}
+	c.returnControl = ReturnControl{}
+	c.gotoTargets = nil
+	c.gotoLocals = nil
 	return c
 }
 
 func (c Context) EnterLoop() Context {
 	c.breakDepth++
 	c.continueDepth++
+	return c
+}
+
+func (c Context) EnterLoopTarget(name string) Context {
+	if name == "" {
+		panic("loop control target is empty")
+	}
+	c = c.EnterLoop()
+	c.breakTarget = name
+	c.continueTarget = name
 	return c
 }
 
@@ -241,6 +272,15 @@ func (c Context) EnterIteratorRange(stateName string) Context {
 	c.controlLabels = nil
 	c.statementLabel = ""
 	c.iteratorRangeStateName = stateName
+	return c
+}
+
+func (c Context) EnterBreakableTarget(name string) Context {
+	if name == "" {
+		panic("breakable control target is empty")
+	}
+	c = c.EnterBreakable()
+	c.breakTarget = name
 	return c
 }
 
@@ -338,6 +378,21 @@ func (c Context) CanContinue() bool {
 	return c.continueDepth != 0
 }
 
+func (c Context) BreakTarget() string {
+	return c.breakTarget
+}
+
+func (c Context) ContinueTarget() string {
+	return c.continueTarget
+}
+
+func (c Context) SelectControlTarget(existing string) (string, error) {
+	if existing != "" || !c.currentControl.Goto() {
+		return existing, nil
+	}
+	return c.names.Temporary(TemporaryControlTarget)
+}
+
 func (c Context) ControlLabel(label *types.Label) (ControlLabel, bool) {
 	if label == nil {
 		return ControlLabel{}, false
@@ -355,10 +410,14 @@ func (c Context) IteratorRangeControl() (IteratorRangeControl, bool) {
 	}, true
 }
 
+func (c Context) ArtifactOwner() ArtifactOwner {
+	return c.artifactOwner
+}
+
 func (c Context) FunctionArtifactOwner() (*types.Func, bool) {
-	source, ok := c.currentArtifactOwner.Source()
-	owner, functionOwned := source.(*types.Func)
-	return owner, ok && functionOwned
+	source, ok := c.artifactOwner.Source()
+	owner, function := source.(*types.Func)
+	return owner, ok && function
 }
 
 func (c Context) LocalConstantProjections(
@@ -459,6 +518,7 @@ func (c IteratorRangeControl) Valid() bool {
 
 type ChildEmitter interface {
 	Block(Context, *ast.BlockStmt) (BlockEmission, error)
+	Statements(Context, ast.Node, []ast.Stmt) (StatementEmission, error)
 	Statement(Context, ast.Stmt) (StatementEmission, error)
 	Expression(Context, ast.Expr) (ExpressionEmission, error)
 	Address(Context, ast.Expr) (ExpressionEmission, error)
@@ -470,4 +530,15 @@ type ChildEmitter interface {
 	IfAlternate(Context, *ast.IfStmt) (StatementEmission, error)
 	Type(Context, ast.Expr) (TypeEmission, error)
 	RepresentedType(Context, ast.Node, types.Type) (TypeEmission, error)
+}
+
+func (c Context) withArtifactOwner(owner ArtifactOwner) Context {
+	if !owner.Valid() {
+		panic("artifact owner is invalid")
+	}
+	if c.artifactOwner.Valid() && c.artifactOwner != owner {
+		panic("artifact owner is inconsistent")
+	}
+	c.artifactOwner = owner
+	return c
 }

@@ -2,6 +2,8 @@ package api
 
 import (
 	"fmt"
+	"go/ast"
+	"go/token"
 	"go/types"
 )
 
@@ -160,6 +162,33 @@ func (r DeclarationRequirement) GenericCapability() (
 	return r.generated, true
 }
 
+func (r DeclarationRequirement) CallableControl() (
+	ArtifactOwner,
+	ast.Node,
+	ast.Node,
+	CallableControlFacet,
+	bool,
+) {
+	if !r.Valid() ||
+		r.kind != DeclarationRequirementCallableControl {
+		return ArtifactOwner{}, nil, nil, CallableControlInvalid, false
+	}
+	return r.owner, r.enclosing, r.callable, r.control, true
+}
+
+func (r DeclarationRequirement) GotoControl() (
+	*types.Label,
+	token.Pos,
+	bool,
+) {
+	if !r.Valid() ||
+		r.kind != DeclarationRequirementCallableControl ||
+		r.control != CallableControlGoto {
+		return nil, token.NoPos, false
+	}
+	return r.controlLabel, r.controlPosition, true
+}
+
 func (r DeclarationRequirement) generatedDefinition(
 	requirementKind DeclarationRequirementKind,
 	artifactKind GeneratedArtifactKind,
@@ -289,6 +318,7 @@ const (
 	DeclarationRequirementInterfaceMethodToken      DeclarationRequirementKind = 10
 	DeclarationRequirementInterfaceDynamicTypeToken DeclarationRequirementKind = 11
 	DeclarationRequirementGenericCapability         DeclarationRequirementKind = 12
+	DeclarationRequirementCallableControl           DeclarationRequirementKind = 13
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -303,7 +333,23 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementAnonymousInterface ||
 		k == DeclarationRequirementInterfaceMethodToken ||
 		k == DeclarationRequirementInterfaceDynamicTypeToken ||
-		k == DeclarationRequirementGenericCapability
+		k == DeclarationRequirementGenericCapability ||
+		k == DeclarationRequirementCallableControl
+}
+
+type CallableControlFacet uint8
+
+const (
+	CallableControlInvalid CallableControlFacet = iota
+	CallableControlDefer
+	CallableControlRecovery
+	CallableControlGoto
+)
+
+func (f CallableControlFacet) Valid() bool {
+	return f == CallableControlDefer ||
+		f == CallableControlRecovery ||
+		f == CallableControlGoto
 }
 
 func NewGenericCapabilityRequirement(

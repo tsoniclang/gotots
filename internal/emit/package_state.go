@@ -138,6 +138,9 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 	})
 	for _, imported := range imports {
 		dependency := s.source.PackageForTypes(imported)
+		if dependency == nil && s.goRuntime.Owns(imported) {
+			continue
+		}
 		if dependency == nil || dependency.ModulePath() == "" {
 			return &ScheduleError{
 				Object: imported.Path(),

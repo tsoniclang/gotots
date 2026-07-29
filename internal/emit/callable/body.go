@@ -11,12 +11,16 @@ import (
 func EmitBody(
 	context api.Context,
 	children api.ChildEmitter,
+	sourceCallable ast.Node,
 	sourceType *ast.FuncType,
 	sourceBody *ast.BlockStmt,
 	signature *types.Signature,
 	bodyRole api.Role,
 ) (api.BlockEmission, error) {
-	if sourceType == nil || sourceBody == nil || signature == nil {
+	if sourceCallable == nil ||
+		sourceType == nil ||
+		sourceBody == nil ||
+		signature == nil {
 		return api.BlockEmission{}, &api.InvariantError{
 			Role:   bodyRole,
 			Reason: "callable body input is nil",
@@ -31,7 +35,7 @@ func EmitBody(
 	if err != nil {
 		return api.BlockEmission{}, err
 	}
-	prologue, prologueRequests, err := namedResultPrologue(
+	prologue, prologueRequests, namedResults, err := namedResultPrologue(
 		context,
 		children,
 		sourceType,
@@ -40,12 +44,21 @@ func EmitBody(
 	if err != nil {
 		return api.BlockEmission{}, err
 	}
-	body, err := children.Block(
-		context.
-			WithRole(bodyRole).
-			EnterFunction(signature.Results()),
-		sourceBody,
-	)
+	callableContext := context.
+		WithRole(bodyRole).
+		EnterCallable(sourceCallable, signature.Results())
+	var body api.BlockEmission
+	if callableContext.CallableControl().Defer() {
+		body, err = emitDeferredBody(
+			callableContext,
+			children,
+			sourceBody,
+			signature,
+			namedResults,
+		)
+	} else {
+		body, err = children.Block(callableContext, sourceBody)
+	}
 	if err != nil {
 		return api.BlockEmission{}, err
 	}
@@ -66,10 +79,10 @@ func namedResultPrologue(
 	children api.ChildEmitter,
 	source *ast.FuncType,
 	results *types.Tuple,
-) ([]tsgo.Statement, []api.RootRequest, error) {
+) ([]tsgo.Statement, []api.RootRequest, bool, error) {
 	names, err := namedResultSyntax(context, source, results)
 	if err != nil || len(names) == 0 {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	var statements []tsgo.Statement
 	var requests []api.RootRequest
@@ -80,7 +93,7 @@ func namedResultPrologue(
 			targetName, err = context.Names().Declare(result)
 		}
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, false, err
 		}
 		var declarationType tsgo.TypeNode
 		if !selected {
@@ -90,7 +103,7 @@ func namedResultPrologue(
 				result.Type(),
 			)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, false, err
 			}
 			declarationType = targetType.Value()
 			requests = append(requests, targetType.Requests()...)
@@ -101,7 +114,7 @@ func namedResultPrologue(
 			result.Type(),
 		)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, false, err
 		}
 		if selected {
 			zero, err = context.AddressableStorage().Cell(
@@ -112,7 +125,7 @@ func namedResultPrologue(
 				zero,
 			)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, false, err
 			}
 		}
 		statements = append(statements, zero.Before()...)
@@ -135,7 +148,7 @@ func namedResultPrologue(
 		)
 		requests = append(requests, zero.Requests()...)
 	}
-	return statements, requests, nil
+	return statements, requests, true, nil
 }
 
 func namedResultSyntax(

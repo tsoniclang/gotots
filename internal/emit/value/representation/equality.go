@@ -50,6 +50,9 @@ func (owner Owner) Equal(
 			reference.Requests()...,
 		), nil
 	}
+	if panicNilRuntimeValue(context, sourceType) {
+		return panicNilEqual(context), nil
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		if defined.Family() == definedtype.FamilyCallable {
 			return api.DirectExpression(

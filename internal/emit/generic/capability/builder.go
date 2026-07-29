@@ -125,6 +125,7 @@ func emitValue(
 			context,
 			children,
 			nil,
+			nil,
 			signature.Params().At(0).Type(),
 			signature.Results().At(0).Type(),
 			api.DirectExpression(arguments[0]),
@@ -370,6 +371,8 @@ func emitConstraintMethod(
 	}
 	return calloperation.ApplyInterfaceMethod(
 		context,
+		nil,
+		interfaceType,
 		receiver,
 		method,
 		arguments[1:],

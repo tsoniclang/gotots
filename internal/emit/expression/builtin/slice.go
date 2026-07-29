@@ -291,6 +291,30 @@ func emitCopy(
 	source *ast.CallExpr,
 	discarded bool,
 ) (api.ExpressionEmission, error) {
+	return emitCopyMode(
+		context,
+		children,
+		source,
+		discarded,
+		false,
+	)
+}
+
+func emitDeferredCopy(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+) (api.ExpressionEmission, error) {
+	return emitCopyMode(context, children, source, true, true)
+}
+
+func emitCopyMode(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	discarded bool,
+	capture bool,
+) (api.ExpressionEmission, error) {
 	if _, err := resultType(context, source, discarded); err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -334,7 +358,11 @@ func emitCopy(
 		}
 		values = append(values, value)
 	}
-	arguments, before, requests, err := arrangeValues(context, values)
+	arrange := arrangeValues
+	if capture {
+		arrange = arrangeCapturedValues
+	}
+	arguments, before, requests, err := arrange(context, values)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -467,7 +495,31 @@ func arrangeValues(
 	[]api.RootRequest,
 	error,
 ) {
-	capture := false
+	return arrangeValueMode(context, values, false)
+}
+
+func arrangeCapturedValues(
+	context api.Context,
+	values []api.ExpressionEmission,
+) (
+	[]tsgo.Expression,
+	[]tsgo.Statement,
+	[]api.RootRequest,
+	error,
+) {
+	return arrangeValueMode(context, values, true)
+}
+
+func arrangeValueMode(
+	context api.Context,
+	values []api.ExpressionEmission,
+	capture bool,
+) (
+	[]tsgo.Expression,
+	[]tsgo.Statement,
+	[]api.RootRequest,
+	error,
+) {
 	for _, value := range values {
 		capture = capture || len(value.Before()) != 0
 	}

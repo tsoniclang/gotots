@@ -464,9 +464,13 @@ func TestRuntimeDependencyClosureIncludesEveryTransitiveOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[api.RuntimeSymbol]struct{}{
-		api.RuntimeArray:         {},
-		api.RuntimeIntegerDivide: {},
-		api.RuntimePanic:         {},
+		api.RuntimeArray:             {},
+		api.RuntimeIntegerDivide:     {},
+		api.RuntimePanic:             {},
+		api.RuntimePanicValue:        {},
+		api.RuntimeInterfaceValue:    {},
+		api.RuntimeErrorMethodToken:  {},
+		api.RuntimeRuntimeErrorToken: {},
 	}
 	if len(closure) != len(want) {
 		t.Fatalf("runtime closure = %v, want %v", closure, want)

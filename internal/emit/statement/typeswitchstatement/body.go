@@ -16,6 +16,7 @@ func emitCaseBody(
 	selected guard,
 	typesInCase []caseType,
 	value tsgo.Expression,
+	targetLabel string,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	var statements []tsgo.Statement
 	var requests []api.RootRequest
@@ -96,19 +97,20 @@ func emitCaseBody(
 			clause,
 		)
 	}
-	for _, sourceStatement := range clause.Body {
-		target, err := children.Statement(
-			context.
-				WithRole(api.RoleTypeSwitchStatement).
-				EnterBreakable(),
-			sourceStatement,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		statements = append(statements, target.Statements()...)
-		requests = append(requests, target.Requests()...)
+	bodyContext := context.
+		WithRole(api.RoleTypeSwitchStatement).
+		EnterBreakable()
+	if context.CallableControl().Goto() {
+		bodyContext = context.
+			WithRole(api.RoleTypeSwitchStatement).
+			EnterBreakableTarget(targetLabel)
 	}
+	body, err := children.Statements(bodyContext, clause, clause.Body)
+	if err != nil {
+		return nil, nil, err
+	}
+	statements = append(statements, body.Statements()...)
+	requests = append(requests, body.Requests()...)
 	statements = append(
 		statements,
 		context.Factory().BreakStatement(nil),

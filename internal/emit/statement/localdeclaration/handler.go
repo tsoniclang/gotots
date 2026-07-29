@@ -178,6 +178,28 @@ func emitSpec(
 		}
 	}
 
+	if len(bindings) != 0 && context.IsGotoLocal(bindings[0].object) {
+		for _, binding := range bindings {
+			target, targetRequests, selected, err := gotoLocalAssignment(
+				context,
+				children,
+				binding,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			if !selected {
+				return nil, nil, &api.InvariantError{
+					Role:   api.RoleLocalDeclaration,
+					Reason: "goto declaration has mixed storage ownership",
+				}
+			}
+			statements = append(statements, target...)
+			requests = append(requests, targetRequests...)
+		}
+		return statements, requests, nil
+	}
+
 	declarations := make([]tsgo.VariableDeclaration, 0, len(bindings))
 	for _, binding := range bindings {
 		declaration, declarationBefore, declarationRequests, err :=

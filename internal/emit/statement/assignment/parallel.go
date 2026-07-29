@@ -141,6 +141,13 @@ func emitParallel(
 				temporary = value.Value()
 				requests = append(requests, value.Requests()...)
 			}
+			if context.IsGotoLocal(target.object) {
+				statements = append(
+					statements,
+					assignmentStatement(context, target.name, temporary),
+				)
+				continue
+			}
 			targetType, typeRequests, err := pointerAnnotation(
 				context.WithRole(api.RoleLocalType),
 				children,

@@ -27,7 +27,22 @@ func Emit(
 		children,
 		source,
 		discarded,
+		false,
 	)
+	return target, true, err
+}
+
+func EmitDeferred(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	builtin *types.Builtin,
+) (api.ExpressionEmission, bool, error) {
+	if builtin == nil ||
+		types.Object(builtin) != types.Universe.Lookup("clear") {
+		return api.ExpressionEmission{}, false, nil
+	}
+	target, err := emit(context, children, source, true, true)
 	return target, true, err
 }
 
@@ -36,6 +51,7 @@ func emit(
 	children api.ChildEmitter,
 	source *ast.CallExpr,
 	discarded bool,
+	capture bool,
 ) (api.ExpressionEmission, error) {
 	if source == nil ||
 		!discarded ||
@@ -57,7 +73,14 @@ func emit(
 		)
 	}
 	if mapType, ok := mapvalue.Source(context, argumentType); ok {
-		return emitMap(context, children, source, argument, mapType)
+		return emitMap(
+			context,
+			children,
+			source,
+			argument,
+			mapType,
+			capture,
+		)
 	}
 	_, elementType, ok := slicevalue.Source(argumentType)
 	if !ok {
@@ -74,6 +97,7 @@ func emit(
 		argument,
 		argumentType,
 		elementType,
+		capture,
 	)
 }
 
@@ -83,6 +107,7 @@ func emitMap(
 	source *ast.CallExpr,
 	argument ast.Expr,
 	mapType mapvalue.Model,
+	capture bool,
 ) (api.ExpressionEmission, error) {
 	receiver, err := children.Expression(
 		context.WithRole(api.RoleMapReceiver).WithExpectedType(mapType.Type()),
@@ -90,6 +115,12 @@ func emitMap(
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if capture {
+		receiver, err = captureReceiver(context, receiver)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	receiver, err = mapType.ReadReceiver(context, argument, receiver)
 	if err != nil {
@@ -113,6 +144,7 @@ func emitSlice(
 	argument ast.Expr,
 	argumentType types.Type,
 	elementType types.Type,
+	capture bool,
 ) (api.ExpressionEmission, error) {
 	receiver, err := children.Expression(
 		context.WithRole(api.RoleSliceReceiver).WithExpectedType(argumentType),
@@ -120,6 +152,12 @@ func emitSlice(
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if capture {
+		receiver, err = captureReceiver(context, receiver)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	receiver, err = slicevalue.Project(context, argumentType, receiver)
 	if err != nil {
@@ -170,6 +208,38 @@ func emitSlice(
 			zero.Requests(),
 			runtime.Requests(),
 		),
+	)
+}
+
+func captureReceiver(
+	context api.Context,
+	receiver api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	name, err := context.Names().Temporary(api.TemporaryCallArgument)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	before := append(
+		receiver.Before(),
+		context.Factory().VariableStatement(
+			nil,
+			context.Factory().VariableDeclarationList(
+				[]tsgo.VariableDeclaration{
+					context.Factory().VariableDeclaration(
+						context.Factory().Identifier(name),
+						nil,
+						nil,
+						receiver.Value(),
+					),
+				},
+				tsgo.NodeFlagsConst,
+			),
+		),
+	)
+	return api.NewExpressionEmission(
+		before,
+		context.Factory().Identifier(name),
+		receiver.Requests(),
 	)
 }
 

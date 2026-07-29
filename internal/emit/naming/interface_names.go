@@ -4,6 +4,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/output"
@@ -261,6 +262,9 @@ func (n *File) InterfaceMethodName(method *types.Func) (string, error) {
 func (n *File) InterfaceMethodToken(
 	method *types.Func,
 ) (api.NameReference, error) {
+	if symbol, ok := runtimeInterfaceMethodToken(method); ok {
+		return n.Runtime(symbol, api.ImportPhaseValue)
+	}
 	signature, ok := methodidentity.Signature(method)
 	if !ok {
 		return api.NameReference{}, &api.NameError{
@@ -293,6 +297,19 @@ func (n *File) InterfaceMethodToken(
 		requirement,
 		api.ArtifactFacetValueSurface,
 	)
+}
+
+func runtimeInterfaceMethodToken(
+	method *types.Func,
+) (api.RuntimeSymbol, bool) {
+	switch interfacecontract.Method(method) {
+	case interfacecontract.MethodError:
+		return api.RuntimeErrorMethodToken, true
+	case interfacecontract.MethodRuntimeError:
+		return api.RuntimeRuntimeErrorToken, true
+	default:
+		return api.RuntimeInvalid, false
+	}
 }
 
 func (n *File) namedInterfaceContract(

@@ -17,6 +17,10 @@ func Emit(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
+	targetLabel, err := context.SelectControlTarget(targetLabel)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
 	initializer, err := emitClauseStatement(
 		context.WithRole(api.RoleForInitializer),
 		children,
@@ -37,10 +41,13 @@ func Emit(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	body, err := children.Block(
-		context.WithRole(api.RoleForBody).EnterLoop(),
-		source.Body,
-	)
+	bodyContext := context.WithRole(api.RoleForBody).EnterLoop()
+	if context.CallableControl().Goto() {
+		bodyContext = context.
+			WithRole(api.RoleForBody).
+			EnterLoopTarget(targetLabel)
+	}
+	body, err := children.Block(bodyContext, source.Body)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}

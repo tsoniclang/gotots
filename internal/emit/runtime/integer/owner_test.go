@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -45,7 +46,8 @@ func TestBuildCreatesExactTypedDivideAndRemainderFunctions(t *testing.T) {
 			Expression().(tsgo.CallExpression)
 		panicMember := panicCall.Expression().(tsgo.PropertyAccessExpression)
 		if panicMember.Expression().(tsgo.Identifier).Text() != "GoPanic" ||
-			panicMember.Name().(tsgo.Identifier).Text() != "raise" {
+			panicMember.Name().(tsgo.Identifier).Text() !=
+				panicruntime.RaiseRuntimeName {
 			t.Fatalf("integer helper %d bypasses the shared panic ABI", index)
 		}
 		operation := body[1].(tsgo.ReturnStatement).

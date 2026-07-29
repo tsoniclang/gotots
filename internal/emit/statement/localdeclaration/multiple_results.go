@@ -67,12 +67,26 @@ func emitMultipleResultSpec(
 		if err != nil {
 			return nil, nil, err
 		}
+		selected := binding{
+			sourceName: sourceName,
+			object:     object,
+			value:      value,
+		}
+		target, targetRequests, hoisted, err := gotoLocalAssignment(
+			context,
+			children,
+			selected,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		if hoisted {
+			statements = append(statements, target...)
+			requests = append(requests, targetRequests...)
+			continue
+		}
 		declaration, before, declarationRequests, err :=
-			localVariableDeclaration(context, children, binding{
-				sourceName: sourceName,
-				object:     object,
-				value:      value,
-			})
+			localVariableDeclaration(context, children, selected)
 		if err != nil {
 			return nil, nil, err
 		}

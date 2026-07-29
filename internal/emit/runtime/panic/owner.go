@@ -1,32 +1,79 @@
 package panicruntime
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
-const RaiseName = "raise"
+const (
+	RaiseName        = "raise"
+	RaiseRuntimeName = "raiseRuntime"
+	TakeName         = "take"
+	RecoveredName    = "recovered"
+)
 
-func Build(factory tsgo.Factory, className string) tsgo.Statement {
-	return factory.ClassDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.Identifier(className),
-		[]tsgo.TypeParameterDeclaration{typeParameter(factory)},
-		nil,
-		[]tsgo.ClassElement{
-			constructor(factory),
-			raise(factory, className),
-		},
-	)
+func Build(
+	factory tsgo.Factory,
+	symbol api.RuntimeSymbol,
+	panicName string,
+	valueName string,
+	runtimeValueName string,
+	recoveryName string,
+	errorTokenName string,
+	runtimeErrorTokenName string,
+) (tsgo.Statement, error) {
+	switch symbol {
+	case api.RuntimePanic:
+		return panicCarrier(factory, panicName, valueName, runtimeValueName), nil
+	case api.RuntimePanicValue:
+		return runtimePanicValue(
+			factory,
+			runtimeValueName,
+			valueName,
+			errorTokenName,
+			runtimeErrorTokenName,
+		), nil
+	case api.RuntimeRecovery:
+		return recovery(factory, recoveryName, panicName, valueName), nil
+	default:
+		return nil, &api.RuntimeSymbolError{Symbol: symbol}
+	}
 }
 
 func Call(
 	factory tsgo.Factory,
 	className string,
+	message tsgo.Expression,
+) tsgo.CallExpression {
+	return staticCall(factory, className, RaiseRuntimeName, message)
+}
+
+func CallValue(
+	factory tsgo.Factory,
+	className string,
+	value tsgo.Expression,
+) tsgo.CallExpression {
+	return staticCall(factory, className, RaiseName, value)
+}
+
+func Rethrow(
+	factory tsgo.Factory,
+	value tsgo.Expression,
+) tsgo.ThrowStatement {
+	return factory.ThrowStatement(value)
+}
+
+func staticCall(
+	factory tsgo.Factory,
+	className string,
+	memberName string,
 	value tsgo.Expression,
 ) tsgo.CallExpression {
 	return factory.CallExpression(
 		factory.PropertyAccessExpression(
 			factory.Identifier(className),
 			nil,
-			factory.Identifier(RaiseName),
+			factory.Identifier(memberName),
 			tsgo.NodeFlagsNone,
 		),
 		nil,
@@ -36,69 +83,104 @@ func Call(
 	)
 }
 
-func constructor(factory tsgo.Factory) tsgo.ConstructorDeclaration {
-	return factory.ConstructorDeclaration(
-		[]tsgo.ModifierLike{factory.PrivateKeyword()},
+func panicCarrier(
+	factory tsgo.Factory,
+	className string,
+	valueName string,
+	runtimeValueName string,
+) tsgo.ClassDeclaration {
+	valueType := factory.TypeReferenceNode(factory.Identifier(valueName), nil)
+	return factory.ClassDeclaration(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		factory.Identifier(className),
 		nil,
-		[]tsgo.ParameterDeclaration{factory.ParameterDeclaration(
-			[]tsgo.ModifierLike{
-				factory.PublicKeyword(),
-				factory.ReadonlyKeyword(),
-			},
-			nil,
-			factory.Identifier("value"),
-			nil,
-			typeReference(factory),
-			nil,
-		)},
 		nil,
-		factory.Block(nil, true),
+		[]tsgo.ClassElement{
+			factory.ConstructorDeclaration(
+				[]tsgo.ModifierLike{factory.PrivateKeyword()},
+				nil,
+				[]tsgo.ParameterDeclaration{
+					parameterProperty(
+						factory,
+						"value",
+						valueType,
+						factory.PublicKeyword(),
+						factory.ReadonlyKeyword(),
+					),
+				},
+				nil,
+				factory.Block(nil, true),
+			),
+			raiseValue(factory, className, valueType),
+			raiseRuntime(factory, className, runtimeValueName),
+		},
 	)
 }
 
-func raise(
+func raiseValue(
 	factory tsgo.Factory,
 	className string,
+	valueType tsgo.TypeNode,
+) tsgo.MethodDeclaration {
+	value := factory.Identifier("value")
+	return staticNeverMethod(
+		factory,
+		RaiseName,
+		parameter(factory, "value", valueType),
+		factory.NewExpression(
+			factory.Identifier(className),
+			nil,
+			[]tsgo.Expression{value},
+		),
+	)
+}
+
+func raiseRuntime(
+	factory tsgo.Factory,
+	className string,
+	runtimeValueName string,
+) tsgo.MethodDeclaration {
+	return staticNeverMethod(
+		factory,
+		RaiseRuntimeName,
+		parameter(
+			factory,
+			"message",
+			factory.KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindStringKeyword,
+			),
+		),
+		factory.NewExpression(
+			factory.Identifier(className),
+			nil,
+			[]tsgo.Expression{
+				factory.NewExpression(
+					factory.Identifier(runtimeValueName),
+					nil,
+					[]tsgo.Expression{factory.Identifier("message")},
+				),
+			},
+		),
+	)
+}
+
+func staticNeverMethod(
+	factory tsgo.Factory,
+	name string,
+	parameterDeclaration tsgo.ParameterDeclaration,
+	thrown tsgo.Expression,
 ) tsgo.MethodDeclaration {
 	return factory.MethodDeclaration(
 		[]tsgo.ModifierLike{factory.StaticKeyword()},
 		nil,
-		factory.Identifier(RaiseName),
+		factory.Identifier(name),
 		nil,
-		[]tsgo.TypeParameterDeclaration{typeParameter(factory)},
-		[]tsgo.ParameterDeclaration{factory.ParameterDeclaration(
-			nil,
-			nil,
-			factory.Identifier("value"),
-			nil,
-			typeReference(factory),
-			nil,
-		)},
-		factory.KeywordTypeNode(
-			tsgo.KeywordTypeSyntaxKindNeverKeyword,
+		nil,
+		[]tsgo.ParameterDeclaration{parameterDeclaration},
+		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNeverKeyword),
+		factory.Block(
+			[]tsgo.Statement{factory.ThrowStatement(thrown)},
+			true,
 		),
-		factory.Block([]tsgo.Statement{factory.ThrowStatement(
-			factory.NewExpression(
-				factory.Identifier(className),
-				[]tsgo.TypeNode{typeReference(factory)},
-				[]tsgo.Expression{factory.Identifier("value")},
-			),
-		)}, true),
 	)
-}
-
-func typeParameter(
-	factory tsgo.Factory,
-) tsgo.TypeParameterDeclaration {
-	return factory.TypeParameterDeclaration(
-		nil,
-		factory.Identifier("T"),
-		nil,
-		nil,
-		nil,
-	)
-}
-
-func typeReference(factory tsgo.Factory) tsgo.TypeReferenceNode {
-	return factory.TypeReferenceNode(factory.Identifier("T"), nil)
 }

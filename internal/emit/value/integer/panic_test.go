@@ -35,8 +35,10 @@ func TestBigIntDivisionByZeroUsesSharedGoPanicDifferentially(t *testing.T) {
 		integerRuntime,
 		`import { GoPanic } from "./panic.js";`,
 	) != 1 ||
-		!strings.Contains(integerRuntime, "GoPanic.raise") ||
-		strings.Count(panicRuntime, "export class GoPanic<T>") != 1 {
+		!strings.Contains(integerRuntime, "GoPanic.raiseRuntime") ||
+		strings.Count(panicRuntime, "export class GoPanic") != 1 ||
+		!strings.Contains(panicRuntime, "export class GoRuntimePanicValue") ||
+		strings.Contains(panicRuntime, "export class GoPanic<") {
 		t.Fatalf(
 			"shared panic artifacts are not exact:\n%s\n%s",
 			integerRuntime,

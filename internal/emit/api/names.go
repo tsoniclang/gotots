@@ -53,6 +53,17 @@ const (
 	TemporaryForCondition
 	TemporaryForPost
 	TemporaryRangeState
+	TemporaryDeferStack
+	TemporaryDeferredCall
+	TemporaryRecoveryAuthority
+	TemporaryActivePanic
+	TemporaryCaughtPanic
+	TemporaryReturnResult
+	TemporaryReturnLabel
+	TemporaryControlTarget
+	TemporaryGotoTarget
+	TemporaryGotoState
+	TemporaryGotoDispatch
 )
 
 type NameReference struct {
@@ -271,6 +282,28 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_for_post_", nil
 	case TemporaryRangeState:
 		return "__gotots_range_state_", nil
+	case TemporaryDeferStack:
+		return "__gotots_defers_", nil
+	case TemporaryDeferredCall:
+		return "__gotots_deferred_", nil
+	case TemporaryRecoveryAuthority:
+		return "__gotots_recovery_", nil
+	case TemporaryActivePanic:
+		return "__gotots_panic_", nil
+	case TemporaryCaughtPanic:
+		return "__gotots_caught_", nil
+	case TemporaryReturnResult:
+		return "__gotots_return_", nil
+	case TemporaryReturnLabel:
+		return "__gotots_return_block_", nil
+	case TemporaryControlTarget:
+		return "__gotots_control_target_", nil
+	case TemporaryGotoTarget:
+		return "__gotots_goto_target_", nil
+	case TemporaryGotoState:
+		return "__gotots_goto_state_", nil
+	case TemporaryGotoDispatch:
+		return "__gotots_goto_dispatch_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

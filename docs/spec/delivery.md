@@ -272,12 +272,14 @@ computes the cycle-free transitive closure, emits each symbol once, and creates
 canonical static ESM imports between runtime modules. Runtime files are
 constructed as TS-Go AST and printed by the pinned TS-Go printer.
 
-All admitted runtime failures enter one generated `GoPanic<T>` carrier.
-`runtime/panic.ts` is the only runtime module that constructs a target
-`ThrowStatement`; integer, string, pointer, array, slice, and map modules
-request it through the dependency graph. Source-level `panic` and `recover`
-remain a later semantic family, so this checkpoint proves failure occurrence
-and carrier identity, not yet recovered runtime-fault payload equivalence.
+All admitted runtime failures enter one generated non-generic `GoPanic`
+carrier. `runtime/panic.ts` is the only runtime module that creates and
+initially throws that carrier; integer, string, pointer, array, slice, and map
+modules request it through the dependency graph. The function-control
+milestone adds source `panic`/`recover`, exact recovered runtime-error
+contracts, and a distinct canonical `*runtime.PanicNilError` dynamic identity.
+A callable envelope may rethrow an unrecognized host exception unchanged, but
+may not interpret it as a Go panic.
 
 One builtin-object dispatcher owns `new`, `make`, `len`, `cap`, `append`,
 `copy`, `delete`, and `clear`. One accessor-store transaction owns Go evaluation order
@@ -465,6 +467,30 @@ constructed type arguments; all three iterator signatures; and strict,
 differential, mutation, tail-size, and scaling proof. Generic body bytes remain
 constant as instantiation count grows, and capability definitions grow only
 with distinct exact operation-selection/signature pairs.
+
+### 3G. Function Control, Defer, Panic, And Goto
+
+Install source `panic`, exact direct-call `recover`, immediate defer
+registration with Go copies, LIFO unwind, named-result mutation, replacement
+panic behavior, exact labels, and arbitrary valid goto. The exact callable
+artifact owns one demand-selected target assembly; no control IR, CFG, source
+inventory, or alternate walker is introduced.
+
+Exit requires direct and function-valued calls, receiver and interface method
+values, generic functions, nested function literals, ordinary and named
+returns, panic replacement and recovery directness, labels, fallthrough,
+labeled break/continue, direct structural goto, non-structural goto, and
+goto/defer/range/switch/type-switch composition. Block and clause statement
+lists share one control owner, and nested generated dispatch must not capture
+an unlabeled source break or continue. The only exception carrier is
+`runtime/panic.ts`; recovery authority is invocation-local and typed.
+Deferred callable-value invocation consumes the one exact-signature callable
+ABI installed by the callable-storage milestone: ordinary invocation omits its
+optional recovery facet and deferred invocation supplies it. Function-control
+must not create an ABI identity per variable, field, pointer, container, or
+adapter, and must not introduce a storage/dataflow graph.
+Functions without control demand remain byte-identical. State-machine size is
+linear in source statements and is absent when direct target control suffices.
 
 ## 4. Environment And Completion
 

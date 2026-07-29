@@ -55,6 +55,14 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
+	context, err = context.WithCallableControls(
+		api.MustSourceArtifactOwner(functionObject),
+		source,
+		requirements,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
 	genericParameters, err := genericdeclaration.Enter(
 		context,
 		children,
@@ -148,9 +156,18 @@ func Emit(
 		}
 		parameterRequests = append(receiverRequests, parameterRequests...)
 	}
+	if context.CallableControlFor(source).Recovery() {
+		recovery, requests, err := callable.RecoveryAuthorityParameter(context)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		parameters = append(parameters, recovery)
+		parameterRequests = append(parameterRequests, requests...)
+	}
 	body, err := callable.EmitBody(
 		context,
 		children,
+		source,
 		source.Type,
 		source.Body,
 		signature,

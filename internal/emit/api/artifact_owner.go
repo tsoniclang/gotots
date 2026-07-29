@@ -55,13 +55,13 @@ func (c Context) WithSourceArtifactOwner(
 			Reason: "source artifact owner is invalid",
 		}
 	}
-	if existing, bound := c.currentArtifactOwner.Source(); bound &&
+	if existing, bound := c.artifactOwner.Source(); bound &&
 		existing != source {
 		return Context{}, &ContextError{
 			Reason: "source artifact owner is already bound",
 		}
 	}
-	c.currentArtifactOwner = owner
+	c.artifactOwner = owner
 	return c, nil
 }
 

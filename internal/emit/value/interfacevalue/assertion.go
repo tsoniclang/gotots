@@ -6,6 +6,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	interfaceadapter "github.com/tsoniclang/gotots/internal/emit/declaration/interfaceadapter"
+	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
+	panicnilruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panicnil"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -15,6 +17,35 @@ func Test(
 	targetType types.Type,
 	value tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	switch context.GoRuntimeType(targetType) {
+	case api.GoRuntimeTypeBuiltinError:
+		return runtimeInterfaceTest(context, api.RuntimeBuiltinErrorGuard, value)
+	case api.GoRuntimeTypeError:
+		return runtimeInterfaceTest(context, api.RuntimeErrorGuard, value)
+	case api.GoRuntimeTypePanicNilPointer:
+		reference, err := context.Names().Runtime(
+			api.RuntimePanicNilValue,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+					context.Factory().Identifier(panicnilruntime.GuardName),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{value},
+				tsgo.NodeFlagsNone,
+			),
+			reference.Requests()...,
+		), nil
+	}
 	if _, ok := interfacetype.Resolve(targetType); ok {
 		contract, err := context.Names().InterfaceContract(targetType)
 		if err != nil {
@@ -58,6 +89,31 @@ func Extract(
 	targetType types.Type,
 	value tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	switch context.GoRuntimeType(targetType) {
+	case api.GoRuntimeTypeBuiltinError:
+		return runtimeInterfaceExtract(context, api.RuntimeBuiltinErrorType, value)
+	case api.GoRuntimeTypeError:
+		return runtimeInterfaceExtract(context, api.RuntimeErrorType, value)
+	case api.GoRuntimeTypePanicNilPointer:
+		reference, err := context.Names().Runtime(
+			api.RuntimePanicNilValue,
+			api.ImportPhaseType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().PropertyAccessExpression(
+				value,
+				nil,
+				context.Factory().Identifier(
+					interfacecontract.PayloadMember,
+				),
+				tsgo.NodeFlagsNone,
+			),
+			reference.Requests()...,
+		), nil
+	}
 	if _, ok := interfacetype.Resolve(targetType); ok {
 		contract, err := context.Names().InterfaceContract(targetType)
 		if err != nil {
@@ -93,4 +149,37 @@ func Extract(
 		target.Value(),
 		api.CombineRequests(target.Requests(), adapter.Requests()),
 	)
+}
+
+func runtimeInterfaceTest(
+	context api.Context,
+	symbol api.RuntimeSymbol,
+	value tsgo.Expression,
+) (api.ExpressionEmission, error) {
+	reference, err := context.Names().Runtime(symbol, api.ImportPhaseValue)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.DirectExpression(
+		context.Factory().CallExpression(
+			context.Factory().Identifier(reference.Name()),
+			nil,
+			nil,
+			[]tsgo.Expression{value},
+			tsgo.NodeFlagsNone,
+		),
+		reference.Requests()...,
+	), nil
+}
+
+func runtimeInterfaceExtract(
+	context api.Context,
+	symbol api.RuntimeSymbol,
+	value tsgo.Expression,
+) (api.ExpressionEmission, error) {
+	reference, err := context.Names().Runtime(symbol, api.ImportPhaseType)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.DirectExpression(value, reference.Requests()...), nil
 }

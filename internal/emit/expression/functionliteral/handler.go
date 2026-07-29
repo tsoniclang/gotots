@@ -41,9 +41,21 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	parameters := targetSignature.Parameters()
+	requests := targetSignature.Requests()
+	if context.CallableControlFor(source).Recovery() {
+		recovery, recoveryRequests, err :=
+			callable.RecoveryAuthorityParameter(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		parameters = append(parameters, recovery)
+		requests = append(requests, recoveryRequests...)
+	}
 	body, err := callable.EmitBody(
 		context,
 		children,
+		source,
 		source.Type,
 		source.Body,
 		signature,
@@ -58,12 +70,12 @@ func Emit(
 			nil,
 			nil,
 			nil,
-			targetSignature.Parameters(),
+			parameters,
 			targetSignature.Result(),
 			body.Value(),
 		),
 		api.CombineRequests(
-			targetSignature.Requests(),
+			requests,
 			body.Requests(),
 		)...,
 	), nil
