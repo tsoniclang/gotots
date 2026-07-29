@@ -322,8 +322,12 @@ func (s *programSession) buildArtifactRevision(
 	defer finish()
 
 	requirements := s.requirements.appliedFor(artifactOwner)
-	context, err := emitnaming.WithLexicalTypeRequirements(
-		builder.context,
+	context, err := builder.context.WithSourceArtifactOwner(artifactOwner)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	context, err = emitnaming.WithLexicalTypeRequirements(
+		context,
 		site.declaration,
 		artifactOwner,
 		requirements,

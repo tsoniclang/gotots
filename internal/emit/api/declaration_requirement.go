@@ -376,12 +376,10 @@ func (r DeclarationRequirement) Valid() bool {
 			return false
 		}
 		source, sourceOK := r.owner.Source()
-		owner, ok := source.(*types.Func)
 		return sourceOK &&
-			ok &&
-			owner.Origin() == owner &&
-			len(genericTypeParameters(owner)) != 0 &&
-			r.genericOperation.Owner() == owner
+			GenericDeclarationOrigin(source) == source &&
+			len(GenericDeclarationParameters(source)) != 0 &&
+			r.genericOperation.Owner() == source
 	case DeclarationRequirementAnonymousStruct:
 		return r.operation == NamedStructOperationInvalid &&
 			r.typeName == nil &&

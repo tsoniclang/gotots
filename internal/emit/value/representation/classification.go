@@ -40,17 +40,20 @@ func namedStruct(
 		return nil, nil, false
 	}
 	named, ok := types.Unalias(sourceType).(*types.Named)
-	if !ok || named.TypeParams().Len() != 0 {
+	if !ok ||
+		named.Obj() == nil ||
+		(named.TypeParams().Len() != 0 &&
+			named.TypeArgs().Len() != named.TypeParams().Len()) {
 		return nil, nil, false
 	}
 	structType, ok := named.Underlying().(*types.Struct)
-	if !ok || named.Obj() == nil {
+	if !ok {
 		return nil, nil, false
 	}
-	return named.Obj(), structType, true
+	return named.Origin().Obj(), structType, true
 }
 
-func namedStructOperationCall(
+func staticStructOperationCall(
 	context api.Context,
 	className string,
 	operation api.NamedStructOperation,

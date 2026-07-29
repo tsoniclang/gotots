@@ -69,7 +69,7 @@ func (r DeclarationRequirement) LocalConstantProjection() (
 }
 
 func (r DeclarationRequirement) GenericOperation() (
-	*types.Func,
+	types.Object,
 	*GenericOperationContract,
 	bool,
 ) {
@@ -78,10 +78,10 @@ func (r DeclarationRequirement) GenericOperation() (
 		return nil, nil, false
 	}
 	source, sourceOK := r.owner.Source()
-	owner, ok := source.(*types.Func)
-	return owner,
+	return source,
 		r.genericOperation,
-		sourceOK && ok
+		sourceOK &&
+			GenericDeclarationOrigin(source) == source
 }
 
 func (r DeclarationRequirement) AnonymousStruct() (
@@ -335,7 +335,7 @@ func NewGenericCapabilityRequest(
 }
 
 func NewGenericOperationRequirement(
-	owner *types.Func,
+	owner types.Object,
 	operation *GenericOperationContract,
 ) (DeclarationRequirement, error) {
 	if owner == nil {
@@ -343,11 +343,11 @@ func NewGenericOperationRequirement(
 			Reason: "generic operation owner is nil",
 		}
 	}
-	owner = owner.Origin()
+	owner = GenericDeclarationOrigin(owner)
 	if operation == nil ||
 		!operation.Valid() ||
 		operation.Owner() != owner ||
-		len(genericTypeParameters(owner)) == 0 {
+		len(GenericDeclarationParameters(owner)) == 0 {
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "generic operation requirement is invalid",
 		}
@@ -360,7 +360,7 @@ func NewGenericOperationRequirement(
 }
 
 func NewGenericOperationRequest(
-	owner *types.Func,
+	owner types.Object,
 	operation *GenericOperationContract,
 ) (RootRequest, error) {
 	requirement, err := NewGenericOperationRequirement(owner, operation)
@@ -370,22 +370,45 @@ func NewGenericOperationRequest(
 	return newDeclarationRequirementRequest(requirement), nil
 }
 
-func genericTypeParameters(owner *types.Func) []*types.TypeParam {
-	if owner == nil {
-		return nil
-	}
-	signature, ok := owner.Type().(*types.Signature)
-	if !ok {
-		return nil
-	}
+func GenericDeclarationParameters(owner types.Object) []*types.TypeParam {
 	var parameters []*types.TypeParam
-	for _, list := range []*types.TypeParamList{
-		signature.RecvTypeParams(),
-		signature.TypeParams(),
-	} {
+	var lists []*types.TypeParamList
+	switch source := owner.(type) {
+	case *types.Func:
+		signature, _ := source.Type().(*types.Signature)
+		if signature != nil {
+			lists = []*types.TypeParamList{
+				signature.RecvTypeParams(),
+				signature.TypeParams(),
+			}
+		}
+	case *types.TypeName:
+		switch declared := source.Type().(type) {
+		case *types.Named:
+			lists = []*types.TypeParamList{declared.TypeParams()}
+		case *types.Alias:
+			lists = []*types.TypeParamList{declared.TypeParams()}
+		}
+	}
+	for _, list := range lists {
 		for index := range list.Len() {
 			parameters = append(parameters, list.At(index))
 		}
 	}
 	return parameters
+}
+
+func GenericDeclarationOrigin(owner types.Object) types.Object {
+	switch source := owner.(type) {
+	case *types.Func:
+		return source.Origin()
+	case *types.TypeName:
+		switch declared := source.Type().(type) {
+		case *types.Named:
+			return declared.Origin().Obj()
+		case *types.Alias:
+			return declared.Origin().Obj()
+		}
+	}
+	return nil
 }

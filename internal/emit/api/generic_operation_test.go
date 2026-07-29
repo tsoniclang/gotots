@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"go/token"
 	"go/types"
 	"regexp"
@@ -146,15 +147,16 @@ func TestGenericOperationContractCarriesCrossParameterSignature(t *testing.T) {
 		owner,
 		"binary_shift_left|(T,U)->T",
 		"$go$binary_shift_left",
+		GenericFunctionOperationConsumer(),
 		selection,
 		operationSignature,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	callable, err := NewGenericCallable(
+	callable, err := NewGenericOperationSet(
 		owner,
-		[]*types.TypeParam{left, right},
+		GenericFunctionOperationConsumer(),
 		[]*GenericOperationContract{contract},
 	)
 	if err != nil {
@@ -209,6 +211,7 @@ func TestGenericOperationContractCarriesCrossParameterSignature(t *testing.T) {
 		owner,
 		"copy|(V)->V",
 		"$go$copy",
+		GenericFunctionOperationConsumer(),
 		mustGenericOperation(t, GenericOperationCopy),
 		foreignOperation,
 	); err == nil {
@@ -226,4 +229,150 @@ func mustGenericOperation(
 		t.Fatal(err)
 	}
 	return selection
+}
+
+func TestGenericParametersRejectForeignSameShapeArtifactOwner(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/generic", "generic")
+	for _, testCase := range []struct {
+		name string
+		pair func() (types.Object, *types.TypeParam, types.Object, *types.TypeParam)
+	}{
+		{name: "function", pair: func() (
+			types.Object,
+			*types.TypeParam,
+			types.Object,
+			*types.TypeParam,
+		) {
+			firstParameter := genericContextTypeParameter(sourcePackage, "T")
+			secondParameter := genericContextTypeParameter(sourcePackage, "T")
+			return genericContextFunction(
+					sourcePackage,
+					"Transform",
+					firstParameter,
+				),
+				firstParameter,
+				genericContextFunction(
+					sourcePackage,
+					"Transform",
+					secondParameter,
+				),
+				secondParameter
+		}},
+		{name: "type", pair: func() (
+			types.Object,
+			*types.TypeParam,
+			types.Object,
+			*types.TypeParam,
+		) {
+			first, firstParameter := genericContextNamedType(
+				sourcePackage,
+				"Box",
+			)
+			second, secondParameter := genericContextNamedType(
+				sourcePackage,
+				"Box",
+			)
+			return first, firstParameter, second, secondParameter
+		}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			owner, parameter, foreign, foreignParameter := testCase.pair()
+			if owner == foreign ||
+				owner.Name() != foreign.Name() ||
+				!types.Identical(
+					owner.Type().Underlying(),
+					foreign.Type().Underlying(),
+				) {
+				t.Fatal("mutation control is not a foreign same-shape owner")
+			}
+			ownerOrigin := GenericDeclarationOrigin(owner)
+			foreignOrigin := GenericDeclarationOrigin(foreign)
+			if ownerOrigin != owner ||
+				foreignOrigin != foreign ||
+				ownerOrigin == foreignOrigin {
+				t.Fatal("generic origin collapsed foreign same-shape owners")
+			}
+			ownerParameters := GenericDeclarationParameters(ownerOrigin)
+			foreignParameters := GenericDeclarationParameters(foreignOrigin)
+			if len(ownerParameters) != 1 ||
+				ownerParameters[0] != parameter ||
+				len(foreignParameters) != 1 ||
+				foreignParameters[0] != foreignParameter {
+				t.Fatal("generic parameter authority diverged from exact origins")
+			}
+			context, err := (Context{}).WithSourceArtifactOwner(
+				MustSourceArtifactOwner(owner),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := context.WithGenericParameters(
+				owner,
+				map[*types.TypeParam]string{parameter: "T"},
+			); err != nil {
+				t.Fatalf("source owner rejected: %v", err)
+			}
+			_, err = context.WithGenericParameters(
+				foreign,
+				map[*types.TypeParam]string{foreignParameter: "T"},
+			)
+			var contextError *ContextError
+			if !errors.As(err, &contextError) {
+				t.Fatalf("foreign owner error = %#v, want ContextError", err)
+			}
+		})
+	}
+}
+
+func genericContextTypeParameter(
+	sourcePackage *types.Package,
+	name string,
+) *types.TypeParam {
+	constraint := types.NewInterfaceType(nil, nil)
+	constraint.Complete()
+	return types.NewTypeParam(
+		types.NewTypeName(token.NoPos, sourcePackage, name, nil),
+		constraint,
+	)
+}
+
+func genericContextFunction(
+	sourcePackage *types.Package,
+	name string,
+	parameter *types.TypeParam,
+) *types.Func {
+	return types.NewFunc(
+		token.NoPos,
+		sourcePackage,
+		name,
+		types.NewSignatureType(
+			nil,
+			nil,
+			[]*types.TypeParam{parameter},
+			types.NewTuple(types.NewVar(
+				token.NoPos,
+				sourcePackage,
+				"value",
+				parameter,
+			)),
+			types.NewTuple(types.NewVar(
+				token.NoPos,
+				sourcePackage,
+				"",
+				parameter,
+			)),
+			false,
+		),
+	)
+}
+
+func genericContextNamedType(
+	sourcePackage *types.Package,
+	name string,
+) (*types.TypeName, *types.TypeParam) {
+	parameter := genericContextTypeParameter(sourcePackage, "T")
+	owner := types.NewTypeName(token.NoPos, sourcePackage, name, nil)
+	named := types.NewNamed(owner, types.NewStruct(nil, nil), nil)
+	named.SetTypeParams([]*types.TypeParam{parameter})
+	return owner, parameter
 }

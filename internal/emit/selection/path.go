@@ -71,7 +71,8 @@ func methodPath(selected *types.Selection) (path, *types.Func, bool) {
 	}
 	named, ok := types.Unalias(base).(*types.Named)
 	if !ok ||
-		named.TypeParams().Len() != 0 ||
+		(named.TypeParams().Len() != 0 &&
+			named.TypeArgs().Len() != named.TypeParams().Len()) ||
 		indices[len(indices)-1] < 0 ||
 		indices[len(indices)-1] >= named.NumMethods() {
 		return path{}, nil, false
@@ -83,8 +84,7 @@ func methodPath(selected *types.Selection) (path, *types.Func, bool) {
 	signature, ok := method.Type().(*types.Signature)
 	if !ok ||
 		signature.Recv() == nil ||
-		signature.TypeParams().Len() != 0 ||
-		signature.RecvTypeParams().Len() != 0 {
+		signature.TypeParams().Len() != 0 {
 		return path{}, nil, false
 	}
 	return result, method, true

@@ -42,39 +42,46 @@ type Context struct {
 	continueDepth            uint32
 	controlLabels            map[*types.Label]ControlLabel
 	statementLabel           string
-	artifactOwner            *types.Func
+	currentArtifactOwner     ArtifactOwner
 	storageNames             map[*types.Var]string
 	localConstantProjections map[*types.Const][]types.BasicKind
 	lexicalTypeRequirements  map[*types.TypeName][]DeclarationRequirement
 	genericResolver          GenericCallableResolver
-	genericOwner             *types.Func
+	genericConsumer          GenericOperationConsumer
 	genericParameters        map[*types.TypeParam]string
 }
 
 func (c Context) WithAddressableStorage(
 	owner *types.Func,
 	storageNames map[*types.Var]string,
-) Context {
-	if owner == nil {
-		panic("addressable-storage owner is nil")
+) (Context, error) {
+	current, ok := c.FunctionArtifactOwner()
+	if owner == nil || !ok || current != owner {
+		return Context{}, &ContextError{
+			Reason: "addressable-storage owner differs from source artifact owner",
+		}
 	}
-	c.artifactOwner = owner
 	c.storageNames = make(map[*types.Var]string, len(storageNames))
 	for variable, name := range storageNames {
 		if variable == nil || variable.IsField() || name == "" {
-			panic("addressable-storage selection is invalid")
+			return Context{}, &ContextError{
+				Reason: "addressable-storage selection is invalid",
+			}
 		}
 		c.storageNames[variable] = name
 	}
-	return c
+	return c, nil
 }
 
 func (c Context) WithLocalConstantProjections(
 	owner *types.Func,
 	projections map[*types.Const][]types.BasicKind,
-) Context {
-	if owner == nil || c.artifactOwner != owner {
-		panic("local-constant projection owner differs from artifact owner")
+) (Context, error) {
+	current, ok := c.FunctionArtifactOwner()
+	if owner == nil || !ok || current != owner {
+		return Context{}, &ContextError{
+			Reason: "local-constant projection owner differs from source artifact owner",
+		}
 	}
 	c.localConstantProjections = make(
 		map[*types.Const][]types.BasicKind,
@@ -82,11 +89,13 @@ func (c Context) WithLocalConstantProjections(
 	)
 	for selected, kinds := range projections {
 		if selected == nil || len(kinds) == 0 {
-			panic("local-constant projection selection is invalid")
+			return Context{}, &ContextError{
+				Reason: "local-constant projection selection is invalid",
+			}
 		}
 		c.localConstantProjections[selected] = slices.Clone(kinds)
 	}
-	return c
+	return c, nil
 }
 
 func (c Context) WithLexicalTypeRequirements(
@@ -323,8 +332,10 @@ func (c Context) ControlLabel(label *types.Label) (ControlLabel, bool) {
 	return target, ok
 }
 
-func (c Context) ArtifactOwner() *types.Func {
-	return c.artifactOwner
+func (c Context) FunctionArtifactOwner() (*types.Func, bool) {
+	source, ok := c.currentArtifactOwner.Source()
+	owner, functionOwned := source.(*types.Func)
+	return owner, ok && functionOwned
 }
 
 func (c Context) LocalConstantProjections(
@@ -400,146 +411,4 @@ type ChildEmitter interface {
 	IfAlternate(Context, *ast.IfStmt) (StatementEmission, error)
 	Type(Context, ast.Expr) (TypeEmission, error)
 	RepresentedType(Context, ast.Node, types.Type) (TypeEmission, error)
-}
-
-func (c Context) WithGenericCallableResolver(
-	resolver GenericCallableResolver,
-) Context {
-	if resolver == nil {
-		panic("generic callable resolver is nil")
-	}
-	c.genericResolver = resolver
-	return c
-}
-
-func (c Context) ProjectGenericOperation(
-	source ast.Node,
-	origin *GenericOperationContract,
-	signature *types.Signature,
-) (NameReference, error) {
-	if c.genericOwner == nil ||
-		c.genericResolver == nil ||
-		source == nil ||
-		!origin.Valid() ||
-		!validGenericOperationSignature(signature) {
-		return NameReference{}, &ContextError{
-			Reason: "projected generic operation is unavailable",
-		}
-	}
-	contract, err := c.genericResolver.ResolveGenericOperation(
-		c.genericOwner,
-		origin.Selection(),
-		signature,
-	)
-	if err != nil {
-		return NameReference{}, err
-	}
-	request, err := NewGenericOperationRequest(c.genericOwner, contract)
-	if err != nil {
-		return NameReference{}, err
-	}
-	return NewNameReference(contract.TargetName(), request)
-}
-
-func (c Context) WithGenericParameters(
-	owner *types.Func,
-	names map[*types.TypeParam]string,
-) Context {
-	if owner == nil || owner.Origin() != owner || c.artifactOwner != owner {
-		panic("generic parameter owner is inconsistent")
-	}
-	c.genericOwner = owner
-	c.genericParameters = make(map[*types.TypeParam]string, len(names))
-	for parameter, name := range names {
-		if parameter == nil ||
-			name == "" ||
-			!genericParameterBelongsTo(owner, parameter) {
-			panic("generic parameter binding is invalid")
-		}
-		c.genericParameters[parameter] = name
-	}
-	return c
-}
-
-func (c Context) GenericOperation(
-	source ast.Node,
-	operation GenericOperation,
-	signature *types.Signature,
-) (NameReference, error) {
-	selection, err := SelectGenericOperation(operation)
-	if err != nil {
-		return NameReference{}, err
-	}
-	return c.genericOperation(source, selection, signature)
-}
-
-func (c Context) GenericConstraintMethod(
-	source ast.Node,
-	method *types.Func,
-	signature *types.Signature,
-) (NameReference, error) {
-	selection, err := SelectGenericConstraintMethod(method)
-	if err != nil {
-		return NameReference{}, err
-	}
-	return c.genericOperation(source, selection, signature)
-}
-
-func (c Context) genericOperation(
-	source ast.Node,
-	selection GenericOperationSelection,
-	signature *types.Signature,
-) (NameReference, error) {
-	if c.genericOwner == nil ||
-		c.genericResolver == nil ||
-		source == nil ||
-		!selection.Valid() ||
-		!validGenericOperationSignature(signature) {
-		return NameReference{}, &ContextError{
-			Reason: "generic operation is unavailable",
-		}
-	}
-	contract, err := c.genericResolver.ResolveGenericOperation(
-		c.genericOwner,
-		selection,
-		signature,
-	)
-	if err != nil {
-		return NameReference{}, err
-	}
-	request, err := NewGenericOperationRequest(c.genericOwner, contract)
-	if err != nil {
-		return NameReference{}, err
-	}
-	return NewNameReference(contract.TargetName(), request)
-}
-
-func (c Context) ResolveGenericCallable(
-	function *types.Func,
-) (GenericCallable, bool, error) {
-	if c.genericResolver == nil {
-		return GenericCallable{}, false, &ContextError{
-			Reason: "generic callable resolver is unavailable",
-		}
-	}
-	return c.genericResolver.ResolveGenericCallable(function)
-}
-
-func (c Context) GenericParameterName(
-	parameter *types.TypeParam,
-) (string, bool) {
-	name, ok := c.genericParameters[parameter]
-	return name, ok
-}
-
-func genericParameterBelongsTo(
-	owner *types.Func,
-	parameter *types.TypeParam,
-) bool {
-	for _, selected := range genericTypeParameters(owner) {
-		if selected == parameter {
-			return true
-		}
-	}
-	return false
 }

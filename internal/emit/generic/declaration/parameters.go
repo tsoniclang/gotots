@@ -17,6 +17,85 @@ type Parameters struct {
 	requests     []api.RootRequest
 }
 
+type TypeParameters struct {
+	context    api.Context
+	nodes      []tsgo.TypeParameterDeclaration
+	references []tsgo.TypeNode
+}
+
+func EnterType(
+	context api.Context,
+	source *ast.TypeSpec,
+	owner *types.TypeName,
+) (TypeParameters, error) {
+	if source == nil || owner == nil {
+		return TypeParameters{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic type declaration identity is invalid",
+		}
+	}
+	parameters := api.GenericDeclarationParameters(owner)
+	if len(parameters) == 0 {
+		if source.TypeParams != nil {
+			return TypeParameters{}, api.Unsupported(
+				context,
+				api.CategoryDeclaration,
+				source.TypeParams,
+			)
+		}
+		return TypeParameters{context: context}, nil
+	}
+	if source.TypeParams == nil {
+		return TypeParameters{}, api.Unsupported(
+			context,
+			api.CategoryDeclaration,
+			source,
+		)
+	}
+	names := make(map[*types.TypeParam]string, len(parameters))
+	nodes := make([]tsgo.TypeParameterDeclaration, 0, len(parameters))
+	references := make([]tsgo.TypeNode, 0, len(parameters))
+	for _, parameter := range parameters {
+		name, err := context.Names().Declare(parameter.Obj())
+		if err != nil {
+			return TypeParameters{}, err
+		}
+		names[parameter] = name
+		nodes = append(nodes, context.Factory().TypeParameterDeclaration(
+			nil,
+			context.Factory().Identifier(name),
+			nil,
+			nil,
+			nil,
+		))
+		references = append(references, context.Factory().TypeReferenceNode(
+			context.Factory().Identifier(name),
+			nil,
+		))
+	}
+	context, err := context.WithGenericParameters(owner, names)
+	if err != nil {
+		return TypeParameters{}, err
+	}
+	return TypeParameters{
+		context:    context,
+		nodes:      nodes,
+		references: references,
+	}, nil
+}
+
+func (p TypeParameters) Context() api.Context {
+	return p.context
+}
+
+func (p TypeParameters) Nodes() []tsgo.TypeParameterDeclaration {
+	return append([]tsgo.TypeParameterDeclaration(nil), p.nodes...)
+}
+
+func (p TypeParameters) References() []tsgo.TypeNode {
+	return append([]tsgo.TypeNode(nil), p.references...)
+}
+
 func Enter(
 	context api.Context,
 	children api.ChildEmitter,
@@ -30,7 +109,7 @@ func Enter(
 			Reason: "generic declaration identity is invalid",
 		}
 	}
-	signature, ok := owner.Type().(*types.Signature)
+	_, ok := owner.Type().(*types.Signature)
 	if !ok {
 		return Parameters{}, api.Unsupported(
 			context,
@@ -38,7 +117,7 @@ func Enter(
 			source,
 		)
 	}
-	parameters := signatureTypeParameters(signature)
+	parameters := api.GenericDeclarationParameters(owner)
 	if len(parameters) == 0 {
 		if source.Type.TypeParams != nil {
 			return Parameters{}, api.Unsupported(
@@ -72,22 +151,58 @@ func Enter(
 			),
 		)
 	}
-	context = context.WithGenericParameters(owner, names)
+	context, err := context.WithGenericParameters(owner, names)
+	if err != nil {
+		return Parameters{}, err
+	}
 	operations, err := appliedOperations(owner, requirements)
 	if err != nil {
 		return Parameters{}, err
 	}
-	var capabilities []tsgo.ParameterDeclaration
+	capabilities, requests, err := EmitOperationParameters(
+		context,
+		children,
+		source.Type,
+		operations,
+	)
+	if err != nil {
+		return Parameters{}, err
+	}
+	return Parameters{
+		context:      context,
+		typeNodes:    typeNodes,
+		capabilities: capabilities,
+		requests:     requests,
+	}, nil
+}
+
+func EmitOperationParameters(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	operations []*api.GenericOperationContract,
+) ([]tsgo.ParameterDeclaration, []api.RootRequest, error) {
+	capabilities := make(
+		[]tsgo.ParameterDeclaration,
+		0,
+		len(operations),
+	)
 	var requests []api.RootRequest
 	for _, operation := range operations {
-		target, targetErr := callable.EmitNonNilType(
+		if !operation.Valid() {
+			return nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "generic operation parameter is invalid",
+			}
+		}
+		target, err := callable.EmitNonNilType(
 			context.WithRole(api.RoleParameterType),
 			children,
-			source.Type,
+			source,
 			operation.Signature(),
 		)
-		if targetErr != nil {
-			return Parameters{}, targetErr
+		if err != nil {
+			return nil, nil, err
 		}
 		capabilities = append(
 			capabilities,
@@ -102,12 +217,7 @@ func Enter(
 		)
 		requests = append(requests, target.Requests()...)
 	}
-	return Parameters{
-		context:      context,
-		typeNodes:    typeNodes,
-		capabilities: capabilities,
-		requests:     requests,
-	}, nil
+	return capabilities, requests, nil
 }
 
 func (p Parameters) Context() api.Context {
@@ -156,19 +266,4 @@ func appliedOperations(
 		}
 	}
 	return operations, nil
-}
-
-func signatureTypeParameters(
-	signature *types.Signature,
-) []*types.TypeParam {
-	var parameters []*types.TypeParam
-	for _, list := range []*types.TypeParamList{
-		signature.RecvTypeParams(),
-		signature.TypeParams(),
-	} {
-		for index := range list.Len() {
-			parameters = append(parameters, list.At(index))
-		}
-	}
-	return parameters
 }

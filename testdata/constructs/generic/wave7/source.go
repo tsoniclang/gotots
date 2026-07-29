@@ -47,6 +47,19 @@ func (box Box[T]) Get() T {
 	return box.Value
 }
 
+func ZeroBox[T any]() Box[T] {
+	var result Box[T]
+	return result
+}
+
+func CopyBox[T any](value Box[T]) Box[T] {
+	return value
+}
+
+func EqualBox[T comparable](left, right Box[T]) bool {
+	return left == right
+}
+
 func AuditFunctions() []int32 {
 	first := Identity(int32(4))
 	second := Add[int32](first, 5)
@@ -62,8 +75,12 @@ func Audit() []int32 {
 	first := Identity(int32(4))
 	second := Add[int32](first, 5)
 	box := NewBox(second)
+	copied := CopyBox(box)
+	empty := ZeroBox[int32]()
 	zero := Zero[int32]()
-	if !Equal(box.Get(), int32(9)) {
+	if !Equal(copied.Get(), int32(9)) ||
+		!Equal(empty.Get(), int32(0)) ||
+		!EqualBox(box, copied) {
 		return []int32{-1}
 	}
 	return []int32{box.Get(), zero}

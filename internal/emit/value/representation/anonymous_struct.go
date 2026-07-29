@@ -104,7 +104,7 @@ func anonymousStructOperation(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	call, err := namedStructOperationCall(
+	call, err := staticStructOperationCall(
 		context,
 		reference.Name(),
 		operation,

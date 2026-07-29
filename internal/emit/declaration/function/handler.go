@@ -175,5 +175,5 @@ func applyLocalConstantProjections(
 		}
 		projections[selected] = append(projections[selected], projection)
 	}
-	return context.WithLocalConstantProjections(owner, projections), nil
+	return context.WithLocalConstantProjections(owner, projections)
 }

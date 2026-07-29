@@ -15,6 +15,9 @@ func conversionMethod(
 	className string,
 	classType tsgo.TypeNode,
 	fields []field,
+	capabilities []tsgo.ParameterDeclaration,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	sourceMembers := make([]tsgo.TypeElement, 0, len(fields))
 	arguments := make([]tsgo.Expression, 0, len(fields))
@@ -83,7 +86,9 @@ func conversionMethod(
 		},
 		classType,
 		[]tsgo.Statement{context.Factory().ReturnStatement(
-			construct(context, className, arguments),
+			construct(context, className, typeArguments, arguments),
 		)},
+		capabilities,
+		typeParameters,
 	), requests, nil
 }

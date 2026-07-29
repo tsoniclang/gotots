@@ -212,6 +212,86 @@ type GenericOperationSelection struct {
 	method    *types.Func
 }
 
+type GenericOperationConsumer uint8
+
+const (
+	GenericOperationConsumerInvalid GenericOperationConsumer = iota
+	GenericOperationConsumerFunction
+	GenericOperationConsumerNamedStructZero
+	GenericOperationConsumerNamedStructCopy
+	GenericOperationConsumerNamedStructEqual
+	GenericOperationConsumerNamedStructHash
+	GenericOperationConsumerNamedStructConvert
+	GenericOperationConsumerNamedStructStorage
+)
+
+func GenericFunctionOperationConsumer() GenericOperationConsumer {
+	return GenericOperationConsumerFunction
+}
+
+func GenericNamedStructOperationConsumer(
+	operation NamedStructOperation,
+) (GenericOperationConsumer, error) {
+	var consumer GenericOperationConsumer
+	switch operation {
+	case NamedStructOperationZero:
+		consumer = GenericOperationConsumerNamedStructZero
+	case NamedStructOperationCopy:
+		consumer = GenericOperationConsumerNamedStructCopy
+	case NamedStructOperationEqual:
+		consumer = GenericOperationConsumerNamedStructEqual
+	case NamedStructOperationHash:
+		consumer = GenericOperationConsumerNamedStructHash
+	case NamedStructOperationConvert:
+		consumer = GenericOperationConsumerNamedStructConvert
+	case NamedStructOperationStorage:
+		consumer = GenericOperationConsumerNamedStructStorage
+	default:
+		return GenericOperationConsumerInvalid, &InvariantError{
+			Role:   RoleFileDeclaration,
+			Reason: "generic named-struct operation consumer is invalid",
+		}
+	}
+	return consumer, nil
+}
+
+func (c GenericOperationConsumer) Valid() bool {
+	return c >= GenericOperationConsumerFunction &&
+		c <= GenericOperationConsumerNamedStructStorage
+}
+
+func (c GenericOperationConsumer) NamedStructOperation() (
+	NamedStructOperation,
+	bool,
+) {
+	switch c {
+	case GenericOperationConsumerNamedStructZero:
+		return NamedStructOperationZero, true
+	case GenericOperationConsumerNamedStructCopy:
+		return NamedStructOperationCopy, true
+	case GenericOperationConsumerNamedStructEqual:
+		return NamedStructOperationEqual, true
+	case GenericOperationConsumerNamedStructHash:
+		return NamedStructOperationHash, true
+	case GenericOperationConsumerNamedStructConvert:
+		return NamedStructOperationConvert, true
+	case GenericOperationConsumerNamedStructStorage:
+		return NamedStructOperationStorage, true
+	default:
+		return NamedStructOperationInvalid, false
+	}
+}
+
+func (c GenericOperationConsumer) Identity() string {
+	if c == GenericOperationConsumerFunction {
+		return "function"
+	}
+	if operation, ok := c.NamedStructOperation(); ok {
+		return "named-struct-" + operation.String()
+	}
+	return ""
+}
+
 func SelectGenericOperation(
 	operation GenericOperation,
 ) (GenericOperationSelection, error) {

@@ -128,8 +128,12 @@ func (Owner) Requirement(
 	context api.Context,
 	variable *types.Var,
 ) (api.RootRequest, error) {
-	return api.NewAddressableStorageRequest(
-		context.ArtifactOwner(),
-		variable,
-	)
+	owner, ok := context.FunctionArtifactOwner()
+	if !ok {
+		return api.RootRequest{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "addressable storage has no function artifact owner",
+		}
+	}
+	return api.NewAddressableStorageRequest(owner, variable)
 }

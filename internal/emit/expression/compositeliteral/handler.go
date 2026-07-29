@@ -117,7 +117,9 @@ func structSourceType(
 				expected != nil &&
 				types.AssignableTo(sourceType, expected)
 	}
-	if named.TypeParams().Len() != 0 || source.Incomplete {
+	if source.Incomplete ||
+		(named.TypeParams().Len() != 0 &&
+			named.TypeArgs().Len() != named.TypeParams().Len()) {
 		return nil, nil, false
 	}
 	structType, ok := named.Underlying().(*types.Struct)

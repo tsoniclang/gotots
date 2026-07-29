@@ -12,29 +12,25 @@ import (
 )
 
 type genericOperationIdentity struct {
-	owner *types.Func
-	key   string
+	owner    types.Object
+	consumer api.GenericOperationConsumer
+	key      string
 }
 
-func (s *programSession) ResolveGenericCallable(
-	function *types.Func,
-) (api.GenericCallable, bool, error) {
-	if function == nil {
-		return api.GenericCallable{}, false, nil
-	}
-	owner := function.Origin()
-	signature, ok := owner.Type().(*types.Signature)
-	if !ok {
-		return api.GenericCallable{}, false, nil
-	}
-	parameters := genericTypeParameters(signature)
-	if len(parameters) == 0 {
-		return api.GenericCallable{}, false, nil
+func (s *programSession) ResolveGenericOperationSet(
+	declaration types.Object,
+	consumer api.GenericOperationConsumer,
+) (api.GenericOperationSet, bool, error) {
+	owner := api.GenericDeclarationOrigin(declaration)
+	if owner == nil ||
+		!consumer.Valid() ||
+		len(api.GenericDeclarationParameters(owner)) == 0 {
+		return api.GenericOperationSet{}, false, nil
 	}
 	if _, ok := s.sites[owner]; !ok {
-		return api.GenericCallable{}, false, &ScheduleError{
+		return api.GenericOperationSet{}, false, &ScheduleError{
 			Object: owner.Name(),
-			Reason: "generic callable has no source declaration",
+			Reason: "generic operation set has no source declaration",
 		}
 	}
 	var operations []*api.GenericOperationContract
@@ -46,8 +42,12 @@ func (s *programSession) ResolveGenericCallable(
 		if !generic {
 			continue
 		}
-		if requirementOwner != owner {
-			return api.GenericCallable{}, false, &ScheduleError{
+		if requirementOwner != owner ||
+			operation.Consumer() != consumer {
+			if requirementOwner == owner {
+				continue
+			}
+			return api.GenericOperationSet{}, false, &ScheduleError{
 				Object: owner.Name(),
 				Reason: "generic operation has inconsistent ownership",
 			}
@@ -57,41 +57,56 @@ func (s *programSession) ResolveGenericCallable(
 	sort.Slice(operations, func(left, right int) bool {
 		return operations[left].Key() < operations[right].Key()
 	})
-	callable, err := api.NewGenericCallable(owner, parameters, operations)
-	return callable, err == nil, err
+	operationSet, err := api.NewGenericOperationSet(
+		owner,
+		consumer,
+		operations,
+	)
+	return operationSet, err == nil, err
 }
 
 func (s *programSession) ResolveGenericOperation(
-	function *types.Func,
+	declaration types.Object,
+	consumer api.GenericOperationConsumer,
 	selection api.GenericOperationSelection,
 	signature *types.Signature,
 ) (*api.GenericOperationContract, error) {
-	if function == nil {
+	owner := api.GenericDeclarationOrigin(declaration)
+	if owner == nil {
 		return nil, &ScheduleError{
 			Reason: "generic operation owner is nil",
 		}
 	}
-	owner := function.Origin()
-	if !selection.Valid() || signature == nil {
+	if !consumer.Valid() || !selection.Valid() || signature == nil {
 		return nil, &ScheduleError{
 			Object: owner.Name(),
 			Reason: "generic operation identity is invalid",
 		}
 	}
 	if _, ok := s.sites[owner]; !ok ||
-		len(genericTypeParametersFromFunction(owner)) == 0 {
+		len(api.GenericDeclarationParameters(owner)) == 0 {
 		return nil, &ScheduleError{
 			Object: owner.Name(),
 			Reason: "generic operation owner has no generic declaration",
 		}
 	}
-	key, err := s.genericOperationKey(owner, selection, signature)
+	key, err := s.genericOperationKey(
+		owner,
+		consumer,
+		selection,
+		signature,
+	)
 	if err != nil {
 		return nil, err
 	}
-	identity := genericOperationIdentity{owner: owner, key: key}
+	identity := genericOperationIdentity{
+		owner:    owner,
+		consumer: consumer,
+		key:      key,
+	}
 	if existing := s.genericOperations[identity]; existing != nil {
-		if existing.Selection() != selection ||
+		if existing.Consumer() != consumer ||
+			existing.Selection() != selection ||
 			!types.Identical(existing.Signature(), signature) {
 			return nil, &ScheduleError{
 				Object: owner.Name(),
@@ -107,6 +122,7 @@ func (s *programSession) ResolveGenericOperation(
 		owner,
 		key,
 		targetName,
+		consumer,
 		selection,
 		signature,
 	)
@@ -117,40 +133,9 @@ func (s *programSession) ResolveGenericOperation(
 	return contract, nil
 }
 
-func genericTypeParameters(
-	signature *types.Signature,
-) []*types.TypeParam {
-	if signature == nil {
-		return nil
-	}
-	parameters := make(
-		[]*types.TypeParam,
-		0,
-		signature.RecvTypeParams().Len()+signature.TypeParams().Len(),
-	)
-	for _, list := range []*types.TypeParamList{
-		signature.RecvTypeParams(),
-		signature.TypeParams(),
-	} {
-		for index := range list.Len() {
-			parameters = append(parameters, list.At(index))
-		}
-	}
-	return parameters
-}
-
-func genericTypeParametersFromFunction(
-	function *types.Func,
-) []*types.TypeParam {
-	if function == nil {
-		return nil
-	}
-	signature, _ := function.Type().(*types.Signature)
-	return genericTypeParameters(signature)
-}
-
 func (s *programSession) genericOperationKey(
-	owner *types.Func,
+	owner types.Object,
+	consumer api.GenericOperationConsumer,
 	selection api.GenericOperationSelection,
 	signature *types.Signature,
 ) (string, error) {
@@ -166,11 +151,11 @@ func (s *programSession) genericOperationKey(
 	if err != nil {
 		return "", err
 	}
-	return prefix + "|" + signatureKey, nil
+	return consumer.Identity() + "|" + prefix + "|" + signatureKey, nil
 }
 
 func (s *programSession) genericOperationNamedIdentity(
-	owner *types.Func,
+	owner types.Object,
 ) typeidentity.NamedObjectIdentity {
 	return func(object *types.TypeName) (string, error) {
 		if object == nil || object.Pkg() == nil {
@@ -207,10 +192,11 @@ func (s *programSession) genericOperationNamedIdentity(
 }
 
 func genericOperationParameterIdentity(
-	owner *types.Func,
+	owner types.Object,
 ) typeidentity.TypeParameterIdentity {
 	identities := make(map[*types.TypeParam]string)
-	if owner != nil {
+	switch owner := owner.(type) {
+	case *types.Func:
 		signature, _ := owner.Type().(*types.Signature)
 		if signature != nil {
 			for index := range signature.RecvTypeParams().Len() {
@@ -221,6 +207,10 @@ func genericOperationParameterIdentity(
 				identities[signature.TypeParams().At(index)] =
 					"function|" + strconv.Itoa(index)
 			}
+		}
+	case *types.TypeName:
+		for index, parameter := range api.GenericDeclarationParameters(owner) {
+			identities[parameter] = "type|" + strconv.Itoa(index)
 		}
 	}
 	return func(parameter *types.TypeParam) (string, error) {

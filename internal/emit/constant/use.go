@@ -53,8 +53,8 @@ func EmitUse(
 		}
 		return target, nil
 	}
-	owner := context.ArtifactOwner()
-	if owner == nil {
+	owner, ok := context.FunctionArtifactOwner()
+	if !ok {
 		return api.ExpressionEmission{},
 			&api.InvariantError{
 				Role:   context.Role(),

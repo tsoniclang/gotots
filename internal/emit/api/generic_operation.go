@@ -1,6 +1,7 @@
 package api
 
 import (
+	"go/ast"
 	"go/types"
 	"slices"
 )
@@ -14,25 +15,29 @@ func GenericTypeParameter(sourceType types.Type) (*types.TypeParam, bool) {
 }
 
 type GenericOperationContract struct {
-	owner      *types.Func
+	owner      types.Object
 	key        string
 	targetName string
+	consumer   GenericOperationConsumer
 	selection  GenericOperationSelection
 	signature  *types.Signature
 }
 
 func NewGenericOperationContract(
-	owner *types.Func,
+	owner types.Object,
 	key string,
 	targetName string,
+	consumer GenericOperationConsumer,
 	selection GenericOperationSelection,
 	signature *types.Signature,
 ) (*GenericOperationContract, error) {
+	owner = GenericDeclarationOrigin(owner)
 	if owner == nil ||
-		owner.Origin() != owner ||
-		len(genericTypeParameters(owner)) == 0 ||
+		len(GenericDeclarationParameters(owner)) == 0 ||
 		key == "" ||
 		targetName == "" ||
+		!consumer.Valid() ||
+		!genericConsumerMatchesOwner(owner, consumer) ||
 		!selection.Valid() ||
 		!validGenericOperationSignature(signature) ||
 		!genericOperationParametersBelongTo(owner, signature) {
@@ -45,12 +50,13 @@ func NewGenericOperationContract(
 		owner:      owner,
 		key:        key,
 		targetName: targetName,
+		consumer:   consumer,
 		selection:  selection,
 		signature:  signature,
 	}, nil
 }
 
-func (c *GenericOperationContract) Owner() *types.Func {
+func (c *GenericOperationContract) Owner() types.Object {
 	if c == nil {
 		return nil
 	}
@@ -78,6 +84,13 @@ func (c *GenericOperationContract) Operation() GenericOperation {
 	return c.selection.Operation()
 }
 
+func (c *GenericOperationContract) Consumer() GenericOperationConsumer {
+	if c == nil {
+		return GenericOperationConsumerInvalid
+	}
+	return c.consumer
+}
+
 func (c *GenericOperationContract) Selection() GenericOperationSelection {
 	if c == nil {
 		return GenericOperationSelection{}
@@ -95,13 +108,30 @@ func (c *GenericOperationContract) Signature() *types.Signature {
 func (c *GenericOperationContract) Valid() bool {
 	return c != nil &&
 		c.owner != nil &&
-		c.owner.Origin() == c.owner &&
-		len(genericTypeParameters(c.owner)) != 0 &&
+		GenericDeclarationOrigin(c.owner) == c.owner &&
+		len(GenericDeclarationParameters(c.owner)) != 0 &&
 		c.key != "" &&
 		c.targetName != "" &&
+		c.consumer.Valid() &&
+		genericConsumerMatchesOwner(c.owner, c.consumer) &&
 		c.selection.Valid() &&
 		validGenericOperationSignature(c.signature) &&
 		genericOperationParametersBelongTo(c.owner, c.signature)
+}
+
+func genericConsumerMatchesOwner(
+	owner types.Object,
+	consumer GenericOperationConsumer,
+) bool {
+	switch owner.(type) {
+	case *types.Func:
+		return consumer == GenericOperationConsumerFunction
+	case *types.TypeName:
+		_, ok := consumer.NamedStructOperation()
+		return ok
+	default:
+		return false
+	}
 }
 
 func validGenericOperationSignature(signature *types.Signature) bool {
@@ -112,11 +142,11 @@ func validGenericOperationSignature(signature *types.Signature) bool {
 }
 
 func genericOperationParametersBelongTo(
-	owner *types.Func,
+	owner types.Object,
 	signature *types.Signature,
 ) bool {
 	owned := make(map[*types.TypeParam]struct{})
-	for _, parameter := range genericTypeParameters(owner) {
+	for _, parameter := range GenericDeclarationParameters(owner) {
 		owned[parameter] = struct{}{}
 	}
 	for parameter := range genericTypeParametersIn(signature) {
@@ -223,75 +253,284 @@ func collectGenericTypeParameters(
 	}
 }
 
-type GenericCallable struct {
-	owner      *types.Func
+type GenericOperationSet struct {
+	owner      types.Object
+	consumer   GenericOperationConsumer
 	parameters []*types.TypeParam
 	operations []*GenericOperationContract
 }
 
-func NewGenericCallable(
-	owner *types.Func,
-	parameters []*types.TypeParam,
+func NewGenericOperationSet(
+	owner types.Object,
+	consumer GenericOperationConsumer,
 	operations []*GenericOperationContract,
-) (GenericCallable, error) {
-	if owner == nil || owner.Origin() != owner || len(parameters) == 0 {
-		return GenericCallable{}, &InvariantError{
+) (GenericOperationSet, error) {
+	owner = GenericDeclarationOrigin(owner)
+	parameters := GenericDeclarationParameters(owner)
+	if owner == nil ||
+		!consumer.Valid() ||
+		!genericConsumerMatchesOwner(owner, consumer) ||
+		len(parameters) == 0 {
+		return GenericOperationSet{}, &InvariantError{
 			Role:   RoleCallCallee,
-			Reason: "generic callable identity is invalid",
+			Reason: "generic operation-set identity is invalid",
 		}
 	}
 	parameters = slices.Clone(parameters)
-	expectedParameters := genericTypeParameters(owner)
-	if len(parameters) != len(expectedParameters) {
-		return GenericCallable{}, &InvariantError{
-			Role:   RoleCallCallee,
-			Reason: "generic callable parameters do not match their owner",
-		}
-	}
-	for index, parameter := range parameters {
-		if parameter == nil || parameter != expectedParameters[index] {
-			return GenericCallable{}, &InvariantError{
-				Role:   RoleCallCallee,
-				Reason: "generic callable parameter identity is inconsistent",
-			}
-		}
-	}
 	operations = slices.Clone(operations)
 	for index, operation := range operations {
 		if !operation.Valid() ||
 			operation.Owner() != owner ||
+			operation.Consumer() != consumer ||
 			index != 0 &&
 				operations[index-1].Key() >= operation.Key() {
-			return GenericCallable{}, &InvariantError{
+			return GenericOperationSet{}, &InvariantError{
 				Role:   RoleCallCallee,
-				Reason: "generic callable operations are not canonical",
+				Reason: "generic operation set is not canonical",
 			}
 		}
 	}
-	return GenericCallable{
+	return GenericOperationSet{
 		owner:      owner,
+		consumer:   consumer,
 		parameters: parameters,
 		operations: operations,
 	}, nil
 }
 
-func (c GenericCallable) Owner() *types.Func {
-	return c.owner
+func (s GenericOperationSet) Owner() types.Object {
+	return s.owner
 }
 
-func (c GenericCallable) Parameters() []*types.TypeParam {
-	return slices.Clone(c.parameters)
+func (s GenericOperationSet) Consumer() GenericOperationConsumer {
+	return s.consumer
 }
 
-func (c GenericCallable) Operations() []*GenericOperationContract {
-	return slices.Clone(c.operations)
+func (s GenericOperationSet) Parameters() []*types.TypeParam {
+	return slices.Clone(s.parameters)
+}
+
+func (s GenericOperationSet) Operations() []*GenericOperationContract {
+	return slices.Clone(s.operations)
 }
 
 type GenericCallableResolver interface {
-	ResolveGenericCallable(*types.Func) (GenericCallable, bool, error)
+	ResolveGenericOperationSet(
+		types.Object,
+		GenericOperationConsumer,
+	) (GenericOperationSet, bool, error)
 	ResolveGenericOperation(
-		*types.Func,
+		types.Object,
+		GenericOperationConsumer,
 		GenericOperationSelection,
 		*types.Signature,
 	) (*GenericOperationContract, error)
+}
+
+func (c Context) WithGenericCallableResolver(
+	resolver GenericCallableResolver,
+) Context {
+	if resolver == nil {
+		panic("generic callable resolver is nil")
+	}
+	c.genericResolver = resolver
+	return c
+}
+
+func (c Context) ProjectGenericOperation(
+	source ast.Node,
+	origin *GenericOperationContract,
+	signature *types.Signature,
+) (NameReference, error) {
+	owner, ownerOK := c.genericSourceOwner()
+	if !ownerOK ||
+		!c.genericConsumer.Valid() ||
+		c.genericResolver == nil ||
+		source == nil ||
+		!origin.Valid() ||
+		!validGenericOperationSignature(signature) {
+		return NameReference{}, &ContextError{
+			Reason: "projected generic operation is unavailable",
+		}
+	}
+	contract, err := c.genericResolver.ResolveGenericOperation(
+		owner,
+		c.genericConsumer,
+		origin.Selection(),
+		signature,
+	)
+	if err != nil {
+		return NameReference{}, err
+	}
+	request, err := NewGenericOperationRequest(owner, contract)
+	if err != nil {
+		return NameReference{}, err
+	}
+	return NewNameReference(contract.TargetName(), request)
+}
+
+func (c Context) WithGenericParameters(
+	owner types.Object,
+	names map[*types.TypeParam]string,
+) (Context, error) {
+	owner = GenericDeclarationOrigin(owner)
+	sourceOwner, sourceOwned := c.currentArtifactOwner.Source()
+	if owner == nil || !sourceOwned || sourceOwner != owner {
+		return Context{}, &ContextError{
+			Reason: "generic parameter owner differs from source artifact owner",
+		}
+	}
+	switch owner.(type) {
+	case *types.Func:
+		c.genericConsumer = GenericFunctionOperationConsumer()
+	case *types.TypeName:
+		c.genericConsumer = GenericOperationConsumerInvalid
+	}
+	c.genericParameters = make(map[*types.TypeParam]string, len(names))
+	for parameter, name := range names {
+		if parameter == nil ||
+			name == "" ||
+			!genericParameterBelongsTo(owner, parameter) {
+			return Context{}, &ContextError{
+				Reason: "generic parameter binding is invalid",
+			}
+		}
+		c.genericParameters[parameter] = name
+	}
+	return c, nil
+}
+
+func (c Context) WithGenericNamedStructOperation(
+	operation NamedStructOperation,
+) Context {
+	owner, ownerOK := c.genericSourceOwner()
+	if !ownerOK {
+		panic("generic named-struct operation has no source owner")
+	}
+	if _, ok := owner.(*types.TypeName); !ok {
+		panic("generic named-struct operation has no type owner")
+	}
+	consumer, err := GenericNamedStructOperationConsumer(operation)
+	if err != nil {
+		panic(err)
+	}
+	c.genericConsumer = consumer
+	return c
+}
+
+func (c Context) GenericOperation(
+	source ast.Node,
+	operation GenericOperation,
+	signature *types.Signature,
+) (NameReference, error) {
+	selection, err := SelectGenericOperation(operation)
+	if err != nil {
+		return NameReference{}, err
+	}
+	return c.genericOperation(source, selection, signature)
+}
+
+func (c Context) GenericConstraintMethod(
+	source ast.Node,
+	method *types.Func,
+	signature *types.Signature,
+) (NameReference, error) {
+	selection, err := SelectGenericConstraintMethod(method)
+	if err != nil {
+		return NameReference{}, err
+	}
+	return c.genericOperation(source, selection, signature)
+}
+
+func (c Context) genericOperation(
+	source ast.Node,
+	selection GenericOperationSelection,
+	signature *types.Signature,
+) (NameReference, error) {
+	owner, ownerOK := c.genericSourceOwner()
+	if !ownerOK ||
+		!c.genericConsumer.Valid() ||
+		c.genericResolver == nil ||
+		source == nil ||
+		!selection.Valid() ||
+		!validGenericOperationSignature(signature) {
+		return NameReference{}, &ContextError{
+			Reason: "generic operation is unavailable",
+		}
+	}
+	contract, err := c.genericResolver.ResolveGenericOperation(
+		owner,
+		c.genericConsumer,
+		selection,
+		signature,
+	)
+	if err != nil {
+		return NameReference{}, err
+	}
+	request, err := NewGenericOperationRequest(owner, contract)
+	if err != nil {
+		return NameReference{}, err
+	}
+	return NewNameReference(contract.TargetName(), request)
+}
+
+func (c Context) ResolveGenericCallable(
+	function *types.Func,
+) (GenericOperationSet, bool, error) {
+	if c.genericResolver == nil {
+		return GenericOperationSet{}, false, &ContextError{
+			Reason: "generic callable resolver is unavailable",
+		}
+	}
+	if function == nil {
+		return GenericOperationSet{}, false, nil
+	}
+	return c.genericResolver.ResolveGenericOperationSet(
+		function.Origin(),
+		GenericFunctionOperationConsumer(),
+	)
+}
+
+func (c Context) ResolveGenericNamedStructOperation(
+	owner *types.TypeName,
+	operation NamedStructOperation,
+) (GenericOperationSet, bool, error) {
+	if c.genericResolver == nil {
+		return GenericOperationSet{}, false, &ContextError{
+			Reason: "generic named-struct operation resolver is unavailable",
+		}
+	}
+	consumer, err := GenericNamedStructOperationConsumer(operation)
+	if err != nil {
+		return GenericOperationSet{}, false, err
+	}
+	return c.genericResolver.ResolveGenericOperationSet(owner, consumer)
+}
+
+func (c Context) GenericParameterName(
+	parameter *types.TypeParam,
+) (string, bool) {
+	name, ok := c.genericParameters[parameter]
+	return name, ok
+}
+
+func genericParameterBelongsTo(
+	owner types.Object,
+	parameter *types.TypeParam,
+) bool {
+	for _, selected := range GenericDeclarationParameters(owner) {
+		if selected == parameter {
+			return true
+		}
+	}
+	return false
+}
+
+func (c Context) genericSourceOwner() (types.Object, bool) {
+	source, ok := c.currentArtifactOwner.Source()
+	if !ok {
+		return nil, false
+	}
+	owner := GenericDeclarationOrigin(source)
+	return owner, owner != nil && owner == source
 }

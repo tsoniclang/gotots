@@ -141,11 +141,20 @@ func TestAddressableStorageContextCopiesAndKeysExactVariables(t *testing.T) {
 	first := types.NewVar(token.Pos(20), sourcePackage, "value", types.Typ[types.Int32])
 	second := types.NewVar(token.Pos(30), sourcePackage, "value", types.Typ[types.Int32])
 	selections := map[*types.Var]string{first: "value$storage"}
-	context := (Context{}).WithAddressableStorage(owner, selections)
+	context, err := (Context{}).WithSourceArtifactOwner(
+		MustSourceArtifactOwner(owner),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	context, err = context.WithAddressableStorage(owner, selections)
+	if err != nil {
+		t.Fatal(err)
+	}
 	selections[first] = "mutated"
 	selections[second] = "forged"
 
-	if context.ArtifactOwner() != owner {
+	if current, ok := context.FunctionArtifactOwner(); !ok || current != owner {
 		t.Fatal("addressable storage lost its exact artifact owner")
 	}
 	if name, ok := context.AddressableStorageName(first); !ok ||
@@ -154,5 +163,23 @@ func TestAddressableStorageContextCopiesAndKeysExactVariables(t *testing.T) {
 	}
 	if _, ok := context.AddressableStorageName(second); ok {
 		t.Fatal("same-spelling unselected variable acquired storage")
+	}
+}
+
+func TestFunctionCapabilityRejectsDivergentCurrentArtifactOwner(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/storage", "storage")
+	signature := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	owner := types.NewFunc(token.Pos(10), sourcePackage, "Use", signature)
+	foreign := types.NewFunc(token.Pos(10), sourcePackage, "Use", signature)
+	context, err := (Context{}).WithSourceArtifactOwner(
+		MustSourceArtifactOwner(owner),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = context.WithAddressableStorage(foreign, nil)
+	var contextError *ContextError
+	if !errors.As(err, &contextError) {
+		t.Fatalf("divergent function owner error = %#v, want ContextError", err)
 	}
 }

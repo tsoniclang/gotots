@@ -203,31 +203,18 @@ func (owner Owner) Zero(
 	if _, _, ok := scalarSlice(context, sourceType); ok {
 		return sliceZero(context, owner.children, source, sourceType)
 	}
-	typeName, _, ok := namedStruct(sourceType)
+	_, _, ok := namedStruct(sourceType)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	reference, err := context.Names().NamedStructOperation(
-		typeName,
-		api.NamedStructOperationZero,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	call, err := namedStructOperationCall(
+	return owner.namedStructOperation(
 		context,
-		reference.Name(),
+		source,
+		sourceType,
 		api.NamedStructOperationZero,
 		nil,
 	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.DirectExpression(
-		call,
-		reference.Requests()...,
-	), nil
 }
 
 func (owner Owner) Copy(
@@ -315,7 +302,7 @@ func (owner Owner) Copy(
 			value.Requests(),
 		)
 	}
-	typeName, _, ok := namedStruct(sourceType)
+	_, _, ok := namedStruct(sourceType)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -327,16 +314,10 @@ func (owner Owner) Copy(
 			value.Requests(),
 		)
 	}
-	reference, err := context.Names().NamedStructOperation(
-		typeName,
-		api.NamedStructOperationCopy,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	call, err := namedStructOperationCall(
+	target, err := owner.namedStructOperation(
 		context,
-		reference.Name(),
+		source,
+		sourceType,
 		api.NamedStructOperationCopy,
 		[]tsgo.Expression{value.Value()},
 	)
@@ -345,8 +326,8 @@ func (owner Owner) Copy(
 	}
 	return api.NewExpressionEmission(
 		value.Before(),
-		call,
-		api.CombineRequests(value.Requests(), reference.Requests()),
+		target.Value(),
+		api.CombineRequests(value.Requests(), target.Requests()),
 	)
 }
 

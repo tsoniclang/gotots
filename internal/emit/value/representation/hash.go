@@ -105,7 +105,7 @@ func supportsHash(
 	return true
 }
 
-func (Owner) Hash(
+func (owner Owner) Hash(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
@@ -231,28 +231,18 @@ func (Owner) Hash(
 			reference.Requests()...,
 		), nil
 	}
-	typeName, _, ok := namedStruct(sourceType)
+	_, _, ok := namedStruct(sourceType)
 	if !ok || !(Owner{}).SupportsHash(context, sourceType) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	reference, err := context.Names().NamedStructOperation(
-		typeName,
-		api.NamedStructOperationHash,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	call, err := namedStructOperationCall(
+	return owner.namedStructOperation(
 		context,
-		reference.Name(),
+		source,
+		sourceType,
 		api.NamedStructOperationHash,
 		[]tsgo.Expression{value},
 	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.DirectExpression(call, reference.Requests()...), nil
 }
 
 func complexHash(

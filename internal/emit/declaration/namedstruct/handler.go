@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -22,9 +23,9 @@ func emitClass(
 	children api.ChildEmitter,
 	declaration *ast.GenDecl,
 	typeName *types.TypeName,
-	operations []api.NamedStructOperation,
+	operations []operationAssembly,
 ) (api.DeclarationEmission, error) {
-	sourceStruct, structType, ok := sourceType(
+	spec, sourceStruct, structType, ok := sourceType(
 		context,
 		declaration,
 		typeName,
@@ -33,6 +34,11 @@ func emitClass(
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, declaration)
 	}
+	parameters, err := genericdeclaration.EnterType(context, spec, typeName)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	context = parameters.Context()
 	fields, err := fields(context, sourceStruct, structType)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -54,6 +60,8 @@ func emitClass(
 		fields,
 		operations,
 		moduleExport,
+		parameters.Nodes(),
+		parameters.References(),
 	)
 }
 
@@ -91,14 +99,20 @@ func EmitAnonymous(
 			blank:      blank,
 		})
 	}
+	selected := make([]operationAssembly, 0, len(operations))
+	for _, operation := range operations {
+		selected = append(selected, operationAssembly{operation: operation})
+	}
 	return emitStructClass(
 		context,
 		children,
 		nil,
 		className,
 		fields,
-		operations,
+		selected,
 		moduleExport,
+		nil,
+		nil,
 	)
 }
 
@@ -108,13 +122,15 @@ func emitStructClass(
 	source ast.Node,
 	className string,
 	fields []field,
-	operations []api.NamedStructOperation,
+	operations []operationAssembly,
 	moduleExport bool,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) (api.DeclarationEmission, error) {
 	storageLayout := false
-	valueOperations := make([]api.NamedStructOperation, 0, len(operations))
+	valueOperations := make([]operationAssembly, 0, len(operations))
 	for _, operation := range operations {
-		if operation == api.NamedStructOperationStorage {
+		if operation.operation == api.NamedStructOperationStorage {
 			storageLayout = true
 			continue
 		}
@@ -128,6 +144,8 @@ func emitStructClass(
 		fields,
 		storageLayout,
 		moduleExport,
+		typeParameters,
+		typeArguments,
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -151,7 +169,7 @@ func emitStructClass(
 
 	classType := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(className),
-		nil,
+		typeArguments,
 	)
 	for _, operation := range valueOperations {
 		member, operationRequests, err := emitValueOperation(
@@ -162,6 +180,8 @@ func emitStructClass(
 			classType,
 			fields,
 			operation,
+			typeParameters,
+			typeArguments,
 		)
 		if err != nil {
 			return api.DeclarationEmission{}, err
@@ -179,7 +199,7 @@ func emitStructClass(
 		context.Factory().ClassDeclaration(
 			modifiers,
 			context.Factory().Identifier(className),
-			nil,
+			typeParameters,
 			nil,
 			members,
 		),
@@ -191,9 +211,9 @@ func sourceType(
 	context api.Context,
 	declaration *ast.GenDecl,
 	typeName *types.TypeName,
-) (*ast.StructType, *types.Struct, bool) {
+) (*ast.TypeSpec, *ast.StructType, *types.Struct, bool) {
 	if declaration == nil || typeName == nil {
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
 	for _, sourceSpec := range declaration.Specs {
 		spec, ok := sourceSpec.(*ast.TypeSpec)
@@ -204,14 +224,13 @@ func sourceType(
 		named, namedOK := types.Unalias(typeName.Type()).(*types.Named)
 		if !syntaxOK || !namedOK ||
 			spec.Assign.IsValid() ||
-			spec.TypeParams != nil ||
-			named.TypeParams().Len() != 0 {
-			return nil, nil, false
+			(spec.TypeParams == nil) != (named.TypeParams().Len() == 0) {
+			return nil, nil, nil, false
 		}
 		structType, structOK := named.Underlying().(*types.Struct)
-		return sourceStruct, structType, structOK
+		return spec, sourceStruct, structType, structOK
 	}
-	return nil, nil, false
+	return nil, nil, nil, false
 }
 
 func fields(

@@ -38,8 +38,9 @@ func emitReceiver(
 	named, ok := types.Unalias(baseType).(*types.Named)
 	if !ok ||
 		named.Obj() == nil ||
-		named.Obj().Pkg() != signature.Recv().Pkg() ||
-		named.TypeParams().Len() != 0 {
+		named.Origin().Obj().Pkg() != signature.Recv().Pkg() ||
+		(named.TypeParams().Len() != 0 &&
+			named.TypeArgs().Len() != named.TypeParams().Len()) {
 		return nil, nil,
 			api.Unsupported(
 				context.WithRole(api.RoleReceiverType),

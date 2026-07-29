@@ -189,6 +189,7 @@ func (e *emitter) declarationObject(
 		if typeName, ok := object.(*types.TypeName); ok {
 			if target, handled, err := generictypedeclaration.Emit(
 				context,
+				e,
 				source,
 				typeName,
 				requirements,
@@ -435,6 +436,7 @@ func (e *emitter) Type(
 	if sourceType := context.TypesInfo().TypeOf(source); sourceType != nil {
 		if target, handled, err := generictype.Emit(
 			context,
+			e,
 			source,
 			sourceType,
 		); handled {
@@ -514,6 +516,7 @@ func (e *emitter) RepresentedType(
 ) (api.TypeEmission, error) {
 	if target, handled, err := generictype.Emit(
 		context,
+		e,
 		source,
 		sourceType,
 	); handled {

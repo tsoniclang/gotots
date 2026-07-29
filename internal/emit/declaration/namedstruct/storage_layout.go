@@ -27,6 +27,8 @@ func emitLayout(
 	fields []field,
 	storage bool,
 	moduleExport bool,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) (layoutEmission, error) {
 	selected, requests, err := emitLayoutFields(
 		context,
@@ -40,9 +42,27 @@ func emitLayout(
 	if !storage {
 		members := []tsgo.ClassElement{
 			directConstructor(context, selected),
-			makeMethod(context, className, selected, false),
+			makeMethod(
+				context,
+				className,
+				context.Factory().TypeReferenceNode(
+					context.Factory().Identifier(className),
+					typeArguments,
+				),
+				selected,
+				false,
+				typeParameters,
+				typeArguments,
+			),
 		}
 		return layoutEmission{members: members, requests: requests}, nil
+	}
+	if len(typeParameters) != 0 {
+		return layoutEmission{}, api.Unsupported(
+			context,
+			api.CategoryDeclaration,
+			source,
+		)
 	}
 	storageName := className + "$Storage"
 	storageType := context.Factory().TypeReferenceNode(
@@ -146,8 +166,11 @@ func directConstructor(
 func makeMethod(
 	context api.Context,
 	className string,
+	classType tsgo.TypeNode,
 	fields []layoutField,
 	storage bool,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) tsgo.MethodDeclaration {
 	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
 	arguments := make([]tsgo.Expression, 0, len(fields))
@@ -165,7 +188,7 @@ func makeMethod(
 	}
 	var value tsgo.Expression = context.Factory().NewExpression(
 		context.Factory().Identifier(className),
-		nil,
+		typeArguments,
 		arguments,
 	)
 	if storage {
@@ -181,7 +204,7 @@ func makeMethod(
 		}
 		value = context.Factory().NewExpression(
 			context.Factory().Identifier(className),
-			nil,
+			typeArguments,
 			[]tsgo.Expression{
 				context.Factory().ObjectLiteralExpression(properties, true),
 			},
@@ -195,12 +218,9 @@ func makeMethod(
 		nil,
 		context.Factory().Identifier(api.StructMakeMember),
 		nil,
-		nil,
+		typeParameters,
 		parameters,
-		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(className),
-			nil,
-		),
+		classType,
 		context.Factory().Block(
 			[]tsgo.Statement{context.Factory().ReturnStatement(value)},
 			true,

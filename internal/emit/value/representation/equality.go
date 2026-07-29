@@ -14,7 +14,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func (Owner) Equal(
+func (owner Owner) Equal(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
@@ -171,29 +171,16 @@ func (Owner) Equal(
 			),
 		), nil
 	}
-	typeName, _, ok := namedStruct(sourceType)
+	_, _, ok := namedStruct(sourceType)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	reference, err := context.Names().NamedStructOperation(
-		typeName,
-		api.NamedStructOperationEqual,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	call, err := namedStructOperationCall(
+	return owner.namedStructOperation(
 		context,
-		reference.Name(),
+		source,
+		sourceType,
 		api.NamedStructOperationEqual,
 		[]tsgo.Expression{left, right},
 	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.DirectExpression(
-		call,
-		reference.Requests()...,
-	), nil
 }

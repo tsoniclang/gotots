@@ -46,6 +46,25 @@ func SourceArtifactOwner(source types.Object) (ArtifactOwner, error) {
 	return ArtifactOwner{source: source}, nil
 }
 
+func (c Context) WithSourceArtifactOwner(
+	owner ArtifactOwner,
+) (Context, error) {
+	source, ok := owner.Source()
+	if !ok || source == nil {
+		return Context{}, &ContextError{
+			Reason: "source artifact owner is invalid",
+		}
+	}
+	if existing, bound := c.currentArtifactOwner.Source(); bound &&
+		existing != source {
+		return Context{}, &ContextError{
+			Reason: "source artifact owner is already bound",
+		}
+	}
+	c.currentArtifactOwner = owner
+	return c, nil
+}
+
 func GeneratedArtifactOwner(
 	generated *GeneratedArtifact,
 ) (ArtifactOwner, error) {

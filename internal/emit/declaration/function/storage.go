@@ -47,5 +47,5 @@ func applyAddressableStorage(
 		}
 		storageNames[variable] = name + "$storage"
 	}
-	return context.WithAddressableStorage(owner, storageNames), nil
+	return context.WithAddressableStorage(owner, storageNames)
 }

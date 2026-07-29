@@ -80,10 +80,92 @@ console.log(output.join(" "));
 				"node",
 				filepath.Join(workingDirectory, "out", "runner.js"),
 			)
-			goOutput := executeWaveSevenGenericGo(t, workingDirectory)
+			goOutput := executeWaveSevenGenericGo(
+				t,
+				workingDirectory,
+				"AuditFunctions",
+			)
 			if targetOutput != goOutput {
 				t.Fatalf(
 					"Wave 7 generic output differs\nTypeScript:\n%s\nGo:\n%s",
+					targetOutput,
+					goOutput,
+				)
+			}
+		})
+	}
+}
+
+func TestWaveSevenGenericNamedTypesCompileThroughPublicPipeline(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		options emit.Options
+	}{
+		{name: "number", options: emit.DefaultOptions()},
+		{
+			name: "bigint",
+			options: emit.Options{
+				IntegerRepresentation: emit.IntegerRepresentationBigInt,
+				EvaluationOrder:       emit.EvaluationOrderPreserveGo,
+			},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			program, err := load.Load(context.Background(), load.Request{
+				Directory: waveSevenGenericDirectory(),
+				Pattern:   ".",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			root, err := emit.NewRoot(
+				program.Roots()[0].Types().Scope().Lookup("Audit"),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			emission, err := emit.CompileWithOptions(
+				program,
+				[]emit.Root{root},
+				testCase.options,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			workingDirectory := t.TempDir()
+			artifacts := materializeArtifacts(t, emission, workingDirectory)
+			runner := filepath.Join(workingDirectory, "runner.ts")
+			writeProgramFile(t, runner, `import "./program.js";
+import { Audit } from "`+artifacts.sourceModule+`";
+
+const values = Audit();
+const output: string[] = [];
+for (let index = 0; index < values.length; index++) {
+    output.push(String(values.get(index)));
+}
+console.log(output.join(" "));
+`)
+			writeProgramFile(
+				t,
+				filepath.Join(workingDirectory, "package.json"),
+				"{\"type\":\"module\"}\n",
+			)
+			paths := append(artifacts.paths, runner)
+			waveThreeTypecheck(t, workingDirectory, paths)
+			targetOutput := runProgram(
+				t,
+				workingDirectory,
+				"node",
+				filepath.Join(workingDirectory, "out", "runner.js"),
+			)
+			goOutput := executeWaveSevenGenericGo(
+				t,
+				workingDirectory,
+				"Audit",
+			)
+			if targetOutput != goOutput {
+				t.Fatalf(
+					"Wave 7 named-generic output differs\nTypeScript:\n%s\nGo:\n%s",
 					targetOutput,
 					goOutput,
 				)
@@ -156,7 +238,11 @@ func targetGenericFunctionText(
 	return printed[start : start+len(startMarker)+end]
 }
 
-func executeWaveSevenGenericGo(t *testing.T, workingDirectory string) string {
+func executeWaveSevenGenericGo(
+	t *testing.T,
+	workingDirectory string,
+	function string,
+) string {
 	t.Helper()
 	modulePath, err := filepath.Abs(waveSevenGenericDirectory())
 	if err != nil {
@@ -174,7 +260,7 @@ replace example.com/wave7generics => %s
 `,
 		filepath.ToSlash(modulePath),
 	))
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), fmt.Sprintf(`package main
 
 import (
 	"fmt"
@@ -183,7 +269,7 @@ import (
 )
 
 func main() {
-	for index, value := range values.AuditFunctions() {
+	for index, value := range values.%s() {
 		if index != 0 {
 			fmt.Print(" ")
 		}
@@ -191,7 +277,7 @@ func main() {
 	}
 	fmt.Println()
 }
-`)
+`, function))
 	return runProgram(
 		t,
 		runnerDirectory,

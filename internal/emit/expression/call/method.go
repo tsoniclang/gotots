@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -38,10 +39,21 @@ func emitMethod(
 	signature, ok := method.Type().(*types.Signature)
 	if !ok ||
 		signature.Recv() == nil ||
-		signature.TypeParams().Len() != 0 ||
-		signature.RecvTypeParams().Len() != 0 {
+		signature.TypeParams().Len() != 0 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if signature.RecvTypeParams().Len() != 0 {
+		return emitGenericReceiverMethod(
+			context,
+			children,
+			source,
+			selector,
+			method,
+			selection,
+			signature,
+			discarded,
+		)
 	}
 	if err := validateResults(context, source, signature, discarded); err != nil {
 		return api.ExpressionEmission{}, err
@@ -116,6 +128,132 @@ func emitMethod(
 			reference.Requests(),
 		),
 	)
+}
+
+func emitGenericReceiverMethod(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	selector *ast.SelectorExpr,
+	method *types.Func,
+	selection *types.Selection,
+	signature *types.Signature,
+	discarded bool,
+) (api.ExpressionEmission, error) {
+	owner := method.Origin()
+	callable, ok, err := context.ResolveGenericCallable(owner)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	arguments := receiverTypeArguments(signature.Recv().Type())
+	if !ok ||
+		arguments == nil ||
+		arguments.Len() != len(callable.Parameters()) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	concrete := types.NewSignatureType(
+		signature.Recv(),
+		nil,
+		nil,
+		signature.Params(),
+		signature.Results(),
+		signature.Variadic(),
+	)
+	if err := validateResults(context, source, concrete, discarded); err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	receiver, resolvedMethod, err := selectionvalue.MethodReceiver(
+		context,
+		children,
+		selector,
+		selection,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if resolvedMethod != method {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	sourceArguments, argumentBefore, argumentRequests, err := emitArguments(
+		context,
+		children,
+		source,
+		concrete,
+		false,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	before := receiver.Before()
+	receiverValue := receiver.Value()
+	var receiverRequests []api.RootRequest
+	if len(argumentBefore) != 0 {
+		receiverValue, receiverRequests, before, err = captureReceiver(
+			context,
+			receiver,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	before = append(before, argumentBefore...)
+	typeArguments, typeRequests, err := genericinstance.EmitTypeArguments(
+		context,
+		children,
+		source,
+		arguments,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	capabilities, capabilityRequests, err := genericinstance.EmitCapabilities(
+		context,
+		source,
+		callable,
+		arguments,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	reference, err := context.Names().Reference(owner)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	callArguments := append(capabilities, receiverValue)
+	callArguments = append(callArguments, sourceArguments...)
+	return api.NewExpressionEmission(
+		before,
+		context.Factory().CallExpression(
+			context.Factory().Identifier(reference.Name()),
+			nil,
+			typeArguments,
+			callArguments,
+			tsgo.NodeFlagsNone,
+		),
+		api.CombineRequests(
+			receiver.Requests(),
+			receiverRequests,
+			argumentRequests,
+			typeRequests,
+			capabilityRequests,
+			reference.Requests(),
+		),
+	)
+}
+
+func receiverTypeArguments(sourceType types.Type) *types.TypeList {
+	if pointer, ok := types.Unalias(sourceType).(*types.Pointer); ok {
+		sourceType = pointer.Elem()
+	}
+	named, ok := types.Unalias(sourceType).(*types.Named)
+	if !ok ||
+		named.TypeParams().Len() == 0 ||
+		named.TypeArgs().Len() != named.TypeParams().Len() {
+		return nil
+	}
+	return named.TypeArgs()
 }
 
 func emitInterfaceMethod(
