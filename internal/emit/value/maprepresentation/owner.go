@@ -87,6 +87,12 @@ func Nil(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if api.ContainsGenericTypeParameter(sourceType) {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "open generic map zero bypassed generic operation ownership",
+		}
+	}
 	if model.Nominal() {
 		return api.DirectExpression(
 			context.Factory().VoidExpression(

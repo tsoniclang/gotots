@@ -167,6 +167,16 @@ func (owner Owner) Zero(
 		)
 	}
 	if _, ok := maprepresentation.Source(context, sourceType); ok {
+		if api.ContainsGenericTypeParameter(sourceType) {
+			return genericoperation.Call(
+				context,
+				source,
+				api.GenericOperationZero,
+				nil,
+				[]types.Type{sourceType},
+				nil,
+			)
+		}
 		return maprepresentation.Nil(
 			context,
 			owner.children,
