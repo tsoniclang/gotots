@@ -409,6 +409,10 @@ func (s *programSession) packageExports(
 			if !sourceOwned || !object.Exported() {
 				continue
 			}
+			if method, ok := object.(*types.Func); ok &&
+				method.Signature().Recv() != nil {
+				continue
+			}
 			binding, ok := s.registry.Target(object)
 			if !ok {
 				return nil, &ScheduleError{

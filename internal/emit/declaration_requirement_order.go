@@ -30,6 +30,20 @@ func compareDeclarationRequirements(
 	if left.Kind() > right.Kind() {
 		return 1
 	}
+	if left.Kind() == api.DeclarationRequirementClassMethod {
+		_, leftMethod, leftOK := left.ClassMethod()
+		_, rightMethod, rightOK := right.ClassMethod()
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		case !leftOK:
+			return 0
+		default:
+			return compareObjects(leftMethod, rightMethod)
+		}
+	}
 	if left.Kind() == api.DeclarationRequirementAddressableStorage {
 		_, leftVariable, leftOK := left.AddressableStorage()
 		_, rightVariable, rightOK := right.AddressableStorage()

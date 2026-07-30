@@ -231,6 +231,10 @@ func (unusedNames) InterfaceContract(
 	panic("unused")
 }
 
+func (unusedNames) MethodTarget(*types.Func) (api.MethodTarget, error) {
+	panic("unused")
+}
+
 func (unusedNames) InterfaceMethodName(*types.Func) (string, error) {
 	panic("unused")
 }

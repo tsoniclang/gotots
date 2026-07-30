@@ -9,13 +9,8 @@ import (
 )
 
 const (
-	BrandMember    = "$goType"
-	ValueMember    = "$value"
-	FromMember     = "$from"
-	ValueOfMember  = "$valueOf"
-	MapReadMember  = "$readMap"
-	MapStoreMember = "$storeMap"
-	MapWrapMember  = "$wrapMap"
+	BrandMember = "$goType"
+	ValueMember = "$value"
 )
 
 type Model struct {
@@ -193,35 +188,11 @@ func (m Model) Project(
 	context api.Context,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	switch m.family {
-	case FamilySlice, FamilyPointer, FamilyCallable, FamilyChannel:
-		reference, err := context.Names().Reference(m.typeName)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.NewExpressionEmission(
-			value.Before(),
-			context.Factory().CallExpression(
-				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
-					nil,
-					context.Factory().Identifier(ValueOfMember),
-					tsgo.NodeFlagsNone,
-				),
-				nil,
-				nil,
-				[]tsgo.Expression{value.Value()},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(value.Requests(), reference.Requests()),
-		)
-	default:
-		return api.NewExpressionEmission(
-			value.Before(),
-			m.Unwrap(context.Factory(), value.Value()),
-			value.Requests(),
-		)
-	}
+	return api.NewExpressionEmission(
+		value.Before(),
+		m.Unwrap(context.Factory(), value.Value()),
+		value.Requests(),
+	)
 }
 
 func (m Model) Construct(
@@ -242,42 +213,6 @@ func (m Model) Wrap(
 	reference, err := context.Names().Reference(m.typeName)
 	if err != nil {
 		return api.ExpressionEmission{}, err
-	}
-	switch m.family {
-	case FamilySlice, FamilyPointer, FamilyCallable, FamilyChannel:
-		return api.NewExpressionEmission(
-			value.Before(),
-			context.Factory().CallExpression(
-				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
-					nil,
-					context.Factory().Identifier(FromMember),
-					tsgo.NodeFlagsNone,
-				),
-				nil,
-				nil,
-				[]tsgo.Expression{value.Value()},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(value.Requests(), reference.Requests()),
-		)
-	case FamilyMap:
-		return api.NewExpressionEmission(
-			value.Before(),
-			context.Factory().CallExpression(
-				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
-					nil,
-					context.Factory().Identifier(MapWrapMember),
-					tsgo.NodeFlagsNone,
-				),
-				nil,
-				nil,
-				[]tsgo.Expression{value.Value()},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(value.Requests(), reference.Requests()),
-		)
 	}
 	return api.NewExpressionEmission(
 		value.Before(),

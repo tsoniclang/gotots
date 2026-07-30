@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type Storage uint8
@@ -89,26 +88,13 @@ func (m Model) TypeName() *types.TypeName {
 
 func (m Model) ReadReceiver(
 	context api.Context,
-	source ast.Node,
+	_ ast.Node,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	if !m.nominal {
 		return value, nil
 	}
-	zero, err := context.Values().Zero(
-		context.WithRole(api.RoleMapReceiver),
-		source,
-		m.defined.Underlying(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return m.staticMapOperation(
-		context,
-		definedtype.MapReadMember,
-		value,
-		zero,
-	)
+	return m.defined.Project(context, value)
 }
 
 func (m Model) StoreReceiver(
@@ -119,7 +105,7 @@ func (m Model) StoreReceiver(
 	if !m.nominal {
 		return value, nil
 	}
-	return m.staticMapOperation(context, definedtype.MapStoreMember, value)
+	return m.defined.Project(context, value)
 }
 
 func (m Model) WrapConverted(
@@ -129,43 +115,7 @@ func (m Model) WrapConverted(
 	if !m.nominal {
 		return value, nil
 	}
-	return m.staticMapOperation(context, definedtype.MapWrapMember, value)
-}
-
-func (m Model) staticMapOperation(
-	context api.Context,
-	member string,
-	value api.ExpressionEmission,
-	arguments ...api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	reference, err := context.Names().Reference(m.TypeName())
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	values := []tsgo.Expression{value.Value()}
-	requests := value.Requests()
-	before := value.Before()
-	for _, argument := range arguments {
-		before = append(before, argument.Before()...)
-		values = append(values, argument.Value())
-		requests = append(requests, argument.Requests()...)
-	}
-	return api.NewExpressionEmission(
-		before,
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
-				nil,
-				context.Factory().Identifier(member),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			nil,
-			values,
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(requests, reference.Requests()),
-	)
+	return m.defined.Wrap(context, value)
 }
 
 func (m Model) Wrap(

@@ -28,8 +28,8 @@ func TestDefinedCallableCrossPackageExecutesDifferentially(t *testing.T) {
 	printed := readMaterializedProgram(t, artifacts)
 	for _, required := range []string{
 		"new Transform(",
-		"Transform | undefined",
-		".$value(",
+		"transform: Transform",
+		"= transform.$value;",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("cross-package callable artifact lacks %q:\n%s", required, printed)
@@ -37,14 +37,15 @@ func TestDefinedCallableCrossPackageExecutesDifferentially(t *testing.T) {
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import {
-    FromRaw,
-    IsNil,
-    Use,
-} from "`+artifacts.module(t, "consumer.ts")+`";
+	    FromRaw,
+	    IsNil,
+	    Use,
+	} from "`+artifacts.module(t, "consumer.ts")+`";
+import { Transform } from "`+artifacts.module(t, "producer.ts")+`";
 
 console.log(String(Use(10)));
 console.log(String(FromRaw(20)));
-console.log(String(IsNil(undefined)));
+console.log(String(IsNil(new Transform(undefined))));
 `)
 	targetOutput := executeMaterializedTypeScript(
 		t,

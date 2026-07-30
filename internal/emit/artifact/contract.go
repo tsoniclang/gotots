@@ -132,6 +132,51 @@ func ProjectCoverageContract(statements []tsgo.Statement) (Contract, error) {
 	return make(Contract), nil
 }
 
+func ProjectClassMemberContract(
+	factory tsgo.Factory,
+	members []tsgo.ClassElement,
+) (Contract, error) {
+	if len(members) == 0 {
+		return nil, &ContractError{
+			Reason: "class-member artifact has no target member",
+		}
+	}
+	signatures := make([]tsgo.Node, 0, len(members))
+	implementations := make([]tsgo.Node, 0, len(members))
+	for _, member := range members {
+		projected, observable, err := projectClassMember(factory, member)
+		if err != nil {
+			return nil, err
+		}
+		if !observable {
+			kind := tsgo.SyntaxKind(0)
+			if member != nil {
+				kind = member.Kind()
+			}
+			return nil, &ContractError{
+				Kind:   kind,
+				Reason: "class-member contribution has no observable signature",
+			}
+		}
+		signatures = append(signatures, projected)
+		implementations = append(implementations, member)
+	}
+	signature, err := tsgo.EncodeNode(factory.SyntaxList(signatures))
+	if err != nil {
+		return nil, err
+	}
+	implementation, err := tsgo.EncodeNode(
+		factory.SyntaxList(implementations),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return Contract{
+		api.ArtifactFacetCallableSignature: signature,
+		api.ArtifactFacetImplementation:    implementation,
+	}, nil
+}
+
 func projectClassContract(
 	factory tsgo.Factory,
 	class tsgo.ClassDeclaration,

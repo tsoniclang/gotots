@@ -21,9 +21,13 @@ func FieldValue(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	role := api.RoleFieldReceiver
+	if context.Role() == api.RoleAssignmentTarget {
+		role = api.RoleAssignmentTarget
+	}
 	root, err := children.Expression(
 		context.
-			WithRole(api.RoleFieldReceiver).
+			WithRole(role).
 			WithExpectedType(resolved.root),
 		source.X,
 	)

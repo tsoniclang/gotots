@@ -363,6 +363,17 @@ func identifier(
 	); ok || err != nil {
 		return selected, err
 	}
+	if receiver, ok := context.ValueReceiver(object); ok {
+		request, err := receiver.CopyRequest()
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		return api.NewStoreTargetEmission(
+			context.Factory().Identifier(receiver.CopyName()),
+			object.Type(),
+			[]api.RootRequest{request},
+		)
+	}
 	reference, err := context.Names().Reference(object)
 	if err != nil {
 		return api.StoreTargetEmission{}, err

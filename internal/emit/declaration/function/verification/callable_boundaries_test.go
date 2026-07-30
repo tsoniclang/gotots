@@ -146,7 +146,7 @@ func TestVariadicCallablesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 			t.Fatalf("aggregate variadic path contains %q:\n%s", forbidden, source)
 		}
 	}
-	if !strings.Contains(source, "return Sum(1, Values.$valueOf(values));") {
+	if !strings.Contains(source, "return Sum(1, values.$value);") {
 		t.Fatalf("defined-slice spread was not projected directly:\n%s", source)
 	}
 	if !strings.Contains(source, "const __gotots_results_") ||

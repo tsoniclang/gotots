@@ -86,6 +86,14 @@ func identifier(
 	); selected {
 		return api.DirectExpression(context.Factory().Identifier(name)), nil
 	}
+	var receiverRequest []api.RootRequest
+	if receiver, ok := context.ValueReceiver(variable); ok {
+		request, err := receiver.CopyRequest()
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		receiverRequest = []api.RootRequest{request}
+	}
 	value, err := children.Expression(
 		context.
 			WithRole(api.RoleUnaryOperand).
@@ -114,6 +122,7 @@ func identifier(
 		cell.Value(),
 		api.CombineRequests(
 			cell.Requests(),
+			receiverRequest,
 			[]api.RootRequest{requirement},
 		),
 	)

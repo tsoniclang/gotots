@@ -58,23 +58,32 @@ func TestProductionAggregateKeyOperationsAreStaticAndTyped(t *testing.T) {
 	}
 	operations := make(map[string]int)
 	requirements := make(map[api.DeclarationRequirement]int)
-	for _, request := range specialization.Requests() {
-		requirement, ok := request.DeclarationRequirement()
-		if !ok {
-			continue
-		}
-		if requirement.Kind() != api.DeclarationRequirementNamedStructOperation {
-			t.Fatalf(
-				"aggregate specialization introduced requirement kind %d",
-				requirement.Kind(),
-			)
-		}
-		requirements[requirement]++
-		typeName, operation, ok := requirement.NamedStructOperation()
-		if !ok {
-			t.Fatal("named-struct requirement lost its typed operation")
-		}
-		operations[typeName.Name()+"/"+operation.String()]++
+	err = api.WalkRootRequests(
+		specialization.Requests(),
+		func(request api.RootRequest) error {
+			requirement, ok := request.DeclarationRequirement()
+			if !ok {
+				return nil
+			}
+			if requirement.Kind() != api.DeclarationRequirementNamedStructOperation {
+				return fmt.Errorf(
+					"aggregate specialization introduced requirement kind %d",
+					requirement.Kind(),
+				)
+			}
+			requirements[requirement]++
+			typeName, operation, ok := requirement.NamedStructOperation()
+			if !ok {
+				return fmt.Errorf(
+					"named-struct requirement lost its typed operation",
+				)
+			}
+			operations[typeName.Name()+"/"+operation.String()]++
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 	for _, operation := range []string{
 		"Key/copy",
@@ -415,6 +424,12 @@ func (aggregateNames) InterfaceType(
 func (aggregateNames) InterfaceContract(
 	types.Type,
 ) (api.InterfaceContractReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) MethodTarget(
+	*types.Func,
+) (api.MethodTarget, error) {
 	panic("unused")
 }
 

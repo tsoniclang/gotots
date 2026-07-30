@@ -71,14 +71,6 @@ func Emit(
 		})
 		requests = append(requests, underlying.Requests()...)
 	}
-	if model.NilCapable() {
-		target = context.Factory().UnionTypeNode([]tsgo.TypeNode{
-			target,
-			context.Factory().KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-			),
-		})
-	}
 	return api.DirectType(
 		target,
 		api.CombineRequests(reference.Requests(), requests)...,

@@ -28,16 +28,15 @@ func Apply(
 		return direct(context, value)
 	}
 	if model, ok := maprepresentation.Source(context, sourceType); ok {
-		if model.Nominal() {
-			return direct(context, value)
+		if !model.Nominal() {
+			name, nameErr := mapruntime.Name(mapruntime.MemberIsNil)
+			return method(
+				context,
+				value,
+				name,
+				nameErr,
+			)
 		}
-		name, nameErr := mapruntime.Name(mapruntime.MemberIsNil)
-		return method(
-			context,
-			value,
-			name,
-			nameErr,
-		)
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		if !defined.NilCapable() {

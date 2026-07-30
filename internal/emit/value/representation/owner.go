@@ -148,16 +148,6 @@ func (owner Owner) Zero(
 		), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
-		if defined.NilCapable() {
-			return api.DirectExpression(
-				context.Factory().VoidExpression(
-					context.Factory().NumericLiteral(
-						"0",
-						tsgo.TokenFlagsNone,
-					),
-				),
-			), nil
-		}
 		zero, err := owner.Zero(
 			context.WithRole(api.RoleDefinedValue),
 			source,
@@ -165,9 +155,6 @@ func (owner Owner) Zero(
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
-		}
-		if defined.Family() == definedtype.FamilyCallable {
-			return zero, nil
 		}
 		return defined.Wrap(context, zero)
 	}

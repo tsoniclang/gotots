@@ -890,7 +890,10 @@ Every target reference carries the exact represented `go/types` type arguments,
 and every operation projects through the wrapper before applying the
 underlying-family behavior. Rejecting a generic defined callable and then
 treating it as a struct or raw function is forbidden: `iter.Seq[E]` is a
-`Seq<E>` wrapper, and invocation uses its canonical payload projection.
+stable `Seq<E>` class value, and invocation uses its canonical payload
+projection. Nil-capable families store `undefined` only in that payload; the
+class reference itself is never optional. This gives every reached receiver
+method one class-owned member surface without static wrap/project helpers.
 
 A generated callback that inverts source control flow, such as the callback
 implementing range-over-function, is not a new source callable and does not

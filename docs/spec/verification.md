@@ -390,11 +390,14 @@ the number of possible function values.
 
 The nil/defined-callable extension additionally proves that callee and
 arguments execute in Go order before the nil panic, known non-nil calls remain
-byte-stable and direct, aliases add no wrapper, and distinct defined callables
-remain statically incompatible. Mutations remove the nil guard, move it before
-argument evaluation, replace the nominal wrapper with an intersection/string
-brand, mutate the function object with `Object.assign`, or invoke through
-`.call`; each must fail its owning shape, differential, or broad-search gate.
+byte-stable and direct, every defined value is a stable class whose nil-capable
+payload alone may be `undefined`, aliases add no wrapper, and distinct defined
+callables remain statically incompatible. Mutations make the class reference
+optional, restore static wrap/project helpers, remove the nil-payload guard,
+move it before argument evaluation, replace the nominal wrapper with an
+intersection/string brand, mutate the function object with `Object.assign`, or
+invoke through `.call`; each must fail its owning shape, differential, or
+broad-search gate.
 Generic defined-callable fixtures additionally require one parameterized class,
 exact represented type arguments at every reference, payload projection before
 call/range, strict execution for two distinct instantiations, and a mutation

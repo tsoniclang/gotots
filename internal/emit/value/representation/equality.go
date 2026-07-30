@@ -65,19 +65,6 @@ func (owner Owner) Equal(
 		)), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
-		if defined.Family() == definedtype.FamilyCallable {
-			return api.DirectExpression(
-				context.Factory().BinaryExpression(
-					nil,
-					left,
-					nil,
-					context.Factory().BinaryOperatorToken(
-						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-					),
-					right,
-				),
-			), nil
-		}
 		leftValue := api.DirectExpression(left)
 		rightValue := api.DirectExpression(right)
 		var err error

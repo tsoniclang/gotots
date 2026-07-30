@@ -227,11 +227,12 @@ func requirementOwnerName(requirement api.DeclarationRequirement) string {
 }
 
 type artifactRevision struct {
-	statements     []tsgo.Statement
-	placement      *targetplacement.Owner
-	dependencies   []api.ArtifactDependency
-	contract       artifactstate.Contract
-	temporaryStart emitnaming.TemporarySnapshot
+	statements        []tsgo.Statement
+	placement         *targetplacement.Owner
+	dependencies      []api.ArtifactDependency
+	contract          artifactstate.Contract
+	classContribution *classMemberContribution
+	temporaryStart    emitnaming.TemporarySnapshot
 }
 
 func (s *programSession) buildArtifactRevision(
@@ -268,6 +269,11 @@ func (s *programSession) buildArtifactRevision(
 	defer finish()
 
 	requirements := s.requirements.appliedFor(artifactOwner)
+	handlerRequirements, selectedMethods, err :=
+		s.partitionClassMethodRequirements(owner, requirements)
+	if err != nil {
+		return artifactRevision{}, err
+	}
 	context, err := builder.context.WithSourceArtifactOwner(artifactOwner)
 	if err != nil {
 		return artifactRevision{}, err
@@ -276,7 +282,7 @@ func (s *programSession) buildArtifactRevision(
 		context,
 		site.declaration,
 		artifactOwner,
-		requirements,
+		handlerRequirements,
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -285,25 +291,81 @@ func (s *programSession) buildArtifactRevision(
 		context,
 		site.declaration,
 		owner,
-		requirements,
+		handlerRequirements,
 	)
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	placement, dependencies, err := s.consumeArtifactRequests(
-		artifactOwner,
+	requests, err := s.classArtifactRequests(
+		owner,
+		selectedMethods,
 		result.Requests(),
 	)
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	var contribution *classMemberContribution
+	if classOwner, members, ok := result.ClassMemberContribution(); ok {
+		method, methodOK := owner.(*types.Func)
+		if !methodOK ||
+			method.Origin() != method ||
+			api.MethodReceiverTypeName(method) != classOwner {
+			return artifactRevision{}, &ScheduleError{
+				Object: owner.Name(),
+				Reason: "class-member contribution has a foreign owner",
+			}
+		}
+		contribution = &classMemberContribution{
+			owner:   classOwner,
+			method:  method,
+			members: members,
+		}
+		request, requestErr := api.NewClassMethodRequest(
+			classOwner,
+			method,
+		)
+		if requestErr != nil {
+			return artifactRevision{}, requestErr
+		}
+		requests = append(requests, request)
+	}
+	placement, dependencies, err := s.consumeArtifactRequests(
+		artifactOwner,
+		requests,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
 	statements := result.Declarations()
+	if len(selectedMethods) != 0 {
+		statements, err = s.attachClassMemberContributions(
+			builder,
+			owner,
+			statements,
+			selectedMethods,
+		)
+		if err != nil {
+			return artifactRevision{}, err
+		}
+	}
 	var contract artifactstate.Contract
 	switch result.Disposition() {
 	case api.DeclarationDispositionMaterialized:
 		contract, err = artifactstate.ProjectContract(s.factory, statements)
 	case api.DeclarationDispositionCoverageOnly:
 		contract, err = artifactstate.ProjectCoverageContract(statements)
+	case api.DeclarationDispositionClassMemberContribution:
+		if contribution == nil || len(statements) != 0 {
+			err = &ScheduleError{
+				Object: owner.Name(),
+				Reason: "class-member artifact lost its contribution",
+			}
+			break
+		}
+		contract, err = artifactstate.ProjectClassMemberContract(
+			s.factory,
+			contribution.members,
+		)
 	default:
 		err = &ScheduleError{
 			Object: owner.Name(),
@@ -314,11 +376,12 @@ func (s *programSession) buildArtifactRevision(
 		return artifactRevision{}, err
 	}
 	return artifactRevision{
-		statements:     statements,
-		placement:      placement,
-		dependencies:   dependencies,
-		contract:       contract,
-		temporaryStart: temporaryStart,
+		statements:        statements,
+		placement:         placement,
+		dependencies:      dependencies,
+		contract:          contract,
+		classContribution: contribution,
+		temporaryStart:    temporaryStart,
 	}, nil
 }
 
@@ -438,6 +501,7 @@ func (s *programSession) reconstructArtifact(owner types.Object) error {
 	); err != nil {
 		return err
 	}
+	s.commitClassMemberContribution(owner, revision.classContribution)
 	s.artifacts.DiscardDirty(artifactOwner)
 	declaration.statements = revision.statements
 	declaration.placement = revision.placement

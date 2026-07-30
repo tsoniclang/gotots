@@ -180,6 +180,36 @@ func Enter(
 	}, nil
 }
 
+func EnterClassMethod(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.FuncDecl,
+	owner *types.Func,
+	requirements []api.DeclarationRequirement,
+) (Parameters, error) {
+	signature, ok := owner.Type().(*types.Signature)
+	if !ok || signature.Recv() == nil {
+		return Parameters{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "class-method generic identity is invalid",
+		}
+	}
+	parameters, err := Enter(
+		context,
+		children,
+		source,
+		owner,
+		requirements,
+	)
+	if err != nil {
+		return Parameters{}, err
+	}
+	if api.ValueReceiverTypeName(owner) != nil {
+		parameters.typeNodes = nil
+	}
+	return parameters, nil
+}
+
 func typeParameterName(
 	context api.Context,
 	parameter *types.TypeParam,

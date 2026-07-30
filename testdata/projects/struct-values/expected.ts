@@ -32,6 +32,11 @@ export class Box {
     static $equal($left: Box, $right: Box): bool {
         return Point.$equal($left.Point, $right.Point) && $left.Active === $right.Active;
     }
+    WithX(value: int32): Box {
+        let box = Box.$copy(this);
+        box.Point.X = value;
+        return box;
+    }
 }
 export class Mirror {
     declare private readonly $goType: void;
@@ -102,12 +107,8 @@ export function ParameterIsolated(value: Box): int32 {
 export function Equal(left: Box, right: Box): bool {
     return Box.$equal(left, right);
 }
-export function Box_WithX(box: Box, value: int32): Box {
-    box.Point.X = value;
-    return box;
-}
 export function Invoke(value: Box, next: int32): Box {
-    return Box_WithX(Box.$copy(value), next);
+    return value.WithX(next);
 }
 export function CopyResult(): int32 {
     return CopyIsolated(NewBox(4));

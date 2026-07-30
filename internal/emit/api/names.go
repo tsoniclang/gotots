@@ -89,6 +89,52 @@ func (r NameReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
 }
 
+type MethodTargetKind uint8
+
+const (
+	MethodTargetInvalid MethodTargetKind = iota
+	MethodTargetClassMember
+	MethodTargetEnvironmentFunction
+)
+
+type MethodTarget struct {
+	kind     MethodTargetKind
+	name     string
+	requests []RootRequest
+}
+
+func NewMethodTarget(
+	kind MethodTargetKind,
+	name string,
+	requests ...RootRequest,
+) (MethodTarget, error) {
+	if (kind != MethodTargetClassMember &&
+		kind != MethodTargetEnvironmentFunction) ||
+		name == "" {
+		return MethodTarget{}, &NameError{
+			Name:   name,
+			Reason: "method target is invalid",
+		}
+	}
+	return MethodTarget{
+		kind:     kind,
+		name:     name,
+		requests: slices.Clone(requests),
+	}, nil
+}
+
+func (t MethodTarget) Kind() MethodTargetKind {
+	return t.kind
+}
+
+func (t MethodTarget) Name() string {
+	return t.name
+}
+
+func (t MethodTarget) Requests() []RootRequest {
+	return slices.Clone(t.requests)
+}
+
 type InterfaceContractReference struct {
 	typeName     string
 	contractName string
@@ -205,6 +251,7 @@ type Names interface {
 	InterfaceDynamicType(types.Type) (NameReference, error)
 	InterfaceType(types.Type) (NameReference, error)
 	InterfaceContract(types.Type) (InterfaceContractReference, error)
+	MethodTarget(*types.Func) (MethodTarget, error)
 	InterfaceMethodName(*types.Func) (string, error)
 	InterfaceMethodToken(*types.Func) (NameReference, error)
 	GenericCapability(

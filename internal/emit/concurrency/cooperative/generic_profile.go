@@ -7,6 +7,13 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
+type genericCallableSelection struct {
+	facet     api.CallableFacet
+	profile   *api.GenericCallableProfile
+	selection api.GenericCallableProfileSelection
+	requests  []api.RootRequest
+}
+
 func SelectGenericCallable(
 	context api.Context,
 	owner *types.Func,
@@ -18,53 +25,26 @@ func SelectGenericCallable(
 	api.GenericCallableProfileSelection,
 	error,
 ) {
-	if owner == nil {
-		return api.NameReference{},
-			api.CallableFacet{},
-			api.GenericCallableProfileSelection{},
-			&api.InvariantError{
-				Role:   context.Role(),
-				Reason: "generic callable owner is nil",
-			}
-	}
-	owner = owner.Origin()
-	profileSelection, requests, err :=
-		CorrespondGenericCallableABIs(
-			context,
-			owner,
-			declaration,
-			instantiated,
-		)
+	selected, err := selectGenericCallable(
+		context,
+		owner,
+		declaration,
+		instantiated,
+	)
 	if err != nil {
 		return api.NameReference{},
 			api.CallableFacet{},
 			api.GenericCallableProfileSelection{},
 			err
 	}
-	var (
-		reference api.NameReference
-		facet     api.CallableFacet
-	)
-	if profileSelection.Cooperative() {
-		profile, resolveErr := context.ResolveGenericCallableProfile(
-			owner,
-			profileSelection,
+	owner = owner.Origin()
+	var reference api.NameReference
+	if selected.profile != nil {
+		reference, err = context.Names().GenericCallableProfile(
+			selected.profile,
 		)
-		if resolveErr != nil {
-			return api.NameReference{},
-				api.CallableFacet{},
-				api.GenericCallableProfileSelection{},
-				resolveErr
-		}
-		reference, err = context.Names().GenericCallableProfile(profile)
-		if err == nil {
-			facet, err = api.NewGenericCallableProfileFacet(profile)
-		}
 	} else {
 		reference, err = context.Names().Reference(owner)
-		if err == nil {
-			facet, err = api.NewSourceCallableFacet(owner)
-		}
 	}
 	if err != nil {
 		return api.NameReference{},
@@ -76,10 +56,107 @@ func SelectGenericCallable(
 		reference.Name(),
 		api.CombineRequests(
 			reference.Requests(),
-			requests,
+			selected.requests,
 		)...,
 	)
-	return reference, facet, profileSelection, err
+	return reference, selected.facet, selected.selection, err
+}
+
+func SelectGenericClassMethod(
+	context api.Context,
+	owner *types.Func,
+	declaration *types.Signature,
+	instantiated *types.Signature,
+) (
+	string,
+	api.CallableFacet,
+	api.GenericCallableProfileSelection,
+	[]api.RootRequest,
+	error,
+) {
+	selected, err := selectGenericCallable(
+		context,
+		owner,
+		declaration,
+		instantiated,
+	)
+	if err != nil {
+		return "",
+			api.CallableFacet{},
+			api.GenericCallableProfileSelection{},
+			nil,
+			err
+	}
+	requests := selected.requests
+	suffix := ""
+	if selected.profile != nil {
+		request, requestErr :=
+			api.NewGenericCallableProfileRequest(selected.profile)
+		if requestErr != nil {
+			return "",
+				api.CallableFacet{},
+				api.GenericCallableProfileSelection{},
+				nil,
+				requestErr
+		}
+		requests = api.CombineRequests(
+			requests,
+			[]api.RootRequest{request},
+		)
+		suffix = selected.profile.Suffix()
+	}
+	return suffix,
+		selected.facet,
+		selected.selection,
+		requests,
+		nil
+}
+
+func selectGenericCallable(
+	context api.Context,
+	owner *types.Func,
+	declaration *types.Signature,
+	instantiated *types.Signature,
+) (genericCallableSelection, error) {
+	if owner == nil {
+		return genericCallableSelection{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic callable owner is nil",
+		}
+	}
+	owner = owner.Origin()
+	profileSelection, requests, err :=
+		CorrespondGenericCallableABIs(
+			context,
+			owner,
+			declaration,
+			instantiated,
+		)
+	if err != nil {
+		return genericCallableSelection{}, err
+	}
+	if profileSelection.Cooperative() {
+		profile, resolveErr := context.ResolveGenericCallableProfile(
+			owner,
+			profileSelection,
+		)
+		if resolveErr != nil {
+			return genericCallableSelection{}, resolveErr
+		}
+		facet, facetErr := api.NewGenericCallableProfileFacet(profile)
+		return genericCallableSelection{
+			facet:     facet,
+			profile:   profile,
+			selection: profileSelection,
+			requests:  requests,
+		}, facetErr
+	}
+	facet, err := api.NewSourceCallableFacet(owner)
+	return genericCallableSelection{
+		facet:     facet,
+		selection: profileSelection,
+		requests:  requests,
+	}, err
 }
 
 func GenericCall(

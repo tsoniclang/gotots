@@ -309,7 +309,7 @@ func changedArtifactFacets(
 	next Contract,
 ) []api.ArtifactFacet {
 	var changed []api.ArtifactFacet
-	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetValueSurface; facet++ {
+	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetImplementation; facet++ {
 		currentValue, currentOK := current[facet]
 		nextValue, nextOK := next[facet]
 		if currentOK != nextOK || !bytes.Equal(currentValue, nextValue) {

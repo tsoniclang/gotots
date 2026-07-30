@@ -90,31 +90,57 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 			)
 		}
 	}
-	for _, provider := range []string{"ApplyFirst", "Box_Apply"} {
-		base := waveNineFunctionText(t, artifacts.printed, provider)
-		for _, forbidden := range []string{"async", "Promise<", "await "} {
-			if strings.Contains(base, forbidden) {
-				t.Fatalf(
-					"synchronous generic provider %s contains %q:\n%s",
-					provider,
-					forbidden,
-					base,
-				)
-			}
-		}
-		variant := waveNineFunctionWithPrefix(
-			t,
-			artifacts.printed,
-			provider+"$cooperative_",
-		)
-		if !strings.Contains(variant, "async") ||
-			!strings.Contains(variant, "await ") {
+	base := waveNineFunctionText(t, artifacts.printed, "ApplyFirst")
+	for _, forbidden := range []string{"async", "Promise<", "await "} {
+		if strings.Contains(base, forbidden) {
 			t.Fatalf(
-				"cooperative generic provider variant %s is incomplete:\n%s",
-				provider,
-				variant,
+				"synchronous generic provider ApplyFirst contains %q:\n%s",
+				forbidden,
+				base,
 			)
 		}
+	}
+	variant := waveNineFunctionWithPrefix(
+		t,
+		artifacts.printed,
+		"ApplyFirst$cooperative_",
+	)
+	if !strings.Contains(variant, "async") ||
+		!strings.Contains(variant, "await ") {
+		t.Fatalf(
+			"cooperative generic provider variant ApplyFirst is incomplete:\n%s",
+			variant,
+		)
+	}
+	base = waveNineClassMemberText(
+		t,
+		artifacts.printed,
+		"Box",
+		"\n    Apply(",
+	)
+	for _, forbidden := range []string{"async", "Promise<", "await "} {
+		if strings.Contains(base, forbidden) {
+			t.Fatalf(
+				"synchronous generic provider Box.Apply contains %q:\n%s",
+				forbidden,
+				base,
+			)
+		}
+	}
+	variant = waveNineClassMemberText(
+		t,
+		artifacts.printed,
+		"Box",
+		"\n    async Apply$cooperative_",
+	)
+	if !strings.Contains(variant, "await ") {
+		t.Fatalf(
+			"cooperative generic provider variant Box.Apply is incomplete:\n%s",
+			variant,
+		)
+	}
+	if strings.Contains(artifacts.printed, "Box_Apply") {
+		t.Fatal("generic receiver method retained a top-level receiver twin")
 	}
 	synchronous := waveNineFunctionText(
 		t,
@@ -402,6 +428,29 @@ func waveNineFunctionWithPrefix(
 		return rest
 	}
 	return rest[:len("export ")+next]
+}
+
+func waveNineClassMemberText(
+	t *testing.T,
+	printed string,
+	className string,
+	marker string,
+) string {
+	t.Helper()
+	classStart := strings.Index(printed, "export class "+className)
+	if classStart < 0 {
+		t.Fatalf("generated output lacks class %s", className)
+	}
+	memberOffset := strings.Index(printed[classStart:], marker)
+	if memberOffset < 0 {
+		t.Fatalf("generated class %s lacks member marker %q", className, marker)
+	}
+	memberStart := classStart + memberOffset + 1
+	memberEnd := strings.Index(printed[memberStart:], "\n    }\n")
+	if memberEnd < 0 {
+		t.Fatalf("generated class %s member %q has no boundary", className, marker)
+	}
+	return printed[memberStart : memberStart+memberEnd+len("\n    }")]
 }
 
 func cooperativeFunctionName(function string) string {

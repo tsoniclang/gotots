@@ -220,11 +220,12 @@ const (
 	ArtifactFacetInstanceTypeSurface ArtifactFacet = 3
 	ArtifactFacetStaticSurface       ArtifactFacet = 4
 	ArtifactFacetValueSurface        ArtifactFacet = 5
+	ArtifactFacetImplementation      ArtifactFacet = 6
 )
 
 func (f ArtifactFacet) Valid() bool {
 	return f >= ArtifactFacetCallableSignature &&
-		f <= ArtifactFacetValueSurface
+		f <= ArtifactFacetImplementation
 }
 
 func (f ArtifactFacet) String() string {
@@ -239,6 +240,8 @@ func (f ArtifactFacet) String() string {
 		return "static-surface"
 	case ArtifactFacetValueSurface:
 		return "value-surface"
+	case ArtifactFacetImplementation:
+		return "implementation"
 	default:
 		return fmt.Sprintf("artifact-facet(%d)", f)
 	}

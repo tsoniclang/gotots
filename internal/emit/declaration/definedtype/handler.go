@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -63,35 +62,13 @@ func Emit(
 		return api.DeclarationEmission{}, true, err
 	}
 	context = parameters.Context()
-	var underlying api.TypeEmission
-	if model.Family() == definedtype.FamilyCallable {
-		signature, valid := model.Callable()
-		if !valid {
-			return api.DeclarationEmission{}, true, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "defined callable declaration is invalid",
-			}
-		}
-		var err error
-		underlying, err = callable.EmitNonNilType(
-			context.WithRole(api.RoleDefinedUnderlyingType),
-			children,
-			source.Type,
-			signature,
-		)
-		if err != nil {
-			return api.DeclarationEmission{}, true, err
-		}
-	} else {
-		var err error
-		underlying, err = children.RepresentedType(
-			context.WithRole(api.RoleDefinedUnderlyingType),
-			source.Type,
-			model.Underlying(),
-		)
-		if err != nil {
-			return api.DeclarationEmission{}, true, err
-		}
+	underlying, err := children.RepresentedType(
+		context.WithRole(api.RoleDefinedUnderlyingType),
+		source.Type,
+		model.Underlying(),
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, true, err
 	}
 	name, modifiers, err := declarationIdentity(context, typeName)
 	if err != nil {
@@ -112,7 +89,7 @@ func Emit(
 			nil,
 		),
 		context.Factory().ConstructorDeclaration(
-			constructorModifiers(context, model),
+			nil,
 			nil,
 			[]tsgo.ParameterDeclaration{
 				context.Factory().ParameterDeclaration(
@@ -131,21 +108,12 @@ func Emit(
 			context.Factory().Block(nil, true),
 		),
 	}
-	familyMembers, familyRequests, err := emitFamilyMembers(
-		context,
-		children,
-		source,
-		model,
-		name,
-		underlying.Value(),
-		requirements,
-		parameters.Nodes(),
-		parameters.References(),
-	)
-	if err != nil {
-		return api.DeclarationEmission{}, true, err
+	if len(requirements) != 0 {
+		return api.DeclarationEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "defined type received foreign declaration requirements",
+		}
 	}
-	members = append(members, familyMembers...)
 	return api.DirectDeclaration(
 		context.Factory().ClassDeclaration(
 			modifiers,
@@ -156,24 +124,8 @@ func Emit(
 		),
 		api.CombineRequests(
 			underlying.Requests(),
-			familyRequests,
 		)...,
 	), true, nil
-}
-
-func constructorModifiers(
-	context api.Context,
-	model definedtype.Model,
-) []tsgo.ModifierLike {
-	switch model.Family() {
-	case definedtype.FamilySlice,
-		definedtype.FamilyPointer,
-		definedtype.FamilyChannel,
-		definedtype.FamilyMap:
-		return []tsgo.ModifierLike{context.Factory().PrivateKeyword()}
-	default:
-		return nil
-	}
 }
 
 func sourceSpec(

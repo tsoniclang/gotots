@@ -113,11 +113,12 @@ func assertGenericMethodAdapterShape(t *testing.T, printed string) {
 	}
 	if strings.Contains(printed, ".call(") ||
 		strings.Contains(printed, ".apply(") ||
-		strings.Contains(printed, ".bind(") {
+		strings.Contains(printed, ".bind(") ||
+		strings.Contains(printed, "function ComparableBox_Same") {
 		t.Fatalf("generic method adapter uses dynamic callable APIs:\n%s", printed)
 	}
 	capabilityFirst := regexp.MustCompile(
-		`ComparableBox_Same<int32>\(\$goCapability_[0-9a-f]+, `,
+		`\.Same\(\$goCapability_[0-9a-f]+, `,
 	)
 	if count := len(capabilityFirst.FindAllString(printed, -1)); count != 2 {
 		t.Fatalf(
@@ -127,7 +128,7 @@ func assertGenericMethodAdapterShape(t *testing.T, printed string) {
 		)
 	}
 	receiverFirst := regexp.MustCompile(
-		`ComparableBox_Same<int32>\((?:__gotots_receiver_|\$argument0), \$goCapability_`,
+		`\.Same\((?:__gotots_receiver_|\$argument0), \$goCapability_`,
 	)
 	if receiverFirst.MatchString(printed) {
 		t.Fatalf("generic method adapter emitted receiver before capability:\n%s", printed)

@@ -101,7 +101,7 @@ func emitMethod(
 			detached,
 		)
 	}
-	receiver, resolvedMethod, err := selectionvalue.MethodReceiver(
+	receiver, resolvedMethod, err := selectionvalue.DirectMethodReceiver(
 		context,
 		children,
 		selector,
@@ -137,25 +137,25 @@ func emitMethod(
 		}
 	}
 	before = append(before, argumentBefore...)
-	reference, err := context.Names().Reference(method)
+	call, callRequests, err := callable.SelectedMethodCall(
+		context,
+		method,
+		"",
+		receiverValue,
+		nil,
+		arguments,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arguments = append([]tsgo.Expression{receiverValue}, arguments...)
 	target, err := api.NewExpressionEmission(
 		before,
-		context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
-			nil,
-			nil,
-			arguments,
-			tsgo.NodeFlagsNone,
-		),
+		call,
 		api.CombineRequests(
 			receiver.Requests(),
 			receiverRequests,
 			argumentRequests,
-			reference.Requests(),
+			callRequests,
 		),
 	)
 	if err != nil {

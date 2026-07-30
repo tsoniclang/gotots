@@ -259,7 +259,7 @@ func emitMethod(
 		),
 	)
 	receiver, dispatchType, resolvedMethod, err :=
-		selectionvalue.MethodSetReceiver(
+		selectionvalue.DirectMethodSetReceiver(
 			context,
 			children,
 			nil,
@@ -315,10 +315,6 @@ func emitMethod(
 			return nil, nil, methodStageError(MethodStageInvocation, err)
 		}
 	} else {
-		reference, referenceErr := context.Names().Reference(method)
-		if referenceErr != nil {
-			return nil, nil, referenceErr
-		}
 		controlRequest, controlErr := api.NewDirectCallableControlRequest(
 			method.Origin(),
 			api.CallableControlRecovery,
@@ -326,21 +322,22 @@ func emitMethod(
 		if controlErr != nil {
 			return nil, nil, controlErr
 		}
-		call = api.DirectExpression(
-			context.Factory().CallExpression(
-				context.Factory().Identifier(reference.Name()),
-				nil,
-				nil,
-				append(
-					[]tsgo.Expression{receiver.Value()},
-					parameterReferences...,
-				),
-				tsgo.NodeFlagsNone,
-			),
+		var targetCall tsgo.CallExpression
+		var targetRequests []api.RootRequest
+		targetCall, targetRequests, err = callable.SelectedMethodCall(
+			context,
+			method,
+			"",
+			receiver.Value(),
+			nil,
+			parameterReferences,
 		)
+		if err != nil {
+			return nil, nil, methodStageError(MethodStageInvocation, err)
+		}
+		call = api.DirectExpression(targetCall, targetRequests...)
 		callRequests = api.CombineRequests(
 			receiver.Requests(),
-			reference.Requests(),
 			[]api.RootRequest{controlRequest},
 		)
 	}

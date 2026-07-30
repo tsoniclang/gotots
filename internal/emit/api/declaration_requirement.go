@@ -7,11 +7,12 @@ import (
 )
 
 type DeclarationRequirement struct {
-	owner     ArtifactOwner
-	kind      DeclarationRequirementKind
-	operation NamedStructOperation
-	typeName  *types.TypeName
-	variable  *types.Var
+	owner       ArtifactOwner
+	kind        DeclarationRequirementKind
+	operation   NamedStructOperation
+	typeName    *types.TypeName
+	classMethod *types.Func
+	variable    *types.Var
 	// constant is the untyped constant a local projection materializes. A
 	// package projection owns the constant directly (owner is the constant), so
 	// this stays nil there; a local projection is owned by the enclosing
@@ -273,7 +274,46 @@ func (r DeclarationRequirement) Valid() bool {
 		(r.interfaceContract != nil || r.interfaceContractKey != "") {
 		return false
 	}
+	if r.kind != DeclarationRequirementClassMethod &&
+		r.classMethod != nil {
+		return false
+	}
 	switch r.kind {
+	case DeclarationRequirementValueReceiverCopy:
+		if r.operation != NamedStructOperationInvalid ||
+			r.typeName != nil ||
+			r.variable != nil ||
+			r.constant != nil ||
+			r.projection != types.Invalid ||
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid {
+			return false
+		}
+		source, sourceOK := r.owner.Source()
+		method, methodOK := source.(*types.Func)
+		return sourceOK &&
+			methodOK &&
+			method.Origin() == method &&
+			ValueReceiverTypeName(method) != nil
+	case DeclarationRequirementClassMethod:
+		if r.operation != NamedStructOperationInvalid ||
+			r.typeName == nil ||
+			r.classMethod == nil ||
+			r.variable != nil ||
+			r.constant != nil ||
+			r.projection != types.Invalid ||
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid {
+			return false
+		}
+		source, sourceOK := r.owner.Source()
+		owner, ownerOK := source.(*types.TypeName)
+		return sourceOK &&
+			ownerOK &&
+			owner == r.typeName &&
+			MethodReceiverTypeName(r.classMethod) == owner
 	case DeclarationRequirementNamedStructOperation:
 		if !r.operation.Valid() ||
 			r.typeName == nil ||
@@ -511,165 +551,6 @@ func validAddressableStorageOwner(
 		variable.Pos().IsValid() &&
 		variable.Pos() >= initializer.Rhs.Pos() &&
 		variable.Pos() <= initializer.Rhs.End()
-}
-
-func NewDirectCallableControlRequirement(
-	owner *types.Func,
-	control CallableControlFacet,
-) (DeclarationRequirement, error) {
-	if owner == nil ||
-		owner.Origin() != owner ||
-		!control.Valid() ||
-		control == CallableControlGoto ||
-		control == CallableControlIteratorReturn {
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "direct callable-control requirement is invalid",
-		}
-	}
-	return DeclarationRequirement{
-		owner:   MustSourceArtifactOwner(owner),
-		kind:    DeclarationRequirementCallableControl,
-		control: control,
-	}, nil
-}
-
-func NewCallableControlRequirement(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-	control CallableControlFacet,
-) (DeclarationRequirement, error) {
-	if !validCallableControlAnchor(owner, enclosing, callable) ||
-		!control.Valid() ||
-		control == CallableControlGoto ||
-		control == CallableControlIteratorReturn {
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "callable-control requirement is invalid",
-		}
-	}
-	return DeclarationRequirement{
-		owner:     owner,
-		kind:      DeclarationRequirementCallableControl,
-		enclosing: enclosing,
-		callable:  callable,
-		control:   control,
-	}, nil
-}
-
-func NewIteratorReturnControlRequirement(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-	source *ast.RangeStmt,
-) (DeclarationRequirement, error) {
-	if !validCallableControlAnchor(owner, enclosing, callable) ||
-		!validIteratorReturnRange(callable, source) {
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "iterator-return control requirement is invalid",
-		}
-	}
-	return DeclarationRequirement{
-		owner:        owner,
-		kind:         DeclarationRequirementCallableControl,
-		enclosing:    enclosing,
-		callable:     callable,
-		control:      CallableControlIteratorReturn,
-		controlRange: source,
-	}, nil
-}
-
-func NewGotoControlRequirement(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-	label *types.Label,
-	position token.Pos,
-) (DeclarationRequirement, error) {
-	if !validCallableControlAnchor(owner, enclosing, callable) ||
-		label == nil ||
-		!position.IsValid() ||
-		position < callable.Pos() ||
-		position > callable.End() {
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "goto control requirement is invalid",
-		}
-	}
-	return DeclarationRequirement{
-		owner:           owner,
-		kind:            DeclarationRequirementCallableControl,
-		enclosing:       enclosing,
-		callable:        callable,
-		control:         CallableControlGoto,
-		controlLabel:    label,
-		controlPosition: position,
-	}, nil
-}
-
-func validIteratorReturnRange(
-	callable ast.Node,
-	source *ast.RangeStmt,
-) bool {
-	return callable != nil &&
-		source != nil &&
-		source.X != nil &&
-		source.Body != nil &&
-		source.Pos() >= callable.Pos() &&
-		source.End() <= callable.End()
-}
-
-func validCallableControlAnchor(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-) bool {
-	if !owner.Valid() ||
-		enclosing == nil ||
-		callable == nil ||
-		callable.Pos() < enclosing.Pos() ||
-		callable.End() > enclosing.End() {
-		return false
-	}
-	switch callable := callable.(type) {
-	case *ast.FuncDecl:
-		source, ok := owner.Source()
-		function, functionOK := source.(*types.Func)
-		return ok &&
-			functionOK &&
-			enclosing == callable &&
-			callable.Type != nil &&
-			callable.Body != nil &&
-			function.Pos() >= callable.Pos() &&
-			function.Pos() <= callable.End()
-	case *ast.FuncLit:
-		if callable.Type == nil || callable.Body == nil {
-			return false
-		}
-		if source, ok := owner.Source(); ok {
-			function, functionOK := source.(*types.Func)
-			return functionOK &&
-				function.Pos() >= enclosing.Pos() &&
-				function.Pos() <= enclosing.End()
-		}
-		_, initializer, ok := owner.PackageInitializer()
-		return ok &&
-			initializer.Rhs != nil &&
-			enclosing == initializer.Rhs
-	default:
-		return false
-	}
-}
-
-func validCallableControlOwner(
-	owner ArtifactOwner,
-	enclosing ast.Node,
-	callable ast.Node,
-) bool {
-	if enclosing != nil || callable != nil {
-		return validCallableControlAnchor(owner, enclosing, callable)
-	}
-	source, ok := owner.Source()
-	function, functionOK := source.(*types.Func)
-	return ok && functionOK && function.Origin() == function
 }
 
 func (r DeclarationRequirement) validGeneratedDefinition(

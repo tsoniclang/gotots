@@ -52,12 +52,30 @@ func addressableParameterPrologue(
 		if !selected {
 			continue
 		}
+		initial := api.DirectExpression(
+			context.Factory().Identifier(names[index]),
+		)
+		if receiver, ok := context.ValueReceiver(variable); ok {
+			initial = api.DirectExpression(receiver.OriginalValue())
+			if receiver.CopySelected() {
+				copied, err := context.Values().Copy(
+					context.WithRole(api.RoleReceiverValue),
+					source,
+					variable.Type(),
+					initial,
+				)
+				if err != nil {
+					return nil, nil, err
+				}
+				initial = copied
+			}
+		}
 		cell, err := context.AddressableStorage().Cell(
 			context,
 			children,
 			source,
 			variable.Type(),
-			api.DirectExpression(context.Factory().Identifier(names[index])),
+			initial,
 		)
 		if err != nil {
 			return nil, nil, err

@@ -53,7 +53,9 @@ func TestGenericReceiverMethodDefersThroughCanonicalABI(t *testing.T) {
 			workingDirectory := t.TempDir()
 			artifacts := materializeArtifacts(t, emission, workingDirectory)
 			for _, required := range []string{
-				"Box_store<int32>",
+				"export class Box<T>",
+				"static $go$private_",
+				"Box.$go$private_",
 				"__gotots_defers_",
 				"$go$recovery",
 			} {
@@ -65,7 +67,12 @@ func TestGenericReceiverMethodDefersThroughCanonicalABI(t *testing.T) {
 					)
 				}
 			}
-			for _, forbidden := range []string{".bind(", ".call(", ".apply("} {
+			for _, forbidden := range []string{
+				"export function Box_store",
+				".bind(",
+				".call(",
+				".apply(",
+			} {
 				if strings.Contains(artifacts.printed, forbidden) {
 					t.Fatalf(
 						"generic receiver defer contains %q:\n%s",

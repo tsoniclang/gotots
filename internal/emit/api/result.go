@@ -350,6 +350,8 @@ func (e StatementEmission) Requests() []RootRequest {
 
 type DeclarationEmission struct {
 	declarations []tsgo.Statement
+	classOwner   *types.TypeName
+	classMembers []tsgo.ClassElement
 	requests     []RootRequest
 	disposition  DeclarationDisposition
 }
@@ -360,11 +362,13 @@ const (
 	DeclarationDispositionInvalid DeclarationDisposition = iota
 	DeclarationDispositionMaterialized
 	DeclarationDispositionCoverageOnly
+	DeclarationDispositionClassMemberContribution
 )
 
 func (d DeclarationDisposition) Valid() bool {
 	return d == DeclarationDispositionMaterialized ||
-		d == DeclarationDispositionCoverageOnly
+		d == DeclarationDispositionCoverageOnly ||
+		d == DeclarationDispositionClassMemberContribution
 }
 
 // CoverageOnlyDeclarationEmission is the sole declaration result with no
@@ -377,6 +381,39 @@ func CoverageOnlyDeclarationEmission(
 		requests:    slices.Clone(requests),
 		disposition: DeclarationDispositionCoverageOnly,
 	}
+}
+
+func ClassMemberContributionEmission(
+	owner *types.TypeName,
+	members []tsgo.ClassElement,
+	requests []RootRequest,
+) (DeclarationEmission, error) {
+	if owner == nil {
+		return DeclarationEmission{}, &ResultError{
+			Result: "class-member contribution",
+			Reason: "target class owner is nil",
+		}
+	}
+	if len(members) == 0 {
+		return DeclarationEmission{}, &ResultError{
+			Result: "class-member contribution",
+			Reason: "target members are empty",
+		}
+	}
+	for _, member := range members {
+		if member == nil {
+			return DeclarationEmission{}, &ResultError{
+				Result: "class-member contribution",
+				Reason: "target member is nil",
+			}
+		}
+	}
+	return DeclarationEmission{
+		classOwner:   owner,
+		classMembers: slices.Clone(members),
+		requests:     slices.Clone(requests),
+		disposition:  DeclarationDispositionClassMemberContribution,
+	}, nil
 }
 
 func NewDeclarationEmission(
@@ -424,6 +461,19 @@ func (e DeclarationEmission) Declarations() []tsgo.Statement {
 
 func (e DeclarationEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
+}
+
+func (e DeclarationEmission) ClassMemberContribution() (
+	*types.TypeName,
+	[]tsgo.ClassElement,
+	bool,
+) {
+	if e.disposition != DeclarationDispositionClassMemberContribution ||
+		e.classOwner == nil ||
+		len(e.classMembers) == 0 {
+		return nil, nil, false
+	}
+	return e.classOwner, slices.Clone(e.classMembers), true
 }
 
 func (e DeclarationEmission) Disposition() DeclarationDisposition {

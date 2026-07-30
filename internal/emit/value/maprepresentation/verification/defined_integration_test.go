@@ -12,7 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestDefinedMapsUseNilUnionAndExecuteDifferentially(t *testing.T) {
+func TestDefinedMapsUseStableClassValuesAndExecuteDifferentially(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
@@ -71,13 +71,13 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		)
 	}
 	for _, required := range []string{
-		"Values | undefined",
-		"export type Alias = Values | undefined",
+		"let values: Values = new Values(GoMap.nil",
+		"export type Alias = Values;",
 		"export type PlainAlias = GoMapValue<",
 		"export class Other",
-		"GoPointer.cell<Values | undefined, Values | undefined>(void 0)",
-		"Values.$wrapMap(GoMap.make",
-		"Other.$wrapMap(",
+		"GoPointer.cell<Values, Values>(new Values(GoMap.nil",
+		"let values: Values = new Values(GoMap.make",
+		"let other: Other = new Other(values.$value)",
 	} {
 		if !strings.Contains(source, required) {
 			t.Fatalf("defined map artifact lacks %q:\n%s", required, source)
@@ -89,30 +89,18 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		t.Fatalf("defined map functions are absent:\n%s", source)
 	}
 	zeroBody := source[zeroStart:makeStart]
-	if strings.Contains(zeroBody, "new Values(") ||
-		strings.Contains(zeroBody, "Values.$wrapMap(") ||
-		!strings.Contains(zeroBody, "void 0") {
-		t.Fatalf("defined map zero allocates a nominal wrapper:\n%s", zeroBody)
+	if strings.Count(zeroBody, "new Values(GoMap.nil") != 2 {
+		t.Fatalf("defined map zero wrapper count differs:\n%s", zeroBody)
 	}
 	conversionStart := strings.Index(source, "export function Conversions")
 	if conversionStart <= makeStart {
 		t.Fatalf("defined map conversion function is absent:\n%s", source)
 	}
-	makeBody := source[makeStart:conversionStart]
-	if strings.Count(makeBody, "Values.$wrapMap(") != 1 {
-		t.Fatalf("defined map make wrapper calls = %d, want one:\n%s",
-			strings.Count(makeBody, "Values.$wrapMap("),
-			makeBody,
-		)
-	}
-	if strings.Count(source, "new Values(") != 1 {
-		t.Fatalf(
-			"defined map Values constructors = %d, want the guarded family owner only:\n%s",
-			strings.Count(source, "new Values("),
-			source,
-		)
-	}
 	for _, forbidden := range []string{
+		"Values | undefined",
+		"$wrapMap",
+		"$readMap",
+		"$storeMap",
 		"export class Alias",
 		"export class PlainAlias",
 		"any",

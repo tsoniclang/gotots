@@ -139,7 +139,9 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementCallableABI != 15 ||
 		DeclarationRequirementEnvironmentBuiltin != 16 ||
 		DeclarationRequirementGenericCallableProfile != 17 ||
-		DeclarationRequirementKind(18).Valid() {
+		DeclarationRequirementClassMethod != 18 ||
+		DeclarationRequirementValueReceiverCopy != 19 ||
+		DeclarationRequirementKind(20).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }

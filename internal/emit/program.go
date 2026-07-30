@@ -58,6 +58,7 @@ type programSession struct {
 	packageInitializations *packageInitializationScheduler
 	genericOperations      map[genericOperationIdentity]*api.GenericOperationContract
 	genericProfiles        map[genericCallableProfileIdentity]*api.GenericCallableProfile
+	classMembers           map[*types.Func]classMemberContribution
 	goRuntime              *gocontract.Contract
 	sealed                 bool
 }
@@ -323,26 +324,6 @@ func compareArtifactOwners(
 	}
 }
 
-func (e ProgramEmission) Files() []TargetFile {
-	return slices.Clone(e.files)
-}
-
-func (f TargetFile) OutputPath() string {
-	return f.outputPath
-}
-
-func (f TargetFile) PackageName() string {
-	return f.packageName
-}
-
-func (f TargetFile) SourceFile() tsgo.SourceFile {
-	return f.sourceFile
-}
-
-func (f TargetFile) Kind() TargetFileKind {
-	return f.kind
-}
-
 func newProgramSession(
 	source *load.Program,
 	options Options,
@@ -380,6 +361,7 @@ func newProgramSession(
 		packageInitializations: newPackageInitializationScheduler(),
 		genericOperations:      make(map[genericOperationIdentity]*api.GenericOperationContract),
 		genericProfiles:        make(map[genericCallableProfileIdentity]*api.GenericCallableProfile),
+		classMembers:           make(map[*types.Func]classMemberContribution),
 		goRuntime:              goRuntime,
 	}
 	for _, sourcePackage := range source.Packages() {
@@ -449,10 +431,14 @@ func newProgramSession(
 				return nil, err
 			}
 		} else {
+			targetSite, err := session.artifactTargetSite(site)
+			if err != nil {
+				return nil, err
+			}
 			if _, err := emitter.names.Reserve(
 				site.object,
-				site.sourceFile.Syntax(),
-				site.outputPath,
+				targetSite.sourceFile.Syntax(),
+				targetSite.outputPath,
 			); err != nil {
 				return nil, err
 			}
@@ -497,6 +483,7 @@ func (s *programSession) emit(object types.Object) error {
 	); err != nil {
 		return err
 	}
+	s.commitClassMemberContribution(object, revision.classContribution)
 	builder.byOwner[owner] = struct{}{}
 	builder.indexByOwner[owner] = len(builder.declarations)
 	builder.declarations = append(builder.declarations, targetDeclaration{
@@ -546,10 +533,14 @@ func (s *programSession) applyRootRequests(
 }
 
 func (s *programSession) builder(site declarationSite) (*targetFileBuilder, error) {
+	targetSite, err := s.artifactTargetSite(site)
+	if err != nil {
+		return nil, err
+	}
 	return s.builderForFile(
-		site.source,
-		site.sourceFile,
-		site.outputPath,
+		targetSite.source,
+		targetSite.sourceFile,
+		targetSite.outputPath,
 		site.object.Name(),
 	)
 }

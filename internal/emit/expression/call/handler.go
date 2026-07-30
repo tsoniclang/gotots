@@ -131,6 +131,16 @@ func emit(
 		return api.ExpressionEmission{}, err
 	}
 	targetCallee := callee.Value()
+	if _, defined := definedtype.ResolveCallable(
+		context.TypesInfo().TypeOf(source.Fun),
+	); defined {
+		targetCallee = context.Factory().PropertyAccessExpression(
+			targetCallee,
+			nil,
+			context.Factory().Identifier(definedtype.ValueMember),
+			tsgo.NodeFlagsNone,
+		)
+	}
 	before := callee.Before()
 	if static && len(before) != 0 {
 		return api.ExpressionEmission{},
@@ -166,27 +176,12 @@ func emit(
 	before = append(before, argumentBefore...)
 	var guardRequests []api.RootRequest
 	if guardNil {
-		defined := false
-		if _, ok := definedtype.ResolveCallable(
-			context.TypesInfo().TypeOf(source.Fun),
-		); ok {
-			defined = true
-		}
 		if detached {
-			nonNil := targetCallee
-			if defined {
-				nonNil = context.Factory().PropertyAccessExpression(
-					targetCallee,
-					nil,
-					context.Factory().Identifier(definedtype.ValueMember),
-					tsgo.NodeFlagsNone,
-				)
-			}
 			targetCallee, guardRequests, err =
 				callable.DetachedNilGuard(
 					context,
 					targetCallee,
-					nonNil,
+					targetCallee,
 				)
 			if err != nil {
 				return api.ExpressionEmission{}, err
@@ -199,14 +194,6 @@ func emit(
 			}
 			before = append(before, guard)
 			guardRequests = requests
-			if defined {
-				targetCallee = context.Factory().PropertyAccessExpression(
-					targetCallee,
-					nil,
-					context.Factory().Identifier(definedtype.ValueMember),
-					tsgo.NodeFlagsNone,
-				)
-			}
 		}
 	}
 	call := context.Factory().CallExpression(

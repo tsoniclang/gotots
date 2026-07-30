@@ -217,6 +217,87 @@ func TestObservableClassContractPartitionsStaticAndInstanceFacets(t *testing.T) 
 	)
 }
 
+func TestClassMemberContractSeparatesSignatureFromImplementation(t *testing.T) {
+	factory := tsgo.NewFactory()
+	member := func(
+		parameterType tsgo.TypeNode,
+		bodyValue string,
+	) tsgo.MethodDeclaration {
+		return factory.MethodDeclaration(
+			nil,
+			nil,
+			factory.Identifier("Read"),
+			nil,
+			nil,
+			[]tsgo.ParameterDeclaration{factory.ParameterDeclaration(
+				nil,
+				nil,
+				factory.Identifier("value"),
+				nil,
+				parameterType,
+				nil,
+			)},
+			factory.KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindNumberKeyword,
+			),
+			factory.Block(
+				[]tsgo.Statement{factory.ReturnStatement(
+					factory.Identifier(bodyValue),
+				)},
+				true,
+			),
+		)
+	}
+	numberType := factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindNumberKeyword,
+	)
+	baseline, err := ProjectClassMemberContract(
+		factory,
+		[]tsgo.ClassElement{member(numberType, "first")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodyChanged, err := ProjectClassMemberContract(
+		factory,
+		[]tsgo.ClassElement{member(numberType, "second")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(
+		baseline[api.ArtifactFacetCallableSignature],
+		bodyChanged[api.ArtifactFacetCallableSignature],
+	) {
+		t.Fatal("class-member body changed its callable signature")
+	}
+	if bytes.Equal(
+		baseline[api.ArtifactFacetImplementation],
+		bodyChanged[api.ArtifactFacetImplementation],
+	) {
+		t.Fatal("class-member body was absent from its implementation facet")
+	}
+
+	signatureChanged, err := ProjectClassMemberContract(
+		factory,
+		[]tsgo.ClassElement{member(
+			factory.KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindStringKeyword,
+			),
+			"first",
+		)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(
+		baseline[api.ArtifactFacetCallableSignature],
+		signatureChanged[api.ArtifactFacetCallableSignature],
+	) {
+		t.Fatal("class-member parameter type did not change its callable signature")
+	}
+}
+
 func TestObservableValueContractIgnoresInitializer(t *testing.T) {
 	factory := tsgo.NewFactory()
 	makeStatement := func(

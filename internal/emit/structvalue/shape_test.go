@@ -31,6 +31,9 @@ func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 		}
 		members := class.Members()
 		wantMembers := 2 + len(operations[name])
+		if name == "Box" {
+			wantMembers++
+		}
 		if len(members) != wantMembers {
 			t.Fatalf("%s members = %d, want %d", name, len(members), wantMembers)
 		}
@@ -179,25 +182,48 @@ func TestNamedStructValuesUseStaticallySelectedClassOperations(t *testing.T) {
 	source := structTargetSource(t, compileStructFixture(t))
 	invoke := targetFunction(t, source, "Invoke")
 	call := invoke.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)
-	if targetName(call.Expression()) != "Box_WithX" {
-		t.Fatalf("receiver call target = %q, want exact named function", targetName(call.Expression()))
+	if receiver, member := targetProperty(call.Expression()); receiver != "value" ||
+		member != "WithX" {
+		t.Fatalf("receiver call target = %s.%s, want value.WithX", receiver, member)
 	}
-	copyCall := call.Arguments()[0].(tsgo.CallExpression)
-	if receiver, member := targetProperty(copyCall.Expression()); receiver != "Box" ||
-		member != "$copy" {
-		t.Fatalf("receiver boundary = %s.%s, want Box.$copy", receiver, member)
+	if len(call.Arguments()) != 1 || targetName(call.Arguments()[0]) != "next" {
+		t.Fatal("value-receiver copy leaked into the call site")
 	}
 
-	method := targetFunction(t, source, "Box_WithX")
-	if len(method.Parameters()) != 2 || targetName(method.Parameters()[0].Name()) != "box" {
-		t.Fatal("value receiver was not emitted as the first explicit parameter")
+	class := targetClass(t, source, "Box")
+	method := targetMethod(t, class, "WithX")
+	if hasModifier(method.Modifiers(), tsgo.SyntaxKindStaticKeyword) {
+		t.Fatal("value receiver method was emitted as a static class member")
+	}
+	if len(method.Parameters()) != 1 || targetName(method.Parameters()[0].Name()) != "value" {
+		t.Fatal("value receiver remained an explicit target parameter")
 	}
 	methodStatements := method.Body().(tsgo.Block).Statements()
-	if len(methodStatements) != 2 {
-		t.Fatalf("receiver body statements = %d, want source store and return only", len(methodStatements))
+	if len(methodStatements) != 3 {
+		t.Fatalf("receiver body statements = %d, want copy, source store, and return", len(methodStatements))
 	}
-	if _, ok := methodStatements[0].(tsgo.ExpressionStatement); !ok {
-		t.Fatal("receiver body gained a wrapper or copy prologue")
+	copyDeclaration, ok := methodStatements[0].(tsgo.VariableStatement)
+	if !ok {
+		t.Fatalf("receiver copy statement = %T, want variable declaration", methodStatements[0])
+	}
+	copy := copyDeclaration.DeclarationList().Declarations()[0]
+	copyCall, ok := copy.Initializer().(tsgo.CallExpression)
+	if !ok || targetName(copy.Name()) != "box" {
+		t.Fatal("value receiver does not begin with its local Go copy")
+	}
+	if receiver, member := targetProperty(copyCall.Expression()); receiver != "Box" ||
+		member != "$copy" || len(copyCall.Arguments()) != 1 ||
+		copyCall.Arguments()[0].Kind() != tsgo.SyntaxKindThisKeyword {
+		t.Fatal("value receiver copy is not Box.$copy(this)")
+	}
+	if _, ok := methodStatements[1].(tsgo.ExpressionStatement); !ok {
+		t.Fatal("receiver source store is absent after the copy")
+	}
+	if _, ok := methodStatements[2].(tsgo.ReturnStatement); !ok {
+		t.Fatal("receiver source return is absent after the copy")
+	}
+	if targetFunctionOrNil(source, "Box_WithX") != nil {
+		t.Fatal("value receiver method was duplicated as a top-level function")
 	}
 
 	assign := targetFunction(t, source, "AssignIsolated")
@@ -375,6 +401,9 @@ func assertStaticOperationSequence(
 	for _, member := range class.Members() {
 		method, ok := member.(tsgo.MethodDeclaration)
 		if !ok {
+			continue
+		}
+		if !hasModifier(method.Modifiers(), tsgo.SyntaxKindStaticKeyword) {
 			continue
 		}
 		name := targetName(method.Name())

@@ -252,7 +252,7 @@ func assertWaveThreeOwnerShapes(t *testing.T, source string) {
 	t.Helper()
 	for _, required := range []string{
 		"stores(Box.$make(",
-		"Table.$wrapMap(GoMap.make<int32, int32>",
+		"new Table(GoMap.make<int32, int32>",
 		"definedBasicOperators(new Flag(false)",
 		"complexValue.$value.real",
 		"complexValue.$value.imag",

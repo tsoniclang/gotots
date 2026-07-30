@@ -94,10 +94,6 @@ func emitDeferredMethod(
 		return api.ExpressionEmission{}, err
 	}
 	before = append(before, argumentBefore...)
-	reference, err := context.Names().Reference(method)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	control, err := api.NewDirectCallableControlRequest(
 		method.Origin(),
 		api.CallableControlRecovery,
@@ -106,22 +102,20 @@ func emitDeferredMethod(
 		return api.ExpressionEmission{}, err
 	}
 	arguments = append(
-		[]tsgo.Expression{
-			context.Factory().Identifier(receiverName),
-		},
-		arguments...,
-	)
-	arguments = append(
 		arguments,
 		context.Factory().Identifier(callable.RecoveryAuthorityName),
 	)
-	call := context.Factory().CallExpression(
-		context.Factory().Identifier(reference.Name()),
-		nil,
+	call, callRequests, err := callable.SelectedMethodCall(
+		context,
+		method,
+		"",
+		context.Factory().Identifier(receiverName),
 		nil,
 		arguments,
-		tsgo.NodeFlagsNone,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	cooperative, contractRequests, err :=
 		cooperativecall.SourceContract(context, method)
 	if err != nil {
@@ -136,7 +130,7 @@ func emitDeferredMethod(
 		api.CombineRequests(
 			receiver.Requests(),
 			argumentRequests,
-			reference.Requests(),
+			callRequests,
 			contractRequests,
 			[]api.RootRequest{control},
 		),

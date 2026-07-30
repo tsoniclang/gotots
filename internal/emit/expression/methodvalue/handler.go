@@ -59,9 +59,10 @@ func Emit(
 	}
 	owner := method.Origin()
 	var (
-		reference      api.NameReference
-		abiCooperative bool
-		sourceRequests []api.RootRequest
+		memberSuffix      string
+		abiCooperative    bool
+		sourceRequests    []api.RootRequest
+		selectionRequests []api.RootRequest
 	)
 	if generic {
 		declarationSignature, ok := owner.Type().(*types.Signature)
@@ -70,8 +71,8 @@ func Emit(
 				api.Unsupported(context, api.CategoryExpression, source)
 		}
 		var facet api.CallableFacet
-		reference, facet, _, err =
-			cooperativecall.SelectGenericCallable(
+		memberSuffix, facet, _, selectionRequests, err =
+			cooperativecall.SelectGenericClassMethod(
 				context,
 				owner,
 				declarationSignature,
@@ -86,15 +87,12 @@ func Emit(
 				)
 		}
 	} else {
-		reference, err = context.Names().Reference(method)
-		if err == nil {
-			_, abiCooperative, sourceRequests, err =
-				cooperativecall.SourceValueContract(
-					context,
-					method,
-					targetSignatureSource,
-				)
-		}
+		_, abiCooperative, sourceRequests, err =
+			cooperativecall.SourceValueContract(
+				context,
+				method,
+				targetSignatureSource,
+			)
 	}
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -179,12 +177,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	callArguments := append(
-		[]tsgo.Expression{
-			context.Factory().Identifier(receiverName),
-		},
-		arguments...,
-	)
+	callArguments := arguments
 	if generic {
 		sourceArguments := targetSignature.SourceParameterReferences(
 			context.Factory(),
@@ -197,13 +190,6 @@ func Emit(
 				Reason: "generic method value lacks recovery authority",
 			}
 		}
-		receiverBinding, bindErr := genericabi.Receiver[tsgo.Expression](
-			owner,
-			context.Factory().Identifier(receiverName),
-		)
-		if bindErr != nil {
-			return api.ExpressionEmission{}, bindErr
-		}
 		sourceBindings, bindErr := genericabi.SourceParameters(
 			owner,
 			sourceArguments,
@@ -211,12 +197,11 @@ func Emit(
 		if bindErr != nil {
 			return api.ExpressionEmission{}, bindErr
 		}
-		callArguments, err = genericabi.JoinMethod(
+		callArguments, err = genericabi.JoinClassMethod(
 			owner,
 			operationSet.Operations(),
 			genericabi.Combine(
 				capabilities,
-				[]genericabi.Binding[tsgo.Expression]{receiverBinding},
 				sourceBindings,
 			),
 		)
@@ -225,13 +210,20 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	call := context.Factory().CallExpression(
-		context.Factory().Identifier(reference.Name()),
-		nil,
+	if api.ValueReceiverTypeName(owner) != nil {
+		targetTypeArguments = nil
+	}
+	call, callRequests, err := callable.SelectedMethodCall(
+		context,
+		owner,
+		memberSuffix,
+		context.Factory().Identifier(receiverName),
 		targetTypeArguments,
 		callArguments,
-		tsgo.NodeFlagsNone,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	var modifiers []tsgo.ModifierLike
 	resultType := targetSignature.Result()
 	if abiCooperative {
@@ -253,7 +245,8 @@ func Emit(
 			targetSignature.Requests(),
 			typeRequests,
 			capabilityRequests,
-			reference.Requests(),
+			selectionRequests,
+			callRequests,
 			[]api.RootRequest{controlRequest},
 			sourceRequests,
 		),

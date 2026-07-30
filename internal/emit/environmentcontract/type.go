@@ -437,21 +437,11 @@ func definedDeclaration(
 		return api.DeclarationEmission{}, err
 	}
 	context = generic.context
-	var target api.TypeEmission
-	if signature, ok := underlying.(*types.Signature); ok {
-		target, err = callable.EmitDefinedNonNilType(
-			context.WithRole(api.RoleDefinedUnderlyingType),
-			children,
-			nil,
-			signature,
-		)
-	} else {
-		target, err = children.RepresentedType(
-			context.WithRole(api.RoleDefinedUnderlyingType),
-			nil,
-			underlying,
-		)
-	}
+	target, err := children.RepresentedType(
+		context.WithRole(api.RoleDefinedUnderlyingType),
+		nil,
+		underlying,
+	)
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
@@ -459,16 +449,6 @@ func definedDeclaration(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-	classType := context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(name),
-		generic.arguments,
-	)
-	optionalClass := context.Factory().UnionTypeNode([]tsgo.TypeNode{
-		classType,
-		context.Factory().KeywordTypeNode(
-			tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-		),
-	})
 	members := []tsgo.ClassElement{
 		context.Factory().PropertyDeclaration(
 			[]tsgo.ModifierLike{
@@ -502,35 +482,6 @@ func definedDeclaration(
 			nil,
 		),
 	}
-	static := []tsgo.ModifierLike{
-		context.Factory().PublicKeyword(),
-		context.Factory().StaticKeyword(),
-	}
-	method := func(
-		methodName string,
-		source tsgo.TypeNode,
-		result tsgo.TypeNode,
-	) tsgo.MethodDeclaration {
-		return context.Factory().MethodDeclaration(
-			static,
-			nil,
-			context.Factory().Identifier(methodName),
-			nil,
-			generic.parameters,
-			[]tsgo.ParameterDeclaration{
-				parameter(context, "$source", source),
-			},
-			result,
-			nil,
-		)
-	}
-	members = append(members,
-		method(definedmodel.FromMember, target.Value(), optionalClass),
-		method(definedmodel.ValueOfMember, optionalClass, target.Value()),
-		method(definedmodel.MapReadMember, optionalClass, target.Value()),
-		method(definedmodel.MapStoreMember, optionalClass, target.Value()),
-		method(definedmodel.MapWrapMember, target.Value(), optionalClass),
-	)
 	return api.DirectDeclaration(
 		context.Factory().ClassDeclaration(
 			exportDeclare(context),

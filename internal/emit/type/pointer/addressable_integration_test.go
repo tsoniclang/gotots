@@ -34,8 +34,9 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 		"goSliceAddress",
 		"goSliceAddressView",
 		"value$storage",
-		"export function Box_Add",
-		"export function Box_Nil",
+		"export class Box",
+		"static Add(box:",
+		"static Nil(box:",
 	} {
 		if !strings.Contains(target, required) {
 			t.Fatalf("addressable pointer artifact lacks %q:\n%s", required, target)
@@ -47,7 +48,8 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 		".call(",
 		".apply(",
 		".bind(",
-		"class Box_Add",
+		"export function Box_Add",
+		"export function Box_Nil",
 	} {
 		if strings.Contains(target, forbidden) {
 			t.Fatalf("addressable pointer artifact contains %q:\n%s", forbidden, target)
@@ -62,7 +64,7 @@ import {
     Array,
     ArrayAddress,
     ArrayThroughPointer,
-    Box_Add,
+    Box,
     Cancel,
     CancelIdentity,
     Closure,
@@ -173,7 +175,7 @@ try {
 console.log(PointerReceiverOnValue(80));
 console.log(PointerReceiverOnPointer(90));
 try {
-    Box_Add(undefined, 1);
+    Box.Add(undefined, 1);
     console.log(false);
 } catch {
     console.log(true);

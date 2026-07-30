@@ -372,6 +372,8 @@ const (
 	DeclarationRequirementCallableABI               DeclarationRequirementKind = 15
 	DeclarationRequirementEnvironmentBuiltin        DeclarationRequirementKind = 16
 	DeclarationRequirementGenericCallableProfile    DeclarationRequirementKind = 17
+	DeclarationRequirementClassMethod               DeclarationRequirementKind = 18
+	DeclarationRequirementValueReceiverCopy         DeclarationRequirementKind = 19
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -391,7 +393,9 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementCooperativeCallable ||
 		k == DeclarationRequirementCallableABI ||
 		k == DeclarationRequirementEnvironmentBuiltin ||
-		k == DeclarationRequirementGenericCallableProfile
+		k == DeclarationRequirementGenericCallableProfile ||
+		k == DeclarationRequirementClassMethod ||
+		k == DeclarationRequirementValueReceiverCopy
 }
 
 type CallableControlFacet uint8

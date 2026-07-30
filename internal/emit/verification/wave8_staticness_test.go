@@ -129,7 +129,7 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 	abi := "(($0: gostring, $go$recovery?: GoRecovery) => void) | undefined"
 	for _, required := range []string{
 		"public Call: " + abi,
-		"public readonly $value: ($0: gostring, $go$recovery?: GoRecovery) => void",
+		"public readonly $value: " + abi,
 		"GoPointer<" + abi + ", " + abi + ">",
 		"RuntimeSlice.literal<" + abi + ">",
 	} {
@@ -168,9 +168,14 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 		artifacts.printed,
 		"recoverDefinedFunction",
 	)
-	if !regexp.MustCompile(
-		`\.\$value\(__gotots_argument_[0-9]+, \$go\$recovery\);`,
-	).MatchString(defined) {
+	definedCallee := regexp.MustCompile(
+		`const (__gotots_callee_[0-9]+): .* = selected\.\$value;`,
+	).FindStringSubmatch(defined)
+	if len(definedCallee) != 2 ||
+		!regexp.MustCompile(
+			regexp.QuoteMeta(definedCallee[1])+
+				`\(__gotots_argument_[0-9]+, \$go\$recovery\);`,
+		).MatchString(defined) {
 		t.Fatalf(
 			"defined deferred callable did not consume the signature ABI:\n%s",
 			defined,

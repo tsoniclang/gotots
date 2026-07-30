@@ -214,12 +214,13 @@ func waveFivePromotedSelector(
 func assertWaveFiveShape(t *testing.T, printed string) {
 	t.Helper()
 	for _, required := range []string{
-		"export function Base_Read",
-		"export function Base_Add",
-		"export function Derived_Name",
-		"=> Base_Read(",
-		"=> Base_Add(",
-		"return Base_Name(base);",
+		"export class Base",
+		"Read($go$recovery?: GoRecovery): int32",
+		"static Add(base:",
+		"static Name(derived:",
+		".Read($go$recovery)",
+		"=> Base.Add(",
+		"return Base.Name(base);",
 		"__go_constructor",
 	} {
 		if !strings.Contains(printed, required) {
@@ -227,6 +228,11 @@ func assertWaveFiveShape(t *testing.T, printed string) {
 		}
 	}
 	for _, forbidden := range []string{
+		"export function Base_Read",
+		"export function Base_Add",
+		"export function Derived_Name",
+		"=> Base_Read(",
+		"=> Base_Add(",
 		"extends Base",
 		".bind(",
 		".call(",
@@ -325,12 +331,22 @@ func TestWaveFivePromotionScalesWithEmbeddingDepth(t *testing.T) {
 		sourceBytes[index] = len(source)
 		targetBytes[index] = len(target)
 		targetNodes[index] = nodes
-		if calls := strings.Count(target, "T0_Add("); calls != 2 {
+		if definitions := strings.Count(target, "static Add("); definitions != 1 {
 			t.Fatalf(
-				"promotion depth %d emits %d T0_Add sites, want declaration and one call",
+				"promotion depth %d emits %d Add definitions, want one",
+				depth,
+				definitions,
+			)
+		}
+		if calls := strings.Count(target, "T0.Add("); calls != 1 {
+			t.Fatalf(
+				"promotion depth %d emits %d T0.Add calls, want one",
 				depth,
 				calls,
 			)
+		}
+		if strings.Contains(target, "T0_Add") {
+			t.Fatalf("promotion depth %d retained a top-level receiver twin", depth)
 		}
 		if strings.Contains(target, "switch (") ||
 			strings.Contains(target, "extends T") {

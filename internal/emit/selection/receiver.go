@@ -13,6 +13,37 @@ func MethodReceiver(
 	source *ast.SelectorExpr,
 	selected *types.Selection,
 ) (api.ExpressionEmission, *types.Func, error) {
+	return methodReceiver(
+		context,
+		children,
+		source,
+		selected,
+		true,
+	)
+}
+
+func DirectMethodReceiver(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.SelectorExpr,
+	selected *types.Selection,
+) (api.ExpressionEmission, *types.Func, error) {
+	return methodReceiver(
+		context,
+		children,
+		source,
+		selected,
+		false,
+	)
+}
+
+func methodReceiver(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.SelectorExpr,
+	selected *types.Selection,
+	copyValue bool,
+) (api.ExpressionEmission, *types.Func, error) {
 	resolved, method, ok := methodPath(selected)
 	if !ok || !Valid(context, source, selected, types.MethodVal) {
 		return api.ExpressionEmission{}, nil,
@@ -49,11 +80,12 @@ func MethodReceiver(
 		resolved,
 		method,
 		root,
+		copyValue,
 	)
 	return receiver, method, err
 }
 
-func MethodSetReceiver(
+func DirectMethodSetReceiver(
 	context api.Context,
 	children api.ChildEmitter,
 	source ast.Node,
@@ -74,6 +106,7 @@ func MethodSetReceiver(
 		resolved,
 		method,
 		root,
+		false,
 	)
 	return receiver, resolved.effective, method, err
 }
@@ -85,6 +118,7 @@ func methodSetReceiver(
 	resolved path,
 	method *types.Func,
 	root api.ExpressionEmission,
+	copyValue bool,
 ) (api.ExpressionEmission, error) {
 	signature := method.Type().(*types.Signature)
 	declared := signature.Recv().Type()
@@ -141,6 +175,9 @@ func methodSetReceiver(
 	default:
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if !copyValue {
+		return value, nil
 	}
 	return context.Values().Copy(
 		context.WithRole(api.RoleReceiverValue),

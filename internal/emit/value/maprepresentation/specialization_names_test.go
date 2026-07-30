@@ -100,6 +100,12 @@ func (staticSpecializationNames) InterfaceContract(
 	panic("unused")
 }
 
+func (staticSpecializationNames) MethodTarget(
+	*types.Func,
+) (api.MethodTarget, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) InterfaceMethodName(
 	*types.Func,
 ) (string, error) {

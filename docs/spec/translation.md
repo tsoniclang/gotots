@@ -784,8 +784,8 @@ boundary; this preserves the fact that Go evaluates arguments before a nil
 function call panics. The non-nil branch invokes the function directly, never
 through `.call`, `.apply`, `.bind`, reflection, or an erased carrier.
 
-A defined callable has one nominal class for its non-nil value and two
-canonical static boundary operations:
+A defined callable has one stable nominal class value. Nil belongs to its
+represented callable payload, not to the class reference:
 
 ```go
 type Transform func(int32) int32
@@ -795,36 +795,30 @@ type Alias = Transform
 ```ts
 export class Transform {
   declare private readonly $goType: void;
-  constructor(public readonly $value: (value: int32) => int32) {}
-  static $from(
-    value: ((value: int32) => int32) | undefined,
-  ): Transform | undefined {
-    return value === undefined ? undefined : new Transform(value);
-  }
-  static $valueOf(
-    value: Transform | undefined,
-  ): ((value: int32) => int32) | undefined {
-    return value === undefined ? undefined : value.$value;
-  }
+  constructor(
+    public readonly $value:
+      ((value: int32) => int32) | undefined,
+  ) {}
 }
-export type Alias = Transform | undefined;
+export type Alias = Transform;
 ```
 
-Every Go use of `Transform` is represented as `Transform | undefined`; the
-class itself represents only the non-nil member. `$from` and `$valueOf` are the
-single wrap/projection owners for both nil and non-nil values. They avoid
-duplicated use-site conditionals and remain valid when TypeScript flow analysis
-already knows an operand is `undefined`; no property access is emitted on a
-branch narrowed to `never`. Conversion from an unnamed function calls `$from`.
-Conversion between distinct defined callable types calls the source `$valueOf`
-and destination `$from`. Calling a defined callable checks the wrapper for
-`undefined` and then invokes `wrapper.$value(arguments)` directly. The class
-contains no string brand, runtime property mutation, `Object.assign`, callback
-registry, or speculative method protocol. A declared alias reuses the same
-representation and emits no class.
+Every Go use of `Transform` is represented as `Transform`; its zero value is
+`new Transform(undefined)`. Conversion from an unnamed function constructs one
+`Transform`, and conversion between distinct defined callable types projects
+the source `$value` and constructs the destination class. Calling a defined
+callable captures `wrapper.$value`, evaluates the arguments, guards that
+payload against `undefined`, and invokes the narrowed payload directly. This
+stable class identity is required because reached Go methods are class-owned
+instance members even when the underlying value family is nil-capable. It also
+removes static wrap/project helpers and use-site wrapper-presence branches.
+The class contains no string brand, runtime property mutation, `Object.assign`,
+callback registry, or speculative method protocol. A declared alias reuses the
+same class representation and emits no class.
 
 Nil equality compares only with `undefined`, as selected by the checker.
-`new(func(...))` creates a fresh pointer cell whose value is `undefined`.
+`new(func(...))` creates a fresh pointer cell whose value is a stable defined
+class carrying an `undefined` callable payload.
 Generic signatures and interface callables remain at their separately owned
 boundaries. Variadic method values and method expressions use the same
 represented final Go-slice parameter as every other variadic callable; they
@@ -1029,17 +1023,17 @@ Generic non-struct defined types use the same owner and wrapper, parameterized
 by the declaration's exact Go type parameters. Every instantiated reference
 projects all `go/types.Named.TypeArgs` through the ordinary represented-type
 owner in order; none are dropped or reconstructed from spelling. For example,
-`iter.Seq[int32]` is `Seq<int32> | undefined`, and range first projects its
-callable payload through `Seq.$valueOf` before invocation. It never calls the
-wrapper object itself. The generic declaration remains one class rather than a
-class per instantiation, and static wrap/project operations carry or infer the
-same parameters.
+`iter.Seq[int32]` is `Seq<int32>`, and range first projects its `$value`
+callable payload before invocation. It never calls the wrapper object itself.
+The generic declaration remains one class rather than a class per
+instantiation.
 
 Named struct definitions keep the direct nominal record class described below;
-they do not acquire a redundant wrapper around that class. Nil-capable defined
-types use `Defined | undefined`; `undefined` remains the sole nil value and only
-a non-nil underlying value is wrapped. Aliases reuse that same union without a
-new class.
+they do not acquire a redundant wrapper around that class. Every non-struct
+defined type also has one stable class value. For a nil-capable underlying
+family, `undefined` remains the sole nil payload inside `$value`; the class
+reference itself is not optional. Aliases reuse that same class without a new
+class.
 
 Type conversions are the only bridges between a defined type and its
 underlying or another defined type. The conversion owner strips only the exact

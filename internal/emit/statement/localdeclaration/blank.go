@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -49,8 +48,8 @@ func emitBlankAwareSpec(
 				sourceName,
 			)
 		}
-		_, callableZero := callable.Signature(object.Type())
-		callableZero = callableZero && len(source.Values) == 0
+		callableZero := len(source.Values) == 0 &&
+			omitCallableZeroInitializer(object.Type())
 		value, err := localValue(
 			context,
 			children,

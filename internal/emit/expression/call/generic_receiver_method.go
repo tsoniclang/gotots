@@ -16,7 +16,8 @@ import (
 type genericReceiverMethodCall struct {
 	owner         *types.Func
 	facet         api.CallableFacet
-	name          string
+	memberSuffix  string
+	receiver      tsgo.Expression
 	before        []tsgo.Statement
 	typeArguments []tsgo.TypeNode
 	arguments     []tsgo.Expression
@@ -48,10 +49,15 @@ func emitGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	expression, expressionRequests, err :=
+		call.expression(context, call.arguments)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	target, err := api.NewExpressionEmission(
 		call.before,
-		call.expression(context.Factory(), call.arguments),
-		call.requests,
+		expression,
+		api.CombineRequests(call.requests, expressionRequests),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -106,6 +112,11 @@ func emitDeferredGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	expression, expressionRequests, err :=
+		call.expression(context, arguments)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	cooperative, contractRequests, err :=
 		cooperativecall.GenericContract(context, call.facet)
 	if err != nil {
@@ -115,10 +126,11 @@ func emitDeferredGenericReceiverMethod(
 		context,
 		call.before,
 		nil,
-		call.expression(context.Factory(), arguments),
+		expression,
 		cooperative,
 		api.CombineRequests(
 			call.requests,
+			expressionRequests,
 			contractRequests,
 			[]api.RootRequest{control},
 		),
@@ -157,8 +169,8 @@ func prepareGenericReceiverMethodCall(
 		return genericReceiverMethodCall{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	reference, callableFacet, _, err :=
-		cooperativecall.SelectGenericCallable(
+	memberSuffix, callableFacet, _, selectionRequests, err :=
+		cooperativecall.SelectGenericClassMethod(
 			context,
 			owner,
 			declarationSignature,
@@ -170,12 +182,24 @@ func prepareGenericReceiverMethodCall(
 	if err := validateResults(context, source, concrete, discarded); err != nil {
 		return genericReceiverMethodCall{}, err
 	}
-	receiver, resolvedMethod, err := selectionvalue.MethodReceiver(
-		context,
-		children,
-		selector,
-		selection,
-	)
+	var receiver api.ExpressionEmission
+	var resolvedMethod *types.Func
+	if capture {
+		receiver, resolvedMethod, err = selectionvalue.MethodReceiver(
+			context,
+			children,
+			selector,
+			selection,
+		)
+	} else {
+		receiver, resolvedMethod, err =
+			selectionvalue.DirectMethodReceiver(
+				context,
+				children,
+				selector,
+				selection,
+			)
+	}
 	if err != nil {
 		return genericReceiverMethodCall{}, err
 	}
@@ -225,20 +249,15 @@ func prepareGenericReceiverMethodCall(
 	if err != nil {
 		return genericReceiverMethodCall{}, err
 	}
-	receiverBinding, err := genericabi.Receiver(owner, receiverValue)
-	if err != nil {
-		return genericReceiverMethodCall{}, err
-	}
 	sourceBindings, err := genericabi.SourceParameters(owner, sourceArguments)
 	if err != nil {
 		return genericReceiverMethodCall{}, err
 	}
-	callArguments, err := genericabi.JoinMethod(
+	callArguments, err := genericabi.JoinClassMethod(
 		owner,
 		callableContract.Operations(),
 		genericabi.Combine(
 			capabilities,
-			[]genericabi.Binding[tsgo.Expression]{receiverBinding},
 			sourceBindings,
 		),
 	)
@@ -248,9 +267,10 @@ func prepareGenericReceiverMethodCall(
 	return genericReceiverMethodCall{
 		owner:         owner,
 		facet:         callableFacet,
-		name:          reference.Name(),
+		memberSuffix:  memberSuffix,
+		receiver:      receiverValue,
 		before:        before,
-		typeArguments: typeArguments,
+		typeArguments: classMethodTypeArguments(owner, typeArguments),
 		arguments:     callArguments,
 		requests: api.CombineRequests(
 			receiver.Requests(),
@@ -258,20 +278,31 @@ func prepareGenericReceiverMethodCall(
 			argumentRequests,
 			typeRequests,
 			capabilityRequests,
-			reference.Requests(),
+			selectionRequests,
 		),
 	}, nil
 }
 
 func (c genericReceiverMethodCall) expression(
-	factory tsgo.Factory,
+	context api.Context,
 	arguments []tsgo.Expression,
-) tsgo.CallExpression {
-	return factory.CallExpression(
-		factory.Identifier(c.name),
-		nil,
+) (tsgo.CallExpression, []api.RootRequest, error) {
+	return callable.SelectedMethodCall(
+		context,
+		c.owner,
+		c.memberSuffix,
+		c.receiver,
 		c.typeArguments,
 		arguments,
-		tsgo.NodeFlagsNone,
 	)
+}
+
+func classMethodTypeArguments(
+	method *types.Func,
+	arguments []tsgo.TypeNode,
+) []tsgo.TypeNode {
+	if api.ValueReceiverTypeName(method) != nil {
+		return nil
+	}
+	return arguments
 }

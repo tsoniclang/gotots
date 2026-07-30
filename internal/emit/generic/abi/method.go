@@ -11,7 +11,6 @@ type slotKind uint8
 const (
 	slotInvalid slotKind = iota
 	slotCapability
-	slotReceiver
 	slotSourceParameter
 )
 
@@ -39,23 +38,6 @@ func Capability[T any](
 		slot: slot{
 			kind:      slotCapability,
 			operation: operation,
-		},
-		value: value,
-	}, nil
-}
-
-func Receiver[T any](
-	owner *types.Func,
-	value T,
-) (Binding[T], error) {
-	owner, signature, err := method(owner)
-	if err != nil {
-		return Binding[T]{}, err
-	}
-	return Binding[T]{
-		slot: slot{
-			kind:      slotReceiver,
-			parameter: signature.Recv(),
 		},
 		value: value,
 	}, nil
@@ -103,7 +85,7 @@ func JoinCapabilities[T any](
 	return join(expected, bindings)
 }
 
-func JoinMethod[T any](
+func JoinClassMethod[T any](
 	owner *types.Func,
 	operations []*api.GenericOperationContract,
 	bindings []Binding[T],
@@ -116,10 +98,6 @@ func JoinMethod[T any](
 	if err != nil {
 		return nil, err
 	}
-	expected = append(expected, slot{
-		kind:      slotReceiver,
-		parameter: signature.Recv(),
-	})
 	for index := range signature.Params().Len() {
 		expected = append(expected, slot{
 			kind:      slotSourceParameter,
