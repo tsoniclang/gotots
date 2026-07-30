@@ -3,6 +3,7 @@ package emit_test
 import (
 	"context"
 	"fmt"
+	"go/ast"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func TestWaveSevenGenericFoundationCompilesThroughPublicPipeline(t *testing.T) {
@@ -95,6 +97,83 @@ console.log(output.join(" "));
 			}
 		})
 	}
+}
+
+func TestInferredGenericFunctionValueUsesIdentifierInstanceEvidence(t *testing.T) {
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: waveSevenGenericDirectory(),
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourcePackage := program.Roots()[0]
+	sourceFunction := waveFourFunction(t, sourcePackage, "InferredGenericFunctionValue")
+	var inferred *ast.Ident
+	ast.Inspect(sourceFunction.Body, func(node ast.Node) bool {
+		identifier, ok := node.(*ast.Ident)
+		if ok && identifier.Name == "Equal" {
+			inferred = identifier
+		}
+		return true
+	})
+	if inferred == nil {
+		t.Fatal("inferred generic function identifier is absent")
+	}
+	if _, instantiated := sourcePackage.TypesInfo().Instances[inferred]; !instantiated {
+		t.Fatal("go/types did not record the inferred identifier instance")
+	}
+	root, err := emit.NewRoot(sourcePackage.Types().Scope().Lookup("AuditFunctions"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(program, []emit.Root{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var capabilityNames []string
+	for _, name := range []string{"InferredGenericFunctionValue", "ExplicitGenericFunctionValue"} {
+		wrapper := genericFunctionValueWrapper(t, waveFourTargetFunction(t, emission, name))
+		body, ok := wrapper.Body().(tsgo.CallExpression)
+		if !ok {
+			t.Fatalf("%s wrapper body = %T, want CallExpression", name, wrapper.Body())
+		}
+		arguments := body.Arguments()
+		if len(arguments) == 0 {
+			t.Fatalf("%s wrapper call has no capability argument", name)
+		}
+		capability, ok := arguments[0].(tsgo.Identifier)
+		if !ok ||
+			!strings.HasPrefix(capability.Text(), "$goCapability_") ||
+			len(arguments) != len(wrapper.Parameters())+1 {
+			t.Fatalf("%s wrapper does not bind one exact generic capability", name)
+		}
+		capabilityNames = append(capabilityNames, capability.Text())
+	}
+	if capabilityNames[0] != capabilityNames[1] {
+		t.Fatalf("explicit/inferred capabilities differ: %v", capabilityNames)
+	}
+}
+
+func genericFunctionValueWrapper(t *testing.T, function tsgo.FunctionDeclaration) tsgo.ArrowFunction {
+	t.Helper()
+	for _, statement := range function.Body().(tsgo.Block).Statements() {
+		returned, ok := statement.(tsgo.ReturnStatement)
+		if !ok {
+			continue
+		}
+		call, ok := returned.Expression().(tsgo.CallExpression)
+		if !ok {
+			continue
+		}
+		for _, argument := range call.Arguments() {
+			if wrapper, ok := argument.(tsgo.ArrowFunction); ok {
+				return wrapper
+			}
+		}
+	}
+	t.Fatalf("%s lacks a generic function-value wrapper", function.Name().Text())
+	return nil
 }
 
 func TestWaveSevenGenericNamedTypesCompileThroughPublicPipeline(t *testing.T) {

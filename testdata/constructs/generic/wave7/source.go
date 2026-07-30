@@ -542,6 +542,22 @@ func MutualAddB[T Integer](value, increment T, remaining int32) T {
 	return MutualAddA(value+increment, increment, remaining-1)
 }
 
+func applyInt32Comparison(
+	left int32,
+	right int32,
+	operation func(int32, int32) bool,
+) bool {
+	return operation(left, right)
+}
+
+func InferredGenericFunctionValue() bool {
+	return applyInt32Comparison(27, 27, Equal)
+}
+
+func ExplicitGenericFunctionValue() bool {
+	return applyInt32Comparison(28, 28, Equal[int32])
+}
+
 func CallableValues() []int32 {
 	identity := Identity[int32]
 	box := Box[int32]{Value: 8}
@@ -600,6 +616,8 @@ func AuditFunctions() []int32 {
 		zeroFromNew,
 		box.Value,
 		embedded.Value,
+		boolToInt32(InferredGenericFunctionValue()),
+		boolToInt32(ExplicitGenericFunctionValue()),
 	}
 }
 

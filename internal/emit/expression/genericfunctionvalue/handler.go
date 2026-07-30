@@ -17,11 +17,6 @@ func Emit(
 	children api.ChildEmitter,
 	source ast.Expr,
 ) (api.ExpressionEmission, bool, error) {
-	switch source.(type) {
-	case *ast.IndexExpr, *ast.IndexListExpr:
-	default:
-		return api.ExpressionEmission{}, false, nil
-	}
 	owner, instance, ok := genericinstance.FunctionEvidence(
 		context.TypesInfo(),
 		source,
