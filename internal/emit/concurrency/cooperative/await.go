@@ -370,9 +370,7 @@ func providerContract(
 	)
 	if providerObservation.Cooperative() &&
 		!abiObservation.Cooperative() {
-		abiFacet, facetErr := context.CallableABIFacet(
-			reference.Artifact(),
-		)
+		abiFacet, facetErr := context.CallableABIFacet(reference)
 		if facetErr != nil {
 			return false, false, nil, facetErr
 		}
@@ -409,7 +407,7 @@ func observeABI(
 			api.CooperativeCallableObservation{},
 			err
 	}
-	facet, err := context.CallableABIFacet(reference.Artifact())
+	facet, err := context.CallableABIFacet(reference)
 	if err != nil {
 		return api.CallableABIReference{},
 			api.CooperativeCallableObservation{},

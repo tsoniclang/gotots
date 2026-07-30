@@ -1274,7 +1274,20 @@ execution:
     each must fail
     differential behavior, strict staticness, artifact shape, ordinary-profile
     byte stability, or source-size evidence; and
-14. the selected-profile boundary: concurrency fails while the profile is
+14. callable-ABI identity-domain isolation: a declaration-scoped callable
+    containing the generic owner's type parameter remains profile-local, an
+    unrelated canonical synchronous named function used inside that profile
+    adapts to its cooperative canonical target ABI, and neither change widens
+    the ordinary generic declaration. Environment fixtures additionally prove
+    that a non-generic `sync.WaitGroup.Go` callback and an environment
+    interface method consume their canonical cooperative contracts, while an
+    environment-owned generic baseline stays declaration-scoped. Mutations
+    erase ABI scope, classify every ABI in a profile as profile-local, classify
+    every ABI as canonical, omit the environment function-value observation,
+    or omit the environment interface-method observation; each must fail
+    artifact shape, strict typechecking, differential behavior, or
+    ordinary-profile byte stability; and
+15. the selected-profile boundary: concurrency fails while the profile is
    disabled; the cooperative selection and all output evidence name that it
    does not reproduce asynchronous preemption. The checked-in busy-goroutine
    counterexample receives no yield/preemption workaround and is never run as

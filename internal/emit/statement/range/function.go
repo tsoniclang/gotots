@@ -227,7 +227,7 @@ func iteratorCallback(
 	if err != nil {
 		return nil, nil, err
 	}
-	facet, err := context.CallableABIFacet(reference.Artifact())
+	facet, err := context.CallableABIFacet(reference)
 	if err != nil {
 		return nil, nil, err
 	}

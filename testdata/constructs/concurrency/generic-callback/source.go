@@ -195,3 +195,37 @@ func InitializedCooperativeCallback() bool {
 func IndependentPackageInitializer() int32 {
 	return dependency.Value
 }
+
+func CooperativePredicateProvider(
+	values <-chan int32,
+) func(int32) bool {
+	return func(value int32) bool {
+		return value == <-values
+	}
+}
+
+func IsSeven(value int32) bool {
+	return value == 7
+}
+
+func InvokeIntPredicate(predicate func(int32) bool) bool {
+	return predicate(7)
+}
+
+func GenericProfileWithNamedCallback[T any](
+	value T,
+	predicate func(T) bool,
+) bool {
+	return InvokeIntPredicate(IsSeven) && predicate(value)
+}
+
+func CooperativeGenericProfileWithNamedCallback() bool {
+	values := make(chan int32, 1)
+	values <- 7
+	return GenericProfileWithNamedCallback(
+		int32(7),
+		func(value int32) bool {
+			return value == <-values
+		},
+	)
+}

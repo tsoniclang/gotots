@@ -224,6 +224,14 @@ func emitEnvironmentNonNilType(
 ) (api.TypeEmission, error) {
 	profile, profiled := context.GenericCallableProfile()
 	if !profiled {
+		if _, generic := context.GenericParameterOwner(); !generic {
+			return EmitNonNilType(
+				context,
+				children,
+				source,
+				signature,
+			)
+		}
 		return EmitInternalNonNilType(
 			context,
 			children,
@@ -274,7 +282,7 @@ func EmitNonNilType(
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
-	facet, err := context.CallableABIFacet(reference.Artifact())
+	facet, err := context.CallableABIFacet(reference)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
@@ -311,6 +319,9 @@ func ABIReference(
 			profile.Owner(),
 			signature,
 		)
+	}
+	if owner, generic := context.GenericParameterOwner(); generic {
+		return context.Names().SourceCallableABI(owner, signature)
 	}
 	return context.Names().CallableABI(signature)
 }

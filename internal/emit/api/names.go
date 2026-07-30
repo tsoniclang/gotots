@@ -418,6 +418,64 @@ type InterfaceMethodCallableReference struct {
 	requests  []RootRequest
 }
 
+type CallableABIReference struct {
+	artifact    *GeneratedArtifact
+	sourceOwner types.Object
+	requests    []RootRequest
+}
+
+func NewCallableABIReference(
+	artifact *GeneratedArtifact,
+	requests ...RootRequest,
+) (CallableABIReference, error) {
+	_, ok := artifact.CallableABI()
+	if !ok {
+		return CallableABIReference{}, &RootRequestError{
+			Reason: "callable ABI reference is invalid",
+		}
+	}
+	if err := validateReferenceRequests(requests); err != nil {
+		return CallableABIReference{}, &RootRequestError{
+			Reason: "callable ABI reference request is invalid",
+		}
+	}
+	return CallableABIReference{
+		artifact: artifact,
+		requests: slices.Clone(requests),
+	}, nil
+}
+
+func NewSourceCallableABIReference(
+	sourceOwner types.Object,
+	artifact *GeneratedArtifact,
+	requests ...RootRequest,
+) (CallableABIReference, error) {
+	sourceOwner = GenericDeclarationOrigin(sourceOwner)
+	reference, err := NewCallableABIReference(artifact, requests...)
+	if err != nil {
+		return CallableABIReference{}, err
+	}
+	if sourceOwner == nil || sourceOwner.Pkg() == nil {
+		return CallableABIReference{}, &RootRequestError{
+			Reason: "source callable ABI reference owner is invalid",
+		}
+	}
+	reference.sourceOwner = sourceOwner
+	return reference, nil
+}
+
+func (r CallableABIReference) Artifact() *GeneratedArtifact {
+	return r.artifact
+}
+
+func (r CallableABIReference) SourceOwner() (types.Object, bool) {
+	return r.sourceOwner, r.sourceOwner != nil
+}
+
+func (r CallableABIReference) Requests() []RootRequest {
+	return slices.Clone(r.requests)
+}
+
 func NewInterfaceMethodCallableReference(
 	artifacts []*GeneratedArtifact,
 	requests ...RootRequest,

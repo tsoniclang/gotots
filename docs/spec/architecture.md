@@ -974,6 +974,19 @@ value location uses that ABI. Functions, immediately invoked literals, and
 callable ABIs that remain nonblocking retain byte-identical synchronous
 declarations and calls.
 
+The callable-ABI reference preserves its semantic identity domain. A closed
+signature containing no declaration-local named type or ambient type parameter
+uses the canonical compilation ABI even when referenced from inside a generic
+profile. A signature containing either uses a declaration-scoped ABI keyed by
+that exact generic owner. Inside a profile, declaration-scoped ABIs and
+explicitly selected closed ABIs acquire profile ownership; unrelated canonical
+ABIs remain canonical and continue to observe their own global contract. Thus
+a profile-local returned `func(T)` cannot widen the ordinary generic
+declaration, while passing an unrelated synchronous `func(int32)` to a
+cooperative canonical `func(int32)` ABI still emits the required static
+adapter. The typed ABI reference carries this distinction; callers may not
+reconstruct it from target names, artifact-key spelling, or profile presence.
+
 An interface method is not a first-class function-value ABI. Its callable
 state is owned by canonical interface-method artifacts keyed by exact Go
 method identity and receiver-free signature. A non-generic method has one such
@@ -1098,6 +1111,18 @@ provider execution behavior. For example, a cooperative range callback passed
 through the result of `slices.Values` selects an ambient
 `Values$cooperative_<profile>` declaration whose returned iterator accepts the
 Promise-returning yield ABI; calling `Values` itself remains synchronous.
+
+Non-generic environment function and method declarations observe canonical
+first-class callable ABIs in their parameter and result types. Environment
+interface declarations observe the canonical interface-method callable facet
+for each method. Therefore a blocking function value passed to
+`sync.WaitGroup.Go` and a blocking concrete implementation of
+`os.Signal.String` change the exact ambient contracts consumed by generated
+calls and adapters. Generic environment baselines remain declaration-scoped
+and synchronous; only their explicit demand-created profile declarations
+apply profile-local ABI selections. Environment contracts never infer
+cooperation from source spelling or from the mere presence of a nested
+function type.
 
 The outer callable effect of an environment provider is never inferred merely
 because a parameter or result contains a cooperative callable. A selected

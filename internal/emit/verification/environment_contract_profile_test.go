@@ -43,6 +43,29 @@ func Render(value context.Context) string {
 	return os.Args[0]
 }
 
+type signal struct {
+	ready <-chan struct{}
+}
+
+func (*signal) Signal() {}
+
+func (s *signal) String() string {
+	<-s.ready
+	return "ready"
+}
+
+func NewSignal(ready <-chan struct{}) os.Signal {
+	return &signal{ready: ready}
+}
+
+func RunWaitGroup(ready <-chan struct{}) {
+	var group sync.WaitGroup
+	group.Go(func() {
+		<-ready
+	})
+	group.Wait()
+}
+
 func ReadPool(pool *sync.Pool, values []sync.Pool) any {
 	result := pool.Get()
 	_ = (&values[0]).Get()
@@ -109,82 +132,34 @@ func RuneBoundary(value byte) bool {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stopTimerRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("StopTimer"),
-	)
-	if err != nil {
-		t.Fatal(err)
+	scope := program.Roots()[0].Types().Scope()
+	rootNames := []string{
+		"Render",
+		"NewSignal",
+		"RunWaitGroup",
+		"ReadPool",
+		"StopTicker",
+		"StopTimer",
+		"EmptyLocalPool",
+		"ImportLocalPool",
+		"ExportLocalPool",
+		"UnsafeRuntime",
+		"UnsafeConstants",
+		"RuneBoundary",
 	}
-	renderRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("Render"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	poolRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("ReadPool"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	stopTickerRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("StopTicker"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	emptyLocalPoolRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("EmptyLocalPool"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	importLocalPoolRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("ImportLocalPool"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	exportLocalPoolRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("ExportLocalPool"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	unsafeRuntimeRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("UnsafeRuntime"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	unsafeConstantsRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("UnsafeConstants"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	runeBoundaryRoot, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("RuneBoundary"),
-	)
-	if err != nil {
-		t.Fatal(err)
+	roots := make([]emit.Root, 0, len(rootNames))
+	for _, name := range rootNames {
+		root, rootErr := emit.NewRoot(scope.Lookup(name))
+		if rootErr != nil {
+			t.Fatal(rootErr)
+		}
+		roots = append(roots, root)
 	}
 	options := emit.DefaultOptions()
 	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	emission, err := emit.CompileWithOptions(
 		program,
-		[]emit.Root{
-			renderRoot,
-			poolRoot,
-			stopTickerRoot,
-			stopTimerRoot,
-			emptyLocalPoolRoot,
-			importLocalPoolRoot,
-			exportLocalPoolRoot,
-			unsafeRuntimeRoot,
-			unsafeConstantsRoot,
-			runeBoundaryRoot,
-		},
+		roots,
 		options,
 	)
 	if err != nil {
@@ -237,6 +212,12 @@ func RuneBoundary(value byte) bool {
 		"export declare function StringData(",
 		"export declare function SliceData(",
 		"export declare const RuneSelf$uint8",
+		"static async String(",
+		"async String(",
+		"export interface Signal",
+		"String(): Promise<gostring>;",
+		"WaitGroup_Go__from_sync",
+		"async function (): Promise<void>",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf(
@@ -245,6 +226,17 @@ func RuneBoundary(value byte) bool {
 				artifacts.printed,
 			)
 		}
+	}
+	waitGroupGo := environmentDeclarationLine(
+		t,
+		artifacts.printed,
+		"export declare function WaitGroup_Go(",
+	)
+	if !strings.Contains(waitGroupGo, "=> Promise<void>") {
+		t.Fatalf(
+			"cooperative environment callback stayed synchronous:\n%s",
+			waitGroupGo,
+		)
 	}
 	for _, forbidden := range []string{
 		"export declare function Sizeof(",

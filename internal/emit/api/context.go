@@ -78,6 +78,10 @@ type Context struct {
 	valueReceiver              *ValueReceiverBinding
 }
 
+func (c Context) GenericParameterOwner() (types.Object, bool) {
+	return c.genericParameterOwner, c.genericParameterOwner != nil
+}
+
 func (c Context) WithAddressableStorage(
 	owner ArtifactOwner,
 	storageNames map[*types.Var]string,

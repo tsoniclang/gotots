@@ -177,6 +177,7 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 		"CooperativeMethodValue",
 		"CooperativeMethodExpression",
 		"CooperativeResult",
+		"CooperativeGenericProfileWithNamedCallback",
 	} {
 		target := waveNineFunctionText(t, artifacts.printed, function)
 		if !strings.Contains(target, "async") ||
@@ -187,6 +188,17 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 				target,
 			)
 		}
+	}
+	namedCallbackProfile := waveNineFunctionWithPrefix(
+		t,
+		artifacts.printed,
+		"GenericProfileWithNamedCallback$cooperative_",
+	)
+	if !strings.Contains(namedCallbackProfile, "async ($argument0: int32)") {
+		t.Fatalf(
+			"generic profile did not adapt a synchronous named callback:\n%s",
+			namedCallbackProfile,
+		)
 	}
 	for _, function := range []string{
 		"SynchronousFunctionValue",
@@ -358,6 +370,7 @@ import {
     IndependentPackageInitializer,
     IndependentSynchronous,
     SynchronousSequence,
+    CooperativeGenericProfileWithNamedCallback,
 } from "`+sourceModuleForExport(
 		t,
 		artifacts,
@@ -385,6 +398,7 @@ await GoScheduler.run(async () => {
         IndependentPackageInitializer(),
         IndependentSynchronous(),
         SynchronousSequence(),
+        await CooperativeGenericProfileWithNamedCallback(),
     ].map(String).join(" "));
 });
 `)
@@ -443,6 +457,7 @@ func main() {
 		values.IndependentPackageInitializer(),
 		values.IndependentSynchronous(),
 		values.SynchronousSequence(),
+		values.CooperativeGenericProfileWithNamedCallback(),
 	)
 }
 `)

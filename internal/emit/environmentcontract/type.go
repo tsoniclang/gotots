@@ -5,6 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	definedmodel "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -141,9 +142,29 @@ func interfaceDeclaration(
 				Cause:  err,
 			}
 		}
+		callableReference, err :=
+			context.Names().InterfaceMethodCallable(method)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		cooperative, contractRequests, err :=
+			cooperativecall.InterfaceMethodContract(
+				context,
+				callableReference,
+			)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
 		memberName, err := context.Names().InterfaceMethodName(method)
 		if err != nil {
 			return api.DeclarationEmission{}, err
+		}
+		resultType := target.Result()
+		if cooperative {
+			resultType = callable.PromiseResult(
+				context.Factory(),
+				resultType,
+			)
 		}
 		members = append(members,
 			context.Factory().MethodSignatureDeclaration(
@@ -152,10 +173,11 @@ func interfaceDeclaration(
 				nil,
 				nil,
 				target.Parameters(),
-				target.Result(),
+				resultType,
 			),
 		)
 		requests = append(requests, target.Requests()...)
+		requests = append(requests, contractRequests...)
 	}
 	interfaceType := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(name),

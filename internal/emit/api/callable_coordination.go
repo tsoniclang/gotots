@@ -94,40 +94,6 @@ func (r GenericOperationReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
 }
 
-type CallableABIReference struct {
-	artifact *GeneratedArtifact
-	requests []RootRequest
-}
-
-func NewCallableABIReference(
-	artifact *GeneratedArtifact,
-	requests ...RootRequest,
-) (CallableABIReference, error) {
-	_, ok := artifact.CallableABI()
-	if !ok {
-		return CallableABIReference{}, &RootRequestError{
-			Reason: "callable ABI reference is invalid",
-		}
-	}
-	if err := validateReferenceRequests(requests); err != nil {
-		return CallableABIReference{}, &RootRequestError{
-			Reason: "callable ABI reference request is invalid",
-		}
-	}
-	return CallableABIReference{
-		artifact: artifact,
-		requests: slices.Clone(requests),
-	}, nil
-}
-
-func (r CallableABIReference) Artifact() *GeneratedArtifact {
-	return r.artifact
-}
-
-func (r CallableABIReference) Requests() []RootRequest {
-	return slices.Clone(r.requests)
-}
-
 type CooperativeCallableResolver interface {
 	ObserveCooperativeCallable(
 		ArtifactOwner,
@@ -225,13 +191,28 @@ func (c Context) GenericCallableProfile() (
 }
 
 func (c Context) CallableABIFacet(
-	artifact *GeneratedArtifact,
+	reference CallableABIReference,
 ) (CallableFacet, error) {
+	artifact := reference.Artifact()
 	if c.genericCallableProfile != nil {
-		return NewGenericProfileCallableABIFacet(
-			c.genericCallableProfile,
-			artifact,
-		)
+		if sourceOwner, scoped := reference.SourceOwner(); scoped {
+			if sourceOwner != c.genericCallableProfile.Owner() {
+				return CallableFacet{}, &ContextError{
+					Reason: "callable ABI scope is foreign to the generic profile",
+				}
+			}
+			return NewGenericProfileCallableABIFacet(
+				c.genericCallableProfile,
+				artifact,
+			)
+		}
+		if _, selected :=
+			c.genericCallableProfile.Selection().ABI(artifact); selected {
+			return NewGenericProfileCallableABIFacet(
+				c.genericCallableProfile,
+				artifact,
+			)
+		}
 	}
 	return NewCallableABIFacet(artifact)
 }

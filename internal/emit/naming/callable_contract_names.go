@@ -189,7 +189,7 @@ func (n *File) CallableABI(
 	if err != nil {
 		return api.CallableABIReference{}, err
 	}
-	return n.callableABI(signature, signatureKey)
+	return n.callableABI(signature, signatureKey, nil)
 }
 
 func (n *File) GenericCallableProfile(
@@ -250,12 +250,18 @@ func (n *File) SourceCallableABI(
 	if err != nil {
 		return api.CallableABIReference{}, err
 	}
-	return n.callableABI(signature, signatureKey)
+	var sourceScope types.Object
+	if api.ContainsGenericTypeParameter(signature) ||
+		len(typeidentity.LocalComponents(signature)) != 0 {
+		sourceScope = owner
+	}
+	return n.callableABI(signature, signatureKey, sourceScope)
 }
 
 func (n *File) callableABI(
 	signature *types.Signature,
 	signatureKey string,
+	sourceScope types.Object,
 ) (api.CallableABIReference, error) {
 	digest := sha256.Sum256([]byte("callable-abi|" + signatureKey))
 	artifactKey := hex.EncodeToString(digest[:])
@@ -283,10 +289,14 @@ func (n *File) callableABI(
 		}
 		requests = append(requests, dependency)
 	}
-	return api.NewCallableABIReference(
-		binding.owner,
-		requests...,
-	)
+	if sourceScope != nil {
+		return api.NewSourceCallableABIReference(
+			sourceScope,
+			binding.owner,
+			requests...,
+		)
+	}
+	return api.NewCallableABIReference(binding.owner, requests...)
 }
 
 func (n *File) sourceGeneratedNamedObjectIdentity(

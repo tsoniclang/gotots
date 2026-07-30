@@ -127,6 +127,43 @@ func TestGenericCallableProfileOverridesOnlySelectedABI(
 			},
 		}).
 		WithGenericCallableProfile(profile)
+	selectedReference, err := NewCallableABIReference(selectedABI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedFacet, err := context.CallableABIFacet(selectedReference)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selectedFacet.Owner() != MustSourceArtifactOwner(owner) {
+		t.Fatal("selected ABI did not acquire generic-profile ownership")
+	}
+	unrelatedReference, err := NewCallableABIReference(unrelatedABI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unrelatedFacet, err := context.CallableABIFacet(unrelatedReference)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unrelatedFacet.Owner() !=
+		MustGeneratedArtifactOwner(unrelatedABI) {
+		t.Fatal("unrelated ABI leaked into generic-profile ownership")
+	}
+	scopedReference, err := NewSourceCallableABIReference(
+		owner,
+		unrelatedABI,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scopedFacet, err := context.CallableABIFacet(scopedReference)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scopedFacet.Owner() != MustSourceArtifactOwner(owner) {
+		t.Fatal("declaration-scoped ABI lost generic-profile ownership")
+	}
 	for artifact, want := range map[*GeneratedArtifact]bool{
 		selectedABI:  true,
 		unrelatedABI: false,
