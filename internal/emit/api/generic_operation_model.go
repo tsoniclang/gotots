@@ -339,6 +339,7 @@ const (
 	GenericOperationConsumerNamedStructHash
 	GenericOperationConsumerNamedStructConvert
 	GenericOperationConsumerNamedStructStorage
+	GenericOperationConsumerNamedStructAssign
 )
 
 func GenericFunctionOperationConsumer() GenericOperationConsumer {
@@ -362,6 +363,8 @@ func GenericNamedStructOperationConsumer(
 		consumer = GenericOperationConsumerNamedStructConvert
 	case NamedStructOperationStorage:
 		consumer = GenericOperationConsumerNamedStructStorage
+	case NamedStructOperationAssign:
+		consumer = GenericOperationConsumerNamedStructAssign
 	default:
 		return GenericOperationConsumerInvalid, &InvariantError{
 			Role:   RoleFileDeclaration,
@@ -373,7 +376,7 @@ func GenericNamedStructOperationConsumer(
 
 func (c GenericOperationConsumer) Valid() bool {
 	return c >= GenericOperationConsumerFunction &&
-		c <= GenericOperationConsumerNamedStructStorage
+		c <= GenericOperationConsumerNamedStructAssign
 }
 
 func (c GenericOperationConsumer) NamedStructOperation() (
@@ -393,6 +396,8 @@ func (c GenericOperationConsumer) NamedStructOperation() (
 		return NamedStructOperationConvert, true
 	case GenericOperationConsumerNamedStructStorage:
 		return NamedStructOperationStorage, true
+	case GenericOperationConsumerNamedStructAssign:
+		return NamedStructOperationAssign, true
 	default:
 		return NamedStructOperationInvalid, false
 	}

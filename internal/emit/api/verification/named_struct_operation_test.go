@@ -100,3 +100,43 @@ func TestNamedStructOperationMemberNamesAreClosed(t *testing.T) {
 		}
 	}
 }
+
+func TestNamedStructOperationsHaveTotalGenericConsumerIdentities(t *testing.T) {
+	seen := make(map[GenericOperationConsumer]NamedStructOperation)
+	for operation := NamedStructOperationZero; operation <= NamedStructOperationAssign; operation++ {
+		consumer, err := GenericNamedStructOperationConsumer(operation)
+		if err != nil {
+			t.Fatalf("%s: %v", operation, err)
+		}
+		if previous, duplicate := seen[consumer]; duplicate {
+			t.Fatalf(
+				"%s and %s share generic consumer %d",
+				previous,
+				operation,
+				consumer,
+			)
+		}
+		seen[consumer] = operation
+		selected, ok := consumer.NamedStructOperation()
+		if !consumer.Valid() || !ok || selected != operation {
+			t.Fatalf(
+				"%s generic consumer round trip = %s, %t",
+				operation,
+				selected,
+				ok,
+			)
+		}
+		if consumer.Identity() != "named-struct-"+operation.String() {
+			t.Fatalf(
+				"%s generic consumer identity = %q",
+				operation,
+				consumer.Identity(),
+			)
+		}
+	}
+	if _, err := GenericNamedStructOperationConsumer(
+		NamedStructOperationInvalid,
+	); err == nil {
+		t.Fatal("invalid named-struct operation acquired a generic consumer")
+	}
+}
