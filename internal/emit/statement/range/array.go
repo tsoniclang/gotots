@@ -42,10 +42,12 @@ func emitArray(
 			return api.StatementEmission{}, err
 		}
 		if source.Value != nil && nonBlank(source.Value) {
-			operand, err = context.Values().Copy(
+			operand, err = context.Values().Transfer(
 				context.WithRole(api.RoleRangeExpression),
 				source.X,
 				array.SourceType(),
+				array.SourceType(),
+				api.ValueTransferCopy,
 				operand,
 			)
 			if err != nil {

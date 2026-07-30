@@ -53,10 +53,12 @@ func conversionMethod(
 				field.object.Type(),
 			)
 		} else {
-			copied, err = context.Values().Copy(
+			copied, err = context.Values().Transfer(
 				context.WithRole(api.RoleStructCopyField),
 				field.source,
 				field.object.Type(),
+				field.object.Type(),
+				api.ValueTransferCopy,
 				api.DirectExpression(property(
 					context,
 					"$source",

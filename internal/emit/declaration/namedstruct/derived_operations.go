@@ -146,10 +146,12 @@ func derivedCopyBody(
 		return nil, nil, err
 	}
 	body, basisValue := captureDerivedValue(context, "$basis", restored)
-	copied, err := context.Values().Copy(
+	copied, err := context.Values().Transfer(
 		context.WithRole(api.RoleStructCopyField),
 		source,
 		basis,
+		basis,
+		api.ValueTransferCopy,
 		api.DirectExpression(basisValue),
 	)
 	if err != nil {
@@ -186,10 +188,12 @@ func derivedConvertBody(
 	className string,
 	typeArguments []tsgo.TypeNode,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
-	copied, err := context.Values().Copy(
+	copied, err := context.Values().Transfer(
 		context.WithRole(api.RoleConversionOperand),
 		source,
 		basis,
+		basis,
+		api.ValueTransferCopy,
 		api.DirectExpression(context.Factory().Identifier("$source")),
 	)
 	if err != nil {

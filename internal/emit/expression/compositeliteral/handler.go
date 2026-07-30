@@ -345,6 +345,14 @@ func emitElements(
 		}
 		seen[fieldIndex] = struct{}{}
 		fieldType := structType.Field(fieldIndex).Type()
+		valueType := context.TypesInfo().TypeOf(valueSource)
+		if valueType == nil || !types.AssignableTo(valueType, fieldType) {
+			return nil, api.Unsupported(
+				context.WithRole(api.RoleCompositeElement),
+				api.CategoryExpression,
+				valueSource,
+			)
+		}
 		value, err := children.Expression(
 			context.
 				WithRole(api.RoleCompositeElement).
@@ -354,10 +362,12 @@ func emitElements(
 		if err != nil {
 			return nil, err
 		}
-		value, err = context.Values().Copy(
+		value, err = context.Values().Transfer(
 			context.WithRole(api.RoleCompositeElement),
 			valueSource,
+			valueType,
 			fieldType,
+			api.ValueTransferCopy,
 			value,
 		)
 		if err != nil {

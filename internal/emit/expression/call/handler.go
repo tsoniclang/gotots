@@ -470,10 +470,12 @@ func emitArguments(
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		target, err = context.Values().Copy(
+		target, err = context.Values().Transfer(
 			context.WithRole(api.RoleCallArgument),
 			argument,
+			argumentType,
 			signature.Params().At(index).Type(),
+			api.ValueTransferCopy,
 			target,
 		)
 		if err != nil {

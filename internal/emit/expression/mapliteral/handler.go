@@ -168,8 +168,19 @@ func emitOperand(
 		context.WithExpectedType(targetType),
 		source,
 	)
-	if err != nil || !copyValue {
+	if err != nil {
 		return value, err
 	}
-	return context.Values().Copy(context, source, targetType, value)
+	mode := api.ValueTransferRepresentation
+	if copyValue {
+		mode = api.ValueTransferCopy
+	}
+	return context.Values().Transfer(
+		context,
+		source,
+		sourceType,
+		targetType,
+		mode,
+		value,
+	)
 }

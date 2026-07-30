@@ -170,10 +170,12 @@ func (a RuntimeArray) Copy(
 		sourceValue := context.Factory().Identifier(sourceName)
 		result := context.Factory().Identifier(resultName)
 		index := context.Factory().Identifier(indexName)
-		elementCopy, err := context.Values().Copy(
+		elementCopy, err := context.Values().Transfer(
 			context.WithRole(api.RoleArrayElement),
 			source,
 			a.ElementType(),
+			a.ElementType(),
+			api.ValueTransferCopy,
 			api.DirectExpression(callMember(
 				context,
 				sourceValue,

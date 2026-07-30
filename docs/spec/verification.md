@@ -285,6 +285,31 @@ Every implemented semantic family includes:
 - real-project samples unrelated to the discovering corpus; and
 - production-path mutations that prove the gate detects the intended defect.
 
+Assignment-boundary proof covers every value-transfer consumer: direct and
+captured arguments, single and multiple results, local and package
+declarations, parallel assignment, struct/array/slice/map elements, channel
+send/receive, and generated generic operation calls. The matrix includes each
+defined reference or aggregate family in both legal directions between a
+defined and an unnamed identical-underlying value, defined basics through
+their legal untyped-constant assignment contexts, and two distinct defined
+types that `go/types` rejects.
+
+The canonical mutation replaces the source projection in:
+
+```go
+type Value []byte
+func consume([]byte)
+func use(value Value) { consume(value) }
+```
+
+with the wrapper expression itself. Strict typechecking must fail at the call
+boundary. A second mutation omits destination construction for the inverse
+assignment and must fail at that boundary. Differential execution proves
+slice aliasing/capacity, map identity, pointer identity, channel identity,
+callable invocation, primitive value, and array-copy behavior rather than
+merely accepting the target shape. Broad search must find no target-only
+`Copy` API and no handler-owned defined-family transfer branch.
+
 Structured-loop certification additionally covers prerequisite-bearing
 conditions, multi-result posts, blocking conditions/posts under the cooperative
 profile, normal and labeled continue, break, return, and panic. Mutations

@@ -252,10 +252,12 @@ func Apply(
 		case directReferenceConversion(sourceType, representedTargetType):
 			target = operandValue
 		case directArrayConversion(sourceType, representedTargetType):
-			target, err = context.Values().Copy(
+			target, err = context.Values().Transfer(
 				context.WithRole(api.RoleConversionOperand),
 				operandSource,
 				sourceType,
+				sourceType,
+				api.ValueTransferCopy,
 				operandValue,
 			)
 		case directCallableConversion(sourceType, representedTargetType):

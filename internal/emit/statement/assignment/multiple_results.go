@@ -81,16 +81,20 @@ func emitMultipleResults(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		if target.declaration || !target.target.CopiesValue() {
-			value, err = context.Values().Copy(
-				context.WithRole(role),
-				source.Rhs[0],
-				targetType,
-				value,
-			)
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
+		mode := api.ValueTransferCopy
+		if !target.declaration {
+			mode = storeTransferMode(target.target)
+		}
+		value, err = context.Values().Transfer(
+			context.WithRole(role),
+			source.Rhs[0],
+			results.At(index).Type(),
+			targetType,
+			mode,
+			value,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
 		}
 		statements = append(statements, value.Before()...)
 		element = value.Value()

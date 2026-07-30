@@ -301,6 +301,11 @@ func emitDefinitionList(
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	sourceType := context.TypesInfo().TypeOf(source.Rhs[0])
+	if sourceType == nil || !types.AssignableTo(sourceType, object.Type()) {
+		return nil, nil, nil,
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
 	value, err := children.Expression(
 		context.
 			WithRole(api.RoleLocalValue).
@@ -310,10 +315,12 @@ func emitDefinitionList(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	value, err = context.Values().Copy(
+	value, err = context.Values().Transfer(
 		context.WithRole(api.RoleLocalValue),
 		source.Rhs[0],
+		sourceType,
 		object.Type(),
+		api.ValueTransferCopy,
 		value,
 	)
 	if err != nil {
@@ -396,16 +403,16 @@ func emitAssignment(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	if !target.CopiesValue() {
-		value, err = context.Values().Copy(
-			context.WithRole(api.RoleAssignmentValue),
-			source.Rhs[0],
-			target.SourceType(),
-			value,
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
+	value, err = context.Values().Transfer(
+		context.WithRole(api.RoleAssignmentValue),
+		source.Rhs[0],
+		sourceType,
+		target.SourceType(),
+		storeTransferMode(target),
+		value,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
 	}
 	stored, err := target.StoreValue(
 		context.WithRole(api.RoleAssignmentTarget),
@@ -420,6 +427,13 @@ func emitAssignment(
 		context.Factory().ExpressionStatement(stored.Value()),
 	)
 	return api.NewStatementEmission(statements, stored.Requests())
+}
+
+func storeTransferMode(target api.StoreTargetEmission) api.ValueTransferMode {
+	if target.CopiesValue() {
+		return api.ValueTransferRepresentation
+	}
+	return api.ValueTransferCopy
 }
 
 func variableStatement(

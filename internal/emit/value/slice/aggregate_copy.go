@@ -34,10 +34,12 @@ func CopyAggregate(
 	count := context.Factory().Identifier(countName)
 	snapshot := context.Factory().Identifier(snapshotName)
 	index := context.Factory().Identifier(indexName)
-	next, err := context.Values().Copy(
+	next, err := context.Values().Transfer(
 		context.WithRole(api.RoleSliceElement),
 		nil,
 		elementType,
+		elementType,
+		api.ValueTransferCopy,
 		api.DirectExpression(sliceCall(
 			context,
 			sourceValue,

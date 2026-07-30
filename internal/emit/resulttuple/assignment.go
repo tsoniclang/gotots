@@ -40,6 +40,5 @@ func AdaptAssignment(
 	if handled {
 		return adapted, nil
 	}
-	return api.ExpressionEmission{},
-		api.Unsupported(context, api.CategoryExpression, source)
+	return value, nil
 }

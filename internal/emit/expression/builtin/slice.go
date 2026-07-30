@@ -210,10 +210,12 @@ func emitAppend(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		target, err = context.Values().Copy(
+		target, err = context.Values().Transfer(
 			context.WithRole(api.RoleSliceElement),
 			argument,
+			argumentType,
 			elementType,
+			api.ValueTransferCopy,
 			target,
 		)
 		if err != nil {

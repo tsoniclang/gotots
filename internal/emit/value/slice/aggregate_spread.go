@@ -228,10 +228,12 @@ func spreadElementOperations(
 	error,
 ) {
 	copyElement := func(value tsgo.Expression) (api.ExpressionEmission, error) {
-		return context.Values().Copy(
+		return context.Values().Transfer(
 			context.WithRole(api.RoleSliceElement),
 			nil,
 			elementType,
+			elementType,
+			api.ValueTransferCopy,
 			api.DirectExpression(value),
 		)
 	}

@@ -173,10 +173,12 @@ func adapt(
 		), nil
 	}
 	sourceType = DynamicType(sourceType)
-	copied, err := context.Values().Copy(
+	copied, err := context.Values().Transfer(
 		context.WithRole(api.RoleConversionOperand),
 		source,
 		sourceType,
+		sourceType,
+		api.ValueTransferCopy,
 		value,
 	)
 	if err != nil {

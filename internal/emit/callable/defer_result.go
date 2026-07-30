@@ -188,10 +188,12 @@ func deferredFinalReturn(
 				context.Factory().Identifier(targetName),
 			)
 		}
-		value, err = context.Values().Copy(
+		value, err = context.Values().Transfer(
 			context.WithRole(api.RoleReturnResult),
 			nil,
 			result.Type(),
+			result.Type(),
+			api.ValueTransferCopy,
 			value,
 		)
 		if err != nil {

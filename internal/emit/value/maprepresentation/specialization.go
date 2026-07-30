@@ -178,20 +178,24 @@ func specializationOperations(
 	if err != nil {
 		return specializationOperationSet{}, nil, err
 	}
-	copyKey, err := context.Values().Copy(
+	copyKey, err := context.Values().Transfer(
 		context.WithRole(api.RoleMapKey),
 		nil,
 		keyType,
+		keyType,
+		api.ValueTransferCopy,
 		api.DirectExpression(key),
 	)
 	if err != nil {
 		return specializationOperationSet{}, nil, err
 	}
 	value := context.Factory().Identifier("$value")
-	copyValue, err := context.Values().Copy(
+	copyValue, err := context.Values().Transfer(
 		context.WithRole(api.RoleMapValue),
 		nil,
 		mapType.Elem(),
+		mapType.Elem(),
+		api.ValueTransferCopy,
 		api.DirectExpression(value),
 	)
 	if err != nil {

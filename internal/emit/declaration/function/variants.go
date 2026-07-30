@@ -443,10 +443,12 @@ func prependValueReceiverCopy(
 	); addressable {
 		return body, nil
 	}
-	copied, err := context.Values().Copy(
+	copied, err := context.Values().Transfer(
 		context.WithRole(api.RoleReceiverValue),
 		source,
 		receiver.Type(),
+		receiver.Type(),
+		api.ValueTransferCopy,
 		api.DirectExpression(binding.OriginalValue()),
 	)
 	if err != nil {

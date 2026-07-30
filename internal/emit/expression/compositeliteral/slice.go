@@ -189,10 +189,12 @@ func emitSliceElements(
 		if err != nil {
 			return nil, 0, false, err
 		}
-		emission, err = context.Values().Copy(
+		emission, err = context.Values().Transfer(
 			context.WithRole(api.RoleSliceElement),
 			valueSource,
+			actualType,
 			elementType,
+			api.ValueTransferCopy,
 			emission,
 		)
 		if err != nil {

@@ -65,10 +65,12 @@ func emitVariadicMultipleArgument(
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		copied, err := context.Values().Copy(
+		copied, err := context.Values().Transfer(
 			context.WithRole(api.RoleCallArgument),
 			source.Args[0],
+			results.At(index).Type(),
 			expected,
+			api.ValueTransferCopy,
 			api.DirectExpression(element),
 		)
 		if err != nil {

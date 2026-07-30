@@ -82,10 +82,12 @@ func emitConversion(
 	targetModel model,
 	operand api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	copied, err := context.Values().Copy(
+	copied, err := context.Values().Transfer(
 		context.WithRole(api.RoleConversionOperand),
 		operandSource,
 		sourceType(sourceModel),
+		sourceType(sourceModel),
+		api.ValueTransferCopy,
 		operand,
 	)
 	if err != nil {

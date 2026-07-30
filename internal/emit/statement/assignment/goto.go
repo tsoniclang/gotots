@@ -23,6 +23,11 @@ func emitGotoDefinition(
 	if !ok || !context.IsGotoLocal(object) {
 		return api.StatementEmission{}, false, nil
 	}
+	sourceType := context.TypesInfo().TypeOf(source.Rhs[0])
+	if sourceType == nil || !types.AssignableTo(sourceType, object.Type()) {
+		return api.StatementEmission{}, true,
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
 	value, err := children.Expression(
 		context.
 			WithRole(api.RoleLocalValue).
@@ -32,10 +37,12 @@ func emitGotoDefinition(
 	if err != nil {
 		return api.StatementEmission{}, true, err
 	}
-	value, err = context.Values().Copy(
+	value, err = context.Values().Transfer(
 		context.WithRole(api.RoleLocalValue),
 		source.Rhs[0],
+		sourceType,
 		object.Type(),
+		api.ValueTransferCopy,
 		value,
 	)
 	if err != nil {

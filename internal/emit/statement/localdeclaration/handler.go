@@ -323,10 +323,12 @@ func localValue(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return context.Values().Copy(
+	return context.Values().Transfer(
 		valueContext,
 		sourceValue,
+		valueType,
 		object.Type(),
+		api.ValueTransferCopy,
 		value,
 	)
 }

@@ -311,6 +311,25 @@ func ProjectKey(
 	return value, nil
 }
 
+func ReifyKey(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if model, ok := definedtype.ResolveBasic(sourceType); ok {
+		return model.Wrap(context, value)
+	}
+	if context.Values().SupportsHash(context, sourceType) {
+		return value, nil
+	}
+	if _, ok := directKey(context, sourceType); !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return value, nil
+}
+
 func StorageKeyType(sourceType types.Type) types.Type {
 	if model, ok := definedtype.ResolveBasic(sourceType); ok {
 		return model.Underlying()

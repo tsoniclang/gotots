@@ -88,12 +88,17 @@ func emitParallel(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		if !target.discard &&
-			(target.declaration || !target.target.CopiesValue()) {
-			value, err = context.Values().Copy(
+		if !target.discard {
+			mode := api.ValueTransferCopy
+			if !target.declaration {
+				mode = storeTransferMode(target.target)
+			}
+			value, err = context.Values().Transfer(
 				context.WithRole(role),
 				sourceValue,
+				sourceType,
 				expectedType,
+				mode,
 				value,
 			)
 			if err != nil {

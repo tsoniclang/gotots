@@ -42,10 +42,12 @@ func AppendAggregate(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	existingCopy, err := context.Values().Copy(
+	existingCopy, err := context.Values().Transfer(
 		context.WithRole(api.RoleSliceElement),
 		nil,
 		elementType,
+		elementType,
+		api.ValueTransferCopy,
 		api.DirectExpression(sliceCall(
 			context,
 			receiver,

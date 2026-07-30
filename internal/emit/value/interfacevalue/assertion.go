@@ -139,10 +139,12 @@ func Extract(
 		context.Factory().Identifier(interfaceadapter.ValueMember),
 		tsgo.NodeFlagsNone,
 	)
-	target, err := context.Values().Copy(
+	target, err := context.Values().Transfer(
 		context,
 		source,
 		targetType,
+		targetType,
+		api.ValueTransferCopy,
 		api.DirectExpression(payload),
 	)
 	if err != nil {

@@ -54,10 +54,12 @@ func emitExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	value, err = context.Values().Copy(
+	value, err = context.Values().Transfer(
 		context.WithRole(api.RoleCallArgument),
 		argument,
+		argumentType,
 		element,
+		api.ValueTransferCopy,
 		value,
 	)
 	if err != nil {

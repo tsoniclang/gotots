@@ -179,10 +179,12 @@ func methodSetReceiver(
 	if !copyValue {
 		return value, nil
 	}
-	return context.Values().Copy(
+	return context.Values().Transfer(
 		context.WithRole(api.RoleReceiverValue),
 		source,
 		declared,
+		declared,
+		api.ValueTransferCopy,
 		value,
 	)
 }
@@ -257,10 +259,12 @@ func MethodExpressionReceiver(
 		return api.ExpressionEmission{}, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	value, err = context.Values().Copy(
+	value, err = context.Values().Transfer(
 		context.WithRole(api.RoleReceiverValue),
 		source,
 		declared,
+		declared,
+		api.ValueTransferCopy,
 		value,
 	)
 	return value, method, err

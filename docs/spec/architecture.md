@@ -287,6 +287,36 @@ child entry point when ordinary expression dispatch would be semantically
 wrong, such as a store target, condition, call callee, type expression, or
 comma-ok result.
 
+### Value Transfer
+
+One value-transfer owner is the only authority for moving an emitted value
+across a typed Go boundary. Its input is the source occurrence, actual
+`go/types.Type`, destination `go/types.Type`, closed copy-ownership mode, and
+typed TS-Go expression. The copy mode records whether this boundary performs
+the Go value copy or only adapts representation because the value is already
+fresh or a typed destination operation (such as aggregate map storage)
+performs the copy exactly once. It first requires
+`types.AssignableTo(actual, destination)`, then composes, in order:
+
+1. the exact source representation projection when actual and destination
+   representations differ;
+2. the destination Go value-copy operation at its declared single owner; and
+3. the exact destination representation construction when required.
+
+Arguments, returns, assignments, declarations, aggregate elements, map
+entries, channel transfers, and generated generic calls all use this owner.
+They do not call a target-only copy function and do not independently
+special-case defined callable, slice, map, pointer, channel, basic, or array
+families. Explicit Go conversions remain owned by the conversion handler and
+are not inferred from assignment.
+
+For `type Value []byte`, passing `Value` to a `[]byte` parameter is admitted by
+`go/types` and produces the static payload projection `value.$value`; passing
+an unnamed `[]byte` to a `Value` destination produces one `new Value(...)`.
+Passing one defined slice type to a different defined slice type is rejected
+before target construction. No cast, structural target assignability,
+spelling comparison, or dynamic wrapper inspection participates.
+
 The root emitter owns mutable target builders, declaration assemblies, the
 artifact dependency graph, and the placement service. Handlers cannot mutate
 an arbitrary target ancestor. They return typed TS-Go protocol AST values and,

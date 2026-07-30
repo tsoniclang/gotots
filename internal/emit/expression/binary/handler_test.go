@@ -382,10 +382,12 @@ func (unusedValues) Zero(
 	panic("unused")
 }
 
-func (unusedValues) Copy(
+func (unusedValues) Transfer(
 	api.Context,
 	ast.Node,
 	types.Type,
+	types.Type,
+	api.ValueTransferMode,
 	api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	panic("unused")

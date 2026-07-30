@@ -58,10 +58,12 @@ func addressableParameterPrologue(
 		if receiver, ok := context.ValueReceiver(variable); ok {
 			initial = api.DirectExpression(receiver.OriginalValue())
 			if receiver.CopySelected() {
-				copied, err := context.Values().Copy(
+				copied, err := context.Values().Transfer(
 					context.WithRole(api.RoleReceiverValue),
 					source,
 					variable.Type(),
+					variable.Type(),
+					api.ValueTransferCopy,
 					initial,
 				)
 				if err != nil {

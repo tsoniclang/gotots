@@ -151,10 +151,13 @@ func emitValue(
 		if len(arguments) != 1 {
 			return api.ExpressionEmission{}, shapeError(context, operation)
 		}
-		return context.Values().Copy(
+		valueType := signature.Params().At(0).Type()
+		return context.Values().Transfer(
 			context,
 			nil,
-			signature.Params().At(0).Type(),
+			valueType,
+			valueType,
+			api.ValueTransferCopy,
 			api.DirectExpression(arguments[0]),
 		)
 	case api.GenericOperationEqual:

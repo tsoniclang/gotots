@@ -322,10 +322,12 @@ func copyMethod(
 			)
 		} else {
 			value := api.DirectExpression(property(context, "$source", field.name))
-			copied, err = context.Values().Copy(
+			copied, err = context.Values().Transfer(
 				context.WithRole(api.RoleStructCopyField),
 				field.source,
 				field.object.Type(),
+				field.object.Type(),
+				api.ValueTransferCopy,
 				value,
 			)
 		}

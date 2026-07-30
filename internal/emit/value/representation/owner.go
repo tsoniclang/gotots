@@ -238,7 +238,70 @@ func (owner Owner) Zero(
 	)
 }
 
-func (owner Owner) Copy(
+func (owner Owner) Transfer(
+	context api.Context,
+	source ast.Node,
+	actualType types.Type,
+	destinationType types.Type,
+	mode api.ValueTransferMode,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if actualType == nil ||
+		destinationType == nil ||
+		!mode.Valid() ||
+		!types.AssignableTo(actualType, destinationType) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if representedAtDestination(actualType, destinationType) {
+		actualType = destinationType
+	}
+	if !types.Identical(actualType, destinationType) {
+		if actual, ok := definedtype.Resolve(actualType); ok {
+			var err error
+			value, err = actual.Project(context, value)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+			actualType = actual.Underlying()
+		}
+		if destination, ok := definedtype.Resolve(destinationType); ok {
+			if mode == api.ValueTransferCopy {
+				var err error
+				value, err = owner.copyExact(
+					context.WithRole(api.RoleDefinedValue),
+					source,
+					destination.Underlying(),
+					value,
+				)
+				if err != nil {
+					return api.ExpressionEmission{}, err
+				}
+			}
+			return destination.Wrap(context, value)
+		}
+	}
+	if mode == api.ValueTransferRepresentation {
+		return value, nil
+	}
+	return owner.copyExact(context, source, destinationType, value)
+}
+
+func representedAtDestination(
+	actualType types.Type,
+	destinationType types.Type,
+) bool {
+	basic, basicOK := types.Unalias(actualType).(*types.Basic)
+	if basicOK && basic.Info()&types.IsUntyped != 0 {
+		return true
+	}
+	if _, destinationInterface := interfacetype.Resolve(destinationType); destinationInterface {
+		return true
+	}
+	return false
+}
+
+func (owner Owner) copyExact(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
@@ -279,23 +342,6 @@ func (owner Owner) Copy(
 			value.Value(),
 			value.Requests(),
 		)
-	}
-	if target, ok := definedtype.ResolveCallable(sourceType); ok {
-		actual := expressionType(context, source)
-		if actual == nil || types.Identical(actual, sourceType) {
-			return api.NewExpressionEmission(
-				value.Before(),
-				value.Value(),
-				value.Requests(),
-			)
-		}
-		return target.Wrap(context, value)
-	}
-	if expression := expressionType(context, source); expression != nil &&
-		!types.Identical(expression, sourceType) {
-		if actual, ok := definedtype.ResolveCallable(expression); ok {
-			return actual.Project(context, value)
-		}
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok &&
 		defined.Family() != definedtype.FamilyArray {
@@ -386,14 +432,6 @@ func ownsFreshValue(context api.Context, source ast.Node) bool {
 	default:
 		return false
 	}
-}
-
-func expressionType(context api.Context, source ast.Node) types.Type {
-	expression, ok := source.(ast.Expr)
-	if !ok {
-		return nil
-	}
-	return context.TypesInfo().TypeOf(expression)
 }
 
 func (Owner) Assign(

@@ -29,7 +29,14 @@ type Values interface {
 		ExpressionEmission,
 	) (ExpressionEmission, error)
 	Zero(Context, ast.Node, types.Type) (ExpressionEmission, error)
-	Copy(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
+	Transfer(
+		Context,
+		ast.Node,
+		types.Type,
+		types.Type,
+		ValueTransferMode,
+		ExpressionEmission,
+	) (ExpressionEmission, error)
 	Assign(
 		Context,
 		ast.Node,
@@ -67,6 +74,19 @@ type Values interface {
 		token.Token,
 		tsgo.Expression,
 	) (ExpressionEmission, bool, error)
+}
+
+type ValueTransferMode uint8
+
+const (
+	ValueTransferInvalid ValueTransferMode = iota
+	ValueTransferCopy
+	ValueTransferRepresentation
+)
+
+func (m ValueTransferMode) Valid() bool {
+	return m == ValueTransferCopy ||
+		m == ValueTransferRepresentation
 }
 
 func (e StoreTargetEmission) ReadValue(

@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -93,10 +92,12 @@ func emitNamed(
 				context.Factory().Identifier(targetName),
 			)
 		}
-		value, err = context.Values().Copy(
+		value, err = context.Values().Transfer(
 			context.WithRole(api.RoleReturnResult),
 			source,
 			result.Type(),
+			result.Type(),
+			api.ValueTransferCopy,
 			value,
 		)
 		if err != nil {
@@ -136,17 +137,20 @@ func emitSingle(
 		return api.StatementEmission{}, err
 	}
 	sourceType := context.TypesInfo().TypeOf(source.Results[0])
-	if _, ok := arrayvalue.Resolve(context, resultType); ok ||
-		callableRepresentationBoundary(sourceType, resultType) {
-		result, err = context.Values().Copy(
-			context.WithRole(api.RoleReturnResult),
-			source.Results[0],
-			resultType,
-			result,
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
+	mode := api.ValueTransferRepresentation
+	if _, copied := arrayvalue.Resolve(context, resultType); copied {
+		mode = api.ValueTransferCopy
+	}
+	result, err = context.Values().Transfer(
+		context.WithRole(api.RoleReturnResult),
+		source.Results[0],
+		sourceType,
+		resultType,
+		mode,
+		result,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
 	}
 	statements := result.Before()
 	statements = append(
@@ -154,14 +158,6 @@ func emitSingle(
 		context.Factory().ReturnStatement(result.Value()),
 	)
 	return api.NewStatementEmission(statements, result.Requests())
-}
-
-func callableRepresentationBoundary(sourceType, resultType types.Type) bool {
-	_, sourceCallable := callable.Signature(sourceType)
-	_, resultCallable := callable.Signature(resultType)
-	return sourceCallable &&
-		resultCallable &&
-		!types.Identical(sourceType, resultType)
 }
 
 func emitMultiple(
@@ -230,10 +226,12 @@ func emitMultiple(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		result, err = context.Values().Copy(
+		result, err = context.Values().Transfer(
 			context.WithRole(api.RoleReturnResult),
 			sourceResult,
+			sourceType,
 			results.At(index).Type(),
+			api.ValueTransferCopy,
 			result,
 		)
 		if err != nil {
@@ -311,10 +309,12 @@ func emitAdaptedMultiple(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		value, err = context.Values().Copy(
+		value, err = context.Values().Transfer(
 			context.WithRole(api.RoleReturnResult),
 			source.Results[0],
+			sourceResults.At(index).Type(),
 			targetType,
+			api.ValueTransferCopy,
 			value,
 		)
 		if err != nil {

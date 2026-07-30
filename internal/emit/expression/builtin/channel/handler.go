@@ -174,10 +174,12 @@ func emitMake(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	copyValue, err := context.Values().Copy(
+	copyValue, err := context.Values().Transfer(
 		context.WithRole(api.RoleChannelElement),
 		source.Args[0],
 		elementType,
+		elementType,
+		api.ValueTransferCopy,
 		api.DirectExpression(context.Factory().Identifier("value")),
 	)
 	if err != nil {

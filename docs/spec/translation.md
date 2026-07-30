@@ -1035,12 +1035,45 @@ family, `undefined` remains the sole nil payload inside `$value`; the class
 reference itself is not optional. Aliases reuse that same class without a new
 class.
 
-Type conversions are the only bridges between a defined type and its
-underlying or another defined type. The conversion owner strips only the exact
-source wrapper, applies the existing source-to-destination representation
-conversion, then constructs only the exact destination wrapper. Constants are
-materialized from the checker value at the destination underlying type before
-wrapping. No conversion falls through to an ordinary call.
+Explicit conversions and Go assignment are distinct bridges between a defined
+type and an unnamed value with an identical underlying type. The selected
+`go/types` graph decides which bridge is legal; target structural
+assignability never does.
+
+Every admitted value transfer carries both the actual Go type and the
+destination Go type to one value-transfer owner. This includes arguments,
+results, assignments, declarations, fields, elements, map entries, channel
+values, and generated generic boundaries. When `go/types.AssignableTo` accepts
+the transfer but the two Go types have different target representations, that
+owner projects the exact source wrapper, applies the destination family's Go
+copy semantics, and constructs the destination wrapper only when the
+destination is defined. For example:
+
+```go
+type Value []byte
+func consume(data []byte) {}
+func use(value Value) { consume(value) }
+```
+
+```ts
+export function use(value: Value): void {
+  consume(value.$value);
+}
+```
+
+The projection is required by the target representation, not an explicit Go
+conversion. The inverse legal assignment from an unnamed `[]byte` to `Value`
+copies the slice descriptor as required and constructs `new Value(...)`.
+Two distinct defined types remain non-assignable even when their underlying
+types are identical. No handler rediscovers the actual type from target
+spelling, and no callable-only or container-only transfer path exists.
+
+The explicit-conversion owner handles the wider set admitted by Go conversion
+rules. It strips only the exact source wrapper, applies the existing
+source-to-destination representation conversion, then constructs only the
+exact destination wrapper. Constants are materialized from the checker value
+at the destination underlying type before wrapping. No conversion falls
+through to an ordinary call.
 
 ## Structs, Receivers, And Classes
 
@@ -2488,7 +2521,9 @@ The current native-`Map` key family is exactly `bool`, represented integer, or
 string, plus defined-basic wrappers whose exact checker type unwraps to one of
 those primitives before every literal/store/lookup/delete operation. The map's
 target key type is the underlying primitive while its Go signature retains the
-defined wrapper at source boundaries:
+defined wrapper at source boundaries. Key iteration performs the inverse
+operation exactly once before exposing each Go range value; storage primitives
+never escape as source-level defined keys:
 
 ```go
 type Count int32

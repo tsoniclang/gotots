@@ -161,10 +161,12 @@ func EmitInitializer(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	value, err = context.Values().Copy(
+	value, err = context.Values().Transfer(
 		valueContext,
 		initializer.Rhs,
+		valueType,
 		variable.Type(),
+		api.ValueTransferCopy,
 		value,
 	)
 	if err != nil {

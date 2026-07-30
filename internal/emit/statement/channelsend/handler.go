@@ -58,6 +58,17 @@ func Emit(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
+	value, err = context.Values().Transfer(
+		context.WithRole(api.RoleChannelElement),
+		source.Value,
+		valueType,
+		model.Element(),
+		api.ValueTransferRepresentation,
+		value,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
 	target, err := channelmodel.BlockingCall(
 		context,
 		source,

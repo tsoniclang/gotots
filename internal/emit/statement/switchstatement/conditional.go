@@ -22,10 +22,12 @@ func emitConditional(
 	requests := tag.target.Requests()
 	var tagValue tsgo.Expression
 	if !tag.expressionless {
-		copied, err := context.Values().Copy(
+		copied, err := context.Values().Transfer(
 			context.WithRole(api.RoleSwitchTag),
 			tag.source,
 			tag.sourceType,
+			tag.sourceType,
+			api.ValueTransferCopy,
 			tag.target,
 		)
 		if err != nil {
