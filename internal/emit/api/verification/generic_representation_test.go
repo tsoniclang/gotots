@@ -12,7 +12,7 @@ func TestGenericRepresentationProfileIsExactOrderedAndIdentityKeyed(
 	t *testing.T,
 ) {
 	owner, first, second := genericRepresentationOwner("Pair")
-	requirements := make([]DeclarationRequirement, 0, 3)
+	requirements := make([]DeclarationRequirement, 0, 4)
 	for _, selection := range []struct {
 		parameter *types.TypeParam
 		facet     GenericRepresentationFacet
@@ -20,6 +20,7 @@ func TestGenericRepresentationProfileIsExactOrderedAndIdentityKeyed(
 		{parameter: second, facet: GenericRepresentationPointer},
 		{parameter: first, facet: GenericRepresentationPointer},
 		{parameter: first, facet: GenericRepresentationStorage},
+		{parameter: first, facet: GenericRepresentationContainerStorage},
 	} {
 		requirement, err := NewGenericRepresentationRequirement(
 			owner,
@@ -38,20 +39,29 @@ func TestGenericRepresentationProfileIsExactOrderedAndIdentityKeyed(
 	if !profile.Valid() ||
 		len(profile.Parameters()) != 2 ||
 		!profile.Requires(first, GenericRepresentationStorage) ||
+		!profile.Requires(first, GenericRepresentationContainerStorage) ||
 		!profile.Requires(first, GenericRepresentationPointer) ||
 		profile.Requires(second, GenericRepresentationStorage) ||
+		profile.Requires(second, GenericRepresentationContainerStorage) ||
 		!profile.Requires(second, GenericRepresentationPointer) {
 		t.Fatalf("generic representation profile = %#v", profile)
 	}
 	ordered := profile.OrderedFacets()
-	if len(ordered) != 3 ||
+	if len(ordered) != 4 ||
 		ordered[0].Parameter() != first ||
 		ordered[0].Facet() != GenericRepresentationStorage ||
 		ordered[1].Parameter() != first ||
-		ordered[1].Facet() != GenericRepresentationPointer ||
-		ordered[2].Parameter() != second ||
-		ordered[2].Facet() != GenericRepresentationPointer {
+		ordered[1].Facet() != GenericRepresentationContainerStorage ||
+		ordered[2].Parameter() != first ||
+		ordered[2].Facet() != GenericRepresentationPointer ||
+		ordered[3].Parameter() != second ||
+		ordered[3].Facet() != GenericRepresentationPointer {
 		t.Fatalf("ordered generic representation facets = %#v", ordered)
+	}
+	if GenericRepresentationStorage != 1 ||
+		GenericRepresentationPointer != 2 ||
+		GenericRepresentationContainerStorage != 3 {
+		t.Fatal("generic representation facet IDs changed")
 	}
 
 	foreignOwner, foreign, _ := genericRepresentationOwner("Foreign")

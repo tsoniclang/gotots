@@ -2864,7 +2864,7 @@ func Replace[T any](pointer *T, value T) T {
 The target declaration is schematically:
 
 ```ts
-function Replace<T, T$Storage, T$Pointer>(
+function Replace<T, T$Pointer>(
   pointer: T$Pointer | undefined,
   value: T,
   load: (pointer: T$Pointer | undefined) => T,
@@ -2883,6 +2883,50 @@ declaration-level static capabilities selected once per exact instantiation,
 not callbacks stored on values. If the declaration only compares or returns
 `T` and never represents `*T`, it remains `function F<T>(...)` with no storage
 or pointer facet.
+
+Container slots are a separate representation question from whole-value
+storage. For example:
+
+```go
+type Item struct{ Value int32 }
+type Arena[T any] struct{ data []T }
+
+func (arena *Arena[T]) Add(value T) *T {
+    arena.data = append(arena.data, value)
+    return &arena.data[len(arena.data)-1]
+}
+```
+
+is schematically:
+
+```ts
+class Arena<T, T$ContainerStorage, T$Pointer> {
+  data: RuntimeSlice<T$ContainerStorage>;
+
+  Add(
+    value: T,
+    toContainer: (value: T) => T$ContainerStorage,
+    indexAddress: (
+      values: RuntimeSlice<T$ContainerStorage>,
+      index: int,
+    ) => T$Pointer | undefined,
+  ): T$Pointer | undefined {
+    this.data = this.data.append(toContainer(value));
+    return indexAddress(this.data, this.data.length - 1);
+  }
+}
+```
+
+For `Item`, the indexed address demand selects
+`T$ContainerStorage = Item$Storage` and
+`T$Pointer = GoPointer<Item, Item$Storage>`; returning the current `Item`
+object would be wrong after a later whole-slot assignment. For `int32`,
+container storage is `int32` and the pointer is
+`GoPointer<int32, int32>`. The concrete `indexAddress` capability always forms
+the canonical backing/index carrier. A generic slice that never takes an
+element address instead uses plain `Item` as container storage and does not
+request `Item$Storage`. The generic body does not branch on a type argument,
+assert a target shape, or conflate the two storage contracts.
 
 For a storage-selected generic struct:
 

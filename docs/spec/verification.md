@@ -726,11 +726,17 @@ type. It proves:
   interior-pointer construction; restoring either unnecessary pointer route
   fails strict typechecking and the artifact-shape gate;
 - a logical-only declaration emits no storage or pointer facet;
-- `*T` transport adds exactly one pointer facet, while address/storage
-  operations add exactly the demanded storage facet and closed operation
-  signatures;
+- `*T` transport adds exactly one pointer facet, whole-value storage adds the
+  whole-storage facet, and array/slice slots add the distinct
+  container-storage facet plus only their demanded closed operation signatures;
 - each concrete instantiation exact-joins source type arguments to its logical,
-  storage, and pointer target arguments in canonical order;
+  whole-storage, container-storage, and pointer target arguments in canonical
+  order;
+- `Bag[T]` with unaddressed `[]T` uses plain `Item` container storage, while
+  `Arena[T]` with `&slice[i]` selects canonical carrier storage; both
+  strict-typecheck and execute for direct-class `Item` and scalar `int32`;
+- replacing a slice or array slot after taking its address remains visible
+  through that pointer, proving the class-object shortcut is not admitted;
 - a nested `Outer[T] -> Box[T] -> *T` demand propagates one facet through the
   artifact fixed point, terminates under recursion, and never creates a second
   body;
@@ -740,8 +746,9 @@ type. It proves:
 - 1x/2x/4x instantiations grow by distinct reached facet contracts rather than
   call count, with unchanged logical-only artifacts byte-identical.
 
-Mutations restore `Storage(T)=T`, substitute `GoPointer<T,T>` for the selected
-pointer facet, omit or reorder a concrete facet argument, add every facet
+Mutations restore `Storage(T)=T`, conflate whole and container storage,
+substitute `GoPointer<T,T>` for the selected pointer facet, bypass the indexed
+address capability, omit or reorder a concrete facet argument, add every facet
 speculatively, key a facet by target spelling, keep both direct and carrier
 forms, or transport a semantic converter on a runtime pointer. Each fails at
 the exact facet join, strict target, differential alias/copy, convergence, or

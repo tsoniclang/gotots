@@ -31,7 +31,7 @@ func EmitTypeArguments(
 			Reason: "generic type arguments do not match their representation profile",
 		}
 	}
-	targets := make([]tsgo.TypeNode, 0, arguments.Len()*3)
+	targets := make([]tsgo.TypeNode, 0, arguments.Len()*4)
 	var requests []api.RootRequest
 	for index := range arguments.Len() {
 		argument := arguments.At(index)
@@ -45,39 +45,60 @@ func EmitTypeArguments(
 		}
 		targets = append(targets, target.Value())
 		requests = append(requests, target.Requests()...)
-		if profile.Requires(
-			parameters[index],
-			api.GenericRepresentationStorage,
-		) {
-			storage, storageErr := context.Values().StorageType(
-				context.WithRole(api.RoleStorageType),
-				source,
-				argument,
-			)
-			if storageErr != nil {
-				return nil, nil, storageErr
+		for _, facet := range api.GenericRepresentationFacetOrder() {
+			if !profile.Requires(parameters[index], facet) {
+				continue
 			}
-			targets = append(targets, storage.Value())
-			requests = append(requests, storage.Requests()...)
-		}
-		if profile.Requires(
-			parameters[index],
-			api.GenericRepresentationPointer,
-		) {
-			pointer, pointerErr := pointertype.EmitNonNilRepresented(
-				context.WithRole(api.RoleCallArgumentType),
+			representation, representationErr := emitRepresentationArgument(
+				context,
 				children,
 				source,
-				types.NewPointer(argument),
+				argument,
+				facet,
 			)
-			if pointerErr != nil {
-				return nil, nil, pointerErr
+			if representationErr != nil {
+				return nil, nil, representationErr
 			}
-			targets = append(targets, pointer.Value())
-			requests = append(requests, pointer.Requests()...)
+			targets = append(targets, representation.Value())
+			requests = append(requests, representation.Requests()...)
 		}
 	}
 	return targets, api.CombineRequests(requests), nil
+}
+
+func emitRepresentationArgument(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	argument types.Type,
+	facet api.GenericRepresentationFacet,
+) (api.TypeEmission, error) {
+	switch facet {
+	case api.GenericRepresentationStorage:
+		return context.Values().StorageType(
+			context.WithRole(api.RoleStorageType),
+			source,
+			argument,
+		)
+	case api.GenericRepresentationContainerStorage:
+		return context.ContainerStorage().ContainerStorageType(
+			context.WithRole(api.RoleStorageType),
+			source,
+			argument,
+		)
+	case api.GenericRepresentationPointer:
+		return pointertype.EmitNonNilRepresented(
+			context.WithRole(api.RoleCallArgumentType),
+			children,
+			source,
+			types.NewPointer(argument),
+		)
+	default:
+		return api.TypeEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic representation argument facet is invalid",
+		}
+	}
 }
 
 func EmitCapabilities(

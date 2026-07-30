@@ -4,6 +4,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericstorage "github.com/tsoniclang/gotots/internal/emit/generic/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -15,7 +16,8 @@ func buildStorageCapability(
 	signature *types.Signature,
 	selection api.GenericOperationSelection,
 ) (tsgo.Statement, []api.RootRequest, bool, error) {
-	sourceType, ok := api.GenericStorageOperationType(selection, signature)
+	sourceType, facet, direction, ok :=
+		api.GenericStorageOperationType(selection, signature)
 	if !ok {
 		return nil, nil, false, nil
 	}
@@ -33,10 +35,11 @@ func buildStorageCapability(
 	if err != nil {
 		return nil, nil, true, err
 	}
-	storage, err := context.Values().StorageType(
+	storage, err := genericstorage.Type(
 		context.WithRole(api.RoleStorageType),
 		nil,
 		sourceType,
+		facet,
 	)
 	if err != nil {
 		return nil, nil, true, err
@@ -44,23 +47,17 @@ func buildStorageCapability(
 	parameterType := logical.Value()
 	resultType := storage.Value()
 	value := context.Factory().Identifier("$0")
-	var result api.ExpressionEmission
-	if selection.Operation() == api.GenericOperationFromStorage {
+	if direction == api.GenericStorageDirectionFrom {
 		parameterType, resultType = resultType, parameterType
-		result, err = context.Values().FromStorage(
-			context.WithRole(api.RoleFunctionBody),
-			nil,
-			sourceType,
-			api.DirectExpression(value),
-		)
-	} else {
-		result, err = context.Values().ToStorage(
-			context.WithRole(api.RoleFunctionBody),
-			nil,
-			sourceType,
-			api.DirectExpression(value),
-		)
 	}
+	result, err := genericstorage.Convert(
+		context.WithRole(api.RoleFunctionBody),
+		nil,
+		sourceType,
+		facet,
+		direction,
+		api.DirectExpression(value),
+	)
 	if err != nil {
 		return nil, nil, true, err
 	}

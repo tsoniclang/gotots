@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 )
 
 func (owner Owner) ContainerStorageType(
@@ -16,7 +17,7 @@ func (owner Owner) ContainerStorageType(
 		return context.GenericParameterRepresentation(
 			source,
 			parameter,
-			api.GenericRepresentationStorage,
+			api.GenericRepresentationContainerStorage,
 		)
 	}
 	selection, err := owner.PointerRepresentation(
@@ -84,8 +85,15 @@ func (owner Owner) ToContainerStorage(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, generic := api.GenericTypeParameter(sourceType); generic {
-		return owner.ToStorage(context, source, sourceType, value)
+	if parameter, generic := api.GenericTypeParameter(sourceType); generic {
+		return genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationToContainerStorage,
+			[]types.Type{parameter},
+			[]types.Type{parameter},
+			[]api.ExpressionEmission{value},
+		)
 	}
 	selection, err := owner.PointerRepresentation(
 		context,
@@ -141,8 +149,15 @@ func (owner Owner) FromContainerStorage(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, generic := api.GenericTypeParameter(sourceType); generic {
-		return owner.FromStorage(context, source, sourceType, value)
+	if parameter, generic := api.GenericTypeParameter(sourceType); generic {
+		return genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationFromContainerStorage,
+			[]types.Type{parameter},
+			[]types.Type{parameter},
+			[]api.ExpressionEmission{value},
+		)
 	}
 	selection, err := owner.PointerRepresentation(
 		context,

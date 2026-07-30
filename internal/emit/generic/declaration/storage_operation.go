@@ -4,6 +4,7 @@ import (
 	"go/ast"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericstorage "github.com/tsoniclang/gotots/internal/emit/generic/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -13,7 +14,7 @@ func emitStorageOperationType(
 	source ast.Node,
 	operation *api.GenericOperationContract,
 ) (api.TypeEmission, bool, error) {
-	sourceType, ok := api.GenericStorageOperationType(
+	sourceType, facet, direction, ok := api.GenericStorageOperationType(
 		operation.Selection(),
 		operation.Signature(),
 	)
@@ -28,17 +29,18 @@ func emitStorageOperationType(
 	if err != nil {
 		return api.TypeEmission{}, true, err
 	}
-	storage, err := context.Values().StorageType(
+	storage, err := genericstorage.Type(
 		context.WithRole(api.RoleStorageType),
 		source,
 		sourceType,
+		facet,
 	)
 	if err != nil {
 		return api.TypeEmission{}, true, err
 	}
 	parameterType := logical.Value()
 	resultType := storage.Value()
-	if operation.Operation() == api.GenericOperationFromStorage {
+	if direction == api.GenericStorageDirectionFrom {
 		parameterType, resultType = resultType, parameterType
 	}
 	return api.DirectType(

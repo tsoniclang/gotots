@@ -242,14 +242,16 @@ func DefaultPointerRepresentationForType(
 type GenericRepresentationFacet uint8
 
 const (
-	GenericRepresentationInvalid GenericRepresentationFacet = 0
-	GenericRepresentationStorage GenericRepresentationFacet = 1
-	GenericRepresentationPointer GenericRepresentationFacet = 2
+	GenericRepresentationInvalid          GenericRepresentationFacet = 0
+	GenericRepresentationStorage          GenericRepresentationFacet = 1
+	GenericRepresentationPointer          GenericRepresentationFacet = 2
+	GenericRepresentationContainerStorage GenericRepresentationFacet = 3
 )
 
 func (f GenericRepresentationFacet) Valid() bool {
 	return f == GenericRepresentationStorage ||
-		f == GenericRepresentationPointer
+		f == GenericRepresentationPointer ||
+		f == GenericRepresentationContainerStorage
 }
 
 func (f GenericRepresentationFacet) String() string {
@@ -258,9 +260,21 @@ func (f GenericRepresentationFacet) String() string {
 		return "storage"
 	case GenericRepresentationPointer:
 		return "pointer"
+	case GenericRepresentationContainerStorage:
+		return "container-storage"
 	default:
 		return "invalid"
 	}
+}
+
+var genericRepresentationFacetOrder = [...]GenericRepresentationFacet{
+	GenericRepresentationStorage,
+	GenericRepresentationContainerStorage,
+	GenericRepresentationPointer,
+}
+
+func GenericRepresentationFacetOrder() []GenericRepresentationFacet {
+	return slices.Clone(genericRepresentationFacetOrder[:])
 }
 
 func GenericRepresentationName(
@@ -278,6 +292,8 @@ func GenericRepresentationName(
 		return logical + "$Storage", nil
 	case GenericRepresentationPointer:
 		return logical + "$Pointer", nil
+	case GenericRepresentationContainerStorage:
+		return logical + "$ContainerStorage", nil
 	default:
 		panic("validated generic representation facet is unhandled")
 	}
@@ -352,8 +368,10 @@ func (p GenericRepresentationProfile) Valid() bool {
 	if len(expected) != len(p.parameters) {
 		return false
 	}
-	validMask := uint8(1)<<GenericRepresentationStorage |
-		uint8(1)<<GenericRepresentationPointer
+	var validMask uint8
+	for _, facet := range genericRepresentationFacetOrder {
+		validMask |= uint8(1) << facet
+	}
 	for index, parameter := range p.parameters {
 		if parameter != expected[index] || p.masks[index]&^validMask != 0 {
 			return false
@@ -393,7 +411,7 @@ func (p GenericRepresentationProfile) OrderedFacets() []GenericRepresentationSel
 	}
 	var result []GenericRepresentationSelection
 	for index, parameter := range p.parameters {
-		for facet := GenericRepresentationStorage; facet <= GenericRepresentationPointer; facet++ {
+		for _, facet := range genericRepresentationFacetOrder {
 			if p.masks[index]&(uint8(1)<<facet) == 0 {
 				continue
 			}

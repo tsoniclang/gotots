@@ -29,9 +29,9 @@ func EmitTypeParameterLayout(
 		parameters: make(
 			[]tsgo.TypeParameterDeclaration,
 			0,
-			len(parameters)*3,
+			len(parameters)*4,
 		),
-		arguments: make([]tsgo.TypeNode, 0, len(parameters)*3),
+		arguments: make([]tsgo.TypeNode, 0, len(parameters)*4),
 	}
 	for _, parameter := range parameters {
 		name := logicalNames[parameter]
@@ -42,7 +42,7 @@ func EmitTypeParameterLayout(
 			}
 		}
 		layout.append(context, name)
-		for facet := api.GenericRepresentationStorage; facet <= api.GenericRepresentationPointer; facet++ {
+		for _, facet := range api.GenericRepresentationFacetOrder() {
 			if !profile.Requires(parameter, facet) {
 				continue
 			}

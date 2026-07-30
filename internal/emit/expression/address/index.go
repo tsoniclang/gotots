@@ -5,13 +5,12 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func indexed(
@@ -137,119 +136,26 @@ func arrayIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	parentValue, before, err := captureBefore(
-		context,
-		parent,
-		index.Before(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementTarget, err := children.RepresentedType(
-		context.WithRole(api.RoleArrayIndex),
-		source,
-		element,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementRepresentation, err := pointertype.Observe(
-		context,
-		types.NewPointer(element),
-		true,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementStorage, err := context.ContainerStorage().PointerStorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		element,
-		elementRepresentation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	arrayTarget, err := array.EmitType(
-		context.WithRole(api.RoleArrayReceiver),
-		children,
-		source.X,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	arrayRepresentation, err := pointertype.Observe(
-		context,
-		types.NewPointer(arrayType),
-		true,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	arrayStorage, err := context.ContainerStorage().PointerStorageType(
-		context.WithRole(api.RoleStorageType),
-		source.X,
-		arrayType,
-		arrayRepresentation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	runtime, err := pointerRuntime(context)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if throughPointer {
-		parentValue = context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(
-					pointerruntime.DereferenceName,
-				),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			[]tsgo.TypeNode{
-				arrayTarget.Value(),
-				arrayStorage.Value(),
+	if parameter, generic := api.GenericTypeParameter(element); generic {
+		return genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationIndexAddress,
+			[]types.Type{
+				types.NewPointer(arrayType),
+				types.Typ[types.Int],
 			},
-			[]tsgo.Expression{parentValue},
-			tsgo.NodeFlagsNone,
+			[]types.Type{types.NewPointer(parameter)},
+			[]api.ExpressionEmission{parent, index},
 		)
 	}
-	typeArguments := []tsgo.TypeNode{
-		elementTarget.Value(),
-		elementStorage.Value(),
-		arrayTarget.Value(),
-		arrayStorage.Value(),
-	}
-	arguments := []tsgo.Expression{parentValue, index.Value()}
-	return api.NewExpressionEmission(
-		before,
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(pointerruntime.IndexName),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			typeArguments,
-			arguments,
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(
-			parent.Requests(),
-			index.Requests(),
-			elementTarget.Requests(),
-			elementStorage.Requests(),
-			arrayTarget.Requests(),
-			arrayStorage.Requests(),
-			runtime.Requests(),
-			elementRepresentation.Requests(),
-			arrayRepresentation.Requests(),
-		),
+	return array.Address(
+		context,
+		children,
+		source,
+		parent,
+		index,
+		throughPointer,
 	)
 }
 
@@ -288,67 +194,25 @@ func sliceIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	receiverValue, before, err := captureBefore(
+	if parameter, generic := api.GenericTypeParameter(element); generic {
+		return genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationIndexAddress,
+			[]types.Type{
+				types.NewSlice(parameter),
+				types.Typ[types.Int],
+			},
+			[]types.Type{types.NewPointer(parameter)},
+			[]api.ExpressionEmission{receiver, index},
+		)
+	}
+	return slicevalue.Address(
 		context,
+		children,
+		source,
+		element,
 		receiver,
-		index.Before(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementTarget, err := children.RepresentedType(
-		context.WithRole(api.RoleSliceElement),
-		source,
-		element,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementRepresentation, err := pointertype.Observe(
-		context,
-		types.NewPointer(element),
-		true,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementStorage, err := context.ContainerStorage().PointerStorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		element,
-		elementRepresentation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	typeArguments := []tsgo.TypeNode{
-		elementTarget.Value(),
-		elementStorage.Value(),
-	}
-	arguments := []tsgo.Expression{receiverValue, index.Value()}
-	runtime, err := context.Names().Runtime(
-		api.RuntimeSliceAddress,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.NewExpressionEmission(
-		before,
-		context.Factory().CallExpression(
-			context.Factory().Identifier(runtime.Name()),
-			nil,
-			typeArguments,
-			arguments,
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(
-			receiver.Requests(),
-			index.Requests(),
-			elementTarget.Requests(),
-			elementStorage.Requests(),
-			runtime.Requests(),
-			elementRepresentation.Requests(),
-		),
+		index,
 	)
 }

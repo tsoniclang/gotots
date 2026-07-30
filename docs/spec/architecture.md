@@ -490,41 +490,85 @@ whole-array stores operate on that storage; they do not demand duplicate
 `get`/`set` methods on the nominal class.
 
 Open generic declarations use the same representation decisions without
-pretending that a source type parameter is its own storage or pointer type.
-Each source `*types.TypeParam` always owns one logical target type parameter.
-The declaration gains an additional storage facet only when its body or
-represented surface creates or transports a mutable location whose storage
-can differ from that logical type, and gains a pointer facet only when an
-exact `*T` value is represented. These are immutable target type parameters
-keyed by the source parameter identity and facet kind, not runtime
-descriptors:
+pretending that a source type parameter is its own whole-value storage,
+container-slot storage, or pointer type. Each source `*types.TypeParam` always
+owns one logical target type parameter. A declaration gains a whole-storage
+facet only when a canonical struct/location record can differ from the logical
+type, a container-storage facet only when an array or slice slot can differ
+from both, and a pointer facet only when an exact `*T` value is represented.
+These are immutable target type parameters keyed by the source parameter
+identity and facet kind, not runtime descriptors:
 
 ```text
-Go T                -> target T
-storage of T needed -> target T$Storage
-Go *T needed        -> target T$Pointer
+Go T                         -> target T
+whole storage of T needed    -> target T$Storage
+array/slice slot of T needed -> target T$ContainerStorage
+Go *T needed                 -> target T$Pointer
 ```
 
 At each concrete instantiation the ordinary representation owner supplies the
-exact selected storage and pointer types. For a direct named-struct pointer,
-`T$Pointer` may be the class itself; for a scalar or conversion-selected
-location it is the exact `GoPointer<T, T$Storage>` carrier. The facet is the
+exact selected facet types. For a direct named struct `Item` with no
+carrier-requiring use, `T$Storage = Item$Storage`,
+`T$ContainerStorage = Item`, and `T$Pointer = Item` when the pointer facet is
+otherwise demanded. If a reached use requires a canonical location carrier,
+container storage and pointer become `Item$Storage` and
+`GoPointer<Item, Item$Storage>`. For a scalar, whole and container storage are
+the scalar and the pointer is its exact carrier. The pointer facet is the
 non-nil representation; an exact Go `*T` occurrence is
-`T$Pointer | undefined`. A declaration that does not demand either facet
-retains only `T`. Generic pointer load, store, construction, equality, and
-conversion use the existing closed generic operation mechanism with exact
-typed signatures; they do not inspect `T$Pointer`, carry semantic callbacks on
-a pointer, or introduce a second generic body.
+`T$Pointer | undefined`. A declaration that demands no additional facet
+retains only `T`.
+
+Whole-storage and container-storage conversion are distinct closed generic
+operations. Indexed address formation is another closed operation over the
+source collection, index, and result pointer. It always requests the canonical
+array/slice location carrier: a slot may later be rebound, so returning its
+current class object would make an existing pointer observe the old value.
+Generic pointer load, store, construction, equality, conversion, and indexed
+address formation therefore use exact typed signatures; they do not inspect a
+facet, carry semantic callbacks, recover an erased payload, or introduce a
+second generic body.
+
+For example:
+
+```go
+type Item struct{ Value int32 }
+type Arena[T any] struct{ data []T }
+func (a *Arena[T]) At(i int) *T { return &a.data[i] }
+```
+
+```ts
+class Arena<T, T$ContainerStorage, T$Pointer> {
+  data: RuntimeSlice<T$ContainerStorage>;
+  At(
+    i: int,
+    indexAddress: (
+      value: RuntimeSlice<T$ContainerStorage>,
+      index: int,
+    ) => T$Pointer | undefined,
+  ): T$Pointer | undefined {
+    return indexAddress(this.data, i);
+  }
+}
+```
+
+`Arena<Item>` supplies `Item$Storage` and
+`GoPointer<Item, Item$Storage>` because `At` takes a slot address.
+`Arena<int32>` supplies `int32` plus `GoPointer<int32, int32>`. Both concrete
+capabilities return a canonical backing/index carrier, and one generic body
+remains strictly typed. A generic `Bag[T]` that stores and reads `[]T` without
+taking an element address instead supplies plain `Item` for
+`T$ContainerStorage`; it does not acquire whole storage speculatively.
 
 Facet demand propagates structurally through reached generic declarations and
 instantiations. For example, if `Box[T]` contains `*T`, every represented
 `Box[X]` supplies the exact pointer facet for `X`; if `Outer[T]` contains
 `Box[T]`, its use of `Box` requests and forwards that same facet. The canonical
 facet ordering is source parameter order and, within one parameter, logical,
-storage when demanded, then pointer when demanded. Structural comparison of
-that closed list drives the existing artifact fixed point. No conditional
-target type, erased payload, universal representation bag, per-use wrapper,
-or declaration-wide speculative facet is admitted.
+whole storage when demanded, container storage when demanded, then pointer
+when demanded. Structural comparison of that closed list drives the existing
+artifact fixed point. No conditional target type, erased payload, universal
+representation bag, per-use wrapper, or declaration-wide speculative facet is
+admitted.
 
 When a reached generic struct requires canonical storage and a field's logical
 and storage facets may differ, the class stores only the storage facet. It

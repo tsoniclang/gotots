@@ -30,6 +30,16 @@ func Build(
 			"generated artifact is not a generic capability",
 		)
 	}
+	if statement, requests, handled, err := buildIndexAddressCapability(
+		context,
+		children,
+		artifact,
+		modifiers,
+		signature,
+		selection,
+	); handled {
+		return statement, requests, err
+	}
 	if statement, requests, handled, err := buildPointerCapability(
 		context,
 		children,

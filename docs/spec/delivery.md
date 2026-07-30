@@ -335,12 +335,16 @@ pointer.
 
 Open generic declarations complete the same representation model before this
 checkpoint exits. A source type parameter always has one logical target
-parameter and gains storage and pointer facets only from exact reached uses.
-Concrete instantiations supply those facets from the one representation owner,
-nested generic declarations forward them in canonical order, and the artifact
-fixed point rejects missing, duplicate, reordered, dual-representation, or
-nonconvergent facet contracts. No target conditional type, erased descriptor,
-runtime semantic callback, or speculative all-facet signature is accepted.
+parameter and gains distinct whole-storage, container-storage, and pointer
+facets only from exact reached uses. Array/slice element address formation uses
+one closed generic operation whose concrete capability always selects the
+canonical location carrier; a rebindable slot cannot be represented by the
+class object currently stored there. Concrete instantiations supply every
+demanded facet from the one representation owner, nested generic declarations
+forward them in canonical order, and the artifact fixed point rejects missing,
+duplicate, reordered, conflated, dual-representation, or nonconvergent facet
+contracts. No target conditional type, erased descriptor, runtime semantic
+callback, or speculative all-facet signature is accepted.
 
 The checkpoint exits only when all six families:
 
