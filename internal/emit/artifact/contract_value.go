@@ -9,7 +9,7 @@ import (
 )
 
 type Contract struct {
-	facets      [api.ArtifactFacetImplementation + 1][]byte
+	facets      [api.ArtifactFacetExportSurface + 1][]byte
 	present     uint8
 	exports     []string
 	exportsSet  bool
@@ -176,7 +176,7 @@ func changedArtifactFacets(
 	next Contract,
 ) []api.ArtifactFacet {
 	var changed []api.ArtifactFacet
-	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetImplementation; facet++ {
+	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
 		currentValue, currentOK := current.facet(facet)
 		nextValue, nextOK := next.facet(facet)
 		if currentOK != nextOK || !bytes.Equal(currentValue, nextValue) {

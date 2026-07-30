@@ -24,7 +24,7 @@ type contractHistory struct {
 }
 
 type contractReverseDelta struct {
-	facets  [api.ArtifactFacetImplementation + 1]facetReverseDelta
+	facets  [api.ArtifactFacetExportSurface + 1]facetReverseDelta
 	changed uint8
 }
 
@@ -123,7 +123,7 @@ func reverseContractDelta(
 
 func (d contractReverseDelta) restore(next Contract) Contract {
 	previous := next
-	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetImplementation; facet++ {
+	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
 		if d.changed&(uint8(1)<<facet) == 0 {
 			continue
 		}
@@ -160,7 +160,7 @@ func (d contractReverseDelta) restore(next Contract) Contract {
 func (h contractHistory) retainedPayloadBytes() int {
 	total := 0
 	for _, entry := range h.entries {
-		for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetImplementation; facet++ {
+		for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
 			total += len(entry.previous.facets[facet].previousMiddle.data)
 		}
 	}
@@ -197,7 +197,7 @@ func fingerprintContract(contract Contract) contractFingerprint {
 		second ^= second >> 29
 	}
 	mix(contract.present)
-	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetImplementation; facet++ {
+	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
 		value, present := contract.facet(facet)
 		mix(byte(facet))
 		if !present {

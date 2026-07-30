@@ -379,7 +379,9 @@ func TestObservableInterfaceAndAliasUseInstanceTypeFacet(t *testing.T) {
 	instanceSurface, present := contract.facet(
 		api.ArtifactFacetInstanceTypeSurface,
 	)
-	if contract.present != uint8(1)<<api.ArtifactFacetInstanceTypeSurface ||
+	if contract.present !=
+		uint8(1)<<api.ArtifactFacetInstanceTypeSurface|
+			uint8(1)<<api.ArtifactFacetExportSurface ||
 		!present ||
 		len(instanceSurface) == 0 {
 		t.Fatalf("contract facets = %#v", contract)

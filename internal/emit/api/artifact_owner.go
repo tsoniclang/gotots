@@ -259,13 +259,13 @@ const (
 	ArtifactFacetInstanceTypeSurface ArtifactFacet = 3
 	ArtifactFacetStaticSurface       ArtifactFacet = 4
 	ArtifactFacetValueSurface        ArtifactFacet = 5
-	ArtifactFacetExportSurface       ArtifactFacet = 6
-	ArtifactFacetImplementation      ArtifactFacet = 7
+	ArtifactFacetImplementation      ArtifactFacet = 6
+	ArtifactFacetExportSurface       ArtifactFacet = 7
 )
 
 func (f ArtifactFacet) Valid() bool {
 	return f >= ArtifactFacetCallableSignature &&
-		f <= ArtifactFacetImplementation
+		f <= ArtifactFacetExportSurface
 }
 
 func (f ArtifactFacet) String() string {
