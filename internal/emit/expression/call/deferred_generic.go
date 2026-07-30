@@ -39,10 +39,6 @@ func emitDeferredGeneric(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	reference, err := context.Names().Reference(owner)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
 	typeArguments, typeRequests, err := genericinstance.EmitTypeArguments(
 		context,
 		children,
@@ -79,6 +75,21 @@ func emitDeferredGeneric(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	declarationSignature, ok := owner.Type().(*types.Signature)
+	if !ok {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	reference, callableFacet, _, err :=
+		cooperativecall.SelectGenericCallable(
+			context,
+			owner,
+			declarationSignature,
+			signature,
+		)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	arguments = append(capabilityArguments, arguments...)
 	arguments = append(
 		arguments,
@@ -92,7 +103,7 @@ func emitDeferredGeneric(
 		return api.ExpressionEmission{}, true, err
 	}
 	cooperative, contractRequests, err :=
-		cooperativecall.SourceContract(context, owner)
+		cooperativecall.GenericContract(context, callableFacet)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}

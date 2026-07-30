@@ -1,4 +1,4 @@
-package call
+package interfaceoperation
 
 import (
 	"go/ast"
@@ -10,8 +10,9 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func ApplyInterfaceMethod(
+func Apply(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	sourceType types.Type,
 	receiver api.ExpressionEmission,
@@ -26,8 +27,9 @@ func ApplyInterfaceMethod(
 			Reason: "interface method operation has no method identity",
 		}
 	}
-	receiverContract, err := emitNonNilInterfaceType(
+	receiverContract, err := NonNilType(
 		context,
+		children,
 		source,
 		sourceType,
 	)
@@ -102,8 +104,9 @@ func ApplyInterfaceMethod(
 	)
 }
 
-func emitNonNilInterfaceType(
+func NonNilType(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
@@ -114,5 +117,5 @@ func emitNonNilInterfaceType(
 	); handled {
 		return target, err
 	}
-	return interfacetype.EmitNonNil(context, source, sourceType)
+	return interfacetype.EmitNonNil(context, children, source, sourceType)
 }

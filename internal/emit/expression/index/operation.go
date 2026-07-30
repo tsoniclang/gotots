@@ -11,6 +11,7 @@ import (
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -78,14 +79,14 @@ func Apply(
 	}
 	if array, ok := arrayvalue.Resolve(context, operandType); ok {
 		if !types.Identical(resultType, array.ElementType()) ||
-			!basictype.SupportsInteger(context.TypesSizes(), indexType) {
+			!integeroperand.Supports(context.TypesSizes(), indexType) {
 			return api.ExpressionEmission{}, false, nil
 		}
 		target, err := array.ApplyIndex(context, operand, index)
 		return target, true, err
 	}
 	if basictype.SupportsString(operandType) &&
-		basictype.SupportsStringIndex(context.TypesSizes(), indexType) &&
+		integeroperand.Supports(context.TypesSizes(), indexType) &&
 		isByte(resultType) {
 		ordered, err := expressionoperands.Preserve(
 			context,
@@ -139,7 +140,7 @@ func Apply(
 	}
 	if !represented ||
 		!types.Identical(resultType, elementType) ||
-		!basictype.SupportsInteger(context.TypesSizes(), indexType) {
+		!integeroperand.Supports(context.TypesSizes(), indexType) {
 		return api.ExpressionEmission{}, false, nil
 	}
 	var err error

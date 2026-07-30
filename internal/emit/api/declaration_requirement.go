@@ -21,17 +21,23 @@ type DeclarationRequirement struct {
 	// constant projection. A basic kind is a canonical, comparable dedup key —
 	// unlike a types.Type interface value, whose pointer identity is not a
 	// stable projection key.
-	projection       types.BasicKind
-	generated        *GeneratedArtifact
-	anonymousDemand  AnonymousStructDemand
-	mapDemand        MapSpecializationDemand
-	genericOperation *GenericOperationContract
-	enclosing        ast.Node
-	callable         ast.Node
-	control          CallableControlFacet
-	controlLabel     *types.Label
-	controlPosition  token.Pos
-	callableFacet    CallableFacet
+	projection           types.BasicKind
+	generated            *GeneratedArtifact
+	interfaceContract    *types.Interface
+	interfaceContractKey string
+	anonymousDemand      AnonymousStructDemand
+	mapDemand            MapSpecializationDemand
+	genericOperation     *GenericOperationContract
+	genericProfile       *GenericCallableProfile
+	environmentBuiltin   *types.Builtin
+	environmentSignature *types.Signature
+	enclosing            ast.Node
+	callable             ast.Node
+	control              CallableControlFacet
+	controlLabel         *types.Label
+	controlPosition      token.Pos
+	controlRange         *ast.RangeStmt
+	callableFacet        CallableFacet
 }
 
 func NewNamedStructOperationRequirement(
@@ -76,13 +82,13 @@ func NewLexicalNamedStructOperationRequirement(
 }
 
 func NewAddressableStorageRequirement(
-	owner *types.Func,
+	owner ArtifactOwner,
 	variable *types.Var,
 ) (DeclarationRequirement, error) {
 	switch {
-	case owner == nil:
+	case !owner.Valid():
 		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "addressable-storage owner is nil",
+			Reason: "addressable-storage owner is invalid",
 		}
 	case variable == nil:
 		return DeclarationRequirement{}, &RootRequestError{
@@ -92,9 +98,13 @@ func NewAddressableStorageRequirement(
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "addressable-storage variable is a field",
 		}
+	case !validAddressableStorageOwner(owner, variable):
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "addressable-storage owner does not contain the variable",
+		}
 	}
 	return DeclarationRequirement{
-		owner:    MustSourceArtifactOwner(owner),
+		owner:    owner,
 		kind:     DeclarationRequirementAddressableStorage,
 		variable: variable,
 	}, nil
@@ -147,6 +157,35 @@ func NewInterfaceAdapterRequirement(
 		DeclarationRequirementInterfaceAdapter,
 		"interface-adapter",
 	)
+}
+
+func NewInterfaceAdapterContractRequirement(
+	artifact *GeneratedArtifact,
+	contract *types.Interface,
+	contractKey string,
+) (DeclarationRequirement, error) {
+	if !artifact.Valid() ||
+		artifact.Kind() != GeneratedArtifactInterfaceAdapter ||
+		contract == nil ||
+		!contract.Complete().IsMethodSet() ||
+		contractKey == "" {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "interface-adapter contract requirement is invalid",
+		}
+	}
+	sourceType, ok := artifact.InterfaceAdapterType()
+	if !ok || !types.Implements(sourceType, contract) {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "interface-adapter source does not implement its demanded contract",
+		}
+	}
+	return DeclarationRequirement{
+		owner:                artifact.ReconstructionOwner(),
+		kind:                 DeclarationRequirementInterfaceAdapter,
+		generated:            artifact,
+		interfaceContract:    contract,
+		interfaceContractKey: contractKey,
+	}, nil
 }
 
 func NewAnonymousInterfaceRequirement(
@@ -209,7 +248,8 @@ func (r DeclarationRequirement) Valid() bool {
 			r.callable != nil ||
 			r.control != CallableControlInvalid ||
 			r.controlLabel != nil ||
-			r.controlPosition.IsValid()) {
+			r.controlPosition.IsValid() ||
+			r.controlRange != nil) {
 		return false
 	}
 	if r.kind != DeclarationRequirementGenericOperation &&
@@ -217,8 +257,20 @@ func (r DeclarationRequirement) Valid() bool {
 		r.genericOperation != nil {
 		return false
 	}
+	if r.kind != DeclarationRequirementGenericCallableProfile &&
+		r.genericProfile != nil {
+		return false
+	}
 	if r.kind != DeclarationRequirementCooperativeCallable &&
 		!r.callableFacet.empty() {
+		return false
+	}
+	if r.kind != DeclarationRequirementEnvironmentBuiltin &&
+		(r.environmentBuiltin != nil || r.environmentSignature != nil) {
+		return false
+	}
+	if r.kind != DeclarationRequirementInterfaceAdapter &&
+		(r.interfaceContract != nil || r.interfaceContractKey != "") {
 		return false
 	}
 	switch r.kind {
@@ -250,9 +302,7 @@ func (r DeclarationRequirement) Valid() bool {
 			r.mapDemand != MapSpecializationDemandInvalid {
 			return false
 		}
-		source, sourceOK := r.owner.Source()
-		_, ok := source.(*types.Func)
-		return sourceOK && ok
+		return validAddressableStorageOwner(r.owner, r.variable)
 	case DeclarationRequirementConstantProjection:
 		if r.operation != NamedStructOperationInvalid ||
 			r.typeName != nil ||
@@ -298,6 +348,23 @@ func (r DeclarationRequirement) Valid() bool {
 			GenericDeclarationOrigin(source) == source &&
 			len(GenericDeclarationParameters(source)) != 0 &&
 			r.genericOperation.Owner() == source
+	case DeclarationRequirementGenericCallableProfile:
+		if !r.owner.Valid() ||
+			r.operation != NamedStructOperationInvalid ||
+			r.typeName != nil ||
+			r.variable != nil ||
+			r.constant != nil ||
+			r.projection != types.Invalid ||
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid ||
+			r.genericOperation != nil ||
+			!r.genericProfile.Valid() {
+			return false
+		}
+		source, sourceOK := r.owner.Source()
+		return sourceOK &&
+			source == r.genericProfile.Owner()
 	case DeclarationRequirementAnonymousStruct:
 		return r.operation == NamedStructOperationInvalid &&
 			r.typeName == nil &&
@@ -321,9 +388,19 @@ func (r DeclarationRequirement) Valid() bool {
 			r.mapDemand.Valid() &&
 			r.owner == r.generated.ReconstructionOwner()
 	case DeclarationRequirementInterfaceAdapter:
-		return r.validGeneratedDefinition(
+		if !r.validGeneratedDefinition(
 			GeneratedArtifactInterfaceAdapter,
-		)
+		) {
+			return false
+		}
+		if r.interfaceContract == nil {
+			return r.interfaceContractKey == ""
+		}
+		sourceType, ok := r.generated.InterfaceAdapterType()
+		return ok &&
+			r.interfaceContractKey != "" &&
+			r.interfaceContract.Complete().IsMethodSet() &&
+			types.Implements(sourceType, r.interfaceContract)
 	case DeclarationRequirementAnonymousInterface:
 		return r.validGeneratedDefinition(
 			GeneratedArtifactAnonymousInterface,
@@ -366,20 +443,74 @@ func (r DeclarationRequirement) Valid() bool {
 		if r.control == CallableControlGoto {
 			return r.controlLabel != nil &&
 				r.controlPosition.IsValid() &&
+				r.controlRange == nil &&
 				r.callable != nil &&
 				r.controlPosition >= r.callable.Pos() &&
 				r.controlPosition <= r.callable.End()
 		}
-		return r.controlLabel == nil && !r.controlPosition.IsValid()
+		if r.control == CallableControlIteratorReturn {
+			return r.controlLabel == nil &&
+				!r.controlPosition.IsValid() &&
+				validIteratorReturnRange(r.callable, r.controlRange)
+		}
+		return r.controlLabel == nil &&
+			!r.controlPosition.IsValid() &&
+			r.controlRange == nil
 	case DeclarationRequirementCooperativeCallable:
 		return r.validCooperativeCallable()
 	case DeclarationRequirementCallableABI:
 		return r.validGeneratedDefinition(
 			GeneratedArtifactCallableABI,
 		)
+	case DeclarationRequirementEnvironmentBuiltin:
+		if !r.owner.Valid() ||
+			r.operation != NamedStructOperationInvalid ||
+			r.typeName != nil ||
+			r.variable != nil ||
+			r.constant != nil ||
+			r.projection != types.Invalid ||
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid ||
+			r.genericOperation != nil ||
+			r.environmentBuiltin == nil ||
+			!validEnvironmentBuiltinSignature(r.environmentSignature) {
+			return false
+		}
+		source, sourceOK := r.owner.Source()
+		return sourceOK &&
+			source == r.environmentBuiltin &&
+			r.environmentBuiltin.Pkg() != nil &&
+			r.environmentBuiltin.Parent() ==
+				r.environmentBuiltin.Pkg().Scope() &&
+			r.environmentBuiltin.Parent().Lookup(
+				r.environmentBuiltin.Name(),
+			) == r.environmentBuiltin
 	default:
 		return false
 	}
+}
+
+func validAddressableStorageOwner(
+	owner ArtifactOwner,
+	variable *types.Var,
+) bool {
+	if !owner.Valid() ||
+		variable == nil ||
+		variable.IsField() ||
+		variable.Pkg() == nil ||
+		owner.Package() != variable.Pkg() {
+		return false
+	}
+	if source, ok := owner.Source(); ok {
+		_, callable := source.(*types.Func)
+		return callable
+	}
+	_, initializer, ok := owner.PackageInitializer()
+	return ok &&
+		variable.Pos().IsValid() &&
+		variable.Pos() >= initializer.Rhs.Pos() &&
+		variable.Pos() <= initializer.Rhs.End()
 }
 
 func NewDirectCallableControlRequirement(
@@ -389,7 +520,8 @@ func NewDirectCallableControlRequirement(
 	if owner == nil ||
 		owner.Origin() != owner ||
 		!control.Valid() ||
-		control == CallableControlGoto {
+		control == CallableControlGoto ||
+		control == CallableControlIteratorReturn {
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "direct callable-control requirement is invalid",
 		}
@@ -409,7 +541,8 @@ func NewCallableControlRequirement(
 ) (DeclarationRequirement, error) {
 	if !validCallableControlAnchor(owner, enclosing, callable) ||
 		!control.Valid() ||
-		control == CallableControlGoto {
+		control == CallableControlGoto ||
+		control == CallableControlIteratorReturn {
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "callable-control requirement is invalid",
 		}
@@ -420,6 +553,28 @@ func NewCallableControlRequirement(
 		enclosing: enclosing,
 		callable:  callable,
 		control:   control,
+	}, nil
+}
+
+func NewIteratorReturnControlRequirement(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+	source *ast.RangeStmt,
+) (DeclarationRequirement, error) {
+	if !validCallableControlAnchor(owner, enclosing, callable) ||
+		!validIteratorReturnRange(callable, source) {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "iterator-return control requirement is invalid",
+		}
+	}
+	return DeclarationRequirement{
+		owner:        owner,
+		kind:         DeclarationRequirementCallableControl,
+		enclosing:    enclosing,
+		callable:     callable,
+		control:      CallableControlIteratorReturn,
+		controlRange: source,
 	}, nil
 }
 
@@ -448,6 +603,18 @@ func NewGotoControlRequirement(
 		controlLabel:    label,
 		controlPosition: position,
 	}, nil
+}
+
+func validIteratorReturnRange(
+	callable ast.Node,
+	source *ast.RangeStmt,
+) bool {
+	return callable != nil &&
+		source != nil &&
+		source.X != nil &&
+		source.Body != nil &&
+		source.Pos() >= callable.Pos() &&
+		source.End() <= callable.End()
 }
 
 func validCallableControlAnchor(

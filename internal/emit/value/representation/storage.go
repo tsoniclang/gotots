@@ -128,6 +128,7 @@ func (owner Owner) ToStorage(
 		reference, err := context.Names().AnonymousStruct(
 			structType,
 			api.AnonymousStructDemandStorage,
+			api.ImportPhaseValue,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -185,6 +186,7 @@ func (owner Owner) FromStorage(
 		reference, err := context.Names().AnonymousStruct(
 			structType,
 			api.AnonymousStructDemandStorage,
+			api.ImportPhaseValue,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err

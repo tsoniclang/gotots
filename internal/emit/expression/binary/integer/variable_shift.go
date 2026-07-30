@@ -226,6 +226,9 @@ func normalizeNumber(
 	carrier integervalue.Carrier,
 	value tsgo.Expression,
 ) tsgo.Expression {
+	if carrier.Width() > 32 {
+		return value
+	}
 	if carrier.Width() == 32 {
 		operator := tsgo.BinaryOperatorBarToken
 		if !carrier.Signed() {

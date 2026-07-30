@@ -1,4 +1,4 @@
-package function
+package storage
 
 import (
 	"go/ast"
@@ -7,16 +7,18 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
-func applyAddressableStorage(
+func ApplyRequirements(
 	context api.Context,
-	source *ast.FuncDecl,
-	owner *types.Func,
+	source ast.Node,
+	owner api.ArtifactOwner,
 	requirements []api.DeclarationRequirement,
 ) (api.Context, error) {
-	if source == nil || owner == nil {
+	if source == nil ||
+		!owner.Valid() ||
+		context.ArtifactOwner() != owner {
 		return api.Context{}, &api.InvariantError{
 			Role:   context.Role(),
-			Reason: "addressable-storage artifact identity is nil",
+			Reason: "addressable-storage artifact identity is invalid",
 		}
 	}
 	storageNames := make(map[*types.Var]string, len(requirements))
@@ -27,18 +29,18 @@ func applyAddressableStorage(
 		requirementOwner, variable, ok := requirement.AddressableStorage()
 		if !ok ||
 			requirementOwner != owner ||
-			variable.Pkg() != owner.Pkg() ||
+			variable.Pkg() != owner.Package() ||
 			variable.Pos() < source.Pos() ||
 			variable.Pos() > source.End() {
 			return api.Context{}, &api.InvariantError{
 				Role:   context.Role(),
-				Reason: "function received foreign addressable-storage requirement",
+				Reason: "artifact received foreign addressable-storage requirement",
 			}
 		}
 		if _, duplicate := storageNames[variable]; duplicate {
 			return api.Context{}, &api.InvariantError{
 				Role:   context.Role(),
-				Reason: "function received duplicate addressable-storage requirement",
+				Reason: "artifact received duplicate addressable-storage requirement",
 			}
 		}
 		name, err := context.Names().Declare(variable)

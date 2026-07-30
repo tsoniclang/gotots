@@ -28,17 +28,15 @@ func (r DeclarationRequirement) NamedStructOperation() (
 }
 
 func (r DeclarationRequirement) AddressableStorage() (
-	*types.Func,
+	ArtifactOwner,
 	*types.Var,
 	bool,
 ) {
 	if !r.Valid() ||
 		r.kind != DeclarationRequirementAddressableStorage {
-		return nil, nil, false
+		return ArtifactOwner{}, nil, false
 	}
-	source, sourceOK := r.owner.Source()
-	owner, ok := source.(*types.Func)
-	return owner, r.variable, sourceOK && ok
+	return r.owner, r.variable, true
 }
 
 func (r DeclarationRequirement) ConstantProjection() (
@@ -120,6 +118,24 @@ func (r DeclarationRequirement) InterfaceAdapter() (
 	)
 }
 
+func (r DeclarationRequirement) InterfaceAdapterContract() (
+	*GeneratedArtifact,
+	*types.Interface,
+	string,
+	bool,
+) {
+	if !r.Valid() ||
+		r.kind != DeclarationRequirementInterfaceAdapter ||
+		r.interfaceContract == nil ||
+		r.interfaceContractKey == "" {
+		return nil, nil, "", false
+	}
+	return r.generated,
+		r.interfaceContract,
+		r.interfaceContractKey,
+		true
+}
+
 func (r DeclarationRequirement) AnonymousInterface() (
 	*GeneratedArtifact,
 	bool,
@@ -189,6 +205,18 @@ func (r DeclarationRequirement) GotoControl() (
 	return r.controlLabel, r.controlPosition, true
 }
 
+func (r DeclarationRequirement) IteratorReturnControl() (
+	*ast.RangeStmt,
+	bool,
+) {
+	if !r.Valid() ||
+		r.kind != DeclarationRequirementCallableControl ||
+		r.control != CallableControlIteratorReturn {
+		return nil, false
+	}
+	return r.controlRange, true
+}
+
 func (r DeclarationRequirement) generatedDefinition(
 	requirementKind DeclarationRequirementKind,
 	artifactKind GeneratedArtifactKind,
@@ -221,6 +249,26 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 	default:
 		return nil, false
 	}
+}
+
+func (r DeclarationRequirement) LexicalGeneratedArtifact() (
+	*GeneratedArtifact,
+	bool,
+) {
+	if artifact, ok := r.GeneratedArtifact(); ok {
+		return artifact,
+			artifact.Placement() == GeneratedArtifactPlacementLexical &&
+				r.Owner() == artifact.ReconstructionOwner()
+	}
+	facet, ok := r.CooperativeCallable()
+	if !ok {
+		return nil, false
+	}
+	artifact, ok := facet.GenericCapability()
+	return artifact,
+		ok &&
+			artifact.Placement() == GeneratedArtifactPlacementLexical &&
+			r.Owner() == artifact.ReconstructionOwner()
 }
 
 type NamedStructOperation uint8
@@ -322,6 +370,8 @@ const (
 	DeclarationRequirementCallableControl           DeclarationRequirementKind = 13
 	DeclarationRequirementCooperativeCallable       DeclarationRequirementKind = 14
 	DeclarationRequirementCallableABI               DeclarationRequirementKind = 15
+	DeclarationRequirementEnvironmentBuiltin        DeclarationRequirementKind = 16
+	DeclarationRequirementGenericCallableProfile    DeclarationRequirementKind = 17
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -339,7 +389,9 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementGenericCapability ||
 		k == DeclarationRequirementCallableControl ||
 		k == DeclarationRequirementCooperativeCallable ||
-		k == DeclarationRequirementCallableABI
+		k == DeclarationRequirementCallableABI ||
+		k == DeclarationRequirementEnvironmentBuiltin ||
+		k == DeclarationRequirementGenericCallableProfile
 }
 
 type CallableControlFacet uint8
@@ -349,12 +401,14 @@ const (
 	CallableControlDefer
 	CallableControlRecovery
 	CallableControlGoto
+	CallableControlIteratorReturn
 )
 
 func (f CallableControlFacet) Valid() bool {
 	return f == CallableControlDefer ||
 		f == CallableControlRecovery ||
-		f == CallableControlGoto
+		f == CallableControlGoto ||
+		f == CallableControlIteratorReturn
 }
 
 func NewGenericCapabilityRequirement(

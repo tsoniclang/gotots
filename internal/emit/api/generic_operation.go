@@ -325,6 +325,10 @@ type GenericCallableResolver interface {
 		GenericOperationSelection,
 		*types.Signature,
 	) (*GenericOperationContract, error)
+	ResolveGenericCallableProfile(
+		*types.Func,
+		GenericCallableProfileSelection,
+	) (*GenericCallableProfile, error)
 }
 
 func (c Context) WithGenericCallableResolver(
@@ -404,6 +408,33 @@ func (c Context) WithGenericParameters(
 	return c, nil
 }
 
+func (c Context) WithEnvironmentGenericParameters(
+	owner types.Object,
+	names map[*types.TypeParam]string,
+) (Context, error) {
+	owner = GenericDeclarationOrigin(owner)
+	if owner == nil ||
+		owner.Pkg() == nil ||
+		owner.Pkg() != c.typesPackage ||
+		c.artifactOwner.Valid() {
+		return Context{}, &ContextError{
+			Reason: "environment generic parameter owner is invalid",
+		}
+	}
+	c.genericParameters = make(map[*types.TypeParam]string, len(names))
+	for parameter, name := range names {
+		if parameter == nil ||
+			name == "" ||
+			!genericParameterBelongsTo(owner, parameter) {
+			return Context{}, &ContextError{
+				Reason: "environment generic parameter binding is invalid",
+			}
+		}
+		c.genericParameters[parameter] = name
+	}
+	return c, nil
+}
+
 func (c Context) WithGenericNamedStructOperation(
 	operation NamedStructOperation,
 ) Context {
@@ -465,9 +496,10 @@ func (c Context) genericOperation(
 		return GenericOperationReference{}, &ContextError{
 			Reason: "generic operation has no resolver",
 		}
-	case source == nil:
+	case source == nil &&
+		selection.Operation() == GenericOperationConstraintMethod:
 		return GenericOperationReference{}, &ContextError{
-			Reason: "generic operation has no source construct",
+			Reason: "generic constraint-method operation has no source construct",
 		}
 	case !selection.Valid():
 		return GenericOperationReference{}, &ContextError{
@@ -512,6 +544,26 @@ func (c Context) ResolveGenericCallable(
 	return c.genericResolver.ResolveGenericOperationSet(
 		function.Origin(),
 		GenericFunctionOperationConsumer(),
+	)
+}
+
+func (c Context) ResolveGenericCallableProfile(
+	function *types.Func,
+	selection GenericCallableProfileSelection,
+) (*GenericCallableProfile, error) {
+	if c.genericResolver == nil {
+		return nil, &ContextError{
+			Reason: "generic callable profile resolver is unavailable",
+		}
+	}
+	if function == nil || !selection.Valid() || !selection.Cooperative() {
+		return nil, &ContextError{
+			Reason: "generic callable profile selection is invalid",
+		}
+	}
+	return c.genericResolver.ResolveGenericCallableProfile(
+		function.Origin(),
+		selection,
 	)
 }
 

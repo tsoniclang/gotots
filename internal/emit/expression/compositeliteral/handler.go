@@ -21,22 +21,27 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
 ) (api.ExpressionEmission, error) {
-	sourceType := context.TypesInfo().TypeOf(source)
+	sourceType := literalType(context, source)
 	if sourceType != nil {
 		if _, ok := types.Unalias(sourceType).Underlying().(*types.Map); ok {
-			return mapliteral.Emit(context, children, source)
+			return mapliteral.Emit(context, children, source, sourceType)
 		}
 	}
 	if array, ok := arrayvalue.Resolve(
 		context,
 		sourceType,
 	); ok {
-		return array.EmitLiteral(context, children, source)
+		return array.EmitLiteral(context, children, source, sourceType)
 	}
-	if target, handled, err := emitSlice(context, children, source); handled || err != nil {
+	if target, handled, err := emitSlice(
+		context,
+		children,
+		source,
+		sourceType,
+	); handled || err != nil {
 		return target, err
 	}
-	named, structType, ok := structSourceType(context, source)
+	named, structType, ok := structSourceType(context, source, sourceType)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -44,6 +49,15 @@ func Emit(
 	elements, err := emitElements(context, children, source, structType)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if named != nil && hasInaccessibleFields(context, structType) {
+		return emitRestrictedNamedStruct(
+			context,
+			source,
+			named,
+			structType,
+			elements,
+		)
 	}
 	before, requests, values, err := arrange(
 		context,
@@ -59,6 +73,7 @@ func Emit(
 		reference, err := context.Names().AnonymousStruct(
 			structType,
 			api.AnonymousStructDemandDefinition,
+			api.ImportPhaseValue,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -102,11 +117,168 @@ func Emit(
 	)
 }
 
+func RequiresAddress(
+	context api.Context,
+	source *ast.CompositeLit,
+) bool {
+	if source == nil || source.Type != nil {
+		return false
+	}
+	sourceType := context.TypesInfo().TypeOf(source)
+	if sourceType == nil {
+		return false
+	}
+	pointer, ok := types.Unalias(sourceType).(*types.Pointer)
+	expected := context.ExpectedType()
+	return ok &&
+		pointer.Elem() != nil &&
+		expected != nil &&
+		types.AssignableTo(sourceType, expected)
+}
+
+func literalType(
+	context api.Context,
+	source *ast.CompositeLit,
+) types.Type {
+	if source == nil {
+		return nil
+	}
+	sourceType := context.TypesInfo().TypeOf(source)
+	if source.Type != nil || sourceType == nil {
+		return sourceType
+	}
+	pointer, ok := types.Unalias(sourceType).(*types.Pointer)
+	expected := context.ExpectedType()
+	if ok &&
+		expected != nil &&
+		types.Identical(pointer.Elem(), expected) {
+		return pointer.Elem()
+	}
+	return sourceType
+}
+
+func hasInaccessibleFields(
+	context api.Context,
+	structType *types.Struct,
+) bool {
+	for index := range structType.NumFields() {
+		field := structType.Field(index)
+		if !field.Exported() &&
+			field.Pkg() != nil &&
+			field.Pkg() != context.TypesPackage() {
+			return true
+		}
+	}
+	return false
+}
+
+func emitRestrictedNamedStruct(
+	context api.Context,
+	source *ast.CompositeLit,
+	named *types.Named,
+	structType *types.Struct,
+	elements []element,
+) (api.ExpressionEmission, error) {
+	before := make([]tsgo.Statement, 0, len(elements)*2+2)
+	requests := make([]api.RootRequest, 0, len(elements)+1)
+	values := make([]tsgo.Expression, 0, len(elements))
+	for _, element := range elements {
+		before = append(before, element.value.Before()...)
+		name, err := context.Names().Temporary(api.TemporaryCompositeField)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		value := context.Factory().Identifier(name)
+		before = append(before, context.Factory().VariableStatement(
+			nil,
+			context.Factory().VariableDeclarationList(
+				[]tsgo.VariableDeclaration{
+					context.Factory().VariableDeclaration(
+						value,
+						nil,
+						nil,
+						element.value.Value(),
+					),
+				},
+				tsgo.NodeFlagsConst,
+			),
+		))
+		values = append(values, value)
+		requests = append(requests, element.value.Requests()...)
+	}
+	zero, err := context.Values().Zero(
+		context.WithRole(api.RoleStructZeroField),
+		source,
+		named,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	before = append(before, zero.Before()...)
+	resultName, err := context.Names().Temporary(api.TemporaryStructSource)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	result := context.Factory().Identifier(resultName)
+	before = append(before, context.Factory().VariableStatement(
+		nil,
+		context.Factory().VariableDeclarationList(
+			[]tsgo.VariableDeclaration{
+				context.Factory().VariableDeclaration(
+					result,
+					nil,
+					nil,
+					zero.Value(),
+				),
+			},
+			tsgo.NodeFlagsConst,
+		),
+	))
+	requests = append(requests, zero.Requests()...)
+	for index, element := range elements {
+		field := structType.Field(element.fieldIndex)
+		if !field.Exported() &&
+			field.Pkg() != nil &&
+			field.Pkg() != context.TypesPackage() {
+			return api.ExpressionEmission{},
+				api.Unsupported(
+					context.WithRole(api.RoleCompositeElement),
+					api.CategoryExpression,
+					element.source,
+				)
+		}
+		if field.Name() == "_" {
+			continue
+		}
+		name, err := context.Names().Member(field)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		before = append(before, context.Factory().ExpressionStatement(
+			context.Factory().BinaryExpression(
+				nil,
+				context.Factory().PropertyAccessExpression(
+					result,
+					nil,
+					context.Factory().Identifier(name),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsToken,
+				),
+				values[index],
+			),
+		))
+	}
+	return api.NewExpressionEmission(before, result, requests)
+}
+
 func structSourceType(
 	context api.Context,
 	source *ast.CompositeLit,
+	sourceType types.Type,
 ) (*types.Named, *types.Struct, bool) {
-	sourceType := context.TypesInfo().TypeOf(source)
 	named, ok := types.Unalias(sourceType).(*types.Named)
 	if !ok {
 		structType, structOK := types.Unalias(sourceType).(*types.Struct)

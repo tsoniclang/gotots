@@ -39,6 +39,8 @@ func TestClearBuiltinsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		"goSliceClear(values, 0)",
 		"values.clear()",
 		"clear()",
+		"export function ClearGeneric<C>",
+		"$go$clear_",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("clear artifact lacks %q:\n%s", required, printed)
@@ -46,9 +48,11 @@ func TestClearBuiltinsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeClearFile(t, runnerPath, fmt.Sprintf(`import {
-    ClearAggregateMap,
-    ClearAggregateSlice,
-    ClearNilValues,
+	    ClearAggregateMap,
+	    ClearAggregateSlice,
+	    ClearGenericMap,
+	    ClearGenericSlice,
+	    ClearNilValues,
     ClearScalarMap,
     ClearScalarSlice,
 } from %q;
@@ -57,6 +61,8 @@ console.log(String(ClearScalarSlice()));
 console.log(String(ClearAggregateSlice()));
 console.log(String(ClearScalarMap()));
 console.log(String(ClearAggregateMap()));
+console.log(String(ClearGenericSlice()));
+console.log(String(ClearGenericMap()));
 console.log(String(ClearNilValues()));
 `, artifacts.module))
 	writeClearFile(
@@ -169,8 +175,8 @@ func TestClearBuiltinIdentityMutationFailsClosed(t *testing.T) {
 			mutations++
 		}
 	}
-	if mutations != 6 {
-		t.Fatalf("clear identity mutations = %d, want six", mutations)
+	if mutations != 7 {
+		t.Fatalf("clear identity mutations = %d, want seven", mutations)
 	}
 	roots, err := emit.ExportedAPIRoots(loaded)
 	if err != nil {
@@ -202,8 +208,8 @@ func TestClearMissingBuiltinIdentityFactFailsAtBuiltinOwner(t *testing.T) {
 			return true
 		})
 	}
-	if removed != 6 {
-		t.Fatalf("clear type facts removed = %d, want six", removed)
+	if removed != 7 {
+		t.Fatalf("clear type facts removed = %d, want seven", removed)
 	}
 	roots, err := emit.ExportedAPIRoots(loaded)
 	if err != nil {
@@ -256,6 +262,8 @@ func main() {
     fmt.Println(clearvalues.ClearAggregateSlice())
     fmt.Println(clearvalues.ClearScalarMap())
     fmt.Println(clearvalues.ClearAggregateMap())
+    fmt.Println(clearvalues.ClearGenericSlice())
+    fmt.Println(clearvalues.ClearGenericMap())
     fmt.Println(clearvalues.ClearNilValues())
 }
 `)

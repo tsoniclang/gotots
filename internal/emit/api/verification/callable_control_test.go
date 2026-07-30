@@ -23,7 +23,10 @@ func TestCallableControlUsesOneCanonicalArtifactOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	context, err = context.WithAddressableStorage(firstObject, nil)
+	context, err = context.WithAddressableStorage(
+		MustSourceArtifactOwner(firstObject),
+		nil,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,6 +158,65 @@ func TestGotoControlCarriesExactLabelUseIdentity(t *testing.T) {
 	}
 }
 
+func TestIteratorReturnControlCarriesExactRangeIdentity(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/control", "control")
+	ownerObject := callableControlFunction(sourcePackage, "Outer", 12)
+	owner := MustSourceArtifactOwner(ownerObject)
+	enclosing := callableControlDeclaration("Outer", 10, 100)
+	selected := callableControlRange(30, 50)
+	sibling := callableControlRange(60, 80)
+	requirement, err := NewIteratorReturnControlRequirement(
+		owner,
+		enclosing,
+		enclosing,
+		selected,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedRange, ok := requirement.IteratorReturnControl()
+	if !ok || selectedRange != selected {
+		t.Fatalf("iterator-return identity = %#v", requirement)
+	}
+	context, err := (Context{}).WithCallableControls(
+		owner,
+		enclosing,
+		[]DeclarationRequirement{requirement},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	demand := context.CallableControlFor(enclosing)
+	if !demand.IteratorReturn(selected) {
+		t.Fatal("selected range lacks iterator-return control")
+	}
+	if demand.IteratorReturn(sibling) {
+		t.Fatal("same-callable sibling range acquired iterator-return control")
+	}
+	if _, err := NewCallableControlRequirement(
+		owner,
+		enclosing,
+		enclosing,
+		CallableControlIteratorReturn,
+	); err == nil {
+		t.Fatal("range-free iterator-return control was admitted")
+	}
+	if _, err := NewDirectCallableControlRequirement(
+		ownerObject,
+		CallableControlIteratorReturn,
+	); err == nil {
+		t.Fatal("anchor-free iterator-return control was admitted")
+	}
+	if _, err := NewIteratorReturnControlRequirement(
+		owner,
+		enclosing,
+		enclosing,
+		callableControlRange(90, 120),
+	); err == nil {
+		t.Fatal("out-of-callable iterator-return range was admitted")
+	}
+}
+
 func callableControlFunction(
 	sourcePackage *types.Package,
 	name string,
@@ -190,5 +252,13 @@ func callableControlLiteral(start token.Pos, end token.Pos) *ast.FuncLit {
 			Params: &ast.FieldList{Opening: start + 4, Closing: start + 5},
 		},
 		Body: &ast.BlockStmt{Lbrace: start + 6, Rbrace: end - 1},
+	}
+}
+
+func callableControlRange(start token.Pos, end token.Pos) *ast.RangeStmt {
+	return &ast.RangeStmt{
+		For:  start,
+		X:    &ast.Ident{NamePos: start + 4, Name: "iterator"},
+		Body: &ast.BlockStmt{Lbrace: start + 12, Rbrace: end - 1},
 	}
 }

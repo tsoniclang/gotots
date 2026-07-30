@@ -177,9 +177,10 @@ func (t GotoTarget) State() int {
 }
 
 type CallableControlDemand struct {
-	deferEnvelope bool
-	recovery      bool
-	gotoControl   bool
+	deferEnvelope   bool
+	recovery        bool
+	gotoControl     bool
+	iteratorReturns map[*ast.RangeStmt]struct{}
 }
 
 func (d CallableControlDemand) With(
@@ -192,6 +193,8 @@ func (d CallableControlDemand) With(
 		d.recovery = true
 	case CallableControlGoto:
 		d.gotoControl = true
+	case CallableControlIteratorReturn:
+		panic("iterator-return control requires an exact range")
 	default:
 		panic("callable-control facet is invalid")
 	}
@@ -208,6 +211,8 @@ func (d CallableControlDemand) Has(
 		return d.recovery
 	case CallableControlGoto:
 		return d.gotoControl
+	case CallableControlIteratorReturn:
+		return len(d.iteratorReturns) != 0
 	default:
 		return false
 	}
@@ -223,6 +228,31 @@ func (d CallableControlDemand) Recovery() bool {
 
 func (d CallableControlDemand) Goto() bool {
 	return d.gotoControl
+}
+
+func (d CallableControlDemand) WithIteratorReturn(
+	source *ast.RangeStmt,
+) CallableControlDemand {
+	if source == nil {
+		panic("iterator-return range is nil")
+	}
+	selected := make(
+		map[*ast.RangeStmt]struct{},
+		len(d.iteratorReturns)+1,
+	)
+	for existing := range d.iteratorReturns {
+		selected[existing] = struct{}{}
+	}
+	selected[source] = struct{}{}
+	d.iteratorReturns = selected
+	return d
+}
+
+func (d CallableControlDemand) IteratorReturn(
+	source *ast.RangeStmt,
+) bool {
+	_, selected := d.iteratorReturns[source]
+	return selected
 }
 
 func (c Context) WithCallableControls(
@@ -265,7 +295,18 @@ func (c Context) WithCallableControls(
 			}
 		}
 		demand := controls[callable]
-		controls[callable] = demand.With(facet)
+		if facet == CallableControlIteratorReturn {
+			source, selected := requirement.IteratorReturnControl()
+			if !selected {
+				return Context{}, &InvariantError{
+					Role:   c.role,
+					Reason: "iterator-return control lacks exact range identity",
+				}
+			}
+			controls[callable] = demand.WithIteratorReturn(source)
+		} else {
+			controls[callable] = demand.With(facet)
+		}
 		if facet == CallableControlGoto {
 			label, position, gotoOK := requirement.GotoControl()
 			if !gotoOK {
@@ -334,6 +375,24 @@ func (c Context) CallableControlRequest(
 	)
 }
 
+func (c Context) FunctionLiteralControlRequest(
+	callable *ast.FuncLit,
+	facet CallableControlFacet,
+) (RootRequest, error) {
+	if callable == nil {
+		return RootRequest{}, &InvariantError{
+			Role:   c.role,
+			Reason: "function-literal control request has no callable",
+		}
+	}
+	return NewCallableControlRequest(
+		c.artifactOwner,
+		c.callableEnclosing,
+		callable,
+		facet,
+	)
+}
+
 func (c Context) GotoControlRequest(
 	label *types.Label,
 	position token.Pos,
@@ -345,6 +404,41 @@ func (c Context) GotoControlRequest(
 		label,
 		position,
 	)
+}
+
+func (c Context) IteratorReturnControlRequests() (
+	[]RootRequest,
+	error,
+) {
+	if len(c.iteratorRangeControls) == 0 {
+		return nil, &InvariantError{
+			Role:   c.role,
+			Reason: "iterator-return request has no range boundary",
+		}
+	}
+	requests := make([]RootRequest, 0, len(c.iteratorRangeControls))
+	for _, control := range c.iteratorRangeControls {
+		if control.Returning() {
+			continue
+		}
+		request, err := NewIteratorReturnControlRequest(
+			c.artifactOwner,
+			c.callableEnclosing,
+			c.currentCallable,
+			control.Source(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, request)
+	}
+	if len(requests) == 0 {
+		return nil, &InvariantError{
+			Role:   c.role,
+			Reason: "iterator-return request has no unselected boundary",
+		}
+	}
+	return requests, nil
 }
 
 func (c Context) GotoUses(label *types.Label) []token.Pos {

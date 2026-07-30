@@ -43,7 +43,7 @@ func Resolve(sourceType types.Type) (Model, bool) {
 		return Model{}, false
 	}
 	named, ok := types.Unalias(sourceType).(*types.Named)
-	if !ok || named.Obj() == nil || named.TypeParams().Len() != 0 {
+	if !ok || named.Obj() == nil {
 		return Model{}, false
 	}
 	underlying := named.Underlying()
@@ -68,6 +68,11 @@ func Resolve(sourceType types.Type) (Model, bool) {
 	case *types.Chan:
 		family = FamilyChannel
 	default:
+		return Model{}, false
+	}
+	if named.TypeParams().Len() != 0 &&
+		named != named.Origin() &&
+		named.TypeArgs().Len() != named.TypeParams().Len() {
 		return Model{}, false
 	}
 	return Model{
@@ -189,7 +194,7 @@ func (m Model) Project(
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	switch m.family {
-	case FamilySlice, FamilyPointer, FamilyChannel:
+	case FamilySlice, FamilyPointer, FamilyCallable, FamilyChannel:
 		reference, err := context.Names().Reference(m.typeName)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -209,22 +214,6 @@ func (m Model) Project(
 				tsgo.NodeFlagsNone,
 			),
 			api.CombineRequests(value.Requests(), reference.Requests()),
-		)
-	case FamilyCallable:
-		temporary, before, err := captureCallable(context, value)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.NewExpressionEmission(
-			before,
-			context.Factory().ConditionalExpression(
-				callableIsNil(context.Factory(), temporary),
-				context.Factory().QuestionToken(),
-				callableNil(context.Factory()),
-				context.Factory().ColonToken(),
-				m.Unwrap(context.Factory(), temporary),
-			),
-			value.Requests(),
 		)
 	default:
 		return api.NewExpressionEmission(
@@ -255,7 +244,7 @@ func (m Model) Wrap(
 		return api.ExpressionEmission{}, err
 	}
 	switch m.family {
-	case FamilySlice, FamilyPointer, FamilyChannel:
+	case FamilySlice, FamilyPointer, FamilyCallable, FamilyChannel:
 		return api.NewExpressionEmission(
 			value.Before(),
 			context.Factory().CallExpression(
@@ -269,26 +258,6 @@ func (m Model) Wrap(
 				nil,
 				[]tsgo.Expression{value.Value()},
 				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(value.Requests(), reference.Requests()),
-		)
-	case FamilyCallable:
-		temporary, before, err := captureCallable(context, value)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.NewExpressionEmission(
-			before,
-			context.Factory().ConditionalExpression(
-				callableIsNil(context.Factory(), temporary),
-				context.Factory().QuestionToken(),
-				callableNil(context.Factory()),
-				context.Factory().ColonToken(),
-				context.Factory().NewExpression(
-					context.Factory().Identifier(reference.Name()),
-					nil,
-					[]tsgo.Expression{temporary},
-				),
 			),
 			api.CombineRequests(value.Requests(), reference.Requests()),
 		)
@@ -318,58 +287,5 @@ func (m Model) Wrap(
 			[]tsgo.Expression{value.Value()},
 		),
 		api.CombineRequests(value.Requests(), reference.Requests()),
-	)
-}
-
-func captureCallable(
-	context api.Context,
-	value api.ExpressionEmission,
-) (tsgo.Identifier, []tsgo.Statement, error) {
-	temporaryName, err := context.Names().Temporary(
-		api.TemporaryConversionOperand,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	temporary := context.Factory().Identifier(temporaryName)
-	before := value.Before()
-	before = append(
-		before,
-		context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{
-					context.Factory().VariableDeclaration(
-						temporary,
-						nil,
-						nil,
-						value.Value(),
-					),
-				},
-				tsgo.NodeFlagsConst,
-			),
-		),
-	)
-	return temporary, before, nil
-}
-
-func callableNil(factory tsgo.Factory) tsgo.Expression {
-	return factory.VoidExpression(
-		factory.NumericLiteral("0", tsgo.TokenFlagsNone),
-	)
-}
-
-func callableIsNil(
-	factory tsgo.Factory,
-	value tsgo.Expression,
-) tsgo.Expression {
-	return factory.BinaryExpression(
-		nil,
-		value,
-		nil,
-		factory.BinaryOperatorToken(
-			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-		),
-		callableNil(factory),
 	)
 }

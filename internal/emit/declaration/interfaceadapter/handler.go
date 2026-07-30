@@ -6,8 +6,11 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
+	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
+	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -21,6 +24,7 @@ func Build(
 	children api.ChildEmitter,
 	name string,
 	sourceType types.Type,
+	contracts []*types.Interface,
 	modifiers []tsgo.ModifierLike,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	if name == "" || sourceType == nil {
@@ -48,19 +52,25 @@ func Build(
 	if err != nil {
 		return nil, nil, err
 	}
-	methodSet := types.NewMethodSet(sourceType)
+	methodSet, selectedMethods, err := demandedMethods(
+		sourceType,
+		contracts,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
 	methods := make(
 		[]tsgo.ClassElement,
 		0,
-		methodSet.Len()+4,
+		len(selectedMethods)+4,
 	)
-	tokens := make([]tsgo.Expression, 0, methodSet.Len())
+	tokens := make([]tsgo.Expression, 0, len(selectedMethods))
 	requests := api.CombineRequests(
 		payload.Requests(),
 		runtimeValue.Requests(),
 		dynamicType.Requests(),
 	)
-	for index := range methodSet.Len() {
+	for _, index := range selectedMethods {
 		selected := methodSet.At(index)
 		method, ok := selected.Obj().(*types.Func)
 		if !ok {
@@ -77,7 +87,15 @@ func Build(
 			method,
 		)
 		if err != nil {
-			return nil, nil, err
+			methodError, staged := err.(*MethodError)
+			if staged && methodError.Method == nil {
+				methodError.Method = method
+				return nil, nil, methodError
+			}
+			return nil, nil, &MethodError{
+				Method: method,
+				Cause:  err,
+			}
 		}
 		methods = append(methods, target)
 		requests = append(requests, methodRequests...)
@@ -151,6 +169,57 @@ func Build(
 		), nil
 }
 
+func demandedMethods(
+	sourceType types.Type,
+	contracts []*types.Interface,
+) (*types.MethodSet, []int, error) {
+	methodSet := types.NewMethodSet(sourceType)
+	required := make(map[*types.Func]struct{})
+	for _, contract := range contracts {
+		if contract == nil ||
+			!contract.Complete().IsMethodSet() ||
+			!types.Implements(sourceType, contract) {
+			return nil, nil, &api.GeneratedArtifactShapeError{
+				Reason: "adapter contract is not implemented by its source type",
+			}
+		}
+		for index := range contract.NumMethods() {
+			method := contract.Method(index)
+			selected := methodSet.Lookup(method.Pkg(), method.Name())
+			if selected == nil {
+				return nil, nil, &api.GeneratedArtifactShapeError{
+					Reason: "adapter contract method has no concrete selection",
+				}
+			}
+			concrete, ok := selected.Obj().(*types.Func)
+			if !ok || !methodidentity.Equivalent(concrete, method) {
+				return nil, nil, &api.GeneratedArtifactShapeError{
+					Reason: "adapter contract method selection is not exact",
+				}
+			}
+			required[concrete] = struct{}{}
+		}
+	}
+	selected := make([]int, 0, len(required))
+	for index := range methodSet.Len() {
+		method, ok := methodSet.At(index).Obj().(*types.Func)
+		if !ok {
+			return nil, nil, &api.GeneratedArtifactShapeError{
+				Reason: "adapter method set contains a non-method object",
+			}
+		}
+		if _, ok := required[method]; ok {
+			selected = append(selected, index)
+		}
+	}
+	if len(selected) != len(required) {
+		return nil, nil, &api.GeneratedArtifactShapeError{
+			Reason: "adapter contract selection lost a required method",
+		}
+	}
+	return methodSet, selected, nil
+}
+
 func emitMethod(
 	context api.Context,
 	children api.ChildEmitter,
@@ -179,16 +248,7 @@ func emitMethod(
 		signature,
 	)
 	if err != nil {
-		return nil, nil, err
-	}
-	providerCooperative, contractCooperative, contractRequests, err :=
-		cooperativecall.SourceValueContract(
-			context,
-			method,
-			signature,
-		)
-	if err != nil {
-		return nil, nil, err
+		return nil, nil, methodStageError(MethodStageABI, err)
 	}
 	root := api.DirectExpression(
 		context.Factory().PropertyAccessExpression(
@@ -198,52 +258,103 @@ func emitMethod(
 			tsgo.NodeFlagsNone,
 		),
 	)
-	receiver, resolvedMethod, err := selectionvalue.MethodSetReceiver(
-		context,
-		children,
-		nil,
-		selected,
-		root,
-	)
+	receiver, dispatchType, resolvedMethod, err :=
+		selectionvalue.MethodSetReceiver(
+			context,
+			children,
+			nil,
+			selected,
+			root,
+		)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, methodStageError(MethodStageReceiver, err)
 	}
 	if resolvedMethod != method || len(receiver.Before()) != 0 {
 		return nil, nil, &api.GeneratedArtifactShapeError{
 			Reason: "adapter method receiver is not direct",
 		}
 	}
-	reference, err := context.Names().Reference(method)
-	if err != nil {
-		return nil, nil, err
+	interfaceDispatch := false
+	if _, selected := interfacetype.Resolve(dispatchType); selected {
+		interfaceDispatch = true
 	}
-	controlRequest, err := api.NewDirectCallableControlRequest(
-		method.Origin(),
-		api.CallableControlRecovery,
-	)
-	if err != nil {
-		return nil, nil, err
+	var providerCooperative bool
+	var contractCooperative bool
+	var contractRequests []api.RootRequest
+	if interfaceDispatch {
+		contractCooperative, contractRequests, err =
+			cooperativecall.ValueContract(context, signature)
+		providerCooperative = contractCooperative
+	} else {
+		providerCooperative, contractCooperative, contractRequests, err =
+			cooperativecall.SourceValueContract(
+				context,
+				method,
+				signature,
+			)
 	}
-	arguments := append(
-		[]tsgo.Expression{receiver.Value()},
-		target.ParameterReferences(context.Factory())...,
-	)
-	call := context.Factory().CallExpression(
-		context.Factory().Identifier(reference.Name()),
-		nil,
-		nil,
-		arguments,
-		tsgo.NodeFlagsNone,
-	)
-	var body []tsgo.Statement
-	if signature.Results().Len() == 0 {
-		body = []tsgo.Statement{
-			context.Factory().ExpressionStatement(call),
+	if err != nil {
+		return nil, nil, methodStageError(MethodStageContract, err)
+	}
+	parameterReferences := target.ParameterReferences(context.Factory())
+	var call api.ExpressionEmission
+	var callRequests []api.RootRequest
+	if interfaceDispatch {
+		call, err = interfaceoperation.Apply(
+			context,
+			children,
+			nil,
+			dispatchType,
+			receiver,
+			method,
+			parameterReferences,
+			nil,
+			nil,
+		)
+		if err != nil {
+			return nil, nil, methodStageError(MethodStageInvocation, err)
 		}
 	} else {
-		body = []tsgo.Statement{
-			context.Factory().ReturnStatement(call),
+		reference, referenceErr := context.Names().Reference(method)
+		if referenceErr != nil {
+			return nil, nil, referenceErr
 		}
+		controlRequest, controlErr := api.NewDirectCallableControlRequest(
+			method.Origin(),
+			api.CallableControlRecovery,
+		)
+		if controlErr != nil {
+			return nil, nil, controlErr
+		}
+		call = api.DirectExpression(
+			context.Factory().CallExpression(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+				nil,
+				append(
+					[]tsgo.Expression{receiver.Value()},
+					parameterReferences...,
+				),
+				tsgo.NodeFlagsNone,
+			),
+		)
+		callRequests = api.CombineRequests(
+			receiver.Requests(),
+			reference.Requests(),
+			[]api.RootRequest{controlRequest},
+		)
+	}
+	body := call.Before()
+	if signature.Results().Len() == 0 {
+		body = append(
+			body,
+			context.Factory().ExpressionStatement(call.Value()),
+		)
+	} else {
+		body = append(
+			body,
+			context.Factory().ReturnStatement(call.Value()),
+		)
 	}
 	memberName, err := context.Names().InterfaceMethodName(method)
 	if err != nil {
@@ -271,9 +382,8 @@ func emitMethod(
 			context.Factory().Block(body, true),
 		), api.CombineRequests(
 			target.Requests(),
-			receiver.Requests(),
-			reference.Requests(),
-			[]api.RootRequest{controlRequest},
+			call.Requests(),
+			callRequests,
 			contractRequests,
 		), nil
 }

@@ -16,6 +16,7 @@ import (
 	slicearrayconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/slicearray"
 	stringconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/stringvalue"
 	structconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/structvalue"
+	unsafepointerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/unsafepointer"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
@@ -76,6 +77,14 @@ func Emit(
 		return target, true, err
 	}
 	sourceType := operandFacts.Type
+	if isUntypedNil(sourceType) {
+		target, err := context.Values().Zero(
+			context.WithRole(api.RoleConversionOperand),
+			operand,
+			targetType,
+		)
+		return target, true, err
+	}
 	if api.ContainsGenericTypeParameter(sourceType) ||
 		api.ContainsGenericTypeParameter(targetType) {
 		operandValue, err := children.Expression(
@@ -167,6 +176,16 @@ func Apply(
 			return operandValue, true, nil
 		}
 	}
+	if target, handled, unsafeErr := unsafepointerconversion.Convert(
+		context,
+		children,
+		source,
+		sourceType,
+		targetType,
+		operandValue,
+	); handled {
+		return target, true, unsafeErr
+	}
 	if target, handled, pointerErr := pointerconversion.Convert(
 		context,
 		children,
@@ -211,6 +230,7 @@ func Apply(
 	} else if structTarget, handled, structErr := structconversion.Convert(
 		context,
 		source,
+		operandSource,
 		sourceType,
 		representedTargetType,
 		operandValue,
@@ -347,4 +367,9 @@ func directBasicConversion(sourceType, targetType types.Type) bool {
 		return false
 	}
 	return source.Kind() == types.Bool || source.Kind() == types.String
+}
+
+func isUntypedNil(sourceType types.Type) bool {
+	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	return ok && basic.Kind() == types.UntypedNil
 }

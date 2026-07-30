@@ -97,8 +97,16 @@ export type int64 = number;
 The CLI may instead select the `bigint` representation for the complete
 dependency closure, in which case the aliases target `bigint` and integer
 literals use BigInt syntax. Neither initial representation reproduces implicit
-fixed-width Go overflow. That behavior is deliberately outside the initial
+fixed-width Go overflow. The default also accepts JavaScript's 32-bit coercion
+for wider bitwise and shift operations; the `bigint` override owns exact wide
+bitwise behavior. Those boundaries are deliberately outside the default
 integer contract rather than being scattered through ordinary arithmetic.
+Every checker-valid integer constant within its selected Go carrier remains
+compilable in either profile: `number` emits the canonical decimal directly,
+including magnitudes beyond JavaScript's safe-integer range, while `bigint`
+emits the exact BigInt literal. The default does not add per-use wrapping,
+casts, helpers, or safe-integer rejection for behavior already outside its
+declared exactness boundary.
 Explicit narrowing conversions and a future fixed-width profile require their
 own complete construct proof.
 
@@ -213,13 +221,13 @@ create a value IR or a generic operation registry.
 
 1. Every predeclared integer type receives a width-preserving GoToTS-owned
    target alias and the operators admitted by the selected `number` or
-   `bigint` profile. Division, remainder, shifts, bitwise operations, and
-   explicit conversions are admitted only where the selected profile has an
-   exact bounded implementation. Fixed-width implicit overflow remains a
-   separately selected future profile rather than hidden ordinary-expression
-   baggage. In this checkpoint, BigInt division and remainder use constant-size
-   checked runtime operations; the `number` profile keeps them unsupported
-   rather than approximating Go integer truncation.
+   `bigint` profile. The default `number` profile emits direct JavaScript
+   bitwise and shift operators; 8/16/32-bit carriers normalize while wider
+   carriers explicitly accept JavaScript's 32-bit bitwise coercion. The
+   `bigint` profile owns exact wide bitwise and shift behavior. Fixed-width
+   implicit overflow remains a separately selected future profile rather than
+   hidden ordinary-expression baggage. Both profiles use constant-size checked
+   division and remainder operations.
 2. Go strings use one byte-preserving target representation. Source literals,
    concatenation, ordered/equality comparison, `len`, indexing, two-index
    slicing, integer/rune encoding, and byte/rune slice conversions are exact
@@ -344,8 +352,10 @@ reconstructions, and package `init` uses no non-artifact requirement path.
 The next value checkpoint completes aliases and defined types whose underlying
 value families are represented here, anonymous and legal recursive structs,
 recursive arrays/slices/maps, aggregate map keys and values, and
-nil-capable/defined callable values. Interfaces, channels, and generic
-underlying families retain their later explicit boundaries.
+nil-capable/defined callable values. Generic non-struct defined families use
+the same nominal owner with exact declaration parameters and instantiated
+target arguments. Interfaces and channels retain their later explicit
+boundaries.
 
 It extends the existing family owners rather than introducing a value IR,
 generic operation registry, runtime strategy object, or second type-identity
@@ -433,13 +443,21 @@ This checkpoint exits only when:
 
 ### 3E. Interfaces
 
-Install one open-world typed adapter per reached concrete dynamic type,
-canonical non-string dynamic-type metadata, O(1) native method dispatch,
-assertions, comma-ok, type switches, interface equality, and interface map
-keys. Concrete receiver calls remain statically selected top-level functions.
-Exit requires the complete nil/typed-nil/copy/assertion/panic/equality matrix,
-constant-size call sites as implementer count grows, and zero erased payload,
-constructor-identity, reflection, or implementer switches.
+Install one typed adapter per reached concrete dynamic type, canonical
+non-string dynamic-type metadata, contract-demanded native methods, O(1)
+dispatch, assertions, comma-ok, type switches, interface equality, and
+interface map keys. Concrete receiver calls remain statically selected
+top-level functions. Concrete conversions seed their exact target contract;
+interface conversions and assertions propagate that target only from a source
+contract already reachable on an adapter, with `go/types` proving the target.
+Implementing a source contract without reaching it never widens the adapter.
+Exit requires the complete
+nil/typed-nil/copy/assertion/panic/equality matrix, constant-size call sites as
+implementer count grows, adapter methods equal to the exact union of demanded
+contracts, and zero erased payload, complete-concrete-method-set expansion,
+constructor-identity, reflection, or implementer switches. Repeated identical
+transition occurrences must not rescan all adapters or reschedule an already
+admitted adapter/contract pair.
 
 ### 3F. Generics And Iterator Functions
 
@@ -515,14 +533,52 @@ arrays/slices/maps, interface assertions/calls, and generic aggregates without
 a call graph, prewalk, storage-facet hierarchy, erased queue, all-function
 async tax, or yield heuristic.
 
+Checker-produced package initializers are exact callable facets under their
+existing initializer artifact identities. A cooperative initializer or source
+`init` function makes only its passive package `$initialize`
+Promise-returning, and the ESM program-initialization module awaits only those
+package calls in Go order. No synthetic initializer function, package-wide
+heuristic, or unconditional top-level await is admitted.
+
 The same cooperative facet applies to hidden generic constraint-method
 functions and deferred invocations. A concrete blocking constraint method
 reconstructs its exact hidden operation function, the generic caller, and only
 their reverse consumers. A deferred blocking call is captured immediately,
 stored as a typed async defer entry, and awaited in LIFO order before function
 exit; recovery authority remains invocation-local across the await. Neither
-case may introduce an alternate generic body, call graph, erased defer stack,
-or unconditional async tax.
+case may introduce a call graph, erased defer stack, or unconditional async
+tax. Generic source declarations may have demand-created callable-profile
+variants only when distinct reached instantiations require different static
+callable ABIs. Such variants are keyed by canonical source and ABI-facet
+identity, reconstructed by the ordinary source handler, and selected directly
+at calls, deferred calls, function values, and generic method
+calls/values/expressions. Declaration-owned callable cooperation propagates
+directionally to each corresponding concrete ABI without creating a duplicate
+variant; concrete call-site cooperation never widens the declaration
+baseline. Declaration-wide widening, runtime Promise detection,
+`T | Promise<T>` results, and per-call wrappers are forbidden.
+If the source declaration is exported, package assembly re-exports every
+reached variant from its owning source module. Export selection comes from the
+same accepted profile requirements as declaration reconstruction; no consumer
+import may name a binding absent from the package value surface.
+
+Source-unavailable standard-library and external generic owners emit
+demand-created ambient profile declarations through the environment-contract
+owner, not source-body variants. Each declaration exact-joins the selected
+nested callable ABI profile and deterministic name used by its consumers,
+contains no body, and remains an explicit implementation obligation.
+Environment callable effects are provider-owned and are never guessed from a
+callable parameter or result. Exit includes `slices.Values` with a cooperative
+range callback, strict typechecking of the consuming source, one declaration
+per distinct reached profile, and mutations that route the owner through the
+source emitter, drop the profile declaration, widen the base declaration, or
+infer an outer Promise solely from nested type shape.
+
+Immediately invoked function literals use their exact literal facet and bypass
+the first-class callable ABI; transported literals still adapt through the ABI.
+Exit includes synchronous and cooperative immediate invocations, a mutation
+that restores ABI routing, strict output-shape inspection, and byte stability
+for the synchronous case.
 
 Exit requires the complete Milestone 3H differential, mutation, staticness,
 artifact, scaling, runtime-cost, deadlock, panic, and synchronous-byte-stability
@@ -547,6 +603,17 @@ Language closure identifies exact unresolved environment obligations but does
 not install standard-library, external, `print`/`println`, cgo, or `unsafe`
 implementations.
 
+The blank identifier is classified by its parent-owned semantic role, never by
+spelling alone. A blank constant, type, function, or method is checked but owns
+no target definition or target name. A blank value parameter, receiver, or type
+parameter preserves its target signature slot under a deterministic target-only
+identifier that is not a Go binding. A blank result preserves result arity,
+type, zero initialization, bare-return, and defer behavior without creating a
+source-visible binding. A blank variable, assignment target, range target, or
+multi-result component preserves evaluation, conversion, copy, ordering, and
+tuple position while omitting only the final store. No `types.Object` for `_`
+may enter ordinary declaration reservation or reference lookup.
+
 Exit requires exact selected-universe/dispatch joins, valid construct fixtures,
 strict TS-Go-printed ESM artifacts, focused Go-versus-TypeScript differentials,
 missing/widened-dispatch and spelling mutations, zero unknown valid in-scope
@@ -562,6 +629,11 @@ reachable-obligation checking.
 
 Source-available dependencies continue through ordinary direct emission.
 Reachable unresolved placeholders block publication.
+
+The compile-only environment profile may materialize the typed throwing
+placeholder for non-nil `unsafe.Pointer` conversion while preserving nil
+exactly. This closes strict product typechecking; it is not an unsafe
+implementation and cannot satisfy the no-placeholder publication gate.
 
 ## 5. Product Proof
 

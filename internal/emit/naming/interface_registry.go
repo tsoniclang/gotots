@@ -58,7 +58,11 @@ func (r *Registry) internInterfaceAdapter(
 	if err != nil {
 		return interfaceAdapterBinding{}, err
 	}
-	binding := interfaceAdapterBinding{owner: owner, name: name}
+	binding := interfaceAdapterBinding{
+		owner: owner,
+		name:  name,
+		key:   artifactKey,
+	}
 	r.interfaceAdapters[artifactKey] = binding
 	return binding, nil
 }

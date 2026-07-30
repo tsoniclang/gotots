@@ -53,6 +53,17 @@ func (owner Owner) Equal(
 	if panicNilRuntimeValue(context, sourceType) {
 		return panicNilEqual(context), nil
 	}
+	if unsafePointerValue(sourceType) {
+		return api.DirectExpression(context.Factory().BinaryExpression(
+			nil,
+			left,
+			nil,
+			context.Factory().BinaryOperatorToken(
+				tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+			),
+			right,
+		)), nil
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		if defined.Family() == definedtype.FamilyCallable {
 			return api.DirectExpression(

@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	channelmodel "github.com/tsoniclang/gotots/internal/emit/concurrency/channel"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -15,6 +16,7 @@ import (
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -36,6 +38,17 @@ func Emit(
 	if sourceType == nil {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryExpression, source.X)
+	}
+	if _, generic := api.GenericTypeParameter(sourceType); generic {
+		if target, handled, err := emitGenericMap(
+			context,
+			children,
+			source,
+			sourceType,
+			targetLabel,
+		); handled || err != nil {
+			return target, err
+		}
 	}
 	if signature, ok := callable.Signature(sourceType); ok {
 		return emitIterator(
@@ -101,6 +114,71 @@ func Emit(
 	}
 	return api.StatementEmission{},
 		api.Unsupported(context, api.CategoryExpression, source.X)
+}
+
+func emitGenericMap(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.RangeStmt,
+	sourceType types.Type,
+	targetLabel string,
+) (api.StatementEmission, bool, error) {
+	if source.Key == nil || source.Value == nil {
+		return api.StatementEmission{}, false, nil
+	}
+	keyType := context.TypesInfo().TypeOf(source.Key)
+	valueType := context.TypesInfo().TypeOf(source.Value)
+	if keyType == nil || valueType == nil {
+		return api.StatementEmission{}, false, nil
+	}
+	mapType := types.NewMap(keyType, valueType)
+	if !types.AssignableTo(sourceType, mapType) ||
+		!types.ConvertibleTo(sourceType, mapType) {
+		return api.StatementEmission{}, false, nil
+	}
+	model, ok := maprepresentation.Source(context, mapType)
+	if !ok {
+		return api.StatementEmission{}, true,
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	operand, err := children.Expression(
+		context.
+			WithRole(api.RoleRangeExpression).
+			WithExpectedType(sourceType),
+		source.X,
+	)
+	if err != nil {
+		return api.StatementEmission{}, true, err
+	}
+	projected, err := genericoperation.Call(
+		context.WithRole(api.RoleRangeExpression),
+		source.X,
+		api.GenericOperationConvert,
+		[]types.Type{sourceType},
+		[]types.Type{mapType},
+		[]tsgo.Expression{operand.Value()},
+		operand.Requests()...,
+	)
+	if err != nil {
+		return api.StatementEmission{}, true, err
+	}
+	projected, err = api.NewExpressionEmission(
+		operand.Before(),
+		projected.Value(),
+		projected.Requests(),
+	)
+	if err != nil {
+		return api.StatementEmission{}, true, err
+	}
+	target, err := emitMapValue(
+		context,
+		children,
+		source,
+		model,
+		projected,
+		targetLabel,
+	)
+	return target, true, err
 }
 
 func validClause(source *ast.RangeStmt) bool {

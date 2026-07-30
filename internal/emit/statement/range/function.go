@@ -6,8 +6,10 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
+	"github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -74,6 +76,18 @@ func emitIterator(
 		before,
 		stateDeclaration(context, stateName, api.IteratorRangeStateReady),
 	)
+	returnSelected := context.CallableControl().IteratorReturn(source)
+	resultName, resultPrelude, resultRequests, err := iteratorReturnStorage(
+		context,
+		children,
+		source,
+		returnSelected,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	before = append(before, resultPrelude...)
+	requests = append(requests, resultRequests...)
 	panicReference, err := context.Names().Runtime(
 		api.RuntimePanic,
 		api.ImportPhaseValue,
@@ -87,14 +101,18 @@ func emitIterator(
 		source,
 		yield,
 		stateName,
+		resultName,
+		returnSelected,
 		panicReference.Name(),
 	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	before = append(
-		before,
-		context.Factory().ExpressionStatement(
+	invocation, err := cooperativecall.ValueCall(
+		context.WithRole(api.RoleRangeExpression),
+		source,
+		signature,
+		api.DirectExpression(
 			context.Factory().CallExpression(
 				targetIterator,
 				nil,
@@ -102,7 +120,19 @@ func emitIterator(
 				[]tsgo.Expression{callback},
 				tsgo.NodeFlagsNone,
 			),
+			callbackRequests...,
 		),
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	after := append(
+		invocation.Before(),
+		context.Factory().ExpressionStatement(
+			invocation.Value(),
+		),
+	)
+	after = append(after,
 		statePanic(
 			context,
 			stateName,
@@ -110,18 +140,35 @@ func emitIterator(
 			panicReference.Name(),
 			rangeMissingPanicMessage,
 		),
+	)
+	requests = append(requests, invocation.Requests()...)
+	if returnSelected {
+		propagation, propagationErr := iteratorReturnPropagation(
+			context,
+			source,
+			stateName,
+			resultName,
+		)
+		if propagationErr != nil {
+			return api.StatementEmission{}, propagationErr
+		}
+		after = append(after, propagation.Statements()...)
+		requests = append(requests, propagation.Requests()...)
+	}
+	after = append(
+		after,
 		stateAssignment(
 			context,
 			stateName,
 			api.IteratorRangeStateExhausted,
 		),
 	)
+	before = append(before, after...)
 	return api.NewStatementEmission(
 		before,
 		api.CombineRequests(
 			requests,
 			panicReference.Requests(),
-			callbackRequests,
 		),
 	)
 }
@@ -171,8 +218,22 @@ func iteratorCallback(
 	source *ast.RangeStmt,
 	yield *types.Signature,
 	stateName string,
+	resultName string,
+	returnSelected bool,
 	panicName string,
 ) (tsgo.ArrowFunction, []api.RootRequest, error) {
+	reference, err := context.Names().CallableABI(yield)
+	if err != nil {
+		return nil, nil, err
+	}
+	facet, err := api.NewCallableABIFacet(reference.Artifact())
+	if err != nil {
+		return nil, nil, err
+	}
+	observation, err := context.ObserveCooperativeCallable(facet)
+	if err != nil {
+		return nil, nil, err
+	}
 	targetSignature, err := callable.EmitAdapter(
 		context.WithRole(api.RoleRangeValue),
 		children,
@@ -192,9 +253,19 @@ func iteratorCallback(
 	if err != nil {
 		return nil, nil, err
 	}
+	control, err := api.NewIteratorRangeControl(
+		source,
+		stateName,
+		resultName,
+		returnSelected,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
 	bodyContext := context.
 		WithRole(api.RoleRangeBody).
-		EnterIteratorRange(stateName)
+		EnterIteratorRange(control).
+		WithCooperativeCallableABI(facet, observation.Cooperative())
 	var bindings api.StatementEmission
 	if source.Key != nil {
 		bindings, err = assignment.EmitRangeIteration(
@@ -238,14 +309,22 @@ func iteratorCallback(
 			context.Factory().TrueLiteral(),
 		),
 	)
+	var modifiers []tsgo.ModifierLike
+	resultType := targetSignature.Result()
+	if observation.Cooperative() {
+		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
+		resultType = callable.PromiseResult(context.Factory(), resultType)
+	}
 	return context.Factory().ArrowFunction(
-			nil,
+			modifiers,
 			nil,
 			targetSignature.Parameters(),
-			targetSignature.Result(),
+			resultType,
 			context.Factory().EqualsGreaterThanToken(),
 			context.Factory().Block(statements, true),
 		), api.CombineRequests(
+			reference.Requests(),
+			observation.Requests(),
 			targetSignature.Requests(),
 			bindings.Requests(),
 			sourceBody.Requests(),
@@ -310,7 +389,109 @@ func iteratorEntryGuards(
 			panicName,
 			rangeExhaustedMessage,
 		),
+		statePanic(
+			context,
+			stateName,
+			api.IteratorRangeStateReturned,
+			panicName,
+			rangeDoneMessage,
+		),
 	}
+}
+
+func iteratorReturnStorage(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.RangeStmt,
+	selected bool,
+) (string, []tsgo.Statement, []api.RootRequest, error) {
+	results := context.FunctionResults()
+	if !selected || results == nil || results.Len() == 0 {
+		return "", nil, nil, nil
+	}
+	name, err := context.Names().Temporary(api.TemporaryRangeReturn)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	targetType, typeRequests, err := callable.EmitResultType(
+		context.WithRole(api.RoleResultType),
+		children,
+		source,
+		results,
+	)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	zero, err := callable.ZeroResult(context, source, results)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	statements := zero.Before()
+	statements = append(
+		statements,
+		context.Factory().VariableStatement(
+			nil,
+			context.Factory().VariableDeclarationList(
+				[]tsgo.VariableDeclaration{
+					context.Factory().VariableDeclaration(
+						context.Factory().Identifier(name),
+						nil,
+						targetType,
+						zero.Value(),
+					),
+				},
+				tsgo.NodeFlagsLet,
+			),
+		),
+	)
+	return name,
+		statements,
+		api.CombineRequests(typeRequests, zero.Requests()),
+		nil
+}
+
+func iteratorReturnPropagation(
+	context api.Context,
+	source *ast.RangeStmt,
+	stateName string,
+	resultName string,
+) (api.StatementEmission, error) {
+	var result tsgo.Expression
+	if resultName != "" {
+		result = context.Factory().Identifier(resultName)
+	}
+	propagated, err := returnstatement.Propagate(
+		context,
+		source,
+		result,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	return api.NewStatementEmission(
+		[]tsgo.Statement{
+			context.Factory().IfStatement(
+				context.Factory().BinaryExpression(
+					nil,
+					context.Factory().Identifier(stateName),
+					nil,
+					context.Factory().BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					),
+					stateLiteral(
+						context,
+						api.IteratorRangeStateReturned,
+					),
+				),
+				context.Factory().Block(
+					propagated.Statements(),
+					true,
+				),
+				nil,
+			),
+		},
+		propagated.Requests(),
+	)
 }
 
 func stateDeclaration(

@@ -223,6 +223,9 @@ func (e *emitter) Expression(
 	case *ast.CallExpr:
 		return adapt(callexpression.Emit(operandContext, e, source))
 	case *ast.CompositeLit:
+		if compositeliteral.RequiresAddress(operandContext, source) {
+			return adapt(e.Address(operandContext, source))
+		}
 		return adapt(compositeliteral.Emit(operandContext, e, source))
 	case *ast.FuncLit:
 		return adapt(functionliteral.Emit(operandContext, e, source))
@@ -459,6 +462,7 @@ func (e *emitter) Type(
 		if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 			if target, handled, err := definedtype.Emit(
 				context,
+				e,
 				source,
 				sourceType,
 			); handled {
@@ -532,6 +536,9 @@ func (e *emitter) RepresentedType(
 	); handled {
 		return target, err
 	}
+	if _, ok := interfacetype.Resolve(sourceType); ok {
+		return interfacetype.Emit(context, e, source, sourceType)
+	}
 	if target, handled, err := generictype.Emit(
 		context,
 		e,
@@ -549,12 +556,10 @@ func (e *emitter) RepresentedType(
 	if _, _, ok := pointertype.Resolve(sourceType); ok {
 		return pointertype.EmitRepresented(context, e, source, sourceType)
 	}
-	if _, ok := interfacetype.Resolve(sourceType); ok {
-		return interfacetype.Emit(context, source, sourceType)
-	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 		if target, handled, err := definedtype.Emit(
 			context,
+			e,
 			source,
 			sourceType,
 		); handled {

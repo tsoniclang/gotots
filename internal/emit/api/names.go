@@ -50,8 +50,7 @@ const (
 	TemporarySwitchSelection
 	TemporarySwitchMatch
 	TemporaryTypeSwitchValue
-	TemporaryForCondition
-	TemporaryForPost
+	TemporaryForFirstIteration
 	TemporaryRangeState
 	TemporaryDeferStack
 	TemporaryDeferredCall
@@ -67,6 +66,7 @@ const (
 	TemporaryChannelOperand
 	TemporaryChannelResult
 	TemporarySelectCase
+	TemporaryRangeReturn
 )
 
 type NameReference struct {
@@ -183,7 +183,9 @@ func (r PackageVariableReference) Expression(
 type Names interface {
 	Declare(types.Object) (string, error)
 	Parameter(*types.Var, int) (string, error)
+	Result(*types.Var, int) (string, error)
 	Reference(types.Object) (NameReference, error)
+	GenericCallableProfile(*GenericCallableProfile) (NameReference, error)
 	TypeReference(types.Object) (NameReference, error)
 	PackageVariable(*types.Var) (PackageVariableReference, error)
 	NamedStructOperation(*types.TypeName, NamedStructOperation) (NameReference, error)
@@ -191,13 +193,15 @@ type Names interface {
 	AnonymousStruct(
 		*types.Struct,
 		AnonymousStructDemand,
+		ImportPhase,
 	) (NameReference, error)
 	AnonymousStructStorage(*types.Struct) (NameReference, error)
 	MapSpecialization(
 		types.Type,
 		MapSpecializationDemand,
 	) (NameReference, error)
-	InterfaceAdapter(types.Type) (NameReference, error)
+	InterfaceAdapter(types.Type, types.Type) (NameReference, error)
+	InterfaceContractDemand(types.Type, types.Type) ([]RootRequest, error)
 	InterfaceDynamicType(types.Type) (NameReference, error)
 	InterfaceType(types.Type) (NameReference, error)
 	InterfaceContract(types.Type) (InterfaceContractReference, error)
@@ -208,6 +212,10 @@ type Names interface {
 		*types.Signature,
 	) (GenericCapabilityReference, error)
 	CallableABI(*types.Signature) (CallableABIReference, error)
+	SourceCallableABI(
+		types.Object,
+		*types.Signature,
+	) (CallableABIReference, error)
 	ConstantProjection(*types.Const, types.BasicKind) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
@@ -280,10 +288,8 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_switch_match_", nil
 	case TemporaryTypeSwitchValue:
 		return "__gotots_type_switch_", nil
-	case TemporaryForCondition:
-		return "__gotots_for_condition_", nil
-	case TemporaryForPost:
-		return "__gotots_for_post_", nil
+	case TemporaryForFirstIteration:
+		return "__gotots_for_first_", nil
 	case TemporaryRangeState:
 		return "__gotots_range_state_", nil
 	case TemporaryDeferStack:
@@ -314,6 +320,8 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_receive_", nil
 	case TemporarySelectCase:
 		return "__gotots_select_", nil
+	case TemporaryRangeReturn:
+		return "__gotots_range_return_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

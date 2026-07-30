@@ -173,11 +173,15 @@ interface family; they are not approximated by this expression-switch owner.
 A three-clause `for` remains a direct target `for` whenever its initializer and
 post each fit one target header and its condition has no prerequisite
 statements. Otherwise the loop owner emits one enclosing lexical block:
-initializer statements execute there once, and a prerequisite-bearing
-condition or multi-statement post receives one typed arrow declaration created
-once before the loop. The target `for` calls those declarations from the exact
-condition or post positions, so `continue` still executes the post and no work
-is moved out of an iteration.
+initializer statements execute there once. If only the initializer requires
+statements, the native target `for` remains. Otherwise the owner emits one
+direct infinite target loop. A post clause executes at the loop top except on
+the first iteration, then condition prerequisites and the condition execute,
+then the body. Native normal and labeled `continue` therefore reach the post;
+`break`, return, and panic do not. No synthetic condition/post callback,
+callable facet, or extra scheduling boundary is created. A cooperative
+condition or post remains directly in the enclosing cooperative source
+callable.
 
 Range is one parent-owned family selected from the checked range-expression
 type. Arrays, pointers to arrays, slices, strings, maps, and integers each
@@ -478,6 +482,15 @@ not install an import, declaration, helper, or statement into a mutable parent.
 The corresponding typed placement request travels in the result and is
 applied once by the root placement owner.
 
+The request slice is a shallow immutable transport view. When multiple child
+views are combined, the API retains their atomic typed requests in an opaque
+persistent sequence rather than eagerly flattening and recopying all
+transitive leaves. Accessors copy only the exposed top-level view. Root
+consumers traverse the sequence once in exact order; sequence shape cannot
+affect placement, scheduling, deduplication, or generated output. Composition
+is proportional to immediate children instead of
+`source depth * transitive requests`.
+
 A declaration requirement similarly carries no mutable target node. It names
 the exact declaration owner and one closed obligation. The root routes it back
 to that semantic owner, which reconstructs its complete typed TS-Go declaration
@@ -771,7 +784,8 @@ boundary; this preserves the fact that Go evaluates arguments before a nil
 function call panics. The non-nil branch invokes the function directly, never
 through `.call`, `.apply`, `.bind`, reflection, or an erased carrier.
 
-A defined callable has one minimal nominal class for its non-nil value:
+A defined callable has one nominal class for its non-nil value and two
+canonical static boundary operations:
 
 ```go
 type Transform func(int32) int32
@@ -782,15 +796,28 @@ type Alias = Transform
 export class Transform {
   declare private readonly $goType: void;
   constructor(public readonly $value: (value: int32) => int32) {}
+  static $from(
+    value: ((value: int32) => int32) | undefined,
+  ): Transform | undefined {
+    return value === undefined ? undefined : new Transform(value);
+  }
+  static $valueOf(
+    value: Transform | undefined,
+  ): ((value: int32) => int32) | undefined {
+    return value === undefined ? undefined : value.$value;
+  }
 }
 export type Alias = Transform | undefined;
 ```
 
 Every Go use of `Transform` is represented as `Transform | undefined`; the
-class itself represents only the non-nil member. Conversion from an unnamed
-non-nil function constructs `new Transform(value)` once. Conversion between
-distinct defined callable types unwraps the exact source and constructs the
-exact destination. Calling a defined callable checks the wrapper for
+class itself represents only the non-nil member. `$from` and `$valueOf` are the
+single wrap/projection owners for both nil and non-nil values. They avoid
+duplicated use-site conditionals and remain valid when TypeScript flow analysis
+already knows an operand is `undefined`; no property access is emitted on a
+branch narrowed to `never`. Conversion from an unnamed function calls `$from`.
+Conversion between distinct defined callable types calls the source `$valueOf`
+and destination `$from`. Calling a defined callable checks the wrapper for
 `undefined` and then invokes `wrapper.$value(arguments)` directly. The class
 contains no string brand, runtime property mutation, `Object.assign`, callback
 registry, or speculative method protocol. A declared alias reuses the same
@@ -991,6 +1018,16 @@ Aggregate underlying values request their recursive copy operation before
 wrapping. Use sites remain O(1), and each defined type contributes exactly one
 class definition.
 
+Generic non-struct defined types use the same owner and wrapper, parameterized
+by the declaration's exact Go type parameters. Every instantiated reference
+projects all `go/types.Named.TypeArgs` through the ordinary represented-type
+owner in order; none are dropped or reconstructed from spelling. For example,
+`iter.Seq[int32]` is `Seq<int32> | undefined`, and range first projects its
+callable payload through `Seq.$valueOf` before invocation. It never calls the
+wrapper object itself. The generic declaration remains one class rather than a
+class per instantiation, and static wrap/project operations carry or infer the
+same parameters.
+
 Named struct definitions keep the direct nominal record class described below;
 they do not acquire a redundant wrapper around that class. Nil-capable defined
 types use `Defined | undefined`; `undefined` remains the sole nil value and only
@@ -1053,6 +1090,24 @@ it does not change Go value semantics. Distinct named structs remain statically
 incompatible even when their fields match. A requested nested struct operation
 requests the corresponding static operation from the nested type's owner. The
 erased brand must produce no JavaScript instance field.
+
+Go permits a receiver declaration to omit its source name:
+
+```go
+func (Token) Kind() int32 { return 1 }
+```
+
+The receiver function still requires its explicit target receiver parameter.
+The declaration owner derives that parameter from the exact
+`go/types.Signature.Recv()` object and assigns the deterministic target-only
+positional name (`$0` when the method has no source parameters). It does not
+invent a Go binding, scan the body, or infer a name from source spelling:
+
+```ts
+export function Token_Kind($0: Token): int32 {
+  return 1;
+}
+```
 
 Interface behavior, generics, reflection entry, pointers to unrepresented
 targets, and fields whose complete standalone representation is not yet exact
@@ -1307,12 +1362,14 @@ dynamic Go value     -> exact statically typed readonly adapter payload
 ```
 
 There is one adapter class per reached exact concrete dynamic type, not per
-interface and not per call. A concrete-to-interface conversion copies a Go
-value once before storing it in the adapter. Pointer, slice, map, channel, and
-function payloads retain their Go reference identity. An interface copy shares
-the immutable adapter. A typed nil pointer is therefore a non-nil adapter whose
-payload is the represented nil pointer; it is never collapsed into
-`undefined`.
+interface and not per call. Its callable surface is the deterministic union of
+the completed interface contracts actually required by the selected
+compilation closure. A concrete-to-interface conversion requests its exact
+target contract and copies a Go value once before storing it in the adapter.
+Pointer, slice, map, channel, and function payloads retain their Go reference
+identity. An interface copy shares the immutable adapter. A typed nil pointer
+is therefore a non-nil adapter whose payload is the represented nil pointer; it
+is never collapsed into `undefined`.
 
 Adapter constructor identity is not Go dynamic-type identity. A local Go type
 declared inside a function has one compile-time identity but its lexical
@@ -1323,12 +1380,20 @@ token by the exact `go/types.Type` identity. Every adapter instance carries
 that token in the readonly `$go$type` member. No string, constructor,
 `Symbol.for`, source spelling, or truncated hash is semantic identity.
 
-Each adapter contains the concrete type's complete `go/types` method set as
-native TypeScript methods. Those methods call the already-owned top-level
-receiver functions directly. The payload, parameter, and result types remain
-exact; no method body uses `any`, `unknown`, a cast, `.call`, `.apply`, or
-`.bind`. Ordinary concrete calls continue to call receiver functions and never
-become virtual.
+Each adapter contains only methods selected by demanded completed interface
+contracts. For every demanded interface method, `go/types` selects the exact
+concrete or promoted method; the adapter emits one native TypeScript method
+that calls the already-owned top-level receiver function directly. Multiple
+contracts selecting the same method emit it once. The payload, parameter, and
+result types remain exact; no method body uses `any`, `unknown`, a cast,
+`.call`, `.apply`, or `.bind`. Ordinary concrete calls continue to call
+receiver functions and never become virtual.
+
+For example, if `*Checker` has 1,976 receiver methods but is converted only to
+`interface { GetSymbolAtLocation(*Node) *Symbol; GetAliasedSymbol(*Symbol)
+*Symbol }`, its adapter emits exactly those two forwards. Boxing `*Checker` as
+`any` alone emits no receiver forwards. An unrelated private checker method can
+never enlarge either artifact.
 
 For example:
 
@@ -1388,9 +1453,10 @@ probes, or hashes used without collision validation.
 
 Each completed interface owns an immutable contract containing its required
 method tokens. Each adapter class owns one module-level `ReadonlySet<object>`
-containing the tokens for its complete concrete method set. The shared runtime
-tests whether every contract token is present in that set. A generated
-interface-specific function exposes the result as a TypeScript type predicate:
+containing exactly the tokens selected by its demanded interface contracts.
+The shared runtime tests whether every target contract token is present in
+that set. A generated interface-specific function exposes the result as a
+TypeScript type predicate:
 
 ```ts
 export function Reader$is(
@@ -1400,10 +1466,22 @@ export function Reader$is(
 }
 ```
 
-This is open-world: a later translated package can emit another statically
-typed adapter using the same method-contract ABI without editing a central
-implementer list. Assertion cost is O(target interface method count), and an
-ordinary interface call is one direct native method call, O(1).
+Concrete conversions request their target contract directly and seed that
+contract on the concrete adapter. For an interface-to-interface conversion or
+assertion, the compiler records the exact static source and target contracts.
+It applies the target only to an adapter whose reachable-contract set already
+contains the source and whose concrete type `go/types` proves implements the
+target. The requirements are retained and closed transitively, so transitions
+and adapters may be discovered in any order. A concrete type that happens to
+implement the source is not widened unless a selected conversion made that
+source contract reachable for its adapter. Therefore the selected closure
+needs no implementer switch or value-flow analysis. Each reachable
+adapter/contract pair is materialized once; repeated uses of the same
+transition are constant-time deduplication rather than repeated whole-program
+closure,
+while an unrelated adapter receives no methods. Assertion cost is O(target
+interface method count), and an ordinary interface call is one direct native
+method call, O(1).
 
 ### Calls, Assertions, Equality, And Hashing
 
@@ -1414,10 +1492,12 @@ receiver explicitly and performs the guard when invoked.
 
 Concrete assertions call the adapter's statically typed `$is` predicate, which
 compares the canonical dynamic-type token and narrows the payload without a
-cast. Interface assertions call the target interface's typed predicate and
-retain the same adapter. Comma-ok and panicking forms share these primitives.
-Type switches evaluate the source once and test cases in source order; each
-case variable receives the exact Go case type.
+cast. Interface assertions request the target contract for every statically
+possible reached dynamic type, call the target interface's typed predicate,
+and retain the same adapter. Interface-to-interface conversions make the same
+request even though their runtime value is unchanged. Comma-ok and panicking
+forms share these primitives. Type switches evaluate the source once and test
+cases in source order; each case variable receives the exact Go case type.
 
 Interface equality is:
 
@@ -1597,9 +1677,159 @@ Returning from the enclosing function, panic/recover, defer, labels, and
 cooperative calls compose through their owning later control capabilities; the
 iterator owner never approximates them with an illegal target branch.
 
+Under the cooperative profile, the callback's exact callable ABI owns whether
+its result is `boolean` or `Promise<boolean>`. For example:
+
+```go
+for value := range numbers {
+    total += value + <-closed
+}
+```
+
+The receive selects the generated yield callback ABI cooperative. The emitted
+callback is therefore `async (value): Promise<boolean>`, the iterator provider
+awaits each yield, the range invocation awaits the iterator, and that
+invocation selects the enclosing source callable cooperative. A nonblocking
+range remains a synchronous callback and call. Marking only the enclosing
+function `async`, or adding `async` only to the callback, is invalid because
+either leaves an illegal `await` or leaves the provider and invocation on a
+synchronous callable contract.
+
 The iterator function is invoked exactly once. Calling yield after it returned
 `false` must reproduce the selected Go runtime panic. Output size depends on
 the source range body, not the number of yields or generic instantiations.
+
+### Callable ABIs Across Generic Instantiation
+
+One generic source declaration retains one ordinary reconstruction path even
+when distinct instantiations supply distinct concrete function types.
+Demand-created static variants reuse that path with only an exact callable-ABI
+profile override:
+
+```go
+func Apply[T any](value T, predicate func(T) bool) bool {
+	return predicate(value)
+}
+
+func Blocking(value int32, closed <-chan int32) bool {
+	return Apply(value, func(value int32) bool {
+		_, ok := <-closed
+		return !ok && value > 0
+	})
+}
+```
+
+The call owner reads the declaration signature `func(T) bool` and the selected
+instantiated signature `func(int32) bool` from the same `go/types.Instance`.
+It recursively pairs only structurally corresponding callable leaves. The
+declaration remains the synchronous baseline. When the concrete literal
+selects `func(int32) bool` cooperative, that use requests one statically named
+variant:
+
+```ts
+export function Apply<T>(
+    value: T,
+    predicate: (($0: T) => boolean) | undefined,
+): boolean {
+    if (predicate === undefined) goPanicNil();
+    return predicate(value);
+}
+
+export async function Apply$cooperative_c17eeb048799ded8a96d<T>(
+    value: T,
+    predicate: (($0: T) => Promise<boolean>) | undefined,
+): Promise<boolean> {
+    if (predicate === undefined) goPanicNil();
+    return await predicate(value);
+}
+```
+
+Synchronous calls name `Apply`; blocking calls name the profile variant.
+Repeated calls with the same exact profile share that variant. The same
+correspondence applies to callable leaves nested in represented containers and
+results, and to generic receiver calls, deferred calls, function values, and
+method values/expressions. It never treats an opaque type-parameter
+substitution as evidence that the substituted type is a callable, and it never
+recovers the relation from target spelling.
+
+When `Apply` is exported and the caller is in another Go package, its generated
+package assembly re-exports both reached bindings from the source module:
+
+```ts
+export {
+    Apply,
+    Apply$cooperative_c17eeb048799ded8a96d,
+} from "./source.js";
+```
+
+The declaration artifact remains the sole producer of both definitions.
+Package assembly projects the reached exported surface; it does not copy a
+body, manufacture another profile identity, or make consumers import an
+implementation file directly.
+
+Direction matters when cooperation originates in the declaration:
+
+```go
+func MakeReceiver[T any](values <-chan T) func() T {
+	return func() T { return <-values }
+}
+```
+
+The declaration's returned `func() T` ABI is cooperative because that literal
+always receives from a channel. The corresponding concrete `func() int32` ABI
+is therefore cooperative and `MakeReceiver[int32]` uses the ordinary
+`MakeReceiver` declaration. No duplicate profile variant is emitted. The
+reverse is forbidden: a cooperative concrete callback passed to `Apply`
+selects an `Apply` variant but never changes `Apply`'s baseline ABI.
+
+When the generic owner is an environment contract rather than translated
+source, the same use-site profile selects an ambient declaration instead of a
+body variant. For example:
+
+```go
+func Sum(values []int32, input <-chan int32) int32 {
+	var total int32
+	for value := range slices.Values(values) {
+		total += value + <-input
+	}
+	return total
+}
+```
+
+The generated range callback is cooperative. Its exact instantiated yield ABI
+selects a declaration shaped like:
+
+```ts
+export declare function Values$cooperative_c17eeb048799ded8a96d<Slice, E>(
+    values: Slice,
+): ((yield: (value: E) => Promise<boolean>) => Promise<void>) | undefined;
+```
+
+The actual generic parameter list is taken from the selected `GOROOT`
+signature; the sketch abbreviates it. `Values` itself remains a synchronous
+call because its result carries the selected callable ABI. The declaration has
+no body. A future `gostdlib` implementation must export the same selected
+profile name and satisfy that exact contract. An external function that invokes
+a cooperative callback cannot acquire an async outer call by inference from
+its type alone; its explicit provider implementation contract must select and
+implement that effect.
+
+The enclosing callable may be a package initializer rather than a declared
+function:
+
+```go
+var Names = Map(values, func(value any) string { return value.(string) })
+```
+
+This use selects the synchronous `Map` profile and remains synchronous even
+when another `Map` use supplies a cooperative callback. The other use selects
+a separate, deterministic source-owned callable-profile variant. Only an
+initializer whose own call selects such a cooperative variant receives the
+reverse requirement: that call becomes `await`, its package `$initialize`
+becomes `async`, and `program.ts` awaits that package before starting the next
+Go-ordered package. The initializer is never assigned to a fabricated
+function, and unrelated calls and package initializers remain byte-identical
+and synchronous.
 
 ## Channels, Goroutines, And `select`
 
@@ -1635,6 +1865,12 @@ callable ABI is cooperative. The ABI does not depend on the value's storage
 location. No
 `.call`, `.apply`, `.bind`, erased argument array, or runtime signature lookup
 is emitted.
+
+An immediately invoked function literal is not a transported function value.
+The call owner selects the literal's exact callable facet, emits the literal
+without a callable-ABI adapter, and awaits only when that literal facet is
+cooperative. Restoring ABI routing at this syntactically static call is a
+semantic and source-size regression.
 
 ```go
 select {
@@ -1721,6 +1957,14 @@ Each alias is emitted once as a typed TS-Go `TypeAliasDeclaration`; generated
 package modules use canonical relative type-only imports. The aliases retain
 the selected Go representation name in generated source. A handler does not
 infer width from `GOARCH` spelling or independently inspect configuration.
+The canonical constant-value owner validates a checker-provided integer
+against its Go carrier width and sign, then emits that decimal through the
+selected target syntax. The `number` profile does not reject an otherwise
+valid `int64` or `uint64` merely because its magnitude exceeds JavaScript's
+safe-integer range; that profile emits a direct `NumericLiteral` and explicitly
+accepts approximate wide-number behavior. The `bigint` profile emits the same
+checker value as an exact `BigIntLiteral`. Neither route re-evaluates source
+spelling or inserts routine casts, wrappers, or runtime helpers.
 
 `float32` and `float64` both carry as the `number` alias regardless of the
 integer-representation profile — TypeScript has one binary64 number type and no
@@ -1920,10 +2164,30 @@ Ordinary integer syntax is source-shaped under both initial profiles:
 Constant and variable shifts are selected by the exact left carrier and
 checker-typed count. A negative variable count enters `GoPanic.raise`; a count
 at least the left width yields zero, except signed right shift yields the sign
-fill. The `number` profile admits only fixed-width carriers representable by
-JavaScript bitwise operators and normalizes at the selected width. The
-`bigint` profile uses `BigInt.asIntN`/`asUintN` and never emits unsigned
-BigInt `>>>`. Generic shift capabilities delegate this same integer owner.
+fill. The `number` profile emits direct JavaScript bitwise and shift operators.
+Its 8/16/32-bit carriers normalize at the selected width; wider carriers
+intentionally inherit JavaScript's 32-bit bitwise coercion as part of the
+declared approximate number contract. The `bigint` profile uses
+`BigInt.asIntN`/`asUintN` and never emits unsigned BigInt `>>>`. Generic shift
+capabilities delegate this same integer owner.
+
+A defined integer shift count remains nominal everywhere except the operation
+boundary. The count expression is emitted once at its declared type and the
+shift owner projects its existing readonly payload before the direct operator:
+
+```go
+type ShiftCount uint8
+func Shift(value int64, count ShiftCount) int64 { return value << count }
+```
+
+```ts
+export function Shift(value: int64, count: ShiftCount): int64 {
+    return value << count.$value;
+}
+```
+
+The owner neither rejects the legal Go count nor inserts a target cast,
+spelling check, or second conversion path.
 
 Integer division and remainder are the bounded exception to direct operators.
 JavaScript BigInt already truncates toward zero, while JavaScript `number`
@@ -1958,12 +2222,13 @@ binding omits a type annotation when its initializer already makes the target
 type exact.
 
 Neither initial profile reproduces implicit fixed-width overflow. The default
-also accepts JavaScript-number precision as its declared integer contract.
-The BigInt override removes that precision limitation but still does not
-implicitly narrow after arithmetic. Evidence names the profile and never
-claims these deferred semantics. Explicit narrowing conversions and any future
-fixed-width profile are separate construct families rather than baggage in
-ordinary multiplication.
+also accepts JavaScript-number precision and 32-bit host coercion for wider
+bitwise and shift operations as its declared integer contract. The BigInt
+override removes those limitations but still does not implicitly narrow after
+arithmetic. Evidence names the profile and never claims these deferred
+semantics. Explicit narrowing conversions and any future fixed-width profile
+are separate construct families rather than baggage in ordinary
+multiplication.
 
 Boolean `&&` and `||` emit direct binary expressions when the right operand has
 no prerequisite statements. Prerequisites of the always-evaluated left operand
@@ -2123,7 +2388,11 @@ without semantic callbacks or per-element-type runtime specialization.
 it never expands the slice into a JavaScript argument list. Distinct named
 slice types are accepted when Go accepts their identical element types.
 `append([]byte, string...)` is the one language-defined string expansion and
-copies the string's Go bytes. Reallocation copies existing aggregate elements
+copies the string's Go bytes. The string-special `append` and `copy` owners
+supply the concrete predeclared `string` expectation for an untyped string
+operand and preserve the exact defined string type for a defined operand. The
+constant-use owner never defaults an untyped operand independently. Reallocation
+copies existing aggregate elements
 with their selected copy owner; reuse preserves the existing backing identity.
 `clear(slice)` writes a fresh zero at every live aggregate element, while
 `clear(map)` removes entries. The slice clear and slice-spread helpers are
@@ -2233,8 +2502,11 @@ value = Box{Count: 7}
 *pointer++
 ```
 
-The enclosing function first emits an addressable-storage requirement for the
-exact `value` object. Its reconstructed TS-Go body has one cell:
+The enclosing reconstructible artifact first emits an addressable-storage
+requirement for the exact `value` object. For an ordinary declaration that
+artifact is the source function; for a literal in a package initializer it is
+the exact checker-produced initializer. Its reconstructed TS-Go body has one
+cell:
 
 ```ts
 const value$storage = GoPointer.cell<Box, Box$Storage>(
@@ -2253,6 +2525,11 @@ as Go requires. Unrelated locals remain ordinary variables. Address requests
 inside nested function literals belong to the enclosing top-level function
 artifact but the selected variable's lexical cell remains in its own scope, so
 closures capture the same cell.
+
+If the outer boundary is a package initializer, an address request inside its
+function literal belongs to that package-initializer artifact instead. It
+never fabricates a `*types.Func` for the literal or attaches the requirement to
+the package variable.
 
 The same address owner handles:
 
@@ -2427,6 +2704,16 @@ returns a typed environment-boundary diagnostic in ordinary and deferred call
 contexts. The language stage does not silently map them to `console`, stdout,
 or stderr. A later selected environment contract may install one behavior and
 its differential proof.
+
+`unsafe.Pointer` is a nullable nominal environment-boundary type, not a
+primitive alias or an erased payload. Pointer-to-unsafe and unsafe-to-pointer
+conversions preserve `nil` exactly. A compile-only environment profile emits
+typed static conversion calls whose non-nil paths throw one explicit unresolved
+placeholder because ordinary TypeScript cannot reinterpret Go storage. The
+placeholder never uses `any`, `unknown`, a cast, source spelling, or a fabricated
+memory model. `uintptr` conversions and other `unsafe` operations remain
+separate closed dispositions until their own exact environment contracts are
+selected. A reachable non-nil unsafe placeholder blocks publication.
 
 ## Failure
 

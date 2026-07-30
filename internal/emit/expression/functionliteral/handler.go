@@ -15,6 +15,7 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.FuncLit,
 ) (api.ExpressionEmission, error) {
+	context, staticallySelected := context.TakeStaticallySelectedCallable()
 	if source == nil {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
@@ -103,6 +104,9 @@ func Emit(
 			observation.Requests(),
 		)...,
 	)
+	if staticallySelected {
+		return target, nil
+	}
 	return cooperativecall.AdaptLiteralValue(
 		context,
 		children,

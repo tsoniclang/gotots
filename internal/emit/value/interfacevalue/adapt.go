@@ -20,70 +20,23 @@ func AdaptExpected(
 		return target, nil
 	}
 	actual := context.TypesInfo().TypeOf(source)
-	if actual == nil || !types.AssignableTo(actual, expected) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	if api.ContainsGenericTypeParameter(actual) {
-		adapted, err := genericoperation.Call(
-			context,
-			source,
-			api.GenericOperationInterfaceAdapt,
-			[]types.Type{actual},
-			[]types.Type{expected},
-			[]tsgo.Expression{target.Value()},
-			target.Requests()...,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.NewExpressionEmission(
-			target.Before(),
-			adapted.Value(),
-			adapted.Requests(),
-		)
-	}
-	if _, ok := interfacetype.Resolve(actual); ok {
-		return target, nil
-	}
-	if basic, ok := types.Unalias(actual).(*types.Basic); ok &&
-		basic.Kind() == types.UntypedNil {
-		return api.DirectExpression(
-			context.Factory().VoidExpression(
-				context.Factory().NumericLiteral(
-					"0",
-					tsgo.TokenFlagsNone,
-				),
-			),
-			target.Requests()...,
-		), nil
-	}
-	actual = DynamicType(actual)
-	copied, err := context.Values().Copy(
-		context.WithRole(api.RoleConversionOperand),
+	adapted, handled, err := Assign(
+		context,
 		source,
 		actual,
+		expected,
 		target,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	adapter, err := context.Names().InterfaceAdapter(actual)
-	if err != nil {
-		return api.ExpressionEmission{}, err
+	if !handled {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "interface expectation was not handled by interface assignment",
+		}
 	}
-	return api.NewExpressionEmission(
-		copied.Before(),
-		context.Factory().NewExpression(
-			context.Factory().Identifier(adapter.Name()),
-			nil,
-			[]tsgo.Expression{copied.Value()},
-		),
-		api.CombineRequests(
-			copied.Requests(),
-			adapter.Requests(),
-		),
-	)
+	return adapted, nil
 }
 
 func OperandContext(
@@ -133,8 +86,79 @@ func Convert(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	target, err := adapt(
+		context,
+		source,
+		sourceType,
+		targetType,
+		value,
+	)
+	return target, true, err
+}
+
+func Assign(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+	targetType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	if _, ok := interfacetype.Resolve(targetType); !ok {
+		return api.ExpressionEmission{}, false, nil
+	}
+	if sourceType == nil || !types.AssignableTo(sourceType, targetType) {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	target, err := adapt(
+		context,
+		source,
+		sourceType,
+		targetType,
+		value,
+	)
+	return target, true, err
+}
+
+func adapt(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+	targetType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if api.ContainsGenericTypeParameter(sourceType) {
+		adapted, err := genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationInterfaceAdapt,
+			[]types.Type{sourceType},
+			[]types.Type{targetType},
+			[]tsgo.Expression{value.Value()},
+			value.Requests()...,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			value.Before(),
+			adapted.Value(),
+			adapted.Requests(),
+		)
+	}
 	if _, ok := interfacetype.Resolve(sourceType); ok {
-		return value, true, nil
+		demands, err := context.Names().InterfaceContractDemand(
+			sourceType,
+			targetType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			value.Before(),
+			value.Value(),
+			api.CombineRequests(value.Requests(), demands),
+		)
 	}
 	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok &&
 		basic.Kind() == types.UntypedNil {
@@ -146,7 +170,7 @@ func Convert(
 				),
 			),
 			value.Requests()...,
-		), true, nil
+		), nil
 	}
 	sourceType = DynamicType(sourceType)
 	copied, err := context.Values().Copy(
@@ -156,11 +180,14 @@ func Convert(
 		value,
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, true, err
+		return api.ExpressionEmission{}, err
 	}
-	adapter, err := context.Names().InterfaceAdapter(sourceType)
+	adapter, err := context.Names().InterfaceAdapter(
+		sourceType,
+		targetType,
+	)
 	if err != nil {
-		return api.ExpressionEmission{}, true, err
+		return api.ExpressionEmission{}, err
 	}
 	target, err := api.NewExpressionEmission(
 		copied.Before(),
@@ -174,5 +201,5 @@ func Convert(
 			adapter.Requests(),
 		),
 	)
-	return target, true, err
+	return target, err
 }

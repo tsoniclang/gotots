@@ -28,8 +28,8 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 		".$value(",
 		`GoPanic.raiseRuntime("call of nil function")`,
 		"GoPointer.cell<",
-		"return value === void 0;",
-		"return !(value === void 0);",
+		"return Transform.$valueOf(value) === undefined;",
+		"return !(Transform.$valueOf(value) === undefined);",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("callable artifact lacks %q:\n%s", required, printed)
@@ -94,8 +94,11 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	if transform == nil {
 		t.Fatal("defined callable Transform declaration is absent")
 	}
-	if len(transform.Members()) != 2 {
-		t.Fatalf("Transform members = %d, want brand and value constructor", len(transform.Members()))
+	if len(transform.Members()) != 4 {
+		t.Fatalf(
+			"Transform members = %d, want brand, value constructor, $from, and $valueOf",
+			len(transform.Members()),
+		)
 	}
 	brand, ok := transform.Members()[0].(tsgo.PropertyDeclaration)
 	if !ok ||
@@ -107,6 +110,17 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	if !ok || len(constructor.Parameters()) != 1 ||
 		constructor.Parameters()[0].Name().(tsgo.Identifier).Text() != "$value" {
 		t.Fatalf("Transform value constructor has the wrong target shape: %#v", transform.Members()[1])
+	}
+	for memberIndex, memberName := range []string{"$from", "$valueOf"} {
+		method, ok := transform.Members()[memberIndex+2].(tsgo.MethodDeclaration)
+		if !ok || method.Name().(tsgo.Identifier).Text() != memberName {
+			t.Fatalf(
+				"Transform member %d = %#v, want static %s",
+				memberIndex+2,
+				transform.Members()[memberIndex+2],
+				memberName,
+			)
+		}
 	}
 	transformAlias := aliases["TransformAlias"]
 	if transformAlias == nil {

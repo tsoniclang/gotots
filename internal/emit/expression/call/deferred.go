@@ -76,7 +76,9 @@ func EmitDeferred(
 	var requests []api.RootRequest
 	var contractRequests []api.RootRequest
 	cooperative := false
-	if static {
+	literal, directLiteral := directFunctionLiteral(source.Fun)
+	switch {
+	case static:
 		owner, direct := calleeObject(context.TypesInfo(), source.Fun)
 		if !direct {
 			return api.ExpressionEmission{}, &api.InvariantError{
@@ -97,7 +99,35 @@ func EmitDeferred(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-	} else {
+	case directLiteral:
+		name, err := context.Names().Temporary(api.TemporaryCallCallee)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		before = append(
+			before,
+			constantDeclaration(
+				context,
+				name,
+				nil,
+				targetCallee,
+			),
+		)
+		targetCallee = context.Factory().Identifier(name)
+		control, err := context.FunctionLiteralControlRequest(
+			literal,
+			api.CallableControlRecovery,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		requests = append(requests, control)
+		cooperative, contractRequests, err =
+			cooperativecall.LiteralContract(context, literal)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	default:
 		targetType, err := children.RepresentedType(
 			context.WithRole(api.RoleCallCallee),
 			source.Fun,

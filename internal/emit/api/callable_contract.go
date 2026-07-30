@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"go/ast"
 	"go/types"
 	"slices"
@@ -9,17 +10,19 @@ import (
 type CallableFacetKind uint8
 
 const (
-	CallableFacetInvalid           CallableFacetKind = 0
-	CallableFacetSource            CallableFacetKind = 1
-	CallableFacetFunctionLiteral   CallableFacetKind = 2
-	CallableFacetABI               CallableFacetKind = 3
-	CallableFacetGenericCapability CallableFacetKind = 4
-	CallableFacetGenericOperation  CallableFacetKind = 5
+	CallableFacetInvalid            CallableFacetKind = 0
+	CallableFacetSource             CallableFacetKind = 1
+	CallableFacetFunctionLiteral    CallableFacetKind = 2
+	CallableFacetABI                CallableFacetKind = 3
+	CallableFacetGenericCapability  CallableFacetKind = 4
+	CallableFacetGenericOperation   CallableFacetKind = 5
+	CallableFacetPackageInitializer CallableFacetKind = 6
+	CallableFacetGenericProfile     CallableFacetKind = 7
 )
 
 func (k CallableFacetKind) Valid() bool {
 	return k >= CallableFacetSource &&
-		k <= CallableFacetGenericOperation
+		k <= CallableFacetGenericProfile
 }
 
 type CallableFacet struct {
@@ -29,6 +32,7 @@ type CallableFacet struct {
 	literal   *ast.FuncLit
 	generated *GeneratedArtifact
 	operation *GenericOperationContract
+	profile   *GenericCallableProfile
 }
 
 func NewSourceCallableFacet(function *types.Func) (CallableFacet, error) {
@@ -72,6 +76,35 @@ func NewFunctionLiteralCallableFacet(
 	}, nil
 }
 
+func NewPackageInitializerCallableFacet(
+	owner ArtifactOwner,
+) (CallableFacet, error) {
+	if _, _, ok := owner.PackageInitializer(); !ok {
+		return CallableFacet{}, &RootRequestError{
+			Reason: "package-initializer callable facet is invalid",
+		}
+	}
+	return CallableFacet{
+		owner: owner,
+		kind:  CallableFacetPackageInitializer,
+	}, nil
+}
+
+func NewGenericCallableProfileFacet(
+	profile *GenericCallableProfile,
+) (CallableFacet, error) {
+	if !profile.Valid() {
+		return CallableFacet{}, &RootRequestError{
+			Reason: "generic callable profile facet is invalid",
+		}
+	}
+	return CallableFacet{
+		owner:   MustSourceArtifactOwner(profile.Owner()),
+		kind:    CallableFacetGenericProfile,
+		profile: profile,
+	}, nil
+}
+
 func NewCallableABIFacet(
 	artifact *GeneratedArtifact,
 ) (CallableFacet, error) {
@@ -100,7 +133,7 @@ func NewGenericCapabilityCallableFacet(
 		}
 	}
 	return CallableFacet{
-		owner:     MustGeneratedArtifactOwner(artifact),
+		owner:     artifact.ReconstructionOwner(),
 		kind:      CallableFacetGenericCapability,
 		generated: artifact,
 	}, nil
@@ -141,6 +174,7 @@ func (f CallableFacet) Valid() bool {
 			f.literal == nil &&
 			f.generated == nil &&
 			f.operation == nil &&
+			f.profile == nil &&
 			signature != nil
 	case CallableFacetFunctionLiteral:
 		_, sourceOwned := f.owner.Source()
@@ -151,7 +185,8 @@ func (f CallableFacet) Valid() bool {
 			f.literal.Type != nil &&
 			f.literal.Body != nil &&
 			f.generated == nil &&
-			f.operation == nil
+			f.operation == nil &&
+			f.profile == nil
 	case CallableFacetABI:
 		generated, generatedOwned := f.owner.Generated()
 		return generatedOwned &&
@@ -160,16 +195,17 @@ func (f CallableFacet) Valid() bool {
 			f.generated == generated &&
 			f.generated.Kind() == GeneratedArtifactCallableABI &&
 			f.generated.Valid() &&
-			f.operation == nil
+			f.operation == nil &&
+			f.profile == nil
 	case CallableFacetGenericCapability:
-		generated, generatedOwned := f.owner.Generated()
-		return generatedOwned &&
+		return f.generated != nil &&
+			f.owner == f.generated.ReconstructionOwner() &&
 			f.function == nil &&
 			f.literal == nil &&
-			f.generated == generated &&
 			f.generated.Kind() == GeneratedArtifactGenericCapability &&
 			f.generated.Valid() &&
-			f.operation == nil
+			f.operation == nil &&
+			f.profile == nil
 	case CallableFacetGenericOperation:
 		source, sourceOwned := f.owner.Source()
 		function, functionOwned := operationOwnerFunction(f.operation)
@@ -180,8 +216,26 @@ func (f CallableFacet) Valid() bool {
 			f.function == nil &&
 			f.literal == nil &&
 			f.generated == nil &&
+			f.profile == nil &&
 			f.operation.Consumer() ==
 				GenericFunctionOperationConsumer()
+	case CallableFacetPackageInitializer:
+		_, _, initializerOwned := f.owner.PackageInitializer()
+		return initializerOwned &&
+			f.function == nil &&
+			f.literal == nil &&
+			f.generated == nil &&
+			f.operation == nil &&
+			f.profile == nil
+	case CallableFacetGenericProfile:
+		source, sourceOwned := f.owner.Source()
+		return sourceOwned &&
+			f.profile.Valid() &&
+			source == f.profile.Owner() &&
+			f.function == nil &&
+			f.literal == nil &&
+			f.generated == nil &&
+			f.operation == nil
 	default:
 		return false
 	}
@@ -193,7 +247,8 @@ func (f CallableFacet) empty() bool {
 		f.function == nil &&
 		f.literal == nil &&
 		f.generated == nil &&
-		f.operation == nil
+		f.operation == nil &&
+		f.profile == nil
 }
 
 func (f CallableFacet) Owner() ArtifactOwner {
@@ -227,6 +282,19 @@ func (f CallableFacet) GenericOperation() (
 ) {
 	return f.operation,
 		f.Valid() && f.kind == CallableFacetGenericOperation
+}
+
+func (f CallableFacet) PackageInitializer() (ArtifactOwner, bool) {
+	return f.owner,
+		f.Valid() && f.kind == CallableFacetPackageInitializer
+}
+
+func (f CallableFacet) GenericProfile() (
+	*GenericCallableProfile,
+	bool,
+) {
+	return f.profile,
+		f.Valid() && f.kind == CallableFacetGenericProfile
 }
 
 func functionType(function *types.Func) (*types.Signature, bool) {
@@ -267,11 +335,9 @@ func NewGenericCapabilityReference(
 			Reason: "generic-capability reference is invalid",
 		}
 	}
-	for _, request := range requests {
-		if request.Kind() == RootRequestInvalid {
-			return GenericCapabilityReference{}, &RootRequestError{
-				Reason: "generic-capability reference request is invalid",
-			}
+	if err := validateReferenceRequests(requests); err != nil {
+		return GenericCapabilityReference{}, &RootRequestError{
+			Reason: "generic-capability reference request is invalid",
 		}
 	}
 	return GenericCapabilityReference{
@@ -311,11 +377,9 @@ func NewGenericOperationReference(
 			Reason: "generic-operation reference is invalid",
 		}
 	}
-	for _, request := range requests {
-		if request.Kind() == RootRequestInvalid {
-			return GenericOperationReference{}, &RootRequestError{
-				Reason: "generic-operation reference request is invalid",
-			}
+	if err := validateReferenceRequests(requests); err != nil {
+		return GenericOperationReference{}, &RootRequestError{
+			Reason: "generic-operation reference request is invalid",
 		}
 	}
 	return GenericOperationReference{
@@ -352,11 +416,9 @@ func NewCallableABIReference(
 			Reason: "callable ABI reference is invalid",
 		}
 	}
-	for _, request := range requests {
-		if request.Kind() == RootRequestInvalid {
-			return CallableABIReference{}, &RootRequestError{
-				Reason: "callable ABI reference request is invalid",
-			}
+	if err := validateReferenceRequests(requests); err != nil {
+		return CallableABIReference{}, &RootRequestError{
+			Reason: "callable ABI reference request is invalid",
 		}
 	}
 	return CallableABIReference{
@@ -389,11 +451,9 @@ func NewCooperativeCallableObservation(
 	cooperative bool,
 	requests ...RootRequest,
 ) (CooperativeCallableObservation, error) {
-	for _, request := range requests {
-		if request.Kind() == RootRequestInvalid {
-			return CooperativeCallableObservation{}, &RootRequestError{
-				Reason: "cooperative callable observation has an invalid request",
-			}
+	if err := validateReferenceRequests(requests); err != nil {
+		return CooperativeCallableObservation{}, &RootRequestError{
+			Reason: "cooperative callable observation has an invalid request",
 		}
 	}
 	return CooperativeCallableObservation{
@@ -408,6 +468,12 @@ func (o CooperativeCallableObservation) Cooperative() bool {
 
 func (o CooperativeCallableObservation) Requests() []RootRequest {
 	return slices.Clone(o.requests)
+}
+
+func validateReferenceRequests(requests []RootRequest) error {
+	return WalkRootRequests(requests, func(RootRequest) error {
+		return nil
+	})
 }
 
 func (c Context) WithCooperativeCallableResolver(
@@ -432,6 +498,39 @@ func (c Context) WithCooperativeCallable(
 	return c
 }
 
+func (c Context) WithCooperativeCallableABI(
+	facet CallableFacet,
+	cooperative bool,
+) Context {
+	if !c.artifactOwner.Valid() ||
+		!facet.Valid() ||
+		facet.Kind() != CallableFacetABI {
+		panic("cooperative callable ABI boundary is invalid")
+	}
+	c.callableFacet = facet
+	c.cooperative = cooperative
+	return c
+}
+
+func (c Context) WithGenericCallableProfile(
+	profile *GenericCallableProfile,
+) Context {
+	if !c.artifactOwner.Valid() ||
+		!profile.Valid() ||
+		c.artifactOwner != MustSourceArtifactOwner(profile.Owner()) {
+		panic("generic callable profile boundary is invalid")
+	}
+	c.genericCallableProfile = profile
+	return c
+}
+
+func (c Context) GenericCallableProfile() (
+	*GenericCallableProfile,
+	bool,
+) {
+	return c.genericCallableProfile, c.genericCallableProfile != nil
+}
+
 func (c Context) IsCooperative() bool {
 	return c.cooperative
 }
@@ -454,19 +553,53 @@ func (c Context) ObserveCooperativeCallable(
 			Reason: "cooperative callable consumer has no artifact owner",
 		}
 	}
-	return c.cooperativeResolver.ObserveCooperativeCallable(
+	observation, err := c.cooperativeResolver.ObserveCooperativeCallable(
 		c.artifactOwner,
 		facet,
+	)
+	if err != nil || c.genericCallableProfile == nil {
+		return observation, err
+	}
+	artifact, abi := facet.ABI()
+	if !abi {
+		return observation, nil
+	}
+	cooperative, selected :=
+		c.genericCallableProfile.Selection().ABI(artifact)
+	if !selected {
+		return observation, nil
+	}
+	return NewCooperativeCallableObservation(
+		cooperative,
+		observation.Requests()...,
 	)
 }
 
 func (c Context) CooperativeRequest() (RootRequest, error) {
 	if !c.callableFacet.Valid() {
 		return RootRequest{}, &ContextError{
-			Reason: "cooperative operation has no callable facet",
+			Reason: fmt.Sprintf(
+				"cooperative operation in %s (%s) has no callable facet",
+				c.artifactOwner.Name(),
+				c.role,
+			),
 		}
 	}
 	return NewCooperativeCallableRequest(c.callableFacet)
+}
+
+func (c Context) WithStaticallySelectedCallable() Context {
+	if c.staticallySelectedCallable {
+		panic("callable is already statically selected")
+	}
+	c.staticallySelectedCallable = true
+	return c
+}
+
+func (c Context) TakeStaticallySelectedCallable() (Context, bool) {
+	selected := c.staticallySelectedCallable
+	c.staticallySelectedCallable = false
+	return c, selected
 }
 
 func (c Context) WithDetachedInvocation() Context {

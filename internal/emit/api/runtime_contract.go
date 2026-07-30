@@ -23,6 +23,7 @@ const (
 	RuntimeModuleInterfaceValue
 	RuntimeModulePanicNil
 	RuntimeModuleChannel
+	RuntimeModuleUnsafePointer
 )
 
 func runtimeContract(

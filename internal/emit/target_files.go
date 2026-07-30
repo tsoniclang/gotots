@@ -94,6 +94,14 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		}
 		files = append(files, target)
 	}
+	environmentFiles, err := s.environmentTargetFiles(
+		primitiveAliases,
+		runtimeSymbols,
+	)
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, environmentFiles...)
 	packageFiles, err := s.packageTargetFiles(primitiveAliases)
 	if err != nil {
 		return nil, err
@@ -208,15 +216,21 @@ func (s *programSession) programInitializationFile() (TargetFile, error) {
 		if err := placement.Apply([]api.RootRequest{request}); err != nil {
 			return TargetFile{}, err
 		}
-		calls = append(calls, s.factory.ExpressionStatement(
-			s.factory.CallExpression(
-				s.factory.Identifier(localName),
-				nil,
-				nil,
-				nil,
-				tsgo.NodeFlagsNone,
-			),
-		))
+		var call tsgo.Expression = s.factory.CallExpression(
+			s.factory.Identifier(localName),
+			nil,
+			nil,
+			nil,
+			tsgo.NodeFlagsNone,
+		)
+		cooperative, err := s.packageInitializationIsCooperative(builder)
+		if err != nil {
+			return TargetFile{}, err
+		}
+		if cooperative {
+			call = s.factory.AwaitExpression(call)
+		}
+		calls = append(calls, s.factory.ExpressionStatement(call))
 	}
 	statements := placement.Statements(s.factory)
 	statements = append(statements, calls...)
@@ -252,6 +266,10 @@ func (s *programSession) packageInitializationOrder() (
 			for _, imported := range candidate.sourcePackage.Types().Imports() {
 				dependency := s.source.PackageForTypes(imported)
 				if dependency == nil && s.goRuntime.Owns(imported) {
+					continue
+				}
+				if dependency == nil &&
+					s.source.EnvironmentForTypes(imported) != nil {
 					continue
 				}
 				dependencyBuilder := s.packageBuilders[dependency]

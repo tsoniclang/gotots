@@ -3,6 +3,7 @@ package emit
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"go/token"
 	"go/types"
 	"sort"
@@ -286,6 +287,45 @@ func TestDeclarationRequirementSchedulerDeduplicatesAndUsesClosedOrder(
 	}
 	if actual, ok := scheduler.nextBatch(); ok || actual != nil {
 		t.Fatalf("unexpected trailing requirement batch = %#v, %t", actual, ok)
+	}
+}
+
+func TestDeclarationRequirementSchedulerLookupVisitsOnlySelectedOwner(
+	t *testing.T,
+) {
+	const ownerCount = 4096
+	sourcePackage := types.NewPackage("example.com/schedule-scale", "schedule")
+	scheduler := newDeclarationRequirementScheduler()
+	owners := make([]api.ArtifactOwner, 0, ownerCount)
+	for index := range ownerCount {
+		typeName := types.NewTypeName(
+			token.Pos(index+1),
+			sourcePackage,
+			fmt.Sprintf("Record%d", index),
+			nil,
+		)
+		requirement, err := api.NewNamedStructOperationRequirement(
+			typeName,
+			api.NamedStructOperationCopy,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		owners = append(owners, requirement.Owner())
+		scheduler.enqueue(requirement)
+	}
+	for {
+		if _, ok := scheduler.nextBatch(); !ok {
+			break
+		}
+	}
+	requirements, visits := scheduler.applied.forOwner(owners[ownerCount/2])
+	if len(requirements) != 1 || visits != 1 {
+		t.Fatalf(
+			"selected-owner lookup returned %d requirements after %d visits",
+			len(requirements),
+			visits,
+		)
 	}
 }
 

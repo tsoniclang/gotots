@@ -36,11 +36,12 @@ func emitStringLength(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	expectedType := types.Type(types.Typ[types.String])
-	defined, definedArgument := definedtype.ResolveBasic(argumentType)
-	if definedArgument {
-		expectedType = defined.Type()
+	expectedType, ok := stringArgumentExpectedType(argumentType)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source.Args[0])
 	}
+	defined, definedArgument := definedtype.ResolveBasic(argumentType)
 	value, err := children.Expression(
 		context.
 			WithRole(api.RoleCallArgument).
@@ -83,11 +84,21 @@ func emitStringLength(
 }
 
 func supportsStringArgument(sourceType types.Type) bool {
-	if basictype.SupportsString(sourceType) {
-		return true
+	_, ok := stringArgumentExpectedType(sourceType)
+	return ok
+}
+
+func stringArgumentExpectedType(sourceType types.Type) (types.Type, bool) {
+	if defined, ok := definedtype.ResolveBasic(sourceType); ok {
+		if !basictype.SupportsString(defined.Underlying()) {
+			return nil, false
+		}
+		return defined.Type(), true
 	}
-	defined, ok := definedtype.ResolveBasic(sourceType)
-	return ok && basictype.SupportsString(defined.Underlying())
+	if !basictype.SupportsString(sourceType) {
+		return nil, false
+	}
+	return types.Typ[types.String], true
 }
 
 func projectDefinedString(

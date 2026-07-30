@@ -29,6 +29,7 @@ func Emit(
 	reference, err := context.Names().AnonymousStruct(
 		structType,
 		api.AnonymousStructDemandDefinition,
+		api.ImportPhaseType,
 	)
 	if err != nil {
 		return api.TypeEmission{}, err

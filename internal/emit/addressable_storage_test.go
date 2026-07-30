@@ -21,6 +21,16 @@ func TestAddressableStorageReconstructsOnlyOwningBodiesIncludingInit(
 	scope := sourcePackage.Types().Scope()
 	addressed := scope.Lookup("Addressed").(*types.Func)
 	caller := scope.Lookup("Caller").(*types.Func)
+	literalValue := scope.Lookup("literalValue").(*types.Var)
+	literalInitializer := packageInitializerForVariable(
+		t,
+		sourcePackage,
+		literalValue,
+	)
+	literalOwner := api.MustPackageInitializerArtifactOwner(
+		sourcePackage.Types(),
+		literalInitializer,
+	)
 	var initializer *types.Func
 	for _, declaration := range sourcePackage.Files()[0].Syntax().Decls {
 		function, ok := declaration.(*ast.FuncDecl)
@@ -68,8 +78,14 @@ func TestAddressableStorageReconstructsOnlyOwningBodiesIncludingInit(
 	}
 	if len(session.requirements.appliedFor(sourceArtifactOwner(addressed))) != 1 ||
 		len(session.requirements.appliedFor(sourceArtifactOwner(initializer))) != 1 ||
+		len(session.requirements.appliedFor(literalOwner)) != 1 ||
 		len(session.requirements.appliedFor(sourceArtifactOwner(caller))) != 0 {
 		t.Fatal("addressable-storage requirements escaped their exact body owners")
+	}
+	builder := session.packageBuilders[sourcePackage]
+	literalIndex, ok := builder.initializerByOwner[literalOwner]
+	if !ok || builder.initialization[literalIndex].reconstructions != 1 {
+		t.Fatal("function-literal storage did not reconstruct its package initializer")
 	}
 	if session.artifacts.HasPending() ||
 		session.requirements.hasPending() ||
@@ -92,7 +108,7 @@ func TestAddressableStorageRejectsForeignAndForgedSameSpellingVariables(
 		t.Fatal("foreign-variable fixture does not share a spelling")
 	}
 	requirement, err := api.NewAddressableStorageRequirement(
-		addressed,
+		sourceArtifactOwner(addressed),
 		callerSignature.Params().At(0),
 	)
 	if err != nil {
@@ -117,7 +133,7 @@ func TestAddressableStorageRejectsForeignAndForgedSameSpellingVariables(
 	var invariant *api.InvariantError
 	if !errors.As(err, &invariant) ||
 		invariant.Reason !=
-			"function received foreign addressable-storage requirement" {
+			"artifact received foreign addressable-storage requirement" {
 		t.Fatalf("foreign same-spelling requirement error = %#v", err)
 	}
 
@@ -128,7 +144,10 @@ func TestAddressableStorageRejectsForeignAndForgedSameSpellingVariables(
 		addressedParameter.Name(),
 		addressedParameter.Type(),
 	)
-	requirement, err = api.NewAddressableStorageRequirement(addressed, forged)
+	requirement, err = api.NewAddressableStorageRequirement(
+		sourceArtifactOwner(addressed),
+		forged,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,6 +191,13 @@ func loadAddressableArtifactFixture(t *testing.T) *load.Program {
 
 var initialized int32
 
+var literalValue = func() int32 {
+	value := int32(3)
+	pointer := &value
+	*pointer++
+	return value
+}()
+
 func init() {
 	value := int32(2)
 	pointer := &value
@@ -186,7 +212,7 @@ func Addressed(value int32) int32 {
 }
 
 func Caller(value int32) int32 {
-	return Addressed(value) + initialized
+	return Addressed(value) + initialized + literalValue
 }
 `),
 		0o600,

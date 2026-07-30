@@ -38,6 +38,25 @@ func EmitAdapter(
 	)
 }
 
+func EmitEnvironmentContract(
+	context api.Context,
+	children api.ChildEmitter,
+	signature *types.Signature,
+) (SignatureEmission, error) {
+	return emitRepresented(
+		context,
+		children,
+		nil,
+		signature,
+		api.RoleCallableParameter,
+		api.RoleCallableResult,
+		func(_ *types.Var, index int) (string, error) {
+			return "$argument" + strconv.Itoa(index), nil
+		},
+		true,
+	)
+}
+
 func EmitABIAdapter(
 	context api.Context,
 	children api.ChildEmitter,
@@ -162,6 +181,26 @@ func EmitType(
 	source ast.Node,
 	signature *types.Signature,
 ) (api.TypeEmission, error) {
+	if context.EnvironmentContract() {
+		target, err := emitEnvironmentNonNilType(
+			context,
+			children,
+			source,
+			signature,
+		)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return api.DirectType(
+			context.Factory().UnionTypeNode([]tsgo.TypeNode{
+				target.Value(),
+				context.Factory().KeywordTypeNode(
+					tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+				),
+			}),
+			target.Requests()...,
+		), nil
+	}
 	target, err := EmitNonNilType(context, children, source, signature)
 	if err != nil {
 		return api.TypeEmission{}, err
@@ -174,6 +213,57 @@ func EmitType(
 			),
 		}),
 		target.Requests()...,
+	), nil
+}
+
+func emitEnvironmentNonNilType(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+) (api.TypeEmission, error) {
+	profile, profiled := context.GenericCallableProfile()
+	if !profiled {
+		return EmitInternalNonNilType(
+			context,
+			children,
+			source,
+			signature,
+		)
+	}
+	reference, err := context.Names().SourceCallableABI(
+		profile.Owner(),
+		signature,
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	cooperative, selected :=
+		profile.Selection().ABI(reference.Artifact())
+	if !selected {
+		return EmitInternalNonNilType(
+			context,
+			children,
+			source,
+			signature,
+		)
+	}
+	target, err := emitInternalNonNilType(
+		context,
+		children,
+		source,
+		signature,
+		cooperative,
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return api.DirectType(
+		target.Value(),
+		api.CombineRequests(
+			reference.Requests(),
+			target.Requests(),
+		)...,
 	), nil
 }
 
@@ -215,11 +305,49 @@ func EmitNonNilType(
 	), nil
 }
 
+func EmitDefinedNonNilType(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+) (api.TypeEmission, error) {
+	if context.EnvironmentContract() {
+		return emitEnvironmentNonNilType(
+			context,
+			children,
+			source,
+			signature,
+		)
+	}
+	return EmitNonNilType(
+		context,
+		children,
+		source,
+		signature,
+	)
+}
+
 func EmitInternalNonNilType(
 	context api.Context,
 	children api.ChildEmitter,
 	source ast.Node,
 	signature *types.Signature,
+) (api.TypeEmission, error) {
+	return emitInternalNonNilType(
+		context,
+		children,
+		source,
+		signature,
+		false,
+	)
+}
+
+func emitInternalNonNilType(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+	cooperative bool,
 ) (api.TypeEmission, error) {
 	target, err := emitRepresented(
 		context,
@@ -236,11 +364,15 @@ func EmitInternalNonNilType(
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
+	result := target.Result()
+	if cooperative {
+		result = PromiseResult(context.Factory(), result)
+	}
 	return api.DirectType(
 		context.Factory().FunctionTypeNode(
 			nil,
 			target.Parameters(),
-			target.Result(),
+			result,
 		),
 		target.Requests()...,
 	), nil
@@ -350,7 +482,7 @@ func emitRepresented(
 		parameterNames = append(parameterNames, name)
 		requests = append(requests, targetType.Requests()...)
 	}
-	result, resultRequests, err := emitResultType(
+	result, resultRequests, err := EmitResultType(
 		context.WithRole(resultRole),
 		children,
 		source,
@@ -368,7 +500,7 @@ func emitRepresented(
 	}, nil
 }
 
-func emitResultType(
+func EmitResultType(
 	context api.Context,
 	children api.ChildEmitter,
 	source ast.Node,

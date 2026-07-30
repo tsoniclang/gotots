@@ -50,7 +50,7 @@ type RootRequestOwner struct {
 	artifactDependency     ArtifactDependency
 }
 
-type RootRequest struct {
+type rootRequestPayload struct {
 	owner           RootRequestOwner
 	importPhase     ImportPhase
 	localName       string
@@ -58,6 +58,11 @@ type RootRequest struct {
 	specifier       tsgo.ImportSpecifier
 	primitiveAlias  PrimitiveAlias
 	runtimeSymbol   RuntimeSymbol
+}
+
+type RootRequest struct {
+	payload  *rootRequestPayload
+	sequence *rootRequestSequence
 }
 
 func NewImportRequest(
@@ -83,7 +88,7 @@ func NewImportRequest(
 	if localName != exportedName {
 		propertyName = factory.Identifier(exportedName)
 	}
-	return RootRequest{
+	return RootRequest{payload: &rootRequestPayload{
 		owner: RootRequestOwner{
 			kind:         RootRequestImport,
 			modulePath:   modulePath,
@@ -97,7 +102,7 @@ func NewImportRequest(
 			propertyName,
 			factory.Identifier(localName),
 		),
-	}, nil
+	}}, nil
 }
 
 func NewPrimitiveAliasRequest(
@@ -120,7 +125,7 @@ func NewPrimitiveAliasRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
-	request.primitiveAlias = alias
+	request.payload.primitiveAlias = alias
 	return request, nil
 }
 
@@ -150,7 +155,7 @@ func NewRuntimeImportRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
-	request.runtimeSymbol = symbol
+	request.payload.runtimeSymbol = symbol
 	return request, nil
 }
 
@@ -184,28 +189,23 @@ func NewLexicalNamedStructOperationRequest(
 func newDeclarationRequirementRequest(
 	requirement DeclarationRequirement,
 ) RootRequest {
-	return RootRequest{
+	return RootRequest{payload: &rootRequestPayload{
 		owner: RootRequestOwner{
 			kind:                   RootRequestDeclarationRequirement,
 			declarationRequirement: requirement,
 		},
-	}
+	}}
 }
 
 func NewAddressableStorageRequest(
-	owner *types.Func,
+	owner ArtifactOwner,
 	variable *types.Var,
 ) (RootRequest, error) {
 	requirement, err := NewAddressableStorageRequirement(owner, variable)
 	if err != nil {
 		return RootRequest{}, err
 	}
-	return RootRequest{
-		owner: RootRequestOwner{
-			kind:                   RootRequestDeclarationRequirement,
-			declarationRequirement: requirement,
-		},
-	}, nil
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
 func NewCallableControlRequest(
@@ -246,6 +246,24 @@ func NewGotoControlRequest(
 	return newDeclarationRequirementRequest(requirement), nil
 }
 
+func NewIteratorReturnControlRequest(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+	source *ast.RangeStmt,
+) (RootRequest, error) {
+	requirement, err := NewIteratorReturnControlRequirement(
+		owner,
+		enclosing,
+		callable,
+		source,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
 func NewDirectCallableControlRequest(
 	owner *types.Func,
 	control CallableControlFacet,
@@ -265,12 +283,7 @@ func NewConstantProjectionRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
-	return RootRequest{
-		owner: RootRequestOwner{
-			kind:                   RootRequestDeclarationRequirement,
-			declarationRequirement: requirement,
-		},
-	}, nil
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
 func NewLocalConstantProjectionRequest(
@@ -286,12 +299,7 @@ func NewLocalConstantProjectionRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
-	return RootRequest{
-		owner: RootRequestOwner{
-			kind:                   RootRequestDeclarationRequirement,
-			declarationRequirement: requirement,
-		},
-	}, nil
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
 func NewArtifactDependencyRequest(
@@ -331,12 +339,12 @@ func newArtifactDependencyRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
-	return RootRequest{
+	return RootRequest{payload: &rootRequestPayload{
 		owner: RootRequestOwner{
 			kind:               RootRequestArtifactDependency,
 			artifactDependency: dependency,
 		},
-	}, nil
+	}}, nil
 }
 
 func NewAnonymousStructRequest(
@@ -350,12 +358,7 @@ func NewAnonymousStructRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
-	return RootRequest{
-		owner: RootRequestOwner{
-			kind:                   RootRequestDeclarationRequirement,
-			declarationRequirement: requirement,
-		},
-	}, nil
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
 func NewMapSpecializationRequest(
@@ -366,18 +369,26 @@ func NewMapSpecializationRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
-	return RootRequest{
-		owner: RootRequestOwner{
-			kind:                   RootRequestDeclarationRequirement,
-			declarationRequirement: requirement,
-		},
-	}, nil
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
 func NewInterfaceAdapterRequest(
 	artifact *GeneratedArtifact,
 ) (RootRequest, error) {
 	requirement, err := NewInterfaceAdapterRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewInterfaceAdapterContractRequest(
+	artifact *GeneratedArtifact,
+	contract *types.Interface,
+	contractKey string,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceAdapterContractRequirement(
+		artifact,
+		contract,
+		contractKey,
+	)
 	return generatedDefinitionRequest(requirement, err)
 }
 
@@ -409,24 +420,25 @@ func generatedDefinitionRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
-	return RootRequest{
-		owner: RootRequestOwner{
-			kind:                   RootRequestDeclarationRequirement,
-			declarationRequirement: requirement,
-		},
-	}, nil
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
 func (r RootRequest) Kind() RootRequestKind {
-	return r.owner.kind
+	if r.payload == nil {
+		return RootRequestInvalid
+	}
+	return r.payload.owner.kind
 }
 
 func (r RootRequest) LegalScope() PlacementScope {
-	if r.owner.kind == RootRequestImport {
+	if r.payload == nil {
+		return ScopeInvalid
+	}
+	if r.payload.owner.kind == RootRequestImport {
 		return ScopeFileImports
 	}
-	if r.owner.kind == RootRequestDeclarationRequirement {
-		if artifact, ok := r.owner.declarationRequirement.
+	if r.payload.owner.kind == RootRequestDeclarationRequirement {
+		if artifact, ok := r.payload.owner.declarationRequirement.
 			GeneratedArtifact(); ok &&
 			(artifact.Placement() ==
 				GeneratedArtifactPlacementCompilation ||
@@ -444,63 +456,90 @@ func (r RootRequest) PreferredScope() PlacementScope {
 }
 
 func (r RootRequest) Execution() ExecutionConstraint {
-	if r.owner.kind == RootRequestImport {
+	if r.payload == nil {
+		return ExecutionInvalid
+	}
+	if r.payload.owner.kind == RootRequestImport {
 		return ExecutionStatic
 	}
-	if r.owner.kind == RootRequestDeclarationRequirement {
+	if r.payload.owner.kind == RootRequestDeclarationRequirement {
 		return ExecutionStatic
 	}
 	return ExecutionInvalid
 }
 
 func (r RootRequest) Owner() RootRequestOwner {
-	return r.owner
+	if r.payload == nil {
+		return RootRequestOwner{}
+	}
+	return r.payload.owner
 }
 
 func (r RootRequest) ImportPhase() ImportPhase {
-	return r.importPhase
+	if r.payload == nil {
+		return ImportPhaseInvalid
+	}
+	return r.payload.importPhase
 }
 
 func (r RootRequest) ModulePath() string {
-	return r.owner.modulePath
+	if r.payload == nil {
+		return ""
+	}
+	return r.payload.owner.modulePath
 }
 
 func (r RootRequest) ExportedName() string {
-	return r.owner.exportedName
+	if r.payload == nil {
+		return ""
+	}
+	return r.payload.owner.exportedName
 }
 
 func (r RootRequest) LocalName() string {
-	return r.localName
+	if r.payload == nil {
+		return ""
+	}
+	return r.payload.localName
 }
 
 func (r RootRequest) ModuleSpecifier() tsgo.StringLiteral {
-	return r.moduleSpecifier
+	if r.payload == nil {
+		return nil
+	}
+	return r.payload.moduleSpecifier
 }
 
 func (r RootRequest) Specifier() tsgo.ImportSpecifier {
-	return r.specifier
+	if r.payload == nil {
+		return nil
+	}
+	return r.payload.specifier
 }
 
 func (r RootRequest) PrimitiveAlias() (PrimitiveAlias, bool) {
-	if r.primitiveAlias == PrimitiveInvalid {
+	if r.payload == nil || r.payload.primitiveAlias == PrimitiveInvalid {
 		return PrimitiveInvalid, false
 	}
-	return r.primitiveAlias, true
+	return r.payload.primitiveAlias, true
 }
 
 func (r RootRequest) RuntimeSymbol() (RuntimeSymbol, bool) {
-	if r.runtimeSymbol == RuntimeInvalid {
+	if r.payload == nil || r.payload.runtimeSymbol == RuntimeInvalid {
 		return RuntimeInvalid, false
 	}
-	return r.runtimeSymbol, true
+	return r.payload.runtimeSymbol, true
 }
 
 func (r RootRequest) DeclarationRequirement() (
 	DeclarationRequirement,
 	bool,
 ) {
-	requirement := r.owner.declarationRequirement
-	if r.owner.kind != RootRequestDeclarationRequirement ||
+	if r.payload == nil {
+		return DeclarationRequirement{}, false
+	}
+	requirement := r.payload.owner.declarationRequirement
+	if r.payload.owner.kind != RootRequestDeclarationRequirement ||
 		!requirement.Valid() {
 		return DeclarationRequirement{}, false
 	}
@@ -508,8 +547,11 @@ func (r RootRequest) DeclarationRequirement() (
 }
 
 func (r RootRequest) ArtifactDependency() (ArtifactDependency, bool) {
-	dependency := r.owner.artifactDependency
-	if r.owner.kind != RootRequestArtifactDependency ||
+	if r.payload == nil {
+		return ArtifactDependency{}, false
+	}
+	dependency := r.payload.owner.artifactDependency
+	if r.payload.owner.kind != RootRequestArtifactDependency ||
 		!dependency.Valid() {
 		return ArtifactDependency{}, false
 	}

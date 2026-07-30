@@ -287,12 +287,18 @@ func (e StoreTargetEmission) SourceType() types.Type {
 func (e StoreTargetEmission) Requests() []RootRequest {
 	requests := slices.Clone(e.requests)
 	if e.property {
-		requests = append(requests, e.propertyReceiver.Requests()...)
+		requests = CombineRequests(
+			requests,
+			e.propertyReceiver.Requests(),
+		)
 	}
 	if e.accessor {
-		requests = append(requests, e.accessorReceiver.Requests()...)
+		requests = CombineRequests(
+			requests,
+			e.accessorReceiver.Requests(),
+		)
 		for _, argument := range e.accessorArguments {
-			requests = append(requests, argument.Requests()...)
+			requests = CombineRequests(requests, argument.Requests())
 		}
 	}
 	return requests
@@ -465,15 +471,7 @@ func (e BlockEmission) Requests() []RootRequest {
 }
 
 func CombineRequests(groups ...[]RootRequest) []RootRequest {
-	size := 0
-	for _, group := range groups {
-		size += len(group)
-	}
-	result := make([]RootRequest, 0, size)
-	for _, group := range groups {
-		result = append(result, group...)
-	}
-	return result
+	return combineRootRequests(groups...)
 }
 
 type ResultError struct {

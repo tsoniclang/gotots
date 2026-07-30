@@ -36,6 +36,9 @@ func indexDeclarations(source *load.Program) (map[types.Object]declarationSite, 
 							Reason: "function declaration has no go/types object",
 						}
 					}
+					if object.Name() == "_" {
+						continue
+					}
 					if err := addDeclarationSite(
 						sites,
 						object,
@@ -94,6 +97,9 @@ func indexGeneralDeclaration(
 						Role:   api.RoleFileDeclaration,
 						Reason: "constant declaration has no go/types object",
 					}
+				}
+				if object.Name() == "_" {
+					continue
 				}
 				if err := addDeclarationSite(
 					sites,
@@ -180,6 +186,9 @@ func indexGeneralDeclaration(
 					Role:   api.RoleFileDeclaration,
 					Reason: "type declaration has no go/types object",
 				}
+			}
+			if object.Name() == "_" {
+				continue
 			}
 			if err := addDeclarationSite(
 				sites,

@@ -29,6 +29,10 @@ func pointerValue(sourceType types.Type) bool {
 	return ok
 }
 
+func unsafePointerValue(sourceType types.Type) bool {
+	return basictype.SupportsUnsafePointer(sourceType)
+}
+
 func channelValue(sourceType types.Type) bool {
 	_, ok := channeltype.Resolve(sourceType)
 	return ok

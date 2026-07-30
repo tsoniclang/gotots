@@ -211,6 +211,30 @@ func Composite(value int32) int32 {
 	return pointer.Count
 }
 
+func ElidedPointerSlice(value int32) (int32, bool) {
+	values := []*Box{{Count: value}, {Count: value + 1}}
+	values[0].Count++
+	return values[0].Count, values[0] != values[1]
+}
+
+func ElidedPointerArray(value int32) int32 {
+	values := [1]*Box{{Count: value}}
+	values[0].Count++
+	return values[0].Count
+}
+
+func ElidedPointerMap(value int32) int32 {
+	values := map[string]*Box{"value": {Count: value}}
+	values["value"].Count++
+	return values["value"].Count
+}
+
+func ElidedPointerCompositeArray(value int32) int32 {
+	values := []*[2]int32{{value, value + 1}}
+	values[0][1]++
+	return values[0][1]
+}
+
 func PointerField(value int32) int32 {
 	holder := Holder{Pointer: &Box{Count: value}}
 	holder.Pointer.Count++

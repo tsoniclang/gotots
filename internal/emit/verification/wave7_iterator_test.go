@@ -42,7 +42,14 @@ func TestWaveSevenIteratorRangesExecuteDifferentially(t *testing.T) {
 				"AuditIteratorRanges",
 				"BreaksBadIterator",
 				"CallsYieldAfterExit",
+				"IteratorDeferredReturn",
+				"IteratorMultipleReturn",
+				"IteratorNamedReturn",
+				"IteratorNestedReturn",
+				"IteratorReturnBoundary",
+				"IteratorSelectiveReturn",
 				"RangesNilIterator",
+				"ReturnsBadIterator",
 			} {
 				root, rootErr := emit.NewRoot(scope.Lookup(name))
 				if rootErr != nil {
@@ -73,7 +80,14 @@ import {
     AuditIteratorRanges,
     BreaksBadIterator,
     CallsYieldAfterExit,
+    IteratorDeferredReturn,
+    IteratorMultipleReturn,
+    IteratorNamedReturn,
+    IteratorNestedReturn,
+    IteratorReturnBoundary,
+    IteratorSelectiveReturn,
     RangesNilIterator,
+    ReturnsBadIterator,
 } from "`+sourceModule+`";
 
 const values = AuditIteratorRanges();
@@ -90,7 +104,14 @@ const panics = (action: () => void): boolean => {
     }
 };
 console.log(output.join(" "));
+console.log(String(IteratorReturnBoundary()));
+console.log(String(IteratorSelectiveReturn()));
+console.log(IteratorMultipleReturn().map(String).join(" "));
+console.log(String(IteratorNamedReturn()));
+console.log(String(IteratorNestedReturn()));
+console.log(String(IteratorDeferredReturn()));
 console.log(String(panics(BreaksBadIterator)));
+console.log(String(panics(ReturnsBadIterator)));
 console.log(String(panics(CallsYieldAfterExit)));
 console.log(String(panics(() => { RangesNilIterator(undefined); })));
 `)
@@ -122,7 +143,7 @@ console.log(String(panics(() => { RangesNilIterator(undefined); })));
 	}
 }
 
-func TestWaveSevenIteratorDeferredControlFailsAtExactBoundary(t *testing.T) {
+func TestWaveSevenIteratorLabelControlFailsAtExactBoundary(t *testing.T) {
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: waveSevenGenericDirectory(),
 		Pattern:   ".",
@@ -130,10 +151,7 @@ func TestWaveSevenIteratorDeferredControlFailsAtExactBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{
-		"IteratorReturnBoundary",
-		"IteratorLabelBoundary",
-	} {
+	for _, name := range []string{"IteratorLabelBoundary"} {
 		t.Run(name, func(t *testing.T) {
 			root, rootErr := emit.NewRoot(
 				program.Roots()[0].Types().Scope().Lookup(name),
@@ -186,6 +204,16 @@ func assertIteratorRangeShape(t *testing.T, printed string) {
 	if strings.Count(printed, "export function GenericIteratorSum<T>") != 1 {
 		t.Fatalf("generic iterator body was duplicated:\n%s", printed)
 	}
+	if count := strings.Count(
+		printed,
+		"let __gotots_range_return_",
+	); count != 8 {
+		t.Fatalf(
+			"iterator-return carrier declarations = %d, want 8:\n%s",
+			count,
+			printed,
+		)
+	}
 }
 
 func executeWaveSevenIteratorGo(
@@ -225,7 +253,14 @@ func main() {
 		fmt.Print(value)
 	}
 	fmt.Println()
+	fmt.Println(values.IteratorReturnBoundary())
+	fmt.Println(values.IteratorSelectiveReturn())
+	fmt.Println(values.IteratorMultipleReturn())
+	fmt.Println(values.IteratorNamedReturn())
+	fmt.Println(values.IteratorNestedReturn())
+	fmt.Println(values.IteratorDeferredReturn())
 	fmt.Println(panics(values.BreaksBadIterator))
+	fmt.Println(panics(func() { values.ReturnsBadIterator() }))
 	fmt.Println(panics(values.CallsYieldAfterExit))
 	fmt.Println(panics(func() { values.RangesNilIterator(nil) }))
 }

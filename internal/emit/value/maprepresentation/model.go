@@ -89,13 +89,26 @@ func (m Model) TypeName() *types.TypeName {
 
 func (m Model) ReadReceiver(
 	context api.Context,
-	_ ast.Node,
+	source ast.Node,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	if !m.nominal {
 		return value, nil
 	}
-	return m.staticMapOperation(context, definedtype.MapReadMember, value)
+	zero, err := context.Values().Zero(
+		context.WithRole(api.RoleMapReceiver),
+		source,
+		m.defined.Underlying(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return m.staticMapOperation(
+		context,
+		definedtype.MapReadMember,
+		value,
+		zero,
+	)
 }
 
 func (m Model) StoreReceiver(
@@ -123,13 +136,22 @@ func (m Model) staticMapOperation(
 	context api.Context,
 	member string,
 	value api.ExpressionEmission,
+	arguments ...api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	reference, err := context.Names().TypeReference(m.TypeName())
+	reference, err := context.Names().Reference(m.TypeName())
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	values := []tsgo.Expression{value.Value()}
+	requests := value.Requests()
+	before := value.Before()
+	for _, argument := range arguments {
+		before = append(before, argument.Before()...)
+		values = append(values, argument.Value())
+		requests = append(requests, argument.Requests()...)
+	}
 	return api.NewExpressionEmission(
-		value.Before(),
+		before,
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
 				context.Factory().Identifier(reference.Name()),
@@ -139,10 +161,10 @@ func (m Model) staticMapOperation(
 			),
 			nil,
 			nil,
-			[]tsgo.Expression{value.Value()},
+			values,
 			tsgo.NodeFlagsNone,
 		),
-		api.CombineRequests(value.Requests(), reference.Requests()),
+		api.CombineRequests(requests, reference.Requests()),
 	)
 }
 

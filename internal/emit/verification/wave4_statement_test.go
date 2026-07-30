@@ -106,13 +106,14 @@ console.log(output.join(" "));
 }
 
 type waveFourArtifacts struct {
-	paths        []string
-	sourceModule string
-	bytes        int
-	nodes        int
-	largest      int
-	sizes        []artifactSize
-	printed      string
+	paths         []string
+	sourceModule  string
+	bytes         int
+	nodes         int
+	largest       int
+	sizes         []artifactSize
+	printed       string
+	printedByKind map[emit.TargetFileKind][]string
 }
 
 type artifactSize struct {
@@ -136,7 +137,9 @@ func materializeArtifacts(
 			t.Errorf("close TS-Go client: %v", err)
 		}
 	})
-	result := waveFourArtifacts{}
+	result := waveFourArtifacts{
+		printedByKind: make(map[emit.TargetFileKind][]string),
+	}
 	for _, file := range emission.Files() {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
 		if err != nil {
@@ -175,6 +178,10 @@ func materializeArtifacts(
 		result.bytes += len(printed)
 		result.nodes += nodes
 		result.printed += "\n// " + file.OutputPath() + "\n" + printed
+		result.printedByKind[file.Kind()] = append(
+			result.printedByKind[file.Kind()],
+			printed,
+		)
 		result.sizes = append(result.sizes, artifactSize{
 			path:  file.OutputPath(),
 			bytes: len(printed),

@@ -30,7 +30,25 @@ func emitMap(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	operand, err = model.ReadReceiver(context, source.X, operand)
+	return emitMapValue(
+		context,
+		children,
+		source,
+		model,
+		operand,
+		targetLabel,
+	)
+}
+
+func emitMapValue(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.RangeStmt,
+	model maprepresentation.Model,
+	operand api.ExpressionEmission,
+	targetLabel string,
+) (api.StatementEmission, error) {
+	operand, err := model.ReadReceiver(context, source.X, operand)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}

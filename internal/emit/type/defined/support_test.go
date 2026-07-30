@@ -98,6 +98,7 @@ func main() {
 	left := values.LabelFromString("a")
 	right := values.LabelFromString("z")
 	fmt.Println(values.StringFromLabel(values.LabelJoin(left, right)))
+	fmt.Println(values.LabelIndex(values.LabelFromString("path"), 2))
 	fmt.Println(values.LabelOrder(left, right))
 	fmt.Println(values.BoolFromSwitch(values.SwitchNot(values.SwitchFromBool(true))))
 	ratio := values.RatioFromFloat(7.5)
@@ -112,6 +113,8 @@ func main() {
 	fmt.Println(values.IntFromCount(values.ConstantValue()))
 	fmt.Println(values.IntFromCount(values.UntypedConstantValue()))
 	fmt.Println(values.IntFromCount(values.CountWithLiteral(values.CountFromInt(5))))
+	fmt.Println(values.IntFromCount(values.CountVariableShift(values.OtherFromCount(values.CountFromInt(3)))))
+	fmt.Println(values.IntFromCount(values.CountVariableShiftUpdate(values.OtherFromCount(values.CountFromInt(4)))))
 	fmt.Println(values.IntFromCount(values.FoldedCount()))
 	fmt.Println(values.LocalTypes(6))
 	fmt.Println(values.IntFromCount(values.CountUpdate(values.CountFromInt(4))))
@@ -174,6 +177,7 @@ console.log(values.CountOrder(count, values.CountFromInt(3` + suffix + `)).join(
 const left = values.LabelFromString("a");
 const right = values.LabelFromString("z");
 console.log(values.StringFromLabel(values.LabelJoin(left, right)));
+console.log(String(values.LabelIndex(values.LabelFromString("path"), 2` + suffix + `)));
 console.log(values.LabelOrder(left, right).join(" "));
 console.log(String(values.BoolFromSwitch(values.SwitchNot(values.SwitchFromBool(true)))));
 const ratio = values.RatioFromFloat(7.5);
@@ -188,6 +192,8 @@ console.log(String(values.SignalEqual(signal, signal)));
 console.log(String(values.IntFromCount(values.ConstantValue())));
 console.log(String(values.IntFromCount(values.UntypedConstantValue())));
 console.log(String(values.IntFromCount(values.CountWithLiteral(values.CountFromInt(5` + suffix + `)))));
+console.log(String(values.IntFromCount(values.CountVariableShift(values.OtherFromCount(values.CountFromInt(3` + suffix + `))))));
+console.log(String(values.IntFromCount(values.CountVariableShiftUpdate(values.OtherFromCount(values.CountFromInt(4` + suffix + `))))));
 console.log(String(values.IntFromCount(values.FoldedCount())));
 console.log(String(values.LocalTypes(6` + suffix + `)));
 console.log(String(values.IntFromCount(values.CountUpdate(values.CountFromInt(4` + suffix + `)))));

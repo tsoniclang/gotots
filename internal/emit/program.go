@@ -33,6 +33,7 @@ const (
 	TargetFilePackageAssembly
 	TargetFileProgramInitialization
 	TargetFileSupport
+	TargetFileEnvironmentContract
 )
 
 type ProgramEmission struct {
@@ -43,6 +44,8 @@ type programSession struct {
 	source                 *load.Program
 	factory                tsgo.Factory
 	integer                api.IntegerRepresentation
+	evaluationOrder        api.EvaluationOrder
+	concurrency            api.ConcurrencySemantics
 	registry               *emitnaming.Registry
 	scheduler              *scheduler
 	requirements           *declarationRequirementScheduler
@@ -51,8 +54,10 @@ type programSession struct {
 	emitters               map[*load.Package]*emitter
 	builders               map[string]*targetFileBuilder
 	packageBuilders        map[*load.Package]*packageTargetBuilder
+	environmentBuilders    map[*load.Package]*environmentContractBuilder
 	packageInitializations *packageInitializationScheduler
 	genericOperations      map[genericOperationIdentity]*api.GenericOperationContract
+	genericProfiles        map[genericCallableProfileIdentity]*api.GenericCallableProfile
 	goRuntime              *gocontract.Contract
 	sealed                 bool
 }
@@ -347,7 +352,10 @@ func newProgramSession(
 		return nil, err
 	}
 	registry := emitnaming.NewRegistry()
-	if err := registry.IndexPackageTargets(source.Packages()); err != nil {
+	if err := registry.IndexCompilationTargets(
+		source.Packages(),
+		source.EnvironmentPackages(),
+	); err != nil {
 		return nil, err
 	}
 	goRuntime, err := gocontract.Resolve(source)
@@ -358,6 +366,8 @@ func newProgramSession(
 		source:                 source,
 		factory:                tsgo.NewFactory(),
 		integer:                options.IntegerRepresentation,
+		evaluationOrder:        options.EvaluationOrder,
+		concurrency:            options.ConcurrencySemantics,
 		registry:               registry,
 		scheduler:              newScheduler(),
 		requirements:           newDeclarationRequirementScheduler(),
@@ -366,8 +376,10 @@ func newProgramSession(
 		emitters:               make(map[*load.Package]*emitter),
 		builders:               make(map[string]*targetFileBuilder),
 		packageBuilders:        make(map[*load.Package]*packageTargetBuilder),
+		environmentBuilders:    make(map[*load.Package]*environmentContractBuilder),
 		packageInitializations: newPackageInitializationScheduler(),
 		genericOperations:      make(map[genericOperationIdentity]*api.GenericOperationContract),
+		genericProfiles:        make(map[genericCallableProfileIdentity]*api.GenericCallableProfile),
 		goRuntime:              goRuntime,
 	}
 	for _, sourcePackage := range source.Packages() {
@@ -452,10 +464,7 @@ func newProgramSession(
 func (s *programSession) emit(object types.Object) error {
 	site, ok := s.sites[object]
 	if !ok {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "scheduled object lost its declaration",
-		}
+		return s.emitEnvironmentObject(object)
 	}
 	if variable, ok := object.(*types.Var); ok {
 		return s.emitPackageStorage(variable, site)
@@ -509,7 +518,7 @@ func (s *programSession) applyRootRequests(
 		return &ScheduleError{Reason: "root request arrived after target files were sealed"}
 	}
 	imports := make([]api.RootRequest, 0, len(requests))
-	for _, request := range requests {
+	err := api.WalkRootRequests(requests, func(request api.RootRequest) error {
 		switch request.Kind() {
 		case api.RootRequestImport:
 			imports = append(imports, request)
@@ -528,6 +537,10 @@ func (s *programSession) applyRootRequests(
 		default:
 			return &ScheduleError{Reason: "root request kind is invalid"}
 		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 	return placement.Apply(imports)
 }

@@ -46,6 +46,9 @@ func Emit(
 						sourceName,
 					)
 			}
+			if selected.Name() == "_" {
+				continue
+			}
 			if constantbinding.IsUntyped(selected.Type()) {
 				base, err := context.Names().Declare(selected)
 				if err != nil {

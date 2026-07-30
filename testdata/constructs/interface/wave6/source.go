@@ -4,6 +4,8 @@ type Reader interface {
 	Read(delta int32) int32
 }
 
+type DerivedReader Reader
+
 type Namer interface {
 	Name() int32
 }
@@ -237,6 +239,17 @@ func promotedAdapters() []int32 {
 	}
 }
 
+func derivedInterfaces() []int32 {
+	var value DerivedReader = Counter{Value: 14}
+	var broad any = value
+	selected, ok := broad.(DerivedReader)
+	return []int32{
+		value.Read(1),
+		selected.Read(2),
+		boolValue(ok),
+	}
+}
+
 func localInterfaces() []int32 {
 	type Local interface {
 		Read(int32) int32
@@ -285,6 +298,32 @@ func localDynamicIdentity() []int32 {
 	}
 }
 
+func tupleSource() (Counter, bool) {
+	return Counter{Value: 24}, true
+}
+
+func tupleReturn() (any, bool) {
+	return tupleSource()
+}
+
+func tupleAssignment() (any, bool) {
+	var value any
+	var ok bool
+	value, ok = tupleSource()
+	return value, ok
+}
+
+func tupleAdaptations() []int32 {
+	returned, returnOK := tupleReturn()
+	assigned, assignmentOK := tupleAssignment()
+	return []int32{
+		returned.(Counter).Value,
+		boolValue(returnOK),
+		assigned.(Counter).Value,
+		boolValue(assignmentOK),
+	}
+}
+
 func boolValue(value bool) int32 {
 	if value {
 		return 1
@@ -299,7 +338,9 @@ func Audit() []int32 {
 	result = append(result, directFloatMaps()...)
 	result = append(result, typeSwitches()...)
 	result = append(result, promotedAdapters()...)
+	result = append(result, derivedInterfaces()...)
 	result = append(result, localInterfaces()...)
 	result = append(result, localDynamicIdentity()...)
+	result = append(result, tupleAdaptations()...)
 	return result
 }

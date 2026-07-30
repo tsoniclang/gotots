@@ -54,6 +54,11 @@ type packageInitializationArtifact struct {
 	reconstructions uint64
 }
 
+type packageInitFunction struct {
+	function *types.Func
+	name     string
+}
+
 type packageTargetBuilder struct {
 	sourcePackage      *load.Package
 	statePath          string
@@ -67,7 +72,7 @@ type packageTargetBuilder struct {
 	storageByObject    map[*types.Var]int
 	initialization     []packageInitializationArtifact
 	initializerByOwner map[api.ArtifactOwner]int
-	initFunctions      []tsgo.Statement
+	initFunctions      []packageInitFunction
 }
 
 func newPackageInitializationScheduler() *packageInitializationScheduler {
@@ -154,6 +159,10 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 	for _, imported := range imports {
 		dependency := s.source.PackageForTypes(imported)
 		if dependency == nil && s.goRuntime.Owns(imported) {
+			continue
+		}
+		if dependency == nil &&
+			s.source.EnvironmentForTypes(imported) != nil {
 			continue
 		}
 		if dependency == nil || dependency.ModulePath() == "" {
@@ -478,15 +487,10 @@ func (s *programSession) emitPackageInitFunctions(
 			}
 			packageBuilder.initFunctions = append(
 				packageBuilder.initFunctions,
-				s.factory.ExpressionStatement(
-					s.factory.CallExpression(
-						s.factory.Identifier(binding.Name),
-						nil,
-						nil,
-						nil,
-						tsgo.NodeFlagsNone,
-					),
-				),
+				packageInitFunction{
+					function: object.Origin(),
+					name:     binding.Name,
+				},
 			)
 		}
 	}

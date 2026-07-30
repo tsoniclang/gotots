@@ -49,6 +49,7 @@ func TestArtifactReferencesRecordExactConsumedFacet(t *testing.T) {
 			sourceFile:   sourceFile,
 			sourcePath:   "modules/current/source.ts",
 			moduleExport: true,
+			kind:         targetBindingSource,
 		}); err != nil {
 			t.Fatal(err)
 		}

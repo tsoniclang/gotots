@@ -24,59 +24,61 @@ type AddressableStorage interface {
 }
 
 type Context struct {
-	role                     Role
-	fileSet                  *token.FileSet
-	typesPackage             *types.Package
-	typesInfo                *types.Info
-	typesSizes               types.Sizes
-	factory                  tsgo.Factory
-	names                    Names
-	values                   Values
-	storage                  AddressableStorage
-	integer                  IntegerRepresentation
-	evaluationOrder          EvaluationOrder
-	goRuntime                GoRuntimeContract
-	concurrency              ConcurrencySemantics
-	expectedType             types.Type
-	expectedResults          *types.Tuple
-	functionResults          *types.Tuple
-	breakDepth               uint32
-	continueDepth            uint32
-	breakTarget              string
-	continueTarget           string
-	controlLabels            map[*types.Label]ControlLabel
-	statementLabel           string
-	artifactOwner            ArtifactOwner
-	callableControls         map[ast.Node]CallableControlDemand
-	callableEnclosing        ast.Node
-	currentCallable          ast.Node
-	currentControl           CallableControlDemand
-	deferControl             DeferControl
-	returnControl            ReturnControl
-	gotoUses                 map[*types.Label][]token.Pos
-	gotoTargets              map[*types.Label]GotoTarget
-	gotoLocals               map[*types.Var]struct{}
-	storageNames             map[*types.Var]string
-	localConstantProjections map[*types.Const][]types.BasicKind
-	lexicalTypeRequirements  map[*types.TypeName][]DeclarationRequirement
-	genericResolver          GenericCallableResolver
-	genericConsumer          GenericOperationConsumer
-	cooperativeResolver      CooperativeCallableResolver
-	callableFacet            CallableFacet
-	cooperative              bool
-	detachedInvocation       bool
-	genericParameters        map[*types.TypeParam]string
-	iteratorRangeStateName   string
+	role                       Role
+	fileSet                    *token.FileSet
+	typesPackage               *types.Package
+	typesInfo                  *types.Info
+	typesSizes                 types.Sizes
+	factory                    tsgo.Factory
+	names                      Names
+	values                     Values
+	storage                    AddressableStorage
+	integer                    IntegerRepresentation
+	evaluationOrder            EvaluationOrder
+	goRuntime                  GoRuntimeContract
+	concurrency                ConcurrencySemantics
+	expectedType               types.Type
+	expectedResults            *types.Tuple
+	functionResults            *types.Tuple
+	breakDepth                 uint32
+	continueDepth              uint32
+	breakTarget                string
+	continueTarget             string
+	controlLabels              map[*types.Label]ControlLabel
+	statementLabel             string
+	artifactOwner              ArtifactOwner
+	callableControls           map[ast.Node]CallableControlDemand
+	callableEnclosing          ast.Node
+	currentCallable            ast.Node
+	currentControl             CallableControlDemand
+	deferControl               DeferControl
+	returnControl              ReturnControl
+	gotoUses                   map[*types.Label][]token.Pos
+	gotoTargets                map[*types.Label]GotoTarget
+	gotoLocals                 map[*types.Var]struct{}
+	storageNames               map[*types.Var]string
+	localConstantProjections   map[*types.Const][]types.BasicKind
+	lexicalTypeRequirements    map[*types.TypeName][]DeclarationRequirement
+	genericResolver            GenericCallableResolver
+	genericConsumer            GenericOperationConsumer
+	cooperativeResolver        CooperativeCallableResolver
+	callableFacet              CallableFacet
+	cooperative                bool
+	staticallySelectedCallable bool
+	detachedInvocation         bool
+	environmentContract        bool
+	genericParameters          map[*types.TypeParam]string
+	genericCallableProfile     *GenericCallableProfile
+	iteratorRangeControls      []IteratorRangeControl
 }
 
 func (c Context) WithAddressableStorage(
-	owner *types.Func,
+	owner ArtifactOwner,
 	storageNames map[*types.Var]string,
 ) (Context, error) {
-	current, ok := c.FunctionArtifactOwner()
-	if owner == nil || !ok || current != owner {
+	if !owner.Valid() || c.ArtifactOwner() != owner {
 		return Context{}, &ContextError{
-			Reason: "addressable-storage owner differs from source artifact owner",
+			Reason: "addressable-storage owner differs from artifact owner",
 		}
 	}
 	c.storageNames = make(map[*types.Var]string, len(storageNames))
@@ -138,7 +140,8 @@ func (c Context) WithLexicalTypeRequirements(
 			if requirement.Owner() != owner {
 				panic("lexical type-requirement owner is inconsistent")
 			}
-			if artifact, ok := requirement.GeneratedArtifact(); ok {
+			if artifact, ok :=
+				requirement.LexicalGeneratedArtifact(); ok {
 				if artifact.Placement() !=
 					GeneratedArtifactPlacementLexical ||
 					artifact.LexicalOwner() != owner ||
@@ -146,6 +149,9 @@ func (c Context) WithLexicalTypeRequirements(
 					panic("lexical generated-artifact requirement is inconsistent")
 				}
 				continue
+			}
+			if _, generated := requirement.GeneratedArtifact(); generated {
+				panic("non-lexical generated-artifact requirement reached lexical owner")
 			}
 			typeName, _, ok := requirement.NamedStructOperation()
 			if !ok || typeName != anchor {
@@ -216,6 +222,15 @@ func (c Context) WithRole(role Role) Context {
 	return c
 }
 
+func (c Context) WithEnvironmentContract() Context {
+	c.environmentContract = true
+	return c
+}
+
+func (c Context) EnvironmentContract() bool {
+	return c.environmentContract
+}
+
 func (c Context) WithExpectedType(expectedType types.Type) Context {
 	c.expectedType = expectedType
 	c.expectedResults = nil
@@ -241,7 +256,7 @@ func (c Context) EnterFunction(results *types.Tuple) Context {
 	c.continueTarget = ""
 	c.controlLabels = nil
 	c.statementLabel = ""
-	c.iteratorRangeStateName = ""
+	c.iteratorRangeControls = nil
 	c.currentCallable = nil
 	c.currentControl = CallableControlDemand{}
 	c.deferControl = DeferControl{}
@@ -272,15 +287,18 @@ func (c Context) EnterBreakable() Context {
 	return c
 }
 
-func (c Context) EnterIteratorRange(stateName string) Context {
-	if stateName == "" {
-		panic("iterator-range state name is empty")
+func (c Context) EnterIteratorRange(control IteratorRangeControl) Context {
+	if !control.Valid() {
+		panic("iterator-range control is invalid")
 	}
 	c.breakDepth = 0
 	c.continueDepth = 0
 	c.controlLabels = nil
 	c.statementLabel = ""
-	c.iteratorRangeStateName = stateName
+	c.iteratorRangeControls = append(
+		slices.Clone(c.iteratorRangeControls),
+		control,
+	)
 	return c
 }
 
@@ -411,12 +429,24 @@ func (c Context) ControlLabel(label *types.Label) (ControlLabel, bool) {
 }
 
 func (c Context) IteratorRangeControl() (IteratorRangeControl, bool) {
-	if c.iteratorRangeStateName == "" {
+	if len(c.iteratorRangeControls) == 0 {
 		return IteratorRangeControl{}, false
 	}
-	return IteratorRangeControl{
-		stateName: c.iteratorRangeStateName,
-	}, true
+	return c.iteratorRangeControls[len(c.iteratorRangeControls)-1], true
+}
+
+func (c Context) IteratorRangeControls() []IteratorRangeControl {
+	return slices.Clone(c.iteratorRangeControls)
+}
+
+func (c Context) WithoutIteratorRangeControl() Context {
+	if len(c.iteratorRangeControls) == 0 {
+		return c
+	}
+	c.iteratorRangeControls = slices.Clone(
+		c.iteratorRangeControls[:len(c.iteratorRangeControls)-1],
+	)
+	return c
 }
 
 func (c Context) ConcurrencySemantics() ConcurrencySemantics {
@@ -490,6 +520,7 @@ const (
 	IteratorRangeStatePanicked  IteratorRangeState = -1
 	IteratorRangeStateDone      IteratorRangeState = 0
 	IteratorRangeStateReady     IteratorRangeState = 1
+	IteratorRangeStateReturned  IteratorRangeState = 2
 )
 
 func (s IteratorRangeState) Literal() string {
@@ -502,21 +533,66 @@ func (s IteratorRangeState) Literal() string {
 		return "0"
 	case IteratorRangeStateReady:
 		return "1"
+	case IteratorRangeStateReturned:
+		return "2"
 	default:
 		return ""
 	}
 }
 
 type IteratorRangeControl struct {
-	stateName string
+	source     *ast.RangeStmt
+	stateName  string
+	resultName string
+	returning  bool
+}
+
+func NewIteratorRangeControl(
+	source *ast.RangeStmt,
+	stateName string,
+	resultName string,
+	returning bool,
+) (IteratorRangeControl, error) {
+	if source == nil ||
+		source.X == nil ||
+		source.Body == nil ||
+		stateName == "" ||
+		(!returning && resultName != "") {
+		return IteratorRangeControl{}, &InvariantError{
+			Role:   RoleRangeBody,
+			Reason: "iterator-range control is invalid",
+		}
+	}
+	return IteratorRangeControl{
+		source:     source,
+		stateName:  stateName,
+		resultName: resultName,
+		returning:  returning,
+	}, nil
+}
+
+func (c IteratorRangeControl) Source() *ast.RangeStmt {
+	return c.source
 }
 
 func (c IteratorRangeControl) StateName() string {
 	return c.stateName
 }
 
+func (c IteratorRangeControl) ResultName() string {
+	return c.resultName
+}
+
+func (c IteratorRangeControl) Returning() bool {
+	return c.returning
+}
+
 func (c IteratorRangeControl) Valid() bool {
-	return c.stateName != ""
+	return c.source != nil &&
+		c.source.X != nil &&
+		c.source.Body != nil &&
+		c.stateName != "" &&
+		(c.returning || c.resultName == "")
 }
 
 type ChildEmitter interface {

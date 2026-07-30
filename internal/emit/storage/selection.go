@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"go/ast"
 	"go/types"
 
@@ -128,11 +129,20 @@ func (Owner) Requirement(
 	context api.Context,
 	variable *types.Var,
 ) (api.RootRequest, error) {
-	owner, ok := context.FunctionArtifactOwner()
-	if !ok {
+	owner := context.ArtifactOwner()
+	source, sourceOwned := owner.Source()
+	_, functionOwned := source.(*types.Func)
+	_, _, initializerOwned := owner.PackageInitializer()
+	if !sourceOwned && !initializerOwned ||
+		sourceOwned && !functionOwned {
 		return api.RootRequest{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "addressable storage has no function artifact owner",
+			Role: context.Role(),
+			Reason: fmt.Sprintf(
+				"addressable variable %q at %s has no reconstructible artifact owner %q",
+				variable.Name(),
+				context.FileSet().Position(variable.Pos()),
+				owner.Name(),
+			),
 		}
 	}
 	return api.NewAddressableStorageRequest(owner, variable)

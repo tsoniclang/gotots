@@ -7,9 +7,10 @@ import (
 func Build(
 	factory tsgo.Factory,
 	name string,
+	modifiers []tsgo.ModifierLike,
 ) tsgo.Statement {
 	return factory.VariableStatement(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		modifiers,
 		factory.VariableDeclarationList(
 			[]tsgo.VariableDeclaration{
 				factory.VariableDeclaration(

@@ -22,10 +22,20 @@ type identityOwner struct {
 func NamedObjectKey(
 	object *types.TypeName,
 ) (string, error) {
-	if object == nil || object.Pkg() == nil {
+	if object == nil {
 		return "", &api.NameError{
 			Reason: "generated-artifact named component has no package identity",
 		}
+	}
+	if object.Pkg() == nil {
+		if object.Parent() != types.Universe ||
+			types.Universe.Lookup(object.Name()) != object {
+			return "", &api.NameError{
+				Name:   object.Name(),
+				Reason: "generated-artifact named component has no language identity",
+			}
+		}
+		return "go:universe|" + object.Name(), nil
 	}
 	if object.Parent() != object.Pkg().Scope() ||
 		object.Parent().Lookup(object.Name()) != object {

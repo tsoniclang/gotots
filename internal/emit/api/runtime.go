@@ -76,6 +76,7 @@ const (
 	RuntimeScheduler            RuntimeSymbol = 1105
 	RuntimeSelectReady          RuntimeSymbol = 1106
 	RuntimeSelectAttempt        RuntimeSymbol = 1107
+	RuntimeUnsafePointer        RuntimeSymbol = 1200
 )
 
 type RuntimeSymbolContract struct {
@@ -571,6 +572,14 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimeErrorType,
 			RuntimeErrorContract,
+		), nil
+	case RuntimeUnsafePointer:
+		return runtimeContract(
+			RuntimeModuleUnsafePointer,
+			"runtime/unsafe-pointer.ts",
+			"GoUnsafePointer",
+			true,
+			RuntimePointer,
 		), nil
 	default:
 		return concurrencyRuntimeContract(symbol)

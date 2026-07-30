@@ -27,38 +27,16 @@ func emitValueOperation(
 	if err != nil {
 		return nil, nil, err
 	}
-	var capabilities []tsgo.ParameterDeclaration
-	var capabilityRequests []api.RootRequest
-	if len(typeParameters) == 0 {
-		if len(assembly.capabilities) != 0 {
-			return nil, nil, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "non-generic struct operation received generic capabilities",
-			}
-		}
-	} else {
-		context = context.WithGenericNamedStructOperation(operation)
-		bindings, requests, emitErr :=
-			genericdeclaration.EmitOperationParameters(
-				context,
-				children,
-				source,
-				assembly.capabilities,
-			)
-		if emitErr != nil {
-			return nil, nil, emitErr
-		}
-		capabilityRequests = requests
-		if len(assembly.capabilities) != 0 {
-			capabilities, err = genericabi.JoinCapabilities(
-				assembly.capabilities[0].Owner(),
-				assembly.capabilities,
-				bindings,
-			)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
+	context, capabilities, capabilityRequests, err :=
+		prepareOperation(
+			context,
+			children,
+			source,
+			assembly,
+			typeParameters,
+		)
+	if err != nil {
+		return nil, nil, err
 	}
 	var member tsgo.MethodDeclaration
 	var requests []api.RootRequest
@@ -131,6 +109,51 @@ func emitValueOperation(
 		return nil, nil, err
 	}
 	return member, api.CombineRequests(capabilityRequests, requests), nil
+}
+
+func prepareOperation(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	assembly operationAssembly,
+	typeParameters []tsgo.TypeParameterDeclaration,
+) (
+	api.Context,
+	[]tsgo.ParameterDeclaration,
+	[]api.RootRequest,
+	error,
+) {
+	if len(typeParameters) == 0 {
+		if len(assembly.capabilities) != 0 {
+			return api.Context{}, nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "non-generic struct operation received generic capabilities",
+			}
+		}
+		return context, nil, nil, nil
+	}
+	context = context.WithGenericNamedStructOperation(assembly.operation)
+	bindings, requests, err := genericdeclaration.EmitOperationParameters(
+		context,
+		children,
+		source,
+		assembly.capabilities,
+	)
+	if err != nil {
+		return api.Context{}, nil, nil, err
+	}
+	if len(assembly.capabilities) == 0 {
+		return context, nil, requests, nil
+	}
+	capabilities, err := genericabi.JoinCapabilities(
+		assembly.capabilities[0].Owner(),
+		assembly.capabilities,
+		bindings,
+	)
+	if err != nil {
+		return api.Context{}, nil, nil, err
+	}
+	return context, capabilities, requests, nil
 }
 
 func hashMethod(

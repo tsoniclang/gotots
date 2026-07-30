@@ -7,8 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
-	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
-	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
+	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
@@ -48,7 +47,9 @@ func emitMethod(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if api.ContainsGenericTypeParameter(selection.Recv()) {
+	if _, constraintReceiver := api.GenericTypeParameter(
+		selection.Recv(),
+	); constraintReceiver {
 		return emitConstraintMethod(
 			context,
 			children,
@@ -171,152 +172,6 @@ func emitMethod(
 	return cooperativecall.SourceCall(context, source, method, target)
 }
 
-func emitGenericReceiverMethod(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.CallExpr,
-	selector *ast.SelectorExpr,
-	method *types.Func,
-	selection *types.Selection,
-	signature *types.Signature,
-	discarded bool,
-	detached bool,
-) (api.ExpressionEmission, error) {
-	owner := method.Origin()
-	callable, ok, err := context.ResolveGenericCallable(owner)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	arguments := genericinstance.ReceiverTypeArguments(signature.Recv().Type())
-	if !ok ||
-		arguments == nil ||
-		arguments.Len() != len(callable.Parameters()) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	concrete, err := genericinstance.ConcreteCallableSignature(signature)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if err := validateResults(context, source, concrete, discarded); err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	receiver, resolvedMethod, err := selectionvalue.MethodReceiver(
-		context,
-		children,
-		selector,
-		selection,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if resolvedMethod != method {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	sourceArguments, argumentBefore, argumentRequests, err := emitArguments(
-		context,
-		children,
-		source,
-		concrete,
-		detached,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	before := receiver.Before()
-	receiverValue := receiver.Value()
-	var receiverRequests []api.RootRequest
-	if len(argumentBefore) != 0 || detached {
-		receiverValue, receiverRequests, before, err = captureReceiver(
-			context,
-			receiver,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
-	before = append(before, argumentBefore...)
-	typeArguments, typeRequests, err := genericinstance.EmitTypeArguments(
-		context,
-		children,
-		source,
-		arguments,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	capabilities, capabilityRequests, err := genericinstance.EmitCapabilities(
-		context,
-		source,
-		callable,
-		arguments,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	reference, err := context.Names().Reference(owner)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	receiverBinding, err := genericabi.Receiver(
-		owner,
-		receiverValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	sourceBindings, err := genericabi.SourceParameters(
-		owner,
-		sourceArguments,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	callArguments, err := genericabi.JoinMethod(
-		owner,
-		callable.Operations(),
-		genericabi.Combine(
-			capabilities,
-			[]genericabi.Binding[tsgo.Expression]{receiverBinding},
-			sourceBindings,
-		),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	target, err := api.NewExpressionEmission(
-		before,
-		context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
-			nil,
-			typeArguments,
-			callArguments,
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(
-			receiver.Requests(),
-			receiverRequests,
-			argumentRequests,
-			typeRequests,
-			capabilityRequests,
-			reference.Requests(),
-		),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if detached {
-		return cooperativecall.DetachedSourceCall(
-			context,
-			source,
-			method,
-			target,
-		)
-	}
-	return cooperativecall.SourceCall(context, source, method, target)
-}
-
 func emitInterfaceMethod(
 	context api.Context,
 	children api.ChildEmitter,
@@ -347,8 +202,9 @@ func emitInterfaceMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	target, err := ApplyInterfaceMethod(
+	target, err := interfaceoperation.Apply(
 		context,
+		children,
 		selector.X,
 		selection.Recv(),
 		receiver,

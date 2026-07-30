@@ -1,5 +1,7 @@
 package conversion
 
+import "unsafe"
+
 func NarrowSigned(value int64) int8 {
 	return int8(value)
 }
@@ -106,6 +108,15 @@ func ConstantFloat() float32 {
 
 func ConstantComplex() complex64 {
 	return complex64(1.5 - 2.25i)
+}
+
+func UnsafePointerRoundTrip(value *int32) *int32 {
+	return (*int32)(unsafe.Pointer(value))
+}
+
+func NilUnsafePointerRoundTrip() bool {
+	var value *int32
+	return (*int32)(unsafe.Pointer(value)) == nil
 }
 
 type Bytes []byte
@@ -356,4 +367,27 @@ func PointerNestedFieldConversion() int32 {
 	right := (*PointerNestedRight)(&value)
 	*right.Value = 8
 	return *value.Value
+}
+
+type NilCallable func()
+
+func NilConversions() bool {
+	pointer := (*int32)(nil)
+	slice := []int32(nil)
+	mapping := map[int32]int32(nil)
+	callable := NilCallable(nil)
+	dynamic := any(nil)
+	return pointer == nil &&
+		slice == nil &&
+		mapping == nil &&
+		callable == nil &&
+		dynamic == nil
+}
+
+func GenericNilPointer[T any]() *T {
+	return (*T)(nil)
+}
+
+func GenericNilPointerIsNil() bool {
+	return GenericNilPointer[int32]() == nil
 }

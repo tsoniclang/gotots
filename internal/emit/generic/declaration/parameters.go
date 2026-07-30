@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/types"
 	"sort"
+	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
@@ -57,8 +58,8 @@ func EnterType(
 	names := make(map[*types.TypeParam]string, len(parameters))
 	nodes := make([]tsgo.TypeParameterDeclaration, 0, len(parameters))
 	references := make([]tsgo.TypeNode, 0, len(parameters))
-	for _, parameter := range parameters {
-		name, err := context.Names().Declare(parameter.Obj())
+	for index, parameter := range parameters {
+		name, err := typeParameterName(context, parameter, index)
 		if err != nil {
 			return TypeParameters{}, err
 		}
@@ -136,8 +137,8 @@ func Enter(
 		0,
 		len(parameters),
 	)
-	for _, parameter := range parameters {
-		name, err := context.Names().Declare(parameter.Obj())
+	for index, parameter := range parameters {
+		name, err := typeParameterName(context, parameter, index)
 		if err != nil {
 			return Parameters{}, err
 		}
@@ -177,6 +178,23 @@ func Enter(
 		capabilities: capabilities,
 		requests:     requests,
 	}, nil
+}
+
+func typeParameterName(
+	context api.Context,
+	parameter *types.TypeParam,
+	index int,
+) (string, error) {
+	if parameter == nil || parameter.Obj() == nil || index < 0 {
+		return "", &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic type-parameter identity is invalid",
+		}
+	}
+	if parameter.Obj().Name() == "" || parameter.Obj().Name() == "_" {
+		return "$T" + strconv.Itoa(index), nil
+	}
+	return context.Names().Declare(parameter.Obj())
 }
 
 func EmitOperationParameters(

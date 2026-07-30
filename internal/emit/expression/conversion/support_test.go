@@ -133,6 +133,9 @@ func main() {
 	fmt.Println(values.PointerStructConversion())
 	fmt.Println(values.PointerRoundTripIdentity())
 	fmt.Println(values.PointerNestedFieldConversion())
+	fmt.Println(values.NilConversions())
+	fmt.Println(values.GenericNilPointerIsNil())
+	fmt.Println(values.NilUnsafePointerRoundTrip())
 }
 `)
 	return runCommand(
@@ -212,6 +215,9 @@ console.log(show(values.PointerScalarConversion()));
 console.log(show(values.PointerStructConversion()));
 console.log(values.PointerRoundTripIdentity());
 console.log(show(values.PointerNestedFieldConversion()));
+console.log(values.NilConversions());
+console.log(values.GenericNilPointerIsNil());
+console.log(values.NilUnsafePointerRoundTrip());
 `
 	return executeConversionTypeScript(
 		t,

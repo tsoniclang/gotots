@@ -18,8 +18,14 @@ type generatedArtifactPlacement struct {
 func (n *File) AnonymousStruct(
 	structType *types.Struct,
 	demand api.AnonymousStructDemand,
+	phase api.ImportPhase,
 ) (api.NameReference, error) {
-	if structType == nil || !demand.Valid() {
+	if structType == nil ||
+		!demand.Valid() ||
+		(phase != api.ImportPhaseType &&
+			phase != api.ImportPhaseValue) ||
+		(phase == api.ImportPhaseType &&
+			demand != api.AnonymousStructDemandDefinition) {
 		return api.NameReference{}, &api.NameError{
 			Reason: "anonymous-struct demand is invalid",
 		}
@@ -81,7 +87,7 @@ func (n *File) AnonymousStruct(
 	}
 	importRequest, err := api.NewImportRequest(
 		n.factory,
-		api.ImportPhaseValue,
+		phase,
 		modulePath,
 		binding.name,
 		binding.name,
@@ -300,11 +306,14 @@ func sameAnonymousStructPlacement(
 func (n *File) generatedNamedObjectIdentity(
 	object *types.TypeName,
 ) (string, error) {
-	if object == nil || object.Pkg() == nil {
+	if object == nil {
 		return "", &api.NameError{
 			Name:   objectName(object),
 			Reason: "generated-artifact named component has no package identity",
 		}
+	}
+	if object.Pkg() == nil {
+		return typeidentity.NamedObjectKey(object)
 	}
 	if object.Parent() == object.Pkg().Scope() {
 		if _, ok := n.owner.registry.byObject[object]; !ok {

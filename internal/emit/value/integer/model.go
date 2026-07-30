@@ -9,8 +9,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
-const exactNumberMaximum = uint64(1<<53 - 1)
-
 type Carrier struct {
 	alias  api.PrimitiveAlias
 	width  uint8
@@ -106,10 +104,6 @@ func FormatConstant(
 		if !exact || !fitsSigned(signed, carrier.width) {
 			return "", false, false
 		}
-		if representation == api.IntegerRepresentationNumber &&
-			absolute(signed) > exactNumberMaximum {
-			return "", false, false
-		}
 		if signed < 0 {
 			return strconv.FormatUint(absolute(signed), 10), true, true
 		}
@@ -117,10 +111,6 @@ func FormatConstant(
 	}
 	unsigned, exact := constant.Uint64Val(value)
 	if !exact || !fitsUnsigned(unsigned, carrier.width) {
-		return "", false, false
-	}
-	if representation == api.IntegerRepresentationNumber &&
-		unsigned > exactNumberMaximum {
 		return "", false, false
 	}
 	return strconv.FormatUint(unsigned, 10), false, true
@@ -170,8 +160,7 @@ func SupportsBitwise(
 	default:
 		return false
 	}
-	return representation == api.IntegerRepresentationBigInt ||
-		representation == api.IntegerRepresentationNumber && carrier.width <= 32
+	return representation.Valid()
 }
 
 func SupportsShift(
@@ -183,8 +172,7 @@ func SupportsShift(
 	if operator != token.SHL && operator != token.SHR {
 		return false
 	}
-	if representation != api.IntegerRepresentationBigInt &&
-		(representation != api.IntegerRepresentationNumber || carrier.width > 32) {
+	if !representation.Valid() {
 		return false
 	}
 	if count == nil || count.Kind() != constant.Int {
@@ -202,8 +190,7 @@ func SupportsVariableShift(
 	if operator != token.SHL && operator != token.SHR {
 		return false
 	}
-	return representation == api.IntegerRepresentationBigInt ||
-		representation == api.IntegerRepresentationNumber && carrier.width <= 32
+	return representation.Valid()
 }
 
 func SupportsUnary(
@@ -217,8 +204,7 @@ func SupportsUnary(
 	case token.SUB:
 		return representation.Valid() && carrier.signed
 	case token.XOR:
-		return representation == api.IntegerRepresentationBigInt ||
-			representation == api.IntegerRepresentationNumber && carrier.width <= 32
+		return representation.Valid()
 	default:
 		return false
 	}

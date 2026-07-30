@@ -97,6 +97,17 @@ func operationModel(
 	if model, ok := definedtype.ResolveBasic(context.TypesInfo().TypeOf(source)); ok {
 		return model, true, operandsBelong(context, source, model)
 	}
+	if source.Op == token.SHL || source.Op == token.SHR {
+		resultType := context.TypesInfo().TypeOf(source)
+		expected := context.ExpectedType()
+		model, ok := definedtype.ResolveBasic(expected)
+		if ok &&
+			constantvalue.IsUntyped(resultType) &&
+			types.AssignableTo(resultType, expected) &&
+			operandsBelong(context, source, model) {
+			return model, true, true
+		}
+	}
 	if !comparison(source.Op) {
 		return definedtype.Model{}, false, false
 	}
@@ -195,6 +206,23 @@ func apply(
 		context.TypesSizes(),
 		underlying,
 	); ok {
+		if (operator == token.SHL || operator == token.SHR) &&
+			rightConstant == nil {
+			if !integervalue.SupportsVariableShift(
+				context.IntegerRepresentation(),
+				carrier,
+				operator,
+			) {
+				return api.ExpressionEmission{}, false, nil
+			}
+			return integerbinary.ApplyVariableShift(
+				context,
+				operator,
+				carrier,
+				left,
+				right,
+			)
+		}
 		if !integerOperation(
 			context,
 			operator,

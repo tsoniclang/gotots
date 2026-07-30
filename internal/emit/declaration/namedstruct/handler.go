@@ -18,6 +18,13 @@ type field struct {
 	blank      bool
 }
 
+type structSource struct {
+	spec      *ast.TypeSpec
+	literal   *ast.StructType
+	structure *types.Struct
+	basis     types.Type
+}
+
 func emitClass(
 	context api.Context,
 	children api.ChildEmitter,
@@ -25,7 +32,7 @@ func emitClass(
 	typeName *types.TypeName,
 	operations []operationAssembly,
 ) (api.DeclarationEmission, error) {
-	spec, sourceStruct, structType, ok := sourceType(
+	source, ok := sourceType(
 		context,
 		declaration,
 		typeName,
@@ -34,28 +41,54 @@ func emitClass(
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, declaration)
 	}
-	parameters, err := genericdeclaration.EnterType(context, spec, typeName)
+	parameters, err := genericdeclaration.EnterType(
+		context,
+		source.spec,
+		typeName,
+	)
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
 	context = parameters.Context()
-	fields, err := fields(context, sourceStruct, structType)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
 	className, err := context.Names().Declare(typeName)
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-
 	moduleExport, err := context.Names().ModuleExport(typeName)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	if source.basis != nil {
+		fields, err := derivedFields(
+			context,
+			typeName,
+			source.spec.Type,
+			source.structure,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		return emitDerivedClass(
+			context,
+			children,
+			source.spec,
+			source.basis,
+			className,
+			fields,
+			operations,
+			moduleExport,
+			parameters.Nodes(),
+			parameters.References(),
+		)
+	}
+	fields, err := fields(context, source.literal, source.structure)
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
 	return emitStructClass(
 		context,
 		children,
-		sourceStruct,
+		source.literal,
 		className,
 		fields,
 		operations,
@@ -212,26 +245,96 @@ func sourceType(
 	context api.Context,
 	declaration *ast.GenDecl,
 	typeName *types.TypeName,
-) (*ast.TypeSpec, *ast.StructType, *types.Struct, bool) {
+) (structSource, bool) {
 	if declaration == nil || typeName == nil {
-		return nil, nil, nil, false
+		return structSource{}, false
 	}
 	for _, sourceSpec := range declaration.Specs {
 		spec, ok := sourceSpec.(*ast.TypeSpec)
 		if !ok || context.TypesInfo().Defs[spec.Name] != typeName {
 			continue
 		}
-		sourceStruct, syntaxOK := spec.Type.(*ast.StructType)
 		named, namedOK := types.Unalias(typeName.Type()).(*types.Named)
-		if !syntaxOK || !namedOK ||
+		if !namedOK ||
 			spec.Assign.IsValid() ||
 			(spec.TypeParams == nil) != (named.TypeParams().Len() == 0) {
-			return nil, nil, nil, false
+			return structSource{}, false
 		}
 		structType, structOK := named.Underlying().(*types.Struct)
-		return spec, sourceStruct, structType, structOK
+		if !structOK {
+			return structSource{}, false
+		}
+		if sourceStruct, ok := structLiteralSyntax(spec.Type); ok {
+			return structSource{
+				spec:      spec,
+				literal:   sourceStruct,
+				structure: structType,
+			}, true
+		}
+		basis := context.TypesInfo().TypeOf(spec.Type)
+		if basis == nil ||
+			!types.Identical(basis.Underlying(), structType) ||
+			types.Identical(basis, typeName.Type()) {
+			return structSource{}, false
+		}
+		return structSource{
+			spec:      spec,
+			structure: structType,
+			basis:     basis,
+		}, true
 	}
-	return nil, nil, nil, false
+	return structSource{}, false
+}
+
+func structLiteralSyntax(source ast.Expr) (*ast.StructType, bool) {
+	for {
+		parenthesized, ok := source.(*ast.ParenExpr)
+		if !ok {
+			break
+		}
+		source = parenthesized.X
+	}
+	structType, ok := source.(*ast.StructType)
+	return structType, ok
+}
+
+func derivedFields(
+	context api.Context,
+	typeName *types.TypeName,
+	source ast.Node,
+	structType *types.Struct,
+) ([]field, error) {
+	if typeName == nil || structType == nil {
+		return nil, api.Unsupported(
+			context,
+			api.CategoryDeclaration,
+			source,
+		)
+	}
+	result := make([]field, 0, structType.NumFields())
+	for index := range structType.NumFields() {
+		object := structType.Field(index)
+		if !object.Exported() && object.Pkg() != typeName.Pkg() {
+			continue
+		}
+		blank := object.Name() == "_"
+		name := fmt.Sprintf("$blank%d", index)
+		if !blank {
+			var err error
+			name, err = context.Names().Member(object)
+			if err != nil {
+				return nil, err
+			}
+		}
+		result = append(result, field{
+			source:     source,
+			typeSource: source,
+			object:     object,
+			name:       name,
+			blank:      blank,
+		})
+	}
+	return result, nil
 }
 
 func fields(

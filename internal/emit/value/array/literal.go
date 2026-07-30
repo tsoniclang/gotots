@@ -20,9 +20,10 @@ func (a RuntimeArray) EmitLiteral(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
+	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
 	if !types.Identical(
-		context.TypesInfo().TypeOf(source),
+		sourceType,
 		a.sourceType,
 	) ||
 		context.ExpectedType() == nil ||

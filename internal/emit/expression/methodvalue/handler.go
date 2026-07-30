@@ -57,8 +57,45 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	cooperative, sourceRequests, err :=
-		cooperativecall.SourceContract(context, method)
+	owner := method.Origin()
+	var (
+		reference      api.NameReference
+		abiCooperative bool
+		sourceRequests []api.RootRequest
+	)
+	if generic {
+		declarationSignature, ok := owner.Type().(*types.Signature)
+		if !ok {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		var facet api.CallableFacet
+		reference, facet, _, err =
+			cooperativecall.SelectGenericCallable(
+				context,
+				owner,
+				declarationSignature,
+				targetSignatureSource,
+			)
+		if err == nil {
+			_, abiCooperative, sourceRequests, err =
+				cooperativecall.GenericValueContract(
+					context,
+					facet,
+					targetSignatureSource,
+				)
+		}
+	} else {
+		reference, err = context.Names().Reference(method)
+		if err == nil {
+			_, abiCooperative, sourceRequests, err =
+				cooperativecall.SourceValueContract(
+					context,
+					method,
+					targetSignatureSource,
+				)
+		}
+	}
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -95,16 +132,11 @@ func Emit(
 			),
 		),
 	)
-	reference, err := context.Names().Reference(method)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	var targetTypeArguments []tsgo.TypeNode
 	var typeRequests []api.RootRequest
 	var capabilities []genericabi.Binding[tsgo.Expression]
 	var capabilityRequests []api.RootRequest
 	var operationSet api.GenericOperationSet
-	owner := method.Origin()
 	if generic {
 		var resolved bool
 		var resolveErr error
@@ -202,7 +234,7 @@ func Emit(
 	)
 	var modifiers []tsgo.ModifierLike
 	resultType := targetSignature.Result()
-	if cooperative {
+	if abiCooperative {
 		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}
@@ -229,13 +261,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return cooperativecall.AdaptSourceValue(
-		context,
-		children,
-		source,
-		method,
-		target,
-	)
+	return target, nil
 }
 
 func emitInterface(

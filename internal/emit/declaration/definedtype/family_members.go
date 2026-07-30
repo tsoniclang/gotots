@@ -14,10 +14,12 @@ func emitReferenceMembers(
 	model definedtype.Model,
 	className string,
 	underlying tsgo.TypeNode,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) ([]tsgo.ClassElement, []api.RootRequest, error) {
 	classType := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(className),
-		nil,
+		typeArguments,
 	)
 	optionalClassType := context.Factory().UnionTypeNode([]tsgo.TypeNode{
 		classType,
@@ -25,6 +27,15 @@ func emitReferenceMembers(
 			tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
 		),
 	})
+	underlyingValueType := underlying
+	if model.Family() == definedtype.FamilyCallable {
+		underlyingValueType = context.Factory().UnionTypeNode([]tsgo.TypeNode{
+			underlying,
+			context.Factory().KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+			),
+		})
+	}
 	value := context.Factory().Identifier("value")
 	isNil, err := referenceNilCondition(context, model, value)
 	if err != nil {
@@ -38,11 +49,11 @@ func emitReferenceMembers(
 		nil,
 		context.Factory().Identifier(definedtype.FromMember),
 		nil,
-		nil,
+		typeParameters,
 		[]tsgo.ParameterDeclaration{referenceParameter(
 			context,
 			value,
-			underlying,
+			underlyingValueType,
 		)},
 		optionalClassType,
 		context.Factory().Block(
@@ -78,13 +89,13 @@ func emitReferenceMembers(
 		nil,
 		context.Factory().Identifier(definedtype.ValueOfMember),
 		nil,
-		nil,
+		typeParameters,
 		[]tsgo.ParameterDeclaration{referenceParameter(
 			context,
 			value,
 			optionalClassType,
 		)},
-		underlying,
+		underlyingValueType,
 		context.Factory().Block(
 			append(
 				zero.Before(),
@@ -117,7 +128,9 @@ func referenceNilCondition(
 	value tsgo.Expression,
 ) (tsgo.Expression, error) {
 	switch model.Family() {
-	case definedtype.FamilyPointer, definedtype.FamilyChannel:
+	case definedtype.FamilyPointer,
+		definedtype.FamilyCallable,
+		definedtype.FamilyChannel:
 		return strictUndefined(context, value), nil
 	case definedtype.FamilySlice:
 		return context.Factory().CallExpression(
@@ -178,6 +191,8 @@ func emitFamilyMembers(
 	className string,
 	underlying tsgo.TypeNode,
 	requirements []api.DeclarationRequirement,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) ([]tsgo.ClassElement, []api.RootRequest, error) {
 	switch model.Family() {
 	case definedtype.FamilyBasic:
@@ -190,6 +205,7 @@ func emitFamilyMembers(
 		return nil, nil, nil
 	case definedtype.FamilySlice,
 		definedtype.FamilyPointer,
+		definedtype.FamilyCallable,
 		definedtype.FamilyChannel:
 		if len(requirements) != 0 {
 			return nil, nil, &api.InvariantError{
@@ -203,6 +219,8 @@ func emitFamilyMembers(
 			model,
 			className,
 			underlying,
+			typeParameters,
+			typeArguments,
 		)
 	case definedtype.FamilyMap:
 		if len(requirements) != 0 {
@@ -216,20 +234,14 @@ func emitFamilyMembers(
 			source,
 			model,
 			underlying,
+			typeParameters,
+			typeArguments,
 		)
 	case definedtype.FamilyArray:
 		if len(requirements) != 0 {
 			return nil, nil, &api.InvariantError{
 				Role:   context.Role(),
 				Reason: "defined array received declaration requirements",
-			}
-		}
-		return nil, nil, nil
-	case definedtype.FamilyCallable:
-		if len(requirements) != 0 {
-			return nil, nil, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "defined callable received declaration requirements",
 			}
 		}
 		return nil, nil, nil

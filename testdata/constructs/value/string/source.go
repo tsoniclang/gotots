@@ -1,8 +1,13 @@
 package stringvalues
 
 const packageBytes string = "\xff"
+const hexDigits = "0123456789ABCDEF"
 
 var PackageValue string
+
+type Offset int
+
+type Path string
 
 func ASCII() string {
 	return "Go"
@@ -81,6 +86,10 @@ func ByteAt(value string, index int) byte {
 	return value[index]
 }
 
+func ConstantByteAt(index int) byte {
+	return hexDigits[index]
+}
+
 func Window(value string, low int, high int) string {
 	return value[low:high]
 }
@@ -109,4 +118,15 @@ func IndexCall(index int) (byte, int32) {
 		return "ab"
 	}
 	return next()[index], calls
+}
+
+func DefinedBounds() (byte, string) {
+	value := "abc"
+	low := Offset(1)
+	high := Offset(3)
+	return value[low], value[low:high]
+}
+
+func DefinedWindow(value Path, low int, high int) Path {
+	return value[low:high]
 }

@@ -135,6 +135,18 @@ func TestWaveSevenGenericNamedTypesCompileThroughPublicPipeline(t *testing.T) {
 			}
 			workingDirectory := t.TempDir()
 			artifacts := materializeArtifacts(t, emission, workingDirectory)
+			local := targetFunctionText(
+				t,
+				artifacts.printed,
+				"LocalTypeCapability",
+			)
+			if !strings.Contains(local, "function $goCapability_") ||
+				strings.Contains(local, "export function $goCapability_") {
+				t.Fatalf(
+					"local-type capability is not lexical and unexported:\n%s",
+					local,
+				)
+			}
 			sourceModule := sourceModuleForExport(
 				t,
 				artifacts,
@@ -181,6 +193,161 @@ console.log(output.join(" "));
 	}
 }
 
+func TestWaveSevenGenericAssertionsCompileThroughPublicPipeline(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		options emit.Options
+	}{
+		{name: "number", options: emit.DefaultOptions()},
+		{
+			name: "bigint",
+			options: emit.Options{
+				IntegerRepresentation: emit.IntegerRepresentationBigInt,
+				EvaluationOrder:       emit.EvaluationOrderPreserveGo,
+			},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			program, err := load.Load(context.Background(), load.Request{
+				Directory: waveSevenGenericDirectory(),
+				Pattern:   ".",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			root, err := emit.NewRoot(
+				program.Roots()[0].Types().Scope().Lookup(
+					"AuditGenericAssertions",
+				),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			emission, err := emit.CompileWithOptions(
+				program,
+				[]emit.Root{root},
+				testCase.options,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			workingDirectory := t.TempDir()
+			artifacts := materializeArtifacts(t, emission, workingDirectory)
+			for _, required := range []string{
+				"export function AssertValue<T>",
+				"export function MustAssertValue<T>",
+				"export function TypeSwitchValue<T>",
+				"$go$interface_assert_",
+				"$go$interface_assert_ok_",
+			} {
+				if !strings.Contains(artifacts.printed, required) {
+					t.Fatalf(
+						"generic assertion artifacts lack %q:\n%s",
+						required,
+						artifacts.printed,
+					)
+				}
+			}
+			runner := filepath.Join(workingDirectory, "runner.ts")
+			writeProgramFile(t, runner, `import "./program.js";
+import { AuditGenericAssertions } from "`+artifacts.sourceModule+`";
+
+const values = AuditGenericAssertions();
+console.log(Array.from({ length: values.length }, (_, index) =>
+    String(values.get(index))).join(" "));
+`)
+			writeProgramFile(
+				t,
+				filepath.Join(workingDirectory, "package.json"),
+				"{\"type\":\"module\"}\n",
+			)
+			waveThreeTypecheck(
+				t,
+				workingDirectory,
+				append(artifacts.paths, runner),
+			)
+			targetOutput := runProgram(
+				t,
+				workingDirectory,
+				"node",
+				filepath.Join(workingDirectory, "out", "runner.js"),
+			)
+			goOutput := executeWaveSevenGenericGo(
+				t,
+				workingDirectory,
+				"AuditGenericAssertions",
+			)
+			if targetOutput != goOutput {
+				t.Fatalf(
+					"generic assertion output differs\nTypeScript:\n%s\nGo:\n%s",
+					targetOutput,
+					goOutput,
+				)
+			}
+		})
+	}
+}
+
+func TestNonGenericAliasToGenericInstantiationCompilesInPointerField(
+	t *testing.T,
+) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/genericalias\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(
+		t,
+		filepath.Join(project, "source.go"),
+		`package genericalias
+
+type Box[T any] struct {
+	Value T
+}
+
+type IntBox = Box[int]
+
+type Holder struct {
+	Box *IntBox
+}
+
+func EmptyHolder() Holder {
+	return Holder{}
+}
+`,
+	)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: project,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := emit.NewRoot(
+		program.Roots()[0].Types().Scope().Lookup("EmptyHolder"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(program, []emit.Root{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	if !strings.Contains(
+		artifacts.printed,
+		"GoPointer<Box<int64>",
+	) {
+		t.Fatalf(
+			"alias to generic instantiation was not canonicalized:\n%s",
+			artifacts.printed,
+		)
+	}
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+}
+
 func sourceModuleForExport(
 	t *testing.T,
 	artifacts waveFourArtifacts,
@@ -188,14 +355,20 @@ func sourceModuleForExport(
 	name string,
 ) string {
 	t.Helper()
-	marker := "export function " + name
 	var selected string
 	for _, path := range artifacts.paths {
 		content, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(content), marker) {
+		printed := string(content)
+		if !strings.Contains(
+			printed,
+			"export function "+name+"(",
+		) && !strings.Contains(
+			printed,
+			"export async function "+name+"(",
+		) {
 			continue
 		}
 		if selected != "" {

@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"errors"
+	"go/ast"
 	"go/token"
 	"go/types"
 	"testing"
@@ -20,7 +21,8 @@ func TestAddressableStorageRequestCarriesExactFunctionAndVariableIdentity(
 		types.NewSignatureType(nil, nil, nil, nil, nil, false),
 	)
 	variable := types.NewVar(token.Pos(20), sourcePackage, "value", types.Typ[types.Int32])
-	request, err := NewAddressableStorageRequest(owner, variable)
+	artifactOwner := MustSourceArtifactOwner(owner)
+	request, err := NewAddressableStorageRequest(artifactOwner, variable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +35,7 @@ func TestAddressableStorageRequestCarriesExactFunctionAndVariableIdentity(
 		t.Fatalf("declaration requirement = %#v, %t", requirement, ok)
 	}
 	gotOwner, gotVariable, ok := requirement.AddressableStorage()
-	if !ok || gotOwner != owner || gotVariable != variable {
+	if !ok || gotOwner != artifactOwner || gotVariable != variable {
 		t.Fatalf(
 			"addressable storage = %v, %v, %t",
 			gotOwner,
@@ -71,12 +73,16 @@ func TestAddressableStorageRequirementRejectsInvalidOwners(t *testing.T) {
 	)
 	for _, testCase := range []struct {
 		name     string
-		owner    *types.Func
+		owner    ArtifactOwner
 		variable *types.Var
 	}{
 		{name: "nil owner", variable: variable},
-		{name: "nil variable", owner: owner},
-		{name: "field", owner: owner, variable: field},
+		{name: "nil variable", owner: MustSourceArtifactOwner(owner)},
+		{
+			name:     "field",
+			owner:    MustSourceArtifactOwner(owner),
+			variable: field,
+		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			_, err := NewAddressableStorageRequest(
@@ -101,11 +107,12 @@ func TestAddressableStorageRequirementNeverKeysBySpelling(t *testing.T) {
 	)
 	first := types.NewVar(token.Pos(20), sourcePackage, "value", types.Typ[types.Int32])
 	second := types.NewVar(token.Pos(30), sourcePackage, "value", types.Typ[types.Int32])
-	firstRequirement, err := NewAddressableStorageRequirement(owner, first)
+	artifactOwner := MustSourceArtifactOwner(owner)
+	firstRequirement, err := NewAddressableStorageRequirement(artifactOwner, first)
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondRequirement, err := NewAddressableStorageRequirement(owner, second)
+	secondRequirement, err := NewAddressableStorageRequirement(artifactOwner, second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +137,9 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementCallableControl != 13 ||
 		DeclarationRequirementCooperativeCallable != 14 ||
 		DeclarationRequirementCallableABI != 15 ||
-		DeclarationRequirementKind(16).Valid() {
+		DeclarationRequirementEnvironmentBuiltin != 16 ||
+		DeclarationRequirementGenericCallableProfile != 17 ||
+		DeclarationRequirementKind(18).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }
@@ -152,7 +161,10 @@ func TestAddressableStorageContextCopiesAndKeysExactVariables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	context, err = context.WithAddressableStorage(owner, selections)
+	context, err = context.WithAddressableStorage(
+		MustSourceArtifactOwner(owner),
+		selections,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,9 +194,79 @@ func TestFunctionCapabilityRejectsDivergentCurrentArtifactOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = context.WithAddressableStorage(foreign, nil)
+	_, err = context.WithAddressableStorage(
+		MustSourceArtifactOwner(foreign),
+		nil,
+	)
 	var contextError *ContextError
 	if !errors.As(err, &contextError) {
 		t.Fatalf("divergent function owner error = %#v, want ContextError", err)
+	}
+}
+
+func TestAddressableStorageSupportsExactPackageInitializerOwner(
+	t *testing.T,
+) {
+	sourcePackage := types.NewPackage("example.com/storage", "storage")
+	target := types.NewVar(
+		token.Pos(5),
+		sourcePackage,
+		"value",
+		types.Typ[types.Int32],
+	)
+	sourcePackage.Scope().Insert(target)
+	literal := &ast.FuncLit{
+		Type: &ast.FuncType{
+			Func:   token.Pos(10),
+			Params: &ast.FieldList{},
+		},
+		Body: &ast.BlockStmt{
+			Lbrace: token.Pos(20),
+			Rbrace: token.Pos(40),
+		},
+	}
+	initializer := &types.Initializer{
+		Lhs: []*types.Var{target},
+		Rhs: literal,
+	}
+	owner := MustPackageInitializerArtifactOwner(
+		sourcePackage,
+		initializer,
+	)
+	local := types.NewVar(
+		token.Pos(30),
+		sourcePackage,
+		"local",
+		types.Typ[types.Int32],
+	)
+	requirement, err := NewAddressableStorageRequirement(owner, local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotOwner, gotVariable, ok := requirement.AddressableStorage()
+	if !ok || gotOwner != owner || gotVariable != local {
+		t.Fatal("package initializer storage lost exact owner or variable")
+	}
+	context := (Context{}).WithArtifactOwner(owner)
+	context, err = context.WithAddressableStorage(
+		owner,
+		map[*types.Var]string{local: "local$storage"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name, ok := context.AddressableStorageName(local); !ok ||
+		name != "local$storage" {
+		t.Fatal("package initializer storage selection was not installed")
+	}
+
+	outside := types.NewVar(
+		token.Pos(50),
+		sourcePackage,
+		"outside",
+		types.Typ[types.Int32],
+	)
+	if _, err := NewAddressableStorageRequirement(owner, outside); err == nil {
+		t.Fatal("package initializer accepted variable outside its source span")
 	}
 }

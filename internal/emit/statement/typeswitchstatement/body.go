@@ -54,12 +54,31 @@ func emitCaseBody(
 		}
 		initial := api.DirectExpression(value)
 		if len(typesInCase) == 1 && !typesInCase[0].nilCase {
-			initial, err = interfacevalue.Extract(
-				context.WithRole(api.RoleTypeSwitchBinding),
-				clause,
-				binding.Type(),
-				value,
-			)
+			if api.ContainsGenericTypeParameter(binding.Type()) {
+				assertion, assertionErr := interfacevalue.AssertGeneric(
+					context.WithRole(api.RoleTypeSwitchBinding),
+					clause.List[0],
+					selected.sourceType,
+					binding.Type(),
+					true,
+					api.DirectExpression(value),
+				)
+				if assertionErr != nil {
+					return nil, nil, assertionErr
+				}
+				initial, err = interfacevalue.GenericAssertionElement(
+					context.WithRole(api.RoleTypeSwitchBinding),
+					assertion,
+					0,
+				)
+			} else {
+				initial, err = interfacevalue.Extract(
+					context.WithRole(api.RoleTypeSwitchBinding),
+					clause,
+					binding.Type(),
+					value,
+				)
+			}
 			if err != nil {
 				return nil, nil, err
 			}

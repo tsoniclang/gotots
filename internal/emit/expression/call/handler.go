@@ -64,6 +64,15 @@ func emit(
 			return api.ExpressionEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
 		}
+		if target, handled, err := emitUnsafeBuiltin(
+			context,
+			children,
+			source,
+			builtin,
+			discarded,
+		); handled {
+			return target, err
+		}
 		return builtinexpression.Emit(
 			context,
 			children,
@@ -216,6 +225,22 @@ func emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	if literal, direct := directFunctionLiteral(source.Fun); direct {
+		if detached {
+			return cooperativecall.DetachedLiteralCall(
+				context,
+				source,
+				literal,
+				target,
+			)
+		}
+		return cooperativecall.LiteralCall(
+			context,
+			source,
+			literal,
+			target,
+		)
+	}
 	if provider, direct := calleeObject(
 		context.TypesInfo(),
 		source.Fun,
@@ -333,6 +358,18 @@ func emitCallee(
 			context.Factory().Identifier(reference.Name()),
 			reference.Requests()...,
 		), true, nil
+	} else if _, ok := directFunctionLiteral(source); ok {
+		target, err := children.Expression(
+			context.
+				WithRole(api.RoleCallCallee).
+				WithExpectedType(signature).
+				WithStaticallySelectedCallable(),
+			source,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, false, err
+		}
+		return target, false, nil
 	} else if identifier, ok := source.(*ast.Ident); ok {
 		variable, valid := context.TypesInfo().Uses[identifier].(*types.Var)
 		if !valid {
@@ -363,6 +400,19 @@ func emitCallee(
 		return api.ExpressionEmission{}, false, err
 	}
 	return target, static, nil
+}
+
+func directFunctionLiteral(source ast.Expr) (*ast.FuncLit, bool) {
+	for {
+		switch selected := source.(type) {
+		case *ast.FuncLit:
+			return selected, true
+		case *ast.ParenExpr:
+			source = selected.X
+		default:
+			return nil, false
+		}
+	}
 }
 
 func emitArguments(

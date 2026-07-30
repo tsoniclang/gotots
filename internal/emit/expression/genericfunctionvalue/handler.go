@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -45,6 +46,30 @@ func Emit(
 		instance.TypeArgs.Len() != len(operationSet.Parameters()) {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	declarationSignature, ok := owner.Type().(*types.Signature)
+	if !ok {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	reference, callableFacet, _, err :=
+		cooperativecall.SelectGenericCallable(
+			context,
+			owner,
+			declarationSignature,
+			signature,
+		)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	_, abiCooperative, contractRequests, err :=
+		cooperativecall.GenericValueContract(
+			context,
+			callableFacet,
+			signature,
+		)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
 	target, err := callable.EmitABIAdapter(
 		context,
@@ -89,10 +114,6 @@ func Emit(
 			Reason: "generic function value lacks recovery authority",
 		}
 	}
-	reference, err := context.Names().Reference(owner)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
 	arguments := append(
 		capabilityArguments,
 		target.SourceParameterReferences(context.Factory())...,
@@ -105,12 +126,23 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	var modifiers []tsgo.ModifierLike
+	resultType := target.Result()
+	if abiCooperative {
+		modifiers = []tsgo.ModifierLike{
+			context.Factory().AsyncKeyword(),
+		}
+		resultType = callable.PromiseResult(
+			context.Factory(),
+			resultType,
+		)
+	}
 	return api.DirectExpression(
 		context.Factory().ArrowFunction(
-			nil,
+			modifiers,
 			nil,
 			target.Parameters(),
-			target.Result(),
+			resultType,
 			context.Factory().EqualsGreaterThanToken(),
 			context.Factory().CallExpression(
 				context.Factory().Identifier(reference.Name()),
@@ -125,6 +157,7 @@ func Emit(
 			typeRequests,
 			capabilityRequests,
 			reference.Requests(),
+			contractRequests,
 			[]api.RootRequest{controlRequest},
 		)...,
 	), true, nil

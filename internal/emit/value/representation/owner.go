@@ -39,6 +39,9 @@ func (Owner) RequiresCustomEquality(
 	if panicNilRuntimeValue(context, sourceType) {
 		return true
 	}
+	if unsafePointerValue(sourceType) {
+		return true
+	}
 	if _, ok := definedtype.Resolve(sourceType); ok {
 		return true
 	}
@@ -75,6 +78,9 @@ func (Owner) RequiresExplicitType(
 		return true
 	}
 	if panicNilRuntimeValue(context, sourceType) {
+		return true
+	}
+	if unsafePointerValue(sourceType) {
 		return true
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
@@ -136,6 +142,11 @@ func (owner Owner) Zero(
 	if panicNilRuntimeValue(context, sourceType) {
 		return panicNilZero(context)
 	}
+	if unsafePointerValue(sourceType) {
+		return api.DirectExpression(
+			context.Factory().Identifier("undefined"),
+		), nil
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		if defined.NilCapable() {
 			return api.DirectExpression(
@@ -171,6 +182,7 @@ func (owner Owner) Zero(
 	if _, ok := maprepresentation.Source(context, sourceType); ok {
 		return maprepresentation.Nil(
 			context,
+			owner.children,
 			source,
 			sourceType,
 		)
@@ -273,6 +285,13 @@ func (owner Owner) Copy(
 	}
 	if panicNilRuntimeValue(context, sourceType) {
 		return panicNilCopy(context, value)
+	}
+	if unsafePointerValue(sourceType) {
+		return api.NewExpressionEmission(
+			value.Before(),
+			value.Value(),
+			value.Requests(),
+		)
 	}
 	if target, ok := definedtype.ResolveCallable(sourceType); ok {
 		actual := expressionType(context, source)
@@ -419,6 +438,7 @@ func (Owner) Assign(
 	_, _, structOK := namedStruct(sourceType)
 	_, anonymousStructOK := isAnonymousStruct(sourceType)
 	_, interfaceOK := interfacetype.Resolve(sourceType)
+	unsafePointerOK := unsafePointerValue(sourceType)
 	if !definedOK &&
 		!arrayOK &&
 		!complexOK &&
@@ -428,6 +448,7 @@ func (Owner) Assign(
 		!channelValue(sourceType) &&
 		!isScalarSlice(context, sourceType) &&
 		!mapValue(context, sourceType) &&
+		!unsafePointerOK &&
 		!interfaceOK &&
 		!anonymousStructOK &&
 		!structOK {

@@ -139,6 +139,7 @@ func assertWaveSixShape(t *testing.T, printed string) {
 		"$go$implements(",
 		"$go$equal(",
 		"$go$hash(",
+		"export interface DerivedReader",
 		"readonly $go$value",
 		"Object.freeze(",
 		"switch (true)",

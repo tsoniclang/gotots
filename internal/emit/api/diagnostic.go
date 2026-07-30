@@ -85,6 +85,7 @@ const (
 	RoleStructHashField       Role = "struct-hash-field"
 	RoleStorageType           Role = "storage-type"
 	RoleDefinedUnderlyingType Role = "defined-underlying-type"
+	RoleDefinedTypeArgument   Role = "defined-type-argument"
 	RoleDefinedValue          Role = "defined-value"
 	RoleCompositeElement      Role = "composite-element"
 	RoleSliceElementType      Role = "slice-element-type"

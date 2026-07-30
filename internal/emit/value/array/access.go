@@ -7,7 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -179,23 +179,9 @@ func emitIndex(
 	children api.ChildEmitter,
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {
-	sourceType := context.TypesInfo().TypeOf(source)
-	alias, represented := basictype.PrimitiveAlias(
-		context.TypesSizes(),
-		sourceType,
-	)
-	if !represented || alias == api.PrimitiveBool {
-		return api.ExpressionEmission{},
-			api.Unsupported(
-				context.WithRole(api.RoleArrayIndex),
-				api.CategoryExpression,
-				source,
-			)
-	}
-	return children.Expression(
-		context.
-			WithRole(api.RoleArrayIndex).
-			WithExpectedType(sourceType),
+	return integeroperand.Emit(
+		context.WithRole(api.RoleArrayIndex),
+		children,
 		source,
 	)
 }

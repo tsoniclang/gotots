@@ -6,7 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -333,11 +333,24 @@ func emitCopyMode(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	sourceExpected := sourceType
+	if stringSource {
+		var expectedOK bool
+		sourceExpected, expectedOK = stringArgumentExpectedType(sourceType)
+		if !expectedOK {
+			return api.ExpressionEmission{},
+				api.Unsupported(
+					context.WithRole(api.RoleCallArgument),
+					api.CategoryExpression,
+					source.Args[1],
+				)
+		}
+	}
 	values := make([]api.ExpressionEmission, 0, 2)
 	for index, argument := range source.Args {
 		expected := targetType
 		if index == 1 {
-			expected = sourceType
+			expected = sourceExpected
 		}
 		value, err := children.Expression(
 			context.
@@ -349,7 +362,7 @@ func emitCopyMode(
 			return api.ExpressionEmission{}, err
 		}
 		if index == 1 && stringSource {
-			value, err = projectDefinedString(context, expected, value)
+			value, err = projectDefinedString(context, sourceType, value)
 		} else {
 			value, err = projectDefinedSlice(context, expected, value)
 		}
@@ -422,19 +435,9 @@ func integerArgument(
 	children api.ChildEmitter,
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {
-	sourceType := context.TypesInfo().TypeOf(source)
-	if !basictype.SupportsInteger(context.TypesSizes(), sourceType) {
-		return api.ExpressionEmission{},
-			api.Unsupported(
-				context.WithRole(api.RoleCallArgument),
-				api.CategoryExpression,
-				source,
-			)
-	}
-	return children.Expression(
-		context.
-			WithRole(api.RoleCallArgument).
-			WithExpectedType(sourceType),
+	return integeroperand.Emit(
+		context.WithRole(api.RoleCallArgument),
+		children,
 		source,
 	)
 }

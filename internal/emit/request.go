@@ -420,21 +420,28 @@ func (s *programSession) require(object types.Object) error {
 	if function, ok := object.(*types.Func); ok {
 		object = function.Origin()
 	}
-	if _, ok := s.sites[object]; !ok {
+	sourcePackage := s.source.PackageForTypes(object.Pkg())
+	environmentPackage := s.source.EnvironmentForTypes(object.Pkg())
+	if _, ok := s.sites[object]; !ok && environmentPackage == nil {
 		return &ScheduleError{
 			Object: object.Name(),
 			Reason: "object has no supported source declaration",
 		}
 	}
-	sourcePackage := s.source.PackageForTypes(object.Pkg())
-	if sourcePackage == nil {
+	if sourcePackage == nil && environmentPackage == nil {
 		return &ScheduleError{
 			Object: object.Name(),
-			Reason: "object package has no source owner",
+			Reason: "object package has no declaration owner",
 		}
 	}
-	if err := s.requirePackage(sourcePackage); err != nil {
-		return err
+	if sourcePackage != nil {
+		if err := s.requirePackage(sourcePackage); err != nil {
+			return err
+		}
+	} else {
+		if _, err := s.requireEnvironmentPackage(environmentPackage); err != nil {
+			return err
+		}
 	}
 	s.scheduler.enqueue(object)
 	return nil

@@ -14,9 +14,11 @@ const interfaceTargetNameHexLength = 20
 
 func (n *File) InterfaceAdapter(
 	sourceType types.Type,
+	targetType types.Type,
 ) (api.NameReference, error) {
 	if !interfaceAdapterSource(sourceType) {
 		return api.NameReference{}, &api.NameError{
+			Name:   types.TypeString(sourceType, nil),
 			Reason: "interface-adapter source type is invalid",
 		}
 	}
@@ -43,11 +45,57 @@ func (n *File) InterfaceAdapter(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	return n.generatedValueReference(
+	reference, err := n.generatedValueReference(
 		binding.owner,
 		binding.name,
 		requirement,
 		api.ArtifactFacetConstructorSurface,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	var targetKey string
+	var targetInterface *types.Interface
+	if targetType != nil {
+		targetInterface, targetKey, err =
+			n.canonicalInterfaceContract(targetType)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+	}
+	demands, err := n.owner.registry.interfaceAdapterContractRequests(
+		binding,
+		targetKey,
+		targetInterface,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return api.NewNameReference(
+		reference.Name(),
+		api.CombineRequests(reference.Requests(), demands)...,
+	)
+}
+
+func (n *File) InterfaceContractDemand(
+	sourceType types.Type,
+	targetType types.Type,
+) ([]api.RootRequest, error) {
+	sourceInterface, sourceKey, err :=
+		n.canonicalInterfaceContract(sourceType)
+	if err != nil {
+		return nil, err
+	}
+	targetInterface, targetKey, err :=
+		n.canonicalInterfaceContract(targetType)
+	if err != nil {
+		return nil, err
+	}
+	return n.owner.registry.recordInterfaceContractDemand(
+		sourceKey,
+		sourceInterface,
+		targetKey,
+		targetInterface,
 	)
 }
 
@@ -56,6 +104,7 @@ func (n *File) InterfaceDynamicType(
 ) (api.NameReference, error) {
 	if !interfaceAdapterSource(sourceType) {
 		return api.NameReference{}, &api.NameError{
+			Name:   types.TypeString(sourceType, nil),
 			Reason: "interface-dynamic-type source type is invalid",
 		}
 	}
@@ -88,7 +137,11 @@ func (n *File) InterfaceDynamicType(
 func (n *File) InterfaceContract(
 	sourceType types.Type,
 ) (api.InterfaceContractReference, error) {
-	if typeName, _, ok := namedInterface(sourceType); ok {
+	if typeName, interfaceType, ok := namedInterface(sourceType); ok {
+		named := types.Unalias(sourceType).(*types.Named)
+		if named.TypeArgs().Len() != 0 {
+			return n.generatedInterfaceContract(interfaceType)
+		}
 		return n.namedInterfaceContract(typeName)
 	}
 	interfaceType, ok := anonymousInterface(sourceType)
@@ -97,6 +150,12 @@ func (n *File) InterfaceContract(
 			Reason: "interface-contract source type is invalid",
 		}
 	}
+	return n.generatedInterfaceContract(interfaceType)
+}
+
+func (n *File) generatedInterfaceContract(
+	interfaceType *types.Interface,
+) (api.InterfaceContractReference, error) {
 	artifactKey, err := typeidentity.BuildKey(
 		interfaceType,
 		n.generatedNamedObjectIdentity,
@@ -169,6 +228,12 @@ func (n *File) InterfaceType(
 	interfaceType, ok := anonymousInterface(sourceType)
 	if !ok {
 		return api.NameReference{}, &api.NameError{
+			Name: types.TypeString(
+				sourceType,
+				func(sourcePackage *types.Package) string {
+					return sourcePackage.Path()
+				},
+			),
 			Reason: "interface type is invalid",
 		}
 	}
@@ -361,7 +426,7 @@ func (n *File) derivedSourceReference(
 	if !ok {
 		binding, ok = n.owner.registry.byObject[object]
 	}
-	if !ok || binding.sourceFile == nil {
+	if !ok || !binding.scheduled() {
 		return api.NameReference{}, &api.NameError{
 			Name:   object.Name(),
 			Reason: "derived source reference has no declaration",
@@ -374,7 +439,7 @@ func (n *File) derivedSourceReference(
 	}
 	exportedName := binding.name + suffix
 	var requests []api.RootRequest
-	if n.artifactOwner.Valid() {
+	if binding.sourceOwned() && n.artifactOwner.Valid() {
 		dependency, err := api.NewArtifactDependencyRequest(object, facet)
 		if err != nil {
 			return api.NameReference{}, err
@@ -514,7 +579,12 @@ func namedInterface(
 	sourceType types.Type,
 ) (*types.TypeName, *types.Interface, bool) {
 	named, ok := types.Unalias(sourceType).(*types.Named)
-	if !ok || named.Obj() == nil || named.TypeArgs().Len() != 0 {
+	if !ok || named.Origin() == nil || named.Origin().Obj() == nil {
+		return nil, nil, false
+	}
+	parameters := named.Origin().TypeParams().Len()
+	arguments := named.TypeArgs().Len()
+	if parameters != arguments {
 		return nil, nil, false
 	}
 	source, ok := named.Underlying().(*types.Interface)
@@ -522,7 +592,7 @@ func namedInterface(
 		return nil, nil, false
 	}
 	source = source.Complete()
-	return named.Obj(), source, source.IsMethodSet()
+	return named.Origin().Obj(), source, source.IsMethodSet()
 }
 
 func anonymousInterface(sourceType types.Type) (*types.Interface, bool) {
@@ -532,6 +602,36 @@ func anonymousInterface(sourceType types.Type) (*types.Interface, bool) {
 	}
 	source = source.Complete()
 	return source, source.IsMethodSet()
+}
+
+func (n *File) canonicalInterfaceContract(
+	sourceType types.Type,
+) (*types.Interface, string, error) {
+	var source *types.Interface
+	if _, selected, ok := namedInterface(sourceType); ok {
+		source = selected
+	} else {
+		var ok bool
+		source, ok = anonymousInterface(sourceType)
+		if !ok {
+			return nil, "", &api.NameError{
+				Name:   types.TypeString(sourceType, nil),
+				Reason: "interface contract demand type is invalid",
+			}
+		}
+	}
+	key, err := typeidentity.BuildKey(
+		source,
+		n.generatedNamedObjectIdentity,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+	source, err = n.owner.registry.internInterfaceContract(key, source)
+	if err != nil {
+		return nil, "", err
+	}
+	return source, key, nil
 }
 
 func interfaceAdapterSource(sourceType types.Type) bool {

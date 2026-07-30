@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
@@ -210,17 +211,48 @@ func (s *programSession) packageAssemblyFile(
 	for _, artifact := range builder.initialization {
 		initialization = append(initialization, artifact.statements...)
 	}
-	initialization = append(initialization, builder.initFunctions...)
+	for _, initFunction := range builder.initFunctions {
+		cooperative, err := s.sourceCallableIsCooperative(
+			initFunction.function,
+		)
+		if err != nil {
+			return TargetFile{}, err
+		}
+		var call tsgo.Expression = s.factory.CallExpression(
+			s.factory.Identifier(initFunction.name),
+			nil,
+			nil,
+			nil,
+			tsgo.NodeFlagsNone,
+		)
+		if cooperative {
+			call = s.factory.AwaitExpression(call)
+		}
+		initialization = append(
+			initialization,
+			s.factory.ExpressionStatement(call),
+		)
+	}
 	if len(initialization) != 0 {
+		cooperative, err := s.packageInitializationIsCooperative(builder)
+		if err != nil {
+			return TargetFile{}, err
+		}
+		modifiers := []tsgo.ModifierLike{s.factory.ExportKeyword()}
+		var result tsgo.TypeNode = s.factory.KeywordTypeNode(
+			tsgo.KeywordTypeSyntaxKindVoidKeyword,
+		)
+		if cooperative {
+			modifiers = append(modifiers, s.factory.AsyncKeyword())
+			result = callable.PromiseResult(s.factory, result)
+		}
 		statements = append(statements, s.factory.FunctionDeclaration(
-			[]tsgo.ModifierLike{s.factory.ExportKeyword()},
+			modifiers,
 			nil,
 			s.factory.Identifier(packageInitializeName),
 			nil,
 			nil,
-			s.factory.KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindVoidKeyword,
-			),
+			result,
 			s.factory.Block(initialization, true),
 		))
 	}
@@ -243,10 +275,84 @@ func (b *packageTargetBuilder) hasInitializationWork() bool {
 		len(b.initFunctions) != 0
 }
 
+func (s *programSession) packageInitializationIsCooperative(
+	builder *packageTargetBuilder,
+) (bool, error) {
+	if builder == nil {
+		return false, &ScheduleError{
+			Reason: "package initialization owner is nil",
+		}
+	}
+	for _, artifact := range builder.initialization {
+		facet, err := api.NewPackageInitializerCallableFacet(artifact.owner)
+		if err != nil {
+			return false, err
+		}
+		cooperative, err := s.callableFacetIsCooperative(facet)
+		if err != nil {
+			return false, err
+		}
+		if cooperative {
+			return true, nil
+		}
+	}
+	for _, initFunction := range builder.initFunctions {
+		cooperative, err := s.sourceCallableIsCooperative(
+			initFunction.function,
+		)
+		if err != nil {
+			return false, err
+		}
+		if cooperative {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (s *programSession) sourceCallableIsCooperative(
+	function *types.Func,
+) (bool, error) {
+	facet, err := api.NewSourceCallableFacet(function)
+	if err != nil {
+		return false, err
+	}
+	return s.callableFacetIsCooperative(facet)
+}
+
+func (s *programSession) callableFacetIsCooperative(
+	facet api.CallableFacet,
+) (bool, error) {
+	observation, err := s.ObserveCooperativeCallable(facet.Owner(), facet)
+	if err != nil {
+		return false, err
+	}
+	return observation.Cooperative(), nil
+}
+
 func (s *programSession) exportedBindingNames(
 	object types.Object,
 	baseName string,
 ) ([]string, error) {
+	if function, ok := object.(*types.Func); ok &&
+		len(api.GenericDeclarationParameters(function)) != 0 {
+		requirements := s.requirements.appliedFor(
+			api.MustSourceArtifactOwner(function.Origin()),
+		)
+		profiles, err := api.SelectGenericCallableProfiles(
+			function,
+			requirements,
+		)
+		if err != nil {
+			return nil, err
+		}
+		names := make([]string, 1, len(profiles)+1)
+		names[0] = baseName
+		for _, profile := range profiles {
+			names = append(names, baseName+profile.Suffix())
+		}
+		return names, nil
+	}
 	if typeName, ok := object.(*types.TypeName); ok {
 		named, namedOK := types.Unalias(typeName.Type()).(*types.Named)
 		if namedOK {

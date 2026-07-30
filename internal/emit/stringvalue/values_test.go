@@ -106,7 +106,10 @@ func TestStringFamilyPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
     Assign,
     ByteAt,
     Concat,
+    ConstantByteAt,
     Constants,
+    DefinedBounds,
+    DefinedWindow,
     Equal,
     Greater,
     GreaterEqual,
@@ -118,6 +121,7 @@ func TestStringFamilyPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
     NotEqual,
     PackageAssign,
     PackageZero,
+    Path,
     Prefix,
     RawUTF8,
     Suffix,
@@ -161,6 +165,7 @@ console.log(Less("\u0080", "\u00ff"));
 console.log(Less("\u00c3\u00a9", "\u00ff"));
 console.log(Length(UTF8()).toString());
 console.log(ByteAt(UTF8(), 1).toString());
+console.log(ConstantByteAt(10).toString());
 console.log(bytes(Window(UTF8(), 0, 1)));
 console.log(bytes(Prefix(UTF8(), 1)));
 console.log(bytes(Suffix(UTF8(), 1)));
@@ -170,6 +175,10 @@ console.log(suffixCallCount.toString());
 const [indexCallValue, indexCallCount] = IndexCall(1);
 console.log(indexCallValue.toString());
 console.log(indexCallCount.toString());
+const [definedByte, definedWindow] = DefinedBounds();
+console.log(definedByte.toString());
+console.log(bytes(definedWindow));
+console.log(bytes(DefinedWindow(new Path("abcd"), 1, 3).$value));
 console.log(panics(() => ByteAt("a", -1)));
 console.log(panics(() => ByteAt("a", 1)));
 console.log(panics(() => ByteAt("a", 9007199254740992)));
@@ -488,6 +497,7 @@ func main() {
 	fmt.Println(values.Less("é", "\xff"))
 	fmt.Println(values.Length(values.UTF8()))
 	fmt.Println(values.ByteAt(values.UTF8(), 1))
+	fmt.Println(values.ConstantByteAt(10))
 	fmt.Printf("%x\n", values.Window(values.UTF8(), 0, 1))
 	fmt.Printf("%x\n", values.Prefix(values.UTF8(), 1))
 	fmt.Printf("%x\n", values.Suffix(values.UTF8(), 1))
@@ -497,6 +507,10 @@ func main() {
 	indexCallValue, indexCallCount := values.IndexCall(1)
 	fmt.Println(indexCallValue)
 	fmt.Println(indexCallCount)
+	definedByte, definedWindow := values.DefinedBounds()
+	fmt.Println(definedByte)
+	fmt.Printf("%x\n", definedWindow)
+	fmt.Printf("%x\n", values.DefinedWindow("abcd", 1, 3))
 	fmt.Println(panics(func() { values.ByteAt("a", -1) }))
 	fmt.Println(panics(func() { values.ByteAt("a", 1) }))
 	fmt.Println(panics(func() { values.ByteAt("a", 9007199254740992) }))

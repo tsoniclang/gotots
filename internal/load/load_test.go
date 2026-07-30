@@ -4,6 +4,7 @@ import (
 	"context"
 	"go/ast"
 	"go/types"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -58,6 +59,122 @@ func TestOneFailsClosedOnTypeErrors(t *testing.T) {
 	}
 	if _, ok := err.(*Error); !ok {
 		t.Fatalf("error = %T, want *load.Error", err)
+	}
+}
+
+func TestLoadRetainsExactEnvironmentContractPackages(t *testing.T) {
+	project := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(project, "go.mod"),
+		[]byte("module example.com/environmentfixture\n\ngo 1.26.4\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(project, "source.go"),
+		[]byte(`package environmentfixture
+
+import "context"
+
+func Use(value context.Context) error { return value.Err() }
+`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	program, err := Load(context.Background(), Request{
+		Directory: project,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(program.Packages()) != 1 {
+		t.Fatalf("source packages = %d, want 1", len(program.Packages()))
+	}
+	contract := program.PackageByPath("context")
+	if contract == nil {
+		t.Fatal("context environment contract is absent")
+	}
+	if contract.Kind() != PackageStandardLibraryContract ||
+		len(contract.Files()) != 0 ||
+		contract.Types() == nil ||
+		contract.TypesSizes() == nil ||
+		contract.ToolchainKey() == "" {
+		t.Fatalf("context contract = %#v", contract)
+	}
+	if got := program.EnvironmentForTypes(contract.Types()); got != contract {
+		t.Fatalf("environment identity lookup = %#v, want context contract", got)
+	}
+	if got := program.PackageForTypes(contract.Types()); got != nil {
+		t.Fatalf("environment package leaked into source lookup: %#v", got)
+	}
+	if contract.Types().Scope().Lookup("Context") == nil {
+		t.Fatal("context contract lost exact go/types declarations")
+	}
+}
+
+func TestLoadCanSelectExactExternalModuleContracts(t *testing.T) {
+	project := t.TempDir()
+	dependency := filepath.Join(project, "dependency")
+	if err := os.MkdirAll(dependency, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for path, content := range map[string]string{
+		"go.mod": `module example.com/application
+
+go 1.26.4
+
+require example.com/dependency v1.2.3
+
+replace example.com/dependency => ./dependency
+`,
+		"source.go": `package application
+
+import "example.com/dependency"
+
+func Use() dependency.Value { return dependency.New() }
+`,
+		"dependency/go.mod": `module example.com/dependency
+
+go 1.26.4
+`,
+		"dependency/dependency.go": `package dependency
+
+type Value struct{ Count int }
+
+func New() Value { return Value{Count: 1} }
+`,
+	} {
+		if err := os.WriteFile(
+			filepath.Join(project, path),
+			[]byte(content),
+			0o644,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	program, err := Load(context.Background(), Request{
+		Directory:            project,
+		Pattern:              ".",
+		ContractDependencies: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(program.Packages()) != 1 {
+		t.Fatalf("source packages = %d, want main module only", len(program.Packages()))
+	}
+	contract := program.PackageByPath("example.com/dependency")
+	if contract == nil ||
+		contract.Kind() != PackageExternalContract ||
+		len(contract.Files()) != 0 ||
+		contract.ExternalContractKey() == "" {
+		t.Fatalf("external contract = %#v", contract)
+	}
+	if program.EnvironmentForTypes(contract.Types()) != contract {
+		t.Fatal("external contract lost exact go/types identity")
 	}
 }
 

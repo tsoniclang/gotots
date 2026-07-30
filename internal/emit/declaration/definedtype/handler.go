@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -57,6 +58,11 @@ func Emit(
 			target.Requests()...,
 		), true, nil
 	}
+	parameters, err := genericdeclaration.EnterType(context, source, typeName)
+	if err != nil {
+		return api.DeclarationEmission{}, true, err
+	}
+	context = parameters.Context()
 	var underlying api.TypeEmission
 	if model.Family() == definedtype.FamilyCallable {
 		signature, valid := model.Callable()
@@ -133,6 +139,8 @@ func Emit(
 		name,
 		underlying.Value(),
 		requirements,
+		parameters.Nodes(),
+		parameters.References(),
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, true, err
@@ -142,7 +150,7 @@ func Emit(
 		context.Factory().ClassDeclaration(
 			modifiers,
 			context.Factory().Identifier(name),
-			nil,
+			parameters.Nodes(),
 			nil,
 			members,
 		),
@@ -181,8 +189,7 @@ func sourceSpec(
 		if !ok || context.TypesInfo().Defs[source.Name] != typeName {
 			continue
 		}
-		if source.TypeParams != nil ||
-			source.Assign.IsValid() != typeName.IsAlias() {
+		if source.Assign.IsValid() != typeName.IsAlias() {
 			return nil, false
 		}
 		return source, true

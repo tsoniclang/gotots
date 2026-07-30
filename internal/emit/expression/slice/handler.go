@@ -9,6 +9,7 @@ import (
 	slicingexpression "github.com/tsoniclang/gotots/internal/emit/expression/slicing"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -33,10 +34,26 @@ func Emit(
 		return slicingexpression.Emit(context, children, source)
 	}
 	resultType := context.TypesInfo().TypeOf(source)
+	stringType := operandType
+	operandExpectedType := types.Type(types.Typ[types.String])
+	definedString, definedStringOK := definedtype.ResolveBasic(operandType)
+	if definedStringOK {
+		underlying, basicOK := definedString.Basic()
+		resultDefined, resultDefinedOK := definedtype.ResolveBasic(resultType)
+		if !basicOK ||
+			!basictype.SupportsString(underlying) ||
+			!resultDefinedOK ||
+			resultDefined.TypeName() != definedString.TypeName() {
+			definedStringOK = false
+		} else {
+			stringType = underlying
+			operandExpectedType = operandType
+		}
+	}
 	if source.Slice3 ||
 		source.Max != nil ||
-		!basictype.SupportsString(operandType) ||
-		!basictype.SupportsString(resultType) {
+		!basictype.SupportsString(stringType) ||
+		(!definedStringOK && !basictype.SupportsString(resultType)) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -48,11 +65,17 @@ func Emit(
 	operand, err := children.Expression(
 		context.
 			WithRole(api.RoleSliceOperand).
-			WithExpectedType(types.Typ[types.String]),
+			WithExpectedType(operandExpectedType),
 		source.X,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if definedStringOK {
+		operand, err = definedString.Project(context, operand)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	low, err := bound(
 		context.WithRole(api.RoleSliceLow),
@@ -95,7 +118,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
+	target, err := api.NewExpressionEmission(
 		ordered.Before(),
 		context.Factory().CallExpression(
 			context.Factory().Identifier(reference.Name()),
@@ -109,6 +132,13 @@ func Emit(
 			reference.Requests(),
 		),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if definedStringOK {
+		return definedString.Wrap(context, target)
+	}
+	return target, nil
 }
 
 func bound(
@@ -128,15 +158,5 @@ func bound(
 		}
 		return api.DirectExpression(zero), nil
 	}
-	sourceType := context.TypesInfo().TypeOf(value)
-	if !basictype.SupportsStringIndex(context.TypesSizes(), sourceType) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	expectedType := sourceType
-	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok &&
-		basic.Info()&types.IsUntyped != 0 {
-		expectedType = types.Typ[types.Int]
-	}
-	return children.Expression(context.WithExpectedType(expectedType), value)
+	return integeroperand.Emit(context, children, value)
 }

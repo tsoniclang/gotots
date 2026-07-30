@@ -77,6 +77,46 @@ func compareDeclarationRequirements(
 			return 0
 		}
 	}
+	if left.Kind() == api.DeclarationRequirementGenericCallableProfile {
+		leftProfile, leftOK := left.GenericCallableProfile()
+		rightProfile, rightOK := right.GenericCallableProfile()
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		case !leftOK:
+			return 0
+		case leftProfile.Key() < rightProfile.Key():
+			return -1
+		case leftProfile.Key() > rightProfile.Key():
+			return 1
+		default:
+			return 0
+		}
+	}
+	if left.Kind() == api.DeclarationRequirementEnvironmentBuiltin {
+		_, leftSignature, leftOK := left.EnvironmentBuiltin()
+		_, rightSignature, rightOK := right.EnvironmentBuiltin()
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		case !leftOK:
+			return 0
+		}
+		leftType := stableTypeString(leftSignature)
+		rightType := stableTypeString(rightSignature)
+		switch {
+		case leftType < rightType:
+			return -1
+		case leftType > rightType:
+			return 1
+		default:
+			return 0
+		}
+	}
 	if left.Kind() == api.DeclarationRequirementCooperativeCallable {
 		leftFacet, leftOK := left.CooperativeCallable()
 		rightFacet, rightOK := right.CooperativeCallable()
@@ -107,6 +147,15 @@ func compareDeclarationRequirements(
 			case leftOperation.Key() < rightOperation.Key():
 				return -1
 			case leftOperation.Key() > rightOperation.Key():
+				return 1
+			}
+		}
+		if leftProfile, ok := leftFacet.GenericProfile(); ok {
+			rightProfile, _ := rightFacet.GenericProfile()
+			switch {
+			case leftProfile.Key() < rightProfile.Key():
+				return -1
+			case leftProfile.Key() > rightProfile.Key():
 				return 1
 			}
 		}
@@ -143,6 +192,36 @@ func compareDeclarationRequirements(
 		case leftDemand < rightDemand:
 			return -1
 		case leftDemand > rightDemand:
+			return 1
+		default:
+			return 0
+		}
+	}
+	if left.Kind() == api.DeclarationRequirementInterfaceAdapter {
+		leftArtifact, _, leftKey, leftDemand :=
+			left.InterfaceAdapterContract()
+		rightArtifact, _, rightKey, rightDemand :=
+			right.InterfaceAdapterContract()
+		if !leftDemand {
+			leftArtifact, _ = left.InterfaceAdapter()
+		}
+		if !rightDemand {
+			rightArtifact, _ = right.InterfaceAdapter()
+		}
+		if order := compareGeneratedArtifacts(
+			leftArtifact,
+			rightArtifact,
+		); order != 0 {
+			return order
+		}
+		switch {
+		case !leftDemand && rightDemand:
+			return -1
+		case leftDemand && !rightDemand:
+			return 1
+		case leftKey < rightKey:
+			return -1
+		case leftKey > rightKey:
 			return 1
 		default:
 			return 0
@@ -202,6 +281,15 @@ func compareDeclarationRequirements(
 	}
 }
 
+func stableTypeString(source types.Type) string {
+	return types.TypeString(source, func(sourcePackage *types.Package) string {
+		if sourcePackage == nil {
+			return ""
+		}
+		return sourcePackage.Path()
+	})
+}
+
 func compareCallableControlRequirements(
 	left api.DeclarationRequirement,
 	right api.DeclarationRequirement,
@@ -213,6 +301,23 @@ func compareCallableControlRequirements(
 		return -1
 	case leftControl > rightControl:
 		return 1
+	case leftControl == api.CallableControlIteratorReturn:
+		leftRange, leftOK := left.IteratorReturnControl()
+		rightRange, rightOK := right.IteratorReturnControl()
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		case !leftOK:
+			return 0
+		case leftRange.Pos() < rightRange.Pos():
+			return -1
+		case leftRange.Pos() > rightRange.Pos():
+			return 1
+		default:
+			return 0
+		}
 	case leftControl != api.CallableControlGoto:
 		return 0
 	}
@@ -240,8 +345,7 @@ func compareCallableControlRequirements(
 }
 
 func artifactKinds(kind api.DeclarationRequirementKind) bool {
-	return kind == api.DeclarationRequirementInterfaceAdapter ||
-		kind == api.DeclarationRequirementAnonymousInterface ||
+	return kind == api.DeclarationRequirementAnonymousInterface ||
 		kind == api.DeclarationRequirementInterfaceMethodToken ||
 		kind == api.DeclarationRequirementInterfaceDynamicTypeToken ||
 		kind == api.DeclarationRequirementGenericCapability ||

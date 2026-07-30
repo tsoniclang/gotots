@@ -90,7 +90,7 @@ func namedResultPrologue(
 		result := results.At(index)
 		targetName, selected := context.AddressableStorage().Name(context, result)
 		if !selected {
-			targetName, err = context.Names().Declare(result)
+			targetName, err = context.Names().Result(result, index)
 		}
 		if err != nil {
 			return nil, nil, false, err

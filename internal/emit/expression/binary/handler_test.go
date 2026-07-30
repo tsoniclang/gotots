@@ -61,6 +61,45 @@ func TestParentOperatorOwnerDoesNotCreateAnIntegerFallback(t *testing.T) {
 	}
 }
 
+func TestLogicalOperationAcceptsUntypedBooleanConditionEvidence(t *testing.T) {
+	source := &ast.BinaryExpr{
+		X:  ast.NewIdent("left"),
+		Op: token.LOR,
+		Y:  ast.NewIdent("right"),
+	}
+	untypedBoolean := types.Typ[types.UntypedBool]
+	info := &types.Info{Types: map[ast.Expr]types.TypeAndValue{
+		source:   {Type: untypedBoolean},
+		source.X: {Type: untypedBoolean},
+		source.Y: {Type: untypedBoolean},
+	}}
+	context, err := api.NewContext(
+		api.RoleIfCondition,
+		token.NewFileSet(),
+		types.NewPackage("example.com/expression", "expression"),
+		info,
+		types.SizesFor("gc", "amd64"),
+		tsgo.Factory{},
+		unusedNames{},
+		unusedValues{},
+		storage.Owner{},
+		api.IntegerRepresentationNumber,
+		api.EvaluationOrderDirect,
+		api.ConcurrencySemanticsDisabled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, operandType, ok := operationFor(context, source)
+	if !ok || !types.Identical(operandType, types.Typ[types.Bool]) {
+		t.Fatalf(
+			"untyped logical condition = handled %v, operand %v",
+			ok,
+			operandType,
+		)
+	}
+}
+
 func TestLogicalRightPrerequisitesStayInsideTheSelectedBranch(t *testing.T) {
 	context, err := api.NewContext(
 		api.RoleReturnResult,
@@ -137,6 +176,10 @@ func (unusedNames) Parameter(*types.Var, int) (string, error) {
 	panic("unused")
 }
 
+func (unusedNames) Result(*types.Var, int) (string, error) {
+	panic("unused")
+}
+
 func (unusedNames) Reference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
@@ -148,6 +191,7 @@ func (unusedNames) TypeReference(types.Object) (api.NameReference, error) {
 func (unusedNames) AnonymousStruct(
 	*types.Struct,
 	api.AnonymousStructDemand,
+	api.ImportPhase,
 ) (api.NameReference, error) {
 	panic("unused")
 }
@@ -159,7 +203,17 @@ func (unusedNames) MapSpecialization(
 	panic("unused")
 }
 
-func (unusedNames) InterfaceAdapter(types.Type) (api.NameReference, error) {
+func (unusedNames) InterfaceAdapter(
+	types.Type,
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) InterfaceContractDemand(
+	types.Type,
+	types.Type,
+) ([]api.RootRequest, error) {
 	panic("unused")
 }
 
@@ -197,6 +251,19 @@ func (unusedNames) GenericCapability(
 func (unusedNames) CallableABI(
 	*types.Signature,
 ) (api.CallableABIReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) SourceCallableABI(
+	types.Object,
+	*types.Signature,
+) (api.CallableABIReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) GenericCallableProfile(
+	*api.GenericCallableProfile,
+) (api.NameReference, error) {
 	panic("unused")
 }
 

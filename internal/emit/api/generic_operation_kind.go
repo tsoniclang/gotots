@@ -42,6 +42,10 @@ const (
 	GenericOperationConstraintMethod
 	GenericOperationMapConstruct
 	GenericOperationInterfaceAdapt
+	GenericOperationInterfaceAssert
+	GenericOperationInterfaceAssertOK
+	GenericOperationClear
+	GenericOperationNilEqual
 )
 
 var genericOperationIdentifiers = [...]string{
@@ -78,11 +82,15 @@ var genericOperationIdentifiers = [...]string{
 	GenericOperationConstraintMethod:   "constraint_method",
 	GenericOperationMapConstruct:       "map_construct",
 	GenericOperationInterfaceAdapt:     "interface_adapt",
+	GenericOperationInterfaceAssert:    "interface_assert",
+	GenericOperationInterfaceAssertOK:  "interface_assert_ok",
+	GenericOperationClear:              "clear",
+	GenericOperationNilEqual:           "nil_equal",
 }
 
 func (o GenericOperation) Valid() bool {
 	return o >= GenericOperationZero &&
-		o <= GenericOperationInterfaceAdapt
+		o <= GenericOperationNilEqual
 }
 
 func (o GenericOperation) Identifier() string {
@@ -124,6 +132,14 @@ func (o GenericOperation) String() string {
 		return "map-construct"
 	case GenericOperationInterfaceAdapt:
 		return "interface-adapt"
+	case GenericOperationInterfaceAssert:
+		return "interface-assert"
+	case GenericOperationInterfaceAssertOK:
+		return "interface-assert-ok"
+	case GenericOperationClear:
+		return "clear"
+	case GenericOperationNilEqual:
+		return "nil-equal"
 	default:
 		if source, ok := o.BinaryToken(); ok {
 			return "binary-" + source.String()

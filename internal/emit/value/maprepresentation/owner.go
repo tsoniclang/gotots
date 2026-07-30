@@ -79,6 +79,7 @@ func EmitType(
 
 func Nil(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
@@ -94,71 +95,63 @@ func Nil(
 			),
 		), nil
 	}
-	if model.Storage() == StorageScalar {
-		zero, err := context.Values().Zero(
-			context.WithRole(api.RoleMapValue),
-			source,
-			model.Element(),
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
+	if children == nil {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "nil map has no type emitter",
 		}
-		if len(zero.Before()) != 0 {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		reference, typeArguments, err := Reference(
-			context,
-			source,
-			sourceType,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		nilName, err := mapruntime.Name(mapruntime.MemberNil)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.DirectExpression(
-			context.Factory().CallExpression(
-				staticMember(context, reference.Name(), nilName),
-				nil,
-				typeArguments,
-				[]tsgo.Expression{zero.Value()},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(
-				reference.Requests(),
-				zero.Requests(),
-			)...,
-		), nil
 	}
-	if model.Storage() == StorageSpecialized {
-		reference, err := context.Names().MapSpecialization(
-			sourceType,
-			api.MapSpecializationDemandStatic,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		nilName, err := mapruntime.Name(mapruntime.MemberNil)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.DirectExpression(
-			context.Factory().CallExpression(
-				staticMember(context, reference.Name(), nilName),
-				nil,
-				nil,
-				nil,
-				tsgo.NodeFlagsNone,
-			),
-			reference.Requests()...,
-		), nil
+	keyType, err := children.RepresentedType(
+		context.WithRole(api.RoleMapKey),
+		source,
+		StorageKeyType(model.Key()),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
-	return api.ExpressionEmission{},
-		api.Unsupported(context, api.CategoryExpression, source)
+	valueType, err := children.RepresentedType(
+		context.WithRole(api.RoleMapValue),
+		source,
+		model.Element(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	zero, err := context.Values().Zero(
+		context.WithRole(api.RoleMapValue),
+		source,
+		model.Element(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	reference, err := context.Names().Runtime(
+		api.RuntimeMap,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	nilName, err := mapruntime.Name(mapruntime.MemberNil)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.NewExpressionEmission(
+		zero.Before(),
+		context.Factory().CallExpression(
+			staticMember(context, reference.Name(), nilName),
+			nil,
+			[]tsgo.TypeNode{keyType.Value(), valueType.Value()},
+			[]tsgo.Expression{zero.Value()},
+			tsgo.NodeFlagsNone,
+		),
+		api.CombineRequests(
+			keyType.Requests(),
+			valueType.Requests(),
+			zero.Requests(),
+			reference.Requests(),
+		),
+	)
 }
 
 func Reference(

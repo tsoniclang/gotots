@@ -16,6 +16,7 @@ import (
 	panicnilruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panicnil"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
+	unsafepointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafepointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -335,6 +336,35 @@ func Build(
 	}
 	if module == api.RuntimeModuleChannel {
 		return buildChannel(factory, symbols)
+	}
+	if module == api.RuntimeModuleUnsafePointer {
+		if len(symbols) != 1 || symbols[0] != api.RuntimeUnsafePointer {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "unsafe-pointer runtime requires exactly RuntimeUnsafePointer",
+			}
+		}
+		contract, err := api.RuntimeContract(api.RuntimeUnsafePointer)
+		if err != nil {
+			return nil, err
+		}
+		pointerContract, err := api.RuntimeContract(api.RuntimePointer)
+		if err != nil {
+			return nil, err
+		}
+		statement := unsafepointerruntime.Build(
+			factory,
+			contract.ExportedName(),
+			pointerContract.ExportedName(),
+		)
+		definition, err := NewDefinition(
+			api.RuntimeUnsafePointer,
+			statement,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
 	}
 	if module == api.RuntimeModulePanic {
 		panicContract, err := api.RuntimeContract(api.RuntimePanic)

@@ -189,6 +189,74 @@ func (n *File) CallableABI(
 	if err != nil {
 		return api.CallableABIReference{}, err
 	}
+	return n.callableABI(signature, signatureKey)
+}
+
+func (n *File) GenericCallableProfile(
+	profile *api.GenericCallableProfile,
+) (api.NameReference, error) {
+	if !profile.Valid() {
+		return api.NameReference{}, &api.NameError{
+			Reason: "generic callable profile reference is invalid",
+		}
+	}
+	requirement, err := api.NewGenericCallableProfileRequest(profile)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	reference, err := n.derivedSourceReference(
+		profile.Owner(),
+		profile.Suffix(),
+		api.ArtifactFacetCallableSignature,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return api.NewNameReference(
+		reference.Name(),
+		api.CombineRequests(
+			reference.Requests(),
+			[]api.RootRequest{requirement},
+		)...,
+	)
+}
+
+func (n *File) SourceCallableABI(
+	owner types.Object,
+	signature *types.Signature,
+) (api.CallableABIReference, error) {
+	owner = api.GenericDeclarationOrigin(owner)
+	if owner == nil ||
+		owner.Pkg() == nil ||
+		signature == nil ||
+		signature.Recv() != nil {
+		return api.CallableABIReference{}, &api.NameError{
+			Reason: "source callable ABI identity is invalid",
+		}
+	}
+	namedIdentity := n.sourceGeneratedNamedObjectIdentity(owner)
+	signatureKey, err := typeidentity.BuildParameterizedKey(
+		signature,
+		namedIdentity,
+		func(parameter *types.TypeParam) (string, error) {
+			if parameter == nil || parameter.Obj() == nil {
+				return "", &api.NameError{
+					Reason: "source callable ABI has an unbound type parameter",
+				}
+			}
+			return namedIdentity(parameter.Obj())
+		},
+	)
+	if err != nil {
+		return api.CallableABIReference{}, err
+	}
+	return n.callableABI(signature, signatureKey)
+}
+
+func (n *File) callableABI(
+	signature *types.Signature,
+	signatureKey string,
+) (api.CallableABIReference, error) {
 	digest := sha256.Sum256([]byte("callable-abi|" + signatureKey))
 	artifactKey := hex.EncodeToString(digest[:])
 	binding, err := n.owner.registry.internCallableABI(
@@ -219,6 +287,43 @@ func (n *File) CallableABI(
 		binding.owner,
 		requests...,
 	)
+}
+
+func (n *File) sourceGeneratedNamedObjectIdentity(
+	owner types.Object,
+) typeidentity.NamedObjectIdentity {
+	artifactOwner := api.MustSourceArtifactOwner(owner)
+	packageScope := owner.Pkg().Scope()
+	return func(object *types.TypeName) (string, error) {
+		if object == nil {
+			return "", &api.NameError{
+				Reason: "source callable ABI component is nil",
+			}
+		}
+		if object.Pkg() == nil ||
+			object.Parent() == object.Pkg().Scope() {
+			if object.Pkg() != nil {
+				if _, ok := n.owner.registry.byObject[object]; !ok {
+					return "", &api.NameError{
+						Name:   object.Name(),
+						Reason: "source callable ABI component has no declaration identity",
+					}
+				}
+			}
+			return typeidentity.NamedObjectKey(object)
+		}
+		if object.Pkg() != owner.Pkg() {
+			return "", &api.NameError{
+				Name:   object.Name(),
+				Reason: "source callable ABI component is foreign to its owner",
+			}
+		}
+		return typeidentity.LexicalNamedObjectKey(
+			object,
+			artifactOwner,
+			packageScope,
+		)
+	}
 }
 
 func (r *Registry) internCallableABI(

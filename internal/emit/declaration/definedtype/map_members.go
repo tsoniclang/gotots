@@ -12,9 +12,11 @@ import (
 
 func emitMapMembers(
 	context api.Context,
-	source *ast.TypeSpec,
+	_ *ast.TypeSpec,
 	model definedtype.Model,
 	underlyingType tsgo.TypeNode,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) ([]tsgo.ClassElement, []api.RootRequest, error) {
 	className, err := context.Names().Declare(model.TypeName())
 	if err != nil {
@@ -22,7 +24,7 @@ func emitMapMembers(
 	}
 	classType := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(className),
-		nil,
+		typeArguments,
 	)
 	optionalClassType := context.Factory().UnionTypeNode([]tsgo.TypeNode{
 		classType,
@@ -30,18 +32,6 @@ func emitMapMembers(
 			tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
 		),
 	})
-	zero, err := context.Values().Zero(
-		context.WithRole(api.RoleMapReceiver),
-		source,
-		model.Underlying(),
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	if len(zero.Before()) != 0 {
-		return nil, nil,
-			api.Unsupported(context, api.CategoryDeclaration, source)
-	}
 	panicReference, err := context.Names().Runtime(
 		api.RuntimePanic,
 		api.ImportPhaseValue,
@@ -58,13 +48,14 @@ func emitMapMembers(
 				context,
 				optionalClassType,
 				underlyingType,
-				zero.Value(),
+				typeParameters,
 			),
 			mapStoreMember(
 				context,
 				optionalClassType,
 				underlyingType,
 				panicReference.Name(),
+				typeParameters,
 			),
 			mapWrapMember(
 				context,
@@ -72,9 +63,9 @@ func emitMapMembers(
 				optionalClassType,
 				underlyingType,
 				isNilName,
+				typeParameters,
 			),
 		}, api.CombineRequests(
-			zero.Requests(),
 			panicReference.Requests(),
 		), nil
 }
@@ -83,14 +74,17 @@ func mapReadMember(
 	context api.Context,
 	classType tsgo.TypeNode,
 	underlyingType tsgo.TypeNode,
-	zero tsgo.Expression,
+	typeParameters []tsgo.TypeParameterDeclaration,
 ) tsgo.MethodDeclaration {
 	source := context.Factory().Identifier("$source")
+	zero := context.Factory().Identifier("$zero")
 	return mapStaticMethod(
 		context,
 		definedtype.MapReadMember,
-		source,
-		classType,
+		[]tsgo.ParameterDeclaration{
+			mapParameter(context, source, classType),
+			mapParameter(context, zero, underlyingType),
+		},
 		underlyingType,
 		[]tsgo.Statement{
 			context.Factory().IfStatement(
@@ -107,6 +101,7 @@ func mapReadMember(
 				mapStorage(context, source),
 			),
 		},
+		typeParameters,
 	)
 }
 
@@ -115,13 +110,15 @@ func mapStoreMember(
 	classType tsgo.TypeNode,
 	underlyingType tsgo.TypeNode,
 	panicName string,
+	typeParameters []tsgo.TypeParameterDeclaration,
 ) tsgo.MethodDeclaration {
 	source := context.Factory().Identifier("$source")
 	return mapStaticMethod(
 		context,
 		definedtype.MapStoreMember,
-		source,
-		classType,
+		[]tsgo.ParameterDeclaration{
+			mapParameter(context, source, classType),
+		},
 		underlyingType,
 		[]tsgo.Statement{
 			context.Factory().IfStatement(
@@ -147,6 +144,7 @@ func mapStoreMember(
 				mapStorage(context, source),
 			),
 		},
+		typeParameters,
 	)
 }
 
@@ -156,6 +154,7 @@ func mapWrapMember(
 	classType tsgo.TypeNode,
 	underlyingType tsgo.TypeNode,
 	isNilName string,
+	typeParameters []tsgo.TypeParameterDeclaration,
 ) tsgo.MethodDeclaration {
 	source := context.Factory().Identifier("$source")
 	isNil := context.Factory().CallExpression(
@@ -173,8 +172,9 @@ func mapWrapMember(
 	return mapStaticMethod(
 		context,
 		definedtype.MapWrapMember,
-		source,
-		underlyingType,
+		[]tsgo.ParameterDeclaration{
+			mapParameter(context, source, underlyingType),
+		},
 		classType,
 		[]tsgo.Statement{
 			context.Factory().ReturnStatement(
@@ -191,35 +191,42 @@ func mapWrapMember(
 				),
 			),
 		},
+		typeParameters,
 	)
 }
 
 func mapStaticMethod(
 	context api.Context,
 	name string,
-	source tsgo.Identifier,
-	sourceType tsgo.TypeNode,
+	parameters []tsgo.ParameterDeclaration,
 	resultType tsgo.TypeNode,
 	body []tsgo.Statement,
+	typeParameters []tsgo.TypeParameterDeclaration,
 ) tsgo.MethodDeclaration {
 	return context.Factory().MethodDeclaration(
 		[]tsgo.ModifierLike{context.Factory().StaticKeyword()},
 		nil,
 		context.Factory().Identifier(name),
 		nil,
-		nil,
-		[]tsgo.ParameterDeclaration{
-			context.Factory().ParameterDeclaration(
-				nil,
-				nil,
-				source,
-				nil,
-				sourceType,
-				nil,
-			),
-		},
+		typeParameters,
+		parameters,
 		resultType,
 		context.Factory().Block(body, true),
+	)
+}
+
+func mapParameter(
+	context api.Context,
+	name tsgo.Identifier,
+	targetType tsgo.TypeNode,
+) tsgo.ParameterDeclaration {
+	return context.Factory().ParameterDeclaration(
+		nil,
+		nil,
+		name,
+		nil,
+		targetType,
+		nil,
 	)
 }
 

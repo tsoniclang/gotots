@@ -14,6 +14,7 @@ import (
 
 func Test(
 	context api.Context,
+	sourceType types.Type,
 	targetType types.Type,
 	value tsgo.Expression,
 ) (api.ExpressionEmission, error) {
@@ -47,6 +48,13 @@ func Test(
 		), nil
 	}
 	if _, ok := interfacetype.Resolve(targetType); ok {
+		demands, err := context.Names().InterfaceContractDemand(
+			sourceType,
+			targetType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		contract, err := context.Names().InterfaceContract(targetType)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -59,10 +67,10 @@ func Test(
 				[]tsgo.Expression{value},
 				tsgo.NodeFlagsNone,
 			),
-			contract.Requests()...,
+			api.CombineRequests(contract.Requests(), demands)...,
 		), nil
 	}
-	adapter, err := context.Names().InterfaceAdapter(targetType)
+	adapter, err := context.Names().InterfaceAdapter(targetType, nil)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -121,7 +129,7 @@ func Extract(
 		}
 		return api.DirectExpression(value, contract.Requests()...), nil
 	}
-	adapter, err := context.Names().InterfaceAdapter(targetType)
+	adapter, err := context.Names().InterfaceAdapter(targetType, nil)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

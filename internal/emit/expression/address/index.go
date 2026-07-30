@@ -6,10 +6,10 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -95,7 +95,7 @@ func arrayIndex(
 	definedPointer definedtype.Model,
 ) (api.ExpressionEmission, error) {
 	if !types.Identical(array.ElementType(), element) ||
-		!basictype.SupportsInteger(
+		!integeroperand.Supports(
 			context.TypesSizes(),
 			context.TypesInfo().TypeOf(source.Index),
 		) {
@@ -129,11 +129,9 @@ func arrayIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	indexType := context.TypesInfo().TypeOf(source.Index)
-	index, err := children.Expression(
-		context.
-			WithRole(api.RoleArrayIndex).
-			WithExpectedType(indexType),
+	index, err := integeroperand.Emit(
+		context.WithRole(api.RoleArrayIndex),
+		children,
 		source.Index,
 	)
 	if err != nil {
@@ -265,7 +263,7 @@ func sliceIndex(
 	element types.Type,
 ) (api.ExpressionEmission, error) {
 	indexType := context.TypesInfo().TypeOf(source.Index)
-	if !basictype.SupportsInteger(context.TypesSizes(), indexType) {
+	if !integeroperand.Supports(context.TypesSizes(), indexType) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -284,10 +282,9 @@ func sliceIndex(
 			return api.ExpressionEmission{}, err
 		}
 	}
-	index, err := children.Expression(
-		context.
-			WithRole(api.RoleSliceIndex).
-			WithExpectedType(indexType),
+	index, err := integeroperand.Emit(
+		context.WithRole(api.RoleSliceIndex),
+		children,
 		source.Index,
 	)
 	if err != nil {

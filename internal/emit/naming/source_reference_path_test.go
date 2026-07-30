@@ -37,6 +37,7 @@ func TestGeneratedArtifactSourceReferencesUseDefiningModulesAndAliases(
 			name:       "record",
 			sourceFile: &ast.File{},
 			sourcePath: path,
+			kind:       targetBindingSource,
 		}); err != nil {
 			t.Fatal(err)
 		}

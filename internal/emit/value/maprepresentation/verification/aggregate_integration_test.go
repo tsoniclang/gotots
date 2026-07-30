@@ -328,6 +328,10 @@ func (aggregateNames) Parameter(variable *types.Var, _ int) (string, error) {
 	return variable.Name(), nil
 }
 
+func (aggregateNames) Result(variable *types.Var, _ int) (string, error) {
+	return variable.Name(), nil
+}
+
 func (aggregateNames) Reference(object types.Object) (api.NameReference, error) {
 	return api.NewNameReference(object.Name())
 }
@@ -370,6 +374,7 @@ func (aggregateNames) AnonymousStructStorage(
 func (aggregateNames) AnonymousStruct(
 	*types.Struct,
 	api.AnonymousStructDemand,
+	api.ImportPhase,
 ) (api.NameReference, error) {
 	panic("unused")
 }
@@ -383,7 +388,15 @@ func (aggregateNames) MapSpecialization(
 
 func (aggregateNames) InterfaceAdapter(
 	types.Type,
+	types.Type,
 ) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceContractDemand(
+	types.Type,
+	types.Type,
+) ([]api.RootRequest, error) {
 	panic("unused")
 }
 
@@ -427,6 +440,19 @@ func (aggregateNames) GenericCapability(
 func (aggregateNames) CallableABI(
 	*types.Signature,
 ) (api.CallableABIReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) SourceCallableABI(
+	types.Object,
+	*types.Signature,
+) (api.CallableABIReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) GenericCallableProfile(
+	*api.GenericCallableProfile,
+) (api.NameReference, error) {
 	panic("unused")
 }
 

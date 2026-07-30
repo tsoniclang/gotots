@@ -171,16 +171,24 @@ func (s *programSession) buildInterfaceArtifactRevision(
 	}
 	defer finish()
 	context := builder.context.WithArtifactOwner(owner)
-	if err := exactInterfaceRequirement(
-		s.requirements.appliedFor(owner),
-		artifact,
-	); err != nil {
+	requirements := s.requirements.appliedFor(owner)
+	var adapterContracts []*types.Interface
+	if artifact.Kind() == api.GeneratedArtifactInterfaceAdapter {
+		adapterContracts, err = interfaceadapterdeclaration.Contracts(
+			artifact,
+			requirements,
+		)
+	} else {
+		err = exactInterfaceRequirement(requirements, artifact)
+	}
+	if err != nil {
 		return artifactRevision{}, err
 	}
 	statements, requests, err := buildInterfaceArtifact(
 		builder,
 		context,
 		artifact,
+		adapterContracts,
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -209,6 +217,7 @@ func buildInterfaceArtifact(
 	builder *targetFileBuilder,
 	context api.Context,
 	artifact *api.GeneratedArtifact,
+	adapterContracts []*types.Interface,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	switch artifact.Kind() {
 	case api.GeneratedArtifactInterfaceMethodToken:
@@ -216,6 +225,9 @@ func buildInterfaceArtifact(
 			interfacemethodtoken.Build(
 				builder.context.Factory(),
 				artifact.TargetName(),
+				[]tsgo.ModifierLike{
+					builder.context.Factory().ExportKeyword(),
+				},
 			),
 		}, nil, nil
 	case api.GeneratedArtifactInterfaceDynamicTypeToken:
@@ -223,6 +235,9 @@ func buildInterfaceArtifact(
 			interfacedynamictype.Build(
 				builder.context.Factory(),
 				artifact.TargetName(),
+				[]tsgo.ModifierLike{
+					builder.context.Factory().ExportKeyword(),
+				},
 			),
 		}, nil, nil
 	case api.GeneratedArtifactAnonymousInterface:
@@ -256,6 +271,7 @@ func buildInterfaceArtifact(
 			builder.emitter,
 			artifact.TargetName(),
 			source,
+			adapterContracts,
 			[]tsgo.ModifierLike{
 				builder.context.Factory().ExportKeyword(),
 			},

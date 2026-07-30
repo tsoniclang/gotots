@@ -25,7 +25,10 @@ func addressableParameterPrologue(
 	variables := make([]*types.Var, 0, signature.Params().Len()+1)
 	names := make([]string, 0, signature.Params().Len()+1)
 	if receiver := signature.Recv(); receiver != nil {
-		name, err := context.Names().Declare(receiver)
+		name, err := context.Names().Parameter(
+			receiver,
+			signature.Params().Len(),
+		)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -59,12 +59,12 @@ func MethodSetReceiver(
 	source ast.Node,
 	selected *types.Selection,
 	root api.ExpressionEmission,
-) (api.ExpressionEmission, *types.Func, error) {
+) (api.ExpressionEmission, types.Type, *types.Func, error) {
 	resolved, method, ok := methodPath(selected)
 	if !ok ||
 		selected.Kind() != types.MethodVal ||
 		!types.Identical(selected.Recv(), resolved.root) {
-		return api.ExpressionEmission{}, nil,
+		return api.ExpressionEmission{}, nil, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	receiver, err := methodSetReceiver(
@@ -75,7 +75,7 @@ func MethodSetReceiver(
 		method,
 		root,
 	)
-	return receiver, method, err
+	return receiver, resolved.effective, method, err
 }
 
 func methodSetReceiver(
@@ -91,6 +91,22 @@ func methodSetReceiver(
 	_, declaredElement, _, declaredPointer := pointerType(declared)
 	_, effectiveElement, _, effectivePointer :=
 		pointerType(resolved.effective)
+	if declaredPointer &&
+		!effectivePointer &&
+		types.Identical(declaredElement, resolved.effective) {
+		if _, _, _, rootPointer := pointerType(resolved.root); !rootPointer {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		return projectAddress(
+			context,
+			children,
+			source,
+			resolved,
+			root,
+			false,
+		)
+	}
 	value, err := projectValue(
 		context,
 		children,
@@ -106,11 +122,6 @@ func methodSetReceiver(
 		effectivePointer &&
 		types.Identical(declaredElement, effectiveElement):
 		return value, nil
-	case declaredPointer &&
-		!effectivePointer &&
-		types.Identical(declaredElement, resolved.effective):
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
 	case !declaredPointer &&
 		effectivePointer &&
 		types.Identical(declared, effectiveElement):

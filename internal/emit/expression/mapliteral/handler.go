@@ -15,8 +15,8 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
+	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
-	sourceType := context.TypesInfo().TypeOf(source)
 	mapType, ok := maprepresentation.Source(context, sourceType)
 	if !ok ||
 		source.Incomplete ||

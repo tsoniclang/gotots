@@ -71,20 +71,30 @@ func emitMultipleResults(
 		if target.declaration {
 			targetType = target.object.Type()
 		}
+		value, err := resulttuple.AdaptAssignment(
+			context.WithRole(role),
+			source.Rhs[0],
+			results.At(index).Type(),
+			targetType,
+			api.DirectExpression(element),
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 		if target.declaration || !target.target.CopiesValue() {
-			copied, err := context.Values().Copy(
+			value, err = context.Values().Copy(
 				context.WithRole(role),
 				source.Rhs[0],
 				targetType,
-				api.DirectExpression(element),
+				value,
 			)
 			if err != nil {
 				return api.StatementEmission{}, err
 			}
-			statements = append(statements, copied.Before()...)
-			element = copied.Value()
-			requests = append(requests, copied.Requests()...)
 		}
+		statements = append(statements, value.Before()...)
+		element = value.Value()
+		requests = append(requests, value.Requests()...)
 		if target.declaration {
 			if target.storage {
 				cell, err := context.AddressableStorage().Cell(

@@ -6,13 +6,14 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	builtinoperation "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
-	calloperation "github.com/tsoniclang/gotots/internal/emit/expression/call"
+	clearoperation "github.com/tsoniclang/gotots/internal/emit/expression/builtin/clear"
 	conversionoperation "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
 	indexoperation "github.com/tsoniclang/gotots/internal/emit/expression/index"
+	assertionoperation "github.com/tsoniclang/gotots/internal/emit/expression/typeassertion/operation"
 	"github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
+	"github.com/tsoniclang/gotots/internal/emit/value/nilcomparison"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -20,6 +21,7 @@ func Build(
 	context api.Context,
 	children api.ChildEmitter,
 	artifact *api.GeneratedArtifact,
+	modifiers []tsgo.ModifierLike,
 ) (tsgo.Statement, []api.RootRequest, error) {
 	signature, selection, ok := artifact.GenericCapability()
 	if !ok {
@@ -28,8 +30,12 @@ func Build(
 			"generated artifact is not a generic capability",
 		)
 	}
+	signatureRole := api.RoleFileDeclaration
+	if artifact.Placement() == api.GeneratedArtifactPlacementLexical {
+		signatureRole = api.RoleLocalDeclaration
+	}
 	target, err := callable.EmitAdapter(
-		context.WithRole(api.RoleFileDeclaration),
+		context.WithRole(signatureRole),
 		children,
 		nil,
 		signature,
@@ -47,11 +53,18 @@ func Build(
 	if err != nil {
 		return nil, nil, err
 	}
-	body := append(
-		value.Before(),
-		context.Factory().ReturnStatement(value.Value()),
-	)
-	modifiers := []tsgo.ModifierLike{context.Factory().ExportKeyword()}
+	body := value.Before()
+	if signature.Results().Len() == 0 {
+		body = append(
+			body,
+			context.Factory().ExpressionStatement(value.Value()),
+		)
+	} else {
+		body = append(
+			body,
+			context.Factory().ReturnStatement(value.Value()),
+		)
+	}
 	resultType := target.Result()
 	if context.IsCooperative() {
 		modifiers = append(modifiers, context.Factory().AsyncKeyword())
@@ -80,7 +93,52 @@ func emitValue(
 	arguments []tsgo.Expression,
 ) (api.ExpressionEmission, error) {
 	operation := selection.Operation()
-	if signature == nil || signature.Results().Len() != 1 {
+	if signature == nil {
+		return api.ExpressionEmission{}, shapeError(context, operation)
+	}
+	switch operation {
+	case api.GenericOperationInterfaceAssert:
+		return emitInterfaceAssertion(
+			context,
+			children,
+			operation,
+			signature,
+			arguments,
+			false,
+		)
+	case api.GenericOperationInterfaceAssertOK:
+		return emitInterfaceAssertion(
+			context,
+			children,
+			operation,
+			signature,
+			arguments,
+			true,
+		)
+	case api.GenericOperationClear:
+		if len(arguments) != 1 ||
+			signature.Params().Len() != 1 ||
+			signature.Results().Len() != 0 {
+			return api.ExpressionEmission{}, shapeError(context, operation)
+		}
+		target, handled, err := clearoperation.Apply(
+			context,
+			nil,
+			signature.Params().At(0).Type(),
+			api.DirectExpression(arguments[0]),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !handled {
+			return api.ExpressionEmission{}, invariant(
+				context,
+				"generic clear capability has no concrete operation",
+			)
+		}
+		return target, nil
+	}
+	if signature.Results().Len() != 1 {
 		return api.ExpressionEmission{}, shapeError(context, operation)
 	}
 	switch operation {
@@ -111,6 +169,31 @@ func emitValue(
 			signature.Params().At(0).Type(),
 			arguments[0],
 		)
+	case api.GenericOperationNilEqual:
+		if len(arguments) != 1 ||
+			signature.Params().Len() != 1 ||
+			!types.Identical(
+				signature.Results().At(0).Type(),
+				types.Typ[types.Bool],
+			) {
+			return api.ExpressionEmission{}, shapeError(context, operation)
+		}
+		target, handled, err := nilcomparison.Apply(
+			context,
+			nil,
+			signature.Params().At(0).Type(),
+			api.DirectExpression(arguments[0]),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !handled {
+			return api.ExpressionEmission{}, invariant(
+				context,
+				"generic nil equality has no concrete operation",
+			)
+		}
+		return target, nil
 	case api.GenericOperationUnaryPlus,
 		api.GenericOperationUnaryMinus,
 		api.GenericOperationUnaryNot,
@@ -229,6 +312,7 @@ func emitValue(
 	case api.GenericOperationConstraintMethod:
 		return emitConstraintMethod(
 			context,
+			children,
 			operation,
 			selection,
 			signature,
@@ -254,6 +338,39 @@ func emitValue(
 				operation.String(),
 		)
 	}
+}
+
+func emitInterfaceAssertion(
+	context api.Context,
+	children api.ChildEmitter,
+	operation api.GenericOperation,
+	signature *types.Signature,
+	arguments []tsgo.Expression,
+	commaOK bool,
+) (api.ExpressionEmission, error) {
+	expectedResults := 1
+	if commaOK {
+		expectedResults = 2
+	}
+	if len(arguments) != 1 ||
+		signature.Params().Len() != 1 ||
+		signature.Results().Len() != expectedResults ||
+		(commaOK &&
+			!types.Identical(
+				signature.Results().At(1).Type(),
+				types.Typ[types.Bool],
+			)) {
+		return api.ExpressionEmission{}, shapeError(context, operation)
+	}
+	return assertionoperation.Apply(
+		context,
+		children,
+		nil,
+		signature.Params().At(0).Type(),
+		signature.Results().At(0).Type(),
+		commaOK,
+		api.DirectExpression(arguments[0]),
+	)
 }
 
 func emitMapConstruct(
@@ -331,65 +448,6 @@ func emitMapConstruct(
 func integerType(sourceType types.Type) bool {
 	basic, ok := types.Unalias(sourceType).(*types.Basic)
 	return ok && basic.Info()&types.IsInteger != 0
-}
-
-func emitConstraintMethod(
-	context api.Context,
-	operation api.GenericOperation,
-	selection api.GenericOperationSelection,
-	signature *types.Signature,
-	arguments []tsgo.Expression,
-) (api.ExpressionEmission, error) {
-	method, ok := selection.Method()
-	if !ok ||
-		len(arguments) == 0 ||
-		signature.Params().Len() != len(arguments) {
-		return api.ExpressionEmission{}, shapeError(context, operation)
-	}
-	methodSignature, ok := method.Type().(*types.Signature)
-	if !ok || methodSignature.Recv() == nil {
-		return api.ExpressionEmission{}, shapeError(context, operation)
-	}
-	receiverType := signature.Params().At(0).Type()
-	interfaceType := methodSignature.Recv().Type()
-	receiver, handled, err := interfacevalue.Convert(
-		context,
-		nil,
-		receiverType,
-		interfaceType,
-		api.DirectExpression(arguments[0]),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if !handled {
-		return api.ExpressionEmission{}, invariant(
-			context,
-			"generic constraint-method receiver has no concrete interface adaptation",
-		)
-	}
-	target, err := calloperation.ApplyInterfaceMethod(
-		context,
-		nil,
-		interfaceType,
-		receiver,
-		method,
-		arguments[1:],
-		nil,
-		nil,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	valueSignature, ok := callable.ValueSignature(methodSignature)
-	if !ok {
-		return api.ExpressionEmission{}, shapeError(context, operation)
-	}
-	return cooperativecall.GeneratedValueCall(
-		context,
-		valueSignature,
-		target,
-	)
 }
 
 func emitEquality(

@@ -41,6 +41,9 @@ func supportsHash(
 	if panicNilRuntimeValue(context, sourceType) {
 		return true
 	}
+	if unsafePointerValue(sourceType) {
+		return true
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		visiting[sourceType] = true
 		result := supportsHash(context, defined.Underlying(), visiting)
@@ -165,6 +168,47 @@ func (owner Owner) Hash(
 	}
 	if panicNilRuntimeValue(context, sourceType) {
 		return panicNilHash(context), nil
+	}
+	if unsafePointerValue(sourceType) {
+		reference, err := context.Names().Runtime(
+			api.RuntimeMapHash,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		undefined := context.Factory().Identifier("undefined")
+		return api.DirectExpression(
+			context.Factory().ConditionalExpression(
+				context.Factory().BinaryExpression(
+					nil,
+					value,
+					nil,
+					context.Factory().BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					),
+					undefined,
+				),
+				context.Factory().QuestionToken(),
+				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+				context.Factory().ColonToken(),
+				context.Factory().CallExpression(
+					context.Factory().PropertyAccessExpression(
+						context.Factory().Identifier(reference.Name()),
+						nil,
+						context.Factory().Identifier(
+							mapruntime.HashObjectMember,
+						),
+						tsgo.NodeFlagsNone,
+					),
+					nil,
+					nil,
+					[]tsgo.Expression{value},
+					tsgo.NodeFlagsNone,
+				),
+			),
+			reference.Requests()...,
+		), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		return (Owner{}).Hash(

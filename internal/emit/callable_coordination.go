@@ -21,6 +21,56 @@ type genericOperationIdentity struct {
 	key      string
 }
 
+type genericCallableProfileIdentity struct {
+	owner *types.Func
+	key   string
+}
+
+func (s *programSession) ResolveGenericCallableProfile(
+	owner *types.Func,
+	selection api.GenericCallableProfileSelection,
+) (*api.GenericCallableProfile, error) {
+	if owner == nil {
+		return nil, &ScheduleError{
+			Reason: "generic callable profile owner is nil",
+		}
+	}
+	owner = owner.Origin()
+	_, sourceOwned := s.sites[owner]
+	environmentOwned :=
+		s.source.EnvironmentForTypes(owner.Pkg()) != nil
+	if (!sourceOwned && !environmentOwned) ||
+		len(api.GenericDeclarationParameters(owner)) == 0 ||
+		!selection.Valid() ||
+		!selection.Cooperative() {
+		return nil, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "generic callable profile identity is invalid",
+		}
+	}
+	identity := genericCallableProfileIdentity{
+		owner: owner,
+		key:   selection.Key(),
+	}
+	if existing := s.genericProfiles[identity]; existing != nil {
+		return existing, nil
+	}
+	digest := sha256.Sum256([]byte(
+		"generic-callable-profile|" + selection.Key(),
+	))
+	suffix := "$cooperative_" + hex.EncodeToString(digest[:10])
+	profile, err := api.NewGenericCallableProfile(
+		owner,
+		selection,
+		suffix,
+	)
+	if err != nil {
+		return nil, err
+	}
+	s.genericProfiles[identity] = profile
+	return profile, nil
+}
+
 func (s *programSession) ResolveGenericOperationSet(
 	declaration types.Object,
 	consumer api.GenericOperationConsumer,
@@ -32,6 +82,14 @@ func (s *programSession) ResolveGenericOperationSet(
 		return api.GenericOperationSet{}, false, nil
 	}
 	if _, ok := s.sites[owner]; !ok {
+		if s.source.EnvironmentForTypes(owner.Pkg()) != nil {
+			operationSet, err := api.NewGenericOperationSet(
+				owner,
+				consumer,
+				nil,
+			)
+			return operationSet, err == nil, err
+		}
 		return api.GenericOperationSet{}, false, &ScheduleError{
 			Object: owner.Name(),
 			Reason: "generic operation set has no source declaration",
@@ -243,6 +301,11 @@ func (s *programSession) ObserveCooperativeCallable(
 			Reason: "cooperative callable facet is invalid",
 		}
 	}
+	if source, ok := facet.Owner().Source(); ok &&
+		source != nil &&
+		s.source.EnvironmentForTypes(source.Pkg()) != nil {
+		return api.NewCooperativeCallableObservation(false)
+	}
 	cooperative := false
 	for _, requirement := range s.requirements.appliedFor(
 		facet.Owner(),
@@ -269,7 +332,8 @@ func (s *programSession) ObserveCooperativeCallable(
 		case api.CallableFacetSource,
 			api.CallableFacetABI,
 			api.CallableFacetGenericCapability,
-			api.CallableFacetGenericOperation:
+			api.CallableFacetGenericOperation,
+			api.CallableFacetGenericProfile:
 			request, err := api.NewOwnedArtifactDependencyRequest(
 				facet.Owner(),
 				api.ArtifactFacetCallableSignature,
@@ -278,10 +342,11 @@ func (s *programSession) ObserveCooperativeCallable(
 				return api.CooperativeCallableObservation{}, err
 			}
 			requests = append(requests, request)
-		case api.CallableFacetFunctionLiteral:
+		case api.CallableFacetFunctionLiteral,
+			api.CallableFacetPackageInitializer:
 			return api.CooperativeCallableObservation{}, &ScheduleError{
 				Object: facet.Owner().Name(),
-				Reason: "function-literal facet escaped its source artifact",
+				Reason: "lexical callable facet escaped its source artifact",
 			}
 		default:
 			return api.CooperativeCallableObservation{}, &ScheduleError{

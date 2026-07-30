@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -15,13 +16,32 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.ReturnStmt,
 ) (api.StatementEmission, error) {
-	if control, inIteratorRange := context.IteratorRangeControl(); inIteratorRange && control.Valid() {
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
+	if control, selected := context.IteratorRangeControl(); selected {
+		if !control.Returning() {
+			requests, err := context.IteratorReturnControlRequests()
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
+			return api.NewStatementEmission(nil, requests)
+		}
+		return emitIteratorReturn(
+			context,
+			children,
+			source,
+			control,
+		)
 	}
 	if control, selected := context.ReturnControl(); selected {
 		return emitControlled(context, children, source, control)
 	}
+	return emitDirect(context, children, source)
+}
+
+func emitDirect(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.ReturnStmt,
+) (api.StatementEmission, error) {
 	results := context.FunctionResults()
 	resultCount := 0
 	if results != nil {
@@ -65,13 +85,12 @@ func emitNamed(
 			return api.StatementEmission{}, err
 		}
 		if !selected {
-			reference, err := context.Names().Reference(result)
+			targetName, err := context.Names().Result(result, index)
 			if err != nil {
 				return api.StatementEmission{}, err
 			}
 			value = api.DirectExpression(
-				context.Factory().Identifier(reference.Name()),
-				reference.Requests()...,
+				context.Factory().Identifier(targetName),
 			)
 		}
 		value, err = context.Values().Copy(
@@ -152,10 +171,28 @@ func emitMultiple(
 	results *types.Tuple,
 ) (api.StatementEmission, error) {
 	if len(source.Results) == 1 {
-		sourceType, ok := context.TypesInfo().TypeOf(source.Results[0]).(*types.Tuple)
-		if !ok || !types.Identical(sourceType, results) {
+		sourceResults, ok := context.TypesInfo().TypeOf(source.Results[0]).(*types.Tuple)
+		if !ok || sourceResults.Len() != results.Len() {
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		for index := range results.Len() {
+			if !types.AssignableTo(
+				sourceResults.At(index).Type(),
+				results.At(index).Type(),
+			) {
+				return api.StatementEmission{},
+					api.Unsupported(context, api.CategoryStatement, source)
+			}
+		}
+		if !types.Identical(sourceResults, results) {
+			return emitAdaptedMultiple(
+				context,
+				children,
+				source,
+				sourceResults,
+				results,
+			)
 		}
 		result, err := children.Expression(
 			context.
@@ -228,6 +265,64 @@ func emitMultiple(
 			capturedResultStatement(context, name, result.Value()),
 		)
 		values = append(values, context.Factory().Identifier(name))
+	}
+	statements = append(
+		statements,
+		context.Factory().ReturnStatement(
+			context.Factory().ArrayLiteralExpression(values, false),
+		),
+	)
+	return api.NewStatementEmission(statements, requests)
+}
+
+func emitAdaptedMultiple(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.ReturnStmt,
+	sourceResults *types.Tuple,
+	targetResults *types.Tuple,
+) (api.StatementEmission, error) {
+	capture, err := resulttuple.Emit(
+		context,
+		children,
+		source.Results[0],
+		sourceResults,
+		api.RoleReturnResult,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	statements := capture.Statements()
+	requests := capture.Requests()
+	values := make([]tsgo.Expression, 0, targetResults.Len())
+	for index := range targetResults.Len() {
+		element, err := capture.Element(context, index)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		targetType := targetResults.At(index).Type()
+		value, err := resulttuple.AdaptAssignment(
+			context.WithRole(api.RoleReturnResult),
+			source.Results[0],
+			sourceResults.At(index).Type(),
+			targetType,
+			api.DirectExpression(element),
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		value, err = context.Values().Copy(
+			context.WithRole(api.RoleReturnResult),
+			source.Results[0],
+			targetType,
+			value,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		statements = append(statements, value.Before()...)
+		values = append(values, value.Value())
+		requests = append(requests, value.Requests()...)
 	}
 	statements = append(
 		statements,

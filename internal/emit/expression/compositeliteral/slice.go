@@ -22,8 +22,8 @@ func emitSlice(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
+	sourceType types.Type,
 ) (api.ExpressionEmission, bool, error) {
-	sourceType := context.TypesInfo().TypeOf(source)
 	_, elementType, represented := slicevalue.Resolve(sourceType)
 	defined, definedOK := definedtype.ResolveSlice(sourceType)
 	if definedOK {

@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -28,6 +29,9 @@ func Emit(
 			),
 		), true, nil
 	}
+	if _, defined := definedtype.Resolve(sourceType); defined {
+		return api.TypeEmission{}, false, nil
+	}
 	object, arguments, instantiated := instantiatedType(sourceType)
 	if !instantiated {
 		return api.TypeEmission{}, false, nil
@@ -50,16 +54,23 @@ func Emit(
 		targetArguments = append(targetArguments, target.Value())
 		requests = append(requests, target.Requests()...)
 	}
-	return api.DirectType(
-		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
-			targetArguments,
-		),
-		requests...,
-	), true, nil
+	target := tsgo.TypeNode(context.Factory().TypeReferenceNode(
+		context.Factory().Identifier(reference.Name()),
+		targetArguments,
+	))
+	return api.DirectType(target, requests...), true, nil
 }
 
 func instantiatedType(
+	sourceType types.Type,
+) (*types.TypeName, *types.TypeList, bool) {
+	if object, arguments, ok := directInstantiatedType(sourceType); ok {
+		return object, arguments, true
+	}
+	return directInstantiatedType(types.Unalias(sourceType))
+}
+
+func directInstantiatedType(
 	sourceType types.Type,
 ) (*types.TypeName, *types.TypeList, bool) {
 	switch source := sourceType.(type) {

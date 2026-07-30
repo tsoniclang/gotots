@@ -23,6 +23,22 @@ func SourceCall(
 	return facetCall(context, source, facet, target, true)
 }
 
+func LiteralCall(
+	context api.Context,
+	source ast.Node,
+	provider *ast.FuncLit,
+	target api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	facet, err := api.NewFunctionLiteralCallableFacet(
+		context.ArtifactOwner(),
+		provider,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return facetCall(context, source, facet, target, true)
+}
+
 func GenericOperationCall(
 	context api.Context,
 	source ast.Node,
@@ -43,6 +59,22 @@ func DetachedSourceCall(
 	target api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	facet, err := api.NewSourceCallableFacet(provider)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return facetCall(context, source, facet, target, false)
+}
+
+func DetachedLiteralCall(
+	context api.Context,
+	source ast.Node,
+	provider *ast.FuncLit,
+	target api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	facet, err := api.NewFunctionLiteralCallableFacet(
+		context.ArtifactOwner(),
+		provider,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -215,6 +247,24 @@ func SourceContract(
 	return observation.Cooperative(), observation.Requests(), nil
 }
 
+func LiteralContract(
+	context api.Context,
+	provider *ast.FuncLit,
+) (bool, []api.RootRequest, error) {
+	facet, err := api.NewFunctionLiteralCallableFacet(
+		context.ArtifactOwner(),
+		provider,
+	)
+	if err != nil {
+		return false, nil, err
+	}
+	observation, err := context.ObserveCooperativeCallable(facet)
+	if err != nil {
+		return false, nil, err
+	}
+	return observation.Cooperative(), observation.Requests(), nil
+}
+
 func SourceValueContract(
 	context api.Context,
 	provider *types.Func,
@@ -225,6 +275,22 @@ func SourceValueContract(
 		return false, false, nil, err
 	}
 	return providerContract(context, facet, signature)
+}
+
+func GenericValueContract(
+	context api.Context,
+	provider api.CallableFacet,
+	signature *types.Signature,
+) (bool, bool, []api.RootRequest, error) {
+	if _, source := provider.SourceFunction(); !source {
+		if _, profile := provider.GenericProfile(); !profile {
+			return false, false, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "generic value provider facet is invalid",
+			}
+		}
+	}
+	return providerContract(context, provider, signature)
 }
 
 func facetCall(

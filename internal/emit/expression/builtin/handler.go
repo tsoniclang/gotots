@@ -286,12 +286,35 @@ func Object(
 	info *types.Info,
 	source ast.Expr,
 ) (*types.Builtin, bool) {
-	identifier, ok := source.(*ast.Ident)
-	if !ok || info == nil {
+	if info == nil {
 		return nil, false
 	}
-	builtin, ok := info.Uses[identifier].(*types.Builtin)
-	return builtin, ok
+	switch selected := source.(type) {
+	case *ast.Ident:
+		builtin, ok := info.Uses[selected].(*types.Builtin)
+		return builtin, ok
+	case *ast.SelectorExpr:
+		if info.Selections[selected] != nil {
+			return nil, false
+		}
+		qualifier, ok := selected.X.(*ast.Ident)
+		if !ok {
+			return nil, false
+		}
+		packageName, ok := info.Uses[qualifier].(*types.PkgName)
+		if !ok {
+			return nil, false
+		}
+		builtin, ok := info.Uses[selected.Sel].(*types.Builtin)
+		if !ok ||
+			builtin.Pkg() == nil ||
+			builtin.Pkg() != packageName.Imported() {
+			return nil, false
+		}
+		return builtin, true
+	default:
+		return nil, false
+	}
 }
 
 func resultType(

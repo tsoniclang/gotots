@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type model struct {
@@ -16,6 +15,7 @@ type model struct {
 func Convert(
 	context api.Context,
 	source *ast.CallExpr,
+	operandSource ast.Node,
 	sourceType types.Type,
 	targetType types.Type,
 	operand api.ExpressionEmission,
@@ -32,6 +32,7 @@ func Convert(
 	target, err := emitConversion(
 		context,
 		source,
+		operandSource,
 		sourceModel,
 		targetModel,
 		operand,
@@ -75,51 +76,41 @@ func compatible(left, right *types.Struct) bool {
 
 func emitConversion(
 	context api.Context,
-	_ ast.Node,
-	_ model,
+	source ast.Node,
+	operandSource ast.Node,
+	sourceModel model,
 	targetModel model,
 	operand api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	reference, err := targetConversion(context, targetModel)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	member, err := api.NamedStructOperationMemberName(
-		api.NamedStructOperationConvert,
+	copied, err := context.Values().Copy(
+		context.WithRole(api.RoleConversionOperand),
+		operandSource,
+		sourceType(sourceModel),
+		operand,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
-		operand.Before(),
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
-				nil,
-				context.Factory().Identifier(member),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			nil,
-			[]tsgo.Expression{operand.Value()},
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(operand.Requests(), reference.Requests()),
+	stored, err := context.Values().ToStorage(
+		context.WithRole(api.RoleStorageType),
+		source,
+		sourceType(sourceModel),
+		copied,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return context.Values().FromStorage(
+		context.WithRole(api.RoleStorageType),
+		source,
+		sourceType(targetModel),
+		stored,
 	)
 }
 
-func targetConversion(
-	context api.Context,
-	target model,
-) (api.NameReference, error) {
-	if target.named != nil {
-		return context.Names().NamedStructOperation(
-			target.named.Obj(),
-			api.NamedStructOperationConvert,
-		)
+func sourceType(source model) types.Type {
+	if source.named != nil {
+		return source.named
 	}
-	return context.Names().AnonymousStruct(
-		target.structType,
-		api.AnonymousStructDemandConvert,
-	)
+	return source.structType
 }

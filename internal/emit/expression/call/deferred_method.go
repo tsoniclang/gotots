@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
+	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -23,10 +24,20 @@ func emitDeferredMethod(
 	signature, ok := method.Type().(*types.Signature)
 	if !ok ||
 		signature.Recv() == nil ||
-		signature.TypeParams().Len() != 0 ||
-		signature.RecvTypeParams().Len() != 0 {
+		signature.TypeParams().Len() != 0 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	if signature.RecvTypeParams().Len() != 0 {
+		return emitDeferredGenericReceiverMethod(
+			context,
+			children,
+			source,
+			selector,
+			method,
+			selection,
+			signature,
+		)
 	}
 	if err := validateResults(context, source, signature, true); err != nil {
 		return api.ExpressionEmission{}, err
@@ -156,8 +167,9 @@ func emitDeferredInterfaceMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	receiverContract, err := emitNonNilInterfaceType(
+	receiverContract, err := interfaceoperation.NonNilType(
 		context,
+		children,
 		selector.X,
 		selection.Recv(),
 	)

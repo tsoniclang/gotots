@@ -4,6 +4,8 @@ type DestinationValues []int32
 type SourceValues []int32
 type ByteText string
 
+const untypedStringBytes = "é"
+
 var packageValues = []int32{2, 3}
 
 func Identity(values []int32) []int32 {
@@ -152,6 +154,13 @@ func AppendDefinedStringBytes() int32 {
 		int32(result[2])
 }
 
+func AppendUntypedStringConstantBytes() int32 {
+	result := append([]byte{1}, untypedStringBytes...)
+	return int32(result[0])*10000 +
+		int32(result[1])*100 +
+		int32(result[2])
+}
+
 func CopyStringBytes() int32 {
 	result := []byte{9, 9, 9, 9}
 	count := copy(result[1:], "é")
@@ -164,6 +173,14 @@ func CopyStringBytes() int32 {
 func CopyDefinedStringBytes() int32 {
 	result := make([]byte, 3)
 	count := copy(result, ByteText("é"))
+	return int32(count)*10000 +
+		int32(result[0])*100 +
+		int32(result[1])
+}
+
+func CopyUntypedStringConstantBytes() int32 {
+	result := make([]byte, 3)
+	count := copy(result, untypedStringBytes)
 	return int32(count)*10000 +
 		int32(result[0])*100 +
 		int32(result[1])

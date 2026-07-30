@@ -14,6 +14,18 @@ func (a RuntimeArray) Zero(
 	children api.ChildEmitter,
 	source ast.Node,
 ) (api.ExpressionEmission, error) {
+	if a.Length() == 0 {
+		target, requests, err := a.runtimeOperation(
+			context,
+			children,
+			api.RuntimeArrayAllocate,
+			a.lengthLiteral(context),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return a.wrap(context, api.DirectExpression(target, requests...))
+	}
 	if a.aggregate {
 		loopZero, err := context.Values().Zero(
 			context,

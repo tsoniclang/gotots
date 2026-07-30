@@ -191,24 +191,26 @@ func declaredTopLevelBindings(source tsgo.SourceFile) []string {
 	return declared
 }
 
-// TestUntypedConstantValueOwnerRejectsUnrepresentable proves the projection
-// reaches the constant-value owner, not merely a type boundary: the large
-// untyped constant projected at uint64 (a supported type) fails under the number
-// profile at the value owner because its magnitude is not representable there.
-func TestUntypedConstantValueOwnerRejectsUnrepresentable(t *testing.T) {
+// TestUntypedConstantNumberProjectionUsesDeclaredApproximateProfile proves a
+// checker-valid wide integer remains compilable under the direct number profile.
+// Exact wide-integer behavior belongs to the BigInt override; the default does
+// not add a cast, wrapper, helper, or safe-integer rejection at each use.
+func TestUntypedConstantNumberProjectionUsesDeclaredApproximateProfile(t *testing.T) {
 	loaded := loadConstantFamily(t)
 	object := loaded.Types().Scope().Lookup(hugeRoot)
 	root, err := emit.NewRoot(object)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = emit.Compile(loaded.Program(), []emit.Root{root})
-	var unsupported *api.UnsupportedError
-	if !errors.As(err, &unsupported) ||
-		unsupported.Category != api.CategoryExpression ||
-		unsupported.Role != api.RolePackageConstantValue ||
-		unsupported.Construct != "*ast.Ident" {
-		t.Fatalf("error = %#v, want package-constant-value expression UnsupportedError at the projection's value owner", err)
+	emission, err := emit.Compile(loaded.Program(), []emit.Root{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	typecheckProgram(t, emission)
+	printed := printConstantFamily(t, emission)
+	if !strings.Contains(printed, "9223372036854775808") ||
+		strings.Contains(printed, "9223372036854775808n") {
+		t.Fatalf("number projection lacks its direct wide literal:\n%s", printed)
 	}
 }
 

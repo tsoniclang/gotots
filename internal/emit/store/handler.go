@@ -9,10 +9,10 @@ import (
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 )
@@ -241,7 +241,7 @@ func sliceIndex(
 	indexType := context.TypesInfo().TypeOf(source.Index)
 	if !ok ||
 		!types.Identical(context.TypesInfo().TypeOf(source), elementType) ||
-		!basictype.SupportsInteger(context.TypesSizes(), indexType) {
+		!integeroperand.Supports(context.TypesSizes(), indexType) {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -260,10 +260,9 @@ func sliceIndex(
 			return api.StoreTargetEmission{}, err
 		}
 	}
-	index, err := children.Expression(
-		context.
-			WithRole(api.RoleSliceIndex).
-			WithExpectedType(indexType),
+	index, err := integeroperand.Emit(
+		context.WithRole(api.RoleSliceIndex),
+		children,
 		source.Index,
 	)
 	if err != nil {

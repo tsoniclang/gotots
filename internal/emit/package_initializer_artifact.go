@@ -7,6 +7,7 @@ import (
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	emitstorage "github.com/tsoniclang/gotots/internal/emit/storage"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 )
 
@@ -137,6 +138,15 @@ func (s *programSession) buildPackageInitializerRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	context, err = emitstorage.ApplyRequirements(
+		context,
+		initializer.Rhs,
+		owner,
+		requirements,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
 	context, err = context.WithCallableControls(
 		owner,
 		initializer.Rhs,
@@ -145,6 +155,18 @@ func (s *programSession) buildPackageInitializerRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	callableFacet, err := api.NewPackageInitializerCallableFacet(owner)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	observation, err := context.ObserveCooperativeCallable(callableFacet)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	context = context.WithCooperativeCallable(
+		callableFacet,
+		observation.Cooperative(),
+	)
 	emission, err := packagevariable.EmitInitializer(
 		context,
 		builder.emitter,
@@ -155,7 +177,10 @@ func (s *programSession) buildPackageInitializerRevision(
 	}
 	placement, dependencies, err := s.consumeArtifactRequests(
 		owner,
-		emission.Requests(),
+		api.CombineRequests(
+			emission.Requests(),
+			observation.Requests(),
+		),
 	)
 	if err != nil {
 		return artifactRevision{}, err
