@@ -366,7 +366,8 @@ func (r *Registry) indexEnvironmentPackage(
 	scope := sourcePackage.Types().Scope()
 	names := scope.Names()
 	sort.Strings(names)
-	used := make(map[string]struct{}, len(names))
+	used := make(map[string]struct{}, len(names)+1)
+	used[api.TargetGlobalAnchorName] = struct{}{}
 	for _, sourceName := range names {
 		object := scope.Lookup(sourceName)
 		if object == nil || object.Name() == "_" {

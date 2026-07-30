@@ -69,7 +69,7 @@ func sliceToString(
 			context.Factory().Identifier("String"),
 			"fromCharCode",
 			context.Factory().CallExpression(
-				context.Factory().Identifier("Number"),
+				api.TargetIntrinsicNumber.Expression(context.Factory()),
 				nil,
 				nil,
 				[]tsgo.Expression{element},

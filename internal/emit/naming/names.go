@@ -77,7 +77,9 @@ func NewOwner(
 			packageScope,
 			objectsByScope,
 			make(map[string]uint64),
-			make(map[string]uint32),
+			map[string]uint32{
+				api.TargetGlobalAnchorName: 1,
+			},
 		)
 		owner.preallocateMethods(info)
 		owner.preallocateMembers(packageScope)

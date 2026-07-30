@@ -251,7 +251,7 @@ func constNumber(
 					nil,
 					nil,
 					factory.CallExpression(
-						factory.Identifier("Number"),
+						api.TargetIntrinsicNumber.Expression(factory),
 						nil,
 						nil,
 						[]tsgo.Expression{source},
@@ -282,7 +282,7 @@ func constSliceHigh(
 		length(factory, value),
 		factory.ColonToken(),
 		factory.CallExpression(
-			factory.Identifier("Number"),
+			api.TargetIntrinsicNumber.Expression(factory),
 			nil,
 			nil,
 			[]tsgo.Expression{source},
@@ -333,7 +333,12 @@ func notSafeInteger(
 ) tsgo.PrefixUnaryExpression {
 	return factory.PrefixUnaryExpression(
 		tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
-		methodCall(factory, factory.Identifier("Number"), "isSafeInteger", []tsgo.Expression{value}),
+		methodCall(
+			factory,
+			api.TargetIntrinsicNumber.Expression(factory),
+			"isSafeInteger",
+			[]tsgo.Expression{value},
+		),
 	)
 }
 

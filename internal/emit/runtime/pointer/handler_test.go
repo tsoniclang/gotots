@@ -168,7 +168,7 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		"static index<L, S, PL, O extends",
 		"static indexView<L, S, PL, V, O extends",
 		"static arrayRegion<L, T, S extends",
-		"const numericIndex = Number(index);",
+		"const numericIndex = globalThis.Number(index);",
 		"static equal<LL, LS, RL, RS>",
 		"static dereference<L, S>",
 		"static view<F, T, S>",

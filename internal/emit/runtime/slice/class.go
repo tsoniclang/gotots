@@ -1,6 +1,7 @@
 package slice
 
 import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -218,7 +219,13 @@ func (b builder) globalCall(
 }
 
 func (b builder) toNumber(value tsgo.Expression) tsgo.CallExpression {
-	return b.globalCall("Number", value)
+	return b.factory.CallExpression(
+		api.TargetIntrinsicNumber.Expression(b.factory),
+		nil,
+		nil,
+		[]tsgo.Expression{value},
+		tsgo.NodeFlagsNone,
+	)
 }
 
 func (b builder) binary(

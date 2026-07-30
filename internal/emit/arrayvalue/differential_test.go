@@ -165,7 +165,7 @@ func TestArrayFamilyStrictTypechecksUnderTheBigIntProfile(t *testing.T) {
 	}
 	runtime := target.printed["runtime/array.ts"]
 	if !strings.Contains(runtime, "number | bigint") ||
-		!strings.Contains(runtime, "Number(index)") {
+		!strings.Contains(runtime, "globalThis.Number(index)") {
 		t.Fatalf("BigInt-compatible runtime array artifact:\n%s", runtime)
 	}
 	assertBigIntConstantReturn(t, emission, "LengthAndCapacity", "10n")

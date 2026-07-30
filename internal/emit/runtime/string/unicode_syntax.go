@@ -1,6 +1,9 @@
 package stringruntime
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 func variable(
 	factory tsgo.Factory,
@@ -139,7 +142,7 @@ func notInteger(
 		tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
 		methodCall(
 			factory,
-			factory.Identifier("Number"),
+			api.TargetIntrinsicNumber.Expression(factory),
 			"isInteger",
 			[]tsgo.Expression{value},
 		),

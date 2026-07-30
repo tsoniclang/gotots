@@ -64,13 +64,14 @@ type programSession struct {
 }
 
 type targetDeclaration struct {
-	owner           api.ArtifactOwner
-	name            string
-	position        token.Pos
-	statements      []tsgo.Statement
-	placement       *targetplacement.Owner
-	temporaryStart  emitnaming.TemporarySnapshot
-	reconstructions uint64
+	owner             api.ArtifactOwner
+	name              string
+	position          token.Pos
+	statements        []tsgo.Statement
+	placement         *targetplacement.Owner
+	eagerDependencies []api.ArtifactOwner
+	temporaryStart    emitnaming.TemporarySnapshot
+	reconstructions   uint64
 }
 
 type targetFileBuilder struct {
@@ -506,12 +507,13 @@ func (s *programSession) emit(object types.Object) error {
 	builder.byOwner[owner] = struct{}{}
 	builder.indexByOwner[owner] = len(builder.declarations)
 	builder.declarations = append(builder.declarations, targetDeclaration{
-		owner:          owner,
-		name:           object.Name(),
-		position:       object.Pos(),
-		statements:     revision.statements,
-		placement:      revision.placement,
-		temporaryStart: revision.temporaryStart,
+		owner:             owner,
+		name:              object.Name(),
+		position:          object.Pos(),
+		statements:        revision.statements,
+		placement:         revision.placement,
+		eagerDependencies: revision.eagerDependencies,
+		temporaryStart:    revision.temporaryStart,
 	})
 	return s.recordPackageExport(s.packageBuilders[site.source], object)
 }

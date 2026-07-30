@@ -1,6 +1,9 @@
 package pointer
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 func (b builder) cellMethod() tsgo.MethodDeclaration {
 	storageValue := b.factory.ElementAccessExpression(
@@ -237,7 +240,7 @@ func (b builder) indexMethod() tsgo.MethodDeclaration {
 	)
 	selectedValue := b.property(b.id("selected"), CellValueName)
 	numericIndex := b.factory.CallExpression(
-		b.id("Number"),
+		api.TargetIntrinsicNumber.Expression(b.factory),
 		nil,
 		nil,
 		[]tsgo.Expression{b.id("index")},

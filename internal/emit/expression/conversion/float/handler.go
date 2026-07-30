@@ -65,7 +65,7 @@ func Convert(
 	if integerSource &&
 		context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
 		value = context.Factory().CallExpression(
-			context.Factory().Identifier("Number"),
+			api.TargetIntrinsicNumber.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{value},

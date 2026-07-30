@@ -3,6 +3,7 @@ package emit
 import (
 	"fmt"
 	"go/types"
+	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
@@ -235,6 +236,7 @@ type artifactRevision struct {
 	statements        []tsgo.Statement
 	placement         *targetplacement.Owner
 	dependencies      []api.ArtifactDependency
+	eagerDependencies []api.ArtifactOwner
 	contract          artifactstate.Contract
 	classContribution *classMemberContribution
 	temporaryStart    emitnaming.TemporarySnapshot
@@ -387,6 +389,7 @@ func (s *programSession) buildArtifactRevision(
 		statements:        statements,
 		placement:         placement,
 		dependencies:      dependencies,
+		eagerDependencies: eagerDeclarationDependencies(owner, dependencies),
 		contract:          contract,
 		classContribution: contribution,
 		temporaryStart:    temporaryStart,
@@ -513,8 +516,36 @@ func (s *programSession) reconstructArtifact(owner types.Object) error {
 	s.artifacts.DiscardDirty(artifactOwner)
 	declaration.statements = revision.statements
 	declaration.placement = revision.placement
+	declaration.eagerDependencies = revision.eagerDependencies
 	declaration.reconstructions++
 	return nil
+}
+
+func eagerDeclarationDependencies(
+	consumer types.Object,
+	dependencies []api.ArtifactDependency,
+) []api.ArtifactOwner {
+	if _, eager := consumer.(*types.Const); !eager {
+		return nil
+	}
+	seen := make(map[api.ArtifactOwner]struct{})
+	result := make([]api.ArtifactOwner, 0, len(dependencies))
+	for _, dependency := range dependencies {
+		provider := dependency.Provider()
+		if _, sourceOwned := provider.Source(); !sourceOwned ||
+			provider == api.MustSourceArtifactOwner(consumer) {
+			continue
+		}
+		if _, duplicate := seen[provider]; duplicate {
+			continue
+		}
+		seen[provider] = struct{}{}
+		result = append(result, provider)
+	}
+	sort.Slice(result, func(left, right int) bool {
+		return compareArtifactOwners(result[left], result[right]) < 0
+	})
+	return result
 }
 
 func (s *programSession) reconstructScheduledArtifact(

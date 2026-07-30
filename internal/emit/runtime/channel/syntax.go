@@ -1,6 +1,7 @@
 package channel
 
 import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -144,7 +145,7 @@ func (b builder) call(
 }
 
 func (b builder) toNumber(value tsgo.Expression) tsgo.CallExpression {
-	return b.call(b.id("Number"), value)
+	return b.call(api.TargetIntrinsicNumber.Expression(b.factory), value)
 }
 
 func (b builder) methodCall(

@@ -1,6 +1,9 @@
 package complex
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 type builder struct {
 	factory tsgo.Factory
@@ -130,7 +133,10 @@ func (b builder) numberCall(
 	member string,
 	value tsgo.Expression,
 ) tsgo.CallExpression {
-	return b.call(b.property(b.id("Number"), member), value)
+	return b.call(
+		b.property(api.TargetIntrinsicNumber.Expression(b.factory), member),
+		value,
+	)
 }
 
 func (b builder) objectIs(

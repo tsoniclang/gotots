@@ -1,7 +1,6 @@
 package emit
 
 import (
-	"go/token"
 	"slices"
 	"sort"
 
@@ -46,32 +45,16 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		for _, symbol := range placement.RuntimeSymbols() {
 			runtimeSymbols[symbol] = struct{}{}
 		}
-		type declarationChunk struct {
-			position   token.Pos
-			name       string
-			statements []tsgo.Statement
+		ordered, err := orderTargetDeclarations(builder.declarations)
+		if err != nil {
+			return nil, err
 		}
-		chunks := make(
-			[]declarationChunk,
-			0,
-			len(builder.declarations),
-		)
-		for _, declaration := range builder.declarations {
-			chunks = append(chunks, declarationChunk{
-				position:   declaration.position,
-				name:       declaration.name,
-				statements: slices.Clone(declaration.statements),
-			})
-		}
-		sort.Slice(chunks, func(left, right int) bool {
-			if chunks[left].position != chunks[right].position {
-				return chunks[left].position < chunks[right].position
-			}
-			return chunks[left].name < chunks[right].name
-		})
 		var declarations []tsgo.Statement
-		for _, chunk := range chunks {
-			declarations = append(declarations, chunk.statements...)
+		for _, declaration := range ordered {
+			declarations = append(
+				declarations,
+				slices.Clone(declaration.statements)...,
+			)
 		}
 		statements := append(
 			placement.Statements(s.factory),

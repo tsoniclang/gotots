@@ -188,7 +188,13 @@ func normalizeNumber64(
 		return nil, nil, err
 	}
 	normalized := normalizeBigInt(context, target, asBigInt)
-	return globalCall(context, "Number", normalized), requests, nil
+	return context.Factory().CallExpression(
+		api.TargetIntrinsicNumber.Expression(context.Factory()),
+		nil,
+		nil,
+		[]tsgo.Expression{normalized},
+		tsgo.NodeFlagsNone,
+	), requests, nil
 }
 
 func numberToBigInt(

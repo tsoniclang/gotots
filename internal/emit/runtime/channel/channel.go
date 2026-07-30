@@ -1,6 +1,9 @@
 package channel
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 const MakeMember = "make"
 
@@ -165,8 +168,8 @@ func (b builder) channelMakeMethod() tsgo.MethodDeclaration {
 				),
 				b.factory.IfStatement(
 					b.logicalOr(
-						b.logicalNot(b.staticCall(
-							"Number",
+						b.logicalNot(b.methodCall(
+							api.TargetIntrinsicNumber.Expression(b.factory),
 							"isSafeInteger",
 							numericCapacity,
 						)),
