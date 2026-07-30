@@ -144,7 +144,7 @@ func TestEveryCarrierBoundaryIsCheckedAgainstItsSelectedProfile(t *testing.T) {
 	}
 }
 
-func TestIntegerCapabilityMatrixAdmitsExactOperationsOnly(t *testing.T) {
+func TestIntegerCapabilityMatrixMatchesSelectedProfileBoundaries(t *testing.T) {
 	sizes := types.SizesFor("gc", "amd64")
 	int32Carrier, _ := Describe(sizes, types.Typ[types.Int32])
 	int64Carrier, _ := Describe(sizes, types.Typ[types.Int64])
@@ -157,11 +157,17 @@ func TestIntegerCapabilityMatrixAdmitsExactOperationsOnly(t *testing.T) {
 	if !SupportsArithmetic(api.IntegerRepresentationBigInt, token.QUO) {
 		t.Fatal("BigInt division was rejected")
 	}
-	if SupportsBitwise(api.IntegerRepresentationNumber, int64Carrier, token.AND) {
-		t.Fatal("number int64 bitwise operation was admitted")
+	if !SupportsBitwise(api.IntegerRepresentationNumber, int64Carrier, token.AND) {
+		t.Fatal("number int64 bitwise operation was rejected")
 	}
 	if !SupportsBitwise(api.IntegerRepresentationNumber, int32Carrier, token.AND) {
 		t.Fatal("number int32 bitwise operation was rejected")
+	}
+	if SupportsBitwise(api.IntegerRepresentationInvalid, int64Carrier, token.AND) {
+		t.Fatal("invalid integer representation admitted bitwise operation")
+	}
+	if SupportsBitwise(api.IntegerRepresentationNumber, int64Carrier, token.ADD) {
+		t.Fatal("non-bitwise operator was admitted as bitwise")
 	}
 	if !RequiresUint32Normalization(api.IntegerRepresentationNumber, uint32Carrier) {
 		t.Fatal("number uint32 lost its required unsigned normalization")
@@ -179,12 +185,12 @@ func TestIntegerCapabilityMatrixAdmitsExactOperationsOnly(t *testing.T) {
 	) {
 		t.Fatal("exact BigInt variable shift was rejected")
 	}
-	if SupportsVariableShift(
+	if !SupportsVariableShift(
 		api.IntegerRepresentationNumber,
 		int64Carrier,
 		token.SHL,
 	) {
-		t.Fatal("number int64 variable shift was admitted")
+		t.Fatal("number int64 variable shift was rejected")
 	}
 	if !SupportsVariableShift(
 		api.IntegerRepresentationNumber,
@@ -192,6 +198,20 @@ func TestIntegerCapabilityMatrixAdmitsExactOperationsOnly(t *testing.T) {
 		token.SHR,
 	) {
 		t.Fatal("exact number int32 variable shift was rejected")
+	}
+	if SupportsVariableShift(
+		api.IntegerRepresentationNumber,
+		int64Carrier,
+		token.AND,
+	) {
+		t.Fatal("non-shift operator was admitted as a variable shift")
+	}
+	if !SupportsUnary(
+		api.IntegerRepresentationNumber,
+		int64Carrier,
+		token.XOR,
+	) {
+		t.Fatal("number int64 complement was rejected")
 	}
 	if SupportsUnary(api.IntegerRepresentationBigInt, uint32Carrier, token.SUB) {
 		t.Fatal("unsigned negation was admitted without fixed-width overflow")

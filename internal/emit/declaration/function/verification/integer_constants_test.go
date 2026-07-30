@@ -230,20 +230,72 @@ console.log(render(WideIncrement(9007199254740993n)));
 	}
 }
 
-func TestWideIntegerConstantsFailAtTheirExpressionOwner(t *testing.T) {
-	for _, declarationIndex := range []int{1, 2, 3} {
+func TestWideIntegerConstantsEmitDirectlyAtTheirExpressionOwner(t *testing.T) {
+	for _, testCase := range []struct {
+		declarationIndex int
+		name             string
+		magnitude        string
+		negative         bool
+	}{
+		{1, "BeyondSafe", "9007199254740993", false},
+		{2, "Maximum", "9223372036854775807", false},
+		{3, "Minimum", "9223372036854775808", true},
+	} {
 		loaded := loadIntegerConstantsProject(t)
-		_, err := compileIntegerRootError(loaded, declarationIndex)
-		var unsupported *api.UnsupportedError
-		if !errors.As(err, &unsupported) ||
-			unsupported.Category != api.CategoryExpression {
+		emission, err := compileIntegerRootError(
+			loaded,
+			testCase.declarationIndex,
+		)
+		if err != nil {
+			t.Fatalf("%s: %v", testCase.name, err)
+		}
+		var declaration tsgo.FunctionDeclaration
+		for _, statement := range integerSourceFile(t, emission).Statements() {
+			function, ok := statement.(tsgo.FunctionDeclaration)
+			if ok && function.Name().Text() == testCase.name {
+				declaration = function
+				break
+			}
+		}
+		if declaration == nil {
+			t.Fatalf("%s declaration is absent", testCase.name)
+		}
+		statements := declaration.Body().(tsgo.Block).Statements()
+		if len(statements) != 1 {
+			t.Fatalf("%s statements = %d, want one", testCase.name, len(statements))
+		}
+		result, ok := statements[0].(tsgo.ReturnStatement)
+		if !ok {
+			t.Fatalf("%s statement = %T, want return", testCase.name, statements[0])
+		}
+		value := result.Expression()
+		if testCase.negative {
+			unary, ok := value.(tsgo.PrefixUnaryExpression)
+			if !ok ||
+				unary.Operator() != tsgo.PrefixUnaryExpressionOperatorKindMinusToken {
+				t.Fatalf("%s value = %T, want direct unary minus", testCase.name, value)
+			}
+			value = unary.Operand()
+		}
+		literal, ok := value.(tsgo.NumericLiteral)
+		if !ok || literal.Text() != testCase.magnitude {
 			t.Fatalf(
-				"declaration %d error = %#v, want expression UnsupportedError",
-				declarationIndex,
-				err,
+				"%s value = %T %q, want numeric literal %s",
+				testCase.name,
+				value,
+				numericLiteralText(value),
+				testCase.magnitude,
 			)
 		}
 	}
+}
+
+func numericLiteralText(value tsgo.Expression) string {
+	literal, ok := value.(tsgo.NumericLiteral)
+	if !ok {
+		return ""
+	}
+	return literal.Text()
 }
 
 func TestWideIntegerOperationsUseTheSelectedCarrier(t *testing.T) {
