@@ -37,6 +37,7 @@ func emitIteratorReturn(
 
 func Propagate(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	value tsgo.Expression,
 ) (api.StatementEmission, error) {
@@ -44,7 +45,7 @@ func Propagate(
 		return propagateIterator(context, source, control, value)
 	}
 	if control, selected := context.ReturnControl(); selected {
-		return propagateControlled(context, source, control, value)
+		return propagateControlled(context, children, source, control, value)
 	}
 	return api.DirectStatement(
 		context.Factory().ReturnStatement(value),

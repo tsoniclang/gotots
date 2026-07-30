@@ -46,6 +46,61 @@ func Emit(
 	if err != nil {
 		return Capture{}, err
 	}
+	return capture(context, results.Len(), value, nil, nil)
+}
+
+func CaptureSynthesized(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	results *types.Tuple,
+	value api.ExpressionEmission,
+) (Capture, error) {
+	if source == nil ||
+		children == nil ||
+		results == nil ||
+		results.Len() < 2 {
+		return Capture{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "synthesized multiple-result capture contract is invalid",
+		}
+	}
+	targetType, err := children.RepresentedType(
+		context.WithRole(api.RoleResultType),
+		source,
+		results,
+	)
+	if err != nil {
+		return Capture{}, err
+	}
+	if _, ok := targetType.Value().(tsgo.TupleTypeNode); !ok {
+		return Capture{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "multiple-result capture type is not a tuple",
+		}
+	}
+	return capture(
+		context,
+		results.Len(),
+		value,
+		targetType.Value(),
+		targetType.Requests(),
+	)
+}
+
+func capture(
+	context api.Context,
+	resultCount int,
+	value api.ExpressionEmission,
+	targetType tsgo.TypeNode,
+	typeRequests []api.RootRequest,
+) (Capture, error) {
+	if resultCount < 2 || value.Value() == nil {
+		return Capture{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "multiple-result capture is invalid",
+		}
+	}
 	name, err := context.Names().Temporary(api.TemporaryMultipleResults)
 	if err != nil {
 		return Capture{}, err
@@ -60,7 +115,7 @@ func Emit(
 					context.Factory().VariableDeclaration(
 						context.Factory().Identifier(name),
 						nil,
-						nil,
+						targetType,
 						value.Value(),
 					),
 				},
@@ -70,9 +125,12 @@ func Emit(
 	)
 	return Capture{
 		name:        name,
-		resultCount: results.Len(),
+		resultCount: resultCount,
 		statements:  statements,
-		requests:    value.Requests(),
+		requests: api.CombineRequests(
+			value.Requests(),
+			typeRequests,
+		),
 	}, nil
 }
 

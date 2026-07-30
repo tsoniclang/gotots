@@ -2,9 +2,9 @@ package returnstatement
 
 import (
 	"go/ast"
-	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -28,6 +28,7 @@ func emitControlled(
 	}
 	propagated, err := propagateControlled(
 		context,
+		children,
 		source,
 		control,
 		value,
@@ -47,6 +48,7 @@ func emitControlled(
 
 func controlledAssignments(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	targets []api.StoreTargetEmission,
 	value tsgo.Expression,
@@ -59,47 +61,37 @@ func controlledAssignments(
 			value,
 		)
 	}
-	if len(targets) == 0 {
+	results := context.FunctionResults()
+	if len(targets) == 0 ||
+		results == nil ||
+		results.Len() != len(targets) {
 		return nil, nil, &api.InvariantError{
 			Role:   api.RoleReturnResult,
-			Reason: "controlled named return has no result targets",
+			Reason: "controlled named return result tuple is invalid",
 		}
 	}
-	name, err := context.Names().Temporary(api.TemporaryMultipleResults)
+	capture, err := resulttuple.CaptureSynthesized(
+		context.WithRole(api.RoleReturnResult),
+		children,
+		source,
+		results,
+		api.DirectExpression(value),
+	)
 	if err != nil {
 		return nil, nil, err
 	}
-	statements := []tsgo.Statement{
-		context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{
-					context.Factory().VariableDeclaration(
-						context.Factory().Identifier(name),
-						nil,
-						nil,
-						value,
-					),
-				},
-				tsgo.NodeFlagsConst,
-			),
-		),
-	}
-	var requests []api.RootRequest
+	statements := capture.Statements()
+	requests := capture.Requests()
 	for index, target := range targets {
+		element, err := capture.Element(context, index)
+		if err != nil {
+			return nil, nil, err
+		}
 		stores, storeRequests, err := storeNamedResult(
 			context,
 			source,
 			target,
-			context.Factory().ElementAccessExpression(
-				context.Factory().Identifier(name),
-				nil,
-				context.Factory().NumericLiteral(
-					strconv.Itoa(index),
-					tsgo.TokenFlagsNone,
-				),
-				tsgo.NodeFlagsNone,
-			),
+			element,
 		)
 		if err != nil {
 			return nil, nil, err
@@ -134,6 +126,7 @@ func storeNamedResult(
 
 func propagateControlled(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	control api.ReturnControl,
 	value tsgo.Expression,
@@ -159,6 +152,7 @@ func propagateControlled(
 	case control.Named():
 		assignments, assignmentRequests, err := controlledAssignments(
 			context,
+			children,
 			source,
 			control.NamedTargets(),
 			value,

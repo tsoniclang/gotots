@@ -145,6 +145,7 @@ func emitIterator(
 	if returnSelected {
 		propagation, propagationErr := iteratorReturnPropagation(
 			context,
+			children,
 			source,
 			stateName,
 			resultName,
@@ -452,6 +453,7 @@ func iteratorReturnStorage(
 
 func iteratorReturnPropagation(
 	context api.Context,
+	children api.ChildEmitter,
 	source *ast.RangeStmt,
 	stateName string,
 	resultName string,
@@ -462,6 +464,7 @@ func iteratorReturnPropagation(
 	}
 	propagated, err := returnstatement.Propagate(
 		context,
+		children,
 		source,
 		result,
 	)
