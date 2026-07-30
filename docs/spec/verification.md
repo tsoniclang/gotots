@@ -743,6 +743,18 @@ forms, or transport a semantic converter on a runtime pointer. Each fails at
 the exact facet join, strict target, differential alias/copy, convergence, or
 artifact-shape gate.
 
+The generic-storage matrix additionally reads, writes, takes addresses of, and
+constructs fields whose concrete logical and storage facets differ. Artifact
+shape proves one whole-storage projection per reached class regardless of
+field count, zero per-field static accessors, caller-owned conversion,
+explicit canonical construction arguments, and no converter field or logical
+cache on an instance. Mutations perform conversion inside an instance member,
+store a callback on the value, read canonical storage as the logical type,
+write the logical type directly, omit one consumer dependency, add per-field
+accessors, or retain both direct and storage-property routes; strict
+typechecking, differential alias/copy behavior, the observable-facet fixed
+point, source-size scaling, and broad searches must catch them.
+
 Map certification exact-joins every public map type and operation against
 semantic `K,V`, while separately inspecting private storage choices. The
 matrix covers primitive keys, defined-basic keys, aggregate keys, generic

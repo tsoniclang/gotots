@@ -143,7 +143,7 @@ func TestObservableChangesReconstructOnlySubscribedDeclarations(t *testing.T) {
 		item:    1,
 		box:     2,
 		trigger: 1,
-		caller:  0,
+		caller:  1,
 	}
 	for object, reconstructions := range expected {
 		declaration := declarationForObject(t, session, object)

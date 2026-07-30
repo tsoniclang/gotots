@@ -69,6 +69,7 @@ func EmitNonNil(
 			context,
 			children,
 			source,
+			named.Origin().Obj(),
 			named.TypeArgs(),
 		)
 		if err != nil {

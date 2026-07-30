@@ -67,18 +67,12 @@ func emitGenericMeasure(
 		operation,
 		[]types.Type{operandType},
 		[]types.Type{resultType},
-		[]tsgo.Expression{operand.Value()},
-		operand.Requests()...,
+		[]api.ExpressionEmission{operand},
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	target, err = api.NewExpressionEmission(
-		operand.Before(),
-		target.Value(),
-		target.Requests(),
-	)
-	return target, true, err
+	return target, true, nil
 }
 
 func ApplyMeasure(

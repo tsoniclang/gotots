@@ -305,18 +305,35 @@ func emitConstraintMethod(
 			signature.Results().At(index).Type(),
 		)
 	}
+	genericArguments := make(
+		[]api.ExpressionEmission,
+		0,
+		len(arguments)+1,
+	)
+	genericArguments = append(
+		genericArguments,
+		api.DirectExpression(
+			receiverValue,
+			api.CombineRequests(
+				receiver.Requests(),
+				receiverRequests,
+				argumentRequests,
+			)...,
+		),
+	)
+	for _, argument := range arguments {
+		genericArguments = append(
+			genericArguments,
+			api.DirectExpression(argument),
+		)
+	}
 	target, err := genericoperation.ConstraintMethod(
 		context,
 		source,
 		method,
 		parameterTypes,
 		resultTypes,
-		append([]tsgo.Expression{receiverValue}, arguments...),
-		api.CombineRequests(
-			receiver.Requests(),
-			receiverRequests,
-			argumentRequests,
-		)...,
+		genericArguments,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

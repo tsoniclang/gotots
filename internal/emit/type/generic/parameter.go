@@ -5,8 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -40,25 +40,27 @@ func Emit(
 	if err != nil {
 		return api.TypeEmission{}, true, err
 	}
-	targetArguments := make([]tsgo.TypeNode, 0, arguments.Len())
-	requests := reference.Requests()
-	for index := range arguments.Len() {
-		target, targetErr := children.RepresentedType(
-			context.WithRole(api.RoleCallArgumentType),
+	targetArguments, argumentRequests, err :=
+		genericinstance.EmitTypeArguments(
+			context,
+			children,
 			source,
-			arguments.At(index),
+			object,
+			arguments,
 		)
-		if targetErr != nil {
-			return api.TypeEmission{}, true, targetErr
-		}
-		targetArguments = append(targetArguments, target.Value())
-		requests = append(requests, target.Requests()...)
+	if err != nil {
+		return api.TypeEmission{}, true, err
 	}
-	target := tsgo.TypeNode(context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(reference.Name()),
-		targetArguments,
-	))
-	return api.DirectType(target, requests...), true, nil
+	return api.DirectType(
+		context.Factory().TypeReferenceNode(
+			context.Factory().Identifier(reference.Name()),
+			targetArguments,
+		),
+		api.CombineRequests(
+			reference.Requests(),
+			argumentRequests,
+		)...,
+	), true, nil
 }
 
 func instantiatedType(

@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
@@ -175,6 +176,14 @@ func canonicalPointerTarget(
 	pointer api.ExpressionEmission,
 	element types.Type,
 ) (api.StoreTargetEmission, error) {
+	if target, handled, err := genericpointer.StoreTarget(
+		context,
+		source,
+		element,
+		pointer,
+	); handled || err != nil {
+		return target, err
+	}
 	storageType, err := context.Values().StorageType(
 		context.WithRole(api.RoleStorageType),
 		source,

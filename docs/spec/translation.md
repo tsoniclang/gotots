@@ -2813,6 +2813,44 @@ not callbacks stored on values. If the declaration only compares or returns
 `T` and never represents `*T`, it remains `function F<T>(...)` with no storage
 or pointer facet.
 
+For a storage-selected generic struct:
+
+```go
+type Box[T any] struct { Value T }
+
+func ReplaceValue[T any](box *Box[T], value T) T {
+    previous := box.Value
+    box.Value = value
+    return previous
+}
+```
+
+the class surface is schematically:
+
+```ts
+class Box<T, T$Storage> {
+  private constructor(
+    private readonly $storage: Box$Storage<T, T$Storage>,
+  ) {}
+
+  static $storageOf<T, T$Storage>(
+    source: Box<T, T$Storage>,
+  ): Box$Storage<T, T$Storage> {
+    return source.$storage;
+  }
+}
+```
+
+The generic function reads with
+`fromStorageT(Box.$storageOf(box).Value)` and writes with
+`Box.$storageOf(box).Value = toStorageT(value)`. The conversion functions are
+the function declaration's ordinary static generic capabilities. The class
+publishes one typed whole-storage projection regardless of field count; it
+does not emit per-field readers/writers, retain converter callbacks, pass
+callbacks into the pointer runtime, or recover values from erased state. At a
+concrete instantiation each demanded conversion is generated once from the
+selected value-family owner.
+
 Pointer receiver declarations are class-owned static members with an explicit
 selected pointer parameter:
 

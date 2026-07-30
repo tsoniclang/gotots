@@ -251,3 +251,73 @@ func compareDeclarationSites(left declarationSite, right declarationSite) int {
 		return 0
 	}
 }
+
+func compareGenericRepresentationRequirements(
+	left api.DeclarationRequirement,
+	right api.DeclarationRequirement,
+) int {
+	leftOwner, leftParameter, leftFacet, leftOK :=
+		left.GenericRepresentation()
+	rightOwner, rightParameter, rightFacet, rightOK :=
+		right.GenericRepresentation()
+	switch {
+	case !leftOK && rightOK:
+		return -1
+	case leftOK && !rightOK:
+		return 1
+	case !leftOK:
+		return 0
+	}
+	leftIndex, leftIndexed :=
+		api.GenericDeclarationParameterIndex(leftOwner, leftParameter)
+	rightIndex, rightIndexed :=
+		api.GenericDeclarationParameterIndex(rightOwner, rightParameter)
+	switch {
+	case !leftIndexed && rightIndexed:
+		return -1
+	case leftIndexed && !rightIndexed:
+		return 1
+	case leftIndex < rightIndex:
+		return -1
+	case leftIndex > rightIndex:
+		return 1
+	case leftFacet < rightFacet:
+		return -1
+	case leftFacet > rightFacet:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func (s *programSession) ResolveGenericRepresentationProfile(
+	declaration types.Object,
+) (api.GenericRepresentationProfile, bool, error) {
+	owner := api.GenericDeclarationOrigin(declaration)
+	if owner == nil || len(api.GenericDeclarationParameters(owner)) == 0 {
+		return api.GenericRepresentationProfile{}, false, nil
+	}
+	if _, ok := s.sites[owner]; ok {
+		profile, err := api.SelectGenericRepresentationProfile(
+			owner,
+			s.requirements.appliedFor(api.MustSourceArtifactOwner(owner)),
+		)
+		return profile, err == nil, err
+	}
+	sourcePackage := s.source.EnvironmentForTypes(owner.Pkg())
+	if sourcePackage == nil {
+		return api.GenericRepresentationProfile{}, false, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "generic representation owner has no declaration",
+		}
+	}
+	var requirements []api.DeclarationRequirement
+	if builder := s.environmentBuilders[sourcePackage]; builder != nil {
+		requirements = builder.environmentRequirements(owner)
+	}
+	profile, err := api.SelectGenericRepresentationProfile(
+		owner,
+		requirements,
+	)
+	return profile, err == nil, err
+}

@@ -92,6 +92,9 @@ func compareDeclarationRequirements(
 			return 0
 		}
 	}
+	if left.Kind() == api.DeclarationRequirementGenericRepresentation {
+		return compareGenericRepresentationRequirements(left, right)
+	}
 	if left.Kind() == api.DeclarationRequirementGenericCallableProfile {
 		leftProfile, leftOK := left.GenericCallableProfile()
 		rightProfile, rightOK := right.GenericCallableProfile()

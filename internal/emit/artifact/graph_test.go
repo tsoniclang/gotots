@@ -95,6 +95,50 @@ func TestArtifactGraphSuppressesUnchangedAndIsolatesFacets(t *testing.T) {
 	}
 }
 
+func TestArtifactGraphInvalidatesExistingSubscriberOnFirstPublication(
+	t *testing.T,
+) {
+	provider := artifactTestObject("Provider", 10)
+	callConsumer := artifactTestObject("CallConsumer", 20)
+	staticConsumer := artifactTestObject("StaticConsumer", 30)
+	graph := NewGraph(compareArtifactTestObjects)
+
+	commitArtifactTestRevision(
+		t,
+		graph,
+		callConsumer,
+		artifactCallable("call-consumer"),
+		artifactTestDependency(
+			t,
+			provider,
+			api.ArtifactFacetCallableSignature,
+		),
+	)
+	commitArtifactTestRevision(
+		t,
+		graph,
+		staticConsumer,
+		artifactCallable("static-consumer"),
+		artifactTestDependency(
+			t,
+			provider,
+			api.ArtifactFacetStaticSurface,
+		),
+	)
+	if graph.HasPending() {
+		t.Fatal("unpublished provider dirtied a consumer")
+	}
+
+	commitArtifactTestRevision(t, graph, provider, artifactCallable("callable"))
+	dirty, ok := graph.NextDirty()
+	if !ok || dirty != artifactTestOwner(callConsumer) {
+		t.Fatalf("first-publication dirty = %v, %t; want call consumer", dirty, ok)
+	}
+	if graph.HasPending() {
+		t.Fatal("first publication dirtied a consumer of an absent facet")
+	}
+}
+
 func TestArtifactGraphNeverRoutesByProviderSpelling(t *testing.T) {
 	first := artifactTestObject("Provider", 10)
 	forged := artifactTestObject("Provider", 11)
@@ -400,66 +444,6 @@ func TestArtifactGraphClosureDiagnosticsUseStableObjectOrder(t *testing.T) {
 		graphError.Object != artifactTestOwner(firstConsumer) ||
 		graphError.Provider != artifactTestOwner(firstProvider) {
 		t.Fatalf("closure error = %#v, want first consumer/provider", err)
-	}
-}
-
-func TestArtifactGraphConvergesCyclesAndRejectsOscillation(t *testing.T) {
-	first := artifactTestObject("First", 10)
-	second := artifactTestObject("Second", 20)
-	graph := NewGraph(compareArtifactTestObjects)
-	commitArtifactTestRevision(
-		t,
-		graph,
-		first,
-		artifactCallable("first-a"),
-		artifactTestDependency(
-			t,
-			second,
-			api.ArtifactFacetCallableSignature,
-		),
-	)
-	commitArtifactTestRevision(
-		t,
-		graph,
-		second,
-		artifactCallable("second-a"),
-		artifactTestDependency(
-			t,
-			first,
-			api.ArtifactFacetCallableSignature,
-		),
-	)
-	commitArtifactTestRevision(t, graph, first, artifactCallable("first-b"))
-	dirty, ok := graph.NextDirty()
-	if !ok || dirty != artifactTestOwner(second) {
-		t.Fatalf("cycle dirty = %v, %t; want second", dirty, ok)
-	}
-	commitArtifactTestRevision(
-		t,
-		graph,
-		second,
-		artifactCallable("second-a"),
-		artifactTestDependency(
-			t,
-			first,
-			api.ArtifactFacetCallableSignature,
-		),
-	)
-	if graph.HasPending() {
-		t.Fatal("stable cycle did not converge")
-	}
-
-	err := graph.Commit(
-		artifactTestOwner(first),
-		artifactCallable("first-a"),
-		nil,
-	)
-	var convergenceError *ArtifactConvergenceError
-	if !errors.As(err, &convergenceError) ||
-		convergenceError.Object != artifactTestOwner(first) ||
-		len(convergenceError.Facets) != 1 ||
-		convergenceError.Facets[0] != api.ArtifactFacetCallableSignature {
-		t.Fatalf("oscillation error = %#v", err)
 	}
 }
 

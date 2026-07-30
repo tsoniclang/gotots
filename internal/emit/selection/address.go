@@ -5,8 +5,10 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -47,6 +49,16 @@ func FieldStoreTarget(
 		)
 		if err != nil {
 			return api.StoreTargetEmission{}, err
+		}
+		target, selected, err := namedstructstorage.FieldTarget(
+			context.WithRole(api.RoleAssignmentTarget),
+			source,
+			resolved.root,
+			field,
+			receiver,
+		)
+		if err != nil || selected {
+			return target, err
 		}
 		name, err := context.Names().Member(field)
 		if err != nil {
@@ -343,6 +355,14 @@ func canonicalPointerTarget(
 	pointer api.ExpressionEmission,
 	element types.Type,
 ) (api.StoreTargetEmission, error) {
+	if target, handled, err := genericpointer.StoreTarget(
+		context,
+		source,
+		element,
+		pointer,
+	); handled || err != nil {
+		return target, err
+	}
 	storage, err := context.Values().StorageType(
 		context.WithRole(api.RoleStorageType),
 		source,

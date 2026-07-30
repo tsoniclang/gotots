@@ -4,6 +4,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -16,44 +17,40 @@ type genericScope struct {
 func enterGeneric(
 	context api.Context,
 	owner types.Object,
+	requirements []api.DeclarationRequirement,
 ) (genericScope, error) {
 	parameters := api.GenericDeclarationParameters(owner)
 	if len(parameters) == 0 {
 		return genericScope{context: context}, nil
 	}
 	names := make(map[*types.TypeParam]string, len(parameters))
-	targetParameters := make(
-		[]tsgo.TypeParameterDeclaration,
-		0,
-		len(parameters),
+	profile, err := api.SelectGenericRepresentationProfile(
+		owner,
+		requirements,
 	)
-	arguments := make([]tsgo.TypeNode, 0, len(parameters))
+	if err != nil {
+		return genericScope{}, err
+	}
 	for index, parameter := range parameters {
 		name := genericName(index)
 		names[parameter] = name
-		targetParameters = append(
-			targetParameters,
-			context.Factory().TypeParameterDeclaration(
-				nil,
-				context.Factory().Identifier(name),
-				nil,
-				nil,
-				nil,
-			),
-		)
-		arguments = append(arguments, context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(name),
-			nil,
-		))
 	}
-	context, err := context.WithEnvironmentGenericParameters(owner, names)
+	layout, err := genericdeclaration.EmitTypeParameterLayout(
+		context,
+		profile,
+		names,
+	)
+	if err != nil {
+		return genericScope{}, err
+	}
+	context, err = context.WithEnvironmentGenericParameters(owner, names)
 	if err != nil {
 		return genericScope{}, err
 	}
 	return genericScope{
 		context:    context,
-		parameters: targetParameters,
-		arguments:  arguments,
+		parameters: layout.Parameters(),
+		arguments:  layout.Arguments(),
 	}, nil
 }
 

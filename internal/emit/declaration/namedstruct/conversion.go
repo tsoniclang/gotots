@@ -18,6 +18,7 @@ func conversionMethod(
 	capabilities []tsgo.ParameterDeclaration,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
+	canonicalStorage bool,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	sourceMembers := make([]tsgo.TypeElement, 0, len(fields))
 	arguments := make([]tsgo.Expression, 0, len(fields))
@@ -66,6 +67,16 @@ func conversionMethod(
 				)),
 			)
 		}
+		if err != nil {
+			return nil, nil, err
+		}
+		copied, err = operationConstructionValue(
+			context.WithRole(api.RoleStructCopyField),
+			field.source,
+			field,
+			copied,
+			canonicalStorage,
+		)
 		if err != nil {
 			return nil, nil, err
 		}

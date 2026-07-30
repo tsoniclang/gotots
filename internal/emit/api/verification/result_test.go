@@ -65,6 +65,90 @@ func TestCopyingAccessorOwnsTheValueCopyBoundary(t *testing.T) {
 	}
 }
 
+func TestFunctionStoreTargetOwnsTypedImmutableOperations(t *testing.T) {
+	factory := tsgo.NewFactory()
+	getterRequest, err := api.NewImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"./pointer.js",
+		"load",
+		"load",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setterRequest, err := api.NewImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"./pointer.js",
+		"store",
+		"store",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arguments := []api.ExpressionEmission{
+		api.DirectExpression(factory.Identifier("pointer")),
+	}
+	target, err := api.NewFunctionStoreTargetEmission(
+		api.DirectExpression(factory.Identifier("load"), getterRequest),
+		api.DirectExpression(factory.Identifier("store"), setterRequest),
+		arguments,
+		types.Typ[types.Int32],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arguments[0] = api.DirectExpression(factory.Identifier("mutated"))
+	var requestNames []string
+	if err := api.WalkRootRequests(
+		target.Requests(),
+		func(request api.RootRequest) error {
+			requestNames = append(requestNames, request.ExportedName())
+			return nil
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if !target.IsAccessor() ||
+		target.AccessorArguments()[0].Value().(tsgo.Identifier).Text() !=
+			"pointer" ||
+		len(requestNames) != 2 ||
+		requestNames[0] != "load" ||
+		requestNames[1] != "store" {
+		t.Fatalf("function store target = %#v", target)
+	}
+	exposed := target.AccessorArguments()
+	exposed[0] = api.DirectExpression(factory.Identifier("alsoMutated"))
+	if target.AccessorArguments()[0].Value().(tsgo.Identifier).Text() !=
+		"pointer" {
+		t.Fatal("function store target exposed argument backing")
+	}
+}
+
+func TestFunctionStoreTargetRejectsOperationPrerequisites(t *testing.T) {
+	factory := tsgo.NewFactory()
+	getter, err := api.NewExpressionEmission(
+		[]tsgo.Statement{
+			factory.ExpressionStatement(factory.Identifier("prepare")),
+		},
+		factory.Identifier("load"),
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = api.NewFunctionStoreTargetEmission(
+		getter,
+		api.DirectExpression(factory.Identifier("store")),
+		nil,
+		types.Typ[types.Int32],
+	)
+	if err == nil {
+		t.Fatal("function store target accepted an unstable operation")
+	}
+}
+
 func TestPropertyStoreTargetOwnsTypedImmutablePrerequisites(t *testing.T) {
 	factory := tsgo.NewFactory()
 	before := []tsgo.Statement{

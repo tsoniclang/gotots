@@ -84,6 +84,7 @@ func Emit(
 		context,
 		children,
 		source,
+		owner,
 		instance.TypeArgs,
 	)
 	if err != nil {

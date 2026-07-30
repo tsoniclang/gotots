@@ -39,17 +39,12 @@ func AssertGeneric(
 		operation,
 		[]types.Type{sourceType},
 		results,
-		[]tsgo.Expression{value.Value()},
-		value.Requests()...,
+		[]api.ExpressionEmission{value},
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
-		value.Before(),
-		target.Value(),
-		target.Requests(),
-	)
+	return target, nil
 }
 
 func GenericAssertionElement(

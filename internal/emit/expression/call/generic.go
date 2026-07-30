@@ -47,6 +47,7 @@ func emitGeneric(
 		context,
 		children,
 		source,
+		owner,
 		instance.TypeArgs,
 	)
 	if err != nil {

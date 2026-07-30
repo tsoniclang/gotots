@@ -318,6 +318,9 @@ func storageMembers(
 		),
 	}
 	requests := makeRequests
+	if len(typeParameters) != 0 {
+		return members, requests, nil
+	}
 	for _, selected := range fields {
 		if selected.field.blank {
 			continue

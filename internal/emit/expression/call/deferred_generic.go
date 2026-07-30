@@ -43,6 +43,7 @@ func emitDeferredGeneric(
 		context,
 		children,
 		source,
+		owner,
 		instance.TypeArgs,
 	)
 	if err != nil {

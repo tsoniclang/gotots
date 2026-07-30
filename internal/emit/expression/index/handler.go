@@ -16,7 +16,6 @@ import (
 	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -316,8 +315,10 @@ func emitGeneric(
 		api.GenericOperationIndex,
 		[]types.Type{operandType, indexType},
 		[]types.Type{resultType},
-		[]tsgo.Expression{values[0], values[1]},
-		ordered.Requests()...,
+		[]api.ExpressionEmission{
+			api.DirectExpression(values[0]),
+			api.DirectExpression(values[1]),
+		},
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -325,6 +326,6 @@ func emitGeneric(
 	return api.NewExpressionEmission(
 		ordered.Before(),
 		target.Value(),
-		target.Requests(),
+		api.CombineRequests(target.Requests(), ordered.Requests()),
 	)
 }

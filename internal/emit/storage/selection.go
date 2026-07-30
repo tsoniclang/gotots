@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -26,6 +27,14 @@ func (owner Owner) Read(
 	name, selected := owner.Name(context, variable)
 	if !selected {
 		return api.ExpressionEmission{}, false, nil
+	}
+	if value, handled, err := genericpointer.Load(
+		context,
+		nil,
+		variable.Type(),
+		api.DirectExpression(context.Factory().Identifier(name)),
+	); handled || err != nil {
+		return value, true, err
 	}
 	value := api.DirectExpression(
 		context.Factory().PropertyAccessExpression(
@@ -55,6 +64,14 @@ func (owner Owner) StoreTarget(
 	if !selected {
 		return api.StoreTargetEmission{}, false, nil
 	}
+	if target, handled, err := genericpointer.StoreTarget(
+		context,
+		nil,
+		variable.Type(),
+		api.DirectExpression(context.Factory().Identifier(name)),
+	); handled || err != nil {
+		return target, true, err
+	}
 	target, err := api.NewCanonicalStorageTargetEmission(
 		context.Factory().PropertyAccessExpression(
 			context.Factory().Identifier(name),
@@ -75,6 +92,14 @@ func (Owner) Cell(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if cell, handled, err := genericpointer.Cell(
+		context,
+		source,
+		sourceType,
+		value,
+	); handled || err != nil {
+		return cell, err
+	}
 	targetType, err := children.RepresentedType(
 		context.WithRole(api.RoleLocalType),
 		source,

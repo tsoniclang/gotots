@@ -338,7 +338,7 @@ func EmptyHolder() Holder {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	if !strings.Contains(
 		artifacts.printed,
-		"GoPointer<Box<int64>",
+		"GoPointer<Box<int64, int64>, Box$Storage<int64, int64>>",
 	) {
 		t.Fatalf(
 			"alias to generic instantiation was not canonicalized:\n%s",

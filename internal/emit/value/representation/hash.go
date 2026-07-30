@@ -127,7 +127,7 @@ func (owner Owner) Hash(
 			api.GenericOperationHash,
 			[]types.Type{parameter},
 			[]types.Type{types.Typ[types.Uint32]},
-			[]tsgo.Expression{value},
+			[]api.ExpressionEmission{api.DirectExpression(value)},
 		)
 	}
 	if _, ok := interfacetype.Resolve(sourceType); ok {

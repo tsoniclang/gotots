@@ -141,7 +141,8 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementGenericCallableProfile != 17 ||
 		DeclarationRequirementClassMethod != 18 ||
 		DeclarationRequirementValueReceiverCopy != 19 ||
-		DeclarationRequirementKind(20).Valid() {
+		DeclarationRequirementGenericRepresentation != 20 ||
+		DeclarationRequirementKind(21).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }

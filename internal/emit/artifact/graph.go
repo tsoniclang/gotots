@@ -130,7 +130,7 @@ func (g *Graph) Commit(
 			}
 			current.facetRevisions[facet] = 1
 		}
-		return nil
+		return g.invalidateConsumers(owner, changed)
 	}
 	if len(changed) == 0 {
 		return nil
@@ -138,6 +138,15 @@ func (g *Graph) Commit(
 	current.history.append(previousContract, nextContract)
 	for _, facet := range changed {
 		current.facetRevisions[facet]++
+	}
+	return g.invalidateConsumers(owner, changed)
+}
+
+func (g *Graph) invalidateConsumers(
+	owner api.ArtifactOwner,
+	facets []api.ArtifactFacet,
+) error {
+	for _, facet := range facets {
 		dependency, dependencyError := api.NewArtifactDependency(owner, facet)
 		if dependencyError != nil {
 			return dependencyError

@@ -57,7 +57,21 @@ func Emit(
 			target.Requests()...,
 		), true, nil
 	}
-	parameters, err := genericdeclaration.EnterType(context, source, typeName)
+	for _, requirement := range requirements {
+		owner, _, _, ok := requirement.GenericRepresentation()
+		if !ok || owner != typeName {
+			return api.DeclarationEmission{}, true, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "defined type received a foreign declaration requirement",
+			}
+		}
+	}
+	parameters, err := genericdeclaration.EnterType(
+		context,
+		source,
+		typeName,
+		requirements,
+	)
 	if err != nil {
 		return api.DeclarationEmission{}, true, err
 	}
@@ -107,12 +121,6 @@ func Emit(
 			nil,
 			context.Factory().Block(nil, true),
 		),
-	}
-	if len(requirements) != 0 {
-		return api.DeclarationEmission{}, true, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "defined type received foreign declaration requirements",
-		}
 	}
 	return api.DirectDeclaration(
 		context.Factory().ClassDeclaration(

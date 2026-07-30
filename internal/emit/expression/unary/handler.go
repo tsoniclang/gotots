@@ -11,7 +11,6 @@ import (
 	definedunary "github.com/tsoniclang/gotots/internal/emit/expression/unary/defined"
 	unaryoperation "github.com/tsoniclang/gotots/internal/emit/expression/unary/operation"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -71,17 +70,12 @@ func Emit(
 			operation,
 			[]types.Type{operandType},
 			[]types.Type{resultType},
-			[]tsgo.Expression{operand.Value()},
-			operand.Requests()...,
+			[]api.ExpressionEmission{operand},
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return api.NewExpressionEmission(
-			operand.Before(),
-			target.Value(),
-			target.Requests(),
-		)
+		return target, nil
 	}
 	operand, err := children.Expression(
 		context.

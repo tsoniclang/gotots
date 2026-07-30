@@ -221,6 +221,7 @@ func (s *programSession) emitPackageStorage(
 	revision, err := s.buildPackageStorageRevision(
 		builder,
 		owner,
+		site,
 		source,
 		variable,
 	)
@@ -250,9 +251,44 @@ func (s *programSession) emitPackageStorage(
 func (s *programSession) buildPackageStorageRevision(
 	builder *packageTargetBuilder,
 	owner api.ArtifactOwner,
+	site declarationSite,
 	source ast.Node,
 	variable *types.Var,
 ) (packageStorageRevision, error) {
+	stateNames, ok := builder.stateContext.Names().(*emitnaming.File)
+	if !ok {
+		return packageStorageRevision{}, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "package storage state has no concrete name owner",
+		}
+	}
+	finishState, err := stateNames.BeginArtifact(
+		owner,
+		source,
+		site.sourceFile.Syntax(),
+		site.outputPath,
+	)
+	if err != nil {
+		return packageStorageRevision{}, err
+	}
+	defer finishState()
+	assemblyNames, ok := builder.assemblyContext.Names().(*emitnaming.File)
+	if !ok {
+		return packageStorageRevision{}, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "package storage assembly has no concrete name owner",
+		}
+	}
+	finishAssembly, err := assemblyNames.BeginArtifact(
+		owner,
+		source,
+		site.sourceFile.Syntax(),
+		site.outputPath,
+	)
+	if err != nil {
+		return packageStorageRevision{}, err
+	}
+	defer finishAssembly()
 	emission, err := packagevariable.EmitStorage(
 		builder.stateContext.WithArtifactOwner(owner),
 		builder.assemblyContext.WithArtifactOwner(owner),
@@ -344,6 +380,7 @@ func (s *programSession) reconstructPackageStorage(
 	revision, err := s.buildPackageStorageRevision(
 		builder,
 		owner,
+		site,
 		storage.source,
 		variable,
 	)

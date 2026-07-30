@@ -436,7 +436,7 @@ func assertIteratorRangeShape(t *testing.T, printed string) {
 		"range function continued iteration after whole loop exit",
 		"range function recovered a loop body panic and did not resume panicking",
 		"export function GenericIteratorSum<T>",
-		"export function GenericIteratorCopy<T>",
+		"export function GenericIteratorCopy<T, T$Storage>",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("iterator artifact lacks %q:\n%s", required, printed)

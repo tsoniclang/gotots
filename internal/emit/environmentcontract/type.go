@@ -13,9 +13,19 @@ func typeDeclaration(
 	context api.Context,
 	children api.ChildEmitter,
 	typeName *types.TypeName,
+	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
+	for _, requirement := range requirements {
+		owner, _, _, ok := requirement.GenericRepresentation()
+		if !ok || owner != typeName {
+			return api.DeclarationEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "environment type received a foreign declaration requirement",
+			}
+		}
+	}
 	if typeName.IsAlias() {
-		return aliasDeclaration(context, children, typeName)
+		return aliasDeclaration(context, children, typeName, requirements)
 	}
 	named, ok := typeName.Type().(*types.Named)
 	if !ok {
@@ -31,6 +41,7 @@ func typeDeclaration(
 			children,
 			typeName,
 			underlying.Complete(),
+			requirements,
 		)
 	case *types.Struct:
 		return structDeclaration(
@@ -38,6 +49,7 @@ func typeDeclaration(
 			children,
 			typeName,
 			underlying,
+			requirements,
 		)
 	default:
 		return definedDeclaration(
@@ -45,6 +57,7 @@ func typeDeclaration(
 			children,
 			typeName,
 			underlying,
+			requirements,
 		)
 	}
 }
@@ -53,8 +66,9 @@ func aliasDeclaration(
 	context api.Context,
 	children api.ChildEmitter,
 	typeName *types.TypeName,
+	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
-	generic, err := enterGeneric(context, typeName)
+	generic, err := enterGeneric(context, typeName, requirements)
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
@@ -86,8 +100,9 @@ func interfaceDeclaration(
 	children api.ChildEmitter,
 	typeName *types.TypeName,
 	source *types.Interface,
+	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
-	generic, err := enterGeneric(context, typeName)
+	generic, err := enterGeneric(context, typeName, requirements)
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
@@ -211,8 +226,9 @@ func structDeclaration(
 	children api.ChildEmitter,
 	typeName *types.TypeName,
 	source *types.Struct,
+	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
-	generic, err := enterGeneric(context, typeName)
+	generic, err := enterGeneric(context, typeName, requirements)
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
@@ -431,8 +447,9 @@ func definedDeclaration(
 	children api.ChildEmitter,
 	typeName *types.TypeName,
 	underlying types.Type,
+	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
-	generic, err := enterGeneric(context, typeName)
+	generic, err := enterGeneric(context, typeName, requirements)
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}

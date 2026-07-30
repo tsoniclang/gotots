@@ -45,18 +45,15 @@ func (Owner) BinaryUpdate(
 			operation,
 			[]types.Type{sourceType, rightRepresentation},
 			[]types.Type{sourceType},
-			[]tsgo.Expression{left, right.Value()},
-			right.Requests()...,
+			[]api.ExpressionEmission{
+				api.DirectExpression(left),
+				right,
+			},
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
-		target, err = api.NewExpressionEmission(
-			right.Before(),
-			target.Value(),
-			target.Requests(),
-		)
-		return target, true, err
+		return target, true, nil
 	}
 	model, ok := definedtype.ResolveBasic(sourceType)
 	if !ok {

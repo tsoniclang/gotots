@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -23,23 +24,19 @@ func Emit(
 	if err != nil {
 		return api.TypeEmission{}, true, err
 	}
-	arguments := make(
-		[]tsgo.TypeNode,
-		0,
-		model.Type().TypeArgs().Len(),
-	)
+	var arguments []tsgo.TypeNode
 	var requests []api.RootRequest
-	for index := range model.Type().TypeArgs().Len() {
-		argument, err := children.RepresentedType(
+	if model.Type().TypeArgs().Len() != 0 {
+		arguments, requests, err = genericinstance.EmitTypeArguments(
 			context.WithRole(api.RoleDefinedTypeArgument),
+			children,
 			source,
-			model.Type().TypeArgs().At(index),
+			model.TypeName(),
+			model.Type().TypeArgs(),
 		)
 		if err != nil {
 			return api.TypeEmission{}, true, err
 		}
-		arguments = append(arguments, argument.Value())
-		requests = append(requests, argument.Requests()...)
 	}
 	target := tsgo.TypeNode(context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(reference.Name()),

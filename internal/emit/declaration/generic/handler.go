@@ -43,13 +43,21 @@ func Emit(
 	if !typeName.IsAlias() || !spec.Assign.IsValid() {
 		return api.DeclarationEmission{}, false, nil
 	}
-	if len(requirements) != 0 {
-		return api.DeclarationEmission{}, true, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "generic alias received declaration requirements",
+	for _, requirement := range requirements {
+		owner, _, _, ok := requirement.GenericRepresentation()
+		if !ok || owner != typeName {
+			return api.DeclarationEmission{}, true, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "generic alias received a foreign declaration requirement",
+			}
 		}
 	}
-	parameters, err := genericdeclaration.EnterType(context, spec, typeName)
+	parameters, err := genericdeclaration.EnterType(
+		context,
+		spec,
+		typeName,
+		requirements,
+	)
 	if err != nil {
 		return api.DeclarationEmission{}, true, err
 	}

@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
@@ -59,6 +60,14 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+	}
+	if value, handled, err := genericpointer.Load(
+		context,
+		source,
+		element,
+		pointer,
+	); handled || err != nil {
+		return value, err
 	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleUnaryOperand),

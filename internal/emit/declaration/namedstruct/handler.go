@@ -31,6 +31,7 @@ func emitClass(
 	declaration *ast.GenDecl,
 	typeName *types.TypeName,
 	operations []operationAssembly,
+	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
 	source, ok := sourceType(
 		context,
@@ -45,6 +46,7 @@ func emitClass(
 		context,
 		source.spec,
 		typeName,
+		requirements,
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -216,6 +218,7 @@ func emitStructClass(
 			operation,
 			typeParameters,
 			typeArguments,
+			storageOperation != nil && len(typeParameters) != 0,
 		)
 		if err != nil {
 			return api.DeclarationEmission{}, err

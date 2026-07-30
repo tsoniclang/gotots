@@ -324,17 +324,12 @@ func (owner Owner) copyExact(
 			api.GenericOperationCopy,
 			[]types.Type{parameter},
 			[]types.Type{parameter},
-			[]tsgo.Expression{value.Value()},
-			value.Requests()...,
+			[]api.ExpressionEmission{value},
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return api.NewExpressionEmission(
-			value.Before(),
-			target.Value(),
-			target.Requests(),
-		)
+		return target, nil
 	}
 	if _, ok := interfacetype.Resolve(sourceType); ok {
 		return api.NewExpressionEmission(

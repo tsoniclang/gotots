@@ -5,8 +5,10 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -64,6 +66,27 @@ func projectValue(
 			return api.ExpressionEmission{},
 				api.Unsupported(context, api.CategoryExpression, source)
 		}
+		target, selected, err := namedstructstorage.FieldTarget(
+			context.WithRole(api.RoleStructField),
+			source,
+			currentType,
+			field,
+			current,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if selected {
+			current, err = target.ReadValue(
+				context.WithRole(api.RoleStructField),
+				source,
+			)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+			currentType = field.Type()
+			continue
+		}
 		name, err := context.Names().Member(field)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -109,6 +132,14 @@ func dereferenceValue(
 		if err != nil {
 			return api.ExpressionEmission{}, nil, err
 		}
+	}
+	if logical, handled, err := genericpointer.Load(
+		context,
+		source,
+		element,
+		value,
+	); handled || err != nil {
+		return logical, element, err
 	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleFieldReceiver),

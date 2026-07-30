@@ -134,17 +134,12 @@ func adapt(
 			api.GenericOperationInterfaceAdapt,
 			[]types.Type{sourceType},
 			[]types.Type{targetType},
-			[]tsgo.Expression{value.Value()},
-			value.Requests()...,
+			[]api.ExpressionEmission{value},
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return api.NewExpressionEmission(
-			value.Before(),
-			adapted.Value(),
-			adapted.Requests(),
-		)
+		return adapted, nil
 	}
 	if _, ok := interfacetype.Resolve(sourceType); ok {
 		demands, err := context.Names().InterfaceContractDemand(

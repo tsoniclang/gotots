@@ -335,6 +335,20 @@ func (s *programSession) applyEnvironmentRequirement(
 			requirement,
 		)
 	}
+	if representationOwner, _, _, ok :=
+		requirement.GenericRepresentation(); ok {
+		if representationOwner != owner {
+			return true, &ScheduleError{
+				Object: owner.Name(),
+				Reason: "environment generic representation requirement is foreign",
+			}
+		}
+		return true, s.applyEnvironmentDeclarationRequirement(
+			builder,
+			owner,
+			requirement,
+		)
+	}
 	if _, _, _, _, ok := requirement.CallableControl(); ok {
 		return true, s.applyEnvironmentCallableControl(
 			builder,

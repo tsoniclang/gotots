@@ -49,10 +49,43 @@ func EmitRepresented(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	cell, err := EmitNonNilRepresented(
+		context,
+		children,
+		source,
+		sourceType,
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return api.DirectType(
+		context.Factory().UnionTypeNode([]tsgo.TypeNode{
+			cell.Value(),
+			context.Factory().KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+			),
+		}),
+		cell.Requests()...,
+	), nil
+}
+
+func EmitNonNilRepresented(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	sourceType types.Type,
+) (api.TypeEmission, error) {
 	_, element, ok := Resolve(sourceType)
 	if !ok {
 		return api.TypeEmission{},
 			api.Unsupported(context, api.CategoryType, source)
+	}
+	if parameter, generic := api.GenericTypeParameter(element); generic {
+		return context.GenericParameterRepresentation(
+			source,
+			parameter,
+			api.GenericRepresentationPointer,
+		)
 	}
 	elementType, err := children.RepresentedType(context, source, element)
 	if err != nil {
@@ -73,17 +106,11 @@ func EmitRepresented(
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
-	cell := context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(reference.Name()),
-		[]tsgo.TypeNode{elementType.Value(), storageType.Value()},
-	)
 	return api.DirectType(
-		context.Factory().UnionTypeNode([]tsgo.TypeNode{
-			cell,
-			context.Factory().KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-			),
-		}),
+		context.Factory().TypeReferenceNode(
+			context.Factory().Identifier(reference.Name()),
+			[]tsgo.TypeNode{elementType.Value(), storageType.Value()},
+		),
 		api.CombineRequests(
 			elementType.Requests(),
 			storageType.Requests(),

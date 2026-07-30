@@ -68,6 +68,7 @@ type Context struct {
 	detachedInvocation         bool
 	environmentContract        bool
 	genericParameters          map[*types.TypeParam]string
+	genericParameterOwner      types.Object
 	genericCallableProfile     *GenericCallableProfile
 	iteratorRangeControls      []IteratorRangeControl
 	valueReceiver              *ValueReceiverBinding

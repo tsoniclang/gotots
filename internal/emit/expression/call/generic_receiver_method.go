@@ -234,6 +234,7 @@ func prepareGenericReceiverMethodCall(
 		context,
 		children,
 		source,
+		method,
 		arguments,
 	)
 	if err != nil {

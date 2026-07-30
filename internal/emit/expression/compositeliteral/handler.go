@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/expression/mapliteral"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -59,12 +60,23 @@ func Emit(
 			elements,
 		)
 	}
+	canonicalStorage := false
+	if named != nil {
+		_, canonicalStorage, err = namedstructstorage.Selected(
+			context,
+			named,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
 	before, requests, values, err := arrange(
 		context,
 		children,
 		source,
 		structType,
 		elements,
+		canonicalStorage,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -95,7 +107,26 @@ func Emit(
 			api.CombineRequests(requests, reference.Requests()),
 		)
 	}
-	reference, err := context.Names().Reference(named.Obj())
+	var reference api.NameReference
+	var typeArguments []tsgo.TypeNode
+	if canonicalStorage {
+		reference, err = context.Names().NamedStructOperation(
+			named.Origin().Obj(),
+			api.NamedStructOperationStorage,
+		)
+		if err == nil {
+			typeArguments, requests, err =
+				genericNamedStructTypeArguments(
+					context,
+					children,
+					source,
+					named,
+					requests,
+				)
+		}
+	} else {
+		reference, err = context.Names().Reference(named.Obj())
+	}
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -109,7 +140,7 @@ func Emit(
 				tsgo.NodeFlagsNone,
 			),
 			nil,
-			nil,
+			typeArguments,
 			values,
 			tsgo.NodeFlagsNone,
 		),
@@ -248,6 +279,33 @@ func emitRestrictedNamedStruct(
 				)
 		}
 		if field.Name() == "_" {
+			continue
+		}
+		target, selected, err := namedstructstorage.FieldTarget(
+			context.WithRole(api.RoleStructAssignField),
+			element.source,
+			named,
+			field,
+			api.DirectExpression(result),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if selected {
+			stored, storeErr := target.StoreValue(
+				context.WithRole(api.RoleStructAssignField),
+				element.source,
+				api.DirectExpression(values[index]),
+			)
+			if storeErr != nil {
+				return api.ExpressionEmission{}, storeErr
+			}
+			before = append(before, stored.Before()...)
+			before = append(
+				before,
+				context.Factory().ExpressionStatement(stored.Value()),
+			)
+			requests = append(requests, stored.Requests()...)
 			continue
 		}
 		name, err := context.Names().Member(field)
@@ -404,12 +462,29 @@ func arrange(
 	source *ast.CompositeLit,
 	structType *types.Struct,
 	elements []element,
+	canonicalStorage bool,
 ) (
 	[]tsgo.Statement,
 	[]api.RootRequest,
 	[]tsgo.Expression,
 	error,
 ) {
+	if canonicalStorage {
+		elements = append([]element(nil), elements...)
+		for index := range elements {
+			fieldType := structType.Field(elements[index].fieldIndex).Type()
+			stored, err := context.Values().ToStorage(
+				context.WithRole(api.RoleStructAssignField),
+				elements[index].source,
+				fieldType,
+				elements[index].value,
+			)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			elements[index].value = stored
+		}
+	}
 	capture := false
 	for index, element := range elements {
 		reordersSource := element.fieldIndex != index &&
@@ -461,6 +536,17 @@ func arrange(
 		)
 		if err != nil {
 			return nil, nil, nil, err
+		}
+		if canonicalStorage {
+			zero, err = context.Values().ToStorage(
+				context.WithRole(api.RoleStructZeroField),
+				source,
+				structType.Field(fieldIndex).Type(),
+				zero,
+			)
+			if err != nil {
+				return nil, nil, nil, err
+			}
 		}
 		if len(zero.Before()) != 0 {
 			return nil, nil, nil, api.Unsupported(

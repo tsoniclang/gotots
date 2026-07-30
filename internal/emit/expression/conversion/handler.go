@@ -25,7 +25,6 @@ import (
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -102,18 +101,12 @@ func Emit(
 			api.GenericOperationConvert,
 			[]types.Type{sourceType},
 			[]types.Type{targetType},
-			[]tsgo.Expression{operandValue.Value()},
-			operandValue.Requests()...,
+			[]api.ExpressionEmission{operandValue},
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
-		target, err = api.NewExpressionEmission(
-			operandValue.Before(),
-			target.Value(),
-			target.Requests(),
-		)
-		return target, true, err
+		return target, true, nil
 	}
 	operandExpected := operandFacts.Type
 	if _, interfaceTarget := interfacetype.Resolve(targetType); interfaceTarget {

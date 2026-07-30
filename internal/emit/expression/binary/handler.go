@@ -202,22 +202,10 @@ func emitGeneric(
 		operation,
 		[]types.Type{leftType, rightType},
 		[]types.Type{resultType},
-		[]tsgo.Expression{
-			operands.Left().Value(),
-			operands.Right().Value(),
+		[]api.ExpressionEmission{
+			operands.Left(),
+			operands.Right(),
 		},
-		operands.Left().Requests()...,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	target, err = api.NewExpressionEmission(
-		target.Before(),
-		target.Value(),
-		api.CombineRequests(
-			target.Requests(),
-			operands.Right().Requests(),
-		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -253,8 +241,7 @@ func emitGenericNilEquality(
 		api.GenericOperationNilEqual,
 		[]types.Type{parameter},
 		[]types.Type{types.Typ[types.Bool]},
-		[]tsgo.Expression{value.Value()},
-		value.Requests()...,
+		[]api.ExpressionEmission{value},
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -267,7 +254,7 @@ func emitGenericNilEquality(
 		)
 	}
 	emission, err := api.NewExpressionEmission(
-		append(value.Before(), target.Before()...),
+		target.Before(),
 		result,
 		target.Requests(),
 	)

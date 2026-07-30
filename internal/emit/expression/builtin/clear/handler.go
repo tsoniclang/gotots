@@ -95,17 +95,12 @@ func emit(
 			api.GenericOperationClear,
 			[]types.Type{argumentType},
 			nil,
-			[]tsgo.Expression{operand.Value()},
-			operand.Requests()...,
+			[]api.ExpressionEmission{operand},
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return api.NewExpressionEmission(
-			operand.Before(),
-			target.Value(),
-			target.Requests(),
-		)
+		return target, nil
 	}
 	if mapType, ok := mapvalue.Source(context, argumentType); ok {
 		return emitMap(

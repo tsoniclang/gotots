@@ -35,13 +35,7 @@ func Declaration(
 		}
 		return typedConstantDeclaration(context, children, selected)
 	case *types.TypeName:
-		if len(requirements) != 0 {
-			return api.DeclarationEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "environment type acquired declaration requirements",
-			}
-		}
-		return typeDeclaration(context, children, selected)
+		return typeDeclaration(context, children, selected, requirements)
 	default:
 		return api.DeclarationEmission{}, &api.InvariantError{
 			Role:   context.Role(),
@@ -89,6 +83,7 @@ func callableDeclaration(
 				children,
 				function,
 				signature,
+				requirements,
 				profile,
 				recovery,
 			)
@@ -109,10 +104,11 @@ func callableVariantDeclaration(
 	children api.ChildEmitter,
 	function *types.Func,
 	signature *types.Signature,
+	requirements []api.DeclarationRequirement,
 	profile *api.GenericCallableProfile,
 	recovery bool,
 ) (tsgo.Statement, []api.RootRequest, error) {
-	generic, err := enterGeneric(context, function)
+	generic, err := enterGeneric(context, function, requirements)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -191,7 +187,9 @@ func requiresRecoveryAuthority(
 	selected := false
 	for _, requirement := range requirements {
 		if requirement.Kind() ==
-			api.DeclarationRequirementGenericCallableProfile {
+			api.DeclarationRequirementGenericCallableProfile ||
+			requirement.Kind() ==
+				api.DeclarationRequirementGenericRepresentation {
 			continue
 		}
 		owner, enclosing, callable, control, ok :=

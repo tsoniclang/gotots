@@ -416,7 +416,7 @@ func TestGenericReceiverMethodDefersThroughCanonicalABI(t *testing.T) {
 			workingDirectory := t.TempDir()
 			artifacts := materializeArtifacts(t, emission, workingDirectory)
 			for _, required := range []string{
-				"export class Box<T>",
+				"export class Box<T, T$Storage, T$Pointer>",
 				"static $go$private_",
 				"Box.$go$private_",
 				"__gotots_defers_",

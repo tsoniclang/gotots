@@ -16,7 +16,6 @@ import (
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -156,16 +155,7 @@ func emitGenericMap(
 		api.GenericOperationConvert,
 		[]types.Type{sourceType},
 		[]types.Type{mapType},
-		[]tsgo.Expression{operand.Value()},
-		operand.Requests()...,
-	)
-	if err != nil {
-		return api.StatementEmission{}, true, err
-	}
-	projected, err = api.NewExpressionEmission(
-		operand.Before(),
-		projected.Value(),
-		projected.Requests(),
+		[]api.ExpressionEmission{operand},
 	)
 	if err != nil {
 		return api.StatementEmission{}, true, err

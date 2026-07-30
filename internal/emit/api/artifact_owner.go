@@ -278,3 +278,48 @@ func (d ArtifactDependency) Provider() ArtifactOwner {
 func (d ArtifactDependency) Facet() ArtifactFacet {
 	return d.facet
 }
+
+func NewArtifactDependencyRequest(
+	provider types.Object,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	owner, err := SourceArtifactOwner(provider)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newArtifactDependencyRequest(owner, facet)
+}
+
+func NewGeneratedArtifactDependencyRequest(
+	provider *GeneratedArtifact,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	owner, err := GeneratedArtifactOwner(provider)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newArtifactDependencyRequest(owner, facet)
+}
+
+func NewOwnedArtifactDependencyRequest(
+	provider ArtifactOwner,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	return newArtifactDependencyRequest(provider, facet)
+}
+
+func newArtifactDependencyRequest(
+	provider ArtifactOwner,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	dependency, err := NewArtifactDependency(provider, facet)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{payload: &rootRequestPayload{
+		owner: RootRequestOwner{
+			kind:               RootRequestArtifactDependency,
+			artifactDependency: dependency,
+		},
+	}}, nil
+}

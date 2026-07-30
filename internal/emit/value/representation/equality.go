@@ -28,7 +28,10 @@ func (owner Owner) Equal(
 			api.GenericOperationEqual,
 			[]types.Type{parameter, parameter},
 			[]types.Type{types.Typ[types.Bool]},
-			[]tsgo.Expression{left, right},
+			[]api.ExpressionEmission{
+				api.DirectExpression(left),
+				api.DirectExpression(right),
+			},
 		)
 	}
 	if _, ok := interfacetype.Resolve(sourceType); ok {

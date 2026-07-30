@@ -154,6 +154,7 @@ func Emit(
 				context,
 				children,
 				source,
+				owner,
 				typeArguments,
 			)
 		if err != nil {

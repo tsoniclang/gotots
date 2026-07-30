@@ -374,6 +374,7 @@ const (
 	DeclarationRequirementGenericCallableProfile    DeclarationRequirementKind = 17
 	DeclarationRequirementClassMethod               DeclarationRequirementKind = 18
 	DeclarationRequirementValueReceiverCopy         DeclarationRequirementKind = 19
+	DeclarationRequirementGenericRepresentation     DeclarationRequirementKind = 20
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -395,7 +396,8 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementEnvironmentBuiltin ||
 		k == DeclarationRequirementGenericCallableProfile ||
 		k == DeclarationRequirementClassMethod ||
-		k == DeclarationRequirementValueReceiverCopy
+		k == DeclarationRequirementValueReceiverCopy ||
+		k == DeclarationRequirementGenericRepresentation
 }
 
 type CallableControlFacet uint8
@@ -518,4 +520,46 @@ func GenericDeclarationOrigin(owner types.Object) types.Object {
 		}
 	}
 	return nil
+}
+
+func validAddressableStorageOwner(
+	owner ArtifactOwner,
+	variable *types.Var,
+) bool {
+	if !owner.Valid() ||
+		variable == nil ||
+		variable.IsField() ||
+		variable.Pkg() == nil ||
+		owner.Package() != variable.Pkg() {
+		return false
+	}
+	if source, ok := owner.Source(); ok {
+		_, callable := source.(*types.Func)
+		return callable
+	}
+	_, initializer, ok := owner.PackageInitializer()
+	return ok &&
+		variable.Pos().IsValid() &&
+		variable.Pos() >= initializer.Rhs.Pos() &&
+		variable.Pos() <= initializer.Rhs.End()
+}
+
+func validLexicalNamedStructOwner(
+	owner ArtifactOwner,
+	typeName *types.TypeName,
+) bool {
+	if !owner.Valid() ||
+		typeName == nil ||
+		typeName.Pkg() == nil ||
+		typeName.Parent() == nil ||
+		typeName.Parent() == typeName.Pkg().Scope() ||
+		owner.Package() != typeName.Pkg() {
+		return false
+	}
+	if source, ok := owner.Source(); ok {
+		_, function := source.(*types.Func)
+		return function
+	}
+	_, _, initializer := owner.PackageInitializer()
+	return initializer
 }

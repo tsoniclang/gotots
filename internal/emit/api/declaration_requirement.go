@@ -29,6 +29,8 @@ type DeclarationRequirement struct {
 	anonymousDemand      AnonymousStructDemand
 	mapDemand            MapSpecializationDemand
 	genericOperation     *GenericOperationContract
+	genericParameter     *types.TypeParam
+	genericFacet         GenericRepresentationFacet
 	genericProfile       *GenericCallableProfile
 	environmentBuiltin   *types.Builtin
 	environmentSignature *types.Signature
@@ -258,6 +260,11 @@ func (r DeclarationRequirement) Valid() bool {
 		r.genericOperation != nil {
 		return false
 	}
+	if r.kind != DeclarationRequirementGenericRepresentation &&
+		(r.genericParameter != nil ||
+			r.genericFacet != GenericRepresentationInvalid) {
+		return false
+	}
 	if r.kind != DeclarationRequirementGenericCallableProfile &&
 		r.genericProfile != nil {
 		return false
@@ -405,6 +412,27 @@ func (r DeclarationRequirement) Valid() bool {
 		source, sourceOK := r.owner.Source()
 		return sourceOK &&
 			source == r.genericProfile.Owner()
+	case DeclarationRequirementGenericRepresentation:
+		if r.operation != NamedStructOperationInvalid ||
+			r.typeName != nil ||
+			r.variable != nil ||
+			r.constant != nil ||
+			r.projection != types.Invalid ||
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid ||
+			r.genericOperation != nil ||
+			!r.genericFacet.Valid() {
+			return false
+		}
+		source, sourceOK := r.owner.Source()
+		_, indexed := GenericDeclarationParameterIndex(
+			source,
+			r.genericParameter,
+		)
+		return sourceOK &&
+			GenericDeclarationOrigin(source) == source &&
+			indexed
 	case DeclarationRequirementAnonymousStruct:
 		return r.operation == NamedStructOperationInvalid &&
 			r.typeName == nil &&
@@ -531,28 +559,6 @@ func (r DeclarationRequirement) Valid() bool {
 	}
 }
 
-func validAddressableStorageOwner(
-	owner ArtifactOwner,
-	variable *types.Var,
-) bool {
-	if !owner.Valid() ||
-		variable == nil ||
-		variable.IsField() ||
-		variable.Pkg() == nil ||
-		owner.Package() != variable.Pkg() {
-		return false
-	}
-	if source, ok := owner.Source(); ok {
-		_, callable := source.(*types.Func)
-		return callable
-	}
-	_, initializer, ok := owner.PackageInitializer()
-	return ok &&
-		variable.Pos().IsValid() &&
-		variable.Pos() >= initializer.Rhs.Pos() &&
-		variable.Pos() <= initializer.Rhs.End()
-}
-
 func (r DeclarationRequirement) validGeneratedDefinition(
 	kind GeneratedArtifactKind,
 ) bool {
@@ -566,24 +572,4 @@ func (r DeclarationRequirement) validGeneratedDefinition(
 		r.anonymousDemand == AnonymousStructDemandInvalid &&
 		r.mapDemand == MapSpecializationDemandInvalid &&
 		r.owner == r.generated.ReconstructionOwner()
-}
-
-func validLexicalNamedStructOwner(
-	owner ArtifactOwner,
-	typeName *types.TypeName,
-) bool {
-	if !owner.Valid() ||
-		typeName == nil ||
-		typeName.Pkg() == nil ||
-		typeName.Parent() == nil ||
-		typeName.Parent() == typeName.Pkg().Scope() ||
-		owner.Package() != typeName.Pkg() {
-		return false
-	}
-	if source, ok := owner.Source(); ok {
-		_, function := source.(*types.Func)
-		return function
-	}
-	_, _, initializer := owner.PackageInitializer()
-	return initializer
 }

@@ -7,6 +7,7 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -138,6 +139,126 @@ func (value Record) Read() int32 {
 	return program
 }
 
+func TestGenericRepresentationChangeReconstructsPackageStorage(
+	t *testing.T,
+) {
+	directory := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(directory, "go.mod"),
+		[]byte("module example.com/genericstorage\n\ngo 1.26.4\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(directory, "source.go"),
+		[]byte(`package genericstorage
+
+type Box[T any] struct {
+	Value T
+	Output *T
+}
+
+var Global Box[int32]
+
+func Result() int32 { return Global.Value }
+`),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope := program.Roots()[0].Types().Scope()
+	result, err := NewRoot(scope.Lookup("Result"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := newProgramSession(program, DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.requireRoot(result); err != nil {
+		t.Fatal(err)
+	}
+	drainProgramSession(t, session)
+
+	global := scope.Lookup("Global").(*types.Var)
+	box := scope.Lookup("Box").(*types.TypeName)
+	boxDeclaration := declarationForObject(t, session, box)
+	boxTypeParameters := 0
+	storageProjectionCount := 0
+	for _, statement := range boxDeclaration.statements {
+		class, ok := statement.(tsgo.ClassDeclaration)
+		if !ok {
+			continue
+		}
+		boxTypeParameters = len(class.TypeParameters())
+		for _, member := range class.Members() {
+			method, ok := member.(tsgo.MethodDeclaration)
+			if !ok {
+				continue
+			}
+			name := method.Name().(tsgo.Identifier).Text()
+			if name == api.StructStorageOfMember {
+				storageProjectionCount++
+			}
+			if strings.HasPrefix(name, "$read$") ||
+				strings.HasPrefix(name, "$write$") {
+				t.Fatalf(
+					"generic storage class retains per-field accessor %q",
+					name,
+				)
+			}
+		}
+	}
+	if storageProjectionCount != 1 {
+		t.Fatalf(
+			"generic storage projections = %d, want one whole-storage projection",
+			storageProjectionCount,
+		)
+	}
+	boxStaticRevision := session.artifacts.FacetRevision(
+		api.MustSourceArtifactOwner(box),
+		api.ArtifactFacetStaticSurface,
+	)
+	builder := session.packageBuilders[program.Roots()[0]]
+	index, ok := builder.storageByObject[global]
+	if !ok {
+		t.Fatal("generic package variable has no storage artifact")
+	}
+	storage := builder.storage[index]
+	reference, ok := storage.field.Type().(tsgo.TypeReferenceNode)
+	if !ok {
+		t.Fatalf(
+			"generic package storage type = %T, want TypeReferenceNode",
+			storage.field.Type(),
+		)
+	}
+	if got := len(reference.TypeArguments()); got != 3 {
+		t.Fatalf(
+			"generic package storage facets = %d with %d reconstructions; provider parameters = %d at static revision %d, want logical/storage/pointer",
+			got,
+			storage.reconstructions,
+			boxTypeParameters,
+			boxStaticRevision,
+		)
+	}
+	if boxStaticRevision <= 1 ||
+		storage.reconstructions != boxStaticRevision-1 {
+		t.Fatalf(
+			"generic package storage reconstructions = %d at provider static revision %d, want every post-publication revision",
+			storage.reconstructions,
+			boxStaticRevision,
+		)
+	}
+}
+
 func targetClass(
 	t *testing.T,
 	statements []tsgo.Statement,
@@ -196,7 +317,7 @@ func TestAddressableStorageReconstructsOnlyOwningBodiesIncludingInit(
 	for object, want := range map[types.Object]uint64{
 		addressed:   1,
 		initializer: 1,
-		caller:      0,
+		caller:      1,
 	} {
 		declaration := declarationForObject(t, session, object)
 		if declaration.reconstructions != want {

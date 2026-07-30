@@ -507,10 +507,13 @@ var waveSevenTailBounds = map[string]struct {
 	bytes int
 	nodes int
 }{
-	"capability":       {bytes: 2_000, nodes: 400},
-	"generic-alias":    {bytes: 500, nodes: 100},
-	"generic-class":    {bytes: 6_000, nodes: 1_500},
-	"generic-function": {bytes: 2_000, nodes: 350},
+	"capability":    {bytes: 2_000, nodes: 400},
+	"generic-alias": {bytes: 500, nodes: 100},
+	"generic-class": {bytes: 6_000, nodes: 1_500},
+	// The 2,500-byte bound includes explicit storage-facet conversion
+	// capabilities. GenericIteratorCopy measures 2,341 bytes/304 nodes; the
+	// prior one-facet ABI could not represent its T-backed struct field.
+	"generic-function": {bytes: 2_500, nodes: 350},
 }
 
 func waveSevenTailIdentity(

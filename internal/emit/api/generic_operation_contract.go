@@ -225,6 +225,9 @@ type GenericCallableResolver interface {
 		*types.Func,
 		GenericCallableProfileSelection,
 	) (*GenericCallableProfile, error)
+	ResolveGenericRepresentationProfile(
+		types.Object,
+	) (GenericRepresentationProfile, bool, error)
 }
 
 func (c Context) WithGenericCallableResolver(
@@ -291,6 +294,7 @@ func (c Context) WithGenericParameters(
 		c.genericConsumer = GenericOperationConsumerInvalid
 	}
 	c.genericParameters = make(map[*types.TypeParam]string, len(names))
+	c.genericParameterOwner = owner
 	for parameter, name := range names {
 		if parameter == nil ||
 			name == "" ||
@@ -318,6 +322,7 @@ func (c Context) WithEnvironmentGenericParameters(
 		}
 	}
 	c.genericParameters = make(map[*types.TypeParam]string, len(names))
+	c.genericParameterOwner = owner
 	for parameter, name := range names {
 		if parameter == nil ||
 			name == "" ||

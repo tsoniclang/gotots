@@ -509,6 +509,19 @@ that closed list drives the existing artifact fixed point. No conditional
 target type, erased payload, universal representation bag, per-use wrapper,
 or declaration-wide speculative facet is admitted.
 
+When a reached generic struct requires canonical storage and a field's logical
+and storage facets may differ, the class stores only the storage facet. It
+publishes one typed static whole-storage projection independent of field
+count; the field-selection owner accesses the selected property and applies
+the declaration-level `to-storage` or `from-storage` capability at the use
+site. The class does not emit per-field accessor methods, retain converter
+callbacks or descriptors, keep a second logical cache, or inspect a type
+argument at runtime. Construction similarly converts each field once at the
+caller and invokes the storage-valued constructor surface with explicit
+canonical type arguments. A storage-facet surface change requeues field and
+construction consumers through the existing observable artifact facets; no
+unconditional rescan or per-instantiation class body is introduced.
+
 A slice-to-array pointer conversion is one typed region view over the slice's
 existing backing store. The slice runtime validates the requested length and
 returns canonical backing identity plus absolute offset; the array runtime

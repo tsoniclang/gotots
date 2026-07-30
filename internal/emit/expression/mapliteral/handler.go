@@ -89,7 +89,12 @@ func Emit(
 	}
 	if api.ContainsGenericTypeParameter(sourceType) {
 		parameterTypes := []types.Type{mapType.Element()}
-		arguments := []tsgo.Expression{zero.Value()}
+		arguments := []api.ExpressionEmission{
+			api.DirectExpression(
+				zero.Value(),
+				api.CombineRequests(requests, zero.Requests())...,
+			),
+		}
 		for index := range source.Elts {
 			parameterTypes = append(
 				parameterTypes,
@@ -98,8 +103,8 @@ func Emit(
 			)
 			arguments = append(
 				arguments,
-				values[index*2],
-				values[index*2+1],
+				api.DirectExpression(values[index*2]),
+				api.DirectExpression(values[index*2+1]),
 			)
 		}
 		target, err := genericoperation.Call(
@@ -109,7 +114,6 @@ func Emit(
 			parameterTypes,
 			[]types.Type{sourceType},
 			arguments,
-			api.CombineRequests(requests, zero.Requests())...,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err

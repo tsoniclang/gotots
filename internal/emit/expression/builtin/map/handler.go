@@ -149,13 +149,21 @@ func emitMake(
 	}
 	if api.ContainsGenericTypeParameter(sourceType) {
 		parameterTypes := []types.Type{mapType.Element()}
-		arguments := []tsgo.Expression{zero.Value()}
+		arguments := []api.ExpressionEmission{
+			api.DirectExpression(
+				zero.Value(),
+				api.CombineRequests(size.Requests(), zero.Requests())...,
+			),
+		}
 		if len(source.Args) == 2 {
 			parameterTypes = append(
 				parameterTypes,
 				context.TypesInfo().TypeOf(source.Args[1]),
 			)
-			arguments = append(arguments, size.Value())
+			arguments = append(
+				arguments,
+				api.DirectExpression(size.Value()),
+			)
 		}
 		target, err := genericoperation.Call(
 			context,
@@ -164,7 +172,6 @@ func emitMake(
 			parameterTypes,
 			[]types.Type{sourceType},
 			arguments,
-			api.CombineRequests(size.Requests(), zero.Requests())...,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err

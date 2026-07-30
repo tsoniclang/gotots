@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -13,29 +14,70 @@ func EmitTypeArguments(
 	context api.Context,
 	children api.ChildEmitter,
 	source ast.Node,
+	declaration types.Object,
 	arguments *types.TypeList,
 ) ([]tsgo.TypeNode, []api.RootRequest, error) {
-	if arguments == nil {
+	profile, resolved, err :=
+		context.ResolveGenericRepresentationProfile(declaration)
+	if err != nil {
+		return nil, nil, err
+	}
+	parameters := profile.Parameters()
+	if arguments == nil ||
+		!resolved ||
+		arguments.Len() != len(parameters) {
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),
-			Reason: "generic type arguments are absent",
+			Reason: "generic type arguments do not match their representation profile",
 		}
 	}
-	targets := make([]tsgo.TypeNode, 0, arguments.Len())
+	targets := make([]tsgo.TypeNode, 0, arguments.Len()*3)
 	var requests []api.RootRequest
 	for index := range arguments.Len() {
+		argument := arguments.At(index)
 		target, err := children.RepresentedType(
 			context.WithRole(api.RoleCallArgumentType),
 			source,
-			arguments.At(index),
+			argument,
 		)
 		if err != nil {
 			return nil, nil, err
 		}
 		targets = append(targets, target.Value())
 		requests = append(requests, target.Requests()...)
+		if profile.Requires(
+			parameters[index],
+			api.GenericRepresentationStorage,
+		) {
+			storage, storageErr := context.Values().StorageType(
+				context.WithRole(api.RoleStorageType),
+				source,
+				argument,
+			)
+			if storageErr != nil {
+				return nil, nil, storageErr
+			}
+			targets = append(targets, storage.Value())
+			requests = append(requests, storage.Requests()...)
+		}
+		if profile.Requires(
+			parameters[index],
+			api.GenericRepresentationPointer,
+		) {
+			pointer, pointerErr := pointertype.EmitNonNilRepresented(
+				context.WithRole(api.RoleCallArgumentType),
+				children,
+				source,
+				types.NewPointer(argument),
+			)
+			if pointerErr != nil {
+				return nil, nil, pointerErr
+			}
+			targets = append(targets, pointer.Value())
+			requests = append(requests, pointer.Requests()...)
+		}
 	}
-	return targets, requests, nil
+	return targets, api.CombineRequests(requests), nil
 }
 
 func EmitCapabilities(
