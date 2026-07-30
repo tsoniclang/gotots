@@ -3,6 +3,7 @@ package namedstruct
 import (
 	"go/ast"
 	"go/types"
+	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -217,8 +218,10 @@ func derivedMakeMethod(
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
 	values := make([]tsgo.Expression, 0, len(fields))
-	for _, selected := range fields {
-		name := context.Factory().Identifier(selected.field.name)
+	for index, selected := range fields {
+		name := context.Factory().Identifier(
+			"$field" + strconv.Itoa(index),
+		)
 		parameters = append(parameters, context.Factory().ParameterDeclaration(
 			nil,
 			nil,

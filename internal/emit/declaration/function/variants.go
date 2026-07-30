@@ -252,6 +252,7 @@ func emitCallableVariant(
 	if valueReceiver && copySelected {
 		body, err = prependValueReceiverCopy(
 			context,
+			children,
 			source,
 			signature,
 			body,
@@ -425,11 +426,18 @@ func valueReceiverCopySelected(
 
 func prependValueReceiverCopy(
 	context api.Context,
+	children api.ChildEmitter,
 	source *ast.FuncDecl,
 	signature *types.Signature,
 	body api.BlockEmission,
 ) (api.BlockEmission, error) {
 	receiver := signature.Recv()
+	if source.Recv == nil || len(source.Recv.List) != 1 {
+		return api.BlockEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "value-receiver copy prologue has no receiver syntax",
+		}
+	}
 	binding, ok := context.ValueReceiver(receiver)
 	if !ok || !binding.CopySelected() {
 		return api.BlockEmission{}, &api.InvariantError{
@@ -454,6 +462,14 @@ func prependValueReceiverCopy(
 	if err != nil {
 		return api.BlockEmission{}, err
 	}
+	receiverType, err := children.RepresentedType(
+		context.WithRole(api.RoleReceiverType),
+		source.Recv.List[0].Type,
+		receiver.Type(),
+	)
+	if err != nil {
+		return api.BlockEmission{}, err
+	}
 	statements := append([]tsgo.Statement(nil), copied.Before()...)
 	statements = append(
 		statements,
@@ -466,7 +482,7 @@ func prependValueReceiverCopy(
 							binding.CopyName(),
 						),
 						nil,
-						nil,
+						receiverType.Value(),
 						copied.Value(),
 					),
 				},
@@ -479,6 +495,7 @@ func prependValueReceiverCopy(
 		context.Factory().Block(statements, true),
 		api.CombineRequests(
 			copied.Requests(),
+			receiverType.Requests(),
 			body.Requests(),
 		)...,
 	), nil
