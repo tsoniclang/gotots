@@ -333,6 +333,15 @@ preserve nil-versus-empty behavior at length zero, panic before construction
 when short, and copy only when Go later assigns an array value through the
 pointer.
 
+Open generic declarations complete the same representation model before this
+checkpoint exits. A source type parameter always has one logical target
+parameter and gains storage and pointer facets only from exact reached uses.
+Concrete instantiations supply those facets from the one representation owner,
+nested generic declarations forward them in canonical order, and the artifact
+fixed point rejects missing, duplicate, reordered, dual-representation, or
+nonconvergent facet contracts. No target conditional type, erased descriptor,
+runtime semantic callback, or speculative all-facet signature is accepted.
+
 The checkpoint exits only when all six families:
 
 - use the one `go/types` graph and the existing parent-directed walk;
@@ -376,6 +385,9 @@ model:
 - aggregate-map lookup/store/delete use one canonical statically specialized
   owner per represented map shape; map instances carry storage, never semantic
   callbacks;
+- every public map contract uses semantic represented key/value types, while
+  key projection and reification remain private to the exact native or
+  generated map owner;
 - nil callable values use `undefined`; defined non-nil callables use one
   minimal wrapper whose `$value` is invoked directly after the nil guard; and
 - local component types constrain generated declarations to the highest scope

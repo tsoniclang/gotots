@@ -2505,11 +2505,12 @@ with their selected copy owner; reuse preserves the existing backing identity.
 `clear(map)` removes entries. The slice clear and slice-spread helpers are
 demanded only by source uses. Every admitted map representation implements one
 closed `GoMapValue<K, V>` source contract containing lookup, store, delete,
-length, nil, clear, and key iteration. Source map operations call those typed
-members directly; no separate `goMapClear`/`goMapKeys` helper or
-operation-specific map specialization exists. This complete contract is
-necessary because a generic map value must remain statically substitutable
-across scalar and generated aggregate-key implementations.
+length, nil, clear, and key iteration. `K` and `V` are the semantic represented
+Go key and element types. Source map operations call those typed members
+directly; no separate `goMapClear`/`goMapKeys` helper or operation-specific map
+specialization exists. This complete semantic contract is necessary because a
+generic map value must remain statically substitutable across scalar and
+generated aggregate-key implementations.
 
 An admitted map is a reference value with an explicit nil state. Map assignment
 aliases the same map. Lookup of a missing key returns the element zero;
@@ -2517,13 +2518,14 @@ comma-ok additionally returns `false`; storing through nil fails. A plain
 object literal is forbidden because it changes key identity and prototype
 behavior.
 
-The current native-`Map` key family is exactly `bool`, represented integer, or
-string, plus defined-basic wrappers whose exact checker type unwraps to one of
-those primitives before every literal/store/lookup/delete operation. The map's
-target key type is the underlying primitive while its Go signature retains the
-defined wrapper at source boundaries. Key iteration performs the inverse
-operation exactly once before exposing each Go range value; storage primitives
-never escape as source-level defined keys:
+The native-`Map` owner is selected only when the semantic key type and private
+storage key type are identical and JavaScript `Map` equality is exact: plain
+`bool`, represented integer, or string. A defined-basic key therefore selects
+one exact map-shape owner, just as an aggregate key does. That owner implements
+the semantic `GoMapValue<Count, V>` contract and privately projects
+`Count.$value` for storage. Key iteration reifies `new Count(storageKey)` inside
+the same owner before returning `Count[]`; callsites never project or reify map
+keys:
 
 ```go
 type Count int32
@@ -2533,10 +2535,30 @@ func Lookup(values map[Count]string, key Count) string {
 ```
 
 ```ts
-export function Lookup(values: GoMap<int32, gostring>, key: Count): gostring {
-  return values.lookup(key.$value);
+export function Lookup(
+  values: GoMapValue<Count, gostring> | undefined,
+  key: Count,
+): gostring {
+  return values.lookup(key);
 }
 ```
+
+The concrete generated map owner contains the only projection:
+
+```ts
+lookup(key: Count): gostring {
+  return this.$storageLookup(key.$value);
+}
+
+keys(): Count[] {
+  const result: Count[] = [];
+  for (const key of this.$storageKeys()) result.push(new Count(key));
+  return result;
+}
+```
+
+This schematic output is constructed as typed TS-Go AST. No target callback
+stores the projection or reification behavior.
 
 Floating keys remain a typed boundary: JavaScript `Map` uses SameValueZero,
 while Go permits distinct stored NaN keys that cannot be retrieved by another
@@ -2591,6 +2613,16 @@ declaration required by the shape. This rule applies inside nested blocks,
 function literals, and package initializer expressions. Package initializer
 placement is owned by the exact `types.Initializer`, not by an arbitrarily
 chosen LHS variable. Unreachable shapes create no target name, file, or class.
+
+For `M ~map[K]V`, `M` remains the represented source type while map operations
+consume its semantic `GoMapValue<K,V>` facet. For an unnamed `map[K]V` inside a
+generic declaration, that semantic contract is the represented target type.
+Construction uses the existing exact generic map-construction operation so a
+concrete instantiation chooses the native or generated map owner once. A
+generic defined map may wrap a `GoMapValue<K,V>` and delegate its complete
+contract; it does not store hash/copy/zero callbacks or duplicate map
+semantics. `keys()` already returns semantic `K`, so generic range has no
+storage-key recovery path.
 
 An admitted pointer is a typed reference to one canonical storage location.
 `new(T)` creates a fresh location when `T` has a complete admitted zero
@@ -2747,6 +2779,39 @@ and mutates the original `Left` storage. No pointee copy, cast, object-shape
 test, semantic callback, or source-name lookup is involved. A pointer
 conversion whose canonical storage facets cannot yet be represented fails at
 the conversion owner rather than falling back to logical read/write adapters.
+
+An open type parameter does not imply `Storage(T) = T`. For example:
+
+```go
+func Replace[T any](pointer *T, value T) T {
+    previous := *pointer
+    *pointer = value
+    return previous
+}
+```
+
+The target declaration is schematically:
+
+```ts
+function Replace<T, T$Storage, T$Pointer>(
+  pointer: T$Pointer | undefined,
+  value: T,
+  load: (pointer: T$Pointer | undefined) => T,
+  store: (pointer: T$Pointer | undefined, value: T) => void,
+): T {
+  const previous = load(pointer);
+  store(pointer, value);
+  return previous;
+}
+```
+
+Only demanded facets and operations are present. At `Replace[Box]`,
+`T$Pointer` is the compilation-wide selected `*Box` representation; at
+`Replace[int32]` it is the scalar carrier. The operation functions are
+declaration-level static capabilities selected once per exact instantiation,
+not callbacks stored on values. If the declaration only compares or returns
+`T` and never represents `*T`, it remains `function F<T>(...)` with no storage
+or pointer facet.
 
 Pointer receiver declarations are class-owned static members with an explicit
 selected pointer parameter:

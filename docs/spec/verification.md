@@ -664,7 +664,7 @@ program. The required evidence includes:
 | strings | arbitrary-byte literal, concat, comparison, byte length/index/slice and bounds; integer/rune UTF-8 encoding; `[]byte`/`[]rune` conversions including invalid and truncated sequences | Unicode-code-point literal; UTF-16 indexing; host text codec; invalid-sequence width drift; missing bounds check |
 | arrays | length-distinct target types, fresh zero/copy, compiler-lowered recursive equality, index/store/len/cap, direct and pointer-to-array slicing with bidirectional aliasing | erased length; shared zero; shallow copy where element policy forbids it; copied array slice; duplicate bounds owner; runtime zero/copy/equality callback or target object identity |
 | slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap, aggregate fresh zero/copy/clear, contextual elided nested literals, distinct-defined spread, `[]byte` plus string spread, and large spread without host argument expansion | bare-array substitution; lost capacity; always-reallocate append; explicit-type requirement for an elided literal; semantic strategy field/parameter; JavaScript spread of a Go slice; unconditional append-spread/clear surface |
-| maps | nil write, missing zero, comma-ok, aliasing, direct bool/integer/string keys, defined-key projection, delete/len, and explicit floating-key rejection | plain-object substitution; missing-value `undefined`; copy-on-assignment; wrapper object identity; floating-key admission through native SameValueZero |
+| maps | nil write, missing zero, comma-ok, aliasing, direct bool/integer/string keys, owner-private defined-key projection/reification, delete/len, and explicit floating-key rejection | plain-object substitution; missing-value `undefined`; copy-on-assignment; callsite storage-key leakage; wrapper object identity; floating-key admission through native SameValueZero |
 | pointers | nil/new/read/store/alias/equality; local/parameter/result/receiver/package/field/array/slice addresses; reassignment through projections; pointer receiver nil/copy cases | fresh wrapper on copy; wrapper identity instead of canonical location; nil dereference success; unrelated-local cell wrapping; wrong requirement owner |
 
 Conversion certification additionally proves that represented struct
@@ -715,6 +715,44 @@ Pointer-conversion certification additionally proves:
   a hand-recursive field rule, omit a storage projection, or expose storage
   conversion as a runtime callback, and each fails its owning strict,
   differential, artifact-shape, or broad-search gate.
+
+Open-generic representation certification uses a matrix in which one source
+type parameter is instantiated by a direct named-struct pointer, scalar
+pointer, conversion-selected struct carrier, defined array, and nested generic
+type. It proves:
+
+- a logical-only declaration emits no storage or pointer facet;
+- `*T` transport adds exactly one pointer facet, while address/storage
+  operations add exactly the demanded storage facet and closed operation
+  signatures;
+- each concrete instantiation exact-joins source type arguments to its logical,
+  storage, and pointer target arguments in canonical order;
+- a nested `Outer[T] -> Box[T] -> *T` demand propagates one facet through the
+  artifact fixed point, terminates under recursion, and never creates a second
+  body;
+- one exact concrete pointer type has one compilation-wide representation, so
+  generic and nongeneric users cannot select direct and carrier forms
+  simultaneously; and
+- 1x/2x/4x instantiations grow by distinct reached facet contracts rather than
+  call count, with unchanged logical-only artifacts byte-identical.
+
+Mutations restore `Storage(T)=T`, substitute `GoPointer<T,T>` for the selected
+pointer facet, omit or reorder a concrete facet argument, add every facet
+speculatively, key a facet by target spelling, keep both direct and carrier
+forms, or transport a semantic converter on a runtime pointer. Each fails at
+the exact facet join, strict target, differential alias/copy, convergence, or
+artifact-shape gate.
+
+Map certification exact-joins every public map type and operation against
+semantic `K,V`, while separately inspecting private storage choices. The
+matrix covers primitive keys, defined-basic keys, aggregate keys, generic
+`map[K]V`, `M ~map[K]V`, defined generic maps, and map range. Mutations expose
+the storage key in `GoMapValue`, project/reify at a callsite, return storage
+keys from `keys()`, restore defined-basic native-map selection, omit a
+defined-key wrapper, store a projection callback, or construct the wrong
+concrete owner. Strict typechecking, Go-versus-TS execution, owner-level AST
+shape, exact facet joins, and 1x/2x/4x source-size gates must each catch their
+owned class.
 
 For every family:
 

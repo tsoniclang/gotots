@@ -472,6 +472,43 @@ underlying `GoArray<Element, Length>`. Indexing, pointer projection, and
 whole-array stores operate on that storage; they do not demand duplicate
 `get`/`set` methods on the nominal class.
 
+Open generic declarations use the same representation decisions without
+pretending that a source type parameter is its own storage or pointer type.
+Each source `*types.TypeParam` always owns one logical target type parameter.
+The declaration gains an additional storage facet only when its body or
+represented surface creates or transports a mutable location whose storage
+can differ from that logical type, and gains a pointer facet only when an
+exact `*T` value is represented. These are immutable target type parameters
+keyed by the source parameter identity and facet kind, not runtime
+descriptors:
+
+```text
+Go T                -> target T
+storage of T needed -> target T$Storage
+Go *T needed        -> target T$Pointer
+```
+
+At each concrete instantiation the ordinary representation owner supplies the
+exact selected storage and pointer types. For a direct named-struct pointer,
+`T$Pointer` may be the class itself; for a scalar or conversion-selected
+location it is the exact `GoPointer<T, T$Storage>` carrier. The facet is the
+non-nil representation; an exact Go `*T` occurrence is
+`T$Pointer | undefined`. A declaration that does not demand either facet
+retains only `T`. Generic pointer load, store, construction, equality, and
+conversion use the existing closed generic operation mechanism with exact
+typed signatures; they do not inspect `T$Pointer`, carry semantic callbacks on
+a pointer, or introduce a second generic body.
+
+Facet demand propagates structurally through reached generic declarations and
+instantiations. For example, if `Box[T]` contains `*T`, every represented
+`Box[X]` supplies the exact pointer facet for `X`; if `Outer[T]` contains
+`Box[T]`, its use of `Box` requests and forwards that same facet. The canonical
+facet ordering is source parameter order and, within one parameter, logical,
+storage when demanded, then pointer when demanded. Structural comparison of
+that closed list drives the existing artifact fixed point. No conditional
+target type, erased payload, universal representation bag, per-use wrapper,
+or declaration-wide speculative facet is admitted.
+
 A slice-to-array pointer conversion is one typed region view over the slice's
 existing backing store. The slice runtime validates the requested length and
 returns canonical backing identity plus absolute offset; the array runtime
