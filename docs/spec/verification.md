@@ -1318,6 +1318,11 @@ Interface callable ownership has a separate exact-identity gate:
 - one adapter demanded through multiple compatible generic and non-generic
   interfaces selects every target facet when any selected implementation is
   cooperative;
+- `Value[T].Change(func(T))` exact-joins its declaration-owned callback ABI
+  with every reached closed or ambient selected callback ABI; a blocking
+  `Value[int32]` callback makes the interface declaration, closed call,
+  adapter, and selected provider agree on `Promise<void>`, while an unrelated
+  callable remains byte-identical;
 - a generic receiver implementation invoked by an adapter receives the exact
   ordered type arguments and operation capabilities from the shared
   selected-method plan; and
@@ -1330,6 +1335,12 @@ adapter bytes, and the twenty largest adapter methods separately. The gate
 rejects duplicated token facets, direct-interface dependencies on
 first-class-callable ABI artifacts, missing reverse dependencies, and
 signature/body disagreement.
+
+Mutations remove one nested-callable correspondence, reverse only one
+cooperative edge, pair leaves by name instead of structural position, or let
+an adapter emit its provider-local callback shape. Each must fail strict
+typechecking, the exact artifact-shape assertion, differential behavior, or
+the unrelated-callable byte-stability check.
 
 Production mutations catch transfer without copy, LIFO queueing, close that
 drops buffered values, incorrect closed-channel `ok`, eager receive-LHS

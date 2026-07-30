@@ -1611,6 +1611,17 @@ cooperative dispatch through the other. These paths never query the
 receiver-free first-class callable ABI merely because the method parameters
 and results have the same shape as an unrelated function.
 
+Nested callable parameters and results remain first-class callable ABIs, but
+their correspondence is owned by the enclosing interface-method family. With
+`type Value[T any] interface { Change(func(T)) }`, a blocking callback at a
+`Value[int32]` use selects the concrete `func(int32)` ABI cooperative. The
+method family exact-joins that leaf to the declaration's `func(T)` ABI, so the
+printed interface and adapter both use `(value: T) => Promise<void>` (after
+substitution for a closed adapter). A synchronous source callback is wrapped
+statically when transferred to this selected ABI. This join is positional and
+type-checked from `go/types`; it is not inferred from `Change`, parameter
+names, target text, or adapter shape.
+
 For example, a blocking `func() bool` elsewhere in the program does not change
 `DirEntry.IsDir() bool`. A blocking concrete implementation of `IsDir` changes
 the `IsDir` callable facet, its adapter and every selected interface call.

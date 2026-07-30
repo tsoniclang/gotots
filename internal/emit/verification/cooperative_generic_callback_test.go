@@ -180,6 +180,7 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 		"CooperativeGenericProfileWithNamedCallback",
 		"CooperativeNestedGenericMethod",
 		"CooperativeRecursiveGenericMethod",
+		"CooperativeGenericInterfaceMethod",
 	} {
 		target := waveNineFunctionText(t, artifacts.printed, function)
 		if !strings.Contains(target, "async") ||
@@ -286,6 +287,20 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 	if strings.Contains(artifacts.printed, "Sequence<T> & {") {
 		t.Fatal("named callable value retained a result intersection repair")
 	}
+	for _, required := range []string{
+		"export interface MutableValue<T>",
+		"Change($argument0: (($0: T, $go$recovery?: GoRecovery) => Promise<void>)",
+		"async Change($argument0: (($0: int32, $go$recovery?: GoRecovery) => Promise<void>)",
+		"async Change($argument0: (($0: gostring, $go$recovery?: GoRecovery) => Promise<void>)",
+	} {
+		if !strings.Contains(artifacts.printed, required) {
+			t.Fatalf(
+				"generic interface callable correspondence lacks %q:\n%s",
+				required,
+				artifacts.printed,
+			)
+		}
+	}
 	if count := strings.Count(
 		artifacts.printed,
 		"function Apply$cooperative_",
@@ -375,6 +390,8 @@ import {
     CooperativeGenericProfileWithNamedCallback,
     CooperativeNestedGenericMethod,
     CooperativeRecursiveGenericMethod,
+    CooperativeGenericInterfaceMethod,
+    SynchronousGenericInterfaceMethod,
 } from "`+sourceModuleForExport(
 		t,
 		artifacts,
@@ -405,6 +422,8 @@ await GoScheduler.run(async () => {
         await CooperativeGenericProfileWithNamedCallback(),
         await CooperativeNestedGenericMethod(),
         await CooperativeRecursiveGenericMethod(),
+        await CooperativeGenericInterfaceMethod(),
+        await SynchronousGenericInterfaceMethod(),
     ].map(String).join(" "));
 });
 `)
@@ -466,6 +485,8 @@ func main() {
 		values.CooperativeGenericProfileWithNamedCallback(),
 		values.CooperativeNestedGenericMethod(),
 		values.CooperativeRecursiveGenericMethod(),
+		values.CooperativeGenericInterfaceMethod(),
+		values.SynchronousGenericInterfaceMethod(),
 	)
 }
 `)

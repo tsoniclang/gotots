@@ -413,11 +413,6 @@ func (i TargetIntrinsic) Expression(
 	)
 }
 
-type InterfaceMethodCallableReference struct {
-	artifacts []*GeneratedArtifact
-	requests  []RootRequest
-}
-
 type CallableABIReference struct {
 	artifact    *GeneratedArtifact
 	sourceOwner types.Object
@@ -476,8 +471,57 @@ func (r CallableABIReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
 }
 
+type InterfaceMethodCallableCorrespondence struct {
+	owner        *types.TypeName
+	declaration  *types.Signature
+	instantiated *types.Signature
+}
+
+func NewInterfaceMethodCallableCorrespondence(
+	owner *types.TypeName,
+	declaration *types.Signature,
+	instantiated *types.Signature,
+) (InterfaceMethodCallableCorrespondence, error) {
+	origin, _ := GenericDeclarationOrigin(owner).(*types.TypeName)
+	validSignatures := declaration != nil &&
+		instantiated != nil &&
+		declaration.Recv() == nil &&
+		instantiated.Recv() == nil &&
+		declaration.Params().Len() == instantiated.Params().Len() &&
+		declaration.Results().Len() == instantiated.Results().Len() &&
+		declaration.Variadic() == instantiated.Variadic() &&
+		!types.Identical(declaration, instantiated)
+	if origin == nil ||
+		len(GenericDeclarationParameters(origin)) == 0 ||
+		!validSignatures {
+		return InterfaceMethodCallableCorrespondence{}, &NameError{
+			Reason: "interface-method callable correspondence is invalid",
+		}
+	}
+	return InterfaceMethodCallableCorrespondence{
+		owner:        origin,
+		declaration:  declaration,
+		instantiated: instantiated,
+	}, nil
+}
+
+func (c InterfaceMethodCallableCorrespondence) Parts() (
+	*types.TypeName,
+	*types.Signature,
+	*types.Signature,
+) {
+	return c.owner, c.declaration, c.instantiated
+}
+
+type InterfaceMethodCallableReference struct {
+	artifacts      []*GeneratedArtifact
+	correspondence []InterfaceMethodCallableCorrespondence
+	requests       []RootRequest
+}
+
 func NewInterfaceMethodCallableReference(
 	artifacts []*GeneratedArtifact,
+	correspondence []InterfaceMethodCallableCorrespondence,
 	requests ...RootRequest,
 ) (InterfaceMethodCallableReference, error) {
 	if len(artifacts) == 0 {
@@ -514,19 +558,33 @@ func NewInterfaceMethodCallableReference(
 		}
 		previous = callable
 	}
+	correspondence = slices.Clone(correspondence)
+	for _, selected := range correspondence {
+		owner, declaration, instantiated := selected.Parts()
+		if owner == nil || declaration == nil || instantiated == nil {
+			return InterfaceMethodCallableReference{}, &NameError{
+				Reason: "interface-method callable correspondences are invalid",
+			}
+		}
+	}
 	if err := validateReferenceRequests(requests); err != nil {
 		return InterfaceMethodCallableReference{}, &RootRequestError{
 			Reason: "interface-method reference request is invalid",
 		}
 	}
 	return InterfaceMethodCallableReference{
-		artifacts: artifacts,
-		requests:  slices.Clone(requests),
+		artifacts:      artifacts,
+		correspondence: correspondence,
+		requests:       slices.Clone(requests),
 	}, nil
 }
 
 func (r InterfaceMethodCallableReference) Artifacts() []*GeneratedArtifact {
 	return slices.Clone(r.artifacts)
+}
+
+func (r InterfaceMethodCallableReference) Correspondences() []InterfaceMethodCallableCorrespondence {
+	return slices.Clone(r.correspondence)
 }
 
 func (r InterfaceMethodCallableReference) Requests() []RootRequest {

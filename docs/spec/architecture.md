@@ -1017,6 +1017,24 @@ only interface-method callable facets. Runtime interface contracts additionally
 request the closed token. An unrelated function or differently named method
 with the same receiver-free signature cannot change that interface method.
 
+Callable leaves nested in a generic interface-method signature are part of
+that same method contract. For example:
+
+```go
+type Value[T any] interface { Change(func(T)) }
+```
+
+If a `Value[int32].Change` call supplies a callback that must block, the exact
+closed `func(int32)` ABI and the declaration-owned `func(T)` ABI converge
+through the `Change` method family. The generated `Value<T>` declaration,
+every reached closed use, and every demanded adapter then expose the same
+Promise-returning callback ABI. Synchronous callbacks adapt statically at that
+boundary. No adapter-local parameter shape, union result, cast, thenable test,
+or declaration-spelling inference may repair a mismatch. Callable leaves are
+paired by structural position in the checker-produced origin and selected
+method signatures, including nested containers; a type parameter itself
+remains opaque.
+
 Only taking a method value or method expression crosses from the
 interface-method callable facet into the canonical first-class callable ABI.
 That wrapper observes the exact callable family as its provider and widens the

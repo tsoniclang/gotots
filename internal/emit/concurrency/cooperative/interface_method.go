@@ -220,6 +220,16 @@ func observeInterfaceMethods(
 			result.requests,
 			reference.Requests()...,
 		)
+		for _, correspondence := range reference.Correspondences() {
+			requests, err := JoinInterfaceMethodCallableABIs(
+				context,
+				correspondence,
+			)
+			if err != nil {
+				return interfaceMethodObservations{}, err
+			}
+			result.requests = append(result.requests, requests...)
+		}
 		for _, artifact := range reference.Artifacts() {
 			if _, duplicate := seen[artifact]; duplicate {
 				continue

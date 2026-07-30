@@ -281,3 +281,35 @@ func CooperativeRecursiveGenericMethod() bool {
 		return value == <-values
 	})
 }
+
+type MutableValue[T any] interface {
+	Change(func(T))
+}
+
+type MutableBox[T any] struct {
+	Value T
+}
+
+func (box *MutableBox[T]) Change(apply func(T)) {
+	apply(box.Value)
+}
+
+func CooperativeGenericInterfaceMethod() int32 {
+	values := make(chan int32, 1)
+	values <- 40
+	var target MutableValue[int32] = &MutableBox[int32]{Value: 2}
+	var result int32
+	target.Change(func(value int32) {
+		result = value + <-values
+	})
+	return result
+}
+
+func SynchronousGenericInterfaceMethod() string {
+	var target MutableValue[string] = &MutableBox[string]{Value: "value"}
+	var result string
+	target.Change(func(value string) {
+		result = value
+	})
+	return result
+}

@@ -121,6 +121,23 @@ func (n *File) InterfaceMethodCallable(
 			artifacts = append(artifacts, concrete.owner)
 		}
 	}
+	var correspondences []api.InterfaceMethodCallableCorrespondence
+	originSignature, originOK := methodidentity.Signature(origin)
+	if method != origin &&
+		originOK &&
+		!types.Identical(originSignature, signature) {
+		correspondence, correspondenceErr :=
+			api.NewInterfaceMethodCallableCorrespondence(
+				api.MethodReceiverTypeName(origin),
+				originSignature,
+				signature,
+			)
+		if correspondenceErr != nil {
+			return api.InterfaceMethodCallableReference{},
+				correspondenceErr
+		}
+		correspondences = append(correspondences, correspondence)
+	}
 	var requests []api.RootRequest
 	for _, artifact := range artifacts {
 		requirement, requirementErr :=
@@ -132,6 +149,7 @@ func (n *File) InterfaceMethodCallable(
 	}
 	return api.NewInterfaceMethodCallableReference(
 		artifacts,
+		correspondences,
 		requests...,
 	)
 }
