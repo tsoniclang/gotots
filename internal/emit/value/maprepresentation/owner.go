@@ -94,6 +94,29 @@ func Nil(
 			),
 		), nil
 	}
+	if model.Storage() == StorageSpecialized {
+		reference, err := context.Names().MapSpecialization(
+			sourceType,
+			api.MapSpecializationDemandStatic,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		nilName, err := mapruntime.Name(mapruntime.MemberNil)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().CallExpression(
+				staticMember(context, reference.Name(), nilName),
+				nil,
+				nil,
+				nil,
+				tsgo.NodeFlagsNone,
+			),
+			reference.Requests()...,
+		), nil
+	}
 	if children == nil {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role:   context.Role(),

@@ -70,3 +70,8 @@ func DefinedKeyBehavior() (int32, int32) {
 func DefinedKeyLookup(values map[Count]int32, key Count) int32 {
 	return values[key]
 }
+
+func DefinedKeyZero() bool {
+	var values map[Count]int32
+	return values == nil
+}

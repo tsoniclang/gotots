@@ -133,6 +133,8 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		"GoMapValue<Count, int32>",
 		".store(key, ",
 		".lookup(key)",
+		"export function DefinedKeyZero(): bool",
+		".nil();",
 	} {
 		if !strings.Contains(source, required) {
 			t.Fatalf("defined map artifact lacks %q:\n%s", required, source)
@@ -179,6 +181,7 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		"key.$value",
 		"export class Alias",
 		"export class PlainAlias",
+		"GoMap.nil<Count",
 		"any",
 		"unknown",
 		".call(",
@@ -281,6 +284,7 @@ func main() {
 	fmt.Println(values.NilOperations())
 	fmt.Println(values.PlainAliasBehavior())
 	fmt.Println(values.DefinedKeyBehavior())
+	fmt.Println(values.DefinedKeyZero())
 	fmt.Println(nilWriteFails())
 }
 `)
@@ -303,6 +307,7 @@ func executeDefinedMapTypeScript(
 	writeFile(t, runnerPath, `import {
     Conversions,
     DefinedKeyBehavior,
+    DefinedKeyZero,
     MakeAliases,
     NilOperations,
     NilWrite,
@@ -324,6 +329,7 @@ print(...Conversions());
 print(...NilOperations());
 print(...PlainAliasBehavior());
 print(...DefinedKeyBehavior());
+console.log(DefinedKeyZero());
 let nilWriteFailed = false;
 try { NilWrite(); } catch { nilWriteFailed = true; }
 console.log(nilWriteFailed);
