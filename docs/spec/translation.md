@@ -647,6 +647,11 @@ A blank target omits only its final declaration/store; it never omits the
 source evaluation or changes tuple position. When one multi-valued call is the
 complete argument list of another call, the call owner uses the same
 single-evaluation rule and passes the indexed values in parameter order.
+Every indexed value then crosses its parameter, result, declaration, or store
+boundary through the ordinary value-transfer owner. For example, the `bool`
+result in `first(pair())`, where `first[T](T, ...any)` receives the remaining
+results as `any`, is boxed exactly once by that owner; it is never inserted raw
+and never routed through a tuple-only interface adapter.
 Direct generated-program verification must prove that the selected source tuple
 maps to the TypeScript tuple without an alternate ABI.
 

@@ -304,6 +304,17 @@ func emitMultipleInitializer(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
+		value, err := context.Values().Transfer(
+			context.WithRole(api.RolePackageVariableValue),
+			initializer.Rhs,
+			results.At(index).Type(),
+			variable.Type(),
+			api.ValueTransferCopy,
+			api.DirectExpression(element),
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 		target, err := api.NewCanonicalStorageTargetEmission(
 			reference.Expression(context.Factory()),
 			variable.Type(),
@@ -315,7 +326,7 @@ func emitMultipleInitializer(
 		assigned, err := target.StoreValue(
 			context.WithRole(api.RolePackageVariableValue),
 			initializer.Rhs,
-			api.DirectExpression(element),
+			value,
 		)
 		if err != nil {
 			return api.StatementEmission{}, err

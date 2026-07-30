@@ -10,35 +10,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func AdaptExpected(
-	context api.Context,
-	source ast.Expr,
-	target api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	expected := context.ExpectedType()
-	if _, ok := interfacetype.Resolve(expected); !ok {
-		return target, nil
-	}
-	actual := context.TypesInfo().TypeOf(source)
-	adapted, handled, err := Assign(
-		context,
-		source,
-		actual,
-		expected,
-		target,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if !handled {
-		return api.ExpressionEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "interface expectation was not handled by interface assignment",
-		}
-	}
-	return adapted, nil
-}
-
 func OperandContext(
 	context api.Context,
 	source ast.Expr,

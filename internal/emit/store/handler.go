@@ -382,6 +382,17 @@ func mapIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
+	key, err = context.Values().Transfer(
+		context.WithRole(api.RoleMapKey),
+		source.Index,
+		context.TypesInfo().TypeOf(source.Index),
+		mapType.Key(),
+		api.ValueTransferRepresentation,
+		key,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
 	member, err := mapruntime.Name(mapruntime.MemberStore)
 	if err != nil {
 		return api.StoreTargetEmission{}, err

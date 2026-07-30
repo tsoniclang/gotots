@@ -11,6 +11,7 @@ import (
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
+	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -269,6 +270,35 @@ func (owner Owner) Transfer(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if _, destinationInterface := interfacetype.Resolve(
+		destinationType,
+	); destinationInterface {
+		adapted, handled, err := interfacevalue.Assign(
+			context,
+			source,
+			actualType,
+			destinationType,
+			value,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !handled {
+			return api.ExpressionEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "interface transfer was not handled",
+			}
+		}
+		if mode == api.ValueTransferRepresentation {
+			return adapted, nil
+		}
+		return owner.copyExact(
+			context,
+			source,
+			destinationType,
+			adapted,
+		)
+	}
 	if representedAtDestination(actualType, destinationType) {
 		actualType = destinationType
 	}
@@ -324,9 +354,6 @@ func representedAtDestination(
 ) bool {
 	basic, basicOK := types.Unalias(actualType).(*types.Basic)
 	if basicOK && basic.Info()&types.IsUntyped != 0 {
-		return true
-	}
-	if _, destinationInterface := interfacetype.Resolve(destinationType); destinationInterface {
 		return true
 	}
 	return false

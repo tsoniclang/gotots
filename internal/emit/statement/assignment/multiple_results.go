@@ -71,27 +71,17 @@ func emitMultipleResults(
 		if target.declaration {
 			targetType = target.object.Type()
 		}
-		value, err := resulttuple.AdaptAssignment(
-			context.WithRole(role),
-			source.Rhs[0],
-			results.At(index).Type(),
-			targetType,
-			api.DirectExpression(element),
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
 		mode := api.ValueTransferCopy
 		if !target.declaration {
 			mode = storeTransferMode(target.target)
 		}
-		value, err = context.Values().Transfer(
+		value, err := context.Values().Transfer(
 			context.WithRole(role),
 			source.Rhs[0],
 			results.At(index).Type(),
 			targetType,
 			mode,
-			value,
+			api.DirectExpression(element),
 		)
 		if err != nil {
 			return api.StatementEmission{}, err

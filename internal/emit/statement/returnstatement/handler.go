@@ -299,23 +299,13 @@ func emitAdaptedMultiple(
 			return api.StatementEmission{}, err
 		}
 		targetType := targetResults.At(index).Type()
-		value, err := resulttuple.AdaptAssignment(
-			context.WithRole(api.RoleReturnResult),
-			source.Results[0],
-			sourceResults.At(index).Type(),
-			targetType,
-			api.DirectExpression(element),
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
-		value, err = context.Values().Transfer(
+		value, err := context.Values().Transfer(
 			context.WithRole(api.RoleReturnResult),
 			source.Results[0],
 			sourceResults.At(index).Type(),
 			targetType,
 			api.ValueTransferCopy,
-			value,
+			api.DirectExpression(element),
 		)
 		if err != nil {
 			return api.StatementEmission{}, err

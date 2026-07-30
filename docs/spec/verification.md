@@ -1037,7 +1037,13 @@ Blocking evidence includes:
 11. pointer-only fixtures that never hash a pointer contain neither
     `goPointerHash` nor `GoMapHash`, while an interface-map fixture with a
     pointer dynamic key exact-joins one optional pointer-hash definition and
-    executes alias-equivalent pointer lookups correctly.
+    executes alias-equivalent pointer lookups correctly; and
+12. ordinary arguments, panic payloads, interface equality operands, map
+    keys, and captured multi-result elements all reach the same value-transfer
+    owner. A `(T, bool)` call expanded into `func first[T](T, ...any)` must
+    contain one typed adapter around the captured `bool`; removing that
+    transfer must fail strict TypeScript, while root expression dispatch
+    contains no interface-boxing route.
 
 Production mutations collapse typed nil, omit the boxing copy, substitute a
 same-spelling private method from another package, change a method signature,

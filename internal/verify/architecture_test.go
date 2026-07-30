@@ -181,6 +181,7 @@ func verifyEmissionSource(
 		}
 	}
 	astAlias := importAliases["go/ast"]
+	interfaceValueAlias := importAliases[modulePath+"/internal/emit/value/interfacevalue"]
 	var violation string
 	ast.Inspect(file, func(node ast.Node) bool {
 		if violation != "" {
@@ -201,6 +202,15 @@ func verifyEmissionSource(
 				violation = "unchecked target non-null assertion is forbidden"
 				return false
 			}
+			qualifier, qualifierOK := selector.X.(*ast.Ident)
+			if qualifierOK &&
+				qualifier.Name == interfaceValueAlias &&
+				(selector.Sel.Name == "AdaptExpected" ||
+					(selector.Sel.Name == "Assign" &&
+						relative != "internal/emit/value/representation/owner.go")) {
+				violation = "interface transfer bypasses the value-transfer owner"
+				return false
+			}
 			for _, forbidden := range forbiddenInterfaceBoundarySelectors(relative) {
 				if selector.Sel.Name == forbidden {
 					violation = "interface boundary bypasses its method-token owner with " +
@@ -208,7 +218,6 @@ func verifyEmissionSource(
 					return false
 				}
 			}
-			qualifier, qualifierOK := selector.X.(*ast.Ident)
 			if qualifierOK && qualifier.Name == astAlias &&
 				(selector.Sel.Name == "Walk" || selector.Sel.Name == "Inspect") {
 				violation = "production emission uses generic AST recursion"
@@ -347,6 +356,15 @@ func leak(names Names, method Method) { names.InterfaceMethodToken(method) }
 			relative: "internal/emit/declaration/interfaceadapter/handler.go",
 			source: `package interfaceadapter
 func leak(owner Owner, method Method) { owner.SelectedMethodCall(method) }
+`,
+		},
+		"interface transfer outside owner": {
+			relative: "internal/emit/resulttuple/leak.go",
+			source: `package resulttuple
+import interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
+func leak(context Context, source Source, value Value) {
+	interfacevalue.Assign(context, source, source.Type(), source.Type(), value)
+}
 `,
 		},
 	} {

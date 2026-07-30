@@ -261,6 +261,29 @@ func assertWaveThreeOwnerShapes(t *testing.T, source string) {
 			t.Fatalf("Wave 3 source lacks owner shape %q:\n%s", required, source)
 		}
 	}
+	const tupleFunction = "export function variadicInterfaceTuple()"
+	tupleStart := strings.Index(source, tupleFunction)
+	if tupleStart < 0 {
+		t.Fatalf("Wave 3 source lacks %q:\n%s", tupleFunction, source)
+	}
+	tupleEnd := strings.Index(source[tupleStart:], "\nexport function builtins(")
+	if tupleEnd < 0 {
+		t.Fatalf("Wave 3 source lacks variadic tuple function boundary:\n%s", source)
+	}
+	tupleSource := source[tupleStart : tupleStart+tupleEnd]
+	for _, required := range []string{
+		"RuntimeSlice.literal<$goInterface_",
+		"[new $goInterfaceAdapter_",
+		"(__gotots_results_",
+	} {
+		if !strings.Contains(tupleSource, required) {
+			t.Fatalf(
+				"variadic tuple interface transfer lacks %q:\n%s",
+				required,
+				tupleSource,
+			)
+		}
+	}
 }
 
 func waveThreeTypecheck(

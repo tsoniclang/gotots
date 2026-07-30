@@ -395,11 +395,33 @@ func emitValueEquality(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	left, err = context.Values().Transfer(
+		context.WithRole(api.RoleBinaryLeft),
+		source.X,
+		leftType,
+		operandType,
+		api.ValueTransferRepresentation,
+		left,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	right, err := children.Expression(
 		context.
 			WithRole(api.RoleBinaryRight).
 			WithExpectedType(operandType),
 		source.Y,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	right, err = context.Values().Transfer(
+		context.WithRole(api.RoleBinaryRight),
+		source.Y,
+		rightType,
+		operandType,
+		api.ValueTransferRepresentation,
+		right,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err

@@ -310,6 +310,14 @@ special-case defined callable, slice, map, pointer, channel, basic, or array
 families. Explicit Go conversions remain owned by the conversion handler and
 are not inferred from assignment.
 
+An expected type guides child representation but is not itself a transfer.
+Root expression dispatch therefore never boxes, copies, or wraps a result merely
+because `Context.ExpectedType` is present. The parent that owns the actual Go
+boundary invokes the value-transfer owner exactly once. Synthesized values that
+do not pass through expression dispatch—including captured multi-result tuple
+elements—enter that same owner directly. No expression-level pre-adapter,
+tuple-specific adapter, or target-shape probe may coexist with this route.
+
 For `type Value []byte`, passing `Value` to a `[]byte` parameter is admitted by
 `go/types` and produces the static payload projection `value.$value`; passing
 an unnamed `[]byte` to a `Value` destination produces one `new Value(...)`.

@@ -210,65 +210,56 @@ func (e *emitter) Expression(
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {
 	operandContext := interfacevalue.OperandContext(context, source)
-	adapt := func(
-		target api.ExpressionEmission,
-		err error,
-	) (api.ExpressionEmission, error) {
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return interfacevalue.AdaptExpected(context, source, target)
-	}
 	if target, handled, err := genericfunctionvalue.Emit(
 		operandContext,
 		e,
 		source,
 	); handled {
-		return adapt(target, err)
+		return target, err
 	}
 
 	switch source := source.(type) {
 	case *ast.BinaryExpr:
-		return adapt(binaryexpression.Emit(operandContext, e, source))
+		return binaryexpression.Emit(operandContext, e, source)
 	case *ast.CallExpr:
-		return adapt(callexpression.Emit(operandContext, e, source))
+		return callexpression.Emit(operandContext, e, source)
 	case *ast.CompositeLit:
 		if compositeliteral.RequiresAddress(operandContext, source) {
-			return adapt(e.Address(operandContext, source))
+			return e.Address(operandContext, source)
 		}
-		return adapt(compositeliteral.Emit(operandContext, e, source))
+		return compositeliteral.Emit(operandContext, e, source)
 	case *ast.FuncLit:
-		return adapt(functionliteral.Emit(operandContext, e, source))
+		return functionliteral.Emit(operandContext, e, source)
 	case *ast.Ident:
-		return adapt(identifierexpression.Emit(operandContext, e, source))
+		return identifierexpression.Emit(operandContext, e, source)
 	case *ast.IndexExpr:
-		return adapt(indexexpression.Emit(operandContext, e, source))
+		return indexexpression.Emit(operandContext, e, source)
 	case *ast.IndexListExpr:
 		return api.ExpressionEmission{},
 			api.Unsupported(operandContext, api.CategoryExpression, source)
 	case *ast.ParenExpr:
-		return adapt(parenthesizedexpression.Emit(operandContext, e, source))
+		return parenthesizedexpression.Emit(operandContext, e, source)
 	case *ast.SelectorExpr:
-		return adapt(selectorexpression.Emit(operandContext, e, source))
+		return selectorexpression.Emit(operandContext, e, source)
 	case *ast.SliceExpr:
-		return adapt(sliceexpression.Emit(operandContext, e, source))
+		return sliceexpression.Emit(operandContext, e, source)
 	case *ast.StarExpr:
-		return adapt(dereferenceexpression.Emit(operandContext, e, source))
+		return dereferenceexpression.Emit(operandContext, e, source)
 	case *ast.TypeAssertExpr:
-		return adapt(typeassertion.Emit(operandContext, e, source))
+		return typeassertion.Emit(operandContext, e, source)
 	case *ast.BasicLit:
 		if source.Kind == token.STRING {
-			return adapt(stringliteral.Emit(operandContext, e, source))
+			return stringliteral.Emit(operandContext, e, source)
 		}
 		if source.Kind == token.IMAG {
-			return adapt(complexliteral.Emit(operandContext, e, source))
+			return complexliteral.Emit(operandContext, e, source)
 		}
 		if source.Kind == token.FLOAT {
-			return adapt(floatliteral.Emit(operandContext, e, source))
+			return floatliteral.Emit(operandContext, e, source)
 		}
-		return adapt(e.IntegerConstant(operandContext, source))
+		return e.IntegerConstant(operandContext, source)
 	case *ast.UnaryExpr:
-		return adapt(unaryexpression.Emit(operandContext, e, source))
+		return unaryexpression.Emit(operandContext, e, source)
 	default:
 		return api.ExpressionEmission{},
 			api.Unsupported(operandContext, api.CategoryExpression, source)
