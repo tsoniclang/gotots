@@ -185,7 +185,7 @@ func (s *programSession) buildPackageInitializerRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	contract, err := artifactstate.ProjectCoverageContract(nil)
+	contract, err := artifactstate.ProjectCoverageContract(s.factory, nil)
 	if err != nil {
 		return artifactRevision{}, err
 	}

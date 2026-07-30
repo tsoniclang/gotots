@@ -358,7 +358,10 @@ func (s *programSession) buildArtifactRevision(
 	case api.DeclarationDispositionMaterialized:
 		contract, err = artifactstate.ProjectContract(s.factory, statements)
 	case api.DeclarationDispositionCoverageOnly:
-		contract, err = artifactstate.ProjectCoverageContract(statements)
+		contract, err = artifactstate.ProjectCoverageContract(
+			s.factory,
+			statements,
+		)
 	case api.DeclarationDispositionClassMemberContribution:
 		if contribution == nil || len(statements) != 0 {
 			err = &ScheduleError{
@@ -517,6 +520,9 @@ func (s *programSession) reconstructArtifact(owner types.Object) error {
 func (s *programSession) reconstructScheduledArtifact(
 	owner api.ArtifactOwner,
 ) error {
+	if _, ok := owner.PackageAssembly(); ok {
+		return s.reconstructPackageExports(owner)
+	}
 	if generated, ok := owner.Generated(); ok {
 		return s.reconstructGeneratedArtifact(generated)
 	}

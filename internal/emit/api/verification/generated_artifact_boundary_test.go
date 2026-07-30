@@ -9,6 +9,27 @@ import (
 	. "github.com/tsoniclang/gotots/internal/emit/api"
 )
 
+func TestPackageAssemblyArtifactOwnerIsExact(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/exported", "exported")
+	owner, err := PackageAssemblyArtifactOwner(sourcePackage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, ok := owner.PackageAssembly()
+	if !owner.Valid() ||
+		!ok ||
+		selected != sourcePackage ||
+		owner.Package() != sourcePackage ||
+		owner.Name() != "example.com/exported.$assembly" {
+		t.Fatalf("package assembly owner = %#v", owner)
+	}
+	if _, err := PackageAssemblyArtifactOwner(
+		types.NewPackage("", "invalid"),
+	); err == nil {
+		t.Fatal("package assembly owner accepted an empty package path")
+	}
+}
+
 func TestGeneratedCallableABIBoundaryOwnsNestedCooperativeDemand(
 	t *testing.T,
 ) {

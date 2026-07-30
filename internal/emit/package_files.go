@@ -6,8 +6,8 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
@@ -256,11 +256,22 @@ func (s *programSession) packageAssemblyFile(
 			s.factory.Block(initialization, true),
 		))
 	}
-	exports, err := s.packageExports(builder)
-	if err != nil {
-		return TargetFile{}, err
+	statements = append(statements, builder.exportStatements...)
+	if hasExportedPackageVariable(builder.storage) {
+		statements = append(statements, s.factory.ExportDeclaration(
+			nil,
+			false,
+			s.factory.NamedExports([]tsgo.ExportSpecifier{
+				s.factory.ExportSpecifier(
+					false,
+					nil,
+					s.factory.Identifier(packagevariable.StateValueName),
+				),
+			}),
+			nil,
+			nil,
+		))
 	}
-	statements = append(statements, exports...)
 	return s.sourceFile(
 		builder.assemblyPath,
 		builder.sourcePackage.Name(),
@@ -330,114 +341,117 @@ func (s *programSession) callableFacetIsCooperative(
 	return observation.Cooperative(), nil
 }
 
-func (s *programSession) exportedBindingNames(
+func (s *programSession) recordPackageExport(
+	builder *packageTargetBuilder,
 	object types.Object,
-	baseName string,
-) ([]string, error) {
-	if function, ok := object.(*types.Func); ok &&
-		len(api.GenericDeclarationParameters(function)) != 0 {
-		requirements := s.requirements.appliedFor(
-			api.MustSourceArtifactOwner(function.Origin()),
-		)
-		profiles, err := api.SelectGenericCallableProfiles(
-			function,
-			requirements,
-		)
-		if err != nil {
-			return nil, err
-		}
-		names := make([]string, 1, len(profiles)+1)
-		names[0] = baseName
-		for _, profile := range profiles {
-			names = append(names, baseName+profile.Suffix())
-		}
-		return names, nil
+) error {
+	if object == nil || !object.Exported() {
+		return nil
 	}
-	if typeName, ok := object.(*types.TypeName); ok {
-		named, namedOK := types.Unalias(typeName.Type()).(*types.Named)
-		if namedOK {
-			if _, structOK := named.Underlying().(*types.Struct); structOK {
-				names := []string{baseName}
-				for _, requirement := range s.requirements.appliedFor(
-					api.MustSourceArtifactOwner(typeName),
-				) {
-					_, operation, ok := requirement.NamedStructOperation()
-					if ok && operation == api.NamedStructOperationStorage {
-						names = append(
-							names,
-							baseName+api.StructStorageTypeSuffix,
-						)
-						break
-					}
-				}
-				return names, nil
-			}
+	if method, ok := object.(*types.Func); ok &&
+		method.Signature().Recv() != nil {
+		return nil
+	}
+	if builder == nil ||
+		object.Pkg() != builder.sourcePackage.Types() {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "package export has no exact assembly owner",
 		}
 	}
-	constant, ok := object.(*types.Const)
-	if !ok || !constantbinding.IsUntyped(constant.Type()) {
-		return []string{baseName}, nil
+	if _, exists := builder.exportObjects[object]; exists {
+		return nil
 	}
-	requirements := s.requirements.appliedFor(
-		api.MustSourceArtifactOwner(constant),
-	)
-	names := make([]string, 0, len(requirements))
-	for _, requirement := range requirements {
-		_, projection, ok := requirement.ConstantProjection()
-		if !ok {
-			continue
-		}
-		name, err := api.ConstantProjectionName(baseName, projection)
-		if err != nil {
-			return nil, err
-		}
-		names = append(names, name)
-	}
-	return names, nil
+	builder.exportObjects[object] = struct{}{}
+	return s.publishPackageExports(builder)
 }
 
-func (s *programSession) packageExports(
-	builder *packageTargetBuilder,
-) ([]tsgo.Statement, error) {
-	byPath := make(map[string][]string)
-	for _, sourceBuilder := range s.builders {
-		if sourceBuilder.sourcePackage != builder.sourcePackage {
-			continue
+func (s *programSession) reconstructPackageExports(
+	owner api.ArtifactOwner,
+) error {
+	if s.sealed {
+		return &ScheduleError{
+			Object: owner.Name(),
+			Reason: "package exports reconstructed after target files were sealed",
 		}
-		for _, declaration := range sourceBuilder.declarations {
-			object, sourceOwned := declaration.owner.Source()
-			if !sourceOwned || !object.Exported() {
-				continue
+	}
+	sourcePackage, ok := owner.PackageAssembly()
+	if !ok {
+		return &ScheduleError{Reason: "package export owner is invalid"}
+	}
+	loaded := s.source.PackageForTypes(sourcePackage)
+	builder := s.packageBuilders[loaded]
+	if builder == nil ||
+		builder.assemblyOwner != owner ||
+		!builder.exportPublished {
+		return &ScheduleError{
+			Object: owner.Name(),
+			Reason: "package export owner has no published assembly",
+		}
+	}
+	return s.publishPackageExports(builder)
+}
+
+func (s *programSession) publishPackageExports(
+	builder *packageTargetBuilder,
+) error {
+	objects := make([]types.Object, 0, len(builder.exportObjects))
+	for object := range builder.exportObjects {
+		objects = append(objects, object)
+	}
+	sort.Slice(objects, func(left, right int) bool {
+		return compareObjects(objects[left], objects[right]) < 0
+	})
+	byPath := make(map[string]map[string]struct{})
+	dependencies := make([]api.ArtifactDependency, 0, len(objects))
+	for _, object := range objects {
+		owner := api.MustSourceArtifactOwner(object)
+		names, ok := s.artifacts.ExportedBindings(owner)
+		if !ok {
+			return &ScheduleError{
+				Object: object.Name(),
+				Reason: "assembly export provider has no committed export surface",
 			}
-			if method, ok := object.(*types.Func); ok &&
-				method.Signature().Recv() != nil {
-				continue
+		}
+		binding, ok := s.registry.Target(object)
+		if !ok {
+			return &ScheduleError{
+				Object: object.Name(),
+				Reason: "assembly export has no target binding",
 			}
-			binding, ok := s.registry.Target(object)
-			if !ok {
-				return nil, &ScheduleError{
-					Object: object.Name(),
-					Reason: "assembly export has no target binding",
+		}
+		if byPath[binding.SourcePath] == nil {
+			byPath[binding.SourcePath] = make(map[string]struct{})
+		}
+		for _, name := range names {
+			if _, duplicate := byPath[binding.SourcePath][name]; duplicate {
+				return &ScheduleError{
+					Object: name,
+					Reason: "assembly export binding is duplicated",
 				}
 			}
-			names, err := s.exportedBindingNames(object, binding.Name)
-			if err != nil {
-				return nil, err
-			}
-			byPath[binding.SourcePath] = append(
-				byPath[binding.SourcePath],
-				names...,
-			)
+			byPath[binding.SourcePath][name] = struct{}{}
 		}
+		dependency, err := api.NewArtifactDependency(
+			owner,
+			api.ArtifactFacetExportSurface,
+		)
+		if err != nil {
+			return err
+		}
+		dependencies = append(dependencies, dependency)
 	}
 	paths := make([]string, 0, len(byPath))
 	for sourcePath := range byPath {
 		paths = append(paths, sourcePath)
 	}
 	sort.Strings(paths)
-	exports := make([]tsgo.Statement, 0, len(paths)+1)
+	exports := make([]tsgo.Statement, 0, len(paths))
 	for _, sourcePath := range paths {
-		names := byPath[sourcePath]
+		names := make([]string, 0, len(byPath[sourcePath]))
+		for name := range byPath[sourcePath] {
+			names = append(names, name)
+		}
 		sort.Strings(names)
 		specifiers := make([]tsgo.ExportSpecifier, 0, len(names))
 		for _, name := range names {
@@ -452,7 +466,7 @@ func (s *programSession) packageExports(
 			sourcePath,
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		exports = append(exports, s.factory.ExportDeclaration(
 			nil,
@@ -462,22 +476,31 @@ func (s *programSession) packageExports(
 			nil,
 		))
 	}
-	if hasExportedPackageVariable(builder.storage) {
-		exports = append(exports, s.factory.ExportDeclaration(
-			nil,
-			false,
-			s.factory.NamedExports([]tsgo.ExportSpecifier{
-				s.factory.ExportSpecifier(
-					false,
-					nil,
-					s.factory.Identifier(packagevariable.StateValueName),
-				),
-			}),
-			nil,
-			nil,
-		))
+	nodes := make([]tsgo.Node, len(exports))
+	for index, statement := range exports {
+		nodes[index] = statement
 	}
-	return exports, nil
+	contract, err := artifactstate.ProjectFacet(
+		api.ArtifactFacetImplementation,
+		s.factory.SyntaxList(nodes),
+	)
+	if err != nil {
+		return err
+	}
+	if err := s.artifacts.Commit(
+		builder.assemblyOwner,
+		contract,
+		dependencies,
+	); err != nil {
+		return err
+	}
+	s.artifacts.DiscardDirty(builder.assemblyOwner)
+	if builder.exportPublished {
+		builder.exportRevisions++
+	}
+	builder.exportPublished = true
+	builder.exportStatements = exports
+	return nil
 }
 
 func hasExportedPackageVariable(storage []packageStorage) bool {

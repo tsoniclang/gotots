@@ -61,6 +61,7 @@ type packageInitFunction struct {
 
 type packageTargetBuilder struct {
 	sourcePackage      *load.Package
+	assemblyOwner      api.ArtifactOwner
 	statePath          string
 	assemblyPath       string
 	emitter            *emitter
@@ -73,6 +74,10 @@ type packageTargetBuilder struct {
 	initialization     []packageInitializationArtifact
 	initializerByOwner map[api.ArtifactOwner]int
 	initFunctions      []packageInitFunction
+	exportObjects      map[types.Object]struct{}
+	exportStatements   []tsgo.Statement
+	exportPublished    bool
+	exportRevisions    uint64
 }
 
 func newPackageInitializationScheduler() *packageInitializationScheduler {
@@ -138,8 +143,15 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 	if err != nil {
 		return err
 	}
+	assemblyOwner, err := api.PackageAssemblyArtifactOwner(
+		sourcePackage.Types(),
+	)
+	if err != nil {
+		return err
+	}
 	builder := &packageTargetBuilder{
 		sourcePackage:      sourcePackage,
+		assemblyOwner:      assemblyOwner,
 		statePath:          statePath,
 		assemblyPath:       assemblyPath,
 		emitter:            emitter,
@@ -149,6 +161,7 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 		assemblyPlacement:  targetplacement.New(),
 		storageByObject:    make(map[*types.Var]int),
 		initializerByOwner: make(map[api.ArtifactOwner]int),
+		exportObjects:      make(map[types.Object]struct{}),
 	}
 	s.packageBuilders[sourcePackage] = builder
 

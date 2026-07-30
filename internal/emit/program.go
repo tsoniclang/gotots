@@ -300,6 +300,23 @@ func compareArtifactOwners(
 	case rightIsInitializer:
 		return 1
 	}
+	leftAssembly, leftIsAssembly := left.PackageAssembly()
+	rightAssembly, rightIsAssembly := right.PackageAssembly()
+	switch {
+	case leftIsAssembly && rightIsAssembly:
+		switch {
+		case leftAssembly.Path() < rightAssembly.Path():
+			return -1
+		case leftAssembly.Path() > rightAssembly.Path():
+			return 1
+		default:
+			return 0
+		}
+	case leftIsAssembly:
+		return -1
+	case rightIsAssembly:
+		return 1
+	}
 	leftGenerated, leftOK := left.Generated()
 	rightGenerated, rightOK := right.Generated()
 	if !leftOK || !rightOK {
@@ -496,7 +513,7 @@ func (s *programSession) emit(object types.Object) error {
 		placement:      revision.placement,
 		temporaryStart: revision.temporaryStart,
 	})
-	return nil
+	return s.recordPackageExport(s.packageBuilders[site.source], object)
 }
 
 func (s *programSession) applyRootRequests(

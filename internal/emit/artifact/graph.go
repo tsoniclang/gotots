@@ -269,3 +269,13 @@ func (g *Graph) FacetRevision(
 	}
 	return record.facetRevisions[facet]
 }
+
+func (g *Graph) ExportedBindings(
+	owner api.ArtifactOwner,
+) ([]string, bool) {
+	record := g.records[owner]
+	if record == nil {
+		return nil, false
+	}
+	return record.contract.ExportedBindings()
+}

@@ -2,12 +2,15 @@ package emit
 
 import (
 	"context"
+	"errors"
 	"go/types"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -335,6 +338,190 @@ func Run() int32 {
 		session.artifacts.HasPending() {
 		t.Fatal("package callable ABI fixed point did not converge")
 	}
+}
+
+func TestPackageAssemblyTracksCommittedExportSurface(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(directory, "go.mod"),
+		[]byte("module example.com/exportfacet\n\ngo 1.26.4\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(directory, "source.go"),
+		[]byte(`package exportfacet
+
+type Writer interface {
+	Write([]byte) (int, error)
+}
+
+type Box struct {
+	Value int32
+}
+
+func demandBox(value *Box) int32 {
+	return value.Value
+}
+`),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourcePackage := program.Roots()[0]
+	writer := sourcePackage.Types().Scope().Lookup("Writer")
+	box := sourcePackage.Types().Scope().Lookup("Box")
+	demandBox := sourcePackage.Types().Scope().Lookup("demandBox")
+	session, err := newProgramSession(program, DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.require(writer); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.require(box); err != nil {
+		t.Fatal(err)
+	}
+	drainProgramSession(t, session)
+	builder := session.packageBuilders[sourcePackage]
+	if builder == nil {
+		t.Fatal("package assembly builder is absent")
+	}
+	if got := packageExportBindings(builder.exportStatements); !equalStrings(
+		got,
+		[]string{"Box", "Writer", "Writer$contract", "Writer$is"},
+	) {
+		t.Fatalf("initial assembly exports = %v", got)
+	}
+	writerBindings, ok := session.artifacts.ExportedBindings(
+		api.MustSourceArtifactOwner(writer),
+	)
+	if !ok || !equalStrings(
+		writerBindings,
+		[]string{"Writer", "Writer$contract", "Writer$is"},
+	) {
+		t.Fatalf("committed Writer export surface = %v, %t", writerBindings, ok)
+	}
+	initialRevisions := builder.exportRevisions
+	initialFacetRevision := session.artifacts.FacetRevision(
+		builder.assemblyOwner,
+		api.ArtifactFacetImplementation,
+	)
+	if err := session.require(demandBox); err != nil {
+		t.Fatal(err)
+	}
+	drainProgramSession(t, session)
+	want := []string{
+		"Box",
+		"Box$Storage",
+		"Writer",
+		"Writer$contract",
+		"Writer$is",
+	}
+	contractBindings, ok := session.artifacts.ExportedBindings(
+		api.MustSourceArtifactOwner(box),
+	)
+	if !ok || !equalStrings(contractBindings, []string{"Box", "Box$Storage"}) {
+		t.Fatalf("committed Box export surface = %v, %t", contractBindings, ok)
+	}
+	if got := packageExportBindings(builder.exportStatements); !equalStrings(
+		got,
+		want,
+	) {
+		t.Fatalf("reconstructed assembly exports = %v", got)
+	}
+	if builder.exportRevisions != initialRevisions+1 {
+		t.Fatalf(
+			"package export reconstructions = %d, want %d",
+			builder.exportRevisions,
+			initialRevisions+1,
+		)
+	}
+	if revision := session.artifacts.FacetRevision(
+		builder.assemblyOwner,
+		api.ArtifactFacetImplementation,
+	); revision != initialFacetRevision+1 {
+		t.Fatalf("package export facet revision = %d, want %d", revision, initialFacetRevision+1)
+	}
+	files, err := session.targetFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var final []string
+	for _, file := range files {
+		if file.Kind() == TargetFilePackageAssembly &&
+			file.PackageName() == sourcePackage.Name() {
+			final = packageExportBindings(file.SourceFile().Statements())
+			break
+		}
+	}
+	if !equalStrings(final, want) {
+		t.Fatalf("sealed package assembly exports = %v", final)
+	}
+
+	mutated := artifactstate.NewGraph(compareArtifactOwners)
+	provider := api.MustSourceArtifactOwner(writer)
+	if err := mutated.Commit(
+		provider,
+		artifactstate.NewContract(),
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	dependency, err := api.NewArtifactDependency(
+		provider,
+		api.ArtifactFacetExportSurface,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assembly, err := artifactstate.ProjectFacet(
+		api.ArtifactFacetImplementation,
+		session.factory.Identifier("assembly"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := mutated.Commit(builder.assemblyOwner, assembly, []api.ArtifactDependency{dependency}); err != nil {
+		t.Fatal(err)
+	}
+	var graphError *artifactstate.GraphError
+	if err := mutated.VerifyClosure(); !errors.As(err, &graphError) ||
+		graphError.Object != builder.assemblyOwner ||
+		graphError.Provider != provider ||
+		graphError.Facet != api.ArtifactFacetExportSurface {
+		t.Fatalf("omitted export-surface mutation error = %#v", err)
+	}
+}
+
+func packageExportBindings(statements []tsgo.Statement) []string {
+	var names []string
+	for _, statement := range statements {
+		declaration, ok := statement.(tsgo.ExportDeclaration)
+		if !ok {
+			continue
+		}
+		exports, ok := declaration.ExportClause().(tsgo.NamedExports)
+		if !ok {
+			continue
+		}
+		for _, specifier := range exports.Elements() {
+			name, ok := specifier.Name().(tsgo.Identifier)
+			if ok {
+				names = append(names, name.Text())
+			}
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 func packageInitializerForVariable(

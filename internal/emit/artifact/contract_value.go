@@ -3,6 +3,7 @@ package artifact
 import (
 	"bytes"
 	"fmt"
+	"slices"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
@@ -10,6 +11,8 @@ import (
 type Contract struct {
 	facets      [api.ArtifactFacetImplementation + 1][]byte
 	present     uint8
+	exports     []string
+	exportsSet  bool
 	initialized bool
 }
 
@@ -56,6 +59,12 @@ func (c Contract) WithFacet(
 			Reason: "facet is invalid",
 		}
 	}
+	if facet == api.ArtifactFacetExportSurface {
+		return Contract{}, &ContractValueError{
+			Facet:  facet,
+			Reason: "export surface is owned by declaration projection",
+		}
+	}
 	if len(encoded) == 0 {
 		return Contract{}, &ContractValueError{
 			Facet:  facet,
@@ -65,6 +74,40 @@ func (c Contract) WithFacet(
 	c.facets[facet] = bytes.Clone(encoded)
 	c.present |= uint8(1) << facet
 	return c, nil
+}
+
+func (c Contract) withOwnedExports(exports []string) (Contract, error) {
+	if !c.hasFacet(api.ArtifactFacetExportSurface) {
+		return Contract{}, &ContractValueError{
+			Facet:  api.ArtifactFacetExportSurface,
+			Reason: "export surface facet is absent",
+		}
+	}
+	for index, name := range exports {
+		if name == "" {
+			return Contract{}, &ContractValueError{
+				Facet:  api.ArtifactFacetExportSurface,
+				Reason: "export binding name is empty",
+			}
+		}
+		if index != 0 && exports[index-1] >= name {
+			return Contract{}, &ContractValueError{
+				Facet:  api.ArtifactFacetExportSurface,
+				Reason: "export bindings are not unique and sorted",
+			}
+		}
+	}
+	c.exports = slices.Clone(exports)
+	c.exportsSet = true
+	return c, nil
+}
+
+func (c Contract) ExportedBindings() ([]string, bool) {
+	if !c.hasFacet(api.ArtifactFacetExportSurface) ||
+		!c.exportsSet {
+		return nil, false
+	}
+	return slices.Clone(c.exports), true
 }
 
 func (c Contract) withOwnedFacet(
@@ -116,6 +159,13 @@ func validateArtifactContract(
 		return Contract{}, &GraphError{
 			Object: owner,
 			Reason: "target artifact observable contract is absent",
+		}
+	}
+	if contract.hasFacet(api.ArtifactFacetExportSurface) !=
+		contract.exportsSet {
+		return Contract{}, &GraphError{
+			Object: owner,
+			Reason: "target artifact export surface is not declaration-projected",
 		}
 	}
 	return contract, nil
