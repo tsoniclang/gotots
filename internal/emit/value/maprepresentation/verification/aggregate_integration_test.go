@@ -51,6 +51,7 @@ func TestProductionAggregateKeyOperationsAreStaticAndTyped(t *testing.T) {
 		"AggregateMap",
 		types.NewMap(key, value),
 		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
+		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
 		factory.TypeReferenceNode(factory.Identifier("Box"), nil),
 	)
 	if err != nil {
@@ -182,6 +183,7 @@ func TestUnnamedArrayKeyOperationsInlineStaticTypedSemantics(t *testing.T) {
 				nil,
 				"ArrayMap",
 				types.NewMap(key, value),
+				factory.TypeReferenceNode(factory.Identifier("ArrayKey"), nil),
 				factory.TypeReferenceNode(factory.Identifier("ArrayKey"), nil),
 				factory.TypeReferenceNode(factory.Identifier("Box"), nil),
 			)

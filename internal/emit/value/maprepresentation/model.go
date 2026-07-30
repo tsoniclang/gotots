@@ -43,7 +43,9 @@ func Source(
 		return Model{}, false
 	}
 	storage := StorageSpecialized
-	if scalarKey && representedBasic(context, source.Elem()) {
+	if scalarKey &&
+		types.Identical(source.Key(), storageKeyType(source.Key())) &&
+		representedBasic(context, source.Elem()) {
 		storage = StorageScalar
 	}
 	return Model{
@@ -69,6 +71,10 @@ func (m Model) Key() types.Type {
 
 func (m Model) Element() types.Type {
 	return m.source.Elem()
+}
+
+func (m Model) StorageKey() types.Type {
+	return storageKeyType(m.source.Key())
 }
 
 func (m Model) Storage() Storage {

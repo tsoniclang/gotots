@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -44,7 +43,7 @@ func EmitType(
 	key, err := children.RepresentedType(
 		context.WithRole(api.RoleMapKey),
 		source,
-		StorageKeyType(model.Key()),
+		model.Key(),
 	)
 	if err != nil {
 		return api.TypeEmission{}, err
@@ -104,7 +103,7 @@ func Nil(
 	keyType, err := children.RepresentedType(
 		context.WithRole(api.RoleMapKey),
 		source,
-		StorageKeyType(model.Key()),
+		model.Key(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -277,60 +276,7 @@ func Make(
 	))
 }
 
-func ProjectKey(
-	context api.Context,
-	source ast.Node,
-	sourceType types.Type,
-	value api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	if model, ok := definedtype.ResolveBasic(sourceType); ok {
-		if expression, ok := source.(ast.Expr); ok {
-			facts, found := context.TypesInfo().Types[expression]
-			if found && facts.Value != nil {
-				return constantvalue.EmitValue(
-					context,
-					expression,
-					model.Underlying(),
-					facts.Value,
-				)
-			}
-		}
-		return api.NewExpressionEmission(
-			value.Before(),
-			model.Unwrap(context.Factory(), value.Value()),
-			value.Requests(),
-		)
-	}
-	if context.Values().SupportsHash(context, sourceType) {
-		return value, nil
-	}
-	if _, ok := directKey(context, sourceType); !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	return value, nil
-}
-
-func ReifyKey(
-	context api.Context,
-	source ast.Node,
-	sourceType types.Type,
-	value api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	if model, ok := definedtype.ResolveBasic(sourceType); ok {
-		return model.Wrap(context, value)
-	}
-	if context.Values().SupportsHash(context, sourceType) {
-		return value, nil
-	}
-	if _, ok := directKey(context, sourceType); !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	return value, nil
-}
-
-func StorageKeyType(sourceType types.Type) types.Type {
+func storageKeyType(sourceType types.Type) types.Type {
 	if model, ok := definedtype.ResolveBasic(sourceType); ok {
 		return model.Underlying()
 	}

@@ -156,8 +156,8 @@ func TestDefinedContainersKeepNominalityAtSourceBoundaries(t *testing.T) {
 	for _, required := range []string{
 		"CountArrayValues(): [\n    GoArray<Count, 2>,",
 		"CountSliceValues(): RuntimeSlice<Count>",
-		"CountMapLookup(values: GoMapValue<int32, Label>, key: Count)",
-		"values.lookupOk(key.$value)",
+		"CountMapLookup(values: GoMapValue<Count, Label>, key: Count)",
+		"values.lookupOk(key)",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("defined container artifact lacks %q:\n%s", required, artifacts.printed)
@@ -165,8 +165,8 @@ func TestDefinedContainersKeepNominalityAtSourceBoundaries(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"GoMap<Count, Label>",
-		"GoMapValue<Count, Label>",
-		"values.lookupOk(key)",
+		"GoMapValue<int32, Label>",
+		"values.lookupOk(key.$value)",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
 			t.Fatalf("defined container artifact contains %q:\n%s", forbidden, artifacts.printed)

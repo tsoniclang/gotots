@@ -29,11 +29,13 @@ func BuildSpecialization(
 	className string,
 	mapType *types.Map,
 	keyType tsgo.TypeNode,
+	storageKeyType tsgo.TypeNode,
 	valueType tsgo.TypeNode,
 ) (Specialization, error) {
 	if className == "" ||
 		mapType == nil ||
 		keyType == nil ||
+		storageKeyType == nil ||
 		valueType == nil ||
 		!types.Comparable(mapType.Key()) ||
 		!context.Values().SupportsHash(context, mapType.Key()) {
@@ -62,22 +64,27 @@ func BuildSpecialization(
 		return Specialization{}, err
 	}
 	builder := specializationBuilder{
-		factory:   context.Factory(),
-		className: className,
-		keyType:   keyType,
-		valueType: valueType,
-		panicName: panicReference.Name(),
-		zero:      operations.zero,
-		hash:      operations.hash,
-		equal:     operations.equal,
-		copyKey:   operations.copyKey,
-		copyValue: operations.copyValue,
-		members:   memberNames,
+		factory:        context.Factory(),
+		className:      className,
+		keyType:        keyType,
+		storageKeyType: storageKeyType,
+		valueType:      valueType,
+		panicName:      panicReference.Name(),
+		zero:           operations.zero,
+		hash:           operations.hash,
+		equal:          operations.equal,
+		copyKey:        operations.copyKey,
+		copyValue:      operations.copyValue,
+		projectKey:     operations.projectKey,
+		reifyKey:       operations.reifyKey,
+		keyProjection:  operations.keyProjection,
+		members:        memberNames,
 	}
 	members := builder.build()
 	if err := validateSpecialization(
 		context.Role(),
 		members,
+		operations.keyProjection,
 	); err != nil {
 		return Specialization{}, err
 	}
@@ -135,11 +142,14 @@ func specializationNames() (specializationMemberNames, error) {
 }
 
 type specializationOperationSet struct {
-	zero      operationBody
-	hash      operationBody
-	equal     operationBody
-	copyKey   operationBody
-	copyValue operationBody
+	zero          operationBody
+	hash          operationBody
+	equal         operationBody
+	copyKey       operationBody
+	copyValue     operationBody
+	projectKey    operationBody
+	reifyKey      operationBody
+	keyProjection bool
 }
 
 func specializationOperations(
@@ -147,7 +157,7 @@ func specializationOperations(
 	source ast.Node,
 	mapType *types.Map,
 ) (specializationOperationSet, []api.RootRequest, error) {
-	keyType := StorageKeyType(mapType.Key())
+	keyType := storageKeyType(mapType.Key())
 	zero, err := context.Values().Zero(
 		context.WithRole(api.RoleMapValue),
 		source,
@@ -189,6 +199,35 @@ func specializationOperations(
 	if err != nil {
 		return specializationOperationSet{}, nil, err
 	}
+	keyProjection := !types.Identical(mapType.Key(), keyType)
+	var projectKey api.ExpressionEmission
+	var reifyKey api.ExpressionEmission
+	var projectKeyBody operationBody
+	var reifyKeyBody operationBody
+	if keyProjection {
+		projectKey, err = context.Values().ToStorage(
+			context.WithRole(api.RoleMapKey),
+			source,
+			mapType.Key(),
+			api.DirectExpression(key),
+		)
+		if err != nil {
+			return specializationOperationSet{}, nil, err
+		}
+		reifyKey, err = context.Values().FromStorage(
+			context.WithRole(api.RoleMapKey),
+			source,
+			mapType.Key(),
+			api.DirectExpression(
+				context.Factory().Identifier("$storageKey"),
+			),
+		)
+		if err != nil {
+			return specializationOperationSet{}, nil, err
+		}
+		projectKeyBody = operation(projectKey)
+		reifyKeyBody = operation(reifyKey)
+	}
 	value := context.Factory().Identifier("$value")
 	copyValue, err := context.Values().Transfer(
 		context.WithRole(api.RoleMapValue),
@@ -202,17 +241,22 @@ func specializationOperations(
 		return specializationOperationSet{}, nil, err
 	}
 	return specializationOperationSet{
-			zero:      operation(zero),
-			hash:      operation(hash),
-			equal:     operation(equal),
-			copyKey:   operation(copyKey),
-			copyValue: operation(copyValue),
+			zero:          operation(zero),
+			hash:          operation(hash),
+			equal:         operation(equal),
+			copyKey:       operation(copyKey),
+			copyValue:     operation(copyValue),
+			projectKey:    projectKeyBody,
+			reifyKey:      reifyKeyBody,
+			keyProjection: keyProjection,
 		}, api.CombineRequests(
 			zero.Requests(),
 			hash.Requests(),
 			equal.Requests(),
 			copyKey.Requests(),
 			copyValue.Requests(),
+			projectKey.Requests(),
+			reifyKey.Requests(),
 		), nil
 }
 

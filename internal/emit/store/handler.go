@@ -317,15 +317,6 @@ func mapIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	key, err = maprepresentation.ProjectKey(
-		context.WithRole(api.RoleMapKey),
-		source.Index,
-		mapType.Key(),
-		key,
-	)
-	if err != nil {
-		return api.StoreTargetEmission{}, err
-	}
 	member, err := mapruntime.Name(mapruntime.MemberStore)
 	if err != nil {
 		return api.StoreTargetEmission{}, err

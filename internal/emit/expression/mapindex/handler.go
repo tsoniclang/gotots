@@ -45,15 +45,6 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	key, err = maprepresentation.ProjectKey(
-		context.WithRole(api.RoleMapKey),
-		source.Index,
-		mapType.Key(),
-		key,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	values, before, requests, err := maprepresentation.ArrangeOperands(
 		context,
 		[]api.ExpressionEmission{receiver, key},

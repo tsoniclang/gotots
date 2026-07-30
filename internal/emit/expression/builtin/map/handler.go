@@ -304,15 +304,6 @@ func emitDelete(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	key, err = maprepresentation.ProjectKey(
-		context.WithRole(api.RoleMapKey),
-		source.Args[1],
-		mapType.Key(),
-		key,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	arrange := maprepresentation.ArrangeOperands
 	if capture {
 		arrange = maprepresentation.ArrangeCapturedOperands

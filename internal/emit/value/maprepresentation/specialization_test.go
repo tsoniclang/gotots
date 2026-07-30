@@ -46,6 +46,7 @@ func testStaticSpecialization(
 		"StaticMap",
 		mapType,
 		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
+		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
 		factory.TypeReferenceNode(factory.Identifier("Box"), nil),
 	)
 	if err != nil {
@@ -135,6 +136,7 @@ func TestStaticSpecializationRejectsStoredSemanticCallbacks(t *testing.T) {
 		"StaticMap",
 		types.NewMap(key, value),
 		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
+		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
 		factory.TypeReferenceNode(factory.Identifier("Box"), nil),
 	)
 	if err != nil {
@@ -171,6 +173,7 @@ func TestStaticSpecializationRejectsStoredSemanticCallbacks(t *testing.T) {
 	if err := validateSpecialization(
 		api.RoleMapReceiver,
 		mutated,
+		false,
 	); err == nil {
 		t.Fatal("stored hash callback mutation passed the specialization gate")
 	}

@@ -208,7 +208,22 @@ func (s *programSession) buildMapSpecializationRevision(
 	keyType, err := builder.emitter.RepresentedType(
 		context.WithRole(api.RoleMapKey),
 		nil,
-		maprepresentation.StorageKeyType(mapType.Key()),
+		mapType.Key(),
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	mapModel, ok := maprepresentation.Source(context, mapType)
+	if !ok {
+		return artifactRevision{}, &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "generated map specialization has no representation model",
+		}
+	}
+	storageKeyType, err := builder.emitter.RepresentedType(
+		context.WithRole(api.RoleStorageType),
+		nil,
+		mapModel.StorageKey(),
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -227,6 +242,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		artifact.TargetName(),
 		mapType,
 		keyType.Value(),
+		storageKeyType.Value(),
 		valueType.Value(),
 	)
 	if err != nil {
@@ -241,6 +257,7 @@ func (s *programSession) buildMapSpecializationRevision(
 	))
 	requests := api.CombineRequests(
 		keyType.Requests(),
+		storageKeyType.Requests(),
 		valueType.Requests(),
 		specialization.Requests(),
 	)

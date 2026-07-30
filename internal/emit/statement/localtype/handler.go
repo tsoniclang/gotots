@@ -432,7 +432,22 @@ func emitLexicalMapSpecialization(
 	keyType, err := children.RepresentedType(
 		context.WithRole(api.RoleMapKey),
 		source,
-		maprepresentation.StorageKeyType(mapType.Key()),
+		mapType.Key(),
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	mapModel, ok := maprepresentation.Source(context, mapType)
+	if !ok {
+		return api.DeclarationEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "lexical map specialization has no representation model",
+		}
+	}
+	storageKeyType, err := children.RepresentedType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		mapModel.StorageKey(),
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -451,6 +466,7 @@ func emitLexicalMapSpecialization(
 		artifact.TargetName(),
 		mapType,
 		keyType.Value(),
+		storageKeyType.Value(),
 		valueType.Value(),
 	)
 	if err != nil {
@@ -466,6 +482,7 @@ func emitLexicalMapSpecialization(
 		),
 		api.CombineRequests(
 			keyType.Requests(),
+			storageKeyType.Requests(),
 			valueType.Requests(),
 			specialization.Requests(),
 		)...,

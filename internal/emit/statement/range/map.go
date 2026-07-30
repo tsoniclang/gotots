@@ -104,16 +104,10 @@ func emitMapValue(
 	}
 	var key assignment.RangeIterationValue
 	if source.Key != nil && nonBlank(source.Key) {
-		reified, reifyErr := maprepresentation.ReifyKey(
-			context.WithRole(api.RoleRangeValue),
-			source.Key,
+		key, err = iteration(
 			model.Key(),
 			api.DirectExpression(keyValue),
 		)
-		if reifyErr != nil {
-			return api.StatementEmission{}, reifyErr
-		}
-		key, err = iteration(model.Key(), reified)
 		if err != nil {
 			return api.StatementEmission{}, err
 		}

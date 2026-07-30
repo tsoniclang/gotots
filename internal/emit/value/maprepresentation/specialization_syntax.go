@@ -5,17 +5,21 @@ import (
 )
 
 type specializationBuilder struct {
-	factory   tsgo.Factory
-	className string
-	keyType   tsgo.TypeNode
-	valueType tsgo.TypeNode
-	panicName string
-	zero      operationBody
-	hash      operationBody
-	equal     operationBody
-	copyKey   operationBody
-	copyValue operationBody
-	members   specializationMemberNames
+	factory        tsgo.Factory
+	className      string
+	keyType        tsgo.TypeNode
+	storageKeyType tsgo.TypeNode
+	valueType      tsgo.TypeNode
+	panicName      string
+	zero           operationBody
+	hash           operationBody
+	equal          operationBody
+	copyKey        operationBody
+	copyValue      operationBody
+	projectKey     operationBody
+	reifyKey       operationBody
+	keyProjection  bool
+	members        specializationMemberNames
 }
 
 type operationBody struct {
@@ -70,8 +74,14 @@ func (b specializationBuilder) entryType() tsgo.TypeNode {
 	)
 }
 
+func (b specializationBuilder) storageEntryType() tsgo.TypeNode {
+	return b.factory.TupleTypeNode(
+		[]tsgo.TypeNode{b.storageKeyType, b.valueType},
+	)
+}
+
 func (b specializationBuilder) bucketType() tsgo.TypeNode {
-	return b.factory.ArrayTypeNode(b.entryType())
+	return b.factory.ArrayTypeNode(b.storageEntryType())
 }
 
 func (b specializationBuilder) storageType() tsgo.TypeNode {
@@ -162,6 +172,39 @@ func (b specializationBuilder) staticCall(
 	return b.call(b.id(b.className), name, arguments...)
 }
 
+func (b specializationBuilder) projectKeyExpression(
+	value tsgo.Expression,
+) tsgo.Expression {
+	if !b.keyProjection {
+		return value
+	}
+	return b.staticCall(specializationProjectKeyOperation, value)
+}
+
+func (b specializationBuilder) reifyKeyExpression(
+	value tsgo.Expression,
+) tsgo.Expression {
+	if !b.keyProjection {
+		return value
+	}
+	return b.staticCall(specializationReifyKeyOperation, value)
+}
+
+func (b specializationBuilder) storageKeyBinding(
+	value tsgo.Expression,
+) (tsgo.Expression, []tsgo.Statement) {
+	if !b.keyProjection {
+		return value, nil
+	}
+	storageKey := b.id("storageKey")
+	return storageKey, []tsgo.Statement{b.variable(
+		tsgo.NodeFlagsConst,
+		"storageKey",
+		b.storageKeyType,
+		b.projectKeyExpression(value),
+	)}
+}
+
 func (b specializationBuilder) binary(
 	left tsgo.Expression,
 	operator tsgo.BinaryOperator,
@@ -231,6 +274,23 @@ func (b specializationBuilder) method(
 		parameters,
 		result,
 		b.factory.Block(statements, true),
+	)
+}
+
+func (b specializationBuilder) methodWithPrefix(
+	modifiers []tsgo.ModifierLike,
+	name string,
+	parameters []tsgo.ParameterDeclaration,
+	result tsgo.TypeNode,
+	prefix []tsgo.Statement,
+	statements ...tsgo.Statement,
+) tsgo.MethodDeclaration {
+	return b.method(
+		modifiers,
+		name,
+		parameters,
+		result,
+		append(prefix, statements...)...,
 	)
 }
 

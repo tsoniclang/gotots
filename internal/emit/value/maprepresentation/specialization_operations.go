@@ -3,12 +3,14 @@ package maprepresentation
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 const (
-	specializationZeroOperation      = "$zeroValue"
-	specializationHashOperation      = "$hash"
-	specializationEqualOperation     = "$equal"
-	specializationCopyOperation      = "$copyKey"
-	specializationCopyValueOperation = "$copyValue"
-	specializationFindOperation      = "$find"
+	specializationZeroOperation       = "$zeroValue"
+	specializationHashOperation       = "$hash"
+	specializationEqualOperation      = "$equal"
+	specializationCopyOperation       = "$copyKey"
+	specializationCopyValueOperation  = "$copyValue"
+	specializationProjectKeyOperation = "$projectKey"
+	specializationReifyKeyOperation   = "$reifyKey"
+	specializationFindOperation       = "$find"
 )
 
 func (b specializationBuilder) build() []tsgo.ClassElement {
@@ -23,7 +25,7 @@ func (b specializationBuilder) build() []tsgo.ClassElement {
 		b.operationMethod(
 			specializationHashOperation,
 			[]tsgo.ParameterDeclaration{
-				b.parameter("$key", b.keyType),
+				b.parameter("$key", b.storageKeyType),
 			},
 			b.numberType(),
 			b.hash,
@@ -31,8 +33,8 @@ func (b specializationBuilder) build() []tsgo.ClassElement {
 		b.operationMethod(
 			specializationEqualOperation,
 			[]tsgo.ParameterDeclaration{
-				b.parameter("$left", b.keyType),
-				b.parameter("$right", b.keyType),
+				b.parameter("$left", b.storageKeyType),
+				b.parameter("$right", b.storageKeyType),
 			},
 			b.booleanType(),
 			b.equal,
@@ -40,9 +42,9 @@ func (b specializationBuilder) build() []tsgo.ClassElement {
 		b.operationMethod(
 			specializationCopyOperation,
 			[]tsgo.ParameterDeclaration{
-				b.parameter("$key", b.keyType),
+				b.parameter("$key", b.storageKeyType),
 			},
-			b.keyType,
+			b.storageKeyType,
 			b.copyKey,
 		),
 		b.operationMethod(
@@ -53,6 +55,30 @@ func (b specializationBuilder) build() []tsgo.ClassElement {
 			b.valueType,
 			b.copyValue,
 		),
+	}
+	if b.keyProjection {
+		members = append(
+			members,
+			b.operationMethod(
+				specializationProjectKeyOperation,
+				[]tsgo.ParameterDeclaration{
+					b.parameter("$key", b.keyType),
+				},
+				b.storageKeyType,
+				b.projectKey,
+			),
+			b.operationMethod(
+				specializationReifyKeyOperation,
+				[]tsgo.ParameterDeclaration{
+					b.parameter("$storageKey", b.storageKeyType),
+				},
+				b.keyType,
+				b.reifyKey,
+			),
+		)
+	}
+	members = append(
+		members,
 		b.nilMethod(),
 		b.makeMethod(),
 		b.findMethod(),
@@ -62,7 +88,7 @@ func (b specializationBuilder) build() []tsgo.ClassElement {
 		b.deleteMethod(),
 		b.lengthMethod(),
 		b.isNilMethod(),
-	}
+	)
 	members = append(members, b.clearMethod(), b.keysMethod())
 	return members
 }

@@ -36,15 +36,6 @@ func Apply(
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
-		index, err = maprepresentation.ProjectKey(
-			context.WithRole(api.RoleMapKey),
-			source,
-			mapType.Key(),
-			index,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
 		ordered, err := expressionoperands.Preserve(
 			context,
 			api.TemporarySliceOperand,
