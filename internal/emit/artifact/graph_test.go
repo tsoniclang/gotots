@@ -16,15 +16,20 @@ func TestArtifactGraphSuppressesUnchangedAndIsolatesFacets(t *testing.T) {
 	staticConsumer := artifactTestObject("StaticConsumer", 30)
 	graph := NewGraph(compareArtifactTestObjects)
 
-	commitArtifactTestRevision(t, graph, provider, Contract{
-		api.ArtifactFacetCallableSignature: []byte("call-a"),
-		api.ArtifactFacetStaticSurface:     []byte("static-a"),
-	})
+	commitArtifactTestRevision(
+		t,
+		graph,
+		provider,
+		artifactTestContract(t, map[api.ArtifactFacet]string{
+			api.ArtifactFacetCallableSignature: "call-a",
+			api.ArtifactFacetStaticSurface:     "static-a",
+		}),
+	)
 	commitArtifactTestRevision(
 		t,
 		graph,
 		callConsumer,
-		Contract{api.ArtifactFacetCallableSignature: []byte("consumer")},
+		artifactCallable("consumer"),
 		artifactTestDependency(
 			t,
 			provider,
@@ -35,7 +40,7 @@ func TestArtifactGraphSuppressesUnchangedAndIsolatesFacets(t *testing.T) {
 		t,
 		graph,
 		staticConsumer,
-		Contract{api.ArtifactFacetCallableSignature: []byte("consumer")},
+		artifactCallable("consumer"),
 		artifactTestDependency(
 			t,
 			provider,
@@ -43,21 +48,31 @@ func TestArtifactGraphSuppressesUnchangedAndIsolatesFacets(t *testing.T) {
 		),
 	)
 
-	commitArtifactTestRevision(t, graph, provider, Contract{
-		api.ArtifactFacetCallableSignature: []byte("call-a"),
-		api.ArtifactFacetStaticSurface:     []byte("static-a"),
-	})
+	commitArtifactTestRevision(
+		t,
+		graph,
+		provider,
+		artifactTestContract(t, map[api.ArtifactFacet]string{
+			api.ArtifactFacetCallableSignature: "call-a",
+			api.ArtifactFacetStaticSurface:     "static-a",
+		}),
+	)
 	if graph.HasPending() {
 		t.Fatal("equal contract dirtied a consumer")
 	}
-	if len(graph.records[artifactTestOwner(provider)].history) != 1 {
+	if len(graph.records[artifactTestOwner(provider)].history.entries) != 1 {
 		t.Fatal("equal contract added convergence history")
 	}
 
-	commitArtifactTestRevision(t, graph, provider, Contract{
-		api.ArtifactFacetCallableSignature: []byte("call-a"),
-		api.ArtifactFacetStaticSurface:     []byte("static-b"),
-	})
+	commitArtifactTestRevision(
+		t,
+		graph,
+		provider,
+		artifactTestContract(t, map[api.ArtifactFacet]string{
+			api.ArtifactFacetCallableSignature: "call-a",
+			api.ArtifactFacetStaticSurface:     "static-b",
+		}),
+	)
 	dirty, ok := graph.NextDirty()
 	if !ok || dirty != artifactTestOwner(staticConsumer) {
 		t.Fatalf("dirty = %v, %t; want static consumer", dirty, ok)
@@ -65,7 +80,7 @@ func TestArtifactGraphSuppressesUnchangedAndIsolatesFacets(t *testing.T) {
 	if graph.HasPending() {
 		t.Fatal("static change dirtied an unrelated callable consumer")
 	}
-	if len(graph.records[artifactTestOwner(provider)].history) != 2 {
+	if len(graph.records[artifactTestOwner(provider)].history.entries) != 2 {
 		t.Fatal("changed contract did not add exactly one history entry")
 	}
 	if graph.FacetRevision(
@@ -222,7 +237,7 @@ func TestArtifactGraphRebuildsConsumerWithoutOutgoingFacets(t *testing.T) {
 		t,
 		graph,
 		bodyOnlyConsumer,
-		Contract{},
+		NewContract(),
 		artifactTestDependency(
 			t,
 			provider,
@@ -239,7 +254,7 @@ func TestArtifactGraphRebuildsConsumerWithoutOutgoingFacets(t *testing.T) {
 		t,
 		graph,
 		bodyOnlyConsumer,
-		Contract{},
+		NewContract(),
 		artifactTestDependency(
 			t,
 			provider,
@@ -260,9 +275,11 @@ func TestArtifactGraphOwnsCanonicalContractBytes(t *testing.T) {
 		t,
 		graph,
 		provider,
-		Contract{
-			api.ArtifactFacetCallableSignature: encoded,
-		},
+		artifactTestContractBytes(
+			t,
+			api.ArtifactFacetCallableSignature,
+			encoded,
+		),
 	)
 	commitArtifactTestRevision(
 		t,
@@ -288,7 +305,7 @@ func TestArtifactGraphRejectsAbsentContract(t *testing.T) {
 	var graphError *GraphError
 	if err := graph.Commit(
 		artifactTestOwner(owner),
-		nil,
+		Contract{},
 		nil,
 	); !errors.As(err, &graphError) {
 		t.Fatalf("absent-contract error = %#v", err)
@@ -322,16 +339,23 @@ func TestArtifactGraphClosureRejectsMissingProvidersAndFacets(t *testing.T) {
 		t,
 		graph,
 		provider,
-		Contract{api.ArtifactFacetStaticSurface: []byte("static")},
+		artifactTestContract(t, map[api.ArtifactFacet]string{
+			api.ArtifactFacetStaticSurface: "static",
+		}),
 	)
 	if err := graph.VerifyClosure(); !errors.As(err, &graphError) {
 		t.Fatalf("missing-facet error = %#v", err)
 	}
 
-	commitArtifactTestRevision(t, graph, provider, Contract{
-		api.ArtifactFacetCallableSignature: []byte("call"),
-		api.ArtifactFacetStaticSurface:     []byte("static"),
-	})
+	commitArtifactTestRevision(
+		t,
+		graph,
+		provider,
+		artifactTestContract(t, map[api.ArtifactFacet]string{
+			api.ArtifactFacetCallableSignature: "call",
+			api.ArtifactFacetStaticSurface:     "static",
+		}),
+	)
 	if err := graph.VerifyClosure(); err != nil {
 		t.Fatal(err)
 	}
@@ -457,9 +481,43 @@ func commitArtifactTestRevision(
 }
 
 func artifactCallable(value string) Contract {
-	return Contract{
-		api.ArtifactFacetCallableSignature: []byte(value),
+	contract, err := NewContractFacet(
+		api.ArtifactFacetCallableSignature,
+		[]byte(value),
+	)
+	if err != nil {
+		panic(err)
 	}
+	return contract
+}
+
+func artifactTestContract(
+	t *testing.T,
+	facets map[api.ArtifactFacet]string,
+) Contract {
+	t.Helper()
+	contract := NewContract()
+	var err error
+	for facet, value := range facets {
+		contract, err = contract.WithFacet(facet, []byte(value))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return contract
+}
+
+func artifactTestContractBytes(
+	t *testing.T,
+	facet api.ArtifactFacet,
+	value []byte,
+) Contract {
+	t.Helper()
+	contract, err := NewContractFacet(facet, value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contract
 }
 
 func artifactTestDependency(

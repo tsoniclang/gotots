@@ -301,13 +301,10 @@ func (s *programSession) buildPackageStorageRevision(
 func packageStorageContract(
 	field tsgo.PropertyDeclaration,
 ) (artifactstate.Contract, error) {
-	encoded, err := tsgo.EncodeNode(field)
-	if err != nil {
-		return nil, err
-	}
-	return artifactstate.Contract{
-		api.ArtifactFacetValueSurface: encoded,
-	}, nil
+	return artifactstate.ProjectFacet(
+		api.ArtifactFacetValueSurface,
+		field,
+	)
 }
 
 func (s *programSession) reconstructPackageStorage(

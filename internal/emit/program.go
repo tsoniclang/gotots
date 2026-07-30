@@ -137,9 +137,11 @@ func CompileWithOptions(
 			}
 			continue
 		}
-		if object, ok := session.artifacts.NextDirty(); ok {
-			if err := session.reconstructScheduledArtifact(object); err != nil {
-				return ProgramEmission{}, err
+		if dirty := session.artifacts.DirtyBatch(); len(dirty) != 0 {
+			for _, object := range dirty {
+				if err := session.reconstructScheduledArtifact(object); err != nil {
+					return ProgramEmission{}, err
+				}
 			}
 			continue
 		}

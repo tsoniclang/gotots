@@ -112,9 +112,11 @@ func TestTargetFilesRejectPendingArtifactReconstruction(t *testing.T) {
 	drainProgramSession(t, session)
 	if err := session.artifacts.Commit(
 		sourceArtifactOwner(trigger),
-		artifactstate.Contract{
-			api.ArtifactFacetCallableSignature: []byte("changed"),
-		},
+		artifactTestFacetContract(
+			t,
+			api.ArtifactFacetCallableSignature,
+			"changed",
+		),
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -124,9 +126,11 @@ func TestTargetFilesRejectPendingArtifactReconstruction(t *testing.T) {
 		t.Fatalf("dirty = %v, %t; want Caller", dirty, ok)
 	} else if err := session.artifacts.Commit(
 		sourceArtifactOwner(trigger),
-		artifactstate.Contract{
-			api.ArtifactFacetCallableSignature: []byte("changed-again"),
-		},
+		artifactTestFacetContract(
+			t,
+			api.ArtifactFacetCallableSignature,
+			"changed-again",
+		),
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -139,6 +143,19 @@ func TestTargetFilesRejectPendingArtifactReconstruction(t *testing.T) {
 	if session.sealed {
 		t.Fatal("failed dirty-artifact seal closed the session")
 	}
+}
+
+func artifactTestFacetContract(
+	t *testing.T,
+	facet api.ArtifactFacet,
+	value string,
+) artifactstate.Contract {
+	t.Helper()
+	contract, err := artifactstate.NewContractFacet(facet, []byte(value))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contract
 }
 
 func TestNonArtifactDependencyCannotBeSilentlyDropped(t *testing.T) {

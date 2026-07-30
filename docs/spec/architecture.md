@@ -551,14 +551,28 @@ unchanged, so `Use` remains untouched. If a later target obligation changes
 facet changes, `Use` is reconstructed, and any resulting change to `Use`'s own
 callable facet propagates to its callers.
 
-Cycles are permitted only when structural contracts converge. The root records
-each distinct committed canonical contract for the compilation, without a
-second copy of the current revision. Repeating a prior non-current contract is
-a typed non-convergence error, not an arbitrary iteration limit or silently
-accepted result. Storage is bounded by current artifacts, consumed facet edges,
-and the exact bytes of distinct changed contracts; unchanged reconstruction
-adds no history. Sealing requires empty declaration, requirement,
-initialization, placement, and dirty-artifact queues.
+Cycles are permitted only when structural contracts converge. The root retains
+the current exact canonical bytes and a losslessly compressed reverse delta
+for each distinct changed contract. A deterministic non-semantic fingerprint may index
+historical candidates, but the root must reconstruct and compare their exact
+canonical bytes before declaring a repeat; a hash alone never establishes
+equality. Repeating a prior non-current contract is a typed non-convergence
+error, not an arbitrary iteration limit or silently accepted result. Unchanged
+reconstruction adds no history. Append-only or locally changed contracts retain
+only a lossless encoding of their exact changed regions rather than a full
+snapshot per revision.
+Dirty owners live in one identity-deduplicated deterministic priority queue.
+Each wave is ordered provider-before-consumer from the exact current facet
+edges, so a fan-in consumer observes all settled providers once; unrelated
+ready owners use exact Go-object order as the tie-breaker. A cyclic remainder
+uses that same order to choose one deterministic break point and remains
+subject to exact oscillation detection. A wave completes against one applied
+requirement snapshot; requirements discovered during reconstruction are
+identity-deduplicated and applied before constructing the next wave. They never
+cause the current dependency order to be rebuilt after each artifact. Queue and wave construction are
+`O((artifacts + consumed facet edges) log artifacts)`, not repeated full-set
+minimum scans. Sealing requires empty declaration, requirement, initialization,
+placement, and dirty-artifact queues.
 
 This graph is target-assembly coordination, not a semantic IR or call graph. It
 contains only authoritative Go definition identities, closed target-contract

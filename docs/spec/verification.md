@@ -248,15 +248,28 @@ immutable payload fields back into every copied transport value must fail that
 gate even when semantic tests remain green.
 
 Mutations remove a dependency edge, widen it to all facets, compare only a
-hash, notify on equal contracts, ignore a changed contract, retain old
-dependencies, process dirty work nondeterministically, mutate a provider node
-through a consumer, or accept an oscillating cycle. Each must fail at the
-contract, graph, lifecycle, determinism, ownership, or broad-search gate.
+hash, retain full historical snapshots, notify on equal contracts, ignore a
+changed contract, retain old dependencies, restore full-set dirty scans,
+process dirty work nondeterministically, mutate a provider node through a
+consumer, or accept an oscillating cycle. Each must fail at the contract,
+graph, lifecycle, determinism, ownership, scaling, or broad-search gate. A
+forced fingerprint-collision foil must remain unequal after exact historical
+reconstruction. A growing-contract fixture must prove retained history tracks
+exact changed regions rather than the sum of all prior full contracts, and a
+fan-out fixture must bound dirty-owner comparisons by `O(n log n)`.
+An adversarial fan-in fixture reverses Go-object order relative to provider
+edges and proves one provider-before-consumer wave; restoring global object
+order must reconstruct the consumer before a still-dirty provider and fail.
+Another fixture discovers a requirement during an early reconstruction,
+finishes the current dependency wave, then proves the requirement is applied
+and its exact owner reconstructed in the next wave. Rebuilding the wave after
+every discovered request must fail the wave-construction work bound.
 Measure declarations, graph vertices/edges, contract bytes, revisions,
 reconstructions, final AST bytes, generation time, typecheck time/RSS, and
 runtime. Current graph state must remain O(artifacts + consumed facet edges +
-current contract bytes); convergence evidence additionally retains one exact
-copy of each distinct changed contract and no entry for an unchanged rebuild.
+current contract bytes + losslessly encoded exact historical changed regions);
+convergence evidence retains compressed reverse deltas and no entry for an
+unchanged rebuild.
 Use-site count may add deduplicated edges but must not duplicate provider
 contracts.
 

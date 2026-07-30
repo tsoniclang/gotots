@@ -444,15 +444,10 @@ func (s *programSession) callableABIContract(
 	if cooperative {
 		result = callable.PromiseResult(s.factory, result)
 	}
-	encoded, err := tsgo.EncodeNode(
+	return artifactstate.ProjectFacet(
+		api.ArtifactFacetCallableSignature,
 		s.factory.FunctionTypeNode(nil, nil, result),
 	)
-	if err != nil {
-		return nil, err
-	}
-	return artifactstate.Contract{
-		api.ArtifactFacetCallableSignature: encoded,
-	}, nil
 }
 
 func callableABIRequirements(
