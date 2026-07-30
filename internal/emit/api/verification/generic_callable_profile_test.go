@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"go/ast"
 	"go/token"
 	"go/types"
 	"testing"
@@ -146,6 +147,58 @@ func TestGenericCallableProfileOverridesOnlySelectedABI(
 				want,
 			)
 		}
+	}
+}
+
+func TestFunctionLiteralFacetIdentityIncludesGenericProfile(
+	t *testing.T,
+) {
+	owner := genericProfileOwner()
+	literal := &ast.FuncLit{
+		Type: &ast.FuncType{},
+		Body: &ast.BlockStmt{},
+	}
+	profiles := make([]*GenericCallableProfile, 2)
+	for index, key := range []string{"first", "second"} {
+		abi := genericProfileABI(t, key)
+		override, err := NewGenericCallableABISelection(abi, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		selection, err := NewGenericCallableProfileSelection(
+			[]GenericCallableABISelection{override},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		profiles[index], err = NewGenericCallableProfile(
+			owner,
+			selection,
+			"$cooperative_"+key,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := Context{}.WithArtifactOwner(MustSourceArtifactOwner(owner))
+	first, err := base.WithGenericCallableProfile(
+		profiles[0],
+	).FunctionLiteralCallableFacet(literal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := base.WithGenericCallableProfile(
+		profiles[1],
+	).FunctionLiteralCallableFacet(literal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatal("distinct generic profiles collapsed one lexical callable facet")
+	}
+	if selected, ok := first.FunctionLiteralProfile(); !ok ||
+		selected != profiles[0] {
+		t.Fatalf("first literal profile = %#v, %t", selected, ok)
 	}
 }
 

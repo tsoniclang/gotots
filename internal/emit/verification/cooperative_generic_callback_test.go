@@ -233,11 +233,56 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 			)
 		}
 	}
+	filterSequence := waveNineFunctionText(
+		t,
+		artifacts.printed,
+		"FilterSequence",
+	)
+	for _, forbidden := range []string{"async function", "Promise<", "await "} {
+		if strings.Contains(filterSequence, forbidden) {
+			t.Fatalf(
+				"synchronous generic returned literal contains %q:\n%s",
+				forbidden,
+				filterSequence,
+			)
+		}
+	}
+	cooperativeFilterSequence := waveNineFunctionWithPrefix(
+		t,
+		artifacts.printed,
+		"FilterSequence$cooperative_",
+	)
+	for _, required := range []string{"async function", "Promise<", "await "} {
+		if !strings.Contains(cooperativeFilterSequence, required) {
+			t.Fatalf(
+				"cooperative generic returned literal lacks %q:\n%s",
+				required,
+				cooperativeFilterSequence,
+			)
+		}
+	}
+	for _, required := range []string{
+		"export class Sequence<T, $Value = ",
+		"constructor(public readonly $value: $Value)",
+	} {
+		if !strings.Contains(artifacts.printed, required) {
+			t.Fatalf("named callable value lacks %q", required)
+		}
+	}
+	if strings.Contains(artifacts.printed, "Sequence<T> & {") {
+		t.Fatal("named callable value retained a result intersection repair")
+	}
 	if count := strings.Count(
 		artifacts.printed,
 		"function Apply$cooperative_",
 	); count != 1 {
 		t.Fatalf("Apply cooperative profile count = %d, want 1", count)
+	}
+	if count := strings.Count(
+		artifacts.printed,
+		"function FilterSequence$cooperative_",
+	); count != 2 {
+		t.Fatalf("FilterSequence cooperative profile count = %d, want 2", count)
 	}
 	applyProfileName := cooperativeFunctionName(cooperativeApply)
 	if applyProfileName == "" {
@@ -306,10 +351,13 @@ import {
     SynchronousMethodValue,
     CooperativeMethodExpression,
     CooperativeResult,
+    CooperativeSequence,
+    CooperativeBoolSequence,
     InitializedSynchronousCallback,
     InitializedCooperativeCallback,
     IndependentPackageInitializer,
     IndependentSynchronous,
+    SynchronousSequence,
 } from "`+sourceModuleForExport(
 		t,
 		artifacts,
@@ -330,10 +378,13 @@ await GoScheduler.run(async () => {
         SynchronousMethodValue(),
         await CooperativeMethodExpression(),
         await CooperativeResult(),
+        await CooperativeSequence(),
+        await CooperativeBoolSequence(),
         InitializedSynchronousCallback(),
         InitializedCooperativeCallback(),
         IndependentPackageInitializer(),
         IndependentSynchronous(),
+        SynchronousSequence(),
     ].map(String).join(" "));
 });
 `)
@@ -385,10 +436,13 @@ func main() {
 		values.SynchronousMethodValue(),
 		values.CooperativeMethodExpression(),
 		values.CooperativeResult(),
+		values.CooperativeSequence(),
+		values.CooperativeBoolSequence(),
 		values.InitializedSynchronousCallback(),
 		values.InitializedCooperativeCallback(),
 		values.IndependentPackageInitializer(),
 		values.IndependentSynchronous(),
+		values.SynchronousSequence(),
 	)
 }
 `)

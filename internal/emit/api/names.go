@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/types"
 	"slices"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -410,4 +411,66 @@ func (i TargetIntrinsic) Expression(
 		factory.Identifier(i.String()),
 		tsgo.NodeFlagsNone,
 	)
+}
+
+type InterfaceMethodCallableReference struct {
+	artifacts []*GeneratedArtifact
+	requests  []RootRequest
+}
+
+func NewInterfaceMethodCallableReference(
+	artifacts []*GeneratedArtifact,
+	requests ...RootRequest,
+) (InterfaceMethodCallableReference, error) {
+	if len(artifacts) == 0 {
+		return InterfaceMethodCallableReference{}, &NameError{
+			Reason: "interface-method callable identities are absent",
+		}
+	}
+	artifacts = slices.Clone(artifacts)
+	slices.SortFunc(
+		artifacts,
+		func(left *GeneratedArtifact, right *GeneratedArtifact) int {
+			if left == nil || right == nil {
+				switch {
+				case left == right:
+					return 0
+				case left == nil:
+					return -1
+				default:
+					return 1
+				}
+			}
+			return strings.Compare(left.ArtifactKey(), right.ArtifactKey())
+		},
+	)
+	var previous *GeneratedArtifact
+	for _, callable := range artifacts {
+		if callable == nil ||
+			callable.Kind() != GeneratedArtifactInterfaceMethodCallable ||
+			!callable.Valid() ||
+			callable == previous {
+			return InterfaceMethodCallableReference{}, &NameError{
+				Reason: "interface-method callable identities are invalid",
+			}
+		}
+		previous = callable
+	}
+	if err := validateReferenceRequests(requests); err != nil {
+		return InterfaceMethodCallableReference{}, &RootRequestError{
+			Reason: "interface-method reference request is invalid",
+		}
+	}
+	return InterfaceMethodCallableReference{
+		artifacts: artifacts,
+		requests:  slices.Clone(requests),
+	}, nil
+}
+
+func (r InterfaceMethodCallableReference) Artifacts() []*GeneratedArtifact {
+	return slices.Clone(r.artifacts)
+}
+
+func (r InterfaceMethodCallableReference) Requests() []RootRequest {
+	return slices.Clone(r.requests)
 }

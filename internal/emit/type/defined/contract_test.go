@@ -2,6 +2,7 @@ package defined_test
 
 import (
 	"context"
+	"go/types"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,9 +10,112 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func TestCallableValueFacetDetectionIsStructural(t *testing.T) {
+	signature := types.NewSignatureType(
+		nil,
+		nil,
+		nil,
+		types.NewTuple(),
+		types.NewTuple(),
+		false,
+	)
+	for name, sourceType := range map[string]types.Type{
+		"direct": signature,
+		"nested": types.NewMap(
+			types.Typ[types.String],
+			types.NewSlice(types.NewArray(signature, 2)),
+		),
+	} {
+		named := types.NewNamed(
+			types.NewTypeName(0, nil, name, nil),
+			sourceType,
+			nil,
+		)
+		if !definedtype.RequiresValueFacet(named) {
+			t.Fatalf("%s callable leaf was not detected", name)
+		}
+	}
+	for name, sourceType := range map[string]types.Type{
+		"basic":  types.Typ[types.Int32],
+		"struct": types.NewStruct(nil, nil),
+	} {
+		named := types.NewNamed(
+			types.NewTypeName(0, nil, name, nil),
+			sourceType,
+			nil,
+		)
+		if definedtype.RequiresValueFacet(named) {
+			t.Fatalf("%s acquired a callable value facet", name)
+		}
+	}
+}
+
+func TestRecursiveStructWithCallableKeepsNativeClassShape(t *testing.T) {
+	target := compileDefinedSource(t, `package spelling
+
+type Node struct {
+	Next *Node
+	Visit func()
+}
+
+func Identity(value Node) Node { return value }
+`)
+	if len(target) > 10_000 {
+		t.Fatalf("recursive callable wrapper expanded to %d bytes", len(target))
+	}
+	for _, required := range []string{
+		"export class Node {",
+		"public Next: Node | undefined",
+		"public Visit: (($go$recovery?: GoRecovery) => void) | undefined",
+	} {
+		if !strings.Contains(target, required) {
+			t.Fatalf("recursive native class lacks %q:\n%s", required, target)
+		}
+	}
+	if strings.Contains(target, "$Value") {
+		t.Fatalf("recursive native class acquired a value facet:\n%s", target)
+	}
+}
+
+func TestGenericValueFacetArityFollowsDeclarationOrigin(t *testing.T) {
+	target := compileDefinedSource(t, `package spelling
+
+type CallbackHolder struct {
+	Callback func(int32) bool
+}
+
+type Cache[T any] map[string]T
+
+func Identity(value Cache[CallbackHolder]) Cache[CallbackHolder] {
+	return value
+}
+`)
+	for _, required := range []string{
+		"export class Cache<T> {",
+		"Cache<CallbackHolder>",
+	} {
+		if !strings.Contains(target, required) {
+			t.Fatalf("generic defined value lacks %q:\n%s", required, target)
+		}
+	}
+	for _, forbidden := range []string{
+		"Cache<T, $Value",
+		"Cache<CallbackHolder, ",
+	} {
+		if strings.Contains(target, forbidden) {
+			t.Fatalf(
+				"generic defined value acquired profile facet %q:\n%s",
+				forbidden,
+				target,
+			)
+		}
+	}
+}
 
 func TestDefinedBasicFamilyHasMinimalNominalShape(t *testing.T) {
 	emission := compileDefinedFixture(t, emit.DefaultOptions())

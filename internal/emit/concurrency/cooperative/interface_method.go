@@ -91,7 +91,7 @@ func InterfaceMethodValueContract(
 		abiObservation.Requests(),
 	)
 	if providers.any && !abiObservation.Cooperative() {
-		abiFacet, facetErr := api.NewCallableABIFacet(
+		abiFacet, facetErr := context.CallableABIFacet(
 			abiReference.Artifact(),
 		)
 		if facetErr != nil {

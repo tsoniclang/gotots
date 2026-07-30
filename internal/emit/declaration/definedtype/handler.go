@@ -88,6 +88,20 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, true, err
 	}
+	typeParameters := parameters.Nodes()
+	valueType := underlying.Value()
+	if definedtype.RequiresValueFacet(model.Type()) {
+		typeParameters = append(
+			typeParameters,
+			definedtype.ValueTypeParameterDeclaration(
+				context.Factory(),
+				underlying.Value(),
+			),
+		)
+		valueType = definedtype.ValueTypeParameterReference(
+			context.Factory(),
+		)
+	}
 	members := []tsgo.ClassElement{
 		context.Factory().PropertyDeclaration(
 			[]tsgo.ModifierLike{
@@ -114,7 +128,7 @@ func Emit(
 					nil,
 					context.Factory().Identifier(definedtype.ValueMember),
 					nil,
-					underlying.Value(),
+					valueType,
 					nil,
 				),
 			},
@@ -126,7 +140,7 @@ func Emit(
 		context.Factory().ClassDeclaration(
 			modifiers,
 			context.Factory().Identifier(name),
-			parameters.Nodes(),
+			typeParameters,
 			nil,
 			members,
 		),

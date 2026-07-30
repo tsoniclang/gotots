@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/emit/environmentcontract"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -270,8 +271,8 @@ func (s *programSession) buildEnvironmentBuiltin(
 ) (environmentBuiltin, error) {
 	ordered := append([]*types.Signature(nil), signatures...)
 	sort.Slice(ordered, func(left, right int) bool {
-		return stableTypeString(ordered[left]) <
-			stableTypeString(ordered[right])
+		return emitordering.StableTypeString(ordered[left]) <
+			emitordering.StableTypeString(ordered[right])
 	})
 	var statements []tsgo.Statement
 	var requests []api.RootRequest

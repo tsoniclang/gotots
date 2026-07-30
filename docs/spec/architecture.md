@@ -1059,6 +1059,36 @@ owner. A callable returned intrinsically cooperative by the declaration
 selects the ordinary source name and propagates that fact to its concrete
 value ABI; it does not create a duplicate variant.
 
+Callable definitions lexically nested inside a demand-created generic profile
+are owned by that profile as well as by their source AST identity. A nested
+literal that blocks in one reached profile therefore requests a profile-local
+callable ABI; it cannot widen the same literal, its enclosing declaration, or
+an open callable ABI in the ordinary profile. Profile-local ABI cooperation
+propagates only through the exact declaration-to-instantiation correspondence
+to the matching closed callable ABI. This remains ordinary reverse-artifact
+coordination, not a call graph or a second effect model.
+
+A named Go value whose represented underlying can change with a callable
+profile while its declared Go type arguments remain unchanged must preserve
+that selected representation through its wrapper. This decision belongs to
+the named declaration origin, so every reference agrees with the
+declaration's arity. A callable reached only through a type parameter or a
+nominal struct field does not create another facet: its ordinary type
+argument or nominal declaration already owns that representation. The
+generated class has one statically typed hidden value-facet parameter,
+defaulted to the ordinary represented underlying type, and its value field
+uses that parameter. A profile use supplies the exact selected underlying
+type. For example,
+`Seq[T] func(func(T) bool)` may be represented as
+`Seq<T, $Value = ((yield: (T) => boolean) => void)>`; a cooperative profile
+selects the same class with a Promise-returning `$Value`. The parameter is
+absent from `Cache[T] map[string]T`, including
+`Cache[StructContainingCallback]`, because `T` already carries the selected
+representation and the declaration origin has no independent callable ABI.
+Intersections, casts, erased payloads, runtime Promise tests, per-use wrapper
+definitions, instantiated-argument arity inference, and declaration-wide
+widening are forbidden.
+
 An environment-owned generic function has no retained body and therefore
 cannot be reconstructed as a source variant. Its environment contract emits a
 separate demand-created ambient declaration for each reached callable profile.

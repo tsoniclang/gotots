@@ -54,6 +54,9 @@ func emitIterator(
 		return api.StatementEmission{}, err
 	}
 	targetIterator := tsgo.Expression(iterator)
+	if model, defined := definedtype.ResolveCallable(sourceType); defined {
+		targetIterator = model.Unwrap(context.Factory(), targetIterator)
+	}
 	if !callable.StaticallyNonNil(context.TypesInfo(), source.X) {
 		guard, guardRequests, guardErr := callable.NilGuard(
 			context.WithRole(api.RoleRangeExpression),
@@ -64,9 +67,6 @@ func emitIterator(
 		}
 		before = append(before, guard)
 		requests = append(requests, guardRequests...)
-	}
-	if model, defined := definedtype.ResolveCallable(sourceType); defined {
-		targetIterator = model.Unwrap(context.Factory(), targetIterator)
 	}
 	stateName, err := context.Names().Temporary(api.TemporaryRangeState)
 	if err != nil {
@@ -223,11 +223,11 @@ func iteratorCallback(
 	returnSelected bool,
 	panicName string,
 ) (tsgo.ArrowFunction, []api.RootRequest, error) {
-	reference, err := context.Names().CallableABI(yield)
+	reference, err := callable.ABIReference(context, yield)
 	if err != nil {
 		return nil, nil, err
 	}
-	facet, err := api.NewCallableABIFacet(reference.Artifact())
+	facet, err := context.CallableABIFacet(reference.Artifact())
 	if err != nil {
 		return nil, nil, err
 	}

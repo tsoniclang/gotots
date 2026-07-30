@@ -1,23 +1,11 @@
 package emit
 
 import (
-	"go/types"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 )
-
-func compareBasicKinds(left types.BasicKind, right types.BasicKind) int {
-	switch {
-	case left < right:
-		return -1
-	case left > right:
-		return 1
-	default:
-		return 0
-	}
-}
 
 func compareDeclarationRequirements(
 	left api.DeclarationRequirement,
@@ -66,7 +54,7 @@ func compareDeclarationRequirements(
 	if left.Kind() == api.DeclarationRequirementConstantProjection {
 		_, leftProjection, _ := left.ConstantProjection()
 		_, rightProjection, _ := right.ConstantProjection()
-		return compareBasicKinds(leftProjection, rightProjection)
+		return emitordering.CompareBasicKinds(leftProjection, rightProjection)
 	}
 	if left.Kind() == api.DeclarationRequirementLocalConstantProjection {
 		_, leftConstant, leftProjection, _ := left.LocalConstantProjection()
@@ -77,7 +65,7 @@ func compareDeclarationRequirements(
 		); order != 0 {
 			return order
 		}
-		return compareBasicKinds(leftProjection, rightProjection)
+		return emitordering.CompareBasicKinds(leftProjection, rightProjection)
 	}
 	if left.Kind() == api.DeclarationRequirementGenericOperation {
 		_, leftOperation, leftOK := left.GenericOperation()
@@ -131,8 +119,8 @@ func compareDeclarationRequirements(
 		case !leftOK:
 			return 0
 		}
-		leftType := stableTypeString(leftSignature)
-		rightType := stableTypeString(rightSignature)
+		leftType := emitordering.StableTypeString(leftSignature)
+		rightType := emitordering.StableTypeString(rightSignature)
 		switch {
 		case leftType < rightType:
 			return -1
@@ -165,6 +153,22 @@ func compareDeclarationRequirements(
 			case leftLiteral.Pos() > rightLiteral.Pos():
 				return 1
 			}
+			leftProfile, leftProfiled :=
+				leftFacet.FunctionLiteralProfile()
+			rightProfile, rightProfiled :=
+				rightFacet.FunctionLiteralProfile()
+			switch {
+			case !leftProfiled && rightProfiled:
+				return -1
+			case leftProfiled && !rightProfiled:
+				return 1
+			case leftProfiled &&
+				leftProfile.Key() < rightProfile.Key():
+				return -1
+			case leftProfiled &&
+				leftProfile.Key() > rightProfile.Key():
+				return 1
+			}
 		}
 		if leftOperation, ok := leftFacet.GenericOperation(); ok {
 			rightOperation, _ := rightFacet.GenericOperation()
@@ -174,6 +178,12 @@ func compareDeclarationRequirements(
 			case leftOperation.Key() > rightOperation.Key():
 				return 1
 			}
+		}
+		if order, profiled := compareGenericProfileABIs(
+			leftFacet,
+			rightFacet,
+		); profiled && order != 0 {
+			return order
 		}
 		if leftProfile, ok := leftFacet.GenericProfile(); ok {
 			rightProfile, _ := rightFacet.GenericProfile()
@@ -304,15 +314,6 @@ func compareDeclarationRequirements(
 	default:
 		return 0
 	}
-}
-
-func stableTypeString(source types.Type) string {
-	return types.TypeString(source, func(sourcePackage *types.Package) string {
-		if sourcePackage == nil {
-			return ""
-		}
-		return sourcePackage.Path()
-	})
 }
 
 func compareCallableControlRequirements(

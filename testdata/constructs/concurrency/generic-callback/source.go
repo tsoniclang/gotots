@@ -14,6 +14,8 @@ type Box[T any] struct {
 	Value T
 }
 
+type Sequence[T any] func(func(T) bool)
+
 var InitializerApply = Apply("initializer", func(value string) bool {
 	return value == "initializer"
 })
@@ -30,6 +32,66 @@ func MakeReceiver[T any](values <-chan T) func() T {
 	return func() T {
 		return <-values
 	}
+}
+
+func FilterSequence[T any](
+	values []T,
+	predicate func(T) bool,
+) Sequence[T] {
+	return func(yield func(T) bool) {
+		for _, value := range values {
+			if predicate(value) && !yield(value) {
+				return
+			}
+		}
+	}
+}
+
+func SynchronousSequence() string {
+	sequence := FilterSequence(
+		[]string{"skip", "kept"},
+		func(value string) bool { return value == "kept" },
+	)
+	var result string
+	sequence(func(value string) bool {
+		result += value
+		return true
+	})
+	return result
+}
+
+func CooperativeSequence() int32 {
+	values := make(chan int32, 1)
+	values <- 2
+	sequence := FilterSequence(
+		[]int32{1, 2},
+		func(value int32) bool {
+			return value == 2 && value == <-values
+		},
+	)
+	var result int32
+	sequence(func(value int32) bool {
+		result += value
+		return true
+	})
+	return result
+}
+
+func CooperativeBoolSequence() bool {
+	values := make(chan bool, 1)
+	values <- true
+	sequence := FilterSequence(
+		[]bool{false, true},
+		func(value bool) bool {
+			return value && value == <-values
+		},
+	)
+	var result bool
+	sequence(func(value bool) bool {
+		result = value
+		return true
+	})
+	return result
 }
 
 func CooperativeApply() bool {

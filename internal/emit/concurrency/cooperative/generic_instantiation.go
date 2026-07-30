@@ -15,6 +15,7 @@ type genericTypePair struct {
 type genericCallableCorrespondence struct {
 	context    api.Context
 	owner      types.Object
+	profile    *api.GenericCallableProfile
 	seen       map[genericTypePair]struct{}
 	selections map[*api.GeneratedArtifact]bool
 	requests   []api.RootRequest
@@ -78,6 +79,43 @@ func CorrespondGenericCallableABIs(
 	return profile,
 		api.CombineRequests(correspondence.requests),
 		nil
+}
+
+func PropagateGenericCallableProfile(
+	context api.Context,
+	owner types.Object,
+	profile *api.GenericCallableProfile,
+	declaration *types.Signature,
+	instantiated *types.Signature,
+) ([]api.RootRequest, error) {
+	owner = api.GenericDeclarationOrigin(owner)
+	if owner == nil ||
+		!profile.Valid() ||
+		profile.Owner() != owner ||
+		declaration == nil ||
+		instantiated == nil ||
+		declaration.Params().Len() != instantiated.Params().Len() ||
+		declaration.Results().Len() != instantiated.Results().Len() ||
+		declaration.Variadic() != instantiated.Variadic() {
+		return nil, &api.InvariantError{
+			Role:   api.RoleCallArgument,
+			Reason: "generic callable profile propagation is invalid",
+		}
+	}
+	correspondence := genericCallableCorrespondence{
+		context:    context,
+		owner:      owner,
+		profile:    profile,
+		seen:       make(map[genericTypePair]struct{}),
+		selections: make(map[*api.GeneratedArtifact]bool),
+	}
+	if err := correspondence.signatureMembers(
+		declaration,
+		instantiated,
+	); err != nil {
+		return nil, err
+	}
+	return api.CombineRequests(correspondence.requests), nil
 }
 
 func (c *genericCallableCorrespondence) signatureMembers(
@@ -270,24 +308,43 @@ func (c *genericCallableCorrespondence) callable(
 	if err != nil {
 		return err
 	}
-	declarationObservation, err :=
-		c.observe(declarationReference)
+	var declarationFacet api.CallableFacet
+	if c.profile == nil {
+		declarationFacet, err = api.NewCallableABIFacet(
+			declarationReference.Artifact(),
+		)
+	} else {
+		declarationFacet, err =
+			api.NewGenericProfileCallableABIFacet(
+				c.profile,
+				declarationReference.Artifact(),
+			)
+	}
 	if err != nil {
 		return err
 	}
-	instantiatedObservation, err :=
-		c.observe(instantiatedReference)
+	instantiatedFacet, err := api.NewCallableABIFacet(
+		instantiatedReference.Artifact(),
+	)
+	if err != nil {
+		return err
+	}
+	declarationObservation, err := c.observe(
+		declarationReference,
+		declarationFacet,
+	)
+	if err != nil {
+		return err
+	}
+	instantiatedObservation, err := c.observe(
+		instantiatedReference,
+		instantiatedFacet,
+	)
 	if err != nil {
 		return err
 	}
 	if declarationObservation.Cooperative() &&
 		!instantiatedObservation.Cooperative() {
-		instantiatedFacet, err := api.NewCallableABIFacet(
-			instantiatedReference.Artifact(),
-		)
-		if err != nil {
-			return err
-		}
 		request, err := api.NewCooperativeCallableRequest(
 			instantiatedFacet,
 		)
@@ -295,6 +352,9 @@ func (c *genericCallableCorrespondence) callable(
 			return err
 		}
 		c.requests = append(c.requests, request)
+	}
+	if c.profile != nil {
+		return nil
 	}
 	if !declarationObservation.Cooperative() &&
 		instantiatedObservation.Cooperative() {
@@ -305,10 +365,13 @@ func (c *genericCallableCorrespondence) callable(
 
 func (c *genericCallableCorrespondence) observe(
 	reference api.CallableABIReference,
+	facet api.CallableFacet,
 ) (api.CooperativeCallableObservation, error) {
-	facet, err := api.NewCallableABIFacet(reference.Artifact())
-	if err != nil {
-		return api.CooperativeCallableObservation{}, err
+	if !facet.Valid() {
+		return api.CooperativeCallableObservation{}, &api.InvariantError{
+			Role:   api.RoleCallArgument,
+			Reason: "generic callable observation facet is invalid",
+		}
 	}
 	observation, err := c.context.ObserveCooperativeCallable(facet)
 	if err != nil {

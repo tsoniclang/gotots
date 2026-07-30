@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -38,12 +37,10 @@ func Emit(
 			return api.TypeEmission{}, true, err
 		}
 	}
-	target := tsgo.TypeNode(context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(reference.Name()),
-		arguments,
-	))
-	if _, profiled := context.GenericCallableProfile(); profiled {
-		underlying, err := profiledUnderlyingType(
+	_, profiled := context.GenericCallableProfile()
+	if RequiresValueFacet(model.Type()) &&
+		(profiled || model.Type().TypeArgs().Len() != 0) {
+		underlying, err := valueFacetType(
 			context,
 			children,
 			source,
@@ -52,42 +49,25 @@ func Emit(
 		if err != nil {
 			return api.TypeEmission{}, true, err
 		}
-		target = context.Factory().IntersectionTypeNode([]tsgo.TypeNode{
-			target,
-			context.Factory().TypeLiteralNode([]tsgo.TypeElement{
-				context.Factory().PropertySignatureDeclaration(
-					[]tsgo.ModifierLike{
-						context.Factory().ReadonlyKeyword(),
-					},
-					context.Factory().Identifier(ValueMember),
-					nil,
-					underlying.Value(),
-					context.Factory().OmittedExpression(),
-				),
-			}),
-		})
+		arguments = append(arguments, underlying.Value())
 		requests = append(requests, underlying.Requests()...)
 	}
+	target := context.Factory().TypeReferenceNode(
+		context.Factory().Identifier(reference.Name()),
+		arguments,
+	)
 	return api.DirectType(
 		target,
 		api.CombineRequests(reference.Requests(), requests)...,
 	), true, nil
 }
 
-func profiledUnderlyingType(
+func valueFacetType(
 	context api.Context,
 	children api.ChildEmitter,
 	source ast.Node,
 	model Model,
 ) (api.TypeEmission, error) {
-	if signature, callableFamily := model.Callable(); callableFamily {
-		return callable.EmitDefinedNonNilType(
-			context.WithRole(api.RoleDefinedUnderlyingType),
-			children,
-			source,
-			signature,
-		)
-	}
 	return children.RepresentedType(
 		context.WithRole(api.RoleDefinedUnderlyingType),
 		source,

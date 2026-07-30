@@ -57,10 +57,11 @@ func NewSourceCallableFacet(function *types.Func) (CallableFacet, error) {
 	}, nil
 }
 
-func NewFunctionLiteralCallableFacet(
-	owner ArtifactOwner,
+func (c Context) FunctionLiteralCallableFacet(
 	literal *ast.FuncLit,
 ) (CallableFacet, error) {
+	owner := c.artifactOwner
+	profile := c.genericCallableProfile
 	_, sourceOwned := owner.Source()
 	_, _, initializerOwned := owner.PackageInitializer()
 	if (!sourceOwned && !initializerOwned) ||
@@ -71,10 +72,21 @@ func NewFunctionLiteralCallableFacet(
 			Reason: "function-literal callable facet is invalid",
 		}
 	}
+	if profile != nil {
+		source, sourceProfile := owner.Source()
+		if !sourceProfile ||
+			!profile.Valid() ||
+			source != profile.Owner() {
+			return CallableFacet{}, &RootRequestError{
+				Reason: "function-literal callable profile is invalid",
+			}
+		}
+	}
 	return CallableFacet{
 		owner:   owner,
 		kind:    CallableFacetFunctionLiteral,
 		literal: literal,
+		profile: profile,
 	}, nil
 }
 
@@ -121,6 +133,26 @@ func NewCallableABIFacet(
 		owner:     MustGeneratedArtifactOwner(artifact),
 		kind:      CallableFacetABI,
 		generated: artifact,
+	}, nil
+}
+
+func NewGenericProfileCallableABIFacet(
+	profile *GenericCallableProfile,
+	artifact *GeneratedArtifact,
+) (CallableFacet, error) {
+	if !profile.Valid() ||
+		artifact == nil ||
+		artifact.Kind() != GeneratedArtifactCallableABI ||
+		!artifact.Valid() {
+		return CallableFacet{}, &RootRequestError{
+			Reason: "generic-profile callable ABI facet is invalid",
+		}
+	}
+	return CallableFacet{
+		owner:     MustSourceArtifactOwner(profile.Owner()),
+		kind:      CallableFacetABI,
+		generated: artifact,
+		profile:   profile,
 	}, nil
 }
 
@@ -196,8 +228,14 @@ func (f CallableFacet) Valid() bool {
 			f.profile == nil &&
 			signature != nil
 	case CallableFacetFunctionLiteral:
-		_, sourceOwned := f.owner.Source()
+		source, sourceOwned := f.owner.Source()
 		_, _, initializerOwned := f.owner.PackageInitializer()
+		profileValid := f.profile == nil
+		if f.profile != nil {
+			profileValid = sourceOwned &&
+				f.profile.Valid() &&
+				source == f.profile.Owner()
+		}
 		return (sourceOwned || initializerOwned) &&
 			f.function == nil &&
 			f.literal != nil &&
@@ -205,17 +243,24 @@ func (f CallableFacet) Valid() bool {
 			f.literal.Body != nil &&
 			f.generated == nil &&
 			f.operation == nil &&
-			f.profile == nil
+			profileValid
 	case CallableFacetABI:
 		generated, generatedOwned := f.owner.Generated()
-		return generatedOwned &&
+		source, sourceOwned := f.owner.Source()
+		global := f.profile == nil &&
+			generatedOwned &&
+			generated == f.generated
+		profiled := f.profile != nil &&
+			sourceOwned &&
+			f.profile.Valid() &&
+			source == f.profile.Owner()
+		return (global || profiled) &&
 			f.function == nil &&
 			f.literal == nil &&
-			f.generated == generated &&
+			f.generated != nil &&
 			f.generated.Kind() == GeneratedArtifactCallableABI &&
 			f.generated.Valid() &&
-			f.operation == nil &&
-			f.profile == nil
+			f.operation == nil
 	case CallableFacetGenericCapability:
 		return f.generated != nil &&
 			f.owner == f.generated.ReconstructionOwner() &&
@@ -297,75 +342,35 @@ func (f CallableFacet) FunctionLiteral() (*ast.FuncLit, bool) {
 	return f.literal, f.Valid() && f.kind == CallableFacetFunctionLiteral
 }
 
+func (f CallableFacet) FunctionLiteralProfile() (
+	*GenericCallableProfile,
+	bool,
+) {
+	return f.profile,
+		f.Valid() &&
+			f.kind == CallableFacetFunctionLiteral &&
+			f.profile != nil
+}
+
 func (f CallableFacet) ABI() (*GeneratedArtifact, bool) {
 	return f.generated, f.Valid() && f.kind == CallableFacetABI
+}
+
+func (f CallableFacet) GenericProfileABI() (
+	*GenericCallableProfile,
+	*GeneratedArtifact,
+	bool,
+) {
+	return f.profile,
+		f.generated,
+		f.Valid() &&
+			f.kind == CallableFacetABI &&
+			f.profile != nil
 }
 
 func (f CallableFacet) InterfaceMethod() (*GeneratedArtifact, bool) {
 	return f.generated,
 		f.Valid() && f.kind == CallableFacetInterfaceMethod
-}
-
-type InterfaceMethodCallableReference struct {
-	artifacts []*GeneratedArtifact
-	requests  []RootRequest
-}
-
-func NewInterfaceMethodCallableReference(
-	artifacts []*GeneratedArtifact,
-	requests ...RootRequest,
-) (InterfaceMethodCallableReference, error) {
-	if len(artifacts) == 0 {
-		return InterfaceMethodCallableReference{}, &NameError{
-			Reason: "interface-method callable identities are absent",
-		}
-	}
-	artifacts = slices.Clone(artifacts)
-	slices.SortFunc(
-		artifacts,
-		func(left *GeneratedArtifact, right *GeneratedArtifact) int {
-			if left == nil || right == nil {
-				switch {
-				case left == right:
-					return 0
-				case left == nil:
-					return -1
-				default:
-					return 1
-				}
-			}
-			return strings.Compare(left.ArtifactKey(), right.ArtifactKey())
-		},
-	)
-	var previous *GeneratedArtifact
-	for _, callable := range artifacts {
-		if callable == nil ||
-			callable.Kind() != GeneratedArtifactInterfaceMethodCallable ||
-			!callable.Valid() ||
-			callable == previous {
-			return InterfaceMethodCallableReference{}, &NameError{
-				Reason: "interface-method callable identities are invalid",
-			}
-		}
-		previous = callable
-	}
-	if err := validateReferenceRequests(requests); err != nil {
-		return InterfaceMethodCallableReference{}, &RootRequestError{
-			Reason: "interface-method reference request is invalid",
-		}
-	}
-	return InterfaceMethodCallableReference{
-		artifacts: artifacts,
-		requests:  slices.Clone(requests),
-	}, nil
-}
-
-func (r InterfaceMethodCallableReference) Artifacts() []*GeneratedArtifact {
-	return slices.Clone(r.artifacts)
-}
-
-func (r InterfaceMethodCallableReference) Requests() []RootRequest {
-	return slices.Clone(r.requests)
 }
 
 func (f CallableFacet) GenericCapability() (*GeneratedArtifact, bool) {

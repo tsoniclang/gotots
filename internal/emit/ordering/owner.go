@@ -6,6 +6,26 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
+func CompareBasicKinds(left types.BasicKind, right types.BasicKind) int {
+	switch {
+	case left < right:
+		return -1
+	case left > right:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func StableTypeString(source types.Type) string {
+	return types.TypeString(source, func(sourcePackage *types.Package) string {
+		if sourcePackage == nil {
+			return ""
+		}
+		return sourcePackage.Path()
+	})
+}
+
 func CompareObjects(left types.Object, right types.Object) int {
 	leftPackage := ""
 	if left != nil && left.Pkg() != nil {

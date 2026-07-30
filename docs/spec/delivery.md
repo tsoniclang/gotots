@@ -585,6 +585,17 @@ directionally to each corresponding concrete ABI without creating a duplicate
 variant; concrete call-site cooperation never widens the declaration
 baseline. Declaration-wide widening, runtime Promise detection,
 `T | Promise<T>` results, and per-call wrappers are forbidden.
+Lexically nested callables inside a selected variant use profile-local
+source-plus-AST facet identities. Their cooperation propagates only to the
+structurally corresponding closed callable ABI. Named values containing a
+callable representation that can vary independently of their declared Go type
+arguments use one hidden, defaulted value-facet type parameter so each profile
+carries its exact represented underlying callable type. The declaration
+origin is the sole arity owner; transitive callable fields reached through a
+type argument or nominal struct do not add a facet. Exit rejects globalized
+nested literal facets, open-ABI widening, result intersections, casts,
+instantiation-derived declaration arity, and hidden facets added to unrelated
+named values.
 If the source declaration is exported, package assembly re-exports every
 reached variant from its owning source module. Export selection comes from the
 same accepted profile requirements as declaration reconstruction; no consumer

@@ -1950,6 +1950,38 @@ is therefore cooperative and `MakeReceiver[int32]` uses the ordinary
 reverse is forbidden: a cooperative concrete callback passed to `Apply`
 selects an `Apply` variant but never changes `Apply`'s baseline ABI.
 
+The profile boundary also owns nested callable definitions and named callable
+values:
+
+```go
+type Sequence[T any] func(func(T) bool)
+
+func FilterSequence[T any](values []T, keep func(T) bool) Sequence[T] {
+	return func(yield func(T) bool) {
+		for _, value := range values {
+			if keep(value) && !yield(value) {
+				return
+			}
+		}
+	}
+}
+```
+
+An ordinary use emits a synchronous nested literal and a
+`Sequence<T, synchronous-value-type>`. A reached cooperative profile emits a
+profile-owned nested literal, then supplies
+`Sequence<T, cooperative-value-type>` whose yield/result ABI is
+Promise-returning. The profile-local literal ABI propagates only to that
+corresponding closed `Sequence` value. The ordinary `FilterSequence` and its
+wrapper default remain synchronous. The wrapper uses one hidden, defaulted,
+statically typed value-facet parameter because its declaration-origin
+underlying representation varies by callable profile without changing `T`.
+The declaration origin—not an instantiated argument's transitive fields—owns
+this arity. Thus `Cache[T] map[string]T` remains `Cache<T>` even for
+`Cache[StructContainingCallback]`: the selected `T` and nested nominal type
+already carry their own representation. No intersection, cast, runtime
+wrapper, or thenable test repairs the result afterward.
+
 When the generic owner is an environment contract rather than translated
 source, the same use-site profile selects an ambient declaration instead of a
 body variant. For example:

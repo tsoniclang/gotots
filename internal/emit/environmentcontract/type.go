@@ -466,6 +466,20 @@ func definedDeclaration(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
+	typeParameters := generic.parameters
+	valueType := target.Value()
+	if definedmodel.RequiresValueFacet(typeName.Type()) {
+		typeParameters = append(
+			typeParameters,
+			definedmodel.ValueTypeParameterDeclaration(
+				context.Factory(),
+				target.Value(),
+			),
+		)
+		valueType = definedmodel.ValueTypeParameterReference(
+			context.Factory(),
+		)
+	}
 	members := []tsgo.ClassElement{
 		context.Factory().PropertyDeclaration(
 			[]tsgo.ModifierLike{
@@ -486,14 +500,14 @@ func definedDeclaration(
 			},
 			context.Factory().Identifier(definedmodel.ValueMember),
 			nil,
-			target.Value(),
+			valueType,
 			nil,
 		),
 		context.Factory().ConstructorDeclaration(
 			nil,
 			nil,
 			[]tsgo.ParameterDeclaration{
-				parameter(context, definedmodel.ValueMember, target.Value()),
+				parameter(context, definedmodel.ValueMember, valueType),
 			},
 			nil,
 			nil,
@@ -503,7 +517,7 @@ func definedDeclaration(
 		context.Factory().ClassDeclaration(
 			exportDeclare(context),
 			context.Factory().Identifier(name),
-			generic.parameters,
+			typeParameters,
 			nil,
 			members,
 		),

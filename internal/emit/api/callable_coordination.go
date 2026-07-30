@@ -224,6 +224,18 @@ func (c Context) GenericCallableProfile() (
 	return c.genericCallableProfile, c.genericCallableProfile != nil
 }
 
+func (c Context) CallableABIFacet(
+	artifact *GeneratedArtifact,
+) (CallableFacet, error) {
+	if c.genericCallableProfile != nil {
+		return NewGenericProfileCallableABIFacet(
+			c.genericCallableProfile,
+			artifact,
+		)
+	}
+	return NewCallableABIFacet(artifact)
+}
+
 func (c Context) IsCooperative() bool {
 	return c.cooperative
 }

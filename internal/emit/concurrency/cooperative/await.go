@@ -29,10 +29,7 @@ func LiteralCall(
 	provider *ast.FuncLit,
 	target api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	facet, err := api.NewFunctionLiteralCallableFacet(
-		context.ArtifactOwner(),
-		provider,
-	)
+	facet, err := context.FunctionLiteralCallableFacet(provider)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -71,10 +68,7 @@ func DetachedLiteralCall(
 	provider *ast.FuncLit,
 	target api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	facet, err := api.NewFunctionLiteralCallableFacet(
-		context.ArtifactOwner(),
-		provider,
-	)
+	facet, err := context.FunctionLiteralCallableFacet(provider)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -163,10 +157,7 @@ func AdaptLiteralValue(
 	source *ast.FuncLit,
 	target api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	facet, err := api.NewFunctionLiteralCallableFacet(
-		context.ArtifactOwner(),
-		source,
-	)
+	facet, err := context.FunctionLiteralCallableFacet(source)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -251,10 +242,7 @@ func LiteralContract(
 	context api.Context,
 	provider *ast.FuncLit,
 ) (bool, []api.RootRequest, error) {
-	facet, err := api.NewFunctionLiteralCallableFacet(
-		context.ArtifactOwner(),
-		provider,
-	)
+	facet, err := context.FunctionLiteralCallableFacet(provider)
 	if err != nil {
 		return false, nil, err
 	}
@@ -380,8 +368,11 @@ func providerContract(
 		reference.Requests(),
 		abiObservation.Requests(),
 	)
-	if providerObservation.Cooperative() {
-		abiFacet, facetErr := api.NewCallableABIFacet(reference.Artifact())
+	if providerObservation.Cooperative() &&
+		!abiObservation.Cooperative() {
+		abiFacet, facetErr := context.CallableABIFacet(
+			reference.Artifact(),
+		)
 		if facetErr != nil {
 			return false, false, nil, facetErr
 		}
@@ -412,13 +403,13 @@ func observeABI(
 				Reason: "callable ABI signature is unsupported",
 			}
 	}
-	reference, err := context.Names().CallableABI(signature)
+	reference, err := callable.ABIReference(context, signature)
 	if err != nil {
 		return api.CallableABIReference{},
 			api.CooperativeCallableObservation{},
 			err
 	}
-	facet, err := api.NewCallableABIFacet(reference.Artifact())
+	facet, err := context.CallableABIFacet(reference.Artifact())
 	if err != nil {
 		return api.CallableABIReference{},
 			api.CooperativeCallableObservation{},

@@ -160,7 +160,7 @@ func compareRoots(left Root, right Root) int {
 	if left.kind > right.kind {
 		return 1
 	}
-	return compareBasicKinds(left.projection, right.projection)
+	return emitordering.CompareBasicKinds(left.projection, right.projection)
 }
 
 func ExportedAPIRoots(source *load.Package) ([]Root, error) {

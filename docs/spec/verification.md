@@ -1260,7 +1260,21 @@ execution:
     route the environment owner through source reconstruction, widen the base,
     infer the outer effect from nested callable shape, or create one ambient
     declaration per use; and
-13. the selected-profile boundary: concurrency fails while the profile is
+13. a generic function returning a named callable value keeps its ordinary
+    nested literal and wrapper synchronous while a distinct reached profile
+    owns a cooperative nested literal and exact closed result ABI. The named
+    wrapper has one hidden value-facet parameter defaulted to its ordinary
+    represented callable type; declaration-origin analysis gives every
+    reference the same arity, while a generic map whose concrete argument's
+    nominal fields contain a callback retains only its declared type
+    parameters. Mutations drop the lexical profile from literal identity,
+    globalize its ABI request, omit profile-to-closed-ABI propagation, restore
+    a result intersection or cast, infer hidden arity from an instantiated
+    argument's transitive fields, or add the hidden facet to every named type;
+    each must fail
+    differential behavior, strict staticness, artifact shape, ordinary-profile
+    byte stability, or source-size evidence; and
+14. the selected-profile boundary: concurrency fails while the profile is
    disabled; the cooperative selection and all output evidence name that it
    does not reproduce asynchronous preemption. The checked-in busy-goroutine
    counterexample receives no yield/preemption workaround and is never run as

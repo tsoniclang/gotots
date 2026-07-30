@@ -231,10 +231,7 @@ func emitEnvironmentNonNilType(
 			signature,
 		)
 	}
-	reference, err := context.Names().SourceCallableABI(
-		profile.Owner(),
-		signature,
-	)
+	reference, err := ABIReference(context, signature)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
@@ -273,11 +270,11 @@ func EmitNonNilType(
 	source ast.Node,
 	signature *types.Signature,
 ) (api.TypeEmission, error) {
-	reference, err := context.Names().CallableABI(signature)
+	reference, err := ABIReference(context, signature)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
-	facet, err := api.NewCallableABIFacet(reference.Artifact())
+	facet, err := context.CallableABIFacet(reference.Artifact())
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
@@ -305,26 +302,17 @@ func EmitNonNilType(
 	), nil
 }
 
-func EmitDefinedNonNilType(
+func ABIReference(
 	context api.Context,
-	children api.ChildEmitter,
-	source ast.Node,
 	signature *types.Signature,
-) (api.TypeEmission, error) {
-	if context.EnvironmentContract() {
-		return emitEnvironmentNonNilType(
-			context,
-			children,
-			source,
+) (api.CallableABIReference, error) {
+	if profile, profiled := context.GenericCallableProfile(); profiled {
+		return context.Names().SourceCallableABI(
+			profile.Owner(),
 			signature,
 		)
 	}
-	return EmitNonNilType(
-		context,
-		children,
-		source,
-		signature,
-	)
+	return context.Names().CallableABI(signature)
 }
 
 func EmitInternalNonNilType(

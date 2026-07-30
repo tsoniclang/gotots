@@ -307,6 +307,10 @@ func (s *programSession) ObserveCooperativeCallable(
 		return api.NewCooperativeCallableObservation(false)
 	}
 	cooperative := false
+	if profile, artifact, profiled := facet.GenericProfileABI(); profiled {
+		selected, found := profile.Selection().ABI(artifact)
+		cooperative = found && selected
+	}
 	for _, requirement := range s.requirements.appliedFor(
 		facet.Owner(),
 	) {
@@ -535,8 +539,40 @@ func callableContractDefinition(
 func callableContractFacet(
 	facet api.CallableFacet,
 ) (*api.GeneratedArtifact, bool) {
+	if _, _, profiled := facet.GenericProfileABI(); profiled {
+		return nil, false
+	}
 	if artifact, ok := facet.ABI(); ok {
 		return artifact, true
 	}
 	return facet.InterfaceMethod()
+}
+
+func compareGenericProfileABIs(
+	left api.CallableFacet,
+	right api.CallableFacet,
+) (int, bool) {
+	leftProfile, leftABI, leftOK := left.GenericProfileABI()
+	rightProfile, rightABI, rightOK := right.GenericProfileABI()
+	if leftOK != rightOK {
+		if leftOK {
+			return 1, true
+		}
+		return -1, true
+	}
+	if !leftOK {
+		return 0, false
+	}
+	switch {
+	case leftProfile.Key() < rightProfile.Key():
+		return -1, true
+	case leftProfile.Key() > rightProfile.Key():
+		return 1, true
+	case leftABI.ArtifactKey() < rightABI.ArtifactKey():
+		return -1, true
+	case leftABI.ArtifactKey() > rightABI.ArtifactKey():
+		return 1, true
+	default:
+		return 0, true
+	}
 }

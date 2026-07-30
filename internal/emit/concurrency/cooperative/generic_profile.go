@@ -143,12 +143,26 @@ func selectGenericCallable(
 		if resolveErr != nil {
 			return genericCallableSelection{}, resolveErr
 		}
+		propagationRequests, propagationErr :=
+			PropagateGenericCallableProfile(
+				context,
+				owner,
+				profile,
+				declaration,
+				instantiated,
+			)
+		if propagationErr != nil {
+			return genericCallableSelection{}, propagationErr
+		}
 		facet, facetErr := api.NewGenericCallableProfileFacet(profile)
 		return genericCallableSelection{
 			facet:     facet,
 			profile:   profile,
 			selection: profileSelection,
-			requests:  requests,
+			requests: api.CombineRequests(
+				requests,
+				propagationRequests,
+			),
 		}, facetErr
 	}
 	facet, err := api.NewSourceCallableFacet(owner)

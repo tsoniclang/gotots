@@ -131,7 +131,8 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 	abi := "(($0: gostring, $go$recovery?: GoRecovery) => void) | undefined"
 	for _, required := range []string{
 		"public Call: " + abi,
-		"public readonly $value: " + abi,
+		"$Value = " + abi,
+		"public readonly $value: $Value",
 		"GoPointer<" + abi + ", " + abi + ">",
 		"RuntimeSlice.literal<" + abi + ">",
 	} {
