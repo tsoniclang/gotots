@@ -125,6 +125,26 @@ func selectGenericCallable(
 		}
 	}
 	owner = owner.Origin()
+	if active, profiled := context.GenericCallableProfile(); profiled &&
+		active.Owner() == owner {
+		requests, propagationErr := PropagateGenericCallableProfile(
+			context,
+			owner,
+			active,
+			declaration,
+			instantiated,
+		)
+		if propagationErr != nil {
+			return genericCallableSelection{}, propagationErr
+		}
+		facet, facetErr := api.NewGenericCallableProfileFacet(active)
+		return genericCallableSelection{
+			facet:     facet,
+			profile:   active,
+			selection: active.Selection(),
+			requests:  requests,
+		}, facetErr
+	}
 	profileSelection, requests, err :=
 		CorrespondGenericCallableABIs(
 			context,

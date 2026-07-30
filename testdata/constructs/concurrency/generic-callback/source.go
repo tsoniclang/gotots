@@ -229,3 +229,55 @@ func CooperativeGenericProfileWithNamedCallback() bool {
 		},
 	)
 }
+
+type CallbackMap[K any, V any] struct {
+	Key   K
+	Value V
+}
+
+func (m CallbackMap[K, V]) Range(callback func(K, V) bool) bool {
+	return callback(m.Key, m.Value)
+}
+
+type CallbackSet[T any] struct {
+	Values CallbackMap[T, struct{}]
+}
+
+func (s CallbackSet[T]) Range(callback func(T) bool) bool {
+	return s.Values.Range(func(key T, _ struct{}) bool {
+		return callback(key)
+	})
+}
+
+func CooperativeNestedGenericMethod() bool {
+	values := make(chan int32, 1)
+	values <- 7
+	set := CallbackSet[int32]{
+		Values: CallbackMap[int32, struct{}]{Key: 7},
+	}
+	return set.Range(func(value int32) bool {
+		return value == <-values
+	})
+}
+
+type RecursiveBox[T any] struct {
+	Value T
+	Proxy *RecursiveBox[T]
+}
+
+func (box *RecursiveBox[T]) Apply(callback func(T) bool) bool {
+	if box.Proxy != nil {
+		return box.Proxy.Apply(callback)
+	}
+	return callback(box.Value)
+}
+
+func CooperativeRecursiveGenericMethod() bool {
+	values := make(chan int32, 1)
+	values <- 7
+	leaf := &RecursiveBox[int32]{Value: 7}
+	root := &RecursiveBox[int32]{Proxy: leaf}
+	return root.Apply(func(value int32) bool {
+		return value == <-values
+	})
+}

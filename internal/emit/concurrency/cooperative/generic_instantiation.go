@@ -304,7 +304,7 @@ func (c *genericCallableCorrespondence) callable(
 		return err
 	}
 	instantiatedReference, err :=
-		c.context.Names().CallableABI(instantiated)
+		callable.ABIReference(c.context, instantiated)
 	if err != nil {
 		return err
 	}
@@ -323,9 +323,8 @@ func (c *genericCallableCorrespondence) callable(
 	if err != nil {
 		return err
 	}
-	instantiatedFacet, err := api.NewCallableABIFacet(
-		instantiatedReference.Artifact(),
-	)
+	instantiatedFacet, err :=
+		c.context.CallableABIFacet(instantiatedReference)
 	if err != nil {
 		return err
 	}

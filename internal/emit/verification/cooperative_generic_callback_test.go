@@ -178,6 +178,8 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 		"CooperativeMethodExpression",
 		"CooperativeResult",
 		"CooperativeGenericProfileWithNamedCallback",
+		"CooperativeNestedGenericMethod",
+		"CooperativeRecursiveGenericMethod",
 	} {
 		target := waveNineFunctionText(t, artifacts.printed, function)
 		if !strings.Contains(target, "async") ||
@@ -371,6 +373,8 @@ import {
     IndependentSynchronous,
     SynchronousSequence,
     CooperativeGenericProfileWithNamedCallback,
+    CooperativeNestedGenericMethod,
+    CooperativeRecursiveGenericMethod,
 } from "`+sourceModuleForExport(
 		t,
 		artifacts,
@@ -399,6 +403,8 @@ await GoScheduler.run(async () => {
         IndependentSynchronous(),
         SynchronousSequence(),
         await CooperativeGenericProfileWithNamedCallback(),
+        await CooperativeNestedGenericMethod(),
+        await CooperativeRecursiveGenericMethod(),
     ].map(String).join(" "));
 });
 `)
@@ -458,6 +464,8 @@ func main() {
 		values.IndependentSynchronous(),
 		values.SynchronousSequence(),
 		values.CooperativeGenericProfileWithNamedCallback(),
+		values.CooperativeNestedGenericMethod(),
+		values.CooperativeRecursiveGenericMethod(),
 	)
 }
 `)
