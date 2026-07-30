@@ -291,8 +291,7 @@ func Object(
 	}
 	switch selected := source.(type) {
 	case *ast.Ident:
-		builtin, ok := info.Uses[selected].(*types.Builtin)
-		return builtin, ok
+		return FromObject(info.Uses[selected])
 	case *ast.SelectorExpr:
 		if info.Selections[selected] != nil {
 			return nil, false
@@ -305,7 +304,7 @@ func Object(
 		if !ok {
 			return nil, false
 		}
-		builtin, ok := info.Uses[selected.Sel].(*types.Builtin)
+		builtin, ok := FromObject(info.Uses[selected.Sel])
 		if !ok ||
 			builtin.Pkg() == nil ||
 			builtin.Pkg() != packageName.Imported() {
@@ -315,6 +314,11 @@ func Object(
 	default:
 		return nil, false
 	}
+}
+
+func FromObject(object types.Object) (*types.Builtin, bool) {
+	builtin, ok := object.(*types.Builtin)
+	return builtin, ok
 }
 
 func resultType(

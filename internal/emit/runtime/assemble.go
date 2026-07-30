@@ -352,10 +352,15 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
 		statement := unsafepointerruntime.Build(
 			factory,
 			contract.ExportedName(),
 			pointerContract.ExportedName(),
+			panicContract.ExportedName(),
 		)
 		definition, err := NewDefinition(
 			api.RuntimeUnsafePointer,

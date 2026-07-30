@@ -7,7 +7,12 @@ import (
 )
 
 func TestBuildCreatesUnconstructableNominalDeclaration(t *testing.T) {
-	class := Build(tsgo.NewFactory(), "GoUnsafePointer", "GoPointer")
+	class := Build(
+		tsgo.NewFactory(),
+		"GoUnsafePointer",
+		"GoPointer",
+		"GoPanic",
+	)
 	if class.Name().Text() != "GoUnsafePointer" ||
 		len(class.Modifiers()) != 1 ||
 		class.Modifiers()[0].Kind() != tsgo.SyntaxKindExportKeyword ||
@@ -27,6 +32,10 @@ func TestBuildCreatesUnconstructableNominalDeclaration(t *testing.T) {
 		constructor.Body() == nil {
 		t.Fatal("unsafe-pointer declaration is constructable")
 	}
+	assertRuntimePanicCall(
+		t,
+		constructor.Body().(tsgo.Block).Statements()[0],
+	)
 	for index, name := range []string{FromName, ToName} {
 		method, ok := class.Members()[index+2].(tsgo.MethodDeclaration)
 		if !ok ||
@@ -37,5 +46,28 @@ func TestBuildCreatesUnconstructableNominalDeclaration(t *testing.T) {
 			method.Body() == nil {
 			t.Fatalf("unsafe-pointer conversion method %q is invalid", name)
 		}
+		statements := method.Body().(tsgo.Block).Statements()
+		assertRuntimePanicCall(t, statements[len(statements)-1])
+	}
+}
+
+func assertRuntimePanicCall(t *testing.T, statement tsgo.Statement) {
+	t.Helper()
+	expression, ok := statement.(tsgo.ExpressionStatement)
+	if !ok {
+		t.Fatalf("unsafe-pointer placeholder = %T, want expression", statement)
+	}
+	call, ok := expression.Expression().(tsgo.CallExpression)
+	if !ok {
+		t.Fatalf(
+			"unsafe-pointer placeholder expression = %T, want call",
+			expression.Expression(),
+		)
+	}
+	member, ok := call.Expression().(tsgo.PropertyAccessExpression)
+	if !ok ||
+		member.Expression().(tsgo.Identifier).Text() != "GoPanic" ||
+		member.Name().(tsgo.Identifier).Text() != "raiseRuntime" {
+		t.Fatal("unsafe-pointer placeholder bypasses the panic runtime")
 	}
 }

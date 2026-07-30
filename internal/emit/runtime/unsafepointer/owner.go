@@ -1,6 +1,9 @@
 package unsafepointer
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 const (
 	brandName             = "$go$unsafePointer"
@@ -13,11 +16,13 @@ func Build(
 	factory tsgo.Factory,
 	className string,
 	pointerName string,
+	panicName string,
 ) tsgo.ClassDeclaration {
 	target := builder{
 		factory:     factory,
 		className:   className,
 		pointerName: pointerName,
+		panicName:   panicName,
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
@@ -37,6 +42,7 @@ type builder struct {
 	factory     tsgo.Factory
 	className   string
 	pointerName string
+	panicName   string
 }
 
 func (b builder) brand() tsgo.PropertyDeclaration {
@@ -60,7 +66,9 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 		nil,
 		nil,
 		b.factory.Block(
-			[]tsgo.Statement{b.factory.ThrowStatement(b.unresolved())},
+			[]tsgo.Statement{
+				b.factory.ExpressionStatement(b.unresolved()),
+			},
 			true,
 		),
 	)
@@ -128,7 +136,7 @@ func (b builder) method(
 					),
 					nil,
 				),
-				b.factory.ThrowStatement(b.unresolved()),
+				b.factory.ExpressionStatement(b.unresolved()),
 			},
 			true,
 		),
@@ -170,16 +178,14 @@ func (b builder) typeParameter(
 	)
 }
 
-func (b builder) unresolved() tsgo.NewExpression {
-	return b.factory.NewExpression(
-		b.id("Error"),
-		nil,
-		[]tsgo.Expression{
-			b.factory.StringLiteral(
-				unresolvedPlaceholder,
-				tsgo.TokenFlagsNone,
-			),
-		},
+func (b builder) unresolved() tsgo.CallExpression {
+	return panicruntime.Call(
+		b.factory,
+		b.panicName,
+		b.factory.StringLiteral(
+			unresolvedPlaceholder,
+			tsgo.TokenFlagsNone,
+		),
 	)
 }
 

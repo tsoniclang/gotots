@@ -580,21 +580,9 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoUnsafePointer",
 			true,
 			RuntimePointer,
+			RuntimePanic,
 		), nil
 	default:
 		return concurrencyRuntimeContract(symbol)
 	}
-}
-
-func complexOperationContract(
-	exportedName string,
-	dependencies ...RuntimeSymbol,
-) (RuntimeSymbolContract, error) {
-	return runtimeContract(
-		RuntimeModuleComplex,
-		"runtime/complex.ts",
-		exportedName,
-		false,
-		dependencies...,
-	), nil
 }
