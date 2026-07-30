@@ -2,6 +2,7 @@ package dereference
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -37,6 +38,9 @@ func Emit(
 		!types.AssignableTo(element, expected) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if zeroFromNew(context, source, pointerType, element) {
+		return context.Values().Zero(context, source, element)
 	}
 	pointer, err := children.Expression(
 		context.
@@ -104,4 +108,34 @@ func Emit(
 		return api.ExpressionEmission{}, err
 	}
 	return context.Values().FromStorage(context, source, element, stored)
+}
+
+func zeroFromNew(
+	context api.Context,
+	source *ast.StarExpr,
+	pointerType types.Type,
+	element types.Type,
+) bool {
+	operand := ast.Expr(source.X)
+	for {
+		parenthesized, ok := operand.(*ast.ParenExpr)
+		if !ok {
+			break
+		}
+		operand = parenthesized.X
+	}
+	call, ok := operand.(*ast.CallExpr)
+	if !ok ||
+		call.Ellipsis != token.NoPos ||
+		len(call.Args) != 1 ||
+		!types.Identical(context.TypesInfo().TypeOf(call), pointerType) ||
+		!types.Identical(context.TypesInfo().TypeOf(call.Args[0]), element) {
+		return false
+	}
+	identifier, ok := call.Fun.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	return context.TypesInfo().Uses[identifier] ==
+		types.Universe.Lookup("new")
 }

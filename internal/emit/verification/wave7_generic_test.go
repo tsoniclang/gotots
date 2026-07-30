@@ -392,6 +392,7 @@ func assertWaveSevenGenericFoundationShape(t *testing.T, printed string) {
 		"export function Identity<T>",
 		"export function Add<T>",
 		"export function Zero<T>",
+		"export function ZeroFromNew<T>",
 		"export function Equal<T>",
 		"export function Twice<T>",
 		"$goCapability_",
@@ -416,6 +417,21 @@ func assertWaveSevenGenericFoundationShape(t *testing.T, printed string) {
 	}
 	if strings.Count(printed, "export function Add<T>") != 1 {
 		t.Fatalf("generic Add body was duplicated:\n%s", printed)
+	}
+	zeroFromNew := targetGenericFunctionText(t, printed, "ZeroFromNew")
+	if !strings.Contains(zeroFromNew, "$go$zero_") ||
+		strings.Contains(zeroFromNew, "GoPointer") ||
+		strings.Contains(zeroFromNew, "$go$pointer_") {
+		t.Fatalf(
+			"generic *new(T) did not lower directly to its zero owner:\n%s",
+			zeroFromNew,
+		)
+	}
+	if strings.Contains(printed, "GoPointer.field<T, Box") {
+		t.Fatalf(
+			"direct generic pointer-receiver field assignment formed an interior pointer:\n%s",
+			printed,
+		)
 	}
 	twice := targetGenericFunctionText(t, printed, "Twice")
 	copyNames := regexp.MustCompile(`\$go\$copy_[0-9a-f]+`).

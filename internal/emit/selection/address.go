@@ -40,47 +40,66 @@ func FieldStoreTarget(
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if field, direct := resolved.directField(); direct {
-		receiver, err := children.Expression(
-			context.
-				WithRole(api.RoleAssignmentTarget).
-				WithExpectedType(resolved.root),
-			source.X,
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		target, selected, err := namedstructstorage.FieldTarget(
-			context.WithRole(api.RoleAssignmentTarget),
-			source,
-			resolved.root,
-			field,
-			receiver,
-		)
-		if err != nil || selected {
-			return target, err
-		}
-		name, err := context.Names().Member(field)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		return api.NewPropertyStoreTargetEmission(
-			context.Factory(),
-			receiver,
-			name,
-			field.Type(),
-		)
-	}
-	pointer, err := addressSource(context, children, source, resolved)
+	receiver, err := children.Expression(
+		context.
+			WithRole(api.RoleAssignmentTarget).
+			WithExpectedType(resolved.root),
+		source.X,
+	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return canonicalPointerTarget(
-		context,
-		children,
+	receiverType := resolved.root
+	for _, field := range resolved.fields[:len(resolved.fields)-1] {
+		receiver, receiverType, err = projectFieldValue(
+			context,
+			children,
+			source,
+			receiverType,
+			receiver,
+			field,
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+	}
+	if _, _, _, pointer := pointerType(receiverType); pointer {
+		receiver, receiverType, err = dereferenceValue(
+			context,
+			children,
+			source,
+			receiverType,
+			receiver,
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+	}
+	field := resolved.fields[len(resolved.fields)-1]
+	if !fieldInType(receiverType, field) ||
+		!types.Identical(field.Type(), resolved.effective) {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	target, storageSelected, err := namedstructstorage.FieldTarget(
+		context.WithRole(api.RoleAssignmentTarget),
 		source,
-		pointer,
-		resolved.effective,
+		receiverType,
+		field,
+		receiver,
+	)
+	if err != nil || storageSelected {
+		return target, err
+	}
+	name, err := context.Names().Member(field)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	return api.NewPropertyStoreTargetEmission(
+		context.Factory(),
+		receiver,
+		name,
+		field.Type(),
 	)
 }
 

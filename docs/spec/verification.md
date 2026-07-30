@@ -721,6 +721,10 @@ type parameter is instantiated by a direct named-struct pointer, scalar
 pointer, conversion-selected struct carrier, defined array, and nested generic
 type. It proves:
 
+- `*new(T)` is emitted as the exact generic zero operation with no pointer or
+  storage facet, while a direct `pointer.Field = value` store emits no
+  interior-pointer construction; restoring either unnecessary pointer route
+  fails strict typechecking and the artifact-shape gate;
 - a logical-only declaration emits no storage or pointer facet;
 - `*T` transport adds exactly one pointer facet, while address/storage
   operations add exactly the demanded storage facet and closed operation

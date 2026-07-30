@@ -147,13 +147,3 @@ func selectedStruct(sourceType types.Type) (*types.Struct, bool) {
 	result, ok := base.(*types.Struct)
 	return result, ok
 }
-
-func (p path) directField() (*types.Var, bool) {
-	if len(p.fields) != 1 {
-		return nil, false
-	}
-	if _, _, _, pointer := pointerType(p.root); pointer {
-		return nil, false
-	}
-	return p.fields[0], true
-}

@@ -54,6 +54,10 @@ type Box[T any] struct {
 	Value T
 }
 
+type EmbeddedBox[T any] struct {
+	Box[T]
+}
+
 type Alias[T any] = Box[T]
 
 type Node[T any] struct {
@@ -94,6 +98,10 @@ func Identity[T any](value T) T {
 func Zero[T any]() T {
 	var result T
 	return result
+}
+
+func ZeroFromNew[T any]() T {
+	return *new(T)
 }
 
 func Add[T Integer](left, right T) T {
@@ -138,6 +146,14 @@ func (box Box[T]) privateValue() T {
 
 func (box Box[T]) ForwardValue() T {
 	return box.privateValue()
+}
+
+func (box *Box[T]) SetValue(value T) {
+	box.Value = value
+}
+
+func (box *EmbeddedBox[T]) SetPromoted(value T) {
+	box.Value = value
 }
 
 func (box ComparableBox[T]) Same(other ComparableBox[T]) bool {
@@ -569,10 +585,22 @@ func AuditFunctions() []int32 {
 	second := Add[int32](first, 5)
 	doubled := Twice(int32(3))
 	zero := Zero[int32]()
+	zeroFromNew := ZeroFromNew[int32]()
+	box := NewBox(int32(1))
+	box.SetValue(int32(2))
+	embedded := EmbeddedBox[int32]{Box: box}
+	embedded.SetPromoted(int32(3))
 	if !Equal(second, int32(9)) {
 		return []int32{-1}
 	}
-	return []int32{second, doubled, zero}
+	return []int32{
+		second,
+		doubled,
+		zero,
+		zeroFromNew,
+		box.Value,
+		embedded.Value,
+	}
 }
 
 func Audit() []int32 {

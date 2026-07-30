@@ -2630,6 +2630,16 @@ representation; assignment copies the pointer; dereference reads or writes the
 selected location; nil is distinct; and equality compares canonical address
 identity.
 
+The exact expression `*new(T)`, including parenthesized spellings, is the Go
+zero value of `T`; because the fresh pointer cannot escape, it lowers directly
+through the value-family zero owner and creates no pointer facet, cell, load,
+storage projection, or runtime request. Conversely, a direct field assignment
+through a pointer receiver such as `box.Value = next`, including a promoted
+field reached through embedded structs, dereferences only the pointer hops and
+stores the final field through its selected logical/storage owner. It does not
+form an interior `*T` merely to perform the assignment. Explicit address
+formation such as `&box.Value` remains a distinct pointer-producing construct.
+
 For an ordinary named struct, the class object is already the canonical
 location: `*Box` is `Box | undefined`, `new(Box)` and `&Box{...}` create direct
 `Box` objects, and pointer equality is `===`. An exact addressed variable keeps
