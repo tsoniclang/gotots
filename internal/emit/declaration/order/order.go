@@ -1,24 +1,40 @@
-package emit
+package order
 
 import (
 	"container/heap"
+	"go/token"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 )
 
-func orderTargetDeclarations(
-	declarations []targetDeclaration,
-) ([]targetDeclaration, error) {
+type Declaration struct {
+	Owner             api.ArtifactOwner
+	Name              string
+	Position          token.Pos
+	EagerDependencies []api.ArtifactOwner
+}
+
+type CycleError struct {
+	Declaration string
+}
+
+func (e *CycleError) Error() string {
+	return "order target declaration " + e.Declaration +
+		": eager dependency cycle"
+}
+
+func Indices(declarations []Declaration) ([]int, error) {
 	indexByOwner := make(map[api.ArtifactOwner]int, len(declarations))
 	for index := range declarations {
-		indexByOwner[declarations[index].owner] = index
+		indexByOwner[declarations[index].Owner] = index
 	}
 	dependents := make([][]int, len(declarations))
 	indegree := make([]int, len(declarations))
 	edges := make(map[[2]int]struct{})
 	for consumer := range declarations {
-		for _, dependency := range declarations[consumer].eagerDependencies {
+		for _, dependency := range declarations[consumer].EagerDependencies {
 			provider, local := indexByOwner[dependency]
 			if !local || provider == consumer {
 				continue
@@ -38,10 +54,10 @@ func orderTargetDeclarations(
 			heap.Push(ready, index)
 		}
 	}
-	ordered := make([]targetDeclaration, 0, len(declarations))
+	ordered := make([]int, 0, len(declarations))
 	for ready.Len() != 0 {
 		provider := heap.Pop(ready).(int)
-		ordered = append(ordered, declarations[provider])
+		ordered = append(ordered, provider)
 		for _, consumer := range dependents[provider] {
 			indegree[consumer]--
 			if indegree[consumer] == 0 {
@@ -55,18 +71,15 @@ func orderTargetDeclarations(
 	var cycle []string
 	for index, remaining := range indegree {
 		if remaining != 0 {
-			cycle = append(cycle, declarations[index].name)
+			cycle = append(cycle, declarations[index].Name)
 		}
 	}
 	sort.Strings(cycle)
-	return nil, &ScheduleError{
-		Object: cycle[0],
-		Reason: "eager target declaration dependency cycle",
-	}
+	return nil, &CycleError{Declaration: cycle[0]}
 }
 
 type declarationHeap struct {
-	declarations []targetDeclaration
+	declarations []Declaration
 	indices      []int
 }
 
@@ -77,15 +90,15 @@ func (h declarationHeap) Len() int {
 func (h declarationHeap) Less(left, right int) bool {
 	leftDeclaration := h.declarations[h.indices[left]]
 	rightDeclaration := h.declarations[h.indices[right]]
-	if leftDeclaration.position != rightDeclaration.position {
-		return leftDeclaration.position < rightDeclaration.position
+	if leftDeclaration.Position != rightDeclaration.Position {
+		return leftDeclaration.Position < rightDeclaration.Position
 	}
-	if leftDeclaration.name != rightDeclaration.name {
-		return leftDeclaration.name < rightDeclaration.name
+	if leftDeclaration.Name != rightDeclaration.Name {
+		return leftDeclaration.Name < rightDeclaration.Name
 	}
-	return compareArtifactOwners(
-		leftDeclaration.owner,
-		rightDeclaration.owner,
+	return emitordering.CompareArtifactOwners(
+		leftDeclaration.Owner,
+		rightDeclaration.Owner,
 	) < 0
 }
 

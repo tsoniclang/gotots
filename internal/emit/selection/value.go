@@ -8,6 +8,7 @@ import (
 	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -162,6 +163,10 @@ func dereferenceValue(
 	); handled || err != nil {
 		return logical, element, err
 	}
+	representation, err := pointertype.Observe(context, raw, false)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
+	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleFieldReceiver),
 		source,
@@ -170,15 +175,35 @@ func dereferenceValue(
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
-	storage, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		element,
-	)
+	runtime, err := pointerRuntime(context)
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
-	runtime, err := pointerRuntime(context)
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		logical, err := api.NewExpressionEmission(
+			value.Before(),
+			pointerruntime.Direct(
+				context.Factory(),
+				runtime.Name(),
+				targetElement.Value(),
+				value.Value(),
+			),
+			api.CombineRequests(
+				value.Requests(),
+				targetElement.Requests(),
+				runtime.Requests(),
+				representation.Requests(),
+			),
+		)
+		return logical, element, err
+	}
+	storage, err := context.ContainerStorage().PointerStorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+		representation,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
@@ -196,21 +221,22 @@ func dereferenceValue(
 			targetElement.Requests(),
 			storage.Requests(),
 			runtime.Requests(),
+			representation.Requests(),
 		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
-	logical, err := context.Values().FromStorage(
+	logical, err := context.ContainerStorage().FromPointerStorage(
 		context.WithRole(api.RoleFieldReceiver),
 		source,
 		element,
+		representation,
 		stored,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
-	_ = raw
 	return logical, element, nil
 }
 

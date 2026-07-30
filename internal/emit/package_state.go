@@ -8,6 +8,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
@@ -213,7 +214,7 @@ func (s *programSession) emitPackageStorage(
 	variable *types.Var,
 	site declarationSite,
 ) error {
-	builder := s.packageBuilders[site.source]
+	builder := s.packageBuilders[site.Source]
 	if builder == nil {
 		return &ScheduleError{
 			Object: variable.Name(),
@@ -278,8 +279,8 @@ func (s *programSession) buildPackageStorageRevision(
 	finishState, err := stateNames.BeginArtifact(
 		owner,
 		source,
-		site.sourceFile.Syntax(),
-		site.outputPath,
+		site.SourceFile.Syntax(),
+		site.OutputPath,
 	)
 	if err != nil {
 		return packageStorageRevision{}, err
@@ -295,8 +296,8 @@ func (s *programSession) buildPackageStorageRevision(
 	finishAssembly, err := assemblyNames.BeginArtifact(
 		owner,
 		source,
-		site.sourceFile.Syntax(),
-		site.outputPath,
+		site.SourceFile.Syntax(),
+		site.OutputPath,
 	)
 	if err != nil {
 		return packageStorageRevision{}, err
@@ -373,7 +374,7 @@ func (s *programSession) reconstructPackageStorage(
 			Reason: "package storage lost its source declaration",
 		}
 	}
-	builder := s.packageBuilders[site.source]
+	builder := s.packageBuilders[site.Source]
 	index, found := builder.storageByObject[variable]
 	if builder == nil || !found || index >= len(builder.storage) {
 		return &ScheduleError{
@@ -420,7 +421,7 @@ func packageVariableSyntax(
 	site declarationSite,
 	variable *types.Var,
 ) (ast.Node, error) {
-	declaration, ok := site.declaration.(*ast.GenDecl)
+	declaration, ok := site.Declaration.(*ast.GenDecl)
 	if !ok {
 		return nil, &ScheduleError{
 			Object: variable.Name(),
@@ -433,7 +434,7 @@ func packageVariableSyntax(
 			continue
 		}
 		for _, name := range spec.Names {
-			if site.source.TypesInfo().Defs[name] == variable {
+			if site.Source.TypesInfo().Defs[name] == variable {
 				return name, nil
 			}
 		}
@@ -489,7 +490,7 @@ func (s *programSession) emitPackageInitFunctions(
 	for _, sourceFile := range packageBuilder.sourcePackage.Files() {
 		for _, declaration := range sourceFile.Syntax().Decls {
 			function, ok := declaration.(*ast.FuncDecl)
-			if !ok || !isPackageInitDeclaration(function) {
+			if !ok || !declarationindex.IsPackageInitializer(function) {
 				continue
 			}
 			object, ok := packageBuilder.sourcePackage.TypesInfo().

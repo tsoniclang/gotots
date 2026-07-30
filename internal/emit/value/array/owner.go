@@ -85,7 +85,7 @@ func (a RuntimeArray) EmitType(
 			reference.Requests()...,
 		), nil
 	}
-	element, err := children.RepresentedType(
+	element, err := context.ContainerStorage().ContainerStorageType(
 		context,
 		source,
 		a.source.Elem(),
@@ -203,7 +203,7 @@ func (a RuntimeArray) targetTypeArguments(
 	context api.Context,
 	children api.ChildEmitter,
 ) ([]tsgo.TypeNode, []api.RootRequest, error) {
-	element, err := children.RepresentedType(
+	element, err := context.ContainerStorage().ContainerStorageType(
 		context.WithRole(api.RoleArrayElement),
 		nil,
 		a.ElementType(),

@@ -128,6 +128,14 @@ func dereference(
 			return api.ExpressionEmission{}, err
 		}
 	}
+	representation, err := pointertype.Observe(
+		context,
+		types.NewPointer(element),
+		false,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleFieldReceiver),
 		source,
@@ -136,15 +144,34 @@ func dereference(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	storageType, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		element,
-	)
+	runtime, err := pointerRuntime(context)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	runtime, err := pointerRuntime(context)
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		return api.NewExpressionEmission(
+			pointer.Before(),
+			pointerruntime.Direct(
+				context.Factory(),
+				runtime.Name(),
+				targetElement.Value(),
+				pointer.Value(),
+			),
+			api.CombineRequests(
+				pointer.Requests(),
+				targetElement.Requests(),
+				runtime.Requests(),
+				representation.Requests(),
+			),
+		)
+	}
+	storageType, err := context.ContainerStorage().PointerStorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+		representation,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -167,6 +194,7 @@ func dereference(
 			targetElement.Requests(),
 			storageType.Requests(),
 			runtime.Requests(),
+			representation.Requests(),
 		),
 	)
 }

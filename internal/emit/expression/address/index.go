@@ -153,6 +153,23 @@ func arrayIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	elementRepresentation, err := pointertype.Observe(
+		context,
+		types.NewPointer(element),
+		true,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	elementStorage, err := context.ContainerStorage().PointerStorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+		elementRepresentation,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	arrayTarget, err := array.EmitType(
 		context.WithRole(api.RoleArrayReceiver),
 		children,
@@ -161,10 +178,19 @@ func arrayIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arrayStorage, err := context.Values().StorageType(
+	arrayRepresentation, err := pointertype.Observe(
+		context,
+		types.NewPointer(arrayType),
+		true,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	arrayStorage, err := context.ContainerStorage().PointerStorageType(
 		context.WithRole(api.RoleStorageType),
 		source.X,
 		arrayType,
+		arrayRepresentation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -192,8 +218,6 @@ func arrayIndex(
 			tsgo.NodeFlagsNone,
 		)
 	}
-	method := pointerruntime.IndexName
-	elementStorage := elementTarget
 	typeArguments := []tsgo.TypeNode{
 		elementTarget.Value(),
 		elementStorage.Value(),
@@ -201,40 +225,13 @@ func arrayIndex(
 		arrayStorage.Value(),
 	}
 	arguments := []tsgo.Expression{parentValue, index.Value()}
-	var projectionRequests []api.RootRequest
-	if context.Values().RequiresStorageProjection(context, element) {
-		projection, err := buildStorageProjection(
-			context,
-			source,
-			element,
-			elementTarget,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		method = pointerruntime.IndexViewName
-		elementStorage = projection.storage
-		typeArguments = []tsgo.TypeNode{
-			elementTarget.Value(),
-			elementStorage.Value(),
-			arrayTarget.Value(),
-			elementTarget.Value(),
-			arrayStorage.Value(),
-		}
-		arguments = append(
-			arguments,
-			projection.toStorage,
-			projection.fromStorage,
-		)
-		projectionRequests = projection.requests
-	}
 	return api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
 				context.Factory().Identifier(runtime.Name()),
 				nil,
-				context.Factory().Identifier(method),
+				context.Factory().Identifier(pointerruntime.IndexName),
 				tsgo.NodeFlagsNone,
 			),
 			nil,
@@ -250,7 +247,8 @@ func arrayIndex(
 			arrayTarget.Requests(),
 			arrayStorage.Requests(),
 			runtime.Requests(),
-			projectionRequests,
+			elementRepresentation.Requests(),
+			arrayRepresentation.Requests(),
 		),
 	)
 }
@@ -306,35 +304,30 @@ func sliceIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	runtimeSymbol := api.RuntimeSliceAddress
-	typeArguments := []tsgo.TypeNode{elementTarget.Value()}
-	arguments := []tsgo.Expression{receiverValue, index.Value()}
-	var projectionRequests []api.RootRequest
-	if context.Values().RequiresStorageProjection(context, element) {
-		projection, err := buildStorageProjection(
-			context,
-			source,
-			element,
-			elementTarget,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		runtimeSymbol = api.RuntimeSliceAddressView
-		typeArguments = []tsgo.TypeNode{
-			elementTarget.Value(),
-			projection.storage.Value(),
-			elementTarget.Value(),
-		}
-		arguments = append(
-			arguments,
-			projection.toStorage,
-			projection.fromStorage,
-		)
-		projectionRequests = projection.requests
+	elementRepresentation, err := pointertype.Observe(
+		context,
+		types.NewPointer(element),
+		true,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
+	elementStorage, err := context.ContainerStorage().PointerStorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+		elementRepresentation,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	typeArguments := []tsgo.TypeNode{
+		elementTarget.Value(),
+		elementStorage.Value(),
+	}
+	arguments := []tsgo.Expression{receiverValue, index.Value()}
 	runtime, err := context.Names().Runtime(
-		runtimeSymbol,
+		api.RuntimeSliceAddress,
 		api.ImportPhaseValue,
 	)
 	if err != nil {
@@ -353,8 +346,9 @@ func sliceIndex(
 			receiver.Requests(),
 			index.Requests(),
 			elementTarget.Requests(),
+			elementStorage.Requests(),
 			runtime.Requests(),
-			projectionRequests,
+			elementRepresentation.Requests(),
 		),
 	)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -36,6 +37,30 @@ func (owner Owner) Read(
 	); handled || err != nil {
 		return value, true, err
 	}
+	representation, err := pointertype.Observe(
+		context,
+		types.NewPointer(variable.Type()),
+		false,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		value := api.DirectExpression(
+			context.Factory().Identifier(name),
+			representation.Requests()...,
+		)
+		copied, err := context.Values().Transfer(
+			context,
+			nil,
+			variable.Type(),
+			variable.Type(),
+			api.ValueTransferCopy,
+			value,
+		)
+		return copied, true, err
+	}
 	value := api.DirectExpression(
 		context.Factory().PropertyAccessExpression(
 			context.Factory().Identifier(name),
@@ -44,16 +69,25 @@ func (owner Owner) Read(
 			tsgo.NodeFlagsNone,
 		),
 	)
-	restored, err := context.Values().FromStorage(
+	restored, err := context.ContainerStorage().FromPointerStorage(
 		context,
 		nil,
 		variable.Type(),
+		representation,
 		value,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	return restored, true, nil
+	emission, err := api.NewExpressionEmission(
+		restored.Before(),
+		restored.Value(),
+		api.CombineRequests(
+			restored.Requests(),
+			representation.Requests(),
+		),
+	)
+	return emission, true, err
 }
 
 func (owner Owner) StoreTarget(
@@ -72,16 +106,42 @@ func (owner Owner) StoreTarget(
 	); handled || err != nil {
 		return target, true, err
 	}
-	target, err := api.NewCanonicalStorageTargetEmission(
-		context.Factory().PropertyAccessExpression(
-			context.Factory().Identifier(name),
-			nil,
-			context.Factory().Identifier(pointerruntime.CellValueName),
-			tsgo.NodeFlagsNone,
-		),
-		variable.Type(),
-		nil,
+	representation, err := pointertype.Observe(
+		context,
+		types.NewPointer(variable.Type()),
+		false,
 	)
+	if err != nil {
+		return api.StoreTargetEmission{}, true, err
+	}
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		target, err := api.NewStableIdentityStoreTargetEmission(
+			api.DirectExpression(
+				context.Factory().Identifier(name),
+				representation.Requests()...,
+			),
+			variable.Type(),
+		)
+		return target, true, err
+	}
+	constructor := api.NewPropertyStoreTargetEmission
+	if representation.Representation() ==
+		api.PointerRepresentationCarrierCanonical {
+		constructor = api.NewCanonicalStoragePropertyStoreTargetEmission
+	}
+	target, err := constructor(
+		context.Factory(),
+		api.DirectExpression(
+			context.Factory().Identifier(name),
+			representation.Requests()...,
+		),
+		pointerruntime.CellValueName,
+		variable.Type(),
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, true, err
+	}
 	return target, true, err
 }
 
@@ -100,6 +160,25 @@ func (Owner) Cell(
 	); handled || err != nil {
 		return cell, err
 	}
+	representation, err := pointertype.Observe(
+		context,
+		types.NewPointer(sourceType),
+		false,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		return api.NewExpressionEmission(
+			value.Before(),
+			value.Value(),
+			api.CombineRequests(
+				value.Requests(),
+				representation.Requests(),
+			),
+		)
+	}
 	targetType, err := children.RepresentedType(
 		context.WithRole(api.RoleLocalType),
 		source,
@@ -108,18 +187,20 @@ func (Owner) Cell(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	storageType, err := context.Values().StorageType(
+	storageType, err := context.ContainerStorage().PointerStorageType(
 		context.WithRole(api.RoleStorageType),
 		source,
 		sourceType,
+		representation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	stored, err := context.Values().ToStorage(
+	stored, err := context.ContainerStorage().ToPointerStorage(
 		context,
 		source,
 		sourceType,
+		representation,
 		value,
 	)
 	if err != nil {
@@ -146,6 +227,7 @@ func (Owner) Cell(
 			targetType.Requests(),
 			storageType.Requests(),
 			reference.Requests(),
+			representation.Requests(),
 		),
 	)
 }

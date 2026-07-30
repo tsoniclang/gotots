@@ -1,12 +1,92 @@
 package naming
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/output"
 )
+
+func (n *File) PointerRepresentation(
+	pointer *types.Pointer,
+) (api.PointerRepresentationReference, error) {
+	if pointer == nil {
+		return api.PointerRepresentationReference{}, &api.NameError{
+			Reason: "pointer-representation type is nil",
+		}
+	}
+	key, err := typeidentity.BuildParameterizedKey(
+		pointer,
+		n.generatedNamedObjectIdentity,
+		func(parameter *types.TypeParam) (string, error) {
+			if parameter == nil || parameter.Obj() == nil {
+				return "", &api.NameError{
+					Reason: "pointer representation has an unbound type parameter",
+				}
+			}
+			return n.generatedNamedObjectIdentity(parameter.Obj())
+		},
+	)
+	if err != nil {
+		return api.PointerRepresentationReference{}, err
+	}
+	digest := sha256.Sum256([]byte("pointer-representation|" + key))
+	artifactKey := hex.EncodeToString(digest[:])
+	binding, err := n.owner.registry.internPointerRepresentation(
+		artifactKey,
+		pointer,
+	)
+	if err != nil {
+		return api.PointerRepresentationReference{}, err
+	}
+	definition, err := api.NewPointerRepresentationRequest(
+		binding.owner,
+		false,
+	)
+	if err != nil {
+		return api.PointerRepresentationReference{}, err
+	}
+	return api.NewPointerRepresentationReference(
+		binding.owner,
+		definition,
+	)
+}
+
+func (r *Registry) internPointerRepresentation(
+	artifactKey string,
+	pointer *types.Pointer,
+) (pointerRepresentationBinding, error) {
+	if r == nil || len(artifactKey) != sha256.Size*2 || pointer == nil {
+		return pointerRepresentationBinding{}, &api.NameError{
+			Reason: "pointer-representation canonicalization input is invalid",
+		}
+	}
+	if existing, ok := r.pointerRepresentations[artifactKey]; ok {
+		bound, valid := existing.owner.PointerRepresentation()
+		if !valid || !types.Identical(bound, pointer) {
+			return pointerRepresentationBinding{}, &api.NameError{
+				Reason: "pointer-representation key joined non-identical types",
+			}
+		}
+		return existing, nil
+	}
+	name := "$goPointer_" + artifactKey[len(artifactKey)-20:]
+	owner, err := api.NewContractGeneratedArtifact(
+		api.GeneratedArtifactPointerRepresentation,
+		pointer,
+		artifactKey,
+		name,
+	)
+	if err != nil {
+		return pointerRepresentationBinding{}, err
+	}
+	binding := pointerRepresentationBinding{owner: owner}
+	r.pointerRepresentations[artifactKey] = binding
+	return binding, nil
+}
 
 func (n *File) NamedStructStorage(
 	typeName *types.TypeName,

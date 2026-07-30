@@ -96,6 +96,10 @@ type callableABIBinding struct {
 	name  string
 }
 
+type pointerRepresentationBinding struct {
+	owner *api.GeneratedArtifact
+}
+
 type Target struct {
 	Name       string
 	SourcePath string
@@ -128,6 +132,7 @@ type Registry struct {
 	genericCapabilityNames       map[string]string
 	callableABIs                 map[string]callableABIBinding
 	callableABINames             map[string]string
+	pointerRepresentations       map[string]pointerRepresentationBinding
 }
 
 func NewRegistry() *Registry {
@@ -158,6 +163,7 @@ func NewRegistry() *Registry {
 		genericCapabilityNames:       make(map[string]string),
 		callableABIs:                 make(map[string]callableABIBinding),
 		callableABINames:             make(map[string]string),
+		pointerRepresentations:       make(map[string]pointerRepresentationBinding),
 	}
 }
 
@@ -217,6 +223,9 @@ func (r *Registry) GeneratedArtifact(
 	case api.GeneratedArtifactCallableABI:
 		binding, ok := r.callableABIs[artifactKey]
 		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactPointerRepresentation:
+		binding, ok := r.pointerRepresentations[artifactKey]
+		return binding.owner, ok && binding.owner != nil
 	default:
 		return nil, false
 	}
@@ -264,6 +273,10 @@ func (r *Registry) GeneratedArtifacts(
 		}
 	case api.GeneratedArtifactCallableABI:
 		for _, binding := range r.callableABIs {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactPointerRepresentation:
+		for _, binding := range r.pointerRepresentations {
 			artifacts = append(artifacts, binding.owner)
 		}
 	}

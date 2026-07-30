@@ -88,6 +88,51 @@ func FieldTarget(
 	return target, true, err
 }
 
+func DemandFieldOwner(
+	context api.Context,
+	sourceType types.Type,
+	field *types.Var,
+	receiver api.ExpressionEmission,
+) (api.ExpressionEmission, string, error) {
+	named, ok := types.Unalias(sourceType).(*types.Named)
+	if !ok ||
+		named.Obj() == nil ||
+		!containsField(named, field) {
+		return api.ExpressionEmission{}, "", &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "field-storage owner is not an exact named struct field",
+		}
+	}
+	member, err := context.Names().Member(field)
+	if err != nil {
+		return api.ExpressionEmission{}, "", err
+	}
+	reference, err := context.Names().NamedStructOperation(
+		named.Origin().Obj(),
+		api.NamedStructOperationStorage,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, "", err
+	}
+	storage, err := api.NewExpressionEmission(
+		receiver.Before(),
+		context.Factory().CallExpression(
+			context.Factory().PropertyAccessExpression(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+				context.Factory().Identifier(api.StructStorageOfMember),
+				tsgo.NodeFlagsNone,
+			),
+			nil,
+			nil,
+			[]tsgo.Expression{receiver.Value()},
+			tsgo.NodeFlagsNone,
+		),
+		api.CombineRequests(receiver.Requests(), reference.Requests()),
+	)
+	return storage, member, err
+}
+
 func containsField(named *types.Named, field *types.Var) bool {
 	structType, ok := named.Underlying().(*types.Struct)
 	if !ok {

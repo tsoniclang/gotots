@@ -93,6 +93,68 @@ func TestGenericRepresentationRequestCarriesExactFacetIdentity(t *testing.T) {
 	}
 }
 
+func TestPointerRepresentationSelectionRequiresCanonicalDefinitionAndDemand(
+	t *testing.T,
+) {
+	sourcePackage := types.NewPackage(
+		"example.com/pointercontract",
+		"pointercontract",
+	)
+	object := types.NewTypeName(1, sourcePackage, "Box", nil)
+	named := types.NewNamed(
+		object,
+		types.NewStruct(
+			[]*types.Var{
+				types.NewField(
+					2,
+					sourcePackage,
+					"Value",
+					types.Typ[types.Int32],
+					false,
+				),
+			},
+			nil,
+		),
+		nil,
+	)
+	artifact, err := NewContractGeneratedArtifact(
+		GeneratedArtifactPointerRepresentation,
+		types.NewPointer(named),
+		"pointer-contract",
+		"$pointer",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition, err := NewPointerRepresentationRequirement(artifact, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	demand, err := NewPointerRepresentationRequirement(artifact, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SelectPointerRepresentation(artifact, nil); err == nil {
+		t.Fatal("missing pointer definition was accepted")
+	}
+	if _, err := SelectPointerRepresentation(
+		artifact,
+		[]DeclarationRequirement{definition, definition},
+	); err == nil {
+		t.Fatal("duplicate pointer definition was accepted")
+	}
+	selected, err := SelectPointerRepresentation(
+		artifact,
+		[]DeclarationRequirement{definition, demand},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selected != PointerRepresentationCarrierCanonical {
+		t.Fatalf("demanded pointer representation = %v", selected)
+	}
+}
+
 func genericRepresentationOwner(
 	name string,
 ) (*types.Func, *types.TypeParam, *types.TypeParam) {

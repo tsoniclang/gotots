@@ -21,6 +21,12 @@ func StateField(
 			Reason: "environment package variable is invalid",
 		}
 	}
+	context, err := context.WithSourceArtifactOwner(
+		api.MustSourceArtifactOwner(variable),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
 	target, err := children.RepresentedType(
 		context.WithRole(api.RolePackageVariableType),
 		nil,

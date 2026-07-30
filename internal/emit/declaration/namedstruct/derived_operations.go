@@ -13,6 +13,7 @@ func emitDerivedValueOperation(
 	children api.ChildEmitter,
 	source ast.Node,
 	basis types.Type,
+	fields []field,
 	className string,
 	classType tsgo.TypeNode,
 	storageType tsgo.TypeNode,
@@ -109,6 +110,34 @@ func emitDerivedValueOperation(
 			typeArguments,
 		)
 		requests = api.CombineRequests(requests, basisType.Requests())
+	case api.NamedStructOperationAssign:
+		parameters = []tsgo.ParameterDeclaration{
+			parameter(context, "$target", classType),
+			parameter(context, "$value", classType),
+		}
+		result = context.Factory().KeywordTypeNode(
+			tsgo.KeywordTypeSyntaxKindVoidKeyword,
+		)
+		for _, field := range fields {
+			if field.blank {
+				continue
+			}
+			body = append(body, assignmentStatement(
+				context,
+				context.Factory().PropertyAccessExpression(
+					property(context, "$target", derivedStorageMember),
+					nil,
+					context.Factory().Identifier(field.name),
+					tsgo.NodeFlagsNone,
+				),
+				context.Factory().PropertyAccessExpression(
+					property(context, "$value", derivedStorageMember),
+					nil,
+					context.Factory().Identifier(field.name),
+					tsgo.NodeFlagsNone,
+				),
+			))
+		}
 	default:
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),

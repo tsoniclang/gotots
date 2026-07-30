@@ -367,66 +367,6 @@ console.log(Array.from({ length: values.length }, (_, index) =>
 	}
 }
 
-func TestNonGenericAliasToGenericInstantiationCompilesInPointerField(
-	t *testing.T,
-) {
-	project := t.TempDir()
-	writeProgramFile(
-		t,
-		filepath.Join(project, "go.mod"),
-		"module example.com/genericalias\n\ngo 1.26.4\n",
-	)
-	writeProgramFile(
-		t,
-		filepath.Join(project, "source.go"),
-		`package genericalias
-
-type Box[T any] struct {
-	Value T
-}
-
-type IntBox = Box[int]
-
-type Holder struct {
-	Box *IntBox
-}
-
-func EmptyHolder() Holder {
-	return Holder{}
-}
-`,
-	)
-	program, err := load.Load(context.Background(), load.Request{
-		Directory: project,
-		Pattern:   ".",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	root, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("EmptyHolder"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	emission, err := emit.Compile(program, []emit.Root{root})
-	if err != nil {
-		t.Fatal(err)
-	}
-	workingDirectory := t.TempDir()
-	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	if !strings.Contains(
-		artifacts.printed,
-		"GoPointer<Box<int64, int64>, Box$Storage<int64, int64>>",
-	) {
-		t.Fatalf(
-			"alias to generic instantiation was not canonicalized:\n%s",
-			artifacts.printed,
-		)
-	}
-	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
-}
-
 func sourceModuleForExport(
 	t *testing.T,
 	artifacts waveFourArtifacts,

@@ -24,6 +24,12 @@ func BuiltinDeclaration(
 			Reason: "environment builtin overload is invalid",
 		}
 	}
+	context, err := context.WithSourceArtifactOwner(
+		api.MustSourceArtifactOwner(builtin),
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
 	target, err := callable.EmitEnvironmentContract(
 		context,
 		children,

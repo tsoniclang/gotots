@@ -31,6 +31,7 @@ type DeclarationRequirement struct {
 	genericOperation     *GenericOperationContract
 	genericParameter     *types.TypeParam
 	genericFacet         GenericRepresentationFacet
+	pointerCarrier       bool
 	genericProfile       *GenericCallableProfile
 	environmentBuiltin   *types.Builtin
 	environmentSignature *types.Signature
@@ -274,6 +275,10 @@ func (r DeclarationRequirement) Valid() bool {
 	if r.kind != DeclarationRequirementGenericRepresentation &&
 		(r.genericParameter != nil ||
 			r.genericFacet != GenericRepresentationInvalid) {
+		return false
+	}
+	if r.kind != DeclarationRequirementPointerRepresentation &&
+		r.pointerCarrier {
 		return false
 	}
 	if r.kind != DeclarationRequirementGenericCallableProfile &&
@@ -544,6 +549,10 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementCallableABI:
 		return r.validGeneratedDefinition(
 			GeneratedArtifactCallableABI,
+		)
+	case DeclarationRequirementPointerRepresentation:
+		return r.validGeneratedDefinition(
+			GeneratedArtifactPointerRepresentation,
 		)
 	case DeclarationRequirementEnvironmentBuiltin:
 		if !r.owner.Valid() ||

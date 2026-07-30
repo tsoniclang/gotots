@@ -354,7 +354,7 @@ func TestEmbeddedInterfacePromotionUsesInterfaceDispatch(t *testing.T) {
 			artifacts := materializeArtifacts(t, emission, workingDirectory)
 			adapter := embeddedInterfaceAdapter(t, artifacts.paths)
 			for _, required := range []string{
-				"$fromStorage(GoPointer.dereference<",
+				"GoPointer.direct<Holder__from_embeddedinterface>",
 				").Reader;",
 				"goInterfaceNonNil",
 				".Read($go$recovery)",
@@ -367,11 +367,18 @@ func TestEmbeddedInterfacePromotionUsesInterfaceDispatch(t *testing.T) {
 					)
 				}
 			}
-			if strings.Contains(adapter, "Reader_Read") {
-				t.Fatalf(
-					"embedded-interface adapter fabricates a static interface method:\n%s",
-					adapter,
-				)
+			for _, forbidden := range []string{
+				"Reader_Read",
+				"$fromStorage(",
+				"switch (",
+			} {
+				if strings.Contains(adapter, forbidden) {
+					t.Fatalf(
+						"embedded-interface adapter contains %q:\n%s",
+						forbidden,
+						adapter,
+					)
+				}
 			}
 			runner := filepath.Join(workingDirectory, "runner.ts")
 			writeProgramFile(t, runner, `import "./program.js";

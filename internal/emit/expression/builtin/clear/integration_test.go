@@ -136,8 +136,13 @@ func Use() int32 {
 		if source == "" {
 			t.Fatalf("map runtime is absent %s", name)
 		}
-		if strings.Count(source, "clear(): void") != 1 {
-			t.Fatalf("map runtime %s lacks one clear contract:\n%s", name, source)
+		if strings.Count(source, "clear(): void {") != 1 ||
+			strings.Count(source, "clear(): void;") != 1 {
+			t.Fatalf(
+				"map runtime %s lacks one implementation and one interface contract:\n%s",
+				name,
+				source,
+			)
 		}
 		if strings.Contains(source, "goMapClear") {
 			t.Fatalf("map runtime %s retained the superseded clear helper:\n%s", name, source)

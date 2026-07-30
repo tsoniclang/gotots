@@ -7,14 +7,13 @@ const (
 	CellName        = "cell"
 	CellValueName   = "value"
 	DereferenceName = "dereference"
+	DirectName      = "direct"
 	EqualName       = "equal"
 	ViewName        = "view"
 	FieldName       = "field"
 	ObjectFieldName = "objectField"
 	ElementName     = "element"
-	ElementViewName = "elementView"
 	IndexName       = "index"
-	IndexViewName   = "indexView"
 	ArrayRegionName = "arrayRegion"
 )
 
@@ -53,12 +52,11 @@ func Build(
 			target.fieldMethod(),
 			target.objectFieldMethod(),
 			target.elementMethod(),
-			target.elementViewMethod(),
 			target.indexMethod(),
-			target.indexViewMethod(),
 			target.arrayRegionMethod(),
 			target.equalMethod(),
 			target.dereferenceMethod(),
+			target.directMethod(),
 			target.viewMethod(),
 			target.valueGetter(),
 			target.valueSetter(),
@@ -103,6 +101,26 @@ func Dereference(
 		),
 		nil,
 		[]tsgo.TypeNode{logicalType, storageType},
+		[]tsgo.Expression{pointer},
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func Direct(
+	factory tsgo.Factory,
+	runtimeName string,
+	logicalType tsgo.TypeNode,
+	pointer tsgo.Expression,
+) tsgo.CallExpression {
+	return factory.CallExpression(
+		factory.PropertyAccessExpression(
+			factory.Identifier(runtimeName),
+			nil,
+			factory.Identifier(DirectName),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		[]tsgo.TypeNode{logicalType},
 		[]tsgo.Expression{pointer},
 		tsgo.NodeFlagsNone,
 	)

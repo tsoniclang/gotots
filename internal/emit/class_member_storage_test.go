@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -296,7 +297,7 @@ func TestAddressableStorageReconstructsOnlyOwningBodiesIncludingInit(
 	var initializer *types.Func
 	for _, declaration := range sourcePackage.Files()[0].Syntax().Decls {
 		function, ok := declaration.(*ast.FuncDecl)
-		if !ok || !isPackageInitDeclaration(function) {
+		if !ok || !declarationindex.IsPackageInitializer(function) {
 			continue
 		}
 		initializer = sourcePackage.TypesInfo().Defs[function.Name].(*types.Func)

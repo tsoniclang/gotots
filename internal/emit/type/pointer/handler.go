@@ -87,14 +87,29 @@ func EmitNonNilRepresented(
 			api.GenericRepresentationPointer,
 		)
 	}
+	representation, err := Observe(context, sourceType, false)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
 	elementType, err := children.RepresentedType(context, source, element)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
-	storageType, err := context.Values().StorageType(
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		return api.DirectType(
+			elementType.Value(),
+			api.CombineRequests(
+				elementType.Requests(),
+				representation.Requests(),
+			)...,
+		), nil
+	}
+	storageType, err := context.ContainerStorage().PointerStorageType(
 		context.WithRole(api.RoleStorageType),
 		source,
 		element,
+		representation,
 	)
 	if err != nil {
 		return api.TypeEmission{}, err
@@ -115,6 +130,33 @@ func EmitNonNilRepresented(
 			elementType.Requests(),
 			storageType.Requests(),
 			reference.Requests(),
+			representation.Requests(),
 		)...,
 	), nil
+}
+
+func Observe(
+	context api.Context,
+	sourceType types.Type,
+	carrierDemand bool,
+) (api.PointerRepresentationObservation, error) {
+	pointer, _, ok := Resolve(sourceType)
+	if !ok {
+		return api.PointerRepresentationObservation{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "pointer representation source is invalid",
+		}
+	}
+	values := context.PointerRepresentationValues()
+	if values == nil {
+		return api.PointerRepresentationObservation{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "pointer representation service is unavailable",
+		}
+	}
+	return values.PointerRepresentation(
+		context,
+		pointer,
+		carrierDemand,
+	)
 }

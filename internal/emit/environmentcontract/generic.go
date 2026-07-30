@@ -19,9 +19,18 @@ func enterGeneric(
 	owner types.Object,
 	requirements []api.DeclarationRequirement,
 ) (genericScope, error) {
+	owner = api.GenericDeclarationOrigin(owner)
+	if owner == nil {
+		return genericScope{}, &api.InvariantError{
+			Reason: "environment generic declaration owner is invalid",
+		}
+	}
 	parameters := api.GenericDeclarationParameters(owner)
 	if len(parameters) == 0 {
-		return genericScope{context: context}, nil
+		bound, err := context.WithSourceArtifactOwner(
+			api.MustSourceArtifactOwner(owner),
+		)
+		return genericScope{context: bound}, err
 	}
 	names := make(map[*types.TypeParam]string, len(parameters))
 	profile, err := api.SelectGenericRepresentationProfile(
@@ -44,6 +53,12 @@ func enterGeneric(
 		return genericScope{}, err
 	}
 	context, err = context.WithEnvironmentGenericParameters(owner, names)
+	if err != nil {
+		return genericScope{}, err
+	}
+	context, err = context.WithSourceArtifactOwner(
+		api.MustSourceArtifactOwner(owner),
+	)
 	if err != nil {
 		return genericScope{}, err
 	}

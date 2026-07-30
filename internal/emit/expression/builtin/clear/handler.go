@@ -260,6 +260,15 @@ func applySlice(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	zero, err = context.ContainerStorage().ToContainerStorage(
+		context.WithRole(api.RoleSliceElement),
+		source,
+		elementType,
+		zero,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	if len(zero.Before()) != 0 {
 		return api.ExpressionEmission{}, api.Unsupported(
 			context,

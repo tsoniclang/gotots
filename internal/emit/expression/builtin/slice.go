@@ -47,7 +47,7 @@ func emitMake(
 	values := []api.ExpressionEmission{length, capacity}
 	aggregate := context.Values().RequiresStructuralCopy(context, elementType)
 	if aggregate {
-		targetElement, err := children.RepresentedType(
+		targetElement, err := context.ContainerStorage().ContainerStorageType(
 			context.WithRole(api.RoleSliceElementType),
 			source,
 			elementType,
@@ -81,6 +81,15 @@ func emitMake(
 		context.WithRole(api.RoleSliceElement),
 		source,
 		elementType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	zero, err = context.ContainerStorage().ToContainerStorage(
+		context.WithRole(api.RoleSliceElement),
+		source,
+		elementType,
+		zero,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -228,7 +237,7 @@ func emitAppend(
 		return api.ExpressionEmission{}, err
 	}
 	if context.Values().RequiresStructuralCopy(context, elementType) {
-		targetElement, err := children.RepresentedType(
+		targetElement, err := context.ContainerStorage().ContainerStorageType(
 			context.WithRole(api.RoleSliceElementType),
 			source,
 			elementType,
@@ -250,10 +259,33 @@ func emitAppend(
 		}
 		return wrapDefinedSlice(context, result, target)
 	}
+	for index := 1; index < len(ordered); index++ {
+		stored, storageErr := context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleSliceElement),
+			source.Args[index],
+			elementType,
+			api.DirectExpression(ordered[index]),
+		)
+		if storageErr != nil {
+			return api.ExpressionEmission{}, storageErr
+		}
+		before = append(before, stored.Before()...)
+		requests = append(requests, stored.Requests()...)
+		ordered[index] = stored.Value()
+	}
 	zero, err := context.Values().Zero(
 		context.WithRole(api.RoleSliceElement),
 		source,
 		elementType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	zero, err = context.ContainerStorage().ToContainerStorage(
+		context.WithRole(api.RoleSliceElement),
+		source,
+		elementType,
+		zero,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -390,7 +422,7 @@ func emitCopyMode(
 			requests,
 		)
 	} else if context.Values().RequiresStructuralCopy(context, elementType) {
-		targetElement, typeErr := children.RepresentedType(
+		targetElement, typeErr := context.ContainerStorage().ContainerStorageType(
 			context.WithRole(api.RoleSliceElementType),
 			source,
 			elementType,
@@ -454,7 +486,7 @@ func runtimeStaticCall(
 	before []tsgo.Statement,
 	requests []api.RootRequest,
 ) (api.ExpressionEmission, error) {
-	element, err := children.RepresentedType(
+	element, err := context.ContainerStorage().ContainerStorageType(
 		context.WithRole(api.RoleSliceElementType),
 		source,
 		elementType,
@@ -546,35 +578,4 @@ func arrangeValueMode(
 		targets = append(targets, context.Factory().Identifier(name))
 	}
 	return targets, before, requests, nil
-}
-
-func variable(
-	context api.Context,
-	name string,
-	value tsgo.Expression,
-) tsgo.VariableStatement {
-	return context.Factory().VariableStatement(
-		nil,
-		context.Factory().VariableDeclarationList(
-			[]tsgo.VariableDeclaration{
-				context.Factory().VariableDeclaration(
-					context.Factory().Identifier(name),
-					nil,
-					nil,
-					value,
-				),
-			},
-			tsgo.NodeFlagsConst,
-		),
-	)
-}
-
-func bigInt(context api.Context, value tsgo.Expression) tsgo.CallExpression {
-	return context.Factory().CallExpression(
-		context.Factory().Identifier("BigInt"),
-		nil,
-		nil,
-		[]tsgo.Expression{value},
-		tsgo.NodeFlagsNone,
-	)
 }

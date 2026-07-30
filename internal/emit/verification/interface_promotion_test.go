@@ -444,7 +444,10 @@ func TestPromotedPointerInterfaceAdapterPreservesReceiverAddress(
 				"$goInterfaceAdapter_",
 			) || !strings.Contains(
 				artifacts.printed,
-				".field<",
+				"GoPointer.objectField<",
+			) || !strings.Contains(
+				artifacts.printed,
+				"$storageOf(GoPointer.direct<Outer",
 			) {
 				t.Fatalf(
 					"promoted pointer adapter lacks typed field-address projection:\n%s",

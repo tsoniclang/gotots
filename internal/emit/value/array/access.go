@@ -57,7 +57,7 @@ func (a RuntimeArray) ApplyIndex(
 		return api.ExpressionEmission{}, err
 	}
 	values := ordered.Values()
-	return api.NewExpressionEmission(
+	stored, err := api.NewExpressionEmission(
 		ordered.Before(),
 		callMember(
 			context,
@@ -66,6 +66,15 @@ func (a RuntimeArray) ApplyIndex(
 			values[1],
 		),
 		ordered.Requests(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return context.ContainerStorage().FromContainerStorage(
+		context.WithRole(api.RoleArrayElement),
+		nil,
+		a.ElementType(),
+		stored,
 	)
 }
 
@@ -102,7 +111,7 @@ func (a RuntimeArray) EmitStoreTarget(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewAccessorStoreTargetEmission(
+	return api.NewContainerStorageAccessorStoreTargetEmission(
 		targetReceiver,
 		arraymember.Get.Name(),
 		arraymember.Set.Name(),
@@ -163,15 +172,21 @@ func (a RuntimeArray) Measure(
 
 func (a RuntimeArray) RangeElement(
 	context api.Context,
+	source ast.Node,
 	receiver tsgo.Expression,
 	index tsgo.Expression,
-) api.ExpressionEmission {
-	return api.DirectExpression(callMember(
-		context,
-		a.storage(context, receiver),
-		arraymember.Get,
-		index,
-	))
+) (api.ExpressionEmission, error) {
+	return context.ContainerStorage().FromContainerStorage(
+		context.WithRole(api.RoleArrayElement),
+		source,
+		a.ElementType(),
+		api.DirectExpression(callMember(
+			context,
+			a.storage(context, receiver),
+			arraymember.Get,
+			index,
+		)),
+	)
 }
 
 func emitIndex(

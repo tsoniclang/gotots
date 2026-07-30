@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	declarationorder "github.com/tsoniclang/gotots/internal/emit/declaration/order"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
@@ -45,12 +46,25 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		for _, symbol := range placement.RuntimeSymbols() {
 			runtimeSymbols[symbol] = struct{}{}
 		}
-		ordered, err := orderTargetDeclarations(builder.declarations)
+		orderInput := make(
+			[]declarationorder.Declaration,
+			len(builder.declarations),
+		)
+		for index, declaration := range builder.declarations {
+			orderInput[index] = declarationorder.Declaration{
+				Owner:             declaration.owner,
+				Name:              declaration.name,
+				Position:          declaration.position,
+				EagerDependencies: declaration.eagerDependencies,
+			}
+		}
+		ordered, err := declarationorder.Indices(orderInput)
 		if err != nil {
 			return nil, err
 		}
 		var declarations []tsgo.Statement
-		for _, declaration := range ordered {
+		for _, index := range ordered {
+			declaration := builder.declarations[index]
 			declarations = append(
 				declarations,
 				slices.Clone(declaration.statements)...,

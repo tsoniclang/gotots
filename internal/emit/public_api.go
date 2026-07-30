@@ -8,6 +8,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -147,7 +148,10 @@ func (r Root) valid() bool {
 }
 
 func compareRoots(left Root, right Root) int {
-	if order := compareObjects(left.object, right.object); order != 0 {
+	if order := emitordering.CompareObjects(
+		left.object,
+		right.object,
+	); order != 0 {
 		return order
 	}
 	if left.kind < right.kind {
@@ -198,7 +202,10 @@ func ExportedAPIRoots(source *load.Package) ([]Root, error) {
 		}
 	}
 	sort.Slice(roots, func(left, right int) bool {
-		return compareObjects(roots[left].object, roots[right].object) < 0
+		return emitordering.CompareObjects(
+			roots[left].object,
+			roots[right].object,
+		) < 0
 	})
 	return roots, nil
 }

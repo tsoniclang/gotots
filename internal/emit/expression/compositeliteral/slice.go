@@ -53,7 +53,7 @@ func emitSlice(
 	if source.Type != nil {
 		typeOwner = source.Type
 	}
-	elementTarget, err := children.RepresentedType(
+	elementTarget, err := context.ContainerStorage().ContainerStorageType(
 		context.WithRole(api.RoleSliceElementType),
 		typeOwner,
 		elementType,
@@ -200,6 +200,15 @@ func emitSliceElements(
 		if err != nil {
 			return nil, 0, false, err
 		}
+		emission, err = context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleSliceElement),
+			valueSource,
+			elementType,
+			emission,
+		)
+		if err != nil {
+			return nil, 0, false, err
+		}
 		result = append(result, sliceElement{
 			index:    index,
 			emission: emission,
@@ -245,6 +254,15 @@ func emitKeyedSlice(
 			context.WithRole(api.RoleSliceElement),
 			source,
 			elementType,
+		)
+		if zeroErr != nil {
+			return api.ExpressionEmission{}, zeroErr
+		}
+		zero, zeroErr = context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleSliceElement),
+			source,
+			elementType,
+			zero,
 		)
 		if zeroErr != nil {
 			return api.ExpressionEmission{}, zeroErr

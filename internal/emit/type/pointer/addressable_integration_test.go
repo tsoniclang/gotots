@@ -30,9 +30,8 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 	for _, required := range []string{
 		"GoPointer.cell",
 		"GoPointer.field",
-		"GoPointer.indexView",
+		"GoPointer.index",
 		"goSliceAddress",
-		"goSliceAddressView",
 		"value$storage",
 		"export class Box",
 		"static Add(box:",
@@ -48,6 +47,8 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 		".call(",
 		".apply(",
 		".bind(",
+		"GoPointer.indexView",
+		"goSliceAddressView",
 		"export function Box_Add",
 		"export function Box_Nil",
 	} {

@@ -484,8 +484,8 @@ func TestUnnamedReceiversPrintTypecheckAndMatchGo(t *testing.T) {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	for _, required := range []string{
 		"Value(): int32",
-		"static Pointer($0: GoPointer<Token",
-		"Token.$fromStorage(value$storage.value).Value()",
+		"static Pointer($0: Token | undefined)",
+		"Token.$copy(value$storage).Value()",
 		"Token.Pointer(value$storage)",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
@@ -495,6 +495,8 @@ func TestUnnamedReceiversPrintTypecheckAndMatchGo(t *testing.T) {
 	for _, forbidden := range []string{
 		"export function Token_Value",
 		"export function Token_Pointer",
+		"Token$Storage",
+		"GoPointer<Token",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
 			t.Fatalf("unnamed receiver artifact contains %q", forbidden)

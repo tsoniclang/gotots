@@ -83,6 +83,7 @@ type emitter struct {
 	require     func(types.Object) error
 	generic     api.GenericCallableResolver
 	cooperative api.CooperativeCallableResolver
+	pointer     api.PointerRepresentationResolver
 	goRuntime   api.GoRuntimeContract
 }
 
@@ -96,6 +97,7 @@ func newEmitter(
 	require func(types.Object) error,
 	generic api.GenericCallableResolver,
 	cooperative api.CooperativeCallableResolver,
+	pointer api.PointerRepresentationResolver,
 	goRuntime api.GoRuntimeContract,
 ) *emitter {
 	var typesInfo *types.Info
@@ -114,6 +116,7 @@ func newEmitter(
 		require:     require,
 		generic:     generic,
 		cooperative: cooperative,
+		pointer:     pointer,
 		goRuntime:   goRuntime,
 	}
 	target.values = representation.NewOwner(target)

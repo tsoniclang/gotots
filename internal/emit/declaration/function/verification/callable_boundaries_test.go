@@ -409,14 +409,21 @@ func TestExpressionNewPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	source := readMaterializedSource(t, artifacts, "source.ts")
 	for _, fragment := range []string{
 		"GoPointer.cell<int32, int32>",
-		"GoPointer.cell<Box, Box$Storage>",
-		"$copy",
+		"return Box.$copy(value);",
+		"return makeBox();",
 	} {
 		if !strings.Contains(source, fragment) {
 			t.Fatalf("expression-form new output lacks %q:\n%s", fragment, source)
 		}
 	}
-	for _, forbidden := range []string{".call(", ".apply(", ": any", ": unknown"} {
+	for _, forbidden := range []string{
+		"GoPointer<Box",
+		"Box$Storage",
+		".call(",
+		".apply(",
+		": any",
+		": unknown",
+	} {
 		if strings.Contains(source, forbidden) {
 			t.Fatalf("expression-form new output contains %q:\n%s", forbidden, source)
 		}

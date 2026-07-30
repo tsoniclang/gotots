@@ -35,6 +35,10 @@ func ClearAggregate(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	zero, err = storeElement(context, source, elementType, zero)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	target := context.Factory().Identifier(receiverName)
 	index := context.Factory().Identifier(indexName)
 	before := append(

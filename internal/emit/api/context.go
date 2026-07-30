@@ -32,6 +32,10 @@ type Context struct {
 	factory                    tsgo.Factory
 	names                      Names
 	values                     Values
+	pointerNames               PointerRepresentationNames
+	pointerValues              PointerRepresentationValues
+	stableAssignments          StableAssignmentValues
+	containerStorage           ContainerStorageValues
 	storage                    AddressableStorage
 	integer                    IntegerRepresentation
 	evaluationOrder            EvaluationOrder
@@ -203,19 +207,27 @@ func NewContext(
 	case !concurrency.Valid():
 		return Context{}, &ContextError{Reason: "concurrency semantics are invalid"}
 	}
+	pointerNames, _ := names.(PointerRepresentationNames)
+	pointerValues, _ := values.(PointerRepresentationValues)
+	stableAssignments, _ := values.(StableAssignmentValues)
+	containerStorage, _ := values.(ContainerStorageValues)
 	return Context{
-		role:            role,
-		fileSet:         fileSet,
-		typesPackage:    typesPackage,
-		typesInfo:       typesInfo,
-		typesSizes:      typesSizes,
-		factory:         factory,
-		names:           names,
-		values:          values,
-		storage:         storage,
-		integer:         integer,
-		evaluationOrder: evaluationOrder,
-		concurrency:     concurrency,
+		role:              role,
+		fileSet:           fileSet,
+		typesPackage:      typesPackage,
+		typesInfo:         typesInfo,
+		typesSizes:        typesSizes,
+		factory:           factory,
+		names:             names,
+		values:            values,
+		pointerNames:      pointerNames,
+		pointerValues:     pointerValues,
+		stableAssignments: stableAssignments,
+		containerStorage:  containerStorage,
+		storage:           storage,
+		integer:           integer,
+		evaluationOrder:   evaluationOrder,
+		concurrency:       concurrency,
 	}, nil
 }
 
@@ -373,6 +385,22 @@ func (c Context) Names() Names {
 
 func (c Context) Values() Values {
 	return c.values
+}
+
+func (c Context) PointerRepresentationNames() PointerRepresentationNames {
+	return c.pointerNames
+}
+
+func (c Context) PointerRepresentationValues() PointerRepresentationValues {
+	return c.pointerValues
+}
+
+func (c Context) StableAssignments() StableAssignmentValues {
+	return c.stableAssignments
+}
+
+func (c Context) ContainerStorage() ContainerStorageValues {
+	return c.containerStorage
 }
 
 func (c Context) AddressableStorage() AddressableStorage {

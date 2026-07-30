@@ -18,6 +18,7 @@ const (
 	GeneratedArtifactGenericCapability
 	GeneratedArtifactCallableABI
 	GeneratedArtifactInterfaceMethodCallable
+	GeneratedArtifactPointerRepresentation
 )
 
 func (k GeneratedArtifactKind) Valid() bool {
@@ -29,7 +30,8 @@ func (k GeneratedArtifactKind) Valid() bool {
 		k == GeneratedArtifactInterfaceDynamicTypeToken ||
 		k == GeneratedArtifactGenericCapability ||
 		k == GeneratedArtifactCallableABI ||
-		k == GeneratedArtifactInterfaceMethodCallable
+		k == GeneratedArtifactInterfaceMethodCallable ||
+		k == GeneratedArtifactPointerRepresentation
 }
 
 type GeneratedArtifactPlacement uint8
@@ -127,7 +129,8 @@ func NewContractGeneratedArtifact(
 	targetName string,
 ) (*GeneratedArtifact, error) {
 	if (kind != GeneratedArtifactCallableABI &&
-		kind != GeneratedArtifactInterfaceMethodCallable) ||
+		kind != GeneratedArtifactInterfaceMethodCallable &&
+		kind != GeneratedArtifactPointerRepresentation) ||
 		!validGeneratedArtifactType(kind, sourceType) ||
 		artifact == "" ||
 		targetName == "" {
@@ -344,6 +347,14 @@ func (o *GeneratedArtifact) CallableABI() (*types.Signature, bool) {
 	return signature, ok && signature.Recv() == nil
 }
 
+func (o *GeneratedArtifact) PointerRepresentation() (*types.Pointer, bool) {
+	if o == nil || o.kind != GeneratedArtifactPointerRepresentation {
+		return nil, false
+	}
+	source, ok := types.Unalias(o.sourceType).(*types.Pointer)
+	return source, ok
+}
+
 func (o *GeneratedArtifact) ArtifactKey() string {
 	if o == nil {
 		return ""
@@ -427,7 +438,8 @@ func (o *GeneratedArtifact) Valid() bool {
 			o.anchor.Parent() != o.anchor.Pkg().Scope()
 	case GeneratedArtifactPlacementContract:
 		return (o.kind == GeneratedArtifactCallableABI ||
-			o.kind == GeneratedArtifactInterfaceMethodCallable) &&
+			o.kind == GeneratedArtifactInterfaceMethodCallable ||
+			o.kind == GeneratedArtifactPointerRepresentation) &&
 			o.outputPath == "" &&
 			!o.lexicalOwner.Valid() &&
 			o.anchor == nil
@@ -471,6 +483,9 @@ func validGeneratedArtifactType(
 	case GeneratedArtifactCallableABI:
 		source, ok := types.Unalias(sourceType).(*types.Signature)
 		return ok && source.Recv() == nil
+	case GeneratedArtifactPointerRepresentation:
+		_, ok := types.Unalias(sourceType).(*types.Pointer)
+		return ok
 	default:
 		return false
 	}

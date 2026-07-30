@@ -115,6 +115,7 @@ func emitDerivedClass(
 			children,
 			source,
 			basis,
+			fields,
 			className,
 			classType,
 			basisStorage.Value(),

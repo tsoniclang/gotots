@@ -43,8 +43,10 @@ func Render(value context.Context) string {
 	return os.Args[0]
 }
 
-func ReadPool(pool *sync.Pool) any {
-	return pool.Get()
+func ReadPool(pool *sync.Pool, values []sync.Pool) any {
+	result := pool.Get()
+	_ = (&values[0]).Get()
+	return result
 }
 
 func StopTicker(ticker *time.Ticker) {
@@ -229,7 +231,7 @@ func RuneBoundary(value byte) bool {
 		"export declare const Context$contract",
 		"export declare function Context$is",
 		"export declare class Pool",
-		"export declare function Pool_Get",
+		"export declare function Pool_Get($receiver: GoPointer<Pool",
 		"export declare function String(",
 		"export declare function Slice(",
 		"export declare function StringData(",

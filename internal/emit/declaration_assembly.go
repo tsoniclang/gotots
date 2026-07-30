@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -116,6 +117,12 @@ func (s *programSession) scheduleDeclarationRequirement(
 			generated.Kind() ==
 				api.GeneratedArtifactInterfaceMethodCallable) {
 		if err := s.ensureCallableContractBaseline(generated); err != nil {
+			return err
+		}
+	}
+	if generated, generatedOwned := owner.Generated(); generatedOwned &&
+		generated.Kind() == api.GeneratedArtifactPointerRepresentation {
+		if err := s.ensurePointerRepresentationBaseline(generated); err != nil {
 			return err
 		}
 	}
@@ -266,9 +273,9 @@ func (s *programSession) buildArtifactRevision(
 	artifactOwner := api.MustSourceArtifactOwner(owner)
 	finish, err := names.BeginArtifact(
 		artifactOwner,
-		site.declaration,
-		site.sourceFile.Syntax(),
-		site.outputPath,
+		site.Declaration,
+		site.SourceFile.Syntax(),
+		site.OutputPath,
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -287,7 +294,7 @@ func (s *programSession) buildArtifactRevision(
 	}
 	context, err = emitnaming.WithLexicalTypeRequirements(
 		context,
-		site.declaration,
+		site.Declaration,
 		artifactOwner,
 		handlerRequirements,
 	)
@@ -296,7 +303,7 @@ func (s *programSession) buildArtifactRevision(
 	}
 	result, err := builder.emitter.declarationObject(
 		context,
-		site.declaration,
+		site.Declaration,
 		owner,
 		handlerRequirements,
 	)
@@ -429,6 +436,8 @@ func (s *programSession) consumeArtifactRequests(
 			sourceObject, sourceProvider := dependency.Provider().Source()
 			if sourceProvider {
 				_, sourceProvider = s.sites[sourceObject]
+				sourceProvider = sourceProvider ||
+					s.environmentArtifactSource(sourceObject)
 			}
 			generated, generatedProvider := dependency.Provider().Generated()
 			if generatedProvider {
@@ -543,7 +552,10 @@ func eagerDeclarationDependencies(
 		result = append(result, provider)
 	}
 	sort.Slice(result, func(left, right int) bool {
-		return compareArtifactOwners(result[left], result[right]) < 0
+		return emitordering.CompareArtifactOwners(
+			result[left],
+			result[right],
+		) < 0
 	})
 	return result
 }
@@ -563,6 +575,9 @@ func (s *programSession) reconstructScheduledArtifact(
 	source, ok := owner.Source()
 	if !ok {
 		return &ScheduleError{Reason: "dirty target artifact owner is invalid"}
+	}
+	if s.environmentArtifactSource(source) {
+		return s.reconstructEnvironmentArtifact(source)
 	}
 	if variable, ok := source.(*types.Var); ok {
 		return s.reconstructPackageStorage(owner, variable)

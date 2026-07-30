@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 )
 
 func compareBasicKinds(left types.BasicKind, right types.BasicKind) int {
@@ -22,7 +23,10 @@ func compareDeclarationRequirements(
 	left api.DeclarationRequirement,
 	right api.DeclarationRequirement,
 ) int {
-	if order := compareArtifactOwners(left.Owner(), right.Owner()); order != 0 {
+	if order := emitordering.CompareArtifactOwners(
+		left.Owner(),
+		right.Owner(),
+	); order != 0 {
 		return order
 	}
 	if left.Kind() < right.Kind() {
@@ -42,7 +46,7 @@ func compareDeclarationRequirements(
 		case !leftOK:
 			return 0
 		default:
-			return compareObjects(leftMethod, rightMethod)
+			return emitordering.CompareObjects(leftMethod, rightMethod)
 		}
 	}
 	if left.Kind() == api.DeclarationRequirementAddressableStorage {
@@ -56,7 +60,7 @@ func compareDeclarationRequirements(
 		case !leftOK:
 			return 0
 		default:
-			return compareObjects(leftVariable, rightVariable)
+			return emitordering.CompareObjects(leftVariable, rightVariable)
 		}
 	}
 	if left.Kind() == api.DeclarationRequirementConstantProjection {
@@ -67,7 +71,10 @@ func compareDeclarationRequirements(
 	if left.Kind() == api.DeclarationRequirementLocalConstantProjection {
 		_, leftConstant, leftProjection, _ := left.LocalConstantProjection()
 		_, rightConstant, rightProjection, _ := right.LocalConstantProjection()
-		if order := compareObjects(leftConstant, rightConstant); order != 0 {
+		if order := emitordering.CompareObjects(
+			leftConstant,
+			rightConstant,
+		); order != 0 {
 			return order
 		}
 		return compareBasicKinds(leftProjection, rightProjection)
@@ -286,7 +293,7 @@ func compareDeclarationRequirements(
 	}
 	leftType, leftOperation, _ := left.NamedStructOperation()
 	rightType, rightOperation, _ := right.NamedStructOperation()
-	if order := compareObjects(leftType, rightType); order != 0 {
+	if order := emitordering.CompareObjects(leftType, rightType); order != 0 {
 		return order
 	}
 	switch {
@@ -349,7 +356,7 @@ func compareCallableControlRequirements(
 	case !leftOK:
 		return 0
 	}
-	if order := compareObjects(leftLabel, rightLabel); order != 0 {
+	if order := emitordering.CompareObjects(leftLabel, rightLabel); order != 0 {
 		return order
 	}
 	switch {
@@ -368,7 +375,8 @@ func artifactKinds(kind api.DeclarationRequirementKind) bool {
 		kind == api.DeclarationRequirementInterfaceMethodCallable ||
 		kind == api.DeclarationRequirementInterfaceDynamicTypeToken ||
 		kind == api.DeclarationRequirementGenericCapability ||
-		kind == api.DeclarationRequirementCallableABI
+		kind == api.DeclarationRequirementCallableABI ||
+		kind == api.DeclarationRequirementPointerRepresentation
 }
 
 func compareGeneratedArtifacts(
@@ -474,7 +482,7 @@ func (q *artifactOwnerPriorityQueue) push(owner api.ArtifactOwner) {
 	index := len(q.owners) - 1
 	for index > 0 {
 		parent := (index - 1) / 2
-		if compareArtifactOwners(q.owners[parent], owner) <= 0 {
+		if emitordering.CompareArtifactOwners(q.owners[parent], owner) <= 0 {
 			break
 		}
 		q.owners[index] = q.owners[parent]
@@ -503,10 +511,13 @@ func (q *artifactOwnerPriorityQueue) pop() (api.ArtifactOwner, bool) {
 		right := left + 1
 		next := left
 		if right < len(q.owners) &&
-			compareArtifactOwners(q.owners[right], q.owners[left]) < 0 {
+			emitordering.CompareArtifactOwners(
+				q.owners[right],
+				q.owners[left],
+			) < 0 {
 			next = right
 		}
-		if compareArtifactOwners(last, q.owners[next]) <= 0 {
+		if emitordering.CompareArtifactOwners(last, q.owners[next]) <= 0 {
 			break
 		}
 		q.owners[index] = q.owners[next]

@@ -11,6 +11,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -361,8 +362,8 @@ type Box struct {
 	Value int32
 }
 
-func demandBox(value *Box) int32 {
-	return value.Value
+func demandBox(values []Box) *Box {
+	return &values[0]
 }
 `),
 		0o600,
@@ -467,7 +468,7 @@ func demandBox(value *Box) int32 {
 		t.Fatalf("sealed package assembly exports = %v", final)
 	}
 
-	mutated := artifactstate.NewGraph(compareArtifactOwners)
+	mutated := artifactstate.NewGraph(emitordering.CompareArtifactOwners)
 	provider := api.MustSourceArtifactOwner(writer)
 	if err := mutated.Commit(
 		provider,

@@ -69,9 +69,18 @@ func emitArray(
 	}
 	var value assignment.RangeIterationValue
 	if source.Value != nil && nonBlank(source.Value) {
+		element, elementErr := array.RangeElement(
+			context,
+			source,
+			receiver,
+			index,
+		)
+		if elementErr != nil {
+			return api.StatementEmission{}, elementErr
+		}
 		value, err = iteration(
 			array.ElementType(),
-			array.RangeElement(context, receiver, index),
+			element,
 		)
 		if err != nil {
 			return api.StatementEmission{}, err
@@ -255,8 +264,19 @@ func pointerArrayElement(
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
-	element := array.RangeElement(context, restored.Value(), index)
-	return element, restored.Requests(), nil
+	element, err := array.RangeElement(
+		context,
+		source,
+		restored.Value(),
+		index,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
+	}
+	return element, api.CombineRequests(
+		restored.Requests(),
+		element.Requests(),
+	), nil
 }
 
 func arrayRangeKey(

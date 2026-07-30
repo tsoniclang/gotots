@@ -12,6 +12,7 @@ import (
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -266,6 +267,23 @@ func (owner Owner) Hash(
 		), nil
 	}
 	if pointerValue(sourceType) {
+		pointer, _, _ := pointertype.Resolve(sourceType)
+		representation, err := owner.PointerRepresentation(
+			context,
+			pointer,
+			false,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if representation.Representation() ==
+			api.PointerRepresentationDirectClass {
+			return directObjectHash(
+				context,
+				value,
+				representation.Requests(),
+			)
+		}
 		reference, err := context.Names().Runtime(
 			api.RuntimePointerHash,
 			api.ImportPhaseValue,
@@ -281,7 +299,10 @@ func (owner Owner) Hash(
 				[]tsgo.Expression{value},
 				tsgo.NodeFlagsNone,
 			),
-			reference.Requests()...,
+			api.CombineRequests(
+				reference.Requests(),
+				representation.Requests(),
+			)...,
 		), nil
 	}
 	if channelValue(sourceType) {
@@ -340,6 +361,52 @@ func (owner Owner) Hash(
 		api.NamedStructOperationHash,
 		[]tsgo.Expression{value},
 	)
+}
+
+func directObjectHash(
+	context api.Context,
+	value tsgo.Expression,
+	requests []api.RootRequest,
+) (api.ExpressionEmission, error) {
+	reference, err := context.Names().Runtime(
+		api.RuntimeMapHash,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	undefined := context.Factory().Identifier("undefined")
+	return api.DirectExpression(
+		context.Factory().ConditionalExpression(
+			context.Factory().BinaryExpression(
+				nil,
+				value,
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+				),
+				undefined,
+			),
+			context.Factory().QuestionToken(),
+			context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+			context.Factory().ColonToken(),
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+					context.Factory().Identifier(
+						mapruntime.HashObjectMember,
+					),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{value},
+				tsgo.NodeFlagsNone,
+			),
+		),
+		api.CombineRequests(reference.Requests(), requests)...,
+	), nil
 }
 
 func complexHash(

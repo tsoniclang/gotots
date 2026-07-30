@@ -46,3 +46,34 @@ func aggregateSliceCall(
 		),
 	)
 }
+
+func variable(
+	context api.Context,
+	name string,
+	value tsgo.Expression,
+) tsgo.VariableStatement {
+	return context.Factory().VariableStatement(
+		nil,
+		context.Factory().VariableDeclarationList(
+			[]tsgo.VariableDeclaration{
+				context.Factory().VariableDeclaration(
+					context.Factory().Identifier(name),
+					nil,
+					nil,
+					value,
+				),
+			},
+			tsgo.NodeFlagsConst,
+		),
+	)
+}
+
+func bigInt(context api.Context, value tsgo.Expression) tsgo.CallExpression {
+	return context.Factory().CallExpression(
+		context.Factory().Identifier("BigInt"),
+		nil,
+		nil,
+		[]tsgo.Expression{value},
+		tsgo.NodeFlagsNone,
+	)
+}

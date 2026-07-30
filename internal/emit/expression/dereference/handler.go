@@ -51,14 +51,6 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	storageType, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		element,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	if definedOK {
 		pointer, err = defined.Project(context, pointer)
 		if err != nil {
@@ -73,6 +65,14 @@ func Emit(
 	); handled || err != nil {
 		return value, err
 	}
+	representation, err := pointertype.Observe(
+		context,
+		types.NewPointer(element),
+		false,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleUnaryOperand),
 		source,
@@ -84,6 +84,44 @@ func Emit(
 	reference, err := context.Names().Runtime(
 		api.RuntimePointer,
 		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		guarded, err := api.NewExpressionEmission(
+			pointer.Before(),
+			pointerruntime.Direct(
+				context.Factory(),
+				reference.Name(),
+				targetElement.Value(),
+				pointer.Value(),
+			),
+			api.CombineRequests(
+				pointer.Requests(),
+				targetElement.Requests(),
+				reference.Requests(),
+				representation.Requests(),
+			),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return context.Values().Transfer(
+			context,
+			source,
+			element,
+			element,
+			api.ValueTransferCopy,
+			guarded,
+		)
+	}
+	storageType, err := context.ContainerStorage().PointerStorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+		representation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -102,12 +140,19 @@ func Emit(
 			targetElement.Requests(),
 			storageType.Requests(),
 			reference.Requests(),
+			representation.Requests(),
 		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return context.Values().FromStorage(context, source, element, stored)
+	return context.ContainerStorage().FromPointerStorage(
+		context,
+		source,
+		element,
+		representation,
+		stored,
+	)
 }
 
 func zeroFromNew(

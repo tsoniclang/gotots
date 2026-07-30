@@ -114,12 +114,6 @@ func callableVariantDeclaration(
 	}
 	context = generic.context
 	if profile != nil {
-		context, err = context.WithSourceArtifactOwner(
-			api.MustSourceArtifactOwner(function),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
 		context = context.WithGenericCallableProfile(profile)
 	}
 	target, err := callable.EmitEnvironmentContract(
@@ -220,6 +214,12 @@ func typedConstantDeclaration(
 	children api.ChildEmitter,
 	selected *types.Const,
 ) (api.DeclarationEmission, error) {
+	context, err := context.WithSourceArtifactOwner(
+		api.MustSourceArtifactOwner(selected),
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
 	target, err := children.RepresentedType(
 		context.WithRole(api.RolePackageConstantType),
 		nil,

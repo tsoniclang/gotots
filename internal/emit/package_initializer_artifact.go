@@ -23,7 +23,7 @@ func (s *programSession) emitPackageInitializer(
 		}
 	}
 	site, ok := s.sites[anchor]
-	if !ok || site.source != builder.sourcePackage {
+	if !ok || site.Source != builder.sourcePackage {
 		return &ScheduleError{
 			Object: anchor.Name(),
 			Reason: "package initializer has no exact source declaration",
@@ -112,16 +112,16 @@ func (s *programSession) buildPackageInitializerRevision(
 		defer names.RestoreTemporaries(current)
 	}
 	sourcePath, err := targetoutput.SourcePath(
-		site.source,
-		site.sourceFile,
+		site.Source,
+		site.SourceFile,
 	)
 	if err != nil {
 		return artifactRevision{}, err
 	}
 	finish, err := names.BeginArtifact(
 		owner,
-		site.declaration,
-		site.sourceFile.Syntax(),
+		site.Declaration,
+		site.SourceFile.Syntax(),
 		sourcePath,
 	)
 	if err != nil {
@@ -131,7 +131,7 @@ func (s *programSession) buildPackageInitializerRevision(
 	requirements := s.requirements.appliedFor(owner)
 	context, err := emitnaming.WithLexicalTypeRequirements(
 		builder.assemblyContext.WithArtifactOwner(owner),
-		site.declaration,
+		site.Declaration,
 		owner,
 		requirements,
 	)

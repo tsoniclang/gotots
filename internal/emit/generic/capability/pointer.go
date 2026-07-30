@@ -35,15 +35,15 @@ func buildPointerCapability(
 	if err != nil {
 		return nil, nil, true, err
 	}
-	storage, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
-		nil,
-		element,
+	pointerSource := types.NewPointer(element)
+	representation, err := pointertype.Observe(
+		context,
+		pointerSource,
+		false,
 	)
 	if err != nil {
 		return nil, nil, true, err
 	}
-	pointerSource := types.NewPointer(element)
 	pointer, err := pointertype.EmitRepresented(
 		context.WithRole(api.RoleParameterType),
 		children,
@@ -62,6 +62,45 @@ func buildPointerCapability(
 	if err != nil {
 		return nil, nil, true, err
 	}
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		parameters, resultType, body, requests, err :=
+			directPointerCapabilityBody(
+				context,
+				element,
+				selection.Operation(),
+				logical.Value(),
+				pointer.Value(),
+				nonNilPointer.Value(),
+			)
+		if err != nil {
+			return nil, nil, true, err
+		}
+		return context.Factory().FunctionDeclaration(
+				modifiers,
+				nil,
+				context.Factory().Identifier(artifact.TargetName()),
+				nil,
+				parameters,
+				resultType,
+				context.Factory().Block(body, true),
+			), api.CombineRequests(
+				logical.Requests(),
+				pointer.Requests(),
+				nonNilPointer.Requests(),
+				representation.Requests(),
+				requests,
+			), true, nil
+	}
+	storage, err := context.ContainerStorage().PointerStorageType(
+		context.WithRole(api.RoleStorageType),
+		nil,
+		element,
+		representation,
+	)
+	if err != nil {
+		return nil, nil, true, err
+	}
 	runtime, err := context.Names().Runtime(
 		api.RuntimePointer,
 		api.ImportPhaseValue,
@@ -73,6 +112,7 @@ func buildPointerCapability(
 		pointerCapabilityBody(
 			context,
 			element,
+			representation,
 			selection.Operation(),
 			logical.Value(),
 			storage.Value(),
@@ -97,13 +137,124 @@ func buildPointerCapability(
 			pointer.Requests(),
 			nonNilPointer.Requests(),
 			runtime.Requests(),
+			representation.Requests(),
 			operationRequests,
 		), true, nil
+}
+
+func directPointerCapabilityBody(
+	context api.Context,
+	element types.Type,
+	operation api.GenericOperation,
+	logicalType tsgo.TypeNode,
+	pointerType tsgo.TypeNode,
+	nonNilPointerType tsgo.TypeNode,
+) (
+	[]tsgo.ParameterDeclaration,
+	tsgo.TypeNode,
+	[]tsgo.Statement,
+	[]api.RootRequest,
+	error,
+) {
+	first := context.Factory().Identifier("$0")
+	second := context.Factory().Identifier("$1")
+	switch operation {
+	case api.GenericOperationPointerCell:
+		value, err := context.Values().Transfer(
+			context.WithRole(api.RoleFunctionBody),
+			nil,
+			element,
+			element,
+			api.ValueTransferCopy,
+			api.DirectExpression(first),
+		)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		body := append(value.Before(), context.Factory().ReturnStatement(
+			value.Value(),
+		))
+		return []tsgo.ParameterDeclaration{
+			operationParameter(context, "$0", logicalType),
+		}, nonNilPointerType, body, value.Requests(), nil
+	case api.GenericOperationPointerLoad, api.GenericOperationPointerStore:
+		runtime, err := context.Names().Runtime(
+			api.RuntimePointer,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		target := pointerruntime.Direct(
+			context.Factory(),
+			runtime.Name(),
+			logicalType,
+			first,
+		)
+		if operation == api.GenericOperationPointerLoad {
+			value, err := context.Values().Transfer(
+				context.WithRole(api.RoleFunctionBody),
+				nil,
+				element,
+				element,
+				api.ValueTransferCopy,
+				api.DirectExpression(target),
+			)
+			if err != nil {
+				return nil, nil, nil, nil, err
+			}
+			body := append(value.Before(), context.Factory().ReturnStatement(
+				value.Value(),
+			))
+			return []tsgo.ParameterDeclaration{
+					operationParameter(context, "$0", pointerType),
+				}, logicalType, body, api.CombineRequests(
+					runtime.Requests(),
+					value.Requests(),
+				), nil
+		}
+		values := context.StableAssignments()
+		if values == nil {
+			return nil, nil, nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "stable-assignment service is unavailable",
+			}
+		}
+		assigned, err := values.AssignStable(
+			context.WithRole(api.RoleFunctionBody),
+			nil,
+			element,
+			target,
+			api.DirectExpression(second),
+		)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		body := append(
+			assigned.Before(),
+			context.Factory().ExpressionStatement(assigned.Value()),
+		)
+		return []tsgo.ParameterDeclaration{
+				operationParameter(context, "$0", pointerType),
+				operationParameter(context, "$1", logicalType),
+			}, context.Factory().KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindVoidKeyword,
+			), body, api.CombineRequests(
+				runtime.Requests(),
+				assigned.Requests(),
+			), nil
+	default:
+		return nil, nil, nil, nil, invariant(
+			context,
+			"direct pointer capability operation is invalid",
+		)
+	}
 }
 
 func pointerCapabilityBody(
 	context api.Context,
 	element types.Type,
+	representation api.PointerRepresentationObservation,
 	operation api.GenericOperation,
 	logicalType tsgo.TypeNode,
 	storageType tsgo.TypeNode,
@@ -121,10 +272,11 @@ func pointerCapabilityBody(
 	second := context.Factory().Identifier("$1")
 	switch operation {
 	case api.GenericOperationPointerCell:
-		stored, err := context.Values().ToStorage(
+		stored, err := context.ContainerStorage().ToPointerStorage(
 			context.WithRole(api.RoleFunctionBody),
 			nil,
 			element,
+			representation,
 			api.DirectExpression(first),
 		)
 		if err != nil {
@@ -154,10 +306,11 @@ func pointerCapabilityBody(
 			storageType,
 			first,
 		))
-		value, err := context.Values().FromStorage(
+		value, err := context.ContainerStorage().FromPointerStorage(
 			context.WithRole(api.RoleFunctionBody),
 			nil,
 			element,
+			representation,
 			stored,
 		)
 		if err != nil {
@@ -174,10 +327,11 @@ func pointerCapabilityBody(
 			value.Requests(),
 			nil
 	case api.GenericOperationPointerStore:
-		stored, err := context.Values().ToStorage(
+		stored, err := context.ContainerStorage().ToPointerStorage(
 			context.WithRole(api.RoleFunctionBody),
 			nil,
 			element,
+			representation,
 			api.DirectExpression(second),
 		)
 		if err != nil {

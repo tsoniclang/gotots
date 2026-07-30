@@ -27,6 +27,15 @@ func MakeAggregate(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	next, err = context.ContainerStorage().ToContainerStorage(
+		context.WithRole(api.RoleSliceElement),
+		source,
+		elementType,
+		next,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	resultName, err := context.Names().Temporary(
 		api.TemporarySliceConstruction,
 	)

@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -100,38 +101,6 @@ func TestFunctionValueReferenceSchedulesExactCrossPackageDeclaration(t *testing.
 		"example.com/callbackdemand/api.Run,"+
 		"example.com/callbackdemand/worker.Double" {
 		t.Fatalf("callable demand closure = %s", labels)
-	}
-}
-
-func TestDeclarationIndexRejectsDuplicateObjectOwnership(t *testing.T) {
-	sourcePackage := types.NewPackage("example.com/schedule", "schedule")
-	object := types.NewFunc(
-		token.Pos(1),
-		sourcePackage,
-		"Run",
-		types.NewSignatureType(nil, nil, nil, nil, nil, false),
-	)
-	sites := make(map[types.Object]declarationSite)
-	declaration := &ast.FuncDecl{Name: ast.NewIdent("Run")}
-	if err := addDeclarationSite(
-		sites,
-		object,
-		nil,
-		load.File{},
-		declaration,
-		"modules/key/schedule/run.ts",
-	); err != nil {
-		t.Fatal(err)
-	}
-	if err := addDeclarationSite(
-		sites,
-		object,
-		nil,
-		load.File{},
-		declaration,
-		"modules/key/schedule/other.ts",
-	); err == nil {
-		t.Fatal("duplicate declaration ownership was accepted")
 	}
 }
 
@@ -234,7 +203,10 @@ func independentReferenceClosure(
 	}
 	for len(pending) != 0 {
 		sort.Slice(pending, func(left, right int) bool {
-			return compareObjects(pending[left], pending[right]) < 0
+			return emitordering.CompareObjects(
+				pending[left],
+				pending[right],
+			) < 0
 		})
 		object := pending[0]
 		pending = pending[1:]

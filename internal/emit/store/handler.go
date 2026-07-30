@@ -184,10 +184,56 @@ func canonicalPointerTarget(
 	); handled || err != nil {
 		return target, err
 	}
-	storageType, err := context.Values().StorageType(
+	representation, err := pointertype.Observe(
+		context,
+		types.NewPointer(element),
+		false,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		logical, err := children.RepresentedType(
+			context.WithRole(api.RoleAssignmentTarget),
+			source,
+			element,
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		runtime, err := context.Names().Runtime(
+			api.RuntimePointer,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		location, err := api.NewExpressionEmission(
+			pointer.Before(),
+			pointerruntime.Direct(
+				context.Factory(),
+				runtime.Name(),
+				logical.Value(),
+				pointer.Value(),
+			),
+			api.CombineRequests(
+				pointer.Requests(),
+				logical.Requests(),
+				runtime.Requests(),
+				representation.Requests(),
+			),
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		return api.NewStableIdentityStoreTargetEmission(location, element)
+	}
+	storageType, err := context.ContainerStorage().PointerStorageType(
 		context.WithRole(api.RoleStorageType),
 		source,
 		element,
+		representation,
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
@@ -221,12 +267,22 @@ func canonicalPointerTarget(
 			targetElement.Requests(),
 			storageType.Requests(),
 			reference.Requests(),
+			representation.Requests(),
 		),
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewCanonicalStoragePropertyStoreTargetEmission(
+	if representation.Representation() ==
+		api.PointerRepresentationCarrierCanonical {
+		return api.NewCanonicalStoragePropertyStoreTargetEmission(
+			context.Factory(),
+			receiver,
+			pointerruntime.CellValueName,
+			element,
+		)
+	}
+	return api.NewPropertyStoreTargetEmission(
 		context.Factory(),
 		receiver,
 		pointerruntime.CellValueName,
@@ -277,7 +333,7 @@ func sliceIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewAccessorStoreTargetEmission(
+	return api.NewContainerStorageAccessorStoreTargetEmission(
 		receiver,
 		runtimeslice.MemberName(runtimeslice.MemberGet),
 		runtimeslice.MemberName(runtimeslice.MemberSet),

@@ -449,10 +449,6 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
-		pointerContract, err := api.RuntimeContract(api.RuntimePointer)
-		if err != nil {
-			return nil, err
-		}
 		definitions := make([]Definition, 0, len(symbols))
 		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
 		for _, symbol := range symbols {
@@ -471,7 +467,6 @@ func Build(
 				valueContract.ExportedName(),
 				runtimeValueContract.ExportedName(),
 				interfaceValueContract.ExportedName(),
-				pointerContract.ExportedName(),
 			)
 			if err != nil {
 				return nil, err

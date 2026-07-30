@@ -222,7 +222,7 @@ func classMemberMethodDirectory() string {
 	)
 }
 
-func TestLocalNamedStructPointerKeepsStorageLexical(t *testing.T) {
+func TestLocalNamedStructPointerStaysDirectAndLexical(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
@@ -262,8 +262,8 @@ func TestLocalNamedStructPointerKeepsStorageLexical(t *testing.T) {
 			artifacts := materializeArtifacts(t, emission, workingDirectory)
 			for _, required := range []string{
 				"class record",
-				"type record$Storage",
-				"GoPointer.cell<record, record$Storage>",
+				"let value: record | undefined = record.$make(",
+				"GoPointer.direct<record>(value).Value",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					t.Fatalf(
@@ -273,9 +273,17 @@ func TestLocalNamedStructPointerKeepsStorageLexical(t *testing.T) {
 					)
 				}
 			}
-			if strings.Contains(artifacts.printed, "export class record") {
+			for _, forbidden := range []string{
+				"export class record",
+				"record$Storage",
+				"GoPointer.cell<record",
+			} {
+				if !strings.Contains(artifacts.printed, forbidden) {
+					continue
+				}
 				t.Fatalf(
-					"local struct escaped file scope:\n%s",
+					"direct local struct contains %q:\n%s",
+					forbidden,
 					artifacts.printed,
 				)
 			}

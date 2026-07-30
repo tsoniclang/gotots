@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
@@ -47,30 +48,18 @@ func environmentContractError(
 	return &EnvironmentContractError{Object: object, Cause: err}
 }
 
-type environmentDeclaration struct {
-	object          types.Object
-	name            string
-	statements      []tsgo.Statement
-	reconstructions uint64
-}
-
-type environmentBuiltinOverload struct {
-	signature  *types.Signature
-	statements []tsgo.Statement
-}
-
 type environmentContractBuilder struct {
-	sourcePackage    *load.Package
-	outputPath       string
-	emitter          *emitter
-	context          api.Context
-	placement        *targetplacement.Owner
-	declarations     map[types.Object]environmentDeclaration
-	stateFields      map[*types.Var]tsgo.TypeElement
-	projections      map[string]tsgo.Statement
-	requiredBuiltins map[*types.Builtin]struct{}
-	builtinOverloads map[*types.Builtin][]environmentBuiltinOverload
-	requirements     map[types.Object]map[api.DeclarationRequirement]struct{}
+	sourcePackage *load.Package
+	outputPath    string
+	emitter       *emitter
+	context       api.Context
+	placement     *targetplacement.Owner
+	declarations  map[types.Object]environmentDeclaration
+	stateFields   map[*types.Var]environmentStateField
+	projections   map[string]tsgo.Statement
+	builtins      map[*types.Builtin]environmentBuiltin
+	requirements  map[types.Object]map[api.DeclarationRequirement]struct{}
+	building      map[types.Object]bool
 }
 
 func (s *programSession) emitEnvironmentObject(object types.Object) error {
@@ -86,34 +75,24 @@ func (s *programSession) emitEnvironmentObject(object types.Object) error {
 		return err
 	}
 	if variable, ok := object.(*types.Var); ok {
-		field, requests, err := environmentcontract.StateField(
-			builder.context,
-			builder.emitter,
-			variable,
-		)
-		if err != nil {
-			return environmentContractError(object, err)
-		}
-		if err := s.applyRootRequests(builder.placement, requests); err != nil {
-			return environmentContractError(object, err)
-		}
 		if _, duplicate := builder.stateFields[variable]; duplicate {
 			return &ScheduleError{
 				Object: variable.Name(),
 				Reason: "environment state field was emitted more than once",
 			}
 		}
-		builder.stateFields[variable] = field
-		return nil
+		return s.emitEnvironmentStateField(builder, variable)
 	}
 	if builtin, ok := builtinexpression.FromObject(object); ok {
-		if _, duplicate := builder.requiredBuiltins[builtin]; duplicate {
+		target := builder.builtins[builtin]
+		if target.emitted {
 			return &ScheduleError{
 				Object: builtin.Name(),
 				Reason: "environment builtin was emitted more than once",
 			}
 		}
-		builder.requiredBuiltins[builtin] = struct{}{}
+		target.emitted = true
+		builder.builtins[builtin] = target
 		return nil
 	}
 	if _, duplicate := builder.declarations[object]; duplicate {
@@ -128,6 +107,13 @@ func (s *programSession) emitEnvironmentObject(object types.Object) error {
 		builder.environmentRequirements(object),
 	)
 	if err != nil {
+		return err
+	}
+	if err := s.artifacts.Commit(
+		api.MustSourceArtifactOwner(object),
+		target.contract,
+		target.dependencies,
+	); err != nil {
 		return err
 	}
 	builder.declarations[object] = target
@@ -161,6 +147,7 @@ func (s *programSession) requireEnvironmentPackage(
 		s.require,
 		s,
 		s,
+		s,
 		s.goRuntime,
 	)
 	context, err := targetEmitter.targetContext(nil, outputPath)
@@ -169,21 +156,19 @@ func (s *programSession) requireEnvironmentPackage(
 	}
 	context = context.WithEnvironmentContract()
 	builder := &environmentContractBuilder{
-		sourcePackage:    sourcePackage,
-		outputPath:       outputPath,
-		emitter:          targetEmitter,
-		context:          context,
-		placement:        targetplacement.New(),
-		declarations:     make(map[types.Object]environmentDeclaration),
-		stateFields:      make(map[*types.Var]tsgo.TypeElement),
-		projections:      make(map[string]tsgo.Statement),
-		requiredBuiltins: make(map[*types.Builtin]struct{}),
-		builtinOverloads: make(
-			map[*types.Builtin][]environmentBuiltinOverload,
-		),
+		sourcePackage: sourcePackage,
+		outputPath:    outputPath,
+		emitter:       targetEmitter,
+		context:       context,
+		placement:     targetplacement.New(),
+		declarations:  make(map[types.Object]environmentDeclaration),
+		stateFields:   make(map[*types.Var]environmentStateField),
+		projections:   make(map[string]tsgo.Statement),
+		builtins:      make(map[*types.Builtin]environmentBuiltin),
 		requirements: make(
 			map[types.Object]map[api.DeclarationRequirement]struct{},
 		),
+		building: make(map[types.Object]bool),
 	}
 	s.environmentBuilders[sourcePackage] = builder
 	return builder, nil
@@ -206,13 +191,17 @@ func (s *programSession) environmentTargetFiles(
 	})
 	files := make([]TargetFile, 0, len(builders))
 	for _, builder := range builders {
-		for _, alias := range builder.placement.PrimitiveAliases() {
+		placement, err := builder.committedPlacement()
+		if err != nil {
+			return nil, err
+		}
+		for _, alias := range placement.PrimitiveAliases() {
 			primitiveAliases[alias] = struct{}{}
 		}
-		for _, symbol := range builder.placement.RuntimeSymbols() {
+		for _, symbol := range placement.RuntimeSymbols() {
 			runtimeSymbols[symbol] = struct{}{}
 		}
-		statements := builder.placement.Statements(s.factory)
+		statements := placement.Statements(s.factory)
 		declarations := make(
 			[]environmentDeclaration,
 			0,
@@ -222,7 +211,7 @@ func (s *programSession) environmentTargetFiles(
 			declarations = append(declarations, declaration)
 		}
 		sort.Slice(declarations, func(left, right int) bool {
-			return compareObjects(
+			return emitordering.CompareObjects(
 				declarations[left].object,
 				declarations[right].object,
 			) < 0
@@ -230,32 +219,27 @@ func (s *programSession) environmentTargetFiles(
 		for _, declaration := range declarations {
 			statements = append(statements, declaration.statements...)
 		}
-		builtins := make(
-			[]*types.Builtin,
-			0,
-			len(builder.requiredBuiltins),
-		)
-		for builtin := range builder.requiredBuiltins {
+		builtins := make([]*types.Builtin, 0, len(builder.builtins))
+		for builtin := range builder.builtins {
 			builtins = append(builtins, builtin)
 		}
 		sort.Slice(builtins, func(left, right int) bool {
-			return compareObjects(builtins[left], builtins[right]) < 0
+			return emitordering.CompareObjects(
+				builtins[left],
+				builtins[right],
+			) < 0
 		})
 		for _, builtin := range builtins {
-			overloads := builder.builtinOverloads[builtin]
-			if len(overloads) == 0 {
+			target := builder.builtins[builtin]
+			if !target.emitted ||
+				len(target.signatures) == 0 ||
+				len(target.statements) == 0 {
 				return nil, &ScheduleError{
 					Object: builtin.Name(),
 					Reason: "environment builtin has no concrete overload",
 				}
 			}
-			sort.Slice(overloads, func(left, right int) bool {
-				return stableTypeString(overloads[left].signature) <
-					stableTypeString(overloads[right].signature)
-			})
-			for _, overload := range overloads {
-				statements = append(statements, overload.statements...)
-			}
+			statements = append(statements, target.statements...)
 		}
 		projectionNames := make(
 			[]string,
@@ -283,7 +267,7 @@ func (s *programSession) environmentTargetFiles(
 		if len(variables) != 0 {
 			fields := make([]tsgo.TypeElement, 0, len(variables))
 			for _, variable := range variables {
-				fields = append(fields, builder.stateFields[variable])
+				fields = append(fields, builder.stateFields[variable].field)
 			}
 			statements = append(
 				statements,
@@ -363,33 +347,22 @@ func (s *programSession) applyEnvironmentRequirement(
 				Reason: "environment builtin requirement owner diverged",
 			}
 		}
-		for _, existing := range builder.builtinOverloads[builtin] {
-			if types.Identical(existing.signature, signature) {
+		current := builder.builtins[builtin]
+		for _, existing := range current.signatures {
+			if types.Identical(existing, signature) {
 				return true, nil
 			}
 		}
-		target, err := environmentcontract.BuiltinDeclaration(
-			builder.context,
-			builder.emitter,
-			builtin,
+		current.signatures = append(
+			append([]*types.Signature(nil), current.signatures...),
 			signature,
 		)
-		if err != nil {
-			return true, environmentContractError(owner, err)
+		builder.builtins[builtin] = current
+		if err := s.reconstructEnvironmentBuiltin(builder, builtin); err != nil {
+			current.signatures = current.signatures[:len(current.signatures)-1]
+			builder.builtins[builtin] = current
+			return true, err
 		}
-		if err := s.applyRootRequests(
-			builder.placement,
-			target.Requests(),
-		); err != nil {
-			return true, environmentContractError(owner, err)
-		}
-		builder.builtinOverloads[builtin] = append(
-			builder.builtinOverloads[builtin],
-			environmentBuiltinOverload{
-				signature:  signature,
-				statements: target.Declarations(),
-			},
-		)
 		return true, nil
 	}
 	selected, projection, ok := requirement.ConstantProjection()
@@ -455,33 +428,6 @@ func (b *environmentContractBuilder) environmentRequirements(
 		) < 0
 	})
 	return requirements
-}
-
-func (s *programSession) buildEnvironmentDeclaration(
-	builder *environmentContractBuilder,
-	object types.Object,
-	requirements []api.DeclarationRequirement,
-) (environmentDeclaration, error) {
-	target, err := environmentcontract.Declaration(
-		builder.context,
-		builder.emitter,
-		object,
-		requirements,
-	)
-	if err != nil {
-		return environmentDeclaration{}, environmentContractError(object, err)
-	}
-	if err := s.applyRootRequests(
-		builder.placement,
-		target.Requests(),
-	); err != nil {
-		return environmentDeclaration{}, environmentContractError(object, err)
-	}
-	return environmentDeclaration{
-		object:     object,
-		name:       object.Name(),
-		statements: target.Declarations(),
-	}, nil
 }
 
 func (s *programSession) applyEnvironmentCallableControl(
@@ -551,20 +497,15 @@ func (s *programSession) applyEnvironmentDeclarationRequirement(
 	}
 	next[requirement] = struct{}{}
 	builder.requirements[object] = next
+	if builder.building[object] {
+		return nil
+	}
 	if _, emitted := builder.declarations[object]; !emitted {
 		return nil
 	}
-	target, err := s.buildEnvironmentDeclaration(
-		builder,
-		object,
-		builder.environmentRequirements(object),
-	)
-	if err != nil {
+	if err := s.reconstructEnvironmentDeclaration(builder, object); err != nil {
 		builder.requirements[object] = current
 		return err
 	}
-	target.reconstructions =
-		builder.declarations[object].reconstructions + 1
-	builder.declarations[object] = target
 	return nil
 }

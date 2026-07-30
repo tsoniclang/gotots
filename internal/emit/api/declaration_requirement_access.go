@@ -255,7 +255,8 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementInterfaceMethodCallable,
 		DeclarationRequirementInterfaceDynamicTypeToken,
 		DeclarationRequirementGenericCapability,
-		DeclarationRequirementCallableABI:
+		DeclarationRequirementCallableABI,
+		DeclarationRequirementPointerRepresentation:
 		return r.generated, true
 	default:
 		return nil, false
@@ -292,6 +293,7 @@ const (
 	NamedStructOperationHash
 	NamedStructOperationConvert
 	NamedStructOperationStorage
+	NamedStructOperationAssign
 )
 
 func (o NamedStructOperation) Valid() bool {
@@ -300,7 +302,8 @@ func (o NamedStructOperation) Valid() bool {
 		o == NamedStructOperationEqual ||
 		o == NamedStructOperationHash ||
 		o == NamedStructOperationConvert ||
-		o == NamedStructOperationStorage
+		o == NamedStructOperationStorage ||
+		o == NamedStructOperationAssign
 }
 
 func (o NamedStructOperation) String() string {
@@ -317,6 +320,8 @@ func (o NamedStructOperation) String() string {
 		return "convert"
 	case NamedStructOperationStorage:
 		return "storage"
+	case NamedStructOperationAssign:
+		return "assign"
 	default:
 		return fmt.Sprintf("named-struct-operation(%d)", o)
 	}
@@ -387,6 +392,7 @@ const (
 	DeclarationRequirementValueReceiverCopy         DeclarationRequirementKind = 19
 	DeclarationRequirementGenericRepresentation     DeclarationRequirementKind = 20
 	DeclarationRequirementInterfaceMethodCallable   DeclarationRequirementKind = 21
+	DeclarationRequirementPointerRepresentation     DeclarationRequirementKind = 22
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -410,7 +416,8 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementClassMethod ||
 		k == DeclarationRequirementValueReceiverCopy ||
 		k == DeclarationRequirementGenericRepresentation ||
-		k == DeclarationRequirementInterfaceMethodCallable
+		k == DeclarationRequirementInterfaceMethodCallable ||
+		k == DeclarationRequirementPointerRepresentation
 }
 
 type CallableControlFacet uint8

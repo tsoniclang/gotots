@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -34,6 +35,22 @@ func Convert(
 			return api.ExpressionEmission{}, true, err
 		}
 	}
+	sourceRepresentation, err := pointertype.Observe(
+		context,
+		sourcePointer,
+		true,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	targetRepresentation, err := pointertype.Observe(
+		context,
+		targetPointer,
+		true,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	sourceLogical, err := children.RepresentedType(
 		context.WithRole(api.RoleConversionOperand),
 		source.Args[0],
@@ -46,6 +63,14 @@ func Convert(
 		context.WithRole(api.RoleConversionOperand),
 		source.Fun,
 		targetPointer.Elem(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	sourceStorage, err := context.Values().StorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		sourcePointer.Elem(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -86,9 +111,12 @@ func Convert(
 		api.CombineRequests(
 			value.Requests(),
 			sourceLogical.Requests(),
+			sourceStorage.Requests(),
 			targetLogical.Requests(),
 			targetStorage.Requests(),
 			runtime.Requests(),
+			sourceRepresentation.Requests(),
+			targetRepresentation.Requests(),
 		),
 	)
 	if err != nil {

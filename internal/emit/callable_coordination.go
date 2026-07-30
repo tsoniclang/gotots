@@ -235,10 +235,10 @@ func (s *programSession) genericOperationNamedIdentity(
 				Reason: "generic operation local type has no owning declaration",
 			}
 		}
-		function, functionOwner := site.declaration.(*ast.FuncDecl)
+		function, functionOwner := site.Declaration.(*ast.FuncDecl)
 		var root *types.Scope
 		if functionOwner {
-			root = site.source.TypesInfo().Scopes[function.Type]
+			root = site.Source.TypesInfo().Scopes[function.Type]
 		}
 		if owner.Pkg() != object.Pkg() || root == nil {
 			return "", &api.NameError{

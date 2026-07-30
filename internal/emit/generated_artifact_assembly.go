@@ -34,6 +34,8 @@ func (s *programSession) validateGeneratedArtifact(
 	case api.GeneratedArtifactCallableABI,
 		api.GeneratedArtifactInterfaceMethodCallable:
 		return s.validateCallableContractArtifact(artifact)
+	case api.GeneratedArtifactPointerRepresentation:
+		return s.validatePointerRepresentationArtifact(artifact)
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
@@ -61,6 +63,8 @@ func (s *programSession) reconstructGeneratedArtifact(
 	case api.GeneratedArtifactCallableABI,
 		api.GeneratedArtifactInterfaceMethodCallable:
 		err = s.reconstructCallableContractArtifact(artifact)
+	case api.GeneratedArtifactPointerRepresentation:
+		err = s.reconstructPointerRepresentationArtifact(artifact)
 	default:
 		err = &ScheduleError{
 			Object: artifact.TargetName(),

@@ -10,6 +10,7 @@ import (
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	anonymousstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
@@ -308,7 +309,7 @@ type classMemberContribution struct {
 func (s *programSession) artifactTargetSite(
 	site declarationSite,
 ) (declarationSite, error) {
-	method, ok := site.object.(*types.Func)
+	method, ok := site.Object.(*types.Func)
 	if !ok || method.Signature().Recv() == nil {
 		return site, nil
 	}
@@ -316,7 +317,7 @@ func (s *programSession) artifactTargetSite(
 	target, ok := s.sites[owner]
 	if owner == nil || !ok {
 		return declarationSite{}, &ScheduleError{
-			Object: site.object.Name(),
+			Object: site.Object.Name(),
 			Reason: "receiver method has no target class declaration",
 		}
 	}
@@ -365,7 +366,7 @@ func (s *programSession) partitionClassMethodRequirements(
 		methods = append(methods, method)
 	}
 	sort.Slice(methods, func(left, right int) bool {
-		return compareObjects(methods[left], methods[right]) < 0
+		return emitordering.CompareObjects(methods[left], methods[right]) < 0
 	})
 	return ordinary, methods, nil
 }

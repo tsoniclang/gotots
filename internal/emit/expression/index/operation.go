@@ -169,5 +169,14 @@ func Apply(
 		),
 		ordered.Requests(),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	target, err = context.ContainerStorage().FromContainerStorage(
+		context.WithRole(api.RoleSliceElement),
+		source,
+		elementType,
+		target,
+	)
 	return target, true, err
 }

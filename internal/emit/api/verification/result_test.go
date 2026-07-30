@@ -1,12 +1,86 @@
 package api_test
 
 import (
+	"go/token"
 	"go/types"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+type accessorContextServices struct {
+	api.Names
+	api.Values
+	api.AddressableStorage
+}
+
+func TestAccessorReadPreservesReceiverPrerequisitesAndRequests(t *testing.T) {
+	factory := tsgo.NewFactory()
+	request, err := api.NewImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"./box.js",
+		"Box",
+		"Box",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receiver, err := api.NewExpressionEmission(
+		[]tsgo.Statement{
+			factory.ExpressionStatement(factory.Identifier("prepare")),
+		},
+		factory.Identifier("Box"),
+		[]api.RootRequest{request},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := api.NewAccessorStoreTargetEmission(
+		receiver,
+		"$get",
+		"$set",
+		nil,
+		types.Typ[types.Int32],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	services := &accessorContextServices{}
+	context, err := api.NewContext(
+		api.RoleAssignmentTarget,
+		token.NewFileSet(),
+		types.NewPackage("example.com/accessor", "accessor"),
+		&types.Info{},
+		types.SizesFor("gc", "amd64"),
+		factory,
+		services,
+		services,
+		services,
+		api.IntegerRepresentationNumber,
+		api.EvaluationOrderDirect,
+		api.ConcurrencySemanticsDisabled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := target.ReadValue(context, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Before()) != 1 ||
+		result.Before()[0].(tsgo.ExpressionStatement).
+			Expression().(tsgo.Identifier).Text() != "prepare" ||
+		len(result.Requests()) != 1 ||
+		result.Requests()[0].ExportedName() != "Box" {
+		t.Fatalf(
+			"accessor read prerequisites = %d, requests = %d",
+			len(result.Before()),
+			len(result.Requests()),
+		)
+	}
+}
 
 func TestAccessorStoreTargetOwnsTypedImmutableArguments(t *testing.T) {
 	factory := tsgo.NewFactory()

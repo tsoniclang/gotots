@@ -58,9 +58,19 @@ func emitSlice(
 	}
 	var value assignment.RangeIterationValue
 	if source.Value != nil && nonBlank(source.Value) {
+		element, elementErr := slicevalue.RangeElement(
+			context,
+			source,
+			elementType,
+			receiver,
+			index,
+		)
+		if elementErr != nil {
+			return api.StatementEmission{}, elementErr
+		}
 		value, err = iteration(
 			elementType,
-			slicevalue.RangeElement(context, receiver, index),
+			element,
 		)
 		if err != nil {
 			return api.StatementEmission{}, err

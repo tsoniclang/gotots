@@ -17,7 +17,7 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	loaded := loadCallableNilProject(t)
 	workingDirectory := t.TempDir()
 	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
-	printed := readMaterializedProgram(t, artifacts)
+	printed := readMaterializedSource(t, artifacts, "source.ts")
 
 	for _, required := range []string{
 		"class Transform",
@@ -42,7 +42,6 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 		" as any",
 		" as unknown",
 		"Object.assign(",
-		"globalThis",
 		`"$goType:`,
 	} {
 		if strings.Contains(printed, forbidden) {

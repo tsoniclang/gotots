@@ -52,6 +52,15 @@ func (a RuntimeArray) EmitLiteral(
 		if zeroErr != nil {
 			return api.ExpressionEmission{}, zeroErr
 		}
+		loopZero, zeroErr = context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleCompositeElement),
+			source,
+			a.ElementType(),
+			loopZero,
+		)
+		if zeroErr != nil {
+			return api.ExpressionEmission{}, zeroErr
+		}
 		resultName, nameErr := context.Names().Temporary(
 			api.TemporaryArrayConstruction,
 		)
@@ -124,6 +133,15 @@ func (a RuntimeArray) EmitLiteral(
 			context.WithRole(api.RoleCompositeElement),
 			source,
 			a.ElementType(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		elementZero, err = context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleCompositeElement),
+			source,
+			a.ElementType(),
+			elementZero,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -240,6 +258,15 @@ func (a RuntimeArray) emitLiteralElements(
 			valueType,
 			a.ElementType(),
 			api.ValueTransferCopy,
+			value,
+		)
+		if err != nil {
+			return nil, err
+		}
+		value, err = context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleCompositeElement),
+			valueSource,
+			a.ElementType(),
 			value,
 		)
 		if err != nil {

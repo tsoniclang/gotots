@@ -228,14 +228,22 @@ func spreadElementOperations(
 	error,
 ) {
 	copyElement := func(value tsgo.Expression) (api.ExpressionEmission, error) {
-		return context.Values().Transfer(
+		loaded, err := loadElement(context, source, elementType, value)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		copied, err := context.Values().Transfer(
 			context.WithRole(api.RoleSliceElement),
 			nil,
 			elementType,
 			elementType,
 			api.ValueTransferCopy,
-			api.DirectExpression(value),
+			loaded,
 		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return storeElement(context, source, elementType, copied)
 	}
 	snapshotNext, err := copyElement(sliceCall(
 		context,
@@ -262,6 +270,14 @@ func spreadElementOperations(
 		source,
 		elementType,
 	)
+	if err == nil {
+		tailZero, err = storeElement(
+			context,
+			source,
+			elementType,
+			tailZero,
+		)
+	}
 	return snapshotNext, existingCopy, tailZero, err
 }
 

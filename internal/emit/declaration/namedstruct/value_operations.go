@@ -104,6 +104,15 @@ func emitValueOperation(
 			typeArguments,
 			canonicalStorage,
 		)
+	case api.NamedStructOperationAssign:
+		member = assignMethod(
+			context,
+			memberName,
+			classType,
+			fields,
+			typeParameters,
+			canonicalStorage,
+		)
 	default:
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),

@@ -10,6 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
@@ -400,7 +401,7 @@ func (s *programSession) publishPackageExports(
 		objects = append(objects, object)
 	}
 	sort.Slice(objects, func(left, right int) bool {
-		return compareObjects(objects[left], objects[right]) < 0
+		return emitordering.CompareObjects(objects[left], objects[right]) < 0
 	})
 	byPath := make(map[string]map[string]struct{})
 	dependencies := make([]api.ArtifactDependency, 0, len(objects))

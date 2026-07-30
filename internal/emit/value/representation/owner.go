@@ -520,3 +520,33 @@ func (Owner) Assign(
 		value.Requests(),
 	)
 }
+
+func (owner Owner) AssignStable(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+	target tsgo.Expression,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if _, _, ok := namedStruct(sourceType); !ok {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "stable-identity assignment requires a named struct",
+		}
+	}
+	assigned, err := owner.namedStructOperation(
+		context,
+		source,
+		sourceType,
+		api.NamedStructOperationAssign,
+		[]tsgo.Expression{target, value.Value()},
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.NewExpressionEmission(
+		value.Before(),
+		assigned.Value(),
+		api.CombineRequests(value.Requests(), assigned.Requests()),
+	)
+}

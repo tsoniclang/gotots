@@ -2,7 +2,9 @@ package emit_test
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"go/ast"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -167,4 +169,155 @@ func targetBindingDirectory() string {
 		"naming",
 		"target-binding",
 	)
+}
+
+func waveFourEncodedNodes(t *testing.T, encoded []byte) int {
+	t.Helper()
+	const (
+		headerSize       = 44
+		nodesOffsetField = 40
+		nodeWidth        = 28
+	)
+	if len(encoded) < headerSize {
+		t.Fatalf("encoded target is %d bytes, want protocol header", len(encoded))
+	}
+	nodesOffset := int(binary.LittleEndian.Uint32(
+		encoded[nodesOffsetField:headerSize],
+	))
+	if nodesOffset < headerSize ||
+		nodesOffset > len(encoded) ||
+		(len(encoded)-nodesOffset)%nodeWidth != 0 {
+		t.Fatalf("encoded target has invalid node offset %d", nodesOffset)
+	}
+	return (len(encoded) - nodesOffset) / nodeWidth
+}
+
+func assertWaveFourLinearDoubling(
+	t *testing.T,
+	name string,
+	values []int,
+) {
+	t.Helper()
+	first := values[1] - values[0]
+	second := values[2] - values[1]
+	if first <= 0 || second*10 < first*17 || second*10 > first*23 {
+		t.Fatalf(
+			"%s = %v; doubling deltas %d/%d are not linear",
+			name,
+			values,
+			first,
+			second,
+		)
+	}
+}
+
+func waveFourFunction(
+	t *testing.T,
+	sourcePackage *load.Package,
+	name string,
+) *ast.FuncDecl {
+	t.Helper()
+	for _, file := range sourcePackage.Files() {
+		for _, declaration := range file.Syntax().Decls {
+			function, ok := declaration.(*ast.FuncDecl)
+			if ok && function.Name.Name == name {
+				return function
+			}
+		}
+	}
+	t.Fatalf("Go function %s is absent", name)
+	return nil
+}
+
+func waveFourTargetFunction(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	name string,
+) tsgo.FunctionDeclaration {
+	t.Helper()
+	for _, file := range emission.Files() {
+		if file.Kind() != emit.TargetFileSource {
+			continue
+		}
+		for _, statement := range file.SourceFile().Statements() {
+			function, ok := statement.(tsgo.FunctionDeclaration)
+			if ok && function.Name().Text() == name {
+				return function
+			}
+		}
+	}
+	t.Fatalf("target function %s is absent", name)
+	return nil
+}
+
+func TestNonGenericAliasToGenericInstantiationCompilesInPointerField(
+	t *testing.T,
+) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/genericalias\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(
+		t,
+		filepath.Join(project, "source.go"),
+		`package genericalias
+
+type Box[T any] struct {
+	Value T
+}
+
+type IntBox = Box[int]
+
+type Holder struct {
+	Box *IntBox
+}
+
+func EmptyHolder() Holder {
+	return Holder{}
+}
+`,
+	)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: project,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := emit.NewRoot(
+		program.Roots()[0].Types().Scope().Lookup("EmptyHolder"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(program, []emit.Root{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	if !strings.Contains(
+		artifacts.printed,
+		"public Box: Box<int64> | undefined",
+	) {
+		t.Fatalf(
+			"alias to generic instantiation was not canonicalized:\n%s",
+			artifacts.printed,
+		)
+	}
+	for _, forbidden := range []string{
+		"GoPointer<Box<int64",
+		"Box$Storage<int64",
+	} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf(
+				"direct alias pointer contains %q:\n%s",
+				forbidden,
+				artifacts.printed,
+			)
+		}
+	}
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }

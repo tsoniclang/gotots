@@ -94,7 +94,7 @@ func emitAppendSpread(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	targetElement, err := children.RepresentedType(
+	targetElement, err := context.ContainerStorage().ContainerStorageType(
 		context.WithRole(api.RoleSliceElementType),
 		source,
 		elementType,
@@ -138,6 +138,15 @@ func emitAppendSpread(
 			context.WithRole(api.RoleSliceElement),
 			source,
 			elementType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		zero, err = context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleSliceElement),
+			source,
+			elementType,
+			zero,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err

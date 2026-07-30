@@ -9,6 +9,7 @@ import (
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -139,6 +140,30 @@ func (owner Owner) Equal(
 		)), nil
 	}
 	if pointerValue(sourceType) {
+		pointer, _, _ := pointertype.Resolve(sourceType)
+		representation, err := owner.PointerRepresentation(
+			context,
+			pointer,
+			false,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if representation.Representation() ==
+			api.PointerRepresentationDirectClass {
+			return api.DirectExpression(
+				context.Factory().BinaryExpression(
+					nil,
+					left,
+					nil,
+					context.Factory().BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					),
+					right,
+				),
+				representation.Requests()...,
+			), nil
+		}
 		reference, err := context.Names().Runtime(
 			api.RuntimePointer,
 			api.ImportPhaseValue,
@@ -159,7 +184,10 @@ func (owner Owner) Equal(
 				[]tsgo.Expression{left, right},
 				tsgo.NodeFlagsNone,
 			),
-			reference.Requests()...,
+			api.CombineRequests(
+				reference.Requests(),
+				representation.Requests(),
+			)...,
 		), nil
 	}
 	if channelValue(sourceType) {
