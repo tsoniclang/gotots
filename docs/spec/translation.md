@@ -242,10 +242,10 @@ func direct() any { return recover() }  // non-nil only when called by defer
 func indirect() any { return direct() } // nil: one call below
 ```
 
-Deferred direct functions, receiver functions, function and method values,
-interface method adapters, and generic functions forward that parameter
-statically. Ordinary calls omit it. No global state or dynamic invocation is
-permitted.
+Deferred direct functions, class-owned receiver members, function and method
+values, interface method adapters, and generic functions forward that
+parameter statically. Ordinary calls omit it. No global state or dynamic
+invocation is permitted.
 
 A defer-site call is not emitted as the original call expression. Its owner
 evaluates the callee, receiver, and arguments in Go order, applies the ordinary
@@ -921,16 +921,23 @@ Hidden operation arguments are not a default protocol. A runtime or generated
 helper is allowed only for a Go behavior that direct TypeScript cannot express,
 and its necessity and cost must be proved for the whole semantic class.
 
-Generated code must not use `.call`, `.apply`, or `.bind`. If an explicit
-receiver entry is required, emit a named typed function:
+Generated code must not use `.call`, `.apply`, or `.bind`. Ordinary functions
+remain named typed functions. Concrete receiver bodies belong to their named
+type's class: value receivers are instance members, while pointer receivers
+whose nil value must enter the body are class-owned static members with an
+explicit typed receiver:
 
 ```ts
-function Counter_Add(receiver: Counter, delta: GoInt): void {
-  receiver.Value += delta;
+class Counter {
+  static $Add(receiver: Counter | undefined, delta: GoInt): void {
+    if (receiver === undefined) goPanicNil();
+    receiver.Value += delta;
+  }
 }
 ```
 
-Calls then invoke `Counter_Add(counter, delta)` directly.
+Calls then invoke `Counter.$Add(counter, delta)` directly. No top-level
+receiver twin or prototype patch is emitted.
 
 For an admitted function-valued callee, the call handler emits the callee
 expression once and invokes it directly:
@@ -1057,8 +1064,9 @@ A generated record class has:
 - one erased private brand, which makes distinct named Go structs nominally
   distinct to strict TypeScript without adding an instance field;
 - public data fields initialized by its constructor;
-- no instance receiver methods, inheritance, dynamic lookup, or hidden
-  semantic payload;
+- reached value-receiver instance members and pointer-receiver static members,
+  with no class inheritance, dynamic semantic lookup, or hidden semantic
+  payload;
 - use-demanded static zero, copy, and equality operations incorporated into
   the class by its one declaration owner.
 
@@ -1097,15 +1105,28 @@ Go permits a receiver declaration to omit its source name:
 func (Token) Kind() int32 { return 1 }
 ```
 
-The receiver function still requires its explicit target receiver parameter.
-The declaration owner derives that parameter from the exact
-`go/types.Signature.Recv()` object and assigns the deterministic target-only
-positional name (`$0` when the method has no source parameters). It does not
-invent a Go binding, scan the body, or infer a name from source spelling:
+An instance value member needs no fabricated receiver parameter because an
+omitted receiver cannot be referenced by the body. The declaration owner still
+validates the exact `go/types.Signature.Recv()` object; it does not invent a Go
+binding, scan the body, or infer a name from source spelling:
 
 ```ts
-export function Token_Kind($0: Token): int32 {
-  return 1;
+class Token {
+  Kind(): int32 {
+    return 1;
+  }
+}
+```
+
+An omitted pointer receiver still needs a deterministic target-only static
+parameter because nil is a legal input even when the source body never names
+it:
+
+```ts
+class Token {
+  static $Reset($receiver: Token | undefined): void {
+    return;
+  }
 }
 ```
 
@@ -1220,8 +1241,9 @@ Every representation capability requires strict typechecking and direct
 Go-versus-generated-ESM differential execution. If zeroing, copying, equality,
 or field representation is unproved, that struct case remains unsupported.
 
-Receiver bodies still have one owner. A value receiver may emit as an explicit
-typed receiver entry that requests the same copy owner:
+Receiver bodies still have one owner, but a represented named type owns their
+target placement. A reached value receiver is an instance member on that
+type's generated class:
 
 ```go
 type Flag struct{ Ready bool }
@@ -1229,17 +1251,64 @@ func (flag Flag) Disable() { flag.Ready = false }
 ```
 
 ```ts
-export function Flag_Disable(flag: Flag): void {
+export class Flag {
+  Disable(): void {
+    const flag = Flag.$copy(this);
+    flag.Ready = false;
+  }
+}
+```
+
+The body-local copy appears only when exact receiver use makes it observable:
+assignment to the receiver, mutation of its fields, implicit address-taking,
+capture by a closure that can mutate it, or a selected pointer-receiver call.
+A receiver used only for reads needs no copy:
+
+```go
+func (flag Flag) IsReady() bool { return flag.Ready }
+```
+
+```ts
+IsReady(): boolean {
+  return this.Ready;
+}
+```
+
+This is a local, fail-closed source-body decision over the exact receiver
+`*types.Var` and `go/types.Selection` evidence. It is not a purity annotation,
+call-graph analysis, spelling rule, or target optimization guess.
+
+A pointer receiver is a class-owned static member with one explicit selected
+pointer parameter:
+
+```go
+func (flag *Flag) Disable() { flag.Ready = false }
+```
+
+```ts
+static $Disable(flag: Flag | undefined): void {
+  if (flag === undefined) goPanicNil();
   flag.Ready = false;
 }
 ```
 
-Concrete generated calls invoke `Flag_Disable(Flag.$copy(flag))` directly, so
-the selected value receiver owns exactly one copy before its body runs. Pointer
-receivers, method values, and interface calls select their own exact checked
-entry shape from `go/types`; they do not reuse a value-receiver entry when its
-copy or nil behavior differs. Generated code never uses `.call`, `.apply`, or
-`.bind`.
+The explicit parameter is necessary because Go permits a nil pointer to enter
+a method and because every call argument is evaluated before the method body.
+`goNonNil(flag).Disable(effect())` would nil-panic before `effect()` and is
+therefore forbidden. The static body receives nil, evaluates no hidden
+precondition, and panics only at the exact dereference performed by the emitted
+source body. For a pointer type whose reached representation requires
+`GoPointer`, the parameter uses that selected type instead of `Flag |
+undefined`; one exact `*Flag` never has both forms.
+
+A Go method may be declared in a different source file from its type.
+The method source artifact constructs one immutable typed TS-Go
+`MethodDeclaration` contribution, including its body requests and imports.
+The exact `*types.TypeName` artifact reconstructs the complete class from all
+reached contributions in deterministic semantic-method order. The source-file
+module emits no top-level receiver function, wrapper twin, prototype
+assignment, or partial class. A body-only contribution change reconstructs the
+class without dirtying callers whose callable-signature facet is unchanged.
 
 Every concrete field or method selector is validated against the exact
 `*types.Selection`: kind, selected object identity, receiver type, result type,
@@ -1267,22 +1336,23 @@ The semantic decisions are:
 - `value.Read` captures one copied `Base` value at method-value formation;
 - `value.Add` captures the canonical address of the promoted `Base` storage;
 - `Derived.Read` is a typed adapter whose first explicit argument is
-  `Derived`, projects its selected `Base`, copies it once, and calls
-  `Base_Read`; and
-- a direct unpromoted method expression is the existing receiver-function
-  reference, with no adapter.
+  `Derived`, projects its selected `Base`, copies it once, and invokes its
+  native `Read` member; and
+- a direct unpromoted value-method expression is a typed arrow over the native
+  member, while a direct pointer-method expression is the class-owned static
+  member reference.
 
 A representative target shape is:
 
 ```ts
 const readReceiver = Base.$copy(value.Base);
-const read = (): int32 => Base_Read(readReceiver);
+const read = (): int32 => readReceiver.Read();
 
-const addReceiver = GoPointer.field(valueAddress, "Base");
-const add = (delta: int32): void => Base_Add(addReceiver, delta);
+const addReceiver = value.Base;
+const add = (delta: int32): void => Base.$Add(addReceiver, delta);
 
 const method = (receiver: Derived): int32 =>
-  Base_Read(Base.$copy(receiver.Base));
+  Base.$copy(receiver.Base).Read();
 ```
 
 Each receiver expression is evaluated once. A nil pointer passed to a
@@ -1297,12 +1367,12 @@ only the selected field path grows. They never expand with method count or
 possible receiver count. Anonymous and named embedded fields share this same
 path owner and their exact member names come from field-object identity.
 
-A TypeScript class outside this bounded nominal-record family is selected only
-when reference identity and all relevant Go call, nil, copy, promotion,
-equality, construction, and runtime-type rules remain exact. Its constructor
-and value operations are side-effect-free generated behavior rather than an
-assumption that class assignment copies. A class is never selected merely to
-attach receiver syntax.
+A TypeScript class is the direct nominal value representation for admitted
+defined and struct types. Its constructor and demanded value operations are
+side-effect-free generated behavior rather than an assumption that class
+assignment copies. Attaching the declaring type's own methods does not imply
+inheritance or target virtual selection: every concrete call still chooses its
+exact Go method owner first and then invokes that owner's member.
 
 This Go program demonstrates why embedding cannot blindly become `extends`:
 
@@ -1320,15 +1390,23 @@ Calling the promoted `Derived.Call` executes `Base.Name`, because the call in
 execute `Derived.Name` and is wrong. An exact direct form is:
 
 ```ts
-function Base_Name(_base: Base): string { return "base"; }
-function Base_Call(base: Base): string { return Base_Name(base); }
+class Base {
+  static $Name(_base: Base | undefined): string { return "base"; }
+  static $Call(base: Base | undefined): string {
+    return Base.$Name(base);
+  }
+}
 ```
 
-`extends` is selected only when every relevant field, construction, copy,
-promotion, method-selection, equality, nil, and runtime-type rule remains
-equivalent. Otherwise structural fields, explicit copy/zero owners, composition,
-and owner-specific receiver functions are used. `implements` states a target
-contract; it never supplies storage or behavior.
+Go embedding does not emit class `extends`. Structural fields, explicit
+copy/zero owners, composition, and exact owner-qualified class members are the
+one current path. `implements` states a target contract; it never supplies
+storage or behavior. Ordinary Go embedding remains composition and a selected
+path such as `derived.Base.Read()`; a same-spelling member on `Derived` cannot
+override that call. Any future class-inheritance family requires a separate
+WCBUBWHB replacement proving every field, construction, copy, promotion,
+method-selection, equality, nil, and runtime-type rule before this invariant
+may change.
 
 ## Interfaces
 
@@ -1383,11 +1461,13 @@ that token in the readonly `$go$type` member. No string, constructor,
 Each adapter contains only methods selected by demanded completed interface
 contracts. For every demanded interface method, `go/types` selects the exact
 concrete or promoted method; the adapter emits one native TypeScript method
-that calls the already-owned top-level receiver function directly. Multiple
-contracts selecting the same method emit it once. The payload, parameter, and
-result types remain exact; no method body uses `any`, `unknown`, a cast,
-`.call`, `.apply`, or `.bind`. Ordinary concrete calls continue to call
-receiver functions and never become virtual.
+that invokes the exact class-owned member. A value receiver copies at the
+method-entry boundary only when the source body requires it; a pointer receiver
+uses its class-owned static nullable entry. Multiple contracts selecting the
+same method emit it once. The payload, parameter, and result types remain
+exact; no method body uses `any`, `unknown`, a cast, `.call`, `.apply`, or
+`.bind`. Ordinary concrete calls remain statically owner-qualified; only the
+adapter's demanded interface surface is target-virtual.
 
 For example, if `*Checker` has 1,976 receiver methods but is converted only to
 `interface { GetSymbolAtLocation(*Node) *Symbol; GetAliasedSymbol(*Symbol)
@@ -1426,7 +1506,7 @@ export class Counter$InterfaceAdapter implements GoInterfaceValue {
     }
 
     Read(delta: int32): int32 {
-        return Counter_Read(this.$go$value, delta);
+        return this.$go$value.Read(delta);
     }
 }
 
@@ -2484,14 +2564,25 @@ placement is owned by the exact `types.Initializer`, not by an arbitrarily
 chosen LHS variable. Unreachable shapes create no target name, file, or class.
 
 An admitted pointer is a typed reference to one canonical storage location.
-`new(T)` creates a fresh cell when `T` has a complete admitted value
-representation including its Go zero value; assignment copies the pointer;
-dereference reads or writes the selected location; nil is distinct; and
-equality compares canonical address identity. The admitted matrix currently
-includes primitives, pointers, scalar slices, scalar maps, fixed arrays, and
-named structs. Callable values do not yet admit their nil state, so
-`new(func(...))` fails at the callable-zero boundary rather than injecting
-`undefined` into an otherwise non-nil function contract.
+`new(T)` creates a fresh location when `T` has a complete admitted zero
+representation; assignment copies the pointer; dereference reads or writes the
+selected location; nil is distinct; and equality compares canonical address
+identity.
+
+For an ordinary named struct, the class object is already the canonical
+location: `*Box` is `Box | undefined`, `new(Box)` and `&Box{...}` create direct
+`Box` objects, and pointer equality is `===`. An exact addressed variable keeps
+one stable object and whole-value assignment copies fields into it. No
+`Box$Storage`, `$make`, `$storageOf`, `$fromStorage`, or generic pointer carrier
+is emitted merely because a `*Box` exists.
+
+`GoPointer<Logical, Storage>` is demanded only where a class reference cannot
+name the location: scalar or pointer cells, array/slice elements, interior
+fields, or an admitted pointer conversion that needs a typed view. The admitted
+matrix currently includes primitives, pointers, scalar slices, scalar maps,
+fixed arrays, and named structs. Callable values do not yet admit their nil
+state, so `new(func(...))` fails at the callable-zero boundary rather than
+injecting `undefined` into an otherwise non-nil function contract.
 
 Address formation is context-directed:
 
@@ -2502,29 +2593,29 @@ value = Box{Count: 7}
 *pointer++
 ```
 
-The enclosing reconstructible artifact first emits an addressable-storage
+The enclosing reconstructible artifact first emits a stable-location
 requirement for the exact `value` object. For an ordinary declaration that
 artifact is the source function; for a literal in a package initializer it is
-the exact checker-produced initializer. Its reconstructed TS-Go body has one
-cell:
+the exact checker-produced initializer. Its reconstructed TS-Go body keeps the
+class object stable and creates only the demanded interior projection:
 
 ```ts
-const value$storage = GoPointer.cell<Box, Box$Storage>(
-  Box.$storageOf(Box.$make(1)),
-);
-const pointer = GoPointer.field<int32, Box, Box$Storage, "Count">(
-  value$storage,
+const value = new Box(1);
+const pointer = GoPointer.field<int32, Box, "Count">(
+  value,
   "Count",
 );
-value$storage.value = Box.$storageOf(Box.$make(7));
+Box.$assign(value, new Box(7));
 GoPointer.dereference(pointer).value++;
 ```
 
-The field pointer follows the variable's storage after whole-value assignment,
-as Go requires. Unrelated locals remain ordinary variables. Address requests
-inside nested function literals belong to the enclosing top-level function
-artifact but the selected variable's lexical cell remains in its own scope, so
-closures capture the same cell.
+The field pointer follows the stable object after whole-value assignment, as
+Go requires. `$assign` is emitted only for a reached whole-value store through
+an observable named-struct location. Unrelated locals remain ordinary
+variables and emit neither it nor a cell. Address requests inside nested
+function literals belong to the enclosing top-level function artifact but the
+selected variable's lexical location remains in its own scope, so closures
+capture the same location.
 
 If the outer boundary is a package initializer, an address request inside its
 function literal belongs to that package-initializer artifact instead. It
@@ -2579,7 +2670,8 @@ retain only typed location accessors plus opaque canonical address identity;
 runtime objects never carry erased `any`/`unknown` payloads or callbacks that
 rediscover Go semantics.
 
-Pointer representation has separate logical and storage type arguments:
+Pointer representation has separate logical and storage type arguments only
+when an exact conversion demands a representation view:
 
 ```go
 type Left struct {
@@ -2627,28 +2719,35 @@ test, semantic callback, or source-name lookup is involved. A pointer
 conversion whose canonical storage facets cannot yet be represented fails at
 the conversion owner rather than falling back to logical read/write adapters.
 
-Pointer receiver declarations remain named typed receiver functions rather
-than class members:
+Pointer receiver declarations are class-owned static members with an explicit
+selected pointer parameter:
 
 ```go
 func (box *Box) Add(delta int32) { box.Count += delta }
 ```
 
 ```ts
-export function Box_Add(
-  box: GoPointer<Box, Box$Storage> | undefined,
-  delta: int32,
-): void {
-  const value = Box.$fromStorage(GoPointer.dereference(box).value);
-  value.Count += delta;
+export class Box {
+  static $Add(
+    box: Box | undefined,
+    delta: int32,
+  ): void {
+    if (box === undefined) goPanicNil();
+    box.Count += delta;
+  }
 }
 ```
 
-`pointer.Add(1)` passes the pointer directly, including nil; the body panics
-only if it dereferences nil. `value.Add(1)` is admitted only when `value` is
-addressable and passes its selected cell. Calling a value-receiver method
-through a pointer nil-checks, dereferences, and copies once. Selection uses the
-exact `go/types.Selection`; target virtual dispatch is never substituted.
+`pointer.Add(1)` becomes `Box.$Add(pointer, 1)` and passes the pointer directly,
+including nil; every argument is evaluated before the body, and the body
+panics only at its first source dereference. `value.Add(1)` is admitted only
+when `value` is addressable and passes its direct stable object. If a reached
+pointer conversion selected `GoPointer<Box, Box$Storage>` for the exact
+`*Box`, the same static member receives that one carrier representation and
+performs its source dereferences through it. Calling a value-receiver method
+through a pointer nil-checks at method-value/callee formation as Go requires
+and then enters the instance member. Selection uses the exact
+`go/types.Selection`; target virtual dispatch is never substituted.
 
 Bounds failures, nil pointer dereference, nil map store, and BigInt
 divide-by-zero all enter the one generated non-generic `GoPanic` carrier. Family

@@ -386,24 +386,38 @@ independent of the selected value representation while retaining one storage
 truth owner.
 
 Logical value representation and addressable storage representation are
-separate facets of the same value-family owner. A pointer is represented as
-`GoPointer<Logical, Storage>`: `Logical` preserves Go's named-type identity,
-while `Storage` is the canonical mutable representation shared by every
-pointer type whose Go base types are identical under the selected toolchain's
-pointer-conversion rule. The runtime reads and writes only `Storage`; load and
-store sites ask the value-family owner to convert between `Logical` and
-`Storage`. The runtime never receives semantic conversion callbacks.
+separate facets of the same value-family owner, but separation is not emitted
+until an exact use requires it. A named-struct object is already a stable,
+mutable JavaScript location. Therefore an ordinary `*S` whose reached uses are
+nil, identity, field access, `new(S)`, `&S{}`, `&local`, or receiver calls is
+represented directly as `S | undefined`. `&local` makes that exact local keep
+one stable `S` object; later whole-value assignment copies fields into that
+object instead of rebinding it. Unaddressed values continue to rebind at Go
+copy boundaries. No `$Storage`, `$make`, `$storageOf`, `$fromStorage`, or
+`GoPointer.dereference` surface is emitted for this ordinary class-reference
+case.
 
-For a named or generated struct that becomes addressable, its declaration is
-reconstructed once with one canonical storage record plus logical
-getters/setters. The ordinary construction surface remains a static `$make`
-member, so changing the private layout does not create a second constructor
-path or require source sites to predict later addressability. A pointer
-conversion requests the storage facet from both endpoint declarations and is
-admitted only when their independently constructed canonical storage types
-match the exact Go conversion evidence. Struct tags do not enter that storage
-facet; field identity, order, package identity, and recursively represented
-field storage do.
+`GoPointer<Logical, Storage>` remains the one explicit location protocol where
+direct class identity is insufficient: pointers to scalars, pointers to
+pointers, array or slice elements, interior field locations, and pointer
+conversions that require a typed representation view. `Logical` preserves Go's
+named-type identity, while `Storage` is the canonical mutable representation
+shared by every admitted pointer type whose Go base types are identical under
+the selected toolchain's pointer-conversion rule. The runtime reads and writes
+only `Storage`; load and store sites ask the value-family owner to convert
+between `Logical` and `Storage`. The runtime never receives semantic conversion
+callbacks.
+
+A named or generated struct gains a canonical storage record and logical
+getters/setters only when a reached conversion or location operation proves
+that direct class identity cannot preserve the required alias. The declaration
+is then reconstructed once from that complete demand set. A pointer conversion
+requests the storage facet from both endpoint declarations and is admitted only
+when their independently constructed canonical storage types match the exact
+Go conversion evidence. Struct tags do not enter that storage facet; field
+identity, order, package identity, and recursively represented field storage
+do. The selected representation is compilation-wide for each exact pointer
+type, so one `*S` never has both direct-class and carrier forms.
 
 ```text
 Go *Left / *Right (underlying bases identical ignoring tags)
@@ -417,7 +431,9 @@ GoPointer<Left, LeftStorage> --typed view--> GoPointer<Right, RightStorage>
 The view operation may allocate a constant-size pointer facade, but it reuses
 the same opaque canonical address and the same typed storage accessors. It
 does not copy the pointee, inspect a value shape, recover an erased payload, or
-carry a source/target conversion function.
+carry a source/target conversion function. Removing the final conversion or
+interior-location demand reconstructs the declarations back to the direct
+class-reference form; demand is not a permanent widening flag.
 
 A defined array follows the same split without growing its nominal wrapper.
 Its generated class is the logical type and contains only its brand,
@@ -632,6 +648,15 @@ One placement service applies the policy:
 - demanded named-struct static operations are incorporated into their owning
   class in a fixed operation order; no top-level sibling helper or instance
   operation is emitted;
+- every reached concrete receiver body is incorporated into its exact named
+  type's class, even when the Go method and type declarations are in different
+  files. The method source artifact owns one typed class-member contribution;
+  the type artifact owns the one reconstructed class declaration. A value
+  receiver contributes an instance member. A pointer receiver contributes a
+  class-owned static member with an explicit selected pointer parameter so nil
+  and argument-evaluation timing remain source-controlled. No top-level
+  receiver function, prototype assignment, partial class, wrapper twin, or
+  second method body survives;
 - one canonical generated artifact represents each exact reached anonymous
   struct or specialized map shape. A shape with no local named component enters
   deterministic compilation support; a shape containing local named
@@ -661,6 +686,16 @@ set. The replacement transaction also replaces that artifact's root requests
 and dependencies and publishes its mechanically derived observable contract.
 Other handlers can request a closed obligation or record a typed dependency but
 cannot receive or mutate the target declaration.
+
+A class-member contribution is immutable typed TS-Go AST, not a declaration
+patch. Its method owner retains the source body, callable requirements, and
+imports; the containing type subscribes to that contribution's exact observable
+facet and reconstructs the complete class in deterministic semantic-method
+order. Changing only a method body reconstructs the type artifact but does not
+requeue callers whose subscribed callable signature is unchanged. Changing a
+method signature changes that facet and requeues its exact users. This is the
+same canonical artifact graph used for static value operations, not a parallel
+method registry or source prepass.
 
 This is controlled pre-seal target assembly, not mutable class reopening.
 There is no target-text patch, prototype assignment, arbitrary AST callback,

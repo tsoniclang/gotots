@@ -466,18 +466,20 @@ The first named-struct family additionally proves:
   executes those statements inside the static struct equality operation and
   short-circuits in field order; scalar-only structs retain the compact direct
   conjunction;
-- concrete value-receiver calls use the exact `go/types.Selection` and a named
-  receiver function, never a class method or virtual dispatch; and
+- concrete value-receiver calls use the exact `go/types.Selection` and the
+  selected owner's native class member, never an unqualified virtual
+  redispatch; and
 - tags, pointers, interfaces, generics, and unsupported field representations
   fail at their typed owner.
 
 Mutations replace a requested copy with direct assignment, replace requested
 field equality with `===`, remove the private brand, add source-order captures
-to `direct`, remove them from `preserve-go`, attach a receiver method to the
-class, emit an unrequested static operation, duplicate an operation, make it an
-instance member, emit a top-level helper, route it to the caller's file, or
-admit an unsupported field. Each fails its owning structural, strict-type,
-differential, placement, or unsupported-boundary gate. The
+to `direct`, remove them from `preserve-go`, detach a receiver method into a
+top-level function, duplicate a receiver body, emit an unrequested static value
+operation, duplicate an operation, make a value operation an instance member,
+route a method contribution to the method's source file instead of its type
+artifact, or admit an unsupported field. Each fails its owning structural,
+strict-type, differential, placement, or unsupported-boundary gate. The
 `preserve-go` fixture uses call-valued field expressions; the `direct` artifact
 test treats constants and calls identically, proving that no purity heuristic
 silently changes profiles. A scaling fixture doubles fields and proves
@@ -809,14 +811,23 @@ Addressability has an additional exact matrix:
    address-taking function literal are each reconstructed by the ordinary
    artifact scheduler, with no fabricated function or variable owner;
 8. pointer-receiver calls on values and pointers, and value-receiver calls
-   through pointers, preserve nil and copy behavior without class methods,
-   `.call`, `.apply`, or `.bind`;
+   through pointers, preserve nil, argument evaluation, and copy behavior
+   through class-owned members without top-level receiver twins, `.call`,
+   `.apply`, or `.bind`;
 9. adding storage changes only the function body contract, causes zero caller
    reconstruction, and reaches a deterministic fixed point; and
 10. 1x/2x/4x address sites keep each use constant-size and leave an unaffected
     declaration's generated TS-Go bytes unchanged;
 11. the assignment package has no concrete storage or pointer-runtime import,
-    while the root emitter installs exactly one typed storage capability.
+    while the root emitter installs exactly one typed storage capability;
+12. ordinary `*S`, `new(S)`, `&S{}`, `&local`, field access, pointer equality,
+    and pointer-receiver calls use `S | undefined` with zero `$Storage`,
+    `$make`, `$storageOf`, `$fromStorage`, or `GoPointer.dereference` surface;
+13. whole assignment to an addressed `S` mutates the one stable location while
+    unaddressed `S` assignment still rebinds a Go copy; and
+14. adding the first exact pointer conversion or non-class location demand
+    reconstructs only the involved pointer/type artifacts into the one carrier
+    form, while removing the last demand reconstructs them back.
 
 Production-path mutations drop a storage requirement, key it by spelling,
 select a shadow sibling, wrap every local, compare pointer wrapper identity,
@@ -824,7 +835,8 @@ mis-key a field/index projection, key a slice by descriptor identity, skip the
 required `&*p` nil check or read its stored value, copy a pointer receiver,
 omit the value-receiver copy, attach a package-initializer literal's local to a
 fabricated function or package-variable owner, bypass package-`init` artifact
-reconstruction, or dirty callers after an
+reconstruction, wrap an ordinary struct pointer, rebind an addressed struct
+location, keep a storage facet after its last demand disappears, or dirty callers after an
 unchanged callable facet. Each fails at its owning structure, artifact,
 strict-type, or differential gate.
 
@@ -844,30 +856,35 @@ Blocking evidence includes:
 2. mutating only selector spelling leaves encoded target AST byte-identical,
    while substituting another valid selection object fails at the selector
    owner;
-3. a promoted call from `Base.CallName` remains `Base_Name(base)` even when the
-   embedding type declares its own `Name`, proving no accidental virtual
+3. a promoted call from `Base.CallName` remains `Base.$Name(base)` even when
+   the embedding type declares its own `Name`, proving no accidental virtual
    dispatch;
 4. method-value formation evaluates and captures the receiver once, copies
    value receivers once, and preserves pointer identity;
 5. nil-safe pointer receiver values may form and execute, while a value method
    selected through a nil pointer and a promoted field through a nil embedded
    pointer panic at the same boundary as Go;
-6. direct method expressions are direct receiver-function references and
+6. direct value-method expressions are typed native-member arrows, direct
+   pointer-method expressions are class-owned static-member references, and
    promoted method expressions are typed arrows with an explicit first
    receiver parameter;
 7. embedded fields remain owned class fields, including anonymous structs and
    reserved/unexported member names; generated support imports their defining
    source modules with collision-safe package-qualified aliases; and
-8. generated artifacts contain no `extends`, `.call`, `.apply`, `.bind`,
-   erased carrier, reflection, or per-method/per-implementer dispatch switch.
+8. generated artifacts contain no class `extends`, top-level receiver twin,
+   prototype patch, `.call`, `.apply`, `.bind`, erased carrier, reflection, or
+   per-method/per-implementer dispatch switch; and
+9. a method declared in another Go file is present exactly once inside the
+   declaring type's class, with its imports owned by that class artifact and no
+   statement emitted in the method source module.
 
 A 1x/2x/4x embedding-depth fixture independently measures source bytes,
 printed target bytes, and encoded TS-Go nodes. Each use contains one selected
-receiver-function call, and all three measures grow linearly with source
+owner-qualified member call, and all three measures grow linearly with source
 depth. Production mutations remove an index component, replace the selected
 object, select by spelling, omit a value copy, skip an embedded-pointer nil
-check, reevaluate a receiver, attach methods to classes, or route generated
-private declarations through a public assembly; each fails its identity,
+check, reevaluate a receiver, restore a top-level receiver function, or route a
+method contribution through the wrong source/public assembly; each fails its identity,
 differential, strict-type, shape, naming, or scaling owner.
 
 ### Milestone 3E Interface Gate
@@ -889,8 +906,8 @@ Blocking evidence includes:
    interface count or call count, plus one canonical compilation-scope
    non-string dynamic-type token;
 4. every adapter payload, method parameter, and result is statically typed,
-   and every native method directly invokes the exact top-level receiver
-   function selected from `go/types`;
+   and every native method directly invokes the exact class-owned member
+   selected from `go/types`;
 5. exported and package-private method contracts exact-join by semantic
    identity and receiver-free signature, never source spelling;
 6. interface calls contain one nil guard and one native call, with no
@@ -1006,8 +1023,8 @@ foreign root.
 The integrated control fixture covers source `panic`, recover outside defer,
 direct deferred recover, recover one call below, nested and replacement
 panics, immediate callee/receiver/argument evaluation, value copies, LIFO
-order, ordinary and named results, receiver functions, function and method
-values, interface calls, generic functions, labels, fallthrough, labeled
+order, ordinary and named results, class-owned receiver members, function and
+method values, interface calls, generic functions, labels, fallthrough, labeled
 break/continue, forward and backward goto, non-structural goto, and
 goto/defer/range composition.
 

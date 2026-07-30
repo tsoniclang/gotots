@@ -314,14 +314,20 @@ value conversion through one source-site typed loop. It also treats checker-
 constant `len`/`cap` as non-evaluating expressions, including array and
 pointer-to-array operands, while nonconstant pointer-to-array expressions are
 evaluated exactly once. Pointer reinterpretation and slice-to-array-pointer
-conversion use the canonical pointer-storage representation. A pointer carries
-distinct logical and storage type arguments; value-family owners project and
-restore storage at the typed load/store site, while the pointer runtime owns
-only address identity and storage access. Named/generated structs reconstruct
-to a storage-backed private layout only when the storage facet is demanded.
-Casts, erased payloads, shape tests, and semantic read/write adapters remain
-forbidden. A defined array's canonical storage is its underlying `GoArray`,
-so its nominal wrapper never grows pointer-only forwarding methods.
+conversion use the canonical pointer-storage representation. Ordinary
+named-struct pointers instead use the class object directly as `S | undefined`;
+`new(S)`, `&S{}`, `&local`, pointer equality, field access, and receiver calls
+therefore add no carrier or storage surface. An addressed struct local retains
+one stable object and whole-value stores copy into it. A pointer carries
+distinct logical and storage type arguments only when a scalar/interior
+location or exact conversion proves that direct class identity is
+insufficient. Value-family owners then project and restore storage at the typed
+load/store site, while the pointer runtime owns only address identity and
+storage access. Named/generated structs reconstruct to a storage-backed private
+layout only when that facet is demanded. Casts, erased payloads, shape tests,
+and semantic read/write adapters remain forbidden. A defined array's canonical
+storage is its underlying `GoArray`, so its nominal wrapper never grows
+pointer-only forwarding methods.
 Slice-to-array pointers are offset-aware aliases of existing slice backing,
 preserve nil-versus-empty behavior at length zero, panic before construction
 when short, and copy only when Go later assigns an array value through the
@@ -418,11 +424,16 @@ embedded fields, promoted field reads/stores/addresses, promoted concrete
 calls, method values, and method expressions.
 
 One selection-path owner consumes exact `go/types.Selection` evidence for all
-of those contexts. Receiver declarations remain named top-level functions.
-Embedding remains class-field composition; ordinary concrete calls never
-become target virtual dispatch. Method values capture their selected receiver
-once, while method expressions use the existing receiver function directly or
-one typed adapter when promotion/receiver adjustment requires it.
+of those contexts. Reached receiver bodies are immutable typed class-member
+contributions assembled into the exact declaring type's one reconstructed
+class, including when source method and type declarations are in different
+files. Value receivers are instance members; pointer receivers are class-owned
+static members with an explicit selected pointer parameter. Embedding remains
+class-field composition; ordinary concrete calls select the exact Go owner
+before member invocation and never become accidental target virtual dispatch.
+Method values capture their selected receiver once, while method expressions
+use a typed native-member arrow, a direct static-member reference, or one typed
+adapter when promotion/receiver adjustment requires it.
 
 This checkpoint exits only when:
 
@@ -434,8 +445,9 @@ This checkpoint exits only when:
   and nil panic timing match Go;
 - source-spelling mutation is byte-stable and mismatched selection identity
   fails closed;
-- generated output contains no `extends`, `.call`, `.apply`, `.bind`, erased
-  payload, or implementer switch;
+- generated output contains no class `extends`, top-level receiver twin,
+  prototype patch, `.call`, `.apply`, `.bind`, erased payload, or implementer
+  switch;
 - each use is constant-size apart from its selected embedding depth, and
   1x/2x/4x depth fixtures grow linearly; and
 - both integer profiles pass TS-Go encode/print, strict typechecking, and
@@ -447,7 +459,7 @@ Install one typed adapter per reached concrete dynamic type, canonical
 non-string dynamic-type metadata, contract-demanded native methods, O(1)
 dispatch, assertions, comma-ok, type switches, interface equality, and
 interface map keys. Concrete receiver calls remain statically selected
-top-level functions. Concrete conversions seed their exact target contract;
+class-owned members. Concrete conversions seed their exact target contract;
 interface conversions and assertions propagate that target only from a source
 contract already reachable on an adapter, with `go/types` proving the target.
 Implementing a source contract without reaching it never widens the adapter.
