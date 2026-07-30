@@ -202,9 +202,170 @@ fmt.Println(pointer.StringPointer("ok").Value)
 	}
 }
 
+func TestGenericPointerReceiverOnStructFieldUsesDeclarationABI(
+	t *testing.T,
+) {
+	source := `package pointerarchitecture
+
+type Shelf[T any] struct { Value T }
+
+func (s *Shelf[T]) Put(value T) {
+	s.Value = value
+}
+
+func (s *Shelf[T]) IsNil() bool {
+	return s == nil
+}
+
+type Store struct {
+	Shelf Shelf[int32]
+}
+
+func GenericField(value int32) int32 {
+	store := Store{}
+	store.Shelf.Put(value)
+	return store.Shelf.Value
+}
+
+func GenericPointer(value int32) (int32, bool) {
+	store := Store{}
+	pointer := &store.Shelf
+	pointer.Put(value)
+	return store.Shelf.Value, pointer.IsNil()
+}
+
+func GenericNil() bool {
+	var pointer *Shelf[int32]
+	return pointer.IsNil()
+}
+`
+	typescript, goOutput, tsOutput := compileAndRunPointerArchitecture(
+		t,
+		source,
+		`import { GenericField, GenericNil, GenericPointer } from "__SOURCE__";
+
+console.log(GenericField(42));
+console.log(...GenericPointer(43));
+console.log(GenericNil());
+`,
+		`fmt.Println(pointer.GenericField(42))
+fmt.Println(pointer.GenericPointer(43))
+fmt.Println(pointer.GenericNil())
+`,
+	)
+	if tsOutput != goOutput {
+		t.Fatalf("TypeScript output = %q, Go output = %q", tsOutput, goOutput)
+	}
+	if strings.Contains(typescript, "GoPointer.field<Shelf") {
+		t.Fatalf(
+			"direct generic receiver acquired an interior pointer:\n%s",
+			typescript,
+		)
+	}
+	if !strings.Contains(
+		typescript,
+		"Shelf.Put<int32, int32>(store.Shelf",
+	) {
+		t.Fatalf(
+			"generic receiver did not use its declaration ABI:\n%s",
+			typescript,
+		)
+	}
+	if count := strings.Count(
+		typescript,
+		"GoPointer.optionalStorage(",
+	); count != 3 {
+		t.Fatalf(
+			"carrier-to-declaration receiver bridges = %d, want 3:\n%s",
+			count,
+			typescript,
+		)
+	}
+}
+
+func TestForeignGenericMethodOriginAndAdapterUseDeclarationABI(
+	t *testing.T,
+) {
+	typescript, goOutput, tsOutput :=
+		compileAndRunPointerArchitectureFiles(
+			t,
+			map[string]string{
+				"ledger.go": `package pointerarchitecture
+
+type Ledger[K comparable, V any] struct { Value V }
+
+func (ledger *Ledger[K, V]) Set(key K, value V) {
+	ledger.Value = value
+}
+
+func (ledger *Ledger[K, V]) Ready() bool {
+	return ledger != nil
+}
+`,
+				"source.go": `package pointerarchitecture
+
+type ReadyContract interface { Ready() bool }
+
+type Registry[T comparable] struct {
+	Ledger Ledger[T, int32]
+}
+
+func ForeignGeneric(key string, value int32) int32 {
+	registry := Registry[string]{}
+	pointer := &registry.Ledger
+	pointer.Set(key, value)
+	return registry.Ledger.Value
+}
+
+func ForeignAdapter() ReadyContract {
+	registry := Registry[string]{}
+	return &registry.Ledger
+}
+`,
+			},
+			`import { ForeignAdapter, ForeignGeneric } from "__SOURCE__";
+
+console.log(ForeignGeneric("key", 44));
+const ready = ForeignAdapter();
+if (ready === undefined) throw new Error("unexpected nil");
+console.log(ready.Ready());
+`,
+			`fmt.Println(pointer.ForeignGeneric("key", 44))
+fmt.Println(pointer.ForeignAdapter().Ready())
+`,
+		)
+	if tsOutput != goOutput {
+		t.Fatalf("TypeScript output = %q, Go output = %q", tsOutput, goOutput)
+	}
+	if strings.Count(typescript, "GoPointer.optionalStorage(") < 2 {
+		t.Fatalf(
+			"foreign generic receiver ABI was not bridged:\n%s",
+			typescript,
+		)
+	}
+	if !strings.Contains(typescript, "class $goInterfaceAdapter_") {
+		t.Fatalf("foreign generic adapter was not emitted:\n%s", typescript)
+	}
+}
+
 func compileAndRunPointerArchitecture(
 	t *testing.T,
 	source string,
+	runner string,
+	goBody string,
+) (string, string, string) {
+	t.Helper()
+	return compileAndRunPointerArchitectureFiles(
+		t,
+		map[string]string{"source.go": source},
+		runner,
+		goBody,
+	)
+}
+
+func compileAndRunPointerArchitectureFiles(
+	t *testing.T,
+	sources map[string]string,
 	runner string,
 	goBody string,
 ) (string, string, string) {
@@ -215,7 +376,9 @@ func compileAndRunPointerArchitecture(
 		filepath.Join(directory, "go.mod"),
 		"module example.com/pointerarchitecture\n\ngo 1.26.4\n",
 	)
-	writeFile(t, filepath.Join(directory, "source.go"), source)
+	for name, source := range sources {
+		writeFile(t, filepath.Join(directory, name), source)
+	}
 	loaded, err := load.One(context.Background(), load.Request{
 		Directory: directory,
 		Pattern:   ".",

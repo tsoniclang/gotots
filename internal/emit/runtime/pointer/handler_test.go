@@ -38,8 +38,8 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 		t.Fatalf("pointer type parameters = %v, want L and S", parameters)
 	}
 	members := class.Members()
-	if len(members) != 18 {
-		t.Fatalf("pointer class members = %d, want 18", len(members))
+	if len(members) != 21 {
+		t.Fatalf("pointer class members = %d, want 21", len(members))
 	}
 	constructor, ok := members[3].(tsgo.ConstructorDeclaration)
 	if !ok {
@@ -71,6 +71,52 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 		len(guard.TypeParameters()) != 2 ||
 		len(guard.Parameters()) != 1 {
 		t.Fatalf("pointer guard = %T, want static typed dereference", guard)
+	}
+}
+
+func TestOptionalStoragePreservesNilWithoutSemanticConverter(t *testing.T) {
+	class := pointer.Build(
+		tsgo.NewFactory(),
+		pointerClassName(t),
+		panicClassName(t),
+	).(tsgo.ClassDeclaration)
+	method := pointerMethod(t, class, pointer.OptionalStorageName)
+	signatures := 0
+	implementations := 0
+	for _, member := range class.Members() {
+		candidate, ok := member.(tsgo.MethodDeclaration)
+		if !ok ||
+			candidate.Name().(tsgo.Identifier).Text() !=
+				pointer.OptionalStorageName {
+			continue
+		}
+		if candidate.Body() == nil {
+			signatures++
+		} else {
+			implementations++
+		}
+	}
+	if signatures != 2 || implementations != 1 {
+		t.Fatalf(
+			"optional storage overloads = %d signatures/%d implementations",
+			signatures,
+			implementations,
+		)
+	}
+	if len(method.TypeParameters()) != 1 ||
+		len(method.Parameters()) != 1 {
+		t.Fatal("optional storage bridge is not a closed typed unary operation")
+	}
+	body := method.Body().(tsgo.Block).Statements()
+	if len(body) != 1 {
+		t.Fatalf("optional storage statements = %d, want one return", len(body))
+	}
+	result, ok := body[0].(tsgo.ReturnStatement).
+		Expression().(tsgo.ConditionalExpression)
+	if !ok ||
+		result.WhenTrue().Kind() != tsgo.SyntaxKindVoidExpression ||
+		result.WhenFalse().Kind() != tsgo.SyntaxKindPropertyAccessExpression {
+		t.Fatal("optional storage does not preserve nil and project storage directly")
 	}
 }
 
@@ -171,6 +217,8 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		"static equal<LL, LS, RL, RS>",
 		"static dereference<L, S>",
 		"static direct<L>",
+		"static optionalStorage(pointer: undefined): undefined",
+		"static optionalStorage<S extends object>",
 		"static view<F, T, S>",
 		"get value(): S",
 		"set value(value: S)",
@@ -201,6 +249,7 @@ func pointerMethod(
 	name string,
 ) tsgo.MethodDeclaration {
 	t.Helper()
+	var signature tsgo.MethodDeclaration
 	for _, member := range class.Members() {
 		method, ok := member.(tsgo.MethodDeclaration)
 		if !ok {
@@ -208,8 +257,14 @@ func pointerMethod(
 		}
 		identifier, ok := method.Name().(tsgo.Identifier)
 		if ok && identifier.Text() == name {
-			return method
+			if method.Body() != nil {
+				return method
+			}
+			signature = method
 		}
+	}
+	if signature != nil {
+		return signature
 	}
 	t.Fatalf("pointer method %q is absent", name)
 	return nil

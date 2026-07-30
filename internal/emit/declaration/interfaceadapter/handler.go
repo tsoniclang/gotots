@@ -294,9 +294,9 @@ func emitMethod(
 	if err != nil {
 		return nil, nil, methodStageError(MethodStageReceiver, err)
 	}
-	if resolvedMethod != method || len(receiver.Before()) != 0 {
+	if resolvedMethod != method {
 		return nil, nil, &api.GeneratedArtifactShapeError{
-			Reason: "adapter method receiver is not direct",
+			Reason: "adapter method receiver selection is inconsistent",
 		}
 	}
 	interfaceDispatch := false
@@ -411,7 +411,7 @@ func emitMethod(
 	if err != nil {
 		return nil, nil, methodStageError(MethodStageInvocation, err)
 	}
-	body := call.Before()
+	body := append(receiver.Before(), call.Before()...)
 	if signature.Results().Len() == 0 {
 		body = append(
 			body,

@@ -112,11 +112,21 @@ type PointerRepresentationNames interface {
 	PointerRepresentation(
 		*types.Pointer,
 	) (PointerRepresentationReference, error)
+	SourcePointerRepresentation(
+		types.Object,
+		*types.Pointer,
+	) (PointerRepresentationReference, error)
 }
 
 type PointerRepresentationValues interface {
 	PointerRepresentation(
 		Context,
+		*types.Pointer,
+		bool,
+	) (PointerRepresentationObservation, error)
+	SourcePointerRepresentation(
+		Context,
+		types.Object,
 		*types.Pointer,
 		bool,
 	) (PointerRepresentationObservation, error)

@@ -40,7 +40,7 @@ func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
 		t.Fatalf("base pointer definitions = %#v", base)
 	}
 	class, ok := base[0].Statement().(tsgo.ClassDeclaration)
-	if !ok || len(class.Members()) != 18 {
+	if !ok || len(class.Members()) != 21 {
 		t.Fatalf("base pointer owner = %T with unexpected members", base[0].Statement())
 	}
 

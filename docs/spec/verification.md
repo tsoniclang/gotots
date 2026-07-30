@@ -971,7 +971,13 @@ Blocking evidence includes:
    per-method/per-implementer dispatch switch; and
 9. a method declared in another Go file is present exactly once inside the
    declaring type's class, with its imports owned by that class artifact and no
-   statement emitted in the method source module.
+   statement emitted in the method source module; and
+10. a generic method selected from a different source file resolves its
+    declaration receiver through the method origin, joins the exact same
+    source-owned pointer-representation artifact as the declaration, and
+    bridges a concrete carrier without rendering the origin's foreign type
+    parameter; the same proof runs through an interface adapter and preserves
+    all receiver prerequisite statements.
 
 A 1x/2x/4x embedding-depth fixture independently measures source bytes,
 printed target bytes, and encoded TS-Go nodes. Each use contains one selected

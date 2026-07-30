@@ -17,6 +17,40 @@ func (owner Owner) PointerRepresentation(
 	pointer *types.Pointer,
 	carrierDemand bool,
 ) (api.PointerRepresentationObservation, error) {
+	return owner.pointerRepresentation(
+		context,
+		nil,
+		pointer,
+		carrierDemand,
+	)
+}
+
+func (owner Owner) SourcePointerRepresentation(
+	context api.Context,
+	sourceOwner types.Object,
+	pointer *types.Pointer,
+	carrierDemand bool,
+) (api.PointerRepresentationObservation, error) {
+	if sourceOwner == nil {
+		return api.PointerRepresentationObservation{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "source pointer representation owner is nil",
+		}
+	}
+	return owner.pointerRepresentation(
+		context,
+		sourceOwner,
+		pointer,
+		carrierDemand,
+	)
+}
+
+func (owner Owner) pointerRepresentation(
+	context api.Context,
+	sourceOwner types.Object,
+	pointer *types.Pointer,
+	carrierDemand bool,
+) (api.PointerRepresentationObservation, error) {
 	if pointer == nil {
 		return api.PointerRepresentationObservation{}, &api.InvariantError{
 			Role:   context.Role(),
@@ -40,7 +74,15 @@ func (owner Owner) PointerRepresentation(
 			Reason: "pointer representation name owner is unavailable",
 		}
 	}
-	reference, err := names.PointerRepresentation(pointer)
+	var reference api.PointerRepresentationReference
+	if sourceOwner == nil {
+		reference, err = names.PointerRepresentation(pointer)
+	} else {
+		reference, err = names.SourcePointerRepresentation(
+			sourceOwner,
+			pointer,
+		)
+	}
 	if err != nil {
 		return api.PointerRepresentationObservation{}, err
 	}

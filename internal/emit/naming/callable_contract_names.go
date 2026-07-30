@@ -297,7 +297,7 @@ func (n *File) sourceGeneratedNamedObjectIdentity(
 	return func(object *types.TypeName) (string, error) {
 		if object == nil {
 			return "", &api.NameError{
-				Reason: "source callable ABI component is nil",
+				Reason: "source-generated component is nil",
 			}
 		}
 		if object.Pkg() == nil ||
@@ -306,7 +306,7 @@ func (n *File) sourceGeneratedNamedObjectIdentity(
 				if _, ok := n.owner.registry.byObject[object]; !ok {
 					return "", &api.NameError{
 						Name:   object.Name(),
-						Reason: "source callable ABI component has no declaration identity",
+						Reason: "source-generated component has no declaration identity",
 					}
 				}
 			}
@@ -315,7 +315,7 @@ func (n *File) sourceGeneratedNamedObjectIdentity(
 		if object.Pkg() != owner.Pkg() {
 			return "", &api.NameError{
 				Name:   object.Name(),
-				Reason: "source callable ABI component is foreign to its owner",
+				Reason: "source-generated component is foreign to its owner",
 			}
 		}
 		return typeidentity.LexicalNamedObjectKey(

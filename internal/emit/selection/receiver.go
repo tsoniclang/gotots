@@ -51,16 +51,23 @@ func methodReceiver(
 	}
 	signature := method.Type().(*types.Signature)
 	declared := signature.Recv().Type()
+	abiReceiver, ok := methodABIReceiver(method)
+	if !ok {
+		return api.ExpressionEmission{}, nil,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	_, declaredElement, _, declaredPointer := pointerType(declared)
 	_, _, _, effectivePointer := pointerType(resolved.effective)
 	if declaredPointer &&
 		!effectivePointer &&
 		types.Identical(declaredElement, resolved.effective) {
-		receiver, err := addressSource(
+		receiver, err := valuePointerMethodReceiver(
 			context,
 			children,
 			source,
 			resolved,
+			method,
+			abiReceiver,
 		)
 		return receiver, method, err
 	}
@@ -122,8 +129,14 @@ func methodSetReceiver(
 ) (api.ExpressionEmission, error) {
 	signature := method.Type().(*types.Signature)
 	declared := signature.Recv().Type()
+	abiReceiver, ok := methodABIReceiver(method)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	abiPointer, _, _, abiIsPointer := pointerType(abiReceiver)
 	_, declaredElement, _, declaredPointer := pointerType(declared)
-	_, effectiveElement, _, effectivePointer :=
+	effectiveRaw, effectiveElement, _, effectivePointer :=
 		pointerType(resolved.effective)
 	if declaredPointer &&
 		!effectivePointer &&
@@ -153,9 +166,19 @@ func methodSetReceiver(
 	}
 	switch {
 	case declaredPointer &&
+		abiIsPointer &&
 		effectivePointer &&
 		types.Identical(declaredElement, effectiveElement):
-		return value, nil
+		return adaptPointerMethodReceiver(
+			context,
+			children,
+			source,
+			method.Origin(),
+			abiPointer,
+			effectiveRaw,
+			declaredElement,
+			value,
+		)
 	case !declaredPointer &&
 		effectivePointer &&
 		types.Identical(declared, effectiveElement):
@@ -203,8 +226,14 @@ func MethodExpressionReceiver(
 	}
 	signature := method.Type().(*types.Signature)
 	declared := signature.Recv().Type()
+	abiReceiver, ok := methodABIReceiver(method)
+	if !ok {
+		return api.ExpressionEmission{}, nil,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	abiPointer, _, _, abiIsPointer := pointerType(abiReceiver)
 	_, declaredElement, _, declaredPointer := pointerType(declared)
-	_, effectiveElement, _, effectivePointer :=
+	effectiveRaw, effectiveElement, _, effectivePointer :=
 		pointerType(resolved.effective)
 
 	if declaredPointer &&
@@ -236,9 +265,20 @@ func MethodExpressionReceiver(
 	}
 	switch {
 	case declaredPointer &&
+		abiIsPointer &&
 		effectivePointer &&
 		types.Identical(declaredElement, effectiveElement):
-		return value, method, nil
+		value, err = adaptPointerMethodReceiver(
+			context,
+			children,
+			source,
+			method.Origin(),
+			abiPointer,
+			effectiveRaw,
+			declaredElement,
+			value,
+		)
+		return value, method, err
 	case !declaredPointer &&
 		effectivePointer &&
 		types.Identical(declared, effectiveElement):

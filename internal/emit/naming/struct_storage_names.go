@@ -13,6 +13,32 @@ import (
 func (n *File) PointerRepresentation(
 	pointer *types.Pointer,
 ) (api.PointerRepresentationReference, error) {
+	return n.pointerRepresentation(
+		pointer,
+		n.generatedNamedObjectIdentity,
+	)
+}
+
+func (n *File) SourcePointerRepresentation(
+	owner types.Object,
+	pointer *types.Pointer,
+) (api.PointerRepresentationReference, error) {
+	owner = api.GenericDeclarationOrigin(owner)
+	if owner == nil || owner.Pkg() == nil {
+		return api.PointerRepresentationReference{}, &api.NameError{
+			Reason: "source pointer representation has no declaration owner",
+		}
+	}
+	return n.pointerRepresentation(
+		pointer,
+		n.sourceGeneratedNamedObjectIdentity(owner),
+	)
+}
+
+func (n *File) pointerRepresentation(
+	pointer *types.Pointer,
+	namedIdentity typeidentity.NamedObjectIdentity,
+) (api.PointerRepresentationReference, error) {
 	if pointer == nil {
 		return api.PointerRepresentationReference{}, &api.NameError{
 			Reason: "pointer-representation type is nil",
@@ -20,14 +46,14 @@ func (n *File) PointerRepresentation(
 	}
 	key, err := typeidentity.BuildParameterizedKey(
 		pointer,
-		n.generatedNamedObjectIdentity,
+		namedIdentity,
 		func(parameter *types.TypeParam) (string, error) {
 			if parameter == nil || parameter.Obj() == nil {
 				return "", &api.NameError{
 					Reason: "pointer representation has an unbound type parameter",
 				}
 			}
-			return n.generatedNamedObjectIdentity(parameter.Obj())
+			return namedIdentity(parameter.Obj())
 		},
 	)
 	if err != nil {

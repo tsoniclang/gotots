@@ -381,6 +381,14 @@ must not widen an adapter that was boxed only into another contract. The final
 adapter method surface is the deterministic union of the reachable exact
 contracts. It is not the concrete type's complete receiver method set, an
 implementer union, a value-flow graph, or a runtime method lookup table.
+The adapter payload retains the exact representation selected for its concrete
+dynamic type. Each adapter method separately consumes the selected provider
+method's origin-owned receiver ABI. If those representations differ, the one
+receiver-selection owner emits the same typed, nil-preserving prerequisites as
+an ordinary selected call, and the adapter places them before invocation.
+Adapters never assume that a concrete payload and a generic method origin have
+the same pointer representation, rediscover the receiver ABI, or discard
+receiver prerequisites.
 Construction admits each `(concrete adapter, contract)` pair at most once and
 propagates only newly reachable pairs through transitions indexed by source
 contract. Repeated occurrences of an already-known conversion or assertion
@@ -393,6 +401,15 @@ question; `go/types.Implements`, completed interface method sets, and exact
 method selections remain the sole truth. Adding or removing an unrelated
 concrete receiver method cannot alter an adapter unless that method enters a
 demanded interface contract.
+
+A generated artifact that consumes a generic source declaration resolves that
+declaration's ABI identities through the canonical source owner, not through
+the consumer's lexical scope. For example, `OrderedSet[T]` calling
+`OrderedMap[K,V].Set` observes the receiver representation owned by the
+`OrderedMap.Set` origin and the concrete representation owned by
+`OrderedMap[T,struct{}]` separately. Relaxing lexical identity, copying the
+foreign parameter spelling `K`, or assigning a consumer-local identity is
+forbidden.
 
 Addressable local storage is the second admitted requirement family. An
 address expression identifies the exact `*types.Var` whose storage becomes

@@ -3,18 +3,19 @@ package pointer
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 const (
-	AddressName     = "$go$address"
-	CellName        = "cell"
-	CellValueName   = "value"
-	DereferenceName = "dereference"
-	DirectName      = "direct"
-	EqualName       = "equal"
-	ViewName        = "view"
-	FieldName       = "field"
-	ObjectFieldName = "objectField"
-	ElementName     = "element"
-	IndexName       = "index"
-	ArrayRegionName = "arrayRegion"
+	AddressName         = "$go$address"
+	CellName            = "cell"
+	CellValueName       = "value"
+	DereferenceName     = "dereference"
+	DirectName          = "direct"
+	OptionalStorageName = "optionalStorage"
+	EqualName           = "equal"
+	ViewName            = "view"
+	FieldName           = "field"
+	ObjectFieldName     = "objectField"
+	ElementName         = "element"
+	IndexName           = "index"
+	ArrayRegionName     = "arrayRegion"
 )
 
 type builder struct {
@@ -57,6 +58,9 @@ func Build(
 			target.equalMethod(),
 			target.dereferenceMethod(),
 			target.directMethod(),
+			target.optionalStorageNilSignature(),
+			target.optionalStorageSignature(),
+			target.optionalStorageMethod(),
 			target.viewMethod(),
 			target.valueGetter(),
 			target.valueSetter(),
@@ -121,6 +125,25 @@ func Direct(
 		),
 		nil,
 		[]tsgo.TypeNode{logicalType},
+		[]tsgo.Expression{pointer},
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func OptionalStorage(
+	factory tsgo.Factory,
+	runtimeName string,
+	pointer tsgo.Expression,
+) tsgo.CallExpression {
+	return factory.CallExpression(
+		factory.PropertyAccessExpression(
+			factory.Identifier(runtimeName),
+			nil,
+			factory.Identifier(OptionalStorageName),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
 		[]tsgo.Expression{pointer},
 		tsgo.NodeFlagsNone,
 	)

@@ -160,3 +160,31 @@ func Observe(
 		carrierDemand,
 	)
 }
+
+func ObserveSource(
+	context api.Context,
+	owner types.Object,
+	sourceType types.Type,
+	carrierDemand bool,
+) (api.PointerRepresentationObservation, error) {
+	pointer, _, ok := Resolve(sourceType)
+	if !ok || owner == nil {
+		return api.PointerRepresentationObservation{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "source pointer representation input is invalid",
+		}
+	}
+	values := context.PointerRepresentationValues()
+	if values == nil {
+		return api.PointerRepresentationObservation{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "pointer representation service is unavailable",
+		}
+	}
+	return values.SourcePointerRepresentation(
+		context,
+		owner,
+		pointer,
+		carrierDemand,
+	)
+}

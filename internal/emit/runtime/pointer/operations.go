@@ -210,6 +210,96 @@ func (b builder) directMethod() tsgo.MethodDeclaration {
 	)
 }
 
+func (b builder) optionalStorageNilSignature() tsgo.MethodDeclaration {
+	return b.factory.MethodDeclaration(
+		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
+		nil,
+		b.id(OptionalStorageName),
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{
+			b.parameter("pointer", b.undefinedType()),
+		},
+		b.undefinedType(),
+		nil,
+	)
+}
+
+func (b builder) optionalStorageSignature() tsgo.MethodDeclaration {
+	storage := b.typeReference("S")
+	pointerValue := b.factory.TypeLiteralNode(
+		[]tsgo.TypeElement{
+			b.factory.PropertySignatureDeclaration(
+				[]tsgo.ModifierLike{b.factory.ReadonlyKeyword()},
+				b.id(CellValueName),
+				nil,
+				storage,
+				b.factory.OmittedExpression(),
+			),
+		},
+	)
+	pointerType := b.factory.UnionTypeNode(
+		[]tsgo.TypeNode{pointerValue, b.undefinedType()},
+	)
+	return b.factory.MethodDeclaration(
+		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
+		nil,
+		b.id(OptionalStorageName),
+		nil,
+		[]tsgo.TypeParameterDeclaration{
+			b.typeParameter("S", b.objectType()),
+		},
+		[]tsgo.ParameterDeclaration{b.parameter("pointer", pointerType)},
+		b.factory.UnionTypeNode(
+			[]tsgo.TypeNode{storage, b.undefinedType()},
+		),
+		nil,
+	)
+}
+
+func (b builder) optionalStorageMethod() tsgo.MethodDeclaration {
+	storage := b.typeReference("S")
+	pointerValue := b.factory.TypeLiteralNode(
+		[]tsgo.TypeElement{
+			b.factory.PropertySignatureDeclaration(
+				[]tsgo.ModifierLike{b.factory.ReadonlyKeyword()},
+				b.id(CellValueName),
+				nil,
+				storage,
+				b.factory.OmittedExpression(),
+			),
+		},
+	)
+	pointerType := b.factory.UnionTypeNode(
+		[]tsgo.TypeNode{pointerValue, b.undefinedType()},
+	)
+	pointer := b.id("pointer")
+	return b.method(
+		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
+		OptionalStorageName,
+		[]tsgo.TypeParameterDeclaration{
+			b.typeParameter("S", b.objectType()),
+		},
+		[]tsgo.ParameterDeclaration{b.parameter("pointer", pointerType)},
+		b.factory.UnionTypeNode(
+			[]tsgo.TypeNode{storage, b.undefinedType()},
+		),
+		b.factory.ReturnStatement(
+			b.factory.ConditionalExpression(
+				b.binary(
+					pointer,
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					b.undefined(),
+				),
+				b.factory.QuestionToken(),
+				b.undefined(),
+				b.factory.ColonToken(),
+				b.property(pointer, CellValueName),
+			),
+		),
+	)
+}
+
 func (b builder) valueGetter() tsgo.GetAccessorDeclaration {
 	return b.factory.GetAccessorDeclaration(
 		nil,

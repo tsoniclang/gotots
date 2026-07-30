@@ -1328,6 +1328,34 @@ source body. For a pointer type whose reached representation requires
 `GoPointer`, the parameter uses that selected type instead of `Flag |
 undefined`; one exact `*Flag` never has both forms.
 
+Generic selection can legitimately join two different exact pointer
+artifacts: the method origin's declaration receiver and the selected concrete
+receiver. The declaration ABI is always observed through `method.Origin()` and
+its source artifact. The concrete receiver is observed through the consuming
+artifact. If the concrete receiver is a carrier while the declaration receiver
+is direct, emission evaluates the carrier once, preserves nil, projects its
+storage, and invokes the origin member:
+
+```go
+pointer := &registry.Ledger
+pointer.Set(key, value)
+```
+
+```ts
+const receiver = GoPointer.optionalStorage(pointer);
+Ledger.Set(
+  receiver === undefined ? undefined : Ledger.$fromStorage(receiver),
+  key,
+  value,
+);
+```
+
+`optionalStorage` is a shared structural projection with a typed `undefined`
+overload and an inferred `S extends object` overload. It carries no semantic
+converter, type descriptor, erased value, or dynamic operation. A definitely
+nil Go pointer therefore remains valid input to a nil-checking method without
+requiring the consumer to render a foreign generic type parameter.
+
 A Go method may be declared in a different source file from its type.
 The method source artifact constructs one immutable typed TS-Go
 `MethodDeclaration` contribution, including its body requests and imports.
