@@ -274,8 +274,22 @@ func emitInterface(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	cooperative, contractRequests, err :=
-		cooperativecall.ValueContract(context, signature)
+	method, ok := selected.Obj().(*types.Func)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	callableReference, err :=
+		context.Names().InterfaceMethodCallable(method)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	_, cooperative, contractRequests, err :=
+		cooperativecall.InterfaceMethodValueContract(
+			context,
+			callableReference,
+			signature,
+		)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -295,9 +309,7 @@ func emitInterface(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	member, err := context.Names().InterfaceMethodName(
-		selected.Obj().(*types.Func),
-	)
+	member, err := context.Names().InterfaceMethodName(method)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

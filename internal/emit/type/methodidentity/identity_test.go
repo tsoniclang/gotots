@@ -193,3 +193,57 @@ func (Box) Get() int32 { return 0 }
 		t.Fatal("instantiated generic interface method does not match its concrete implementation")
 	}
 }
+
+func TestGenericInterfaceMethodIdentityUsesParameterOrdinals(t *testing.T) {
+	fileSet := token.NewFileSet()
+	source, err := parser.ParseFile(fileSet, "source.go", `package generic
+
+type First[T any] interface {
+	Read() T
+}
+
+type Renamed[U any] interface {
+	Read() U
+}
+
+type Different[T any] interface {
+	Write() T
+}
+`, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checked, err := new(types.Config).Check(
+		"example.com/generic",
+		fileSet,
+		[]*ast.File{source},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	method := func(typeName string) *types.Func {
+		t.Helper()
+		named := checked.Scope().Lookup(typeName).Type().(*types.Named)
+		return named.Underlying().(*types.Interface).Method(0)
+	}
+	identity := func(object *types.TypeName) (string, error) {
+		return object.Pkg().Path() + "." + object.Name(), nil
+	}
+	key := func(typeName string) string {
+		t.Helper()
+		result, buildErr := BuildKey(method(typeName), identity)
+		if buildErr != nil {
+			t.Fatal(buildErr)
+		}
+		return result
+	}
+	if key("First") != key("Renamed") ||
+		!Equivalent(method("First"), method("Renamed")) {
+		t.Fatal("alpha-equivalent generic interface methods do not share identity")
+	}
+	if key("First") == key("Different") ||
+		Equivalent(method("First"), method("Different")) {
+		t.Fatal("differently named generic interface methods share identity")
+	}
+}

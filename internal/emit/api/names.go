@@ -253,6 +253,10 @@ type Names interface {
 	InterfaceContract(types.Type) (InterfaceContractReference, error)
 	MethodTarget(*types.Func) (MethodTarget, error)
 	InterfaceMethodName(*types.Func) (string, error)
+	InterfaceMethodCallable(*types.Func) (
+		InterfaceMethodCallableReference,
+		error,
+	)
 	InterfaceMethodToken(*types.Func) (NameReference, error)
 	GenericCapability(
 		GenericOperationSelection,

@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
+	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -55,6 +56,16 @@ func emitDeferredMethod(
 			signature,
 		)
 	}
+	invocation, err := methodcall.Resolve(
+		context,
+		children,
+		source,
+		method,
+		signature,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	receiver, resolvedMethod, err := selectionvalue.MethodReceiver(
 		context,
 		children,
@@ -94,30 +105,22 @@ func emitDeferredMethod(
 		return api.ExpressionEmission{}, err
 	}
 	before = append(before, argumentBefore...)
-	control, err := api.NewDirectCallableControlRequest(
-		method.Origin(),
-		api.CallableControlRecovery,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	arguments = append(
-		arguments,
-		context.Factory().Identifier(callable.RecoveryAuthorityName),
-	)
-	call, callRequests, err := callable.SelectedMethodCall(
+	call, callRequests, err := invocation.Call(
 		context,
-		method,
-		"",
 		context.Factory().Identifier(receiverName),
-		nil,
 		arguments,
+		context.Factory().Identifier(
+			callable.RecoveryAuthorityName,
+		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	cooperative, contractRequests, err :=
-		cooperativecall.SourceContract(context, method)
+		cooperativecall.GenericContract(
+			context,
+			invocation.Facet(),
+		)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -132,7 +135,6 @@ func emitDeferredMethod(
 			argumentRequests,
 			callRequests,
 			contractRequests,
-			[]api.RootRequest{control},
 		),
 	)
 }
@@ -224,18 +226,16 @@ func emitDeferredInterfaceMethod(
 		arguments,
 		tsgo.NodeFlagsNone,
 	)
-	selectedSignature, ok := selection.Type().(*types.Signature)
-	if !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	valueSignature, ok := callable.ValueSignature(selectedSignature)
-	if !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
+	callableReference, err :=
+		context.Names().InterfaceMethodCallable(method)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	cooperative, contractRequests, err :=
-		cooperativecall.ValueContract(context, valueSignature)
+		cooperativecall.InterfaceMethodContract(
+			context,
+			callableReference,
+		)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

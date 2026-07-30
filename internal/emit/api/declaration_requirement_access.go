@@ -156,6 +156,16 @@ func (r DeclarationRequirement) InterfaceMethodToken() (
 	)
 }
 
+func (r DeclarationRequirement) InterfaceMethodCallable() (
+	*GeneratedArtifact,
+	bool,
+) {
+	return r.generatedDefinition(
+		DeclarationRequirementInterfaceMethodCallable,
+		GeneratedArtifactInterfaceMethodCallable,
+	)
+}
+
 func (r DeclarationRequirement) InterfaceDynamicTypeToken() (
 	*GeneratedArtifact,
 	bool,
@@ -242,6 +252,7 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementInterfaceAdapter,
 		DeclarationRequirementAnonymousInterface,
 		DeclarationRequirementInterfaceMethodToken,
+		DeclarationRequirementInterfaceMethodCallable,
 		DeclarationRequirementInterfaceDynamicTypeToken,
 		DeclarationRequirementGenericCapability,
 		DeclarationRequirementCallableABI:
@@ -375,6 +386,7 @@ const (
 	DeclarationRequirementClassMethod               DeclarationRequirementKind = 18
 	DeclarationRequirementValueReceiverCopy         DeclarationRequirementKind = 19
 	DeclarationRequirementGenericRepresentation     DeclarationRequirementKind = 20
+	DeclarationRequirementInterfaceMethodCallable   DeclarationRequirementKind = 21
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -397,7 +409,8 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementGenericCallableProfile ||
 		k == DeclarationRequirementClassMethod ||
 		k == DeclarationRequirementValueReceiverCopy ||
-		k == DeclarationRequirementGenericRepresentation
+		k == DeclarationRequirementGenericRepresentation ||
+		k == DeclarationRequirementInterfaceMethodCallable
 }
 
 type CallableControlFacet uint8

@@ -198,8 +198,9 @@ func TestGeneratedArtifactDomainsArePinned(t *testing.T) {
 		GeneratedArtifactInterfaceDynamicTypeToken != 6 ||
 		GeneratedArtifactGenericCapability != 7 ||
 		GeneratedArtifactCallableABI != 8 ||
+		GeneratedArtifactInterfaceMethodCallable != 9 ||
 		GeneratedArtifactInvalid.Valid() ||
-		GeneratedArtifactKind(9).Valid() {
+		GeneratedArtifactKind(10).Valid() {
 		t.Fatal("generated-artifact kind IDs drifted")
 	}
 	if GeneratedArtifactPlacementCompilation != 1 ||
@@ -269,6 +270,79 @@ func TestCallableABIIsContractOnlyCompilationSupport(t *testing.T) {
 		"support/callable.ts",
 	); err == nil {
 		t.Fatal("callable ABI accepted a materialized support file")
+	}
+}
+
+func TestInterfaceMethodCallableIsContractOnlyCompilationSupport(t *testing.T) {
+	signature := types.NewSignatureType(
+		nil,
+		nil,
+		nil,
+		types.NewTuple(),
+		types.NewTuple(types.NewVar(
+			token.NoPos,
+			nil,
+			"",
+			types.Typ[types.Int32],
+		)),
+		false,
+	)
+	artifact, err := NewContractGeneratedArtifact(
+		GeneratedArtifactInterfaceMethodCallable,
+		signature,
+		"interface-method",
+		"$goInterfaceCallable_method",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := NewInterfaceMethodCallableRequest(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirement, ok := request.DeclarationRequirement()
+	selected, selectedOK := requirement.InterfaceMethodCallable()
+	if !artifact.Valid() ||
+		artifact.Placement() != GeneratedArtifactPlacementContract ||
+		artifact.OutputPath() != "" ||
+		request.LegalScope() != ScopeCompilationSupport ||
+		!ok ||
+		!selectedOK ||
+		selected != artifact {
+		t.Fatalf(
+			"contract-only interface callable = %#v / %#v",
+			artifact,
+			request,
+		)
+	}
+	parameter := types.NewTypeParam(
+		types.NewTypeName(token.NoPos, nil, "T", nil),
+		types.NewInterfaceType(nil, nil).Complete(),
+	)
+	openSignature := types.NewSignatureType(
+		nil,
+		nil,
+		nil,
+		types.NewTuple(),
+		types.NewTuple(types.NewVar(token.NoPos, nil, "", parameter)),
+		false,
+	)
+	if _, err := NewContractGeneratedArtifact(
+		GeneratedArtifactInterfaceMethodCallable,
+		openSignature,
+		"open-interface-method",
+		"$goInterfaceCallable_open",
+	); err != nil {
+		t.Fatalf("open callable family rejected: %v", err)
+	}
+	if _, err := NewCompilationInterfaceMethodTokenArtifact(
+		openSignature,
+		"open-interface-method",
+		"$goInterfaceMethod_open",
+		"support/interface-methods.ts",
+		RuntimeInvalid,
+	); err == nil {
+		t.Fatal("open interface method received a runtime token")
 	}
 }
 

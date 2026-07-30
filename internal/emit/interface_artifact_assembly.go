@@ -221,6 +221,26 @@ func buildInterfaceArtifact(
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	switch artifact.Kind() {
 	case api.GeneratedArtifactInterfaceMethodToken:
+		runtime, ok := artifact.InterfaceMethodRuntime()
+		if !ok {
+			return nil, nil, &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "interface-method token runtime identity is invalid",
+			}
+		}
+		var initializer tsgo.Expression
+		var requests []api.RootRequest
+		if runtime != api.RuntimeInvalid {
+			reference, err := context.Names().Runtime(
+				runtime,
+				api.ImportPhaseValue,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			initializer = context.Factory().Identifier(reference.Name())
+			requests = reference.Requests()
+		}
 		return []tsgo.Statement{
 			interfacemethodtoken.Build(
 				builder.context.Factory(),
@@ -228,8 +248,9 @@ func buildInterfaceArtifact(
 				[]tsgo.ModifierLike{
 					builder.context.Factory().ExportKeyword(),
 				},
+				initializer,
 			),
-		}, nil, nil
+		}, requests, nil
 	case api.GeneratedArtifactInterfaceDynamicTypeToken:
 		return []tsgo.Statement{
 			interfacedynamictype.Build(

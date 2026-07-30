@@ -112,6 +112,12 @@ func (staticSpecializationNames) InterfaceMethodName(
 	panic("unused")
 }
 
+func (staticSpecializationNames) InterfaceMethodCallable(
+	*types.Func,
+) (api.InterfaceMethodCallableReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) InterfaceMethodToken(
 	*types.Func,
 ) (api.NameReference, error) {

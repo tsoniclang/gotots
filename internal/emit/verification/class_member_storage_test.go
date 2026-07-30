@@ -375,3 +375,153 @@ func localStructStorageDirectory() string {
 		"local-struct-storage",
 	)
 }
+
+func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: waveNineConcurrencyDirectory(),
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := emit.NewRoot(
+		program.Roots()[0].Types().Scope().
+			Lookup("GenericInterfaceAudit"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.CompileWithOptions(
+		program,
+		[]emit.Root{root},
+		waveNineOptions(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	for _, required := range []string{
+		"export interface GenericValue<T>",
+		"export interface IntValue",
+		"Value($go$recovery?: GoRecovery): Promise<T>",
+		"export async function GenericInterfaceAudit(): Promise<int32>",
+		"return await goInterfaceNonNil<GenericValue<T>>(__gotots_receiver_0).Value()",
+	} {
+		if !strings.Contains(artifacts.printed, required) {
+			t.Fatalf(
+				"generic interface callable family lacks %q:\n%s",
+				required,
+				artifacts.printed,
+			)
+		}
+	}
+	if methods := strings.Count(
+		artifacts.printed,
+		"async Value($go$recovery?: GoRecovery): Promise<",
+	); methods < 2 {
+		t.Fatalf(
+			"generic interface adapters have %d async Value methods, want at least two:\n%s",
+			methods,
+			artifacts.printed,
+		)
+	}
+	if tokens := strings.Count(
+		artifacts.printed,
+		"export const $goInterfaceMethod_",
+	); tokens != 2 {
+		t.Fatalf(
+			"generic interface runtime tokens = %d, want two closed signatures",
+			tokens,
+		)
+	}
+	if strings.Contains(artifacts.printed, "$goInterfaceCallable_") {
+		t.Fatal("contract-only interface callable leaked into TypeScript output")
+	}
+	runner := filepath.Join(workingDirectory, "runner.ts")
+	writeProgramFile(t, runner, `import "./program.js";
+import { GenericInterfaceAudit } from "`+artifacts.sourceModule+`";
+import { GoScheduler } from "./runtime/channel.js";
+
+await GoScheduler.run(async () => {
+    console.log(String(await GenericInterfaceAudit()));
+});
+`)
+	writeProgramFile(
+		t,
+		filepath.Join(workingDirectory, "package.json"),
+		"{\"type\":\"module\"}\n",
+	)
+	waveThreeTypecheck(
+		t,
+		workingDirectory,
+		append(artifacts.paths, runner),
+	)
+	targetOutput := runProgram(
+		t,
+		workingDirectory,
+		"node",
+		filepath.Join(workingDirectory, "out", "runner.js"),
+	)
+	goOutput := executeGenericInterfaceCallableGo(t, workingDirectory)
+	if targetOutput != goOutput {
+		t.Fatalf(
+			"generic interface callable output differs\nTypeScript:\n%s\nGo:\n%s",
+			targetOutput,
+			goOutput,
+		)
+	}
+}
+
+func executeGenericInterfaceCallableGo(
+	t *testing.T,
+	workingDirectory string,
+) string {
+	t.Helper()
+	modulePath, err := filepath.Abs(waveNineConcurrencyDirectory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runnerDirectory := filepath.Join(
+		workingDirectory,
+		"go-runner-generic-interface-callable",
+	)
+	writeProgramFile(
+		t,
+		filepath.Join(runnerDirectory, "go.mod"),
+		fmt.Sprintf(
+			`module example.com/runner
+
+go 1.26.4
+
+require example.com/wave9concurrency v0.0.0
+
+replace example.com/wave9concurrency => %s
+`,
+			filepath.ToSlash(modulePath),
+		),
+	)
+	writeProgramFile(
+		t,
+		filepath.Join(runnerDirectory, "main.go"),
+		`package main
+
+import (
+	"fmt"
+
+	values "example.com/wave9concurrency"
+)
+
+func main() {
+	fmt.Println(values.GenericInterfaceAudit())
+}
+`,
+	)
+	return runProgram(
+		t,
+		runnerDirectory,
+		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		"run",
+		".",
+	)
+}

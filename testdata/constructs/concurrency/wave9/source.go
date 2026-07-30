@@ -185,6 +185,62 @@ type Reader interface {
 	Next() int32
 }
 
+type ImmediateReceiver struct{}
+
+func (*ImmediateReceiver) Next() int32 {
+	return 31
+}
+
+func DirectSynchronousInterface() int32 {
+	var reader Reader = &ImmediateReceiver{}
+	return reader.Next()
+}
+
+type GenericValue[T any] interface {
+	Value() T
+}
+
+type IntValue interface {
+	Value() int32
+}
+
+type BlockingIntValue struct {
+	Values <-chan int32
+}
+
+func (value *BlockingIntValue) Value() int32 {
+	return <-value.Values
+}
+
+type ImmediateStringValue struct{}
+
+func (*ImmediateStringValue) Value() string {
+	return "ok"
+}
+
+func readGenericValue[T any](value GenericValue[T]) T {
+	return value.Value()
+}
+
+func readIntValue(value IntValue) int32 {
+	return value.Value()
+}
+
+func GenericInterfaceAudit() int32 {
+	values := make(chan int32, 2)
+	values <- 37
+	values <- 5
+	number := readGenericValue[int32](
+		&BlockingIntValue{Values: values},
+	)
+	number += readIntValue(&BlockingIntValue{Values: values})
+	text := readGenericValue[string](&ImmediateStringValue{})
+	if text != "ok" {
+		return -1
+	}
+	return number
+}
+
 func identity[T any](value T) T {
 	return value
 }

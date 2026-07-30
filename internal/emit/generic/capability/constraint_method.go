@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
 	"github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
@@ -27,7 +26,7 @@ func emitConstraintMethod(
 		signature.Params().Len() != len(arguments) {
 		return api.ExpressionEmission{}, shapeError(context, operation)
 	}
-	interfaceType, concreteMethod, methodSignature, err :=
+	interfaceType, concreteMethod, _, err :=
 		concreteConstraintMethod(method, signature)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -63,13 +62,14 @@ func emitConstraintMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	valueSignature, ok := callable.ValueSignature(methodSignature)
-	if !ok {
-		return api.ExpressionEmission{}, shapeError(context, operation)
+	callableReference, err :=
+		context.Names().InterfaceMethodCallable(concreteMethod)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
-	return cooperativecall.GeneratedValueCall(
+	return cooperativecall.GeneratedInterfaceMethodCall(
 		context,
-		valueSignature,
+		callableReference,
 		target,
 	)
 }

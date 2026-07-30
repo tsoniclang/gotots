@@ -17,6 +17,7 @@ const (
 	GeneratedArtifactInterfaceDynamicTypeToken
 	GeneratedArtifactGenericCapability
 	GeneratedArtifactCallableABI
+	GeneratedArtifactInterfaceMethodCallable
 )
 
 func (k GeneratedArtifactKind) Valid() bool {
@@ -27,7 +28,8 @@ func (k GeneratedArtifactKind) Valid() bool {
 		k == GeneratedArtifactInterfaceMethodToken ||
 		k == GeneratedArtifactInterfaceDynamicTypeToken ||
 		k == GeneratedArtifactGenericCapability ||
-		k == GeneratedArtifactCallableABI
+		k == GeneratedArtifactCallableABI ||
+		k == GeneratedArtifactInterfaceMethodCallable
 }
 
 type GeneratedArtifactPlacement uint8
@@ -55,6 +57,7 @@ type GeneratedArtifact struct {
 	lexicalOwner ArtifactOwner
 	anchor       *types.TypeName
 	generic      GenericOperationSelection
+	runtime      RuntimeSymbol
 }
 
 func NewCompilationGeneratedArtifact(
@@ -66,6 +69,8 @@ func NewCompilationGeneratedArtifact(
 ) (*GeneratedArtifact, error) {
 	if kind == GeneratedArtifactGenericCapability ||
 		kind == GeneratedArtifactCallableABI ||
+		kind == GeneratedArtifactInterfaceMethodCallable ||
+		kind == GeneratedArtifactInterfaceMethodToken ||
 		!validGeneratedArtifactType(kind, sourceType) ||
 		artifact == "" ||
 		targetName == "" ||
@@ -84,13 +89,45 @@ func NewCompilationGeneratedArtifact(
 	}, nil
 }
 
+func NewCompilationInterfaceMethodTokenArtifact(
+	signature *types.Signature,
+	artifact string,
+	targetName string,
+	outputPath string,
+	runtime RuntimeSymbol,
+) (*GeneratedArtifact, error) {
+	if !validGeneratedArtifactType(
+		GeneratedArtifactInterfaceMethodToken,
+		signature,
+	) ||
+		ContainsGenericTypeParameter(signature) ||
+		artifact == "" ||
+		targetName == "" ||
+		outputPath == "" ||
+		!validInterfaceMethodRuntime(runtime) {
+		return nil, &RootRequestError{
+			Reason: "compilation interface-method-token artifact is invalid",
+		}
+	}
+	return &GeneratedArtifact{
+		kind:       GeneratedArtifactInterfaceMethodToken,
+		sourceType: signature,
+		artifact:   artifact,
+		targetName: targetName,
+		placement:  GeneratedArtifactPlacementCompilation,
+		outputPath: outputPath,
+		runtime:    runtime,
+	}, nil
+}
+
 func NewContractGeneratedArtifact(
 	kind GeneratedArtifactKind,
 	sourceType types.Type,
 	artifact string,
 	targetName string,
 ) (*GeneratedArtifact, error) {
-	if kind != GeneratedArtifactCallableABI ||
+	if (kind != GeneratedArtifactCallableABI &&
+		kind != GeneratedArtifactInterfaceMethodCallable) ||
 		!validGeneratedArtifactType(kind, sourceType) ||
 		artifact == "" ||
 		targetName == "" {
@@ -120,6 +157,7 @@ func NewLexicalGeneratedArtifact(
 	_, _, initializerOwned := lexicalOwner.PackageInitializer()
 	if kind == GeneratedArtifactGenericCapability ||
 		kind == GeneratedArtifactCallableABI ||
+		kind == GeneratedArtifactInterfaceMethodCallable ||
 		!validGeneratedArtifactType(kind, sourceType) ||
 		artifact == "" ||
 		targetName == "" ||
@@ -261,6 +299,24 @@ func (o *GeneratedArtifact) InterfaceMethodSignature() (*types.Signature, bool) 
 	return source, ok && source.Recv() == nil
 }
 
+func (o *GeneratedArtifact) InterfaceMethodCallableSignature() (
+	*types.Signature,
+	bool,
+) {
+	if o == nil || o.kind != GeneratedArtifactInterfaceMethodCallable {
+		return nil, false
+	}
+	source, ok := types.Unalias(o.sourceType).(*types.Signature)
+	return source, ok && source.Recv() == nil
+}
+
+func (o *GeneratedArtifact) InterfaceMethodRuntime() (RuntimeSymbol, bool) {
+	if o == nil || o.kind != GeneratedArtifactInterfaceMethodToken {
+		return RuntimeInvalid, false
+	}
+	return o.runtime, true
+}
+
 func (o *GeneratedArtifact) InterfaceDynamicType() (types.Type, bool) {
 	if o == nil || o.kind != GeneratedArtifactInterfaceDynamicTypeToken {
 		return nil, false
@@ -346,7 +402,11 @@ func (o *GeneratedArtifact) Valid() bool {
 		o.artifact == "" ||
 		o.targetName == "" ||
 		!o.placement.Valid() ||
-		(o.kind == GeneratedArtifactGenericCapability) != o.generic.Valid() {
+		(o.kind == GeneratedArtifactGenericCapability) != o.generic.Valid() ||
+		(o.kind == GeneratedArtifactInterfaceMethodToken &&
+			!validInterfaceMethodRuntime(o.runtime)) ||
+		(o.kind != GeneratedArtifactInterfaceMethodToken &&
+			o.runtime != RuntimeInvalid) {
 		return false
 	}
 	switch o.placement {
@@ -366,7 +426,8 @@ func (o *GeneratedArtifact) Valid() bool {
 			o.anchor.Parent() != nil &&
 			o.anchor.Parent() != o.anchor.Pkg().Scope()
 	case GeneratedArtifactPlacementContract:
-		return o.kind == GeneratedArtifactCallableABI &&
+		return (o.kind == GeneratedArtifactCallableABI ||
+			o.kind == GeneratedArtifactInterfaceMethodCallable) &&
 			o.outputPath == "" &&
 			!o.lexicalOwner.Valid() &&
 			o.anchor == nil
@@ -396,6 +457,11 @@ func validGeneratedArtifactType(
 		return ok && source.IsMethodSet()
 	case GeneratedArtifactInterfaceMethodToken:
 		source, ok := types.Unalias(sourceType).(*types.Signature)
+		return ok &&
+			source.Recv() == nil &&
+			!ContainsGenericTypeParameter(source)
+	case GeneratedArtifactInterfaceMethodCallable:
+		source, ok := types.Unalias(sourceType).(*types.Signature)
 		return ok && source.Recv() == nil
 	case GeneratedArtifactInterfaceDynamicTypeToken:
 		return interfaceAdapterType(sourceType)
@@ -420,6 +486,12 @@ func interfaceAdapterType(sourceType types.Type) bool {
 	default:
 		return true
 	}
+}
+
+func validInterfaceMethodRuntime(symbol RuntimeSymbol) bool {
+	return symbol == RuntimeInvalid ||
+		symbol == RuntimeErrorMethodToken ||
+		symbol == RuntimeRuntimeErrorToken
 }
 
 type GeneratedArtifactPlacementError struct {

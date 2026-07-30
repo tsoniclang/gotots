@@ -232,6 +232,7 @@ func emitLexicalGeneratedArtifact(
 				context.Factory(),
 				artifact.TargetName(),
 				nil,
+				nil,
 			),
 		), nil
 	case api.GeneratedArtifactInterfaceDynamicTypeToken:

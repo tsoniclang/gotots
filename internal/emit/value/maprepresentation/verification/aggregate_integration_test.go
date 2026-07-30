@@ -441,6 +441,12 @@ func (aggregateNames) InterfaceMethodName(
 	panic("unused")
 }
 
+func (aggregateNames) InterfaceMethodCallable(
+	*types.Func,
+) (api.InterfaceMethodCallableReference, error) {
+	panic("unused")
+}
+
 func (aggregateNames) InterfaceMethodToken(
 	*types.Func,
 ) (api.NameReference, error) {

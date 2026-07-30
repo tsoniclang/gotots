@@ -8,7 +8,24 @@ func Build(
 	factory tsgo.Factory,
 	name string,
 	modifiers []tsgo.ModifierLike,
+	initializer tsgo.Expression,
 ) tsgo.Statement {
+	if initializer == nil {
+		initializer = factory.CallExpression(
+			factory.PropertyAccessExpression(
+				factory.Identifier("Object"),
+				nil,
+				factory.Identifier("freeze"),
+				tsgo.NodeFlagsNone,
+			),
+			nil,
+			nil,
+			[]tsgo.Expression{
+				factory.ObjectLiteralExpression(nil, false),
+			},
+			tsgo.NodeFlagsNone,
+		)
+	}
 	return factory.VariableStatement(
 		modifiers,
 		factory.VariableDeclarationList(
@@ -19,20 +36,7 @@ func Build(
 					factory.KeywordTypeNode(
 						tsgo.KeywordTypeSyntaxKindObjectKeyword,
 					),
-					factory.CallExpression(
-						factory.PropertyAccessExpression(
-							factory.Identifier("Object"),
-							nil,
-							factory.Identifier("freeze"),
-							tsgo.NodeFlagsNone,
-						),
-						nil,
-						nil,
-						[]tsgo.Expression{
-							factory.ObjectLiteralExpression(nil, false),
-						},
-						tsgo.NodeFlagsNone,
-					),
+					initializer,
 				),
 			},
 			tsgo.NodeFlagsConst,

@@ -239,6 +239,12 @@ func (unusedNames) InterfaceMethodName(*types.Func) (string, error) {
 	panic("unused")
 }
 
+func (unusedNames) InterfaceMethodCallable(
+	*types.Func,
+) (api.InterfaceMethodCallableReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) InterfaceMethodToken(
 	*types.Func,
 ) (api.NameReference, error) {

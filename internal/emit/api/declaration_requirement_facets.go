@@ -52,6 +52,16 @@ func NewCallableABIRequest(
 	return newDeclarationRequirementRequest(requirement), nil
 }
 
+func NewInterfaceMethodCallableRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceMethodCallableRequirement(artifact)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
 func (r DeclarationRequirement) CooperativeCallable() (
 	CallableFacet,
 	bool,

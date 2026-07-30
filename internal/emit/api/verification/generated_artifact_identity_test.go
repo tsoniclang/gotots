@@ -415,8 +415,9 @@ func TestGenericCooperativeFacetsCarryExactCallableIdentity(t *testing.T) {
 		CallableFacetGenericOperation != 5 ||
 		CallableFacetPackageInitializer != 6 ||
 		CallableFacetGenericProfile != 7 ||
+		CallableFacetInterfaceMethod != 8 ||
 		CallableFacetInvalid.Valid() ||
-		CallableFacetKind(8).Valid() {
+		CallableFacetKind(9).Valid() {
 		t.Fatal("callable-facet kind IDs drifted")
 	}
 }

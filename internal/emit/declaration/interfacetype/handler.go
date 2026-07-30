@@ -155,8 +155,16 @@ func build(
 		if err != nil {
 			return nil, nil, err
 		}
+		callableReference, err :=
+			context.Names().InterfaceMethodCallable(method)
+		if err != nil {
+			return nil, nil, err
+		}
 		cooperative, contractRequests, err :=
-			cooperativecall.ValueContract(context, signature)
+			cooperativecall.InterfaceMethodContract(
+				context,
+				callableReference,
+			)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -188,9 +196,10 @@ func build(
 		)
 		requests = append(requests, contractRequests...)
 		if emitRuntimeContract {
-			token, err := context.Names().InterfaceMethodToken(method)
-			if err != nil {
-				return nil, nil, err
+			token, tokenErr :=
+				context.Names().InterfaceMethodToken(method)
+			if tokenErr != nil {
+				return nil, nil, tokenErr
 			}
 			tokens = append(
 				tokens,

@@ -111,8 +111,10 @@ func (s *programSession) scheduleDeclarationRequirement(
 		}
 	}
 	if generated, generatedOwned := owner.Generated(); generatedOwned &&
-		generated.Kind() == api.GeneratedArtifactCallableABI {
-		if err := s.ensureCallableABIBaseline(generated); err != nil {
+		(generated.Kind() == api.GeneratedArtifactCallableABI ||
+			generated.Kind() ==
+				api.GeneratedArtifactInterfaceMethodCallable) {
+		if err := s.ensureCallableContractBaseline(generated); err != nil {
 			return err
 		}
 	}
@@ -217,6 +219,9 @@ func generatedCallableFacetMatches(
 		return selected == artifact
 	}
 	if selected, ok := facet.GenericCapability(); ok {
+		return selected == artifact
+	}
+	if selected, ok := facet.InterfaceMethod(); ok {
 		return selected == artifact
 	}
 	return false

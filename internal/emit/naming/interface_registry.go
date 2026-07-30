@@ -127,6 +127,7 @@ func (r *Registry) internInterfaceMethodToken(
 	artifactKey string,
 	method *types.Func,
 	signature *types.Signature,
+	runtime api.RuntimeSymbol,
 ) (interfaceMethodTokenBinding, error) {
 	if r == nil ||
 		method == nil ||
@@ -138,10 +139,13 @@ func (r *Registry) internInterfaceMethodToken(
 		}
 	}
 	if existing, ok := r.interfaceMethodTokens[artifactKey]; ok {
-		existingSignature, valid :=
+		_, valid :=
 			existing.owner.InterfaceMethodSignature()
+		existingRuntime, runtimeValid :=
+			existing.owner.InterfaceMethodRuntime()
 		if !valid ||
-			!types.Identical(existingSignature, signature) ||
+			!runtimeValid ||
+			existingRuntime != runtime ||
 			!methodidentity.Equivalent(existing.method, method) {
 			return interfaceMethodTokenBinding{}, &api.NameError{
 				Name:   existing.name,
@@ -162,12 +166,12 @@ func (r *Registry) internInterfaceMethodToken(
 	); err != nil {
 		return interfaceMethodTokenBinding{}, err
 	}
-	owner, err := api.NewCompilationGeneratedArtifact(
-		api.GeneratedArtifactInterfaceMethodToken,
+	owner, err := api.NewCompilationInterfaceMethodTokenArtifact(
 		signature,
 		artifactKey,
 		name,
 		output.InterfaceMethodSupportPath,
+		runtime,
 	)
 	if err != nil {
 		return interfaceMethodTokenBinding{}, err
@@ -178,6 +182,65 @@ func (r *Registry) internInterfaceMethodToken(
 		name:   name,
 	}
 	r.interfaceMethodTokens[artifactKey] = binding
+	return binding, nil
+}
+
+func (r *Registry) internInterfaceMethodCallable(
+	artifactKey string,
+	method *types.Func,
+	signature *types.Signature,
+) (interfaceMethodCallableBinding, error) {
+	if r == nil ||
+		method == nil ||
+		signature == nil ||
+		signature.Recv() != nil ||
+		artifactKey == "" {
+		return interfaceMethodCallableBinding{}, &api.NameError{
+			Reason: "interface-method callable canonicalization input is invalid",
+		}
+	}
+	if existing, ok := r.interfaceMethodCallables[artifactKey]; ok {
+		_, valid := existing.owner.InterfaceMethodCallableSignature()
+		if !valid ||
+			!methodidentity.Equivalent(existing.method, method) {
+			return interfaceMethodCallableBinding{}, &api.NameError{
+				Name: existing.name,
+				Reason: "interface-method callable key joined " +
+					"non-identical contracts",
+			}
+		}
+		return existing, nil
+	}
+	name, err := interfaceTargetName(
+		"$goInterfaceCallable_",
+		artifactKey,
+	)
+	if err != nil {
+		return interfaceMethodCallableBinding{}, err
+	}
+	if err := reserveGeneratedName(
+		r.interfaceMethodCallableNames,
+		name,
+		artifactKey,
+		"interface-method callable",
+	); err != nil {
+		return interfaceMethodCallableBinding{}, err
+	}
+	owner, err := api.NewContractGeneratedArtifact(
+		api.GeneratedArtifactInterfaceMethodCallable,
+		signature,
+		artifactKey,
+		name,
+	)
+	if err != nil {
+		return interfaceMethodCallableBinding{}, err
+	}
+	binding := interfaceMethodCallableBinding{
+		owner:  owner,
+		method: method,
+		name:   name,
+	}
+	r.interfaceMethodCallables[artifactKey] = binding
 	return binding, nil
 }
 

@@ -365,6 +365,7 @@ func compareCallableControlRequirements(
 func artifactKinds(kind api.DeclarationRequirementKind) bool {
 	return kind == api.DeclarationRequirementAnonymousInterface ||
 		kind == api.DeclarationRequirementInterfaceMethodToken ||
+		kind == api.DeclarationRequirementInterfaceMethodCallable ||
 		kind == api.DeclarationRequirementInterfaceDynamicTypeToken ||
 		kind == api.DeclarationRequirementGenericCapability ||
 		kind == api.DeclarationRequirementCallableABI

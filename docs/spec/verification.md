@@ -1253,6 +1253,38 @@ execution:
    counterexample receives no yield/preemption workaround and is never run as
    if it were admitted exact behavior.
 
+Interface callable ownership has a separate exact-identity gate:
+
+- adding a cooperative unrelated `func() bool` leaves the emitted
+  `interface{ IsDir() bool }` declaration, adapter and direct call byte
+  unchanged;
+- making the selected concrete `IsDir` implementation cooperative changes the
+  one canonical method-token callable facet and reconstructs its declaration,
+  adapter, direct/deferred calls, method-value bridge and generic
+  constraint-method capability;
+- changing the method name while retaining its receiver-free signature does
+  not join token identities;
+- alpha-renaming `Value[T].Get() T` to `Value[U].Get() U` preserves the
+  generic callable-family identity, while `Value[int32].Get` and
+  `Value[string].Get` receive distinct closed runtime tokens;
+- an open `Value[T].Get` direct call observes the generic family and a mutation
+  that requests a runtime token fails at the naming boundary;
+- one adapter demanded through multiple compatible generic and non-generic
+  interfaces selects every target facet when any selected implementation is
+  cooperative;
+- a generic receiver implementation invoked by an adapter receives the exact
+  ordered type arguments and operation capabilities from the shared
+  selected-method plan; and
+- restoring interface-boundary `ValueContract`, `ValueCall`,
+  `SourceValueContract`, or a raw adapter `SelectedMethodCall` fails the
+  architecture wall and the unrelated-function mutation.
+
+Artifact inspection reports synchronous and cooperative interface methods,
+adapter bytes, and the twenty largest adapter methods separately. The gate
+rejects duplicated token facets, direct-interface dependencies on
+first-class-callable ABI artifacts, missing reverse dependencies, and
+signature/body disagreement.
+
 Production mutations catch transfer without copy, LIFO queueing, close that
 drops buffered values, incorrect closed-channel `ok`, eager receive-LHS
 evaluation, duplicate select commit, uncanceled alternatives, default beating

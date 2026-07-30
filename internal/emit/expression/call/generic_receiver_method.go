@@ -7,21 +7,17 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
-	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
-	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
+	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type genericReceiverMethodCall struct {
-	owner         *types.Func
-	facet         api.CallableFacet
-	memberSuffix  string
-	receiver      tsgo.Expression
-	before        []tsgo.Statement
-	typeArguments []tsgo.TypeNode
-	arguments     []tsgo.Expression
-	requests      []api.RootRequest
+	invocation methodcall.Selection
+	receiver   tsgo.Expression
+	before     []tsgo.Statement
+	arguments  []tsgo.Expression
+	requests   []api.RootRequest
 }
 
 func emitGenericReceiverMethod(
@@ -50,7 +46,7 @@ func emitGenericReceiverMethod(
 		return api.ExpressionEmission{}, err
 	}
 	expression, expressionRequests, err :=
-		call.expression(context, call.arguments)
+		call.expression(context, call.arguments, nil)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -66,14 +62,14 @@ func emitGenericReceiverMethod(
 		return cooperativecall.DetachedGenericCall(
 			context,
 			source,
-			call.facet,
+			call.invocation.Facet(),
 			target,
 		)
 	}
 	return cooperativecall.GenericCall(
 		context,
 		source,
-		call.facet,
+		call.invocation.Facet(),
 		target,
 	)
 }
@@ -101,24 +97,22 @@ func emitDeferredGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arguments := append(
-		append([]tsgo.Expression(nil), call.arguments...),
-		context.Factory().Identifier(callable.RecoveryAuthorityName),
-	)
-	control, err := api.NewDirectCallableControlRequest(
-		call.owner,
-		api.CallableControlRecovery,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	expression, expressionRequests, err :=
-		call.expression(context, arguments)
+		call.expression(
+			context,
+			call.arguments,
+			context.Factory().Identifier(
+				callable.RecoveryAuthorityName,
+			),
+		)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	cooperative, contractRequests, err :=
-		cooperativecall.GenericContract(context, call.facet)
+		cooperativecall.GenericContract(
+			context,
+			call.invocation.Facet(),
+		)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -132,7 +126,6 @@ func emitDeferredGenericReceiverMethod(
 			call.requests,
 			expressionRequests,
 			contractRequests,
-			[]api.RootRequest{control},
 		),
 	)
 }
@@ -148,37 +141,17 @@ func prepareGenericReceiverMethodCall(
 	discarded bool,
 	capture bool,
 ) (genericReceiverMethodCall, error) {
-	owner := method.Origin()
-	callableContract, ok, err := context.ResolveGenericCallable(owner)
+	invocation, err := methodcall.Resolve(
+		context,
+		children,
+		source,
+		method,
+		signature,
+	)
 	if err != nil {
 		return genericReceiverMethodCall{}, err
 	}
-	arguments := genericinstance.ReceiverTypeArguments(signature.Recv().Type())
-	if !ok ||
-		arguments == nil ||
-		arguments.Len() != len(callableContract.Parameters()) {
-		return genericReceiverMethodCall{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	concrete, err := genericinstance.ConcreteCallableSignature(signature)
-	if err != nil {
-		return genericReceiverMethodCall{}, err
-	}
-	declarationSignature, ok := owner.Type().(*types.Signature)
-	if !ok {
-		return genericReceiverMethodCall{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	memberSuffix, callableFacet, _, selectionRequests, err :=
-		cooperativecall.SelectGenericClassMethod(
-			context,
-			owner,
-			declarationSignature,
-			concrete,
-		)
-	if err != nil {
-		return genericReceiverMethodCall{}, err
-	}
+	concrete := invocation.Signature()
 	if err := validateResults(context, source, concrete, discarded); err != nil {
 		return genericReceiverMethodCall{}, err
 	}
@@ -230,56 +203,15 @@ func prepareGenericReceiverMethodCall(
 		}
 	}
 	before = append(before, argumentBefore...)
-	typeArguments, typeRequests, err := genericinstance.EmitTypeArguments(
-		context,
-		children,
-		source,
-		method,
-		arguments,
-	)
-	if err != nil {
-		return genericReceiverMethodCall{}, err
-	}
-	capabilities, capabilityRequests, err :=
-		genericinstance.EmitCapabilities(
-			context,
-			source,
-			callableContract,
-			arguments,
-		)
-	if err != nil {
-		return genericReceiverMethodCall{}, err
-	}
-	sourceBindings, err := genericabi.SourceParameters(owner, sourceArguments)
-	if err != nil {
-		return genericReceiverMethodCall{}, err
-	}
-	callArguments, err := genericabi.JoinClassMethod(
-		owner,
-		callableContract.Operations(),
-		genericabi.Combine(
-			capabilities,
-			sourceBindings,
-		),
-	)
-	if err != nil {
-		return genericReceiverMethodCall{}, err
-	}
 	return genericReceiverMethodCall{
-		owner:         owner,
-		facet:         callableFacet,
-		memberSuffix:  memberSuffix,
-		receiver:      receiverValue,
-		before:        before,
-		typeArguments: classMethodTypeArguments(owner, typeArguments),
-		arguments:     callArguments,
+		invocation: invocation,
+		receiver:   receiverValue,
+		before:     before,
+		arguments:  sourceArguments,
 		requests: api.CombineRequests(
 			receiver.Requests(),
 			receiverRequests,
 			argumentRequests,
-			typeRequests,
-			capabilityRequests,
-			selectionRequests,
 		),
 	}, nil
 }
@@ -287,23 +219,12 @@ func prepareGenericReceiverMethodCall(
 func (c genericReceiverMethodCall) expression(
 	context api.Context,
 	arguments []tsgo.Expression,
+	recovery tsgo.Expression,
 ) (tsgo.CallExpression, []api.RootRequest, error) {
-	return callable.SelectedMethodCall(
+	return c.invocation.Call(
 		context,
-		c.owner,
-		c.memberSuffix,
 		c.receiver,
-		c.typeArguments,
 		arguments,
+		recovery,
 	)
-}
-
-func classMethodTypeArguments(
-	method *types.Func,
-	arguments []tsgo.TypeNode,
-) []tsgo.TypeNode {
-	if api.ValueReceiverTypeName(method) != nil {
-		return nil
-	}
-	return arguments
 }

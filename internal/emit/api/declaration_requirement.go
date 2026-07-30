@@ -213,6 +213,17 @@ func NewInterfaceMethodTokenRequirement(
 	)
 }
 
+func NewInterfaceMethodCallableRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	return newGeneratedDefinitionRequirement(
+		artifact,
+		GeneratedArtifactInterfaceMethodCallable,
+		DeclarationRequirementInterfaceMethodCallable,
+		"interface-method callable",
+	)
+}
+
 func NewInterfaceDynamicTypeTokenRequirement(
 	artifact *GeneratedArtifact,
 ) (DeclarationRequirement, error) {
@@ -476,6 +487,10 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementInterfaceMethodToken:
 		return r.validGeneratedDefinition(
 			GeneratedArtifactInterfaceMethodToken,
+		)
+	case DeclarationRequirementInterfaceMethodCallable:
+		return r.validGeneratedDefinition(
+			GeneratedArtifactInterfaceMethodCallable,
 		)
 	case DeclarationRequirementInterfaceDynamicTypeToken:
 		return r.validGeneratedDefinition(

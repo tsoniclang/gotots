@@ -331,6 +331,7 @@ func (s *programSession) ObserveCooperativeCallable(
 		switch facet.Kind() {
 		case api.CallableFacetSource,
 			api.CallableFacetABI,
+			api.CallableFacetInterfaceMethod,
 			api.CallableFacetGenericCapability,
 			api.CallableFacetGenericOperation,
 			api.CallableFacetGenericProfile:
@@ -361,15 +362,15 @@ func (s *programSession) ObserveCooperativeCallable(
 	)
 }
 
-func (s *programSession) validateCallableABIArtifact(
+func (s *programSession) validateCallableContractArtifact(
 	artifact *api.GeneratedArtifact,
 ) error {
-	signature, ok := artifact.CallableABI()
+	signature, ok := callableContractSignature(artifact)
 	binding, found := s.registry.GeneratedArtifact(
-		api.GeneratedArtifactCallableABI,
+		artifact.Kind(),
 		artifact.ArtifactKey(),
 	)
-	boundSignature, bound := binding.CallableABI()
+	boundSignature, bound := callableContractSignature(binding)
 	if !ok ||
 		!found ||
 		binding != artifact ||
@@ -378,33 +379,33 @@ func (s *programSession) validateCallableABIArtifact(
 		artifact.Placement() != api.GeneratedArtifactPlacementContract {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "callable ABI artifact has no exact canonical binding",
+			Reason: "callable contract artifact has no exact canonical binding",
 		}
 	}
 	return nil
 }
 
-func (s *programSession) reconstructCallableABIArtifact(
+func (s *programSession) reconstructCallableContractArtifact(
 	artifact *api.GeneratedArtifact,
 ) error {
 	if s.sealed {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "callable ABI reconstructed after target files were sealed",
+			Reason: "callable contract reconstructed after target files were sealed",
 		}
 	}
-	if err := s.validateCallableABIArtifact(artifact); err != nil {
+	if err := s.validateCallableContractArtifact(artifact); err != nil {
 		return err
 	}
 	owner := api.MustGeneratedArtifactOwner(artifact)
-	cooperative, err := callableABIRequirements(
+	cooperative, err := callableContractRequirements(
 		s.requirements.appliedFor(owner),
 		artifact,
 	)
 	if err != nil {
 		return err
 	}
-	contract, err := s.callableABIContract(cooperative)
+	contract, err := s.callableContract(cooperative)
 	if err != nil {
 		return err
 	}
@@ -415,7 +416,7 @@ func (s *programSession) reconstructCallableABIArtifact(
 	return nil
 }
 
-func (s *programSession) ensureCallableABIBaseline(
+func (s *programSession) ensureCallableContractBaseline(
 	artifact *api.GeneratedArtifact,
 ) error {
 	owner := api.MustGeneratedArtifactOwner(artifact)
@@ -425,54 +426,69 @@ func (s *programSession) ensureCallableABIBaseline(
 	) != 0 {
 		return nil
 	}
-	if err := s.validateCallableABIArtifact(artifact); err != nil {
+	if err := s.validateCallableContractArtifact(artifact); err != nil {
 		return err
 	}
-	contract, err := s.callableABIContract(false)
+	contract, err := s.callableContract(false)
 	if err != nil {
 		return err
 	}
 	return s.artifacts.Commit(owner, contract, nil)
 }
 
-func (s *programSession) callableABIContract(
+func (s *programSession) callableContract(
 	cooperative bool,
 ) (artifactstate.Contract, error) {
+	encoded, err := s.callableSignatureFacet(cooperative)
+	if err != nil {
+		return artifactstate.Contract{}, err
+	}
+	return artifactstate.NewContractFacet(
+		api.ArtifactFacetCallableSignature,
+		encoded,
+	)
+}
+
+func (s *programSession) callableSignatureFacet(
+	cooperative bool,
+) ([]byte, error) {
 	var result tsgo.TypeNode = s.factory.KeywordTypeNode(
 		tsgo.KeywordTypeSyntaxKindVoidKeyword,
 	)
 	if cooperative {
 		result = callable.PromiseResult(s.factory, result)
 	}
-	return artifactstate.ProjectFacet(
-		api.ArtifactFacetCallableSignature,
+	return tsgo.EncodeNode(
 		s.factory.FunctionTypeNode(nil, nil, result),
 	)
 }
 
-func callableABIRequirements(
+func callableContractRequirements(
 	requirements []api.DeclarationRequirement,
 	artifact *api.GeneratedArtifact,
 ) (bool, error) {
 	definitions := 0
 	cooperative := false
 	for _, requirement := range requirements {
-		if selected, ok := requirement.CallableABI(); ok {
+		if selected, ok := callableContractDefinition(
+			requirement,
+			artifact.Kind(),
+		); ok {
 			if selected != artifact {
 				return false, &ScheduleError{
 					Object: artifact.TargetName(),
-					Reason: "callable ABI received a foreign definition",
+					Reason: "callable contract received a foreign definition",
 				}
 			}
 			definitions++
 			continue
 		}
 		facet, ok := requirement.CooperativeCallable()
-		selected, abi := facet.ABI()
-		if !ok || !abi || selected != artifact || cooperative {
+		selected, callable := callableContractFacet(facet)
+		if !ok || !callable || selected != artifact || cooperative {
 			return false, &ScheduleError{
 				Object: artifact.TargetName(),
-				Reason: "callable ABI received a foreign requirement",
+				Reason: "callable contract received a foreign requirement",
 			}
 		}
 		cooperative = true
@@ -480,8 +496,47 @@ func callableABIRequirements(
 	if definitions != 1 {
 		return false, &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "callable ABI requires exactly one definition request",
+			Reason: "callable contract requires exactly one definition request",
 		}
 	}
 	return cooperative, nil
+}
+
+func callableContractSignature(
+	artifact *api.GeneratedArtifact,
+) (*types.Signature, bool) {
+	if artifact == nil {
+		return nil, false
+	}
+	switch artifact.Kind() {
+	case api.GeneratedArtifactCallableABI:
+		return artifact.CallableABI()
+	case api.GeneratedArtifactInterfaceMethodCallable:
+		return artifact.InterfaceMethodCallableSignature()
+	default:
+		return nil, false
+	}
+}
+
+func callableContractDefinition(
+	requirement api.DeclarationRequirement,
+	kind api.GeneratedArtifactKind,
+) (*api.GeneratedArtifact, bool) {
+	switch kind {
+	case api.GeneratedArtifactCallableABI:
+		return requirement.CallableABI()
+	case api.GeneratedArtifactInterfaceMethodCallable:
+		return requirement.InterfaceMethodCallable()
+	default:
+		return nil, false
+	}
+}
+
+func callableContractFacet(
+	facet api.CallableFacet,
+) (*api.GeneratedArtifact, bool) {
+	if artifact, ok := facet.ABI(); ok {
+		return artifact, true
+	}
+	return facet.InterfaceMethod()
 }

@@ -1558,6 +1558,39 @@ Tokens are interned by the deterministic target-name owner and compared only by
 object identity at runtime. They are not strings, source spellings, property
 probes, or hashes used without collision validation.
 
+The same canonical interface-method artifact family owns callable state. A
+non-generic method has one callable facet and one closed runtime token. For
+`type Value[T any] interface { Get() T }`, `Get() T` owns a
+parameter-ordinal-normalized callable family. `Value[int32].Get` additionally
+owns the closed `Get() int32` facet and runtime token. A call through
+`Value[T]` observes the generic family only; it must not fabricate a runtime
+token containing the ambient `T`. Callable-family artifacts are contract-only
+and never appear in generated TypeScript; only closed runtime tokens are
+materialized.
+
+If a selected concrete implementation blocks, its adapter selects every exact
+target-interface callable facet it implements as cooperative. The interface
+declaration, adapter signature and body, direct or deferred interface call, and
+a generic constraint-method capability therefore change together. A single
+adapter demanded as both `Value[int32]` and another structurally compatible
+interface cannot advertise synchronous dispatch through one contract and
+cooperative dispatch through the other. These paths never query the
+receiver-free first-class callable ABI merely because the method parameters
+and results have the same shape as an unrelated function.
+
+For example, a blocking `func() bool` elsewhere in the program does not change
+`DirEntry.IsDir() bool`. A blocking concrete implementation of `IsDir` changes
+the `IsDir` callable facet, its adapter and every selected interface call.
+Taking `entry.IsDir` as a function value additionally adapts that
+interface-method provider to the canonical `func() bool` value ABI; that
+value-level adaptation does not widen direct `entry.IsDir()` dispatch.
+
+Adapter invocation uses the same selected-method plan as a source call. For a
+generic receiver method this means exact receiver type arguments and demanded
+operation capabilities are supplied before source parameters. An adapter
+cannot call the target member directly and omit those hidden static
+capabilities.
+
 Each completed interface owns an immutable contract containing its required
 method tokens. Each adapter class owns one module-level `ReadonlySet<object>`
 containing exactly the tokens selected by its demanded interface contracts.

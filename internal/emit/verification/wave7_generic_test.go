@@ -593,13 +593,3 @@ func main() {
 		".",
 	)
 }
-
-func waveSevenGenericDirectory() string {
-	return filepath.Join(
-		repositoryRoot(),
-		"testdata",
-		"constructs",
-		"generic",
-		"wave7",
-	)
-}

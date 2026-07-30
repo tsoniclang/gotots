@@ -913,6 +913,43 @@ value location uses that ABI. Functions, immediately invoked literals, and
 callable ABIs that remain nonblocking retain byte-identical synchronous
 declarations and calls.
 
+An interface method is not a first-class function-value ABI. Its callable
+state is owned by canonical interface-method artifacts keyed by exact Go
+method identity and receiver-free signature. A non-generic method has one such
+artifact. A method of a generic interface has a parameter-ordinal-normalized
+family artifact; a closed instantiation additionally has its exact concrete
+signature artifact. Open signatures containing ambient type parameters never
+receive runtime method-set tokens. Runtime tokens exist only for closed
+signatures, while callable observation may use the generic family and closed
+facets together. Callable-family artifacts are contract-only compiler state:
+they participate in exact reverse dependencies but emit no TypeScript
+declaration.
+
+A concrete adapter observes the selected source-method facets and every
+demanded target-interface facet. If the source or any demanded target facet is
+cooperative, the adapter selects every demanded target facet as cooperative;
+one generated adapter method cannot expose contradictory call contracts
+through two interfaces. Interface declarations, direct interface calls,
+deferred interface calls, adapters, and constraint-method capabilities observe
+only interface-method callable facets. Runtime interface contracts additionally
+request the closed token. An unrelated function or differently named method
+with the same receiver-free signature cannot change that interface method.
+
+Only taking a method value or method expression crosses from the
+interface-method callable facet into the canonical first-class callable ABI.
+That wrapper observes the exact callable family as its provider and widens the
+function-value ABI when
+necessary; widening never flows back from the function ABI into direct
+interface dispatch. Interface-method callable state is an observable generated
+artifact facet, so a synchronous-to-cooperative change invalidates exact
+subscribers through the ordinary reverse artifact graph.
+
+There is one selected-method invocation plan for source calls and generated
+adapters. It owns generic receiver type arguments, exact generic operation
+capabilities, recovery-control parameters, class-versus-environment target
+selection, and cooperative source observation. Generated adapters may not
+bypass that plan with a raw member call.
+
 Generic instantiation does not create a second callable-effect model. At each
 generic function or generic-receiver-method use, the selected
 `go/types.Instance` supplies an exact structural correspondence between

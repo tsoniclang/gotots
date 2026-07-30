@@ -90,15 +90,58 @@ func (n *File) MethodTarget(
 	}
 }
 
-func (n *File) InterfaceMethodToken(
+func (n *File) InterfaceMethodCallable(
 	method *types.Func,
-) (api.NameReference, error) {
-	if symbol, ok := runtimeInterfaceMethodToken(method); ok {
-		return n.Runtime(symbol, api.ImportPhaseValue)
+) (api.InterfaceMethodCallableReference, error) {
+	if method == nil {
+		return api.InterfaceMethodCallableReference{}, &api.NameError{
+			Reason: "interface method identity is nil",
+		}
 	}
+	origin := method.Origin()
+	originBinding, err := n.interfaceMethodCallableBinding(origin)
+	if err != nil {
+		return api.InterfaceMethodCallableReference{}, err
+	}
+	artifacts := []*api.GeneratedArtifact{originBinding.owner}
 	signature, ok := methodidentity.Signature(method)
 	if !ok {
-		return api.NameReference{}, &api.NameError{
+		return api.InterfaceMethodCallableReference{}, &api.NameError{
+			Name:   objectName(method),
+			Reason: "interface method signature is invalid",
+		}
+	}
+	if method != origin && !api.ContainsGenericTypeParameter(signature) {
+		concrete, concreteErr :=
+			n.interfaceMethodCallableBinding(method)
+		if concreteErr != nil {
+			return api.InterfaceMethodCallableReference{}, concreteErr
+		}
+		if concrete.owner != originBinding.owner {
+			artifacts = append(artifacts, concrete.owner)
+		}
+	}
+	var requests []api.RootRequest
+	for _, artifact := range artifacts {
+		requirement, requirementErr :=
+			api.NewInterfaceMethodCallableRequest(artifact)
+		if requirementErr != nil {
+			return api.InterfaceMethodCallableReference{}, requirementErr
+		}
+		requests = append(requests, requirement)
+	}
+	return api.NewInterfaceMethodCallableReference(
+		artifacts,
+		requests...,
+	)
+}
+
+func (n *File) interfaceMethodCallableBinding(
+	method *types.Func,
+) (interfaceMethodCallableBinding, error) {
+	signature, ok := methodidentity.Signature(method)
+	if !ok {
+		return interfaceMethodCallableBinding{}, &api.NameError{
 			Name:   objectName(method),
 			Reason: "interface method signature is invalid",
 		}
@@ -108,13 +151,27 @@ func (n *File) InterfaceMethodToken(
 		n.generatedNamedObjectIdentity,
 	)
 	if err != nil {
-		return api.NameReference{}, err
+		return interfaceMethodCallableBinding{}, err
 	}
-	binding, err := n.owner.registry.internInterfaceMethodToken(
+	return n.owner.registry.internInterfaceMethodCallable(
 		artifactKey,
 		method,
 		signature,
 	)
+}
+
+func (n *File) InterfaceMethodToken(
+	method *types.Func,
+) (api.NameReference, error) {
+	signature, ok := methodidentity.Signature(method)
+	if !ok || api.ContainsGenericTypeParameter(signature) {
+		return api.NameReference{}, &api.NameError{
+			Name:   objectName(method),
+			Reason: "runtime interface-method token requires a closed signature",
+		}
+	}
+	runtime, _ := runtimeInterfaceMethodToken(method)
+	binding, err := n.interfaceMethodTokenBinding(method, runtime)
 	if err != nil {
 		return api.NameReference{}, err
 	}
@@ -122,12 +179,46 @@ func (n *File) InterfaceMethodToken(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	return n.generatedValueReference(
+	reference, err := n.generatedValueReference(
 		binding.owner,
 		binding.name,
 		requirement,
 		api.ArtifactFacetValueSurface,
 	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return reference, nil
+}
+
+func (n *File) interfaceMethodTokenBinding(
+	method *types.Func,
+	runtime api.RuntimeSymbol,
+) (interfaceMethodTokenBinding, error) {
+	signature, ok := methodidentity.Signature(method)
+	if !ok {
+		return interfaceMethodTokenBinding{}, &api.NameError{
+			Name:   objectName(method),
+			Reason: "interface method signature is invalid",
+		}
+	}
+	artifactKey, err := methodidentity.BuildKey(
+		method,
+		n.generatedNamedObjectIdentity,
+	)
+	if err != nil {
+		return interfaceMethodTokenBinding{}, err
+	}
+	binding, err := n.owner.registry.internInterfaceMethodToken(
+		artifactKey,
+		method,
+		signature,
+		runtime,
+	)
+	if err != nil {
+		return interfaceMethodTokenBinding{}, err
+	}
+	return binding, nil
 }
 
 func runtimeInterfaceMethodToken(
