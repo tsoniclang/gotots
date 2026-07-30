@@ -83,6 +83,12 @@ func (Owner) RequiresExplicitType(
 	if unsafePointerValue(sourceType) {
 		return true
 	}
+	if model, ok := maprepresentation.Source(
+		context,
+		sourceType,
+	); ok && !model.Nominal() {
+		return true
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		return defined.NilCapable()
 	}
@@ -265,6 +271,21 @@ func (owner Owner) Transfer(
 	}
 	if representedAtDestination(actualType, destinationType) {
 		actualType = destinationType
+	}
+	if _, generic := api.GenericTypeParameter(actualType); generic {
+		if _, mapDestination :=
+			maprepresentation.Source(context, destinationType); mapDestination &&
+			!types.Identical(actualType, destinationType) &&
+			types.ConvertibleTo(actualType, destinationType) {
+			return genericoperation.Call(
+				context,
+				source,
+				api.GenericOperationConvert,
+				[]types.Type{actualType},
+				[]types.Type{destinationType},
+				[]api.ExpressionEmission{value},
+			)
+		}
 	}
 	if !types.Identical(actualType, destinationType) {
 		if actual, ok := definedtype.Resolve(actualType); ok {

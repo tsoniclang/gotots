@@ -22,7 +22,7 @@ func TestScalarMapArtifactsStayAtTheImmutableBaseline(t *testing.T) {
 		t.TempDir(),
 	)
 	for path, expected := range map[string]string{
-		"source.ts":      "03b88afbe335259cd53706f7dda8a150d51b9c7d5211a0b0bb2c067e843bf6de",
+		"source.ts":      "5137e4d2a84f40636951ab24b911a46bd19bedba960df79d19bda7e7a2f4fb88",
 		"runtime/map.ts": "7f26493efc6f9213e59853a6e485061ae24fa2d0cd41a277f6d54e9399c3fc6e",
 	} {
 		content := readFile(t, artifacts.file(t, path))

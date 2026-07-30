@@ -8,7 +8,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	channelmodel "github.com/tsoniclang/gotots/internal/emit/concurrency/channel"
-	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -149,13 +148,13 @@ func emitGenericMap(
 	if err != nil {
 		return api.StatementEmission{}, true, err
 	}
-	projected, err := genericoperation.Call(
+	projected, err := context.Values().Transfer(
 		context.WithRole(api.RoleRangeExpression),
 		source.X,
-		api.GenericOperationConvert,
-		[]types.Type{sourceType},
-		[]types.Type{mapType},
-		[]api.ExpressionEmission{operand},
+		sourceType,
+		mapType,
+		api.ValueTransferRepresentation,
+		operand,
 	)
 	if err != nil {
 		return api.StatementEmission{}, true, err
