@@ -25,6 +25,9 @@ func (n *File) sourceReferencePath(
 	if !crossPackage {
 		return binding.sourcePath, false, nil
 	}
+	if !object.Exported() {
+		return binding.sourcePath, true, nil
+	}
 	referencePath := n.owner.registry.assemblyPathByPackage[object.Pkg()]
 	if referencePath == "" {
 		return "", false, &api.NameError{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/load"
@@ -175,5 +176,49 @@ func TestLayoutIsStableAcrossCheckoutRelocationAndSeparatesModuleVersions(t *tes
 	if moduleKey("example.com/dependency", "v1.0.0") ==
 		moduleKey("example.com/dependency", "v1.0.1") {
 		t.Fatal("distinct semantic module versions share one output owner")
+	}
+}
+
+func TestEnvironmentContractPathUsesPackageIdentityWithoutFabricatedModule(
+	t *testing.T,
+) {
+	project := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(project, "go.mod"),
+		[]byte("module example.com/environmentpath\n\ngo 1.26.4\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(project, "source.go"),
+		[]byte("package environmentpath\n\nimport \"context\"\n\nvar _ context.Context\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: project,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract := program.PackageByPath("context")
+	first, err := EnvironmentContractPath(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := EnvironmentContractPath(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second ||
+		!strings.HasPrefix(first, "gostdlib/") ||
+		!strings.HasSuffix(first, "/context/index.ts") {
+		t.Fatalf("environment contract path = %q / %q", first, second)
+	}
+	if _, err := PackageAssemblyPath(contract); err == nil {
+		t.Fatal("environment contract accepted fabricated source-module assembly")
 	}
 }

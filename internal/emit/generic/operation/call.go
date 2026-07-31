@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -16,8 +17,7 @@ func Call(
 	operation api.GenericOperation,
 	parameterTypes []types.Type,
 	resultTypes []types.Type,
-	arguments []tsgo.Expression,
-	requests ...api.RootRequest,
+	arguments []api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	selection, err := api.SelectGenericOperation(operation)
 	if err != nil {
@@ -30,8 +30,29 @@ func Call(
 		parameterTypes,
 		resultTypes,
 		arguments,
-		requests...,
 	)
+}
+
+func Reference(
+	context api.Context,
+	source ast.Node,
+	operation api.GenericOperation,
+	parameterTypes []types.Type,
+	resultTypes []types.Type,
+) (api.GenericOperationReference, error) {
+	selection, err := api.SelectGenericOperation(operation)
+	if err != nil {
+		return api.GenericOperationReference{}, err
+	}
+	signature, err := operationSignature(
+		context,
+		parameterTypes,
+		resultTypes,
+	)
+	if err != nil {
+		return api.GenericOperationReference{}, err
+	}
+	return context.GenericOperation(source, selection.Operation(), signature)
 }
 
 func ConstraintMethod(
@@ -40,8 +61,7 @@ func ConstraintMethod(
 	method *types.Func,
 	parameterTypes []types.Type,
 	resultTypes []types.Type,
-	arguments []tsgo.Expression,
-	requests ...api.RootRequest,
+	arguments []api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	selection, err := api.SelectGenericConstraintMethod(method)
 	if err != nil {
@@ -54,7 +74,6 @@ func ConstraintMethod(
 		parameterTypes,
 		resultTypes,
 		arguments,
-		requests...,
 	)
 }
 
@@ -64,8 +83,7 @@ func call(
 	selection api.GenericOperationSelection,
 	parameterTypes []types.Type,
 	resultTypes []types.Type,
-	arguments []tsgo.Expression,
-	requests ...api.RootRequest,
+	arguments []api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	if len(parameterTypes) != len(arguments) {
 		return api.ExpressionEmission{}, &api.InvariantError{
@@ -73,43 +91,28 @@ func call(
 			Reason: "generic operation argument arity is inconsistent",
 		}
 	}
-	parameters := make([]*types.Var, 0, len(parameterTypes))
-	for _, sourceType := range parameterTypes {
-		if sourceType == nil {
-			return api.ExpressionEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "generic operation parameter type is nil",
-			}
-		}
-		parameters = append(
-			parameters,
-			types.NewVar(token.NoPos, nil, "", sourceType),
-		)
-	}
-	results := make([]*types.Var, 0, len(resultTypes))
-	for _, sourceType := range resultTypes {
-		if sourceType == nil {
-			return api.ExpressionEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "generic operation result type is nil",
-			}
-		}
-		results = append(
-			results,
-			types.NewVar(token.NoPos, nil, "", sourceType),
-		)
-	}
-	signature := types.NewSignatureType(
-		nil,
-		nil,
-		nil,
-		types.NewTuple(parameters...),
-		types.NewTuple(results...),
-		false,
+	signature, err := operationSignature(
+		context,
+		parameterTypes,
+		resultTypes,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	ordered := make([]expressionoperands.Item, 0, len(arguments))
+	for _, argument := range arguments {
+		ordered = append(ordered, expressionoperands.Present(argument))
+	}
+	sequence, err := expressionoperands.Preserve(
+		context,
+		api.TemporaryCallArgument,
+		ordered...,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	method, constraintMethod := selection.Method()
 	var reference api.GenericOperationReference
-	var err error
 	if constraintMethod {
 		reference, err = context.GenericConstraintMethod(
 			source,
@@ -126,16 +129,20 @@ func call(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	target := api.DirectExpression(
+	target, err := api.NewExpressionEmission(
+		sequence.Before(),
 		context.Factory().CallExpression(
 			context.Factory().Identifier(reference.Name()),
 			nil,
 			nil,
-			arguments,
+			sequence.Values(),
 			tsgo.NodeFlagsNone,
 		),
-		api.CombineRequests(requests, reference.Requests())...,
+		api.CombineRequests(sequence.Requests(), reference.Requests()),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	if reference.Contract().Consumer() !=
 		api.GenericFunctionOperationConsumer() ||
 		reference.Contract().Operation() !=
@@ -148,4 +155,45 @@ func call(
 		reference.Contract(),
 		target,
 	)
+}
+
+func operationSignature(
+	context api.Context,
+	parameterTypes []types.Type,
+	resultTypes []types.Type,
+) (*types.Signature, error) {
+	parameters := make([]*types.Var, 0, len(parameterTypes))
+	for _, sourceType := range parameterTypes {
+		if sourceType == nil {
+			return nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "generic operation parameter type is nil",
+			}
+		}
+		parameters = append(
+			parameters,
+			types.NewVar(token.NoPos, nil, "", sourceType),
+		)
+	}
+	results := make([]*types.Var, 0, len(resultTypes))
+	for _, sourceType := range resultTypes {
+		if sourceType == nil {
+			return nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "generic operation result type is nil",
+			}
+		}
+		results = append(
+			results,
+			types.NewVar(token.NoPos, nil, "", sourceType),
+		)
+	}
+	return types.NewSignatureType(
+		nil,
+		nil,
+		nil,
+		types.NewTuple(parameters...),
+		types.NewTuple(results...),
+		false,
+	), nil
 }

@@ -52,6 +52,7 @@ type rangeBinding struct {
 	declaration bool
 	storage     bool
 	target      api.StoreTargetEmission
+	sourceType  types.Type
 	value       api.ExpressionEmission
 	fresh       bool
 }
@@ -82,18 +83,21 @@ func EmitRangeIteration(
 	var requests []api.RootRequest
 	for index := range bindings {
 		binding := &bindings[index]
-		copied := binding.value
-		if !binding.fresh {
-			var err error
-			copied, err = context.Values().Copy(
-				context.WithRole(api.RoleRangeValue),
-				binding.source,
-				binding.valueType(),
-				binding.value,
-			)
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
+		mode := api.ValueTransferCopy
+		if binding.fresh ||
+			(!binding.declaration && binding.target.CopiesValue()) {
+			mode = api.ValueTransferRepresentation
+		}
+		copied, err := context.Values().Transfer(
+			context.WithRole(api.RoleRangeValue),
+			binding.source,
+			binding.sourceType,
+			binding.valueType(),
+			mode,
+			binding.value,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
 		}
 		name, err := context.Names().Temporary(api.TemporaryRangeValue)
 		if err != nil {
@@ -217,6 +221,7 @@ func rangeBindings(
 				name:        name,
 				declaration: true,
 				storage:     storage,
+				sourceType:  selected.sourceType,
 				value:       selected.emission,
 				fresh:       selected.fresh,
 			})
@@ -234,10 +239,11 @@ func rangeBindings(
 				api.Unsupported(context, api.CategoryStatement, expression)
 		}
 		bindings = append(bindings, rangeBinding{
-			source: expression,
-			target: target,
-			value:  selected.emission,
-			fresh:  selected.fresh,
+			source:     expression,
+			target:     target,
+			sourceType: selected.sourceType,
+			value:      selected.emission,
+			fresh:      selected.fresh,
 		})
 	}
 	return bindings, nil

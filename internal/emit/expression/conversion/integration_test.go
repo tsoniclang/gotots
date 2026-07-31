@@ -50,6 +50,12 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 				"private readonly $offset: number",
 				"static arrayRegion<L, T, S extends",
 				"GoPointer<Pair, GoArray<int32, 2>>",
+				"GoUnsafePointer.from(value)",
+				"GoUnsafePointer.to<GoPointer<int32, int32>>(",
+				"GoUnsafePointer.to<UnsafeBox>(",
+				"unsafe.Pointer conversion requires an environment implementation",
+				"export function GenericNilPointer<T, T$Pointer>(): T$Pointer | undefined {\n" +
+					"    return void 0;\n}",
 			} {
 				if !strings.Contains(printed, required) {
 					t.Fatalf(
@@ -69,19 +75,19 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 					printed,
 				)
 			}
-			if got := strings.Count(printed, "static $convert("); got != 2 {
+			if got := strings.Count(printed, "static $convert("); got != 0 {
 				t.Fatalf(
-					"struct conversion definitions = %d, want 2:\n%s",
+					"superseded field-projection conversion definitions = %d, want 0:\n%s",
 					got,
 					printed,
 				)
 			}
 			if got := strings.Count(
 				printed,
-				"TaggedRight.$convert(",
+				"TaggedRight.$fromStorage(",
 			); got != 3 {
 				t.Fatalf(
-					"TaggedRight conversion uses = %d, want 3:\n%s",
+					"TaggedRight storage conversion uses = %d, want 3:\n%s",
 					got,
 					printed,
 				)

@@ -69,16 +69,12 @@ func methodPath(selected *types.Selection) (path, *types.Func, bool) {
 	if pointer, ok := types.Unalias(base).(*types.Pointer); ok {
 		base = pointer.Elem()
 	}
-	named, ok := types.Unalias(base).(*types.Named)
-	if !ok ||
-		(named.TypeParams().Len() != 0 &&
-			named.TypeArgs().Len() != named.TypeParams().Len()) ||
-		indices[len(indices)-1] < 0 ||
-		indices[len(indices)-1] >= named.NumMethods() {
+	methodIndex := indices[len(indices)-1]
+	if methodIndex < 0 {
 		return path{}, nil, false
 	}
-	method := named.Method(indices[len(indices)-1])
-	if method == nil || method != selected.Obj() {
+	method, ok := selectedMethod(base, methodIndex)
+	if !ok || method == nil || method != selected.Obj() {
 		return path{}, nil, false
 	}
 	signature, ok := method.Type().(*types.Signature)
@@ -88,6 +84,27 @@ func methodPath(selected *types.Selection) (path, *types.Func, bool) {
 		return path{}, nil, false
 	}
 	return result, method, true
+}
+
+func selectedMethod(sourceType types.Type, index int) (*types.Func, bool) {
+	base := types.Unalias(sourceType)
+	named, namedType := base.(*types.Named)
+	if namedType &&
+		named.TypeParams().Len() != 0 &&
+		named.TypeArgs().Len() != named.TypeParams().Len() {
+		return nil, false
+	}
+	if interfaceType, ok := base.Underlying().(*types.Interface); ok {
+		interfaceType = interfaceType.Complete()
+		if index >= interfaceType.NumMethods() {
+			return nil, false
+		}
+		return interfaceType.Method(index), true
+	}
+	if !namedType || index >= named.NumMethods() {
+		return nil, false
+	}
+	return named.Method(index), true
 }
 
 func resolveFields(root types.Type, indices []int) (path, bool) {
@@ -129,14 +146,4 @@ func selectedStruct(sourceType types.Type) (*types.Struct, bool) {
 	}
 	result, ok := base.(*types.Struct)
 	return result, ok
-}
-
-func (p path) directField() (*types.Var, bool) {
-	if len(p.fields) != 1 {
-		return nil, false
-	}
-	if _, _, _, pointer := pointerType(p.root); pointer {
-		return nil, false
-	}
-	return p.fields[0], true
 }

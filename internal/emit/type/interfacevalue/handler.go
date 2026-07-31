@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -26,10 +27,11 @@ func Resolve(sourceType types.Type) (*types.Interface, bool) {
 
 func Emit(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
-	target, err := EmitNonNil(context, source, sourceType)
+	target, err := EmitNonNil(context, children, source, sourceType)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
@@ -46,6 +48,7 @@ func Emit(
 
 func EmitNonNil(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
@@ -57,11 +60,28 @@ func EmitNonNil(
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
+	var arguments []tsgo.TypeNode
+	requests := reference.Requests()
+	named, namedType := types.Unalias(sourceType).(*types.Named)
+	if namedType && named.TypeArgs().Len() != 0 {
+		var argumentRequests []api.RootRequest
+		arguments, argumentRequests, err = genericinstance.EmitTypeArguments(
+			context,
+			children,
+			source,
+			named.Origin().Obj(),
+			named.TypeArgs(),
+		)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		requests = api.CombineRequests(requests, argumentRequests)
+	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
 			context.Factory().Identifier(reference.Name()),
-			nil,
+			arguments,
 		),
-		reference.Requests()...,
+		requests...,
 	), nil
 }

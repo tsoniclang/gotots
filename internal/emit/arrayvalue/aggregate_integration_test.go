@@ -186,6 +186,7 @@ console.log(values.CopyIsDeep().map(String).join(" "));
 console.log(values.NamedCopyIsDeep().map(String).join(" "));
 console.log(values.NestedCopyIsDeep().map(String).join(" "));
 console.log(values.SparseLiteralZerosAreFresh().map(String).join(" "));
+console.log(String(values.GenericZeroLengthPhantom()));
 const left = values.NewBoxes(1` + suffix + `, 2` + suffix + `);
 const right = values.NewBoxes(1` + suffix + `, 2` + suffix + `);
 console.log(values.Equal(left, right));
@@ -250,6 +251,7 @@ func main() {
 	fmt.Println(values.NamedCopyIsDeep())
 	fmt.Println(values.NestedCopyIsDeep())
 	fmt.Println(values.SparseLiteralZerosAreFresh())
+	fmt.Println(values.GenericZeroLengthPhantom())
 	left := values.Boxes{{Value: 1}, {Value: 2}}
 	right := values.Boxes{{Value: 1}, {Value: 2}}
 	fmt.Println(values.Equal(left, right))

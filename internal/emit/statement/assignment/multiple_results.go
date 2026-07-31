@@ -71,20 +71,24 @@ func emitMultipleResults(
 		if target.declaration {
 			targetType = target.object.Type()
 		}
-		if target.declaration || !target.target.CopiesValue() {
-			copied, err := context.Values().Copy(
-				context.WithRole(role),
-				source.Rhs[0],
-				targetType,
-				api.DirectExpression(element),
-			)
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
-			statements = append(statements, copied.Before()...)
-			element = copied.Value()
-			requests = append(requests, copied.Requests()...)
+		mode := api.ValueTransferCopy
+		if !target.declaration {
+			mode = storeTransferMode(target.target)
 		}
+		value, err := context.Values().Transfer(
+			context.WithRole(role),
+			source.Rhs[0],
+			results.At(index).Type(),
+			targetType,
+			mode,
+			api.DirectExpression(element),
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		statements = append(statements, value.Before()...)
+		element = value.Value()
+		requests = append(requests, value.Requests()...)
 		if target.declaration {
 			if target.storage {
 				cell, err := context.AddressableStorage().Cell(

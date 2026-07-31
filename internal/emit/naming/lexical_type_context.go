@@ -39,7 +39,8 @@ func WithLexicalTypeRequirements(
 	)
 	for _, requirement := range requirements {
 		var anchor *types.TypeName
-		if artifact, generated := requirement.GeneratedArtifact(); generated {
+		if artifact, generated :=
+			requirement.LexicalGeneratedArtifact(); generated {
 			if artifact.Placement() !=
 				api.GeneratedArtifactPlacementLexical ||
 				artifact.ReconstructionOwner() != owner {
@@ -49,6 +50,11 @@ func WithLexicalTypeRequirements(
 				}
 			}
 			anchor = artifact.LexicalAnchor()
+		} else if _, generated := requirement.GeneratedArtifact(); generated {
+			return api.Context{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "source artifact received a non-lexical generated artifact",
+			}
 		} else if typeName, _, namedStruct :=
 			requirement.NamedStructOperation(); namedStruct {
 			if requirement.Owner() != owner {

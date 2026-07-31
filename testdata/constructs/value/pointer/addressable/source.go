@@ -12,9 +12,14 @@ type Container struct {
 	Box Box
 }
 
+type PackageBox struct {
+	Count int32
+}
+
 type Count int32
 
 var Shared = Box{Count: 1}
+var WholeShared = PackageBox{Count: 1}
 var InitValue int32
 
 func init() {
@@ -205,10 +210,41 @@ func Package(value int32) (int32, bool) {
 	return Shared.Count, pointer == &Shared.Count
 }
 
+func PackageValueAddress(value int32) (int32, bool) {
+	pointer := &WholeShared
+	WholeShared = PackageBox{Count: value}
+	pointer.Count++
+	return WholeShared.Count, pointer == &WholeShared
+}
+
 func Composite(value int32) int32 {
 	pointer := &Box{Count: value}
 	pointer.Count++
 	return pointer.Count
+}
+
+func ElidedPointerSlice(value int32) (int32, bool) {
+	values := []*Box{{Count: value}, {Count: value + 1}}
+	values[0].Count++
+	return values[0].Count, values[0] != values[1]
+}
+
+func ElidedPointerArray(value int32) int32 {
+	values := [1]*Box{{Count: value}}
+	values[0].Count++
+	return values[0].Count
+}
+
+func ElidedPointerMap(value int32) int32 {
+	values := map[string]*Box{"value": {Count: value}}
+	values["value"].Count++
+	return values["value"].Count
+}
+
+func ElidedPointerCompositeArray(value int32) int32 {
+	values := []*[2]int32{{value, value + 1}}
+	values[0][1]++
+	return values[0][1]
 }
 
 func PointerField(value int32) int32 {

@@ -7,7 +7,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
-	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -58,14 +57,6 @@ func emitVariadicArguments(
 			children,
 			source.Args[fixedCount],
 			variadicParameter.Type(),
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		emission, err = slicevalue.Project(
-			context,
-			context.TypesInfo().TypeOf(source.Args[fixedCount]),
-			emission,
 		)
 		if err != nil {
 			return nil, nil, nil, err
@@ -132,10 +123,12 @@ func emitVariadicArgument(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return context.Values().Copy(
+	return context.Values().Transfer(
 		context.WithRole(api.RoleCallArgument),
 		source,
+		actual,
 		expected,
+		api.ValueTransferCopy,
 		emission,
 	)
 }
@@ -158,7 +151,7 @@ func emitVariadicSlice(
 	elementType types.Type,
 	values []api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	element, err := children.RepresentedType(
+	element, err := context.ContainerStorage().ContainerStorageType(
 		context.WithRole(api.RoleCallArgument),
 		source,
 		elementType,
@@ -166,6 +159,20 @@ func emitVariadicSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	storedValues := make([]api.ExpressionEmission, 0, len(values))
+	for _, value := range values {
+		stored, storageErr := context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleCallArgument),
+			source,
+			elementType,
+			value,
+		)
+		if storageErr != nil {
+			return api.ExpressionEmission{}, storageErr
+		}
+		storedValues = append(storedValues, stored)
+	}
+	values = storedValues
 	var arguments []tsgo.Expression
 	var before []tsgo.Statement
 	var requests []api.RootRequest

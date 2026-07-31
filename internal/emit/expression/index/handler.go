@@ -13,9 +13,9 @@ import (
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -55,8 +55,18 @@ func Emit(
 	}
 	indexType := context.TypesInfo().TypeOf(source.Index)
 	resultType := context.TypesInfo().TypeOf(source)
-	if !basictype.SupportsString(operandType) ||
-		!basictype.SupportsStringIndex(context.TypesSizes(), indexType) ||
+	stringType := operandType
+	definedString, definedStringOK := definedtype.ResolveBasic(operandType)
+	if definedStringOK {
+		underlying, basicOK := definedString.Basic()
+		if !basicOK || !basictype.SupportsString(underlying) {
+			definedStringOK = false
+		} else {
+			stringType = underlying
+		}
+	}
+	if !basictype.SupportsString(stringType) ||
+		!integeroperand.Supports(context.TypesSizes(), indexType) ||
 		!isByte(resultType) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -66,23 +76,29 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	operandExpectedType := operandType
+	if basic, ok := types.Unalias(operandType).(*types.Basic); ok &&
+		basic.Info()&types.IsUntyped != 0 {
+		operandExpectedType = types.Default(operandType)
+	}
 	operand, err := children.Expression(
 		context.
 			WithRole(api.RoleIndexOperand).
-			WithExpectedType(types.Typ[types.String]),
+			WithExpectedType(operandExpectedType),
 		source.X,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	indexExpected := indexType
-	if isUntypedInteger(indexExpected) {
-		indexExpected = types.Typ[types.Int]
+	if definedStringOK {
+		operand, err = definedString.Project(context, operand)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
-	index, err := children.Expression(
-		context.
-			WithRole(api.RoleIndexValue).
-			WithExpectedType(indexExpected),
+	index, err := integeroperand.Emit(
+		context.WithRole(api.RoleIndexValue),
+		children,
 		source.Index,
 	)
 	if err != nil {
@@ -91,7 +107,7 @@ func Emit(
 	target, handled, err := Apply(
 		context,
 		source,
-		operandType,
+		stringType,
 		indexType,
 		resultType,
 		operand,
@@ -184,13 +200,6 @@ func isByte(sourceType types.Type) bool {
 	return ok && basic.Kind() == types.Uint8
 }
 
-func isUntypedInteger(sourceType types.Type) bool {
-	basic, ok := types.Unalias(sourceType).(*types.Basic)
-	return ok &&
-		basic.Info()&types.IsUntyped != 0 &&
-		basic.Info()&types.IsInteger != 0
-}
-
 func emitSliceIndex(
 	context api.Context,
 	children api.ChildEmitter,
@@ -213,7 +222,7 @@ func emitSliceIndex(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	indexType := context.TypesInfo().TypeOf(source.Index)
-	if !basictype.SupportsInteger(context.TypesSizes(), indexType) {
+	if !integeroperand.Supports(context.TypesSizes(), indexType) {
 		return api.ExpressionEmission{},
 			api.Unsupported(
 				context.WithRole(api.RoleSliceIndex),
@@ -230,10 +239,9 @@ func emitSliceIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	index, err := children.Expression(
-		context.
-			WithRole(api.RoleSliceIndex).
-			WithExpectedType(indexType),
+	index, err := integeroperand.Emit(
+		context.WithRole(api.RoleSliceIndex),
+		children,
 		source.Index,
 	)
 	if err != nil {
@@ -307,8 +315,10 @@ func emitGeneric(
 		api.GenericOperationIndex,
 		[]types.Type{operandType, indexType},
 		[]types.Type{resultType},
-		[]tsgo.Expression{values[0], values[1]},
-		ordered.Requests()...,
+		[]api.ExpressionEmission{
+			api.DirectExpression(values[0]),
+			api.DirectExpression(values[1]),
+		},
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -316,6 +326,6 @@ func emitGeneric(
 	return api.NewExpressionEmission(
 		ordered.Before(),
 		target.Value(),
-		target.Requests(),
+		api.CombineRequests(target.Requests(), ordered.Requests()),
 	)
 }

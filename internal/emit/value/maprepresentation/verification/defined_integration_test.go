@@ -12,7 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestDefinedMapsUseNilUnionAndExecuteDifferentially(t *testing.T) {
+func TestDefinedMapsUseStableClassValuesAndExecuteDifferentially(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
@@ -60,9 +60,61 @@ func TestDefinedMapsUseNilUnionAndExecuteDifferentially(t *testing.T) {
 	}
 }
 
+func TestDefinedMapStorageProjectionMutationsFailStrictTypecheck(t *testing.T) {
+	loaded := loadDefinedMapProject(t)
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materialize(t, emission, workingDirectory)
+	specializationPath := definedKeySpecializationPath(t, artifacts)
+	original := readFile(t, specializationPath)
+	strictTypecheck(t, artifacts, workingDirectory)
+	for _, testCase := range []struct {
+		name        string
+		method      string
+		replacement string
+	}{
+		{
+			name:        "logical key returned as storage",
+			method:      "$projectKey",
+			replacement: "return $key;",
+		},
+		{
+			name:        "storage key returned as logical",
+			method:      "$reifyKey",
+			replacement: "return $storageKey;",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			mutated := replaceMethodReturn(
+				t,
+				original,
+				testCase.method,
+				testCase.replacement,
+			)
+			writeFile(t, specializationPath, mutated)
+			if err := strictTypecheckResult(
+				artifacts,
+				workingDirectory,
+				"",
+			); err == nil {
+				t.Fatalf("%s mutation passed strict typechecking", testCase.method)
+			}
+			writeFile(t, specializationPath, original)
+		})
+	}
+}
+
 func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 	t.Helper()
 	source := readFile(t, artifacts.file(t, "source.ts"))
+	specialization := definedKeySpecialization(t, artifacts)
 	t.Logf("defined map source bytes=%d", len(source))
 	if len(source) > 12_000 {
 		t.Fatalf(
@@ -71,16 +123,41 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		)
 	}
 	for _, required := range []string{
-		"Values | undefined",
-		"export type Alias = Values | undefined",
+		"let values: Values = new Values(GoMap.nil",
+		"export type Alias = Values;",
 		"export type PlainAlias = GoMapValue<",
 		"export class Other",
-		"GoPointer.cell<Values | undefined, Values | undefined>(void 0)",
-		"Values.$wrapMap(GoMap.make",
-		"Other.$wrapMap(",
+		"GoPointer.cell<Values, Values>(new Values(GoMap.nil",
+		"let values: Values = new Values(GoMap.make",
+		"let other: Other = new Other(values.$value)",
+		"GoMapValue<Count, int32>",
+		".store(key, ",
+		".lookup(key)",
+		"export function DefinedKeyZero(): bool",
+		".nil();",
 	} {
 		if !strings.Contains(source, required) {
 			t.Fatalf("defined map artifact lacks %q:\n%s", required, source)
+		}
+	}
+	for _, required := range []string{
+		"private static $projectKey($key: Count",
+		"return $key.$value;",
+		"private static $reifyKey($storageKey: int32): Count",
+		"return new Count",
+		"($storageKey);",
+		"lookup(key: Count",
+		"store(key: Count",
+		"value: int32): void",
+		"keys(): Count",
+		"[] {",
+	} {
+		if !strings.Contains(specialization, required) {
+			t.Fatalf(
+				"defined-key map specialization lacks %q:\n%s",
+				required,
+				specialization,
+			)
 		}
 	}
 	zeroStart := strings.Index(source, "export function ZeroState")
@@ -89,32 +166,22 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		t.Fatalf("defined map functions are absent:\n%s", source)
 	}
 	zeroBody := source[zeroStart:makeStart]
-	if strings.Contains(zeroBody, "new Values(") ||
-		strings.Contains(zeroBody, "Values.$wrapMap(") ||
-		!strings.Contains(zeroBody, "void 0") {
-		t.Fatalf("defined map zero allocates a nominal wrapper:\n%s", zeroBody)
+	if strings.Count(zeroBody, "new Values(GoMap.nil") != 2 {
+		t.Fatalf("defined map zero wrapper count differs:\n%s", zeroBody)
 	}
 	conversionStart := strings.Index(source, "export function Conversions")
 	if conversionStart <= makeStart {
 		t.Fatalf("defined map conversion function is absent:\n%s", source)
 	}
-	makeBody := source[makeStart:conversionStart]
-	if strings.Count(makeBody, "Values.$wrapMap(") != 1 {
-		t.Fatalf("defined map make wrapper calls = %d, want one:\n%s",
-			strings.Count(makeBody, "Values.$wrapMap("),
-			makeBody,
-		)
-	}
-	if strings.Count(source, "new Values(") != 1 {
-		t.Fatalf(
-			"defined map Values constructors = %d, want the guarded family owner only:\n%s",
-			strings.Count(source, "new Values("),
-			source,
-		)
-	}
 	for _, forbidden := range []string{
+		"Values | undefined",
+		"$wrapMap",
+		"$readMap",
+		"$storeMap",
+		"key.$value",
 		"export class Alias",
 		"export class PlainAlias",
+		"GoMap.nil<Count",
 		"any",
 		"unknown",
 		".call(",
@@ -125,6 +192,60 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 			t.Fatalf("defined map artifact contains %q:\n%s", forbidden, source)
 		}
 	}
+}
+
+func definedKeySpecialization(t *testing.T, artifacts materialized) string {
+	t.Helper()
+	return readFile(t, definedKeySpecializationPath(t, artifacts))
+}
+
+func definedKeySpecializationPath(
+	t *testing.T,
+	artifacts materialized,
+) string {
+	t.Helper()
+	var matches []string
+	for _, path := range artifacts.paths {
+		if strings.Contains(filepath.ToSlash(path), "/support/maps/") {
+			matches = append(matches, path)
+		}
+	}
+	if len(matches) != 1 {
+		t.Fatalf(
+			"defined-key map specialization files = %d, want one",
+			len(matches),
+		)
+	}
+	return matches[0]
+}
+
+func replaceMethodReturn(
+	t *testing.T,
+	source string,
+	method string,
+	replacement string,
+) string {
+	t.Helper()
+	start := strings.Index(source, "static "+method+"(")
+	if start < 0 {
+		t.Fatalf("specialization method %q is absent", method)
+	}
+	body := strings.Index(source[start:], "{")
+	if body < 0 {
+		t.Fatalf("specialization method %q has no body", method)
+	}
+	body += start
+	returnStart := strings.Index(source[body:], "return ")
+	if returnStart < 0 {
+		t.Fatalf("specialization method %q has no return", method)
+	}
+	returnStart += body
+	returnEnd := strings.Index(source[returnStart:], ";")
+	if returnEnd < 0 {
+		t.Fatalf("specialization method %q return has no terminator", method)
+	}
+	returnEnd += returnStart + 1
+	return source[:returnStart] + replacement + source[returnEnd:]
 }
 
 func executeDefinedMapGo(t *testing.T, workingDirectory string) string {
@@ -162,6 +283,8 @@ func main() {
 	fmt.Println(values.Conversions())
 	fmt.Println(values.NilOperations())
 	fmt.Println(values.PlainAliasBehavior())
+	fmt.Println(values.DefinedKeyBehavior())
+	fmt.Println(values.DefinedKeyZero())
 	fmt.Println(nilWriteFails())
 }
 `)
@@ -183,6 +306,8 @@ func executeDefinedMapTypeScript(
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import {
     Conversions,
+    DefinedKeyBehavior,
+    DefinedKeyZero,
     MakeAliases,
     NilOperations,
     NilWrite,
@@ -203,6 +328,8 @@ print(...MakeAliases());
 print(...Conversions());
 print(...NilOperations());
 print(...PlainAliasBehavior());
+print(...DefinedKeyBehavior());
+console.log(DefinedKeyZero());
 let nilWriteFailed = false;
 try { NilWrite(); } catch { nilWriteFailed = true; }
 console.log(nilWriteFailed);

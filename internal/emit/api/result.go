@@ -59,21 +59,33 @@ func (e ExpressionEmission) Requests() []RootRequest {
 
 type StoreTargetEmission struct {
 	accessor          bool
+	accessorFunction  bool
 	property          bool
 	before            []tsgo.Statement
 	value             tsgo.Expression
 	propertyReceiver  ExpressionEmission
 	propertyMember    string
 	accessorReceiver  ExpressionEmission
+	getterFunction    ExpressionEmission
+	setterFunction    ExpressionEmission
 	getterMember      string
 	setterMember      string
 	accessorArguments []ExpressionEmission
 	locationCaptured  bool
 	copiesValue       bool
-	canonicalStorage  bool
+	storage           StoreTargetStorage
+	stableIdentity    bool
 	sourceType        types.Type
 	requests          []RootRequest
 }
+
+type StoreTargetStorage uint8
+
+const (
+	StoreTargetStorageLogical StoreTargetStorage = iota
+	StoreTargetStorageCanonical
+	StoreTargetStorageContainer
+)
 
 func NewPropertyStoreTargetEmission(
 	factory tsgo.Factory,
@@ -127,7 +139,7 @@ func NewCanonicalStoragePropertyStoreTargetEmission(
 	if err != nil {
 		return StoreTargetEmission{}, err
 	}
-	target.canonicalStorage = true
+	target.storage = StoreTargetStorageCanonical
 	return target, nil
 }
 
@@ -164,75 +176,7 @@ func NewCanonicalStorageTargetEmission(
 	if err != nil {
 		return StoreTargetEmission{}, err
 	}
-	target.canonicalStorage = true
-	return target, nil
-}
-
-func NewAccessorStoreTargetEmission(
-	receiver ExpressionEmission,
-	getter string,
-	setter string,
-	arguments []ExpressionEmission,
-	sourceType types.Type,
-) (StoreTargetEmission, error) {
-	switch {
-	case receiver.Value() == nil:
-		return StoreTargetEmission{}, &ResultError{
-			Result: "accessor store target",
-			Reason: "target receiver is nil",
-		}
-	case getter == "":
-		return StoreTargetEmission{}, &ResultError{
-			Result: "accessor store target",
-			Reason: "getter member is empty",
-		}
-	case setter == "":
-		return StoreTargetEmission{}, &ResultError{
-			Result: "accessor store target",
-			Reason: "setter member is empty",
-		}
-	case sourceType == nil:
-		return StoreTargetEmission{}, &ResultError{
-			Result: "accessor store target",
-			Reason: "source type is nil",
-		}
-	}
-	for _, argument := range arguments {
-		if argument.Value() == nil {
-			return StoreTargetEmission{}, &ResultError{
-				Result: "accessor store target",
-				Reason: "accessor argument is nil",
-			}
-		}
-	}
-	return StoreTargetEmission{
-		accessor:          true,
-		accessorReceiver:  receiver,
-		getterMember:      getter,
-		setterMember:      setter,
-		accessorArguments: slices.Clone(arguments),
-		sourceType:        sourceType,
-	}, nil
-}
-
-func NewCopyingAccessorStoreTargetEmission(
-	receiver ExpressionEmission,
-	getter string,
-	setter string,
-	arguments []ExpressionEmission,
-	sourceType types.Type,
-) (StoreTargetEmission, error) {
-	target, err := NewAccessorStoreTargetEmission(
-		receiver,
-		getter,
-		setter,
-		arguments,
-		sourceType,
-	)
-	if err != nil {
-		return StoreTargetEmission{}, err
-	}
-	target.copiesValue = true
+	target.storage = StoreTargetStorageCanonical
 	return target, nil
 }
 
@@ -249,7 +193,11 @@ func (e StoreTargetEmission) CopiesValue() bool {
 }
 
 func (e StoreTargetEmission) UsesCanonicalStorage() bool {
-	return e.canonicalStorage
+	return e.storage == StoreTargetStorageCanonical
+}
+
+func (e StoreTargetEmission) UsesContainerStorage() bool {
+	return e.storage == StoreTargetStorageContainer
 }
 
 func (e StoreTargetEmission) Before() []tsgo.Statement {
@@ -287,12 +235,26 @@ func (e StoreTargetEmission) SourceType() types.Type {
 func (e StoreTargetEmission) Requests() []RootRequest {
 	requests := slices.Clone(e.requests)
 	if e.property {
-		requests = append(requests, e.propertyReceiver.Requests()...)
+		requests = CombineRequests(
+			requests,
+			e.propertyReceiver.Requests(),
+		)
 	}
 	if e.accessor {
-		requests = append(requests, e.accessorReceiver.Requests()...)
+		if e.accessorFunction {
+			requests = CombineRequests(
+				requests,
+				e.getterFunction.Requests(),
+				e.setterFunction.Requests(),
+			)
+		} else {
+			requests = CombineRequests(
+				requests,
+				e.accessorReceiver.Requests(),
+			)
+		}
 		for _, argument := range e.accessorArguments {
-			requests = append(requests, argument.Requests()...)
+			requests = CombineRequests(requests, argument.Requests())
 		}
 	}
 	return requests
@@ -344,6 +306,8 @@ func (e StatementEmission) Requests() []RootRequest {
 
 type DeclarationEmission struct {
 	declarations []tsgo.Statement
+	classOwner   *types.TypeName
+	classMembers []tsgo.ClassElement
 	requests     []RootRequest
 	disposition  DeclarationDisposition
 }
@@ -354,11 +318,13 @@ const (
 	DeclarationDispositionInvalid DeclarationDisposition = iota
 	DeclarationDispositionMaterialized
 	DeclarationDispositionCoverageOnly
+	DeclarationDispositionClassMemberContribution
 )
 
 func (d DeclarationDisposition) Valid() bool {
 	return d == DeclarationDispositionMaterialized ||
-		d == DeclarationDispositionCoverageOnly
+		d == DeclarationDispositionCoverageOnly ||
+		d == DeclarationDispositionClassMemberContribution
 }
 
 // CoverageOnlyDeclarationEmission is the sole declaration result with no
@@ -371,6 +337,39 @@ func CoverageOnlyDeclarationEmission(
 		requests:    slices.Clone(requests),
 		disposition: DeclarationDispositionCoverageOnly,
 	}
+}
+
+func ClassMemberContributionEmission(
+	owner *types.TypeName,
+	members []tsgo.ClassElement,
+	requests []RootRequest,
+) (DeclarationEmission, error) {
+	if owner == nil {
+		return DeclarationEmission{}, &ResultError{
+			Result: "class-member contribution",
+			Reason: "target class owner is nil",
+		}
+	}
+	if len(members) == 0 {
+		return DeclarationEmission{}, &ResultError{
+			Result: "class-member contribution",
+			Reason: "target members are empty",
+		}
+	}
+	for _, member := range members {
+		if member == nil {
+			return DeclarationEmission{}, &ResultError{
+				Result: "class-member contribution",
+				Reason: "target member is nil",
+			}
+		}
+	}
+	return DeclarationEmission{
+		classOwner:   owner,
+		classMembers: slices.Clone(members),
+		requests:     slices.Clone(requests),
+		disposition:  DeclarationDispositionClassMemberContribution,
+	}, nil
 }
 
 func NewDeclarationEmission(
@@ -420,6 +419,19 @@ func (e DeclarationEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
 }
 
+func (e DeclarationEmission) ClassMemberContribution() (
+	*types.TypeName,
+	[]tsgo.ClassElement,
+	bool,
+) {
+	if e.disposition != DeclarationDispositionClassMemberContribution ||
+		e.classOwner == nil ||
+		len(e.classMembers) == 0 {
+		return nil, nil, false
+	}
+	return e.classOwner, slices.Clone(e.classMembers), true
+}
+
 func (e DeclarationEmission) Disposition() DeclarationDisposition {
 	return e.disposition
 }
@@ -465,15 +477,7 @@ func (e BlockEmission) Requests() []RootRequest {
 }
 
 func CombineRequests(groups ...[]RootRequest) []RootRequest {
-	size := 0
-	for _, group := range groups {
-		size += len(group)
-	}
-	result := make([]RootRequest, 0, size)
-	for _, group := range groups {
-		result = append(result, group...)
-	}
-	return result
+	return combineRootRequests(groups...)
 }
 
 type ResultError struct {

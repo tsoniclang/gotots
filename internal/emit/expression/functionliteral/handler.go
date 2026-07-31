@@ -15,6 +15,7 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.FuncLit,
 ) (api.ExpressionEmission, error) {
+	context, staticallySelected := context.TakeStaticallySelectedCallable()
 	if source == nil {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
@@ -32,10 +33,7 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	facet, err := api.NewFunctionLiteralCallableFacet(
-		context.ArtifactOwner(),
-		source,
-	)
+	facet, err := context.FunctionLiteralCallableFacet(source)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -103,6 +101,9 @@ func Emit(
 			observation.Requests(),
 		)...,
 	)
+	if staticallySelected {
+		return target, nil
+	}
 	return cooperativecall.AdaptLiteralValue(
 		context,
 		children,

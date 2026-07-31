@@ -5,10 +5,9 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	assertionoperation "github.com/tsoniclang/gotots/internal/emit/expression/typeassertion/operation"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -30,167 +29,24 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	sourceTarget, err := children.RepresentedType(
-		context,
-		source.X,
-		sourceType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	targetTarget, err := children.RepresentedType(
-		context,
-		source,
-		targetType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	value := context.Factory().Identifier("$value")
-	condition, err := interfacevalue.Test(
-		context,
-		targetType,
-		value,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	success, err := interfacevalue.Extract(
-		context,
-		source,
-		targetType,
-		value,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	var resultType tsgo.TypeNode
-	var body []tsgo.Statement
-	var failureRequests []api.RootRequest
-	if results != nil {
-		resultType = context.Factory().TupleTypeNode([]tsgo.TypeNode{
-			targetTarget.Value(),
-			context.Factory().KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindBooleanKeyword,
-			),
-		})
-		zero, err := context.Values().Zero(
+	if api.ContainsGenericTypeParameter(targetType) {
+		return interfacevalue.AssertGeneric(
 			context,
 			source,
+			sourceType,
 			targetType,
+			results != nil,
+			receiver,
 		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if len(zero.Before()) != 0 {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		body = []tsgo.Statement{
-			context.Factory().IfStatement(
-				context.Factory().PrefixUnaryExpression(
-					tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
-					condition.Value(),
-				),
-				context.Factory().Block(
-					[]tsgo.Statement{
-						context.Factory().ReturnStatement(
-							context.Factory().ArrayLiteralExpression(
-								[]tsgo.Expression{
-									zero.Value(),
-									context.Factory().FalseLiteral(),
-								},
-								false,
-							),
-						),
-					},
-					true,
-				),
-				nil,
-			),
-			context.Factory().ReturnStatement(
-				context.Factory().ArrayLiteralExpression(
-					[]tsgo.Expression{
-						success.Value(),
-						context.Factory().TrueLiteral(),
-					},
-					false,
-				),
-			),
-		}
-		failureRequests = zero.Requests()
-	} else {
-		resultType = targetTarget.Value()
-		panicReference, err := context.Names().Runtime(
-			api.RuntimePanic,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		body = []tsgo.Statement{
-			context.Factory().IfStatement(
-				context.Factory().PrefixUnaryExpression(
-					tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
-					condition.Value(),
-				),
-				context.Factory().Block(
-					[]tsgo.Statement{
-						context.Factory().ReturnStatement(
-							panicruntime.Call(
-								context.Factory(),
-								panicReference.Name(),
-								context.Factory().StringLiteral(
-									"runtime error: interface conversion failed",
-									tsgo.TokenFlagsNone,
-								),
-							),
-						),
-					},
-					true,
-				),
-				nil,
-			),
-			context.Factory().ReturnStatement(success.Value()),
-		}
-		failureRequests = panicReference.Requests()
 	}
-	target := context.Factory().CallExpression(
-		context.Factory().ParenthesizedExpression(
-			context.Factory().ArrowFunction(
-				nil,
-				nil,
-				[]tsgo.ParameterDeclaration{
-					context.Factory().ParameterDeclaration(
-						nil,
-						nil,
-						value,
-						nil,
-						sourceTarget.Value(),
-						nil,
-					),
-				},
-				resultType,
-				context.Factory().EqualsGreaterThanToken(),
-				context.Factory().Block(body, true),
-			),
-		),
-		nil,
-		nil,
-		[]tsgo.Expression{receiver.Value()},
-		tsgo.NodeFlagsNone,
-	)
-	return api.NewExpressionEmission(
-		receiver.Before(),
-		target,
-		api.CombineRequests(
-			receiver.Requests(),
-			sourceTarget.Requests(),
-			targetTarget.Requests(),
-			condition.Requests(),
-			success.Requests(),
-			failureRequests,
-		),
+	return assertionoperation.Apply(
+		context,
+		children,
+		source,
+		sourceType,
+		targetType,
+		results != nil,
+		receiver,
 	)
 }
 

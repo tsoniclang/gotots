@@ -19,26 +19,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-var integerCarrierRoots = []string{
-	"Byte",
-	"CompareSigned",
-	"CompareUnsigned",
-	"ConstantConversion",
-	"Int8",
-	"Int16",
-	"Int32",
-	"Int64",
-	"NativeInt",
-	"NativeUint",
-	"PointerUint",
-	"Rune",
-	"Uint8",
-	"Uint16",
-	"Uint32",
-	"Uint64",
-	"UnsignedComplement8",
-}
-
 func TestIntegerNumberProfilePrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 	loaded := loadIntegerFamily(t)
 	names := append(slices.Clone(integerCarrierRoots),
@@ -48,10 +28,14 @@ func TestIntegerNumberProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 		"NumberShifts",
 		"NumberUnary",
 		"NumberUnaryUint",
+		"NumberWideBits",
+		"NumberWideShifts",
+		"NumberWideUnary",
 		"NumberUnsignedShift",
 		"NumberVariableShift",
 		"NumberVariableSignedShift",
 		"NumberVariableUnsignedShift",
+		"DefinedShift",
 		"WidenSigned",
 		"WidenUnsigned",
 	)
@@ -78,6 +62,7 @@ func TestIntegerBigIntProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 		"BigVariableShift",
 		"BigVariableSignedShift",
 		"BigVariableUnsignedShift",
+		"DefinedShift",
 		"WidenSigned",
 		"WidenUnsigned",
 	)
@@ -136,7 +121,7 @@ func assertBigIntDivisionUsesRuntime(
 	}
 }
 
-func TestIntegerUnsupportedNeighborsFailAtTheirExactOwner(t *testing.T) {
+func TestIntegerNumberProfileEmitsWideConstantsWithoutWrapping(t *testing.T) {
 	loaded, err := load.One(context.Background(), load.Request{
 		Directory: integerBoundaryDirectory(),
 		Pattern:   ".",
@@ -144,43 +129,42 @@ func TestIntegerUnsupportedNeighborsFailAtTheirExactOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testCases := []struct {
-		name           string
-		root           string
-		representation emit.IntegerRepresentation
-		construct      string
-		category       api.Category
-	}{
-		{"number int64 bits", "NumberInt64Bits", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
-		{"unsafe number literal", "UnsafeNumber", emit.IntegerRepresentationNumber, "*ast.BasicLit", api.CategoryExpression},
-		{"unsafe number conversion", "UnsafeConversion", emit.IntegerRepresentationNumber, "*ast.CallExpr", api.CategoryExpression},
+	emission := compileIntegerFamily(
+		t,
+		loaded,
+		emit.DefaultOptions(),
+		"WideNumber",
+		"WideConversion",
+	)
+	printed := printIntegerFamily(t, emission)
+	if strings.Count(printed, "9007199254740992") != 2 {
+		t.Fatalf("wide number constants were not emitted directly:\n%s", printed)
 	}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			options := emit.DefaultOptions()
-			options.IntegerRepresentation = testCase.representation
-			object := loaded.Types().Scope().Lookup(testCase.root)
-			root, rootErr := emit.NewRoot(object)
-			if rootErr != nil {
-				t.Fatal(rootErr)
-			}
-			_, compileErr := emit.CompileWithOptions(
-				loaded.Program(),
-				[]emit.Root{root},
-				options,
-			)
-			var unsupported *api.UnsupportedError
-			if !errors.As(compileErr, &unsupported) ||
-				unsupported.Construct != testCase.construct ||
-				unsupported.Category != testCase.category {
-				t.Fatalf(
-					"error = %#v, want %s %s UnsupportedError",
-					compileErr,
-					testCase.category,
-					testCase.construct,
-				)
-			}
-		})
+	for _, forbidden := range []string{
+		"9007199254740992n",
+		"BigInt",
+		"Math.imul",
+	} {
+		if strings.Contains(printed, forbidden) {
+			t.Fatalf("wide number constants contain %q:\n%s", forbidden, printed)
+		}
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeIntegerFamily(t, emission, workingDirectory)
+	runnerPath := filepath.Join(workingDirectory, "runner.ts")
+	writeFile(t, runnerPath, `import * as values from "`+
+		artifacts.module(t, "source.ts")+`";
+
+console.log(values.WideNumber(), values.WideConversion());
+`)
+	output := executeMaterializedTypeScript(
+		t,
+		workingDirectory,
+		artifacts,
+		runnerPath,
+	)
+	if output != "9007199254740992 9007199254740992\n" {
+		t.Fatalf("wide number output = %q", output)
 	}
 }
 
@@ -426,6 +410,7 @@ console.log(row(values.BigVariableShift(-9n, 3n)));
 console.log(row(values.BigVariableShift(-9n, 64n)));
 console.log(String(panics(() => { values.BigVariableSignedShift(1n, -1n); })));
 console.log(row(values.BigVariableUnsignedShift(15n, 80n)));
+console.log(row(values.DefinedShift(-9n, new values.DefinedShiftCount(3n))));
 console.log(row(values.BigUnary(9007199254740993n)));
 console.log(show(values.WidenSigned(-8n)));
 console.log(show(values.WidenUnsigned(4000000000n)));
@@ -443,8 +428,12 @@ console.log(row(values.NumberVariableShift(-9, 3)));
 console.log(row(values.NumberVariableShift(-9, 32)));
 console.log(String(panics(() => { values.NumberVariableSignedShift(1, -1); })));
 console.log(row(values.NumberVariableUnsignedShift(15, 40)));
+console.log(row(values.DefinedShift(-9, new values.DefinedShiftCount(3))));
 console.log(row(values.NumberUnary(-123456)));
 console.log(show(values.NumberUnaryUint(4042322160)));
+console.log(row(values.NumberWideBits(123456, 255)));
+console.log(row(values.NumberWideShifts(-123456)));
+console.log(show(values.NumberWideUnary(123456)));
 console.log(show(values.WidenSigned(-8)));
 console.log(show(values.WidenUnsigned(4000000000)));
 console.log(values.CompareSigned(-8, 4).join(" "));
@@ -454,6 +443,7 @@ console.log(values.CompareUnsigned(8, 4).join(" "));
 	runner += `
 console.log(show(values.ConstantConversion()));
 console.log(show(values.UnsignedComplement8(240` + suffix + `)));
+console.log(String(values.UntypedBooleanNot(3` + suffix + `, 4` + suffix + `)));
 console.log(show(values.Int8(-5` + suffix + `, 3` + suffix + `)));
 console.log(show(values.Uint64(40` + suffix + `, 2` + suffix + `)));
 `
@@ -522,8 +512,12 @@ replace example.com/integerfamily => %s
 	fmt.Println(values.NumberVariableShift(-9, 32))
 	fmt.Println(panics(func() { values.NumberVariableSignedShift(1, -1) }))
 	fmt.Println(values.NumberVariableUnsignedShift(15, 40))
+	fmt.Println(values.DefinedShift(-9, 3))
 	fmt.Println(values.NumberUnary(-123456))
 	fmt.Println(values.NumberUnaryUint(4042322160))
+	fmt.Println(values.NumberWideBits(123456, 255))
+	fmt.Println(values.NumberWideShifts(-123456))
+	fmt.Println(values.NumberWideUnary(123456))
 	fmt.Println(values.WidenSigned(-8))
 	fmt.Println(values.WidenUnsigned(4000000000))
 	fmt.Println(values.CompareSigned(-8, 4))
@@ -538,6 +532,7 @@ replace example.com/integerfamily => %s
 	fmt.Println(values.BigVariableShift(-9, 64))
 	fmt.Println(panics(func() { values.BigVariableSignedShift(1, -1) }))
 	fmt.Println(values.BigVariableUnsignedShift(15, 80))
+	fmt.Println(values.DefinedShift(-9, 3))
 	fmt.Println(values.BigUnary(9007199254740993))
 	fmt.Println(values.WidenSigned(-8))
 	fmt.Println(values.WidenUnsigned(4000000000))
@@ -556,6 +551,7 @@ func main() {
 `+body+`
 	fmt.Println(values.ConstantConversion())
 	fmt.Println(values.UnsignedComplement8(240))
+	fmt.Println(values.UntypedBooleanNot(3, 4))
 	fmt.Println(values.Int8(-5, 3))
 	fmt.Println(values.Uint64(40, 2))
 }

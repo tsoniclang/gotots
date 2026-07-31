@@ -17,7 +17,7 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	loaded := loadCallableNilProject(t)
 	workingDirectory := t.TempDir()
 	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
-	printed := readMaterializedProgram(t, artifacts)
+	printed := readMaterializedSource(t, artifacts, "source.ts")
 
 	for _, required := range []string{
 		"class Transform",
@@ -25,11 +25,11 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 		"constructor(public readonly $value:",
 		"| undefined",
 		"new Transform(",
-		".$value(",
+		"= value.$value;",
 		`GoPanic.raiseRuntime("call of nil function")`,
 		"GoPointer.cell<",
-		"return value === void 0;",
-		"return !(value === void 0);",
+		"return value.$value === undefined;",
+		"return !(value.$value === undefined);",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("callable artifact lacks %q:\n%s", required, printed)
@@ -42,7 +42,6 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 		" as any",
 		" as unknown",
 		"Object.assign(",
-		"globalThis",
 		`"$goType:`,
 	} {
 		if strings.Contains(printed, forbidden) {
@@ -95,7 +94,10 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 		t.Fatal("defined callable Transform declaration is absent")
 	}
 	if len(transform.Members()) != 2 {
-		t.Fatalf("Transform members = %d, want brand and value constructor", len(transform.Members()))
+		t.Fatalf(
+			"Transform members = %d, want only brand and value constructor",
+			len(transform.Members()),
+		)
 	}
 	brand, ok := transform.Members()[0].(tsgo.PropertyDeclaration)
 	if !ok ||
@@ -112,13 +114,9 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	if transformAlias == nil {
 		t.Fatal("TransformAlias declaration is absent")
 	}
-	aliasUnion, ok := transformAlias.Type().(tsgo.UnionTypeNode)
-	if !ok || len(aliasUnion.Types()) != 2 {
-		t.Fatalf("TransformAlias target = %#v, want Transform | undefined", transformAlias)
-	}
-	reference, ok := aliasUnion.Types()[0].(tsgo.TypeReferenceNode)
+	reference, ok := transformAlias.Type().(tsgo.TypeReferenceNode)
 	if !ok || reference.TypeName().(tsgo.Identifier).Text() != "Transform" {
-		t.Fatalf("TransformAlias non-nil target = %#v, want Transform", aliasUnion.Types()[0])
+		t.Fatalf("TransformAlias target = %#v, want Transform", transformAlias)
 	}
 	rawAlias := aliases["RawAlias"]
 	if rawAlias == nil {
@@ -136,7 +134,8 @@ func TestCallableNilAndDefinedTypesExecuteDifferentially(t *testing.T) {
 	goOutput := executeCallableNilGo(t, workingDirectory)
 	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import {
+	writeFile(t, runnerPath, `import "`+artifacts.initialization(t)+`";
+import {
     ApplyDefined,
     ApplyRawAlias,
     AssignDefinedToRaw,
@@ -158,8 +157,9 @@ func TestCallableNilAndDefinedTypesExecuteDifferentially(t *testing.T) {
     NilResult,
     NilCallOrder,
     NilVoidCallOrder,
-    Offset,
-    ImplicitOffset,
+	    Offset,
+	    Other,
+	    ImplicitOffset,
     PassRawToDefined,
     OtherFromDefined,
     PackageIsNil,
@@ -168,7 +168,8 @@ func TestCallableNilAndDefinedTypesExecuteDifferentially(t *testing.T) {
     ShortCircuit,
     StoreThroughPointer,
     TraceValue,
-    TransformFromOther,
+	    TransformFromOther,
+	    Transform,
     ReturnDefinedAsRaw,
     ReturnRawAsDefined,
 } from "`+artifacts.module(t, "source.ts")+`";
@@ -176,13 +177,13 @@ func TestCallableNilAndDefinedTypesExecuteDifferentially(t *testing.T) {
 const defined = DefinedFromRaw(Increment);
 const other = OtherFromDefined(defined);
 console.log(String(IsNilRaw(undefined)));
-console.log(String(IsNilDefined(undefined)));
+console.log(String(IsNilDefined(new Transform(undefined))));
 console.log(String(IsNonNilAlias(defined)));
 console.log(String(LocalNil()));
 console.log(String(IsNilDefined(NilResult())));
 console.log(String(IsNilDefined(ConvertNilRaw())));
 console.log(String(IsNilRaw(ConvertNilDefined())));
-console.log(String(IsNilDefined(TransformFromOther(undefined))));
+console.log(String(IsNilDefined(TransformFromOther(new Other(undefined)))));
 console.log(String(ApplyDefined(defined, 4)));
 console.log(String(ApplyDefined(TransformFromOther(other), 5)));
 console.log(String(ApplyRawAlias(Increment, 6)));
@@ -243,10 +244,10 @@ func TestDefinedCallableNominalityRejectsUnconvertedValues(t *testing.T) {
     type Transform,
 } from "`+artifacts.module(t, "source.ts")+`";
 
-const wrongTransform: Transform | undefined = Increment;
-const wrongOther: Other | undefined = Increment;
+const wrongTransform: Transform = Increment;
+const wrongOther: Other = Increment;
 const transform = DefinedFromRaw(Increment);
-const wrongNominal: Other | undefined = transform;
+const wrongNominal: Other = transform;
 void wrongTransform;
 void wrongOther;
 void wrongNominal;
@@ -350,10 +351,10 @@ void NilCallOrder;
 		sourcePath := materializedSourcePath(t, artifacts, "source.ts")
 		printed := readFile(t, sourcePath)
 		function := printedFunction(t, printed, "ApplyDefined")
-		if !strings.Contains(function, ".$value(") {
+		if !strings.Contains(function, "value.$value") {
 			t.Fatalf("defined-call mutation cannot locate projection:\n%s", function)
 		}
-		mutatedFunction := strings.Replace(function, ".$value(", "(", 1)
+		mutatedFunction := strings.Replace(function, "value.$value", "value", 1)
 		writeFile(
 			t,
 			sourcePath,

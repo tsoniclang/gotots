@@ -16,6 +16,10 @@ func (staticSpecializationNames) Parameter(*types.Var, int) (string, error) {
 	panic("unused")
 }
 
+func (staticSpecializationNames) Result(*types.Var, int) (string, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) Reference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
@@ -52,6 +56,7 @@ func (staticSpecializationNames) AnonymousStructStorage(
 func (staticSpecializationNames) AnonymousStruct(
 	*types.Struct,
 	api.AnonymousStructDemand,
+	api.ImportPhase,
 ) (api.NameReference, error) {
 	panic("unused")
 }
@@ -65,7 +70,15 @@ func (staticSpecializationNames) MapSpecialization(
 
 func (staticSpecializationNames) InterfaceAdapter(
 	types.Type,
+	types.Type,
 ) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceContractDemand(
+	types.Type,
+	types.Type,
+) ([]api.RootRequest, error) {
 	panic("unused")
 }
 
@@ -87,9 +100,21 @@ func (staticSpecializationNames) InterfaceContract(
 	panic("unused")
 }
 
+func (staticSpecializationNames) MethodTarget(
+	*types.Func,
+) (api.MethodTarget, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) InterfaceMethodName(
 	*types.Func,
 ) (string, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceMethodCallable(
+	*types.Func,
+) (api.InterfaceMethodCallableReference, error) {
 	panic("unused")
 }
 
@@ -109,6 +134,19 @@ func (staticSpecializationNames) GenericCapability(
 func (staticSpecializationNames) CallableABI(
 	*types.Signature,
 ) (api.CallableABIReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) SourceCallableABI(
+	types.Object,
+	*types.Signature,
+) (api.CallableABIReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) GenericCallableProfile(
+	*api.GenericCallableProfile,
+) (api.NameReference, error) {
 	panic("unused")
 }
 

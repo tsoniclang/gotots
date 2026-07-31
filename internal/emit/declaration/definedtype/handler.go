@@ -5,7 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
+	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -57,39 +57,50 @@ func Emit(
 			target.Requests()...,
 		), true, nil
 	}
-	var underlying api.TypeEmission
-	if model.Family() == definedtype.FamilyCallable {
-		signature, valid := model.Callable()
-		if !valid {
+	for _, requirement := range requirements {
+		owner, _, _, ok := requirement.GenericRepresentation()
+		if !ok || owner != typeName {
 			return api.DeclarationEmission{}, true, &api.InvariantError{
 				Role:   context.Role(),
-				Reason: "defined callable declaration is invalid",
+				Reason: "defined type received a foreign declaration requirement",
 			}
 		}
-		var err error
-		underlying, err = callable.EmitNonNilType(
-			context.WithRole(api.RoleDefinedUnderlyingType),
-			children,
-			source.Type,
-			signature,
-		)
-		if err != nil {
-			return api.DeclarationEmission{}, true, err
-		}
-	} else {
-		var err error
-		underlying, err = children.RepresentedType(
-			context.WithRole(api.RoleDefinedUnderlyingType),
-			source.Type,
-			model.Underlying(),
-		)
-		if err != nil {
-			return api.DeclarationEmission{}, true, err
-		}
+	}
+	parameters, err := genericdeclaration.EnterType(
+		context,
+		source,
+		typeName,
+		requirements,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, true, err
+	}
+	context = parameters.Context()
+	underlying, err := children.RepresentedType(
+		context.WithRole(api.RoleDefinedUnderlyingType),
+		source.Type,
+		model.Underlying(),
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, true, err
 	}
 	name, modifiers, err := declarationIdentity(context, typeName)
 	if err != nil {
 		return api.DeclarationEmission{}, true, err
+	}
+	typeParameters := parameters.Nodes()
+	valueType := underlying.Value()
+	if definedtype.RequiresValueFacet(model.Type()) {
+		typeParameters = append(
+			typeParameters,
+			definedtype.ValueTypeParameterDeclaration(
+				context.Factory(),
+				underlying.Value(),
+			),
+		)
+		valueType = definedtype.ValueTypeParameterReference(
+			context.Factory(),
+		)
 	}
 	members := []tsgo.ClassElement{
 		context.Factory().PropertyDeclaration(
@@ -106,7 +117,7 @@ func Emit(
 			nil,
 		),
 		context.Factory().ConstructorDeclaration(
-			constructorModifiers(context, model),
+			nil,
 			nil,
 			[]tsgo.ParameterDeclaration{
 				context.Factory().ParameterDeclaration(
@@ -117,7 +128,7 @@ func Emit(
 					nil,
 					context.Factory().Identifier(definedtype.ValueMember),
 					nil,
-					underlying.Value(),
+					valueType,
 					nil,
 				),
 			},
@@ -125,47 +136,18 @@ func Emit(
 			context.Factory().Block(nil, true),
 		),
 	}
-	familyMembers, familyRequests, err := emitFamilyMembers(
-		context,
-		children,
-		source,
-		model,
-		name,
-		underlying.Value(),
-		requirements,
-	)
-	if err != nil {
-		return api.DeclarationEmission{}, true, err
-	}
-	members = append(members, familyMembers...)
 	return api.DirectDeclaration(
 		context.Factory().ClassDeclaration(
 			modifiers,
 			context.Factory().Identifier(name),
-			nil,
+			typeParameters,
 			nil,
 			members,
 		),
 		api.CombineRequests(
 			underlying.Requests(),
-			familyRequests,
 		)...,
 	), true, nil
-}
-
-func constructorModifiers(
-	context api.Context,
-	model definedtype.Model,
-) []tsgo.ModifierLike {
-	switch model.Family() {
-	case definedtype.FamilySlice,
-		definedtype.FamilyPointer,
-		definedtype.FamilyChannel,
-		definedtype.FamilyMap:
-		return []tsgo.ModifierLike{context.Factory().PrivateKeyword()}
-	default:
-		return nil
-	}
 }
 
 func sourceSpec(
@@ -181,8 +163,7 @@ func sourceSpec(
 		if !ok || context.TypesInfo().Defs[source.Name] != typeName {
 			continue
 		}
-		if source.TypeParams != nil ||
-			source.Assign.IsValid() != typeName.IsAlias() {
+		if source.Assign.IsValid() != typeName.IsAlias() {
 			return nil, false
 		}
 		return source, true

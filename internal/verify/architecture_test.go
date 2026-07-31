@@ -181,6 +181,7 @@ func verifyEmissionSource(
 		}
 	}
 	astAlias := importAliases["go/ast"]
+	interfaceValueAlias := importAliases[modulePath+"/internal/emit/value/interfacevalue"]
 	var violation string
 	ast.Inspect(file, func(node ast.Node) bool {
 		if violation != "" {
@@ -202,6 +203,21 @@ func verifyEmissionSource(
 				return false
 			}
 			qualifier, qualifierOK := selector.X.(*ast.Ident)
+			if qualifierOK &&
+				qualifier.Name == interfaceValueAlias &&
+				(selector.Sel.Name == "AdaptExpected" ||
+					(selector.Sel.Name == "Assign" &&
+						relative != "internal/emit/value/representation/owner.go")) {
+				violation = "interface transfer bypasses the value-transfer owner"
+				return false
+			}
+			for _, forbidden := range forbiddenInterfaceBoundarySelectors(relative) {
+				if selector.Sel.Name == forbidden {
+					violation = "interface boundary bypasses its method-token owner with " +
+						forbidden
+					return false
+				}
+			}
 			if qualifierOK && qualifier.Name == astAlias &&
 				(selector.Sel.Name == "Walk" || selector.Sel.Name == "Inspect") {
 				violation = "production emission uses generic AST recursion"
@@ -238,6 +254,36 @@ func verifyEmissionSource(
 		return &wallError{source: relative, reason: violation}
 	}
 	return nil
+}
+
+func forbiddenInterfaceBoundarySelectors(relative string) []string {
+	switch relative {
+	case "internal/emit/declaration/interfaceadapter/handler.go":
+		return []string{
+			"ValueContract",
+			"SourceValueContract",
+			"GeneratedValueCall",
+			"SelectedMethodCall",
+		}
+	case "internal/emit/declaration/interfacetype/handler.go":
+		return []string{"ValueContract", "SourceValueContract"}
+	case "internal/emit/expression/call/method.go":
+		return []string{
+			"ValueContract",
+			"ValueCall",
+			"DetachedValueCall",
+			"InterfaceMethodToken",
+		}
+	case "internal/emit/expression/call/deferred_method.go":
+		return []string{"ValueContract", "ValueCall", "InterfaceMethodToken"}
+	case "internal/emit/expression/methodvalue/handler.go",
+		"internal/emit/expression/methodexpression/handler.go":
+		return []string{"InterfaceMethodToken"}
+	case "internal/emit/generic/capability/constraint_method.go":
+		return []string{"ValueContract", "ValueCall", "InterfaceMethodToken"}
+	default:
+		return nil
+	}
 }
 
 func TestArchitectureWallMutationControls(t *testing.T) {
@@ -292,6 +338,33 @@ func leak(factory Factory, value Expression) { factory.NonNullExpression(value, 
 			relative: "internal/emit/statement/assignment/leak.go",
 			source: `package assignment
 import _ "github.com/tsoniclang/gotots/internal/emit/store/map"
+`,
+		},
+		"interface call through value ABI": {
+			relative: "internal/emit/expression/call/method.go",
+			source: `package call
+func leak(owner Owner, signature Signature) { owner.ValueContract(signature) }
+`,
+		},
+		"open interface call through runtime token": {
+			relative: "internal/emit/expression/call/method.go",
+			source: `package call
+func leak(names Names, method Method) { names.InterfaceMethodToken(method) }
+`,
+		},
+		"interface adapter raw selected call": {
+			relative: "internal/emit/declaration/interfaceadapter/handler.go",
+			source: `package interfaceadapter
+func leak(owner Owner, method Method) { owner.SelectedMethodCall(method) }
+`,
+		},
+		"interface transfer outside owner": {
+			relative: "internal/emit/resulttuple/leak.go",
+			source: `package resulttuple
+import interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
+func leak(context Context, source Source, value Value) {
+	interfacevalue.Assign(context, source, source.Type(), source.Type(), value)
+}
 `,
 		},
 	} {

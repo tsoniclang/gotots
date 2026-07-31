@@ -68,6 +68,19 @@ func Emit(
 			}
 			return selected, nil
 		}
+		if receiver, ok := context.ValueReceiver(variable); ok {
+			value := receiver.Value()
+			var requests []api.RootRequest
+			if context.Role() == api.RoleAssignmentTarget {
+				request, err := receiver.CopyRequest()
+				if err != nil {
+					return api.ExpressionEmission{}, err
+				}
+				value = context.Factory().Identifier(receiver.CopyName())
+				requests = []api.RootRequest{request}
+			}
+			return api.DirectExpression(value, requests...), nil
+		}
 	}
 	reference, err := context.Names().Reference(object)
 	if err != nil {

@@ -46,6 +46,7 @@ func testStaticSpecialization(
 		"StaticMap",
 		mapType,
 		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
+		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
 		factory.TypeReferenceNode(factory.Identifier("Box"), nil),
 	)
 	if err != nil {
@@ -135,6 +136,7 @@ func TestStaticSpecializationRejectsStoredSemanticCallbacks(t *testing.T) {
 		"StaticMap",
 		types.NewMap(key, value),
 		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
+		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
 		factory.TypeReferenceNode(factory.Identifier("Box"), nil),
 	)
 	if err != nil {
@@ -171,6 +173,7 @@ func TestStaticSpecializationRejectsStoredSemanticCallbacks(t *testing.T) {
 	if err := validateSpecialization(
 		api.RoleMapReceiver,
 		mutated,
+		false,
 	); err == nil {
 		t.Fatal("stored hash callback mutation passed the specialization gate")
 	}
@@ -440,15 +443,20 @@ func (v staticSpecializationValues) Zero(
 	), nil
 }
 
-func (v staticSpecializationValues) Copy(
+func (v staticSpecializationValues) Transfer(
 	context api.Context,
 	_ ast.Node,
-	sourceType types.Type,
+	actualType types.Type,
+	destinationType types.Type,
+	mode api.ValueTransferMode,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if actualType != destinationType || mode != api.ValueTransferCopy {
+		panic("unexpected specialization transfer")
+	}
 	var className string
 	var fields []tsgo.Expression
-	switch sourceType {
+	switch destinationType {
 	case v.key:
 		className = "Key"
 		fields = []tsgo.Expression{

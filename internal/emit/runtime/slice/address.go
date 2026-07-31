@@ -64,24 +64,17 @@ func BuildAddress(
 	className string,
 	pointerName string,
 ) tsgo.FunctionDeclaration {
-	typeParameter := factory.TypeParameterDeclaration(
-		nil,
-		factory.Identifier("T"),
-		nil,
-		nil,
-		nil,
-	)
+	logicalParameter := typeParameter(factory, "L")
+	storageParameter := typeParameter(factory, "S")
 	sliceType := factory.TypeReferenceNode(
 		factory.Identifier(className),
-		[]tsgo.TypeNode{
-			factory.TypeReferenceNode(factory.Identifier("T"), nil),
-		},
+		[]tsgo.TypeNode{typeReference(factory, "S")},
 	)
 	pointerType := factory.TypeReferenceNode(
 		factory.Identifier(pointerName),
 		[]tsgo.TypeNode{
-			factory.TypeReferenceNode(factory.Identifier("T"), nil),
-			factory.TypeReferenceNode(factory.Identifier("T"), nil),
+			typeReference(factory, "L"),
+			typeReference(factory, "S"),
 		},
 	)
 	indexType := factory.UnionTypeNode(
@@ -114,10 +107,7 @@ func BuildAddress(
 			tsgo.NodeFlagsNone,
 		),
 		nil,
-		[]tsgo.TypeNode{
-			factory.TypeReferenceNode(factory.Identifier("T"), nil),
-			factory.TypeReferenceNode(factory.Identifier("T"), nil),
-		},
+		[]tsgo.TypeNode{typeReference(factory, "L"), typeReference(factory, "S")},
 		[]tsgo.Expression{location},
 		tsgo.NodeFlagsNone,
 	)
@@ -125,7 +115,10 @@ func BuildAddress(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		nil,
 		factory.Identifier(functionName),
-		[]tsgo.TypeParameterDeclaration{typeParameter},
+		[]tsgo.TypeParameterDeclaration{
+			logicalParameter,
+			storageParameter,
+		},
 		[]tsgo.ParameterDeclaration{
 			factory.ParameterDeclaration(
 				nil,
@@ -143,86 +136,6 @@ func BuildAddress(
 				indexType,
 				nil,
 			),
-		},
-		pointerType,
-		factory.Block(
-			[]tsgo.Statement{factory.ReturnStatement(result)},
-			true,
-		),
-	)
-}
-
-func BuildAddressView(
-	factory tsgo.Factory,
-	functionName string,
-	className string,
-	pointerName string,
-) tsgo.FunctionDeclaration {
-	typeL := typeReference(factory, "L")
-	typeS := typeReference(factory, "S")
-	typeO := typeReference(factory, "O")
-	sliceType := factory.TypeReferenceNode(
-		factory.Identifier(className),
-		[]tsgo.TypeNode{typeO},
-	)
-	pointerType := factory.TypeReferenceNode(
-		factory.Identifier(pointerName),
-		[]tsgo.TypeNode{typeL, typeS},
-	)
-	indexType := factory.UnionTypeNode(
-		[]tsgo.TypeNode{
-			factory.KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindNumberKeyword,
-			),
-			factory.KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindBigIntKeyword,
-			),
-		},
-	)
-	toStorage := converterType(factory, typeO, typeS)
-	fromStorage := converterType(factory, typeS, typeO)
-	location := factory.CallExpression(
-		factory.PropertyAccessExpression(
-			factory.Identifier("value"),
-			nil,
-			factory.Identifier(MemberName(MemberAddress)),
-			tsgo.NodeFlagsNone,
-		),
-		nil,
-		nil,
-		[]tsgo.Expression{factory.Identifier("index")},
-		tsgo.NodeFlagsNone,
-	)
-	result := factory.CallExpression(
-		factory.PropertyAccessExpression(
-			factory.Identifier(pointerName),
-			nil,
-			factory.Identifier("elementView"),
-			tsgo.NodeFlagsNone,
-		),
-		nil,
-		[]tsgo.TypeNode{typeL, typeS, typeO},
-		[]tsgo.Expression{
-			location,
-			factory.Identifier("toStorage"),
-			factory.Identifier("fromStorage"),
-		},
-		tsgo.NodeFlagsNone,
-	)
-	return factory.FunctionDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		nil,
-		factory.Identifier(functionName),
-		[]tsgo.TypeParameterDeclaration{
-			typeParameter(factory, "L"),
-			typeParameter(factory, "S"),
-			typeParameter(factory, "O"),
-		},
-		[]tsgo.ParameterDeclaration{
-			parameter(factory, "value", sliceType),
-			parameter(factory, "index", indexType),
-			parameter(factory, "toStorage", toStorage),
-			parameter(factory, "fromStorage", fromStorage),
 		},
 		pointerType,
 		factory.Block(
@@ -261,19 +174,5 @@ func parameter(
 		nil,
 		targetType,
 		nil,
-	)
-}
-
-func converterType(
-	factory tsgo.Factory,
-	source tsgo.TypeNode,
-	target tsgo.TypeNode,
-) tsgo.FunctionTypeNode {
-	return factory.FunctionTypeNode(
-		nil,
-		[]tsgo.ParameterDeclaration{
-			parameter(factory, "value", source),
-		},
-		target,
 	)
 }

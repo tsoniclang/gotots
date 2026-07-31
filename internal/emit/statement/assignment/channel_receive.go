@@ -65,6 +65,26 @@ func EmitSelectedReceive(
 			continue
 		}
 		selected := values[index].emission
+		var targetType types.Type
+		var mode api.ValueTransferMode
+		if target.declaration {
+			targetType = target.object.Type()
+			mode = api.ValueTransferCopy
+		} else {
+			targetType = target.target.SourceType()
+			mode = storeTransferMode(target.target)
+		}
+		selected, err = context.Values().Transfer(
+			context.WithRole(api.RoleAssignmentValue),
+			source.Rhs[0],
+			values[index].sourceType,
+			targetType,
+			mode,
+			selected,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 		before = append(before, selected.Before()...)
 		requests = append(requests, selected.Requests()...)
 		if target.declaration {

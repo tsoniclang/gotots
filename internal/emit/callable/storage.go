@@ -25,7 +25,10 @@ func addressableParameterPrologue(
 	variables := make([]*types.Var, 0, signature.Params().Len()+1)
 	names := make([]string, 0, signature.Params().Len()+1)
 	if receiver := signature.Recv(); receiver != nil {
-		name, err := context.Names().Declare(receiver)
+		name, err := context.Names().Parameter(
+			receiver,
+			signature.Params().Len(),
+		)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -49,12 +52,32 @@ func addressableParameterPrologue(
 		if !selected {
 			continue
 		}
+		initial := api.DirectExpression(
+			context.Factory().Identifier(names[index]),
+		)
+		if receiver, ok := context.ValueReceiver(variable); ok {
+			initial = api.DirectExpression(receiver.OriginalValue())
+			if receiver.CopySelected() {
+				copied, err := context.Values().Transfer(
+					context.WithRole(api.RoleReceiverValue),
+					source,
+					variable.Type(),
+					variable.Type(),
+					api.ValueTransferCopy,
+					initial,
+				)
+				if err != nil {
+					return nil, nil, err
+				}
+				initial = copied
+			}
+		}
 		cell, err := context.AddressableStorage().Cell(
 			context,
 			children,
 			source,
 			variable.Type(),
-			api.DirectExpression(context.Factory().Identifier(names[index])),
+			initial,
 		)
 		if err != nil {
 			return nil, nil, err

@@ -5,14 +5,15 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 )
@@ -175,10 +176,64 @@ func canonicalPointerTarget(
 	pointer api.ExpressionEmission,
 	element types.Type,
 ) (api.StoreTargetEmission, error) {
-	storageType, err := context.Values().StorageType(
+	if target, handled, err := genericpointer.StoreTarget(
+		context,
+		source,
+		element,
+		pointer,
+	); handled || err != nil {
+		return target, err
+	}
+	representation, err := pointertype.Observe(
+		context,
+		types.NewPointer(element),
+		false,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		logical, err := children.RepresentedType(
+			context.WithRole(api.RoleAssignmentTarget),
+			source,
+			element,
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		runtime, err := context.Names().Runtime(
+			api.RuntimePointer,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		location, err := api.NewExpressionEmission(
+			pointer.Before(),
+			pointerruntime.Direct(
+				context.Factory(),
+				runtime.Name(),
+				logical.Value(),
+				pointer.Value(),
+			),
+			api.CombineRequests(
+				pointer.Requests(),
+				logical.Requests(),
+				runtime.Requests(),
+				representation.Requests(),
+			),
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		return api.NewStableIdentityStoreTargetEmission(location, element)
+	}
+	storageType, err := context.ContainerStorage().PointerStorageType(
 		context.WithRole(api.RoleStorageType),
 		source,
 		element,
+		representation,
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
@@ -212,12 +267,22 @@ func canonicalPointerTarget(
 			targetElement.Requests(),
 			storageType.Requests(),
 			reference.Requests(),
+			representation.Requests(),
 		),
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewCanonicalStoragePropertyStoreTargetEmission(
+	if representation.Representation() ==
+		api.PointerRepresentationCarrierCanonical {
+		return api.NewCanonicalStoragePropertyStoreTargetEmission(
+			context.Factory(),
+			receiver,
+			pointerruntime.CellValueName,
+			element,
+		)
+	}
+	return api.NewPropertyStoreTargetEmission(
 		context.Factory(),
 		receiver,
 		pointerruntime.CellValueName,
@@ -241,7 +306,7 @@ func sliceIndex(
 	indexType := context.TypesInfo().TypeOf(source.Index)
 	if !ok ||
 		!types.Identical(context.TypesInfo().TypeOf(source), elementType) ||
-		!basictype.SupportsInteger(context.TypesSizes(), indexType) {
+		!integeroperand.Supports(context.TypesSizes(), indexType) {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -260,16 +325,15 @@ func sliceIndex(
 			return api.StoreTargetEmission{}, err
 		}
 	}
-	index, err := children.Expression(
-		context.
-			WithRole(api.RoleSliceIndex).
-			WithExpectedType(indexType),
+	index, err := integeroperand.Emit(
+		context.WithRole(api.RoleSliceIndex),
+		children,
 		source.Index,
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewAccessorStoreTargetEmission(
+	return api.NewContainerStorageAccessorStoreTargetEmission(
 		receiver,
 		runtimeslice.MemberName(runtimeslice.MemberGet),
 		runtimeslice.MemberName(runtimeslice.MemberSet),
@@ -318,10 +382,12 @@ func mapIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	key, err = maprepresentation.ProjectKey(
+	key, err = context.Values().Transfer(
 		context.WithRole(api.RoleMapKey),
 		source.Index,
+		context.TypesInfo().TypeOf(source.Index),
 		mapType.Key(),
+		api.ValueTransferRepresentation,
 		key,
 	)
 	if err != nil {
@@ -363,6 +429,17 @@ func identifier(
 		object,
 	); ok || err != nil {
 		return selected, err
+	}
+	if receiver, ok := context.ValueReceiver(object); ok {
+		request, err := receiver.CopyRequest()
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		return api.NewStoreTargetEmission(
+			context.Factory().Identifier(receiver.CopyName()),
+			object.Type(),
+			[]api.RootRequest{request},
+		)
 	}
 	reference, err := context.Names().Reference(object)
 	if err != nil {

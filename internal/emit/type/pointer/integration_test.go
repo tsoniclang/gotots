@@ -107,7 +107,7 @@ func TestScalarPointersPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		"GoPointer.cell<int32, int32>(0)",
 		"GoPointer.dereference<int32, int32>(pointer).value",
 		"GoPointer.equal(original, alias)",
-		"!GoPointer.equal(original, void 0)",
+		"!(original === undefined)",
 		"let assigned: GoPointer<int32, int32> | undefined",
 	} {
 		if !strings.Contains(target, required) {

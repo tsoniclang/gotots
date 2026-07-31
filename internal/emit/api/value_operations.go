@@ -29,7 +29,14 @@ type Values interface {
 		ExpressionEmission,
 	) (ExpressionEmission, error)
 	Zero(Context, ast.Node, types.Type) (ExpressionEmission, error)
-	Copy(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
+	Transfer(
+		Context,
+		ast.Node,
+		types.Type,
+		types.Type,
+		ValueTransferMode,
+		ExpressionEmission,
+	) (ExpressionEmission, error)
 	Assign(
 		Context,
 		ast.Node,
@@ -69,82 +76,17 @@ type Values interface {
 	) (ExpressionEmission, bool, error)
 }
 
-func (e StoreTargetEmission) ReadValue(
-	context Context,
-	source ast.Node,
-) (ExpressionEmission, error) {
-	var value ExpressionEmission
-	if e.accessor {
-		target, err := e.AccessorRead(context)
-		if err != nil {
-			return ExpressionEmission{}, err
-		}
-		value = DirectExpression(target)
-	} else {
-		value = DirectExpression(e.value)
-	}
-	if !e.canonicalStorage {
-		return value, nil
-	}
-	return context.Values().FromStorage(
-		context,
-		source,
-		e.sourceType,
-		value,
-	)
-}
+type ValueTransferMode uint8
 
-func (e StoreTargetEmission) StoreValue(
-	context Context,
-	source ast.Node,
-	value ExpressionEmission,
-) (ExpressionEmission, error) {
-	if e.accessor {
-		return e.AccessorStore(context, value)
-	}
-	if e.canonicalStorage {
-		var err error
-		value, err = context.Values().ToStorage(
-			context,
-			source,
-			e.sourceType,
-			value,
-		)
-		if err != nil {
-			return ExpressionEmission{}, err
-		}
-		return NewExpressionEmission(
-			append(
-				e.Before(),
-				value.Before()...,
-			),
-			context.Factory().BinaryExpression(
-				nil,
-				e.value,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorEqualsToken,
-				),
-				value.Value(),
-			),
-			CombineRequests(e.Requests(), value.Requests()),
-		)
-	}
-	assigned, err := context.Values().Assign(
-		context,
-		source,
-		e.sourceType,
-		e.value,
-		value,
-	)
-	if err != nil {
-		return ExpressionEmission{}, err
-	}
-	return NewExpressionEmission(
-		append(e.Before(), assigned.Before()...),
-		assigned.Value(),
-		CombineRequests(e.Requests(), assigned.Requests()),
-	)
+const (
+	ValueTransferInvalid ValueTransferMode = iota
+	ValueTransferCopy
+	ValueTransferRepresentation
+)
+
+func (m ValueTransferMode) Valid() bool {
+	return m == ValueTransferCopy ||
+		m == ValueTransferRepresentation
 }
 
 func (e StoreTargetEmission) CaptureAccessorLocation(
@@ -186,6 +128,25 @@ func (e StoreTargetEmission) PrepareLocation(
 		}
 	}
 	if !e.accessor && !e.property {
+		if e.stableIdentity {
+			before, value, requests, err := captureStoreOperand(
+				context,
+				ExpressionEmission{
+					before:   e.before,
+					value:    e.value,
+					requests: e.requests,
+				},
+			)
+			if err != nil {
+				return StoreTargetEmission{}, nil, nil, err
+			}
+			captured := e
+			captured.before = nil
+			captured.value = value
+			captured.requests = nil
+			captured.locationCaptured = true
+			return captured, before, requests, nil
+		}
 		captured := e
 		before := captured.Before()
 		requests := captured.Requests()
@@ -225,7 +186,7 @@ func (e StoreTargetEmission) preparePropertyLocation(
 		return StoreTargetEmission{}, nil, nil, err
 	}
 	captured.copiesValue = e.copiesValue
-	captured.canonicalStorage = e.canonicalStorage
+	captured.storage = e.storage
 	captured.locationCaptured = true
 	return captured,
 		append(slices.Clone(e.before), before...),
@@ -241,7 +202,10 @@ func (e StoreTargetEmission) prepareAccessorLocation(
 	[]RootRequest,
 	error,
 ) {
-	operands := []ExpressionEmission{e.accessorReceiver}
+	var operands []ExpressionEmission
+	if !e.accessorFunction {
+		operands = append(operands, e.accessorReceiver)
+	}
 	operands = append(operands, e.accessorArguments...)
 	values := make([]tsgo.Expression, 0, len(operands))
 	var before []tsgo.Statement
@@ -258,23 +222,42 @@ func (e StoreTargetEmission) prepareAccessorLocation(
 		values = append(values, value)
 		requests = append(requests, operandRequests...)
 	}
-	receiver := DirectExpression(values[0])
-	arguments := make([]ExpressionEmission, 0, len(values)-1)
-	for _, value := range values[1:] {
+	argumentStart := 0
+	if !e.accessorFunction {
+		argumentStart = 1
+	}
+	arguments := make([]ExpressionEmission, 0, len(values)-argumentStart)
+	for _, value := range values[argumentStart:] {
 		arguments = append(arguments, DirectExpression(value))
 	}
-	captured, err := NewAccessorStoreTargetEmission(
-		receiver,
-		e.getterMember,
-		e.setterMember,
-		arguments,
-		e.sourceType,
-	)
+	var captured StoreTargetEmission
+	var err error
+	if e.accessorFunction {
+		captured, err = NewFunctionStoreTargetEmission(
+			DirectExpression(e.getterFunction.Value()),
+			DirectExpression(e.setterFunction.Value()),
+			arguments,
+			e.sourceType,
+		)
+		requests = CombineRequests(
+			requests,
+			e.getterFunction.Requests(),
+			e.setterFunction.Requests(),
+		)
+	} else {
+		captured, err = NewAccessorStoreTargetEmission(
+			DirectExpression(values[0]),
+			e.getterMember,
+			e.setterMember,
+			arguments,
+			e.sourceType,
+		)
+	}
 	if err != nil {
 		return StoreTargetEmission{}, nil, nil, err
 	}
 	captured.copiesValue = e.copiesValue
-	captured.canonicalStorage = e.canonicalStorage
+	captured.storage = e.storage
 	captured.locationCaptured = true
 	return captured,
 		append(slices.Clone(e.before), before...),
@@ -300,25 +283,46 @@ func captureStoreOperand(
 		nil
 }
 
-func (e StoreTargetEmission) AccessorRead(
+func (e StoreTargetEmission) accessorRead(
 	context Context,
-) (tsgo.Expression, error) {
+) (ExpressionEmission, error) {
 	if !e.accessor {
-		return nil, &ResultError{
+		return ExpressionEmission{}, &ResultError{
 			Result: "accessor read",
 			Reason: "store target is not accessor-backed",
 		}
 	}
-	arguments := make([]tsgo.Expression, 0, len(e.accessorArguments))
-	for _, argument := range e.accessorArguments {
-		arguments = append(arguments, argument.Value())
+	var operands []ExpressionEmission
+	if !e.accessorFunction {
+		operands = append(operands, e.accessorReceiver)
 	}
-	return accessorCall(
-		context,
-		e.accessorReceiver.Value(),
-		e.getterMember,
-		arguments,
-	), nil
+	operands = append(operands, e.accessorArguments...)
+	values, before, requests, err := arrangeStoreOperands(context, operands)
+	if err != nil {
+		return ExpressionEmission{}, err
+	}
+	before = append(e.Before(), before...)
+	requests = CombineRequests(e.requests, requests)
+	var target tsgo.Expression
+	if e.accessorFunction {
+		target = functionCall(
+			context,
+			e.getterFunction.Value(),
+			values,
+		)
+		requests = CombineRequests(
+			requests,
+			e.getterFunction.Requests(),
+		)
+	} else {
+		target = accessorCall(
+			context,
+			values[0],
+			e.getterMember,
+			values[1:],
+		)
+	}
+	return NewExpressionEmission(before, target, requests)
 }
 
 func (e StoreTargetEmission) AccessorStore(
@@ -331,7 +335,10 @@ func (e StoreTargetEmission) AccessorStore(
 			Reason: "store target is not accessor-backed",
 		}
 	}
-	operands := []ExpressionEmission{e.accessorReceiver}
+	var operands []ExpressionEmission
+	if !e.accessorFunction {
+		operands = append(operands, e.accessorReceiver)
+	}
 	operands = append(operands, e.accessorArguments...)
 	operands = append(operands, value)
 	var values []tsgo.Expression
@@ -356,16 +363,27 @@ func (e StoreTargetEmission) AccessorStore(
 	}
 	before = append(e.Before(), before...)
 	requests = append(slices.Clone(e.requests), requests...)
-	return NewExpressionEmission(
-		before,
-		accessorCall(
+	var target tsgo.Expression
+	if e.accessorFunction {
+		target = functionCall(
+			context,
+			e.setterFunction.Value(),
+			values,
+		)
+		requests = CombineRequests(
+			requests,
+			e.getterFunction.Requests(),
+			e.setterFunction.Requests(),
+		)
+	} else {
+		target = accessorCall(
 			context,
 			values[0],
 			e.setterMember,
 			values[1:],
-		),
-		requests,
-	)
+		)
+	}
+	return NewExpressionEmission(before, target, requests)
 }
 
 func arrangeStoreOperands(
@@ -413,6 +431,20 @@ func accessorCall(
 			context.Factory().Identifier(member),
 			tsgo.NodeFlagsNone,
 		),
+		nil,
+		nil,
+		arguments,
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func functionCall(
+	context Context,
+	function tsgo.Expression,
+	arguments []tsgo.Expression,
+) tsgo.CallExpression {
+	return context.Factory().CallExpression(
+		function,
 		nil,
 		nil,
 		arguments,

@@ -1,18 +1,15 @@
 package artifact
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
-type Contract map[api.ArtifactFacet][]byte
-
 type artifactRecord struct {
 	contract       Contract
-	history        []Contract
+	history        contractHistory
 	dependencies   map[api.ArtifactDependency]struct{}
 	facetRevisions map[api.ArtifactFacet]uint64
 }
@@ -20,7 +17,7 @@ type artifactRecord struct {
 type Graph struct {
 	records map[api.ArtifactOwner]*artifactRecord
 	reverse map[api.ArtifactDependency]map[api.ArtifactOwner]struct{}
-	dirty   map[api.ArtifactOwner]struct{}
+	dirty   artifactOwnerQueue
 	compare func(api.ArtifactOwner, api.ArtifactOwner) int
 }
 
@@ -69,7 +66,7 @@ func NewGraph(
 		reverse: make(
 			map[api.ArtifactDependency]map[api.ArtifactOwner]struct{},
 		),
-		dirty:   make(map[api.ArtifactOwner]struct{}),
+		dirty:   newArtifactOwnerQueue(compare),
 		compare: compare,
 	}
 }
@@ -98,16 +95,16 @@ func (g *Graph) Commit(
 	}
 
 	current := g.records[owner]
-	changed := changedArtifactFacets(nil, nextContract)
+	var previousContract Contract
+	changed := changedArtifactFacets(Contract{}, nextContract)
 	if current != nil {
+		previousContract = current.contract
 		changed = changedArtifactFacets(current.contract, nextContract)
 		if len(changed) != 0 {
-			for _, historical := range current.history {
-				if equalArtifactContracts(historical, nextContract) {
-					return &ArtifactConvergenceError{
-						Object: owner,
-						Facets: append([]api.ArtifactFacet(nil), changed...),
-					}
+			if current.history.contains(current.contract, nextContract) {
+				return &ArtifactConvergenceError{
+					Object: owner,
+					Facets: append([]api.ArtifactFacet(nil), changed...),
 				}
 			}
 		}
@@ -125,25 +122,37 @@ func (g *Graph) Commit(
 	current.contract = nextContract
 	g.addReverseEdges(owner, nextDependencies)
 
-	if len(current.history) == 0 {
-		current.history = append(current.history, nextContract)
-		for facet := range nextContract {
+	if len(current.history.entries) == 0 {
+		current.history.initialize(nextContract)
+		for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
+			if !nextContract.hasFacet(facet) {
+				continue
+			}
 			current.facetRevisions[facet] = 1
 		}
-		return nil
+		return g.invalidateConsumers(owner, changed)
 	}
 	if len(changed) == 0 {
 		return nil
 	}
-	current.history = append(current.history, nextContract)
+	current.history.append(previousContract, nextContract)
 	for _, facet := range changed {
 		current.facetRevisions[facet]++
+	}
+	return g.invalidateConsumers(owner, changed)
+}
+
+func (g *Graph) invalidateConsumers(
+	owner api.ArtifactOwner,
+	facets []api.ArtifactFacet,
+) error {
+	for _, facet := range facets {
 		dependency, dependencyError := api.NewArtifactDependency(owner, facet)
 		if dependencyError != nil {
 			return dependencyError
 		}
 		for consumer := range g.reverse[dependency] {
-			g.dirty[consumer] = struct{}{}
+			g.dirty.push(consumer)
 		}
 	}
 	return nil
@@ -177,27 +186,15 @@ func (g *Graph) addReverseEdges(
 }
 
 func (g *Graph) NextDirty() (api.ArtifactOwner, bool) {
-	var selected api.ArtifactOwner
-	found := false
-	for object := range g.dirty {
-		if !found || g.compare(object, selected) < 0 {
-			selected = object
-			found = true
-		}
-	}
-	if !found {
-		return api.ArtifactOwner{}, false
-	}
-	delete(g.dirty, selected)
-	return selected, true
+	return g.dirty.pop()
 }
 
 func (g *Graph) DiscardDirty(owner api.ArtifactOwner) {
-	delete(g.dirty, owner)
+	g.dirty.discard(owner)
 }
 
 func (g *Graph) HasPending() bool {
-	return len(g.dirty) != 0
+	return g.dirty.pending()
 }
 
 func (g *Graph) VerifyClosure() error {
@@ -238,7 +235,7 @@ func (g *Graph) VerifyClosure() error {
 					Reason:   "artifact dependency provider was not published",
 				}
 			}
-			if _, ok := provider.contract[dependency.Facet()]; !ok {
+			if !provider.contract.hasFacet(dependency.Facet()) {
 				return &GraphError{
 					Object:   consumer,
 					Provider: dependency.Provider(),
@@ -273,52 +270,12 @@ func (g *Graph) FacetRevision(
 	return record.facetRevisions[facet]
 }
 
-func validateArtifactContract(
+func (g *Graph) ExportedBindings(
 	owner api.ArtifactOwner,
-	contract Contract,
-) (Contract, error) {
-	if contract == nil {
-		return nil, &GraphError{
-			Object: owner,
-			Reason: "target artifact observable contract is absent",
-		}
+) ([]string, bool) {
+	record := g.records[owner]
+	if record == nil {
+		return nil, false
 	}
-	result := make(Contract, len(contract))
-	for facet, encoded := range contract {
-		if !facet.Valid() {
-			return nil, &GraphError{
-				Object: owner,
-				Facet:  facet,
-				Reason: "target artifact observable contract has an invalid facet",
-			}
-		}
-		if len(encoded) == 0 {
-			return nil, &GraphError{
-				Object: owner,
-				Facet:  facet,
-				Reason: "target artifact observable contract has an empty facet",
-			}
-		}
-		result[facet] = bytes.Clone(encoded)
-	}
-	return result, nil
-}
-
-func changedArtifactFacets(
-	current Contract,
-	next Contract,
-) []api.ArtifactFacet {
-	var changed []api.ArtifactFacet
-	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetValueSurface; facet++ {
-		currentValue, currentOK := current[facet]
-		nextValue, nextOK := next[facet]
-		if currentOK != nextOK || !bytes.Equal(currentValue, nextValue) {
-			changed = append(changed, facet)
-		}
-	}
-	return changed
-}
-
-func equalArtifactContracts(left Contract, right Contract) bool {
-	return len(changedArtifactFacets(left, right)) == 0
+	return record.contract.ExportedBindings()
 }

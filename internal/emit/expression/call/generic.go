@@ -43,14 +43,11 @@ func emitGeneric(
 	if err := validateResults(context, source, signature, discarded); err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	reference, err := context.Names().Reference(owner)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
 	typeArguments, typeRequests, err := genericinstance.EmitTypeArguments(
 		context,
 		children,
 		source,
+		owner,
 		instance.TypeArgs,
 	)
 	if err != nil {
@@ -83,6 +80,21 @@ func emitGeneric(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	declarationSignature, ok := owner.Type().(*types.Signature)
+	if !ok {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	reference, callableFacet, _, err :=
+		cooperativecall.SelectGenericCallable(
+			context,
+			owner,
+			declarationSignature,
+			signature,
+		)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	arguments = append(capabilityArguments, arguments...)
 	result, err := api.NewExpressionEmission(
 		before,
@@ -104,17 +116,17 @@ func emitGeneric(
 		return api.ExpressionEmission{}, true, err
 	}
 	if detached {
-		result, err = cooperativecall.DetachedSourceCall(
+		result, err = cooperativecall.DetachedGenericCall(
 			context,
 			source,
-			owner,
+			callableFacet,
 			result,
 		)
 	} else {
-		result, err = cooperativecall.SourceCall(
+		result, err = cooperativecall.GenericCall(
 			context,
 			source,
-			owner,
+			callableFacet,
 			result,
 		)
 	}

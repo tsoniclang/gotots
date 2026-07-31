@@ -76,7 +76,9 @@ func EmitDeferred(
 	var requests []api.RootRequest
 	var contractRequests []api.RootRequest
 	cooperative := false
-	if static {
+	literal, directLiteral := directFunctionLiteral(source.Fun)
+	switch {
+	case static:
 		owner, direct := calleeObject(context.TypesInfo(), source.Fun)
 		if !direct {
 			return api.ExpressionEmission{}, &api.InvariantError{
@@ -97,14 +99,60 @@ func EmitDeferred(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-	} else {
-		targetType, err := children.RepresentedType(
-			context.WithRole(api.RoleCallCallee),
-			source.Fun,
-			context.TypesInfo().TypeOf(source.Fun),
+	case directLiteral:
+		name, err := context.Names().Temporary(api.TemporaryCallCallee)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		before = append(
+			before,
+			constantDeclaration(
+				context,
+				name,
+				nil,
+				targetCallee,
+			),
+		)
+		targetCallee = context.Factory().Identifier(name)
+		control, err := context.FunctionLiteralControlRequest(
+			literal,
+			api.CallableControlRecovery,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
+		}
+		requests = append(requests, control)
+		cooperative, contractRequests, err =
+			cooperativecall.LiteralContract(context, literal)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	default:
+		sourceType := context.TypesInfo().TypeOf(source.Fun)
+		targetType, err := children.RepresentedType(
+			context.WithRole(api.RoleCallCallee),
+			source.Fun,
+			sourceType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if _, defined := definedtype.ResolveCallable(sourceType); defined {
+			targetCallee = context.Factory().PropertyAccessExpression(
+				targetCallee,
+				nil,
+				context.Factory().Identifier(definedtype.ValueMember),
+				tsgo.NodeFlagsNone,
+			)
+			targetType, err = callable.EmitType(
+				context.WithRole(api.RoleCallCallee),
+				children,
+				source.Fun,
+				signature,
+			)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
 		}
 		name, err := context.Names().Temporary(api.TemporaryCallCallee)
 		if err != nil {
@@ -148,16 +196,6 @@ func EmitDeferred(
 		}
 		invocationBefore = append(invocationBefore, guard)
 		requests = append(requests, guardRequests...)
-		if _, ok := definedtype.ResolveCallable(
-			context.TypesInfo().TypeOf(source.Fun),
-		); ok {
-			targetCallee = context.Factory().PropertyAccessExpression(
-				targetCallee,
-				nil,
-				context.Factory().Identifier(definedtype.ValueMember),
-				tsgo.NodeFlagsNone,
-			)
-		}
 	}
 	arguments = append(
 		arguments,

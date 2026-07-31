@@ -1,6 +1,7 @@
 package slicevalue
 
 import (
+	"go/ast"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -38,23 +39,30 @@ func RangeLength(
 
 func RangeElement(
 	context api.Context,
+	source ast.Node,
+	elementType types.Type,
 	receiver tsgo.Expression,
 	index tsgo.Expression,
-) api.ExpressionEmission {
-	return api.DirectExpression(context.Factory().CallExpression(
-		context.Factory().PropertyAccessExpression(
-			receiver,
-			nil,
-			context.Factory().Identifier(
-				runtimeslice.MemberName(runtimeslice.MemberGet),
+) (api.ExpressionEmission, error) {
+	return context.ContainerStorage().FromContainerStorage(
+		context.WithRole(api.RoleSliceElement),
+		source,
+		elementType,
+		api.DirectExpression(context.Factory().CallExpression(
+			context.Factory().PropertyAccessExpression(
+				receiver,
+				nil,
+				context.Factory().Identifier(
+					runtimeslice.MemberName(runtimeslice.MemberGet),
+				),
+				tsgo.NodeFlagsNone,
 			),
+			nil,
+			nil,
+			[]tsgo.Expression{index},
 			tsgo.NodeFlagsNone,
-		),
-		nil,
-		nil,
-		[]tsgo.Expression{index},
-		tsgo.NodeFlagsNone,
-	))
+		)),
+	)
 }
 
 func Source(

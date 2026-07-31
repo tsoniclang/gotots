@@ -15,8 +15,8 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
+	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
-	sourceType := context.TypesInfo().TypeOf(source)
 	mapType, ok := maprepresentation.Source(context, sourceType)
 	if !ok ||
 		source.Incomplete ||
@@ -42,15 +42,6 @@ func Emit(
 			entry.Key,
 			mapType.Key(),
 			false,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		key, err = maprepresentation.ProjectKey(
-			context.WithRole(api.RoleMapKey),
-			entry.Key,
-			mapType.Key(),
-			key,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -98,7 +89,12 @@ func Emit(
 	}
 	if api.ContainsGenericTypeParameter(sourceType) {
 		parameterTypes := []types.Type{mapType.Element()}
-		arguments := []tsgo.Expression{zero.Value()}
+		arguments := []api.ExpressionEmission{
+			api.DirectExpression(
+				zero.Value(),
+				api.CombineRequests(requests, zero.Requests())...,
+			),
+		}
 		for index := range source.Elts {
 			parameterTypes = append(
 				parameterTypes,
@@ -107,8 +103,8 @@ func Emit(
 			)
 			arguments = append(
 				arguments,
-				values[index*2],
-				values[index*2+1],
+				api.DirectExpression(values[index*2]),
+				api.DirectExpression(values[index*2+1]),
 			)
 		}
 		target, err := genericoperation.Call(
@@ -118,7 +114,6 @@ func Emit(
 			parameterTypes,
 			[]types.Type{sourceType},
 			arguments,
-			api.CombineRequests(requests, zero.Requests())...,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -168,8 +163,19 @@ func emitOperand(
 		context.WithExpectedType(targetType),
 		source,
 	)
-	if err != nil || !copyValue {
+	if err != nil {
 		return value, err
 	}
-	return context.Values().Copy(context, source, targetType, value)
+	mode := api.ValueTransferRepresentation
+	if copyValue {
+		mode = api.ValueTransferCopy
+	}
+	return context.Values().Transfer(
+		context,
+		source,
+		sourceType,
+		targetType,
+		mode,
+		value,
+	)
 }

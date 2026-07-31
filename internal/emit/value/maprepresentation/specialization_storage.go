@@ -23,7 +23,9 @@ func (b specializationBuilder) findMethod() tsgo.MethodDeclaration {
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
 		specializationFindOperation,
-		[]tsgo.ParameterDeclaration{b.parameter("key", b.keyType)},
+		[]tsgo.ParameterDeclaration{
+			b.parameter("key", b.storageKeyType),
+		},
 		b.foundType(),
 		b.variable(
 			tsgo.NodeFlagsConst,
@@ -102,11 +104,9 @@ func (b specializationBuilder) findMethod() tsgo.MethodDeclaration {
 
 func (b specializationBuilder) lookupMethod() tsgo.MethodDeclaration {
 	found := b.id("found")
-	return b.method(
-		nil,
-		b.members.lookup,
-		[]tsgo.ParameterDeclaration{b.parameter("key", b.keyType)},
-		b.valueType,
+	storageKey, statements := b.storageKeyBinding(b.id("key"))
+	statements = append(
+		statements,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"found",
@@ -114,7 +114,7 @@ func (b specializationBuilder) lookupMethod() tsgo.MethodDeclaration {
 			b.call(
 				b.factory.ThisExpression(),
 				specializationFindOperation,
-				b.id("key"),
+				storageKey,
 			),
 		),
 		b.factory.ReturnStatement(
@@ -130,19 +130,24 @@ func (b specializationBuilder) lookupMethod() tsgo.MethodDeclaration {
 			),
 		),
 	)
+	return b.method(
+		nil,
+		b.members.lookup,
+		[]tsgo.ParameterDeclaration{b.parameter("key", b.keyType)},
+		b.valueType,
+		statements...,
+	)
 }
 
 func (b specializationBuilder) lookupOKMethod() tsgo.MethodDeclaration {
 	found := b.id("found")
+	storageKey, statements := b.storageKeyBinding(b.id("key"))
 	resultType := b.factory.TupleTypeNode([]tsgo.TypeNode{
 		b.valueType,
 		b.booleanType(),
 	})
-	return b.method(
-		nil,
-		b.members.lookupOK,
-		[]tsgo.ParameterDeclaration{b.parameter("key", b.keyType)},
-		resultType,
+	statements = append(
+		statements,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"found",
@@ -150,7 +155,7 @@ func (b specializationBuilder) lookupOKMethod() tsgo.MethodDeclaration {
 			b.call(
 				b.factory.ThisExpression(),
 				specializationFindOperation,
-				b.id("key"),
+				storageKey,
 			),
 		),
 		b.factory.IfStatement(
@@ -182,6 +187,13 @@ func (b specializationBuilder) lookupOKMethod() tsgo.MethodDeclaration {
 			),
 		),
 	)
+	return b.method(
+		nil,
+		b.members.lookupOK,
+		[]tsgo.ParameterDeclaration{b.parameter("key", b.keyType)},
+		resultType,
+		statements...,
+	)
 }
 
 func (b specializationBuilder) foundValue(
@@ -200,7 +212,8 @@ func (b specializationBuilder) storeMethod() tsgo.MethodDeclaration {
 	hash := b.id("hash")
 	bucket := b.id("bucket")
 	entry := b.id("entry")
-	return b.method(
+	storageKey, keyStatements := b.storageKeyBinding(b.id("key"))
+	return b.methodWithPrefix(
 		nil,
 		b.members.store,
 		[]tsgo.ParameterDeclaration{
@@ -208,6 +221,7 @@ func (b specializationBuilder) storeMethod() tsgo.MethodDeclaration {
 			b.parameter("value", b.valueType),
 		},
 		b.voidType(),
+		keyStatements,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"buckets",
@@ -228,7 +242,7 @@ func (b specializationBuilder) storeMethod() tsgo.MethodDeclaration {
 			tsgo.NodeFlagsConst,
 			"hash",
 			b.numberType(),
-			b.staticCall(specializationHashOperation, b.id("key")),
+			b.staticCall(specializationHashOperation, storageKey),
 		),
 		b.variable(
 			tsgo.NodeFlagsLet,
@@ -263,7 +277,7 @@ func (b specializationBuilder) storeMethod() tsgo.MethodDeclaration {
 				b.staticCall(
 					specializationEqualOperation,
 					b.element(entry, b.number("0")),
-					b.id("key"),
+					storageKey,
 				),
 				b.factory.Block(
 					[]tsgo.Statement{
@@ -291,7 +305,7 @@ func (b specializationBuilder) storeMethod() tsgo.MethodDeclaration {
 					[]tsgo.Expression{
 						b.staticCall(
 							specializationCopyOperation,
-							b.id("key"),
+							storageKey,
 						),
 						b.staticCall(
 							specializationCopyValueOperation,
@@ -326,12 +340,14 @@ func (b specializationBuilder) deleteMethod() tsgo.MethodDeclaration {
 	found := b.id("found")
 	bucket := b.element(found, b.number("0"))
 	index := b.element(found, b.number("1"))
-	hash := b.staticCall(specializationHashOperation, b.id("key"))
-	return b.method(
+	storageKey, keyStatements := b.storageKeyBinding(b.id("key"))
+	hash := b.staticCall(specializationHashOperation, storageKey)
+	return b.methodWithPrefix(
 		nil,
 		b.members.deleteMember,
 		[]tsgo.ParameterDeclaration{b.parameter("key", b.keyType)},
 		b.voidType(),
+		keyStatements,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"found",
@@ -339,7 +355,7 @@ func (b specializationBuilder) deleteMethod() tsgo.MethodDeclaration {
 			b.call(
 				b.factory.ThisExpression(),
 				specializationFindOperation,
-				b.id("key"),
+				storageKey,
 			),
 		),
 		b.factory.IfStatement(
@@ -513,7 +529,9 @@ func (b specializationBuilder) keysMethod() tsgo.MethodDeclaration {
 							b.call(
 								result,
 								"push",
-								b.element(entry, b.number("0")),
+								b.reifyKeyExpression(
+									b.element(entry, b.number("0")),
+								),
 							),
 						),
 					}, true),

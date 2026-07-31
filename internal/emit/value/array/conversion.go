@@ -48,17 +48,31 @@ func (a RuntimeArray) FromSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	elementCopy, err := context.Values().Copy(
-		context.WithRole(api.RoleArrayElement),
-		nil,
-		a.ElementType(),
-		api.DirectExpression(callSlice(
+	element, err := a.loadElement(
+		context,
+		source,
+		callSlice(
 			context,
 			sourceValue,
 			runtimeslice.MemberName(runtimeslice.MemberGet),
 			index,
-		)),
+		),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	elementCopy, err := context.Values().Transfer(
+		context.WithRole(api.RoleArrayElement),
+		nil,
+		a.ElementType(),
+		a.ElementType(),
+		api.ValueTransferCopy,
+		element,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	elementCopy, err = a.storeElement(context, source, elementCopy)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

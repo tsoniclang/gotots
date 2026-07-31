@@ -7,6 +7,20 @@ type Box struct {
 type Boxes [2]Box
 type Matrix [2][2]Box
 
+type Phantom[T any] struct {
+	_     [0]T
+	Value int32
+}
+
+func genericZeroLengthPhantom[T any](value int32) int32 {
+	phantom := Phantom[T]{Value: value}
+	return phantom.Value
+}
+
+func GenericZeroLengthPhantom() int32 {
+	return genericZeroLengthPhantom[Box](17)
+}
+
 func NewBoxes(left, right int32) Boxes {
 	return Boxes{{Value: left}, {Value: right}}
 }

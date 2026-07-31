@@ -125,7 +125,7 @@ func hashBigIntMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 		factory.Identifier("value"),
 	)
 	number := factory.CallExpression(
-		factory.Identifier("Number"),
+		api.TargetIntrinsicNumber.Expression(factory),
 		nil,
 		nil,
 		[]tsgo.Expression{low},

@@ -136,8 +136,36 @@ func emitCaseTypes(
 				sourceType,
 			)
 		}
+		if api.ContainsGenericTypeParameter(targetType) {
+			assertion, err := interfacevalue.AssertGeneric(
+				context.WithRole(api.RoleTypeSwitchCaseType),
+				sourceType,
+				selected.sourceType,
+				targetType,
+				true,
+				api.DirectExpression(value),
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			test, err := interfacevalue.GenericAssertionElement(
+				context.WithRole(api.RoleTypeSwitchCaseType),
+				assertion,
+				1,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			targets = append(targets, caseType{
+				sourceType: targetType,
+				test:       test,
+			})
+			requests = append(requests, test.Requests()...)
+			continue
+		}
 		test, err := interfacevalue.Test(
 			context.WithRole(api.RoleTypeSwitchCaseType),
+			selected.sourceType,
 			targetType,
 			value,
 		)

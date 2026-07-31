@@ -13,6 +13,37 @@ func MethodReceiver(
 	source *ast.SelectorExpr,
 	selected *types.Selection,
 ) (api.ExpressionEmission, *types.Func, error) {
+	return methodReceiver(
+		context,
+		children,
+		source,
+		selected,
+		true,
+	)
+}
+
+func DirectMethodReceiver(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.SelectorExpr,
+	selected *types.Selection,
+) (api.ExpressionEmission, *types.Func, error) {
+	return methodReceiver(
+		context,
+		children,
+		source,
+		selected,
+		false,
+	)
+}
+
+func methodReceiver(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.SelectorExpr,
+	selected *types.Selection,
+	copyValue bool,
+) (api.ExpressionEmission, *types.Func, error) {
 	resolved, method, ok := methodPath(selected)
 	if !ok || !Valid(context, source, selected, types.MethodVal) {
 		return api.ExpressionEmission{}, nil,
@@ -20,16 +51,23 @@ func MethodReceiver(
 	}
 	signature := method.Type().(*types.Signature)
 	declared := signature.Recv().Type()
+	abiReceiver, ok := methodABIReceiver(method)
+	if !ok {
+		return api.ExpressionEmission{}, nil,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	_, declaredElement, _, declaredPointer := pointerType(declared)
 	_, _, _, effectivePointer := pointerType(resolved.effective)
 	if declaredPointer &&
 		!effectivePointer &&
 		types.Identical(declaredElement, resolved.effective) {
-		receiver, err := addressSource(
+		receiver, err := valuePointerMethodReceiver(
 			context,
 			children,
 			source,
 			resolved,
+			method,
+			abiReceiver,
 		)
 		return receiver, method, err
 	}
@@ -49,22 +87,23 @@ func MethodReceiver(
 		resolved,
 		method,
 		root,
+		copyValue,
 	)
 	return receiver, method, err
 }
 
-func MethodSetReceiver(
+func DirectMethodSetReceiver(
 	context api.Context,
 	children api.ChildEmitter,
 	source ast.Node,
 	selected *types.Selection,
 	root api.ExpressionEmission,
-) (api.ExpressionEmission, *types.Func, error) {
+) (api.ExpressionEmission, types.Type, *types.Func, error) {
 	resolved, method, ok := methodPath(selected)
 	if !ok ||
 		selected.Kind() != types.MethodVal ||
 		!types.Identical(selected.Recv(), resolved.root) {
-		return api.ExpressionEmission{}, nil,
+		return api.ExpressionEmission{}, nil, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	receiver, err := methodSetReceiver(
@@ -74,8 +113,9 @@ func MethodSetReceiver(
 		resolved,
 		method,
 		root,
+		false,
 	)
-	return receiver, method, err
+	return receiver, resolved.effective, method, err
 }
 
 func methodSetReceiver(
@@ -85,12 +125,35 @@ func methodSetReceiver(
 	resolved path,
 	method *types.Func,
 	root api.ExpressionEmission,
+	copyValue bool,
 ) (api.ExpressionEmission, error) {
 	signature := method.Type().(*types.Signature)
 	declared := signature.Recv().Type()
+	abiReceiver, ok := methodABIReceiver(method)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	abiPointer, _, _, abiIsPointer := pointerType(abiReceiver)
 	_, declaredElement, _, declaredPointer := pointerType(declared)
-	_, effectiveElement, _, effectivePointer :=
+	effectiveRaw, effectiveElement, _, effectivePointer :=
 		pointerType(resolved.effective)
+	if declaredPointer &&
+		!effectivePointer &&
+		types.Identical(declaredElement, resolved.effective) {
+		if _, _, _, rootPointer := pointerType(resolved.root); !rootPointer {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		return projectAddress(
+			context,
+			children,
+			source,
+			resolved,
+			root,
+			false,
+		)
+	}
 	value, err := projectValue(
 		context,
 		children,
@@ -103,14 +166,17 @@ func methodSetReceiver(
 	}
 	switch {
 	case declaredPointer &&
+		abiIsPointer &&
 		effectivePointer &&
 		types.Identical(declaredElement, effectiveElement):
-		return value, nil
-	case declaredPointer &&
-		!effectivePointer &&
-		types.Identical(declaredElement, resolved.effective):
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
+		return adaptPointerMethodReceiver(
+			context,
+			source,
+			method.Origin(),
+			abiPointer,
+			effectiveRaw,
+			value,
+		)
 	case !declaredPointer &&
 		effectivePointer &&
 		types.Identical(declared, effectiveElement):
@@ -131,10 +197,15 @@ func methodSetReceiver(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	return context.Values().Copy(
+	if !copyValue {
+		return value, nil
+	}
+	return context.Values().Transfer(
 		context.WithRole(api.RoleReceiverValue),
 		source,
 		declared,
+		declared,
+		api.ValueTransferCopy,
 		value,
 	)
 }
@@ -153,8 +224,14 @@ func MethodExpressionReceiver(
 	}
 	signature := method.Type().(*types.Signature)
 	declared := signature.Recv().Type()
+	abiReceiver, ok := methodABIReceiver(method)
+	if !ok {
+		return api.ExpressionEmission{}, nil,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	abiPointer, _, _, abiIsPointer := pointerType(abiReceiver)
 	_, declaredElement, _, declaredPointer := pointerType(declared)
-	_, effectiveElement, _, effectivePointer :=
+	effectiveRaw, effectiveElement, _, effectivePointer :=
 		pointerType(resolved.effective)
 
 	if declaredPointer &&
@@ -186,9 +263,18 @@ func MethodExpressionReceiver(
 	}
 	switch {
 	case declaredPointer &&
+		abiIsPointer &&
 		effectivePointer &&
 		types.Identical(declaredElement, effectiveElement):
-		return value, method, nil
+		value, err = adaptPointerMethodReceiver(
+			context,
+			source,
+			method.Origin(),
+			abiPointer,
+			effectiveRaw,
+			value,
+		)
+		return value, method, err
 	case !declaredPointer &&
 		effectivePointer &&
 		types.Identical(declared, effectiveElement):
@@ -209,10 +295,12 @@ func MethodExpressionReceiver(
 		return api.ExpressionEmission{}, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	value, err = context.Values().Copy(
+	value, err = context.Values().Transfer(
 		context.WithRole(api.RoleReceiverValue),
 		source,
 		declared,
+		declared,
+		api.ValueTransferCopy,
 		value,
 	)
 	return value, method, err

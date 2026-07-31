@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -104,8 +105,8 @@ func emitSpec(
 				)
 		}
 
-		_, callableZero := callable.Signature(object.Type())
-		callableZero = callableZero && len(source.Values) == 0
+		callableZero := len(source.Values) == 0 &&
+			omitCallableZeroInitializer(object.Type())
 		var value api.ExpressionEmission
 		var err error
 		if callableZero {
@@ -223,6 +224,12 @@ func emitSpec(
 	return statements, requests, nil
 }
 
+func omitCallableZeroInitializer(sourceType types.Type) bool {
+	_, callableValue := callable.Signature(sourceType)
+	_, definedValue := definedtype.ResolveCallable(sourceType)
+	return callableValue && !definedValue
+}
+
 func localVariableDeclaration(
 	context api.Context,
 	children api.ChildEmitter,
@@ -316,10 +323,12 @@ func localValue(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return context.Values().Copy(
+	return context.Values().Transfer(
 		valueContext,
 		sourceValue,
+		valueType,
 		object.Type(),
+		api.ValueTransferCopy,
 		value,
 	)
 }

@@ -12,6 +12,104 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+func (owner Owner) PointerRepresentation(
+	context api.Context,
+	pointer *types.Pointer,
+	carrierDemand bool,
+) (api.PointerRepresentationObservation, error) {
+	return owner.pointerRepresentation(
+		context,
+		nil,
+		pointer,
+		carrierDemand,
+	)
+}
+
+func (owner Owner) SourcePointerRepresentation(
+	context api.Context,
+	sourceOwner types.Object,
+	pointer *types.Pointer,
+	carrierDemand bool,
+) (api.PointerRepresentationObservation, error) {
+	if sourceOwner == nil {
+		return api.PointerRepresentationObservation{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "source pointer representation owner is nil",
+		}
+	}
+	return owner.pointerRepresentation(
+		context,
+		sourceOwner,
+		pointer,
+		carrierDemand,
+	)
+}
+
+func (owner Owner) pointerRepresentation(
+	context api.Context,
+	sourceOwner types.Object,
+	pointer *types.Pointer,
+	carrierDemand bool,
+) (api.PointerRepresentationObservation, error) {
+	if pointer == nil {
+		return api.PointerRepresentationObservation{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "pointer representation source is nil",
+		}
+	}
+	baseline, err := api.DefaultPointerRepresentationForType(pointer)
+	if err != nil {
+		return api.PointerRepresentationObservation{}, err
+	}
+	if baseline == api.PointerRepresentationCarrierLogical &&
+		!owner.RequiresStorageProjection(context, pointer.Elem()) {
+		return api.NewPointerRepresentationObservation(
+			api.PointerRepresentationCarrierLogical,
+		)
+	}
+	names := context.PointerRepresentationNames()
+	if names == nil {
+		return api.PointerRepresentationObservation{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "pointer representation name owner is unavailable",
+		}
+	}
+	var reference api.PointerRepresentationReference
+	if sourceOwner == nil {
+		reference, err = names.PointerRepresentation(pointer)
+	} else {
+		reference, err = names.SourcePointerRepresentation(
+			sourceOwner,
+			pointer,
+		)
+	}
+	if err != nil {
+		return api.PointerRepresentationObservation{}, err
+	}
+	resolver, ok := owner.children.(api.PointerRepresentationResolver)
+	if !ok {
+		return api.PointerRepresentationObservation{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "pointer representation resolver is unavailable",
+		}
+	}
+	observation, err := resolver.ObservePointerRepresentation(
+		context.ArtifactOwner(),
+		reference.Artifact(),
+		carrierDemand,
+	)
+	if err != nil {
+		return api.PointerRepresentationObservation{}, err
+	}
+	return api.NewPointerRepresentationObservation(
+		observation.Representation(),
+		api.CombineRequests(
+			reference.Requests(),
+			observation.Requests(),
+		)...,
+	)
+}
+
 func primitive(
 	context api.Context,
 	sourceType types.Type,
@@ -27,6 +125,10 @@ func callableValue(sourceType types.Type) bool {
 func pointerValue(sourceType types.Type) bool {
 	_, _, ok := pointertype.Resolve(sourceType)
 	return ok
+}
+
+func unsafePointerValue(sourceType types.Type) bool {
+	return basictype.SupportsUnsafePointer(sourceType)
 }
 
 func channelValue(sourceType types.Type) bool {

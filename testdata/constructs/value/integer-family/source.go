@@ -93,12 +93,34 @@ func NumberVariableUnsignedShift(value uint32, count uint8) (uint32, uint32) {
 	return value << count, value >> count
 }
 
+type DefinedShiftCount uint8
+
+func DefinedShift(value int64, count DefinedShiftCount) (int64, int64) {
+	return value << count, value >> count
+}
+
 func NumberUnary(value int32) (int32, int32, int32) {
 	return +value, -value, ^value
 }
 
 func NumberUnaryUint(value uint32) uint32 {
 	return ^value
+}
+
+func NumberWideBits(left, right int64) (int64, int64, int64, int64) {
+	return left & right, left | right, left ^ right, left &^ right
+}
+
+func NumberWideShifts(value int64) (int64, int64) {
+	return value << 3, value >> 2
+}
+
+func NumberWideUnary(value int) int {
+	return ^value
+}
+
+func UntypedBooleanNot(left int32, right int32) bool {
+	return !(left <= right && right <= 10)
 }
 
 func UnsignedComplement8(value uint8) uint8 {

@@ -95,7 +95,7 @@ func allocateMethod(
 		[]tsgo.TypeNode{elementType},
 		[]tsgo.Expression{call(
 			factory,
-			factory.Identifier("Number"),
+			api.TargetIntrinsicNumber.Expression(factory),
 			nil,
 			length,
 		)},
@@ -381,7 +381,7 @@ func copyMethod(
 						tsgo.BinaryOperatorPlusToken,
 						call(
 							factory,
-							factory.Identifier("Number"),
+							api.TargetIntrinsicNumber.Expression(factory),
 							nil,
 							runtimeProperty(
 								factory,
@@ -546,7 +546,7 @@ func checkMethod(
 				),
 				call(
 					factory,
-					factory.Identifier("Number"),
+					api.TargetIntrinsicNumber.Expression(factory),
 					nil,
 					index,
 				),
@@ -562,7 +562,7 @@ func checkMethod(
 								factory,
 								property(
 									factory,
-									factory.Identifier("Number"),
+									api.TargetIntrinsicNumber.Expression(factory),
 									"isInteger",
 								),
 								nil,

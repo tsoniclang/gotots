@@ -42,7 +42,7 @@ func deferredReturnControl(
 	if err != nil {
 		return api.ReturnControl{}, nil, nil, "", err
 	}
-	targetType, typeRequests, err := emitResultType(
+	targetType, typeRequests, err := EmitResultType(
 		context.WithRole(api.RoleResultType),
 		children,
 		source,
@@ -51,7 +51,7 @@ func deferredReturnControl(
 	if err != nil {
 		return api.ReturnControl{}, nil, nil, "", err
 	}
-	zero, err := zeroResult(context, source, results)
+	zero, err := ZeroResult(context, source, results)
 	if err != nil {
 		return api.ReturnControl{}, nil, nil, "", err
 	}
@@ -95,14 +95,14 @@ func namedReturnTargets(
 			return nil, err
 		}
 		if !selected {
-			reference, err := context.Names().Reference(result)
+			targetName, err := context.Names().Result(result, index)
 			if err != nil {
 				return nil, err
 			}
 			target, err = api.NewStoreTargetEmission(
-				context.Factory().Identifier(reference.Name()),
+				context.Factory().Identifier(targetName),
 				result.Type(),
-				reference.Requests(),
+				nil,
 			)
 			if err != nil {
 				return nil, err
@@ -113,7 +113,7 @@ func namedReturnTargets(
 	return targets, nil
 }
 
-func zeroResult(
+func ZeroResult(
 	context api.Context,
 	source ast.Node,
 	results *types.Tuple,
@@ -180,19 +180,20 @@ func deferredFinalReturn(
 			return nil, nil, err
 		}
 		if !selected {
-			reference, err := context.Names().Reference(result)
+			targetName, err := context.Names().Result(result, index)
 			if err != nil {
 				return nil, nil, err
 			}
 			value = api.DirectExpression(
-				context.Factory().Identifier(reference.Name()),
-				reference.Requests()...,
+				context.Factory().Identifier(targetName),
 			)
 		}
-		value, err = context.Values().Copy(
+		value, err = context.Values().Transfer(
 			context.WithRole(api.RoleReturnResult),
 			nil,
 			result.Type(),
+			result.Type(),
+			api.ValueTransferCopy,
 			value,
 		)
 		if err != nil {

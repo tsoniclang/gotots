@@ -22,10 +22,20 @@ type identityOwner struct {
 func NamedObjectKey(
 	object *types.TypeName,
 ) (string, error) {
-	if object == nil || object.Pkg() == nil {
+	if object == nil {
 		return "", &api.NameError{
 			Reason: "generated-artifact named component has no package identity",
 		}
+	}
+	if object.Pkg() == nil {
+		if object.Parent() != types.Universe ||
+			types.Universe.Lookup(object.Name()) != object {
+			return "", &api.NameError{
+				Name:   object.Name(),
+				Reason: "generated-artifact named component has no language identity",
+			}
+		}
+		return "go:universe|" + object.Name(), nil
 	}
 	if object.Parent() != object.Pkg().Scope() ||
 		object.Parent().Lookup(object.Name()) != object {
@@ -131,7 +141,19 @@ func BuildKey(
 	sourceType types.Type,
 	namedObjectIdentity NamedObjectIdentity,
 ) (string, error) {
-	return buildKey(sourceType, identityOwner{
+	descriptor, err := BuildDescriptor(sourceType, namedObjectIdentity)
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256([]byte(descriptor))
+	return hex.EncodeToString(digest[:]), nil
+}
+
+func BuildDescriptor(
+	sourceType types.Type,
+	namedObjectIdentity NamedObjectIdentity,
+) (string, error) {
+	return buildDescriptor(sourceType, identityOwner{
 		namedObject: namedObjectIdentity,
 	})
 }
@@ -141,18 +163,35 @@ func BuildParameterizedKey(
 	namedObjectIdentity NamedObjectIdentity,
 	typeParameterIdentity TypeParameterIdentity,
 ) (string, error) {
+	descriptor, err := BuildParameterizedDescriptor(
+		sourceType,
+		namedObjectIdentity,
+		typeParameterIdentity,
+	)
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256([]byte(descriptor))
+	return hex.EncodeToString(digest[:]), nil
+}
+
+func BuildParameterizedDescriptor(
+	sourceType types.Type,
+	namedObjectIdentity NamedObjectIdentity,
+	typeParameterIdentity TypeParameterIdentity,
+) (string, error) {
 	if typeParameterIdentity == nil {
 		return "", &api.NameError{
 			Reason: "generated-artifact type-parameter identity owner is nil",
 		}
 	}
-	return buildKey(sourceType, identityOwner{
+	return buildDescriptor(sourceType, identityOwner{
 		namedObject:   namedObjectIdentity,
 		typeParameter: typeParameterIdentity,
 	})
 }
 
-func buildKey(
+func buildDescriptor(
 	sourceType types.Type,
 	owner identityOwner,
 ) (string, error) {
@@ -174,8 +213,7 @@ func buildKey(
 	); err != nil {
 		return "", err
 	}
-	digest := sha256.Sum256([]byte(descriptor.String()))
-	return hex.EncodeToString(digest[:]), nil
+	return descriptor.String(), nil
 }
 
 func appendTypeDescriptor(

@@ -23,6 +23,7 @@ func EmitAssembly(
 	seen := make(map[api.DeclarationRequirement]struct{}, len(requirements))
 	operations := make(map[api.NamedStructOperation]operationAssembly)
 	demanded := make(map[api.NamedStructOperation]bool)
+	var representationRequirements []api.DeclarationRequirement
 	for _, requirement := range requirements {
 		if _, duplicate := seen[requirement]; duplicate {
 			return api.DeclarationEmission{}, &api.InvariantError{
@@ -31,6 +32,21 @@ func EmitAssembly(
 			}
 		}
 		seen[requirement] = struct{}{}
+		if requirement.Kind() ==
+			api.DeclarationRequirementGenericRepresentation {
+			owner, _, _, ok := requirement.GenericRepresentation()
+			if !ok || owner != typeName {
+				return api.DeclarationEmission{}, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "named struct received a foreign generic representation",
+				}
+			}
+			representationRequirements = append(
+				representationRequirements,
+				requirement,
+			)
+			continue
+		}
 		if owner, operation, ok := requirement.NamedStructOperation(); ok {
 			if owner != typeName {
 				return api.DeclarationEmission{}, &api.InvariantError{
@@ -80,5 +96,12 @@ func EmitAssembly(
 	sort.Slice(ordered, func(left, right int) bool {
 		return ordered[left].operation < ordered[right].operation
 	})
-	return emitClass(context, children, declaration, typeName, ordered)
+	return emitClass(
+		context,
+		children,
+		declaration,
+		typeName,
+		ordered,
+		representationRequirements,
+	)
 }

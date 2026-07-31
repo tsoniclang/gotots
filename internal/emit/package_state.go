@@ -8,6 +8,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
@@ -54,8 +55,14 @@ type packageInitializationArtifact struct {
 	reconstructions uint64
 }
 
+type packageInitFunction struct {
+	function *types.Func
+	name     string
+}
+
 type packageTargetBuilder struct {
 	sourcePackage      *load.Package
+	assemblyOwner      api.ArtifactOwner
 	statePath          string
 	assemblyPath       string
 	emitter            *emitter
@@ -67,7 +74,11 @@ type packageTargetBuilder struct {
 	storageByObject    map[*types.Var]int
 	initialization     []packageInitializationArtifact
 	initializerByOwner map[api.ArtifactOwner]int
-	initFunctions      []tsgo.Statement
+	initFunctions      []packageInitFunction
+	exportObjects      map[types.Object]struct{}
+	exportStatements   []tsgo.Statement
+	exportPublished    bool
+	exportRevisions    uint64
 }
 
 func newPackageInitializationScheduler() *packageInitializationScheduler {
@@ -133,8 +144,15 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 	if err != nil {
 		return err
 	}
+	assemblyOwner, err := api.PackageAssemblyArtifactOwner(
+		sourcePackage.Types(),
+	)
+	if err != nil {
+		return err
+	}
 	builder := &packageTargetBuilder{
 		sourcePackage:      sourcePackage,
+		assemblyOwner:      assemblyOwner,
 		statePath:          statePath,
 		assemblyPath:       assemblyPath,
 		emitter:            emitter,
@@ -144,6 +162,7 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 		assemblyPlacement:  targetplacement.New(),
 		storageByObject:    make(map[*types.Var]int),
 		initializerByOwner: make(map[api.ArtifactOwner]int),
+		exportObjects:      make(map[types.Object]struct{}),
 	}
 	s.packageBuilders[sourcePackage] = builder
 
@@ -154,6 +173,10 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 	for _, imported := range imports {
 		dependency := s.source.PackageForTypes(imported)
 		if dependency == nil && s.goRuntime.Owns(imported) {
+			continue
+		}
+		if dependency == nil &&
+			s.source.EnvironmentForTypes(imported) != nil {
 			continue
 		}
 		if dependency == nil || dependency.ModulePath() == "" {
@@ -191,7 +214,7 @@ func (s *programSession) emitPackageStorage(
 	variable *types.Var,
 	site declarationSite,
 ) error {
-	builder := s.packageBuilders[site.source]
+	builder := s.packageBuilders[site.Source]
 	if builder == nil {
 		return &ScheduleError{
 			Object: variable.Name(),
@@ -212,6 +235,7 @@ func (s *programSession) emitPackageStorage(
 	revision, err := s.buildPackageStorageRevision(
 		builder,
 		owner,
+		site,
 		source,
 		variable,
 	)
@@ -241,9 +265,44 @@ func (s *programSession) emitPackageStorage(
 func (s *programSession) buildPackageStorageRevision(
 	builder *packageTargetBuilder,
 	owner api.ArtifactOwner,
+	site declarationSite,
 	source ast.Node,
 	variable *types.Var,
 ) (packageStorageRevision, error) {
+	stateNames, ok := builder.stateContext.Names().(*emitnaming.File)
+	if !ok {
+		return packageStorageRevision{}, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "package storage state has no concrete name owner",
+		}
+	}
+	finishState, err := stateNames.BeginArtifact(
+		owner,
+		source,
+		site.SourceFile.Syntax(),
+		site.OutputPath,
+	)
+	if err != nil {
+		return packageStorageRevision{}, err
+	}
+	defer finishState()
+	assemblyNames, ok := builder.assemblyContext.Names().(*emitnaming.File)
+	if !ok {
+		return packageStorageRevision{}, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "package storage assembly has no concrete name owner",
+		}
+	}
+	finishAssembly, err := assemblyNames.BeginArtifact(
+		owner,
+		source,
+		site.SourceFile.Syntax(),
+		site.OutputPath,
+	)
+	if err != nil {
+		return packageStorageRevision{}, err
+	}
+	defer finishAssembly()
 	emission, err := packagevariable.EmitStorage(
 		builder.stateContext.WithArtifactOwner(owner),
 		builder.assemblyContext.WithArtifactOwner(owner),
@@ -292,13 +351,10 @@ func (s *programSession) buildPackageStorageRevision(
 func packageStorageContract(
 	field tsgo.PropertyDeclaration,
 ) (artifactstate.Contract, error) {
-	encoded, err := tsgo.EncodeNode(field)
-	if err != nil {
-		return nil, err
-	}
-	return artifactstate.Contract{
-		api.ArtifactFacetValueSurface: encoded,
-	}, nil
+	return artifactstate.ProjectFacet(
+		api.ArtifactFacetValueSurface,
+		field,
+	)
 }
 
 func (s *programSession) reconstructPackageStorage(
@@ -318,7 +374,7 @@ func (s *programSession) reconstructPackageStorage(
 			Reason: "package storage lost its source declaration",
 		}
 	}
-	builder := s.packageBuilders[site.source]
+	builder := s.packageBuilders[site.Source]
 	index, found := builder.storageByObject[variable]
 	if builder == nil || !found || index >= len(builder.storage) {
 		return &ScheduleError{
@@ -338,6 +394,7 @@ func (s *programSession) reconstructPackageStorage(
 	revision, err := s.buildPackageStorageRevision(
 		builder,
 		owner,
+		site,
 		storage.source,
 		variable,
 	)
@@ -364,7 +421,7 @@ func packageVariableSyntax(
 	site declarationSite,
 	variable *types.Var,
 ) (ast.Node, error) {
-	declaration, ok := site.declaration.(*ast.GenDecl)
+	declaration, ok := site.Declaration.(*ast.GenDecl)
 	if !ok {
 		return nil, &ScheduleError{
 			Object: variable.Name(),
@@ -377,7 +434,7 @@ func packageVariableSyntax(
 			continue
 		}
 		for _, name := range spec.Names {
-			if site.source.TypesInfo().Defs[name] == variable {
+			if site.Source.TypesInfo().Defs[name] == variable {
 				return name, nil
 			}
 		}
@@ -433,7 +490,7 @@ func (s *programSession) emitPackageInitFunctions(
 	for _, sourceFile := range packageBuilder.sourcePackage.Files() {
 		for _, declaration := range sourceFile.Syntax().Decls {
 			function, ok := declaration.(*ast.FuncDecl)
-			if !ok || !isPackageInitDeclaration(function) {
+			if !ok || !declarationindex.IsPackageInitializer(function) {
 				continue
 			}
 			object, ok := packageBuilder.sourcePackage.TypesInfo().
@@ -478,15 +535,10 @@ func (s *programSession) emitPackageInitFunctions(
 			}
 			packageBuilder.initFunctions = append(
 				packageBuilder.initFunctions,
-				s.factory.ExpressionStatement(
-					s.factory.CallExpression(
-						s.factory.Identifier(binding.Name),
-						nil,
-						nil,
-						nil,
-						tsgo.NodeFlagsNone,
-					),
-				),
+				packageInitFunction{
+					function: object.Origin(),
+					name:     binding.Name,
+				},
 			)
 		}
 	}

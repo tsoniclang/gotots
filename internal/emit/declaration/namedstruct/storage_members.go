@@ -16,6 +16,15 @@ func storageMakeMethod(
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
+	if len(typeParameters) != 0 {
+		return genericStorageMakeMethod(
+			context,
+			className,
+			fields,
+			typeParameters,
+			typeArguments,
+		), nil, nil
+	}
 	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
 	properties := make([]tsgo.ObjectLiteralElementLike, 0, len(fields))
 	var requests []api.RootRequest
@@ -82,6 +91,63 @@ func storageMakeMethod(
 			true,
 		),
 	), requests, nil
+}
+
+func genericStorageMakeMethod(
+	context api.Context,
+	className string,
+	fields []layoutField,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
+) tsgo.MethodDeclaration {
+	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
+	properties := make([]tsgo.ObjectLiteralElementLike, 0, len(fields))
+	for index, selected := range fields {
+		name := context.Factory().Identifier(
+			"$field" + strconv.Itoa(index),
+		)
+		parameters = append(parameters, context.Factory().ParameterDeclaration(
+			nil,
+			nil,
+			name,
+			nil,
+			selected.storageType,
+			nil,
+		))
+		properties = append(properties, context.Factory().PropertyAssignment(
+			nil,
+			context.Factory().Identifier(selected.field.name),
+			nil,
+			selected.storageType,
+			name,
+		))
+	}
+	value := context.Factory().NewExpression(
+		context.Factory().Identifier(className),
+		typeArguments,
+		[]tsgo.Expression{
+			context.Factory().ObjectLiteralExpression(properties, true),
+		},
+	)
+	return context.Factory().MethodDeclaration(
+		[]tsgo.ModifierLike{
+			context.Factory().PublicKeyword(),
+			context.Factory().StaticKeyword(),
+		},
+		nil,
+		context.Factory().Identifier(api.StructMakeMember),
+		nil,
+		typeParameters,
+		parameters,
+		context.Factory().TypeReferenceNode(
+			context.Factory().Identifier(className),
+			typeArguments,
+		),
+		context.Factory().Block(
+			[]tsgo.Statement{context.Factory().ReturnStatement(value)},
+			true,
+		),
+	)
 }
 
 func storageOfMethod(

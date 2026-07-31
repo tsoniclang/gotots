@@ -9,6 +9,7 @@ import (
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -21,14 +22,17 @@ func (owner Owner) Equal(
 	left tsgo.Expression,
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
-	if parameter, ok := api.GenericTypeParameter(sourceType); ok {
+	if api.ContainsGenericTypeParameter(sourceType) {
 		return genericoperation.Call(
 			context,
 			source,
 			api.GenericOperationEqual,
-			[]types.Type{parameter, parameter},
+			[]types.Type{sourceType, sourceType},
 			[]types.Type{types.Typ[types.Bool]},
-			[]tsgo.Expression{left, right},
+			[]api.ExpressionEmission{
+				api.DirectExpression(left),
+				api.DirectExpression(right),
+			},
 		)
 	}
 	if _, ok := interfacetype.Resolve(sourceType); ok {
@@ -53,20 +57,18 @@ func (owner Owner) Equal(
 	if panicNilRuntimeValue(context, sourceType) {
 		return panicNilEqual(context), nil
 	}
+	if unsafePointerValue(sourceType) {
+		return api.DirectExpression(context.Factory().BinaryExpression(
+			nil,
+			left,
+			nil,
+			context.Factory().BinaryOperatorToken(
+				tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+			),
+			right,
+		)), nil
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
-		if defined.Family() == definedtype.FamilyCallable {
-			return api.DirectExpression(
-				context.Factory().BinaryExpression(
-					nil,
-					left,
-					nil,
-					context.Factory().BinaryOperatorToken(
-						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-					),
-					right,
-				),
-			), nil
-		}
 		leftValue := api.DirectExpression(left)
 		rightValue := api.DirectExpression(right)
 		var err error
@@ -138,6 +140,30 @@ func (owner Owner) Equal(
 		)), nil
 	}
 	if pointerValue(sourceType) {
+		pointer, _, _ := pointertype.Resolve(sourceType)
+		representation, err := owner.PointerRepresentation(
+			context,
+			pointer,
+			false,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if representation.Representation() ==
+			api.PointerRepresentationDirectClass {
+			return api.DirectExpression(
+				context.Factory().BinaryExpression(
+					nil,
+					left,
+					nil,
+					context.Factory().BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					),
+					right,
+				),
+				representation.Requests()...,
+			), nil
+		}
 		reference, err := context.Names().Runtime(
 			api.RuntimePointer,
 			api.ImportPhaseValue,
@@ -158,7 +184,10 @@ func (owner Owner) Equal(
 				[]tsgo.Expression{left, right},
 				tsgo.NodeFlagsNone,
 			),
-			reference.Requests()...,
+			api.CombineRequests(
+				reference.Requests(),
+				representation.Requests(),
+			)...,
 		), nil
 	}
 	if channelValue(sourceType) {

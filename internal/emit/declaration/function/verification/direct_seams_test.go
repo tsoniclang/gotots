@@ -26,8 +26,8 @@ func TestDirectSeamsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		"switch (true)",
 		"for (current = 0; current < limit; current = current + 1)",
 		"for (Touch(); value < 2; Touch())",
-		"const __gotots_for_post_",
-		"const __gotots_for_condition_",
+		"let __gotots_for_first_",
+		"for (;;)",
 	} {
 		if !strings.Contains(printed, expected) {
 			t.Fatalf("printed direct-seam artifact lacks %q:\n%s", expected, printed)

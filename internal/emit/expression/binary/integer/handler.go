@@ -39,6 +39,10 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	right, err = projectDefinedShiftCount(context, source, right)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	operands, err := expressionoperands.PreservePair(
 		context,
 		left,
@@ -188,11 +192,16 @@ func operationTypes(
 		if !ok {
 			return nil, nil, integervalue.Carrier{}, false
 		}
+		definedCount := isDefinedIntegerShiftCount(
+			context.TypesSizes(),
+			rightType,
+		)
 		if typeAndValue.Value == nil {
 			if _, rightOK := integervalue.Describe(
 				context.TypesSizes(),
 				rightType,
-			); !rightOK ||
+			); !rightOK &&
+				!definedCount ||
 				!integervalue.SupportsVariableShift(
 					context.IntegerRepresentation(),
 					carrier,
@@ -212,7 +221,7 @@ func operationTypes(
 		if _, represented := integervalue.Describe(
 			context.TypesSizes(),
 			rightType,
-		); !represented {
+		); !represented && !definedCount {
 			expectedRight = resultType
 		}
 		if !types.AssignableTo(rightType, expectedRight) {

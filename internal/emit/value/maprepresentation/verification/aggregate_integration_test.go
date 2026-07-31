@@ -22,7 +22,7 @@ func TestScalarMapArtifactsStayAtTheImmutableBaseline(t *testing.T) {
 		t.TempDir(),
 	)
 	for path, expected := range map[string]string{
-		"source.ts":      "03b88afbe335259cd53706f7dda8a150d51b9c7d5211a0b0bb2c067e843bf6de",
+		"source.ts":      "5137e4d2a84f40636951ab24b911a46bd19bedba960df79d19bda7e7a2f4fb88",
 		"runtime/map.ts": "7f26493efc6f9213e59853a6e485061ae24fa2d0cd41a277f6d54e9399c3fc6e",
 	} {
 		content := readFile(t, artifacts.file(t, path))
@@ -51,6 +51,7 @@ func TestProductionAggregateKeyOperationsAreStaticAndTyped(t *testing.T) {
 		"AggregateMap",
 		types.NewMap(key, value),
 		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
+		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
 		factory.TypeReferenceNode(factory.Identifier("Box"), nil),
 	)
 	if err != nil {
@@ -58,23 +59,32 @@ func TestProductionAggregateKeyOperationsAreStaticAndTyped(t *testing.T) {
 	}
 	operations := make(map[string]int)
 	requirements := make(map[api.DeclarationRequirement]int)
-	for _, request := range specialization.Requests() {
-		requirement, ok := request.DeclarationRequirement()
-		if !ok {
-			continue
-		}
-		if requirement.Kind() != api.DeclarationRequirementNamedStructOperation {
-			t.Fatalf(
-				"aggregate specialization introduced requirement kind %d",
-				requirement.Kind(),
-			)
-		}
-		requirements[requirement]++
-		typeName, operation, ok := requirement.NamedStructOperation()
-		if !ok {
-			t.Fatal("named-struct requirement lost its typed operation")
-		}
-		operations[typeName.Name()+"/"+operation.String()]++
+	err = api.WalkRootRequests(
+		specialization.Requests(),
+		func(request api.RootRequest) error {
+			requirement, ok := request.DeclarationRequirement()
+			if !ok {
+				return nil
+			}
+			if requirement.Kind() != api.DeclarationRequirementNamedStructOperation {
+				return fmt.Errorf(
+					"aggregate specialization introduced requirement kind %d",
+					requirement.Kind(),
+				)
+			}
+			requirements[requirement]++
+			typeName, operation, ok := requirement.NamedStructOperation()
+			if !ok {
+				return fmt.Errorf(
+					"named-struct requirement lost its typed operation",
+				)
+			}
+			operations[typeName.Name()+"/"+operation.String()]++
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 	for _, operation := range []string{
 		"Key/copy",
@@ -173,6 +183,7 @@ func TestUnnamedArrayKeyOperationsInlineStaticTypedSemantics(t *testing.T) {
 				nil,
 				"ArrayMap",
 				types.NewMap(key, value),
+				factory.TypeReferenceNode(factory.Identifier("ArrayKey"), nil),
 				factory.TypeReferenceNode(factory.Identifier("ArrayKey"), nil),
 				factory.TypeReferenceNode(factory.Identifier("Box"), nil),
 			)
@@ -328,6 +339,10 @@ func (aggregateNames) Parameter(variable *types.Var, _ int) (string, error) {
 	return variable.Name(), nil
 }
 
+func (aggregateNames) Result(variable *types.Var, _ int) (string, error) {
+	return variable.Name(), nil
+}
+
 func (aggregateNames) Reference(object types.Object) (api.NameReference, error) {
 	return api.NewNameReference(object.Name())
 }
@@ -370,6 +385,7 @@ func (aggregateNames) AnonymousStructStorage(
 func (aggregateNames) AnonymousStruct(
 	*types.Struct,
 	api.AnonymousStructDemand,
+	api.ImportPhase,
 ) (api.NameReference, error) {
 	panic("unused")
 }
@@ -383,7 +399,15 @@ func (aggregateNames) MapSpecialization(
 
 func (aggregateNames) InterfaceAdapter(
 	types.Type,
+	types.Type,
 ) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceContractDemand(
+	types.Type,
+	types.Type,
+) ([]api.RootRequest, error) {
 	panic("unused")
 }
 
@@ -405,9 +429,21 @@ func (aggregateNames) InterfaceContract(
 	panic("unused")
 }
 
+func (aggregateNames) MethodTarget(
+	*types.Func,
+) (api.MethodTarget, error) {
+	panic("unused")
+}
+
 func (aggregateNames) InterfaceMethodName(
 	*types.Func,
 ) (string, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceMethodCallable(
+	*types.Func,
+) (api.InterfaceMethodCallableReference, error) {
 	panic("unused")
 }
 
@@ -427,6 +463,19 @@ func (aggregateNames) GenericCapability(
 func (aggregateNames) CallableABI(
 	*types.Signature,
 ) (api.CallableABIReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) SourceCallableABI(
+	types.Object,
+	*types.Signature,
+) (api.CallableABIReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) GenericCallableProfile(
+	*api.GenericCallableProfile,
+) (api.NameReference, error) {
 	panic("unused")
 }
 

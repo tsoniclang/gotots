@@ -30,12 +30,12 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 	for _, required := range []string{
 		"GoPointer.cell",
 		"GoPointer.field",
-		"GoPointer.indexView",
+		"GoPointer.index",
 		"goSliceAddress",
-		"goSliceAddressView",
 		"value$storage",
-		"export function Box_Add",
-		"export function Box_Nil",
+		"export class Box",
+		"static Add(box:",
+		"static Nil(box:",
 	} {
 		if !strings.Contains(target, required) {
 			t.Fatalf("addressable pointer artifact lacks %q:\n%s", required, target)
@@ -47,7 +47,10 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 		".call(",
 		".apply(",
 		".bind(",
-		"class Box_Add",
+		"GoPointer.indexView",
+		"goSliceAddressView",
+		"export function Box_Add",
+		"export function Box_Nil",
 	} {
 		if strings.Contains(target, forbidden) {
 			t.Fatalf("addressable pointer artifact contains %q:\n%s", forbidden, target)
@@ -62,13 +65,17 @@ import {
     Array,
     ArrayAddress,
     ArrayThroughPointer,
-    Box_Add,
+    Box,
     Cancel,
     CancelIdentity,
     Closure,
     Composite,
     DefinedArrayAddress,
     DefinedSliceAddress,
+    ElidedPointerArray,
+    ElidedPointerCompositeArray,
+    ElidedPointerMap,
+    ElidedPointerSlice,
     EscapedValue,
     Field,
     FunctionVariable,
@@ -86,6 +93,7 @@ import {
     NilPointerReceiver,
     MultipleResult,
     Package,
+    PackageValueAddress,
     Parallel,
     Parameter,
     PointerReceiverOnPointer,
@@ -139,7 +147,12 @@ console.log(...DefinedSliceAddress(52));
 console.log(...StructArrayAddress(53));
 console.log(...StructSliceAddress(54));
 console.log(...Package(60));
+console.log(...PackageValueAddress(61));
 console.log(Composite(70));
+console.log(...ElidedPointerSlice(71));
+console.log(ElidedPointerArray(72));
+console.log(ElidedPointerMap(73));
+console.log(ElidedPointerCompositeArray(74));
 console.log(PointerField(75));
 console.log(PointerToPointer(76));
 console.log(...SliceVariable(76));
@@ -165,7 +178,7 @@ try {
 console.log(PointerReceiverOnValue(80));
 console.log(PointerReceiverOnPointer(90));
 try {
-    Box_Add(undefined, 1);
+    Box.Add(undefined, 1);
     console.log(false);
 } catch {
     console.log(true);
@@ -389,7 +402,12 @@ func main() {
     fmt.Println(pointer.StructArrayAddress(53))
     fmt.Println(pointer.StructSliceAddress(54))
     fmt.Println(pointer.Package(60))
+    fmt.Println(pointer.PackageValueAddress(61))
     fmt.Println(pointer.Composite(70))
+    fmt.Println(pointer.ElidedPointerSlice(71))
+    fmt.Println(pointer.ElidedPointerArray(72))
+    fmt.Println(pointer.ElidedPointerMap(73))
+    fmt.Println(pointer.ElidedPointerCompositeArray(74))
     fmt.Println(pointer.PointerField(75))
     fmt.Println(pointer.PointerToPointer(76))
     fmt.Println(pointer.SliceVariable(76))

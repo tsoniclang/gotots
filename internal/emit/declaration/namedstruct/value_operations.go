@@ -7,7 +7,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
-	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -21,44 +20,23 @@ func emitValueOperation(
 	assembly operationAssembly,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
+	canonicalStorage bool,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	operation := assembly.operation
 	memberName, err := api.NamedStructOperationMemberName(operation)
 	if err != nil {
 		return nil, nil, err
 	}
-	var capabilities []tsgo.ParameterDeclaration
-	var capabilityRequests []api.RootRequest
-	if len(typeParameters) == 0 {
-		if len(assembly.capabilities) != 0 {
-			return nil, nil, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "non-generic struct operation received generic capabilities",
-			}
-		}
-	} else {
-		context = context.WithGenericNamedStructOperation(operation)
-		bindings, requests, emitErr :=
-			genericdeclaration.EmitOperationParameters(
-				context,
-				children,
-				source,
-				assembly.capabilities,
-			)
-		if emitErr != nil {
-			return nil, nil, emitErr
-		}
-		capabilityRequests = requests
-		if len(assembly.capabilities) != 0 {
-			capabilities, err = genericabi.JoinCapabilities(
-				assembly.capabilities[0].Owner(),
-				assembly.capabilities,
-				bindings,
-			)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
+	context, capabilities, capabilityRequests, err :=
+		prepareOperation(
+			context,
+			children,
+			source,
+			assembly,
+			typeParameters,
+		)
+	if err != nil {
+		return nil, nil, err
 	}
 	var member tsgo.MethodDeclaration
 	var requests []api.RootRequest
@@ -74,6 +52,7 @@ func emitValueOperation(
 			capabilities,
 			typeParameters,
 			typeArguments,
+			canonicalStorage,
 		)
 	case api.NamedStructOperationCopy:
 		member, requests, err = copyMethod(
@@ -86,6 +65,7 @@ func emitValueOperation(
 			capabilities,
 			typeParameters,
 			typeArguments,
+			canonicalStorage,
 		)
 	case api.NamedStructOperationEqual:
 		member, requests, err = equalMethod(
@@ -97,6 +77,7 @@ func emitValueOperation(
 			fields,
 			capabilities,
 			typeParameters,
+			canonicalStorage,
 		)
 	case api.NamedStructOperationHash:
 		member, requests, err = hashMethod(
@@ -107,6 +88,7 @@ func emitValueOperation(
 			fields,
 			capabilities,
 			typeParameters,
+			canonicalStorage,
 		)
 	case api.NamedStructOperationConvert:
 		member, requests, err = conversionMethod(
@@ -120,6 +102,16 @@ func emitValueOperation(
 			capabilities,
 			typeParameters,
 			typeArguments,
+			canonicalStorage,
+		)
+	case api.NamedStructOperationAssign:
+		member = assignMethod(
+			context,
+			memberName,
+			classType,
+			fields,
+			typeParameters,
+			canonicalStorage,
 		)
 	default:
 		return nil, nil, &api.InvariantError{
@@ -133,101 +125,49 @@ func emitValueOperation(
 	return member, api.CombineRequests(capabilityRequests, requests), nil
 }
 
-func hashMethod(
+func prepareOperation(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
-	memberName string,
-	classType tsgo.TypeNode,
-	fields []field,
-	capabilities []tsgo.ParameterDeclaration,
+	assembly operationAssembly,
 	typeParameters []tsgo.TypeParameterDeclaration,
-) (tsgo.MethodDeclaration, []api.RootRequest, error) {
-	runtime, err := context.Names().Runtime(
-		api.RuntimeMapHash,
-		api.ImportPhaseValue,
+) (
+	api.Context,
+	[]tsgo.ParameterDeclaration,
+	[]api.RootRequest,
+	error,
+) {
+	if len(typeParameters) == 0 {
+		if len(assembly.capabilities) != 0 {
+			return api.Context{}, nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "non-generic struct operation received generic capabilities",
+			}
+		}
+		return context, nil, nil, nil
+	}
+	context = context.WithGenericNamedStructOperation(assembly.operation)
+	bindings, requests, err := genericdeclaration.EmitOperationParameters(
+		context,
+		children,
+		source,
+		assembly.capabilities,
 	)
 	if err != nil {
-		return nil, nil, err
+		return api.Context{}, nil, nil, err
 	}
-	hashName := "$hash"
-	hash := context.Factory().Identifier(hashName)
-	body := []tsgo.Statement{
-		context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{
-					context.Factory().VariableDeclaration(
-						hash,
-						nil,
-						nil,
-						context.Factory().NumericLiteral(
-							"2166136261",
-							tsgo.TokenFlagsNone,
-						),
-					),
-				},
-				tsgo.NodeFlagsLet,
-			),
-		),
+	if len(assembly.capabilities) == 0 {
+		return context, nil, requests, nil
 	}
-	requests := runtime.Requests()
-	for _, field := range fields {
-		if field.blank {
-			continue
-		}
-		fieldHash, err := context.Values().Hash(
-			context.WithRole(api.RoleStructHashField),
-			field.source,
-			field.object.Type(),
-			property(context, "$source", field.name),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		body = append(body, fieldHash.Before()...)
-		body = append(
-			body,
-			context.Factory().ExpressionStatement(
-				context.Factory().BinaryExpression(
-					nil,
-					hash,
-					nil,
-					context.Factory().BinaryOperatorToken(
-						tsgo.BinaryOperatorEqualsToken,
-					),
-					context.Factory().CallExpression(
-						context.Factory().PropertyAccessExpression(
-							context.Factory().Identifier(runtime.Name()),
-							nil,
-							context.Factory().Identifier(
-								mapruntime.HashMixMember,
-							),
-							tsgo.NodeFlagsNone,
-						),
-						nil,
-						nil,
-						[]tsgo.Expression{hash, fieldHash.Value()},
-						tsgo.NodeFlagsNone,
-					),
-				),
-			),
-		)
-		requests = append(requests, fieldHash.Requests()...)
+	capabilities, err := genericabi.JoinCapabilities(
+		assembly.capabilities[0].Owner(),
+		assembly.capabilities,
+		bindings,
+	)
+	if err != nil {
+		return api.Context{}, nil, nil, err
 	}
-	body = append(body, context.Factory().ReturnStatement(hash))
-	return operationMethod(
-		context,
-		memberName,
-		[]tsgo.ParameterDeclaration{
-			parameter(context, "$source", classType),
-		},
-		context.Factory().KeywordTypeNode(
-			tsgo.KeywordTypeSyntaxKindNumberKeyword,
-		),
-		body,
-		capabilities,
-		typeParameters,
-	), requests, nil
+	return context, capabilities, requests, nil
 }
 
 func zeroMethod(
@@ -240,6 +180,7 @@ func zeroMethod(
 	capabilities []tsgo.ParameterDeclaration,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
+	canonicalStorage bool,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	arguments := make([]tsgo.Expression, 0, len(fields))
 	var requests []api.RootRequest
@@ -248,6 +189,16 @@ func zeroMethod(
 			context.WithRole(api.RoleStructZeroField),
 			field.source,
 			field.object.Type(),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		value, err = operationConstructionValue(
+			context.WithRole(api.RoleStructZeroField),
+			field.source,
+			field,
+			value,
+			canonicalStorage,
 		)
 		if err != nil {
 			return nil, nil, err
@@ -285,6 +236,7 @@ func copyMethod(
 	capabilities []tsgo.ParameterDeclaration,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
+	canonicalStorage bool,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	arguments := make([]tsgo.Expression, 0, len(fields))
 	var requests []api.RootRequest
@@ -298,14 +250,45 @@ func copyMethod(
 				field.object.Type(),
 			)
 		} else {
-			value := api.DirectExpression(property(context, "$source", field.name))
-			copied, err = context.Values().Copy(
+			value, valueErr := operationFieldValue(
+				context.WithRole(api.RoleStructCopyField),
+				field.source,
+				"$source",
+				field,
+				canonicalStorage,
+			)
+			if valueErr != nil {
+				return nil, nil, valueErr
+			}
+			copied, err = context.Values().Transfer(
 				context.WithRole(api.RoleStructCopyField),
 				field.source,
 				field.object.Type(),
+				field.object.Type(),
+				api.ValueTransferCopy,
 				value,
 			)
+			if err == nil {
+				copied, err = api.NewExpressionEmission(
+					copied.Before(),
+					copied.Value(),
+					api.CombineRequests(
+						value.Requests(),
+						copied.Requests(),
+					),
+				)
+			}
 		}
+		if err != nil {
+			return nil, nil, err
+		}
+		copied, err = operationConstructionValue(
+			context.WithRole(api.RoleStructCopyField),
+			field.source,
+			field,
+			copied,
+			canonicalStorage,
+		)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -341,6 +324,7 @@ func equalMethod(
 	fields []field,
 	capabilities []tsgo.ParameterDeclaration,
 	typeParameters []tsgo.TypeParameterDeclaration,
+	canonicalStorage bool,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	equalities := make([]api.ExpressionEmission, 0, len(fields))
 	var requests []api.RootRequest
@@ -349,18 +333,53 @@ func equalMethod(
 		if field.blank {
 			continue
 		}
+		left, err := operationFieldValue(
+			context.WithRole(api.RoleStructEqualField),
+			field.source,
+			"$left",
+			field,
+			canonicalStorage,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		right, err := operationFieldValue(
+			context.WithRole(api.RoleStructEqualField),
+			field.source,
+			"$right",
+			field,
+			canonicalStorage,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
 		equal, err := context.Values().Equal(
 			context.WithRole(api.RoleStructEqualField),
 			field.source,
 			field.object.Type(),
-			property(context, "$left", field.name),
-			property(context, "$right", field.name),
+			left.Value(),
+			right.Value(),
 		)
 		if err != nil {
 			return nil, nil, err
 		}
 		if len(equal.Before()) != 0 {
 			hasPrerequisites = true
+		}
+		equal, err = api.NewExpressionEmission(
+			append(
+				append(left.Before(), right.Before()...),
+				equal.Before()...,
+			),
+			equal.Value(),
+			api.CombineRequests(
+				left.Requests(),
+				right.Requests(),
+				equal.Requests(),
+			),
+		)
+		if err != nil {
+			return nil, nil, err
 		}
 		equalities = append(equalities, equal)
 		requests = append(requests, equal.Requests()...)

@@ -54,6 +54,10 @@ type Box[T any] struct {
 	Value T
 }
 
+type EmbeddedBox[T any] struct {
+	Box[T]
+}
+
 type Alias[T any] = Box[T]
 
 type Node[T any] struct {
@@ -75,6 +79,10 @@ type ComparableBox[T comparable] struct {
 	Value T
 }
 
+type DefinedMap[V any] map[int32]V
+
+type RangeMap map[int32]int32
+
 type ReaderValue struct {
 	Value int32
 }
@@ -90,6 +98,10 @@ func Identity[T any](value T) T {
 func Zero[T any]() T {
 	var result T
 	return result
+}
+
+func ZeroFromNew[T any]() T {
+	return *new(T)
 }
 
 func Add[T Integer](left, right T) T {
@@ -108,12 +120,45 @@ func Equal[T comparable](left, right T) bool {
 	return left == right
 }
 
+func GenericNil[T *U, U any](value T) bool {
+	return value == nil
+}
+
+func GenericMapNil[M ~map[int32]int32](value M) bool {
+	return value == nil
+}
+
+func GenericSliceNonNil[S ~[]int32](value S) bool {
+	return value != nil
+}
+
+func SameSliceStorage[T any](left, right []T) bool {
+	return len(left) == len(right) &&
+		(len(left) == 0 || &left[0] == &right[0])
+}
+
 func NewBox[T any](value T) Box[T] {
 	return Box[T]{Value: value}
 }
 
 func (box Box[T]) Get() T {
 	return box.Value
+}
+
+func (box Box[T]) privateValue() T {
+	return box.Value
+}
+
+func (box Box[T]) ForwardValue() T {
+	return box.privateValue()
+}
+
+func (box *Box[T]) SetValue(value T) {
+	box.Value = value
+}
+
+func (box *EmbeddedBox[T]) SetPromoted(value T) {
+	box.Value = value
 }
 
 func (box ComparableBox[T]) Same(other ComparableBox[T]) bool {
@@ -247,6 +292,25 @@ func GenericMapOperations[K comparable, V any](
 	return result, present, count + int32(len(values))
 }
 
+func GenericMapRange[M ~map[int32]int32](values M) int32 {
+	result := int32(0)
+	for key, value := range values {
+		result += key + value
+	}
+	return result
+}
+
+func (values DefinedMap[V]) At(key int32) V {
+	return values[key]
+}
+
+func GenericDefinedMapValue[V any](value V) (V, V) {
+	values := make(DefinedMap[V], 1)
+	values[1] = value
+	var nilValues DefinedMap[V]
+	return values.At(1), nilValues.At(1)
+}
+
 func ReadConstraint[T ValueReader](value T) int32 {
 	return value.ReadValue()
 }
@@ -260,6 +324,10 @@ func ConstructedValues[T any](value T) ([]T, *T, [2]T) {
 	pointer := &value
 	array := [2]T{value, value}
 	return items, pointer, array
+}
+
+func AppendValue[T any](items []T, value T) []T {
+	return append(items, value)
 }
 
 func ZeroIterator(yield func() bool) {
@@ -350,6 +418,64 @@ func IteratorReturnBoundary() int32 {
 	return 0
 }
 
+func IteratorMultipleReturn() (int32, string) {
+	for value := range OneIterator {
+		if value == 2 {
+			return value, "multiple"
+		}
+	}
+	return 0, "missing"
+}
+
+func IteratorNamedReturn() (result int32) {
+	for value := range OneIterator {
+		result = value
+		if value == 3 {
+			return
+		}
+	}
+	return
+}
+
+func IteratorNestedReturn() int32 {
+	for outer := range OneIterator {
+		for inner := range OneIterator {
+			if outer == 2 && inner == 3 {
+				return outer*10 + inner
+			}
+		}
+	}
+	return 0
+}
+
+func IteratorDeferredReturn() (result int32) {
+	defer func() {
+		result++
+	}()
+	for value := range OneIterator {
+		if value == 2 {
+			return value
+		}
+	}
+	return 0
+}
+
+func ReturnsBadIterator() int32 {
+	for value := range BadIterator {
+		return value
+	}
+	return 0
+}
+
+func IteratorSelectiveReturn() int32 {
+	for range ZeroIterator {
+	}
+	for range ZeroIterator {
+		return 1
+	}
+	return 0
+}
+
 func IteratorLabelBoundary() {
 iterator:
 	for range ZeroIterator {
@@ -421,6 +547,22 @@ func MutualAddB[T Integer](value, increment T, remaining int32) T {
 	return MutualAddA(value+increment, increment, remaining-1)
 }
 
+func applyInt32Comparison(
+	left int32,
+	right int32,
+	operation func(int32, int32) bool,
+) bool {
+	return operation(left, right)
+}
+
+func InferredGenericFunctionValue() bool {
+	return applyInt32Comparison(27, 27, Equal)
+}
+
+func ExplicitGenericFunctionValue() bool {
+	return applyInt32Comparison(28, 28, Equal[int32])
+}
+
 func CallableValues() []int32 {
 	identity := Identity[int32]
 	box := Box[int32]{Value: 8}
@@ -435,6 +577,13 @@ func CallableValues() []int32 {
 		unboundGet(box),
 		externalGet(),
 	}
+}
+
+func LocalTypeCapability() int32 {
+	type entry struct {
+		value int32
+	}
+	return GenericMapValue(entry{value: 24})
 }
 
 func AuditGenericMethodAdapters() []int32 {
@@ -457,10 +606,27 @@ func AuditFunctions() []int32 {
 	second := Add[int32](first, 5)
 	doubled := Twice(int32(3))
 	zero := Zero[int32]()
+	zeroFromNew := ZeroFromNew[int32]()
+	box := NewBox(int32(1))
+	box.SetValue(int32(2))
+	embedded := EmbeddedBox[int32]{Box: box}
+	embedded.SetPromoted(int32(3))
 	if !Equal(second, int32(9)) {
 		return []int32{-1}
 	}
-	return []int32{second, doubled, zero}
+	values := []int32{1}
+	return []int32{
+		second,
+		doubled,
+		zero,
+		zeroFromNew,
+		box.Value,
+		embedded.Value,
+		boolToInt32(InferredGenericFunctionValue()),
+		boolToInt32(ExplicitGenericFunctionValue()),
+		boolToInt32(SameSliceStorage(values, values)),
+		boolToInt32(SameSliceStorage(values, []int32{1})),
+	}
 }
 
 func Audit() []int32 {
@@ -477,11 +643,15 @@ func Audit() []int32 {
 	external := support.Make(int32(6))
 	constructedSlice, constructedPointer, constructedArray :=
 		ConstructedValues(int32(11))
+	appended := AppendValue([]int32{20}, int32(21))
 	mapValue, mapPresent, mapCount :=
 		GenericMapOperations(int32(15), int32(17))
+	definedMapValue, nilDefinedMapValue :=
+		GenericDefinedMapValue(int32(22))
 	textValue, textOrdered := TextOperations("go", "ts")
 	interfaceValue := InterfaceValue(int32(10))
 	zero := Zero[int32]()
+	pointerValue := int32(23)
 	if !Equal(copied.Get(), int32(9)) ||
 		!Equal(alias.Get(), int32(9)) ||
 		!Equal(empty.Get(), int32(0)) ||
@@ -496,11 +666,18 @@ func Audit() []int32 {
 		ComplexArithmetic(complex128(2+3i), complex128(1-1i)) !=
 			complex128(-4-2i) ||
 		interfaceValue != int32(10) ||
+		GenericNil(&pointerValue) ||
+		!GenericNil[*int32](nil) ||
+		!GenericMapNil(RangeMap(nil)) ||
+		GenericMapNil(RangeMap{1: 1}) ||
+		GenericSliceNonNil([]int32(nil)) ||
+		!GenericSliceNonNil([]int32{}) ||
 		!Equal(external.Get(), int32(6)) {
 		return []int32{-1}
 	}
 	return []int32{
 		box.Get(),
+		box.ForwardValue(),
 		zero,
 		RecursiveValue(),
 		MutualValue(),
@@ -528,10 +705,16 @@ func Audit() []int32 {
 		GenericMapValue(int32(15)),
 		mapValue,
 		mapCount,
+		GenericMapRange(RangeMap{2: 3}),
 		ReadConstraint(ReaderValue{Value: 16}),
 		constructedSlice[0],
 		*constructedPointer,
 		constructedArray[1],
+		appended[0],
+		appended[1],
+		definedMapValue,
+		nilDefinedMapValue,
+		LocalTypeCapability(),
 	}
 }
 

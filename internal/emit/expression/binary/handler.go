@@ -12,10 +12,10 @@ import (
 	definedbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/defined"
 	floatbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/float"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
-	"github.com/tsoniclang/gotots/internal/emit/expression/mapcomparison"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	"github.com/tsoniclang/gotots/internal/emit/value/nilcomparison"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -34,6 +34,13 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if target, handled, err := nilcomparison.Emit(
+		context,
+		children,
+		source,
+	); handled {
+		return target, err
+	}
 	if target, handled, err := emitGeneric(
 		context,
 		children,
@@ -41,21 +48,7 @@ func Emit(
 	); handled {
 		return target, err
 	}
-	if target, handled, err := mapcomparison.Emit(
-		context,
-		children,
-		source,
-	); handled {
-		return target, err
-	}
 	if source.Op == token.EQL || source.Op == token.NEQ {
-		if target, ok, err := emitSliceNilEquality(
-			context,
-			children,
-			source,
-		); ok || err != nil {
-			return target, err
-		}
 		if target, ok, err := emitValueEquality(context, children, source); ok || err != nil {
 			return target, err
 		}
@@ -146,6 +139,13 @@ func emitGeneric(
 	children api.ChildEmitter,
 	source *ast.BinaryExpr,
 ) (api.ExpressionEmission, bool, error) {
+	if target, handled, err := emitGenericNilEquality(
+		context,
+		children,
+		source,
+	); handled {
+		return target, true, err
+	}
 	leftType := context.TypesInfo().TypeOf(source.X)
 	rightType := context.TypesInfo().TypeOf(source.Y)
 	resultType := context.TypesInfo().TypeOf(source)
@@ -163,6 +163,12 @@ func emitGeneric(
 	case token.EQL, token.NEQ, token.LSS, token.LEQ, token.GTR, token.GEQ:
 		resultType = types.Typ[types.Bool]
 	}
+	leftType, rightType = contextualGenericOperandTypes(
+		leftType,
+		rightType,
+		leftGeneric,
+		rightGeneric,
+	)
 	left, err := children.Expression(
 		context.
 			WithRole(api.RoleBinaryLeft).
@@ -196,28 +202,82 @@ func emitGeneric(
 		operation,
 		[]types.Type{leftType, rightType},
 		[]types.Type{resultType},
-		[]tsgo.Expression{
-			operands.Left().Value(),
-			operands.Right().Value(),
+		[]api.ExpressionEmission{
+			operands.Left(),
+			operands.Right(),
 		},
-		operands.Left().Requests()...,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	target, err = api.NewExpressionEmission(
-		target.Before(),
-		target.Value(),
-		api.CombineRequests(
-			target.Requests(),
-			operands.Right().Requests(),
-		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
 	result, err := expressionoperands.Finish(operands, target)
 	return result, true, err
+}
+
+func emitGenericNilEquality(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.BinaryExpr,
+) (api.ExpressionEmission, bool, error) {
+	valueSource, role, valueType, negated, selected :=
+		nilcomparison.SelectSource(context.TypesInfo(), source)
+	if !selected {
+		return api.ExpressionEmission{}, false, nil
+	}
+	parameter, generic := api.GenericTypeParameter(valueType)
+	if !generic {
+		return api.ExpressionEmission{}, false, nil
+	}
+	value, err := children.Expression(
+		context.WithRole(role).WithExpectedType(parameter),
+		valueSource,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	target, err := genericoperation.Call(
+		context,
+		source,
+		api.GenericOperationNilEqual,
+		[]types.Type{parameter},
+		[]types.Type{types.Typ[types.Bool]},
+		[]api.ExpressionEmission{value},
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	result := target.Value()
+	if negated {
+		result = context.Factory().PrefixUnaryExpression(
+			tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+			result,
+		)
+	}
+	emission, err := api.NewExpressionEmission(
+		target.Before(),
+		result,
+		target.Requests(),
+	)
+	return emission, true, err
+}
+
+func contextualGenericOperandTypes(
+	leftType types.Type,
+	rightType types.Type,
+	leftGeneric bool,
+	rightGeneric bool,
+) (types.Type, types.Type) {
+	switch {
+	case leftGeneric &&
+		constantvalue.IsUntyped(rightType) &&
+		types.AssignableTo(rightType, leftType):
+		rightType = leftType
+	case rightGeneric &&
+		constantvalue.IsUntyped(leftType) &&
+		types.AssignableTo(leftType, rightType):
+		leftType = rightType
+	}
+	return leftType, rightType
 }
 
 func emitLogical(
@@ -335,11 +395,33 @@ func emitValueEquality(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	left, err = context.Values().Transfer(
+		context.WithRole(api.RoleBinaryLeft),
+		source.X,
+		leftType,
+		operandType,
+		api.ValueTransferRepresentation,
+		left,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	right, err := children.Expression(
 		context.
 			WithRole(api.RoleBinaryRight).
 			WithExpectedType(operandType),
 		source.Y,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	right, err = context.Values().Transfer(
+		context.WithRole(api.RoleBinaryRight),
+		source.Y,
+		rightType,
+		operandType,
+		api.ValueTransferRepresentation,
+		right,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -494,5 +576,5 @@ func isLogicalOperator(operator token.Token) bool {
 
 func isSupportedBoolean(value types.Type) bool {
 	basic, ok := types.Unalias(value).(*types.Basic)
-	return ok && basic.Kind() == types.Bool
+	return ok && basic.Info()&types.IsBoolean != 0
 }

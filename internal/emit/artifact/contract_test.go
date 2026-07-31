@@ -9,26 +9,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestObservableContractRejectsGenericEmptyButAcceptsTypedCoverage(t *testing.T) {
-	factory := tsgo.NewFactory()
-	if _, err := ProjectContract(factory, nil); err == nil {
-		t.Fatal("generic empty materialized contract was accepted")
-	}
-	contract, err := ProjectCoverageContract(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if contract == nil || len(contract) != 0 {
-		t.Fatalf("coverage contract = %#v, want explicit empty contract", contract)
-	}
-	statement := artifactTestFunction(factory, "value", nil)
-	if _, err := ProjectCoverageContract(
-		[]tsgo.Statement{statement},
-	); err == nil {
-		t.Fatal("coverage-only contract accepted a target declaration")
-	}
-}
-
 func TestObservableFunctionContractIgnoresBody(t *testing.T) {
 	factory := tsgo.NewFactory()
 	first := artifactTestFunction(factory, "value", nil)
@@ -48,8 +28,8 @@ func TestObservableFunctionContractIgnoresBody(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(
-		firstContract[api.ArtifactFacetCallableSignature],
-		secondContract[api.ArtifactFacetCallableSignature],
+		artifactFacetBytes(firstContract, api.ArtifactFacetCallableSignature),
+		artifactFacetBytes(secondContract, api.ArtifactFacetCallableSignature),
 	) {
 		t.Fatal("function body changed the observable callable signature")
 	}
@@ -78,8 +58,8 @@ func TestObservableFunctionContractIgnoresBody(t *testing.T) {
 		t.Fatal(err)
 	}
 	if bytes.Equal(
-		firstContract[api.ArtifactFacetCallableSignature],
-		changedContract[api.ArtifactFacetCallableSignature],
+		artifactFacetBytes(firstContract, api.ArtifactFacetCallableSignature),
+		artifactFacetBytes(changedContract, api.ArtifactFacetCallableSignature),
 	) {
 		t.Fatal("parameter change was absent from the callable signature")
 	}
@@ -142,8 +122,8 @@ func TestObservableClassContractPartitionsStaticAndInstanceFacets(t *testing.T) 
 		t.Fatal(err)
 	}
 	if bytes.Equal(
-		baseline[api.ArtifactFacetConstructorSurface],
-		constructorContract[api.ArtifactFacetConstructorSurface],
+		artifactFacetBytes(baseline, api.ArtifactFacetConstructorSurface),
+		artifactFacetBytes(constructorContract, api.ArtifactFacetConstructorSurface),
 	) {
 		t.Fatal("constructor parameter change did not change constructor surface")
 	}
@@ -164,8 +144,8 @@ func TestObservableClassContractPartitionsStaticAndInstanceFacets(t *testing.T) 
 		t.Fatal(err)
 	}
 	if bytes.Equal(
-		baseline[api.ArtifactFacetInstanceTypeSurface],
-		instanceContract[api.ArtifactFacetInstanceTypeSurface],
+		artifactFacetBytes(baseline, api.ArtifactFacetInstanceTypeSurface),
+		artifactFacetBytes(instanceContract, api.ArtifactFacetInstanceTypeSurface),
 	) {
 		t.Fatal("instance field type change did not change instance surface")
 	}
@@ -203,8 +183,8 @@ func TestObservableClassContractPartitionsStaticAndInstanceFacets(t *testing.T) 
 		t.Fatal(err)
 	}
 	if bytes.Equal(
-		baseline[api.ArtifactFacetStaticSurface],
-		staticContract[api.ArtifactFacetStaticSurface],
+		artifactFacetBytes(baseline, api.ArtifactFacetStaticSurface),
+		artifactFacetBytes(staticContract, api.ArtifactFacetStaticSurface),
 	) {
 		t.Fatal("static member addition did not change static surface")
 	}
@@ -215,6 +195,87 @@ func TestObservableClassContractPartitionsStaticAndInstanceFacets(t *testing.T) 
 		api.ArtifactFacetConstructorSurface,
 		api.ArtifactFacetInstanceTypeSurface,
 	)
+}
+
+func TestClassMemberContractSeparatesSignatureFromImplementation(t *testing.T) {
+	factory := tsgo.NewFactory()
+	member := func(
+		parameterType tsgo.TypeNode,
+		bodyValue string,
+	) tsgo.MethodDeclaration {
+		return factory.MethodDeclaration(
+			nil,
+			nil,
+			factory.Identifier("Read"),
+			nil,
+			nil,
+			[]tsgo.ParameterDeclaration{factory.ParameterDeclaration(
+				nil,
+				nil,
+				factory.Identifier("value"),
+				nil,
+				parameterType,
+				nil,
+			)},
+			factory.KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindNumberKeyword,
+			),
+			factory.Block(
+				[]tsgo.Statement{factory.ReturnStatement(
+					factory.Identifier(bodyValue),
+				)},
+				true,
+			),
+		)
+	}
+	numberType := factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindNumberKeyword,
+	)
+	baseline, err := ProjectClassMemberContract(
+		factory,
+		[]tsgo.ClassElement{member(numberType, "first")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodyChanged, err := ProjectClassMemberContract(
+		factory,
+		[]tsgo.ClassElement{member(numberType, "second")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(
+		artifactFacetBytes(baseline, api.ArtifactFacetCallableSignature),
+		artifactFacetBytes(bodyChanged, api.ArtifactFacetCallableSignature),
+	) {
+		t.Fatal("class-member body changed its callable signature")
+	}
+	if bytes.Equal(
+		artifactFacetBytes(baseline, api.ArtifactFacetImplementation),
+		artifactFacetBytes(bodyChanged, api.ArtifactFacetImplementation),
+	) {
+		t.Fatal("class-member body was absent from its implementation facet")
+	}
+
+	signatureChanged, err := ProjectClassMemberContract(
+		factory,
+		[]tsgo.ClassElement{member(
+			factory.KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindStringKeyword,
+			),
+			"first",
+		)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(
+		artifactFacetBytes(baseline, api.ArtifactFacetCallableSignature),
+		artifactFacetBytes(signatureChanged, api.ArtifactFacetCallableSignature),
+	) {
+		t.Fatal("class-member parameter type did not change its callable signature")
+	}
 }
 
 func TestObservableValueContractIgnoresInitializer(t *testing.T) {
@@ -260,8 +321,8 @@ func TestObservableValueContractIgnoresInitializer(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(
-		first[api.ArtifactFacetValueSurface],
-		second[api.ArtifactFacetValueSurface],
+		artifactFacetBytes(first, api.ArtifactFacetValueSurface),
+		artifactFacetBytes(second, api.ArtifactFacetValueSurface),
 	) {
 		t.Fatal("variable initializer changed the observable value surface")
 	}
@@ -276,8 +337,8 @@ func TestObservableValueContractIgnoresInitializer(t *testing.T) {
 		t.Fatal(err)
 	}
 	if bytes.Equal(
-		first[api.ArtifactFacetValueSurface],
-		changed[api.ArtifactFacetValueSurface],
+		artifactFacetBytes(first, api.ArtifactFacetValueSurface),
+		artifactFacetBytes(changed, api.ArtifactFacetValueSurface),
 	) {
 		t.Fatal("variable type change was absent from the value surface")
 	}
@@ -315,8 +376,14 @@ func TestObservableInterfaceAndAliasUseInstanceTypeFacet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(contract) != 1 ||
-		len(contract[api.ArtifactFacetInstanceTypeSurface]) == 0 {
+	instanceSurface, present := contract.facet(
+		api.ArtifactFacetInstanceTypeSurface,
+	)
+	if contract.present !=
+		uint8(1)<<api.ArtifactFacetInstanceTypeSurface|
+			uint8(1)<<api.ArtifactFacetExportSurface ||
+		!present ||
+		len(instanceSurface) == 0 {
 		t.Fatalf("contract facets = %#v", contract)
 	}
 
@@ -346,8 +413,8 @@ func TestObservableInterfaceAndAliasUseInstanceTypeFacet(t *testing.T) {
 		t.Fatal(err)
 	}
 	if bytes.Equal(
-		contract[api.ArtifactFacetInstanceTypeSurface],
-		changed[api.ArtifactFacetInstanceTypeSurface],
+		artifactFacetBytes(contract, api.ArtifactFacetInstanceTypeSurface),
+		artifactFacetBytes(changed, api.ArtifactFacetInstanceTypeSurface),
 	) {
 		t.Fatal("interface member change did not change instance type surface")
 	}
@@ -496,8 +563,18 @@ func assertArtifactFacetEqual(
 ) {
 	t.Helper()
 	for _, facet := range facets {
-		if !bytes.Equal(left[facet], right[facet]) {
+		leftValue, leftOK := left.facet(facet)
+		rightValue, rightOK := right.facet(facet)
+		if leftOK != rightOK || !bytes.Equal(leftValue, rightValue) {
 			t.Fatalf("facet %v changed unexpectedly", facet)
 		}
 	}
+}
+
+func artifactFacetBytes(
+	contract Contract,
+	facet api.ArtifactFacet,
+) []byte {
+	value, _ := contract.facet(facet)
+	return value
 }

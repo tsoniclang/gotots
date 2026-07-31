@@ -306,8 +306,9 @@ console.log(Add(-7, 2).toString());
 }
 
 type materializedProgram struct {
-	targetPaths []string
-	modules     map[string]string
+	targetPaths          []string
+	modules              map[string]string
+	initializationModule string
 }
 
 func materializeExportedProgram(
@@ -352,6 +353,12 @@ func materializeExportedProgram(
 			}
 			result.modules[base] = "./" +
 				strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
+		} else if file.Kind() == emit.TargetFileProgramInitialization {
+			if result.initializationModule != "" {
+				t.Fatal("multiple program-initialization modules were emitted")
+			}
+			result.initializationModule = "./" +
+				strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
 		}
 	}
 	return result
@@ -364,6 +371,14 @@ func (p materializedProgram) module(t *testing.T, base string) string {
 		t.Fatalf("emitted source module %q is absent", base)
 	}
 	return module
+}
+
+func (p materializedProgram) initialization(t *testing.T) string {
+	t.Helper()
+	if p.initializationModule == "" {
+		t.Fatal("program-initialization module is absent")
+	}
+	return p.initializationModule
 }
 
 func executeMaterializedTypeScript(

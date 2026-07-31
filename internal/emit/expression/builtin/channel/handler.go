@@ -8,7 +8,7 @@ import (
 	channeloperation "github.com/tsoniclang/gotots/internal/emit/concurrency/channel"
 	concurrencyprofile "github.com/tsoniclang/gotots/internal/emit/concurrency/profile"
 	runtimechannel "github.com/tsoniclang/gotots/internal/emit/runtime/channel"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -140,7 +140,7 @@ func emitMake(
 	}
 	if len(source.Args) == 2 {
 		capacityType := context.TypesInfo().TypeOf(source.Args[1])
-		if !basictype.SupportsInteger(context.TypesSizes(), capacityType) {
+		if !integeroperand.Supports(context.TypesSizes(), capacityType) {
 			return api.ExpressionEmission{},
 				api.Unsupported(
 					context.WithRole(api.RoleChannelCapacity),
@@ -148,10 +148,9 @@ func emitMake(
 					source.Args[1],
 				)
 		}
-		capacity, err = children.Expression(
-			context.
-				WithRole(api.RoleChannelCapacity).
-				WithExpectedType(capacityType),
+		capacity, err = integeroperand.Emit(
+			context.WithRole(api.RoleChannelCapacity),
+			children,
 			source.Args[1],
 		)
 		if err != nil {
@@ -175,10 +174,12 @@ func emitMake(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	copyValue, err := context.Values().Copy(
+	copyValue, err := context.Values().Transfer(
 		context.WithRole(api.RoleChannelElement),
 		source.Args[0],
 		elementType,
+		elementType,
+		api.ValueTransferCopy,
 		api.DirectExpression(context.Factory().Identifier("value")),
 	)
 	if err != nil {

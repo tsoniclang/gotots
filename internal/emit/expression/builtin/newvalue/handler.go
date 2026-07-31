@@ -67,18 +67,35 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	storageType, err := context.Values().StorageType(
+	representation, err := pointertype.Observe(context, pointer, false)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		return api.NewExpressionEmission(
+			zero.Before(),
+			zero.Value(),
+			api.CombineRequests(
+				zero.Requests(),
+				representation.Requests(),
+			),
+		)
+	}
+	storageType, err := context.ContainerStorage().PointerStorageType(
 		context.WithRole(api.RoleStorageType),
 		source,
 		element,
+		representation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	stored, err := context.Values().ToStorage(
+	stored, err := context.ContainerStorage().ToPointerStorage(
 		context.WithRole(api.RoleCallArgument),
 		source,
 		element,
+		representation,
 		zero,
 	)
 	if err != nil {
@@ -116,6 +133,7 @@ func Emit(
 			storageType.Requests(),
 			stored.Requests(),
 			reference.Requests(),
+			representation.Requests(),
 		)...,
 	), nil
 }

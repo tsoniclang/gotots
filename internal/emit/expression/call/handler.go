@@ -64,6 +64,15 @@ func emit(
 			return api.ExpressionEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
 		}
+		if target, handled, err := emitUnsafeBuiltin(
+			context,
+			children,
+			source,
+			builtin,
+			discarded,
+		); handled {
+			return target, err
+		}
 		return builtinexpression.Emit(
 			context,
 			children,
@@ -122,6 +131,16 @@ func emit(
 		return api.ExpressionEmission{}, err
 	}
 	targetCallee := callee.Value()
+	if _, defined := definedtype.ResolveCallable(
+		context.TypesInfo().TypeOf(source.Fun),
+	); defined {
+		targetCallee = context.Factory().PropertyAccessExpression(
+			targetCallee,
+			nil,
+			context.Factory().Identifier(definedtype.ValueMember),
+			tsgo.NodeFlagsNone,
+		)
+	}
 	before := callee.Before()
 	if static && len(before) != 0 {
 		return api.ExpressionEmission{},
@@ -157,27 +176,12 @@ func emit(
 	before = append(before, argumentBefore...)
 	var guardRequests []api.RootRequest
 	if guardNil {
-		defined := false
-		if _, ok := definedtype.ResolveCallable(
-			context.TypesInfo().TypeOf(source.Fun),
-		); ok {
-			defined = true
-		}
 		if detached {
-			nonNil := targetCallee
-			if defined {
-				nonNil = context.Factory().PropertyAccessExpression(
-					targetCallee,
-					nil,
-					context.Factory().Identifier(definedtype.ValueMember),
-					tsgo.NodeFlagsNone,
-				)
-			}
 			targetCallee, guardRequests, err =
 				callable.DetachedNilGuard(
 					context,
 					targetCallee,
-					nonNil,
+					targetCallee,
 				)
 			if err != nil {
 				return api.ExpressionEmission{}, err
@@ -190,14 +194,6 @@ func emit(
 			}
 			before = append(before, guard)
 			guardRequests = requests
-			if defined {
-				targetCallee = context.Factory().PropertyAccessExpression(
-					targetCallee,
-					nil,
-					context.Factory().Identifier(definedtype.ValueMember),
-					tsgo.NodeFlagsNone,
-				)
-			}
 		}
 	}
 	call := context.Factory().CallExpression(
@@ -215,6 +211,22 @@ func emit(
 	target, err := api.NewExpressionEmission(before, call, requests)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if literal, direct := directFunctionLiteral(source.Fun); direct {
+		if detached {
+			return cooperativecall.DetachedLiteralCall(
+				context,
+				source,
+				literal,
+				target,
+			)
+		}
+		return cooperativecall.LiteralCall(
+			context,
+			source,
+			literal,
+			target,
+		)
 	}
 	if provider, direct := calleeObject(
 		context.TypesInfo(),
@@ -333,6 +345,18 @@ func emitCallee(
 			context.Factory().Identifier(reference.Name()),
 			reference.Requests()...,
 		), true, nil
+	} else if _, ok := directFunctionLiteral(source); ok {
+		target, err := children.Expression(
+			context.
+				WithRole(api.RoleCallCallee).
+				WithExpectedType(signature).
+				WithStaticallySelectedCallable(),
+			source,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, false, err
+		}
+		return target, false, nil
 	} else if identifier, ok := source.(*ast.Ident); ok {
 		variable, valid := context.TypesInfo().Uses[identifier].(*types.Var)
 		if !valid {
@@ -363,6 +387,19 @@ func emitCallee(
 		return api.ExpressionEmission{}, false, err
 	}
 	return target, static, nil
+}
+
+func directFunctionLiteral(source ast.Expr) (*ast.FuncLit, bool) {
+	for {
+		switch selected := source.(type) {
+		case *ast.FuncLit:
+			return selected, true
+		case *ast.ParenExpr:
+			source = selected.X
+		default:
+			return nil, false
+		}
+	}
 }
 
 func emitArguments(
@@ -433,10 +470,12 @@ func emitArguments(
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		target, err = context.Values().Copy(
+		target, err = context.Values().Transfer(
 			context.WithRole(api.RoleCallArgument),
 			argument,
+			argumentType,
 			signature.Params().At(index).Type(),
+			api.ValueTransferCopy,
 			target,
 		)
 		if err != nil {

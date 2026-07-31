@@ -50,6 +50,7 @@ func Distinct() {
 		references[index], err = names.AnonymousStruct(
 			structType.target,
 			api.AnonymousStructDemandDefinition,
+			api.ImportPhaseValue,
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -67,6 +68,54 @@ func Distinct() {
 		if len(binding.name) > len("$goStruct_")+20 {
 			t.Fatalf("anonymous struct target name is unbounded: %q", binding.name)
 		}
+	}
+}
+
+func TestAnonymousStructImportPhaseIsDemandedExplicitly(t *testing.T) {
+	names := NewOwner(nil, nil, NewRegistry()).ForFile(
+		nil,
+		nil,
+		tsgo.NewFactory(),
+		"modules/application/source.ts",
+		nil,
+	)
+	structType := types.NewStruct(
+		[]*types.Var{types.NewField(
+			token.NoPos,
+			nil,
+			"Value",
+			types.Typ[types.Int],
+			false,
+		)},
+		nil,
+	)
+	reference, err := names.AnonymousStruct(
+		structType,
+		api.AnonymousStructDemandDefinition,
+		api.ImportPhaseType,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	imports := 0
+	for _, request := range reference.Requests() {
+		if request.Kind() != api.RootRequestImport {
+			continue
+		}
+		imports++
+		if request.ImportPhase() != api.ImportPhaseType {
+			t.Fatalf("anonymous-struct type import phase = %v", request.ImportPhase())
+		}
+	}
+	if imports != 1 {
+		t.Fatalf("anonymous-struct type imports = %d, want one", imports)
+	}
+	if _, err := names.AnonymousStruct(
+		structType,
+		api.AnonymousStructDemandCopy,
+		api.ImportPhaseType,
+	); err == nil {
+		t.Fatal("value operation accepted a type-only import")
 	}
 }
 
@@ -107,6 +156,7 @@ func Second() {
 			sourceFile:   sourceFile,
 			sourcePath:   "modules/identity/source.ts",
 			moduleExport: true,
+			kind:         targetBindingSource,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -136,6 +186,7 @@ func Second() {
 		reference, err := names.AnonymousStruct(
 			structType.target,
 			api.AnonymousStructDemandDefinition,
+			api.ImportPhaseValue,
 		)
 		finish()
 		if err != nil {
@@ -228,6 +279,7 @@ func Use() {
 	first, err := names.AnonymousStruct(
 		structTypes[0].target,
 		api.AnonymousStructDemandDefinition,
+		api.ImportPhaseValue,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -237,6 +289,7 @@ func Use() {
 	second, err := names.AnonymousStruct(
 		structTypes[0].target,
 		api.AnonymousStructDemandDefinition,
+		api.ImportPhaseValue,
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -29,30 +29,13 @@ func Emit(
 	); interfaceReceiver {
 		return emitInterface(context, children, source, selected)
 	}
-	method, direct := selectionvalue.DirectMethodExpression(
+	method, _ := selectionvalue.DirectMethodExpression(
 		context,
 		source,
 		selected,
 	)
 	typeArguments := genericinstance.ReceiverTypeArguments(selected.Recv())
 	generic := typeArguments != nil
-	if direct && !generic {
-		reference, err := context.Names().Reference(method)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		target := api.DirectExpression(
-			context.Factory().Identifier(reference.Name()),
-			reference.Requests()...,
-		)
-		return cooperativecall.AdaptSourceValue(
-			context,
-			children,
-			source,
-			method,
-			target,
-		)
-	}
 	signature, ok := selected.Type().(*types.Signature)
 	if !ok ||
 		signature.Params().Len() == 0 ||
@@ -95,12 +78,50 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	cooperative, sourceRequests, err :=
-		cooperativecall.SourceContract(context, method)
-	if err != nil {
-		return api.ExpressionEmission{}, err
+	owner := method.Origin()
+	var (
+		memberSuffix      string
+		abiCooperative    bool
+		sourceRequests    []api.RootRequest
+		selectionRequests []api.RootRequest
+	)
+	if generic {
+		providerSignature, signatureErr :=
+			genericinstance.ConcreteMethodExpressionProviderSignature(
+				signature,
+			)
+		if signatureErr != nil {
+			return api.ExpressionEmission{}, signatureErr
+		}
+		declarationSignature, ok := owner.Type().(*types.Signature)
+		if !ok {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		var facet api.CallableFacet
+		memberSuffix, facet, _, selectionRequests, err =
+			cooperativecall.SelectGenericClassMethod(
+				context,
+				owner,
+				declarationSignature,
+				providerSignature,
+			)
+		if err == nil {
+			_, abiCooperative, sourceRequests, err =
+				cooperativecall.GenericValueContract(
+					context,
+					facet,
+					targetSignatureSource,
+				)
+		}
+	} else {
+		_, abiCooperative, sourceRequests, err =
+			cooperativecall.SourceValueContract(
+				context,
+				method,
+				targetSignatureSource,
+			)
 	}
-	reference, err := context.Names().Reference(method)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -109,7 +130,6 @@ func Emit(
 	var capabilities []genericabi.Binding[tsgo.Expression]
 	var capabilityRequests []api.RootRequest
 	var operationSet api.GenericOperationSet
-	owner := method.Origin()
 	if generic {
 		var resolved bool
 		var resolveErr error
@@ -128,6 +148,7 @@ func Emit(
 				context,
 				children,
 				source,
+				owner,
 				typeArguments,
 			)
 		if err != nil {
@@ -151,10 +172,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arguments := append(
-		[]tsgo.Expression{receiver.Value()},
-		parameters[1:]...,
-	)
+	arguments := parameters[1:]
 	if generic {
 		sourceParameters := targetSignature.SourceParameterReferences(
 			context.Factory(),
@@ -167,13 +185,6 @@ func Emit(
 				Reason: "generic method expression lacks recovery authority",
 			}
 		}
-		receiverBinding, bindErr := genericabi.Receiver(
-			owner,
-			receiver.Value(),
-		)
-		if bindErr != nil {
-			return api.ExpressionEmission{}, bindErr
-		}
 		sourceBindings, bindErr := genericabi.SourceParameters(
 			owner,
 			sourceParameters[1:],
@@ -181,12 +192,11 @@ func Emit(
 		if bindErr != nil {
 			return api.ExpressionEmission{}, bindErr
 		}
-		arguments, err = genericabi.JoinMethod(
+		arguments, err = genericabi.JoinClassMethod(
 			owner,
 			operationSet.Operations(),
 			genericabi.Combine(
 				capabilities,
-				[]genericabi.Binding[tsgo.Expression]{receiverBinding},
 				sourceBindings,
 			),
 		)
@@ -195,13 +205,20 @@ func Emit(
 		}
 		arguments = append(arguments, recoveryAuthority)
 	}
-	call := context.Factory().CallExpression(
-		context.Factory().Identifier(reference.Name()),
-		nil,
+	if api.ValueReceiverTypeName(owner) != nil {
+		targetTypeArguments = nil
+	}
+	call, callRequests, err := callable.SelectedMethodCall(
+		context,
+		owner,
+		memberSuffix,
+		receiver.Value(),
 		targetTypeArguments,
 		arguments,
-		tsgo.NodeFlagsNone,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	var body tsgo.ConciseBody = call
 	if len(receiver.Before()) != 0 {
 		statements := receiver.Before()
@@ -220,7 +237,7 @@ func Emit(
 	}
 	var modifiers []tsgo.ModifierLike
 	resultType := targetSignature.Result()
-	if cooperative {
+	if abiCooperative {
 		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}
@@ -238,18 +255,13 @@ func Emit(
 			targetSignature.Requests(),
 			typeRequests,
 			capabilityRequests,
-			reference.Requests(),
+			selectionRequests,
+			callRequests,
 			[]api.RootRequest{controlRequest},
 			sourceRequests,
 		)...,
 	)
-	return cooperativecall.AdaptSourceValue(
-		context,
-		children,
-		source,
-		method,
-		target,
-	)
+	return target, nil
 }
 
 func emitInterface(
@@ -278,16 +290,25 @@ func emitInterface(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	cooperative, contractRequests, err :=
-		cooperativecall.ValueContract(context, signature)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	arguments := target.ParameterReferences(context.Factory())
 	method, ok := selected.Obj().(*types.Func)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	callableReference, err :=
+		context.Names().InterfaceMethodCallable(method)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	_, cooperative, contractRequests, err :=
+		cooperativecall.InterfaceMethodValueContract(
+			context,
+			callableReference,
+			signature,
+		)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	member, err := context.Names().InterfaceMethodName(method)
 	if err != nil {

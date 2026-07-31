@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -32,6 +33,13 @@ func (owner Owner) StorageType(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if parameter, generic := api.GenericTypeParameter(sourceType); generic {
+		return context.GenericParameterRepresentation(
+			source,
+			parameter,
+			api.GenericRepresentationStorage,
+		)
+	}
 	if panicNilRuntimeValue(context, sourceType) {
 		return owner.children.RepresentedType(
 			context,
@@ -79,6 +87,7 @@ func (owner Owner) StorageType(
 					context,
 					owner.children,
 					source,
+					named.Origin().Obj(),
 					named.TypeArgs(),
 				)
 			if err != nil {
@@ -109,6 +118,16 @@ func (owner Owner) ToStorage(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if parameter, generic := api.GenericTypeParameter(sourceType); generic {
+		return genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationToStorage,
+			[]types.Type{parameter},
+			[]types.Type{parameter},
+			[]api.ExpressionEmission{value},
+		)
+	}
 	if panicNilRuntimeValue(context, sourceType) {
 		return value, nil
 	}
@@ -128,6 +147,7 @@ func (owner Owner) ToStorage(
 		reference, err := context.Names().AnonymousStruct(
 			structType,
 			api.AnonymousStructDemandStorage,
+			api.ImportPhaseValue,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -166,6 +186,16 @@ func (owner Owner) FromStorage(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if parameter, generic := api.GenericTypeParameter(sourceType); generic {
+		return genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationFromStorage,
+			[]types.Type{parameter},
+			[]types.Type{parameter},
+			[]api.ExpressionEmission{value},
+		)
+	}
 	if panicNilRuntimeValue(context, sourceType) {
 		return value, nil
 	}
@@ -185,6 +215,7 @@ func (owner Owner) FromStorage(
 		reference, err := context.Names().AnonymousStruct(
 			structType,
 			api.AnonymousStructDemandStorage,
+			api.ImportPhaseValue,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err

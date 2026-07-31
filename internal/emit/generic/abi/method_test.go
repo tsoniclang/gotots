@@ -11,58 +11,50 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
-func TestMethodABIExactJoinCanonicalizesIdentities(t *testing.T) {
+func TestClassMethodABIExactJoinCanonicalizesIdentities(t *testing.T) {
 	method, _, operation := methodABIFixture(t)
 	capability, err := Capability(operation, "capability")
 	if err != nil {
 		t.Fatal(err)
 	}
-	receiver, err := Receiver(method, "receiver")
-	if err != nil {
-		t.Fatal(err)
-	}
 	source, err := SourceParameters(method, []string{"source"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	joined, err := JoinMethod(
+	joined, err := JoinClassMethod(
 		method,
 		[]*api.GenericOperationContract{operation},
-		Combine(source, []Binding[string]{receiver, capability}),
+		Combine(source, []Binding[string]{capability}),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := []string{"capability", "receiver", "source"}
+	expected := []string{"capability", "source"}
 	if !slices.Equal(joined, expected) {
 		t.Fatalf("method ABI = %v, want %v", joined, expected)
 	}
-	receiverFirstMutation := []string{"receiver", "capability", "source"}
-	if slices.Equal(joined, receiverFirstMutation) {
-		t.Fatal("receiver-first method ABI mutation was not distinguished")
+	sourceFirstMutation := []string{"source", "capability"}
+	if slices.Equal(joined, sourceFirstMutation) {
+		t.Fatal("source-first method ABI mutation was not distinguished")
 	}
 }
 
-func TestMethodABIExactJoinRejectsForeignSameShapeOwner(t *testing.T) {
+func TestClassMethodABIExactJoinRejectsForeignSameShapeOwner(t *testing.T) {
 	method, foreign, operation := methodABIFixture(t)
 	capability, err := Capability(operation, "capability")
 	if err != nil {
 		t.Fatal(err)
 	}
-	foreignReceiver, err := Receiver(foreign, "receiver")
+	foreignSource, err := SourceParameters(foreign, []string{"source"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	source, err := SourceParameters(method, []string{"source"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = JoinMethod(
+	_, err = JoinClassMethod(
 		method,
 		[]*api.GenericOperationContract{operation},
 		Combine(
-			[]Binding[string]{capability, foreignReceiver},
-			source,
+			[]Binding[string]{capability},
+			foreignSource,
 		),
 	)
 	if err == nil {

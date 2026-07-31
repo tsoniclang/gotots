@@ -1,11 +1,11 @@
 package emit
 
 import (
-	"go/token"
 	"slices"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	declarationorder "github.com/tsoniclang/gotots/internal/emit/declaration/order"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
@@ -46,32 +46,29 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		for _, symbol := range placement.RuntimeSymbols() {
 			runtimeSymbols[symbol] = struct{}{}
 		}
-		type declarationChunk struct {
-			position   token.Pos
-			name       string
-			statements []tsgo.Statement
-		}
-		chunks := make(
-			[]declarationChunk,
-			0,
+		orderInput := make(
+			[]declarationorder.Declaration,
 			len(builder.declarations),
 		)
-		for _, declaration := range builder.declarations {
-			chunks = append(chunks, declarationChunk{
-				position:   declaration.position,
-				name:       declaration.name,
-				statements: slices.Clone(declaration.statements),
-			})
-		}
-		sort.Slice(chunks, func(left, right int) bool {
-			if chunks[left].position != chunks[right].position {
-				return chunks[left].position < chunks[right].position
+		for index, declaration := range builder.declarations {
+			orderInput[index] = declarationorder.Declaration{
+				Owner:             declaration.owner,
+				Name:              declaration.name,
+				Position:          declaration.position,
+				EagerDependencies: declaration.eagerDependencies,
 			}
-			return chunks[left].name < chunks[right].name
-		})
+		}
+		ordered, err := declarationorder.Indices(orderInput)
+		if err != nil {
+			return nil, err
+		}
 		var declarations []tsgo.Statement
-		for _, chunk := range chunks {
-			declarations = append(declarations, chunk.statements...)
+		for _, index := range ordered {
+			declaration := builder.declarations[index]
+			declarations = append(
+				declarations,
+				slices.Clone(declaration.statements)...,
+			)
 		}
 		statements := append(
 			placement.Statements(s.factory),
@@ -94,6 +91,14 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		}
 		files = append(files, target)
 	}
+	environmentFiles, err := s.environmentTargetFiles(
+		primitiveAliases,
+		runtimeSymbols,
+	)
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, environmentFiles...)
 	packageFiles, err := s.packageTargetFiles(primitiveAliases)
 	if err != nil {
 		return nil, err
@@ -208,15 +213,21 @@ func (s *programSession) programInitializationFile() (TargetFile, error) {
 		if err := placement.Apply([]api.RootRequest{request}); err != nil {
 			return TargetFile{}, err
 		}
-		calls = append(calls, s.factory.ExpressionStatement(
-			s.factory.CallExpression(
-				s.factory.Identifier(localName),
-				nil,
-				nil,
-				nil,
-				tsgo.NodeFlagsNone,
-			),
-		))
+		var call tsgo.Expression = s.factory.CallExpression(
+			s.factory.Identifier(localName),
+			nil,
+			nil,
+			nil,
+			tsgo.NodeFlagsNone,
+		)
+		cooperative, err := s.packageInitializationIsCooperative(builder)
+		if err != nil {
+			return TargetFile{}, err
+		}
+		if cooperative {
+			call = s.factory.AwaitExpression(call)
+		}
+		calls = append(calls, s.factory.ExpressionStatement(call))
 	}
 	statements := placement.Statements(s.factory)
 	statements = append(statements, calls...)
@@ -252,6 +263,10 @@ func (s *programSession) packageInitializationOrder() (
 			for _, imported := range candidate.sourcePackage.Types().Imports() {
 				dependency := s.source.PackageForTypes(imported)
 				if dependency == nil && s.goRuntime.Owns(imported) {
+					continue
+				}
+				if dependency == nil &&
+					s.source.EnvironmentForTypes(imported) != nil {
 					continue
 				}
 				dependencyBuilder := s.packageBuilders[dependency]

@@ -2,6 +2,7 @@ package namedstruct
 
 import (
 	"go/ast"
+	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -177,8 +178,10 @@ func makeMethod(
 ) tsgo.MethodDeclaration {
 	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
 	arguments := make([]tsgo.Expression, 0, len(fields))
-	for _, selected := range fields {
-		name := context.Factory().Identifier(selected.field.name)
+	for index, selected := range fields {
+		name := context.Factory().Identifier(
+			"$field" + strconv.Itoa(index),
+		)
 		parameters = append(parameters, context.Factory().ParameterDeclaration(
 			nil,
 			nil,
@@ -318,6 +321,9 @@ func storageMembers(
 		),
 	}
 	requests := makeRequests
+	if len(typeParameters) != 0 {
+		return members, requests, nil
+	}
 	for _, selected := range fields {
 		if selected.field.blank {
 			continue

@@ -33,7 +33,7 @@ func sliceZero(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	elementType, err := children.RepresentedType(
+	elementType, err := context.ContainerStorage().ContainerStorageType(
 		context.WithRole(api.RoleSliceElementType),
 		source,
 		sourceElementType,

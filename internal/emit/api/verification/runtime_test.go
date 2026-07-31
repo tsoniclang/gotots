@@ -33,7 +33,6 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeSlice, 300, api.RuntimeModuleSlice, "runtime/slice.ts", "RuntimeSlice", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeSliceAddress, 301, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceAddress", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimePointer}},
 		{api.RuntimeSliceStorage, 302, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceAllocate", false, []api.RuntimeSymbol{api.RuntimeSlice}},
-		{api.RuntimeSliceAddressView, 303, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceAddressView", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimePointer}},
 		{api.RuntimeSliceArrayPointer, 304, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceArrayPointer", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimePointer, api.RuntimeArray, api.RuntimeArrayView}},
 		{api.RuntimeArraySlice, 305, api.RuntimeModuleSlice, "runtime/slice.ts", "goArraySlice", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimeArray, api.RuntimeArrayLocation}},
 		{api.RuntimeSliceAppendSlice, 307, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceAppendSlice", false, []api.RuntimeSymbol{api.RuntimeSlice}},
@@ -82,6 +81,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeScheduler, 1105, api.RuntimeModuleChannel, "runtime/channel.ts", "GoScheduler", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeSelectReady, 1106, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectReady", false, []api.RuntimeSymbol{api.RuntimeSelectAttempt}},
 		{api.RuntimeSelectAttempt, 1107, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectAttempt", false, []api.RuntimeSymbol{api.RuntimeSelectCase}},
+		{api.RuntimeUnsafePointer, 1200, api.RuntimeModuleUnsafePointer, "runtime/unsafe-pointer.ts", "GoUnsafePointer", true, []api.RuntimeSymbol{api.RuntimePanic}},
 	}
 	for _, test := range tests {
 		if uint16(test.symbol) != test.id {

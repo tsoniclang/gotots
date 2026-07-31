@@ -28,17 +28,15 @@ func (r DeclarationRequirement) NamedStructOperation() (
 }
 
 func (r DeclarationRequirement) AddressableStorage() (
-	*types.Func,
+	ArtifactOwner,
 	*types.Var,
 	bool,
 ) {
 	if !r.Valid() ||
 		r.kind != DeclarationRequirementAddressableStorage {
-		return nil, nil, false
+		return ArtifactOwner{}, nil, false
 	}
-	source, sourceOK := r.owner.Source()
-	owner, ok := source.(*types.Func)
-	return owner, r.variable, sourceOK && ok
+	return r.owner, r.variable, true
 }
 
 func (r DeclarationRequirement) ConstantProjection() (
@@ -120,6 +118,24 @@ func (r DeclarationRequirement) InterfaceAdapter() (
 	)
 }
 
+func (r DeclarationRequirement) InterfaceAdapterContract() (
+	*GeneratedArtifact,
+	*types.Interface,
+	string,
+	bool,
+) {
+	if !r.Valid() ||
+		r.kind != DeclarationRequirementInterfaceAdapter ||
+		r.interfaceContract == nil ||
+		r.interfaceContractKey == "" {
+		return nil, nil, "", false
+	}
+	return r.generated,
+		r.interfaceContract,
+		r.interfaceContractKey,
+		true
+}
+
 func (r DeclarationRequirement) AnonymousInterface() (
 	*GeneratedArtifact,
 	bool,
@@ -137,6 +153,16 @@ func (r DeclarationRequirement) InterfaceMethodToken() (
 	return r.generatedDefinition(
 		DeclarationRequirementInterfaceMethodToken,
 		GeneratedArtifactInterfaceMethodToken,
+	)
+}
+
+func (r DeclarationRequirement) InterfaceMethodCallable() (
+	*GeneratedArtifact,
+	bool,
+) {
+	return r.generatedDefinition(
+		DeclarationRequirementInterfaceMethodCallable,
+		GeneratedArtifactInterfaceMethodCallable,
 	)
 }
 
@@ -189,6 +215,18 @@ func (r DeclarationRequirement) GotoControl() (
 	return r.controlLabel, r.controlPosition, true
 }
 
+func (r DeclarationRequirement) IteratorReturnControl() (
+	*ast.RangeStmt,
+	bool,
+) {
+	if !r.Valid() ||
+		r.kind != DeclarationRequirementCallableControl ||
+		r.control != CallableControlIteratorReturn {
+		return nil, false
+	}
+	return r.controlRange, true
+}
+
 func (r DeclarationRequirement) generatedDefinition(
 	requirementKind DeclarationRequirementKind,
 	artifactKind GeneratedArtifactKind,
@@ -214,13 +252,35 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementInterfaceAdapter,
 		DeclarationRequirementAnonymousInterface,
 		DeclarationRequirementInterfaceMethodToken,
+		DeclarationRequirementInterfaceMethodCallable,
 		DeclarationRequirementInterfaceDynamicTypeToken,
 		DeclarationRequirementGenericCapability,
-		DeclarationRequirementCallableABI:
+		DeclarationRequirementCallableABI,
+		DeclarationRequirementPointerRepresentation:
 		return r.generated, true
 	default:
 		return nil, false
 	}
+}
+
+func (r DeclarationRequirement) LexicalGeneratedArtifact() (
+	*GeneratedArtifact,
+	bool,
+) {
+	if artifact, ok := r.GeneratedArtifact(); ok {
+		return artifact,
+			artifact.Placement() == GeneratedArtifactPlacementLexical &&
+				r.Owner() == artifact.ReconstructionOwner()
+	}
+	facet, ok := r.CooperativeCallable()
+	if !ok {
+		return nil, false
+	}
+	artifact, ok := facet.GenericCapability()
+	return artifact,
+		ok &&
+			artifact.Placement() == GeneratedArtifactPlacementLexical &&
+			r.Owner() == artifact.ReconstructionOwner()
 }
 
 type NamedStructOperation uint8
@@ -233,6 +293,7 @@ const (
 	NamedStructOperationHash
 	NamedStructOperationConvert
 	NamedStructOperationStorage
+	NamedStructOperationAssign
 )
 
 func (o NamedStructOperation) Valid() bool {
@@ -241,7 +302,8 @@ func (o NamedStructOperation) Valid() bool {
 		o == NamedStructOperationEqual ||
 		o == NamedStructOperationHash ||
 		o == NamedStructOperationConvert ||
-		o == NamedStructOperationStorage
+		o == NamedStructOperationStorage ||
+		o == NamedStructOperationAssign
 }
 
 func (o NamedStructOperation) String() string {
@@ -258,6 +320,8 @@ func (o NamedStructOperation) String() string {
 		return "convert"
 	case NamedStructOperationStorage:
 		return "storage"
+	case NamedStructOperationAssign:
+		return "assign"
 	default:
 		return fmt.Sprintf("named-struct-operation(%d)", o)
 	}
@@ -322,6 +386,13 @@ const (
 	DeclarationRequirementCallableControl           DeclarationRequirementKind = 13
 	DeclarationRequirementCooperativeCallable       DeclarationRequirementKind = 14
 	DeclarationRequirementCallableABI               DeclarationRequirementKind = 15
+	DeclarationRequirementEnvironmentBuiltin        DeclarationRequirementKind = 16
+	DeclarationRequirementGenericCallableProfile    DeclarationRequirementKind = 17
+	DeclarationRequirementClassMethod               DeclarationRequirementKind = 18
+	DeclarationRequirementValueReceiverCopy         DeclarationRequirementKind = 19
+	DeclarationRequirementGenericRepresentation     DeclarationRequirementKind = 20
+	DeclarationRequirementInterfaceMethodCallable   DeclarationRequirementKind = 21
+	DeclarationRequirementPointerRepresentation     DeclarationRequirementKind = 22
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -339,7 +410,14 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementGenericCapability ||
 		k == DeclarationRequirementCallableControl ||
 		k == DeclarationRequirementCooperativeCallable ||
-		k == DeclarationRequirementCallableABI
+		k == DeclarationRequirementCallableABI ||
+		k == DeclarationRequirementEnvironmentBuiltin ||
+		k == DeclarationRequirementGenericCallableProfile ||
+		k == DeclarationRequirementClassMethod ||
+		k == DeclarationRequirementValueReceiverCopy ||
+		k == DeclarationRequirementGenericRepresentation ||
+		k == DeclarationRequirementInterfaceMethodCallable ||
+		k == DeclarationRequirementPointerRepresentation
 }
 
 type CallableControlFacet uint8
@@ -349,12 +427,14 @@ const (
 	CallableControlDefer
 	CallableControlRecovery
 	CallableControlGoto
+	CallableControlIteratorReturn
 )
 
 func (f CallableControlFacet) Valid() bool {
 	return f == CallableControlDefer ||
 		f == CallableControlRecovery ||
-		f == CallableControlGoto
+		f == CallableControlGoto ||
+		f == CallableControlIteratorReturn
 }
 
 func NewGenericCapabilityRequirement(
@@ -460,4 +540,46 @@ func GenericDeclarationOrigin(owner types.Object) types.Object {
 		}
 	}
 	return nil
+}
+
+func validAddressableStorageOwner(
+	owner ArtifactOwner,
+	variable *types.Var,
+) bool {
+	if !owner.Valid() ||
+		variable == nil ||
+		variable.IsField() ||
+		variable.Pkg() == nil ||
+		owner.Package() != variable.Pkg() {
+		return false
+	}
+	if source, ok := owner.Source(); ok {
+		_, callable := source.(*types.Func)
+		return callable
+	}
+	_, initializer, ok := owner.PackageInitializer()
+	return ok &&
+		variable.Pos().IsValid() &&
+		variable.Pos() >= initializer.Rhs.Pos() &&
+		variable.Pos() <= initializer.Rhs.End()
+}
+
+func validLexicalNamedStructOwner(
+	owner ArtifactOwner,
+	typeName *types.TypeName,
+) bool {
+	if !owner.Valid() ||
+		typeName == nil ||
+		typeName.Pkg() == nil ||
+		typeName.Parent() == nil ||
+		typeName.Parent() == typeName.Pkg().Scope() ||
+		owner.Package() != typeName.Pkg() {
+		return false
+	}
+	if source, ok := owner.Source(); ok {
+		_, function := source.(*types.Func)
+		return function
+	}
+	_, _, initializer := owner.PackageInitializer()
+	return initializer
 }

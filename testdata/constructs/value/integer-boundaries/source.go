@@ -38,10 +38,10 @@ func NamedValue(value Named) Named {
 	return value
 }
 
-func UnsafeNumber() int64 {
+func WideNumber() int64 {
 	return 9007199254740992
 }
 
-func UnsafeConversion() int64 {
+func WideConversion() int64 {
 	return int64(9007199254740992)
 }

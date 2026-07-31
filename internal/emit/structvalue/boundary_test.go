@@ -63,7 +63,8 @@ func TestNamedStructReceiverSelectionUsesGoTypesIdentity(t *testing.T) {
 	}
 	target := targetFunction(t, structTargetSource(t, emission), "Invoke")
 	targetCall := target.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)
-	if targetName(targetCall.Expression()) != "Box_WithX" {
+	if receiver, member := targetProperty(targetCall.Expression()); receiver != "value" ||
+		member != "WithX" {
 		t.Fatal("receiver call used mutated source spelling instead of selection identity")
 	}
 	delete(program.Roots()[0].TypesInfo().Selections, selector)
@@ -92,13 +93,10 @@ func (value Value) Unused() Value {
 		t.Fatal(err)
 	}
 	source := structTargetSource(t, emission)
-	targetFunction(t, source, "Value_Unused")
 	class := targetClass(t, source, "Value")
-	for _, member := range class.Members() {
-		method, ok := member.(tsgo.MethodDeclaration)
-		if ok && targetName(method.Name()) == "Unused" {
-			t.Fatal("receiver method was attached to the representation class")
-		}
+	targetMethod(t, class, "Unused")
+	if targetFunctionOrNil(source, "Value_Unused") != nil {
+		t.Fatal("receiver method was duplicated as a top-level function")
 	}
 }
 

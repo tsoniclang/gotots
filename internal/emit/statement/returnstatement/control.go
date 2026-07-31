@@ -2,9 +2,9 @@ package returnstatement
 
 import (
 	"go/ast"
-	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -14,81 +14,42 @@ func emitControlled(
 	source *ast.ReturnStmt,
 	control api.ReturnControl,
 ) (api.StatementEmission, error) {
-	if len(source.Results) == 0 {
-		return api.DirectStatement(
-			context.Factory().BreakStatement(
-				context.Factory().Identifier(control.Label()),
-			),
-		), nil
-	}
-	direct, err := Emit(
-		context.WithoutReturnControl(),
+	direct, err := emitDirect(
+		context,
 		children,
 		source,
 	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	statements := direct.Statements()
-	if len(statements) == 0 {
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
+	statements, value, err := directReturnParts(context, source, direct)
+	if err != nil {
+		return api.StatementEmission{}, err
 	}
-	last := len(statements) - 1
-	returnStatement, ok := statements[last].(tsgo.ReturnStatement)
-	if !ok || returnStatement.Expression() == nil {
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
+	propagated, err := propagateControlled(
+		context,
+		children,
+		source,
+		control,
+		value,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
 	}
-	statements = statements[:last]
-	targets := control.NamedTargets()
-	if control.Named() {
-		assignments, assignmentRequests, err := controlledAssignments(
-			context,
-			source,
-			targets,
-			returnStatement.Expression(),
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
-		statements = append(statements, assignments...)
-		direct, err = api.NewStatementEmission(
-			direct.Statements(),
-			api.CombineRequests(
-				direct.Requests(),
-				assignmentRequests,
-			),
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
-	} else {
-		if control.ResultTarget() == "" {
-			return api.StatementEmission{},
-				api.Unsupported(context, api.CategoryStatement, source)
-		}
-		statements = append(
-			statements,
-			assignment(
-				context,
-				context.Factory().Identifier(control.ResultTarget()),
-				returnStatement.Expression(),
-			),
-		)
-	}
-	statements = append(
+	statements = append(statements, propagated.Statements()...)
+	return api.NewStatementEmission(
 		statements,
-		context.Factory().BreakStatement(
-			context.Factory().Identifier(control.Label()),
+		api.CombineRequests(
+			direct.Requests(),
+			propagated.Requests(),
 		),
 	)
-	return api.NewStatementEmission(statements, direct.Requests())
 }
 
 func controlledAssignments(
 	context api.Context,
-	source *ast.ReturnStmt,
+	children api.ChildEmitter,
+	source ast.Node,
 	targets []api.StoreTargetEmission,
 	value tsgo.Expression,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
@@ -100,47 +61,37 @@ func controlledAssignments(
 			value,
 		)
 	}
-	if len(targets) == 0 {
+	results := context.FunctionResults()
+	if len(targets) == 0 ||
+		results == nil ||
+		results.Len() != len(targets) {
 		return nil, nil, &api.InvariantError{
 			Role:   api.RoleReturnResult,
-			Reason: "controlled named return has no result targets",
+			Reason: "controlled named return result tuple is invalid",
 		}
 	}
-	name, err := context.Names().Temporary(api.TemporaryMultipleResults)
+	capture, err := resulttuple.CaptureSynthesized(
+		context.WithRole(api.RoleReturnResult),
+		children,
+		source,
+		results,
+		api.DirectExpression(value),
+	)
 	if err != nil {
 		return nil, nil, err
 	}
-	statements := []tsgo.Statement{
-		context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{
-					context.Factory().VariableDeclaration(
-						context.Factory().Identifier(name),
-						nil,
-						nil,
-						value,
-					),
-				},
-				tsgo.NodeFlagsConst,
-			),
-		),
-	}
-	var requests []api.RootRequest
+	statements := capture.Statements()
+	requests := capture.Requests()
 	for index, target := range targets {
+		element, err := capture.Element(context, index)
+		if err != nil {
+			return nil, nil, err
+		}
 		stores, storeRequests, err := storeNamedResult(
 			context,
 			source,
 			target,
-			context.Factory().ElementAccessExpression(
-				context.Factory().Identifier(name),
-				nil,
-				context.Factory().NumericLiteral(
-					strconv.Itoa(index),
-					tsgo.TokenFlagsNone,
-				),
-				tsgo.NodeFlagsNone,
-			),
+			element,
 		)
 		if err != nil {
 			return nil, nil, err
@@ -153,7 +104,7 @@ func controlledAssignments(
 
 func storeNamedResult(
 	context api.Context,
-	source *ast.ReturnStmt,
+	source ast.Node,
 	target api.StoreTargetEmission,
 	value tsgo.Expression,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
@@ -171,6 +122,89 @@ func storeNamedResult(
 		context.Factory().ExpressionStatement(stored.Value()),
 	)
 	return statements, stored.Requests(), nil
+}
+
+func propagateControlled(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	control api.ReturnControl,
+	value tsgo.Expression,
+) (api.StatementEmission, error) {
+	if !control.Valid() {
+		return api.StatementEmission{}, &api.InvariantError{
+			Role:   api.RoleReturnResult,
+			Reason: "return control is invalid",
+		}
+	}
+	var statements []tsgo.Statement
+	var requests []api.RootRequest
+	switch {
+	case value == nil:
+		if control.Named() || control.ResultTarget() != "" {
+			return api.StatementEmission{},
+				api.Unsupported(
+					context,
+					api.CategoryStatement,
+					source,
+				)
+		}
+	case control.Named():
+		assignments, assignmentRequests, err := controlledAssignments(
+			context,
+			children,
+			source,
+			control.NamedTargets(),
+			value,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		statements = append(statements, assignments...)
+		requests = append(requests, assignmentRequests...)
+	case control.ResultTarget() != "":
+		statements = append(
+			statements,
+			assignment(
+				context,
+				context.Factory().Identifier(control.ResultTarget()),
+				value,
+			),
+		)
+	default:
+		return api.StatementEmission{},
+			api.Unsupported(
+				context,
+				api.CategoryStatement,
+				source,
+			)
+	}
+	statements = append(
+		statements,
+		context.Factory().BreakStatement(
+			context.Factory().Identifier(control.Label()),
+		),
+	)
+	return api.NewStatementEmission(statements, requests)
+}
+
+func directReturnParts(
+	context api.Context,
+	source ast.Node,
+	direct api.StatementEmission,
+) ([]tsgo.Statement, tsgo.Expression, error) {
+	statements := direct.Statements()
+	if len(statements) == 0 {
+		return nil, nil,
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	last := len(statements) - 1
+	returnStatement, ok := statements[last].(tsgo.ReturnStatement)
+	if !ok {
+		return nil, nil,
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	return statements[:last], returnStatement.Expression(), nil
 }
 
 func assignment(

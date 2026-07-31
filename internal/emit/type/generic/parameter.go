@@ -5,7 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 )
 
 func Emit(
@@ -28,6 +29,9 @@ func Emit(
 			),
 		), true, nil
 	}
+	if _, defined := definedtype.Resolve(sourceType); defined {
+		return api.TypeEmission{}, false, nil
+	}
 	object, arguments, instantiated := instantiatedType(sourceType)
 	if !instantiated {
 		return api.TypeEmission{}, false, nil
@@ -36,30 +40,39 @@ func Emit(
 	if err != nil {
 		return api.TypeEmission{}, true, err
 	}
-	targetArguments := make([]tsgo.TypeNode, 0, arguments.Len())
-	requests := reference.Requests()
-	for index := range arguments.Len() {
-		target, targetErr := children.RepresentedType(
-			context.WithRole(api.RoleCallArgumentType),
+	targetArguments, argumentRequests, err :=
+		genericinstance.EmitTypeArguments(
+			context,
+			children,
 			source,
-			arguments.At(index),
+			object,
+			arguments,
 		)
-		if targetErr != nil {
-			return api.TypeEmission{}, true, targetErr
-		}
-		targetArguments = append(targetArguments, target.Value())
-		requests = append(requests, target.Requests()...)
+	if err != nil {
+		return api.TypeEmission{}, true, err
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
 			context.Factory().Identifier(reference.Name()),
 			targetArguments,
 		),
-		requests...,
+		api.CombineRequests(
+			reference.Requests(),
+			argumentRequests,
+		)...,
 	), true, nil
 }
 
 func instantiatedType(
+	sourceType types.Type,
+) (*types.TypeName, *types.TypeList, bool) {
+	if object, arguments, ok := directInstantiatedType(sourceType); ok {
+		return object, arguments, true
+	}
+	return directInstantiatedType(types.Unalias(sourceType))
+}
+
+func directInstantiatedType(
 	sourceType types.Type,
 ) (*types.TypeName, *types.TypeList, bool) {
 	switch source := sourceType.(type) {

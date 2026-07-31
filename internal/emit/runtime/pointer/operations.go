@@ -174,6 +174,42 @@ func (b builder) dereferenceMethod() tsgo.MethodDeclaration {
 	)
 }
 
+func (b builder) directMethod() tsgo.MethodDeclaration {
+	pointerType := b.factory.UnionTypeNode(
+		[]tsgo.TypeNode{b.typeL(), b.undefinedType()},
+	)
+	pointer := b.id("pointer")
+	return b.method(
+		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
+		DirectName,
+		[]tsgo.TypeParameterDeclaration{b.typeParameter("L", nil)},
+		[]tsgo.ParameterDeclaration{b.parameter("pointer", pointerType)},
+		b.typeL(),
+		b.factory.IfStatement(
+			b.binary(
+				pointer,
+				tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+				b.undefined(),
+			),
+			b.factory.Block(
+				[]tsgo.Statement{b.factory.ExpressionStatement(
+					panicruntime.Call(
+						b.factory,
+						b.panicName,
+						b.factory.StringLiteral(
+							"nil pointer dereference",
+							tsgo.TokenFlagsNone,
+						),
+					),
+				)},
+				true,
+			),
+			nil,
+		),
+		b.factory.ReturnStatement(pointer),
+	)
+}
+
 func (b builder) valueGetter() tsgo.GetAccessorDeclaration {
 	return b.factory.GetAccessorDeclaration(
 		nil,

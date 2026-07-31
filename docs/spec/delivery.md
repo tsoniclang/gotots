@@ -97,8 +97,16 @@ export type int64 = number;
 The CLI may instead select the `bigint` representation for the complete
 dependency closure, in which case the aliases target `bigint` and integer
 literals use BigInt syntax. Neither initial representation reproduces implicit
-fixed-width Go overflow. That behavior is deliberately outside the initial
+fixed-width Go overflow. The default also accepts JavaScript's 32-bit coercion
+for wider bitwise and shift operations; the `bigint` override owns exact wide
+bitwise behavior. Those boundaries are deliberately outside the default
 integer contract rather than being scattered through ordinary arithmetic.
+Every checker-valid integer constant within its selected Go carrier remains
+compilable in either profile: `number` emits the canonical decimal directly,
+including magnitudes beyond JavaScript's safe-integer range, while `bigint`
+emits the exact BigInt literal. The default does not add per-use wrapping,
+casts, helpers, or safe-integer rejection for behavior already outside its
+declared exactness boundary.
 Explicit narrowing conversions and a future fixed-width profile require their
 own complete construct proof.
 
@@ -213,13 +221,13 @@ create a value IR or a generic operation registry.
 
 1. Every predeclared integer type receives a width-preserving GoToTS-owned
    target alias and the operators admitted by the selected `number` or
-   `bigint` profile. Division, remainder, shifts, bitwise operations, and
-   explicit conversions are admitted only where the selected profile has an
-   exact bounded implementation. Fixed-width implicit overflow remains a
-   separately selected future profile rather than hidden ordinary-expression
-   baggage. In this checkpoint, BigInt division and remainder use constant-size
-   checked runtime operations; the `number` profile keeps them unsupported
-   rather than approximating Go integer truncation.
+   `bigint` profile. The default `number` profile emits direct JavaScript
+   bitwise and shift operators; 8/16/32-bit carriers normalize while wider
+   carriers explicitly accept JavaScript's 32-bit bitwise coercion. The
+   `bigint` profile owns exact wide bitwise and shift behavior. Fixed-width
+   implicit overflow remains a separately selected future profile rather than
+   hidden ordinary-expression baggage. Both profiles use constant-size checked
+   division and remainder operations.
 2. Go strings use one byte-preserving target representation. Source literals,
    concatenation, ordered/equality comparison, `len`, indexing, two-index
    slicing, integer/rune encoding, and byte/rune slice conversions are exact
@@ -306,18 +314,37 @@ value conversion through one source-site typed loop. It also treats checker-
 constant `len`/`cap` as non-evaluating expressions, including array and
 pointer-to-array operands, while nonconstant pointer-to-array expressions are
 evaluated exactly once. Pointer reinterpretation and slice-to-array-pointer
-conversion use the canonical pointer-storage representation. A pointer carries
-distinct logical and storage type arguments; value-family owners project and
-restore storage at the typed load/store site, while the pointer runtime owns
-only address identity and storage access. Named/generated structs reconstruct
-to a storage-backed private layout only when the storage facet is demanded.
-Casts, erased payloads, shape tests, and semantic read/write adapters remain
-forbidden. A defined array's canonical storage is its underlying `GoArray`,
-so its nominal wrapper never grows pointer-only forwarding methods.
+conversion use the canonical pointer-storage representation. Ordinary
+named-struct pointers instead use the class object directly as `S | undefined`;
+`new(S)`, `&S{}`, `&local`, pointer equality, field access, and receiver calls
+therefore add no carrier or storage surface. An addressed struct local retains
+one stable object and whole-value stores copy into it. A pointer carries
+distinct logical and storage type arguments only when a scalar/interior
+location or exact conversion proves that direct class identity is
+insufficient. Value-family owners then project and restore storage at the typed
+load/store site, while the pointer runtime owns only address identity and
+storage access. Named/generated structs reconstruct to a storage-backed private
+layout only when that facet is demanded. Casts, erased payloads, shape tests,
+and semantic read/write adapters remain forbidden. A defined array's canonical
+storage is its underlying `GoArray`, so its nominal wrapper never grows
+pointer-only forwarding methods.
 Slice-to-array pointers are offset-aware aliases of existing slice backing,
 preserve nil-versus-empty behavior at length zero, panic before construction
 when short, and copy only when Go later assigns an array value through the
 pointer.
+
+Open generic declarations complete the same representation model before this
+checkpoint exits. A source type parameter always has one logical target
+parameter and gains distinct whole-storage, container-storage, and pointer
+facets only from exact reached uses. Array/slice element address formation uses
+one closed generic operation whose concrete capability always selects the
+canonical location carrier; a rebindable slot cannot be represented by the
+class object currently stored there. Concrete instantiations supply every
+demanded facet from the one representation owner, nested generic declarations
+forward them in canonical order, and the artifact fixed point rejects missing,
+duplicate, reordered, conflated, dual-representation, or nonconvergent facet
+contracts. No target conditional type, erased descriptor, runtime semantic
+callback, or speculative all-facet signature is accepted.
 
 The checkpoint exits only when all six families:
 
@@ -344,8 +371,10 @@ reconstructions, and package `init` uses no non-artifact requirement path.
 The next value checkpoint completes aliases and defined types whose underlying
 value families are represented here, anonymous and legal recursive structs,
 recursive arrays/slices/maps, aggregate map keys and values, and
-nil-capable/defined callable values. Interfaces, channels, and generic
-underlying families retain their later explicit boundaries.
+nil-capable/defined callable values. Generic non-struct defined families use
+the same nominal owner with exact declaration parameters and instantiated
+target arguments. Interfaces and channels retain their later explicit
+boundaries.
 
 It extends the existing family owners rather than introducing a value IR,
 generic operation registry, runtime strategy object, or second type-identity
@@ -360,6 +389,9 @@ model:
 - aggregate-map lookup/store/delete use one canonical statically specialized
   owner per represented map shape; map instances carry storage, never semantic
   callbacks;
+- every public map contract uses semantic represented key/value types, while
+  key projection and reification remain private to the exact native or
+  generated map owner;
 - nil callable values use `undefined`; defined non-nil callables use one
   minimal wrapper whose `$value` is invoked directly after the nil guard; and
 - local component types constrain generated declarations to the highest scope
@@ -408,11 +440,16 @@ embedded fields, promoted field reads/stores/addresses, promoted concrete
 calls, method values, and method expressions.
 
 One selection-path owner consumes exact `go/types.Selection` evidence for all
-of those contexts. Receiver declarations remain named top-level functions.
-Embedding remains class-field composition; ordinary concrete calls never
-become target virtual dispatch. Method values capture their selected receiver
-once, while method expressions use the existing receiver function directly or
-one typed adapter when promotion/receiver adjustment requires it.
+of those contexts. Reached receiver bodies are immutable typed class-member
+contributions assembled into the exact declaring type's one reconstructed
+class, including when source method and type declarations are in different
+files. Value receivers are instance members; pointer receivers are class-owned
+static members with an explicit selected pointer parameter. Embedding remains
+class-field composition; ordinary concrete calls select the exact Go owner
+before member invocation and never become accidental target virtual dispatch.
+Method values capture their selected receiver once, while method expressions
+use a typed native-member arrow, a direct static-member reference, or one typed
+adapter when promotion/receiver adjustment requires it.
 
 This checkpoint exits only when:
 
@@ -424,8 +461,9 @@ This checkpoint exits only when:
   and nil panic timing match Go;
 - source-spelling mutation is byte-stable and mismatched selection identity
   fails closed;
-- generated output contains no `extends`, `.call`, `.apply`, `.bind`, erased
-  payload, or implementer switch;
+- generated output contains no class `extends`, top-level receiver twin,
+  prototype patch, `.call`, `.apply`, `.bind`, erased payload, or implementer
+  switch;
 - each use is constant-size apart from its selected embedding depth, and
   1x/2x/4x depth fixtures grow linearly; and
 - both integer profiles pass TS-Go encode/print, strict typechecking, and
@@ -433,13 +471,21 @@ This checkpoint exits only when:
 
 ### 3E. Interfaces
 
-Install one open-world typed adapter per reached concrete dynamic type,
-canonical non-string dynamic-type metadata, O(1) native method dispatch,
-assertions, comma-ok, type switches, interface equality, and interface map
-keys. Concrete receiver calls remain statically selected top-level functions.
-Exit requires the complete nil/typed-nil/copy/assertion/panic/equality matrix,
-constant-size call sites as implementer count grows, and zero erased payload,
-constructor-identity, reflection, or implementer switches.
+Install one typed adapter per reached concrete dynamic type, canonical
+non-string dynamic-type metadata, contract-demanded native methods, O(1)
+dispatch, assertions, comma-ok, type switches, interface equality, and
+interface map keys. Concrete receiver calls remain statically selected
+class-owned members. Concrete conversions seed their exact target contract;
+interface conversions and assertions propagate that target only from a source
+contract already reachable on an adapter, with `go/types` proving the target.
+Implementing a source contract without reaching it never widens the adapter.
+Exit requires the complete
+nil/typed-nil/copy/assertion/panic/equality matrix, constant-size call sites as
+implementer count grows, adapter methods equal to the exact union of demanded
+contracts, and zero erased payload, complete-concrete-method-set expansion,
+constructor-identity, reflection, or implementer switches. Repeated identical
+transition occurrences must not rescan all adapters or reschedule an already
+admitted adapter/contract pair.
 
 ### 3F. Generics And Iterator Functions
 
@@ -515,14 +561,63 @@ arrays/slices/maps, interface assertions/calls, and generic aggregates without
 a call graph, prewalk, storage-facet hierarchy, erased queue, all-function
 async tax, or yield heuristic.
 
+Checker-produced package initializers are exact callable facets under their
+existing initializer artifact identities. A cooperative initializer or source
+`init` function makes only its passive package `$initialize`
+Promise-returning, and the ESM program-initialization module awaits only those
+package calls in Go order. No synthetic initializer function, package-wide
+heuristic, or unconditional top-level await is admitted.
+
 The same cooperative facet applies to hidden generic constraint-method
 functions and deferred invocations. A concrete blocking constraint method
 reconstructs its exact hidden operation function, the generic caller, and only
 their reverse consumers. A deferred blocking call is captured immediately,
 stored as a typed async defer entry, and awaited in LIFO order before function
 exit; recovery authority remains invocation-local across the await. Neither
-case may introduce an alternate generic body, call graph, erased defer stack,
-or unconditional async tax.
+case may introduce a call graph, erased defer stack, or unconditional async
+tax. Generic source declarations may have demand-created callable-profile
+variants only when distinct reached instantiations require different static
+callable ABIs. Such variants are keyed by canonical source and ABI-facet
+identity, reconstructed by the ordinary source handler, and selected directly
+at calls, deferred calls, function values, and generic method
+calls/values/expressions. Declaration-owned callable cooperation propagates
+directionally to each corresponding concrete ABI without creating a duplicate
+variant; concrete call-site cooperation never widens the declaration
+baseline. Declaration-wide widening, runtime Promise detection,
+`T | Promise<T>` results, and per-call wrappers are forbidden.
+Lexically nested callables inside a selected variant use profile-local
+source-plus-AST facet identities. Their cooperation propagates only to the
+structurally corresponding closed callable ABI. Named values containing a
+callable representation that can vary independently of their declared Go type
+arguments use one hidden, defaulted value-facet type parameter so each profile
+carries its exact represented underlying callable type. The declaration
+origin is the sole arity owner; transitive callable fields reached through a
+type argument or nominal struct do not add a facet. Exit rejects globalized
+nested literal facets, open-ABI widening, result intersections, casts,
+instantiation-derived declaration arity, and hidden facets added to unrelated
+named values.
+If the source declaration is exported, package assembly re-exports every
+reached variant from its owning source module. Export selection comes from the
+same accepted profile requirements as declaration reconstruction; no consumer
+import may name a binding absent from the package value surface.
+
+Source-unavailable standard-library and external generic owners emit
+demand-created ambient profile declarations through the environment-contract
+owner, not source-body variants. Each declaration exact-joins the selected
+nested callable ABI profile and deterministic name used by its consumers,
+contains no body, and remains an explicit implementation obligation.
+Environment callable effects are provider-owned and are never guessed from a
+callable parameter or result. Exit includes `slices.Values` with a cooperative
+range callback, strict typechecking of the consuming source, one declaration
+per distinct reached profile, and mutations that route the owner through the
+source emitter, drop the profile declaration, widen the base declaration, or
+infer an outer Promise solely from nested type shape.
+
+Immediately invoked function literals use their exact literal facet and bypass
+the first-class callable ABI; transported literals still adapt through the ABI.
+Exit includes synchronous and cooperative immediate invocations, a mutation
+that restores ABI routing, strict output-shape inspection, and byte stability
+for the synchronous case.
 
 Exit requires the complete Milestone 3H differential, mutation, staticness,
 artifact, scaling, runtime-cost, deadlock, panic, and synchronous-byte-stability
@@ -547,6 +642,17 @@ Language closure identifies exact unresolved environment obligations but does
 not install standard-library, external, `print`/`println`, cgo, or `unsafe`
 implementations.
 
+The blank identifier is classified by its parent-owned semantic role, never by
+spelling alone. A blank constant, type, function, or method is checked but owns
+no target definition or target name. A blank value parameter, receiver, or type
+parameter preserves its target signature slot under a deterministic target-only
+identifier that is not a Go binding. A blank result preserves result arity,
+type, zero initialization, bare-return, and defer behavior without creating a
+source-visible binding. A blank variable, assignment target, range target, or
+multi-result component preserves evaluation, conversion, copy, ordering, and
+tuple position while omitting only the final store. No `types.Object` for `_`
+may enter ordinary declaration reservation or reference lookup.
+
 Exit requires exact selected-universe/dispatch joins, valid construct fixtures,
 strict TS-Go-printed ESM artifacts, focused Go-versus-TypeScript differentials,
 missing/widened-dispatch and spelling mutations, zero unknown valid in-scope
@@ -562,6 +668,11 @@ reachable-obligation checking.
 
 Source-available dependencies continue through ordinary direct emission.
 Reachable unresolved placeholders block publication.
+
+The compile-only environment profile may materialize the typed throwing
+placeholder for non-nil `unsafe.Pointer` conversion while preserving nil
+exactly. This closes strict product typechecking; it is not an unsafe
+implementation and cannot satisfy the no-placeholder publication gate.
 
 ## 5. Product Proof
 

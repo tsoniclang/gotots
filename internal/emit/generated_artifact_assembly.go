@@ -31,8 +31,11 @@ func (s *programSession) validateGeneratedArtifact(
 		return s.validateInterfaceArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
 		return s.validateGenericCapabilityArtifact(artifact)
-	case api.GeneratedArtifactCallableABI:
-		return s.validateCallableABIArtifact(artifact)
+	case api.GeneratedArtifactCallableABI,
+		api.GeneratedArtifactInterfaceMethodCallable:
+		return s.validateCallableContractArtifact(artifact)
+	case api.GeneratedArtifactPointerRepresentation:
+		return s.validatePointerRepresentationArtifact(artifact)
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
@@ -44,26 +47,31 @@ func (s *programSession) validateGeneratedArtifact(
 func (s *programSession) reconstructGeneratedArtifact(
 	artifact *api.GeneratedArtifact,
 ) error {
+	var err error
 	switch artifact.Kind() {
 	case api.GeneratedArtifactAnonymousStruct:
-		return s.reconstructAnonymousStruct(artifact)
+		err = s.reconstructAnonymousStruct(artifact)
 	case api.GeneratedArtifactMapSpecialization:
-		return s.reconstructMapSpecialization(artifact)
+		err = s.reconstructMapSpecialization(artifact)
 	case api.GeneratedArtifactInterfaceAdapter,
 		api.GeneratedArtifactAnonymousInterface,
 		api.GeneratedArtifactInterfaceMethodToken,
 		api.GeneratedArtifactInterfaceDynamicTypeToken:
-		return s.reconstructInterfaceArtifact(artifact)
+		err = s.reconstructInterfaceArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
-		return s.reconstructGenericCapabilityArtifact(artifact)
-	case api.GeneratedArtifactCallableABI:
-		return s.reconstructCallableABIArtifact(artifact)
+		err = s.reconstructGenericCapabilityArtifact(artifact)
+	case api.GeneratedArtifactCallableABI,
+		api.GeneratedArtifactInterfaceMethodCallable:
+		err = s.reconstructCallableContractArtifact(artifact)
+	case api.GeneratedArtifactPointerRepresentation:
+		err = s.reconstructPointerRepresentationArtifact(artifact)
 	default:
-		return &ScheduleError{
+		err = &ScheduleError{
 			Object: artifact.TargetName(),
 			Reason: "generated artifact kind is invalid",
 		}
 	}
+	return api.WrapGeneratedArtifactError(artifact, err)
 }
 
 func (s *programSession) validateMapSpecializationArtifact(
@@ -206,7 +214,22 @@ func (s *programSession) buildMapSpecializationRevision(
 	keyType, err := builder.emitter.RepresentedType(
 		context.WithRole(api.RoleMapKey),
 		nil,
-		maprepresentation.StorageKeyType(mapType.Key()),
+		mapType.Key(),
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	mapModel, ok := maprepresentation.Source(context, mapType)
+	if !ok {
+		return artifactRevision{}, &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "generated map specialization has no representation model",
+		}
+	}
+	storageKeyType, err := builder.emitter.RepresentedType(
+		context.WithRole(api.RoleStorageType),
+		nil,
+		mapModel.StorageKey(),
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -225,6 +248,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		artifact.TargetName(),
 		mapType,
 		keyType.Value(),
+		storageKeyType.Value(),
 		valueType.Value(),
 	)
 	if err != nil {
@@ -239,6 +263,7 @@ func (s *programSession) buildMapSpecializationRevision(
 	))
 	requests := api.CombineRequests(
 		keyType.Requests(),
+		storageKeyType.Requests(),
 		valueType.Requests(),
 		specialization.Requests(),
 	)
@@ -385,9 +410,10 @@ func (s *programSession) buildGenericCapabilityRevision(
 	}
 	defer finish()
 	context := builder.context.WithArtifactOwner(owner)
-	if err := exactGenericCapabilityRequirement(
-		s.requirements.appliedFor(owner),
+	if err := genericcapability.ValidateRequirements(
+		builder.context.Role(),
 		artifact,
+		s.requirements.appliedFor(owner),
 	); err != nil {
 		return artifactRevision{}, err
 	}
@@ -407,6 +433,7 @@ func (s *programSession) buildGenericCapabilityRevision(
 		context,
 		builder.emitter,
 		artifact,
+		[]tsgo.ModifierLike{context.Factory().ExportKeyword()},
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -430,42 +457,6 @@ func (s *programSession) buildGenericCapabilityRevision(
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
-}
-
-func exactGenericCapabilityRequirement(
-	requirements []api.DeclarationRequirement,
-	artifact *api.GeneratedArtifact,
-) error {
-	definitions := 0
-	cooperative := false
-	for _, requirement := range requirements {
-		if selected, ok := requirement.GenericCapability(); ok {
-			if selected != artifact {
-				return &ScheduleError{
-					Object: artifact.TargetName(),
-					Reason: "generic capability received a foreign definition",
-				}
-			}
-			definitions++
-			continue
-		}
-		facet, ok := requirement.CooperativeCallable()
-		selected, capability := facet.GenericCapability()
-		if !ok || !capability || selected != artifact || cooperative {
-			return &ScheduleError{
-				Object: artifact.TargetName(),
-				Reason: "generic capability received a foreign requirement",
-			}
-		}
-		cooperative = true
-	}
-	if definitions != 1 {
-		return &ScheduleError{
-			Object: artifact.TargetName(),
-			Reason: "generic capability requires exactly one definition request",
-		}
-	}
-	return nil
 }
 
 func (s *programSession) compilationGeneratedArtifactBuilder(

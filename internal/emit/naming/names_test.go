@@ -226,6 +226,66 @@ func TestNameOwnerRejectsDeclarationOutsideIndexedTypeGraph(t *testing.T) {
 	}
 }
 
+func TestBlankSlotsAreTargetOnlyAndBlankMethodsAreNotPreallocated(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/blank", "blank")
+	typeName := types.NewTypeName(
+		token.Pos(1),
+		sourcePackage,
+		"Item",
+		nil,
+	)
+	named := types.NewNamed(typeName, types.NewStruct(nil, nil), nil)
+	sourcePackage.Scope().Insert(typeName)
+	receiver := types.NewVar(
+		token.Pos(2),
+		sourcePackage,
+		"",
+		named,
+	)
+	blankMethod := types.NewFunc(
+		token.Pos(3),
+		sourcePackage,
+		"_",
+		types.NewSignatureType(
+			receiver,
+			nil,
+			nil,
+			types.NewTuple(),
+			types.NewTuple(),
+			false,
+		),
+	)
+	owner := NewOwner(
+		sourcePackage.Scope(),
+		&types.Info{Defs: map[*ast.Ident]types.Object{
+			{Name: "_"}: blankMethod,
+		}},
+		NewRegistry(),
+	)
+	if _, exists := owner.targetNameByObject[blankMethod]; exists {
+		t.Fatal("blank method received a target declaration name")
+	}
+
+	file := &File{owner: owner}
+	blankParameter := types.NewVar(
+		token.Pos(4),
+		sourcePackage,
+		"_",
+		types.Typ[types.Int],
+	)
+	parameterName, err := file.Parameter(blankParameter, 2)
+	if err != nil || parameterName != "$2" {
+		t.Fatalf("blank parameter = %q, %v; want $2", parameterName, err)
+	}
+	resultName, err := file.Result(blankParameter, 2)
+	if err != nil || resultName != "$result2" {
+		t.Fatalf("blank result = %q, %v; want $result2", resultName, err)
+	}
+	if _, exists := owner.byObject[blankParameter]; exists {
+		t.Fatal("blank slot entered the Go binding table")
+	}
+}
+
 func TestCrossPackageReferenceRequiresItsExactObjectBeforeImporting(t *testing.T) {
 	currentPackage := types.NewPackage("example.com/current", "current")
 	importedPackage := types.NewPackage("example.com/dependency", "dependency")
@@ -244,6 +304,7 @@ func TestCrossPackageReferenceRequiresItsExactObjectBeforeImporting(t *testing.T
 		sourceFile:   declarationFile,
 		sourcePath:   "modules/dependency/dependency.ts",
 		moduleExport: true,
+		kind:         targetBindingSource,
 	}); err != nil {
 		t.Fatal(err)
 	}

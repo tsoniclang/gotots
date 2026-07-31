@@ -6,8 +6,12 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
+	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
+	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
+	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -21,6 +25,7 @@ func Build(
 	children api.ChildEmitter,
 	name string,
 	sourceType types.Type,
+	contracts []*types.Interface,
 	modifiers []tsgo.ModifierLike,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	if name == "" || sourceType == nil {
@@ -48,48 +53,74 @@ func Build(
 	if err != nil {
 		return nil, nil, err
 	}
-	methodSet := types.NewMethodSet(sourceType)
+	demanded, err := demandedMethods(
+		sourceType,
+		contracts,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
 	methods := make(
 		[]tsgo.ClassElement,
 		0,
-		methodSet.Len()+4,
+		len(demanded)+4,
 	)
-	tokens := make([]tsgo.Expression, 0, methodSet.Len())
+	tokens := make([]tsgo.Expression, 0, len(demanded))
+	tokenNames := make(map[string]struct{})
 	requests := api.CombineRequests(
 		payload.Requests(),
 		runtimeValue.Requests(),
 		dynamicType.Requests(),
 	)
-	for index := range methodSet.Len() {
-		selected := methodSet.At(index)
-		method, ok := selected.Obj().(*types.Func)
-		if !ok {
-			return nil, nil, &api.GeneratedArtifactShapeError{
-				Artifact: name,
-				Reason:   "method set contains a non-method object",
+	for _, selected := range demanded {
+		targets := make(
+			[]api.InterfaceMethodCallableReference,
+			0,
+			len(selected.contracts),
+		)
+		for _, contract := range selected.contracts {
+			callableReference, callableErr :=
+				context.Names().InterfaceMethodCallable(contract)
+			if callableErr != nil {
+				return nil, nil, callableErr
 			}
+			targets = append(targets, callableReference)
+			token, tokenErr :=
+				context.Names().InterfaceMethodToken(contract)
+			if tokenErr != nil {
+				return nil, nil, tokenErr
+			}
+			requests = append(requests, token.Requests()...)
+			if _, duplicate := tokenNames[token.Name()]; duplicate {
+				continue
+			}
+			tokenNames[token.Name()] = struct{}{}
+			tokens = append(
+				tokens,
+				context.Factory().Identifier(token.Name()),
+			)
 		}
 		target, methodRequests, err := emitMethod(
 			context,
 			children,
 			sourceType,
-			selected,
-			method,
+			selected.selection,
+			selected.method,
+			targets,
 		)
 		if err != nil {
-			return nil, nil, err
+			methodError, staged := err.(*MethodError)
+			if staged && methodError.Method == nil {
+				methodError.Method = selected.method
+				return nil, nil, methodError
+			}
+			return nil, nil, &MethodError{
+				Method: selected.method,
+				Cause:  err,
+			}
 		}
 		methods = append(methods, target)
 		requests = append(requests, methodRequests...)
-		token, err := context.Names().InterfaceMethodToken(method)
-		if err != nil {
-			return nil, nil, err
-		}
-		tokens = append(
-			tokens,
-			context.Factory().Identifier(token.Name()),
-		)
-		requests = append(requests, token.Requests()...)
 	}
 	equal, equalRequests, err := equalMethod(
 		context,
@@ -151,17 +182,80 @@ func Build(
 		), nil
 }
 
+type demandedMethod struct {
+	selection *types.Selection
+	method    *types.Func
+	contracts []*types.Func
+}
+
+func demandedMethods(
+	sourceType types.Type,
+	contracts []*types.Interface,
+) ([]demandedMethod, error) {
+	methodSet := types.NewMethodSet(sourceType)
+	required := make(map[*types.Func][]*types.Func)
+	for _, contract := range contracts {
+		if contract == nil ||
+			!contract.Complete().IsMethodSet() ||
+			!types.Implements(sourceType, contract) {
+			return nil, &api.GeneratedArtifactShapeError{
+				Reason: "adapter contract is not implemented by its source type",
+			}
+		}
+		for index := range contract.NumMethods() {
+			method := contract.Method(index)
+			selected := methodSet.Lookup(method.Pkg(), method.Name())
+			if selected == nil {
+				return nil, &api.GeneratedArtifactShapeError{
+					Reason: "adapter contract method has no concrete selection",
+				}
+			}
+			concrete, ok := selected.Obj().(*types.Func)
+			if !ok || !methodidentity.Equivalent(concrete, method) {
+				return nil, &api.GeneratedArtifactShapeError{
+					Reason: "adapter contract method selection is not exact",
+				}
+			}
+			required[concrete] = append(required[concrete], method)
+		}
+	}
+	demanded := make([]demandedMethod, 0, len(required))
+	for index := range methodSet.Len() {
+		selection := methodSet.At(index)
+		method, ok := selection.Obj().(*types.Func)
+		if !ok {
+			return nil, &api.GeneratedArtifactShapeError{
+				Reason: "adapter method set contains a non-method object",
+			}
+		}
+		if targetContracts := required[method]; len(targetContracts) != 0 {
+			demanded = append(demanded, demandedMethod{
+				selection: selection,
+				method:    method,
+				contracts: targetContracts,
+			})
+		}
+	}
+	if len(demanded) != len(required) {
+		return nil, &api.GeneratedArtifactShapeError{
+			Reason: "adapter contract selection lost a required method",
+		}
+	}
+	return demanded, nil
+}
+
 func emitMethod(
 	context api.Context,
 	children api.ChildEmitter,
 	sourceType types.Type,
 	selected *types.Selection,
 	method *types.Func,
+	targets []api.InterfaceMethodCallableReference,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	sourceSignature, ok := method.Type().(*types.Signature)
-	if !ok || sourceSignature.Recv() == nil {
+	if !ok || sourceSignature.Recv() == nil || len(targets) == 0 {
 		return nil, nil, &api.GeneratedArtifactShapeError{
-			Reason: "adapter method has no receiver signature",
+			Reason: "adapter method contract is incomplete",
 		}
 	}
 	signature := types.NewSignatureType(
@@ -179,16 +273,7 @@ func emitMethod(
 		signature,
 	)
 	if err != nil {
-		return nil, nil, err
-	}
-	providerCooperative, contractCooperative, contractRequests, err :=
-		cooperativecall.SourceValueContract(
-			context,
-			method,
-			signature,
-		)
-	if err != nil {
-		return nil, nil, err
+		return nil, nil, methodStageError(MethodStageABI, err)
 	}
 	root := api.DirectExpression(
 		context.Factory().PropertyAccessExpression(
@@ -198,52 +283,145 @@ func emitMethod(
 			tsgo.NodeFlagsNone,
 		),
 	)
-	receiver, resolvedMethod, err := selectionvalue.MethodSetReceiver(
-		context,
-		children,
-		nil,
-		selected,
-		root,
-	)
+	receiver, dispatchType, resolvedMethod, err :=
+		selectionvalue.DirectMethodSetReceiver(
+			context,
+			children,
+			nil,
+			selected,
+			root,
+		)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, methodStageError(MethodStageReceiver, err)
 	}
-	if resolvedMethod != method || len(receiver.Before()) != 0 {
+	if resolvedMethod != method {
 		return nil, nil, &api.GeneratedArtifactShapeError{
-			Reason: "adapter method receiver is not direct",
+			Reason: "adapter method receiver selection is inconsistent",
 		}
 	}
-	reference, err := context.Names().Reference(method)
-	if err != nil {
-		return nil, nil, err
+	interfaceDispatch := false
+	if _, selected := interfacetype.Resolve(dispatchType); selected {
+		interfaceDispatch = true
 	}
-	controlRequest, err := api.NewDirectCallableControlRequest(
-		method.Origin(),
-		api.CallableControlRecovery,
-	)
-	if err != nil {
-		return nil, nil, err
+	var providerCooperative bool
+	var contractCooperative bool
+	var contractRequests []api.RootRequest
+	var invocation methodcall.Selection
+	if interfaceDispatch {
+		provider, providerErr :=
+			context.Names().InterfaceMethodCallable(method)
+		if providerErr != nil {
+			return nil, nil, methodStageError(
+				MethodStageContract,
+				providerErr,
+			)
+		}
+		providerCooperative,
+			contractCooperative,
+			contractRequests,
+			err = cooperativecall.InterfaceProviderMethodContracts(
+			context,
+			provider,
+			targets,
+		)
+	} else {
+		invocation, err = methodcall.Resolve(
+			context,
+			children,
+			nil,
+			method,
+			sourceSignature,
+		)
+		if err != nil {
+			return nil, nil, methodStageError(MethodStageContract, err)
+		}
+		if !types.Identical(invocation.Signature(), signature) {
+			return nil, nil, &api.GeneratedArtifactShapeError{
+				Reason: "adapter method invocation signature is inconsistent",
+			}
+		}
+		providerCooperative, contractCooperative, contractRequests, err =
+			cooperativecall.ProviderInterfaceMethodContracts(
+				context,
+				invocation.Facet(),
+				targets,
+			)
 	}
-	arguments := append(
-		[]tsgo.Expression{receiver.Value()},
-		target.ParameterReferences(context.Factory())...,
-	)
-	call := context.Factory().CallExpression(
-		context.Factory().Identifier(reference.Name()),
-		nil,
-		nil,
-		arguments,
-		tsgo.NodeFlagsNone,
-	)
-	var body []tsgo.Statement
-	if signature.Results().Len() == 0 {
-		body = []tsgo.Statement{
-			context.Factory().ExpressionStatement(call),
+	if err != nil {
+		return nil, nil, methodStageError(MethodStageContract, err)
+	}
+	var call api.ExpressionEmission
+	var callRequests []api.RootRequest
+	if interfaceDispatch {
+		call, err = interfaceoperation.Apply(
+			context,
+			children,
+			nil,
+			dispatchType,
+			receiver,
+			method,
+			target.ParameterReferences(context.Factory()),
+			nil,
+			nil,
+		)
+		if err != nil {
+			return nil, nil, methodStageError(MethodStageInvocation, err)
 		}
 	} else {
-		body = []tsgo.Statement{
-			context.Factory().ReturnStatement(call),
+		recovery, ok := target.RecoveryAuthorityReference(
+			context.Factory(),
+		)
+		if !ok {
+			return nil, nil, &api.GeneratedArtifactShapeError{
+				Reason: "adapter method lacks recovery authority",
+			}
 		}
+		targetCall, targetRequests, callErr := invocation.Call(
+			context,
+			receiver.Value(),
+			target.SourceParameterReferences(context.Factory()),
+			recovery,
+		)
+		if callErr != nil {
+			return nil, nil, methodStageError(
+				MethodStageInvocation,
+				callErr,
+			)
+		}
+		call = api.DirectExpression(targetCall, targetRequests...)
+		callRequests = receiver.Requests()
+	}
+	call, err = api.NewExpressionEmission(
+		call.Before(),
+		call.Value(),
+		api.CombineRequests(
+			call.Requests(),
+			callRequests,
+			contractRequests,
+		),
+	)
+	if err != nil {
+		return nil, nil, methodStageError(MethodStageInvocation, err)
+	}
+	call, err = cooperativecall.GeneratedInterfaceProviderCall(
+		context,
+		call,
+		providerCooperative,
+	)
+	if err != nil {
+		return nil, nil, methodStageError(MethodStageInvocation, err)
+	}
+	body := append(receiver.Before(), call.Before()...)
+	if signature.Results().Len() == 0 {
+		body = append(
+			body,
+			context.Factory().ExpressionStatement(call.Value()),
+		)
+	} else {
+		body = append(
+			body,
+			context.Factory().ReturnStatement(call.Value()),
+		)
 	}
 	memberName, err := context.Names().InterfaceMethodName(method)
 	if err != nil {
@@ -271,9 +449,6 @@ func emitMethod(
 			context.Factory().Block(body, true),
 		), api.CombineRequests(
 			target.Requests(),
-			receiver.Requests(),
-			reference.Requests(),
-			[]api.RootRequest{controlRequest},
-			contractRequests,
+			call.Requests(),
 		), nil
 }

@@ -8,6 +8,7 @@ import (
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(context api.Context, source ast.Expr) (api.TypeEmission, error) {
@@ -23,6 +24,29 @@ func EmitRepresented(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if SupportsUnsafePointer(sourceType) {
+		reference, err := context.Names().Runtime(
+			api.RuntimeUnsafePointer,
+			api.ImportPhaseType,
+		)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return api.DirectType(
+			context.Factory().UnionTypeNode(
+				[]tsgo.TypeNode{
+					context.Factory().TypeReferenceNode(
+						context.Factory().Identifier(reference.Name()),
+						nil,
+					),
+					context.Factory().KeywordTypeNode(
+						tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+					),
+				},
+			),
+			reference.Requests()...,
+		), nil
+	}
 	if _, ok := complexvalue.Describe(sourceType); ok {
 		return complexvalue.EmitType(context, source, sourceType)
 	}
@@ -41,6 +65,11 @@ func EmitRepresented(
 		),
 		reference.Requests()...,
 	), nil
+}
+
+func SupportsUnsafePointer(sourceType types.Type) bool {
+	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	return ok && basic.Kind() == types.UnsafePointer
 }
 
 func SupportsInteger(sizes types.Sizes, sourceType types.Type) bool {

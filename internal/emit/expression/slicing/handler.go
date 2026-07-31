@@ -7,8 +7,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -125,15 +125,7 @@ func emitBound(
 	if source == nil {
 		return expressionoperands.Omitted(omitted), nil
 	}
-	sourceType := context.TypesInfo().TypeOf(source)
-	if !basictype.SupportsInteger(context.TypesSizes(), sourceType) {
-		return expressionoperands.Item{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	emission, err := children.Expression(
-		context.WithExpectedType(sourceType),
-		source,
-	)
+	emission, err := integeroperand.Emit(context, children, source)
 	if err != nil {
 		return expressionoperands.Item{}, err
 	}

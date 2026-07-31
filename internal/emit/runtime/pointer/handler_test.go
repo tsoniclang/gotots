@@ -38,8 +38,8 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 		t.Fatalf("pointer type parameters = %v, want L and S", parameters)
 	}
 	members := class.Members()
-	if len(members) != 19 {
-		t.Fatalf("pointer class members = %d, want 19", len(members))
+	if len(members) != 18 {
+		t.Fatalf("pointer class members = %d, want 18", len(members))
 	}
 	constructor, ok := members[3].(tsgo.ConstructorDeclaration)
 	if !ok {
@@ -164,13 +164,13 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		"static cell<L, S>(value: S): GoPointer<L, S>",
 		"static field<L, PL, PS extends object, K extends keyof PS>",
 		"static objectField<L, O extends object, K extends keyof O>",
-		"static elementView<L, S, O>",
+		"static element<L, S>",
 		"static index<L, S, PL, O extends",
-		"static indexView<L, S, PL, V, O extends",
 		"static arrayRegion<L, T, S extends",
-		"const numericIndex = Number(index);",
+		"const numericIndex = globalThis.Number(index);",
 		"static equal<LL, LS, RL, RS>",
 		"static dereference<L, S>",
+		"static direct<L>",
 		"static view<F, T, S>",
 		"get value(): S",
 		"set value(value: S)",
@@ -180,7 +180,16 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 			t.Fatalf("pointer runtime lacks %q:\n%s", required, printed)
 		}
 	}
-	for _, forbidden := range []string{"any", "unknown", ".call(", ".apply(", ".bind("} {
+	for _, forbidden := range []string{
+		"any",
+		"unknown",
+		".call(",
+		".apply(",
+		".bind(",
+		"optionalStorage",
+		"elementView",
+		"indexView",
+	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("pointer runtime contains %q:\n%s", forbidden, printed)
 		}
@@ -193,6 +202,7 @@ func pointerMethod(
 	name string,
 ) tsgo.MethodDeclaration {
 	t.Helper()
+	var signature tsgo.MethodDeclaration
 	for _, member := range class.Members() {
 		method, ok := member.(tsgo.MethodDeclaration)
 		if !ok {
@@ -200,8 +210,14 @@ func pointerMethod(
 		}
 		identifier, ok := method.Name().(tsgo.Identifier)
 		if ok && identifier.Text() == name {
-			return method
+			if method.Body() != nil {
+				return method
+			}
+			signature = method
 		}
+	}
+	if signature != nil {
+		return signature
 	}
 	t.Fatalf("pointer method %q is absent", name)
 	return nil

@@ -49,7 +49,7 @@ func TestDescribePreservesEveryPredeclaredIntegerWidthAndSign(t *testing.T) {
 	}
 }
 
-func TestFormatConstantEnforcesCarrierAndProfileBounds(t *testing.T) {
+func TestFormatConstantEnforcesCarrierBoundsAndSelectedSyntax(t *testing.T) {
 	int64Carrier, _ := Describe(
 		types.SizesFor("gc", "amd64"),
 		types.Typ[types.Int64],
@@ -68,7 +68,7 @@ func TestFormatConstantEnforcesCarrierAndProfileBounds(t *testing.T) {
 		want           bool
 	}{
 		{"number-safe", api.IntegerRepresentationNumber, int64Carrier, "9007199254740991", "9007199254740991", false, true},
-		{"number-unsafe", api.IntegerRepresentationNumber, int64Carrier, "9007199254740992", "", false, false},
+		{"number-wide", api.IntegerRepresentationNumber, int64Carrier, "9007199254740992", "9007199254740992", false, true},
 		{"bigint-max-signed", api.IntegerRepresentationBigInt, int64Carrier, "9223372036854775807", "9223372036854775807", false, true},
 		{"bigint-min-signed", api.IntegerRepresentationBigInt, int64Carrier, "-9223372036854775808", "9223372036854775808", true, true},
 		{"bigint-max-unsigned", api.IntegerRepresentationBigInt, uint64Carrier, "18446744073709551615", "18446744073709551615", false, true},
@@ -101,19 +101,18 @@ func TestFormatConstantEnforcesCarrierAndProfileBounds(t *testing.T) {
 
 func TestEveryCarrierBoundaryIsCheckedAgainstItsSelectedProfile(t *testing.T) {
 	testCases := []struct {
-		kind        types.BasicKind
-		minimum     string
-		maximum     string
-		numberExact bool
+		kind    types.BasicKind
+		minimum string
+		maximum string
 	}{
-		{types.Int8, "-128", "127", true},
-		{types.Int16, "-32768", "32767", true},
-		{types.Int32, "-2147483648", "2147483647", true},
-		{types.Int64, "-9223372036854775808", "9223372036854775807", false},
-		{types.Uint8, "0", "255", true},
-		{types.Uint16, "0", "65535", true},
-		{types.Uint32, "0", "4294967295", true},
-		{types.Uint64, "0", "18446744073709551615", false},
+		{types.Int8, "-128", "127"},
+		{types.Int16, "-32768", "32767"},
+		{types.Int32, "-2147483648", "2147483647"},
+		{types.Int64, "-9223372036854775808", "9223372036854775807"},
+		{types.Uint8, "0", "255"},
+		{types.Uint16, "0", "65535"},
+		{types.Uint32, "0", "4294967295"},
+		{types.Uint64, "0", "18446744073709551615"},
 	}
 	sizes := types.SizesFor("gc", "amd64")
 	for _, testCase := range testCases {
@@ -130,26 +129,22 @@ func TestEveryCarrierBoundaryIsCheckedAgainstItsSelectedProfile(t *testing.T) {
 			); !exact {
 				t.Fatalf("BigInt %v boundary %s was rejected", testCase.kind, boundary)
 			}
-			_, _, exact := FormatConstant(
+			if _, _, admitted := FormatConstant(
 				api.IntegerRepresentationNumber,
 				carrier,
 				value,
-			)
-			want := testCase.numberExact || boundary == "0"
-			if exact != want {
+			); !admitted {
 				t.Fatalf(
-					"number %v boundary %s exact = %v, want %v",
+					"number %v boundary %s was rejected",
 					testCase.kind,
 					boundary,
-					exact,
-					want,
 				)
 			}
 		}
 	}
 }
 
-func TestIntegerCapabilityMatrixAdmitsExactOperationsOnly(t *testing.T) {
+func TestIntegerCapabilityMatrixMatchesSelectedProfileBoundaries(t *testing.T) {
 	sizes := types.SizesFor("gc", "amd64")
 	int32Carrier, _ := Describe(sizes, types.Typ[types.Int32])
 	int64Carrier, _ := Describe(sizes, types.Typ[types.Int64])
@@ -162,11 +157,17 @@ func TestIntegerCapabilityMatrixAdmitsExactOperationsOnly(t *testing.T) {
 	if !SupportsArithmetic(api.IntegerRepresentationBigInt, token.QUO) {
 		t.Fatal("BigInt division was rejected")
 	}
-	if SupportsBitwise(api.IntegerRepresentationNumber, int64Carrier, token.AND) {
-		t.Fatal("number int64 bitwise operation was admitted")
+	if !SupportsBitwise(api.IntegerRepresentationNumber, int64Carrier, token.AND) {
+		t.Fatal("number int64 bitwise operation was rejected")
 	}
 	if !SupportsBitwise(api.IntegerRepresentationNumber, int32Carrier, token.AND) {
 		t.Fatal("number int32 bitwise operation was rejected")
+	}
+	if SupportsBitwise(api.IntegerRepresentationInvalid, int64Carrier, token.AND) {
+		t.Fatal("invalid integer representation admitted bitwise operation")
+	}
+	if SupportsBitwise(api.IntegerRepresentationNumber, int64Carrier, token.ADD) {
+		t.Fatal("non-bitwise operator was admitted as bitwise")
 	}
 	if !RequiresUint32Normalization(api.IntegerRepresentationNumber, uint32Carrier) {
 		t.Fatal("number uint32 lost its required unsigned normalization")
@@ -184,12 +185,12 @@ func TestIntegerCapabilityMatrixAdmitsExactOperationsOnly(t *testing.T) {
 	) {
 		t.Fatal("exact BigInt variable shift was rejected")
 	}
-	if SupportsVariableShift(
+	if !SupportsVariableShift(
 		api.IntegerRepresentationNumber,
 		int64Carrier,
 		token.SHL,
 	) {
-		t.Fatal("number int64 variable shift was admitted")
+		t.Fatal("number int64 variable shift was rejected")
 	}
 	if !SupportsVariableShift(
 		api.IntegerRepresentationNumber,
@@ -197,6 +198,20 @@ func TestIntegerCapabilityMatrixAdmitsExactOperationsOnly(t *testing.T) {
 		token.SHR,
 	) {
 		t.Fatal("exact number int32 variable shift was rejected")
+	}
+	if SupportsVariableShift(
+		api.IntegerRepresentationNumber,
+		int64Carrier,
+		token.AND,
+	) {
+		t.Fatal("non-shift operator was admitted as a variable shift")
+	}
+	if !SupportsUnary(
+		api.IntegerRepresentationNumber,
+		int64Carrier,
+		token.XOR,
+	) {
+		t.Fatal("number int64 complement was rejected")
 	}
 	if SupportsUnary(api.IntegerRepresentationBigInt, uint32Carrier, token.SUB) {
 		t.Fatal("unsigned negation was admitted without fixed-width overflow")

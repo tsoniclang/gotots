@@ -11,6 +11,7 @@ import (
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
+	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -37,6 +38,9 @@ func (Owner) RequiresCustomEquality(
 		return true
 	}
 	if panicNilRuntimeValue(context, sourceType) {
+		return true
+	}
+	if unsafePointerValue(sourceType) {
 		return true
 	}
 	if _, ok := definedtype.Resolve(sourceType); ok {
@@ -75,6 +79,15 @@ func (Owner) RequiresExplicitType(
 		return true
 	}
 	if panicNilRuntimeValue(context, sourceType) {
+		return true
+	}
+	if unsafePointerValue(sourceType) {
+		return true
+	}
+	if model, ok := maprepresentation.Source(
+		context,
+		sourceType,
+	); ok && !model.Nominal() {
 		return true
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
@@ -136,17 +149,12 @@ func (owner Owner) Zero(
 	if panicNilRuntimeValue(context, sourceType) {
 		return panicNilZero(context)
 	}
+	if unsafePointerValue(sourceType) {
+		return api.DirectExpression(
+			context.Factory().Identifier("undefined"),
+		), nil
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
-		if defined.NilCapable() {
-			return api.DirectExpression(
-				context.Factory().VoidExpression(
-					context.Factory().NumericLiteral(
-						"0",
-						tsgo.TokenFlagsNone,
-					),
-				),
-			), nil
-		}
 		zero, err := owner.Zero(
 			context.WithRole(api.RoleDefinedValue),
 			source,
@@ -154,9 +162,6 @@ func (owner Owner) Zero(
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
-		}
-		if defined.Family() == definedtype.FamilyCallable {
-			return zero, nil
 		}
 		return defined.Wrap(context, zero)
 	}
@@ -169,8 +174,19 @@ func (owner Owner) Zero(
 		)
 	}
 	if _, ok := maprepresentation.Source(context, sourceType); ok {
+		if api.ContainsGenericTypeParameter(sourceType) {
+			return genericoperation.Call(
+				context,
+				source,
+				api.GenericOperationZero,
+				nil,
+				[]types.Type{sourceType},
+				nil,
+			)
+		}
 		return maprepresentation.Nil(
 			context,
+			owner.children,
 			source,
 			sourceType,
 		)
@@ -239,7 +255,111 @@ func (owner Owner) Zero(
 	)
 }
 
-func (owner Owner) Copy(
+func (owner Owner) Transfer(
+	context api.Context,
+	source ast.Node,
+	actualType types.Type,
+	destinationType types.Type,
+	mode api.ValueTransferMode,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if actualType == nil ||
+		destinationType == nil ||
+		!mode.Valid() ||
+		!types.AssignableTo(actualType, destinationType) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if _, destinationInterface := interfacetype.Resolve(
+		destinationType,
+	); destinationInterface {
+		adapted, handled, err := interfacevalue.Assign(
+			context,
+			source,
+			actualType,
+			destinationType,
+			value,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !handled {
+			return api.ExpressionEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "interface transfer was not handled",
+			}
+		}
+		if mode == api.ValueTransferRepresentation {
+			return adapted, nil
+		}
+		return owner.copyExact(
+			context,
+			source,
+			destinationType,
+			adapted,
+		)
+	}
+	if representedAtDestination(actualType, destinationType) {
+		actualType = destinationType
+	}
+	if _, generic := api.GenericTypeParameter(actualType); generic {
+		if _, mapDestination :=
+			maprepresentation.Source(context, destinationType); mapDestination &&
+			!types.Identical(actualType, destinationType) &&
+			types.ConvertibleTo(actualType, destinationType) {
+			return genericoperation.Call(
+				context,
+				source,
+				api.GenericOperationConvert,
+				[]types.Type{actualType},
+				[]types.Type{destinationType},
+				[]api.ExpressionEmission{value},
+			)
+		}
+	}
+	if !types.Identical(actualType, destinationType) {
+		if actual, ok := definedtype.Resolve(actualType); ok {
+			var err error
+			value, err = actual.Project(context, value)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+			actualType = actual.Underlying()
+		}
+		if destination, ok := definedtype.Resolve(destinationType); ok {
+			if mode == api.ValueTransferCopy {
+				var err error
+				value, err = owner.copyExact(
+					context.WithRole(api.RoleDefinedValue),
+					source,
+					destination.Underlying(),
+					value,
+				)
+				if err != nil {
+					return api.ExpressionEmission{}, err
+				}
+			}
+			return destination.Wrap(context, value)
+		}
+	}
+	if mode == api.ValueTransferRepresentation {
+		return value, nil
+	}
+	return owner.copyExact(context, source, destinationType, value)
+}
+
+func representedAtDestination(
+	actualType types.Type,
+	destinationType types.Type,
+) bool {
+	basic, basicOK := types.Unalias(actualType).(*types.Basic)
+	if basicOK && basic.Info()&types.IsUntyped != 0 {
+		return true
+	}
+	return false
+}
+
+func (owner Owner) copyExact(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
@@ -252,17 +372,12 @@ func (owner Owner) Copy(
 			api.GenericOperationCopy,
 			[]types.Type{parameter},
 			[]types.Type{parameter},
-			[]tsgo.Expression{value.Value()},
-			value.Requests()...,
+			[]api.ExpressionEmission{value},
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return api.NewExpressionEmission(
-			value.Before(),
-			target.Value(),
-			target.Requests(),
-		)
+		return target, nil
 	}
 	if _, ok := interfacetype.Resolve(sourceType); ok {
 		return api.NewExpressionEmission(
@@ -274,22 +389,12 @@ func (owner Owner) Copy(
 	if panicNilRuntimeValue(context, sourceType) {
 		return panicNilCopy(context, value)
 	}
-	if target, ok := definedtype.ResolveCallable(sourceType); ok {
-		actual := expressionType(context, source)
-		if actual == nil || types.Identical(actual, sourceType) {
-			return api.NewExpressionEmission(
-				value.Before(),
-				value.Value(),
-				value.Requests(),
-			)
-		}
-		return target.Wrap(context, value)
-	}
-	if expression := expressionType(context, source); expression != nil &&
-		!types.Identical(expression, sourceType) {
-		if actual, ok := definedtype.ResolveCallable(expression); ok {
-			return actual.Project(context, value)
-		}
+	if unsafePointerValue(sourceType) {
+		return api.NewExpressionEmission(
+			value.Before(),
+			value.Value(),
+			value.Requests(),
+		)
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok &&
 		defined.Family() != definedtype.FamilyArray {
@@ -382,14 +487,6 @@ func ownsFreshValue(context api.Context, source ast.Node) bool {
 	}
 }
 
-func expressionType(context api.Context, source ast.Node) types.Type {
-	expression, ok := source.(ast.Expr)
-	if !ok {
-		return nil
-	}
-	return context.TypesInfo().TypeOf(expression)
-}
-
 func (Owner) Assign(
 	context api.Context,
 	source ast.Node,
@@ -419,6 +516,7 @@ func (Owner) Assign(
 	_, _, structOK := namedStruct(sourceType)
 	_, anonymousStructOK := isAnonymousStruct(sourceType)
 	_, interfaceOK := interfacetype.Resolve(sourceType)
+	unsafePointerOK := unsafePointerValue(sourceType)
 	if !definedOK &&
 		!arrayOK &&
 		!complexOK &&
@@ -428,6 +526,7 @@ func (Owner) Assign(
 		!channelValue(sourceType) &&
 		!isScalarSlice(context, sourceType) &&
 		!mapValue(context, sourceType) &&
+		!unsafePointerOK &&
 		!interfaceOK &&
 		!anonymousStructOK &&
 		!structOK {
@@ -446,5 +545,35 @@ func (Owner) Assign(
 			value.Value(),
 		),
 		value.Requests(),
+	)
+}
+
+func (owner Owner) AssignStable(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+	target tsgo.Expression,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if _, _, ok := namedStruct(sourceType); !ok {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "stable-identity assignment requires a named struct",
+		}
+	}
+	assigned, err := owner.namedStructOperation(
+		context,
+		source,
+		sourceType,
+		api.NamedStructOperationAssign,
+		[]tsgo.Expression{target, value.Value()},
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.NewExpressionEmission(
+		value.Before(),
+		assigned.Value(),
+		api.CombineRequests(value.Requests(), assigned.Requests()),
 	)
 }

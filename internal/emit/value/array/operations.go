@@ -5,7 +5,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
-	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -15,11 +14,27 @@ func (a RuntimeArray) Zero(
 	source ast.Node,
 ) (api.ExpressionEmission, error) {
 	if a.aggregate {
+		if a.Length() == 0 {
+			target, requests, err := a.runtimeOperation(
+				context,
+				children,
+				api.RuntimeArrayAllocate,
+				a.lengthLiteral(context),
+			)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+			return a.wrap(context, api.DirectExpression(target, requests...))
+		}
 		loopZero, err := context.Values().Zero(
 			context,
 			source,
 			a.ElementType(),
 		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		loopZero, err = a.storeElement(context, source, loopZero)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
@@ -93,6 +108,10 @@ func (a RuntimeArray) Zero(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	elementZero, err = a.storeElement(context, source, elementZero)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	if len(elementZero.Before()) != 0 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -158,17 +177,31 @@ func (a RuntimeArray) Copy(
 		sourceValue := context.Factory().Identifier(sourceName)
 		result := context.Factory().Identifier(resultName)
 		index := context.Factory().Identifier(indexName)
-		elementCopy, err := context.Values().Copy(
-			context.WithRole(api.RoleArrayElement),
+		loaded, err := a.loadElement(
+			context,
 			source,
-			a.ElementType(),
-			api.DirectExpression(callMember(
+			callMember(
 				context,
 				sourceValue,
 				arraymember.Get,
 				index,
-			)),
+			),
 		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		elementCopy, err := context.Values().Transfer(
+			context.WithRole(api.RoleArrayElement),
+			source,
+			a.ElementType(),
+			a.ElementType(),
+			api.ValueTransferCopy,
+			loaded,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		elementCopy, err = a.storeElement(context, source, elementCopy)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
@@ -306,22 +339,38 @@ func (a RuntimeArray) Equal(
 		return api.ExpressionEmission{}, err
 	}
 	index := context.Factory().Identifier(indexName)
-	elementEqual, err := context.Values().Equal(
-		context.WithRole(api.RoleArrayElement),
+	leftElement, err := a.loadElement(
+		context,
 		source,
-		a.ElementType(),
 		callMember(
 			context,
 			context.Factory().Identifier(leftName),
 			arraymember.Get,
 			index,
 		),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	rightElement, err := a.loadElement(
+		context,
+		source,
 		callMember(
 			context,
 			context.Factory().Identifier(rightName),
 			arraymember.Get,
 			index,
 		),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	elementEqual, err := context.Values().Equal(
+		context.WithRole(api.RoleArrayElement),
+		source,
+		a.ElementType(),
+		leftElement.Value(),
+		rightElement.Value(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -341,7 +390,15 @@ func (a RuntimeArray) Equal(
 		context.Factory().BreakStatement(nil),
 	}
 	body := append(
-		elementEqual.Before(),
+		leftElement.Before(),
+		rightElement.Before()...,
+	)
+	body = append(
+		body,
+		elementEqual.Before()...,
+	)
+	body = append(
+		body,
 		context.Factory().IfStatement(
 			context.Factory().PrefixUnaryExpression(
 				tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
@@ -404,125 +461,10 @@ func (a RuntimeArray) Equal(
 	return api.NewExpressionEmission(
 		before,
 		context.Factory().Identifier(resultName),
-		elementEqual.Requests(),
-	)
-}
-
-func (a RuntimeArray) Hash(
-	context api.Context,
-	source ast.Node,
-	value tsgo.Expression,
-) (api.ExpressionEmission, error) {
-	arrayName, err := context.Names().Temporary(api.TemporaryArrayHash)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	indexName, err := context.Names().Temporary(api.TemporaryArrayHash)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	hashName, err := context.Names().Temporary(api.TemporaryArrayHash)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	array := context.Factory().Identifier(arrayName)
-	index := context.Factory().Identifier(indexName)
-	hash := context.Factory().Identifier(hashName)
-	elementHash, err := context.Values().Hash(
-		context.WithRole(api.RoleArrayElement),
-		source,
-		a.ElementType(),
-		callMember(context, array, arraymember.Get, index),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	runtime, err := context.Names().Runtime(
-		api.RuntimeMapHash,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	mixed := context.Factory().CallExpression(
-		context.Factory().PropertyAccessExpression(
-			context.Factory().Identifier(runtime.Name()),
-			nil,
-			context.Factory().Identifier(mapruntime.HashMixMember),
-			tsgo.NodeFlagsNone,
-		),
-		nil,
-		nil,
-		[]tsgo.Expression{hash, elementHash.Value()},
-		tsgo.NodeFlagsNone,
-	)
-	body := append(
-		elementHash.Before(),
-		context.Factory().ExpressionStatement(
-			context.Factory().BinaryExpression(
-				nil,
-				hash,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorEqualsToken,
-				),
-				mixed,
-			),
-		),
-	)
-	before := []tsgo.Statement{
-		arrayComparisonVariable(
-			context,
-			tsgo.NodeFlagsConst,
-			arrayName,
-			a.storage(context, value),
-		),
-		arrayComparisonVariable(
-			context,
-			tsgo.NodeFlagsLet,
-			hashName,
-			context.Factory().NumericLiteral(
-				"2166136261",
-				tsgo.TokenFlagsNone,
-			),
-		),
-		context.Factory().ForStatement(
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{
-					context.Factory().VariableDeclaration(
-						index,
-						nil,
-						nil,
-						context.Factory().NumericLiteral(
-							"0",
-							tsgo.TokenFlagsNone,
-						),
-					),
-				},
-				tsgo.NodeFlagsLet,
-			),
-			context.Factory().BinaryExpression(
-				nil,
-				index,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorLessThanToken,
-				),
-				a.lengthLiteral(context),
-			),
-			context.Factory().PostfixUnaryExpression(
-				index,
-				tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken,
-			),
-			context.Factory().Block(body, true),
-		),
-	}
-	return api.NewExpressionEmission(
-		before,
-		hash,
 		api.CombineRequests(
-			elementHash.Requests(),
-			runtime.Requests(),
+			leftElement.Requests(),
+			rightElement.Requests(),
+			elementEqual.Requests(),
 		),
 	)
 }

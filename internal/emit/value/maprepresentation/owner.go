@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -44,7 +43,7 @@ func EmitType(
 	key, err := children.RepresentedType(
 		context.WithRole(api.RoleMapKey),
 		source,
-		StorageKeyType(model.Key()),
+		model.Key(),
 	)
 	if err != nil {
 		return api.TypeEmission{}, err
@@ -79,6 +78,7 @@ func EmitType(
 
 func Nil(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
@@ -87,51 +87,17 @@ func Nil(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if api.ContainsGenericTypeParameter(sourceType) {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "open generic map zero bypassed generic operation ownership",
+		}
+	}
 	if model.Nominal() {
 		return api.DirectExpression(
 			context.Factory().VoidExpression(
 				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
 			),
-		), nil
-	}
-	if model.Storage() == StorageScalar {
-		zero, err := context.Values().Zero(
-			context.WithRole(api.RoleMapValue),
-			source,
-			model.Element(),
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if len(zero.Before()) != 0 {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		reference, typeArguments, err := Reference(
-			context,
-			source,
-			sourceType,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		nilName, err := mapruntime.Name(mapruntime.MemberNil)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.DirectExpression(
-			context.Factory().CallExpression(
-				staticMember(context, reference.Name(), nilName),
-				nil,
-				typeArguments,
-				[]tsgo.Expression{zero.Value()},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(
-				reference.Requests(),
-				zero.Requests(),
-			)...,
 		), nil
 	}
 	if model.Storage() == StorageSpecialized {
@@ -157,8 +123,63 @@ func Nil(
 			reference.Requests()...,
 		), nil
 	}
-	return api.ExpressionEmission{},
-		api.Unsupported(context, api.CategoryExpression, source)
+	if children == nil {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "nil map has no type emitter",
+		}
+	}
+	keyType, err := children.RepresentedType(
+		context.WithRole(api.RoleMapKey),
+		source,
+		model.Key(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	valueType, err := children.RepresentedType(
+		context.WithRole(api.RoleMapValue),
+		source,
+		model.Element(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	zero, err := context.Values().Zero(
+		context.WithRole(api.RoleMapValue),
+		source,
+		model.Element(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	reference, err := context.Names().Runtime(
+		api.RuntimeMap,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	nilName, err := mapruntime.Name(mapruntime.MemberNil)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.NewExpressionEmission(
+		zero.Before(),
+		context.Factory().CallExpression(
+			staticMember(context, reference.Name(), nilName),
+			nil,
+			[]tsgo.TypeNode{keyType.Value(), valueType.Value()},
+			[]tsgo.Expression{zero.Value()},
+			tsgo.NodeFlagsNone,
+		),
+		api.CombineRequests(
+			keyType.Requests(),
+			valueType.Requests(),
+			zero.Requests(),
+			reference.Requests(),
+		),
+	)
 }
 
 func Reference(
@@ -284,41 +305,7 @@ func Make(
 	))
 }
 
-func ProjectKey(
-	context api.Context,
-	source ast.Node,
-	sourceType types.Type,
-	value api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	if model, ok := definedtype.ResolveBasic(sourceType); ok {
-		if expression, ok := source.(ast.Expr); ok {
-			facts, found := context.TypesInfo().Types[expression]
-			if found && facts.Value != nil {
-				return constantvalue.EmitValue(
-					context,
-					expression,
-					model.Underlying(),
-					facts.Value,
-				)
-			}
-		}
-		return api.NewExpressionEmission(
-			value.Before(),
-			model.Unwrap(context.Factory(), value.Value()),
-			value.Requests(),
-		)
-	}
-	if context.Values().SupportsHash(context, sourceType) {
-		return value, nil
-	}
-	if _, ok := directKey(context, sourceType); !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	return value, nil
-}
-
-func StorageKeyType(sourceType types.Type) types.Type {
+func storageKeyType(sourceType types.Type) types.Type {
 	if model, ok := definedtype.ResolveBasic(sourceType); ok {
 		return model.Underlying()
 	}

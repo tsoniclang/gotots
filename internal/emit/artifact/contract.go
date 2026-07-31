@@ -2,6 +2,7 @@ package artifact
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -25,16 +26,17 @@ func ProjectContract(
 	statements []tsgo.Statement,
 ) (Contract, error) {
 	if len(statements) == 0 {
-		return nil, &ContractError{
+		return Contract{}, &ContractError{
 			Reason: "materialized artifact has no target declaration",
 		}
 	}
 	nodes := make(map[api.ArtifactFacet][]tsgo.Node)
+	var exports []string
 	for _, statement := range statements {
 		switch statement := statement.(type) {
 		case tsgo.FunctionDeclaration:
 			if statement.Type() == nil {
-				return nil, &ContractError{
+				return Contract{}, &ContractError{
 					Kind:   statement.Kind(),
 					Reason: "callable surface relies on target inference",
 				}
@@ -51,34 +53,46 @@ func ProjectContract(
 					nil,
 				),
 			)
+			exports = append(exports, statement.Name().Text())
 		case tsgo.ClassDeclaration:
 			classFacets, err := projectClassContract(factory, statement)
 			if err != nil {
-				return nil, err
+				return Contract{}, err
 			}
 			for facet, node := range classFacets {
 				nodes[facet] = append(nodes[facet], node)
 			}
+			exports = append(exports, statement.Name().Text())
 		case tsgo.InterfaceDeclaration:
 			nodes[api.ArtifactFacetInstanceTypeSurface] = append(
 				nodes[api.ArtifactFacetInstanceTypeSurface],
 				statement,
 			)
+			exports = append(exports, statement.Name().Text())
 		case tsgo.TypeAliasDeclaration:
 			nodes[api.ArtifactFacetInstanceTypeSurface] = append(
 				nodes[api.ArtifactFacetInstanceTypeSurface],
 				statement,
 			)
+			exports = append(exports, statement.Name().Text())
 		case tsgo.VariableStatement:
 			declarations := statement.DeclarationList().Declarations()
 			projected := make([]tsgo.VariableDeclaration, len(declarations))
 			for index, declaration := range declarations {
 				if declaration.Type() == nil {
-					return nil, &ContractError{
+					return Contract{}, &ContractError{
 						Kind:   declaration.Kind(),
 						Reason: "value surface relies on target inference",
 					}
 				}
+				name, ok := declaration.Name().(tsgo.Identifier)
+				if !ok {
+					return Contract{}, &ContractError{
+						Kind:   declaration.Kind(),
+						Reason: "observable value binding name is not an identifier",
+					}
+				}
+				exports = append(exports, name.Text())
 				projected[index] = factory.VariableDeclaration(
 					declaration.Name(),
 					declaration.ExclamationToken(),
@@ -101,35 +115,141 @@ func ProjectContract(
 			if statement != nil {
 				kind = statement.Kind()
 			}
-			return nil, &ContractError{
+			return Contract{}, &ContractError{
 				Kind:   kind,
 				Reason: "declaration form has no closed observable projection",
 			}
 		}
 	}
-	contract := make(Contract, len(nodes))
+	sort.Strings(exports)
+	exportSpecifiers := make([]tsgo.ExportSpecifier, len(exports))
+	for index, name := range exports {
+		exportSpecifiers[index] = factory.ExportSpecifier(
+			false,
+			nil,
+			factory.Identifier(name),
+		)
+	}
+	nodes[api.ArtifactFacetExportSurface] = []tsgo.Node{
+		factory.NamedExports(exportSpecifiers),
+	}
+	contract := NewContract()
 	for facet, facetNodes := range nodes {
 		encoded, err := tsgo.EncodeNode(factory.SyntaxList(facetNodes))
 		if err != nil {
-			return nil, err
+			return Contract{}, err
 		}
-		contract[facet] = encoded
+		contract, err = contract.withOwnedFacet(facet, encoded)
+		if err != nil {
+			return Contract{}, err
+		}
 	}
-	if len(contract) == 0 {
-		return nil, &ContractError{
+	contract, err := contract.withOwnedExports(exports)
+	if err != nil {
+		return Contract{}, err
+	}
+	if contract.present == 0 {
+		return Contract{}, &ContractError{
 			Reason: "artifact contains no observable declaration",
 		}
 	}
 	return contract, nil
 }
 
-func ProjectCoverageContract(statements []tsgo.Statement) (Contract, error) {
+func ProjectCoverageContract(
+	factory tsgo.Factory,
+	statements []tsgo.Statement,
+) (Contract, error) {
 	if len(statements) != 0 {
-		return nil, &ContractError{
+		return Contract{}, &ContractError{
 			Reason: "coverage-only artifact contains target declarations",
 		}
 	}
-	return make(Contract), nil
+	encoded, err := tsgo.EncodeNode(factory.NamedExports(nil))
+	if err != nil {
+		return Contract{}, err
+	}
+	contract, err := NewContract().withOwnedFacet(
+		api.ArtifactFacetExportSurface,
+		encoded,
+	)
+	if err != nil {
+		return Contract{}, err
+	}
+	return contract.withOwnedExports(nil)
+}
+
+func ProjectFacet(
+	facet api.ArtifactFacet,
+	node tsgo.Node,
+) (Contract, error) {
+	if facet == api.ArtifactFacetExportSurface {
+		kind := tsgo.SyntaxKind(0)
+		if node != nil {
+			kind = node.Kind()
+		}
+		return Contract{}, &ContractError{
+			Kind:   kind,
+			Reason: "export surface must be projected from complete declarations",
+		}
+	}
+	encoded, err := tsgo.EncodeNode(node)
+	if err != nil {
+		return Contract{}, err
+	}
+	return NewContract().withOwnedFacet(facet, encoded)
+}
+
+func ProjectClassMemberContract(
+	factory tsgo.Factory,
+	members []tsgo.ClassElement,
+) (Contract, error) {
+	if len(members) == 0 {
+		return Contract{}, &ContractError{
+			Reason: "class-member artifact has no target member",
+		}
+	}
+	signatures := make([]tsgo.Node, 0, len(members))
+	implementations := make([]tsgo.Node, 0, len(members))
+	for _, member := range members {
+		projected, observable, err := projectClassMember(factory, member)
+		if err != nil {
+			return Contract{}, err
+		}
+		if !observable {
+			kind := tsgo.SyntaxKind(0)
+			if member != nil {
+				kind = member.Kind()
+			}
+			return Contract{}, &ContractError{
+				Kind:   kind,
+				Reason: "class-member contribution has no observable signature",
+			}
+		}
+		signatures = append(signatures, projected)
+		implementations = append(implementations, member)
+	}
+	signature, err := tsgo.EncodeNode(factory.SyntaxList(signatures))
+	if err != nil {
+		return Contract{}, err
+	}
+	implementation, err := tsgo.EncodeNode(
+		factory.SyntaxList(implementations),
+	)
+	if err != nil {
+		return Contract{}, err
+	}
+	contract, err := NewContract().withOwnedFacet(
+		api.ArtifactFacetCallableSignature,
+		signature,
+	)
+	if err != nil {
+		return Contract{}, err
+	}
+	return contract.withOwnedFacet(
+		api.ArtifactFacetImplementation,
+		implementation,
+	)
 }
 
 func projectClassContract(

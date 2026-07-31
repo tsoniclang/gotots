@@ -34,17 +34,32 @@ func CopyAggregate(
 	count := context.Factory().Identifier(countName)
 	snapshot := context.Factory().Identifier(snapshotName)
 	index := context.Factory().Identifier(indexName)
-	next, err := context.Values().Copy(
-		context.WithRole(api.RoleSliceElement),
-		nil,
+	loaded, err := loadElement(
+		context,
+		source,
 		elementType,
-		api.DirectExpression(sliceCall(
+		sliceCall(
 			context,
 			sourceValue,
 			runtimeslice.MemberName(runtimeslice.MemberGet),
 			index,
-		)),
+		),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	next, err := context.Values().Transfer(
+		context.WithRole(api.RoleSliceElement),
+		nil,
+		elementType,
+		elementType,
+		api.ValueTransferCopy,
+		loaded,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	next, err = storeElement(context, source, elementType, next)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

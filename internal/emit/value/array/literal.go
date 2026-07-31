@@ -20,9 +20,10 @@ func (a RuntimeArray) EmitLiteral(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
+	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
 	if !types.Identical(
-		context.TypesInfo().TypeOf(source),
+		sourceType,
 		a.sourceType,
 	) ||
 		context.ExpectedType() == nil ||
@@ -47,6 +48,15 @@ func (a RuntimeArray) EmitLiteral(
 			context.WithRole(api.RoleCompositeElement),
 			source,
 			a.ElementType(),
+		)
+		if zeroErr != nil {
+			return api.ExpressionEmission{}, zeroErr
+		}
+		loopZero, zeroErr = context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleCompositeElement),
+			source,
+			a.ElementType(),
+			loopZero,
 		)
 		if zeroErr != nil {
 			return api.ExpressionEmission{}, zeroErr
@@ -123,6 +133,15 @@ func (a RuntimeArray) EmitLiteral(
 			context.WithRole(api.RoleCompositeElement),
 			source,
 			a.ElementType(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		elementZero, err = context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleCompositeElement),
+			source,
+			a.ElementType(),
+			elementZero,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -215,6 +234,15 @@ func (a RuntimeArray) emitLiteralElements(
 			)
 		}
 		seen[index] = struct{}{}
+		valueType := context.TypesInfo().TypeOf(valueSource)
+		if valueType == nil ||
+			!types.AssignableTo(valueType, a.ElementType()) {
+			return nil, api.Unsupported(
+				context.WithRole(api.RoleCompositeElement),
+				api.CategoryExpression,
+				valueSource,
+			)
+		}
 		value, err := children.Expression(
 			context.
 				WithRole(api.RoleCompositeElement).
@@ -224,7 +252,18 @@ func (a RuntimeArray) emitLiteralElements(
 		if err != nil {
 			return nil, err
 		}
-		value, err = context.Values().Copy(
+		value, err = context.Values().Transfer(
+			context.WithRole(api.RoleCompositeElement),
+			valueSource,
+			valueType,
+			a.ElementType(),
+			api.ValueTransferCopy,
+			value,
+		)
+		if err != nil {
+			return nil, err
+		}
+		value, err = context.ContainerStorage().ToContainerStorage(
 			context.WithRole(api.RoleCompositeElement),
 			valueSource,
 			a.ElementType(),

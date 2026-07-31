@@ -30,7 +30,9 @@ func Apply(
 		return floatOperation(context, operator, operand)
 	}
 	basic, ok := types.Unalias(sourceType).(*types.Basic)
-	if !ok || basic.Kind() != types.Bool || operator != token.NOT {
+	if !ok ||
+		basic.Info()&types.IsBoolean == 0 ||
+		operator != token.NOT {
 		return api.ExpressionEmission{}, false, nil
 	}
 	result, err := api.NewExpressionEmission(
@@ -161,6 +163,9 @@ func normalizeComplement(
 			),
 			zero,
 		), nil
+	case context.IntegerRepresentation() == api.IntegerRepresentationNumber &&
+		carrier.Width() > 32:
+		return target, nil
 	case !carrier.Signed():
 		mask, ok := integervalue.UnsignedMask(carrier)
 		if !ok {

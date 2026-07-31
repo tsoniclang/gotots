@@ -70,6 +70,18 @@ func calls(values Counts) int32 {
 	return variadic(1) + variadic(1, 2, 3) + variadic(1, values...)
 }
 
+func first[T any](value T, _ ...any) T {
+	return value
+}
+
+func valueAndInterface() (int32, bool) {
+	return 5, true
+}
+
+func variadicInterfaceTuple() int32 {
+	return first(valueAndInterface())
+}
+
 func builtins(values Counts, table Table) int32 {
 	values = append(values, 1, 2)
 	values = append(values, Counts{3, 4}...)
@@ -275,7 +287,7 @@ func Audit() (
 	return numberOperators(9, 4),
 		int32(definedOperators(7, 2)),
 		storeResult,
-		calls(Counts{2, 3}),
+		calls(Counts{2, 3}) + variadicInterfaceTuple(),
 		builtins(Counts{1, 2}, Table{0: 9}),
 		logical && rightCalls == 1,
 		pair[0] + (*pairPointer)[1] + box.Value,

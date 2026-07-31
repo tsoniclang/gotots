@@ -163,6 +163,17 @@ func prepareSend(
 	if err != nil {
 		return clause{}, nil, nil, err
 	}
+	value, err = context.Values().Transfer(
+		context.WithRole(api.RoleChannelElement),
+		send.Value,
+		valueType,
+		model.Element(),
+		api.ValueTransferRepresentation,
+		value,
+	)
+	if err != nil {
+		return clause{}, nil, nil, err
+	}
 	alternative, err := channelmodel.StaticCall(
 		context,
 		send,

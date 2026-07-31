@@ -54,14 +54,31 @@ func emitExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	value, err = context.Values().Copy(
+	value, err = context.Values().Transfer(
 		context.WithRole(api.RoleCallArgument),
 		argument,
+		argumentType,
 		element,
+		api.ValueTransferCopy,
 		value,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	representation, err := pointertype.Observe(context, pointer, false)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if representation.Representation() ==
+		api.PointerRepresentationDirectClass {
+		return api.NewExpressionEmission(
+			value.Before(),
+			value.Value(),
+			api.CombineRequests(
+				value.Requests(),
+				representation.Requests(),
+			),
+		)
 	}
 	represented, err := children.RepresentedType(
 		context.WithRole(api.RoleCallArgument),
@@ -71,18 +88,20 @@ func emitExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	storageType, err := context.Values().StorageType(
+	storageType, err := context.ContainerStorage().PointerStorageType(
 		context.WithRole(api.RoleStorageType),
 		source,
 		element,
+		representation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	value, err = context.Values().ToStorage(
+	value, err = context.ContainerStorage().ToPointerStorage(
 		context.WithRole(api.RoleCallArgument),
 		source,
 		element,
+		representation,
 		value,
 	)
 	if err != nil {
@@ -117,6 +136,7 @@ func emitExpression(
 			represented.Requests(),
 			storageType.Requests(),
 			reference.Requests(),
+			representation.Requests(),
 		),
 	)
 }

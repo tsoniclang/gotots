@@ -77,7 +77,9 @@ func NewOwner(
 			packageScope,
 			objectsByScope,
 			make(map[string]uint64),
-			make(map[string]uint32),
+			map[string]uint32{
+				api.TargetGlobalAnchorName: 1,
+			},
 		)
 		owner.preallocateMethods(info)
 		owner.preallocateMembers(packageScope)
@@ -120,6 +122,7 @@ func (n *Owner) Reserve(
 		sourceFile:   sourceFile,
 		sourcePath:   sourcePath,
 		moduleExport: true,
+		kind:         targetBindingSource,
 	}
 	name, err := n.declare(object, binding)
 	if err != nil {
@@ -160,9 +163,10 @@ func (n *Owner) declare(object types.Object, binding targetBinding) (string, err
 		return "", &api.NameError{Reason: "declaration object is nil"}
 	}
 	if existing, ok := n.byObject[object]; ok {
-		if binding.sourceFile != nil &&
+		if binding.kind != targetBindingLocal &&
 			(existing.sourceFile != binding.sourceFile ||
-				existing.sourcePath != binding.sourcePath) {
+				existing.sourcePath != binding.sourcePath ||
+				existing.kind != binding.kind) {
 			return "", &api.NameError{
 				Name:   object.Name(),
 				Reason: "declaration was reserved by a different target module",
@@ -380,6 +384,9 @@ func (n *Owner) preallocateMethods(info *types.Info) {
 		used[name] = struct{}{}
 	}
 	for _, method := range methods {
+		if method.Name() == "_" {
+			continue
+		}
 		signature := method.Type().(*types.Signature)
 		receiverName := receiverTypeName(signature.Recv().Type())
 		base := portableIdentifier(receiverName) + "_" +

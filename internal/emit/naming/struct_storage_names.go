@@ -1,6 +1,8 @@
 package naming
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -8,10 +10,128 @@ import (
 	"github.com/tsoniclang/gotots/internal/output"
 )
 
+func (n *File) PointerRepresentation(
+	pointer *types.Pointer,
+) (api.PointerRepresentationReference, error) {
+	return n.pointerRepresentation(
+		pointer,
+		n.generatedNamedObjectIdentity,
+	)
+}
+
+func (n *File) SourcePointerRepresentation(
+	owner types.Object,
+	pointer *types.Pointer,
+) (api.PointerRepresentationReference, error) {
+	owner = api.GenericDeclarationOrigin(owner)
+	if owner == nil || owner.Pkg() == nil {
+		return api.PointerRepresentationReference{}, &api.NameError{
+			Reason: "source pointer representation has no declaration owner",
+		}
+	}
+	return n.pointerRepresentation(
+		pointer,
+		n.sourceGeneratedNamedObjectIdentity(owner),
+	)
+}
+
+func (n *File) pointerRepresentation(
+	pointer *types.Pointer,
+	namedIdentity typeidentity.NamedObjectIdentity,
+) (api.PointerRepresentationReference, error) {
+	if pointer == nil {
+		return api.PointerRepresentationReference{}, &api.NameError{
+			Reason: "pointer-representation type is nil",
+		}
+	}
+	pointer = pointerRepresentationFamily(pointer)
+	key, err := typeidentity.BuildParameterizedKey(
+		pointer,
+		namedIdentity,
+		func(parameter *types.TypeParam) (string, error) {
+			if parameter == nil || parameter.Obj() == nil {
+				return "", &api.NameError{
+					Reason: "pointer representation has an unbound type parameter",
+				}
+			}
+			return namedIdentity(parameter.Obj())
+		},
+	)
+	if err != nil {
+		return api.PointerRepresentationReference{}, err
+	}
+	digest := sha256.Sum256([]byte("pointer-representation|" + key))
+	artifactKey := hex.EncodeToString(digest[:])
+	binding, err := n.owner.registry.internPointerRepresentation(
+		artifactKey,
+		pointer,
+	)
+	if err != nil {
+		return api.PointerRepresentationReference{}, err
+	}
+	definition, err := api.NewPointerRepresentationRequest(
+		binding.owner,
+		false,
+	)
+	if err != nil {
+		return api.PointerRepresentationReference{}, err
+	}
+	return api.NewPointerRepresentationReference(
+		binding.owner,
+		definition,
+	)
+}
+
+func pointerRepresentationFamily(pointer *types.Pointer) *types.Pointer {
+	if pointer == nil {
+		return nil
+	}
+	named, ok := types.Unalias(pointer.Elem()).(*types.Named)
+	if !ok ||
+		named.Origin() == nil ||
+		named.Origin().TypeParams().Len() == 0 {
+		return pointer
+	}
+	return types.NewPointer(named.Origin())
+}
+
+func (r *Registry) internPointerRepresentation(
+	artifactKey string,
+	pointer *types.Pointer,
+) (pointerRepresentationBinding, error) {
+	if r == nil || len(artifactKey) != sha256.Size*2 || pointer == nil {
+		return pointerRepresentationBinding{}, &api.NameError{
+			Reason: "pointer-representation canonicalization input is invalid",
+		}
+	}
+	if existing, ok := r.pointerRepresentations[artifactKey]; ok {
+		bound, valid := existing.owner.PointerRepresentation()
+		if !valid || !types.Identical(bound, pointer) {
+			return pointerRepresentationBinding{}, &api.NameError{
+				Reason: "pointer-representation key joined non-identical types",
+			}
+		}
+		return existing, nil
+	}
+	name := "$goPointer_" + artifactKey[len(artifactKey)-20:]
+	owner, err := api.NewContractGeneratedArtifact(
+		api.GeneratedArtifactPointerRepresentation,
+		pointer,
+		artifactKey,
+		name,
+	)
+	if err != nil {
+		return pointerRepresentationBinding{}, err
+	}
+	binding := pointerRepresentationBinding{owner: owner}
+	r.pointerRepresentations[artifactKey] = binding
+	return binding, nil
+}
+
 func (n *File) NamedStructStorage(
 	typeName *types.TypeName,
 ) (api.NameReference, error) {
-	request, err := api.NewNamedStructOperationRequest(
+	request, err := n.namedStructOperationRequest(
 		typeName,
 		api.NamedStructOperationStorage,
 	)
@@ -28,7 +148,7 @@ func (n *File) NamedStructStorage(
 			Reason: "struct storage owner has no emitted declaration",
 		}
 	}
-	if binding.sourceFile != nil && n.require != nil {
+	if binding.scheduled() && n.require != nil {
 		if err := n.require(typeName); err != nil {
 			return api.NameReference{}, err
 		}
@@ -36,7 +156,7 @@ func (n *File) NamedStructStorage(
 	exportedName := binding.name + api.StructStorageTypeSuffix
 	localName := exportedName
 	requests := []api.RootRequest{request}
-	if binding.sourceFile != nil && n.artifactOwner.Valid() {
+	if binding.sourceOwned() && n.artifactOwner.Valid() {
 		dependency, err := api.NewArtifactDependencyRequest(
 			typeName,
 			api.ArtifactFacetStaticSurface,
@@ -46,7 +166,7 @@ func (n *File) NamedStructStorage(
 		}
 		requests = append(requests, dependency)
 	}
-	if binding.sourceFile == nil || binding.sourcePath == n.targetPath {
+	if !binding.scheduled() || binding.sourcePath == n.targetPath {
 		return api.NewNameReference(localName, requests...)
 	}
 	referencePath, _, err := n.sourceReferencePath(typeName, binding)

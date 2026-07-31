@@ -3,6 +3,7 @@ package emit_test
 import (
 	"context"
 	"fmt"
+	"go/ast"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func TestWaveSevenGenericFoundationCompilesThroughPublicPipeline(t *testing.T) {
@@ -97,6 +99,83 @@ console.log(output.join(" "));
 	}
 }
 
+func TestInferredGenericFunctionValueUsesIdentifierInstanceEvidence(t *testing.T) {
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: waveSevenGenericDirectory(),
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourcePackage := program.Roots()[0]
+	sourceFunction := waveFourFunction(t, sourcePackage, "InferredGenericFunctionValue")
+	var inferred *ast.Ident
+	ast.Inspect(sourceFunction.Body, func(node ast.Node) bool {
+		identifier, ok := node.(*ast.Ident)
+		if ok && identifier.Name == "Equal" {
+			inferred = identifier
+		}
+		return true
+	})
+	if inferred == nil {
+		t.Fatal("inferred generic function identifier is absent")
+	}
+	if _, instantiated := sourcePackage.TypesInfo().Instances[inferred]; !instantiated {
+		t.Fatal("go/types did not record the inferred identifier instance")
+	}
+	root, err := emit.NewRoot(sourcePackage.Types().Scope().Lookup("AuditFunctions"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(program, []emit.Root{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var capabilityNames []string
+	for _, name := range []string{"InferredGenericFunctionValue", "ExplicitGenericFunctionValue"} {
+		wrapper := genericFunctionValueWrapper(t, waveFourTargetFunction(t, emission, name))
+		body, ok := wrapper.Body().(tsgo.CallExpression)
+		if !ok {
+			t.Fatalf("%s wrapper body = %T, want CallExpression", name, wrapper.Body())
+		}
+		arguments := body.Arguments()
+		if len(arguments) == 0 {
+			t.Fatalf("%s wrapper call has no capability argument", name)
+		}
+		capability, ok := arguments[0].(tsgo.Identifier)
+		if !ok ||
+			!strings.HasPrefix(capability.Text(), "$goCapability_") ||
+			len(arguments) != len(wrapper.Parameters())+1 {
+			t.Fatalf("%s wrapper does not bind one exact generic capability", name)
+		}
+		capabilityNames = append(capabilityNames, capability.Text())
+	}
+	if capabilityNames[0] != capabilityNames[1] {
+		t.Fatalf("explicit/inferred capabilities differ: %v", capabilityNames)
+	}
+}
+
+func genericFunctionValueWrapper(t *testing.T, function tsgo.FunctionDeclaration) tsgo.ArrowFunction {
+	t.Helper()
+	for _, statement := range function.Body().(tsgo.Block).Statements() {
+		returned, ok := statement.(tsgo.ReturnStatement)
+		if !ok {
+			continue
+		}
+		call, ok := returned.Expression().(tsgo.CallExpression)
+		if !ok {
+			continue
+		}
+		for _, argument := range call.Arguments() {
+			if wrapper, ok := argument.(tsgo.ArrowFunction); ok {
+				return wrapper
+			}
+		}
+	}
+	t.Fatalf("%s lacks a generic function-value wrapper", function.Name().Text())
+	return nil
+}
+
 func TestWaveSevenGenericNamedTypesCompileThroughPublicPipeline(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
@@ -135,6 +214,18 @@ func TestWaveSevenGenericNamedTypesCompileThroughPublicPipeline(t *testing.T) {
 			}
 			workingDirectory := t.TempDir()
 			artifacts := materializeArtifacts(t, emission, workingDirectory)
+			local := targetFunctionText(
+				t,
+				artifacts.printed,
+				"LocalTypeCapability",
+			)
+			if !strings.Contains(local, "function $goCapability_") ||
+				strings.Contains(local, "export function $goCapability_") {
+				t.Fatalf(
+					"local-type capability is not lexical and unexported:\n%s",
+					local,
+				)
+			}
 			sourceModule := sourceModuleForExport(
 				t,
 				artifacts,
@@ -181,6 +272,101 @@ console.log(output.join(" "));
 	}
 }
 
+func TestWaveSevenGenericAssertionsCompileThroughPublicPipeline(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		options emit.Options
+	}{
+		{name: "number", options: emit.DefaultOptions()},
+		{
+			name: "bigint",
+			options: emit.Options{
+				IntegerRepresentation: emit.IntegerRepresentationBigInt,
+				EvaluationOrder:       emit.EvaluationOrderPreserveGo,
+			},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			program, err := load.Load(context.Background(), load.Request{
+				Directory: waveSevenGenericDirectory(),
+				Pattern:   ".",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			root, err := emit.NewRoot(
+				program.Roots()[0].Types().Scope().Lookup(
+					"AuditGenericAssertions",
+				),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			emission, err := emit.CompileWithOptions(
+				program,
+				[]emit.Root{root},
+				testCase.options,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			workingDirectory := t.TempDir()
+			artifacts := materializeArtifacts(t, emission, workingDirectory)
+			for _, required := range []string{
+				"export function AssertValue<T>",
+				"export function MustAssertValue<T>",
+				"export function TypeSwitchValue<T>",
+				"$go$interface_assert_",
+				"$go$interface_assert_ok_",
+			} {
+				if !strings.Contains(artifacts.printed, required) {
+					t.Fatalf(
+						"generic assertion artifacts lack %q:\n%s",
+						required,
+						artifacts.printed,
+					)
+				}
+			}
+			runner := filepath.Join(workingDirectory, "runner.ts")
+			writeProgramFile(t, runner, `import "./program.js";
+import { AuditGenericAssertions } from "`+artifacts.sourceModule+`";
+
+const values = AuditGenericAssertions();
+console.log(Array.from({ length: values.length }, (_, index) =>
+    String(values.get(index))).join(" "));
+`)
+			writeProgramFile(
+				t,
+				filepath.Join(workingDirectory, "package.json"),
+				"{\"type\":\"module\"}\n",
+			)
+			waveThreeTypecheck(
+				t,
+				workingDirectory,
+				append(artifacts.paths, runner),
+			)
+			targetOutput := runProgram(
+				t,
+				workingDirectory,
+				"node",
+				filepath.Join(workingDirectory, "out", "runner.js"),
+			)
+			goOutput := executeWaveSevenGenericGo(
+				t,
+				workingDirectory,
+				"AuditGenericAssertions",
+			)
+			if targetOutput != goOutput {
+				t.Fatalf(
+					"generic assertion output differs\nTypeScript:\n%s\nGo:\n%s",
+					targetOutput,
+					goOutput,
+				)
+			}
+		})
+	}
+}
+
 func sourceModuleForExport(
 	t *testing.T,
 	artifacts waveFourArtifacts,
@@ -188,14 +374,20 @@ func sourceModuleForExport(
 	name string,
 ) string {
 	t.Helper()
-	marker := "export function " + name
 	var selected string
 	for _, path := range artifacts.paths {
 		content, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(content), marker) {
+		printed := string(content)
+		if !strings.Contains(
+			printed,
+			"export function "+name+"(",
+		) && !strings.Contains(
+			printed,
+			"export async function "+name+"(",
+		) {
 			continue
 		}
 		if selected != "" {
@@ -219,6 +411,7 @@ func assertWaveSevenGenericFoundationShape(t *testing.T, printed string) {
 		"export function Identity<T>",
 		"export function Add<T>",
 		"export function Zero<T>",
+		"export function ZeroFromNew<T>",
 		"export function Equal<T>",
 		"export function Twice<T>",
 		"$goCapability_",
@@ -243,6 +436,30 @@ func assertWaveSevenGenericFoundationShape(t *testing.T, printed string) {
 	}
 	if strings.Count(printed, "export function Add<T>") != 1 {
 		t.Fatalf("generic Add body was duplicated:\n%s", printed)
+	}
+	zeroFromNew := targetGenericFunctionText(t, printed, "ZeroFromNew")
+	if !strings.Contains(zeroFromNew, "$go$zero_") ||
+		strings.Contains(zeroFromNew, "GoPointer") ||
+		strings.Contains(zeroFromNew, "$go$pointer_") {
+		t.Fatalf(
+			"generic *new(T) did not lower directly to its zero owner:\n%s",
+			zeroFromNew,
+		)
+	}
+	if strings.Contains(printed, "GoPointer.field<T, Box") {
+		t.Fatalf(
+			"direct generic pointer-receiver field assignment formed an interior pointer:\n%s",
+			printed,
+		)
+	}
+	sameStorage := targetGenericFunctionText(t, printed, "SameSliceStorage")
+	if !strings.Contains(sameStorage, "$go$equal_") ||
+		!strings.Contains(sameStorage, "$go$index_address_") ||
+		strings.Contains(sameStorage, "GoPointer.equal") {
+		t.Fatalf(
+			"generic pointer equality bypassed its selected capability:\n%s",
+			sameStorage,
+		)
 	}
 	twice := targetGenericFunctionText(t, printed, "Twice")
 	copyNames := regexp.MustCompile(`\$go\$copy_[0-9a-f]+`).
@@ -323,15 +540,5 @@ func main() {
 		filepath.Join(runtime.GOROOT(), "bin", "go"),
 		"run",
 		".",
-	)
-}
-
-func waveSevenGenericDirectory() string {
-	return filepath.Join(
-		repositoryRoot(),
-		"testdata",
-		"constructs",
-		"generic",
-		"wave7",
 	)
 }

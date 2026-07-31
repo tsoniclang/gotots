@@ -10,6 +10,7 @@ import (
 func validateSpecialization(
 	role api.Role,
 	members []tsgo.ClassElement,
+	keyProjection bool,
 ) error {
 	names, err := specializationNames()
 	if err != nil {
@@ -49,6 +50,16 @@ func validateSpecialization(
 		names.isNil:        nil,
 		names.clear:        nil,
 		names.keys:         nil,
+	}
+	if keyProjection {
+		expected[specializationProjectKeyOperation] = []tsgo.SyntaxKind{
+			tsgo.SyntaxKindPrivateKeyword,
+			tsgo.SyntaxKindStaticKeyword,
+		}
+		expected[specializationReifyKeyOperation] = []tsgo.SyntaxKind{
+			tsgo.SyntaxKindPrivateKeyword,
+			tsgo.SyntaxKindStaticKeyword,
+		}
 	}
 	if len(members) != len(expected)+1 {
 		return specializationShapeError(

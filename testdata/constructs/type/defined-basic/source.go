@@ -70,6 +70,10 @@ func LabelJoin(left, right Label) Label {
 	return left + right
 }
 
+func LabelIndex(value Label, index int) byte {
+	return value[index]
+}
+
 func LabelOrder(left, right Label) (bool, bool, bool, bool, bool, bool) {
 	return left == right,
 		left != right,
@@ -145,6 +149,16 @@ func UntypedConstantValue() Count {
 
 func CountWithLiteral(value Count) Count {
 	return value + 2
+}
+
+func CountVariableShift(count Other) Count {
+	return 1 << count
+}
+
+func CountVariableShiftUpdate(count Other) Count {
+	var value Count
+	value |= 1 << count
+	return value
 }
 
 func FoldedCount() Count {

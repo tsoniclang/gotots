@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	mapvalue "github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
@@ -72,6 +73,35 @@ func emit(
 			argument,
 		)
 	}
+	if api.ContainsGenericTypeParameter(argumentType) {
+		operand, err := children.Expression(
+			context.
+				WithRole(api.RoleBuiltinArgument).
+				WithExpectedType(argumentType),
+			argument,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if capture {
+			operand, err = captureReceiver(context, operand)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+		}
+		target, err := genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationClear,
+			[]types.Type{argumentType},
+			nil,
+			[]api.ExpressionEmission{operand},
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return target, nil
+	}
 	if mapType, ok := mapvalue.Source(context, argumentType); ok {
 		return emitMap(
 			context,
@@ -101,6 +131,30 @@ func emit(
 	)
 }
 
+func Apply(
+	context api.Context,
+	source ast.Node,
+	argumentType types.Type,
+	argument api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	if mapType, ok := mapvalue.Source(context, argumentType); ok {
+		target, err := applyMap(context, source, mapType, argument)
+		return target, true, err
+	}
+	_, elementType, ok := slicevalue.Source(argumentType)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
+	}
+	target, err := applySlice(
+		context,
+		source,
+		argumentType,
+		elementType,
+		argument,
+	)
+	return target, true, err
+}
+
 func emitMap(
 	context api.Context,
 	children api.ChildEmitter,
@@ -122,7 +176,17 @@ func emitMap(
 			return api.ExpressionEmission{}, err
 		}
 	}
-	receiver, err = mapType.ReadReceiver(context, argument, receiver)
+	return applyMap(context, source, mapType, receiver)
+}
+
+func applyMap(
+	context api.Context,
+	source ast.Node,
+	mapType mapvalue.Model,
+	receiver api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	var err error
+	receiver, err = mapType.ReadReceiver(context, source, receiver)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -159,6 +223,23 @@ func emitSlice(
 			return api.ExpressionEmission{}, err
 		}
 	}
+	return applySlice(
+		context,
+		source,
+		argumentType,
+		elementType,
+		receiver,
+	)
+}
+
+func applySlice(
+	context api.Context,
+	source ast.Node,
+	argumentType types.Type,
+	elementType types.Type,
+	receiver api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	var err error
 	receiver, err = slicevalue.Project(context, argumentType, receiver)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -175,6 +256,15 @@ func emitSlice(
 		context.WithRole(api.RoleSliceElement),
 		source,
 		elementType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	zero, err = context.ContainerStorage().ToContainerStorage(
+		context.WithRole(api.RoleSliceElement),
+		source,
+		elementType,
+		zero,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

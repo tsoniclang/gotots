@@ -12,6 +12,30 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
+func TestNamedObjectKeyOwnsPredeclaredNamedTypes(t *testing.T) {
+	errorObject, ok := types.Universe.Lookup("error").(*types.TypeName)
+	if !ok {
+		t.Fatal("predeclared error is not a type name")
+	}
+	key, err := NamedObjectKey(errorObject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if key != "go:universe|error" {
+		t.Fatalf("key = %q", key)
+	}
+
+	orphan := types.NewTypeName(
+		token.NoPos,
+		nil,
+		"orphan",
+		types.NewInterfaceType(nil, nil).Complete(),
+	)
+	if _, err := NamedObjectKey(orphan); err == nil {
+		t.Fatal("expected non-universe package-less type rejection")
+	}
+}
+
 func TestLocalComponentsIncludesInterfaceMethodContracts(t *testing.T) {
 	fileSet := token.NewFileSet()
 	source, err := parser.ParseFile(fileSet, "source.go", `package local

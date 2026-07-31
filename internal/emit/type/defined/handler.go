@@ -5,11 +5,13 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, bool, error) {
@@ -21,17 +23,54 @@ func Emit(
 	if err != nil {
 		return api.TypeEmission{}, true, err
 	}
-	target := tsgo.TypeNode(context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(reference.Name()),
-		nil,
-	))
-	if model.NilCapable() {
-		target = context.Factory().UnionTypeNode([]tsgo.TypeNode{
-			target,
-			context.Factory().KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-			),
-		})
+	var arguments []tsgo.TypeNode
+	var requests []api.RootRequest
+	if model.Type().TypeArgs().Len() != 0 {
+		arguments, requests, err = genericinstance.EmitTypeArguments(
+			context.WithRole(api.RoleDefinedTypeArgument),
+			children,
+			source,
+			model.TypeName(),
+			model.Type().TypeArgs(),
+		)
+		if err != nil {
+			return api.TypeEmission{}, true, err
+		}
 	}
-	return api.DirectType(target, reference.Requests()...), true, nil
+	_, profiled := context.GenericCallableProfile()
+	if RequiresValueFacet(model.Type()) &&
+		(profiled || model.Type().TypeArgs().Len() != 0) {
+		underlying, err := valueFacetType(
+			context,
+			children,
+			source,
+			model,
+		)
+		if err != nil {
+			return api.TypeEmission{}, true, err
+		}
+		arguments = append(arguments, underlying.Value())
+		requests = append(requests, underlying.Requests()...)
+	}
+	target := context.Factory().TypeReferenceNode(
+		context.Factory().Identifier(reference.Name()),
+		arguments,
+	)
+	return api.DirectType(
+		target,
+		api.CombineRequests(reference.Requests(), requests)...,
+	), true, nil
+}
+
+func valueFacetType(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	model Model,
+) (api.TypeEmission, error) {
+	return children.RepresentedType(
+		context.WithRole(api.RoleDefinedUnderlyingType),
+		source,
+		model.Underlying(),
+	)
 }

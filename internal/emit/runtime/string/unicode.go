@@ -1,6 +1,9 @@
 package stringruntime
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 func encodeRune(
 	factory tsgo.Factory,
@@ -47,7 +50,13 @@ func encodeRune(
 				factory,
 				tsgo.NodeFlagsLet,
 				runeValue,
-				callIdentifier(factory, "Number", input),
+				factory.CallExpression(
+					api.TargetIntrinsicNumber.Expression(factory),
+					nil,
+					nil,
+					[]tsgo.Expression{input},
+					tsgo.NodeFlagsNone,
+				),
 			),
 			factory.IfStatement(
 				invalid,
@@ -199,7 +208,13 @@ func decodeRune(
 				factory,
 				tsgo.NodeFlagsConst,
 				index,
-				callIdentifier(factory, "Number", input),
+				factory.CallExpression(
+					api.TargetIntrinsicNumber.Expression(factory),
+					nil,
+					nil,
+					[]tsgo.Expression{input},
+					tsgo.NodeFlagsNone,
+				),
 			),
 			variable(
 				factory,

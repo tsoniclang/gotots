@@ -33,6 +33,17 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	argument, err = context.Values().Transfer(
+		context.WithRole(api.RoleBuiltinArgument),
+		source.Args[0],
+		context.TypesInfo().TypeOf(source.Args[0]),
+		emptyInterface,
+		api.ValueTransferCopy,
+		argument,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	argument, err = captureArgument(context, argument)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -104,6 +115,17 @@ func EmitDeferred(
 			WithRole(api.RoleBuiltinArgument).
 			WithExpectedType(emptyInterface),
 		source.Args[0],
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	argument, err = context.Values().Transfer(
+		context.WithRole(api.RoleBuiltinArgument),
+		source.Args[0],
+		context.TypesInfo().TypeOf(source.Args[0]),
+		emptyInterface,
+		api.ValueTransferCopy,
+		argument,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err

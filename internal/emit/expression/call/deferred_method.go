@@ -7,6 +7,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
+	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
+	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -23,10 +25,20 @@ func emitDeferredMethod(
 	signature, ok := method.Type().(*types.Signature)
 	if !ok ||
 		signature.Recv() == nil ||
-		signature.TypeParams().Len() != 0 ||
-		signature.RecvTypeParams().Len() != 0 {
+		signature.TypeParams().Len() != 0 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	if signature.RecvTypeParams().Len() != 0 {
+		return emitDeferredGenericReceiverMethod(
+			context,
+			children,
+			source,
+			selector,
+			method,
+			selection,
+			signature,
+		)
 	}
 	if err := validateResults(context, source, signature, true); err != nil {
 		return api.ExpressionEmission{}, err
@@ -43,6 +55,16 @@ func emitDeferredMethod(
 			selection,
 			signature,
 		)
+	}
+	invocation, err := methodcall.Resolve(
+		context,
+		children,
+		source,
+		method,
+		signature,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	receiver, resolvedMethod, err := selectionvalue.MethodReceiver(
 		context,
@@ -83,36 +105,22 @@ func emitDeferredMethod(
 		return api.ExpressionEmission{}, err
 	}
 	before = append(before, argumentBefore...)
-	reference, err := context.Names().Reference(method)
+	call, callRequests, err := invocation.Call(
+		context,
+		context.Factory().Identifier(receiverName),
+		arguments,
+		context.Factory().Identifier(
+			callable.RecoveryAuthorityName,
+		),
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	control, err := api.NewDirectCallableControlRequest(
-		method.Origin(),
-		api.CallableControlRecovery,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	arguments = append(
-		[]tsgo.Expression{
-			context.Factory().Identifier(receiverName),
-		},
-		arguments...,
-	)
-	arguments = append(
-		arguments,
-		context.Factory().Identifier(callable.RecoveryAuthorityName),
-	)
-	call := context.Factory().CallExpression(
-		context.Factory().Identifier(reference.Name()),
-		nil,
-		nil,
-		arguments,
-		tsgo.NodeFlagsNone,
-	)
 	cooperative, contractRequests, err :=
-		cooperativecall.SourceContract(context, method)
+		cooperativecall.GenericContract(
+			context,
+			invocation.Facet(),
+		)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -125,9 +133,8 @@ func emitDeferredMethod(
 		api.CombineRequests(
 			receiver.Requests(),
 			argumentRequests,
-			reference.Requests(),
+			callRequests,
 			contractRequests,
-			[]api.RootRequest{control},
 		),
 	)
 }
@@ -156,8 +163,9 @@ func emitDeferredInterfaceMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	receiverContract, err := emitNonNilInterfaceType(
+	receiverContract, err := interfaceoperation.NonNilType(
 		context,
+		children,
 		selector.X,
 		selection.Recv(),
 	)
@@ -218,18 +226,16 @@ func emitDeferredInterfaceMethod(
 		arguments,
 		tsgo.NodeFlagsNone,
 	)
-	selectedSignature, ok := selection.Type().(*types.Signature)
-	if !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	valueSignature, ok := callable.ValueSignature(selectedSignature)
-	if !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
+	callableReference, err :=
+		context.Names().InterfaceMethodCallable(method)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	cooperative, contractRequests, err :=
-		cooperativecall.ValueContract(context, valueSignature)
+		cooperativecall.InterfaceMethodContract(
+			context,
+			callableReference,
+		)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

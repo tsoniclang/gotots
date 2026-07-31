@@ -45,13 +45,15 @@ func guardDeclaration(
 	name string,
 	runtimeValueName string,
 	modifiers []tsgo.ModifierLike,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) tsgo.FunctionDeclaration {
 	value := factory.Identifier("value")
 	return factory.FunctionDeclaration(
 		modifiers,
 		nil,
 		factory.Identifier(name+"$is"),
-		nil,
+		typeParameters,
 		[]tsgo.ParameterDeclaration{
 			factory.ParameterDeclaration(
 				nil,
@@ -75,7 +77,7 @@ func guardDeclaration(
 			value,
 			factory.TypeReferenceNode(
 				factory.Identifier(name),
-				nil,
+				typeArguments,
 			),
 		),
 		factory.Block(

@@ -3,7 +3,6 @@ package panicnil
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -19,7 +18,6 @@ func Build(
 	valueName string,
 	runtimeValueName string,
 	interfaceValueName string,
-	pointerName string,
 ) (tsgo.Statement, error) {
 	switch symbol {
 	case api.RuntimePanicNilError:
@@ -31,7 +29,6 @@ func Build(
 			errorName,
 			runtimeValueName,
 			interfaceValueName,
-			pointerName,
 		), nil
 	default:
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
@@ -89,13 +86,8 @@ func panicNilValue(
 	errorName string,
 	runtimeValueName string,
 	interfaceValueName string,
-	pointerName string,
 ) tsgo.ClassDeclaration {
 	errorType := factory.TypeReferenceNode(factory.Identifier(errorName), nil)
-	pointerType := factory.TypeReferenceNode(
-		factory.Identifier(pointerName),
-		[]tsgo.TypeNode{errorType, errorType},
-	)
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
@@ -112,7 +104,7 @@ func panicNilValue(
 			),
 		},
 		[]tsgo.ClassElement{
-			panicNilConstructor(factory, pointerType),
+			panicNilConstructor(factory, errorType),
 			factory.PropertyDeclaration(
 				[]tsgo.ModifierLike{
 					factory.OverrideKeyword(),
@@ -129,8 +121,6 @@ func panicNilValue(
 				factory,
 				className,
 				errorName,
-				pointerName,
-				errorType,
 			),
 			panicNilGuard(
 				factory,
@@ -189,19 +179,11 @@ func panicNilCreate(
 	factory tsgo.Factory,
 	className string,
 	errorName string,
-	pointerName string,
-	errorType tsgo.TypeNode,
 ) tsgo.MethodDeclaration {
-	payload := pointerruntime.Cell(
-		factory,
-		pointerName,
-		errorType,
-		errorType,
-		factory.NewExpression(
-			factory.Identifier(errorName),
-			nil,
-			nil,
-		),
+	payload := factory.NewExpression(
+		factory.Identifier(errorName),
+		nil,
+		nil,
 	)
 	return factory.MethodDeclaration(
 		[]tsgo.ModifierLike{factory.StaticKeyword()},

@@ -57,8 +57,17 @@ func (n *Owner) ForFile(
 }
 
 func (n *File) Declare(object types.Object) (string, error) {
+	if n.owner.registry != nil {
+		if binding, ok := n.owner.registry.byObject[object]; ok &&
+			binding.scheduled() {
+			return binding.name, nil
+		}
+	}
 	if object != nil && object.Parent() == n.packageScope {
 		binding, ok := n.owner.byObject[object]
+		if !ok && n.owner.registry != nil {
+			binding, ok = n.owner.registry.byObject[object]
+		}
 		if !ok {
 			return "", &api.NameError{
 				Name:   object.Name(),
@@ -76,10 +85,23 @@ func (n *File) Parameter(parameter *types.Var, index int) (string, error) {
 		return "", &api.NameError{Reason: "parameter object is nil"}
 	case index < 0:
 		return "", &api.NameError{Reason: "parameter index is negative"}
-	case parameter.Name() != "":
+	case parameter.Name() != "" && parameter.Name() != "_":
 		return n.Declare(parameter)
 	default:
 		return "$" + strconv.Itoa(index), nil
+	}
+}
+
+func (n *File) Result(result *types.Var, index int) (string, error) {
+	switch {
+	case result == nil:
+		return "", &api.NameError{Reason: "result object is nil"}
+	case index < 0:
+		return "", &api.NameError{Reason: "result index is negative"}
+	case result.Name() != "" && result.Name() != "_":
+		return n.Declare(result)
+	default:
+		return "$result" + strconv.Itoa(index), nil
 	}
 }
 
@@ -137,20 +159,20 @@ func (n *File) reference(
 			Reason: "object has no emitted declaration",
 		}
 	}
-	if binding.sourceFile != nil && n.require != nil {
+	if binding.scheduled() && n.require != nil {
 		if err := n.require(object); err != nil {
 			return api.NameReference{}, err
 		}
 	}
 	var requests []api.RootRequest
-	if binding.sourceFile != nil && n.artifactOwner.Valid() {
+	if binding.sourceOwned() && n.artifactOwner.Valid() {
 		request, err := api.NewArtifactDependencyRequest(object, facet)
 		if err != nil {
 			return api.NameReference{}, err
 		}
 		requests = append(requests, request)
 	}
-	if binding.sourceFile != nil && binding.sourcePath != n.targetPath {
+	if binding.scheduled() && binding.sourcePath != n.targetPath {
 		referencePath, crossPackage, err := n.sourceReferencePath(
 			object,
 			binding,
@@ -245,36 +267,7 @@ func (n *File) NamedStructOperation(
 	typeName *types.TypeName,
 	operation api.NamedStructOperation,
 ) (api.NameReference, error) {
-	var request api.RootRequest
-	var err error
-	if typeName != nil &&
-		typeName.Pkg() != nil &&
-		typeName.Parent() != nil &&
-		typeName.Parent() != typeName.Pkg().Scope() {
-		placement, placementErr := n.generatedArtifactPlacement(
-			typeName.Type(),
-		)
-		if placementErr != nil {
-			return api.NameReference{}, placementErr
-		}
-		if placement.kind != api.GeneratedArtifactPlacementLexical ||
-			placement.anchor != typeName {
-			return api.NameReference{}, &api.NameError{
-				Name:   typeName.Name(),
-				Reason: "local named-struct operation has no exact lexical owner",
-			}
-		}
-		request, err = api.NewLexicalNamedStructOperationRequest(
-			placement.lexicalOwner,
-			typeName,
-			operation,
-		)
-	} else {
-		request, err = api.NewNamedStructOperationRequest(
-			typeName,
-			operation,
-		)
-	}
+	request, err := n.namedStructOperationRequest(typeName, operation)
 	if err != nil {
 		return api.NameReference{}, err
 	}
@@ -288,6 +281,39 @@ func (n *File) NamedStructOperation(
 	}
 	requests := append(reference.Requests(), request)
 	return api.NewNameReference(reference.Name(), requests...)
+}
+
+func (n *File) namedStructOperationRequest(
+	typeName *types.TypeName,
+	operation api.NamedStructOperation,
+) (api.RootRequest, error) {
+	if typeName != nil &&
+		typeName.Pkg() != nil &&
+		typeName.Parent() != nil &&
+		typeName.Parent() != typeName.Pkg().Scope() {
+		placement, placementErr := n.generatedArtifactPlacement(
+			typeName.Type(),
+		)
+		if placementErr != nil {
+			return api.RootRequest{}, placementErr
+		}
+		if placement.kind != api.GeneratedArtifactPlacementLexical ||
+			placement.anchor != typeName {
+			return api.RootRequest{}, &api.NameError{
+				Name:   typeName.Name(),
+				Reason: "local named-struct operation has no exact lexical owner",
+			}
+		}
+		return api.NewLexicalNamedStructOperationRequest(
+			placement.lexicalOwner,
+			typeName,
+			operation,
+		)
+	}
+	return api.NewNamedStructOperationRequest(
+		typeName,
+		operation,
+	)
 }
 
 func (n *File) BeginArtifact(
@@ -376,7 +402,7 @@ func (n *File) RestoreTemporaries(snapshot TemporarySnapshot) {
 
 func valueReferenceFacet(object types.Object) (api.ArtifactFacet, error) {
 	switch object.(type) {
-	case *types.Func:
+	case *types.Func, *types.Builtin:
 		return api.ArtifactFacetCallableSignature, nil
 	case *types.TypeName:
 		return api.ArtifactFacetConstructorSurface, nil

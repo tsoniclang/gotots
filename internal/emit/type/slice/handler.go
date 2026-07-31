@@ -33,7 +33,7 @@ func EmitRepresented(
 		return api.TypeEmission{},
 			api.Unsupported(context, api.CategoryType, source)
 	}
-	element, err := children.RepresentedType(
+	element, err := context.ContainerStorage().ContainerStorageType(
 		context.WithRole(api.RoleSliceElementType),
 		source,
 		elementType,

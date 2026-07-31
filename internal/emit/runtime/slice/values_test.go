@@ -63,15 +63,17 @@ import {
     AppendNoValues,
     AppendGrowthCapacity,
     AppendReallocationZeroTail,
-    AppendSpread,
-    AppendSpreadOverlap,
-    AppendStringBytes,
-    BoolElements,
-    CopyCount,
-    CopyDefinedStringBytes,
-    CopyDistinct,
-    CopyOverlapping,
-    CopyStringBytes,
+	    AppendSpread,
+	    AppendSpreadOverlap,
+	    AppendStringBytes,
+	    AppendUntypedStringConstantBytes,
+	    BoolElements,
+	    CopyCount,
+	    CopyDefinedStringBytes,
+	    CopyDistinct,
+	    CopyOverlapping,
+	    CopyStringBytes,
+	    CopyUntypedStringConstantBytes,
     DescriptorAliasesBacking,
     EmptyIsNil,
     IndexBoundsPanic,
@@ -113,8 +115,9 @@ console.log(AppendReallocationZeroTail());
 console.log(AppendSpread());
 console.log(AppendSpreadOverlap());
 console.log(AppendDistinctNamedSlices());
-console.log(AppendStringBytes());
-console.log(AppendDefinedStringBytes());
+	console.log(AppendStringBytes());
+	console.log(AppendDefinedStringBytes());
+	console.log(AppendUntypedStringConstantBytes());
 console.log(AppendLargeSpread());
 console.log(IndexUpdates());
 console.log(StringIndexCompound());
@@ -122,8 +125,9 @@ console.log(ParallelStoreOrder());
 console.log(CopyOverlapping());
 console.log(CopyDistinct());
 console.log(CopyCount());
-console.log(CopyStringBytes());
-console.log(CopyDefinedStringBytes());
+	console.log(CopyStringBytes());
+	console.log(CopyDefinedStringBytes());
+	console.log(CopyUntypedStringConstantBytes());
 console.log(NilSliceStaysNil());
 console.log(BoolElements());
 console.log(ShadowedLenIsOrdinaryCall());
@@ -151,7 +155,7 @@ for (const operation of [
 		filepath.Join(workingDirectory, "out", "runner.js"),
 	)
 	goOutput := executeGo(t, workingDirectory)
-	const expected = "true\ntrue\n7\ntrue\nfalse\n25\n5\n57\n9\n15\n13\n934\n1\n24\n4\n0\n4\n123\n123\n29669\n29669\n7\n19\nab\n12345678\n1123\n78\n2\n2109669\n39669\ntrue\ntrue\n5\npanic\npanic\npanic\npanic\n"
+	const expected = "true\ntrue\n7\ntrue\nfalse\n25\n5\n57\n9\n15\n13\n934\n1\n24\n4\n0\n4\n123\n123\n29669\n29669\n29669\n7\n19\nab\n12345678\n1123\n78\n2\n2109669\n39669\n39669\ntrue\ntrue\n5\npanic\npanic\npanic\npanic\n"
 	if goOutput != expected {
 		t.Fatalf("Go output = %q, want exact slice mutation sentinel output", goOutput)
 	}
@@ -390,6 +394,7 @@ func main() {
 	fmt.Println(values.AppendDistinctNamedSlices())
 	fmt.Println(values.AppendStringBytes())
 	fmt.Println(values.AppendDefinedStringBytes())
+	fmt.Println(values.AppendUntypedStringConstantBytes())
 	fmt.Println(values.AppendLargeSpread())
 	fmt.Println(values.IndexUpdates())
 	fmt.Println(values.StringIndexCompound())
@@ -399,6 +404,7 @@ func main() {
 	fmt.Println(values.CopyCount())
 	fmt.Println(values.CopyStringBytes())
 	fmt.Println(values.CopyDefinedStringBytes())
+	fmt.Println(values.CopyUntypedStringConstantBytes())
 	fmt.Println(values.NilSliceStaysNil())
 	fmt.Println(values.BoolElements())
 	fmt.Println(values.ShadowedLenIsOrdinaryCall())

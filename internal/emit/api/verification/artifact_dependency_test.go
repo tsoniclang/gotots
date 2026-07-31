@@ -64,14 +64,16 @@ func TestArtifactFacetIDsArePinned(t *testing.T) {
 		api.ArtifactFacetInstanceTypeSurface,
 		api.ArtifactFacetStaticSurface,
 		api.ArtifactFacetValueSurface,
+		api.ArtifactFacetImplementation,
+		api.ArtifactFacetExportSurface,
 	}
-	expected := []api.ArtifactFacet{1, 2, 3, 4, 5}
+	expected := []api.ArtifactFacet{1, 2, 3, 4, 5, 6, 7}
 	for index := range expected {
 		if actual[index] != expected[index] || !actual[index].Valid() {
 			t.Fatalf("facet %d = %d", index, actual[index])
 		}
 	}
-	if api.ArtifactFacetInvalid.Valid() || api.ArtifactFacet(6).Valid() {
+	if api.ArtifactFacetInvalid.Valid() || api.ArtifactFacet(8).Valid() {
 		t.Fatal("artifact facet domain is not closed")
 	}
 }

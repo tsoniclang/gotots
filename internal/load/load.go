@@ -2,10 +2,13 @@ package load
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -14,8 +17,9 @@ import (
 )
 
 type Request struct {
-	Directory string
-	Pattern   string
+	Directory            string
+	Pattern              string
+	ContractDependencies bool
 }
 
 type File struct {
@@ -36,6 +40,8 @@ type Package struct {
 	name          string
 	modulePath    string
 	moduleVersion string
+	contractKey   string
+	kind          PackageKind
 	files         []File
 	fileSet       *token.FileSet
 	typesPackage  *types.Package
@@ -45,10 +51,32 @@ type Package struct {
 }
 
 type Program struct {
-	roots    []*Package
-	packages []*Package
-	byPath   map[string]*Package
-	byTypes  map[*types.Package]*Package
+	roots               []*Package
+	packages            []*Package
+	environmentPackages []*Package
+	byPath              map[string]*Package
+	byTypes             map[*types.Package]*Package
+	environmentByTypes  map[*types.Package]*Package
+}
+
+type PackageKind uint8
+
+const (
+	PackageInvalid PackageKind = iota
+	PackageSource
+	PackageStandardLibraryContract
+	PackageExternalContract
+)
+
+func (k PackageKind) Valid() bool {
+	return k == PackageSource ||
+		k == PackageStandardLibraryContract ||
+		k == PackageExternalContract
+}
+
+func (k PackageKind) EnvironmentContract() bool {
+	return k == PackageStandardLibraryContract ||
+		k == PackageExternalContract
 }
 
 type Error struct {
@@ -116,21 +144,43 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 		selectedSet[root] = struct{}{}
 	}
 	var sourcePackages []*packages.Package
+	var environmentPackages []*packages.Package
 	packages.Visit(loaded, nil, func(current *packages.Package) {
 		_, selected := selectedSet[current]
-		if current.Module != nil || selected {
+		if selected ||
+			current.Module != nil &&
+				(!request.ContractDependencies || current.Module.Main) {
 			sourcePackages = append(sourcePackages, current)
+			return
 		}
+		environmentPackages = append(environmentPackages, current)
 	})
 	sort.Slice(sourcePackages, func(left, right int) bool {
 		return sourcePackages[left].PkgPath < sourcePackages[right].PkgPath
 	})
+	sort.Slice(environmentPackages, func(left, right int) bool {
+		return environmentPackages[left].PkgPath <
+			environmentPackages[right].PkgPath
+	})
 
 	program := &Program{
 		packages: make([]*Package, 0, len(sourcePackages)),
-		byPath:   make(map[string]*Package, len(sourcePackages)),
-		byTypes:  make(map[*types.Package]*Package, len(sourcePackages)),
+		environmentPackages: make(
+			[]*Package,
+			0,
+			len(environmentPackages),
+		),
+		byPath: make(
+			map[string]*Package,
+			len(sourcePackages)+len(environmentPackages),
+		),
+		byTypes: make(map[*types.Package]*Package, len(sourcePackages)),
+		environmentByTypes: make(
+			map[*types.Package]*Package,
+			len(environmentPackages),
+		),
 	}
+	toolchainKey := currentToolchainKey()
 	byLoaded := make(map[*packages.Package]*Package, len(sourcePackages))
 	for _, current := range sourcePackages {
 		sourcePackage, err := wrapPackage(request.Pattern, current, fileSet)
@@ -149,6 +199,41 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 		sourcePackage.program = program
 		byLoaded[current] = sourcePackage
 	}
+	for _, current := range environmentPackages {
+		kind := PackageStandardLibraryContract
+		contractKey := toolchainKey
+		if current.Module != nil {
+			kind = PackageExternalContract
+			contractKey = moduleContractKey(
+				current.Module.Path,
+				current.Module.Version,
+			)
+		}
+		environmentPackage, err := wrapEnvironmentPackage(
+			request.Pattern,
+			current,
+			fileSet,
+			kind,
+			contractKey,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if _, duplicate := program.byPath[environmentPackage.path]; duplicate {
+			return nil, &Error{
+				Pattern: request.Pattern,
+				Reason:  "duplicate package path " + environmentPackage.path,
+			}
+		}
+		program.environmentPackages = append(
+			program.environmentPackages,
+			environmentPackage,
+		)
+		program.byPath[environmentPackage.path] = environmentPackage
+		program.environmentByTypes[environmentPackage.typesPackage] =
+			environmentPackage
+		environmentPackage.program = program
+	}
 	program.roots = make([]*Package, 0, len(loaded))
 	for _, root := range loaded {
 		sourcePackage := byLoaded[root]
@@ -161,6 +246,50 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 		program.roots = append(program.roots, sourcePackage)
 	}
 	return program, nil
+}
+
+func wrapEnvironmentPackage(
+	pattern string,
+	selected *packages.Package,
+	fileSet *token.FileSet,
+	kind PackageKind,
+	contractKey string,
+) (*Package, error) {
+	if selected == nil ||
+		selected.Fset != fileSet ||
+		selected.Types == nil ||
+		selected.TypesSizes == nil ||
+		selected.PkgPath == "" ||
+		selected.Name == "" ||
+		!kind.EnvironmentContract() ||
+		contractKey == "" {
+		return nil, &Error{
+			Pattern: pattern,
+			Reason:  "environment package lacks coherent contract evidence",
+		}
+	}
+	return &Package{
+		path:         selected.PkgPath,
+		name:         selected.Name,
+		contractKey:  contractKey,
+		kind:         kind,
+		fileSet:      selected.Fset,
+		typesPackage: selected.Types,
+		typesInfo:    &types.Info{},
+		typesSizes:   selected.TypesSizes,
+	}, nil
+}
+
+func currentToolchainKey() string {
+	digest := sha256.Sum256([]byte(
+		runtime.Version() + "\x00" + runtime.GOOS + "\x00" + runtime.GOARCH,
+	))
+	return hex.EncodeToString(digest[:])
+}
+
+func moduleContractKey(modulePath string, moduleVersion string) string {
+	digest := sha256.Sum256([]byte(modulePath + "\x00" + moduleVersion))
+	return hex.EncodeToString(digest[:])
 }
 
 func wrapPackage(
@@ -204,6 +333,7 @@ func wrapPackage(
 		name:          selected.Name,
 		modulePath:    modulePath,
 		moduleVersion: moduleVersion,
+		kind:          PackageSource,
 		files:         files,
 		fileSet:       selected.Fset,
 		typesPackage:  selected.Types,
@@ -226,6 +356,24 @@ func (p *Package) ModulePath() string {
 
 func (p *Package) ModuleVersion() string {
 	return p.moduleVersion
+}
+
+func (p *Package) ToolchainKey() string {
+	if p.kind != PackageStandardLibraryContract {
+		return ""
+	}
+	return p.contractKey
+}
+
+func (p *Package) ExternalContractKey() string {
+	if p.kind != PackageExternalContract {
+		return ""
+	}
+	return p.contractKey
+}
+
+func (p *Package) Kind() PackageKind {
+	return p.kind
 }
 
 func (p *Package) Files() []File {
@@ -269,12 +417,20 @@ func (p *Program) Packages() []*Package {
 	return slices.Clone(p.packages)
 }
 
+func (p *Program) EnvironmentPackages() []*Package {
+	return slices.Clone(p.environmentPackages)
+}
+
 func (p *Program) PackageByPath(path string) *Package {
 	return p.byPath[path]
 }
 
 func (p *Program) PackageForTypes(source *types.Package) *Package {
 	return p.byTypes[source]
+}
+
+func (p *Program) EnvironmentForTypes(source *types.Package) *Package {
+	return p.environmentByTypes[source]
 }
 
 func packageProblems(roots []*packages.Package) []string {

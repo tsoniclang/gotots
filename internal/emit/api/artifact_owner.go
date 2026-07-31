@@ -9,7 +9,19 @@ type ArtifactOwner struct {
 	source             types.Object
 	initializerPackage *types.Package
 	initializer        *types.Initializer
+	assemblyPackage    *types.Package
 	generated          *GeneratedArtifact
+}
+
+func PackageAssemblyArtifactOwner(
+	sourcePackage *types.Package,
+) (ArtifactOwner, error) {
+	if sourcePackage == nil || sourcePackage.Path() == "" {
+		return ArtifactOwner{}, &RootRequestError{
+			Reason: "package assembly artifact owner is invalid",
+		}
+	}
+	return ArtifactOwner{assemblyPackage: sourcePackage}, nil
 }
 
 func PackageInitializerArtifactOwner(
@@ -95,6 +107,16 @@ func MustPackageInitializerArtifactOwner(
 	return owner
 }
 
+func MustPackageAssemblyArtifactOwner(
+	sourcePackage *types.Package,
+) ArtifactOwner {
+	owner, err := PackageAssemblyArtifactOwner(sourcePackage)
+	if err != nil {
+		panic(err)
+	}
+	return owner
+}
+
 func MustGeneratedArtifactOwner(generated *GeneratedArtifact) ArtifactOwner {
 	owner, err := GeneratedArtifactOwner(generated)
 	if err != nil {
@@ -128,6 +150,12 @@ func (o ArtifactOwner) Valid() bool {
 	if o.generated != nil {
 		variants++
 	}
+	if o.assemblyPackage != nil {
+		if o.assemblyPackage.Path() == "" {
+			return false
+		}
+		variants++
+	}
 	return variants == 1 &&
 		(o.generated == nil || o.generated.Valid())
 }
@@ -150,6 +178,11 @@ func (o ArtifactOwner) Generated() (*GeneratedArtifact, bool) {
 	return o.generated, o.Valid() && o.generated != nil
 }
 
+func (o ArtifactOwner) PackageAssembly() (*types.Package, bool) {
+	return o.assemblyPackage,
+		o.Valid() && o.assemblyPackage != nil
+}
+
 func (o ArtifactOwner) Package() *types.Package {
 	if source, ok := o.Source(); ok {
 		return source.Pkg()
@@ -159,6 +192,9 @@ func (o ArtifactOwner) Package() *types.Package {
 	}
 	if generated, ok := o.Generated(); ok {
 		return generated.LexicalOwner().Package()
+	}
+	if sourcePackage, ok := o.PackageAssembly(); ok {
+		return sourcePackage
 	}
 	return nil
 }
@@ -173,6 +209,9 @@ func (o ArtifactOwner) Name() string {
 	if sourcePackage, initializer, ok := o.PackageInitializer(); ok {
 		return sourcePackage.Path() + ".$init@" +
 			fmt.Sprint(initializer.Rhs.Pos())
+	}
+	if sourcePackage, ok := o.PackageAssembly(); ok {
+		return sourcePackage.Path() + ".$assembly"
 	}
 	return ""
 }
@@ -220,11 +259,13 @@ const (
 	ArtifactFacetInstanceTypeSurface ArtifactFacet = 3
 	ArtifactFacetStaticSurface       ArtifactFacet = 4
 	ArtifactFacetValueSurface        ArtifactFacet = 5
+	ArtifactFacetImplementation      ArtifactFacet = 6
+	ArtifactFacetExportSurface       ArtifactFacet = 7
 )
 
 func (f ArtifactFacet) Valid() bool {
 	return f >= ArtifactFacetCallableSignature &&
-		f <= ArtifactFacetValueSurface
+		f <= ArtifactFacetExportSurface
 }
 
 func (f ArtifactFacet) String() string {
@@ -239,6 +280,10 @@ func (f ArtifactFacet) String() string {
 		return "static-surface"
 	case ArtifactFacetValueSurface:
 		return "value-surface"
+	case ArtifactFacetExportSurface:
+		return "export-surface"
+	case ArtifactFacetImplementation:
+		return "implementation"
 	default:
 		return fmt.Sprintf("artifact-facet(%d)", f)
 	}
@@ -274,4 +319,49 @@ func (d ArtifactDependency) Provider() ArtifactOwner {
 
 func (d ArtifactDependency) Facet() ArtifactFacet {
 	return d.facet
+}
+
+func NewArtifactDependencyRequest(
+	provider types.Object,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	owner, err := SourceArtifactOwner(provider)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newArtifactDependencyRequest(owner, facet)
+}
+
+func NewGeneratedArtifactDependencyRequest(
+	provider *GeneratedArtifact,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	owner, err := GeneratedArtifactOwner(provider)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newArtifactDependencyRequest(owner, facet)
+}
+
+func NewOwnedArtifactDependencyRequest(
+	provider ArtifactOwner,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	return newArtifactDependencyRequest(provider, facet)
+}
+
+func newArtifactDependencyRequest(
+	provider ArtifactOwner,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	dependency, err := NewArtifactDependency(provider, facet)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{payload: &rootRequestPayload{
+		owner: RootRequestOwner{
+			kind:               RootRequestArtifactDependency,
+			artifactDependency: dependency,
+		},
+	}}, nil
 }

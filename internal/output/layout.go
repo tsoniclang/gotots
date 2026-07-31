@@ -19,6 +19,65 @@ const (
 	InterfaceTypeSupportPath   = "support/interface-types.ts"
 )
 
+func EnvironmentContractPath(
+	sourcePackage *load.Package,
+) (string, error) {
+	if sourcePackage == nil {
+		return "", &PathError{Reason: "environment package is nil"}
+	}
+	if !sourcePackage.Kind().EnvironmentContract() ||
+		sourcePackage.Path() == "" {
+		return "", &PathError{
+			Source: sourcePackage.Path(),
+			Reason: "package is not an environment contract",
+		}
+	}
+	importPath := sourcePackage.Path()
+	if path.IsAbs(importPath) ||
+		path.Clean(importPath) != importPath ||
+		importPath == "." ||
+		strings.HasPrefix(importPath, "../") {
+		return "", &PathError{
+			Source: importPath,
+			Reason: "environment contract import path is not canonical",
+		}
+	}
+	switch sourcePackage.Kind() {
+	case load.PackageStandardLibraryContract:
+		if sourcePackage.ModulePath() != "" ||
+			sourcePackage.ToolchainKey() == "" {
+			return "", &PathError{
+				Source: importPath,
+				Reason: "standard-library contract identity is incomplete",
+			}
+		}
+		return path.Join(
+			"gostdlib",
+			sourcePackage.ToolchainKey(),
+			importPath,
+			"index.ts",
+		), nil
+	case load.PackageExternalContract:
+		if sourcePackage.ExternalContractKey() == "" {
+			return "", &PathError{
+				Source: importPath,
+				Reason: "external contract identity is incomplete",
+			}
+		}
+		return path.Join(
+			"externals",
+			sourcePackage.ExternalContractKey(),
+			importPath,
+			"index.ts",
+		), nil
+	default:
+		return "", &PathError{
+			Source: importPath,
+			Reason: "environment contract ownership is invalid",
+		}
+	}
+}
+
 const (
 	packageAssemblyFile = "package.ts"
 	packageStateFile    = "state.ts"

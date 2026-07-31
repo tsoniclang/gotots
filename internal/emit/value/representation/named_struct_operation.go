@@ -81,6 +81,7 @@ func (owner Owner) namedStructOperationMember(
 				context,
 				owner.children,
 				source,
+				typeName,
 				named.TypeArgs(),
 			)
 		if err != nil {

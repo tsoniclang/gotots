@@ -40,7 +40,7 @@ func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
 		t.Fatalf("base pointer definitions = %#v", base)
 	}
 	class, ok := base[0].Statement().(tsgo.ClassDeclaration)
-	if !ok || len(class.Members()) != 19 {
+	if !ok || len(class.Members()) != 18 {
 		t.Fatalf("base pointer owner = %T with unexpected members", base[0].Statement())
 	}
 
@@ -65,6 +65,34 @@ func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
 			"pointer hash definition = %T, want function",
 			withHash[1].Statement(),
 		)
+	}
+}
+
+func TestUnsafePointerRuntimeIsNominalAndTypedPlaceholder(t *testing.T) {
+	definitions, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleUnsafePointer,
+		[]api.RuntimeSymbol{api.RuntimeUnsafePointer},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 1 ||
+		definitions[0].Symbol() != api.RuntimeUnsafePointer {
+		t.Fatalf("unsafe-pointer definitions = %#v", definitions)
+	}
+	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
+	if !ok ||
+		class.Name().Text() != "GoUnsafePointer" ||
+		len(class.Members()) != 4 {
+		t.Fatalf(
+			"unsafe-pointer definition = %T with unexpected shape",
+			definitions[0].Statement(),
+		)
+	}
+	if len(class.Modifiers()) != 1 ||
+		class.Modifiers()[0].Kind() != tsgo.SyntaxKindExportKeyword {
+		t.Fatal("unsafe-pointer class is not one exported runtime definition")
 	}
 }
 

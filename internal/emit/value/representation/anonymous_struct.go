@@ -100,6 +100,7 @@ func anonymousStructOperation(
 	reference, err := context.Names().AnonymousStruct(
 		structType,
 		demand,
+		api.ImportPhaseValue,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

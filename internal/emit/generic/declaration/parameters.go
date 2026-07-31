@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/types"
 	"sort"
+	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
@@ -29,6 +30,7 @@ func EnterType(
 	context api.Context,
 	source *ast.TypeSpec,
 	owner *types.TypeName,
+	requirements []api.DeclarationRequirement,
 ) (TypeParameters, error) {
 	if source == nil || owner == nil {
 		return TypeParameters{}, &api.InvariantError{
@@ -54,28 +56,11 @@ func EnterType(
 			source,
 		)
 	}
-	names := make(map[*types.TypeParam]string, len(parameters))
-	nodes := make([]tsgo.TypeParameterDeclaration, 0, len(parameters))
-	references := make([]tsgo.TypeNode, 0, len(parameters))
-	for _, parameter := range parameters {
-		name, err := context.Names().Declare(parameter.Obj())
-		if err != nil {
-			return TypeParameters{}, err
-		}
-		names[parameter] = name
-		nodes = append(nodes, context.Factory().TypeParameterDeclaration(
-			nil,
-			context.Factory().Identifier(name),
-			nil,
-			nil,
-			nil,
-		))
-		references = append(references, context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(name),
-			nil,
-		))
-	}
-	context, err := context.WithGenericParameters(owner, names)
+	context, nodes, references, err := enterTypeParameterScope(
+		context,
+		owner,
+		requirements,
+	)
 	if err != nil {
 		return TypeParameters{}, err
 	}
@@ -130,30 +115,11 @@ func Enter(
 		}
 		return Parameters{context: context}, nil
 	}
-	names := make(map[*types.TypeParam]string, len(parameters))
-	typeNodes := make(
-		[]tsgo.TypeParameterDeclaration,
-		0,
-		len(parameters),
+	context, typeNodes, _, err := enterTypeParameterScope(
+		context,
+		owner,
+		requirements,
 	)
-	for _, parameter := range parameters {
-		name, err := context.Names().Declare(parameter.Obj())
-		if err != nil {
-			return Parameters{}, err
-		}
-		names[parameter] = name
-		typeNodes = append(
-			typeNodes,
-			context.Factory().TypeParameterDeclaration(
-				nil,
-				context.Factory().Identifier(name),
-				nil,
-				nil,
-				nil,
-			),
-		)
-	}
-	context, err := context.WithGenericParameters(owner, names)
 	if err != nil {
 		return Parameters{}, err
 	}
@@ -177,6 +143,96 @@ func Enter(
 		capabilities: capabilities,
 		requests:     requests,
 	}, nil
+}
+
+func enterTypeParameterScope(
+	context api.Context,
+	owner types.Object,
+	requirements []api.DeclarationRequirement,
+) (
+	api.Context,
+	[]tsgo.TypeParameterDeclaration,
+	[]tsgo.TypeNode,
+	error,
+) {
+	parameters := api.GenericDeclarationParameters(owner)
+	profile, err := api.SelectGenericRepresentationProfile(
+		owner,
+		requirements,
+	)
+	if err != nil {
+		return api.Context{}, nil, nil, err
+	}
+	names := make(map[*types.TypeParam]string, len(parameters))
+	for index, parameter := range parameters {
+		nameParameter := parameter
+		if representationOwner, selected, ok :=
+			api.GenericRepresentationParameter(owner, parameter); ok &&
+			representationOwner != api.GenericDeclarationOrigin(owner) {
+			nameParameter = selected
+		}
+		name, nameErr := typeParameterName(context, nameParameter, index)
+		if nameErr != nil {
+			return api.Context{}, nil, nil, nameErr
+		}
+		names[parameter] = name
+	}
+	layout, err := EmitTypeParameterLayout(context, profile, names)
+	if err != nil {
+		return api.Context{}, nil, nil, err
+	}
+	context, err = context.WithGenericParameters(owner, names)
+	if err != nil {
+		return api.Context{}, nil, nil, err
+	}
+	return context, layout.Parameters(), layout.Arguments(), nil
+}
+
+func EnterClassMethod(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.FuncDecl,
+	owner *types.Func,
+	requirements []api.DeclarationRequirement,
+) (Parameters, error) {
+	signature, ok := owner.Type().(*types.Signature)
+	if !ok || signature.Recv() == nil {
+		return Parameters{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "class-method generic identity is invalid",
+		}
+	}
+	parameters, err := Enter(
+		context,
+		children,
+		source,
+		owner,
+		requirements,
+	)
+	if err != nil {
+		return Parameters{}, err
+	}
+	if api.ValueReceiverTypeName(owner) != nil {
+		parameters.typeNodes = nil
+	}
+	return parameters, nil
+}
+
+func typeParameterName(
+	context api.Context,
+	parameter *types.TypeParam,
+	index int,
+) (string, error) {
+	if parameter == nil || parameter.Obj() == nil || index < 0 {
+		return "", &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic type-parameter identity is invalid",
+		}
+	}
+	if parameter.Obj().Name() == "" || parameter.Obj().Name() == "_" {
+		return "$T" + strconv.Itoa(index), nil
+	}
+	return context.Names().Declare(parameter.Obj())
 }
 
 func EmitOperationParameters(
@@ -207,7 +263,28 @@ func EmitOperationParameters(
 			targetErr     error
 			facetRequests []api.RootRequest
 		)
-		if operation.Operation() ==
+		target, storageOperation, targetErr := emitStorageOperationType(
+			context,
+			children,
+			source,
+			operation,
+		)
+		if targetErr != nil {
+			return nil, nil, targetErr
+		}
+		handled := storageOperation
+		if !handled {
+			target, handled, targetErr = emitPointerOperationType(
+				context,
+				children,
+				source,
+				operation,
+			)
+			if targetErr != nil {
+				return nil, nil, targetErr
+			}
+		}
+		if !handled && operation.Operation() ==
 			api.GenericOperationConstraintMethod {
 			facet, facetErr :=
 				api.NewGenericOperationCallableFacet(operation)
@@ -227,7 +304,7 @@ func EmitOperationParameters(
 				observation.Cooperative(),
 			)
 			facetRequests = observation.Requests()
-		} else {
+		} else if !handled {
 			target, targetErr = callable.EmitInlineNonNilType(
 				context.WithRole(api.RoleParameterType),
 				children,

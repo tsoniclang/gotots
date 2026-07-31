@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type Storage uint8
@@ -44,7 +43,9 @@ func Source(
 		return Model{}, false
 	}
 	storage := StorageSpecialized
-	if scalarKey && representedBasic(context, source.Elem()) {
+	if scalarKey &&
+		types.Identical(source.Key(), storageKeyType(source.Key())) &&
+		representedBasic(context, source.Elem()) {
 		storage = StorageScalar
 	}
 	return Model{
@@ -72,6 +73,10 @@ func (m Model) Element() types.Type {
 	return m.source.Elem()
 }
 
+func (m Model) StorageKey() types.Type {
+	return storageKeyType(m.source.Key())
+}
+
 func (m Model) Storage() Storage {
 	return m.storage
 }
@@ -95,7 +100,7 @@ func (m Model) ReadReceiver(
 	if !m.nominal {
 		return value, nil
 	}
-	return m.staticMapOperation(context, definedtype.MapReadMember, value)
+	return m.defined.Project(context, value)
 }
 
 func (m Model) StoreReceiver(
@@ -106,7 +111,7 @@ func (m Model) StoreReceiver(
 	if !m.nominal {
 		return value, nil
 	}
-	return m.staticMapOperation(context, definedtype.MapStoreMember, value)
+	return m.defined.Project(context, value)
 }
 
 func (m Model) WrapConverted(
@@ -116,34 +121,7 @@ func (m Model) WrapConverted(
 	if !m.nominal {
 		return value, nil
 	}
-	return m.staticMapOperation(context, definedtype.MapWrapMember, value)
-}
-
-func (m Model) staticMapOperation(
-	context api.Context,
-	member string,
-	value api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	reference, err := context.Names().TypeReference(m.TypeName())
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.NewExpressionEmission(
-		value.Before(),
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
-				nil,
-				context.Factory().Identifier(member),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			nil,
-			[]tsgo.Expression{value.Value()},
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(value.Requests(), reference.Requests()),
-	)
+	return m.defined.Wrap(context, value)
 }
 
 func (m Model) Wrap(

@@ -48,12 +48,12 @@ func (n *File) ConstantProjection(
 	}
 	localName := exportedName
 	requests := []api.RootRequest{request}
-	if binding.sourceFile != nil && n.require != nil {
+	if binding.scheduled() && n.require != nil {
 		if err := n.require(selected); err != nil {
 			return api.NameReference{}, err
 		}
 	}
-	if binding.sourceFile != nil && n.artifactOwner.Valid() {
+	if binding.sourceOwned() && n.artifactOwner.Valid() {
 		dependency, err := api.NewArtifactDependencyRequest(
 			selected,
 			api.ArtifactFacetValueSurface,
@@ -63,7 +63,7 @@ func (n *File) ConstantProjection(
 		}
 		requests = append(requests, dependency)
 	}
-	if binding.sourceFile != nil && binding.sourceFile != n.sourceFile {
+	if binding.scheduled() && binding.sourcePath != n.targetPath {
 		referencePath, crossPackage, err := n.sourceReferencePath(
 			selected,
 			binding,

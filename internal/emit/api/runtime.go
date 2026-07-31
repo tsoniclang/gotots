@@ -19,7 +19,6 @@ const (
 	RuntimeSlice                RuntimeSymbol = 300
 	RuntimeSliceAddress         RuntimeSymbol = 301
 	RuntimeSliceStorage         RuntimeSymbol = 302
-	RuntimeSliceAddressView     RuntimeSymbol = 303
 	RuntimeSliceArrayPointer    RuntimeSymbol = 304
 	RuntimeArraySlice           RuntimeSymbol = 305
 	RuntimeSliceAppendSlice     RuntimeSymbol = 307
@@ -76,6 +75,7 @@ const (
 	RuntimeScheduler            RuntimeSymbol = 1105
 	RuntimeSelectReady          RuntimeSymbol = 1106
 	RuntimeSelectAttempt        RuntimeSymbol = 1107
+	RuntimeUnsafePointer        RuntimeSymbol = 1200
 )
 
 type RuntimeSymbolContract struct {
@@ -206,15 +206,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimeSlice,
 		), nil
-	case RuntimeSliceAddressView:
-		return runtimeContract(
-			RuntimeModuleSlice,
-			"runtime/slice.ts",
-			"goSliceAddressView",
-			false,
-			RuntimeSlice,
-			RuntimePointer,
-		), nil
 	case RuntimeSliceArrayPointer:
 		return runtimeContract(
 			RuntimeModuleSlice,
@@ -334,7 +325,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimePanicNilError,
 			RuntimePanicValue,
 			RuntimeInterfaceValue,
-			RuntimePointer,
 		), nil
 	case RuntimeIntegerDivide:
 		return runtimeContract(
@@ -572,20 +562,15 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeErrorType,
 			RuntimeErrorContract,
 		), nil
+	case RuntimeUnsafePointer:
+		return runtimeContract(
+			RuntimeModuleUnsafePointer,
+			"runtime/unsafe-pointer.ts",
+			"GoUnsafePointer",
+			true,
+			RuntimePanic,
+		), nil
 	default:
 		return concurrencyRuntimeContract(symbol)
 	}
-}
-
-func complexOperationContract(
-	exportedName string,
-	dependencies ...RuntimeSymbol,
-) (RuntimeSymbolContract, error) {
-	return runtimeContract(
-		RuntimeModuleComplex,
-		"runtime/complex.ts",
-		exportedName,
-		false,
-		dependencies...,
-	), nil
 }

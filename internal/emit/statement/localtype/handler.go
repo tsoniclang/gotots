@@ -1,6 +1,7 @@
 package localtype
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -9,8 +10,11 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/declaration/definedtype"
 	interfaceadapter "github.com/tsoniclang/gotots/internal/emit/declaration/interfaceadapter"
+	interfacedynamictype "github.com/tsoniclang/gotots/internal/emit/declaration/interfacedynamictype"
+	interfacemethodtoken "github.com/tsoniclang/gotots/internal/emit/declaration/interfacemethodtoken"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
 	namedstruct "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
+	genericcapability "github.com/tsoniclang/gotots/internal/emit/generic/capability"
 	maprepresentation "github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -44,6 +48,9 @@ func Emit(
 					api.CategoryDeclaration,
 					spec.Name,
 				)
+		}
+		if typeName.Name() == "_" {
+			continue
 		}
 		if _, err := context.Names().Declare(typeName); err != nil {
 			return api.StatementEmission{}, err
@@ -104,7 +111,7 @@ func Emit(
 			map[*api.GeneratedArtifact][]api.DeclarationRequirement,
 		)
 		for _, requirement := range context.LexicalTypeRequirements(typeName) {
-			artifact, ok := requirement.GeneratedArtifact()
+			artifact, ok := requirement.LexicalGeneratedArtifact()
 			if !ok {
 				continue
 			}
@@ -135,7 +142,8 @@ func Emit(
 				artifacts[artifact],
 			)
 			if err != nil {
-				return api.StatementEmission{}, err
+				return api.StatementEmission{},
+					api.WrapGeneratedArtifactError(artifact, err)
 			}
 			statements = append(statements, generated.Declarations()...)
 			requests = append(requests, generated.Requests()...)
@@ -150,7 +158,8 @@ func localTypeRequirements(
 ) []api.DeclarationRequirement {
 	var requirements []api.DeclarationRequirement
 	for _, requirement := range context.LexicalTypeRequirements(typeName) {
-		if _, generated := requirement.GeneratedArtifact(); !generated {
+		if _, generated :=
+			requirement.LexicalGeneratedArtifact(); !generated {
 			requirements = append(requirements, requirement)
 		}
 	}
@@ -211,12 +220,104 @@ func emitLexicalGeneratedArtifact(
 			artifact,
 			requirements,
 		)
+	case api.GeneratedArtifactInterfaceMethodToken:
+		if err := exactLexicalInterfaceRequirement(
+			artifact,
+			requirements,
+		); err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		return api.DirectDeclaration(
+			interfacemethodtoken.Build(
+				context.Factory(),
+				artifact.TargetName(),
+				nil,
+				nil,
+			),
+		), nil
+	case api.GeneratedArtifactInterfaceDynamicTypeToken:
+		if err := exactLexicalInterfaceRequirement(
+			artifact,
+			requirements,
+		); err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		return api.DirectDeclaration(
+			interfacedynamictype.Build(
+				context.Factory(),
+				artifact.TargetName(),
+				nil,
+			),
+		), nil
+	case api.GeneratedArtifactGenericCapability:
+		return emitLexicalGenericCapability(
+			context,
+			children,
+			artifact,
+			requirements,
+		)
 	default:
+		anchor := artifact.LexicalAnchor()
+		anchorName := "<unknown>"
+		position := token.Position{}
+		if anchor != nil {
+			anchorName = anchor.Name()
+			position = context.FileSet().Position(anchor.Pos())
+		}
 		return api.DeclarationEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "lexical generated-artifact kind is invalid",
+			Role: context.Role(),
+			Reason: fmt.Sprintf(
+				"lexical generated-artifact kind %d (%s) for %s at %s is invalid",
+				artifact.Kind(),
+				artifact.TargetName(),
+				anchorName,
+				position,
+			),
 		}
 	}
+}
+
+func emitLexicalGenericCapability(
+	context api.Context,
+	children api.ChildEmitter,
+	artifact *api.GeneratedArtifact,
+	requirements []api.DeclarationRequirement,
+) (api.DeclarationEmission, error) {
+	if err := genericcapability.ValidateRequirements(
+		context.Role(),
+		artifact,
+		requirements,
+	); err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	facet, err := api.NewGenericCapabilityCallableFacet(artifact)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	observation, err := context.ObserveCooperativeCallable(facet)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	context = context.WithCooperativeCallable(
+		facet,
+		observation.Cooperative(),
+	)
+	statement, requests, err := genericcapability.Build(
+		context,
+		children,
+		artifact,
+		nil,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	return api.DirectDeclaration(
+		statement,
+		api.CombineRequests(
+			requests,
+			observation.Requests(),
+		)...,
+	), nil
 }
 
 func emitLexicalInterfaceAdapter(
@@ -232,10 +333,11 @@ func emitLexicalInterfaceAdapter(
 			Reason: "lexical interface adapter has no concrete type",
 		}
 	}
-	if err := exactLexicalInterfaceRequirement(
+	contracts, err := interfaceadapter.Contracts(
 		artifact,
 		requirements,
-	); err != nil {
+	)
+	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
 	statements, requests, err := interfaceadapter.Build(
@@ -243,6 +345,7 @@ func emitLexicalInterfaceAdapter(
 		children,
 		artifact.TargetName(),
 		sourceType,
+		contracts,
 		nil,
 	)
 	if err != nil {
@@ -330,7 +433,22 @@ func emitLexicalMapSpecialization(
 	keyType, err := children.RepresentedType(
 		context.WithRole(api.RoleMapKey),
 		source,
-		maprepresentation.StorageKeyType(mapType.Key()),
+		mapType.Key(),
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	mapModel, ok := maprepresentation.Source(context, mapType)
+	if !ok {
+		return api.DeclarationEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "lexical map specialization has no representation model",
+		}
+	}
+	storageKeyType, err := children.RepresentedType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		mapModel.StorageKey(),
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -349,6 +467,7 @@ func emitLexicalMapSpecialization(
 		artifact.TargetName(),
 		mapType,
 		keyType.Value(),
+		storageKeyType.Value(),
 		valueType.Value(),
 	)
 	if err != nil {
@@ -364,6 +483,7 @@ func emitLexicalMapSpecialization(
 		),
 		api.CombineRequests(
 			keyType.Requests(),
+			storageKeyType.Requests(),
 			valueType.Requests(),
 			specialization.Requests(),
 		)...,

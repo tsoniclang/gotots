@@ -23,7 +23,7 @@ func Build(
 	value := factory.Identifier("value")
 	finite := factory.CallExpression(
 		factory.PropertyAccessExpression(
-			factory.Identifier("Number"),
+			api.TargetIntrinsicNumber.Expression(factory),
 			nil,
 			factory.Identifier("isFinite"),
 			tsgo.NodeFlagsNone,

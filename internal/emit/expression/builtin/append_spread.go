@@ -46,6 +46,18 @@ func emitAppendSpread(
 			source,
 		)
 	}
+	spreadExpected := spreadType
+	if stringSpread {
+		var expectedOK bool
+		spreadExpected, expectedOK = stringArgumentExpectedType(spreadType)
+		if !expectedOK {
+			return api.ExpressionEmission{}, api.Unsupported(
+				context.WithRole(api.RoleCallArgument),
+				api.CategoryExpression,
+				source.Args[1],
+			)
+		}
+	}
 	receiver, err := children.Expression(
 		context.WithRole(api.RoleSliceReceiver).WithExpectedType(result),
 		source.Args[0],
@@ -58,7 +70,7 @@ func emitAppendSpread(
 		return api.ExpressionEmission{}, err
 	}
 	spread, err := children.Expression(
-		context.WithRole(api.RoleCallArgument).WithExpectedType(spreadType),
+		context.WithRole(api.RoleCallArgument).WithExpectedType(spreadExpected),
 		source.Args[1],
 	)
 	if err != nil {
@@ -82,7 +94,7 @@ func emitAppendSpread(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	targetElement, err := children.RepresentedType(
+	targetElement, err := context.ContainerStorage().ContainerStorageType(
 		context.WithRole(api.RoleSliceElementType),
 		source,
 		elementType,
@@ -126,6 +138,15 @@ func emitAppendSpread(
 			context.WithRole(api.RoleSliceElement),
 			source,
 			elementType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		zero, err = context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleSliceElement),
+			source,
+			elementType,
+			zero,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err

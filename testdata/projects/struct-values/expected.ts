@@ -3,8 +3,8 @@ export class Point {
     declare private readonly $goType: void;
     private constructor(public X: int32, public Visible: bool) {
     }
-    public static $make(X: int32, Visible: bool): Point {
-        return new Point(X, Visible);
+    public static $make($field0: int32, $field1: bool): Point {
+        return new Point($field0, $field1);
     }
     static $zero(): Point {
         return Point.$make(0, false);
@@ -20,8 +20,8 @@ export class Box {
     declare private readonly $goType: void;
     private constructor(public Point: Point, public Active: bool) {
     }
-    public static $make(Point: Point, Active: bool): Box {
-        return new Box(Point, Active);
+    public static $make($field0: Point, $field1: bool): Box {
+        return new Box($field0, $field1);
     }
     static $zero(): Box {
         return Box.$make(Point.$zero(), false);
@@ -32,29 +32,34 @@ export class Box {
     static $equal($left: Box, $right: Box): bool {
         return Point.$equal($left.Point, $right.Point) && $left.Active === $right.Active;
     }
+    WithX(value: int32): Box {
+        let box: Box = Box.$copy(this);
+        box.Point.X = value;
+        return box;
+    }
 }
 export class Mirror {
     declare private readonly $goType: void;
     private constructor(public Point: Point, public Active: bool) {
     }
-    public static $make(Point: Point, Active: bool): Mirror {
-        return new Mirror(Point, Active);
+    public static $make($field0: Point, $field1: bool): Mirror {
+        return new Mirror($field0, $field1);
     }
 }
 export class Reserved {
     declare private readonly $goType: void;
     private constructor(public __go_constructor: int32) {
     }
-    public static $make(__go_constructor: int32): Reserved {
-        return new Reserved(__go_constructor);
+    public static $make($field0: int32): Reserved {
+        return new Reserved($field0);
     }
 }
 export class Grouped {
     declare private readonly $goType: void;
     private constructor(public Left: int32, public Right: int32) {
     }
-    public static $make(Left: int32, Right: int32): Grouped {
-        return new Grouped(Left, Right);
+    public static $make($field0: int32, $field1: int32): Grouped {
+        return new Grouped($field0, $field1);
     }
 }
 export class Empty {
@@ -102,12 +107,8 @@ export function ParameterIsolated(value: Box): int32 {
 export function Equal(left: Box, right: Box): bool {
     return Box.$equal(left, right);
 }
-export function Box_WithX(box: Box, value: int32): Box {
-    box.Point.X = value;
-    return box;
-}
 export function Invoke(value: Box, next: int32): Box {
-    return Box_WithX(Box.$copy(value), next);
+    return value.WithX(next);
 }
 export function CopyResult(): int32 {
     return CopyIsolated(NewBox(4));

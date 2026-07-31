@@ -7,7 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -57,7 +57,7 @@ func (a RuntimeArray) ApplyIndex(
 		return api.ExpressionEmission{}, err
 	}
 	values := ordered.Values()
-	return api.NewExpressionEmission(
+	stored, err := api.NewExpressionEmission(
 		ordered.Before(),
 		callMember(
 			context,
@@ -66,6 +66,15 @@ func (a RuntimeArray) ApplyIndex(
 			values[1],
 		),
 		ordered.Requests(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return context.ContainerStorage().FromContainerStorage(
+		context.WithRole(api.RoleArrayElement),
+		nil,
+		a.ElementType(),
+		stored,
 	)
 }
 
@@ -102,7 +111,7 @@ func (a RuntimeArray) EmitStoreTarget(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewAccessorStoreTargetEmission(
+	return api.NewContainerStorageAccessorStoreTargetEmission(
 		targetReceiver,
 		arraymember.Get.Name(),
 		arraymember.Set.Name(),
@@ -163,15 +172,21 @@ func (a RuntimeArray) Measure(
 
 func (a RuntimeArray) RangeElement(
 	context api.Context,
+	source ast.Node,
 	receiver tsgo.Expression,
 	index tsgo.Expression,
-) api.ExpressionEmission {
-	return api.DirectExpression(callMember(
-		context,
-		a.storage(context, receiver),
-		arraymember.Get,
-		index,
-	))
+) (api.ExpressionEmission, error) {
+	return context.ContainerStorage().FromContainerStorage(
+		context.WithRole(api.RoleArrayElement),
+		source,
+		a.ElementType(),
+		api.DirectExpression(callMember(
+			context,
+			a.storage(context, receiver),
+			arraymember.Get,
+			index,
+		)),
+	)
 }
 
 func emitIndex(
@@ -179,23 +194,9 @@ func emitIndex(
 	children api.ChildEmitter,
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {
-	sourceType := context.TypesInfo().TypeOf(source)
-	alias, represented := basictype.PrimitiveAlias(
-		context.TypesSizes(),
-		sourceType,
-	)
-	if !represented || alias == api.PrimitiveBool {
-		return api.ExpressionEmission{},
-			api.Unsupported(
-				context.WithRole(api.RoleArrayIndex),
-				api.CategoryExpression,
-				source,
-			)
-	}
-	return children.Expression(
-		context.
-			WithRole(api.RoleArrayIndex).
-			WithExpectedType(sourceType),
+	return integeroperand.Emit(
+		context.WithRole(api.RoleArrayIndex),
+		children,
 		source,
 	)
 }

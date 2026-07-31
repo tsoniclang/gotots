@@ -42,19 +42,60 @@ func AppendAggregate(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	existingCopy, err := context.Values().Copy(
-		context.WithRole(api.RoleSliceElement),
-		nil,
+	tailZero, err = storeElement(context, source, elementType, tailZero)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	existing, err := loadElement(
+		context,
+		source,
 		elementType,
-		api.DirectExpression(sliceCall(
+		sliceCall(
 			context,
 			receiver,
 			runtimeslice.MemberName(runtimeslice.MemberGet),
 			index,
-		)),
+		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	existingCopy, err := context.Values().Transfer(
+		context.WithRole(api.RoleSliceElement),
+		nil,
+		elementType,
+		elementType,
+		api.ValueTransferCopy,
+		existing,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	existingCopy, err = storeElement(
+		context,
+		source,
+		elementType,
+		existingCopy,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	storedValues := make([]tsgo.Expression, 0, len(operands)-1)
+	var storageBefore []tsgo.Statement
+	var storageRequests []api.RootRequest
+	for _, value := range operands[1:] {
+		stored, storageErr := storeElement(
+			context,
+			source,
+			elementType,
+			api.DirectExpression(value),
+		)
+		if storageErr != nil {
+			return api.ExpressionEmission{}, storageErr
+		}
+		storageBefore = append(storageBefore, stored.Before()...)
+		storageRequests = append(storageRequests, stored.Requests()...)
+		storedValues = append(storedValues, stored.Value())
 	}
 	allocation, err := context.Names().Runtime(
 		api.RuntimeSliceStorage,
@@ -71,6 +112,7 @@ func AppendAggregate(
 		return api.ExpressionEmission{}, err
 	}
 	statements := append([]tsgo.Statement(nil), before...)
+	statements = append(statements, storageBefore...)
 	statements = append(
 		statements,
 		sliceVariable(
@@ -117,7 +159,7 @@ func AppendAggregate(
 					receiver,
 					result,
 					newLength,
-					operands[1:],
+					storedValues,
 				),
 				true,
 			),
@@ -128,7 +170,7 @@ func AppendAggregate(
 					result,
 					newLength,
 					index,
-					operands[1:],
+					storedValues,
 					tailZero,
 					existingCopy,
 					targetElement.Value(),
@@ -147,6 +189,7 @@ func AppendAggregate(
 			targetElement.Requests(),
 			tailZero.Requests(),
 			existingCopy.Requests(),
+			storageRequests,
 			allocation.Requests(),
 			runtime.Requests(),
 		),

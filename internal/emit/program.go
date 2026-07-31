@@ -9,7 +9,9 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/emit/runtime/gocontract"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -33,16 +35,21 @@ const (
 	TargetFilePackageAssembly
 	TargetFileProgramInitialization
 	TargetFileSupport
+	TargetFileEnvironmentContract
 )
 
 type ProgramEmission struct {
 	files []TargetFile
 }
 
+type declarationSite = declarationindex.Site
+
 type programSession struct {
 	source                 *load.Program
 	factory                tsgo.Factory
 	integer                api.IntegerRepresentation
+	evaluationOrder        api.EvaluationOrder
+	concurrency            api.ConcurrencySemantics
 	registry               *emitnaming.Registry
 	scheduler              *scheduler
 	requirements           *declarationRequirementScheduler
@@ -51,20 +58,25 @@ type programSession struct {
 	emitters               map[*load.Package]*emitter
 	builders               map[string]*targetFileBuilder
 	packageBuilders        map[*load.Package]*packageTargetBuilder
+	environmentBuilders    map[*load.Package]*environmentContractBuilder
 	packageInitializations *packageInitializationScheduler
 	genericOperations      map[genericOperationIdentity]*api.GenericOperationContract
+	genericProfiles        map[genericCallableProfileIdentity]*api.GenericCallableProfile
+	classMembers           map[*types.Func]classMemberContribution
 	goRuntime              *gocontract.Contract
+	compareArtifactOwners  func(api.ArtifactOwner, api.ArtifactOwner) int
 	sealed                 bool
 }
 
 type targetDeclaration struct {
-	owner           api.ArtifactOwner
-	name            string
-	position        token.Pos
-	statements      []tsgo.Statement
-	placement       *targetplacement.Owner
-	temporaryStart  emitnaming.TemporarySnapshot
-	reconstructions uint64
+	owner             api.ArtifactOwner
+	name              string
+	position          token.Pos
+	statements        []tsgo.Statement
+	placement         *targetplacement.Owner
+	eagerDependencies []api.ArtifactOwner
+	temporaryStart    emitnaming.TemporarySnapshot
+	reconstructions   uint64
 }
 
 type targetFileBuilder struct {
@@ -111,7 +123,11 @@ func CompileWithOptions(
 	}
 	orderedRoots := slices.Clone(roots)
 	sort.Slice(orderedRoots, func(left, right int) bool {
-		return compareRoots(orderedRoots[left], orderedRoots[right]) < 0
+		return compareRoots(
+			orderedRoots[left],
+			orderedRoots[right],
+			session.compareArtifactOwners,
+		) < 0
 	})
 	for _, root := range orderedRoots {
 		if err := session.requireRoot(root); err != nil {
@@ -131,9 +147,11 @@ func CompileWithOptions(
 			}
 			continue
 		}
-		if object, ok := session.artifacts.NextDirty(); ok {
-			if err := session.reconstructScheduledArtifact(object); err != nil {
-				return ProgramEmission{}, err
+		if dirty := session.artifacts.DirtyBatch(); len(dirty) != 0 {
+			for _, object := range dirty {
+				if err := session.reconstructScheduledArtifact(object); err != nil {
+					return ProgramEmission{}, err
+				}
 			}
 			continue
 		}
@@ -181,7 +199,7 @@ func fileRoots(
 	for _, declaration := range sourceFile.Decls {
 		switch declaration := declaration.(type) {
 		case *ast.FuncDecl:
-			if isPackageInitDeclaration(declaration) {
+			if declarationindex.IsPackageInitializer(declaration) {
 				continue
 			}
 			object := sourcePackage.TypesInfo().Defs[declaration.Name]
@@ -228,147 +246,51 @@ func fileRoots(
 	return roots, nil
 }
 
-func compareObjects(left types.Object, right types.Object) int {
-	leftPackage := ""
-	if left != nil && left.Pkg() != nil {
-		leftPackage = left.Pkg().Path()
-	}
-	rightPackage := ""
-	if right != nil && right.Pkg() != nil {
-		rightPackage = right.Pkg().Path()
-	}
-	switch {
-	case leftPackage < rightPackage:
-		return -1
-	case leftPackage > rightPackage:
-		return 1
-	case left.Pos() < right.Pos():
-		return -1
-	case left.Pos() > right.Pos():
-		return 1
-	case left.Name() < right.Name():
-		return -1
-	case left.Name() > right.Name():
-		return 1
-	default:
-		return 0
-	}
-}
-
-func compareArtifactOwners(
-	left api.ArtifactOwner,
-	right api.ArtifactOwner,
-) int {
-	leftSource, leftIsSource := left.Source()
-	rightSource, rightIsSource := right.Source()
-	switch {
-	case leftIsSource && rightIsSource:
-		return compareObjects(leftSource, rightSource)
-	case leftIsSource:
-		return -1
-	case rightIsSource:
-		return 1
-	}
-	leftPackage, leftInitializer, leftIsInitializer :=
-		left.PackageInitializer()
-	rightPackage, rightInitializer, rightIsInitializer :=
-		right.PackageInitializer()
-	switch {
-	case leftIsInitializer && rightIsInitializer:
-		switch {
-		case leftPackage.Path() < rightPackage.Path():
-			return -1
-		case leftPackage.Path() > rightPackage.Path():
-			return 1
-		case leftInitializer.Rhs.Pos() < rightInitializer.Rhs.Pos():
-			return -1
-		case leftInitializer.Rhs.Pos() > rightInitializer.Rhs.Pos():
-			return 1
-		default:
-			return 0
-		}
-	case leftIsInitializer:
-		return -1
-	case rightIsInitializer:
-		return 1
-	}
-	leftGenerated, leftOK := left.Generated()
-	rightGenerated, rightOK := right.Generated()
-	if !leftOK || !rightOK {
-		switch {
-		case leftOK:
-			return 1
-		case rightOK:
-			return -1
-		default:
-			return 0
-		}
-	}
-	switch {
-	case leftGenerated.Kind() < rightGenerated.Kind():
-		return -1
-	case leftGenerated.Kind() > rightGenerated.Kind():
-		return 1
-	case leftGenerated.ArtifactKey() < rightGenerated.ArtifactKey():
-		return -1
-	case leftGenerated.ArtifactKey() > rightGenerated.ArtifactKey():
-		return 1
-	default:
-		return 0
-	}
-}
-
-func (e ProgramEmission) Files() []TargetFile {
-	return slices.Clone(e.files)
-}
-
-func (f TargetFile) OutputPath() string {
-	return f.outputPath
-}
-
-func (f TargetFile) PackageName() string {
-	return f.packageName
-}
-
-func (f TargetFile) SourceFile() tsgo.SourceFile {
-	return f.sourceFile
-}
-
-func (f TargetFile) Kind() TargetFileKind {
-	return f.kind
-}
-
 func newProgramSession(
 	source *load.Program,
 	options Options,
 ) (*programSession, error) {
-	sites, err := indexDeclarations(source)
+	sites, err := declarationindex.Program(source)
 	if err != nil {
 		return nil, err
 	}
 	registry := emitnaming.NewRegistry()
-	if err := registry.IndexPackageTargets(source.Packages()); err != nil {
+	if err := registry.IndexCompilationTargets(
+		source.Packages(),
+		source.EnvironmentPackages(),
+	); err != nil {
 		return nil, err
 	}
 	goRuntime, err := gocontract.Resolve(source)
 	if err != nil {
 		return nil, err
 	}
+	compareArtifactOwners := sourceArtifactOwnerOrder(sites)
 	session := &programSession{
-		source:                 source,
-		factory:                tsgo.NewFactory(),
-		integer:                options.IntegerRepresentation,
-		registry:               registry,
-		scheduler:              newScheduler(),
-		requirements:           newDeclarationRequirementScheduler(),
-		artifacts:              artifactstate.NewGraph(compareArtifactOwners),
+		source:          source,
+		factory:         tsgo.NewFactory(),
+		integer:         options.IntegerRepresentation,
+		evaluationOrder: options.EvaluationOrder,
+		concurrency:     options.ConcurrencySemantics,
+		registry:        registry,
+		scheduler:       newScheduler(),
+		requirements: newDeclarationRequirementScheduler(
+			compareArtifactOwners,
+		),
+		artifacts: artifactstate.NewGraph(
+			compareArtifactOwners,
+		),
 		sites:                  sites,
 		emitters:               make(map[*load.Package]*emitter),
 		builders:               make(map[string]*targetFileBuilder),
 		packageBuilders:        make(map[*load.Package]*packageTargetBuilder),
+		environmentBuilders:    make(map[*load.Package]*environmentContractBuilder),
 		packageInitializations: newPackageInitializationScheduler(),
 		genericOperations:      make(map[genericOperationIdentity]*api.GenericOperationContract),
+		genericProfiles:        make(map[genericCallableProfileIdentity]*api.GenericCallableProfile),
+		classMembers:           make(map[*types.Func]classMemberContribution),
 		goRuntime:              goRuntime,
+		compareArtifactOwners:  compareArtifactOwners,
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
@@ -381,6 +303,7 @@ func newProgramSession(
 			session.require,
 			session,
 			session,
+			session,
 			goRuntime,
 		)
 	}
@@ -389,15 +312,18 @@ func newProgramSession(
 		orderedSites = append(orderedSites, site)
 	}
 	sort.Slice(orderedSites, func(left, right int) bool {
-		return compareDeclarationSites(orderedSites[left], orderedSites[right]) < 0
+		return declarationindex.CompareSites(
+			orderedSites[left],
+			orderedSites[right],
+		) < 0
 	})
 	initializers := make(map[*load.Package][]types.Object)
 	for _, site := range orderedSites {
-		function, ok := site.declaration.(*ast.FuncDecl)
-		if ok && isPackageInitDeclaration(function) {
-			initializers[site.source] = append(
-				initializers[site.source],
-				site.object,
+		function, ok := site.Declaration.(*ast.FuncDecl)
+		if ok && declarationindex.IsPackageInitializer(function) {
+			initializers[site.Source] = append(
+				initializers[site.Source],
+				site.Object,
 			)
 		}
 	}
@@ -414,33 +340,37 @@ func newProgramSession(
 		}
 	}
 	for _, site := range orderedSites {
-		emitter := session.emitters[site.source]
+		emitter := session.emitters[site.Source]
 		if emitter == nil {
 			return nil, &ScheduleError{
-				Object: site.object.Name(),
+				Object: site.Object.Name(),
 				Reason: "declaration package has no emitter",
 			}
 		}
-		if variable, ok := site.object.(*types.Var); ok {
+		if variable, ok := site.Object.(*types.Var); ok {
 			if variable.Name() == "_" {
 				continue
 			}
-			assemblyPath, err := targetoutput.PackageAssemblyPath(site.source)
+			assemblyPath, err := targetoutput.PackageAssemblyPath(site.Source)
 			if err != nil {
 				return nil, err
 			}
 			if _, err := emitter.names.ReservePackageVariable(
 				variable,
-				site.outputPath,
+				site.OutputPath,
 				assemblyPath,
 			); err != nil {
 				return nil, err
 			}
 		} else {
+			targetSite, err := session.artifactTargetSite(site)
+			if err != nil {
+				return nil, err
+			}
 			if _, err := emitter.names.Reserve(
-				site.object,
-				site.sourceFile.Syntax(),
-				site.outputPath,
+				site.Object,
+				targetSite.SourceFile.Syntax(),
+				targetSite.OutputPath,
 			); err != nil {
 				return nil, err
 			}
@@ -449,13 +379,32 @@ func newProgramSession(
 	return session, nil
 }
 
+func sourceArtifactOwnerOrder(
+	sites map[types.Object]declarationSite,
+) func(api.ArtifactOwner, api.ArtifactOwner) int {
+	return func(left api.ArtifactOwner, right api.ArtifactOwner) int {
+		leftObject, leftSource := left.Source()
+		rightObject, rightSource := right.Source()
+		if leftSource && rightSource {
+			leftSite, leftIndexed := sites[leftObject]
+			rightSite, rightIndexed := sites[rightObject]
+			if leftIndexed && rightIndexed {
+				if order := declarationindex.CompareSites(
+					leftSite,
+					rightSite,
+				); order != 0 {
+					return order
+				}
+			}
+		}
+		return emitordering.CompareArtifactOwners(left, right)
+	}
+}
+
 func (s *programSession) emit(object types.Object) error {
 	site, ok := s.sites[object]
 	if !ok {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "scheduled object lost its declaration",
-		}
+		return s.emitEnvironmentObject(object)
 	}
 	if variable, ok := object.(*types.Var); ok {
 		return s.emitPackageStorage(variable, site)
@@ -488,17 +437,19 @@ func (s *programSession) emit(object types.Object) error {
 	); err != nil {
 		return err
 	}
+	s.commitClassMemberContribution(object, revision.classContribution)
 	builder.byOwner[owner] = struct{}{}
 	builder.indexByOwner[owner] = len(builder.declarations)
 	builder.declarations = append(builder.declarations, targetDeclaration{
-		owner:          owner,
-		name:           object.Name(),
-		position:       object.Pos(),
-		statements:     revision.statements,
-		placement:      revision.placement,
-		temporaryStart: revision.temporaryStart,
+		owner:             owner,
+		name:              object.Name(),
+		position:          object.Pos(),
+		statements:        revision.statements,
+		placement:         revision.placement,
+		eagerDependencies: revision.eagerDependencies,
+		temporaryStart:    revision.temporaryStart,
 	})
-	return nil
+	return s.recordPackageExport(s.packageBuilders[site.Source], object)
 }
 
 func (s *programSession) applyRootRequests(
@@ -509,7 +460,7 @@ func (s *programSession) applyRootRequests(
 		return &ScheduleError{Reason: "root request arrived after target files were sealed"}
 	}
 	imports := make([]api.RootRequest, 0, len(requests))
-	for _, request := range requests {
+	err := api.WalkRootRequests(requests, func(request api.RootRequest) error {
 		switch request.Kind() {
 		case api.RootRequestImport:
 			imports = append(imports, request)
@@ -528,16 +479,24 @@ func (s *programSession) applyRootRequests(
 		default:
 			return &ScheduleError{Reason: "root request kind is invalid"}
 		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 	return placement.Apply(imports)
 }
 
 func (s *programSession) builder(site declarationSite) (*targetFileBuilder, error) {
+	targetSite, err := s.artifactTargetSite(site)
+	if err != nil {
+		return nil, err
+	}
 	return s.builderForFile(
-		site.source,
-		site.sourceFile,
-		site.outputPath,
-		site.object.Name(),
+		targetSite.Source,
+		targetSite.SourceFile,
+		targetSite.OutputPath,
+		site.Object.Name(),
 	)
 }
 

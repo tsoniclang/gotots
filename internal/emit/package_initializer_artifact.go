@@ -7,6 +7,7 @@ import (
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	emitstorage "github.com/tsoniclang/gotots/internal/emit/storage"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 )
 
@@ -22,7 +23,7 @@ func (s *programSession) emitPackageInitializer(
 		}
 	}
 	site, ok := s.sites[anchor]
-	if !ok || site.source != builder.sourcePackage {
+	if !ok || site.Source != builder.sourcePackage {
 		return &ScheduleError{
 			Object: anchor.Name(),
 			Reason: "package initializer has no exact source declaration",
@@ -111,16 +112,16 @@ func (s *programSession) buildPackageInitializerRevision(
 		defer names.RestoreTemporaries(current)
 	}
 	sourcePath, err := targetoutput.SourcePath(
-		site.source,
-		site.sourceFile,
+		site.Source,
+		site.SourceFile,
 	)
 	if err != nil {
 		return artifactRevision{}, err
 	}
 	finish, err := names.BeginArtifact(
 		owner,
-		site.declaration,
-		site.sourceFile.Syntax(),
+		site.Declaration,
+		site.SourceFile.Syntax(),
 		sourcePath,
 	)
 	if err != nil {
@@ -130,7 +131,16 @@ func (s *programSession) buildPackageInitializerRevision(
 	requirements := s.requirements.appliedFor(owner)
 	context, err := emitnaming.WithLexicalTypeRequirements(
 		builder.assemblyContext.WithArtifactOwner(owner),
-		site.declaration,
+		site.Declaration,
+		owner,
+		requirements,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	context, err = emitstorage.ApplyRequirements(
+		context,
+		initializer.Rhs,
 		owner,
 		requirements,
 	)
@@ -145,6 +155,18 @@ func (s *programSession) buildPackageInitializerRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	callableFacet, err := api.NewPackageInitializerCallableFacet(owner)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	observation, err := context.ObserveCooperativeCallable(callableFacet)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	context = context.WithCooperativeCallable(
+		callableFacet,
+		observation.Cooperative(),
+	)
 	emission, err := packagevariable.EmitInitializer(
 		context,
 		builder.emitter,
@@ -155,12 +177,15 @@ func (s *programSession) buildPackageInitializerRevision(
 	}
 	placement, dependencies, err := s.consumeArtifactRequests(
 		owner,
-		emission.Requests(),
+		api.CombineRequests(
+			emission.Requests(),
+			observation.Requests(),
+		),
 	)
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	contract, err := artifactstate.ProjectCoverageContract(nil)
+	contract, err := artifactstate.ProjectCoverageContract(s.factory, nil)
 	if err != nil {
 		return artifactRevision{}, err
 	}

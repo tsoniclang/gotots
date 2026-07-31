@@ -63,7 +63,7 @@ func (p *Owner) Requests() []api.RootRequest {
 }
 
 func (p *Owner) Apply(requests []api.RootRequest) error {
-	for _, request := range requests {
+	return api.WalkRootRequests(requests, func(request api.RootRequest) error {
 		if request.Kind() != api.RootRequestImport ||
 			request.LegalScope() != api.ScopeFileImports ||
 			request.PreferredScope() != api.ScopeFileImports ||
@@ -87,11 +87,11 @@ func (p *Owner) Apply(requests []api.RootRequest) error {
 				request.ImportPhase() == api.ImportPhaseValue {
 				p.requests[owner] = request
 			}
-			continue
+			return nil
 		}
 		p.requests[owner] = request
-	}
-	return nil
+		return nil
+	})
 }
 
 func (p *Owner) RequireTypeOnly() error {

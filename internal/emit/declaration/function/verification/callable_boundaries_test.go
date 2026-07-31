@@ -146,7 +146,7 @@ func TestVariadicCallablesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 			t.Fatalf("aggregate variadic path contains %q:\n%s", forbidden, source)
 		}
 	}
-	if !strings.Contains(source, "return Sum(1, Values.$valueOf(values));") {
+	if !strings.Contains(source, "return Sum(1, values.$value);") {
 		t.Fatalf("defined-slice spread was not projected directly:\n%s", source)
 	}
 	if !strings.Contains(source, "const __gotots_results_") ||
@@ -409,14 +409,21 @@ func TestExpressionNewPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	source := readMaterializedSource(t, artifacts, "source.ts")
 	for _, fragment := range []string{
 		"GoPointer.cell<int32, int32>",
-		"GoPointer.cell<Box, Box$Storage>",
-		"$copy",
+		"return Box.$copy(value);",
+		"return makeBox();",
 	} {
 		if !strings.Contains(source, fragment) {
 			t.Fatalf("expression-form new output lacks %q:\n%s", fragment, source)
 		}
 	}
-	for _, forbidden := range []string{".call(", ".apply(", ": any", ": unknown"} {
+	for _, forbidden := range []string{
+		"GoPointer<Box",
+		"Box$Storage",
+		".call(",
+		".apply(",
+		": any",
+		": unknown",
+	} {
 		if strings.Contains(source, forbidden) {
 			t.Fatalf("expression-form new output contains %q:\n%s", forbidden, source)
 		}

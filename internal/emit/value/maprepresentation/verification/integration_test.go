@@ -388,6 +388,20 @@ func strictTypecheckWithRunner(
 	runnerPath string,
 ) {
 	t.Helper()
+	if err := strictTypecheckResult(
+		artifacts,
+		workingDirectory,
+		runnerPath,
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func strictTypecheckResult(
+	artifacts materialized,
+	workingDirectory string,
+	runnerPath string,
+) error {
 	outputDirectory := filepath.Join(workingDirectory, "out")
 	arguments := []string{
 		"--target", "es2022",
@@ -402,14 +416,12 @@ func strictTypecheckWithRunner(
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := tsgo.Compile(
+	return tsgo.Compile(
 		ctx,
 		repositoryRoot(),
 		workingDirectory,
 		arguments,
-	); err != nil {
-		t.Fatal(err)
-	}
+	)
 }
 
 func loadMapValuesProject(t *testing.T) *load.Package {

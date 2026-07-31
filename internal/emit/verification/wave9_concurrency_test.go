@@ -179,6 +179,94 @@ func TestWaveNineLeavesUnrelatedCallableABIByteStable(t *testing.T) {
 	}
 }
 
+func TestImmediateFunctionLiteralBypassesFirstClassCallableABI(t *testing.T) {
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: filepath.Join(
+			repositoryRoot(),
+			"testdata",
+			"constructs",
+			"concurrency",
+			"immediate-literal",
+		),
+		Pattern: ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := emit.NewRoot(
+		program.Roots()[0].Types().Scope().
+			Lookup("ImmediateLiteralABIIsolation"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.CompileWithOptions(
+		program,
+		[]emit.Root{root},
+		waveNineOptions(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	packageAssemblies := artifacts.printedByKind[emit.TargetFilePackageAssembly]
+	if len(packageAssemblies) != 1 {
+		t.Fatalf("package assemblies = %d, want one", len(packageAssemblies))
+	}
+	packageAssembly := packageAssemblies[0]
+	if strings.Contains(packageAssembly, "async function $initialize") ||
+		strings.Contains(packageAssembly, "await (") {
+		t.Fatalf(
+			"immediate synchronous literal inherited its callable ABI:\n%s",
+			packageAssembly,
+		)
+	}
+	if !strings.Contains(
+		artifacts.printed,
+		" = function ($go$recovery?: GoRecovery): void {",
+	) {
+		t.Fatalf(
+			"deferred direct literal lacks its exact recovery-aware facet:\n%s",
+			artifacts.printed,
+		)
+	}
+	if strings.Contains(
+		artifacts.printed,
+		"=> Promise<void>) | undefined = function",
+	) {
+		t.Fatalf(
+			"deferred direct literal inherited its first-class ABI:\n%s",
+			artifacts.printed,
+		)
+	}
+	runner := filepath.Join(workingDirectory, "runner.ts")
+	writeProgramFile(t, runner, `import "./program.js";
+import { ImmediateLiteralABIIsolation } from "`+artifacts.sourceModule+`";
+import { GoScheduler } from "./runtime/channel.js";
+
+await GoScheduler.run(async () => {
+    console.log(await ImmediateLiteralABIIsolation());
+});
+`)
+	writeProgramFile(
+		t,
+		filepath.Join(workingDirectory, "package.json"),
+		"{\"type\":\"module\"}\n",
+	)
+	paths := append(artifacts.paths, runner)
+	waveThreeTypecheck(t, workingDirectory, paths)
+	targetOutput := runProgram(
+		t,
+		workingDirectory,
+		"node",
+		filepath.Join(workingDirectory, "out", "runner.js"),
+	)
+	if targetOutput != "literalimmediateproviderbodydeferred\n" {
+		t.Fatalf("immediate-literal output = %q", targetOutput)
+	}
+}
+
 func assertWaveNineArtifactShape(t *testing.T, printed string) {
 	t.Helper()
 	for _, required := range []string{

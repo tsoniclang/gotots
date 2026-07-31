@@ -58,10 +58,12 @@ func emitMultipleResultSpec(
 		if err != nil {
 			return nil, nil, err
 		}
-		value, err := context.Values().Copy(
+		value, err := context.Values().Transfer(
 			context.WithRole(api.RoleLocalValue),
 			source.Values[0],
+			results.At(index).Type(),
 			object.Type(),
+			api.ValueTransferCopy,
 			api.DirectExpression(element),
 		)
 		if err != nil {
