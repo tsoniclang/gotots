@@ -690,6 +690,18 @@ introduce a spurious Promise and fail. Reconstructing a consumer so that its
 last profile use disappears must remove the declaration, obligation, and
 manifest demand rather than preserve an append-only residue.
 
+The same gate exact-joins every reached provider representation operation and
+recovery call. It inspects private facet modules through the pinned TS-Go
+project API and proves the recorded value export, optional storage-type export,
+fingerprints, implementation owners, closed capability set, and callable
+effect. Mutations that remove `sync.Mutex`'s `zero`, redirect
+`runtime/metrics.Sample`'s `copy`, exchange two generic profile keys, omit a
+recovery adapter, widen a storage export, or point a facet at a public module
+must fail before generated source is printed. Artifact inspection proves that
+ordinary public calls remain source-shaped while compiler operations import
+only certified private facets; public provider classes expose no dollar-prefixed
+compiler members.
+
 Requirement-liveness verification also reconstructs an interface adapter and
 a cooperative callable after their requested provider facets already exist.
 Repeated naming and contract queries must return the same typed obligations

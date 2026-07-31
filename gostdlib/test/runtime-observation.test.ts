@@ -105,10 +105,10 @@ test("runtime metrics publish typed descriptions and selected values", () => {
   ]);
   Read(samples);
 
-  assert.equal(Value.Kind(samples.get(0).Value).value, KindUint64.value);
-  assert.ok(Value.Uint64(samples.get(0).Value) > 0);
-  assert.equal(Value.Kind(samples.get(1).Value).value, KindFloat64.value);
-  assert.ok(Value.Float64(samples.get(1).Value) >= 0);
+  assert.equal(samples.get(0).Value.Kind().value, KindUint64.value);
+  assert.ok(samples.get(0).Value.Uint64() > 0);
+  assert.equal(samples.get(1).Value.Kind().value, KindFloat64.value);
+  assert.ok(samples.get(1).Value.Float64() >= 0);
   assert.equal(KindFloat64Histogram.value, 3);
 });
 

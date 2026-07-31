@@ -39,6 +39,33 @@ func (n *File) ConstantProjection(
 			Reason: "constant has no reserved projection owner",
 		}
 	}
+	if binding.kind == targetBindingMissingProvider {
+		return api.NameReference{}, &api.NameError{
+			Name:   selected.Name(),
+			Reason: "selected standard-library constant has no provider binding",
+		}
+	}
+	if binding.kind == targetBindingProvider {
+		if n.require != nil {
+			if err := n.require(selected); err != nil {
+				return api.NameReference{}, err
+			}
+		}
+		qualifier, importRequest, err := n.providerImport(
+			selected.Pkg(),
+			binding.providerModule,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		return api.NewQualifiedNameReference(
+			qualifier,
+			binding.providerExport,
+			request,
+			importRequest,
+		)
+	}
 	exportedName, err := api.ConstantProjectionName(
 		binding.name,
 		projection,

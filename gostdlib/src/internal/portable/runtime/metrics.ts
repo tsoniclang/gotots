@@ -24,22 +24,22 @@ export class Value {
     private readonly numeric: number = 0,
   ) {}
 
-  static Float64(receiver: Value): float64 {
-    if (receiver.kind.value !== KindFloat64.value) {
+  Float64(): float64 {
+    if (this.kind.value !== KindFloat64.value) {
       GoPanic.raiseRuntime("called Float64 on non-float64 metric value");
     }
-    return receiver.numeric;
+    return this.numeric;
   }
 
-  static Kind(receiver: Value): ValueKind {
-    return receiver.kind;
+  Kind(): ValueKind {
+    return this.kind;
   }
 
-  static Uint64(receiver: Value): uint64 {
-    if (receiver.kind.value !== KindUint64.value) {
+  Uint64(): uint64 {
+    if (this.kind.value !== KindUint64.value) {
       GoPanic.raiseRuntime("called Uint64 on non-uint64 metric value");
     }
-    return receiver.numeric;
+    return this.numeric;
   }
 }
 

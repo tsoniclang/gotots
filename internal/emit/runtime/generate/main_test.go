@@ -19,6 +19,16 @@ func TestSynchronizeChecksAndRepairsExactGeneratedSurface(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(
+		filepath.Join(directory, "slice.d.ts"),
+		[]byte("export declare class RuntimeSlice {}\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := synchronize(directory, expected, true); err != nil {
+		t.Fatalf("build declaration was treated as generated source: %v", err)
+	}
+	if err := os.WriteFile(
 		filepath.Join(directory, "slice.ts"),
 		[]byte("export class Changed {}\n"),
 		0o644,

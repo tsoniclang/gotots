@@ -1,0 +1,488 @@
+package certify
+
+import (
+	"bytes"
+	"fmt"
+	"go/types"
+	"os"
+	"path"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+type moduleSeed struct {
+	GoImportPath string `json:"goImportPath"`
+	Specifier    string `json:"specifier"`
+	SourcePath   string `json:"sourcePath"`
+}
+
+func Generate(config Config) ([]byte, error) {
+	resolved, err := resolveConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	ordered, err := readModuleSeeds(resolved.moduleMapPath)
+	if err != nil {
+		return nil, err
+	}
+	facetSeeds, err := readFacetSeeds(resolved.facetMapPath)
+	if err != nil {
+		return nil, err
+	}
+	selectedToolchain, err := inspectToolchain(resolved)
+	if err != nil {
+		return nil, err
+	}
+	providerPackage, err := readProviderPackage(resolved)
+	if err != nil {
+		return nil, err
+	}
+	if err := verifyPackageModules(providerPackage, ordered, facetSeeds); err != nil {
+		return nil, err
+	}
+	paths := make([]string, len(ordered))
+	for index, seed := range ordered {
+		paths[index] = seed.GoImportPath
+	}
+	source, err := loadGoSurface(resolved, selectedToolchain, paths)
+	if err != nil {
+		return nil, err
+	}
+	client, err := tsgo.StartClient(resolved.repositoryRoot, resolved.providerRoot)
+	if err != nil {
+		return nil, err
+	}
+	project, err := client.OpenProject(resolved.tsConfigPath)
+	if err != nil {
+		client.Close()
+		return nil, err
+	}
+	modules := make([]gostdlib.ModuleDocument, len(ordered))
+	for index, seed := range ordered {
+		module, buildErr := buildModule(resolved, project, source, seed)
+		if buildErr != nil {
+			client.Close()
+			return nil, buildErr
+		}
+		modules[index] = module
+	}
+	facetModules, err := buildFacetModules(resolved, project, source, facetSeeds)
+	if err != nil {
+		client.Close()
+		return nil, err
+	}
+	if err := client.Close(); err != nil {
+		return nil, err
+	}
+	runtimeDigest, err := fileDigest(resolved.runtimeContractPath)
+	if err != nil {
+		return nil, err
+	}
+	integrity, err := providerDigest(resolved)
+	if err != nil {
+		return nil, err
+	}
+	return gostdlib.Seal(gostdlib.Document{
+		SchemaVersion:    gostdlib.SchemaVersion,
+		PackageName:      gostdlib.PackageName,
+		PackageVersion:   providerPackage.Version,
+		Backend:          resolved.backend,
+		GoVersion:        selectedToolchain.version,
+		MinimumGoVersion: resolved.minimumGoVersion,
+		MaximumGoVersion: resolved.maximumGoVersion,
+		GOOS:             selectedToolchain.goos,
+		GOARCH:           selectedToolchain.goarch,
+		RuntimeDigest:    runtimeDigest,
+		ProviderDigest:   integrity,
+		Modules:          modules,
+		FacetModules:     facetModules,
+	})
+}
+
+func buildModule(
+	config resolvedConfig,
+	project *tsgo.ProjectInspection,
+	source goSurface,
+	seed moduleSeed,
+) (gostdlib.ModuleDocument, error) {
+	sourcePackage := source.packages[seed.GoImportPath]
+	if sourcePackage == nil {
+		return gostdlib.ModuleDocument{}, certifyError(
+			"build module",
+			seed.GoImportPath,
+			"Go package is absent",
+		)
+	}
+	sourcePath := filepath.Join(config.providerRoot, filepath.FromSlash(seed.SourcePath))
+	exports, err := project.Exports(sourcePath)
+	if err != nil {
+		return gostdlib.ModuleDocument{}, err
+	}
+	var bindings []gostdlib.BindingDocument
+	targetOwners := make(map[string]struct{})
+	for _, target := range exports {
+		if err := verifyPublicName(target.Name(), target.TypeString()); err != nil {
+			return gostdlib.ModuleDocument{}, certifyError(
+				"build module",
+				seed.Specifier+"#"+target.Name(),
+				err.Error(),
+			)
+		}
+		if target.Name() == "state" {
+			stateBindings, err := buildStateBindings(sourcePackage, target)
+			if err != nil {
+				return gostdlib.ModuleDocument{}, err
+			}
+			for _, binding := range stateBindings {
+				if err := addTargetOwner(targetOwners, binding); err != nil {
+					return gostdlib.ModuleDocument{}, err
+				}
+			}
+			bindings = append(bindings, stateBindings...)
+			continue
+		}
+		evidence, ok := sourcePackage.objectsByName[target.Name()]
+		if !ok {
+			return gostdlib.ModuleDocument{}, certifyError(
+				"build module",
+				seed.Specifier+"#"+target.Name(),
+				"public export has no selected-GOROOT declaration",
+			)
+		}
+		binding, err := bindingDocument(
+			evidence,
+			target.Name(),
+			"",
+			gostdlib.AccessExport,
+			target.Fingerprint(),
+			target.ImplementationOwners(),
+		)
+		if err != nil {
+			return gostdlib.ModuleDocument{}, err
+		}
+		if err := addTargetOwner(targetOwners, binding); err != nil {
+			return gostdlib.ModuleDocument{}, err
+		}
+		bindings = append(bindings, binding)
+		typeName, ok := evidence.object.(*types.TypeName)
+		if !ok || typeName.IsAlias() {
+			continue
+		}
+		methodBindings, err := buildMethodBindings(
+			target,
+			sourcePackage.methodsByType[target.Name()],
+		)
+		if err != nil {
+			return gostdlib.ModuleDocument{}, err
+		}
+		for _, methodBinding := range methodBindings {
+			if err := addTargetOwner(targetOwners, methodBinding); err != nil {
+				return gostdlib.ModuleDocument{}, err
+			}
+		}
+		bindings = append(bindings, methodBindings...)
+	}
+	sort.Slice(bindings, func(left, right int) bool {
+		return bindings[left].Identity < bindings[right].Identity
+	})
+	return gostdlib.ModuleDocument{
+		GoImportPath: seed.GoImportPath,
+		Specifier:    seed.Specifier,
+		SourcePath:   seed.SourcePath,
+		Bindings:     bindings,
+	}, nil
+}
+
+func buildStateBindings(
+	source *goPackageSurface,
+	target tsgo.ProjectExport,
+) ([]gostdlib.BindingDocument, error) {
+	var result []gostdlib.BindingDocument
+	for _, member := range target.ValueMembers() {
+		if !member.Visible() {
+			continue
+		}
+		evidence, ok := source.objectsByName[member.Name()]
+		if !ok {
+			return nil, certifyError(
+				"build state",
+				member.Name(),
+				"state member has no selected-GOROOT declaration",
+			)
+		}
+		if _, ok := evidence.object.(*types.Var); !ok {
+			return nil, certifyError(
+				"build state",
+				member.Name(),
+				"state member does not own a Go variable",
+			)
+		}
+		binding, err := bindingDocument(
+			evidence,
+			"state",
+			member.Name(),
+			gostdlib.AccessStateMember,
+			member.Fingerprint(),
+			member.ImplementationOwners(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, binding)
+	}
+	if len(result) == 0 {
+		return nil, certifyError("build state", target.Name(), "state has no members")
+	}
+	return result, nil
+}
+
+func buildMethodBindings(
+	target tsgo.ProjectExport,
+	methods []goObject,
+) ([]gostdlib.BindingDocument, error) {
+	var result []gostdlib.BindingDocument
+	for _, method := range methods {
+		name := method.object.Name()
+		static, staticOK := target.ValueMember(name)
+		instance, instanceOK := target.TypeMember(name)
+		if staticOK && !static.Visible() {
+			staticOK = false
+		}
+		if instanceOK && !instance.Visible() {
+			instanceOK = false
+		}
+		if !staticOK && !instanceOK {
+			continue
+		}
+		selected, access, err := selectMethodOwner(
+			method,
+			static,
+			staticOK,
+			instance,
+			instanceOK,
+		)
+		if err != nil {
+			return nil, err
+		}
+		binding, err := bindingDocument(
+			method,
+			target.Name(),
+			name,
+			access,
+			selected.Fingerprint(),
+			selected.ImplementationOwners(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, binding)
+	}
+	return result, nil
+}
+
+func selectMethodOwner(
+	method goObject,
+	static tsgo.ProjectMember,
+	staticOK bool,
+	instance tsgo.ProjectMember,
+	instanceOK bool,
+) (tsgo.ProjectMember, gostdlib.AccessKind, error) {
+	signature, ok := method.object.Type().(*types.Signature)
+	if !ok || signature.Recv() == nil {
+		return tsgo.ProjectMember{}, gostdlib.AccessInvalid, certifyError(
+			"build methods",
+			method.contract.Identity(),
+			"Go method receiver evidence is absent",
+		)
+	}
+	_, pointerReceiver := signature.Recv().Type().(*types.Pointer)
+	if pointerReceiver {
+		if !staticOK {
+			return tsgo.ProjectMember{}, gostdlib.AccessInvalid, certifyError(
+				"build methods",
+				method.contract.Identity(),
+				"pointer receiver has no static operation",
+			)
+		}
+		return static, gostdlib.AccessStaticMethod, nil
+	}
+	if !instanceOK {
+		return tsgo.ProjectMember{}, gostdlib.AccessInvalid, certifyError(
+			"build methods",
+			method.contract.Identity(),
+			"value receiver has no instance operation",
+		)
+	}
+	return instance, gostdlib.AccessInstanceMethod, nil
+}
+
+func bindingDocument(
+	evidence goObject,
+	export string,
+	member string,
+	access gostdlib.AccessKind,
+	fingerprint string,
+	owners []string,
+) (gostdlib.BindingDocument, error) {
+	if fingerprint == "" {
+		return gostdlib.BindingDocument{}, certifyError(
+			"build binding",
+			evidence.contract.Identity(),
+			"target fingerprint is absent",
+		)
+	}
+	if len(owners) != 1 {
+		return gostdlib.BindingDocument{}, certifyError(
+			"build binding",
+			evidence.contract.Identity(),
+			fmt.Sprintf("target has %d implementation owners, want one", len(owners)),
+		)
+	}
+	kind, err := bindingKind(evidence.contract.Kind())
+	if err != nil {
+		return gostdlib.BindingDocument{}, err
+	}
+	representation := gostdlib.RepresentationInvalid
+	if kind == gostdlib.BindingType {
+		representation = gostdlib.RepresentationDirect
+	}
+	return gostdlib.BindingDocument{
+		Identity:            evidence.contract.Identity(),
+		Kind:                kind,
+		Access:              access,
+		Representation:      representation,
+		Export:              export,
+		Member:              member,
+		SourceSignature:     evidence.contract.Signature(),
+		SourceValue:         evidence.contract.Value(),
+		SourceLocation:      evidence.location,
+		ImplementationOwner: owners[0],
+		TargetFingerprint:   fingerprint,
+	}, nil
+}
+
+func bindingKind(source environmentcontract.ObjectKind) (gostdlib.BindingKind, error) {
+	switch source {
+	case environmentcontract.ObjectConstant:
+		return gostdlib.BindingConstant, nil
+	case environmentcontract.ObjectType:
+		return gostdlib.BindingType, nil
+	case environmentcontract.ObjectVariable:
+		return gostdlib.BindingVariable, nil
+	case environmentcontract.ObjectFunction:
+		return gostdlib.BindingFunction, nil
+	case environmentcontract.ObjectBuiltin:
+		return gostdlib.BindingBuiltin, nil
+	default:
+		return gostdlib.BindingInvalid, certifyError(
+			"build binding",
+			fmt.Sprint(source),
+			"Go object kind is unsupported",
+		)
+	}
+}
+
+func addTargetOwner(
+	owners map[string]struct{},
+	binding gostdlib.BindingDocument,
+) error {
+	key := string(binding.Access) + "\x00" + binding.Export + "\x00" + binding.Member
+	if _, duplicate := owners[key]; duplicate {
+		return certifyError("build binding", key, "target owner is duplicated")
+	}
+	owners[key] = struct{}{}
+	return nil
+}
+
+func validateSeeds(source []moduleSeed) ([]moduleSeed, error) {
+	if len(source) == 0 {
+		return nil, certifyError("configure modules", "", "module set is empty")
+	}
+	result := append([]moduleSeed(nil), source...)
+	specifiers := make(map[string]struct{}, len(result))
+	sources := make(map[string]struct{}, len(result))
+	for index, seed := range result {
+		if seed.GoImportPath == "" || seed.GoImportPath == "." ||
+			path.Clean(seed.GoImportPath) != seed.GoImportPath ||
+			strings.HasPrefix(seed.GoImportPath, "../") ||
+			strings.HasPrefix(seed.GoImportPath, "/") {
+			return nil, certifyError(
+				"configure modules",
+				seed.GoImportPath,
+				"Go import path is not canonical",
+			)
+		}
+		if _, ok := providerSubpath(seed.Specifier); !ok ||
+			path.Clean(seed.SourcePath) != seed.SourcePath ||
+			!strings.HasPrefix(seed.SourcePath, "src/") ||
+			!strings.HasSuffix(seed.SourcePath, ".ts") {
+			return nil, certifyError("configure modules", seed.GoImportPath, "identity is incomplete")
+		}
+		if index != 0 && result[index-1].GoImportPath >= seed.GoImportPath {
+			return nil, certifyError(
+				"configure modules",
+				seed.GoImportPath,
+				"modules are not strictly ordered",
+			)
+		}
+		if _, duplicate := specifiers[seed.Specifier]; duplicate {
+			return nil, certifyError("configure modules", seed.Specifier, "specifier is duplicated")
+		}
+		if _, duplicate := sources[seed.SourcePath]; duplicate {
+			return nil, certifyError("configure modules", seed.SourcePath, "source is duplicated")
+		}
+		specifiers[seed.Specifier] = struct{}{}
+		sources[seed.SourcePath] = struct{}{}
+	}
+	return result, nil
+}
+
+func verifyPublicName(name string, targetType string) error {
+	if name == "" || targetType == "" {
+		return fmt.Errorf("public symbol identity is incomplete")
+	}
+	for _, forbidden := range []string{
+		"$argument",
+		"__from_",
+		"$cooperative_",
+		"$contract",
+		"$state",
+	} {
+		if strings.Contains(name, forbidden) || strings.Contains(targetType, forbidden) {
+			return fmt.Errorf("public symbol contains encoded ABI spelling %q", forbidden)
+		}
+	}
+	return nil
+}
+
+func compareCanonical(left []byte, right []byte) error {
+	if bytes.Equal(left, right) {
+		return nil
+	}
+	return certifyError(
+		"verify manifest",
+		"canonical bytes",
+		"checked manifest differs from independently regenerated evidence",
+	)
+}
+
+func readManifest(path string) ([]byte, gostdlib.Manifest, error) {
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		return nil, gostdlib.Manifest{}, certifyError("read manifest", path, err.Error())
+	}
+	manifest, err := gostdlib.Parse(payload)
+	if err != nil {
+		return nil, gostdlib.Manifest{}, err
+	}
+	canonical, err := gostdlib.Encode(manifest)
+	if err != nil {
+		return nil, gostdlib.Manifest{}, err
+	}
+	return canonical, manifest, nil
+}

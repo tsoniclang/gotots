@@ -36,7 +36,7 @@ func EmitRepresented(
 			context.Factory().UnionTypeNode(
 				[]tsgo.TypeNode{
 					context.Factory().TypeReferenceNode(
-						context.Factory().Identifier(reference.Name()),
+						reference.EntityName(context.Factory()),
 						nil,
 					),
 					context.Factory().KeywordTypeNode(
@@ -60,7 +60,7 @@ func EmitRepresented(
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			nil,
 		),
 		reference.Requests()...,

@@ -2,6 +2,7 @@ import type {
   GoError,
   GoInterfaceValue,
 } from "@gotots/runtime/interface-value.js";
+import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
@@ -101,6 +102,13 @@ export class PathError extends WrappedProviderError {
 
   Unwrap(): GoError | undefined {
     return this.Err;
+  }
+
+  static Unwrap(receiver: PathError | undefined): GoError | undefined {
+    if (receiver === undefined) {
+      GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
+    }
+    return receiver.Unwrap();
   }
 }
 

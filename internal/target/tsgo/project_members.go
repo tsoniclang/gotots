@@ -3,6 +3,7 @@ package tsgo
 import (
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 type ProjectMember struct {
@@ -10,6 +11,7 @@ type ProjectMember struct {
 	flags        uint32
 	typeString   string
 	declarations []string
+	ownerKeys    []string
 }
 
 func (m ProjectMember) Name() string {
@@ -26,6 +28,14 @@ func (m ProjectMember) TypeString() string {
 
 func (m ProjectMember) Declarations() []string {
 	return cloneStrings(m.declarations)
+}
+
+func (m ProjectMember) ImplementationOwners() []string {
+	return cloneStrings(m.ownerKeys)
+}
+
+func (m ProjectMember) Visible() bool {
+	return m.name != "" && !strings.HasPrefix(m.name, "\uFFFD#")
 }
 
 func (p *ProjectInspection) projectTypeDeclarations(
@@ -168,11 +178,23 @@ func (p *ProjectInspection) projectMember(
 	if err != nil {
 		return ProjectMember{}, err
 	}
+	ownerKeys, err := projectOwnerKeys(
+		declarations,
+		filepath.Dir(p.config),
+	)
+	if err != nil {
+		return ProjectMember{}, &ProjectInspectionError{
+			Operation: operation,
+			Path:      sourcePath,
+			Reason:    "member " + symbol.Name + " " + err.Error(),
+		}
+	}
 	return ProjectMember{
 		name:         symbol.Name,
 		flags:        symbol.Flags,
 		typeString:   typeString,
 		declarations: declarations,
+		ownerKeys:    ownerKeys,
 	}, nil
 }
 

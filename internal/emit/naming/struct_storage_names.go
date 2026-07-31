@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/output"
@@ -137,6 +138,23 @@ func (n *File) NamedStructStorage(
 	)
 	if err != nil {
 		return api.NameReference{}, err
+	}
+	providerReference, providerOwned, err := n.providerFacetStorageReference(
+		typeName,
+		gostdlib.FacetNamedStructOperations,
+		gostdlib.FacetCapabilityStorage,
+		api.ImportPhaseType,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	if providerOwned {
+		return providerReference.WithRequests(
+			api.CombineRequests(
+				providerReference.Requests(),
+				[]api.RootRequest{request},
+			)...,
+		)
 	}
 	binding, ok := n.owner.byObject[typeName]
 	if !ok && n.owner.registry != nil {

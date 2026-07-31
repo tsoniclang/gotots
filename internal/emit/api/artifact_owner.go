@@ -417,6 +417,16 @@ func (r NameReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
 }
 
+func (r NameReference) WithRequests(
+	requests ...RootRequest,
+) (NameReference, error) {
+	if r.name == "" {
+		return NameReference{}, &NameError{Reason: "reference name is empty"}
+	}
+	r.requests = slices.Clone(requests)
+	return r, nil
+}
+
 func (r NameReference) Expression(factory tsgo.Factory) tsgo.Expression {
 	if r.qualifier == "" {
 		return factory.Identifier(r.name)

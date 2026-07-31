@@ -3,6 +3,7 @@ package naming
 import (
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
@@ -82,6 +83,29 @@ func (n *File) MethodTarget(
 			reference.Name(),
 			reference.Requests()...,
 		)
+	case targetBindingProvider:
+		if binding.providerMember == "" ||
+			(binding.providerAccess != gostdlib.AccessStaticMethod &&
+				binding.providerAccess != gostdlib.AccessInstanceMethod) {
+			return api.MethodTarget{}, &api.NameError{
+				Name:   method.Name(),
+				Reason: "provider method target is invalid",
+			}
+		}
+		if n.require != nil {
+			if err := n.require(method); err != nil {
+				return api.MethodTarget{}, err
+			}
+		}
+		return api.NewMethodTarget(
+			api.MethodTargetClassMember,
+			binding.providerMember,
+		)
+	case targetBindingMissingProvider:
+		return api.MethodTarget{}, &api.NameError{
+			Name:   method.Name(),
+			Reason: "selected standard-library method has no provider binding",
+		}
 	default:
 		return api.MethodTarget{}, &api.NameError{
 			Name:   method.Name(),

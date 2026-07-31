@@ -342,7 +342,7 @@ func emitCallee(
 			return api.ExpressionEmission{}, false, err
 		}
 		return api.DirectExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			reference.Requests()...,
 		), true, nil
 	} else if _, ok := directFunctionLiteral(source); ok {

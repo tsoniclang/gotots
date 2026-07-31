@@ -61,7 +61,7 @@ func (owner Owner) StorageType(
 		}
 		return api.DirectType(
 			context.Factory().TypeReferenceNode(
-				context.Factory().Identifier(reference.Name()),
+				reference.EntityName(context.Factory()),
 				nil,
 			),
 			reference.Requests()...,
@@ -96,7 +96,7 @@ func (owner Owner) StorageType(
 		}
 		return api.DirectType(
 			context.Factory().TypeReferenceNode(
-				context.Factory().Identifier(reference.Name()),
+				reference.EntityName(context.Factory()),
 				typeArguments,
 			),
 			api.CombineRequests(
@@ -267,7 +267,7 @@ func callStorageMember(
 		value.Before(),
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(member),
 				tsgo.NodeFlagsNone,

@@ -62,12 +62,33 @@ func EmitDeferred(
 	if err := validateResults(context, source, signature, true); err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	callee, static, err := emitCallee(
-		context,
-		children,
-		source.Fun,
-		signature,
-	)
+	directOwner, direct := calleeObject(context.TypesInfo(), source.Fun)
+	var providerRecovery api.RecoveryCallableReference
+	providerRecoverySelected := false
+	var err error
+	if direct {
+		providerRecovery, providerRecoverySelected, err =
+			context.Names().RecoveryCallable(directOwner)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	var callee api.ExpressionEmission
+	static := false
+	if direct && providerRecoverySelected {
+		callee = api.DirectExpression(
+			providerRecovery.Expression(context.Factory()),
+			providerRecovery.Requests()...,
+		)
+		static = true
+	} else {
+		callee, static, err = emitCallee(
+			context,
+			children,
+			source.Fun,
+			signature,
+		)
+	}
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -79,25 +100,29 @@ func EmitDeferred(
 	literal, directLiteral := directFunctionLiteral(source.Fun)
 	switch {
 	case static:
-		owner, direct := calleeObject(context.TypesInfo(), source.Fun)
-		if !direct {
+		owner := directOwner
+		if !direct || owner == nil {
 			return api.ExpressionEmission{}, &api.InvariantError{
 				Role:   api.RoleCallCallee,
 				Reason: "static deferred callee has no exact function owner",
 			}
 		}
-		control, err := api.NewDirectCallableControlRequest(
-			owner.Origin(),
-			api.CallableControlRecovery,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		requests = append(requests, control)
-		cooperative, contractRequests, err =
-			cooperativecall.SourceContract(context, owner)
-		if err != nil {
-			return api.ExpressionEmission{}, err
+		if providerRecoverySelected {
+			cooperative = providerRecovery.Cooperative()
+		} else {
+			control, controlErr := api.NewDirectCallableControlRequest(
+				owner.Origin(),
+				api.CallableControlRecovery,
+			)
+			if controlErr != nil {
+				return api.ExpressionEmission{}, controlErr
+			}
+			requests = append(requests, control)
+			cooperative, contractRequests, err =
+				cooperativecall.SourceContract(context, owner)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
 		}
 	case directLiteral:
 		name, err := context.Names().Temporary(api.TemporaryCallCallee)

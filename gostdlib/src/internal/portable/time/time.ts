@@ -15,53 +15,53 @@ export class Time {
     private readonly nanosecondRemainder: number = 0,
   ) {}
 
-  static Add(receiver: Time, d: Duration): Time {
-    if (receiver.epochMilliseconds === undefined) {
+  Add(d: Duration): Time {
+    if (this.epochMilliseconds === undefined) {
       return new Time();
     }
     const deltaNanoseconds = d.Nanoseconds();
-    const remainderTotal = receiver.nanosecondRemainder + deltaNanoseconds;
+    const remainderTotal = this.nanosecondRemainder + deltaNanoseconds;
     const deltaMilliseconds = Math.floor(
       remainderTotal / nanosecondsPerMillisecond,
     );
     const remainder = remainderTotal
       - deltaMilliseconds * nanosecondsPerMillisecond;
     return new Time(
-      receiver.epochMilliseconds + deltaMilliseconds,
-      receiver.monotonic === undefined
+      this.epochMilliseconds + deltaMilliseconds,
+      this.monotonic === undefined
         ? undefined
-        : receiver.monotonic + deltaNanoseconds / nanosecondsPerMillisecond,
+        : this.monotonic + deltaNanoseconds / nanosecondsPerMillisecond,
       remainder,
     );
   }
 
-  static After(receiver: Time, u: Time): bool {
-    return Time.#compare(receiver, u) > 0;
+  After(u: Time): bool {
+    return Time.#compare(this, u) > 0;
   }
 
-  static Before(receiver: Time, u: Time): bool {
-    return Time.#compare(receiver, u) < 0;
+  Before(u: Time): bool {
+    return Time.#compare(this, u) < 0;
   }
 
-  static Equal(receiver: Time, u: Time): bool {
-    return Time.#compare(receiver, u) === 0;
+  Equal(u: Time): bool {
+    return Time.#compare(this, u) === 0;
   }
 
-  static Format(receiver: Time, layout: gostring): gostring {
-    return Time.#format(receiver, layout);
+  Format(layout: gostring): gostring {
+    return Time.#format(this, layout);
   }
 
-  static Sub(receiver: Time, u: Time): Duration {
-    if (receiver.monotonic !== undefined && u.monotonic !== undefined) {
+  Sub(u: Time): Duration {
+    if (this.monotonic !== undefined && u.monotonic !== undefined) {
       return new Duration(
-        Math.trunc((receiver.monotonic - u.monotonic) * nanosecondsPerMillisecond),
+        Math.trunc((this.monotonic - u.monotonic) * nanosecondsPerMillisecond),
       );
     }
     return new Duration(Math.trunc((
-      (receiver.epochMilliseconds ?? zeroEpochMilliseconds)
+      (this.epochMilliseconds ?? zeroEpochMilliseconds)
         - (u.epochMilliseconds ?? zeroEpochMilliseconds)
     ) * nanosecondsPerMillisecond
-      + receiver.nanosecondRemainder
+      + this.nanosecondRemainder
       - u.nanosecondRemainder));
   }
 
@@ -189,7 +189,7 @@ export function Now(): Time {
 }
 
 export function Since(t: Time): Duration {
-  return Time.Sub(Now(), t);
+  return Now().Sub(t);
 }
 
 export function Unix(sec: int64, nsec: int64): Time {
@@ -215,7 +215,7 @@ export function UnixMilli(msec: int64): Time {
 }
 
 export function Until(t: Time): Duration {
-  return Time.Sub(t, Now());
+  return t.Sub(Now());
 }
 
 function pad(value: number): string {

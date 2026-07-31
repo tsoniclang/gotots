@@ -44,7 +44,7 @@ func SelectedMethodCall(
 				return nil, nil, referenceErr
 			}
 			callee = context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(name),
 				tsgo.NodeFlagsNone,

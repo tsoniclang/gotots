@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/packages"
+
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 )
 
 type Request struct {
@@ -281,10 +283,15 @@ func wrapEnvironmentPackage(
 }
 
 func currentToolchainKey() string {
-	digest := sha256.Sum256([]byte(
-		runtime.Version() + "\x00" + runtime.GOOS + "\x00" + runtime.GOARCH,
-	))
-	return hex.EncodeToString(digest[:])
+	key, err := environmentcontract.ToolchainKey(
+		runtime.Version(),
+		runtime.GOOS,
+		runtime.GOARCH,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return key
 }
 
 func moduleContractKey(modulePath string, moduleVersion string) string {

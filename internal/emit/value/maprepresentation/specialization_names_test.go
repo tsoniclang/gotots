@@ -34,6 +34,12 @@ func (staticSpecializationNames) PackageVariable(
 	panic("unused")
 }
 
+func (staticSpecializationNames) NamedStructConstructor(
+	*types.TypeName,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) NamedStructOperation(
 	*types.TypeName,
 	api.NamedStructOperation,
@@ -97,6 +103,12 @@ func (staticSpecializationNames) InterfaceType(
 func (staticSpecializationNames) InterfaceContract(
 	types.Type,
 ) (api.InterfaceContractReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) RecoveryCallable(
+	*types.Func,
+) (api.RecoveryCallableReference, bool, error) {
 	panic("unused")
 }
 

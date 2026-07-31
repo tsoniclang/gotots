@@ -282,7 +282,7 @@ func runtimeFold(
 	result := values[0]
 	for _, value := range values[1:] {
 		result = context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{result, value},

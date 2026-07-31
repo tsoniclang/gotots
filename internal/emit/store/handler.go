@@ -446,7 +446,7 @@ func identifier(
 		return api.StoreTargetEmission{}, err
 	}
 	return api.NewStoreTargetEmission(
-		context.Factory().Identifier(reference.Name()),
+		reference.Expression(context.Factory()),
 		object.Type(),
 		reference.Requests(),
 	)

@@ -204,6 +204,22 @@ func (n *File) GenericCallableProfile(
 	if err != nil {
 		return api.NameReference{}, err
 	}
+	providerReference, _, providerOwned, err :=
+		n.providerGenericCallableProfileReference(
+			profile.Owner(),
+			profile.Selection().Key(),
+		)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	if providerOwned {
+		return providerReference.WithRequests(
+			api.CombineRequests(
+				providerReference.Requests(),
+				[]api.RootRequest{requirement},
+			)...,
+		)
+	}
 	reference, err := n.derivedSourceReference(
 		profile.Owner(),
 		profile.Suffix(),
@@ -212,8 +228,7 @@ func (n *File) GenericCallableProfile(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	return api.NewNameReference(
-		reference.Name(),
+	return reference.WithRequests(
 		api.CombineRequests(
 			reference.Requests(),
 			[]api.RootRequest{requirement},

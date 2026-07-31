@@ -121,7 +121,7 @@ func Emit(
 	target, err := api.NewExpressionEmission(
 		ordered.Before(),
 		context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			nil,
 			ordered.Values(),

@@ -45,7 +45,7 @@ func (owner Owner) Equal(
 		}
 		return api.DirectExpression(
 			context.Factory().CallExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				nil,
 				[]tsgo.Expression{left, right},
@@ -174,7 +174,7 @@ func (owner Owner) Equal(
 		return api.DirectExpression(
 			context.Factory().CallExpression(
 				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
+					reference.Expression(context.Factory()),
 					nil,
 					context.Factory().Identifier(pointerruntime.EqualName),
 					tsgo.NodeFlagsNone,

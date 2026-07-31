@@ -241,7 +241,7 @@ func buildInterfaceArtifact(
 			if err != nil {
 				return nil, nil, err
 			}
-			initializer = context.Factory().Identifier(reference.Name())
+			initializer = reference.Expression(context.Factory())
 			requests = reference.Requests()
 		}
 		return []tsgo.Statement{

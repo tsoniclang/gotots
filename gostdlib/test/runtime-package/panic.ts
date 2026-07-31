@@ -35,3 +35,18 @@ export class GoRuntimePanicValue implements GoInterfaceValue {
     RuntimeError(): void {
     }
 }
+export class GoRecovery {
+    constructor(private pending: GoPanic | undefined) {
+    }
+    take(): GoInterfaceValue | undefined {
+        const pending = this.pending;
+        if (pending === undefined) {
+            return undefined;
+        }
+        this.pending = undefined;
+        return pending.value;
+    }
+    recovered(): boolean {
+        return this.pending === undefined;
+    }
+}

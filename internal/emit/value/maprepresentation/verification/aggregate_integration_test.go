@@ -359,6 +359,12 @@ func (aggregateNames) PackageVariable(
 	panic("unused")
 }
 
+func (aggregateNames) NamedStructConstructor(
+	typeName *types.TypeName,
+) (api.NameReference, error) {
+	return api.NewNameReference(typeName.Name())
+}
+
 func (aggregateNames) NamedStructOperation(
 	typeName *types.TypeName,
 	operation api.NamedStructOperation,
@@ -427,6 +433,12 @@ func (aggregateNames) InterfaceContract(
 	types.Type,
 ) (api.InterfaceContractReference, error) {
 	panic("unused")
+}
+
+func (aggregateNames) RecoveryCallable(
+	*types.Func,
+) (api.RecoveryCallableReference, bool, error) {
+	return api.RecoveryCallableReference{}, false, nil
 }
 
 func (aggregateNames) MethodTarget(

@@ -74,6 +74,7 @@ type programSession struct {
 	runtimePackage          RuntimePackage
 	compareArtifactOwners   func(api.ArtifactOwner, api.ArtifactOwner) int
 	requirementRemovalOwner api.ArtifactOwner
+	standardLibraryLinked   bool
 	sealed                  bool
 }
 
@@ -283,6 +284,7 @@ func newProgramSession(
 	if err := registry.IndexCompilationTargets(
 		source.Packages(),
 		source.EnvironmentPackages(),
+		options.StandardLibrary,
 	); err != nil {
 		return nil, err
 	}
@@ -316,6 +318,7 @@ func newProgramSession(
 		classMembers:           make(map[*types.Func]classMemberContribution),
 		goRuntime:              goRuntime,
 		compareArtifactOwners:  compareArtifactOwners,
+		standardLibraryLinked:  options.StandardLibrary != nil,
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(

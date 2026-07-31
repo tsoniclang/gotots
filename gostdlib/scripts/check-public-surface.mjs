@@ -2,6 +2,8 @@ import { readFile, readdir } from "node:fs/promises";
 
 const sourceRoot = new URL("../src/", import.meta.url);
 const packageFile = new URL("../package.json", import.meta.url);
+const contractFile = new URL("../contract/manifest.json", import.meta.url);
+const packageName = "@gotots/gostdlib";
 const forbidden = [
   /\$argument/u,
   /__from_/u,
@@ -30,17 +32,35 @@ for (const file of files) {
 }
 
 const packageManifest = JSON.parse(await readFile(packageFile, "utf8"));
-const expectedExports = files
+const contractManifest = JSON.parse(await readFile(contractFile, "utf8"));
+const publicExports = files
   .map((file) => file.pathname.slice(sourceRoot.pathname.length))
   .filter((path) => !path.startsWith("internal/") || path === "internal/abi.ts")
   .map((path) => `./${path.slice(0, -3)}.js`)
   .sort();
+const facetExports = contractManifest.facetModules
+  .map((module) => {
+    const prefix = `${packageName}/`;
+    if (!module.specifier.startsWith(prefix)) {
+      throw new Error(`facet module has foreign specifier ${module.specifier}`);
+    }
+    const modulePath = `./${module.specifier.slice(prefix.length)}`;
+    const sourcePath = `src/${modulePath.slice(2, -3)}.ts`;
+    if (module.sourcePath !== sourcePath) {
+      throw new Error(
+        `facet module ${module.specifier} owns ${module.sourcePath}, want ${sourcePath}`,
+      );
+    }
+    return modulePath;
+  })
+  .sort();
+const expectedExports = [...publicExports, ...facetExports].sort();
 const actualExports = Object.keys(packageManifest.exports)
   .filter((path) => path !== "./package.json")
   .sort();
 if (JSON.stringify(actualExports) !== JSON.stringify(expectedExports)) {
   throw new Error(
-    `public export map differs from source modules:\n` +
+    `package export map differs from public modules plus certified facets:\n` +
       `actual=${JSON.stringify(actualExports)}\n` +
       `expected=${JSON.stringify(expectedExports)}`,
   );
@@ -54,7 +74,7 @@ for (const modulePath of expectedExports) {
   };
   if (JSON.stringify(target) !== JSON.stringify(expectedTarget)) {
     throw new Error(
-      `public export ${modulePath} has target ${JSON.stringify(target)}, ` +
+      `package export ${modulePath} has target ${JSON.stringify(target)}, ` +
         `want ${JSON.stringify(expectedTarget)}`,
     );
   }

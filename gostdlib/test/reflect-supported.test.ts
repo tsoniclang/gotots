@@ -48,14 +48,14 @@ test("reflect StructField.IsExported uses package-path evidence", () => {
     Index: RuntimeSlice.literal([0]),
     Anonymous: false,
   });
-  assert.equal(StructField.IsExported(exported), true);
-  assert.equal(StructField.IsExported(privateField), false);
+  assert.equal(exported.IsExported(), true);
+  assert.equal(privateField.IsExported(), false);
 });
 
 test("reflect StructTag.Get decodes Go quoted values", () => {
   const tag = new StructTag('json:"name,omitempty" xml:"line\\nvalue" octal:"\\141"');
-  assert.equal(StructTag.Get(tag, "json"), "name,omitempty");
-  assert.equal(StructTag.Get(tag, "xml"), "line\nvalue");
-  assert.equal(StructTag.Get(tag, "octal"), "a");
-  assert.equal(StructTag.Get(tag, "missing"), "");
+  assert.equal(tag.Get("json"), "name,omitempty");
+  assert.equal(tag.Get("xml"), "line\nvalue");
+  assert.equal(tag.Get("octal"), "a");
+  assert.equal(tag.Get("missing"), "");
 });

@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
+	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
-	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
@@ -26,15 +26,15 @@ const (
 	EnvironmentObligationBuiltin
 )
 
-type EnvironmentObjectKind uint8
+type EnvironmentObjectKind = environmentidentity.ObjectKind
 
 const (
-	EnvironmentObjectInvalid EnvironmentObjectKind = iota
-	EnvironmentObjectConstant
-	EnvironmentObjectType
-	EnvironmentObjectVariable
-	EnvironmentObjectFunction
-	EnvironmentObjectBuiltin
+	EnvironmentObjectInvalid  = environmentidentity.ObjectInvalid
+	EnvironmentObjectConstant = environmentidentity.ObjectConstant
+	EnvironmentObjectType     = environmentidentity.ObjectType
+	EnvironmentObjectVariable = environmentidentity.ObjectVariable
+	EnvironmentObjectFunction = environmentidentity.ObjectFunction
+	EnvironmentObjectBuiltin  = environmentidentity.ObjectBuiltin
 )
 
 type EnvironmentObligation struct {
@@ -230,7 +230,7 @@ func buildEnvironmentObligation(
 			Reason: "environment obligation identity is invalid",
 		}
 	}
-	objectKind, err := environmentObjectKind(object)
+	description, err := environmentidentity.Describe(object)
 	if err != nil {
 		return EnvironmentObligation{}, err
 	}
@@ -241,19 +241,15 @@ func buildEnvironmentObligation(
 			Reason: "environment target contract has no canonical fingerprint",
 		}
 	}
-	receiver := environmentReceiver(object)
-	signature := environmentSourceSignature(object)
-	value := environmentSourceValue(object)
+	objectKind := description.Kind()
+	receiver := description.Receiver()
+	signature := description.Signature()
+	value := description.Value()
 	requirementKeys, err := environmentRequirementKeys(object, requirements)
 	if err != nil {
 		return EnvironmentObligation{}, err
 	}
-	identity := environmentObjectIdentity(
-		builder.sourcePackage.Path(),
-		objectKind,
-		receiver,
-		object.Name(),
-	)
+	identity := description.Identity()
 	if kind == EnvironmentObligationConstantProjection {
 		selected, valid := api.ConstantProjectionType(projection)
 		if !valid {
@@ -262,8 +258,8 @@ func buildEnvironmentObligation(
 				Reason: "environment constant projection is invalid",
 			}
 		}
-		identity += "|projection=" + emitordering.StableTypeString(selected)
-		signature += "|projection=" + emitordering.StableTypeString(selected)
+		identity += "|projection=" + environmentidentity.StableTypeString(selected)
+		signature += "|projection=" + environmentidentity.StableTypeString(selected)
 	}
 	return EnvironmentObligation{
 		kind:              kind,
@@ -296,10 +292,10 @@ func buildEnvironmentBuiltinObligation(
 	}
 	signatures := make([]string, len(target.signatures))
 	for index, signature := range target.signatures {
-		signatures[index] = emitordering.StableTypeString(signature)
+		signatures[index] = environmentidentity.StableTypeString(signature)
 	}
 	sort.Strings(signatures)
-	identity := environmentObjectIdentity(
+	identity := environmentidentity.Identity(
 		builder.sourcePackage.Path(),
 		EnvironmentObjectBuiltin,
 		"",
@@ -317,87 +313,6 @@ func buildEnvironmentBuiltinObligation(
 		targetName:        builtin.Name(),
 		targetFingerprint: fingerprint,
 	}, nil
-}
-
-func environmentObjectKind(object types.Object) (EnvironmentObjectKind, error) {
-	switch object.(type) {
-	case *types.Const:
-		return EnvironmentObjectConstant, nil
-	case *types.TypeName:
-		return EnvironmentObjectType, nil
-	case *types.Var:
-		return EnvironmentObjectVariable, nil
-	case *types.Func:
-		return EnvironmentObjectFunction, nil
-	case *types.Builtin:
-		return EnvironmentObjectBuiltin, nil
-	default:
-		return EnvironmentObjectInvalid, &ScheduleError{
-			Object: object.Name(),
-			Reason: "environment object kind is unsupported",
-		}
-	}
-}
-
-func environmentObjectIdentity(
-	packagePath string,
-	kind EnvironmentObjectKind,
-	receiver string,
-	name string,
-) string {
-	return packagePath + "|kind=" + strconv.Itoa(int(kind)) +
-		"|receiver=" + receiver +
-		"|name=" + name
-}
-
-func environmentReceiver(object types.Object) string {
-	function, ok := object.(*types.Func)
-	if !ok {
-		return ""
-	}
-	signature, ok := function.Type().(*types.Signature)
-	if !ok || signature.Recv() == nil {
-		return ""
-	}
-	return emitordering.StableTypeString(signature.Recv().Type())
-}
-
-func environmentSourceSignature(object types.Object) string {
-	switch selected := object.(type) {
-	case *types.TypeName:
-		return "defined=" + emitordering.StableTypeString(selected.Type()) +
-			"|underlying=" +
-			emitordering.StableTypeString(selected.Type().Underlying())
-	case *types.Func:
-		signature, _ := selected.Type().(*types.Signature)
-		return emitordering.StableTypeString(selected.Type()) +
-			"|params=" + tupleNames(signature.Params()) +
-			"|results=" + tupleNames(signature.Results())
-	default:
-		if object.Type() == nil {
-			return ""
-		}
-		return emitordering.StableTypeString(object.Type())
-	}
-}
-
-func environmentSourceValue(object types.Object) string {
-	selected, ok := object.(*types.Const)
-	if !ok || selected.Val() == nil {
-		return ""
-	}
-	return selected.Val().ExactString()
-}
-
-func tupleNames(tuple *types.Tuple) string {
-	if tuple == nil {
-		return ""
-	}
-	names := make([]string, tuple.Len())
-	for index := range tuple.Len() {
-		names[index] = tuple.At(index).Name()
-	}
-	return strings.Join(names, ",")
 }
 
 func environmentContractKey(sourcePackage *load.Package) string {

@@ -69,8 +69,7 @@ func (n *File) InterfaceAdapter(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	return api.NewNameReference(
-		reference.Name(),
+	return reference.WithRequests(
 		api.CombineRequests(reference.Requests(), demands)...,
 	)
 }

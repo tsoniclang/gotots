@@ -1,3 +1,4 @@
+import { GoDenseIndex } from "./dense-index.js";
 import { GoPanic } from "./panic.js";
 export class RuntimeSlice<T> {
     private constructor(private readonly backing: T[] | null, private readonly offset: number, public readonly length: number, public readonly capacity: number) {
@@ -24,7 +25,7 @@ export class RuntimeSlice<T> {
         const backing = this.backing;
         if (backing === null || (numericIndex < 0 || numericIndex >= this.length))
             GoPanic.raiseRuntime("runtime error: index out of range [" + String(numericIndex) + "] with length " + String(this.length));
-        return backing[this.offset + numericIndex]!;
+        return GoDenseIndex.get(backing, this.offset + numericIndex);
     }
     set(index: number | bigint, value: T): T {
         const numericIndex = globalThis.Number(index);
@@ -51,7 +52,7 @@ export class RuntimeSlice<T> {
             if (existingBacking === null)
                 GoPanic.raiseRuntime("slice bounds out of range");
             for (let index = 0; index < values.length; index = index + 1) {
-                existingBacking[this.offset + this.length + index] = values[index]!;
+                existingBacking[this.offset + this.length + index] = GoDenseIndex.get(values, index);
             }
             return new RuntimeSlice<T>(existingBacking, this.offset, newLength, this.capacity);
         }
@@ -62,11 +63,11 @@ export class RuntimeSlice<T> {
         const backing = new Array<T>(nextCapacity).fill(zero);
         if (existingBacking !== null) {
             for (let index = 0; index < this.length; index = index + 1) {
-                backing[index] = existingBacking[this.offset + index]!;
+                backing[index] = GoDenseIndex.get(existingBacking, this.offset + index);
             }
         }
         for (let index = 0; index < values.length; index = index + 1) {
-            backing[this.length + index] = values[index]!;
+            backing[this.length + index] = GoDenseIndex.get(values, index);
         }
         return new RuntimeSlice<T>(backing, 0, newLength, nextCapacity);
     }
@@ -82,7 +83,7 @@ export class RuntimeSlice<T> {
             targetBacking.copyWithin(target.offset, source.offset, source.offset + count);
         else
             for (let index = 0; index < count; index = index + 1) {
-                targetBacking[target.offset + index] = sourceBacking[source.offset + index]!;
+                targetBacking[target.offset + index] = GoDenseIndex.get(sourceBacking, source.offset + index);
             }
         return count;
     }

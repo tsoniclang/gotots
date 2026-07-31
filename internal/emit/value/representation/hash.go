@@ -195,7 +195,7 @@ func (owner Owner) Hash(
 				context.Factory().ColonToken(),
 				context.Factory().CallExpression(
 					context.Factory().PropertyAccessExpression(
-						context.Factory().Identifier(reference.Name()),
+						reference.Expression(context.Factory()),
 						nil,
 						context.Factory().Identifier(
 							mapruntime.HashObjectMember,
@@ -253,7 +253,7 @@ func (owner Owner) Hash(
 		return api.DirectExpression(
 			context.Factory().CallExpression(
 				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
+					reference.Expression(context.Factory()),
 					nil,
 					context.Factory().Identifier(member),
 					tsgo.NodeFlagsNone,
@@ -293,7 +293,7 @@ func (owner Owner) Hash(
 		}
 		return api.DirectExpression(
 			context.Factory().CallExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				nil,
 				[]tsgo.Expression{value},
@@ -333,7 +333,7 @@ func (owner Owner) Hash(
 				context.Factory().ColonToken(),
 				context.Factory().CallExpression(
 					context.Factory().PropertyAccessExpression(
-						context.Factory().Identifier(reference.Name()),
+						reference.Expression(context.Factory()),
 						nil,
 						context.Factory().Identifier(
 							mapruntime.HashObjectMember,
@@ -392,7 +392,7 @@ func directObjectHash(
 			context.Factory().ColonToken(),
 			context.Factory().CallExpression(
 				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
+					reference.Expression(context.Factory()),
 					nil,
 					context.Factory().Identifier(
 						mapruntime.HashObjectMember,
@@ -423,7 +423,7 @@ func complexHash(
 	call := func(member string, arguments ...tsgo.Expression) tsgo.Expression {
 		return context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(member),
 				tsgo.NodeFlagsNone,

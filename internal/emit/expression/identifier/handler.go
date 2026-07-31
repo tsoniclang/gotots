@@ -87,7 +87,7 @@ func Emit(
 		return api.ExpressionEmission{}, err
 	}
 	target := api.DirectExpression(
-		context.Factory().Identifier(reference.Name()),
+		reference.Expression(context.Factory()),
 		reference.Requests()...,
 	)
 	if function, ok := object.(*types.Func); ok {

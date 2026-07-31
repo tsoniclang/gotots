@@ -231,6 +231,12 @@ func (unusedNames) InterfaceContract(
 	panic("unused")
 }
 
+func (unusedNames) RecoveryCallable(
+	*types.Func,
+) (api.RecoveryCallableReference, bool, error) {
+	panic("unused")
+}
+
 func (unusedNames) MethodTarget(*types.Func) (api.MethodTarget, error) {
 	panic("unused")
 }
@@ -280,6 +286,12 @@ func (unusedNames) GenericCallableProfile(
 func (unusedNames) PackageVariable(
 	*types.Var,
 ) (api.PackageVariableReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) NamedStructConstructor(
+	*types.TypeName,
+) (api.NameReference, error) {
 	panic("unused")
 }
 

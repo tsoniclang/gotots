@@ -36,6 +36,7 @@ type ProjectExport struct {
 	flags        uint32
 	typeString   string
 	declarations []string
+	ownerKeys    []string
 	valueMembers []ProjectMember
 	typeMembers  []ProjectMember
 }
@@ -54,6 +55,10 @@ func (e ProjectExport) TypeString() string {
 
 func (e ProjectExport) Declarations() []string {
 	return slices.Clone(e.declarations)
+}
+
+func (e ProjectExport) ImplementationOwners() []string {
+	return slices.Clone(e.ownerKeys)
 }
 
 func (e ProjectExport) ValueMembers() []ProjectMember {
@@ -301,6 +306,17 @@ func (p *ProjectInspection) projectExport(
 			Reason:    "export " + symbol.Name + " has no declaration owner",
 		}
 	}
+	ownerKeys, err := projectOwnerKeys(
+		declarations,
+		filepath.Dir(p.config),
+	)
+	if err != nil {
+		return ProjectExport{}, &ProjectInspectionError{
+			Operation: "exports",
+			Path:      sourcePath,
+			Reason:    "export " + symbol.Name + " " + err.Error(),
+		}
+	}
 	valueMembers, err := p.projectMembers(
 		sourcePath,
 		"value members of "+symbol.Name,
@@ -325,6 +341,7 @@ func (p *ProjectInspection) projectExport(
 		flags:        symbol.Flags,
 		typeString:   typeString,
 		declarations: declarations,
+		ownerKeys:    ownerKeys,
 		valueMembers: valueMembers,
 		typeMembers:  typeMembers,
 	}, nil

@@ -23,7 +23,7 @@ func RecoveryAuthorityParameter(
 		context.Factory().Identifier(RecoveryAuthorityName),
 		context.Factory().QuestionToken(),
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			nil,
 		),
 		nil,

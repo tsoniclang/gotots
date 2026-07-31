@@ -70,6 +70,9 @@ export const state: { Count: number } = { Count: 0 };
 	names := make([]string, len(exports))
 	for index, selected := range exports {
 		names[index] = selected.Name()
+		if selected.Fingerprint() == "" {
+			t.Fatalf("%s has no canonical target fingerprint", selected.Name())
+		}
 		if selected.TypeString() == "" ||
 			selected.Flags() == 0 ||
 			len(selected.Declarations()) == 0 {
@@ -123,6 +126,19 @@ export const state: { Count: number } = { Count: 0 };
 		[]string{"Box", "Shape", "Value", "count", "state"},
 	) {
 		t.Fatalf("exports = %v", names)
+	}
+	boxIndex := slices.IndexFunc(exports, func(selected ProjectExport) bool {
+		return selected.Name() == "Box"
+	})
+	if boxIndex < 0 {
+		t.Fatal("Box export is absent")
+	}
+	makeMember, ok := exports[boxIndex].ValueMember("Make")
+	if !ok || makeMember.Fingerprint() == "" || !makeMember.Visible() {
+		t.Fatalf("Box.Make member = %#v, %t", makeMember, ok)
+	}
+	if _, ok := exports[boxIndex].ValueMember("missing"); ok {
+		t.Fatal("missing member resolved")
 	}
 	renamed, err := project.Exports(renamedPath)
 	if err != nil {

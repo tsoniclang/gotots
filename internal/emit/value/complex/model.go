@@ -70,7 +70,7 @@ func EmitType(
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			nil,
 		),
 		reference.Requests()...,
@@ -102,7 +102,7 @@ func Construct(
 	return api.DirectExpression(
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(runtimecomplex.MakeMember),
 				tsgo.NodeFlagsNone,
@@ -242,7 +242,7 @@ func Call(
 	}
 	return api.DirectExpression(
 		context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			nil,
 			arguments,

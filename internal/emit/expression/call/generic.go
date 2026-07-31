@@ -99,7 +99,7 @@ func emitGeneric(
 	result, err := api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			typeArguments,
 			arguments,

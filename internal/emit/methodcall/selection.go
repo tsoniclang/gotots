@@ -157,23 +157,9 @@ func (s Selection) Call(
 			"selected-method invocation does not match its plan",
 		)
 	}
-	arguments := slices.Clone(sourceArguments)
-	if len(s.operations) != 0 {
-		source, err := genericabi.SourceParameters(
-			s.owner,
-			sourceArguments,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		arguments, err = genericabi.JoinClassMethod(
-			s.owner,
-			s.operations,
-			genericabi.Combine(s.capabilities, source),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
+	arguments, err := s.callArguments(sourceArguments)
+	if err != nil {
+		return nil, nil, err
 	}
 	requests := s.Requests()
 	if recovery != nil {
@@ -196,6 +182,79 @@ func (s Selection) Call(
 		arguments,
 	)
 	return call, api.CombineRequests(requests, callRequests), err
+}
+
+func (s Selection) RecoveryCall(
+	context api.Context,
+	receiver tsgo.Expression,
+	sourceArguments []tsgo.Expression,
+	recovery tsgo.Expression,
+) (
+	tsgo.CallExpression,
+	bool,
+	bool,
+	[]api.RootRequest,
+	error,
+) {
+	if recovery == nil {
+		return nil, false, false, nil, invariant(
+			context,
+			"selected-method recovery invocation has no authority",
+		)
+	}
+	reference, providerOwned, err :=
+		context.Names().RecoveryCallable(s.owner)
+	if err != nil {
+		return nil, providerOwned, false, nil, err
+	}
+	if !providerOwned {
+		call, requests, callErr := s.Call(
+			context,
+			receiver,
+			sourceArguments,
+			recovery,
+		)
+		return call, false, false, requests, callErr
+	}
+	arguments, err := s.callArguments(sourceArguments)
+	if err != nil {
+		return nil, true, reference.Cooperative(), nil, err
+	}
+	arguments = append([]tsgo.Expression{receiver}, arguments...)
+	arguments = append(arguments, recovery)
+	call := context.Factory().CallExpression(
+		reference.Expression(context.Factory()),
+		nil,
+		s.typeArguments,
+		arguments,
+		tsgo.NodeFlagsNone,
+	)
+	return call,
+		true,
+		reference.Cooperative(),
+		api.CombineRequests(s.Requests(), reference.Requests()),
+		nil
+}
+
+func (s Selection) callArguments(
+	sourceArguments []tsgo.Expression,
+) ([]tsgo.Expression, error) {
+	arguments := slices.Clone(sourceArguments)
+	if len(s.operations) == 0 {
+		return arguments, nil
+	}
+	source, err := genericabi.SourceParameters(
+		s.owner,
+		sourceArguments,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return genericabi.JoinClassMethod(
+		s.owner,
+		s.operations,
+		genericabi.Combine(s.capabilities, source),
+	)
 }
 
 func invariant(context api.Context, reason string) error {

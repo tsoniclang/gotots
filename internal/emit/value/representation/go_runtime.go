@@ -27,7 +27,7 @@ func panicNilZero(
 	}
 	return api.DirectExpression(
 		context.Factory().NewExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			nil,
 		),

@@ -49,7 +49,7 @@ func emit(
 		return api.TypeEmission{}, true, err
 	}
 	target := tsgo.TypeNode(context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(reference.Name()),
+		reference.EntityName(context.Factory()),
 		nil,
 	))
 	if nilCapable && includeNil {

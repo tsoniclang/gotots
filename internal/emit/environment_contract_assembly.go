@@ -288,6 +288,10 @@ func (s *programSession) environmentTargetFiles(
 				),
 			)
 		}
+		if s.standardLibraryLinked &&
+			builder.sourcePackage.Kind() == load.PackageStandardLibraryContract {
+			continue
+		}
 		file, err := s.sourceFile(
 			builder.outputPath,
 			builder.sourcePackage.Name(),

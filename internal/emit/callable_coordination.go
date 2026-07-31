@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
@@ -299,6 +300,21 @@ func (s *programSession) ObserveCooperativeCallable(
 	if !consumer.Valid() || !facet.Valid() {
 		return api.CooperativeCallableObservation{}, &ScheduleError{
 			Reason: "cooperative callable facet is invalid",
+		}
+	}
+	if profile, profiled := facet.GenericProfile(); profiled {
+		effect, providerOwned, err :=
+			s.registry.ProviderGenericCallableEffect(
+				profile.Owner(),
+				profile.Selection().Key(),
+			)
+		if err != nil {
+			return api.CooperativeCallableObservation{}, err
+		}
+		if providerOwned {
+			return api.NewCooperativeCallableObservation(
+				effect == gostdlib.EffectAsynchronous,
+			)
 		}
 	}
 	if source, ok := facet.Owner().Source(); ok &&

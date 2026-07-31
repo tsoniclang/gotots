@@ -90,16 +90,16 @@ export class StructField {
     this.Anonymous = fields.Anonymous;
   }
 
-  static IsExported(receiver: StructField): bool {
-    return receiver.PkgPath === "";
+  IsExported(): bool {
+    return this.PkgPath === "";
   }
 }
 
 export class StructTag {
   constructor(readonly value: gostring) {}
 
-  static Get(receiver: StructTag, key: gostring): gostring {
-    return getStructTag(receiver.value, key);
+  Get(key: gostring): gostring {
+    return getStructTag(this.value, key);
   }
 }
 

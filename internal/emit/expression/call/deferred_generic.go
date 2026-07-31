@@ -109,7 +109,7 @@ func emitDeferredGeneric(
 		return api.ExpressionEmission{}, true, err
 	}
 	call := context.Factory().CallExpression(
-		context.Factory().Identifier(reference.Name()),
+		reference.Expression(context.Factory()),
 		nil,
 		typeArguments,
 		arguments,

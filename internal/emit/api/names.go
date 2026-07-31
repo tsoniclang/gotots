@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/types"
 	"slices"
-	"strings"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -84,6 +83,40 @@ type MethodTarget struct {
 	requests []RootRequest
 }
 
+type RecoveryCallableReference struct {
+	reference   NameReference
+	cooperative bool
+}
+
+func NewRecoveryCallableReference(
+	reference NameReference,
+	cooperative bool,
+) (RecoveryCallableReference, error) {
+	if reference.Name() == "" {
+		return RecoveryCallableReference{}, &NameError{
+			Reason: "recovery-callable reference is empty",
+		}
+	}
+	return RecoveryCallableReference{
+		reference:   reference,
+		cooperative: cooperative,
+	}, nil
+}
+
+func (r RecoveryCallableReference) Expression(
+	factory tsgo.Factory,
+) tsgo.Expression {
+	return r.reference.Expression(factory)
+}
+
+func (r RecoveryCallableReference) Requests() []RootRequest {
+	return r.reference.Requests()
+}
+
+func (r RecoveryCallableReference) Cooperative() bool {
+	return r.cooperative
+}
+
 func NewMethodTarget(
 	kind MethodTargetKind,
 	name string,
@@ -159,9 +192,32 @@ func (r InterfaceContractReference) Requests() []RootRequest {
 }
 
 type PackageVariableReference struct {
+	qualifier string
 	stateName string
 	fieldName string
 	requests  []RootRequest
+}
+
+func NewQualifiedPackageVariableReference(
+	qualifier string,
+	stateName string,
+	fieldName string,
+	requests ...RootRequest,
+) (PackageVariableReference, error) {
+	if qualifier == "" {
+		return PackageVariableReference{},
+			&NameError{Reason: "package state qualifier is empty"}
+	}
+	reference, err := NewPackageVariableReference(
+		stateName,
+		fieldName,
+		requests...,
+	)
+	if err != nil {
+		return PackageVariableReference{}, err
+	}
+	reference.qualifier = qualifier
+	return reference, nil
 }
 
 func NewPackageVariableReference(
@@ -199,8 +255,17 @@ func (r PackageVariableReference) Requests() []RootRequest {
 func (r PackageVariableReference) Expression(
 	factory tsgo.Factory,
 ) tsgo.PropertyAccessExpression {
+	var state tsgo.Expression = factory.Identifier(r.stateName)
+	if r.qualifier != "" {
+		state = factory.PropertyAccessExpression(
+			factory.Identifier(r.qualifier),
+			nil,
+			factory.Identifier(r.stateName),
+			tsgo.NodeFlagsNone,
+		)
+	}
 	return factory.PropertyAccessExpression(
-		factory.Identifier(r.stateName),
+		state,
 		nil,
 		factory.Identifier(r.fieldName),
 		tsgo.NodeFlagsNone,
@@ -215,6 +280,7 @@ type Names interface {
 	GenericCallableProfile(*GenericCallableProfile) (NameReference, error)
 	TypeReference(types.Object) (NameReference, error)
 	PackageVariable(*types.Var) (PackageVariableReference, error)
+	NamedStructConstructor(*types.TypeName) (NameReference, error)
 	NamedStructOperation(*types.TypeName, NamedStructOperation) (NameReference, error)
 	NamedStructStorage(*types.TypeName) (NameReference, error)
 	AnonymousStruct(
@@ -232,6 +298,7 @@ type Names interface {
 	InterfaceDynamicType(types.Type) (NameReference, error)
 	InterfaceType(types.Type) (NameReference, error)
 	InterfaceContract(types.Type) (InterfaceContractReference, error)
+	RecoveryCallable(*types.Func) (RecoveryCallableReference, bool, error)
 	MethodTarget(*types.Func) (MethodTarget, error)
 	InterfaceMethodName(*types.Func) (string, error)
 	InterfaceMethodCallable(*types.Func) (
@@ -391,182 +458,4 @@ func (i TargetIntrinsic) Expression(
 		factory.Identifier(i.String()),
 		tsgo.NodeFlagsNone,
 	)
-}
-
-type CallableABIReference struct {
-	artifact    *GeneratedArtifact
-	sourceOwner types.Object
-	requests    []RootRequest
-}
-
-func NewCallableABIReference(
-	artifact *GeneratedArtifact,
-	requests ...RootRequest,
-) (CallableABIReference, error) {
-	_, ok := artifact.CallableABI()
-	if !ok {
-		return CallableABIReference{}, &RootRequestError{
-			Reason: "callable ABI reference is invalid",
-		}
-	}
-	if err := validateReferenceRequests(requests); err != nil {
-		return CallableABIReference{}, &RootRequestError{
-			Reason: "callable ABI reference request is invalid",
-		}
-	}
-	return CallableABIReference{
-		artifact: artifact,
-		requests: slices.Clone(requests),
-	}, nil
-}
-
-func NewSourceCallableABIReference(
-	sourceOwner types.Object,
-	artifact *GeneratedArtifact,
-	requests ...RootRequest,
-) (CallableABIReference, error) {
-	sourceOwner = GenericDeclarationOrigin(sourceOwner)
-	reference, err := NewCallableABIReference(artifact, requests...)
-	if err != nil {
-		return CallableABIReference{}, err
-	}
-	if sourceOwner == nil || sourceOwner.Pkg() == nil {
-		return CallableABIReference{}, &RootRequestError{
-			Reason: "source callable ABI reference owner is invalid",
-		}
-	}
-	reference.sourceOwner = sourceOwner
-	return reference, nil
-}
-
-func (r CallableABIReference) Artifact() *GeneratedArtifact {
-	return r.artifact
-}
-
-func (r CallableABIReference) SourceOwner() (types.Object, bool) {
-	return r.sourceOwner, r.sourceOwner != nil
-}
-
-func (r CallableABIReference) Requests() []RootRequest {
-	return slices.Clone(r.requests)
-}
-
-type InterfaceMethodCallableCorrespondence struct {
-	owner        *types.TypeName
-	declaration  *types.Signature
-	instantiated *types.Signature
-}
-
-func NewInterfaceMethodCallableCorrespondence(
-	owner *types.TypeName,
-	declaration *types.Signature,
-	instantiated *types.Signature,
-) (InterfaceMethodCallableCorrespondence, error) {
-	origin, _ := GenericDeclarationOrigin(owner).(*types.TypeName)
-	validSignatures := declaration != nil &&
-		instantiated != nil &&
-		declaration.Recv() == nil &&
-		instantiated.Recv() == nil &&
-		declaration.Params().Len() == instantiated.Params().Len() &&
-		declaration.Results().Len() == instantiated.Results().Len() &&
-		declaration.Variadic() == instantiated.Variadic() &&
-		!types.Identical(declaration, instantiated)
-	if origin == nil ||
-		len(GenericDeclarationParameters(origin)) == 0 ||
-		!validSignatures {
-		return InterfaceMethodCallableCorrespondence{}, &NameError{
-			Reason: "interface-method callable correspondence is invalid",
-		}
-	}
-	return InterfaceMethodCallableCorrespondence{
-		owner:        origin,
-		declaration:  declaration,
-		instantiated: instantiated,
-	}, nil
-}
-
-func (c InterfaceMethodCallableCorrespondence) Parts() (
-	*types.TypeName,
-	*types.Signature,
-	*types.Signature,
-) {
-	return c.owner, c.declaration, c.instantiated
-}
-
-type InterfaceMethodCallableReference struct {
-	artifacts      []*GeneratedArtifact
-	correspondence []InterfaceMethodCallableCorrespondence
-	requests       []RootRequest
-}
-
-func NewInterfaceMethodCallableReference(
-	artifacts []*GeneratedArtifact,
-	correspondence []InterfaceMethodCallableCorrespondence,
-	requests ...RootRequest,
-) (InterfaceMethodCallableReference, error) {
-	if len(artifacts) == 0 {
-		return InterfaceMethodCallableReference{}, &NameError{
-			Reason: "interface-method callable identities are absent",
-		}
-	}
-	artifacts = slices.Clone(artifacts)
-	slices.SortFunc(
-		artifacts,
-		func(left *GeneratedArtifact, right *GeneratedArtifact) int {
-			if left == nil || right == nil {
-				switch {
-				case left == right:
-					return 0
-				case left == nil:
-					return -1
-				default:
-					return 1
-				}
-			}
-			return strings.Compare(left.ArtifactKey(), right.ArtifactKey())
-		},
-	)
-	var previous *GeneratedArtifact
-	for _, callable := range artifacts {
-		if callable == nil ||
-			callable.Kind() != GeneratedArtifactInterfaceMethodCallable ||
-			!callable.Valid() ||
-			callable == previous {
-			return InterfaceMethodCallableReference{}, &NameError{
-				Reason: "interface-method callable identities are invalid",
-			}
-		}
-		previous = callable
-	}
-	correspondence = slices.Clone(correspondence)
-	for _, selected := range correspondence {
-		owner, declaration, instantiated := selected.Parts()
-		if owner == nil || declaration == nil || instantiated == nil {
-			return InterfaceMethodCallableReference{}, &NameError{
-				Reason: "interface-method callable correspondences are invalid",
-			}
-		}
-	}
-	if err := validateReferenceRequests(requests); err != nil {
-		return InterfaceMethodCallableReference{}, &RootRequestError{
-			Reason: "interface-method reference request is invalid",
-		}
-	}
-	return InterfaceMethodCallableReference{
-		artifacts:      artifacts,
-		correspondence: correspondence,
-		requests:       slices.Clone(requests),
-	}, nil
-}
-
-func (r InterfaceMethodCallableReference) Artifacts() []*GeneratedArtifact {
-	return slices.Clone(r.artifacts)
-}
-
-func (r InterfaceMethodCallableReference) Correspondences() []InterfaceMethodCallableCorrespondence {
-	return slices.Clone(r.correspondence)
-}
-
-func (r InterfaceMethodCallableReference) Requests() []RootRequest {
-	return slices.Clone(r.requests)
 }

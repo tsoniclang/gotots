@@ -53,7 +53,7 @@ func Emit(
 		requests = append(requests, underlying.Requests()...)
 	}
 	target := context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(reference.Name()),
+		reference.EntityName(context.Factory()),
 		arguments,
 	)
 	return api.DirectType(

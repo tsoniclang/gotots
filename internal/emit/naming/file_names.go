@@ -5,29 +5,31 @@ import (
 	"go/types"
 	"strconv"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type File struct {
-	owner          *Owner
-	sourceFile     *ast.File
-	packageScope   *types.Scope
-	factory        tsgo.Factory
-	targetPath     string
-	require        func(types.Object) error
-	temporaries    map[api.TemporaryKind]uint64
-	importNames    map[string]struct{}
-	importAliases  map[types.Object]string
-	derivedImports map[string]string
-	projections    map[constantProjectionImport]string
-	primitives     map[api.PrimitiveAlias]string
-	runtime        map[api.RuntimeSymbol]string
-	artifactOwner  api.ArtifactOwner
-	artifactSource ast.Node
-	artifactFile   *ast.File
-	artifactPath   string
+	owner           *Owner
+	sourceFile      *ast.File
+	packageScope    *types.Scope
+	factory         tsgo.Factory
+	targetPath      string
+	require         func(types.Object) error
+	temporaries     map[api.TemporaryKind]uint64
+	importNames     map[string]struct{}
+	importAliases   map[types.Object]string
+	derivedImports  map[string]string
+	projections     map[constantProjectionImport]string
+	primitives      map[api.PrimitiveAlias]string
+	runtime         map[api.RuntimeSymbol]string
+	providerImports map[providerImportIdentity]providerImport
+	artifactOwner   api.ArtifactOwner
+	artifactSource  ast.Node
+	artifactFile    *ast.File
+	artifactPath    string
 }
 
 type TemporarySnapshot map[api.TemporaryKind]uint64
@@ -72,19 +74,20 @@ func (n *Owner) ForFile(
 	require func(types.Object) error,
 ) api.Names {
 	return &File{
-		owner:          n,
-		sourceFile:     sourceFile,
-		packageScope:   packageScope,
-		factory:        factory,
-		targetPath:     targetPath,
-		require:        require,
-		temporaries:    make(map[api.TemporaryKind]uint64),
-		importNames:    make(map[string]struct{}),
-		importAliases:  make(map[types.Object]string),
-		derivedImports: make(map[string]string),
-		projections:    make(map[constantProjectionImport]string),
-		primitives:     make(map[api.PrimitiveAlias]string),
-		runtime:        make(map[api.RuntimeSymbol]string),
+		owner:           n,
+		sourceFile:      sourceFile,
+		packageScope:    packageScope,
+		factory:         factory,
+		targetPath:      targetPath,
+		require:         require,
+		temporaries:     make(map[api.TemporaryKind]uint64),
+		importNames:     make(map[string]struct{}),
+		importAliases:   make(map[types.Object]string),
+		derivedImports:  make(map[string]string),
+		projections:     make(map[constantProjectionImport]string),
+		primitives:      make(map[api.PrimitiveAlias]string),
+		runtime:         make(map[api.RuntimeSymbol]string),
+		providerImports: make(map[providerImportIdentity]providerImport),
 	}
 }
 
@@ -191,6 +194,38 @@ func (n *File) reference(
 			Reason: "object has no emitted declaration",
 		}
 	}
+	if binding.kind == targetBindingMissingProvider {
+		return api.NameReference{}, &api.NameError{
+			Name:   object.Name(),
+			Reason: "selected standard-library declaration has no provider binding",
+		}
+	}
+	if binding.kind == targetBindingProvider {
+		if binding.providerMember != "" {
+			return api.NameReference{}, &api.NameError{
+				Name:   object.Name(),
+				Reason: "provider member requires method-target selection",
+			}
+		}
+		if n.require != nil {
+			if err := n.require(object); err != nil {
+				return api.NameReference{}, err
+			}
+		}
+		qualifier, request, err := n.providerImport(
+			object.Pkg(),
+			binding.providerModule,
+			phase,
+		)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		return api.NewQualifiedNameReference(
+			qualifier,
+			binding.providerExport,
+			request,
+		)
+	}
 	if binding.scheduled() && n.require != nil {
 		if err := n.require(object); err != nil {
 			return api.NameReference{}, err
@@ -253,6 +288,40 @@ func (n *File) PackageVariable(
 			Reason: "package variable has no state ownership",
 		}
 	}
+	target := n.owner.registry.byObject[variable]
+	if target.kind == targetBindingMissingProvider {
+		return api.PackageVariableReference{}, &api.NameError{
+			Name:   variable.Name(),
+			Reason: "selected standard-library variable has no provider binding",
+		}
+	}
+	if target.kind == targetBindingProvider {
+		if target.providerAccess != gostdlib.AccessStateMember {
+			return api.PackageVariableReference{}, &api.NameError{
+				Name:   variable.Name(),
+				Reason: "provider variable has invalid package-state access",
+			}
+		}
+		if n.require != nil {
+			if err := n.require(variable); err != nil {
+				return api.PackageVariableReference{}, err
+			}
+		}
+		qualifier, request, err := n.providerImport(
+			variable.Pkg(),
+			target.providerModule,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.PackageVariableReference{}, err
+		}
+		return api.NewQualifiedPackageVariableReference(
+			qualifier,
+			target.providerExport,
+			target.providerMember,
+			request,
+		)
+	}
 	if n.require != nil {
 		if err := n.require(variable); err != nil {
 			return api.PackageVariableReference{}, err
@@ -292,59 +361,6 @@ func (n *File) PackageVariable(
 		stateName,
 		binding.fieldName,
 		request,
-	)
-}
-
-func (n *File) NamedStructOperation(
-	typeName *types.TypeName,
-	operation api.NamedStructOperation,
-) (api.NameReference, error) {
-	request, err := n.namedStructOperationRequest(typeName, operation)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	reference, err := n.reference(
-		typeName,
-		api.ImportPhaseValue,
-		api.ArtifactFacetStaticSurface,
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	requests := append(reference.Requests(), request)
-	return api.NewNameReference(reference.Name(), requests...)
-}
-
-func (n *File) namedStructOperationRequest(
-	typeName *types.TypeName,
-	operation api.NamedStructOperation,
-) (api.RootRequest, error) {
-	if typeName != nil &&
-		typeName.Pkg() != nil &&
-		typeName.Parent() != nil &&
-		typeName.Parent() != typeName.Pkg().Scope() {
-		placement, placementErr := n.generatedArtifactPlacement(
-			typeName.Type(),
-		)
-		if placementErr != nil {
-			return api.RootRequest{}, placementErr
-		}
-		if placement.kind != api.GeneratedArtifactPlacementLexical ||
-			placement.anchor != typeName {
-			return api.RootRequest{}, &api.NameError{
-				Name:   typeName.Name(),
-				Reason: "local named-struct operation has no exact lexical owner",
-			}
-		}
-		return api.NewLexicalNamedStructOperationRequest(
-			placement.lexicalOwner,
-			typeName,
-			operation,
-		)
-	}
-	return api.NewNamedStructOperationRequest(
-		typeName,
-		operation,
 	)
 }
 

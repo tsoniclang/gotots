@@ -79,6 +79,10 @@
       "export": "GoPanic"
     },
     {
+      "id": 502,
+      "export": "GoRecovery"
+    },
+    {
       "id": 801,
       "export": "GoComplex128"
     },

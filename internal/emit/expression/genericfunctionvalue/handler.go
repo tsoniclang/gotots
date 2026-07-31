@@ -141,7 +141,7 @@ func Emit(
 			resultType,
 			context.Factory().EqualsGreaterThanToken(),
 			context.Factory().CallExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				typeArguments,
 				arguments,

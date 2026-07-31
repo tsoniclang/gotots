@@ -80,7 +80,7 @@ func emitUnsafeBuiltin(
 		target, err := api.NewExpressionEmission(
 			before,
 			context.Factory().CallExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				nil,
 				arguments,

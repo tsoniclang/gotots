@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
@@ -329,6 +330,7 @@ type Options struct {
 	IntegerRepresentation IntegerRepresentation
 	EvaluationOrder       EvaluationOrder
 	ConcurrencySemantics  ConcurrencySemantics
+	StandardLibrary       *certify.Certificate
 }
 
 func DefaultOptions() Options {
@@ -398,6 +400,12 @@ func (o Options) validate() error {
 		return &OptionsError{
 			Field:  "concurrency semantics",
 			Reason: "value is invalid",
+		}
+	}
+	if o.StandardLibrary != nil && !o.StandardLibrary.Valid() {
+		return &OptionsError{
+			Field:  "standard library",
+			Reason: "certificate is invalid",
 		}
 	}
 	return nil

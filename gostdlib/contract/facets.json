@@ -1,0 +1,710 @@
+{
+  "schemaVersion": 1,
+  "facets": [
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "unicode|kind=2|receiver=|name=Range16",
+      "specifier": "@gotots/gostdlib/internal/facets/named-unicode.js",
+      "sourcePath": "src/internal/facets/named-unicode.ts",
+      "export": "UnicodeRange16Operations",
+      "capabilities": [
+        "make"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "unicode|kind=2|receiver=|name=Range32",
+      "specifier": "@gotots/gostdlib/internal/facets/named-unicode.js",
+      "sourcePath": "src/internal/facets/named-unicode.ts",
+      "export": "UnicodeRange32Operations",
+      "capabilities": [
+        "make"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "unicode|kind=2|receiver=|name=RangeTable",
+      "specifier": "@gotots/gostdlib/internal/facets/named-unicode.js",
+      "sourcePath": "src/internal/facets/named-unicode.ts",
+      "export": "UnicodeRangeTableOperations",
+      "capabilities": [
+        "make"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=Map",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncMapOperations",
+      "capabilities": [
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncMapStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=Mutex",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncMutexOperations",
+      "capabilities": [
+        "zero"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=Once",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncOnceOperations",
+      "capabilities": [
+        "zero"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=Pool",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncPoolOperations",
+      "capabilities": [
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncPoolStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=RWMutex",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncRWMutexOperations",
+      "capabilities": [
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncRWMutexStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Uint32",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync-atomic.js",
+      "sourcePath": "src/internal/facets/named-sync-atomic.ts",
+      "export": "SyncAtomicUint32Operations",
+      "capabilities": [
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncAtomicUint32Storage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Uint64",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync-atomic.js",
+      "sourcePath": "src/internal/facets/named-sync-atomic.ts",
+      "export": "SyncAtomicUint64Operations",
+      "capabilities": [
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncAtomicUint64Storage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "strings|kind=2|receiver=|name=Builder",
+      "specifier": "@gotots/gostdlib/internal/facets/named-strings.js",
+      "sourcePath": "src/internal/facets/named-strings.ts",
+      "export": "StringsBuilderOperations",
+      "capabilities": [
+        "zero"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=Description",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime-metrics.js",
+      "sourcePath": "src/internal/facets/named-runtime-metrics.ts",
+      "export": "RuntimeMetricsDescriptionOperations",
+      "capabilities": [
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=Sample",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime-metrics.js",
+      "sourcePath": "src/internal/facets/named-runtime-metrics.ts",
+      "export": "RuntimeMetricsSampleOperations",
+      "capabilities": [
+        "copy",
+        "make",
+        "zero"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=Value",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime-metrics.js",
+      "sourcePath": "src/internal/facets/named-runtime-metrics.ts",
+      "export": "RuntimeMetricsValueOperations",
+      "capabilities": [
+        "zero"
+      ]
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "bufio|kind=4|receiver=*bufio.Reader|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "BufioReaderRead",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "bufio|kind=4|receiver=*bufio.Writer|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "BufioWriterWrite",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "bytes|kind=4|receiver=*bytes.Buffer|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "BytesBufferRead",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "compress/gzip|kind=4|receiver=*compress/gzip.Reader|name=Close",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "GzipReaderClose",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "compress/gzip|kind=4|receiver=*compress/gzip.Reader|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "GzipReaderRead",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "io/fs|kind=4|receiver=*io/fs.PathError|name=Error",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "IoFsPathErrorError",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "os|kind=4|receiver=*os.File|name=Close",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "OsFileClose",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "os|kind=4|receiver=*os.File|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "OsFileRead",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "os|kind=4|receiver=*os.File|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "OsFileWrite",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "strings|kind=4|receiver=*strings.Builder|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "StringsBuilderWrite",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "strings|kind=4|receiver=*strings.Reader|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "StringsReaderRead",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "cmp|kind=4|receiver=|name=Compare",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "CmpCompare",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "syscall|kind=4|receiver=syscall.Errno|name=Error",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "SyscallErrnoError",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "syscall|kind=4|receiver=syscall.Signal|name=Signal",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "SyscallSignalSignal",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "syscall|kind=4|receiver=syscall.Signal|name=String",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "SyscallSignalString",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=*time.Ticker|name=Stop",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTickerStop",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Duration|name=String",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeDurationString",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Time|name=String",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTimeString",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=PutUint16",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianPutUint16",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=PutUint32",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianPutUint32",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=PutUint64",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianPutUint64",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=String",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianString",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint16",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianUint16",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint32",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianUint32",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint64",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianUint64",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=PutUint16",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianPutUint16",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=PutUint32",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianPutUint32",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=PutUint64",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianPutUint64",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=String",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianString",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=Uint16",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianUint16",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=Uint32",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianUint32",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=Uint64",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianUint64",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync|kind=4|receiver=*sync.Mutex|name=Unlock",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncMutexUnlock",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync|kind=4|receiver=*sync.Pool|name=Put",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncPoolPut",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync|kind=4|receiver=*sync.RWMutex|name=RUnlock",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncRWMutexRUnlock",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync|kind=4|receiver=*sync.RWMutex|name=Unlock",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncRWMutexUnlock",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync|kind=4|receiver=*sync.WaitGroup|name=Done",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncWaitGroupDone",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync/atomic|kind=4|receiver=*sync/atomic.Bool|name=Store",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncAtomicBoolStore",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "maps|kind=4|receiver=|name=Keys",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-maps.js",
+      "sourcePath": "src/internal/facets/generic-maps.ts",
+      "export": "MapsKeysCooperative",
+      "profileKey": "aa2e21194a2d3328597e14f3ca5998266a104afacc0ba2162588b7942d5cd653=cooperative",
+      "effect": "sync"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "maps|kind=4|receiver=|name=Keys",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-maps.js",
+      "sourcePath": "src/internal/facets/generic-maps.ts",
+      "export": "MapsKeysFullyCooperative",
+      "profileKey": "aa2e21194a2d3328597e14f3ca5998266a104afacc0ba2162588b7942d5cd653=cooperative|ef5cb30187984705b87503620f43c4522f10605f9b386f9f6df9b301978a7738=cooperative",
+      "effect": "sync"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "maps|kind=4|receiver=|name=Values",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-maps.js",
+      "sourcePath": "src/internal/facets/generic-maps.ts",
+      "export": "MapsValuesCooperative",
+      "profileKey": "965fc01e67df151e5b283a6bc5cd988f0e819c509cb310b56ba4631c8f9533ec=cooperative",
+      "effect": "sync"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "maps|kind=4|receiver=|name=Values",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-maps.js",
+      "sourcePath": "src/internal/facets/generic-maps.ts",
+      "export": "MapsValuesFullyCooperative",
+      "profileKey": "965fc01e67df151e5b283a6bc5cd988f0e819c509cb310b56ba4631c8f9533ec=cooperative|c3a257d7ce8b651159ff2e3c62b7161627f720bfc6b0cb28f65f5915ecf7d056=cooperative",
+      "effect": "sync"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=AppendSeq",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesAppendSeqCooperative",
+      "profileKey": "625d99cc3a4a8041a6c210aff3a339db4e83cf34c18dbe41a42fa48cf59f77ab=cooperative|f729115bf3e3995f96e7e344375769cd4b0a973dceaa98d59427a06f0fa3f074=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=Collect",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesCollectCooperative",
+      "profileKey": "e5c8b67a6f38dcfde6fc5d8fcca5ba4cb80f3909208a66256240dab706e89d68=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=Collect",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesCollectFullyCooperative",
+      "profileKey": "463c4851d985a1488203116869cc8bc37b98bf61ec5d5484bf0df7e59ca40e58=cooperative|e5c8b67a6f38dcfde6fc5d8fcca5ba4cb80f3909208a66256240dab706e89d68=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=ContainsFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesContainsFuncCooperative",
+      "profileKey": "98f3effe694159cd5fcdf4894738038a38beff8b733aebf56102260f34dc227e=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=DeleteFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesDeleteFuncCooperative",
+      "profileKey": "026708ea596ca95841f50135eac06712b5d2e0aee950329cfab8fad8b55049d0=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=IndexFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesIndexFuncCooperative",
+      "profileKey": "9014504e4639e10692a74a28a9b3c11107e87b1aea32c765ce0f1142f4329b54=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=SortFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesSortFuncCooperative",
+      "profileKey": "f9086f9314839d7450dc53d220168964ca4b935e0b995136a4fceb36d02868a7=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=SortStableFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesSortStableFuncCooperative",
+      "profileKey": "4c38e810dd7be44174703a3dfe388af078747cca1c11be0db66281a5493daeb3=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=Sorted",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesSortedCooperative",
+      "profileKey": "1bcecf0698ae7e007b8fbf07b9e01ec5913c886b85743bfd0d8726501d67fbbe=cooperative|fb2488bb05450d70e9d3a3b060575c3f2ff9052f56ba075e968dfe9e6d84fdbe=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=Values",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesValuesCooperative",
+      "profileKey": "652217bd97327bcf74dac90763c1f154a7d8bbcf536ce7e832bdaf968a702881=cooperative|cdd8b52d8c59de6acb71522442974fa2016409e18b1d99841c9cd34a1fe8561d=cooperative",
+      "effect": "sync"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "sync|kind=4|receiver=|name=OnceValue",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-sync.js",
+      "sourcePath": "src/internal/facets/generic-sync.ts",
+      "export": "SyncOnceValueCooperative",
+      "profileKey": "c30278625496c7198c92a774ca902c537bd14851c35fbd06e171ee3f89e3602c=cooperative",
+      "effect": "sync"
+    }
+  ]
+}

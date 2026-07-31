@@ -34,18 +34,18 @@ test("Duration and Time preserve arithmetic, ordering, formatting, and zero", ()
   assert.equal(duration.String(), "1.25s");
 
   const epoch = UnixMilli(0);
-  const later = Time.Add(epoch, duration);
-  assert.equal(Time.Before(epoch, later), true);
-  assert.equal(Time.After(later, epoch), true);
-  assert.equal(Time.Equal(epoch, UnixMilli(0)), true);
-  assert.equal(Time.Sub(later, epoch).Nanoseconds(), duration.Nanoseconds());
+  const later = epoch.Add(duration);
+  assert.equal(epoch.Before(later), true);
+  assert.equal(later.After(epoch), true);
+  assert.equal(epoch.Equal(UnixMilli(0)), true);
+  assert.equal(later.Sub(epoch).Nanoseconds(), duration.Nanoseconds());
   const localEpoch = new Date(0);
   const hour = localEpoch.getHours() % 12 || 12;
   const expectedTime = `${String(hour).padStart(2, "0")}:`
     + `${String(localEpoch.getMinutes()).padStart(2, "0")}:`
     + `${String(localEpoch.getSeconds()).padStart(2, "0")} `
     + `${localEpoch.getHours() < 12 ? "AM" : "PM"}`;
-  assert.equal(Time.Format(UnixMilli(0), "03:04:05 PM"), expectedTime);
+  assert.equal(UnixMilli(0).Format("03:04:05 PM"), expectedTime);
   assert.equal(new Time().IsZero(), true);
   assert.equal(UnixMilli(0).UnixMilli(), 0);
   assert.equal(UnixMilli(0).UnixNano(), 0);
@@ -54,7 +54,7 @@ test("Duration and Time preserve arithmetic, ordering, formatting, and zero", ()
   const now = Now();
   assert.equal(now.IsZero(), false);
   assert.ok(Since(now).Nanoseconds() >= 0);
-  assert.ok(Until(Time.Add(now, new Duration(1_000_000_000))).Nanoseconds() > 0);
+  assert.ok(Until(now.Add(new Duration(1_000_000_000))).Nanoseconds() > 0);
 });
 
 test("Timer delivers once, supports reset, and reports stop state", async () => {

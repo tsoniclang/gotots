@@ -7,17 +7,23 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
 )
 
 type targetBinding struct {
-	name         string
-	sourceFile   *ast.File
-	sourcePath   string
-	moduleExport bool
-	kind         targetBindingKind
+	name           string
+	sourceFile     *ast.File
+	sourcePath     string
+	moduleExport   bool
+	kind           targetBindingKind
+	providerModule string
+	providerExport string
+	providerMember string
+	providerAccess gostdlib.AccessKind
 }
 
 type targetBindingKind uint8
@@ -26,11 +32,14 @@ const (
 	targetBindingLocal targetBindingKind = iota
 	targetBindingSource
 	targetBindingEnvironment
+	targetBindingProvider
+	targetBindingMissingProvider
 )
 
 func (b targetBinding) scheduled() bool {
 	return b.kind == targetBindingSource ||
-		b.kind == targetBindingEnvironment
+		b.kind == targetBindingEnvironment ||
+		b.kind == targetBindingProvider
 }
 
 func (b targetBinding) sourceOwned() bool {
@@ -106,6 +115,7 @@ type Target struct {
 }
 
 type Registry struct {
+	provider                     standardLibraryProvider
 	byObject                     map[types.Object]targetBinding
 	memberNameByObject           map[*types.Var]string
 	packageVariables             map[*types.Var]packageVariableBinding
@@ -297,7 +307,11 @@ func (r *Registry) reserve(
 		if existing.sourceFile != binding.sourceFile ||
 			existing.sourcePath != binding.sourcePath ||
 			existing.name != binding.name ||
-			existing.kind != binding.kind {
+			existing.kind != binding.kind ||
+			existing.providerModule != binding.providerModule ||
+			existing.providerExport != binding.providerExport ||
+			existing.providerMember != binding.providerMember ||
+			existing.providerAccess != binding.providerAccess {
 			return &api.NameError{
 				Name:   objectName(object),
 				Reason: "declaration has conflicting target ownership",
@@ -312,6 +326,7 @@ func (r *Registry) reserve(
 func (r *Registry) IndexCompilationTargets(
 	sourcePackages []*load.Package,
 	environmentPackages []*load.Package,
+	certificate *certify.Certificate,
 ) error {
 	if r == nil {
 		return &api.NameError{Reason: "declaration registry is nil"}
@@ -339,6 +354,11 @@ func (r *Registry) IndexCompilationTargets(
 		r.assemblyPathByPackage[typesPackage] = assemblyPath
 		packages = append(packages, typesPackage)
 	}
+	var provider standardLibraryProvider
+	if certificate != nil {
+		provider = certificate
+	}
+	r.provider = provider
 	for _, environmentPackage := range environmentPackages {
 		if environmentPackage == nil ||
 			!environmentPackage.Kind().EnvironmentContract() ||
@@ -364,6 +384,7 @@ func (r *Registry) IndexCompilationTargets(
 		if err := r.indexEnvironmentPackage(
 			environmentPackage,
 			contractPath,
+			provider,
 		); err != nil {
 			return err
 		}
@@ -375,6 +396,7 @@ func (r *Registry) IndexCompilationTargets(
 func (r *Registry) indexEnvironmentPackage(
 	sourcePackage *load.Package,
 	contractPath string,
+	provider standardLibraryProvider,
 ) error {
 	scope := sourcePackage.Types().Scope()
 	names := scope.Names()
@@ -392,6 +414,15 @@ func (r *Registry) indexEnvironmentPackage(
 			sourcePath:   contractPath,
 			moduleExport: true,
 			kind:         targetBindingEnvironment,
+		}
+		binding, err := selectProviderBinding(
+			sourcePackage,
+			object,
+			binding,
+			provider,
+		)
+		if err != nil {
+			return err
 		}
 		if err := r.reserve(object, binding); err != nil {
 			return err
@@ -423,12 +454,22 @@ func (r *Registry) indexEnvironmentPackage(
 			base := portableIdentifier(typeName.Name()) + "_" +
 				portableIdentifier(method.Name())
 			methodName := allocatePackageName(base, used)
-			if err := r.reserve(method, targetBinding{
+			methodBinding := targetBinding{
 				name:         methodName,
 				sourcePath:   contractPath,
 				moduleExport: true,
 				kind:         targetBindingEnvironment,
-			}); err != nil {
+			}
+			methodBinding, err = selectProviderBinding(
+				sourcePackage,
+				method,
+				methodBinding,
+				provider,
+			)
+			if err != nil {
+				return err
+			}
+			if err := r.reserve(method, methodBinding); err != nil {
 				return err
 			}
 		}

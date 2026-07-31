@@ -79,7 +79,7 @@ func EmitNonNil(
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			arguments,
 		),
 		requests...,

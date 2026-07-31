@@ -52,8 +52,7 @@ func SelectGenericCallable(
 			api.GenericCallableProfileSelection{},
 			err
 	}
-	reference, err = api.NewNameReference(
-		reference.Name(),
+	reference, err = reference.WithRequests(
 		api.CombineRequests(
 			reference.Requests(),
 			selected.requests,

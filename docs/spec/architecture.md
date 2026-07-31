@@ -1371,6 +1371,36 @@ map to the provider-owned
 data. The internal export is an adapter to the one ordinary semantic
 implementation, not a second implementation.
 
+The checked provider contract has two disjoint surfaces. Public module records
+own ordinary Go declarations. Compiler-facet records own only an exact selected
+capability of one such declaration or represented type. A compiler-facet record
+contains the canonical selected-Go object identity, a closed facet kind, a
+sorted non-empty capability set, one stable internal module/export, the exact
+TS-Go project fingerprint and implementation owner, and—only for callable
+facets—the independently selected outer `sync` or `async` effect. Named-struct
+facets may additionally own one storage-type export and its separate
+fingerprint. The valid capabilities are the compiler's closed operation names
+(`make`, `zero`, `copy`, `equal`, `hash`, `convert`, `storage`, and `assign`),
+the exact generic callable profile key, or `recovery`; arbitrary strings are
+rejected.
+
+For example, a generated zero of `sync.Mutex` does not call a `$zero` member on
+the public `sync.Mutex` class. The selected `sync.Mutex` identity plus capability
+`zero` exact-joins a private `MutexOperations` export, and the typed TS-Go AST
+calls `syncFacets.MutexOperations.$zero()`. Ordinary calls still use
+`sync.Mutex.Lock(receiver)`. Likewise, a cooperative `slices.SortFunc` use joins
+its exact profile key to `SortFuncCooperative`; a deferred provider call joins
+`recovery` to a provider adapter whose explicit last parameter is the recovery
+authority. No caller invents a private module, export, effect, operation set, or
+storage type from source spelling.
+
+Construction is a represented-type operation too. A composite literal such as
+`unicode.Range16{Lo: 1}` selects the certified `make` facet and emits
+`unicodeFacets.Range16Operations.$make(1, ...)`; it never assumes that the clean
+public provider class exposes compiler members. Source-emitted structs continue
+to use their demand-created class operation. This distinction is selected from
+canonical declaration ownership, not package spelling.
+
 The selected `GOROOT` remains the declaration truth owner. For every public
 provider export, verification records and joins:
 

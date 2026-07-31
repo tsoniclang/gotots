@@ -30,7 +30,7 @@ func EmitType(
 		return api.DirectType(
 			context.Factory().UnionTypeNode([]tsgo.TypeNode{
 				context.Factory().TypeReferenceNode(
-					context.Factory().Identifier(reference.Name()),
+					reference.EntityName(context.Factory()),
 					nil,
 				),
 				context.Factory().KeywordTypeNode(
@@ -65,7 +65,7 @@ func EmitType(
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			[]tsgo.TypeNode{key.Value(), value.Value()},
 		),
 		api.CombineRequests(
@@ -216,7 +216,7 @@ func Reference(
 		keyRequests,
 		valueRequests,
 	)
-	reference, err = api.NewNameReference(reference.Name(), requests...)
+	reference, err = reference.WithRequests(requests...)
 	if err != nil {
 		return api.NameReference{}, nil, err
 	}
@@ -287,7 +287,7 @@ func Make(
 	return model.Wrap(context, api.DirectExpression(
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(makeName),
 				tsgo.NodeFlagsNone,
@@ -353,7 +353,7 @@ func representedType(
 			return nil, nil, err
 		}
 		return context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			nil,
 		), reference.Requests(), nil
 	}
@@ -380,7 +380,7 @@ func primitiveType(
 		return nil, nil, err
 	}
 	return context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(reference.Name()),
+		reference.EntityName(context.Factory()),
 		nil,
 	), reference.Requests(), nil
 }

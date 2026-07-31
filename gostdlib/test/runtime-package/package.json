@@ -19,6 +19,10 @@
       "types": "./complex.d.ts",
       "default": "./complex.js"
     },
+    "./dense-index.js": {
+      "types": "./dense-index.d.ts",
+      "default": "./dense-index.js"
+    },
     "./interface-value.js": {
       "types": "./interface-value.d.ts",
       "default": "./interface-value.js"

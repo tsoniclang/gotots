@@ -128,6 +128,8 @@ func verifyProductionFile(relative string, sourcePath string) error {
 		importAliases[importPath] = alias
 		if importPath == "go/ast" || importPath == "go/types" {
 			if !strings.HasPrefix(relative, "internal/load/") &&
+				!strings.HasPrefix(relative, "internal/contracts/environment/") &&
+				!strings.HasPrefix(relative, "internal/contracts/gostdlib/certify/") &&
 				!strings.HasPrefix(relative, "internal/emit/") {
 				return &wallError{
 					source: relative,
@@ -553,6 +555,8 @@ func layerFor(relative string) int {
 	relative = filepath.ToSlash(relative)
 	switch {
 	case strings.HasPrefix(relative, "internal/load/"):
+		return 10
+	case strings.HasPrefix(relative, "internal/contracts/"):
 		return 10
 	case strings.HasPrefix(relative, "internal/target/tsgo/"):
 		return 10

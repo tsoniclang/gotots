@@ -217,7 +217,7 @@ func (m Model) Wrap(
 	return api.NewExpressionEmission(
 		value.Before(),
 		context.Factory().NewExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			[]tsgo.Expression{value.Value()},
 		),

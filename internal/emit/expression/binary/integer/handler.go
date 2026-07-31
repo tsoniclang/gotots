@@ -101,7 +101,7 @@ func Apply(
 		}
 		return api.DirectExpression(
 			context.Factory().CallExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				nil,
 				[]tsgo.Expression{left.Value(), right.Value()},

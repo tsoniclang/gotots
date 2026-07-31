@@ -123,7 +123,7 @@ func EmitNonNilRepresented(
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			[]tsgo.TypeNode{elementType.Value(), storageType.Value()},
 		),
 		api.CombineRequests(

@@ -101,7 +101,7 @@ func Emit(
 			before,
 			context.Factory().CallExpression(
 				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
+					reference.Expression(context.Factory()),
 					nil,
 					context.Factory().Identifier(api.StructMakeMember),
 					tsgo.NodeFlagsNone,
@@ -132,7 +132,9 @@ func Emit(
 				)
 		}
 	} else {
-		reference, err = context.Names().Reference(named.Obj())
+		reference, err = context.Names().NamedStructConstructor(
+			named.Origin().Obj(),
+		)
 	}
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -141,7 +143,7 @@ func Emit(
 		before,
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(api.StructMakeMember),
 				tsgo.NodeFlagsNone,

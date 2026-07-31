@@ -1,0 +1,92 @@
+package certify
+
+import (
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+)
+
+type Certificate struct {
+	manifest     gostdlib.Manifest
+	toolchainKey string
+	providerRoot string
+}
+
+func Verify(config Config) (*Certificate, error) {
+	resolved, err := resolveConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	checkedBytes, checked, err := readManifest(resolved.manifestPath)
+	if err != nil {
+		return nil, err
+	}
+	generated, err := Generate(config)
+	if err != nil {
+		return nil, err
+	}
+	if err := compareCanonical(checkedBytes, generated); err != nil {
+		return nil, err
+	}
+	selectedToolchain, err := inspectToolchain(resolved)
+	if err != nil {
+		return nil, err
+	}
+	return &Certificate{
+		manifest:     checked,
+		toolchainKey: selectedToolchain.key,
+		providerRoot: resolved.providerRoot,
+	}, nil
+}
+
+func (c *Certificate) Valid() bool {
+	return c != nil && c.manifest.Digest() != "" &&
+		c.toolchainKey != "" && c.providerRoot != ""
+}
+
+func (c *Certificate) ManifestDigest() string {
+	if c == nil {
+		return ""
+	}
+	return c.manifest.Digest()
+}
+
+func (c *Certificate) ToolchainKey() string {
+	if c == nil {
+		return ""
+	}
+	return c.toolchainKey
+}
+
+func (c *Certificate) Binding(identity string) (gostdlib.Binding, bool) {
+	if !c.Valid() {
+		return gostdlib.Binding{}, false
+	}
+	return c.manifest.Binding(identity)
+}
+
+func (c *Certificate) Modules() []gostdlib.Module {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.Modules()
+}
+
+func (c *Certificate) Facet(
+	sourceIdentity string,
+	kind gostdlib.FacetKind,
+	capability gostdlib.FacetCapability,
+) (gostdlib.Facet, bool) {
+	if !c.Valid() {
+		return gostdlib.Facet{}, false
+	}
+	return c.manifest.Facet(sourceIdentity, kind, capability)
+}
+
+func (c *Certificate) GenericCallableFacet(
+	sourceIdentity string,
+	profileKey string,
+) (gostdlib.Facet, bool) {
+	if !c.Valid() {
+		return gostdlib.Facet{}, false
+	}
+	return c.manifest.GenericCallableFacet(sourceIdentity, profileKey)
+}

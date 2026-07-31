@@ -115,7 +115,7 @@ func Emit(
 	return api.DirectExpression(
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(pointerruntime.CellName),
 				tsgo.NodeFlagsNone,

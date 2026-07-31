@@ -97,8 +97,8 @@ func emitDeferredGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	expression, expressionRequests, err :=
-		call.expression(
+	expression, providerRecovery, recoveryCooperative, expressionRequests, err :=
+		call.recoveryExpression(
 			context,
 			call.arguments,
 			context.Factory().Identifier(
@@ -108,13 +108,17 @@ func emitDeferredGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	cooperative, contractRequests, err :=
-		cooperativecall.GenericContract(
-			context,
-			call.invocation.Facet(),
-		)
-	if err != nil {
-		return api.ExpressionEmission{}, err
+	cooperative := recoveryCooperative
+	var contractRequests []api.RootRequest
+	if !providerRecovery {
+		cooperative, contractRequests, err =
+			cooperativecall.GenericContract(
+				context,
+				call.invocation.Facet(),
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	return deferredInvocation(
 		context,
@@ -222,6 +226,25 @@ func (c genericReceiverMethodCall) expression(
 	recovery tsgo.Expression,
 ) (tsgo.CallExpression, []api.RootRequest, error) {
 	return c.invocation.Call(
+		context,
+		c.receiver,
+		arguments,
+		recovery,
+	)
+}
+
+func (c genericReceiverMethodCall) recoveryExpression(
+	context api.Context,
+	arguments []tsgo.Expression,
+	recovery tsgo.Expression,
+) (
+	tsgo.CallExpression,
+	bool,
+	bool,
+	[]api.RootRequest,
+	error,
+) {
+	return c.invocation.RecoveryCall(
 		context,
 		c.receiver,
 		arguments,

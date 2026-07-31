@@ -175,7 +175,8 @@ func synchronize(
 			if walkErr != nil {
 				return walkErr
 			}
-			if entry.IsDir() || filepath.Ext(entry.Name()) != ".ts" {
+			if entry.IsDir() || filepath.Ext(entry.Name()) != ".ts" ||
+				strings.HasSuffix(entry.Name(), ".d.ts") {
 				return nil
 			}
 			relative, err := filepath.Rel(outputDirectory, path)

@@ -105,24 +105,29 @@ func emitDeferredMethod(
 		return api.ExpressionEmission{}, err
 	}
 	before = append(before, argumentBefore...)
-	call, callRequests, err := invocation.Call(
-		context,
-		context.Factory().Identifier(receiverName),
-		arguments,
-		context.Factory().Identifier(
-			callable.RecoveryAuthorityName,
-		),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	cooperative, contractRequests, err :=
-		cooperativecall.GenericContract(
+	call, providerRecovery, recoveryCooperative, callRequests, err :=
+		invocation.RecoveryCall(
 			context,
-			invocation.Facet(),
+			context.Factory().Identifier(receiverName),
+			arguments,
+			context.Factory().Identifier(
+				callable.RecoveryAuthorityName,
+			),
 		)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	cooperative := recoveryCooperative
+	var contractRequests []api.RootRequest
+	if !providerRecovery {
+		cooperative, contractRequests, err =
+			cooperativecall.GenericContract(
+				context,
+				invocation.Facet(),
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	return deferredInvocation(
 		context,

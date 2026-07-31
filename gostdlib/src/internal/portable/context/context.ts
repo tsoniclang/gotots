@@ -171,13 +171,13 @@ export function WithTimeout(
   timeout: Duration,
 ): [Context, CancelFunc] {
   const actualParent = requireParent(parent);
-  const requestedDeadline = Time.Add(Now(), timeout);
+  const requestedDeadline = Now().Add(timeout);
   const [parentDeadline, parentHasDeadline] = actualParent.Deadline();
-  const deadline = parentHasDeadline && Time.Before(parentDeadline, requestedDeadline)
+  const deadline = parentHasDeadline && parentDeadline.Before(requestedDeadline)
     ? parentDeadline
     : requestedDeadline;
   const child = new CancelContext(actualParent, deadline);
-  void After(Time.Sub(deadline, Now())).receive().then(() => child.cancel(deadlineExceeded));
+  void After(deadline.Sub(Now())).receive().then(() => child.cancel(deadlineExceeded));
   return [child, async (): Promise<void> => child.cancel(canceled)];
 }
 

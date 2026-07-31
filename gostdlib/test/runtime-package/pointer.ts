@@ -1,3 +1,4 @@
+import { GoDenseIndex } from "./dense-index.js";
 import { GoPanic } from "./panic.js";
 export class GoPointer<L, S> {
     declare private readonly logical: (value: L) => L;
@@ -57,7 +58,7 @@ export class GoPointer<L, S> {
         const backing = location[0];
         const index = location[1];
         return new GoPointer<L, S>(GoPointer.child(GoPointer.root(backing), index), () => {
-            return backing[index]!;
+            return GoDenseIndex.get(backing, index);
         }, (next: S) => {
             backing[index] = next;
         });
