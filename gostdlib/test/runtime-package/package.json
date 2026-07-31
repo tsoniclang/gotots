@@ -14,6 +14,34 @@
     "./interface-value.js": {
       "types": "./interface-value.d.ts",
       "default": "./interface-value.js"
+    },
+    "./panic.js": {
+      "types": "./panic.d.ts",
+      "default": "./panic.js"
+    },
+    "./pointer.js": {
+      "types": "./pointer.d.ts",
+      "default": "./pointer.js"
+    },
+    "./array.js": {
+      "types": "./array.d.ts",
+      "default": "./array.js"
+    },
+    "./map.js": {
+      "types": "./map.d.ts",
+      "default": "./map.js"
+    },
+    "./channel.js": {
+      "types": "./channel.d.ts",
+      "default": "./channel.js"
+    },
+    "./complex.js": {
+      "types": "./complex.d.ts",
+      "default": "./complex.js"
+    },
+    "./unsafe-pointer.js": {
+      "types": "./unsafe-pointer.d.ts",
+      "default": "./unsafe-pointer.js"
     }
   }
 }

@@ -10,6 +10,11 @@ export interface GoError extends GoInterfaceValue {
   Error(): string;
 }
 
+export declare const GoErrorMethodToken: object;
+export declare const GoRuntimeErrorMethodToken: object;
+export declare const GoError$contract: readonly object[];
+export declare function GoError$is(value: GoInterfaceValue | undefined): value is GoError;
+
 export declare class GoBasicError extends GoInterfaceValue implements GoError {
   constructor(message: string);
   readonly $go$type: object;
