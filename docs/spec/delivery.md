@@ -666,6 +666,23 @@ standard-library contracts, reusable manual `gostdlib`, true external
 contracts, placeholders, structural manual completion, extensions, and
 reachable-obligation checking.
 
+Build `gostdlib` first as the independently typechecked and executable
+`@gotots/gostdlib` ESM package. Its public subpaths mirror Go import paths and
+contain ordinary named exports with Go declaration names. The first backend is
+Node.js, but `node` does not occur in the public package name or subpaths.
+Portable and host-dependent implementation ownership remains internal.
+
+Before compiler linkage, exact-join every provider export and implementation
+against selected-`GOROOT` declaration identity and signature, execute focused
+Go-versus-provider differentials, and prove the package contains no placeholder
+or opaque public ABI spelling. The provider must be installable and vendorable
+under the same module specifiers. Linkage is then one atomic compiler change:
+replace ambient standard-library imports with namespace imports from
+`@gotots/gostdlib/<go-import-path>.js`, migrate receiver and package-state
+references, delete the ambient standard-library runtime path, and rerun the
+whole-product gates. Do not combine an incomplete provider with compiler
+linkage.
+
 Source-available dependencies continue through ordinary direct emission.
 Reachable unresolved placeholders block publication.
 

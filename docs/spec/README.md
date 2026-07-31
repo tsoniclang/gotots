@@ -146,6 +146,11 @@ artifacts reach a fixed point.
   Generated files in one compilation cannot mix selections.
 - **manual obligation:** an exact generated declaration whose implementation
   must be supplied manually.
+- **standard-library provider:** the GoToTS-owned `@gotots/gostdlib` package.
+  Its public ESM subpaths mirror Go standard-library import paths, its named
+  exports preserve Go declaration names, and its implementation satisfies the
+  exact selected-`GOROOT` contract. The selected host backend is implementation
+  metadata and never appears in the public package name.
 - **true external:** unavailable or host/native behavior represented by an
   explicit contract rather than inferred from import spelling.
 

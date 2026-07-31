@@ -1229,6 +1229,106 @@ typed non-executable obligation. No source body is fabricated, no environment
 package is entered into the source emitter, and no runtime Promise inspection
 or union result is admitted.
 
+### Standard-Library Provider Surface
+
+Reusable standard-library behavior is published as the GoToTS-owned ESM
+package `@gotots/gostdlib`. The public package name is independent of the
+selected host. A Node.js-backed build, a future browser-backed build, and any
+other exact implementation all expose the same public module specifiers:
+
+```text
+Go import          provider module
+"strings"       -> @gotots/gostdlib/strings.js
+"os"            -> @gotots/gostdlib/os.js
+"os/exec"       -> @gotots/gostdlib/os/exec.js
+"path/filepath" -> @gotots/gostdlib/path/filepath.js
+```
+
+The implementation backend is package metadata and internal source ownership;
+`node`, a platform name, a contract digest, and a toolchain digest never enter
+an ordinary public module specifier or export name. The Node.js implementation
+may import `node:` modules only inside the provider package. Generated source
+does not import `node:` modules directly.
+
+Each public module is an ordinary hand-maintainable TypeScript module with
+named exports. Package functions retain their Go declaration names and source
+parameter names. Exported types retain their Go names. A generated consumer
+uses one namespace import under the source Go package qualifier, so ordinary
+calls remain source-shaped:
+
+```ts
+import * as strings from "@gotots/gostdlib/strings.js";
+import * as os from "@gotots/gostdlib/os.js";
+
+strings.Contains(text, suffix);
+const [directory, err] = os.Getwd();
+```
+
+An imported type-name collision uses an ordinary explicit alias such as
+`File as OsFile`; it never uses `__from_`, an opaque digest, or traversal-order
+numbering. Parameter fallbacks use `argument0`, `argument1`, and so on only
+when the selected Go declaration genuinely has no source name. Dollar-prefixed
+compiler names are forbidden on the public provider surface.
+
+A receiver operation that cannot be represented as an exact native instance
+method is a static member of its declaring type with an explicit first
+`receiver` parameter:
+
+```ts
+export class File {
+    static Read(
+        receiver: File | undefined,
+        buffer: RuntimeSlice<uint8>,
+    ): [int64, GoError | undefined];
+}
+
+const [count, readErr] = os.File.Read(file, buffer);
+```
+
+This preserves Go nil-receiver entry and statically selected concrete method
+semantics. It does not create JavaScript virtual dispatch or dereference the
+receiver before entering the method. A native instance method is admissible
+only when the ordinary representation proof already establishes exact nil,
+copy, promotion, and dispatch behavior for that receiver family.
+
+Mutable package variables live in one exported `state` object, allowing exact
+read and write behavior without attempting to assign through an immutable ESM
+namespace binding:
+
+```ts
+export const state: {
+    Args: RuntimeSlice<gostring>;
+    Stdout: File | undefined;
+};
+
+const first = os.state.Args.get(0);
+```
+
+Compiler-only recovery, cooperative, specialization, interface, and generated
+operation facets live behind non-public internal modules. They do not rename
+the ordinary API with `$cooperative_<digest>`, `$is`, `$contract`, `$state`,
+receiver-name concatenation, or another encoded ABI spelling. An internal
+facet exact-joins one public Go declaration and one provider implementation;
+it may not become a second semantic implementation.
+
+The selected `GOROOT` remains the declaration truth owner. For every public
+provider export, verification records and joins:
+
+```text
+Go import path + exact object identity + selected signature/profile
+    <-> public module subpath + named export
+    <-> provider implementation owner
+```
+
+The provider package carries a canonical machine-readable contract manifest
+with the selected Go versions, declaration identities, signatures, backend
+ownership, and implementation source locations. Digests belong in that
+manifest and package integrity metadata, not in source-level names.
+A missing implementation, mismatched signature, unexplained public export,
+duplicate owner, placeholder, or unsupported selected profile fails before
+linkage. The provider may be installed normally or vendored into the generated
+product under the same package name; generated source is identical either way.
+
 Generic non-struct defined types retain one parameterized nominal wrapper.
 Every target reference carries the exact represented `go/types` type arguments,
 and every operation projects through the wrapper before applying the
@@ -1694,7 +1794,10 @@ internal/contracts/                 environment/manual/external contracts
 internal/verify/                    independent gates and harnesses
 
 runtime/                            minimal reusable Go-semantics runtime
-gostdlib/                           reusable manual standard-library behavior
+gostdlib/                           reusable `@gotots/gostdlib` package
+  src/<go-import-path>.ts           ordinary public named exports
+  src/internal/node/                Node.js-backed implementation owners
+  test/                             contract and behavior differentials
 
 testdata/constructs/                minimal construct-case fixtures
   <domain>/<semantic-owner>/<case>/
@@ -1763,20 +1866,22 @@ A generated product uses deterministic ownership:
   modules/<module-key>/<package>/<source-file>.ts
   packages/<module-key>/<package>/state.ts
   packages/<module-key>/<package>/package.ts
-  gostdlib/<toolchain-key>/<import-path>/<source-file>.ts
   externals/<contract-key>/<import-path>/index.ts
   support/scalars.ts
   runtime/<runtime-module>.ts
+  node_modules/@gotots/gostdlib/    installed or vendored exact provider
   manifest.json
 ```
 
 Source-available dependencies go under `modules`, regardless of whether they
 come from the workspace, module cache, vendor tree, or replacement directory.
 Standard-library and external routing uses resolved metadata and explicit
-contracts, never path spelling. `support/scalars.ts` contains only aliases
-requested by the selected program, each defined once. `runtime/` contains only
-GoToTS-owned behavior required for exact standalone execution; neither location
-imports an unrelated compiler, transpiler, target, or product.
+contracts, never path spelling. Standard-library calls use public
+`@gotots/gostdlib/<go-import-path>.js` modules after provider verification.
+`support/scalars.ts` contains only aliases requested by the selected program,
+each defined once. `runtime/` contains only GoToTS-owned behavior required for
+exact standalone execution; neither location imports an unrelated compiler,
+transpiler, target, or product.
 
 ## Extension Boundary
 
