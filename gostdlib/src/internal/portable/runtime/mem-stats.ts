@@ -52,7 +52,7 @@ export class MemStats {
   NumGC: uint32 = 0;
   NumForcedGC: uint32 = 0;
   GCCPUFraction: float64 = 0;
-  EnableGC: bool = true;
+  EnableGC: bool = false;
   DebugGC: bool = false;
   BySize = zeroBySize();
 }
@@ -69,6 +69,7 @@ export function populateMemStats(target: MemStats, source: MemorySnapshot): void
   target.MSpanSys = source.malloced;
   target.OtherSys = source.external + source.arrayBuffers;
   target.NextGC = source.heapLimit;
+  target.EnableGC = true;
 }
 
 function zeroBySize(): GoArray<MemStatsBySize, 61> {

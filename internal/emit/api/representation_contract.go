@@ -270,6 +270,7 @@ const (
 	RuntimeModuleChannel
 	RuntimeModuleUnsafePointer
 	RuntimeModuleDenseIndex
+	RuntimeModuleUnsafe
 )
 
 func runtimeContract(

@@ -11,6 +11,7 @@ import {
   Caller,
   GC,
   GOMAXPROCS,
+  GOARCH,
   GOOS,
   MemStats,
   ReadMemStats,
@@ -36,6 +37,7 @@ import { Testing } from "../src/testing.js";
 class BufferWriter extends GoInterfaceValue {
   readonly $go$type: object = BufferWriter;
   readonly $go$methods: ReadonlySet<object> = new Set<object>();
+  readonly $go$formatString = false;
   readonly bytes: number[] = [];
 
   $go$implements(contract: readonly object[]): boolean {
@@ -50,6 +52,10 @@ class BufferWriter extends GoInterfaceValue {
     return 0;
   }
 
+  $go$format(): string {
+    return "buffer writer";
+  }
+
   Write(buffer: RuntimeSlice<uint8>): [int64, GoError | undefined] {
     for (let index = 0; index < buffer.length; index += 1) {
       this.bytes.push(buffer.get(index));
@@ -59,6 +65,7 @@ class BufferWriter extends GoInterfaceValue {
 }
 
 test("runtime process observations are populated", () => {
+  assert.notEqual(GOARCH, "");
   assert.notEqual(GOOS, "");
   assert.equal(GOMAXPROCS(0), 1);
   GC();

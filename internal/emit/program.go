@@ -37,6 +37,7 @@ const (
 	TargetFileProgramInitialization
 	TargetFileSupport
 	TargetFileEnvironmentContract
+	TargetFileStandardLibraryConstantProjection
 )
 
 type ProgramEmission struct {

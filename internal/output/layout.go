@@ -81,6 +81,34 @@ func EnvironmentContractPath(
 	}
 }
 
+func StandardLibraryConstantProjectionPath(
+	sourcePackage *load.Package,
+) (string, error) {
+	if sourcePackage == nil ||
+		sourcePackage.Kind() != load.PackageStandardLibraryContract ||
+		sourcePackage.Path() == "" ||
+		sourcePackage.ToolchainKey() == "" {
+		return "", &PathError{Reason: "standard-library projection owner is invalid"}
+	}
+	importPath := sourcePackage.Path()
+	if path.IsAbs(importPath) ||
+		path.Clean(importPath) != importPath ||
+		importPath == "." ||
+		strings.HasPrefix(importPath, "../") {
+		return "", &PathError{
+			Source: importPath,
+			Reason: "standard-library projection import path is not canonical",
+		}
+	}
+	return path.Join(
+		"support",
+		"constant-projections",
+		sourcePackage.ToolchainKey(),
+		importPath,
+		"index.ts",
+	), nil
+}
+
 const (
 	packageAssemblyFile = "package.ts"
 	packageStateFile    = "state.ts"

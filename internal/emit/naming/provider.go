@@ -3,6 +3,7 @@ package naming
 import (
 	"fmt"
 	"go/types"
+	"slices"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
@@ -13,6 +14,7 @@ import (
 type standardLibraryProvider interface {
 	Valid() bool
 	ToolchainKey() string
+	ProviderModules() []string
 	Binding(string) (gostdlib.Binding, bool)
 	Facet(
 		string,
@@ -20,6 +22,7 @@ type standardLibraryProvider interface {
 		gostdlib.FacetCapability,
 	) (gostdlib.Facet, bool)
 	GenericCallableFacet(string, string) (gostdlib.Facet, bool)
+	ProviderRepresentation(string, string) (gostdlib.ProviderRepresentation, bool)
 }
 
 func selectProviderBinding(
@@ -45,8 +48,13 @@ func selectProviderBinding(
 	}
 	selected, ok := provider.Binding(contract.Identity())
 	if !ok {
-		base.kind = targetBindingMissingProvider
-		return base, nil
+		return selectProviderRepresentationBinding(
+			sourcePackage,
+			object,
+			contract,
+			base,
+			provider,
+		)
 	}
 	if err := validateProviderBinding(contract, object, sourcePackage, selected); err != nil {
 		return targetBinding{}, err
@@ -56,6 +64,106 @@ func selectProviderBinding(
 	base.providerExport = selected.Export()
 	base.providerMember = selected.Member()
 	base.providerAccess = selected.Access()
+	base.providerGenericOperations = selected.GenericOperations()
+	return base, nil
+}
+
+func selectProviderRepresentationBinding(
+	sourcePackage *load.Package,
+	object types.Object,
+	contract environmentcontract.ObjectContract,
+	base targetBinding,
+	provider standardLibraryProvider,
+) (targetBinding, error) {
+	base.kind = targetBindingMissingProvider
+	typeName, ok := object.(*types.TypeName)
+	if !ok || typeName.IsAlias() {
+		return base, nil
+	}
+	facet, ok := provider.Facet(
+		contract.Identity(),
+		gostdlib.FacetNamedStructOperations,
+		gostdlib.FacetCapabilityRepresentation,
+	)
+	if !ok {
+		return base, nil
+	}
+	if facet.SourceIdentity() != contract.Identity() ||
+		facet.Kind() != gostdlib.FacetNamedStructOperations {
+		return targetBinding{}, &api.NameError{
+			Name:   contract.Identity(),
+			Reason: "provider representation facet is invalid",
+		}
+	}
+	representation, ok := facet.Representation()
+	if !ok || !slices.Contains(
+		representation.SourceTypes(),
+		contract.Identity(),
+	) {
+		return targetBinding{}, &api.NameError{
+			Name:   contract.Identity(),
+			Reason: "provider representation does not own the source type",
+		}
+	}
+	selectedRepresentation, ok := provider.ProviderRepresentation(
+		representation.ModuleSpecifier(),
+		representation.Export(),
+	)
+	if !ok || selectedRepresentation.TargetFingerprint() == "" ||
+		selectedRepresentation.ImplementationOwner() == "" {
+		return targetBinding{}, &api.NameError{
+			Name:   contract.Identity(),
+			Reason: "provider representation certificate is invalid",
+		}
+	}
+	base.kind = targetBindingProvider
+	base.providerModule = representation.ModuleSpecifier()
+	base.providerExport = representation.Export()
+	base.providerAccess = gostdlib.AccessExport
+	base.providerRepresentation = true
+	return base, nil
+}
+
+func selectProviderRepresentationMethod(
+	method *types.Func,
+	base targetBinding,
+	owner targetBinding,
+	provider standardLibraryProvider,
+) (targetBinding, error) {
+	if provider == nil || !owner.providerRepresentation {
+		return targetBinding{}, &api.NameError{
+			Name:   method.Name(),
+			Reason: "provider representation owner is invalid",
+		}
+	}
+	representation, ok := provider.ProviderRepresentation(
+		owner.providerModule,
+		owner.providerExport,
+	)
+	if !ok {
+		return targetBinding{}, &api.NameError{
+			Name:   method.Name(),
+			Reason: "provider representation is absent",
+		}
+	}
+	contract, err := environmentcontract.Describe(method.Origin())
+	if err != nil {
+		return targetBinding{}, err
+	}
+	selected, ok := representation.Method(contract.Identity())
+	if !ok || selected.SourceIdentity() != contract.Identity() ||
+		selected.SourceSignature() != contract.Signature() {
+		return targetBinding{}, &api.NameError{
+			Name:   method.Name(),
+			Reason: "provider representation does not own the concrete method",
+		}
+	}
+	base.kind = targetBindingProvider
+	base.providerModule = owner.providerModule
+	base.providerExport = owner.providerExport
+	base.providerMember = selected.Member()
+	base.providerAccess = gostdlib.AccessInstanceMethod
+	base.providerRepresentation = true
 	return base, nil
 }
 

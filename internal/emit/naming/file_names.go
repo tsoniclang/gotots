@@ -5,6 +5,7 @@ import (
 	"go/types"
 	"strconv"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/output"
@@ -25,7 +26,7 @@ type File struct {
 	projections     map[constantProjectionImport]string
 	primitives      map[api.PrimitiveAlias]string
 	runtime         map[api.RuntimeSymbol]string
-	providerImports map[providerImportIdentity]providerImport
+	providerImports map[string]providerImport
 	artifactOwner   api.ArtifactOwner
 	artifactSource  ast.Node
 	artifactFile    *ast.File
@@ -87,7 +88,7 @@ func (n *Owner) ForFile(
 		projections:     make(map[constantProjectionImport]string),
 		primitives:      make(map[api.PrimitiveAlias]string),
 		runtime:         make(map[api.RuntimeSymbol]string),
-		providerImports: make(map[providerImportIdentity]providerImport),
+		providerImports: make(map[string]providerImport),
 	}
 }
 
@@ -195,8 +196,12 @@ func (n *File) reference(
 		}
 	}
 	if binding.kind == targetBindingMissingProvider {
+		contract, err := environmentcontract.Describe(object)
+		if err != nil {
+			return api.NameReference{}, err
+		}
 		return api.NameReference{}, &api.NameError{
-			Name:   object.Name(),
+			Name:   contract.Identity(),
 			Reason: "selected standard-library declaration has no provider binding",
 		}
 	}
@@ -213,7 +218,6 @@ func (n *File) reference(
 			}
 		}
 		qualifier, request, err := n.providerImport(
-			object.Pkg(),
 			binding.providerModule,
 			phase,
 		)
@@ -308,7 +312,6 @@ func (n *File) PackageVariable(
 			}
 		}
 		qualifier, request, err := n.providerImport(
-			variable.Pkg(),
 			target.providerModule,
 			api.ImportPhaseValue,
 		)

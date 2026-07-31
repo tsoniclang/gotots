@@ -342,6 +342,57 @@ func valueContract(
 				),
 				nil,
 			),
+			factory.PropertyDeclaration(
+				[]tsgo.ModifierLike{
+					factory.AbstractKeyword(),
+					factory.ReadonlyKeyword(),
+				},
+				factory.Identifier(interfacecontract.FormatStringMember),
+				nil,
+				factory.KeywordTypeNode(
+					tsgo.KeywordTypeSyntaxKindBooleanKeyword,
+				),
+				nil,
+			),
+			factory.MethodDeclaration(
+				[]tsgo.ModifierLike{factory.AbstractKeyword()},
+				nil,
+				factory.Identifier(interfacecontract.FormatMember),
+				nil,
+				nil,
+				[]tsgo.ParameterDeclaration{
+					parameter(
+						factory,
+						"verb",
+						factory.KeywordTypeNode(
+							tsgo.KeywordTypeSyntaxKindStringKeyword,
+						),
+					),
+					parameter(
+						factory,
+						"flags",
+						factory.KeywordTypeNode(
+							tsgo.KeywordTypeSyntaxKindStringKeyword,
+						),
+					),
+					parameter(
+						factory,
+						"precision",
+						factory.UnionTypeNode([]tsgo.TypeNode{
+							factory.KeywordTypeNode(
+								tsgo.KeywordTypeSyntaxKindNumberKeyword,
+							),
+							factory.KeywordTypeNode(
+								tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+							),
+						}),
+					),
+				},
+				factory.KeywordTypeNode(
+					tsgo.KeywordTypeSyntaxKindStringKeyword,
+				),
+				nil,
+			),
 		},
 	)
 }

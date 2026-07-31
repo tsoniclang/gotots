@@ -15,15 +15,17 @@ import (
 )
 
 type targetBinding struct {
-	name           string
-	sourceFile     *ast.File
-	sourcePath     string
-	moduleExport   bool
-	kind           targetBindingKind
-	providerModule string
-	providerExport string
-	providerMember string
-	providerAccess gostdlib.AccessKind
+	name                      string
+	sourceFile                *ast.File
+	sourcePath                string
+	moduleExport              bool
+	kind                      targetBindingKind
+	providerModule            string
+	providerExport            string
+	providerMember            string
+	providerAccess            gostdlib.AccessKind
+	providerRepresentation    bool
+	providerGenericOperations []gostdlib.GenericOperationDocument
 }
 
 type targetBindingKind uint8
@@ -116,6 +118,7 @@ type Target struct {
 
 type Registry struct {
 	provider                     standardLibraryProvider
+	providerImportNameByModule   map[string]string
 	byObject                     map[types.Object]targetBinding
 	memberNameByObject           map[*types.Var]string
 	packageVariables             map[*types.Var]packageVariableBinding
@@ -148,6 +151,7 @@ type Registry struct {
 func NewRegistry() *Registry {
 	return &Registry{
 		byObject:                     make(map[types.Object]targetBinding),
+		providerImportNameByModule:   make(map[string]string),
 		memberNameByObject:           make(map[*types.Var]string),
 		packageVariables:             make(map[*types.Var]packageVariableBinding),
 		assemblyPathByPackage:        make(map[*types.Package]string),
@@ -189,6 +193,15 @@ func (r *Registry) Target(object types.Object) (Target, bool) {
 		Name:       binding.name,
 		SourcePath: binding.sourcePath,
 	}, true
+}
+
+func (r *Registry) HasProviderCoverageOwner(object types.Object) bool {
+	if r == nil || r.provider == nil || !r.provider.Valid() {
+		return false
+	}
+	binding, ok := r.byObject[object]
+	return ok && (binding.kind == targetBindingProvider ||
+		binding.kind == targetBindingMissingProvider)
 }
 
 func (r *Registry) ImportQualifier(sourcePackage *types.Package) string {
@@ -311,7 +324,8 @@ func (r *Registry) reserve(
 			existing.providerModule != binding.providerModule ||
 			existing.providerExport != binding.providerExport ||
 			existing.providerMember != binding.providerMember ||
-			existing.providerAccess != binding.providerAccess {
+			existing.providerAccess != binding.providerAccess ||
+			existing.providerRepresentation != binding.providerRepresentation {
 			return &api.NameError{
 				Name:   objectName(object),
 				Reason: "declaration has conflicting target ownership",
@@ -359,6 +373,11 @@ func (r *Registry) IndexCompilationTargets(
 		provider = certificate
 	}
 	r.provider = provider
+	if provider != nil {
+		if err := r.indexProviderImportNames(provider.ProviderModules()); err != nil {
+			return err
+		}
+	}
 	for _, environmentPackage := range environmentPackages {
 		if environmentPackage == nil ||
 			!environmentPackage.Kind().EnvironmentContract() ||
@@ -380,10 +399,20 @@ func (r *Registry) IndexCompilationTargets(
 		if err != nil {
 			return err
 		}
-		r.assemblyPathByPackage[typesPackage] = contractPath
+		targetPath := contractPath
+		if provider != nil &&
+			environmentPackage.Kind() == load.PackageStandardLibraryContract {
+			targetPath, err = output.StandardLibraryConstantProjectionPath(
+				environmentPackage,
+			)
+			if err != nil {
+				return err
+			}
+		}
+		r.assemblyPathByPackage[typesPackage] = targetPath
 		if err := r.indexEnvironmentPackage(
 			environmentPackage,
-			contractPath,
+			targetPath,
 			provider,
 		); err != nil {
 			return err
@@ -468,6 +497,18 @@ func (r *Registry) indexEnvironmentPackage(
 			)
 			if err != nil {
 				return err
+			}
+			if methodBinding.kind == targetBindingMissingProvider &&
+				binding.providerRepresentation {
+				methodBinding, err = selectProviderRepresentationMethod(
+					method,
+					methodBinding,
+					binding,
+					provider,
+				)
+				if err != nil {
+					return err
+				}
 			}
 			if err := r.reserve(method, methodBinding); err != nil {
 				return err

@@ -27,12 +27,34 @@ export abstract class EndianOrder extends ProviderInterfaceValue {
   abstract Uint32(buffer: RuntimeSlice<uint8>): uint32;
   abstract Uint64(buffer: RuntimeSlice<uint8>): uint64;
 
+  GoString(): gostring {
+    return this.String();
+  }
+
+  AppendUint16(
+    buffer: RuntimeSlice<uint8>,
+    value: uint16,
+  ): RuntimeSlice<uint8> {
+    const encoded = RuntimeSlice.make<uint8>(2, 2, 0);
+    this.PutUint16(encoded, value);
+    return buffer.append(0, sliceValues(encoded));
+  }
+
   AppendUint32(
     buffer: RuntimeSlice<uint8>,
     value: uint32,
   ): RuntimeSlice<uint8> {
     const encoded = RuntimeSlice.make<uint8>(4, 4, 0);
     this.PutUint32(encoded, value);
+    return buffer.append(0, sliceValues(encoded));
+  }
+
+  AppendUint64(
+    buffer: RuntimeSlice<uint8>,
+    value: uint64,
+  ): RuntimeSlice<uint8> {
+    const encoded = RuntimeSlice.make<uint8>(8, 8, 0);
+    this.PutUint64(encoded, value);
     return buffer.append(0, sliceValues(encoded));
   }
 

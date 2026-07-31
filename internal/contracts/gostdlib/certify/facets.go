@@ -11,51 +11,199 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
-const facetMapSchemaVersion = 1
+const facetMapSchemaVersion = 3
 
 type facetMapDocument struct {
-	SchemaVersion int         `json:"schemaVersion"`
-	Facets        []facetSeed `json:"facets"`
+	SchemaVersion        int                          `json:"schemaVersion"`
+	Representations      []providerRepresentationSeed `json:"representations,omitempty"`
+	Facets               []facetSeed                  `json:"facets"`
+	GenericOperationSets []genericOperationSetSeed    `json:"genericOperationSets"`
+}
+
+type providerRepresentationSeed struct {
+	Specifier        string   `json:"specifier"`
+	SourcePath       string   `json:"sourcePath"`
+	Export           string   `json:"export"`
+	SourceTypes      []string `json:"sourceTypes"`
+	SourceInterfaces []string `json:"sourceInterfaces"`
+}
+
+type genericOperationSetSeed struct {
+	SourceIdentity string                              `json:"sourceIdentity"`
+	Operations     []gostdlib.GenericOperationDocument `json:"operations"`
 }
 
 type facetSeed struct {
-	Kind           gostdlib.FacetKind         `json:"kind"`
-	SourceIdentity string                     `json:"sourceIdentity"`
-	Capabilities   []gostdlib.FacetCapability `json:"capabilities,omitempty"`
-	ProfileKey     string                     `json:"profileKey,omitempty"`
-	Specifier      string                     `json:"specifier"`
-	SourcePath     string                     `json:"sourcePath"`
-	Export         string                     `json:"export"`
-	StorageExport  string                     `json:"storageExport,omitempty"`
-	Effect         gostdlib.EffectKind        `json:"effect,omitempty"`
+	Kind                 gostdlib.FacetKind         `json:"kind"`
+	SourceIdentity       string                     `json:"sourceIdentity"`
+	Capabilities         []gostdlib.FacetCapability `json:"capabilities,omitempty"`
+	ProfileKey           string                     `json:"profileKey,omitempty"`
+	Specifier            string                     `json:"specifier"`
+	SourcePath           string                     `json:"sourcePath"`
+	Export               string                     `json:"export"`
+	StorageExport        string                     `json:"storageExport,omitempty"`
+	RepresentationExport string                     `json:"representationExport,omitempty"`
+	Effect               gostdlib.EffectKind        `json:"effect,omitempty"`
 }
 
-func readFacetSeeds(sourcePath string) ([]facetSeed, error) {
+func readFacetSeeds(
+	sourcePath string,
+) (
+	[]facetSeed,
+	[]providerRepresentationSeed,
+	map[string][]gostdlib.GenericOperationDocument,
+	error,
+) {
 	file, err := os.Open(sourcePath)
 	if err != nil {
-		return nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	defer file.Close()
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()
 	var document facetMapDocument
 	if err := decoder.Decode(&document); err != nil {
-		return nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	var extra json.RawMessage
 	if err := decoder.Decode(&extra); err != io.EOF {
 		if err == nil {
 			err = fmt.Errorf("multiple JSON values")
 		}
-		return nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	if document.SchemaVersion != facetMapSchemaVersion {
-		return nil, certifyError("read facet map", sourcePath, "schema is unsupported")
+		return nil, nil, nil, certifyError("read facet map", sourcePath, "schema is unsupported")
 	}
-	return validateFacetSeeds(document.Facets)
+	representations, representationIndex, err :=
+		validateProviderRepresentationSeeds(document.Representations)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	facets, err := validateFacetSeeds(document.Facets, representationIndex)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	operations, err := validateGenericOperationSetSeeds(
+		document.GenericOperationSets,
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return facets, representations, operations, nil
 }
 
-func validateFacetSeeds(source []facetSeed) ([]facetSeed, error) {
+func validateProviderRepresentationSeeds(
+	source []providerRepresentationSeed,
+) (
+	[]providerRepresentationSeed,
+	map[string]providerRepresentationSeed,
+	error,
+) {
+	result := append([]providerRepresentationSeed(nil), source...)
+	for index := range result {
+		result[index].SourceTypes = append([]string(nil), result[index].SourceTypes...)
+		sort.Strings(result[index].SourceTypes)
+		result[index].SourceInterfaces = append(
+			[]string(nil),
+			result[index].SourceInterfaces...,
+		)
+		sort.Strings(result[index].SourceInterfaces)
+	}
+	sort.Slice(result, func(left, right int) bool {
+		return representationSeedKey(result[left]) < representationSeedKey(result[right])
+	})
+	index := make(map[string]providerRepresentationSeed, len(result))
+	for _, seed := range result {
+		key := representationSeedKey(seed)
+		if seed.Specifier == "" || seed.SourcePath == "" || seed.Export == "" ||
+			len(seed.SourceTypes) == 0 || len(seed.SourceInterfaces) == 0 {
+			return nil, nil, certifyError(
+				"configure representations",
+				key,
+				"representation identity is incomplete",
+			)
+		}
+		if subpath, ok := providerSubpath(seed.Specifier); !ok ||
+			!strings.HasPrefix(subpath, "./internal/facets/") ||
+			!strings.HasPrefix(seed.SourcePath, "src/internal/facets/") ||
+			!strings.HasSuffix(seed.SourcePath, ".ts") {
+			return nil, nil, certifyError(
+				"configure representations",
+				key,
+				"representation module is invalid",
+			)
+		}
+		for typeIndex, identity := range seed.SourceTypes {
+			if identity == "" || typeIndex != 0 && identity == seed.SourceTypes[typeIndex-1] {
+				return nil, nil, certifyError(
+					"configure representations",
+					key,
+					"source types are empty or duplicated",
+				)
+			}
+		}
+		for interfaceIndex, identity := range seed.SourceInterfaces {
+			if identity == "" || interfaceIndex != 0 &&
+				identity == seed.SourceInterfaces[interfaceIndex-1] {
+				return nil, nil, certifyError(
+					"configure representations",
+					key,
+					"source interfaces are empty or duplicated",
+				)
+			}
+		}
+		if _, duplicate := index[key]; duplicate {
+			return nil, nil, certifyError(
+				"configure representations",
+				key,
+				"representation owner is duplicated",
+			)
+		}
+		index[key] = seed
+	}
+	return result, index, nil
+}
+
+func validateGenericOperationSetSeeds(
+	source []genericOperationSetSeed,
+) (map[string][]gostdlib.GenericOperationDocument, error) {
+	result := make(
+		map[string][]gostdlib.GenericOperationDocument,
+		len(source),
+	)
+	for _, seed := range source {
+		if seed.SourceIdentity == "" || len(seed.Operations) == 0 {
+			return nil, certifyError(
+				"configure generic operations",
+				seed.SourceIdentity,
+				"operation-set identity is incomplete",
+			)
+		}
+		if _, duplicate := result[seed.SourceIdentity]; duplicate {
+			return nil, certifyError(
+				"configure generic operations",
+				seed.SourceIdentity,
+				"operation-set owner is duplicated",
+			)
+		}
+		operations, err := gostdlib.CanonicalGenericOperations(seed.Operations)
+		if err != nil {
+			return nil, certifyError(
+				"configure generic operations",
+				seed.SourceIdentity,
+				err.Error(),
+			)
+		}
+		result[seed.SourceIdentity] = operations
+	}
+	return result, nil
+}
+
+func validateFacetSeeds(
+	source []facetSeed,
+	representations map[string]providerRepresentationSeed,
+) ([]facetSeed, error) {
 	result := append([]facetSeed(nil), source...)
 	for index := range result {
 		result[index].Capabilities = append(
@@ -68,6 +216,10 @@ func validateFacetSeeds(source []facetSeed) ([]facetSeed, error) {
 	})
 	lookups := make(map[string]struct{})
 	targets := make(map[string]struct{})
+	referencedRepresentations := make(map[string]struct{})
+	for key := range representations {
+		targets[key] = struct{}{}
+	}
 	previous := ""
 	for index, seed := range result {
 		key := facetSeedKey(seed)
@@ -95,6 +247,29 @@ func validateFacetSeeds(source []facetSeed) ([]facetSeed, error) {
 		if len(capabilities) == 0 {
 			return nil, certifyError("configure facets", key, "capability set is empty")
 		}
+		representation := false
+		for _, capability := range seed.Capabilities {
+			representation = representation ||
+				capability == gostdlib.FacetCapabilityRepresentation
+		}
+		if representation != (seed.RepresentationExport != "") {
+			return nil, certifyError(
+				"configure facets",
+				key,
+				"representation target shape is invalid",
+			)
+		}
+		if seed.RepresentationExport != "" {
+			representationKey := seed.Specifier + "\x00" + seed.RepresentationExport
+			if _, ok := representations[representationKey]; !ok {
+				return nil, certifyError(
+					"configure facets",
+					key,
+					"representation is absent from the facet module",
+				)
+			}
+			referencedRepresentations[representationKey] = struct{}{}
+		}
 		for _, capability := range capabilities {
 			lookup := seed.SourceIdentity + "\x00" + string(seed.Kind) + "\x00" + capability
 			if _, duplicate := lookups[lookup]; duplicate {
@@ -113,10 +288,23 @@ func validateFacetSeeds(source []facetSeed) ([]facetSeed, error) {
 			targets[target] = struct{}{}
 		}
 	}
+	for key := range representations {
+		if _, referenced := referencedRepresentations[key]; !referenced {
+			return nil, certifyError(
+				"configure representations",
+				key,
+				"representation has no facet reference",
+			)
+		}
+	}
 	return result, nil
 }
 
 func facetSeedKey(seed facetSeed) string {
 	return seed.Specifier + "\x00" + seed.SourceIdentity + "\x00" +
 		string(seed.Kind) + "\x00" + seed.Export
+}
+
+func representationSeedKey(seed providerRepresentationSeed) string {
+	return seed.Specifier + "\x00" + seed.Export
 }

@@ -23,7 +23,6 @@ const (
 	EnvironmentObligationDeclaration
 	EnvironmentObligationState
 	EnvironmentObligationConstantProjection
-	EnvironmentObligationBuiltin
 )
 
 type EnvironmentObjectKind = environmentidentity.ObjectKind
@@ -34,7 +33,6 @@ const (
 	EnvironmentObjectType     = environmentidentity.ObjectType
 	EnvironmentObjectVariable = environmentidentity.ObjectVariable
 	EnvironmentObjectFunction = environmentidentity.ObjectFunction
-	EnvironmentObjectBuiltin  = environmentidentity.ObjectBuiltin
 )
 
 type EnvironmentObligation struct {
@@ -186,20 +184,6 @@ func (s *programSession) environmentObligations() (
 			}
 			obligations = append(obligations, obligation)
 		}
-		for builtin, target := range builder.builtins {
-			if !target.emitted || len(target.signatures) == 0 {
-				continue
-			}
-			obligation, err := buildEnvironmentBuiltinObligation(
-				builder,
-				builtin,
-				target,
-			)
-			if err != nil {
-				return nil, err
-			}
-			obligations = append(obligations, obligation)
-		}
 	}
 	sort.Slice(obligations, func(left, right int) bool {
 		if obligations[left].identity != obligations[right].identity {
@@ -276,42 +260,6 @@ func buildEnvironmentObligation(
 		targetName:        targetName,
 		targetFingerprint: fingerprint,
 		requirements:      requirementKeys,
-	}, nil
-}
-
-func buildEnvironmentBuiltinObligation(
-	builder *environmentContractBuilder,
-	builtin *types.Builtin,
-	target environmentBuiltin,
-) (EnvironmentObligation, error) {
-	fingerprint, ok := target.contract.Fingerprint()
-	if !ok || builtin == nil || len(target.signatures) == 0 {
-		return EnvironmentObligation{}, &ScheduleError{
-			Reason: "environment builtin obligation is invalid",
-		}
-	}
-	signatures := make([]string, len(target.signatures))
-	for index, signature := range target.signatures {
-		signatures[index] = environmentidentity.StableTypeString(signature)
-	}
-	sort.Strings(signatures)
-	identity := environmentidentity.Identity(
-		builder.sourcePackage.Path(),
-		EnvironmentObjectBuiltin,
-		"",
-		builtin.Name(),
-	)
-	return EnvironmentObligation{
-		kind:              EnvironmentObligationBuiltin,
-		objectKind:        EnvironmentObjectBuiltin,
-		packageKind:       builder.sourcePackage.Kind(),
-		packagePath:       builder.sourcePackage.Path(),
-		contractKey:       environmentContractKey(builder.sourcePackage),
-		identity:          identity,
-		name:              builtin.Name(),
-		sourceSignature:   strings.Join(signatures, "|"),
-		targetName:        builtin.Name(),
-		targetFingerprint: fingerprint,
 	}, nil
 }
 

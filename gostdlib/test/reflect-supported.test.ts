@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoPanic } from "@gotots/runtime/panic.js";
 
 import {
   Array,
   Bool,
+  Invalid,
   Float64,
   Int,
   Map,
@@ -15,7 +17,10 @@ import {
   StructField,
   StructTag,
   Uint64,
+  Value,
+  ValueOf,
 } from "../src/reflect.js";
+import { ProviderError } from "../src/internal/runtime/error.js";
 
 test("reflect kind values retain the selected Go numbering", () => {
   assert.equal(Bool.value, 1);
@@ -58,4 +63,27 @@ test("reflect StructTag.Get decodes Go quoted values", () => {
   assert.equal(tag.Get("xml"), "line\nvalue");
   assert.equal(tag.Get("octal"), "a");
   assert.equal(tag.Get("missing"), "");
+});
+
+test("reflect.ValueOf retains a typed interface descriptor", () => {
+  assert.ok(ValueOf(new ProviderError("failure")) instanceof Value);
+  const invalid = ValueOf(undefined);
+  assert.ok(invalid instanceof Value);
+  assert.equal(invalid.IsValid(), false);
+  assert.equal(invalid.Kind(), Invalid);
+  assert.equal(invalid.String(), "<invalid Value>");
+});
+
+test("unimplemented reflect operations fail explicitly", () => {
+  assert.throws(
+    () => ValueOf(new ProviderError("failure")).Kind(),
+    (failure): boolean => {
+      assert.ok(failure instanceof GoPanic);
+      assert.match(
+        failure.value.$go$format("v", "", undefined),
+        /reflect\.Value\.Kind requires generated reflection metadata/,
+      );
+      return true;
+    },
+  );
 });

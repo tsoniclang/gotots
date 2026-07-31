@@ -17,6 +17,7 @@ import (
 	panicnilruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panicnil"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
+	unsaferuntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafeoperation"
 	unsafepointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafepointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -119,13 +120,26 @@ func Build(
 		return []Definition{definition}, nil
 	}
 	if module == api.RuntimeModulePointer {
-		if len(symbols) == 0 ||
-			len(symbols) > 2 ||
-			symbols[0] != api.RuntimePointer ||
-			(len(symbols) == 2 && symbols[1] != api.RuntimePointerHash) {
+		if len(symbols) == 0 || symbols[0] != api.RuntimePointer {
 			return nil, &AssemblyError{
 				Module: module,
 				Reason: "pointer runtime requires exactly RuntimePointer",
+			}
+		}
+		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
+		for _, symbol := range symbols {
+			if _, duplicate := seen[symbol]; duplicate {
+				return nil, &AssemblyError{
+					Module: module,
+					Symbol: symbol,
+					Reason: "pointer runtime symbol is duplicated",
+				}
+			}
+			seen[symbol] = struct{}{}
+			if symbol != api.RuntimePointer &&
+				symbol != api.RuntimePointerHash &&
+				symbol != api.RuntimePointerRegion {
+				return nil, &api.RuntimeSymbolError{Symbol: symbol}
 			}
 		}
 		contract, err := api.RuntimeContract(api.RuntimePointer)
@@ -142,41 +156,52 @@ func Build(
 		}
 		definition, err := NewDefinition(
 			api.RuntimePointer,
-			pointerruntime.Build(
+			pointerruntime.BuildWithCapabilities(
 				factory,
 				contract.ExportedName(),
 				panicContract.ExportedName(),
 				denseIndexContract.ExportedName(),
+				pointerruntime.Capabilities{
+					Region: slices.Contains(symbols, api.RuntimePointerRegion),
+				},
 			),
 		)
 		if err != nil {
 			return nil, err
 		}
 		definitions := []Definition{definition}
-		if len(symbols) == 1 {
-			return definitions, nil
+		for _, symbol := range symbols[1:] {
+			selected, err := api.RuntimeContract(symbol)
+			if err != nil {
+				return nil, err
+			}
+			var statement tsgo.Statement
+			switch symbol {
+			case api.RuntimePointerHash:
+				mapHashContract, err := api.RuntimeContract(api.RuntimeMapHash)
+				if err != nil {
+					return nil, err
+				}
+				statement = pointerruntime.Hash(
+					factory,
+					selected.ExportedName(),
+					contract.ExportedName(),
+					mapHashContract.ExportedName(),
+				)
+			case api.RuntimePointerRegion:
+				statement = pointerruntime.Region(
+					factory,
+					selected.ExportedName(),
+					contract.ExportedName(),
+				)
+			}
+			definition, err := NewDefinition(symbol, statement)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
 		}
-		hashContract, err := api.RuntimeContract(api.RuntimePointerHash)
-		if err != nil {
-			return nil, err
-		}
-		mapHashContract, err := api.RuntimeContract(api.RuntimeMapHash)
-		if err != nil {
-			return nil, err
-		}
-		hashDefinition, err := NewDefinition(
-			api.RuntimePointerHash,
-			pointerruntime.Hash(
-				factory,
-				hashContract.ExportedName(),
-				contract.ExportedName(),
-				mapHashContract.ExportedName(),
-			),
-		)
-		if err != nil {
-			return nil, err
-		}
-		return append(definitions, hashDefinition), nil
+		return definitions, nil
 	}
 	if module == api.RuntimeModuleArray {
 		if symbols[0] != api.RuntimeArray {
@@ -404,6 +429,30 @@ func Build(
 			return nil, err
 		}
 		return []Definition{definition}, nil
+	}
+	if module == api.RuntimeModuleUnsafe {
+		definitions := make([]Definition, 0, len(symbols))
+		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
+		for _, symbol := range symbols {
+			if _, duplicate := seen[symbol]; duplicate {
+				return nil, &AssemblyError{
+					Module: module,
+					Symbol: symbol,
+					Reason: "unsafe runtime symbol is duplicated",
+				}
+			}
+			seen[symbol] = struct{}{}
+			statement, err := unsaferuntime.Build(factory, symbol)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(symbol, statement)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
 	}
 	if module == api.RuntimeModulePanic {
 		panicContract, err := api.RuntimeContract(api.RuntimePanic)

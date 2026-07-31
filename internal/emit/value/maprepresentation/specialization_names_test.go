@@ -183,10 +183,14 @@ func (staticSpecializationNames) Runtime(
 	symbol api.RuntimeSymbol,
 	_ api.ImportPhase,
 ) (api.NameReference, error) {
-	if symbol != api.RuntimePanic {
+	switch symbol {
+	case api.RuntimePanic:
+		return api.NewNameReference("GoPanic")
+	case api.RuntimeDenseIndex:
+		return api.NewNameReference("GoDenseIndex")
+	default:
 		panic("unexpected runtime symbol")
 	}
-	return api.NewNameReference("GoPanic")
 }
 
 func (staticSpecializationNames) Temporary(api.TemporaryKind) (string, error) {

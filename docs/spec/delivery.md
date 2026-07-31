@@ -692,6 +692,19 @@ references, delete the ambient standard-library runtime path, and rerun the
 whole-product gates. Do not combine an incomplete provider with compiler
 linkage.
 
+Preallocate provider namespace names by certified module specifier before
+emission. One module receives one namespace import even when its internal facet
+exports certify declarations from multiple Go packages; source-package identity
+must not split or rename that target import.
+
+Linked untyped standard-library constants retain the compiler's contextual
+projection contract. Materialize only demanded initialized projections from
+the selected `go/constant.Value` in compiler-owned support modules; do not use
+one provider export for every target type and do not retain an ambient
+`declare const`. Type annotations and literal forms must follow the selected
+integer-representation profile. Typed constants continue through the ordinary
+certified provider binding.
+
 Before that atomic linkage, close requirement liveness and provider effects:
 artifact reconstruction replaces its complete declaration-requirement set,
 final-consumer removals wait until additions, reachability, dirty
@@ -712,6 +725,37 @@ The compile-only environment profile may materialize the typed throwing
 placeholder for non-nil `unsafe.Pointer` conversion while preserving nil
 exactly. This closes strict product typechecking; it is not an unsafe
 implementation and cannot satisfy the no-placeholder publication gate.
+
+Linked generic provider functions declare required operations in their
+certified public-binding ABI. Implement operation kinds only when a concrete
+provider behavior requires them, but route every implemented kind through the
+one generic-operation capability path. `slices.Grow`, for example, requires
+`copy(E) E` and `zero() E`; those capabilities precede its two Go arguments and
+permit exact copy and independent-zero behavior. A provider function must not
+recover a missing operation through target shape, casts, sparse values, or a
+compiler name special case.
+
+Certified copies of `sync` and `sync/atomic` no-copy-after-first-use values
+must allocate independent pre-first-use state. They may copy public
+configuration such as `sync.Pool.New`, but must not alias the source carrier
+or imply support for source programs that violate the Go package contract.
+The equivalent zero-only copy for `strings.Builder` must likewise return a
+fresh empty builder.
+
+Close private provider representations before whole-product linkage. One
+certified internal representation record may cover multiple selected-Go private
+types only when their complete exported method sets exact-join one inspected
+target type. `encoding/binary` must preserve distinct public `ByteOrder` and
+`AppendByteOrder` contracts while its three private endian implementations use
+one exact internal member union. Delete ambient reconstruction and reject any
+missing representation member before emitting the linked consumer.
+
+An operation kind not yet admitted by the closed provider contract remains an
+explicit strict-compilation boundary. For example, `errors.AsType[E]` requires
+the caller's canonical `interface-assert E` operation. Until that operation is
+certified and consumed by the same ABI, the provider may fail explicitly with
+the exact selected signature; returning a false match or recovering `E`
+dynamically is forbidden. Such a boundary remains a publication blocker.
 
 ## 5. Product Proof
 

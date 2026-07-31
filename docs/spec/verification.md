@@ -659,7 +659,8 @@ programs may link it. Verification must:
    their ultimate declaration owners; source-text export parsing and rendered
    declaration comparison are not evidence;
 3. exact-join every public provider module and export to its Go package,
-   object identity, source signature, and selected callable/profile facets;
+   object identity, source signature, selected callable/profile facets, and
+   certified generic-operation set;
 4. reject missing implementations, duplicate owners, unexplained public
    exports, placeholders, and signatures widened by target convenience;
 5. inspect public declarations and fail on `$argument`, `__from_`,
@@ -702,6 +703,31 @@ ordinary public calls remain source-shaped while compiler operations import
 only certified private facets; public provider classes expose no dollar-prefixed
 compiler members.
 
+Private provider-representation certification independently derives every
+represented selected-Go type's exported method set, records each concrete
+method identity once, and exact-joins the deduplicated callable union against
+the internal target type's visible members. The
+`encoding/binary.bigEndian`/`littleEndian`/`nativeEndian` matrix must include
+`Uint*`, `PutUint*`, `AppendUint*`, `String`, and `GoString`, while the public
+`ByteOrder` and `AppendByteOrder` provider declarations remain distinct.
+Mutations that omit one concrete type, remove or add one target member, map a
+method to the wrong member, change one source signature, duplicate the
+representation owner, or replace the representation with either public
+interface must fail manifest certification or linked strict typechecking.
+Artifact inspection proves direct state-member calls and interface conversion
+without an ambient private-type declaration, cast, dynamic lookup, or
+per-method compiler special case.
+
+For every certified `sync` or `sync/atomic` copy facet, a focused artifact and
+execution test proves that the result is a distinct carrier, mutation/use of
+the source cannot affect the copy, and copied public pre-use configuration
+such as `sync.Pool.New` is retained. Returning the source object, sharing its
+mutable cell, or resetting public configuration must fail. These tests are
+scoped to copies permitted before first use by the selected Go package
+contract; they do not claim semantics for prohibited post-use copies.
+The same distinct-carrier and source-mutation proof applies to the admissible
+zero-state copy of `strings.Builder`.
+
 Requirement-liveness verification also reconstructs an interface adapter and
 a cooperative callable after their requested provider facets already exist.
 Repeated naming and contract queries must return the same typed obligations
@@ -713,6 +739,27 @@ fail the artifact oscillation gate. Mutations restoring eager removal,
 first-seen-only interface closure, satisfied-cooperative suppression,
 unconditional historical acceptance, dropped causal propagation, or sticky
 foreign requirements must each fail at these gates.
+
+For each certified provider generic-operation set, verification proves that
+the owner is the exact selected generic function, every signature leaf names a
+valid declaration type-parameter position, operations are closed and
+canonically ordered, and the emitted call prepends one typed capability per
+record before the source arguments. The `slices.Grow` differential covers nil,
+negative growth, sufficient-capacity identity, allocation, old-element copy,
+new capacity zeros, and independent mutable zero values. Mutations deleting
+`copy`, deleting `zero`, changing type-parameter index `E` to `S`, restoring
+the provider empty-operation assumption, or swapping capability/source ABI
+slots must fail manifest certification, TS-Go AST shape, strict typechecking,
+or differential execution.
+
+Linked-provider constant verification compiles `math.MaxFloat64` and
+`math.MaxInt64` uses through exact contextual projections. It inspects the
+TS-Go AST for one initialized projection per demanded representation, proves
+the `bigint` profile emits the exact wide integer literal, strict-typechecks the
+consumer and support module, and rejects a provider-module reference or
+ambient `declare const`. Mutations restoring the direct-provider shortcut,
+dropping the projection identity, using the provider's numeric runtime value,
+or suppressing the linked projection file must fail.
 
 Dense-storage verification inspects the generated TS-Go AST and proves that
 pointer, array, and slice reads call the one demanded `GoDenseIndex.get`
@@ -729,6 +776,26 @@ qualified provider reference with its exact manifest owner. Mutations that
 drop the qualifier, select a named import, route a static receiver operation
 through an instance call, retain an ambient standard-library target file, or
 permit a missing manifest entry must fail before TypeScript execution.
+The same gate requests two recovery facets from different Go packages that
+share one provider module, in both request orders. Both must resolve to one
+module-owned namespace name and one import. Restoring source-package ownership,
+lazy first-visitor naming, or duplicate namespace requests must fail.
+
+The same gate compiles a linked function that accepts, zeroes, copies, and
+returns `reflect.Value`. It proves that the provider import and certified
+`zero`/`copy` facets are selected, no ambient standard-library artifact is
+materialized, and the unexported embedded `reflect.flag` is never resolved.
+Mutating provider coverage back into ambient declaration construction must
+fail on that exact private-representation boundary; removing either operation
+facet must fail at the facet lookup rather than reconstructing the GOROOT
+struct.
+
+Strict-compilation evidence reports every explicit provider failure boundary
+separately from implemented provider behavior. If `errors.AsType[E]` remains
+selected before `interface-assert E` is admitted to the certified provider
+operation set, it must fail explicitly; returning `[zero, false]`, using a
+cast, or recovering `E` from runtime shape must fail review. Executable-product
+proof cannot include that boundary as implemented behavior.
 
 Provider verification and compiler contract generation must compare canonical
 typed identities and signatures. They may not compare rendered declaration
@@ -1205,6 +1272,15 @@ string or truncated hash, reorder type-switch cases, return false instead of
 panicking for equal dynamic uncomparable types, or hash an uncomparable
 payload. Each must fail its owning identity, strict-type, differential,
 mutation, shape, or artifact gate.
+
+Interface-format verification uses source cases for primitive, named,
+Stringer/error, nil-interface, and unsupported aggregate dynamic values. It
+proves Go input -> exact adapter type decision -> typed `$go$format` AST ->
+`fmt` output for `%v`, `%s`, `%q`, `%d`, `%x`, `%T`, width, precision, and `%w`.
+Mutations that expose a base payload, replace the adapter call with host
+`String`, format by type-name lookup, omit writer errors, or duplicate a format
+body per call must fail. Artifact review reports adapter count and format-method
+bytes separately so the provider boundary cannot hide source-size growth.
 
 A 1x/2x/4x fixture varies implementer count while holding interface call sites
 constant. Call-site printed bytes and TS-Go node counts must remain constant;

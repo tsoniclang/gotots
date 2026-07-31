@@ -13,6 +13,7 @@ class ErrnoError extends GoInterfaceValue implements GoError {
   readonly $go$methods: ReadonlySet<object> = new Set<object>([
     GoErrorMethodToken,
   ]);
+  readonly $go$formatString = false;
 
   constructor(private readonly errno: Errno) {
     super();
@@ -33,6 +34,14 @@ class ErrnoError extends GoInterfaceValue implements GoError {
 
   $go$hash(): number {
     return this.errno.value;
+  }
+
+  $go$format(verb: string, _flags: string, _precision: number | undefined): string {
+    if (verb === "T") {
+      return "syscall.Errno";
+    }
+    const message = this.Error();
+    return verb === "q" ? JSON.stringify(message) : message;
   }
 }
 

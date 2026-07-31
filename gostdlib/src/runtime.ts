@@ -7,6 +7,7 @@ import type {
 import { GoPanic } from "@gotots/runtime/panic.js";
 import {
   caller,
+  goArchitecture,
   goOperatingSystem,
   memorySnapshot,
 } from "./internal/node/runtime/process.js";
@@ -18,6 +19,7 @@ import {
 export { MemStats };
 
 export const GOOS: gostring = goOperatingSystem();
+export const GOARCH: gostring = goArchitecture();
 
 export function Caller(skip: int64): [uint64, gostring, int64, bool] {
   return caller(skip);

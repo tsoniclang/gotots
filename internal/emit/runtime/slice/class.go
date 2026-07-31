@@ -21,6 +21,7 @@ type Capabilities struct {
 	Clear        bool
 	ArrayPointer bool
 	ArrayView    bool
+	Region       bool
 }
 
 func Build(
@@ -92,10 +93,10 @@ func BuildWithCapabilities(
 	if capabilities.Address {
 		members = append(members, target.addressMethod())
 	}
-	if capabilities.ArrayPointer {
+	if capabilities.ArrayPointer || capabilities.Region {
 		members = append(members, target.arrayLocationMethod())
 	}
-	if capabilities.ArrayView {
+	if capabilities.ArrayView || capabilities.Region {
 		members = append(members, target.arrayViewMethod())
 	}
 	return factory.ClassDeclaration(

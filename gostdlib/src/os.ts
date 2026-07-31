@@ -13,6 +13,7 @@ import type {
   FileInfo,
   FileMode,
 } from "./io/fs.js";
+export { PathError } from "./io/fs.js";
 import type { Time } from "./time.js";
 import {
   changeTimes,
@@ -51,6 +52,12 @@ import {
 import { isNotExistError } from "./internal/node/os/error.js";
 import { stringSlice } from "./internal/runtime/slice.js";
 import { SIGINT } from "./syscall.js";
+import { constants as nodeFileConstants } from "node:fs";
+
+export const O_APPEND: int64 = nodeFileConstants.O_APPEND;
+export const O_CREATE: int64 = nodeFileConstants.O_CREAT;
+export const O_TRUNC: int64 = nodeFileConstants.O_TRUNC;
+export const O_WRONLY: int64 = nodeFileConstants.O_WRONLY;
 
 export interface Signal {
   Signal(): void;

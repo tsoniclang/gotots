@@ -19,7 +19,7 @@ func (b specializationBuilder) findMethod() tsgo.MethodDeclaration {
 	buckets := b.id("buckets")
 	bucket := b.id("bucket")
 	index := b.id("index")
-	entry := b.element(bucket, index)
+	entry := b.denseElement(bucket, index)
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
 		specializationFindOperation,
@@ -202,7 +202,7 @@ func (b specializationBuilder) foundValue(
 	bucket := b.element(found, b.number("0"))
 	index := b.element(found, b.number("1"))
 	return b.element(
-		b.element(bucket, index),
+		b.denseElement(bucket, index),
 		b.number("1"),
 	)
 }

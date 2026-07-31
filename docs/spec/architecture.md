@@ -408,6 +408,32 @@ an ordinary selected call, and the adapter places them before invocation.
 Adapters never assume that a concrete payload and a generic method origin have
 the same pointer representation, rediscover the receiver ABI, or discard
 receiver prerequisites.
+
+Formatting a Go interface value is the one provider observation that cannot be
+recovered from the public interface contract alone. For example,
+`fmt.Sprintf("%d", 7)` boxes an exact integer, while the manual `fmt` provider
+receives only `GoInterfaceValue`. The interface adapter therefore owns one
+intrinsic `$go$format` operation over its exact statically typed payload. The
+operation receives the parsed verb, flags, and precision and returns one
+unpadded Go rendering; `%T` uses the adapter's canonical dynamic Go type.
+`fmt` remains the sole owner of directive parsing, argument indexing, width,
+padding, writer behavior, and `%w` error construction.
+
+This intrinsic is the static substitute for the narrow reflection that Go's
+`fmt` performs. It is not a general reflection API and does not expose the
+payload on `GoInterfaceValue`. Generated adapters select behavior directly from
+their authoritative `go/types.Type`; provider-owned interface values implement
+the same closed operation explicitly. An unsupported dynamic type/verb pair
+raises an explicit Go runtime failure. Using `any`, `unknown`, a payload cast,
+`String(object)`, object-shape inspection, a runtime type-name registry, or a
+call-site formatter special case is forbidden.
+
+The operation is constant-size per concrete adapter and is emitted only once
+with that adapter. A source program that adds formatting calls may enlarge the
+reached adapters but may not duplicate format bodies per call or per interface
+contract. If complete static rendering for a new Go family becomes available,
+the family owner replaces that adapter branch; no fallback formatter survives.
+
 Construction admits each `(concrete adapter, contract)` pair at most once and
 propagates only newly reachable pairs through transitions indexed by source
 contract. Repeated occurrences of an already-known conversion or assertion
@@ -1371,6 +1397,16 @@ map to the provider-owned
 data. The internal export is an adapter to the one ordinary semantic
 implementation, not a second implementation.
 
+A certified provider module owns exactly one namespace import in each generated
+file. Public modules normally inherit the source package spelling (`strings`,
+`os`). Internal facet modules may intentionally serve declarations from more
+than one Go package (`sync` and `sync/atomic` can share `recovery-sync.js`), so
+their namespace identity and preallocated qualifier come from the certified
+target module specifier, never from whichever source declaration is visited
+first. Module-stem collisions are resolved once in sorted module order. Import
+identity, alias selection, and emitted references therefore remain independent
+of root order and contributing Go package.
+
 The checked provider contract has two disjoint surfaces. Public module records
 own ordinary Go declarations. Compiler-facet records own only an exact selected
 capability of one such declaration or represented type. A compiler-facet record
@@ -1384,6 +1420,58 @@ fingerprint. The valid capabilities are the compiler's closed operation names
 the exact generic callable profile key, or `recovery`; arbitrary strings are
 rejected.
 
+A private selected-Go named type may use a provider representation only through
+one certified representation record. The record owns one internal type export,
+closed sorted sets of exact selected-Go type and supporting-interface
+identities, and an exact binding for every externally selectable method in
+those types' method sets. The certifier derives those method sets from
+`go/types`, proves that every represented type implements each supporting
+interface, requires every shared target member to have one callable contract,
+and exact-joins the concrete-method union plus the already-certified interface
+target surfaces to the target type inspected through the pinned TS-Go project
+API. Facets reference that record; they do not repeat its method set, substitute
+one supporting interface for the concrete surface, or infer anything from
+variable spelling or target shape during compilation.
+
+For example, `encoding/binary.bigEndian`, `littleEndian`, and `nativeEndian`
+share one private representation whose target surface contains the exact union
+of `Uint*`, `PutUint*`, `AppendUint*`, `String`, and `GoString`. The provider may
+spell that internal surface `BinaryEndianRepresentation`, while public
+`ByteOrder` and `AppendByteOrder` remain exact, distinct Go interfaces. Thus
+`binary.BigEndian.PutUint32(b, v)` is a direct typed member call and returning
+`binary.BigEndian` as `ByteOrder` uses the ordinary interface adapter; the
+compiler neither reconstructs a private GOROOT struct nor pretends that either
+public interface contains the other.
+
+A public generic-function record may additionally own one sorted closed
+generic-operation set. Each operation records its compiler operation kind and
+an exact parameter/result signature whose leaves reference the selected Go
+declaration's type-parameter positions. This metadata is part of the public
+binding certificate and is integrity-bound to that binding's provider target;
+it is not a private target export, a source scan, or a second type model. At a
+concrete call, the existing generic-operation owner instantiates those exact
+signatures from `go/types.Instance`, selects the ordinary typed capabilities,
+and prepends them through the one canonical generic-call ABI.
+
+A provider's public export for an untyped Go constant is not a universal
+runtime representation. Each generated use still requests its exact contextual
+projection. In linked mode the ordinary constant-value owner materializes the
+canonical `go/constant.Value` once per demanded basic representation under
+`support/constant-projections/<toolchain>/<package>/index.ts`. Typed constants
+continue to use their certified public provider export. Projection modules
+contain initialized `export const` declarations, never ambient `declare`
+bindings, and remain profile-aware (`math.MaxInt64` is a `bigint` literal only
+under the `bigint` profile). No provider spelling or runtime value is used to
+recover the compile-time constant.
+
+For example, selected `slices.Grow[S ~[]E, E any]` records `copy(E) E` and
+`zero() E`. A call `slices.Grow(values, 3)` therefore becomes the TS-Go AST for
+`slices.Grow(copyE, zeroE, values, 3)`. The provider can allocate independent
+zero elements and copy the old backing values without `any`, `unknown`, target
+shape inspection, sparse-array holes, or a compiler check for the name
+`Grow`. Removing either certified operation changes the call AST and fails the
+provider ABI gate.
+
 For example, a generated zero of `sync.Mutex` does not call a `$zero` member on
 the public `sync.Mutex` class. The selected `sync.Mutex` identity plus capability
 `zero` exact-joins a private `MutexOperations` export, and the typed TS-Go AST
@@ -1391,8 +1479,18 @@ calls `syncFacets.MutexOperations.$zero()`. Ordinary calls still use
 `sync.Mutex.Lock(receiver)`. Likewise, a cooperative `slices.SortFunc` use joins
 its exact profile key to `SortFuncCooperative`; a deferred provider call joins
 `recovery` to a provider adapter whose explicit last parameter is the recovery
-authority. No caller invents a private module, export, effect, operation set, or
-storage type from source spelling.
+authority. No caller invents a private module, export, effect, operation set,
+type-parameter reference, or storage type from source spelling.
+
+For `sync` and `sync/atomic` values whose Go contract forbids copying after
+first use, a certified `copy` facet covers exactly the remaining admissible
+pre-first-use operation. It creates independent zero synchronization state;
+it never returns or embeds the source carrier. Public pre-use configuration is
+copied where Go copies it (`sync.Pool.New`). The provider does not define or
+claim behavior for a source program that violates the selected Go package's
+post-first-use copy restriction. `strings.Builder` follows the same ownership
+rule: copying its admissible zero state creates a fresh empty builder; a
+non-zero copy remains outside the selected Go contract.
 
 Construction is a represented-type operation too. A composite literal such as
 `unicode.Range16{Lo: 1}` selects the certified `make` facet and emits
@@ -1429,6 +1527,18 @@ types, methods, package state, generic profiles, deferred calls, and method
 values—must construct qualified TS-Go AST nodes through the canonical name
 reference API; concatenated dotted identifiers and post-print rewriting are
 forbidden.
+
+The two profiles are also disjoint inside compilation. Once an exact public
+binding or private facet has joined the selected provider certificate, its
+source artifact is a provider-coverage owner used only for requirement
+liveness. The compiler must not reconstruct an ambient declaration and then
+discard its file. In particular, it must not expose or resolve a provider
+type's private representation merely to validate a linked reference
+(`reflect.Value` contains the unexported embedded `reflect.flag`, but linked
+code imports the certified provider `Value` and never asks the ambient
+contract builder to represent `flag`). The compile-only profile remains the
+sole owner of ambient declaration construction, including its exported-field
+and embedded-promotion contract.
 
 Generic non-struct defined types retain one parameterized nominal wrapper.
 Every target reference carries the exact represented `go/types` type arguments,

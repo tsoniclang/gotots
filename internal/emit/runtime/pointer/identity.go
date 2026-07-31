@@ -88,35 +88,46 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 			tsgo.KeywordTypeSyntaxKindVoidKeyword,
 		),
 	)
+	parameters := []tsgo.ParameterDeclaration{
+		b.factory.ParameterDeclaration(
+			readonly,
+			nil,
+			b.id(AddressName),
+			nil,
+			b.objectType(),
+			nil,
+		),
+		b.factory.ParameterDeclaration(
+			privateReadonly,
+			nil,
+			b.id("read"),
+			nil,
+			readType,
+			nil,
+		),
+		b.factory.ParameterDeclaration(
+			privateReadonly,
+			nil,
+			b.id("write"),
+			nil,
+			writeType,
+			nil,
+		),
+	}
+	if b.capabilities.Region {
+		parameters = append(parameters, b.factory.ParameterDeclaration(
+			privateReadonly,
+			nil,
+			b.id(RegionName),
+			nil,
+			b.optionalRegionType(b.typeS()),
+			nil,
+		))
+	}
 	return b.factory.ConstructorDeclaration(
 		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
 		nil,
-		[]tsgo.ParameterDeclaration{
-			b.factory.ParameterDeclaration(
-				readonly,
-				nil,
-				b.id(AddressName),
-				nil,
-				b.objectType(),
-				nil,
-			),
-			b.factory.ParameterDeclaration(
-				privateReadonly,
-				nil,
-				b.id("read"),
-				nil,
-				readType,
-				nil,
-			),
-			b.factory.ParameterDeclaration(
-				privateReadonly,
-				nil,
-				b.id("write"),
-				nil,
-				writeType,
-				nil,
-			),
-		},
+		parameters,
 		nil,
 		b.factory.Block(nil, true),
 	)

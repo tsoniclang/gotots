@@ -76,9 +76,33 @@
       "types": "./dist/src/internal/facets/generic-sync.d.ts",
       "default": "./dist/src/internal/facets/generic-sync.js"
     },
+    "./internal/facets/named-encoding-binary.js": {
+      "types": "./dist/src/internal/facets/named-encoding-binary.d.ts",
+      "default": "./dist/src/internal/facets/named-encoding-binary.js"
+    },
+    "./internal/facets/named-io-fs.js": {
+      "types": "./dist/src/internal/facets/named-io-fs.d.ts",
+      "default": "./dist/src/internal/facets/named-io-fs.js"
+    },
+    "./internal/facets/named-math-big.js": {
+      "types": "./dist/src/internal/facets/named-math-big.d.ts",
+      "default": "./dist/src/internal/facets/named-math-big.js"
+    },
+    "./internal/facets/named-net-url.js": {
+      "types": "./dist/src/internal/facets/named-net-url.d.ts",
+      "default": "./dist/src/internal/facets/named-net-url.js"
+    },
     "./internal/facets/named-runtime-metrics.js": {
       "types": "./dist/src/internal/facets/named-runtime-metrics.d.ts",
       "default": "./dist/src/internal/facets/named-runtime-metrics.js"
+    },
+    "./internal/facets/named-runtime.js": {
+      "types": "./dist/src/internal/facets/named-runtime.d.ts",
+      "default": "./dist/src/internal/facets/named-runtime.js"
+    },
+    "./internal/facets/named-reflect.js": {
+      "types": "./dist/src/internal/facets/named-reflect.d.ts",
+      "default": "./dist/src/internal/facets/named-reflect.js"
     },
     "./internal/facets/named-strings.js": {
       "types": "./dist/src/internal/facets/named-strings.d.ts",
@@ -91,6 +115,10 @@
     "./internal/facets/named-sync.js": {
       "types": "./dist/src/internal/facets/named-sync.d.ts",
       "default": "./dist/src/internal/facets/named-sync.js"
+    },
+    "./internal/facets/named-time.js": {
+      "types": "./dist/src/internal/facets/named-time.d.ts",
+      "default": "./dist/src/internal/facets/named-time.js"
     },
     "./internal/facets/named-unicode.js": {
       "types": "./dist/src/internal/facets/named-unicode.d.ts",

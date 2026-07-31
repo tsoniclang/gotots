@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { GoError } from "@gotots/runtime/interface-value.js";
+import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { int64, uint8 } from "@gotots/runtime/scalars.js";
 
@@ -11,7 +12,7 @@ import {
   Reader as BufferedReader,
   Writer as BufferedWriter,
 } from "../src/bufio.js";
-import { Is, New } from "../src/errors.js";
+import { AsType, Is, New } from "../src/errors.js";
 import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 import {
   bytes,
@@ -84,6 +85,14 @@ test("errors preserve sentinel identity", () => {
   assert.equal(Is(first, first), true);
   assert.equal(Is(first, second), false);
   assert.equal(first.Error(), "first");
+  assert.throws(() => AsType(first), (failure): boolean => {
+    assert.ok(failure instanceof GoPanic);
+    assert.match(
+      failure.value.$go$format("v", "", undefined),
+      /requires a generated interface-assert capability/u,
+    );
+    return true;
+  });
 });
 
 test("ReadFull handles exact EOF and reports unexpected EOF for short input", () => {

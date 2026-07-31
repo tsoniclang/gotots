@@ -86,6 +86,18 @@ func testStaticSpecialization(
 class GoPanic {
     static raiseRuntime(message: string): never { throw new Error(message); }
 }
+class GoDenseIndex {
+    private static present<T>(values: readonly T[], index: number, value: T | undefined): value is T {
+        return index in values;
+    }
+    static get<T>(values: readonly T[], index: number): T {
+        const value = values[index];
+        if (!GoDenseIndex.present(values, index, value)) {
+            GoPanic.raiseRuntime("dense storage index is absent");
+        }
+        return value;
+    }
+}
 class Box {
     constructor(public value: number) {}
 }
@@ -191,6 +203,7 @@ func assertStaticSpecializationArtifact(t *testing.T, source string) {
 		"StaticMap.$equal(entry[0], key)",
 		"StaticMap.$copyKey(key)",
 		"StaticMap.$copyValue(value)",
+		"GoDenseIndex.get(bucket, index)",
 	} {
 		if !strings.Contains(source, required) {
 			t.Fatalf("specialization lacks %q:\n%s", required, source)
@@ -281,6 +294,7 @@ func compileAndRunSpecialization(t *testing.T, source string) string {
 			"--module", "nodenext",
 			"--moduleResolution", "nodenext",
 			"--strict",
+			"--noUncheckedIndexedAccess",
 			"--outDir", "out",
 			sourcePath,
 		},

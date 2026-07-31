@@ -106,28 +106,6 @@ func compareDeclarationRequirements(
 			return 0
 		}
 	}
-	if left.Kind() == api.DeclarationRequirementEnvironmentBuiltin {
-		_, leftSignature, leftOK := left.EnvironmentBuiltin()
-		_, rightSignature, rightOK := right.EnvironmentBuiltin()
-		switch {
-		case !leftOK && rightOK:
-			return -1
-		case leftOK && !rightOK:
-			return 1
-		case !leftOK:
-			return 0
-		}
-		leftType := emitordering.StableTypeString(leftSignature)
-		rightType := emitordering.StableTypeString(rightSignature)
-		switch {
-		case leftType < rightType:
-			return -1
-		case leftType > rightType:
-			return 1
-		default:
-			return 0
-		}
-	}
 	if left.Kind() == api.DeclarationRequirementCooperativeCallable {
 		leftFacet, leftOK := left.CooperativeCallable()
 		rightFacet, rightOK := right.CooperativeCallable()

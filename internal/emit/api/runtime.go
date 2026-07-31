@@ -13,6 +13,7 @@ const (
 	RuntimeDenseIndex           RuntimeSymbol = 90
 	RuntimePointer              RuntimeSymbol = 100
 	RuntimePointerHash          RuntimeSymbol = 101
+	RuntimePointerRegion        RuntimeSymbol = 102
 	RuntimeArray                RuntimeSymbol = 200
 	RuntimeArrayAllocate        RuntimeSymbol = 201
 	RuntimeArrayView            RuntimeSymbol = 202
@@ -24,6 +25,7 @@ const (
 	RuntimeArraySlice           RuntimeSymbol = 305
 	RuntimeSliceAppendSlice     RuntimeSymbol = 307
 	RuntimeSliceClear           RuntimeSymbol = 308
+	RuntimeSliceRegion          RuntimeSymbol = 309
 	RuntimeMap                  RuntimeSymbol = 400
 	RuntimeMapHash              RuntimeSymbol = 401
 	RuntimeMapClear             RuntimeSymbol = 402
@@ -77,6 +79,10 @@ const (
 	RuntimeSelectReady          RuntimeSymbol = 1106
 	RuntimeSelectAttempt        RuntimeSymbol = 1107
 	RuntimeUnsafePointer        RuntimeSymbol = 1200
+	RuntimeUnsafeString         RuntimeSymbol = 1210
+	RuntimeUnsafeSlice          RuntimeSymbol = 1211
+	RuntimeUnsafeStringData     RuntimeSymbol = 1212
+	RuntimeUnsafeSliceData      RuntimeSymbol = 1213
 )
 
 type RuntimeSymbolContract struct {
@@ -158,6 +164,15 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimePointer,
 			RuntimeMapHash,
+		), nil
+	case RuntimePointerRegion:
+		return runtimeContract(
+			RuntimeModulePointer,
+			"runtime/pointer.ts",
+			"goPointerRegion",
+			false,
+			RuntimePointer,
+			RuntimePanic,
 		), nil
 	case RuntimeArray:
 		return runtimeContract(
@@ -254,6 +269,15 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goSliceClear",
 			false,
 			RuntimeSlice,
+		), nil
+	case RuntimeSliceRegion:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceRegion",
+			false,
+			RuntimeSlice,
+			RuntimePanic,
 		), nil
 	case RuntimeMap:
 		return runtimeContract(
@@ -581,6 +605,47 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoUnsafePointer",
 			true,
 			RuntimePanic,
+		), nil
+	case RuntimeUnsafeString:
+		return runtimeContract(
+			RuntimeModuleUnsafe,
+			"runtime/unsafe.ts",
+			"goUnsafeString",
+			false,
+			RuntimePointerRegion,
+			RuntimePointer,
+			RuntimeDenseIndex,
+		), nil
+	case RuntimeUnsafeSlice:
+		return runtimeContract(
+			RuntimeModuleUnsafe,
+			"runtime/unsafe.ts",
+			"goUnsafeSlice",
+			false,
+			RuntimePointerRegion,
+			RuntimePointer,
+			RuntimeSliceRegion,
+			RuntimeSlice,
+		), nil
+	case RuntimeUnsafeStringData:
+		return runtimeContract(
+			RuntimeModuleUnsafe,
+			"runtime/unsafe.ts",
+			"goUnsafeStringData",
+			false,
+			RuntimePointerRegion,
+			RuntimePointer,
+		), nil
+	case RuntimeUnsafeSliceData:
+		return runtimeContract(
+			RuntimeModuleUnsafe,
+			"runtime/unsafe.ts",
+			"goUnsafeSliceData",
+			false,
+			RuntimePointerRegion,
+			RuntimePointer,
+			RuntimeSliceRegion,
+			RuntimeSlice,
 		), nil
 	default:
 		return concurrencyRuntimeContract(symbol)

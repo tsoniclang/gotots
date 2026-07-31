@@ -15,13 +15,20 @@ const (
 	ElementName     = "element"
 	IndexName       = "index"
 	ArrayRegionName = "arrayRegion"
+	RegionName      = "$go$region"
+	RegionMethod    = "region"
 )
+
+type Capabilities struct {
+	Region bool
+}
 
 type builder struct {
 	factory        tsgo.Factory
 	className      string
 	panicName      string
 	denseIndexName string
+	capabilities   Capabilities
 }
 
 func Build(
@@ -30,11 +37,51 @@ func Build(
 	panicName string,
 	denseIndexName string,
 ) tsgo.Statement {
+	return BuildWithCapabilities(
+		factory,
+		className,
+		panicName,
+		denseIndexName,
+		Capabilities{},
+	)
+}
+
+func BuildWithCapabilities(
+	factory tsgo.Factory,
+	className string,
+	panicName string,
+	denseIndexName string,
+	capabilities Capabilities,
+) tsgo.Statement {
 	target := builder{
 		factory:        factory,
 		className:      className,
 		panicName:      panicName,
 		denseIndexName: denseIndexName,
+		capabilities:   capabilities,
+	}
+	members := []tsgo.ClassElement{
+		target.logicalProperty(),
+		target.rootsProperty(),
+		target.childrenProperty(),
+		target.constructor(),
+		target.rootMethod(),
+		target.childMethod(),
+		target.cellMethod(),
+		target.fieldMethod(),
+		target.objectFieldMethod(),
+		target.elementMethod(),
+		target.indexMethod(),
+		target.arrayRegionMethod(),
+		target.equalMethod(),
+		target.dereferenceMethod(),
+		target.directMethod(),
+		target.viewMethod(),
+		target.valueGetter(),
+		target.valueSetter(),
+	}
+	if capabilities.Region {
+		members = append(members, target.regionMethod())
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
@@ -44,26 +91,7 @@ func Build(
 			target.typeParameter("S", nil),
 		},
 		nil,
-		[]tsgo.ClassElement{
-			target.logicalProperty(),
-			target.rootsProperty(),
-			target.childrenProperty(),
-			target.constructor(),
-			target.rootMethod(),
-			target.childMethod(),
-			target.cellMethod(),
-			target.fieldMethod(),
-			target.objectFieldMethod(),
-			target.elementMethod(),
-			target.indexMethod(),
-			target.arrayRegionMethod(),
-			target.equalMethod(),
-			target.dereferenceMethod(),
-			target.directMethod(),
-			target.viewMethod(),
-			target.valueGetter(),
-			target.valueSetter(),
-		},
+		members,
 	)
 }
 

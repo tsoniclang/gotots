@@ -3,6 +3,7 @@ import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { gostring, int64, uint8 } from "@gotots/runtime/scalars.js";
 
 import type { Time } from "./time.js";
+import { ProviderError } from "./internal/runtime/error.js";
 
 export interface Addr {
   Network(): gostring;
@@ -24,4 +25,14 @@ export interface Listener {
   Accept(): [Conn | undefined, GoError | undefined];
   Addr(): Addr | undefined;
   Close(): GoError | undefined;
+}
+
+export function Listen(
+  network: gostring,
+  _address: gostring,
+): [Listener | undefined, GoError | undefined] {
+  return [
+    undefined,
+    new ProviderError(`net.Listen ${network} is not implemented by this backend`),
+  ];
 }

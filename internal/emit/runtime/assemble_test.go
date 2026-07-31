@@ -96,6 +96,34 @@ func TestUnsafePointerRuntimeIsNominalAndTypedPlaceholder(t *testing.T) {
 	}
 }
 
+func TestUnsafeRuntimeExactJoinsFourIntrinsicDefinitions(t *testing.T) {
+	symbols := []api.RuntimeSymbol{
+		api.RuntimeUnsafeString,
+		api.RuntimeUnsafeSlice,
+		api.RuntimeUnsafeStringData,
+		api.RuntimeUnsafeSliceData,
+	}
+	definitions, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleUnsafe,
+		symbols,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != len(symbols) {
+		t.Fatalf("unsafe runtime definitions = %d, want %d", len(definitions), len(symbols))
+	}
+	for index, definition := range definitions {
+		if definition.Symbol() != symbols[index] {
+			t.Fatalf("unsafe definition %d = %d, want %d", index, definition.Symbol(), symbols[index])
+		}
+		if _, ok := definition.Statement().(tsgo.FunctionDeclaration); !ok {
+			t.Fatalf("unsafe definition %d = %T, want function", index, definition.Statement())
+		}
+	}
+}
+
 func TestAggregateArrayRuntimeAssemblyExactJoinsDemandedOperations(t *testing.T) {
 	factory := tsgo.NewFactory()
 	symbols := []api.RuntimeSymbol{

@@ -25,10 +25,19 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 			Specifier:    "@gotots/gostdlib/strings.js",
 			SourcePath:   "src/strings.ts",
 			Bindings: []gostdlib.BindingDocument{{
-				Identity:            "strings|kind=4|receiver=|name=Contains",
-				Kind:                gostdlib.BindingFunction,
-				Access:              gostdlib.AccessExport,
-				Export:              "Contains",
+				Identity: "strings|kind=4|receiver=|name=Contains",
+				Kind:     gostdlib.BindingFunction,
+				Access:   gostdlib.AccessExport,
+				Export:   "Contains",
+				GenericOperations: []gostdlib.GenericOperationDocument{{
+					Kind: gostdlib.GenericOperationCopy,
+					Parameters: []gostdlib.GenericOperationTypeDocument{{
+						TypeParameter: 0,
+					}},
+					Results: []gostdlib.GenericOperationTypeDocument{{
+						TypeParameter: 0,
+					}},
+				}},
 				SourceSignature:     "func(s, substr string) bool|params=s,substr|results=",
 				SourceLocation:      "strings/strings.go:1:1",
 				ImplementationOwner: "src/internal/portable/strings/search.ts",
@@ -67,6 +76,16 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 		binding.ModuleSpecifier() != "@gotots/gostdlib/strings.js" {
 		t.Fatalf("binding = %#v, %t", binding, ok)
 	}
+	operations := binding.GenericOperations()
+	if len(operations) != 1 ||
+		operations[0].Kind != gostdlib.GenericOperationCopy ||
+		operations[0].Parameters[0].TypeParameter != 0 {
+		t.Fatalf("generic operations = %#v", operations)
+	}
+	operations[0].Parameters[0].TypeParameter = 9
+	if binding.GenericOperations()[0].Parameters[0].TypeParameter != 0 {
+		t.Fatal("binding exposed mutable generic-operation storage")
+	}
 	modules := manifest.Modules()
 	modules[0] = gostdlib.Module{}
 	if manifest.Modules()[0].GoImportPath() != "strings" {
@@ -92,6 +111,32 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 	}
 	if string(reencoded) != string(payload) {
 		t.Fatalf("round trip changed canonical bytes\nfirst=%s\nnext=%s", payload, reencoded)
+	}
+}
+
+func TestManifestRejectsInvalidGenericOperationShape(t *testing.T) {
+	document := validDocument()
+	binding := &document.Modules[0].Bindings[0]
+	binding.GenericOperations = []gostdlib.GenericOperationDocument{{
+		Kind: gostdlib.GenericOperationZero,
+		Parameters: []gostdlib.GenericOperationTypeDocument{{
+			TypeParameter: 0,
+		}},
+		Results: []gostdlib.GenericOperationTypeDocument{{
+			TypeParameter: 0,
+		}},
+	}}
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("zero operation with a parameter passed")
+	}
+	binding.GenericOperations = []gostdlib.GenericOperationDocument{{
+		Kind: gostdlib.GenericOperationKind("invented"),
+		Results: []gostdlib.GenericOperationTypeDocument{{
+			TypeParameter: 0,
+		}},
+	}}
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("open generic operation passed")
 	}
 }
 
@@ -206,6 +251,92 @@ func TestManifestOwnsUnsafeBuiltinsAsDirectExports(t *testing.T) {
 	if !ok || binding.Kind() != gostdlib.BindingBuiltin ||
 		binding.Access() != gostdlib.AccessExport {
 		t.Fatalf("builtin binding = %#v, %t", binding, ok)
+	}
+}
+
+func TestManifestOwnsClosedPrivateProviderRepresentation(t *testing.T) {
+	document := validDocument()
+	document.FacetModules = []gostdlib.FacetModuleDocument{{
+		Specifier:  "@gotots/gostdlib/internal/facets/binary.js",
+		SourcePath: "src/internal/facets/binary.ts",
+		Representations: []gostdlib.ProviderRepresentationDocument{{
+			Export: "BinaryEndianRepresentation",
+			SourceTypes: []string{
+				"encoding/binary|kind=2|receiver=|name=bigEndian",
+			},
+			SourceInterfaces: []string{
+				"encoding/binary|kind=2|receiver=|name=ByteOrder",
+			},
+			Methods: []gostdlib.ProviderRepresentationMethodDocument{{
+				SourceIdentity:      "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint16",
+				Member:              "Uint16",
+				SourceSignature:     "func([]byte) uint16|params=|results=",
+				SourceLocation:      "encoding/binary/binary.go:1:1",
+				ImplementationOwner: "src/internal/facets/binary.ts",
+				TargetFingerprint:   digest('e'),
+			}},
+			ImplementationOwner: "src/internal/facets/binary.ts",
+			TargetFingerprint:   digest('f'),
+		}},
+		Facets: []gostdlib.FacetDocument{{
+			Kind:           gostdlib.FacetNamedStructOperations,
+			SourceIdentity: "encoding/binary|kind=2|receiver=|name=bigEndian",
+			Capabilities: []gostdlib.FacetCapability{
+				gostdlib.FacetCapabilityRepresentation,
+			},
+			Export:               "BinaryBigEndianOperations",
+			RepresentationExport: "BinaryEndianRepresentation",
+			ImplementationOwner:  "src/internal/facets/binary.ts",
+			TargetFingerprint:    digest('d'),
+		}},
+	}}
+	payload, err := gostdlib.Seal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := gostdlib.Parse(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	facet, ok := manifest.Facet(
+		"encoding/binary|kind=2|receiver=|name=bigEndian",
+		gostdlib.FacetNamedStructOperations,
+		gostdlib.FacetCapabilityRepresentation,
+	)
+	if !ok {
+		t.Fatal("representation facet is absent")
+	}
+	representation, ok := facet.Representation()
+	if !ok || representation.Export() != "BinaryEndianRepresentation" {
+		t.Fatalf("representation = %#v, %t", representation, ok)
+	}
+	method, ok := representation.Method(
+		"encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint16",
+	)
+	if !ok || method.Member() != "Uint16" {
+		t.Fatalf("method = %#v, %t", method, ok)
+	}
+	types := representation.SourceTypes()
+	types[0] = "changed"
+	if representation.SourceTypes()[0] == "changed" {
+		t.Fatal("representation exposed mutable source types")
+	}
+
+	document.FacetModules[0].Representations[0].Methods = nil
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("representation without methods passed")
+	}
+	document.FacetModules[0].Representations[0].Methods = []gostdlib.ProviderRepresentationMethodDocument{{
+		SourceIdentity:      "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint16",
+		Member:              "Uint16",
+		SourceSignature:     "func([]byte) uint16|params=|results=",
+		SourceLocation:      "encoding/binary/binary.go:1:1",
+		ImplementationOwner: "src/internal/facets/binary.ts",
+		TargetFingerprint:   digest('e'),
+	}}
+	document.FacetModules[0].Facets[0].RepresentationExport = "Missing"
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("facet with a missing representation passed")
 	}
 }
 

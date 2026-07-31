@@ -19,6 +19,7 @@ import {
   NewTicker,
   NewTimer,
   Since,
+  Second,
   Ticker,
   Now,
   Time,
@@ -51,6 +52,7 @@ test("Duration and Time preserve arithmetic, ordering, formatting, and zero", ()
   assert.equal(UnixMilli(0).UnixNano(), 0);
   assert.match(UnixMilli(0).String(), /1970/u);
   assert.equal(Millisecond.Nanoseconds(), 1_000_000);
+  assert.equal(Second.Nanoseconds(), 1_000_000_000);
   const now = Now();
   assert.equal(now.IsZero(), false);
   assert.ok(Since(now).Nanoseconds() >= 0);

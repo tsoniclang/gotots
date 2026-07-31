@@ -27,6 +27,25 @@ export function goOperatingSystem(): gostring {
   }
 }
 
+export function goArchitecture(): gostring {
+  switch (process.arch) {
+    case "x64":
+      return "amd64";
+    case "ia32":
+      return "386";
+    case "arm":
+    case "arm64":
+    case "loong64":
+    case "mips":
+    case "ppc64":
+    case "riscv64":
+    case "s390x":
+      return process.arch;
+    case "mipsel":
+      return "mipsle";
+  }
+}
+
 export function memorySnapshot(): MemorySnapshot {
   const memory = process.memoryUsage();
   const heap = getHeapStatistics();

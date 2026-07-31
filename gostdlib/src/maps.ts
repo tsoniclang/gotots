@@ -1,5 +1,6 @@
 export {
   Copy,
+  Clone,
   Equal,
   EqualFunc,
   Keys,

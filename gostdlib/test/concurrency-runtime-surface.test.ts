@@ -58,6 +58,7 @@ const timeSurface: Same<
   | "NewTimer"
   | "Now"
   | "Since"
+  | "Second"
   | "Ticker"
   | "Time"
   | "Timer"
@@ -68,7 +69,13 @@ const timeSurface: Same<
 
 const runtimeSurface: Same<
   keyof typeof runtime,
-  "Caller" | "GC" | "GOMAXPROCS" | "GOOS" | "MemStats" | "ReadMemStats"
+  | "Caller"
+  | "GC"
+  | "GOARCH"
+  | "GOMAXPROCS"
+  | "GOOS"
+  | "MemStats"
+  | "ReadMemStats"
 > = true;
 
 const debugSurface: Same<

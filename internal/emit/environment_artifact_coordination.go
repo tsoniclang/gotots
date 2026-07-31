@@ -2,13 +2,13 @@ package emit
 
 import (
 	"go/types"
-	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	"github.com/tsoniclang/gotots/internal/emit/environmentcontract"
-	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -21,21 +21,39 @@ type environmentArtifact struct {
 }
 
 type environmentDeclaration struct {
-	object     types.Object
-	name       string
-	statements []tsgo.Statement
+	object           types.Object
+	name             string
+	statements       []tsgo.Statement
+	providerCoverage bool
 	environmentArtifact
+}
+
+func (s *programSession) buildProviderCoverageDeclaration(
+	object types.Object,
+) (environmentDeclaration, error) {
+	if object == nil || !s.standardLibraryLinked ||
+		!s.registry.HasProviderCoverageOwner(object) {
+		return environmentDeclaration{}, &ScheduleError{
+			Reason: "provider coverage owner is invalid",
+		}
+	}
+	contract, err := artifactstate.ProjectCoverageContract(s.factory, nil)
+	if err != nil {
+		return environmentDeclaration{}, environmentContractError(object, err)
+	}
+	return environmentDeclaration{
+		object:           object,
+		name:             object.Name(),
+		providerCoverage: true,
+		environmentArtifact: environmentArtifact{
+			placement: targetplacement.New(),
+			contract:  contract,
+		},
+	}, nil
 }
 
 type environmentStateField struct {
 	field tsgo.TypeElement
-	environmentArtifact
-}
-
-type environmentBuiltin struct {
-	emitted    bool
-	signatures []*types.Signature
-	statements []tsgo.Statement
 	environmentArtifact
 }
 
@@ -124,11 +142,16 @@ func (s *programSession) reconstructEnvironmentDeclaration(
 	if err != nil {
 		return err
 	}
-	target, err := s.buildEnvironmentDeclaration(
-		builder,
-		object,
-		requirements,
-	)
+	var target environmentDeclaration
+	if current.providerCoverage {
+		target, err = s.buildProviderCoverageDeclaration(object)
+	} else {
+		target, err = s.buildEnvironmentDeclaration(
+			builder,
+			object,
+			requirements,
+		)
+	}
 	if err != nil {
 		return err
 	}
@@ -237,95 +260,6 @@ func (s *programSession) reconstructEnvironmentStateField(
 	return nil
 }
 
-func (s *programSession) reconstructEnvironmentBuiltin(
-	builder *environmentContractBuilder,
-	builtin *types.Builtin,
-) error {
-	current, emitted := builder.builtins[builtin]
-	if !emitted || len(current.signatures) == 0 {
-		return &ScheduleError{
-			Object: builtin.Name(),
-			Reason: "environment builtin has no selected overload",
-		}
-	}
-	target, err := s.buildEnvironmentBuiltin(
-		builder,
-		builtin,
-		current.signatures,
-	)
-	if err != nil {
-		return err
-	}
-	owner := api.MustSourceArtifactOwner(builtin)
-	if err := s.commitArtifactRevision(
-		owner,
-		target.contract,
-		target.dependencies,
-		target.requirements,
-	); err != nil {
-		return err
-	}
-	s.artifacts.DiscardDirty(owner)
-	if len(current.statements) != 0 {
-		target.reconstructions = current.reconstructions + 1
-	}
-	target.emitted = current.emitted
-	builder.builtins[builtin] = target
-	return nil
-}
-
-func (s *programSession) replaceEnvironmentBuiltin(
-	builder *environmentContractBuilder,
-	builtin *types.Builtin,
-	requirements []api.DeclarationRequirement,
-) error {
-	current, emitted := builder.builtins[builtin]
-	if !emitted {
-		return &ScheduleError{
-			Object: builtin.Name(),
-			Reason: "environment builtin was not emitted before requirement replacement",
-		}
-	}
-	signatures := make([]*types.Signature, 0, len(requirements))
-	for _, requirement := range requirements {
-		owner, signature, ok := requirement.EnvironmentBuiltin()
-		if !ok || owner != builtin {
-			return &ScheduleError{
-				Object: builtin.Name(),
-				Reason: "environment builtin requirement is invalid",
-			}
-		}
-		duplicate := false
-		for _, existing := range signatures {
-			if types.Identical(existing, signature) {
-				duplicate = true
-				break
-			}
-		}
-		if !duplicate {
-			signatures = append(signatures, signature)
-		}
-	}
-	target, err := s.buildEnvironmentBuiltin(builder, builtin, signatures)
-	if err != nil {
-		return err
-	}
-	owner := api.MustSourceArtifactOwner(builtin)
-	if err := s.commitArtifactRevision(
-		owner,
-		target.contract,
-		target.dependencies,
-		target.requirements,
-	); err != nil {
-		return err
-	}
-	s.artifacts.DiscardDirty(owner)
-	target.emitted = true
-	target.reconstructions = current.reconstructions + 1
-	builder.builtins[builtin] = target
-	return nil
-}
-
 func (s *programSession) replaceEnvironmentConstantProjections(
 	builder *environmentContractBuilder,
 	selected *types.Const,
@@ -360,15 +294,37 @@ func (s *programSession) replaceEnvironmentConstantProjections(
 		if err != nil {
 			return err
 		}
-		statement, selectedRequests, err :=
-			environmentcontract.ConstantProjection(
+		var statement tsgo.Statement
+		var selectedRequests []api.RootRequest
+		if s.standardLibraryLinked &&
+			builder.sourcePackage.Kind() == load.PackageStandardLibraryContract {
+			emission, projectionErr := constantbinding.EmitProjection(
 				builder.context,
 				builder.emitter,
+				nil,
 				selected,
+				name,
 				projection,
+				api.RolePackageConstantType,
+				api.RolePackageConstantValue,
 			)
-		if err != nil {
-			return err
+			if projectionErr != nil {
+				return environmentContractError(selected, projectionErr)
+			}
+			statement = emission.ExportedStatement(s.factory)
+			selectedRequests = emission.Requests()
+		} else {
+			var projectionErr error
+			statement, selectedRequests, projectionErr =
+				environmentcontract.ConstantProjection(
+					builder.context,
+					builder.emitter,
+					selected,
+					projection,
+				)
+			if projectionErr != nil {
+				return projectionErr
+			}
 		}
 		contract, err := artifactstate.ProjectContract(
 			s.factory,
@@ -427,68 +383,6 @@ func (s *programSession) replaceEnvironmentConstantProjections(
 	return nil
 }
 
-func (s *programSession) buildEnvironmentBuiltin(
-	builder *environmentContractBuilder,
-	builtin *types.Builtin,
-	signatures []*types.Signature,
-) (environmentBuiltin, error) {
-	ordered := append([]*types.Signature(nil), signatures...)
-	sort.Slice(ordered, func(left, right int) bool {
-		return emitordering.StableTypeString(ordered[left]) <
-			emitordering.StableTypeString(ordered[right])
-	})
-	var statements []tsgo.Statement
-	var requests []api.RootRequest
-	for _, signature := range ordered {
-		target, err := environmentcontract.BuiltinDeclaration(
-			builder.context,
-			builder.emitter,
-			builtin,
-			signature,
-		)
-		if err != nil {
-			return environmentBuiltin{},
-				environmentContractError(builtin, err)
-		}
-		statements = append(statements, target.Declarations()...)
-		requests = append(requests, target.Requests()...)
-	}
-	owner := api.MustSourceArtifactOwner(builtin)
-	placement, dependencies, requirements, err :=
-		s.consumeArtifactRequests(owner, requests)
-	if err != nil {
-		return environmentBuiltin{},
-			environmentContractError(builtin, err)
-	}
-	nodes := make([]tsgo.Node, len(statements))
-	for index, statement := range statements {
-		nodes[index] = statement
-	}
-	var contract artifactstate.Contract
-	if len(nodes) == 0 {
-		contract, err = artifactstate.ProjectCoverageContract(s.factory, nil)
-	} else {
-		contract, err = artifactstate.ProjectFacet(
-			api.ArtifactFacetCallableSignature,
-			builder.context.Factory().SyntaxList(nodes),
-		)
-	}
-	if err != nil {
-		return environmentBuiltin{},
-			environmentContractError(builtin, err)
-	}
-	return environmentBuiltin{
-		signatures: ordered,
-		statements: statements,
-		environmentArtifact: environmentArtifact{
-			placement:    placement,
-			dependencies: dependencies,
-			requirements: requirements,
-			contract:     contract,
-		},
-	}, nil
-}
-
 func (b *environmentContractBuilder) committedPlacement() (
 	*targetplacement.Owner,
 	error,
@@ -503,14 +397,6 @@ func (b *environmentContractBuilder) committedPlacement() (
 		}
 	}
 	for _, target := range b.stateFields {
-		if err := placement.Apply(target.placement.Requests()); err != nil {
-			return nil, err
-		}
-	}
-	for _, target := range b.builtins {
-		if target.placement == nil {
-			continue
-		}
 		if err := placement.Apply(target.placement.Requests()); err != nil {
 			return nil, err
 		}
@@ -535,11 +421,12 @@ func (s *programSession) reconstructEnvironmentArtifact(
 			Reason: "environment artifact lost its target builder",
 		}
 	}
+	if target, ok := builder.declarations[owner]; ok && target.providerCoverage {
+		return s.reconstructEnvironmentDeclaration(builder, owner)
+	}
 	switch selected := owner.(type) {
 	case *types.Var:
 		return s.reconstructEnvironmentStateField(builder, selected)
-	case *types.Builtin:
-		return s.reconstructEnvironmentBuiltin(builder, selected)
 	default:
 		return s.reconstructEnvironmentDeclaration(builder, owner)
 	}
@@ -554,7 +441,7 @@ func (s *programSession) environmentArtifactSource(
 		return false
 	}
 	switch object.(type) {
-	case *types.Func, *types.Const, *types.TypeName, *types.Var, *types.Builtin:
+	case *types.Func, *types.Const, *types.TypeName, *types.Var:
 		return true
 	default:
 		return false

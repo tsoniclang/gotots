@@ -214,10 +214,10 @@ func NativeUint16(value []byte) uint16 {
 		"export declare function Context$is",
 		"export declare class Pool",
 		"export declare function Pool_Get($receiver: GoPointer<Pool",
-		"export declare function String(",
-		"export declare function Slice(",
-		"export declare function StringData(",
-		"export declare function SliceData(",
+		"export function goUnsafeString<",
+		"export function goUnsafeSlice<",
+		"export function goUnsafeStringData<",
+		"export function goUnsafeSliceData<",
 		"export declare const RuneSelf$uint8",
 		"littleEndian: littleEndian;",
 		".littleEndian",
@@ -248,6 +248,10 @@ func NativeUint16(value []byte) uint16 {
 		)
 	}
 	for _, forbidden := range []string{
+		"export declare function String(",
+		"export declare function Slice(",
+		"export declare function StringData(",
+		"export declare function SliceData(",
 		"export declare function Sizeof(",
 		"export declare function Alignof(",
 		"export declare function Offsetof(",

@@ -29,6 +29,13 @@ export class GoRuntimePanicValue implements GoInterfaceValue {
     $go$hash(): number {
         return 0;
     }
+    readonly $go$formatString: boolean = false;
+    $go$format(verb: string, _flags: string, _precision: number | undefined): string {
+        if (verb === "T") {
+            return "runtime.errorString";
+        }
+        return this.message;
+    }
     Error(): string {
         return this.message;
     }

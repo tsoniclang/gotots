@@ -8,12 +8,29 @@ import { Duration } from "./duration.js";
 const nanosecondsPerMillisecond = 1_000_000;
 const zeroEpochMilliseconds = -62_135_596_800_000;
 
+let equalTimeRepresentation: (left: Time, right: Time) => bool;
+let hashTimeRepresentation: (source: Time) => number;
+
 export class Time {
   constructor(
     private readonly epochMilliseconds: number | undefined = undefined,
     private readonly monotonic: number | undefined = undefined,
     private readonly nanosecondRemainder: number = 0,
   ) {}
+
+  static {
+    equalTimeRepresentation = (left: Time, right: Time): bool => (
+      left.epochMilliseconds === right.epochMilliseconds
+        && left.monotonic === right.monotonic
+        && left.nanosecondRemainder === right.nanosecondRemainder
+    );
+    hashTimeRepresentation = (source: Time): number => {
+      let hash = 2_166_136_261;
+      hash = hashTimeNumber(hash, source.epochMilliseconds);
+      hash = hashTimeNumber(hash, source.monotonic);
+      return hashTimeNumber(hash, source.nanosecondRemainder);
+    };
+  }
 
   Add(d: Duration): Time {
     if (this.epochMilliseconds === undefined) {
@@ -184,6 +201,14 @@ export class Time {
   }
 }
 
+export function timeRepresentationEqual(left: Time, right: Time): bool {
+  return equalTimeRepresentation(left, right);
+}
+
+export function timeRepresentationHash(source: Time): number {
+  return hashTimeRepresentation(source);
+}
+
 export function Now(): Time {
   return new Time(wallMilliseconds(), monotonicMilliseconds());
 }
@@ -220,6 +245,18 @@ export function Until(t: Time): Duration {
 
 function pad(value: number): string {
   return String(value).padStart(2, "0");
+}
+
+function hashTimeNumber(hash: number, value: number | undefined): number {
+  if (value === undefined) {
+    return Math.imul(hash ^ 0x9e37_79b9, 16_777_619) >>> 0;
+  }
+  const text = String(value);
+  let result = hash;
+  for (let index = 0; index < text.length; index += 1) {
+    result = Math.imul(result ^ text.charCodeAt(index), 16_777_619) >>> 0;
+  }
+  return Math.imul(result ^ 0xff, 16_777_619) >>> 0;
 }
 
 function dayOfYear(year: number, month: number, day: number): number {

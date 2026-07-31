@@ -3,6 +3,8 @@ import type { int64, uint16, uint32 } from "@gotots/runtime/scalars.js";
 
 import { Range16, Range32, RangeTable } from "../../unicode.js";
 
+export type UnicodeRangeTableStorage = RangeTable;
+
 export class UnicodeRange16Operations {
   static $make(lo: uint16, hi: uint16, stride: uint16): Range16 {
     return new Range16(lo, hi, stride);
@@ -22,5 +24,13 @@ export class UnicodeRangeTableOperations {
     latinOffset: int64,
   ): RangeTable {
     return new RangeTable(ranges16, ranges32, latinOffset);
+  }
+
+  static $storageOf(source: RangeTable): UnicodeRangeTableStorage {
+    return source;
+  }
+
+  static $fromStorage(source: UnicodeRangeTableStorage): RangeTable {
+    return source;
   }
 }

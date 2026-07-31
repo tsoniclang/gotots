@@ -1,6 +1,8 @@
 package certify
 
 import (
+	"sort"
+
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
@@ -56,6 +58,25 @@ func (c *Certificate) ToolchainKey() string {
 	return c.toolchainKey
 }
 
+func (c *Certificate) ProviderModules() []string {
+	if !c.Valid() {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	for _, module := range c.manifest.Modules() {
+		seen[module.Specifier()] = struct{}{}
+	}
+	for _, module := range c.manifest.FacetModules() {
+		seen[module.Specifier()] = struct{}{}
+	}
+	modules := make([]string, 0, len(seen))
+	for module := range seen {
+		modules = append(modules, module)
+	}
+	sort.Strings(modules)
+	return modules
+}
+
 func (c *Certificate) Binding(identity string) (gostdlib.Binding, bool) {
 	if !c.Valid() {
 		return gostdlib.Binding{}, false
@@ -89,4 +110,14 @@ func (c *Certificate) GenericCallableFacet(
 		return gostdlib.Facet{}, false
 	}
 	return c.manifest.GenericCallableFacet(sourceIdentity, profileKey)
+}
+
+func (c *Certificate) ProviderRepresentation(
+	module string,
+	export string,
+) (gostdlib.ProviderRepresentation, bool) {
+	if !c.Valid() {
+		return gostdlib.ProviderRepresentation{}, false
+	}
+	return c.manifest.ProviderRepresentation(module, export)
 }

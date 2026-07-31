@@ -1,9 +1,7 @@
 package gostdlib
 
-import "slices"
-
 const (
-	SchemaVersion = 2
+	SchemaVersion = 4
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -75,24 +73,26 @@ type ModuleDocument struct {
 }
 
 type BindingDocument struct {
-	Identity            string             `json:"identity"`
-	Kind                BindingKind        `json:"kind"`
-	Access              AccessKind         `json:"access"`
-	Representation      RepresentationKind `json:"representation,omitempty"`
-	Export              string             `json:"export"`
-	Member              string             `json:"member,omitempty"`
-	SourceSignature     string             `json:"sourceSignature"`
-	SourceValue         string             `json:"sourceValue,omitempty"`
-	SourceLocation      string             `json:"sourceLocation"`
-	ImplementationOwner string             `json:"implementationOwner"`
-	TargetFingerprint   string             `json:"targetFingerprint"`
+	Identity            string                     `json:"identity"`
+	Kind                BindingKind                `json:"kind"`
+	Access              AccessKind                 `json:"access"`
+	Representation      RepresentationKind         `json:"representation,omitempty"`
+	Export              string                     `json:"export"`
+	Member              string                     `json:"member,omitempty"`
+	GenericOperations   []GenericOperationDocument `json:"genericOperations,omitempty"`
+	SourceSignature     string                     `json:"sourceSignature"`
+	SourceValue         string                     `json:"sourceValue,omitempty"`
+	SourceLocation      string                     `json:"sourceLocation"`
+	ImplementationOwner string                     `json:"implementationOwner"`
+	TargetFingerprint   string                     `json:"targetFingerprint"`
 }
 
 type Manifest struct {
-	document Document
-	payload  []byte
-	bindings map[string]Binding
-	facets   map[facetLookup]Facet
+	document        Document
+	payload         []byte
+	bindings        map[string]Binding
+	facets          map[facetLookup]Facet
+	representations map[providerRepresentationLookup]ProviderRepresentation
 }
 
 func (m Manifest) Digest() string {
@@ -185,6 +185,17 @@ func (m Manifest) GenericCallableFacet(
 	return selected, ok
 }
 
+func (m Manifest) ProviderRepresentation(
+	module string,
+	export string,
+) (ProviderRepresentation, bool) {
+	selected, ok := m.representations[providerRepresentationLookup{
+		module: module,
+		export: export,
+	}]
+	return selected, ok
+}
+
 type Module struct {
 	document ModuleDocument
 }
@@ -243,6 +254,10 @@ func (b Binding) Member() string {
 	return b.binding.Member
 }
 
+func (b Binding) GenericOperations() []GenericOperationDocument {
+	return cloneGenericOperations(b.binding.GenericOperations)
+}
+
 func (b Binding) SourceSignature() string {
 	return b.binding.SourceSignature
 }
@@ -286,6 +301,11 @@ func cloneDocument(source Document) Document {
 
 func cloneModule(source ModuleDocument) ModuleDocument {
 	result := source
-	result.Bindings = slices.Clone(source.Bindings)
+	result.Bindings = make([]BindingDocument, len(source.Bindings))
+	for index, binding := range source.Bindings {
+		result.Bindings[index] = binding
+		result.Bindings[index].GenericOperations =
+			cloneGenericOperations(binding.GenericOperations)
+	}
 	return result
 }

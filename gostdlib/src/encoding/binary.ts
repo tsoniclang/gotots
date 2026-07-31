@@ -1,4 +1,7 @@
-import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
+import type {
+  GoError,
+  GoInterfaceValue,
+} from "@gotots/runtime/interface-value.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   gostring,
@@ -13,6 +16,8 @@ import {
   BigEndianOrder,
   LittleEndianOrder,
 } from "../internal/portable/encoding/binary/byte-order.js";
+import { ProviderError } from "../internal/runtime/error.js";
+import type { Reader, Writer } from "../io.js";
 
 export interface ByteOrder extends GoInterfaceValue {
   PutUint16(buffer: RuntimeSlice<uint8>, value: uint16): void;
@@ -24,15 +29,45 @@ export interface ByteOrder extends GoInterfaceValue {
   Uint64(buffer: RuntimeSlice<uint8>): uint64;
 }
 
-const bigEndian: ByteOrder = new BigEndianOrder();
-const littleEndian: ByteOrder = new LittleEndianOrder();
+export interface AppendByteOrder extends GoInterfaceValue {
+  AppendUint16(buffer: RuntimeSlice<uint8>, value: uint16): RuntimeSlice<uint8>;
+  AppendUint32(buffer: RuntimeSlice<uint8>, value: uint32): RuntimeSlice<uint8>;
+  AppendUint64(buffer: RuntimeSlice<uint8>, value: uint64): RuntimeSlice<uint8>;
+}
+
+interface BinaryEndian extends ByteOrder, AppendByteOrder {
+  GoString(): gostring;
+}
+
+const bigEndian: BinaryEndian = new BigEndianOrder();
+const littleEndian: BinaryEndian = new LittleEndianOrder();
 
 export const state: {
-  BigEndian: ByteOrder;
-  LittleEndian: ByteOrder;
-  NativeEndian: ByteOrder;
+  BigEndian: BinaryEndian;
+  LittleEndian: BinaryEndian;
+  NativeEndian: BinaryEndian;
 } = {
   BigEndian: bigEndian,
   LittleEndian: littleEndian,
   NativeEndian: nativeEndian(),
 };
+
+export function Read(
+  _reader: Reader | undefined,
+  _order: ByteOrder | undefined,
+  _data: GoInterfaceValue | undefined,
+): GoError | undefined {
+  return new ProviderError(
+    "encoding/binary.Read requires generated reflection metadata",
+  );
+}
+
+export function Write(
+  _writer: Writer | undefined,
+  _order: ByteOrder | undefined,
+  _data: GoInterfaceValue | undefined,
+): GoError | undefined {
+  return new ProviderError(
+    "encoding/binary.Write requires generated reflection metadata",
+  );
+}

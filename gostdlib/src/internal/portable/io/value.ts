@@ -1,7 +1,9 @@
 import { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
+import { GoPanic } from "@gotots/runtime/panic.js";
 
 export abstract class ProviderInterfaceValue extends GoInterfaceValue {
   readonly $go$methods: ReadonlySet<object> = new Set<object>();
+  readonly $go$formatString = false;
 
   protected constructor(readonly $go$type: object) {
     super();
@@ -17,5 +19,9 @@ export abstract class ProviderInterfaceValue extends GoInterfaceValue {
 
   $go$hash(): number {
     return 0;
+  }
+
+  $go$format(_verb: string, _flags: string, _precision: number | undefined): string {
+    return GoPanic.raiseRuntime("provider value has no formatting contract");
   }
 }

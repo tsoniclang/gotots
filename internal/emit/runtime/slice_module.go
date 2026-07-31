@@ -41,6 +41,8 @@ func buildSlice(
 			capabilities.AppendSlice = true
 		case api.RuntimeSliceClear:
 			capabilities.Clear = true
+		case api.RuntimeSliceRegion:
+			capabilities.Region = true
 		default:
 			return nil, &api.RuntimeSymbolError{Symbol: symbol}
 		}
@@ -96,7 +98,8 @@ func buildSliceOperation(
 ) (tsgo.Statement, error) {
 	if symbol != api.RuntimeSliceAddress &&
 		symbol != api.RuntimeSliceArrayPointer &&
-		symbol != api.RuntimeArraySlice {
+		symbol != api.RuntimeArraySlice &&
+		symbol != api.RuntimeSliceRegion {
 		return runtimeslice.BuildOperation(factory, symbol)
 	}
 	addressContract, err := api.RuntimeContract(symbol)
@@ -140,6 +143,18 @@ func buildSliceOperation(
 			sliceName,
 			arrayContract.ExportedName(),
 			locationContract.ExportedName(),
+		), nil
+	}
+	if symbol == api.RuntimeSliceRegion {
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeslice.BuildRegion(
+			factory,
+			addressContract.ExportedName(),
+			sliceName,
+			panicContract.ExportedName(),
 		), nil
 	}
 	return runtimeslice.BuildAddress(

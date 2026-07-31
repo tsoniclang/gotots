@@ -1,6 +1,7 @@
 package maprepresentation
 
 import (
+	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -11,6 +12,7 @@ type specializationBuilder struct {
 	storageKeyType tsgo.TypeNode
 	valueType      tsgo.TypeNode
 	panicName      string
+	denseIndexName string
 	zero           operationBody
 	hash           operationBody
 	equal          operationBody
@@ -148,6 +150,18 @@ func (b specializationBuilder) element(
 		nil,
 		index,
 		tsgo.NodeFlagsNone,
+	)
+}
+
+func (b specializationBuilder) denseElement(
+	receiver tsgo.Expression,
+	index tsgo.Expression,
+) tsgo.CallExpression {
+	return indexedstorage.Element(
+		b.factory,
+		b.denseIndexName,
+		receiver,
+		index,
 	)
 }
 

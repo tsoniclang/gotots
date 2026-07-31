@@ -3,6 +3,7 @@ import type { GoMapValue } from "@gotots/runtime/map.js";
 import type { bool } from "@gotots/runtime/scalars.js";
 
 import { Seq } from "../iter/sequence.js";
+import { ProviderError } from "../../runtime/error.js";
 
 type PrimitiveComparable = boolean | number | bigint | string;
 type Equality<L, R> = ((left: L, right: R) => bool) | undefined;
@@ -14,6 +15,15 @@ export function Copy<K, V>(
   for (const key of source.keys()) {
     target.store(key, source.lookup(key));
   }
+}
+
+export function Clone<K, V>(source: GoMapValue<K, V>): GoMapValue<K, V> {
+  void source;
+  return GoPanic.raise(
+    new ProviderError(
+      "maps.Clone requires a generated map-construction capability",
+    ),
+  );
 }
 
 export function Equal<K, V extends PrimitiveComparable>(

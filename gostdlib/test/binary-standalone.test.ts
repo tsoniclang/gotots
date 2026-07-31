@@ -39,8 +39,27 @@ test("AppendUint32 remains an unexported-receiver operation", (): void => {
     [0xaa, 1, 2, 3, 4],
   );
   assert.deepEqual(
+    sliceValues(binary.state.BigEndian.AppendUint16(prefix, 0x0102)),
+    [0xaa, 1, 2],
+  );
+  assert.deepEqual(
+    sliceValues(binary.state.LittleEndian.AppendUint64(prefix, 0x0102_0304)),
+    [0xaa, 4, 3, 2, 1, 0, 0, 0, 0],
+  );
+  assert.deepEqual(
     sliceValues(new LittleEndianOrder().AppendUint32(prefix, 0x0102_0304)),
     [0xaa, 4, 3, 2, 1],
+  );
+});
+
+test("reflection-backed structured I/O fails through a typed provider boundary", (): void => {
+  assert.match(
+    binary.Read(undefined, undefined, undefined)?.Error() ?? "",
+    /requires generated reflection metadata/u,
+  );
+  assert.match(
+    binary.Write(undefined, undefined, undefined)?.Error() ?? "",
+    /requires generated reflection metadata/u,
   );
 });
 

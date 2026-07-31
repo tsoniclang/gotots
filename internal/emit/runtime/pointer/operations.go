@@ -273,12 +273,33 @@ func (b builder) newPointer(
 	read tsgo.Expression,
 	write tsgo.Expression,
 ) tsgo.NewExpression {
-	return b.newPointerWithWrite(
+	return b.newPointerWithRegion(
 		logicalType,
 		storageType,
 		address,
 		read,
-		b.assign(write, b.id("next")),
+		write,
+		nil,
+	)
+}
+
+func (b builder) newPointerWithRegion(
+	logicalType tsgo.TypeNode,
+	storageType tsgo.TypeNode,
+	address tsgo.Expression,
+	read tsgo.Expression,
+	write tsgo.Expression,
+	region tsgo.Expression,
+) tsgo.NewExpression {
+	return b.newPointerWithWriteBodyAndRegion(
+		logicalType,
+		storageType,
+		address,
+		read,
+		[]tsgo.Statement{b.factory.ExpressionStatement(
+			b.assign(write, b.id("next")),
+		)},
+		region,
 	)
 }
 
@@ -289,12 +310,13 @@ func (b builder) newPointerWithWrite(
 	read tsgo.Expression,
 	write tsgo.Expression,
 ) tsgo.NewExpression {
-	return b.newPointerWithWriteBody(
+	return b.newPointerWithWriteBodyAndRegion(
 		logicalType,
 		storageType,
 		address,
 		read,
 		[]tsgo.Statement{b.factory.ExpressionStatement(write)},
+		nil,
 	)
 }
 
@@ -304,6 +326,24 @@ func (b builder) newPointerWithWriteBody(
 	address tsgo.Expression,
 	read tsgo.Expression,
 	write []tsgo.Statement,
+) tsgo.NewExpression {
+	return b.newPointerWithWriteBodyAndRegion(
+		logicalType,
+		storageType,
+		address,
+		read,
+		write,
+		nil,
+	)
+}
+
+func (b builder) newPointerWithWriteBodyAndRegion(
+	logicalType tsgo.TypeNode,
+	storageType tsgo.TypeNode,
+	address tsgo.Expression,
+	read tsgo.Expression,
+	write []tsgo.Statement,
+	region tsgo.Expression,
 ) tsgo.NewExpression {
 	readArrow := b.factory.ArrowFunction(
 		nil,
@@ -326,10 +366,17 @@ func (b builder) newPointerWithWriteBody(
 		b.factory.EqualsGreaterThanToken(),
 		b.factory.Block(write, true),
 	)
+	arguments := []tsgo.Expression{address, readArrow, writeArrow}
+	if b.capabilities.Region {
+		if region == nil {
+			region = b.undefined()
+		}
+		arguments = append(arguments, region)
+	}
 	return b.factory.NewExpression(
 		b.id(b.className),
 		[]tsgo.TypeNode{logicalType, storageType},
-		[]tsgo.Expression{address, readArrow, writeArrow},
+		arguments,
 	)
 }
 
@@ -368,16 +415,20 @@ func (b builder) viewMethod() tsgo.MethodDeclaration {
 			),
 			nil,
 		),
-		b.factory.ReturnStatement(
-			b.factory.NewExpression(
+		b.factory.ReturnStatement(func() tsgo.Expression {
+			arguments := []tsgo.Expression{
+				b.property(pointer, AddressName),
+				b.property(pointer, "read"),
+				b.property(pointer, "write"),
+			}
+			if b.capabilities.Region {
+				arguments = append(arguments, b.property(pointer, RegionName))
+			}
+			return b.factory.NewExpression(
 				b.id(b.className),
 				[]tsgo.TypeNode{to, storage},
-				[]tsgo.Expression{
-					b.property(pointer, AddressName),
-					b.property(pointer, "read"),
-					b.property(pointer, "write"),
-				},
-			),
-		),
+				arguments,
+			)
+		}()),
 	)
 }

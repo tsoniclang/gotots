@@ -50,6 +50,22 @@ export async function SlicesAppendSeqCooperative<Element>(
   return AppendSeqCooperative(source, sequence);
 }
 
+export function SlicesAppendSeqFullyCooperative<
+  Slice extends RuntimeSlice<Element>,
+  Element,
+>(
+  source: Slice,
+  sequence: CooperativeSequence<Element>,
+  recovery?: GoRecovery,
+): Promise<Slice>;
+export async function SlicesAppendSeqFullyCooperative<Element>(
+  source: RuntimeSlice<Element>,
+  sequence: CooperativeSequence<Element>,
+  _recovery?: GoRecovery,
+): Promise<RuntimeSlice<Element>> {
+  return AppendSeqCooperative(source, sequence);
+}
+
 export async function SlicesCollectCooperative<
   Element,
   ElementStorage = Element,
@@ -140,7 +156,27 @@ export async function SlicesSortedCooperative<
   return SortedCooperative(sequence);
 }
 
+export async function SlicesSortedFullyCooperative<
+  Element extends OrderedValue,
+  ElementStorage = Element,
+>(
+  sequence: CooperativeSequence<Element>,
+  _recovery?: GoRecovery,
+): Promise<RuntimeSlice<Element>> {
+  return SortedCooperative(sequence);
+}
+
 export function SlicesValuesCooperative<
+  Slice extends RuntimeSlice<Element>,
+  Element,
+>(
+  source: Slice,
+  _recovery?: GoRecovery,
+): CooperativeSequence<Element> {
+  return ValuesCooperative(source);
+}
+
+export function SlicesValuesFullyCooperative<
   Slice extends RuntimeSlice<Element>,
   Element,
 >(

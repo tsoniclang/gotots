@@ -30,7 +30,8 @@ func Generate(config Config) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	facetSeeds, err := readFacetSeeds(resolved.facetMapPath)
+	facetSeeds, representationSeeds, genericOperations, err :=
+		readFacetSeeds(resolved.facetMapPath)
 	if err != nil {
 		return nil, err
 	}
@@ -64,14 +65,35 @@ func Generate(config Config) ([]byte, error) {
 	}
 	modules := make([]gostdlib.ModuleDocument, len(ordered))
 	for index, seed := range ordered {
-		module, buildErr := buildModule(resolved, project, source, seed)
+		module, buildErr := buildModule(
+			resolved,
+			project,
+			source,
+			seed,
+			genericOperations,
+		)
 		if buildErr != nil {
 			client.Close()
 			return nil, buildErr
 		}
 		modules[index] = module
 	}
-	facetModules, err := buildFacetModules(resolved, project, source, facetSeeds)
+	if err := verifyGenericOperationBindings(
+		source,
+		modules,
+		genericOperations,
+	); err != nil {
+		client.Close()
+		return nil, err
+	}
+	facetModules, err := buildFacetModules(
+		resolved,
+		project,
+		source,
+		facetSeeds,
+		representationSeeds,
+		modules,
+	)
 	if err != nil {
 		client.Close()
 		return nil, err
@@ -109,6 +131,7 @@ func buildModule(
 	project *tsgo.ProjectInspection,
 	source goSurface,
 	seed moduleSeed,
+	genericOperations map[string][]gostdlib.GenericOperationDocument,
 ) (gostdlib.ModuleDocument, error) {
 	sourcePackage := source.packages[seed.GoImportPath]
 	if sourcePackage == nil {
@@ -165,6 +188,7 @@ func buildModule(
 		if err != nil {
 			return gostdlib.ModuleDocument{}, err
 		}
+		binding.GenericOperations = genericOperations[binding.Identity]
 		if err := addTargetOwner(targetOwners, binding); err != nil {
 			return gostdlib.ModuleDocument{}, err
 		}
@@ -196,6 +220,70 @@ func buildModule(
 		SourcePath:   seed.SourcePath,
 		Bindings:     bindings,
 	}, nil
+}
+
+func verifyGenericOperationBindings(
+	source goSurface,
+	modules []gostdlib.ModuleDocument,
+	configured map[string][]gostdlib.GenericOperationDocument,
+) error {
+	bound := make(map[string]struct{}, len(configured))
+	for _, module := range modules {
+		for _, binding := range module.Bindings {
+			if len(binding.GenericOperations) != 0 {
+				bound[binding.Identity] = struct{}{}
+			}
+		}
+	}
+	for identity, operations := range configured {
+		evidence, ok := source.objects[identity]
+		if !ok {
+			return certifyError(
+				"configure generic operations",
+				identity,
+				"selected-GOROOT declaration is absent",
+			)
+		}
+		function, ok := evidence.object.(*types.Func)
+		if !ok {
+			return certifyError(
+				"configure generic operations",
+				identity,
+				"operation-set owner is not a function",
+			)
+		}
+		signature, _ := function.Type().(*types.Signature)
+		parameterCount := 0
+		if signature != nil {
+			parameterCount = signature.RecvTypeParams().Len() +
+				signature.TypeParams().Len()
+		}
+		for _, operation := range operations {
+			for _, reference := range append(
+				append(
+					[]gostdlib.GenericOperationTypeDocument(nil),
+					operation.Parameters...,
+				),
+				operation.Results...,
+			) {
+				if reference.TypeParameter >= parameterCount {
+					return certifyError(
+						"configure generic operations",
+						identity,
+						"type-parameter index is outside its Go declaration",
+					)
+				}
+			}
+		}
+		if _, ok := bound[identity]; !ok {
+			return certifyError(
+				"configure generic operations",
+				identity,
+				"provider export is absent",
+			)
+		}
+	}
+	return nil
 }
 
 func buildStateBindings(

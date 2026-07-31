@@ -54,6 +54,7 @@ test("hex encodes every byte with lower-case digits", () => {
 class CapturingWriter extends GoInterfaceValue implements Writer {
   readonly $go$type: object = CapturingWriter;
   readonly $go$methods: ReadonlySet<object> = new Set<object>();
+  readonly $go$formatString = false;
   private readonly bytes: number[] = [];
 
   $go$implements(contract: readonly object[]): boolean {
@@ -66,6 +67,10 @@ class CapturingWriter extends GoInterfaceValue implements Writer {
 
   $go$hash(): number {
     return 0;
+  }
+
+  $go$format(): string {
+    return "capturing writer";
   }
 
   Write(buffer: RuntimeSlice<number>): [number, GoError | undefined] {

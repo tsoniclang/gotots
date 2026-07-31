@@ -7,6 +7,8 @@ import { callEquality, callPredicate } from "./read.js";
 
 type Predicate<T> = ((value: T) => bool) | undefined;
 type Equality<T> = ((left: T, right: T) => bool) | undefined;
+type Copy<T> = (value: T) => T;
+type Zero<T> = () => T;
 
 export function Clip<T>(source: RuntimeSlice<T>): RuntimeSlice<T> {
   return source.slice(0, source.length, source.length);
@@ -87,6 +89,50 @@ export function Insert<T>(
   const result = sliceValues(source);
   result.splice(index, 0, ...sliceValues(values));
   return RuntimeSlice.literal(result);
+}
+
+export function Grow<Slice extends RuntimeSlice<Element>, Element>(
+  copy: Copy<Element>,
+  zero: Zero<Element>,
+  source: Slice,
+  amount: int64,
+): Slice;
+export function Grow<Element>(
+  copy: Copy<Element>,
+  zero: Zero<Element>,
+  source: RuntimeSlice<Element>,
+  amount: int64,
+): RuntimeSlice<Element> {
+  const numericAmount = globalThis.Number(amount);
+  if (!Number.isSafeInteger(numericAmount) || numericAmount < 0) {
+    GoPanic.raiseRuntime("cannot be negative");
+  }
+  const requiredCapacity = source.length + numericAmount;
+  if (!Number.isSafeInteger(requiredCapacity)) {
+    GoPanic.raiseRuntime("cannot be negative");
+  }
+  if (requiredCapacity <= source.capacity) {
+    return source;
+  }
+  let nextCapacity = source.capacity === 0 ? 1 : source.capacity * 2;
+  while (nextCapacity < requiredCapacity) {
+    nextCapacity *= 2;
+  }
+  if (!Number.isSafeInteger(nextCapacity)) {
+    GoPanic.raiseRuntime("cannot be negative");
+  }
+  const result = RuntimeSlice.make<Element>(
+    nextCapacity,
+    nextCapacity,
+    zero(),
+  );
+  for (let index = 0; index < nextCapacity; index += 1) {
+    result.set(index, zero());
+  }
+  for (let index = 0; index < source.length; index += 1) {
+    result.set(index, copy(source.get(index)));
+  }
+  return result.slice(0, source.length, null);
 }
 
 export function Repeat<T>(

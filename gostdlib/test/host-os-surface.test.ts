@@ -5,6 +5,7 @@ import * as flag from "../src/flag.js";
 import * as os from "../src/os.js";
 import * as exec from "../src/os/exec.js";
 import * as signal from "../src/os/signal.js";
+import { PathError as FsPathError } from "../src/io/fs.js";
 import * as syscall from "../src/syscall.js";
 
 test("host OS modules expose only selected clean Go names", () => {
@@ -22,7 +23,12 @@ test("host OS modules expose only selected clean Go names", () => {
     "IsNotExist",
     "Lstat",
     "MkdirAll",
+    "O_APPEND",
+    "O_CREATE",
+    "O_TRUNC",
+    "O_WRONLY",
     "OpenFile",
+    "PathError",
     "Process",
     "ProcessState",
     "ReadDir",
@@ -66,6 +72,10 @@ test("host OS modules expose only selected clean Go names", () => {
   assert.deepEqual(staticMembers(flag.FlagSet), ["Bool", "Parse", "String"]);
   assert.deepEqual(instanceMembers(syscall.Errno), ["Error"]);
   assert.deepEqual(instanceMembers(syscall.Signal), ["Signal", "String"]);
+  assert.equal(os.PathError, FsPathError);
+  assert.notEqual(os.O_APPEND & os.O_WRONLY, os.O_APPEND);
+  assert.notEqual(os.O_CREATE, 0);
+  assert.notEqual(os.O_TRUNC, 0);
 });
 
 test("public declarations do not expose internal Node ownership", () => {

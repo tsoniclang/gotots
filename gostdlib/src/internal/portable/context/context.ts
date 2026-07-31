@@ -26,6 +26,7 @@ export interface Context extends GoInterfaceValue {
 abstract class ContextValue extends InterfaceValue implements Context {
   readonly $go$type: object = ContextValue;
   readonly $go$methods: ReadonlySet<object> = new Set<object>([contextMethodToken]);
+  readonly $go$formatString = false;
 
   abstract Deadline(): [Time, bool];
   abstract Done(): GoReceiveChannel<void> | undefined;
@@ -42,6 +43,13 @@ abstract class ContextValue extends InterfaceValue implements Context {
 
   $go$hash(): number {
     return 0;
+  }
+
+  $go$format(verb: string): string {
+    if (verb === "T") {
+      return "context.Context";
+    }
+    return GoPanic.raiseRuntime("context value formatting is unsupported");
   }
 }
 

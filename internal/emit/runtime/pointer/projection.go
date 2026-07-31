@@ -32,12 +32,16 @@ func (b builder) cellMethod() tsgo.MethodDeclaration {
 			),
 		),
 		b.factory.ReturnStatement(
-			b.newPointer(
+			b.newPointerWithRegion(
 				b.typeL(),
 				b.typeS(),
 				b.id("storage"),
 				storageValue,
 				storageValue,
+				b.factory.ArrayLiteralExpression(
+					[]tsgo.Expression{b.id("storage"), b.factory.NumericLiteral("0", tsgo.TokenFlagsNone)},
+					false,
+				),
 			),
 		),
 	)
@@ -184,7 +188,7 @@ func (b builder) elementMethod() tsgo.MethodDeclaration {
 			),
 		),
 		b.factory.ReturnStatement(
-			b.newPointer(
+			b.newPointerWithRegion(
 				typeL,
 				typeS,
 				b.call(
@@ -195,6 +199,7 @@ func (b builder) elementMethod() tsgo.MethodDeclaration {
 				),
 				readElement,
 				element,
+				b.id("location"),
 			),
 		),
 	)

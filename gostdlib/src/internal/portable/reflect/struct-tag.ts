@@ -68,7 +68,7 @@ function unquote(source: string): string | undefined {
   return result;
 }
 
-export function getStructTag(tagValue: string, key: string): string {
+export function lookupStructTag(tagValue: string, key: string): [string, boolean] {
   let tag = tagValue;
   while (tag !== "") {
     tag = tag.replace(/^ +/, "");
@@ -105,8 +105,13 @@ export function getStructTag(tagValue: string, key: string): string {
     const quotedValue = tag.slice(0, quoteEnd + 1);
     tag = tag.slice(quoteEnd + 1);
     if (name === key) {
-      return unquote(quotedValue) ?? "";
+      const value = unquote(quotedValue);
+      return value === undefined ? ["", false] : [value, true];
     }
   }
-  return "";
+  return ["", false];
+}
+
+export function getStructTag(tagValue: string, key: string): string {
+  return lookupStructTag(tagValue, key)[0];
 }

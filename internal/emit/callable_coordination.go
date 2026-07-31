@@ -84,12 +84,7 @@ func (s *programSession) ResolveGenericOperationSet(
 	}
 	if _, ok := s.sites[owner]; !ok {
 		if s.source.EnvironmentForTypes(owner.Pkg()) != nil {
-			operationSet, err := api.NewGenericOperationSet(
-				owner,
-				consumer,
-				nil,
-			)
-			return operationSet, err == nil, err
+			return s.providerGenericOperationSet(owner, consumer)
 		}
 		return api.GenericOperationSet{}, false, &ScheduleError{
 			Object: owner.Name(),
@@ -153,47 +148,12 @@ func (s *programSession) ResolveGenericOperation(
 			Reason: "generic operation owner has no generic declaration",
 		}
 	}
-	key, err := s.genericOperationKey(
+	return s.internGenericOperation(
 		owner,
 		consumer,
 		selection,
 		signature,
 	)
-	if err != nil {
-		return nil, err
-	}
-	identity := genericOperationIdentity{
-		owner:    owner,
-		consumer: consumer,
-		key:      key,
-	}
-	if existing := s.genericOperations[identity]; existing != nil {
-		if existing.Consumer() != consumer ||
-			existing.Selection() != selection ||
-			!types.Identical(existing.Signature(), signature) {
-			return nil, &ScheduleError{
-				Object: owner.Name(),
-				Reason: "generic operation identity changed semantic contract",
-			}
-		}
-		return existing, nil
-	}
-	digest := sha256.Sum256([]byte(key))
-	targetName := "$go$" + selection.Operation().Identifier() + "_" +
-		hex.EncodeToString(digest[:10])
-	contract, err := api.NewGenericOperationContract(
-		owner,
-		key,
-		targetName,
-		consumer,
-		selection,
-		signature,
-	)
-	if err != nil {
-		return nil, err
-	}
-	s.genericOperations[identity] = contract
-	return contract, nil
 }
 
 func (s *programSession) genericOperationKey(

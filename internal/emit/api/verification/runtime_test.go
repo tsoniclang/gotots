@@ -27,6 +27,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeDenseIndex, 90, api.RuntimeModuleDenseIndex, "runtime/dense-index.ts", "GoDenseIndex", false, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimePointer, 100, api.RuntimeModulePointer, "runtime/pointer.ts", "GoPointer", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeDenseIndex}},
 		{api.RuntimePointerHash, 101, api.RuntimeModulePointer, "runtime/pointer.ts", "goPointerHash", false, []api.RuntimeSymbol{api.RuntimePointer, api.RuntimeMapHash}},
+		{api.RuntimePointerRegion, 102, api.RuntimeModulePointer, "runtime/pointer.ts", "goPointerRegion", false, []api.RuntimeSymbol{api.RuntimePointer, api.RuntimePanic}},
 		{api.RuntimeArray, 200, api.RuntimeModuleArray, "runtime/array.ts", "GoArray", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeDenseIndex}},
 		{api.RuntimeArrayAllocate, 201, api.RuntimeModuleArray, "runtime/array.ts", "goArrayAllocate", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeArrayView, 202, api.RuntimeModuleArray, "runtime/array.ts", "goArrayView", false, []api.RuntimeSymbol{api.RuntimeArray}},
@@ -38,6 +39,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeArraySlice, 305, api.RuntimeModuleSlice, "runtime/slice.ts", "goArraySlice", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimeArray, api.RuntimeArrayLocation}},
 		{api.RuntimeSliceAppendSlice, 307, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceAppendSlice", false, []api.RuntimeSymbol{api.RuntimeSlice}},
 		{api.RuntimeSliceClear, 308, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceClear", false, []api.RuntimeSymbol{api.RuntimeSlice}},
+		{api.RuntimeSliceRegion, 309, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceRegion", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimePanic}},
 		{api.RuntimeMap, 400, api.RuntimeModuleMap, "runtime/map.ts", "GoMap", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeMapHash, 401, api.RuntimeModuleMap, "runtime/map.ts", "GoMapHash", false, nil},
 		{api.RuntimeMapClear, 402, api.RuntimeModuleMap, "runtime/map.ts", "goMapClear", false, []api.RuntimeSymbol{api.RuntimeMap}},
@@ -83,6 +85,10 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeSelectReady, 1106, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectReady", false, []api.RuntimeSymbol{api.RuntimeSelectAttempt}},
 		{api.RuntimeSelectAttempt, 1107, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectAttempt", false, []api.RuntimeSymbol{api.RuntimeSelectCase}},
 		{api.RuntimeUnsafePointer, 1200, api.RuntimeModuleUnsafePointer, "runtime/unsafe-pointer.ts", "GoUnsafePointer", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeUnsafeString, 1210, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeString", false, []api.RuntimeSymbol{api.RuntimePointerRegion, api.RuntimePointer, api.RuntimeDenseIndex}},
+		{api.RuntimeUnsafeSlice, 1211, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeSlice", false, []api.RuntimeSymbol{api.RuntimePointerRegion, api.RuntimePointer, api.RuntimeSliceRegion, api.RuntimeSlice}},
+		{api.RuntimeUnsafeStringData, 1212, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeStringData", false, []api.RuntimeSymbol{api.RuntimePointerRegion, api.RuntimePointer}},
+		{api.RuntimeUnsafeSliceData, 1213, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeSliceData", false, []api.RuntimeSymbol{api.RuntimePointerRegion, api.RuntimePointer, api.RuntimeSliceRegion, api.RuntimeSlice}},
 	}
 	for _, test := range tests {
 		if uint16(test.symbol) != test.id {

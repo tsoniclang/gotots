@@ -18,6 +18,7 @@ export {
   Concat,
   Delete,
   DeleteFunc,
+  Grow,
   Insert,
   Repeat,
   Replace,

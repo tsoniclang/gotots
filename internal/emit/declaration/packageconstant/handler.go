@@ -178,13 +178,7 @@ func emitProjections(
 		}
 		declarations = append(
 			declarations,
-			context.Factory().VariableStatement(
-				[]tsgo.ModifierLike{context.Factory().ExportKeyword()},
-				context.Factory().VariableDeclarationList(
-					[]tsgo.VariableDeclaration{emission.Declaration()},
-					tsgo.NodeFlagsConst,
-				),
-			),
+			emission.ExportedStatement(context.Factory()),
 		)
 		requests = append(requests, emission.Requests()...)
 	}

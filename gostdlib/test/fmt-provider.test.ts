@@ -1,0 +1,92 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  GoInterfaceValue,
+  type GoError,
+} from "@gotots/runtime/interface-value.js";
+import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import type { uint8 } from "@gotots/runtime/scalars.js";
+
+import { Fprintln, Sprintf } from "../src/fmt.js";
+import type { Writer } from "../src/io.js";
+
+class FormattedValue extends GoInterfaceValue {
+  readonly $go$type: object = FormattedValue;
+  readonly $go$methods: ReadonlySet<object> = new Set<object>();
+  readonly $go$formatString: boolean;
+
+  constructor(
+    private readonly decimal: string,
+    private readonly hexadecimal: string,
+  ) {
+    super();
+    this.$go$formatString = decimal === "value";
+  }
+
+  $go$implements(contract: readonly object[]): boolean {
+    return contract.length === 0;
+  }
+
+  $go$equal(other: GoInterfaceValue): boolean {
+    return this === other;
+  }
+
+  $go$hash(): number {
+    return 0;
+  }
+
+  $go$format(verb: string, _flags: string, _precision: number | undefined): string {
+    return verb === "x" ? this.hexadecimal : this.decimal;
+  }
+}
+
+class CaptureWriter extends GoInterfaceValue implements Writer {
+  readonly $go$type: object = CaptureWriter;
+  readonly $go$methods: ReadonlySet<object> = new Set<object>();
+  readonly $go$formatString = false;
+  content = "";
+
+  $go$implements(contract: readonly object[]): boolean {
+    return contract.length === 0;
+  }
+
+  $go$equal(other: GoInterfaceValue): boolean {
+    return this === other;
+  }
+
+  $go$hash(): number {
+    return 0;
+  }
+
+  $go$format(_verb: string, _flags: string, _precision: number | undefined): string {
+    return "capture-writer";
+  }
+
+  Write(buffer: RuntimeSlice<uint8>): [number, GoError | undefined] {
+    const bytes: number[] = [];
+    for (let index = 0; index < buffer.length; index += 1) {
+      bytes.push(buffer.get(index));
+    }
+    this.content += new TextDecoder().decode(Uint8Array.from(bytes));
+    return [buffer.length, undefined];
+  }
+}
+
+test("fmt parses directives and delegates exact dynamic-value rendering", () => {
+  const arguments_ = RuntimeSlice.literal<GoInterfaceValue | undefined>([
+    new FormattedValue("value", "value"),
+    new FormattedValue("15", "f"),
+  ]);
+  assert.equal(Sprintf("%s=%04x", arguments_), "value=000f");
+});
+
+test("fmt Fprintln writes one Go line through io.Writer", () => {
+  const writer = new CaptureWriter();
+  const arguments_ = RuntimeSlice.literal<GoInterfaceValue | undefined>([
+    new FormattedValue("value", "value"),
+    new FormattedValue("15", "f"),
+  ]);
+  assert.deepEqual(Fprintln(writer, arguments_), [9, undefined]);
+  assert.equal(writer.content, "value 15\n");
+});

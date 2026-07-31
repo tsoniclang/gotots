@@ -1,6 +1,9 @@
 package gostdlib
 
-import "slices"
+import (
+	"slices"
+	"strings"
+)
 
 type FacetKind string
 
@@ -20,16 +23,17 @@ func (k FacetKind) Valid() bool {
 type FacetCapability string
 
 const (
-	FacetCapabilityInvalid  FacetCapability = ""
-	FacetCapabilityMake     FacetCapability = "make"
-	FacetCapabilityZero     FacetCapability = "zero"
-	FacetCapabilityCopy     FacetCapability = "copy"
-	FacetCapabilityEqual    FacetCapability = "equal"
-	FacetCapabilityHash     FacetCapability = "hash"
-	FacetCapabilityConvert  FacetCapability = "convert"
-	FacetCapabilityStorage  FacetCapability = "storage"
-	FacetCapabilityAssign   FacetCapability = "assign"
-	FacetCapabilityRecovery FacetCapability = "recovery"
+	FacetCapabilityInvalid        FacetCapability = ""
+	FacetCapabilityMake           FacetCapability = "make"
+	FacetCapabilityZero           FacetCapability = "zero"
+	FacetCapabilityCopy           FacetCapability = "copy"
+	FacetCapabilityEqual          FacetCapability = "equal"
+	FacetCapabilityHash           FacetCapability = "hash"
+	FacetCapabilityConvert        FacetCapability = "convert"
+	FacetCapabilityStorage        FacetCapability = "storage"
+	FacetCapabilityAssign         FacetCapability = "assign"
+	FacetCapabilityRepresentation FacetCapability = "representation"
+	FacetCapabilityRecovery       FacetCapability = "recovery"
 )
 
 func (c FacetCapability) NamedStructOperation() bool {
@@ -41,7 +45,8 @@ func (c FacetCapability) NamedStructOperation() bool {
 		FacetCapabilityHash,
 		FacetCapabilityConvert,
 		FacetCapabilityStorage,
-		FacetCapabilityAssign:
+		FacetCapabilityAssign,
+		FacetCapabilityRepresentation:
 		return true
 	default:
 		return false
@@ -61,9 +66,28 @@ func (k EffectKind) Valid() bool {
 }
 
 type FacetModuleDocument struct {
-	Specifier  string          `json:"specifier"`
-	SourcePath string          `json:"sourcePath"`
-	Facets     []FacetDocument `json:"facets"`
+	Specifier       string                           `json:"specifier"`
+	SourcePath      string                           `json:"sourcePath"`
+	Representations []ProviderRepresentationDocument `json:"representations,omitempty"`
+	Facets          []FacetDocument                  `json:"facets"`
+}
+
+type ProviderRepresentationDocument struct {
+	Export              string                                 `json:"export"`
+	SourceTypes         []string                               `json:"sourceTypes"`
+	SourceInterfaces    []string                               `json:"sourceInterfaces"`
+	Methods             []ProviderRepresentationMethodDocument `json:"methods"`
+	ImplementationOwner string                                 `json:"implementationOwner"`
+	TargetFingerprint   string                                 `json:"targetFingerprint"`
+}
+
+type ProviderRepresentationMethodDocument struct {
+	SourceIdentity      string `json:"sourceIdentity"`
+	Member              string `json:"member"`
+	SourceSignature     string `json:"sourceSignature"`
+	SourceLocation      string `json:"sourceLocation"`
+	ImplementationOwner string `json:"implementationOwner"`
+	TargetFingerprint   string `json:"targetFingerprint"`
 }
 
 type FacetDocument struct {
@@ -73,6 +97,7 @@ type FacetDocument struct {
 	ProfileKey                 string            `json:"profileKey,omitempty"`
 	Export                     string            `json:"export"`
 	StorageExport              string            `json:"storageExport,omitempty"`
+	RepresentationExport       string            `json:"representationExport,omitempty"`
 	Effect                     EffectKind        `json:"effect,omitempty"`
 	ImplementationOwner        string            `json:"implementationOwner"`
 	StorageImplementationOwner string            `json:"storageImplementationOwner,omitempty"`
@@ -84,6 +109,11 @@ type facetLookup struct {
 	sourceIdentity string
 	kind           FacetKind
 	capability     string
+}
+
+type providerRepresentationLookup struct {
+	module string
+	export string
 }
 
 type FacetModule struct {
@@ -102,6 +132,14 @@ func (m FacetModule) Facets() []Facet {
 	result := make([]Facet, len(m.document.Facets))
 	for index, facet := range m.document.Facets {
 		result[index] = newFacet(m.document, facet)
+	}
+	return result
+}
+
+func (m FacetModule) Representations() []ProviderRepresentation {
+	result := make([]ProviderRepresentation, len(m.document.Representations))
+	for index, representation := range m.document.Representations {
+		result[index] = newProviderRepresentation(m.document, representation)
 	}
 	return result
 }
@@ -144,6 +182,18 @@ func (f Facet) StorageExport() string {
 	return f.facet.StorageExport
 }
 
+func (f Facet) Representation() (ProviderRepresentation, bool) {
+	if f.facet.RepresentationExport == "" {
+		return ProviderRepresentation{}, false
+	}
+	for _, representation := range f.module.Representations {
+		if representation.Export == f.facet.RepresentationExport {
+			return newProviderRepresentation(f.module, representation), true
+		}
+	}
+	return ProviderRepresentation{}, false
+}
+
 func (f Facet) Effect() EffectKind {
 	return f.facet.Effect
 }
@@ -166,10 +216,114 @@ func (f Facet) StorageTargetFingerprint() string {
 
 func cloneFacetModule(source FacetModuleDocument) FacetModuleDocument {
 	result := source
+	result.Representations = make(
+		[]ProviderRepresentationDocument,
+		len(source.Representations),
+	)
+	for index, representation := range source.Representations {
+		result.Representations[index] = cloneProviderRepresentation(representation)
+	}
 	result.Facets = make([]FacetDocument, len(source.Facets))
 	for index, facet := range source.Facets {
 		result.Facets[index] = facet
 		result.Facets[index].Capabilities = slices.Clone(facet.Capabilities)
 	}
+	return result
+}
+
+type ProviderRepresentation struct {
+	module         FacetModuleDocument
+	representation ProviderRepresentationDocument
+}
+
+func newProviderRepresentation(
+	module FacetModuleDocument,
+	representation ProviderRepresentationDocument,
+) ProviderRepresentation {
+	module.Facets = nil
+	module.Representations = nil
+	return ProviderRepresentation{
+		module:         module,
+		representation: cloneProviderRepresentation(representation),
+	}
+}
+
+func (r ProviderRepresentation) ModuleSpecifier() string {
+	return r.module.Specifier
+}
+
+func (r ProviderRepresentation) Export() string {
+	return r.representation.Export
+}
+
+func (r ProviderRepresentation) SourceTypes() []string {
+	return slices.Clone(r.representation.SourceTypes)
+}
+
+func (r ProviderRepresentation) SourceInterfaces() []string {
+	return slices.Clone(r.representation.SourceInterfaces)
+}
+
+func (r ProviderRepresentation) Method(
+	sourceIdentity string,
+) (ProviderRepresentationMethod, bool) {
+	index, found := slices.BinarySearchFunc(
+		r.representation.Methods,
+		sourceIdentity,
+		func(method ProviderRepresentationMethodDocument, identity string) int {
+			return strings.Compare(method.SourceIdentity, identity)
+		},
+	)
+	if !found {
+		return ProviderRepresentationMethod{}, false
+	}
+	return ProviderRepresentationMethod{
+		document: r.representation.Methods[index],
+	}, true
+}
+
+func (r ProviderRepresentation) ImplementationOwner() string {
+	return r.representation.ImplementationOwner
+}
+
+func (r ProviderRepresentation) TargetFingerprint() string {
+	return r.representation.TargetFingerprint
+}
+
+type ProviderRepresentationMethod struct {
+	document ProviderRepresentationMethodDocument
+}
+
+func (m ProviderRepresentationMethod) SourceIdentity() string {
+	return m.document.SourceIdentity
+}
+
+func (m ProviderRepresentationMethod) Member() string {
+	return m.document.Member
+}
+
+func (m ProviderRepresentationMethod) SourceSignature() string {
+	return m.document.SourceSignature
+}
+
+func (m ProviderRepresentationMethod) SourceLocation() string {
+	return m.document.SourceLocation
+}
+
+func (m ProviderRepresentationMethod) ImplementationOwner() string {
+	return m.document.ImplementationOwner
+}
+
+func (m ProviderRepresentationMethod) TargetFingerprint() string {
+	return m.document.TargetFingerprint
+}
+
+func cloneProviderRepresentation(
+	source ProviderRepresentationDocument,
+) ProviderRepresentationDocument {
+	result := source
+	result.SourceTypes = slices.Clone(source.SourceTypes)
+	result.SourceInterfaces = slices.Clone(source.SourceInterfaces)
+	result.Methods = slices.Clone(source.Methods)
 	return result
 }

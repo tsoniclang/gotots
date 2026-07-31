@@ -1,6 +1,177 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
+  "representations": [
+    {
+      "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
+      "sourcePath": "src/internal/facets/named-encoding-binary.ts",
+      "export": "BinaryEndianRepresentation",
+      "sourceTypes": [
+        "encoding/binary|kind=2|receiver=|name=bigEndian",
+        "encoding/binary|kind=2|receiver=|name=littleEndian",
+        "encoding/binary|kind=2|receiver=|name=nativeEndian"
+      ],
+      "sourceInterfaces": [
+        "encoding/binary|kind=2|receiver=|name=AppendByteOrder",
+        "encoding/binary|kind=2|receiver=|name=ByteOrder"
+      ]
+    }
+  ],
   "facets": [
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "encoding/binary|kind=2|receiver=|name=bigEndian",
+      "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
+      "sourcePath": "src/internal/facets/named-encoding-binary.ts",
+      "export": "BinaryBigEndianOperations",
+      "capabilities": [
+        "copy",
+        "equal",
+        "hash",
+        "representation",
+        "storage"
+      ],
+      "representationExport": "BinaryEndianRepresentation",
+      "storageExport": "BinaryBigEndianStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "encoding/binary|kind=2|receiver=|name=littleEndian",
+      "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
+      "sourcePath": "src/internal/facets/named-encoding-binary.ts",
+      "export": "BinaryLittleEndianOperations",
+      "capabilities": [
+        "copy",
+        "equal",
+        "hash",
+        "representation",
+        "storage"
+      ],
+      "representationExport": "BinaryEndianRepresentation",
+      "storageExport": "BinaryLittleEndianStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "encoding/binary|kind=2|receiver=|name=nativeEndian",
+      "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
+      "sourcePath": "src/internal/facets/named-encoding-binary.ts",
+      "export": "BinaryNativeEndianOperations",
+      "capabilities": [
+        "copy",
+        "equal",
+        "hash",
+        "representation",
+        "storage"
+      ],
+      "representationExport": "BinaryEndianRepresentation",
+      "storageExport": "BinaryNativeEndianStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "io/fs|kind=2|receiver=|name=PathError",
+      "specifier": "@gotots/gostdlib/internal/facets/named-io-fs.js",
+      "sourcePath": "src/internal/facets/named-io-fs.ts",
+      "export": "IoFsPathErrorOperations",
+      "capabilities": [
+        "make",
+        "storage"
+      ],
+      "storageExport": "IoFsPathErrorStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "math/big|kind=2|receiver=|name=Float",
+      "specifier": "@gotots/gostdlib/internal/facets/named-math-big.js",
+      "sourcePath": "src/internal/facets/named-math-big.ts",
+      "export": "MathBigFloatOperations",
+      "capabilities": [
+        "storage",
+        "zero"
+      ],
+      "storageExport": "MathBigFloatStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "math/big|kind=2|receiver=|name=Int",
+      "specifier": "@gotots/gostdlib/internal/facets/named-math-big.js",
+      "sourcePath": "src/internal/facets/named-math-big.ts",
+      "export": "MathBigIntOperations",
+      "capabilities": [
+        "storage",
+        "zero"
+      ],
+      "storageExport": "MathBigIntStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "net/url|kind=2|receiver=|name=URL",
+      "specifier": "@gotots/gostdlib/internal/facets/named-net-url.js",
+      "sourcePath": "src/internal/facets/named-net-url.ts",
+      "export": "NetUrlURLOperations",
+      "capabilities": [
+        "storage"
+      ],
+      "storageExport": "NetUrlURLStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "runtime|kind=2|receiver=|name=MemStats",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime.js",
+      "sourcePath": "src/internal/facets/named-runtime.ts",
+      "export": "RuntimeMemStatsOperations",
+      "capabilities": [
+        "storage",
+        "zero"
+      ],
+      "storageExport": "RuntimeMemStatsStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Value",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectValueOperations",
+      "capabilities": [
+        "copy",
+        "zero"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "time|kind=2|receiver=|name=Ticker",
+      "specifier": "@gotots/gostdlib/internal/facets/named-time.js",
+      "sourcePath": "src/internal/facets/named-time.ts",
+      "export": "TimeTickerOperations",
+      "capabilities": [
+        "storage"
+      ],
+      "storageExport": "TimeTickerStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "time|kind=2|receiver=|name=Time",
+      "specifier": "@gotots/gostdlib/internal/facets/named-time.js",
+      "sourcePath": "src/internal/facets/named-time.ts",
+      "export": "TimeOperations",
+      "capabilities": [
+        "copy",
+        "equal",
+        "hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "TimeStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "time|kind=2|receiver=|name=Timer",
+      "specifier": "@gotots/gostdlib/internal/facets/named-time.js",
+      "sourcePath": "src/internal/facets/named-time.ts",
+      "export": "TimeTimerOperations",
+      "capabilities": [
+        "storage"
+      ],
+      "storageExport": "TimeTimerStorage"
+    },
     {
       "kind": "named-struct-operations",
       "sourceIdentity": "unicode|kind=2|receiver=|name=Range16",
@@ -28,8 +199,10 @@
       "sourcePath": "src/internal/facets/named-unicode.ts",
       "export": "UnicodeRangeTableOperations",
       "capabilities": [
-        "make"
-      ]
+        "make",
+        "storage"
+      ],
+      "storageExport": "UnicodeRangeTableStorage"
     },
     {
       "kind": "named-struct-operations",
@@ -38,6 +211,7 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncMapOperations",
       "capabilities": [
+        "copy",
         "storage",
         "zero"
       ],
@@ -50,8 +224,11 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncMutexOperations",
       "capabilities": [
+        "copy",
+        "storage",
         "zero"
-      ]
+      ],
+      "storageExport": "SyncMutexStorage"
     },
     {
       "kind": "named-struct-operations",
@@ -60,8 +237,11 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncOnceOperations",
       "capabilities": [
+        "copy",
+        "storage",
         "zero"
-      ]
+      ],
+      "storageExport": "SyncOnceStorage"
     },
     {
       "kind": "named-struct-operations",
@@ -70,6 +250,7 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncPoolOperations",
       "capabilities": [
+        "copy",
         "storage",
         "zero"
       ],
@@ -82,10 +263,63 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncRWMutexOperations",
       "capabilities": [
+        "copy",
         "storage",
         "zero"
       ],
       "storageExport": "SyncRWMutexStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=WaitGroup",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncWaitGroupOperations",
+      "capabilities": [
+        "copy",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncWaitGroupStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Bool",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync-atomic.js",
+      "sourcePath": "src/internal/facets/named-sync-atomic.ts",
+      "export": "SyncAtomicBoolOperations",
+      "capabilities": [
+		"copy",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncAtomicBoolStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Int32",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync-atomic.js",
+      "sourcePath": "src/internal/facets/named-sync-atomic.ts",
+      "export": "SyncAtomicInt32Operations",
+      "capabilities": [
+		"copy",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncAtomicInt32Storage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Int64",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync-atomic.js",
+      "sourcePath": "src/internal/facets/named-sync-atomic.ts",
+      "export": "SyncAtomicInt64Operations",
+      "capabilities": [
+		"copy",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncAtomicInt64Storage"
     },
     {
       "kind": "named-struct-operations",
@@ -94,6 +328,7 @@
       "sourcePath": "src/internal/facets/named-sync-atomic.ts",
       "export": "SyncAtomicUint32Operations",
       "capabilities": [
+		"copy",
         "storage",
         "zero"
       ],
@@ -106,6 +341,7 @@
       "sourcePath": "src/internal/facets/named-sync-atomic.ts",
       "export": "SyncAtomicUint64Operations",
       "capabilities": [
+		"copy",
         "storage",
         "zero"
       ],
@@ -118,8 +354,11 @@
       "sourcePath": "src/internal/facets/named-strings.ts",
       "export": "StringsBuilderOperations",
       "capabilities": [
+        "copy",
+        "storage",
         "zero"
-      ]
+      ],
+      "storageExport": "StringsBuilderStorage"
     },
     {
       "kind": "named-struct-operations",
@@ -613,6 +852,15 @@
       "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
       "sourcePath": "src/internal/facets/generic-slices.ts",
       "export": "SlicesAppendSeqCooperative",
+      "profileKey": "625d99cc3a4a8041a6c210aff3a339db4e83cf34c18dbe41a42fa48cf59f77ab=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=AppendSeq",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesAppendSeqFullyCooperative",
       "profileKey": "625d99cc3a4a8041a6c210aff3a339db4e83cf34c18dbe41a42fa48cf59f77ab=cooperative|f729115bf3e3995f96e7e344375769cd4b0a973dceaa98d59427a06f0fa3f074=cooperative",
       "effect": "async"
     },
@@ -685,6 +933,15 @@
       "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
       "sourcePath": "src/internal/facets/generic-slices.ts",
       "export": "SlicesSortedCooperative",
+      "profileKey": "1bcecf0698ae7e007b8fbf07b9e01ec5913c886b85743bfd0d8726501d67fbbe=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=Sorted",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesSortedFullyCooperative",
       "profileKey": "1bcecf0698ae7e007b8fbf07b9e01ec5913c886b85743bfd0d8726501d67fbbe=cooperative|fb2488bb05450d70e9d3a3b060575c3f2ff9052f56ba075e968dfe9e6d84fdbe=cooperative",
       "effect": "async"
     },
@@ -694,6 +951,15 @@
       "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
       "sourcePath": "src/internal/facets/generic-slices.ts",
       "export": "SlicesValuesCooperative",
+      "profileKey": "652217bd97327bcf74dac90763c1f154a7d8bbcf536ce7e832bdaf968a702881=cooperative",
+      "effect": "sync"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=Values",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesValuesFullyCooperative",
       "profileKey": "652217bd97327bcf74dac90763c1f154a7d8bbcf536ce7e832bdaf968a702881=cooperative|cdd8b52d8c59de6acb71522442974fa2016409e18b1d99841c9cd34a1fe8561d=cooperative",
       "effect": "sync"
     },
@@ -705,6 +971,29 @@
       "export": "SyncOnceValueCooperative",
       "profileKey": "c30278625496c7198c92a774ca902c537bd14851c35fbd06e171ee3f89e3602c=cooperative",
       "effect": "sync"
+    }
+  ],
+  "genericOperationSets": [
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=Grow",
+      "operations": [
+        {
+          "kind": "copy",
+          "parameters": [
+            { "typeParameter": 1 }
+          ],
+          "results": [
+            { "typeParameter": 1 }
+          ]
+        },
+        {
+          "kind": "zero",
+          "parameters": [],
+          "results": [
+            { "typeParameter": 1 }
+          ]
+        }
+      ]
     }
   ]
 }

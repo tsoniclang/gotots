@@ -10,40 +10,31 @@ import (
 )
 
 type providerImport struct {
-	module string
-	local  string
-}
-
-type providerImportIdentity struct {
-	sourcePackage *types.Package
-	module        string
+	local string
 }
 
 func (n *File) providerImport(
-	sourcePackage *types.Package,
 	module string,
 	phase api.ImportPhase,
 ) (string, api.RootRequest, error) {
-	if sourcePackage == nil || module == "" {
+	if module == "" {
 		return "", api.RootRequest{}, &api.NameError{
-			Reason: "provider import identity is incomplete",
+			Reason: "provider import identity is empty",
 		}
 	}
-	identity := providerImportIdentity{
-		sourcePackage: sourcePackage,
-		module:        module,
-	}
-	selected := n.providerImports[identity]
+	selected := n.providerImports[module]
 	if selected.local == "" {
-		preferred, err := n.packageImportQualifier(sourcePackage)
-		if err != nil {
-			return "", api.RootRequest{}, err
+		preferred := n.owner.registry.providerImportNameByModule[module]
+		if preferred == "" {
+			return "", api.RootRequest{}, &api.NameError{
+				Name:   module,
+				Reason: "provider module has no preallocated import name",
+			}
 		}
 		selected = providerImport{
-			module: module,
-			local:  n.allocateProviderImportName(preferred),
+			local: n.allocateProviderImportName(preferred),
 		}
-		n.providerImports[identity] = selected
+		n.providerImports[module] = selected
 	}
 	request, err := api.NewNamespaceImportRequest(
 		n.factory,
@@ -105,8 +96,9 @@ func (n *File) providerFacetTargetReference(
 	)
 	if !ok {
 		return api.NameReference{}, true, &api.NameError{
-			Name:   contract.Identity(),
-			Reason: "selected standard-library declaration has no certified provider facet",
+			Name: contract.Identity(),
+			Reason: "selected standard-library declaration has no certified provider facet for capability " +
+				strconv.Quote(string(capability)),
 		}
 	}
 	if selected.SourceIdentity() != contract.Identity() ||
@@ -127,7 +119,6 @@ func (n *File) providerFacetTargetReference(
 		}
 	}
 	qualifier, request, err := n.providerImport(
-		object.Pkg(),
 		selected.ModuleSpecifier(),
 		phase,
 	)
@@ -161,8 +152,9 @@ func (n *File) providerGenericCallableProfileReference(
 	)
 	if !ok {
 		return api.NameReference{}, gostdlib.EffectInvalid, true, &api.NameError{
-			Name:   contract.Identity(),
-			Reason: "selected generic standard-library callable has no certified provider profile",
+			Name: contract.Identity(),
+			Reason: "selected generic standard-library callable has no certified provider profile " +
+				strconv.Quote(profileKey),
 		}
 	}
 	if selected.SourceIdentity() != contract.Identity() ||
@@ -175,7 +167,6 @@ func (n *File) providerGenericCallableProfileReference(
 		}
 	}
 	qualifier, request, err := n.providerImport(
-		owner.Pkg(),
 		selected.ModuleSpecifier(),
 		api.ImportPhaseValue,
 	)
@@ -267,6 +258,10 @@ func (n *File) providerFacetOwner(
 		return environmentcontract.ObjectContract{}, false, &api.NameError{
 			Reason: "provider facet owner is invalid",
 		}
+	}
+	if object.Pkg() != nil && object.Parent() != nil &&
+		object.Parent() != object.Pkg().Scope() {
+		return environmentcontract.ObjectContract{}, false, nil
 	}
 	binding, ok := n.owner.registry.byObject[object]
 	if !ok {

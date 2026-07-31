@@ -83,6 +83,17 @@ func Parse(payload []byte) (Manifest, error) {
 			bindings[binding.Identity] = newBinding(module, binding)
 		}
 	}
+	representations := make(
+		map[providerRepresentationLookup]ProviderRepresentation,
+	)
+	for _, module := range document.FacetModules {
+		for _, representation := range module.Representations {
+			representations[providerRepresentationLookup{
+				module: module.Specifier,
+				export: representation.Export,
+			}] = newProviderRepresentation(module, representation)
+		}
+	}
 	facets := make(map[facetLookup]Facet)
 	for _, module := range document.FacetModules {
 		for _, facet := range module.Facets {
@@ -103,10 +114,11 @@ func Parse(payload []byte) (Manifest, error) {
 		}
 	}
 	return Manifest{
-		document: cloneDocument(document),
-		payload:  canonical,
-		bindings: bindings,
-		facets:   facets,
+		document:        cloneDocument(document),
+		payload:         canonical,
+		bindings:        bindings,
+		facets:          facets,
+		representations: representations,
 	}, nil
 }
 
@@ -222,8 +234,39 @@ func validateFacetModule(
 	if len(module.Facets) == 0 {
 		return manifestError(field+".facets", "set is empty")
 	}
-	previous := ""
 	owners := make(map[string]struct{})
+	representations := make(
+		map[string]ProviderRepresentationDocument,
+		len(module.Representations),
+	)
+	previousRepresentation := ""
+	for index, representation := range module.Representations {
+		representationField := fmt.Sprintf("%s.representations[%d]", field, index)
+		if err := validateProviderRepresentation(
+			representation,
+			representationField,
+		); err != nil {
+			return err
+		}
+		if previousRepresentation != "" &&
+			representation.Export <= previousRepresentation {
+			return manifestError(
+				field+".representations",
+				"representations are not strictly ordered",
+			)
+		}
+		previousRepresentation = representation.Export
+		if _, duplicate := owners[representation.Export]; duplicate {
+			return manifestError(
+				representationField+".export",
+				"target owner is duplicated",
+			)
+		}
+		owners[representation.Export] = struct{}{}
+		representations[representation.Export] = representation
+	}
+	previous := ""
+	referencedRepresentations := make(map[string]struct{})
 	for index, facet := range module.Facets {
 		facetField := fmt.Sprintf("%s.facets[%d]", field, index)
 		if err := validateFacet(facet, facetField); err != nil {
@@ -234,6 +277,15 @@ func validateFacetModule(
 			return manifestError(field+".facets", "facets are not strictly ordered")
 		}
 		previous = key
+		if facet.RepresentationExport != "" {
+			if _, ok := representations[facet.RepresentationExport]; !ok {
+				return manifestError(
+					facetField+".representationExport",
+					"representation is absent from the facet module",
+				)
+			}
+			referencedRepresentations[facet.RepresentationExport] = struct{}{}
+		}
 		for _, target := range []string{facet.Export, facet.StorageExport} {
 			if target == "" {
 				continue
@@ -260,6 +312,86 @@ func validateFacetModule(
 				return manifestError(facetField, "capability owner is duplicated")
 			}
 			lookups[lookup] = struct{}{}
+		}
+	}
+	for export := range representations {
+		if _, referenced := referencedRepresentations[export]; !referenced {
+			return manifestError(
+				field+".representations",
+				"representation has no facet reference",
+			)
+		}
+	}
+	return nil
+}
+
+func validateProviderRepresentation(
+	representation ProviderRepresentationDocument,
+	field string,
+) error {
+	switch {
+	case representation.Export == "":
+		return manifestError(field+".export", "value is empty")
+	case len(representation.SourceTypes) == 0:
+		return manifestError(field+".sourceTypes", "set is empty")
+	case len(representation.SourceInterfaces) == 0:
+		return manifestError(field+".sourceInterfaces", "set is empty")
+	case len(representation.Methods) == 0:
+		return manifestError(field+".methods", "set is empty")
+	case !sourcePath(representation.ImplementationOwner):
+		return manifestError(
+			field+".implementationOwner",
+			"value is not a provider source path",
+		)
+	case !validDigest(representation.TargetFingerprint):
+		return manifestError(
+			field+".targetFingerprint",
+			"value is not a sha256 digest",
+		)
+	}
+	for index, identity := range representation.SourceTypes {
+		if identity == "" || index != 0 && identity <= representation.SourceTypes[index-1] {
+			return manifestError(
+				field+".sourceTypes",
+				"values are empty, duplicated, or not strictly ordered",
+			)
+		}
+	}
+	for index, identity := range representation.SourceInterfaces {
+		if identity == "" || index != 0 && identity <= representation.SourceInterfaces[index-1] {
+			return manifestError(
+				field+".sourceInterfaces",
+				"values are empty, duplicated, or not strictly ordered",
+			)
+		}
+	}
+	for index, method := range representation.Methods {
+		methodField := fmt.Sprintf("%s.methods[%d]", field, index)
+		switch {
+		case method.SourceIdentity == "":
+			return manifestError(methodField+".sourceIdentity", "value is empty")
+		case method.Member == "":
+			return manifestError(methodField+".member", "value is empty")
+		case method.SourceSignature == "":
+			return manifestError(methodField+".sourceSignature", "value is empty")
+		case method.SourceLocation == "":
+			return manifestError(methodField+".sourceLocation", "value is empty")
+		case !sourcePath(method.ImplementationOwner):
+			return manifestError(
+				methodField+".implementationOwner",
+				"value is not a provider source path",
+			)
+		case !validDigest(method.TargetFingerprint):
+			return manifestError(
+				methodField+".targetFingerprint",
+				"value is not a sha256 digest",
+			)
+		case index != 0 && method.SourceIdentity <=
+			representation.Methods[index-1].SourceIdentity:
+			return manifestError(
+				field+".methods",
+				"methods are not strictly ordered",
+			)
 		}
 	}
 	return nil
@@ -290,11 +422,14 @@ func validateFacet(facet FacetDocument, field string) error {
 			return manifestError(field, "named-struct facet shape is invalid")
 		}
 		storage := false
+		representation := false
 		for _, capability := range facet.Capabilities {
 			if !capability.NamedStructOperation() {
 				return manifestError(field+".capabilities", "named-struct capability is invalid")
 			}
 			storage = storage || capability == FacetCapabilityStorage
+			representation = representation ||
+				capability == FacetCapabilityRepresentation
 		}
 		if storage != (facet.StorageExport != "") ||
 			storage != (facet.StorageImplementationOwner != "") ||
@@ -305,11 +440,15 @@ func validateFacet(facet FacetDocument, field string) error {
 			!validDigest(facet.StorageTargetFingerprint)) {
 			return manifestError(field, "storage target evidence is invalid")
 		}
+		if representation != (facet.RepresentationExport != "") {
+			return manifestError(field, "representation target shape is invalid")
+		}
 	case FacetRecoveryCallable:
 		if len(facet.Capabilities) != 1 ||
 			facet.Capabilities[0] != FacetCapabilityRecovery ||
 			facet.ProfileKey != "" || !facet.Effect.Valid() ||
 			facet.StorageExport != "" ||
+			facet.RepresentationExport != "" ||
 			facet.StorageImplementationOwner != "" ||
 			facet.StorageTargetFingerprint != "" {
 			return manifestError(field, "recovery facet shape is invalid")
@@ -318,6 +457,7 @@ func validateFacet(facet FacetDocument, field string) error {
 		if len(facet.Capabilities) != 0 ||
 			!validProfileKey(facet.ProfileKey) ||
 			!facet.Effect.Valid() || facet.StorageExport != "" ||
+			facet.RepresentationExport != "" ||
 			facet.StorageImplementationOwner != "" ||
 			facet.StorageTargetFingerprint != "" {
 			return manifestError(field, "generic-callable facet shape is invalid")
@@ -380,6 +520,19 @@ func validateBinding(binding BindingDocument, field string) error {
 		return manifestError(field+".implementationOwner", "value is not a provider source path")
 	case !validDigest(binding.TargetFingerprint):
 		return manifestError(field+".targetFingerprint", "value is not a sha256 digest")
+	}
+	if err := validateGenericOperations(
+		binding.GenericOperations,
+		field+".genericOperations",
+	); err != nil {
+		return err
+	}
+	if len(binding.GenericOperations) != 0 &&
+		(binding.Kind != BindingFunction || binding.Access != AccessExport) {
+		return manifestError(
+			field+".genericOperations",
+			"operations do not belong to an exported function",
+		)
 	}
 	switch binding.Access {
 	case AccessStateMember:

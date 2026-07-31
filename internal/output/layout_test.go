@@ -218,6 +218,15 @@ func TestEnvironmentContractPathUsesPackageIdentityWithoutFabricatedModule(
 		!strings.HasSuffix(first, "/context/index.ts") {
 		t.Fatalf("environment contract path = %q / %q", first, second)
 	}
+	projection, err := StandardLibraryConstantProjectionPath(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projection == first ||
+		!strings.HasPrefix(projection, "support/constant-projections/") ||
+		!strings.HasSuffix(projection, "/context/index.ts") {
+		t.Fatalf("standard-library constant projection path = %q", projection)
+	}
 	if _, err := PackageAssemblyPath(contract); err == nil {
 		t.Fatal("environment contract accepted fabricated source-module assembly")
 	}

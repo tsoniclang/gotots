@@ -33,8 +33,6 @@ type DeclarationRequirement struct {
 	genericFacet         GenericRepresentationFacet
 	pointerCarrier       bool
 	genericProfile       *GenericCallableProfile
-	environmentBuiltin   *types.Builtin
-	environmentSignature *types.Signature
 	enclosing            ast.Node
 	callable             ast.Node
 	control              CallableControlFacet
@@ -287,10 +285,6 @@ func (r DeclarationRequirement) Valid() bool {
 	}
 	if r.kind != DeclarationRequirementCooperativeCallable &&
 		!r.callableFacet.empty() {
-		return false
-	}
-	if r.kind != DeclarationRequirementEnvironmentBuiltin &&
-		(r.environmentBuiltin != nil || r.environmentSignature != nil) {
 		return false
 	}
 	if r.kind != DeclarationRequirementInterfaceAdapter &&
@@ -554,30 +548,6 @@ func (r DeclarationRequirement) Valid() bool {
 		return r.validGeneratedDefinition(
 			GeneratedArtifactPointerRepresentation,
 		)
-	case DeclarationRequirementEnvironmentBuiltin:
-		if !r.owner.Valid() ||
-			r.operation != NamedStructOperationInvalid ||
-			r.typeName != nil ||
-			r.variable != nil ||
-			r.constant != nil ||
-			r.projection != types.Invalid ||
-			r.generated != nil ||
-			r.anonymousDemand != AnonymousStructDemandInvalid ||
-			r.mapDemand != MapSpecializationDemandInvalid ||
-			r.genericOperation != nil ||
-			r.environmentBuiltin == nil ||
-			!validEnvironmentBuiltinSignature(r.environmentSignature) {
-			return false
-		}
-		source, sourceOK := r.owner.Source()
-		return sourceOK &&
-			source == r.environmentBuiltin &&
-			r.environmentBuiltin.Pkg() != nil &&
-			r.environmentBuiltin.Parent() ==
-				r.environmentBuiltin.Pkg().Scope() &&
-			r.environmentBuiltin.Parent().Lookup(
-				r.environmentBuiltin.Name(),
-			) == r.environmentBuiltin
 	default:
 		return false
 	}

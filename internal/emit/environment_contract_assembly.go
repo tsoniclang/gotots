@@ -7,7 +7,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
-	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -57,7 +56,6 @@ type environmentContractBuilder struct {
 	declarations  map[types.Object]environmentDeclaration
 	stateFields   map[*types.Var]environmentStateField
 	projections   map[string]environmentConstantProjection
-	builtins      map[*types.Builtin]environmentBuiltin
 }
 
 func (s *programSession) emitEnvironmentObject(object types.Object) error {
@@ -72,6 +70,30 @@ func (s *programSession) emitEnvironmentObject(object types.Object) error {
 	if err != nil {
 		return err
 	}
+	if s.standardLibraryLinked &&
+		s.registry.HasProviderCoverageOwner(object) {
+		if _, duplicate := builder.declarations[object]; duplicate {
+			return &ScheduleError{
+				Object: object.Name(),
+				Reason: "provider coverage owner was emitted more than once",
+			}
+		}
+		target, err := s.buildProviderCoverageDeclaration(object)
+		if err != nil {
+			return err
+		}
+		owner := api.MustSourceArtifactOwner(object)
+		if err := s.commitArtifactRevision(
+			owner,
+			target.contract,
+			target.dependencies,
+			target.requirements,
+		); err != nil {
+			return err
+		}
+		builder.declarations[object] = target
+		return nil
+	}
 	if variable, ok := object.(*types.Var); ok {
 		if _, duplicate := builder.stateFields[variable]; duplicate {
 			return &ScheduleError{
@@ -80,18 +102,6 @@ func (s *programSession) emitEnvironmentObject(object types.Object) error {
 			}
 		}
 		return s.emitEnvironmentStateField(builder, variable)
-	}
-	if builtin, ok := builtinexpression.FromObject(object); ok {
-		target := builder.builtins[builtin]
-		if target.emitted {
-			return &ScheduleError{
-				Object: builtin.Name(),
-				Reason: "environment builtin was emitted more than once",
-			}
-		}
-		target.emitted = true
-		builder.builtins[builtin] = target
-		return nil
 	}
 	if _, duplicate := builder.declarations[object]; duplicate {
 		return &ScheduleError{
@@ -136,6 +146,15 @@ func (s *programSession) requireEnvironmentPackage(
 	if err != nil {
 		return nil, err
 	}
+	if s.standardLibraryLinked &&
+		sourcePackage.Kind() == load.PackageStandardLibraryContract {
+		outputPath, err = targetoutput.StandardLibraryConstantProjectionPath(
+			sourcePackage,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
 	targetEmitter := newEmitter(
 		sourcePackage,
 		s.factory,
@@ -163,7 +182,6 @@ func (s *programSession) requireEnvironmentPackage(
 		declarations:  make(map[types.Object]environmentDeclaration),
 		stateFields:   make(map[*types.Var]environmentStateField),
 		projections:   make(map[string]environmentConstantProjection),
-		builtins:      make(map[*types.Builtin]environmentBuiltin),
 	}
 	s.environmentBuilders[sourcePackage] = builder
 	return builder, nil
@@ -214,41 +232,6 @@ func (s *programSession) environmentTargetFiles(
 		for _, declaration := range declarations {
 			statements = append(statements, declaration.statements...)
 		}
-		builtins := make([]*types.Builtin, 0, len(builder.builtins))
-		for builtin := range builder.builtins {
-			builtins = append(builtins, builtin)
-		}
-		sort.Slice(builtins, func(left, right int) bool {
-			return emitordering.CompareObjects(
-				builtins[left],
-				builtins[right],
-			) < 0
-		})
-		for _, builtin := range builtins {
-			target := builder.builtins[builtin]
-			if !target.emitted {
-				return nil, &ScheduleError{
-					Object: builtin.Name(),
-					Reason: "environment builtin was not emitted",
-				}
-			}
-			if len(target.signatures) == 0 {
-				if len(target.statements) != 0 {
-					return nil, &ScheduleError{
-						Object: builtin.Name(),
-						Reason: "environment builtin without overloads has declarations",
-					}
-				}
-				continue
-			}
-			if len(target.statements) == 0 {
-				return nil, &ScheduleError{
-					Object: builtin.Name(),
-					Reason: "environment builtin has no concrete overload",
-				}
-			}
-			statements = append(statements, target.statements...)
-		}
 		projectionNames := make(
 			[]string,
 			0,
@@ -289,13 +272,19 @@ func (s *programSession) environmentTargetFiles(
 			)
 		}
 		if s.standardLibraryLinked &&
-			builder.sourcePackage.Kind() == load.PackageStandardLibraryContract {
+			builder.sourcePackage.Kind() == load.PackageStandardLibraryContract &&
+			len(builder.projections) == 0 {
 			continue
+		}
+		kind := TargetFileEnvironmentContract
+		if s.standardLibraryLinked &&
+			builder.sourcePackage.Kind() == load.PackageStandardLibraryContract {
+			kind = TargetFileStandardLibraryConstantProjection
 		}
 		file, err := s.sourceFile(
 			builder.outputPath,
 			builder.sourcePackage.Name(),
-			TargetFileEnvironmentContract,
+			kind,
 			statements,
 		)
 		if err != nil {
@@ -324,16 +313,14 @@ func (s *programSession) applyEnvironmentRequirementSet(
 			Reason: "environment requirement owner was not emitted",
 		}
 	}
-	switch selected := object.(type) {
-	case *types.Builtin:
-		return s.replaceEnvironmentBuiltin(builder, selected, requirements)
-	case *types.Const:
+	if selected, ok := object.(*types.Const); ok {
 		return s.replaceEnvironmentConstantProjections(
 			builder,
 			selected,
 			requirements,
 		)
-	default:
+	}
+	if target, ok := builder.declarations[object]; ok && target.providerCoverage {
 		if _, err := s.environmentDeclarationRequirements(
 			object,
 			requirements,
@@ -342,6 +329,13 @@ func (s *programSession) applyEnvironmentRequirementSet(
 		}
 		return s.reconstructEnvironmentDeclaration(builder, object)
 	}
+	if _, err := s.environmentDeclarationRequirements(
+		object,
+		requirements,
+	); err != nil {
+		return err
+	}
+	return s.reconstructEnvironmentDeclaration(builder, object)
 }
 
 func (s *programSession) environmentDeclarationRequirements(
@@ -350,7 +344,13 @@ func (s *programSession) environmentDeclarationRequirements(
 ) ([]api.DeclarationRequirement, error) {
 	selected := make([]api.DeclarationRequirement, 0, len(requirements))
 	for _, requirement := range requirements {
-		if _, _, ok := requirement.NamedStructOperation(); ok {
+		if owner, _, ok := requirement.NamedStructOperation(); ok {
+			if owner != object {
+				return nil, &ScheduleError{
+					Object: object.Name(),
+					Reason: "environment named-struct operation requirement is foreign",
+				}
+			}
 			continue
 		}
 		if profile, ok := requirement.GenericCallableProfile(); ok {

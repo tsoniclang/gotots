@@ -1,11 +1,14 @@
 package naming
 
 import (
+	"go/ast"
 	"go/token"
 	"go/types"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type facetOnlyProvider struct{}
@@ -13,6 +16,8 @@ type facetOnlyProvider struct{}
 func (facetOnlyProvider) Valid() bool { return true }
 
 func (facetOnlyProvider) ToolchainKey() string { return "toolchain" }
+
+func (facetOnlyProvider) ProviderModules() []string { return nil }
 
 func (facetOnlyProvider) Binding(string) (gostdlib.Binding, bool) {
 	return gostdlib.Binding{}, false
@@ -31,6 +36,13 @@ func (facetOnlyProvider) GenericCallableFacet(
 	string,
 ) (gostdlib.Facet, bool) {
 	return gostdlib.Facet{}, false
+}
+
+func (facetOnlyProvider) ProviderRepresentation(
+	string,
+	string,
+) (gostdlib.ProviderRepresentation, bool) {
+	return gostdlib.ProviderRepresentation{}, false
 }
 
 func TestPrivateProviderDeclarationCanOwnCertifiedFacetWithoutPublicBinding(
@@ -58,5 +70,121 @@ func TestPrivateProviderDeclarationCanOwnCertifiedFacetWithoutPublicBinding(
 	if !providerOwned ||
 		contract.Identity() != "example.com/provider|kind=2|receiver=|name=privateType" {
 		t.Fatalf("facet owner = %#v, provider=%t", contract, providerOwned)
+	}
+}
+
+func TestLexicalSourceTypeIsNotAProviderFacetOwner(t *testing.T) {
+	selectedPackage := types.NewPackage("example.com/application", "application")
+	functionScope := types.NewScope(
+		selectedPackage.Scope(),
+		token.NoPos,
+		token.NoPos,
+		"function",
+	)
+	localType := types.NewTypeName(
+		token.NoPos,
+		selectedPackage,
+		"MemberInfo",
+		types.NewStruct(nil, nil),
+	)
+	if existing := functionScope.Insert(localType); existing != nil {
+		t.Fatal("local type identity was duplicated")
+	}
+	names := &File{owner: &Owner{registry: NewRegistry()}}
+
+	_, providerOwned, err := names.providerFacetOwner(localType)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if providerOwned {
+		t.Fatal("lexical source type was classified as provider-owned")
+	}
+}
+
+func TestUnindexedPackageTypeFailsProviderFacetOwnership(t *testing.T) {
+	selectedPackage := types.NewPackage("example.com/application", "application")
+	packageType := types.NewTypeName(
+		token.NoPos,
+		selectedPackage,
+		"PackageInfo",
+		types.NewStruct(nil, nil),
+	)
+	if existing := selectedPackage.Scope().Insert(packageType); existing != nil {
+		t.Fatal("package type identity was duplicated")
+	}
+	names := &File{owner: &Owner{registry: NewRegistry()}}
+
+	if _, _, err := names.providerFacetOwner(packageType); err == nil {
+		t.Fatal("unindexed package type was accepted")
+	}
+}
+
+func TestProviderNamespaceIdentityIsTheCertifiedModule(t *testing.T) {
+	const (
+		recoveryModule = "@gotots/gostdlib/internal/facets/recovery-sync.js"
+		firstShared    = "@first/provider/shared.js"
+		secondShared   = "@second/provider/shared.js"
+	)
+	modules := []string{secondShared, recoveryModule, firstShared}
+	first := NewRegistry()
+	if err := first.indexProviderImportNames(modules); err != nil {
+		t.Fatal(err)
+	}
+	second := NewRegistry()
+	if err := second.indexProviderImportNames([]string{
+		firstShared,
+		recoveryModule,
+		secondShared,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, module := range modules {
+		if first.providerImportNameByModule[module] !=
+			second.providerImportNameByModule[module] {
+			t.Fatalf(
+				"module %q name depends on discovery order: %q != %q",
+				module,
+				first.providerImportNameByModule[module],
+				second.providerImportNameByModule[module],
+			)
+		}
+	}
+	if first.providerImportNameByModule[recoveryModule] != "recovery_sync" ||
+		first.providerImportNameByModule[firstShared] != "shared" ||
+		first.providerImportNameByModule[secondShared] != "shared__provider_1" {
+		t.Fatalf("provider module names = %#v", first.providerImportNameByModule)
+	}
+
+	owner := NewOwner(nil, nil, first)
+	names := owner.ForFile(
+		&ast.File{},
+		nil,
+		tsgo.NewFactory(),
+		"modules/application/source.ts",
+		nil,
+	).(*File)
+	firstLocal, firstRequest, err := names.providerImport(
+		recoveryModule,
+		api.ImportPhaseType,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondLocal, secondRequest, err := names.providerImport(
+		recoveryModule,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstLocal != "recovery_sync" || secondLocal != firstLocal ||
+		firstRequest.Owner() != secondRequest.Owner() {
+		t.Fatalf(
+			"shared provider imports = %q/%#v and %q/%#v",
+			firstLocal,
+			firstRequest.Owner(),
+			secondLocal,
+			secondRequest.Owner(),
+		)
 	}
 }

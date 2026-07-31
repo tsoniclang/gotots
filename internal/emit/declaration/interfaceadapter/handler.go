@@ -63,7 +63,7 @@ func Build(
 	methods := make(
 		[]tsgo.ClassElement,
 		0,
-		len(demanded)+4,
+		len(demanded)+6,
 	)
 	tokens := make([]tsgo.Expression, 0, len(demanded))
 	tokenNames := make(map[string]struct{})
@@ -139,6 +139,10 @@ func Build(
 	if err != nil {
 		return nil, nil, err
 	}
+	format, formatRequests, err := formatMethod(context, sourceType)
+	if err != nil {
+		return nil, nil, err
+	}
 	classMembers := []tsgo.ClassElement{
 		constructor(context.Factory(), payload.Value()),
 		dynamicTypeProperty(context.Factory(), dynamicType.Name()),
@@ -152,6 +156,8 @@ func Build(
 		implementsMethod(context.Factory()),
 		equal,
 		hash,
+		formatStringProperty(context.Factory(), sourceType),
+		format,
 	}
 	classMembers = append(classMembers, methods...)
 	return []tsgo.Statement{
@@ -179,6 +185,7 @@ func Build(
 			requests,
 			equalRequests,
 			hashRequests,
+			formatRequests,
 		), nil
 }
 

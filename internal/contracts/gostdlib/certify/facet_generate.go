@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"go/types"
 	"path/filepath"
+	"slices"
 	"sort"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -15,24 +18,64 @@ func buildFacetModules(
 	project *tsgo.ProjectInspection,
 	source goSurface,
 	seeds []facetSeed,
+	representationSeeds []providerRepresentationSeed,
+	modules []gostdlib.ModuleDocument,
 ) ([]gostdlib.FacetModuleDocument, error) {
+	interfaceTargets, err := providerInterfaceTargets(
+		config,
+		project,
+		representationSeeds,
+		modules,
+	)
+	if err != nil {
+		return nil, err
+	}
 	bySpecifier := make(map[string][]facetSeed)
 	for _, seed := range seeds {
 		bySpecifier[seed.Specifier] = append(bySpecifier[seed.Specifier], seed)
+	}
+	representationsBySpecifier := make(
+		map[string][]providerRepresentationSeed,
+	)
+	for _, seed := range representationSeeds {
+		representationsBySpecifier[seed.Specifier] = append(
+			representationsBySpecifier[seed.Specifier],
+			seed,
+		)
 	}
 	specifiers := make([]string, 0, len(bySpecifier))
 	for specifier := range bySpecifier {
 		specifiers = append(specifiers, specifier)
 	}
+	for specifier := range representationsBySpecifier {
+		if _, selected := bySpecifier[specifier]; !selected {
+			specifiers = append(specifiers, specifier)
+		}
+	}
 	sort.Strings(specifiers)
 	result := make([]gostdlib.FacetModuleDocument, 0, len(specifiers))
 	for _, specifier := range specifiers {
 		selected := bySpecifier[specifier]
-		sourcePath := selected[0].SourcePath
+		selectedRepresentations := representationsBySpecifier[specifier]
+		sourcePath := ""
+		if len(selected) != 0 {
+			sourcePath = selected[0].SourcePath
+		} else if len(selectedRepresentations) != 0 {
+			sourcePath = selectedRepresentations[0].SourcePath
+		}
 		for _, seed := range selected {
 			if seed.SourcePath != sourcePath {
 				return nil, certifyError(
 					"build facets",
+					specifier,
+					"one facet module has multiple source files",
+				)
+			}
+		}
+		for _, seed := range selectedRepresentations {
+			if seed.SourcePath != sourcePath {
+				return nil, certifyError(
+					"build representations",
 					specifier,
 					"one facet module has multiple source files",
 				)
@@ -50,9 +93,43 @@ func buildFacetModules(
 			byName[target.Name()] = target
 		}
 		owned := make(map[string]struct{})
+		representationDocuments := make(
+			[]gostdlib.ProviderRepresentationDocument,
+			0,
+			len(selectedRepresentations),
+		)
+		representations := make(
+			map[string]gostdlib.ProviderRepresentationDocument,
+			len(selectedRepresentations),
+		)
+		for _, seed := range selectedRepresentations {
+			target, ok := byName[seed.Export]
+			if !ok {
+				return nil, certifyError(
+					"build representation",
+					seed.Export,
+					"target export is absent",
+				)
+			}
+			representation, err := buildProviderRepresentation(
+				source,
+				seed,
+				target,
+				interfaceTargets,
+			)
+			if err != nil {
+				return nil, err
+			}
+			representationDocuments = append(
+				representationDocuments,
+				representation,
+			)
+			representations[representation.Export] = representation
+			owned[representation.Export] = struct{}{}
+		}
 		facets := make([]gostdlib.FacetDocument, 0, len(selected))
 		for _, seed := range selected {
-			facet, err := buildFacet(source, seed, byName)
+			facet, err := buildFacet(source, seed, byName, representations)
 			if err != nil {
 				return nil, err
 			}
@@ -62,6 +139,9 @@ func buildFacetModules(
 				}
 			}
 			facets = append(facets, facet)
+		}
+		if err := verifyRepresentationReferences(facets, representations); err != nil {
+			return nil, err
 		}
 		for name := range byName {
 			if _, ok := owned[name]; !ok {
@@ -80,9 +160,10 @@ func buildFacetModules(
 			return leftKey < rightKey
 		})
 		result = append(result, gostdlib.FacetModuleDocument{
-			Specifier:  specifier,
-			SourcePath: sourcePath,
-			Facets:     facets,
+			Specifier:       specifier,
+			SourcePath:      sourcePath,
+			Representations: representationDocuments,
+			Facets:          facets,
 		})
 	}
 	return result, nil
@@ -92,6 +173,7 @@ func buildFacet(
 	source goSurface,
 	seed facetSeed,
 	targets map[string]tsgo.ProjectExport,
+	representations map[string]gostdlib.ProviderRepresentationDocument,
 ) (gostdlib.FacetDocument, error) {
 	evidence, ok := source.objects[seed.SourceIdentity]
 	if !ok {
@@ -136,15 +218,29 @@ func buildFacet(
 		return gostdlib.FacetDocument{}, err
 	}
 	document := gostdlib.FacetDocument{
-		Kind:                seed.Kind,
-		SourceIdentity:      seed.SourceIdentity,
-		Capabilities:        append([]gostdlib.FacetCapability(nil), seed.Capabilities...),
-		ProfileKey:          seed.ProfileKey,
-		Export:              seed.Export,
-		StorageExport:       seed.StorageExport,
-		Effect:              seed.Effect,
-		ImplementationOwner: owner,
-		TargetFingerprint:   target.Fingerprint(),
+		Kind:                 seed.Kind,
+		SourceIdentity:       seed.SourceIdentity,
+		Capabilities:         append([]gostdlib.FacetCapability(nil), seed.Capabilities...),
+		ProfileKey:           seed.ProfileKey,
+		Export:               seed.Export,
+		StorageExport:        seed.StorageExport,
+		RepresentationExport: seed.RepresentationExport,
+		Effect:               seed.Effect,
+		ImplementationOwner:  owner,
+		TargetFingerprint:    target.Fingerprint(),
+	}
+	if seed.RepresentationExport != "" {
+		representation, ok := representations[seed.RepresentationExport]
+		if !ok || !slices.Contains(
+			representation.SourceTypes,
+			seed.SourceIdentity,
+		) {
+			return gostdlib.FacetDocument{}, certifyError(
+				"build facet",
+				seed.SourceIdentity,
+				"representation does not own the selected source type",
+			)
+		}
 	}
 	if seed.StorageExport == "" {
 		return document, nil
@@ -168,64 +264,301 @@ func buildFacet(
 	return document, nil
 }
 
-func validateFacetTarget(seed facetSeed, target tsgo.ProjectExport) error {
-	if seed.Kind != gostdlib.FacetNamedStructOperations {
-		return nil
-	}
-	for _, capability := range seed.Capabilities {
-		members, err := facetCapabilityMembers(capability)
-		if err != nil {
-			return err
+func providerInterfaceTargets(
+	config resolvedConfig,
+	project *tsgo.ProjectInspection,
+	representationSeeds []providerRepresentationSeed,
+	modules []gostdlib.ModuleDocument,
+) (map[string]tsgo.ProjectExport, error) {
+	needed := make(map[string]struct{})
+	for _, seed := range representationSeeds {
+		for _, identity := range seed.SourceInterfaces {
+			needed[identity] = struct{}{}
 		}
-		for _, member := range members {
-			if _, ok := target.ValueMember(member); !ok {
-				return certifyError(
-					"build facet",
-					seed.Export+"."+member,
-					"named-struct capability member is absent",
+	}
+	result := make(map[string]tsgo.ProjectExport, len(needed))
+	for _, module := range modules {
+		var selected []gostdlib.BindingDocument
+		for _, binding := range module.Bindings {
+			if _, required := needed[binding.Identity]; required {
+				selected = append(selected, binding)
+			}
+		}
+		if len(selected) == 0 {
+			continue
+		}
+		exports, err := project.Exports(filepath.Join(
+			config.providerRoot,
+			filepath.FromSlash(module.SourcePath),
+		))
+		if err != nil {
+			return nil, err
+		}
+		byName := make(map[string]tsgo.ProjectExport, len(exports))
+		for _, target := range exports {
+			byName[target.Name()] = target
+		}
+		for _, binding := range selected {
+			target, ok := byName[binding.Export]
+			if !ok || binding.Kind != gostdlib.BindingType ||
+				binding.Access != gostdlib.AccessExport ||
+				binding.Representation != gostdlib.RepresentationDirect {
+				return nil, certifyError(
+					"build representation",
+					binding.Identity,
+					"source interface has no direct provider type",
 				)
+			}
+			result[binding.Identity] = target
+		}
+	}
+	for identity := range needed {
+		if _, ok := result[identity]; !ok {
+			return nil, certifyError(
+				"build representation",
+				identity,
+				"source interface has no direct provider type",
+			)
+		}
+	}
+	return result, nil
+}
+
+func buildProviderRepresentation(
+	source goSurface,
+	seed providerRepresentationSeed,
+	target tsgo.ProjectExport,
+	interfaceTargets map[string]tsgo.ProjectExport,
+) (gostdlib.ProviderRepresentationDocument, error) {
+	implementationOwner, err := singleImplementationOwner(
+		seed.Export,
+		target.ImplementationOwners(),
+	)
+	if err != nil {
+		return gostdlib.ProviderRepresentationDocument{}, err
+	}
+	interfaces := make([]*types.Interface, 0, len(seed.SourceInterfaces))
+	expectedMembers := make(map[string]tsgo.ProjectMember)
+	for _, identity := range seed.SourceInterfaces {
+		evidence, ok := source.objects[identity]
+		if !ok {
+			return gostdlib.ProviderRepresentationDocument{}, certifyError(
+				"build representation",
+				identity,
+				"selected-Go interface is absent",
+			)
+		}
+		typeName, ok := evidence.object.(*types.TypeName)
+		if !ok {
+			return gostdlib.ProviderRepresentationDocument{}, certifyError(
+				"build representation",
+				identity,
+				"source interface owner is not a type",
+			)
+		}
+		selected, ok := typeName.Type().Underlying().(*types.Interface)
+		if !ok {
+			return gostdlib.ProviderRepresentationDocument{}, certifyError(
+				"build representation",
+				identity,
+				"source interface owner is not an interface",
+			)
+		}
+		interfaces = append(interfaces, selected.Complete())
+		interfaceTarget := interfaceTargets[identity]
+		for _, member := range interfaceTarget.TypeMembers() {
+			if !member.Visible() {
+				continue
+			}
+			if err := addRepresentationMember(
+				expectedMembers,
+				member,
+				identity,
+			); err != nil {
+				return gostdlib.ProviderRepresentationDocument{}, err
 			}
 		}
 	}
+	methodsByIdentity := make(
+		map[string]gostdlib.ProviderRepresentationMethodDocument,
+	)
+	methodByMember := make(map[string]*types.Func)
+	for _, identity := range seed.SourceTypes {
+		evidence, ok := source.objects[identity]
+		if !ok {
+			return gostdlib.ProviderRepresentationDocument{}, certifyError(
+				"build representation",
+				identity,
+				"selected-Go source type is absent",
+			)
+		}
+		typeName, ok := evidence.object.(*types.TypeName)
+		if !ok || typeName.IsAlias() || typeName.Exported() {
+			return gostdlib.ProviderRepresentationDocument{}, certifyError(
+				"build representation",
+				identity,
+				"represented source owner is not a private named type",
+			)
+		}
+		for _, contract := range interfaces {
+			if !types.Implements(typeName.Type(), contract) {
+				return gostdlib.ProviderRepresentationDocument{}, certifyError(
+					"build representation",
+					identity,
+					"source type does not implement a certified interface",
+				)
+			}
+		}
+		methodSet := types.NewMethodSet(typeName.Type())
+		for index := range methodSet.Len() {
+			method, ok := methodSet.At(index).Obj().(*types.Func)
+			if !ok || !method.Exported() {
+				continue
+			}
+			method = method.Origin()
+			contract, err := environmentcontract.Describe(method)
+			if err != nil {
+				return gostdlib.ProviderRepresentationDocument{}, err
+			}
+			methodEvidence, ok := source.objects[contract.Identity()]
+			if !ok {
+				return gostdlib.ProviderRepresentationDocument{}, certifyError(
+					"build representation",
+					contract.Identity(),
+					"selected-Go method evidence is absent",
+				)
+			}
+			targetMember, ok := target.TypeMember(method.Name())
+			if !ok || !targetMember.Visible() {
+				return gostdlib.ProviderRepresentationDocument{}, certifyError(
+					"build representation",
+					contract.Identity(),
+					"target method is absent",
+				)
+			}
+			if existing := methodByMember[method.Name()]; existing != nil &&
+				!methodidentity.Equivalent(existing, method) {
+				return gostdlib.ProviderRepresentationDocument{}, certifyError(
+					"build representation",
+					method.Name(),
+					"represented source methods have incompatible contracts",
+				)
+			}
+			methodByMember[method.Name()] = method
+			if err := addRepresentationMember(
+				expectedMembers,
+				targetMember,
+				contract.Identity(),
+			); err != nil {
+				return gostdlib.ProviderRepresentationDocument{}, err
+			}
+			owner, err := singleImplementationOwner(
+				method.Name(),
+				targetMember.ImplementationOwners(),
+			)
+			if err != nil {
+				return gostdlib.ProviderRepresentationDocument{}, err
+			}
+			document := gostdlib.ProviderRepresentationMethodDocument{
+				SourceIdentity:      contract.Identity(),
+				Member:              method.Name(),
+				SourceSignature:     contract.Signature(),
+				SourceLocation:      methodEvidence.location,
+				ImplementationOwner: owner,
+				TargetFingerprint:   targetMember.Fingerprint(),
+			}
+			if existing, duplicate := methodsByIdentity[contract.Identity()]; duplicate && existing != document {
+				return gostdlib.ProviderRepresentationDocument{}, certifyError(
+					"build representation",
+					contract.Identity(),
+					"method binding is inconsistent",
+				)
+			}
+			methodsByIdentity[contract.Identity()] = document
+		}
+	}
+	if err := verifyRepresentationTargetMembers(target, expectedMembers); err != nil {
+		return gostdlib.ProviderRepresentationDocument{}, err
+	}
+	methods := make(
+		[]gostdlib.ProviderRepresentationMethodDocument,
+		0,
+		len(methodsByIdentity),
+	)
+	for _, method := range methodsByIdentity {
+		methods = append(methods, method)
+	}
+	sort.Slice(methods, func(left, right int) bool {
+		return methods[left].SourceIdentity < methods[right].SourceIdentity
+	})
+	return gostdlib.ProviderRepresentationDocument{
+		Export:              seed.Export,
+		SourceTypes:         append([]string(nil), seed.SourceTypes...),
+		SourceInterfaces:    append([]string(nil), seed.SourceInterfaces...),
+		Methods:             methods,
+		ImplementationOwner: implementationOwner,
+		TargetFingerprint:   target.Fingerprint(),
+	}, nil
+}
+
+func addRepresentationMember(
+	members map[string]tsgo.ProjectMember,
+	member tsgo.ProjectMember,
+	subject string,
+) error {
+	existing, duplicate := members[member.Name()]
+	if duplicate && (existing.Flags() != member.Flags() ||
+		existing.TypeString() != member.TypeString()) {
+		return certifyError(
+			"build representation",
+			subject,
+			"target member contracts conflict",
+		)
+	}
+	members[member.Name()] = member
 	return nil
 }
 
-func facetCapabilityMembers(
-	capability gostdlib.FacetCapability,
-) ([]string, error) {
-	switch capability {
-	case gostdlib.FacetCapabilityMake:
-		return []string{"$make"}, nil
-	case gostdlib.FacetCapabilityZero:
-		return []string{"$zero"}, nil
-	case gostdlib.FacetCapabilityCopy:
-		return []string{"$copy"}, nil
-	case gostdlib.FacetCapabilityEqual:
-		return []string{"$equal"}, nil
-	case gostdlib.FacetCapabilityHash:
-		return []string{"$hash"}, nil
-	case gostdlib.FacetCapabilityConvert:
-		return []string{"$convert"}, nil
-	case gostdlib.FacetCapabilityStorage:
-		return []string{"$storageOf", "$fromStorage"}, nil
-	case gostdlib.FacetCapabilityAssign:
-		return []string{"$assign"}, nil
-	default:
-		return nil, certifyError(
-			"build facet",
-			string(capability),
-			"named-struct capability is invalid",
+func verifyRepresentationTargetMembers(
+	target tsgo.ProjectExport,
+	expected map[string]tsgo.ProjectMember,
+) error {
+	actual := make(map[string]tsgo.ProjectMember)
+	for _, member := range target.TypeMembers() {
+		if member.Visible() {
+			actual[member.Name()] = member
+		}
+	}
+	if len(actual) != len(expected) {
+		return certifyError(
+			"build representation",
+			target.Name(),
+			fmt.Sprintf(
+				"target has %d visible members, want %d",
+				len(actual),
+				len(expected),
+			),
 		)
 	}
-}
-
-func singleImplementationOwner(name string, owners []string) (string, error) {
-	if len(owners) != 1 {
-		return "", certifyError(
-			"build facet",
-			name,
-			fmt.Sprintf("target has %d implementation owners, want one", len(owners)),
-		)
+	for name, wanted := range expected {
+		got, ok := actual[name]
+		if !ok || got.Flags() != wanted.Flags() ||
+			got.TypeString() != wanted.TypeString() {
+			return certifyError(
+				"build representation",
+				name,
+				"target member contract does not exact-join its source",
+			)
+		}
 	}
-	return owners[0], nil
+	for _, member := range target.ValueMembers() {
+		if member.Visible() {
+			return certifyError(
+				"build representation",
+				target.Name(),
+				"representation target has a runtime value member",
+			)
+		}
+	}
+	return nil
 }

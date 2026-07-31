@@ -63,6 +63,13 @@ func BuildSpecialization(
 	if err != nil {
 		return Specialization{}, err
 	}
+	denseIndexReference, err := context.Names().Runtime(
+		api.RuntimeDenseIndex,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return Specialization{}, err
+	}
 	builder := specializationBuilder{
 		factory:        context.Factory(),
 		className:      className,
@@ -70,6 +77,7 @@ func BuildSpecialization(
 		storageKeyType: storageKeyType,
 		valueType:      valueType,
 		panicName:      panicReference.Name(),
+		denseIndexName: denseIndexReference.Name(),
 		zero:           operations.zero,
 		hash:           operations.hash,
 		equal:          operations.equal,
@@ -89,8 +97,12 @@ func BuildSpecialization(
 		return Specialization{}, err
 	}
 	return Specialization{
-		members:  members,
-		requests: api.CombineRequests(requests, panicReference.Requests()),
+		members: members,
+		requests: api.CombineRequests(
+			requests,
+			panicReference.Requests(),
+			denseIndexReference.Requests(),
+		),
 	}, nil
 }
 

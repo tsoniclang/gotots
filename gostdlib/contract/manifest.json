@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "packageName": "@gotots/gostdlib",
   "packageVersion": "0.0.0",
   "backend": "node",
@@ -9,7 +9,7 @@
   "goos": "linux",
   "goarch": "amd64",
   "runtimeDigest": "ae75219a3ca68c3dd5316af5372a357a4e1024c8fa54d3b1150acc110346f286",
-  "providerDigest": "d338756696c04eb1170d737f93254611e9025f715980e0242cb38245698f808f",
+  "providerDigest": "342ea0fb9818aeaa73d30af158efdeea2214f7382139f73d48508034d1a60c3b",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -309,7 +309,7 @@
           "sourceSignature": "defined=context.Context|underlying=interface{Deadline() (deadline time.Time, ok bool); Done() \u003c-chan struct{}; Err() error; Value(key any) any}",
           "sourceLocation": "context/context.go:71:6",
           "implementationOwner": "src/internal/portable/context/context.ts",
-          "targetFingerprint": "4b429921455c500942c5e1bae63d3c6cdf9814d2da3f429f45b8c9ea69061c49"
+          "targetFingerprint": "f7dd2c8b485e988e924da2855c5aad82ac8610893985380d3c7d2a85ae625548"
         },
         {
           "identity": "context|kind=3|receiver=|name=Canceled",
@@ -408,7 +408,7 @@
           "sourceSignature": "defined=encoding.TextMarshaler|underlying=interface{MarshalText() (text []byte, err error)}",
           "sourceLocation": "encoding/encoding.go:54:6",
           "implementationOwner": "src/encoding.ts",
-          "targetFingerprint": "7db02db6e0528e7952ae9b8285980434fa146ea71e99ab1e10918b4c895d8893"
+          "targetFingerprint": "c6714ab19358816838a095cfb18c2dbe5ead949fb98c36a82ce028acac7575db"
         }
       ]
     },
@@ -490,6 +490,17 @@
       "sourcePath": "src/encoding/binary.ts",
       "bindings": [
         {
+          "identity": "encoding/binary|kind=2|receiver=|name=AppendByteOrder",
+          "kind": "type",
+          "access": "export",
+          "representation": "direct",
+          "export": "AppendByteOrder",
+          "sourceSignature": "defined=encoding/binary.AppendByteOrder|underlying=interface{AppendUint16([]byte, uint16) []byte; AppendUint32([]byte, uint32) []byte; AppendUint64([]byte, uint64) []byte; String() string}",
+          "sourceLocation": "encoding/binary/binary.go:53:6",
+          "implementationOwner": "src/encoding/binary.ts",
+          "targetFingerprint": "611e3b7d26c5c92463b976136a7a7acbe6a57f25a1696c06f44a3561eec31c68"
+        },
+        {
           "identity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
           "kind": "type",
           "access": "export",
@@ -498,7 +509,7 @@
           "sourceSignature": "defined=encoding/binary.ByteOrder|underlying=interface{PutUint16([]byte, uint16); PutUint32([]byte, uint32); PutUint64([]byte, uint64); String() string; Uint16([]byte) uint16; Uint32([]byte) uint32; Uint64([]byte) uint64}",
           "sourceLocation": "encoding/binary/binary.go:39:6",
           "implementationOwner": "src/encoding/binary.ts",
-          "targetFingerprint": "9ce2c3389b14cc7c083108484c0ccbb3592f05bd0f81dd52d147f0f16856192e"
+          "targetFingerprint": "e1a96feaab994a260c0d902d1896639628985e43a40528b5b61442882743003b"
         },
         {
           "identity": "encoding/binary|kind=3|receiver=|name=BigEndian",
@@ -509,7 +520,7 @@
           "sourceSignature": "encoding/binary.bigEndian",
           "sourceLocation": "encoding/binary/binary.go:64:5",
           "implementationOwner": "src/encoding/binary.ts",
-          "targetFingerprint": "a694f2a98b6beba0da900f4a102d3e4efcb7da60904880d237adf86ac8e49edf"
+          "targetFingerprint": "7e8322e771ee9be9a97d0be860fb6252d663af7552a69cb03bc718e0baf52171"
         },
         {
           "identity": "encoding/binary|kind=3|receiver=|name=LittleEndian",
@@ -520,7 +531,7 @@
           "sourceSignature": "encoding/binary.littleEndian",
           "sourceLocation": "encoding/binary/binary.go:61:5",
           "implementationOwner": "src/encoding/binary.ts",
-          "targetFingerprint": "ce29750aefe21564cbe54be66cefc78f84df1255e001ddfa77668c5540493b90"
+          "targetFingerprint": "8ab38cdbb9a6258c433a56b26c27c8ed41e01cd319014ef4a9531d88f3f8d2be"
         },
         {
           "identity": "encoding/binary|kind=3|receiver=|name=NativeEndian",
@@ -531,7 +542,27 @@
           "sourceSignature": "encoding/binary.nativeEndian",
           "sourceLocation": "encoding/binary/native_endian_little.go:14:5",
           "implementationOwner": "src/encoding/binary.ts",
-          "targetFingerprint": "d1a3e52598d9f4ca4c7e424c7314d51b62e24270d3f477227745f0e92769a157"
+          "targetFingerprint": "a87de5475f8e380af93628d75e3f16825dc80c59f279ce11e35868c7371feff2"
+        },
+        {
+          "identity": "encoding/binary|kind=4|receiver=|name=Read",
+          "kind": "function",
+          "access": "export",
+          "export": "Read",
+          "sourceSignature": "func(r io.Reader, order encoding/binary.ByteOrder, data any) error|params=r,order,data|results=",
+          "sourceLocation": "encoding/binary/binary.go:258:6",
+          "implementationOwner": "src/encoding/binary.ts",
+          "targetFingerprint": "9cc25be62cf1729bdeed3beb74a0d68f8d38e25d3610c2baaffacdbb751dcb28"
+        },
+        {
+          "identity": "encoding/binary|kind=4|receiver=|name=Write",
+          "kind": "function",
+          "access": "export",
+          "export": "Write",
+          "sourceSignature": "func(w io.Writer, order encoding/binary.ByteOrder, data any) error|params=w,order,data|results=",
+          "sourceLocation": "encoding/binary/binary.go:410:6",
+          "implementationOwner": "src/encoding/binary.ts",
+          "targetFingerprint": "6e92692dfdf23a3e11914b772a9aee3b5d3f5ae04544db9d0c89bf06493c7a99"
         }
       ]
     },
@@ -557,6 +588,16 @@
       "specifier": "@gotots/gostdlib/errors.js",
       "sourcePath": "src/errors.ts",
       "bindings": [
+        {
+          "identity": "errors|kind=4|receiver=|name=AsType",
+          "kind": "function",
+          "access": "export",
+          "export": "AsType",
+          "sourceSignature": "func[E error](err error) (E, bool)|params=err|results=,",
+          "sourceLocation": "errors/wrap.go:167:6",
+          "implementationOwner": "src/errors.ts",
+          "targetFingerprint": "4daae606298df4e76c6979eb943e79c1d738f0c6f20a1047991269bc2ce41a68"
+        },
         {
           "identity": "errors|kind=4|receiver=|name=Is",
           "kind": "function",
@@ -676,7 +717,67 @@
           "sourceSignature": "defined=fmt.Stringer|underlying=interface{String() string}",
           "sourceLocation": "fmt/print.go:63:6",
           "implementationOwner": "src/fmt.ts",
-          "targetFingerprint": "a72fc43e99f55a64c36813d37d2b9d42549795aa2fd034dcf81214a56eaf5568"
+          "targetFingerprint": "0d4984ef177de49ae8157a5f61a8be505638b73ec66bb24d5837bdf49a032f09"
+        },
+        {
+          "identity": "fmt|kind=4|receiver=|name=Errorf",
+          "kind": "function",
+          "access": "export",
+          "export": "Errorf",
+          "sourceSignature": "func(format string, a ...any) (err error)|params=format,a|results=err",
+          "sourceLocation": "fmt/errors.go:23:6",
+          "implementationOwner": "src/fmt.ts",
+          "targetFingerprint": "dcbdc3a05c24fdfb75032ec5aff042c24918683cbeb37769bb9ea2d8e46765df"
+        },
+        {
+          "identity": "fmt|kind=4|receiver=|name=Fprint",
+          "kind": "function",
+          "access": "export",
+          "export": "Fprint",
+          "sourceSignature": "func(w io.Writer, a ...any) (n int, err error)|params=w,a|results=n,err",
+          "sourceLocation": "fmt/print.go:260:6",
+          "implementationOwner": "src/fmt.ts",
+          "targetFingerprint": "9fd4aa29278e1e28fb5e158b01b0f766b2060f6c07dc57c2d306867d08ac02aa"
+        },
+        {
+          "identity": "fmt|kind=4|receiver=|name=Fprintf",
+          "kind": "function",
+          "access": "export",
+          "export": "Fprintf",
+          "sourceSignature": "func(w io.Writer, format string, a ...any) (n int, err error)|params=w,format,a|results=n,err",
+          "sourceLocation": "fmt/print.go:222:6",
+          "implementationOwner": "src/fmt.ts",
+          "targetFingerprint": "a4bcc8c21083e88821f96fa1301c2b340155170a618f060e65d7400e18c8dc24"
+        },
+        {
+          "identity": "fmt|kind=4|receiver=|name=Fprintln",
+          "kind": "function",
+          "access": "export",
+          "export": "Fprintln",
+          "sourceSignature": "func(w io.Writer, a ...any) (n int, err error)|params=w,a|results=n,err",
+          "sourceLocation": "fmt/print.go:303:6",
+          "implementationOwner": "src/fmt.ts",
+          "targetFingerprint": "035127cddb03943aee0e2208030f4c50dee9724c5af55716fc98bf8c5c061dbb"
+        },
+        {
+          "identity": "fmt|kind=4|receiver=|name=Sprint",
+          "kind": "function",
+          "access": "export",
+          "export": "Sprint",
+          "sourceSignature": "func(a ...any) string|params=a|results=",
+          "sourceLocation": "fmt/print.go:277:6",
+          "implementationOwner": "src/fmt.ts",
+          "targetFingerprint": "4e61c8ed61c822df90fe35398e8198aa2d7203da708bece8d464f55801618d83"
+        },
+        {
+          "identity": "fmt|kind=4|receiver=|name=Sprintf",
+          "kind": "function",
+          "access": "export",
+          "export": "Sprintf",
+          "sourceSignature": "func(format string, a ...any) string|params=format,a|results=",
+          "sourceLocation": "fmt/print.go:237:6",
+          "implementationOwner": "src/fmt.ts",
+          "targetFingerprint": "73a1c53e5da9c4411130bccaf766f1a43aad699fe5f7aa9eecf44b5e39db9c32"
         }
       ]
     },
@@ -767,7 +868,7 @@
           "sourceSignature": "defined=io.Closer|underlying=interface{Close() error}",
           "sourceLocation": "io/io.go:107:6",
           "implementationOwner": "src/io.ts",
-          "targetFingerprint": "a8e0aaafa639ae086735b68b8df4cad5c2ac8d968ad1bb5d00127119172b2781"
+          "targetFingerprint": "01b09ec61d14422687a741a1d9444ef827a9fcf0af3530c5ecebe7066bf96692"
         },
         {
           "identity": "io|kind=2|receiver=|name=ReadCloser",
@@ -778,7 +879,7 @@
           "sourceSignature": "defined=io.ReadCloser|underlying=interface{io.Reader; io.Closer}",
           "sourceLocation": "io/io.go:137:6",
           "implementationOwner": "src/io.ts",
-          "targetFingerprint": "b61615349ef20c126665ceadea475e842bf7905b3286328f3b7e6dfe19394374"
+          "targetFingerprint": "6e80c9996aec153a663f0eb8e7dcd8169597092693f33e441c837bf4e705e53b"
         },
         {
           "identity": "io|kind=2|receiver=|name=ReadWriteCloser",
@@ -789,7 +890,7 @@
           "sourceSignature": "defined=io.ReadWriteCloser|underlying=interface{io.Reader; io.Writer; io.Closer}",
           "sourceLocation": "io/io.go:149:6",
           "implementationOwner": "src/io.ts",
-          "targetFingerprint": "f1d3aa252b01822105fba18d646443dc7dbb9b86bbd5cd29ab60ef736d8bd5dc"
+          "targetFingerprint": "18c51e122d1c886a14aeb3ba9612df7f328acebfa6614b7480f2626575430def"
         },
         {
           "identity": "io|kind=2|receiver=|name=ReadWriter",
@@ -800,7 +901,7 @@
           "sourceSignature": "defined=io.ReadWriter|underlying=interface{io.Reader; io.Writer}",
           "sourceLocation": "io/io.go:131:6",
           "implementationOwner": "src/io.ts",
-          "targetFingerprint": "0cb40eef55e54dc42432962611584860b13a20f9b83e2885f1f28ccbf61d89d1"
+          "targetFingerprint": "1a7e7e6f154f3c5f19ad2a8a52c481cef65539d6ffeff27058c927099e8d92bf"
         },
         {
           "identity": "io|kind=2|receiver=|name=Reader",
@@ -811,7 +912,7 @@
           "sourceSignature": "defined=io.Reader|underlying=interface{Read(p []byte) (n int, err error)}",
           "sourceLocation": "io/io.go:86:6",
           "implementationOwner": "src/io.ts",
-          "targetFingerprint": "7cc4d491bea14cac69306aa8996144cadd97996496d895149a95cabfae68b933"
+          "targetFingerprint": "4f1237ee506bc8ef40d0819fe451668e5615002e15f4877d19a40593102b9314"
         },
         {
           "identity": "io|kind=2|receiver=|name=WriteCloser",
@@ -822,7 +923,7 @@
           "sourceSignature": "defined=io.WriteCloser|underlying=interface{io.Writer; io.Closer}",
           "sourceLocation": "io/io.go:143:6",
           "implementationOwner": "src/io.ts",
-          "targetFingerprint": "212ed4539a68c5cb6950bd117b222eb59149b6ca0bd2ae0b42983652410e4293"
+          "targetFingerprint": "9e76e7fa03e054e6a9ae8cdf2d5f14c3aa49922b5e75166416c359e015ca7c63"
         },
         {
           "identity": "io|kind=2|receiver=|name=Writer",
@@ -833,7 +934,7 @@
           "sourceSignature": "defined=io.Writer|underlying=interface{Write(p []byte) (n int, err error)}",
           "sourceLocation": "io/io.go:99:6",
           "implementationOwner": "src/io.ts",
-          "targetFingerprint": "3546d193c8a8ad5c4290c5bbc42c0b4829a7c02ecd61927ca130d722c21c5608"
+          "targetFingerprint": "f0fb4d2e849e19bb2c5ae36294de8aeadd8578f6bf41bf07db5ca4ea1e1b596f"
         },
         {
           "identity": "io|kind=3|receiver=|name=Discard",
@@ -916,7 +1017,7 @@
           "sourceSignature": "defined=io/fs.DirEntry|underlying=interface{Info() (io/fs.FileInfo, error); IsDir() bool; Name() string; Type() io/fs.FileMode}",
           "sourceLocation": "io/fs/fs.go:103:6",
           "implementationOwner": "src/io/fs.ts",
-          "targetFingerprint": "2bccf12f305cebcacbad8329ccc66aecedc11d06ee5ff13053f4ce5b0c7d7273"
+          "targetFingerprint": "a1ce609c72da0efd34a2d17d1b1991985d7e85538cc0a64d4d834e4bd802d489"
         },
         {
           "identity": "io/fs|kind=2|receiver=|name=FS",
@@ -927,7 +1028,7 @@
           "sourceSignature": "defined=io/fs.FS|underlying=interface{Open(name string) (io/fs.File, error)}",
           "sourceLocation": "io/fs/fs.go:40:6",
           "implementationOwner": "src/io/fs.ts",
-          "targetFingerprint": "4237b1c073beec63404321ceb456f415859d459366157d50e771c75a92794302"
+          "targetFingerprint": "b80ade8c17078489c512d983224c3be8a1abd921542db0b28e2d3d94a7279c9c"
         },
         {
           "identity": "io/fs|kind=2|receiver=|name=File",
@@ -938,7 +1039,7 @@
           "sourceSignature": "defined=io/fs.File|underlying=interface{Close() error; Read([]byte) (int, error); Stat() (io/fs.FileInfo, error)}",
           "sourceLocation": "io/fs/fs.go:95:6",
           "implementationOwner": "src/io/fs.ts",
-          "targetFingerprint": "ef9fdceef14ec5958889406b6d672a601cdfbdfe8335512b192e4d457153b5fa"
+          "targetFingerprint": "6a1ac11db92e76f9a9baac708c90ec0b1363813264bd0308e487073520e01753"
         },
         {
           "identity": "io/fs|kind=2|receiver=|name=FileInfo",
@@ -949,7 +1050,7 @@
           "sourceSignature": "defined=io/fs.FileInfo|underlying=interface{IsDir() bool; ModTime() time.Time; Mode() io/fs.FileMode; Name() string; Size() int64; Sys() any}",
           "sourceLocation": "io/fs/fs.go:168:6",
           "implementationOwner": "src/io/fs.ts",
-          "targetFingerprint": "dd3c974eeecdb61edd48813f8b59daf14d59a7aa573f5af5eba5ab087d7f6bb5"
+          "targetFingerprint": "d46fdb45296a7a52f4a5fd235c115e6a4df5eff304c8d074eded7f3ac3cc3efd"
         },
         {
           "identity": "io/fs|kind=2|receiver=|name=FileMode",
@@ -971,7 +1072,7 @@
           "sourceSignature": "defined=io/fs.PathError|underlying=struct{Op string; Path string; Err error}",
           "sourceLocation": "io/fs/fs.go:261:6",
           "implementationOwner": "src/io/fs.ts",
-          "targetFingerprint": "06b0a94fc3891960b6bc7d21f2af6a2169f1e714bd4fd3a450d7ad3226cb878f"
+          "targetFingerprint": "72eeac891431aaadfb1b46a8f667dfaf559b745d8a678fc39e7d036f75c6014a"
         },
         {
           "identity": "io/fs|kind=2|receiver=|name=WalkDirFunc",
@@ -1202,6 +1303,16 @@
       "specifier": "@gotots/gostdlib/maps.js",
       "sourcePath": "src/maps.ts",
       "bindings": [
+        {
+          "identity": "maps|kind=4|receiver=|name=Clone",
+          "kind": "function",
+          "access": "export",
+          "export": "Clone",
+          "sourceSignature": "func[M ~map[K]V, K comparable, V any](m M) M|params=m|results=",
+          "sourceLocation": "maps/maps.go:50:6",
+          "implementationOwner": "src/internal/portable/maps/operations.ts",
+          "targetFingerprint": "924c7c643831bc2ec41019b1a6d7db3e7f3e69a927cecab4b2ca5d11107dd98d"
+        },
         {
           "identity": "maps|kind=4|receiver=|name=Copy",
           "kind": "function",
@@ -1675,6 +1786,16 @@
           "sourceLocation": "net/net.go:412:6",
           "implementationOwner": "src/net.ts",
           "targetFingerprint": "a156981eaf67070b80c246d5704268dd3dee288a70c2493f422cce8a4fc293a0"
+        },
+        {
+          "identity": "net|kind=4|receiver=|name=Listen",
+          "kind": "function",
+          "access": "export",
+          "export": "Listen",
+          "sourceSignature": "func(network string, address string) (net.Listener, error)|params=network,address|results=,",
+          "sourceLocation": "net/dial.go:966:6",
+          "implementationOwner": "src/net.ts",
+          "targetFingerprint": "1b4b320ab2d6d271f0066e01c7153a1691c167de3978d209f8471e782cd4298b"
         }
       ]
     },
@@ -1743,6 +1864,50 @@
       "sourcePath": "src/os.ts",
       "bindings": [
         {
+          "identity": "os|kind=1|receiver=|name=O_APPEND",
+          "kind": "constant",
+          "access": "export",
+          "export": "O_APPEND",
+          "sourceSignature": "int",
+          "sourceValue": "1024",
+          "sourceLocation": "os/file.go:85:2",
+          "implementationOwner": "src/os.ts",
+          "targetFingerprint": "5bab6030623148a49ee911160aeecda194b1e8c92e78238afa1109efab9a8ae2"
+        },
+        {
+          "identity": "os|kind=1|receiver=|name=O_CREATE",
+          "kind": "constant",
+          "access": "export",
+          "export": "O_CREATE",
+          "sourceSignature": "int",
+          "sourceValue": "64",
+          "sourceLocation": "os/file.go:86:2",
+          "implementationOwner": "src/os.ts",
+          "targetFingerprint": "2d2f9a1987f4c740551ff941b134ccbd96c9c1360cb6180fb15e47b74ea2ff8e"
+        },
+        {
+          "identity": "os|kind=1|receiver=|name=O_TRUNC",
+          "kind": "constant",
+          "access": "export",
+          "export": "O_TRUNC",
+          "sourceSignature": "int",
+          "sourceValue": "512",
+          "sourceLocation": "os/file.go:89:2",
+          "implementationOwner": "src/os.ts",
+          "targetFingerprint": "6a0a3abc460ca0e5266cf99695f6f3cd610bd8eb00e0adb43fd93b6aa7a03bed"
+        },
+        {
+          "identity": "os|kind=1|receiver=|name=O_WRONLY",
+          "kind": "constant",
+          "access": "export",
+          "export": "O_WRONLY",
+          "sourceSignature": "int",
+          "sourceValue": "1",
+          "sourceLocation": "os/file.go:82:2",
+          "implementationOwner": "src/os.ts",
+          "targetFingerprint": "35f93578ff94af24ca8b9e23a455ea297a403180b917d7b4892a85a1e48a6764"
+        },
+        {
           "identity": "os|kind=2|receiver=|name=File",
           "kind": "type",
           "access": "export",
@@ -1752,6 +1917,17 @@
           "sourceLocation": "os/types.go:18:6",
           "implementationOwner": "src/os.ts",
           "targetFingerprint": "a3c316375f339daa06138400e9edadf3299052fc55c373f41dda36f3906885a3"
+        },
+        {
+          "identity": "os|kind=2|receiver=|name=PathError",
+          "kind": "type",
+          "access": "export",
+          "representation": "direct",
+          "export": "PathError",
+          "sourceSignature": "defined=os.PathError|underlying=struct{Op string; Path string; Err error}",
+          "sourceLocation": "os/error.go:46:6",
+          "implementationOwner": "src/io/fs.ts",
+          "targetFingerprint": "769d105eb6c8c87cec323f526d8bcc631be55b6dc073bd7cfb8e9b9315938eeb"
         },
         {
           "identity": "os|kind=2|receiver=|name=Process",
@@ -2274,7 +2450,7 @@
           "sourceValue": "17",
           "sourceLocation": "reflect/type.go:318:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "a0644ebdf8487f75e591147e639d43b04ebe5946768761acc1dba181e5cadbb8"
+          "targetFingerprint": "5e93a98896ef893da934cedde1aecb1e016d98eb522f31aa55c58e0600ab9345"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Bool",
@@ -2285,7 +2461,51 @@
           "sourceValue": "1",
           "sourceLocation": "reflect/type.go:302:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "c1f9617e1af084462fd06c0480486a3041e85fd2b514a49f7bf54cda4a7ad6df"
+          "targetFingerprint": "c17f87c63e2ccb202c1214292e44269627d7d3d14544532d251eb0d3a03512de"
+        },
+        {
+          "identity": "reflect|kind=1|receiver=|name=Chan",
+          "kind": "constant",
+          "access": "export",
+          "export": "Chan",
+          "sourceSignature": "reflect.Kind",
+          "sourceValue": "18",
+          "sourceLocation": "reflect/type.go:319:2",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "1991243a2c634415d545c9ea77aad54d119c8ae81b8498d276145d456aead45e"
+        },
+        {
+          "identity": "reflect|kind=1|receiver=|name=Complex128",
+          "kind": "constant",
+          "access": "export",
+          "export": "Complex128",
+          "sourceSignature": "reflect.Kind",
+          "sourceValue": "16",
+          "sourceLocation": "reflect/type.go:317:2",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "a9c07d4f5059d3d2d367c494b1b10ee7484c728a88b7f8971cd74c69a63489a7"
+        },
+        {
+          "identity": "reflect|kind=1|receiver=|name=Complex64",
+          "kind": "constant",
+          "access": "export",
+          "export": "Complex64",
+          "sourceSignature": "reflect.Kind",
+          "sourceValue": "15",
+          "sourceLocation": "reflect/type.go:316:2",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "eafbb585320b018620bb2c3f2b2d7160d8421bc4a1a8dd5240985b412efde579"
+        },
+        {
+          "identity": "reflect|kind=1|receiver=|name=Float32",
+          "kind": "constant",
+          "access": "export",
+          "export": "Float32",
+          "sourceSignature": "reflect.Kind",
+          "sourceValue": "13",
+          "sourceLocation": "reflect/type.go:314:2",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "82a709e1e073043608f393bf42ca42735ae405ca17bf25d85f1732d275d1a0c4"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Float64",
@@ -2296,7 +2516,18 @@
           "sourceValue": "14",
           "sourceLocation": "reflect/type.go:315:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "0f261d04423e2c3e59e337be9360b051c374498bb9365728991c34989dce388e"
+          "targetFingerprint": "332573cae94b93435d4f6141319e3398341b9787e27e8df7a302421fb9f2eed8"
+        },
+        {
+          "identity": "reflect|kind=1|receiver=|name=Func",
+          "kind": "constant",
+          "access": "export",
+          "export": "Func",
+          "sourceSignature": "reflect.Kind",
+          "sourceValue": "19",
+          "sourceLocation": "reflect/type.go:320:2",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "1fe64ee7558053dd7be0ae9cf4506fc47cae91ca4347be6fdf818e1f24bd09a0"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Int",
@@ -2307,7 +2538,7 @@
           "sourceValue": "2",
           "sourceLocation": "reflect/type.go:303:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "795623cb57643ff75c28e17d7cdcff8894f2c6773d666f91e356d622c6a4ace9"
+          "targetFingerprint": "01cacf66f13a715f81cc89412b09117d39663811c2d2f4ca4c9ea7cb8215fac5"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Int16",
@@ -2318,7 +2549,7 @@
           "sourceValue": "4",
           "sourceLocation": "reflect/type.go:305:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "50ccf2abeb817c7288738c4acf2a8e5f69eb623e0af856ba2993a7ea9901d74a"
+          "targetFingerprint": "ccb50c70d452b065d9117a3f0b9e04bf5c354b8f031f73c0c8522331074d0231"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Int32",
@@ -2329,7 +2560,7 @@
           "sourceValue": "5",
           "sourceLocation": "reflect/type.go:306:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "551d7ad933e9422287eb95e9a5268baa8ce30fc29b8f614421a78161c3577d33"
+          "targetFingerprint": "39c4fbf9ab18a1f6ef95c852cd24c735581256a1d92a8d7b2e640c07d60a37ce"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Int64",
@@ -2340,7 +2571,7 @@
           "sourceValue": "6",
           "sourceLocation": "reflect/type.go:307:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "f026eba3075baba96bc73ee96be388af56336240680aa5fee572e052f16ac997"
+          "targetFingerprint": "b6d99f33b92f60619fb603fa9ff1f42c05867dead31332d285985fcb396afe4c"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Int8",
@@ -2351,7 +2582,29 @@
           "sourceValue": "3",
           "sourceLocation": "reflect/type.go:304:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "28e81ec4201ea26c9f30a1b107463efa39c2845f22fcba63394377d2e8ea1699"
+          "targetFingerprint": "7c3b8bb5f96606e8472ad48ea826bfb7a702fb970067b4ef772d31718806aee0"
+        },
+        {
+          "identity": "reflect|kind=1|receiver=|name=Interface",
+          "kind": "constant",
+          "access": "export",
+          "export": "Interface",
+          "sourceSignature": "reflect.Kind",
+          "sourceValue": "20",
+          "sourceLocation": "reflect/type.go:321:2",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "e6c00bfc3990b53d743da7c7f2b2caa8f5ec31a288b0529bc9357f2abfe934a5"
+        },
+        {
+          "identity": "reflect|kind=1|receiver=|name=Invalid",
+          "kind": "constant",
+          "access": "export",
+          "export": "Invalid",
+          "sourceSignature": "reflect.Kind",
+          "sourceValue": "0",
+          "sourceLocation": "reflect/type.go:301:2",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "848cb51b06925680940abc937101971353aa7bb4e86a62387593ee030dd81355"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Map",
@@ -2362,7 +2615,29 @@
           "sourceValue": "21",
           "sourceLocation": "reflect/type.go:322:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "30279a92ccc9a1a740b4fa26d0903984e040343b47a89563720c25eb10daf250"
+          "targetFingerprint": "d023e92d4ade93434ffeff580c015a31ecc8fb910d561eaa3ae85c337cf731e7"
+        },
+        {
+          "identity": "reflect|kind=1|receiver=|name=Pointer",
+          "kind": "constant",
+          "access": "export",
+          "export": "Pointer",
+          "sourceSignature": "reflect.Kind",
+          "sourceValue": "22",
+          "sourceLocation": "reflect/type.go:323:2",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "a5ccd770a61e198db9c874c7e51330fb7dfa321a3999fd967f6f6ce8f433cec7"
+        },
+        {
+          "identity": "reflect|kind=1|receiver=|name=Ptr",
+          "kind": "constant",
+          "access": "export",
+          "export": "Ptr",
+          "sourceSignature": "reflect.Kind",
+          "sourceValue": "22",
+          "sourceLocation": "reflect/type.go:333:7",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "dd8f88c21d58922aa8181e49a2ee3f5ebcc30fc8938948a004cd144171978649"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Slice",
@@ -2373,7 +2648,7 @@
           "sourceValue": "23",
           "sourceLocation": "reflect/type.go:324:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "f5716a5c51727588d258c133bb7ea5d65f452b20ace8aa9fc288f1c65a23ab81"
+          "targetFingerprint": "412ae4089983890d89d506f46260f7ae7b9a189c50a3b927513b98f7afce2806"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=String",
@@ -2384,7 +2659,7 @@
           "sourceValue": "24",
           "sourceLocation": "reflect/type.go:325:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "2ce21dfbe8d63423f08004e05e5f3df8a88345ac688e299fe78238b37dcb64cf"
+          "targetFingerprint": "7893e682b2693333b738a9c8445a41cefd50b02c082f9cbac97a70aee89b6c39"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Struct",
@@ -2395,7 +2670,7 @@
           "sourceValue": "25",
           "sourceLocation": "reflect/type.go:326:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "e532aeb23a9fcf842350d296e1cf13ce108502727158fe5954f844c5fa13b80b"
+          "targetFingerprint": "9e9c412b78f88c8b214c1ea94d0563d790f15311564d4abb6104993100946d14"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Uint",
@@ -2406,7 +2681,7 @@
           "sourceValue": "7",
           "sourceLocation": "reflect/type.go:308:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "c472120d4b60182b8b85d68337b52737dee98e82add082f1dd0280ea97ab2eb6"
+          "targetFingerprint": "d7b4660c8051b3d3a18ee5ddb30d9668b84b11aec1eacbf5c856a408ba886e05"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Uint16",
@@ -2417,7 +2692,7 @@
           "sourceValue": "9",
           "sourceLocation": "reflect/type.go:310:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "05c085a9177f814e48211f8dacb167729c0c1f24a88f61ce886c28c11c0372ec"
+          "targetFingerprint": "3b9f03fae4787264479c974006ac6938bc826f1e759751aedeeac23e53ddf7f0"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Uint32",
@@ -2428,7 +2703,7 @@
           "sourceValue": "10",
           "sourceLocation": "reflect/type.go:311:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "eb5ae97deed7b11e458c40c6293f833440492f01ccdf2e58c4a82324ce774a0c"
+          "targetFingerprint": "dc24d92398c097cce7c8d1f4aeb12eb401beff0dcd6afeda9ef96adcb2141111"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Uint64",
@@ -2439,7 +2714,7 @@
           "sourceValue": "11",
           "sourceLocation": "reflect/type.go:312:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "1302987bc85e9218a9cbae87465718f75c7cd62f1dae019f2d380caa5fc08305"
+          "targetFingerprint": "7f78784c1065d582baac0e2d5c00298343038ef7e80389205c4205a7176bd484"
         },
         {
           "identity": "reflect|kind=1|receiver=|name=Uint8",
@@ -2450,7 +2725,29 @@
           "sourceValue": "8",
           "sourceLocation": "reflect/type.go:309:2",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "27bf8ddca1971c04348f7ead5494dc497aaaafc40c889c19d8a9a5c9b91f5076"
+          "targetFingerprint": "96e65b2b32cde7f3787c439cf5ff3549e95ddf02d443a1db777e554cf0b9714f"
+        },
+        {
+          "identity": "reflect|kind=1|receiver=|name=Uintptr",
+          "kind": "constant",
+          "access": "export",
+          "export": "Uintptr",
+          "sourceSignature": "reflect.Kind",
+          "sourceValue": "12",
+          "sourceLocation": "reflect/type.go:313:2",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "6497f5ca547e7413f44b221c9909216e1c72010079096a94f1832eee24b02deb"
+        },
+        {
+          "identity": "reflect|kind=1|receiver=|name=UnsafePointer",
+          "kind": "constant",
+          "access": "export",
+          "export": "UnsafePointer",
+          "sourceSignature": "reflect.Kind",
+          "sourceValue": "26",
+          "sourceLocation": "reflect/type.go:327:2",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "405b0eb2a796fa81374a6c6a7a56fadd79f90f00bff5a4eaa98e17e669f228a0"
         },
         {
           "identity": "reflect|kind=2|receiver=|name=ChanDir",
@@ -2472,7 +2769,18 @@
           "sourceSignature": "defined=reflect.Kind|underlying=uint",
           "sourceLocation": "reflect/type.go:298:6",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "03ce92d2bbb96f01cc307f5d9299eabd8ebf9091b0caa2641fde6cfbef1dabfa"
+          "targetFingerprint": "3fc1725f177ea3148487f54961a995c1e9287697b7f1a0c5813d55a7afd28b07"
+        },
+        {
+          "identity": "reflect|kind=2|receiver=|name=MapIter",
+          "kind": "type",
+          "access": "export",
+          "representation": "direct",
+          "export": "MapIter",
+          "sourceSignature": "defined=reflect.MapIter|underlying=struct{m reflect.Value; hiter internal/runtime/maps.Iter}",
+          "sourceLocation": "reflect/map.go:239:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "fb041812ca635e7effb657d53cbe576fb615413fba3fc24951057da2a2c51e9d"
         },
         {
           "identity": "reflect|kind=2|receiver=|name=Method",
@@ -2505,7 +2813,7 @@
           "sourceSignature": "defined=reflect.StructTag|underlying=string",
           "sourceLocation": "reflect/type.go:1110:6",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "b5971944cf70cb0fcd1d5806b6a3fb89b65920557a21d8784ec1e074f731653a"
+          "targetFingerprint": "9c16decdc5eba849252c39f99fe871573d21b329c6151f2bfa03ac13e3971fc2"
         },
         {
           "identity": "reflect|kind=2|receiver=|name=Type",
@@ -2527,7 +2835,51 @@
           "sourceSignature": "defined=reflect.Value|underlying=struct{typ_ *internal/abi.Type; ptr unsafe.Pointer; reflect.flag}",
           "sourceLocation": "reflect/value.go:40:6",
           "implementationOwner": "src/reflect.ts",
-          "targetFingerprint": "3e9644e58092d5b3b880be2d7d69a5c4e43396bc893ceeb2cf46fb709dacd839"
+          "targetFingerprint": "f2842b04a07d6181d1b9b31926df52e766f8b7ea86bddc55ca89ac73ca5e0c72"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=*reflect.MapIter|name=Key",
+          "kind": "function",
+          "access": "static-method",
+          "export": "MapIter",
+          "member": "Key",
+          "sourceSignature": "func() reflect.Value|params=|results=",
+          "sourceLocation": "reflect/map.go:245:22",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "c005ee78cd60c5ebec879ee7481d6de44a84668bcefceab290dd6f322e866fe6"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=*reflect.MapIter|name=Next",
+          "kind": "function",
+          "access": "static-method",
+          "export": "MapIter",
+          "member": "Next",
+          "sourceSignature": "func() bool|params=|results=",
+          "sourceLocation": "reflect/map.go:335:22",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "abe95a1109146d23c223496d0e9d6319f922b26d472e834e2b0c7eb0d79553ae"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=*reflect.MapIter|name=Value",
+          "kind": "function",
+          "access": "static-method",
+          "export": "MapIter",
+          "member": "Value",
+          "sourceSignature": "func() reflect.Value|params=|results=",
+          "sourceLocation": "reflect/map.go:289:22",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "7470b240188f93c48edf0dd6dd4b7fcdb59fcc31f8d8ef0364bee1507a8c4af6"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Kind|name=String",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Kind",
+          "member": "String",
+          "sourceSignature": "func() string|params=|results=",
+          "sourceLocation": "reflect/type.go:492:15",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "83df6414adb7776d41e508393b4d56f6d8faa5e81eb34ea7ca2435dc31e63db9"
         },
         {
           "identity": "reflect|kind=4|receiver=reflect.StructField|name=IsExported",
@@ -2550,6 +2902,575 @@
           "sourceLocation": "reflect/type.go:1117:22",
           "implementationOwner": "src/reflect.ts",
           "targetFingerprint": "4068f24655cd7d061c048de9d7144e06ef1cc5908044a824ce26e308037a5b86"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.StructTag|name=Lookup",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "StructTag",
+          "member": "Lookup",
+          "sourceSignature": "func(key string) (value string, ok bool)|params=key|results=value,ok",
+          "sourceLocation": "reflect/type.go:1128:22",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "c8544412b4c1477650679f5455627c57d341cec27869c7a72477f914b6f9c67e"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Addr",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Addr",
+          "sourceSignature": "func() reflect.Value|params=|results=",
+          "sourceLocation": "reflect/value.go:269:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "6929563fae79a54890184640a0bde93dd67c02fa1818bce72c4b3c4bfbbcc548"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Bool",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Bool",
+          "sourceSignature": "func() bool|params=|results=",
+          "sourceLocation": "reflect/value.go:281:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "6eff503e5e17ec653dda188eb433a35f4c658726b961573ed9d1fbb337b92abd"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Bytes",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Bytes",
+          "sourceSignature": "func() []byte|params=|results=",
+          "sourceLocation": "reflect/value.go:298:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "14f68b1ab9aa1ec3f8d8cdae4cad8bb6746b32a1416fafc0472ecfb602ba1d6a"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=CanInt",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "CanInt",
+          "sourceSignature": "func() bool|params=|results=",
+          "sourceLocation": "reflect/value.go:1445:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "93dcb7965f590bad189bcf9191e08616e1caa5fbf6df5351528e908b5521bdd9"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=CanSet",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "CanSet",
+          "sourceSignature": "func() bool|params=|results=",
+          "sourceLocation": "reflect/value.go:353:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "c301a27969d2d8e6ccafb888a7160ba0e5382c51b52f3667f2eca8d52e4c023a"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Cap",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Cap",
+          "sourceSignature": "func() int|params=|results=",
+          "sourceLocation": "reflect/value.go:1155:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "9ac41c6c8267a807bd0af4ce178f6696669c326fa67b5a7be4800b6f11f5efb8"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Convert",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Convert",
+          "sourceSignature": "func(t reflect.Type) reflect.Value|params=t|results=",
+          "sourceLocation": "reflect/value.go:3221:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "9051d03f961d909d6cbed29c878fe4018d52de1611181553d26787489145f9be"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Elem",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Elem",
+          "sourceSignature": "func() reflect.Value|params=|results=",
+          "sourceLocation": "reflect/value.go:1220:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "19faf9f0bf4459bf7e8c4976988ce224c4d3dda7a68d67df1213e8410712a822"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Field",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Field",
+          "sourceSignature": "func(i int) reflect.Value|params=i|results=",
+          "sourceLocation": "reflect/value.go:1264:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "72f3b7d8ba4d0c684a8b1f60087b8555d450f36637b01ec3a5a88c6c17001acf"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Float",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Float",
+          "sourceSignature": "func() float64|params=|results=",
+          "sourceLocation": "reflect/value.go:1385:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "d13d15a5958b59a332b62996cffdb0161a70bf5042945cc6b8ea7b9dde10fc6f"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Grow",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Grow",
+          "sourceSignature": "func(n int)|params=n|results=",
+          "sourceLocation": "reflect/value.go:2730:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "71253a4f9a15b04d9be2a4a2a4a2a8d6f96129915dd53e6a9552c480eada9542"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Index",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Index",
+          "sourceSignature": "func(i int) reflect.Value|params=i|results=",
+          "sourceLocation": "reflect/value.go:1400:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "66de072ac5bf81539674cc67b9668dafdae1a7274865f1e36bf3edae4e0c8620"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Int",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Int",
+          "sourceSignature": "func() int64|params=|results=",
+          "sourceLocation": "reflect/value.go:1456:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "bda1cc79607e51119248eecd3a778dadfb1c7f27a42b31c6306432bdefa7a488"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Interface",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Interface",
+          "sourceSignature": "func() (i any)|params=|results=i",
+          "sourceLocation": "reflect/value.go:1489:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "3b0f3213bfdee20aee9f7e7c9b07e92a154c291b6c29663f8b4e08b82f1be3b3"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=IsNil",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "IsNil",
+          "sourceSignature": "func() bool|params=|results=",
+          "sourceLocation": "reflect/value.go:1632:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "a81af9305b5a20fc2b1e56264552438643b9f0dc5baa1ff92ce9d472f6922bb7"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=IsValid",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "IsValid",
+          "sourceSignature": "func() bool|params=|results=",
+          "sourceLocation": "reflect/value.go:1657:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "8db5249a5f2f9a2a8bbdc0adfd96544a05343c62392a5ff9a6bc77ef2db673a4"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=IsZero",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "IsZero",
+          "sourceSignature": "func() bool|params=|results=",
+          "sourceLocation": "reflect/value.go:1663:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "825adc1498a1d9c243ed91e83de3005b6eaa61f9d2bbf838d76da142e5e424c0"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Kind",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Kind",
+          "sourceSignature": "func() reflect.Kind|params=|results=",
+          "sourceLocation": "reflect/value.go:1844:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "fb66415cc18867eb3f77a2dbf340165e9c859c249a51e8a89dce9bc5db0149f6"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Len",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Len",
+          "sourceSignature": "func() int|params=|results=",
+          "sourceLocation": "reflect/value.go:1850:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "85c5848fc2f4fb7a0e6d825253f0e69e66fa1b39e0dc97dd0de45b4320afc053"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=MapIndex",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "MapIndex",
+          "sourceSignature": "func(key reflect.Value) reflect.Value|params=key|results=",
+          "sourceLocation": "reflect/map.go:139:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "7f59955c6bf9eb280c5682debd15eb140722b54da37769fa0cbff0592f90289d"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=MapRange",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "MapRange",
+          "sourceSignature": "func() *reflect.MapIter|params=|results=",
+          "sourceLocation": "reflect/map.go:379:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "fe4a05dcf7913140c246d2d1dd001f6e9384f6428e43f075d847a12657bab641"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=NumField",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "NumField",
+          "sourceSignature": "func() int|params=|results=",
+          "sourceLocation": "reflect/value.go:1955:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "0c8937ba14a71332bdb39bdfc4848e634a2b3182f4b383cc036a002690838edb"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Set",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Set",
+          "sourceSignature": "func(x reflect.Value)|params=x|results=",
+          "sourceLocation": "reflect/value.go:2151:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "316c121c56accd98c8a988e8c9c1ae4d3883a6c31fd9d7505c082341a3d20b8a"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=SetBool",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "SetBool",
+          "sourceSignature": "func(x bool)|params=x|results=",
+          "sourceLocation": "reflect/value.go:2172:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "439573d1a8fd1ab5d996b8efb94a1529ffc769a0c93b71fa233e95099f7f6c97"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=SetBytes",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "SetBytes",
+          "sourceSignature": "func(x []byte)|params=x|results=",
+          "sourceLocation": "reflect/value.go:2181:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "29675dc58cdf51b9b2a4ab5b24845e97e15af50f8a271f4d5eafb208a8a868b0"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=SetFloat",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "SetFloat",
+          "sourceSignature": "func(x float64)|params=x|results=",
+          "sourceLocation": "reflect/value.go:2220:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "ceffa5b28fa8b8896e4521ede2108a683da33b870402944a46bf7c1a463a111a"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=SetInt",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "SetInt",
+          "sourceSignature": "func(x int64)|params=x|results=",
+          "sourceLocation": "reflect/value.go:2235:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "5ce19c1900c728171ddbbbae62e42b7c374e3b52487b57d5b86c8d1b639ee763"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=SetIterKey",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "SetIterKey",
+          "sourceSignature": "func(iter *reflect.MapIter)|params=iter|results=",
+          "sourceLocation": "reflect/map.go:264:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "9432041f7a5b15cedccadbfee005198a978ddb5b3cca7554ff960ab89d5b3d4b"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=SetIterValue",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "SetIterValue",
+          "sourceSignature": "func(iter *reflect.MapIter)|params=iter|results=",
+          "sourceLocation": "reflect/map.go:308:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "1cd06dfe04aae116288353bb7cfde4c5ddff83e4021e56df149f41200b3ba88a"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=SetLen",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "SetLen",
+          "sourceSignature": "func(n int)|params=n|results=",
+          "sourceLocation": "reflect/value.go:2257:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "7a1d15972e7d1a4f7f07be1e1d8e5a554510a0692422120d16a5f2c41224cd8f"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=SetMapIndex",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "SetMapIndex",
+          "sourceSignature": "func(key reflect.Value, elem reflect.Value)|params=key,elem|results=",
+          "sourceLocation": "reflect/map.go:396:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "ac0d11e651bfcf7bfeaf53a4d3691efb9e02cabf9369bfe6755b5e3c2dfbdf1a"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=SetString",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "SetString",
+          "sourceSignature": "func(x string)|params=x|results=",
+          "sourceLocation": "reflect/value.go:2315:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "f7d63ba335563fac77c753a7a8f19b59a1505b932206e5ab9ff8016ed1475180"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=SetUint",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "SetUint",
+          "sourceSignature": "func(x uint64)|params=x|results=",
+          "sourceLocation": "reflect/value.go:2284:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "f7a6b75f4241e1f5d0209c5ebaed464495b8a3b6eacabd5b69b36f14ec6f1471"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=SetZero",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "SetZero",
+          "sourceSignature": "func()|params=|results=",
+          "sourceLocation": "reflect/value.go:1790:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "32bb0c655db66afac39829e9f452be8c25790abf807a458f74be388bf20cd6dd"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=String",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "String",
+          "sourceSignature": "func() string|params=|results=",
+          "sourceLocation": "reflect/value.go:2441:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "83df6414adb7776d41e508393b4d56f6d8faa5e81eb34ea7ca2435dc31e63db9"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Type",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Type",
+          "sourceSignature": "func() reflect.Type|params=|results=",
+          "sourceLocation": "reflect/value.go:2480:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "f8e593b31a022c321e13a3de1e4c5bdf9d0f2535848bef8a0ba15b059f6b7f88"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=Uint",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "Uint",
+          "sourceSignature": "func() uint64|params=|results=",
+          "sourceLocation": "reflect/value.go:2542:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "e1b082acfbc0b80c0b50a0d2e85421eb6563c27e6d1c353fdb89e208b269abe1"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=reflect.Value|name=UnsafePointer",
+          "kind": "function",
+          "access": "instance-method",
+          "export": "Value",
+          "member": "UnsafePointer",
+          "sourceSignature": "func() unsafe.Pointer|params=|results=",
+          "sourceLocation": "reflect/value.go:2597:16",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "953712a9ae1c1c654a39bb7412242f1534aa85dac8630f9a8af4088e73ccc653"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=Append",
+          "kind": "function",
+          "access": "export",
+          "export": "Append",
+          "sourceSignature": "func(s reflect.Value, x ...reflect.Value) reflect.Value|params=s,x|results=",
+          "sourceLocation": "reflect/value.go:2789:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "3565a6589a677deac6fe5b80630910b342106ed9888987ad5c0959fea5107f61"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=DeepEqual",
+          "kind": "function",
+          "access": "export",
+          "export": "DeepEqual",
+          "sourceSignature": "func(x any, y any) bool|params=x,y|results=",
+          "sourceLocation": "reflect/deepequal.go:229:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "39a5f1710ab723a6e6a13d1fbb3f84ec5425c9e8fae375d008a41be09802f0de"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=Indirect",
+          "kind": "function",
+          "access": "export",
+          "export": "Indirect",
+          "sourceSignature": "func(v reflect.Value) reflect.Value|params=v|results=",
+          "sourceLocation": "reflect/value.go:3110:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "52642212252b2c3260c8aaa329dea318c85286ea6c45b789fc343788731706b7"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=MakeMap",
+          "kind": "function",
+          "access": "export",
+          "export": "MakeMap",
+          "sourceSignature": "func(typ reflect.Type) reflect.Value|params=typ|results=",
+          "sourceLocation": "reflect/value.go:3092:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "4a4211cb9515026996d251a4b4917879f6112561b00941333e299ab88baec610"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=MakeSlice",
+          "kind": "function",
+          "access": "export",
+          "export": "MakeSlice",
+          "sourceSignature": "func(typ reflect.Type, len int, cap int) reflect.Value|params=typ,len,cap|results=",
+          "sourceLocation": "reflect/value.go:3047:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "2fb084ba5df0528a74894d08f531dbce5468e1cbbd056139a7da7d2addfcb139"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=MapOf",
+          "kind": "function",
+          "access": "export",
+          "export": "MapOf",
+          "sourceSignature": "func(key reflect.Type, elem reflect.Type) reflect.Type|params=key,elem|results=",
+          "sourceLocation": "reflect/map.go:29:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "3b20f065a31c9c5622029ef1eb744f896ebef8fe85cd06c36a15cacc42ae30da"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=New",
+          "kind": "function",
+          "access": "export",
+          "export": "New",
+          "sourceSignature": "func(typ reflect.Type) reflect.Value|params=typ|results=",
+          "sourceLocation": "reflect/value.go:3154:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "09ac095646d24ce11749ae1b56b270d293a0aa586b330c7eee21c7fe9eadeafc"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=PointerTo",
+          "kind": "function",
+          "access": "export",
+          "export": "PointerTo",
+          "sourceSignature": "func(t reflect.Type) reflect.Type|params=t|results=",
+          "sourceLocation": "reflect/type.go:1414:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "2c82df9ae007787723e95fb940d3b314d93a7f0258f8a937a72c3e9f5f10420e"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=SliceOf",
+          "kind": "function",
+          "access": "export",
+          "export": "SliceOf",
+          "sourceSignature": "func(t reflect.Type) reflect.Type|params=t|results=",
+          "sourceLocation": "reflect/type.go:2149:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "3b24cbc80c76cfc73c4043a2d0f4a2cc4d73b61db0a024a07d25a8e1d3525a6e"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=TypeAssert",
+          "kind": "function",
+          "access": "export",
+          "export": "TypeAssert",
+          "sourceSignature": "func[T any](v reflect.Value) (T, bool)|params=v|results=,",
+          "sourceLocation": "reflect/value.go:1518:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "e556d9016d4d24904106a20be17f9e40308646585ecbeba047001bad00f3c311"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=TypeFor",
+          "kind": "function",
+          "access": "export",
+          "export": "TypeFor",
+          "sourceSignature": "func[T any]() reflect.Type|params=|results=",
+          "sourceLocation": "reflect/type.go:1388:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "29908c4237706b89fa84806fc19ff70997d27cf801dcb4ec50327dfa7ebcd0ef"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=TypeOf",
+          "kind": "function",
+          "access": "export",
+          "export": "TypeOf",
+          "sourceSignature": "func(i any) reflect.Type|params=i|results=",
+          "sourceLocation": "reflect/type.go:1383:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "35dd2356ed733d16b24110ddb9f5ce5154268c5394f53f489b7a26a5e35b7520"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=ValueOf",
+          "kind": "function",
+          "access": "export",
+          "export": "ValueOf",
+          "sourceSignature": "func(i any) reflect.Value|params=i|results=",
+          "sourceLocation": "reflect/value.go:3119:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "15fcb1b500d5688c429b289c180ac857f06e4422b434fb9b8e73591b93d50845"
+        },
+        {
+          "identity": "reflect|kind=4|receiver=|name=Zero",
+          "kind": "function",
+          "access": "export",
+          "export": "Zero",
+          "sourceSignature": "func(typ reflect.Type) reflect.Value|params=typ|results=",
+          "sourceLocation": "reflect/value.go:3131:6",
+          "implementationOwner": "src/reflect.ts",
+          "targetFingerprint": "fbe374b49d5a27da1ac20ce94446daab71c77d70d98737f7b52a9fee160f182c"
         }
       ]
     },
@@ -2651,6 +3572,17 @@
       "specifier": "@gotots/gostdlib/runtime.js",
       "sourcePath": "src/runtime.ts",
       "bindings": [
+        {
+          "identity": "runtime|kind=1|receiver=|name=GOARCH",
+          "kind": "constant",
+          "access": "export",
+          "export": "GOARCH",
+          "sourceSignature": "string",
+          "sourceValue": "\"amd64\"",
+          "sourceLocation": "runtime/extern.go:384:7",
+          "implementationOwner": "src/runtime.ts",
+          "targetFingerprint": "157a5663883a808dfa28d3b26c092195792a0100626ab79cf0a7f8712b8b6b8f"
+        },
         {
           "identity": "runtime|kind=1|receiver=|name=GOOS",
           "kind": "constant",
@@ -3112,6 +4044,40 @@
           "sourceLocation": "slices/slices.go:37:6",
           "implementationOwner": "src/internal/portable/slices/read.ts",
           "targetFingerprint": "fa2910b4bf78db449e3df173d4c42e15246eb00dff292ca1c0f15a0385e582c7"
+        },
+        {
+          "identity": "slices|kind=4|receiver=|name=Grow",
+          "kind": "function",
+          "access": "export",
+          "export": "Grow",
+          "genericOperations": [
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "zero",
+              "parameters": null,
+              "results": [
+                {
+                  "typeParameter": 1
+                }
+              ]
+            }
+          ],
+          "sourceSignature": "func[S ~[]E, E any](s S, n int) S|params=s,n|results=",
+          "sourceLocation": "slices/slices.go:420:6",
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "51a577697c5f51e75254b035736bb1d81abfcb58d16c691f8c2b8bf9d5319d21"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Index",
@@ -4647,6 +5613,17 @@
           "targetFingerprint": "6ead0313279788fc42e67ad66eb6672b4b808c2736ca19b28f2c857ae9fc1a1a"
         },
         {
+          "identity": "time|kind=1|receiver=|name=Second",
+          "kind": "constant",
+          "access": "export",
+          "export": "Second",
+          "sourceSignature": "time.Duration",
+          "sourceValue": "1000000000",
+          "sourceLocation": "time/time.go:938:2",
+          "implementationOwner": "src/internal/portable/time/duration.ts",
+          "targetFingerprint": "0665b2fe060b2f6923819264955385785231b2fb5d150b32e698c62c5a922b02"
+        },
+        {
           "identity": "time|kind=2|receiver=|name=Duration",
           "kind": "type",
           "access": "export",
@@ -5200,7 +6177,7 @@
       "goImportPath": "unsafe",
       "specifier": "@gotots/gostdlib/unsafe.js",
       "sourcePath": "src/unsafe.ts",
-      "bindings": null
+      "bindings": []
     }
   ],
   "facetModules": [
@@ -5253,11 +6230,20 @@
         {
           "kind": "generic-callable-profile",
           "sourceIdentity": "slices|kind=4|receiver=|name=AppendSeq",
-          "profileKey": "625d99cc3a4a8041a6c210aff3a339db4e83cf34c18dbe41a42fa48cf59f77ab=cooperative|f729115bf3e3995f96e7e344375769cd4b0a973dceaa98d59427a06f0fa3f074=cooperative",
+          "profileKey": "625d99cc3a4a8041a6c210aff3a339db4e83cf34c18dbe41a42fa48cf59f77ab=cooperative",
           "export": "SlicesAppendSeqCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
           "targetFingerprint": "05414f5aa4f19cc58a3f795f4100ea64a3fa4c96449d1fc09ac4c70277b039c6"
+        },
+        {
+          "kind": "generic-callable-profile",
+          "sourceIdentity": "slices|kind=4|receiver=|name=AppendSeq",
+          "profileKey": "625d99cc3a4a8041a6c210aff3a339db4e83cf34c18dbe41a42fa48cf59f77ab=cooperative|f729115bf3e3995f96e7e344375769cd4b0a973dceaa98d59427a06f0fa3f074=cooperative",
+          "export": "SlicesAppendSeqFullyCooperative",
+          "effect": "async",
+          "implementationOwner": "src/internal/facets/generic-slices.ts",
+          "targetFingerprint": "22a16351dd255a1f16ce6ad3bc12ce019a9ff44e6fc9af081b46d4de7e613687"
         },
         {
           "kind": "generic-callable-profile",
@@ -5325,7 +6311,7 @@
         {
           "kind": "generic-callable-profile",
           "sourceIdentity": "slices|kind=4|receiver=|name=Sorted",
-          "profileKey": "1bcecf0698ae7e007b8fbf07b9e01ec5913c886b85743bfd0d8726501d67fbbe=cooperative|fb2488bb05450d70e9d3a3b060575c3f2ff9052f56ba075e968dfe9e6d84fdbe=cooperative",
+          "profileKey": "1bcecf0698ae7e007b8fbf07b9e01ec5913c886b85743bfd0d8726501d67fbbe=cooperative",
           "export": "SlicesSortedCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
@@ -5333,12 +6319,30 @@
         },
         {
           "kind": "generic-callable-profile",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Sorted",
+          "profileKey": "1bcecf0698ae7e007b8fbf07b9e01ec5913c886b85743bfd0d8726501d67fbbe=cooperative|fb2488bb05450d70e9d3a3b060575c3f2ff9052f56ba075e968dfe9e6d84fdbe=cooperative",
+          "export": "SlicesSortedFullyCooperative",
+          "effect": "async",
+          "implementationOwner": "src/internal/facets/generic-slices.ts",
+          "targetFingerprint": "2fdcbbdeadad0927df62b2710aa2a542685c9bcbe02d1dd86d42cfd430ef4540"
+        },
+        {
+          "kind": "generic-callable-profile",
           "sourceIdentity": "slices|kind=4|receiver=|name=Values",
-          "profileKey": "652217bd97327bcf74dac90763c1f154a7d8bbcf536ce7e832bdaf968a702881=cooperative|cdd8b52d8c59de6acb71522442974fa2016409e18b1d99841c9cd34a1fe8561d=cooperative",
+          "profileKey": "652217bd97327bcf74dac90763c1f154a7d8bbcf536ce7e832bdaf968a702881=cooperative",
           "export": "SlicesValuesCooperative",
           "effect": "sync",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
           "targetFingerprint": "13a54aba993057df8a5db59c6d7a7e00d4b6d74e5c99f9731adb785f5ef81a4f"
+        },
+        {
+          "kind": "generic-callable-profile",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Values",
+          "profileKey": "652217bd97327bcf74dac90763c1f154a7d8bbcf536ce7e832bdaf968a702881=cooperative|cdd8b52d8c59de6acb71522442974fa2016409e18b1d99841c9cd34a1fe8561d=cooperative",
+          "export": "SlicesValuesFullyCooperative",
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/generic-slices.ts",
+          "targetFingerprint": "9c5a98ad65eb76b670c0aa6dd69f96222f709cdaec78d644fe9a77338f10bc0e"
         }
       ]
     },
@@ -5354,6 +6358,366 @@
           "effect": "sync",
           "implementationOwner": "src/internal/facets/generic-sync.ts",
           "targetFingerprint": "a67439edf1dec2ecb2cb54e8e3f6724fc26eda1ae05f35c7379ee7ed70165ee6"
+        }
+      ]
+    },
+    {
+      "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
+      "sourcePath": "src/internal/facets/named-encoding-binary.ts",
+      "representations": [
+        {
+          "export": "BinaryEndianRepresentation",
+          "sourceTypes": [
+            "encoding/binary|kind=2|receiver=|name=bigEndian",
+            "encoding/binary|kind=2|receiver=|name=littleEndian",
+            "encoding/binary|kind=2|receiver=|name=nativeEndian"
+          ],
+          "sourceInterfaces": [
+            "encoding/binary|kind=2|receiver=|name=AppendByteOrder",
+            "encoding/binary|kind=2|receiver=|name=ByteOrder"
+          ],
+          "methods": [
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=AppendUint16",
+              "member": "AppendUint16",
+              "sourceSignature": "func(b []byte, v uint16) []byte|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:168:18",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "c8b15d3008abe1b6416fb7db45f8a6607e005ecb0459d4d700cfa3031e0960b9"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=AppendUint32",
+              "member": "AppendUint32",
+              "sourceSignature": "func(b []byte, v uint32) []byte|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:191:18",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "7e1bad1efac527a445ed4d61e56289a1482aad78ded3efee185d379d1234bbb0"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=AppendUint64",
+              "member": "AppendUint64",
+              "sourceSignature": "func(b []byte, v uint64) []byte|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:221:18",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "b8a296beb9accf4ea68d6327031a219a2494003f743de7edd9869d121aed2510"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=GoString",
+              "member": "GoString",
+              "sourceSignature": "func() string|params=|results=",
+              "sourceLocation": "encoding/binary/binary.go:236:18",
+              "implementationOwner": "src/internal/facets/named-encoding-binary.ts",
+              "targetFingerprint": "9cf8840bd713776975d217b63414a0ebe3690e8f1419b8e9624a371e6f02bb37"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=PutUint16",
+              "member": "PutUint16",
+              "sourceSignature": "func(b []byte, v uint16)|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:161:18",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "126a3fd096c16d9b12b38ed02783e654e4fbd196917188d5091ac7205abf0e99"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=PutUint32",
+              "member": "PutUint32",
+              "sourceSignature": "func(b []byte, v uint32)|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:182:18",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "523407a356433cedd7f300e299e6d49e9a1c2127bd0d22b028c9274aa865bffc"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=PutUint64",
+              "member": "PutUint64",
+              "sourceSignature": "func(b []byte, v uint64)|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:208:18",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "d13f82b2da0b73b471eb8c42b27669501d5bef37916b9a872cd9c051c8efb47c"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=String",
+              "member": "String",
+              "sourceSignature": "func() string|params=|results=",
+              "sourceLocation": "encoding/binary/binary.go:234:18",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "a631bc5c2b15b4bb1ed5f422cbd1c1ad7e94ed999bde247d475e01ca89be3f8a"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint16",
+              "member": "Uint16",
+              "sourceSignature": "func(b []byte) uint16|params=b|results=",
+              "sourceLocation": "encoding/binary/binary.go:155:18",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "49b23159b4993a3d918f0baf6d65549fa817cb5274dc363a34484dd0be4ebe9c"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint32",
+              "member": "Uint32",
+              "sourceSignature": "func(b []byte) uint32|params=b|results=",
+              "sourceLocation": "encoding/binary/binary.go:176:18",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "f1b3ac252e9c90312381eaedf92b4b50b294155316807929f4cda8cf88e88807"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint64",
+              "member": "Uint64",
+              "sourceSignature": "func(b []byte) uint64|params=b|results=",
+              "sourceLocation": "encoding/binary/binary.go:201:18",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "f129b393df8bfdba30a23bb8ea109134531f4f16ce25418ebf68803d04ba80f4"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=AppendUint16",
+              "member": "AppendUint16",
+              "sourceSignature": "func(b []byte, v uint16) []byte|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:82:21",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "c8b15d3008abe1b6416fb7db45f8a6607e005ecb0459d4d700cfa3031e0960b9"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=AppendUint32",
+              "member": "AppendUint32",
+              "sourceSignature": "func(b []byte, v uint32) []byte|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:105:21",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "7e1bad1efac527a445ed4d61e56289a1482aad78ded3efee185d379d1234bbb0"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=AppendUint64",
+              "member": "AppendUint64",
+              "sourceSignature": "func(b []byte, v uint64) []byte|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:135:21",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "b8a296beb9accf4ea68d6327031a219a2494003f743de7edd9869d121aed2510"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=GoString",
+              "member": "GoString",
+              "sourceSignature": "func() string|params=|results=",
+              "sourceLocation": "encoding/binary/binary.go:150:21",
+              "implementationOwner": "src/internal/facets/named-encoding-binary.ts",
+              "targetFingerprint": "9cf8840bd713776975d217b63414a0ebe3690e8f1419b8e9624a371e6f02bb37"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=PutUint16",
+              "member": "PutUint16",
+              "sourceSignature": "func(b []byte, v uint16)|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:75:21",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "126a3fd096c16d9b12b38ed02783e654e4fbd196917188d5091ac7205abf0e99"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=PutUint32",
+              "member": "PutUint32",
+              "sourceSignature": "func(b []byte, v uint32)|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:96:21",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "523407a356433cedd7f300e299e6d49e9a1c2127bd0d22b028c9274aa865bffc"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=PutUint64",
+              "member": "PutUint64",
+              "sourceSignature": "func(b []byte, v uint64)|params=b,v|results=",
+              "sourceLocation": "encoding/binary/binary.go:122:21",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "d13f82b2da0b73b471eb8c42b27669501d5bef37916b9a872cd9c051c8efb47c"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=String",
+              "member": "String",
+              "sourceSignature": "func() string|params=|results=",
+              "sourceLocation": "encoding/binary/binary.go:148:21",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "a631bc5c2b15b4bb1ed5f422cbd1c1ad7e94ed999bde247d475e01ca89be3f8a"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=Uint16",
+              "member": "Uint16",
+              "sourceSignature": "func(b []byte) uint16|params=b|results=",
+              "sourceLocation": "encoding/binary/binary.go:69:21",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "49b23159b4993a3d918f0baf6d65549fa817cb5274dc363a34484dd0be4ebe9c"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=Uint32",
+              "member": "Uint32",
+              "sourceSignature": "func(b []byte) uint32|params=b|results=",
+              "sourceLocation": "encoding/binary/binary.go:90:21",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "f1b3ac252e9c90312381eaedf92b4b50b294155316807929f4cda8cf88e88807"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=Uint64",
+              "member": "Uint64",
+              "sourceSignature": "func(b []byte) uint64|params=b|results=",
+              "sourceLocation": "encoding/binary/binary.go:115:21",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "f129b393df8bfdba30a23bb8ea109134531f4f16ce25418ebf68803d04ba80f4"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.nativeEndian|name=GoString",
+              "member": "GoString",
+              "sourceSignature": "func() string|params=|results=",
+              "sourceLocation": "encoding/binary/binary.go:240:21",
+              "implementationOwner": "src/internal/facets/named-encoding-binary.ts",
+              "targetFingerprint": "9cf8840bd713776975d217b63414a0ebe3690e8f1419b8e9624a371e6f02bb37"
+            },
+            {
+              "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.nativeEndian|name=String",
+              "member": "String",
+              "sourceSignature": "func() string|params=|results=",
+              "sourceLocation": "encoding/binary/binary.go:238:21",
+              "implementationOwner": "src/encoding/binary.ts",
+              "targetFingerprint": "a631bc5c2b15b4bb1ed5f422cbd1c1ad7e94ed999bde247d475e01ca89be3f8a"
+            }
+          ],
+          "implementationOwner": "src/internal/facets/named-encoding-binary.ts",
+          "targetFingerprint": "ddedf79bdd8e561da6199e44392362f526c46a2b48770bc36e03d105e9efd36b"
+        }
+      ],
+      "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=bigEndian",
+          "capabilities": [
+            "copy",
+            "equal",
+            "hash",
+            "representation",
+            "storage"
+          ],
+          "export": "BinaryBigEndianOperations",
+          "storageExport": "BinaryBigEndianStorage",
+          "representationExport": "BinaryEndianRepresentation",
+          "implementationOwner": "src/internal/facets/named-encoding-binary.ts",
+          "storageImplementationOwner": "src/internal/facets/named-encoding-binary.ts",
+          "targetFingerprint": "1eadfcb7ce02d29000fa2400ffe80afad7765ddc76cbe0e6df306bdbb0540b85",
+          "storageTargetFingerprint": "57fcb45e24d03c4a6db4039208b3e1921b118e5cbe9403d9a44645a5db6281c1"
+        },
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=littleEndian",
+          "capabilities": [
+            "copy",
+            "equal",
+            "hash",
+            "representation",
+            "storage"
+          ],
+          "export": "BinaryLittleEndianOperations",
+          "storageExport": "BinaryLittleEndianStorage",
+          "representationExport": "BinaryEndianRepresentation",
+          "implementationOwner": "src/internal/facets/named-encoding-binary.ts",
+          "storageImplementationOwner": "src/internal/facets/named-encoding-binary.ts",
+          "targetFingerprint": "ce8a4a9baa17e46968fcd8c3ffbe3e22e0dc3e58ece406c5f47635d997eadedb",
+          "storageTargetFingerprint": "ad0d05fbbf36ad634d80ededfdf7055d1616d2986236ee7850882cd323f77018"
+        },
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=nativeEndian",
+          "capabilities": [
+            "copy",
+            "equal",
+            "hash",
+            "representation",
+            "storage"
+          ],
+          "export": "BinaryNativeEndianOperations",
+          "storageExport": "BinaryNativeEndianStorage",
+          "representationExport": "BinaryEndianRepresentation",
+          "implementationOwner": "src/internal/facets/named-encoding-binary.ts",
+          "storageImplementationOwner": "src/internal/facets/named-encoding-binary.ts",
+          "targetFingerprint": "4094c20ad8e15204e34c632067c1dccb3d5e2f99f3451c9dbafb7cdc1deb8941",
+          "storageTargetFingerprint": "2961b4feff355dae2604855ba164da38685ad99872c9401d66a36dead11ad9b0"
+        }
+      ]
+    },
+    {
+      "specifier": "@gotots/gostdlib/internal/facets/named-io-fs.js",
+      "sourcePath": "src/internal/facets/named-io-fs.ts",
+      "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=PathError",
+          "capabilities": [
+            "make",
+            "storage"
+          ],
+          "export": "IoFsPathErrorOperations",
+          "storageExport": "IoFsPathErrorStorage",
+          "implementationOwner": "src/internal/facets/named-io-fs.ts",
+          "storageImplementationOwner": "src/io/fs.ts",
+          "targetFingerprint": "83d9c07e5fc0f862e728ad284041995b8d27ec1e701bab58cafcf9fab9b0ff77",
+          "storageTargetFingerprint": "1e1aff35f95983cc09c5e234f87b705e64f6f69dcbd0da8a3a703338673e7921"
+        }
+      ]
+    },
+    {
+      "specifier": "@gotots/gostdlib/internal/facets/named-math-big.js",
+      "sourcePath": "src/internal/facets/named-math-big.ts",
+      "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "math/big|kind=2|receiver=|name=Float",
+          "capabilities": [
+            "storage",
+            "zero"
+          ],
+          "export": "MathBigFloatOperations",
+          "storageExport": "MathBigFloatStorage",
+          "implementationOwner": "src/internal/facets/named-math-big.ts",
+          "storageImplementationOwner": "src/internal/portable/math/big.ts",
+          "targetFingerprint": "1dcabf609b1a510e583e78094465e90d1a1afb7f03ebf59af7fac08b1a8830b1",
+          "storageTargetFingerprint": "bebe684d28ab78d7298c6fc558363c7f7c6c464a73e8edcef00b7c29213109ad"
+        },
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "math/big|kind=2|receiver=|name=Int",
+          "capabilities": [
+            "storage",
+            "zero"
+          ],
+          "export": "MathBigIntOperations",
+          "storageExport": "MathBigIntStorage",
+          "implementationOwner": "src/internal/facets/named-math-big.ts",
+          "storageImplementationOwner": "src/internal/portable/math/big.ts",
+          "targetFingerprint": "d5b264f9b34e35e14a31267cd41bf2e345b30000fd408506db86b08652d39df0",
+          "storageTargetFingerprint": "ffd32712d5dce0bc877547aa12cd517e46935c9c49d215e0041e29334bba48a1"
+        }
+      ]
+    },
+    {
+      "specifier": "@gotots/gostdlib/internal/facets/named-net-url.js",
+      "sourcePath": "src/internal/facets/named-net-url.ts",
+      "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "net/url|kind=2|receiver=|name=URL",
+          "capabilities": [
+            "storage"
+          ],
+          "export": "NetUrlURLOperations",
+          "storageExport": "NetUrlURLStorage",
+          "implementationOwner": "src/internal/facets/named-net-url.ts",
+          "storageImplementationOwner": "src/net/url.ts",
+          "targetFingerprint": "42ea8904f8422c533d57d5d87c64aa1693424f59e2ded78a1d76cc64cc92e419",
+          "storageTargetFingerprint": "b3205d2dc9990c3f196868e5d950de03959d8ffe2df7787288d39854cdbc6ee6"
+        }
+      ]
+    },
+    {
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "reflect|kind=2|receiver=|name=Value",
+          "capabilities": [
+            "copy",
+            "zero"
+          ],
+          "export": "ReflectValueOperations",
+          "implementationOwner": "src/internal/facets/named-reflect.ts",
+          "targetFingerprint": "6ae4cc3e3fe90bfb3e5ebf47e761961af56706273f0742e49c13e7514029c26f"
         }
       ]
     },
@@ -5396,6 +6760,26 @@
       ]
     },
     {
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime.js",
+      "sourcePath": "src/internal/facets/named-runtime.ts",
+      "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "runtime|kind=2|receiver=|name=MemStats",
+          "capabilities": [
+            "storage",
+            "zero"
+          ],
+          "export": "RuntimeMemStatsOperations",
+          "storageExport": "RuntimeMemStatsStorage",
+          "implementationOwner": "src/internal/facets/named-runtime.ts",
+          "storageImplementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+          "targetFingerprint": "ce5b23e68cecf8ef5ae46f5e32092049c164435dfd03a7a69564aa6be61b4283",
+          "storageTargetFingerprint": "af8e466a73ba3be4098b30066aedbc94076c9aa0b8e0dbb540e4eece148c58e4"
+        }
+      ]
+    },
+    {
       "specifier": "@gotots/gostdlib/internal/facets/named-strings.js",
       "sourcePath": "src/internal/facets/named-strings.ts",
       "facets": [
@@ -5403,11 +6787,16 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "strings|kind=2|receiver=|name=Builder",
           "capabilities": [
+            "copy",
+            "storage",
             "zero"
           ],
           "export": "StringsBuilderOperations",
+          "storageExport": "StringsBuilderStorage",
           "implementationOwner": "src/internal/facets/named-strings.ts",
-          "targetFingerprint": "a9e9416c5d828ce24962ebaef1e148a0dba79703daa4687d0b55d63c50a08e08"
+          "storageImplementationOwner": "src/internal/portable/strings/builder.ts",
+          "targetFingerprint": "c0d14aec4bdb8231bd5d3d0f256d784e4538e8cd9d69104ecf1be5616a676471",
+          "storageTargetFingerprint": "81d80387430ddb838a6dd41165cf820f29ac0b25865329e1ab28c1ed6d339de6"
         }
       ]
     },
@@ -5417,8 +6806,54 @@
       "facets": [
         {
           "kind": "named-struct-operations",
+          "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Bool",
+          "capabilities": [
+            "copy",
+            "storage",
+            "zero"
+          ],
+          "export": "SyncAtomicBoolOperations",
+          "storageExport": "SyncAtomicBoolStorage",
+          "implementationOwner": "src/internal/facets/named-sync-atomic.ts",
+          "storageImplementationOwner": "src/internal/portable/sync/atomic/cell.ts",
+          "targetFingerprint": "1c6a34a6379bbc36e7202191bbaa8597beb9816804d8f0b10793f5bd54fdee4e",
+          "storageTargetFingerprint": "c15d3e8c5540dd58bcf76c466b38118e320b7b0bfd062afa04df66315ea1de80"
+        },
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Int32",
+          "capabilities": [
+            "copy",
+            "storage",
+            "zero"
+          ],
+          "export": "SyncAtomicInt32Operations",
+          "storageExport": "SyncAtomicInt32Storage",
+          "implementationOwner": "src/internal/facets/named-sync-atomic.ts",
+          "storageImplementationOwner": "src/internal/portable/sync/atomic/cell.ts",
+          "targetFingerprint": "0ea954db9929af8f71630bb3d67e5cfd0d86b4b916a6ae3234d5bd13fe2bc7b9",
+          "storageTargetFingerprint": "d4b87648d16a311c293a9f32982753c29ca279783d44ff08e921c5fa14df2a5a"
+        },
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Int64",
+          "capabilities": [
+            "copy",
+            "storage",
+            "zero"
+          ],
+          "export": "SyncAtomicInt64Operations",
+          "storageExport": "SyncAtomicInt64Storage",
+          "implementationOwner": "src/internal/facets/named-sync-atomic.ts",
+          "storageImplementationOwner": "src/internal/portable/sync/atomic/cell.ts",
+          "targetFingerprint": "99fb057f11607bf00a4225ecaba13aaaf30b094548dda72e605bcfac3756afb6",
+          "storageTargetFingerprint": "dcea122935fb1cd5240437fd4a4b70e2cd573d2e09e4482cfe3b539677aab8a9"
+        },
+        {
+          "kind": "named-struct-operations",
           "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Uint32",
           "capabilities": [
+            "copy",
             "storage",
             "zero"
           ],
@@ -5426,13 +6861,14 @@
           "storageExport": "SyncAtomicUint32Storage",
           "implementationOwner": "src/internal/facets/named-sync-atomic.ts",
           "storageImplementationOwner": "src/internal/portable/sync/atomic/cell.ts",
-          "targetFingerprint": "cae26fb470c23f2e75ea4565b144d1e86a750687fda40a3f89d6f0687fd8b393",
+          "targetFingerprint": "e938809a15683ea8128515e5877dd1534efd3c78a9eca8ad84360fc5b29c30e6",
           "storageTargetFingerprint": "824d6aba8e015ee7e80bf240bd9ded40adb3274f5d05b43a1f13e5510c7e55eb"
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Uint64",
           "capabilities": [
+            "copy",
             "storage",
             "zero"
           ],
@@ -5440,7 +6876,7 @@
           "storageExport": "SyncAtomicUint64Storage",
           "implementationOwner": "src/internal/facets/named-sync-atomic.ts",
           "storageImplementationOwner": "src/internal/portable/sync/atomic/cell.ts",
-          "targetFingerprint": "e6d03f387121596aa897f578a4964723fcadbd467cc6b52d122b44e302d7434b",
+          "targetFingerprint": "5b4ec54eca93e18014b1b4a94f890dbd7efd3964e5fdf0b934f2e2a83ef69a5d",
           "storageTargetFingerprint": "f02b7203f4b4fe9a585ab470009e25765cc38b30b37dde514411cbb35ab40620"
         }
       ]
@@ -5453,6 +6889,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=Map",
           "capabilities": [
+            "copy",
             "storage",
             "zero"
           ],
@@ -5460,33 +6897,44 @@
           "storageExport": "SyncMapStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/map.ts",
-          "targetFingerprint": "0b8e2f8125ad1121b3bce246eca5bec02a2cb3593247b9e68999e15a2e711b52",
+          "targetFingerprint": "71d6a0056fcecf1e8ddcc780d562a8f44437778078ed6c188b14d626d7825d14",
           "storageTargetFingerprint": "a489678083c9782ac47953a1168299626552e2c08e7a60ebd775c5b0ee9037b4"
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=Mutex",
           "capabilities": [
+            "copy",
+            "storage",
             "zero"
           ],
           "export": "SyncMutexOperations",
+          "storageExport": "SyncMutexStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
-          "targetFingerprint": "0001257229afd81567299f60489697ef4dc94d2c429ccd299898d00f42466f5f"
+          "storageImplementationOwner": "src/internal/portable/sync/mutex.ts",
+          "targetFingerprint": "3559d6dac359061c038a0447e8133d9309761c0fb92ddfe8d0a67ba99672887f",
+          "storageTargetFingerprint": "cd7aabb3a224893419d76942ddf095072b8e4180feb06c0981bc32519132d60c"
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=Once",
           "capabilities": [
+            "copy",
+            "storage",
             "zero"
           ],
           "export": "SyncOnceOperations",
+          "storageExport": "SyncOnceStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
-          "targetFingerprint": "ffb43a07f0de43a29287144682ebce7432f020c219bbe84e805292193a210c88"
+          "storageImplementationOwner": "src/internal/portable/sync/once.ts",
+          "targetFingerprint": "5c078dfc2c15d830fac39984eff67d0d9c9b256cf1688f017bb662aee8530105",
+          "storageTargetFingerprint": "85618d431bdbebbe1261382e1fb4bcdd75f54ded2a30e549544b5d91f558fdea"
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=Pool",
           "capabilities": [
+            "copy",
             "storage",
             "zero"
           ],
@@ -5494,13 +6942,14 @@
           "storageExport": "SyncPoolStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/pool.ts",
-          "targetFingerprint": "2311f8f00dae707b23ed7f8c56a2e54dae34d12b4f120a334c58114a10ee3a7c",
+          "targetFingerprint": "a91f0d41ff7a7207e9a0ffb7732f160a0572cb98af7879e585f7b3ec8e949087",
           "storageTargetFingerprint": "cef67a67c61a5b0386d321d4551396860636a13f2294cc1a5957b26165373932"
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=RWMutex",
           "capabilities": [
+            "copy",
             "storage",
             "zero"
           ],
@@ -5508,8 +6957,72 @@
           "storageExport": "SyncRWMutexStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/mutex.ts",
-          "targetFingerprint": "70c378e518cfddd4c0d07f1876a11a87ead107af503427fb52b34a278be3ff25",
+          "targetFingerprint": "abe5575bd922d99606236ee33814ea3513c4319ecc5d7d00cbe8b3e832f1e03a",
           "storageTargetFingerprint": "b3f4db5108c807b70b959f252597a0719661f3a3e0a3776486d94abd88aaeb08"
+        },
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "sync|kind=2|receiver=|name=WaitGroup",
+          "capabilities": [
+            "copy",
+            "storage",
+            "zero"
+          ],
+          "export": "SyncWaitGroupOperations",
+          "storageExport": "SyncWaitGroupStorage",
+          "implementationOwner": "src/internal/facets/named-sync.ts",
+          "storageImplementationOwner": "src/internal/portable/sync/wait-group.ts",
+          "targetFingerprint": "95f0bacb12386120b53cccc5a668558e74df37ccbbcda40f98c92aed3564ff3c",
+          "storageTargetFingerprint": "82b60b062fb280c49bf3f9c78c6d1aa801a308e81a7a4a88b860f9ed0cf1b5bd"
+        }
+      ]
+    },
+    {
+      "specifier": "@gotots/gostdlib/internal/facets/named-time.js",
+      "sourcePath": "src/internal/facets/named-time.ts",
+      "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "time|kind=2|receiver=|name=Ticker",
+          "capabilities": [
+            "storage"
+          ],
+          "export": "TimeTickerOperations",
+          "storageExport": "TimeTickerStorage",
+          "implementationOwner": "src/internal/facets/named-time.ts",
+          "storageImplementationOwner": "src/internal/portable/time/timer.ts",
+          "targetFingerprint": "2a47d53a0009db9f8f33495b6b0dec62ffeff09b8d32e3ea02d7c4f02e13732c",
+          "storageTargetFingerprint": "e48b5f3bd44c09e0123d41492020c22c65371aee9a6421dc20707290f35f4721"
+        },
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "time|kind=2|receiver=|name=Time",
+          "capabilities": [
+            "copy",
+            "equal",
+            "hash",
+            "storage",
+            "zero"
+          ],
+          "export": "TimeOperations",
+          "storageExport": "TimeStorage",
+          "implementationOwner": "src/internal/facets/named-time.ts",
+          "storageImplementationOwner": "src/internal/portable/time/time.ts",
+          "targetFingerprint": "8bdb218738184404acd8c476431bdaa24a3b04ac958f8ea63c88bcc1fd1aca7c",
+          "storageTargetFingerprint": "2cbdc5902057fef9e744586a5a4a04f5d294a62c7c12c8e81cb6f77ba702d68e"
+        },
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "time|kind=2|receiver=|name=Timer",
+          "capabilities": [
+            "storage"
+          ],
+          "export": "TimeTimerOperations",
+          "storageExport": "TimeTimerStorage",
+          "implementationOwner": "src/internal/facets/named-time.ts",
+          "storageImplementationOwner": "src/internal/portable/time/timer.ts",
+          "targetFingerprint": "59aa0fe619dbf53d94f8c35a3a9a1e2153953240a5b48bfc84c8746454496d94",
+          "storageTargetFingerprint": "cc81f3a16b51b1c1e42c31a3703fff179dddee41376be109e64f8df3ad372470"
         }
       ]
     },
@@ -5541,11 +7054,15 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "unicode|kind=2|receiver=|name=RangeTable",
           "capabilities": [
-            "make"
+            "make",
+            "storage"
           ],
           "export": "UnicodeRangeTableOperations",
+          "storageExport": "UnicodeRangeTableStorage",
           "implementationOwner": "src/internal/facets/named-unicode.ts",
-          "targetFingerprint": "bf0413143d4d235e009238ce6a8cf8c377ca3b5c34fac80c95a4371ba60b4583"
+          "storageImplementationOwner": "src/internal/portable/unicode/ranges.ts",
+          "targetFingerprint": "d1e4e324a5e86c54854e753af235f416a004a36b70d04a650a00d8f72b43cd8c",
+          "storageTargetFingerprint": "090ad23a7b8927c21c3e76b2669c0dd399d58bb2ab50cadacda347cea45c57c8"
         }
       ]
     },
@@ -5992,5 +7509,5 @@
       ]
     }
   ],
-  "manifestDigest": "46052a4155125b405bb5d21736bf60ca339809132129b4b61176534286ec480f"
+  "manifestDigest": "bfcf50b9d0cfc21afe056fd00f3bf6a7d2e440293730432ebc241e83f0d95b23"
 }
