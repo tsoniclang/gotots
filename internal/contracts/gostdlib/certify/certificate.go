@@ -4,12 +4,14 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	runtimecontract "github.com/tsoniclang/gotots/internal/contracts/runtime"
 )
 
 type Certificate struct {
 	manifest     gostdlib.Manifest
 	toolchainKey string
 	providerRoot string
+	runtime      runtimecontract.Requirements
 }
 
 func Verify(config Config) (*Certificate, error) {
@@ -28,6 +30,19 @@ func Verify(config Config) (*Certificate, error) {
 	if err := compareCanonical(checkedBytes, generated); err != nil {
 		return nil, err
 	}
+	runtimeRequirements, runtimeDigest, err := readRuntimeContract(
+		resolved.runtimeContractPath,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if runtimeDigest != checked.RuntimeDigest() {
+		return nil, certifyError(
+			"verify runtime contract",
+			resolved.runtimeContractPath,
+			"content digest does not match the checked manifest",
+		)
+	}
 	selectedToolchain, err := inspectToolchain(resolved)
 	if err != nil {
 		return nil, err
@@ -36,12 +51,13 @@ func Verify(config Config) (*Certificate, error) {
 		manifest:     checked,
 		toolchainKey: selectedToolchain.key,
 		providerRoot: resolved.providerRoot,
+		runtime:      runtimeRequirements,
 	}, nil
 }
 
 func (c *Certificate) Valid() bool {
 	return c != nil && c.manifest.Digest() != "" &&
-		c.toolchainKey != "" && c.providerRoot != ""
+		c.toolchainKey != "" && c.providerRoot != "" && c.runtime.Valid()
 }
 
 func (c *Certificate) ManifestDigest() string {
@@ -75,6 +91,16 @@ func (c *Certificate) ProviderModules() []string {
 	}
 	sort.Strings(modules)
 	return modules
+}
+
+func (c *Certificate) RuntimeRequirements() (
+	runtimecontract.Requirements,
+	bool,
+) {
+	if !c.Valid() {
+		return runtimecontract.Requirements{}, false
+	}
+	return c.runtime, true
 }
 
 func (c *Certificate) Binding(identity string) (gostdlib.Binding, bool) {

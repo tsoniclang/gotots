@@ -81,7 +81,7 @@ func (e *emitter) generatedContext(
 }
 
 func (s *programSession) packageTargetFiles(
-	primitiveAliases map[api.PrimitiveAlias]struct{},
+	requirements *targetRequirements,
 ) ([]TargetFile, error) {
 	builders := make([]*packageTargetBuilder, 0, len(s.packageBuilders))
 	for _, builder := range s.packageBuilders {
@@ -98,28 +98,14 @@ func (s *programSession) packageTargetFiles(
 				Reason: "package assembly was sealed before initialization",
 			}
 		}
-		for _, alias := range builder.statePlacement.PrimitiveAliases() {
-			primitiveAliases[alias] = struct{}{}
-		}
-		for _, alias := range builder.assemblyPlacement.PrimitiveAliases() {
-			primitiveAliases[alias] = struct{}{}
-		}
-		for _, storage := range builder.storage {
-			for _, alias := range storage.statePlacement.PrimitiveAliases() {
-				primitiveAliases[alias] = struct{}{}
-			}
-			for _, alias := range storage.assemblyPlacement.PrimitiveAliases() {
-				primitiveAliases[alias] = struct{}{}
-			}
-		}
 		if len(builder.storage) != 0 {
-			stateFile, err := s.packageStateFile(builder)
+			stateFile, err := s.packageStateFile(builder, requirements)
 			if err != nil {
 				return nil, err
 			}
 			files = append(files, stateFile)
 		}
-		assemblyFile, err := s.packageAssemblyFile(builder)
+		assemblyFile, err := s.packageAssemblyFile(builder, requirements)
 		if err != nil {
 			return nil, err
 		}
@@ -130,6 +116,7 @@ func (s *programSession) packageTargetFiles(
 
 func (s *programSession) packageStateFile(
 	builder *packageTargetBuilder,
+	requirements *targetRequirements,
 ) (TargetFile, error) {
 	placement := targetplacement.New()
 	if err := placement.Apply(builder.statePlacement.Requests()); err != nil {
@@ -149,6 +136,7 @@ func (s *programSession) packageStateFile(
 	if err := placement.RequireTypeOnly(); err != nil {
 		return TargetFile{}, err
 	}
+	requirements.observe(placement)
 	sort.Slice(builder.storage, func(left, right int) bool {
 		return builder.storage[left].variable.Name() <
 			builder.storage[right].variable.Name()
@@ -175,6 +163,7 @@ func (s *programSession) packageStateFile(
 
 func (s *programSession) packageAssemblyFile(
 	builder *packageTargetBuilder,
+	requirements *targetRequirements,
 ) (TargetFile, error) {
 	placement := targetplacement.New()
 	if err := placement.Apply(builder.assemblyPlacement.Requests()); err != nil {
@@ -204,6 +193,7 @@ func (s *programSession) packageAssemblyFile(
 			return TargetFile{}, err
 		}
 	}
+	requirements.observe(placement)
 	statements := placement.Statements(s.factory)
 	var initialization []tsgo.Statement
 	for _, storage := range builder.storage {

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
@@ -75,7 +76,7 @@ type programSession struct {
 	runtimePackage          RuntimePackage
 	compareArtifactOwners   func(api.ArtifactOwner, api.ArtifactOwner) int
 	requirementRemovalOwner api.ArtifactOwner
-	standardLibraryLinked   bool
+	standardLibrary         *certify.Certificate
 	sealed                  bool
 }
 
@@ -319,7 +320,7 @@ func newProgramSession(
 		classMembers:           make(map[*types.Func]classMemberContribution),
 		goRuntime:              goRuntime,
 		compareArtifactOwners:  compareArtifactOwners,
-		standardLibraryLinked:  options.StandardLibrary != nil,
+		standardLibrary:        options.StandardLibrary,
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(

@@ -31,7 +31,7 @@ type environmentDeclaration struct {
 func (s *programSession) buildProviderCoverageDeclaration(
 	object types.Object,
 ) (environmentDeclaration, error) {
-	if object == nil || !s.standardLibraryLinked ||
+	if object == nil || s.standardLibrary == nil ||
 		!s.registry.HasProviderCoverageOwner(object) {
 		return environmentDeclaration{}, &ScheduleError{
 			Reason: "provider coverage owner is invalid",
@@ -296,7 +296,7 @@ func (s *programSession) replaceEnvironmentConstantProjections(
 		}
 		var statement tsgo.Statement
 		var selectedRequests []api.RootRequest
-		if s.standardLibraryLinked &&
+		if s.standardLibrary != nil &&
 			builder.sourcePackage.Kind() == load.PackageStandardLibraryContract {
 			emission, projectionErr := constantbinding.EmitProjection(
 				builder.context,

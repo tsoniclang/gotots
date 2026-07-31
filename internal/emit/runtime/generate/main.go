@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	runtimecontract "github.com/tsoniclang/gotots/internal/contracts/runtime"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -33,7 +34,13 @@ func main() {
 	if err != nil {
 		fail(err.Error())
 	}
-	requirements, err := runtimeemission.DecodePackageRequirements(contract)
+	contractRequirements, err := runtimecontract.Decode(contract)
+	if err != nil {
+		fail(err.Error())
+	}
+	requirements, err := runtimeemission.ResolvePackageRequirements(
+		contractRequirements,
+	)
 	if err != nil {
 		fail(err.Error())
 	}

@@ -170,15 +170,6 @@ func providerDigest(config resolvedConfig) (string, error) {
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-func fileDigest(sourcePath string) (string, error) {
-	payload, err := os.ReadFile(sourcePath)
-	if err != nil {
-		return "", certifyError("hash file", sourcePath, err.Error())
-	}
-	digest := sha256.Sum256(payload)
-	return hex.EncodeToString(digest[:]), nil
-}
-
 func relativeProviderPath(config resolvedConfig, sourcePath string) string {
 	relative, err := filepath.Rel(config.providerRoot, sourcePath)
 	if err != nil {

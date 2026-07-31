@@ -70,7 +70,7 @@ func (s *programSession) emitEnvironmentObject(object types.Object) error {
 	if err != nil {
 		return err
 	}
-	if s.standardLibraryLinked &&
+	if s.standardLibrary != nil &&
 		s.registry.HasProviderCoverageOwner(object) {
 		if _, duplicate := builder.declarations[object]; duplicate {
 			return &ScheduleError{
@@ -146,7 +146,7 @@ func (s *programSession) requireEnvironmentPackage(
 	if err != nil {
 		return nil, err
 	}
-	if s.standardLibraryLinked &&
+	if s.standardLibrary != nil &&
 		sourcePackage.Kind() == load.PackageStandardLibraryContract {
 		outputPath, err = targetoutput.StandardLibraryConstantProjectionPath(
 			sourcePackage,
@@ -188,8 +188,7 @@ func (s *programSession) requireEnvironmentPackage(
 }
 
 func (s *programSession) environmentTargetFiles(
-	primitiveAliases map[api.PrimitiveAlias]struct{},
-	runtimeSymbols map[api.RuntimeSymbol]struct{},
+	requirements *targetRequirements,
 ) ([]TargetFile, error) {
 	builders := make(
 		[]*environmentContractBuilder,
@@ -208,12 +207,7 @@ func (s *programSession) environmentTargetFiles(
 		if err != nil {
 			return nil, err
 		}
-		for _, alias := range placement.PrimitiveAliases() {
-			primitiveAliases[alias] = struct{}{}
-		}
-		for _, symbol := range placement.RuntimeSymbols() {
-			runtimeSymbols[symbol] = struct{}{}
-		}
+		requirements.observe(placement)
 		statements := placement.Statements(s.factory)
 		declarations := make(
 			[]environmentDeclaration,
@@ -271,13 +265,13 @@ func (s *programSession) environmentTargetFiles(
 				),
 			)
 		}
-		if s.standardLibraryLinked &&
+		if s.standardLibrary != nil &&
 			builder.sourcePackage.Kind() == load.PackageStandardLibraryContract &&
 			len(builder.projections) == 0 {
 			continue
 		}
 		kind := TargetFileEnvironmentContract
-		if s.standardLibraryLinked &&
+		if s.standardLibrary != nil &&
 			builder.sourcePackage.Kind() == load.PackageStandardLibraryContract {
 			kind = TargetFileStandardLibraryConstantProjection
 		}

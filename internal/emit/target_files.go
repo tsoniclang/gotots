@@ -32,20 +32,14 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 	}
 	sort.Strings(paths)
 	files := make([]TargetFile, 0, len(paths)+1)
-	primitiveAliases := make(map[api.PrimitiveAlias]struct{})
-	runtimeSymbols := make(map[api.RuntimeSymbol]struct{})
+	requirements := s.newTargetRequirements()
 	for _, outputPath := range paths {
 		builder := s.builders[outputPath]
 		placement, err := committedTargetFilePlacement(builder)
 		if err != nil {
 			return nil, err
 		}
-		for _, alias := range placement.PrimitiveAliases() {
-			primitiveAliases[alias] = struct{}{}
-		}
-		for _, symbol := range placement.RuntimeSymbols() {
-			runtimeSymbols[symbol] = struct{}{}
-		}
+		requirements.observe(placement)
 		orderInput := make(
 			[]declarationorder.Declaration,
 			len(builder.declarations),
@@ -91,50 +85,29 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		}
 		files = append(files, target)
 	}
-	environmentFiles, err := s.environmentTargetFiles(
-		primitiveAliases,
-		runtimeSymbols,
-	)
+	environmentFiles, err := s.environmentTargetFiles(requirements)
 	if err != nil {
 		return nil, err
 	}
 	files = append(files, environmentFiles...)
-	packageFiles, err := s.packageTargetFiles(primitiveAliases)
+	packageFiles, err := s.packageTargetFiles(requirements)
 	if err != nil {
 		return nil, err
 	}
 	files = append(files, packageFiles...)
-	for _, builder := range s.packageBuilders {
-		for _, symbol := range builder.statePlacement.RuntimeSymbols() {
-			runtimeSymbols[symbol] = struct{}{}
-		}
-		for _, symbol := range builder.assemblyPlacement.RuntimeSymbols() {
-			runtimeSymbols[symbol] = struct{}{}
-		}
-		for _, storage := range builder.storage {
-			for _, symbol := range storage.statePlacement.RuntimeSymbols() {
-				runtimeSymbols[symbol] = struct{}{}
-			}
-			for _, symbol := range storage.assemblyPlacement.RuntimeSymbols() {
-				runtimeSymbols[symbol] = struct{}{}
-			}
-		}
-	}
-	programFile, err := s.programInitializationFile()
+	programFile, err := s.programInitializationFile(requirements)
 	if err != nil {
 		return nil, err
 	}
 	files = append(files, programFile)
-	aliases := make([]api.PrimitiveAlias, 0, len(primitiveAliases))
-	for alias := range primitiveAliases {
-		aliases = append(aliases, alias)
+	if err := requirements.addProviderRuntime(s); err != nil {
+		return nil, err
 	}
-	slices.Sort(aliases)
 	runtimePackage, err := runtimeemission.AssemblePackage(
 		s.factory,
 		s.integer,
-		runtimeSymbols,
-		aliases,
+		requirements.runtimeSymbols,
+		requirements.aliases(),
 	)
 	if err != nil {
 		return nil, err
@@ -179,7 +152,9 @@ func committedTargetFilePlacement(
 	return placement, nil
 }
 
-func (s *programSession) programInitializationFile() (TargetFile, error) {
+func (s *programSession) programInitializationFile(
+	requirements *targetRequirements,
+) (TargetFile, error) {
 	order, err := s.packageInitializationOrder()
 	if err != nil {
 		return TargetFile{}, err
@@ -236,12 +211,90 @@ func (s *programSession) programInitializationFile() (TargetFile, error) {
 	}
 	statements := placement.Statements(s.factory)
 	statements = append(statements, calls...)
+	requirements.observe(placement)
 	return s.sourceFile(
 		targetoutput.ProgramInitializationPath,
 		"",
 		TargetFileProgramInitialization,
 		statements,
 	)
+}
+
+type targetRequirements struct {
+	primitiveAliases         map[api.PrimitiveAlias]struct{}
+	runtimeSymbols           map[api.RuntimeSymbol]struct{}
+	certifiedProviderModules map[string]struct{}
+	selectedProviderModules  map[string]struct{}
+}
+
+func (s *programSession) newTargetRequirements() *targetRequirements {
+	result := &targetRequirements{
+		primitiveAliases:         make(map[api.PrimitiveAlias]struct{}),
+		runtimeSymbols:           make(map[api.RuntimeSymbol]struct{}),
+		certifiedProviderModules: make(map[string]struct{}),
+		selectedProviderModules:  make(map[string]struct{}),
+	}
+	if s.standardLibrary == nil {
+		return result
+	}
+	for _, module := range s.standardLibrary.ProviderModules() {
+		result.certifiedProviderModules[module] = struct{}{}
+	}
+	return result
+}
+
+func (r *targetRequirements) observe(placement *targetplacement.Owner) {
+	for _, alias := range placement.PrimitiveAliases() {
+		r.primitiveAliases[alias] = struct{}{}
+	}
+	for _, symbol := range placement.RuntimeSymbols() {
+		r.runtimeSymbols[symbol] = struct{}{}
+	}
+	for _, request := range placement.Requests() {
+		module := request.ModulePath()
+		if _, certified := r.certifiedProviderModules[module]; certified {
+			r.selectedProviderModules[module] = struct{}{}
+		}
+	}
+}
+
+func (r *targetRequirements) addProviderRuntime(s *programSession) error {
+	if len(r.selectedProviderModules) == 0 {
+		return nil
+	}
+	if s.standardLibrary == nil {
+		return &ScheduleError{Reason: "selected provider has no certificate"}
+	}
+	contract, ok := s.standardLibrary.RuntimeRequirements()
+	if !ok {
+		return &ScheduleError{Reason: "selected provider has no runtime contract"}
+	}
+	requirements, err := runtimeemission.ResolvePackageRequirements(contract)
+	if err != nil {
+		return err
+	}
+	if !requirements.AllowsProfile(s.integer) {
+		return &OptionsError{
+			Field:  "integer representation",
+			Reason: "selected provider runtime does not admit " + s.integer.String(),
+		}
+	}
+	for _, alias := range requirements.PrimitiveAliases() {
+		r.primitiveAliases[alias] = struct{}{}
+	}
+	for symbol := range requirements.RuntimeSymbols() {
+		r.runtimeSymbols[symbol] = struct{}{}
+	}
+	return nil
+}
+
+func (r *targetRequirements) aliases() []api.PrimitiveAlias {
+	aliases := make([]api.PrimitiveAlias, 0, len(r.primitiveAliases))
+	for alias := range r.primitiveAliases {
+		aliases = append(aliases, alias)
+	}
+	slices.Sort(aliases)
+	return aliases
 }
 
 func (s *programSession) packageInitializationOrder() (

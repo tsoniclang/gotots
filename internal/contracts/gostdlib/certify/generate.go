@@ -118,7 +118,7 @@ func Generate(config Config) ([]byte, error) {
 	if err := client.Close(); err != nil {
 		return nil, err
 	}
-	runtimeDigest, err := fileDigest(resolved.runtimeContractPath)
+	_, runtimeDigest, err := readRuntimeContract(resolved.runtimeContractPath)
 	if err != nil {
 		return nil, err
 	}

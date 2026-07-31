@@ -3,11 +3,12 @@ package runtime
 import (
 	"testing"
 
+	runtimecontract "github.com/tsoniclang/gotots/internal/contracts/runtime"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
 func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
-	requirements, err := DecodePackageRequirements([]byte(`{
+	contract, err := runtimecontract.Decode([]byte(`{
 	  "schemaVersion": 1,
 	  "integerRepresentations": ["number"],
 	  "primitiveAliases": [
@@ -17,6 +18,10 @@ func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
 	    {"id": 300, "export": "RuntimeSlice"}
 	  ]
 	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirements, err := ResolvePackageRequirements(contract)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +69,11 @@ func TestPackageRequirementsRejectIdentityMutations(t *testing.T) {
 		  "runtimeSymbols": [{"id": 300, "export": "RuntimeSlice"}]
 		}`,
 	} {
-		if _, err := DecodePackageRequirements([]byte(source)); err == nil {
+		contract, err := runtimecontract.Decode([]byte(source))
+		if err == nil {
+			_, err = ResolvePackageRequirements(contract)
+		}
+		if err == nil {
 			t.Fatal("mutated runtime requirement was accepted")
 		}
 	}
