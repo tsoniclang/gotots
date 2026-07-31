@@ -1,5 +1,6 @@
 import {
   GoErrorMethodToken,
+  type GoError,
   GoInterfaceValue,
   GoRuntimeErrorMethodToken,
 } from "@gotots/runtime/interface-value.js";
@@ -34,4 +35,8 @@ export class ProviderError extends GoInterfaceValue {
 
 export function providerError(failure: object): ProviderError {
   return new ProviderError(failure instanceof Error ? failure.message : String(failure));
+}
+
+export function isGoError(value: GoInterfaceValue): value is GoError {
+  return value.$go$implements([GoErrorMethodToken]);
 }

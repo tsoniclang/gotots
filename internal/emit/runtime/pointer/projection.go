@@ -186,7 +186,7 @@ func (b builder) elementMethod() tsgo.MethodDeclaration {
 					b.call(b.id(b.className), "root", backing),
 					index,
 				),
-				element,
+				b.defined(element),
 				element,
 			),
 		),

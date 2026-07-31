@@ -12,14 +12,202 @@
     "README.md"
   ],
   "exports": {
-    "./*.js": {
-      "types": "./dist/src/*.d.ts",
-      "default": "./dist/src/*.js"
+    "./bufio.js": {
+      "types": "./dist/src/bufio.d.ts",
+      "default": "./dist/src/bufio.js"
+    },
+    "./bytes.js": {
+      "types": "./dist/src/bytes.d.ts",
+      "default": "./dist/src/bytes.js"
+    },
+    "./cmp.js": {
+      "types": "./dist/src/cmp.d.ts",
+      "default": "./dist/src/cmp.js"
+    },
+    "./compress/gzip.js": {
+      "types": "./dist/src/compress/gzip.d.ts",
+      "default": "./dist/src/compress/gzip.js"
+    },
+    "./context.js": {
+      "types": "./dist/src/context.d.ts",
+      "default": "./dist/src/context.js"
+    },
+    "./encoding.js": {
+      "types": "./dist/src/encoding.d.ts",
+      "default": "./dist/src/encoding.js"
+    },
+    "./encoding/base64.js": {
+      "types": "./dist/src/encoding/base64.d.ts",
+      "default": "./dist/src/encoding/base64.js"
+    },
+    "./encoding/binary.js": {
+      "types": "./dist/src/encoding/binary.d.ts",
+      "default": "./dist/src/encoding/binary.js"
+    },
+    "./encoding/hex.js": {
+      "types": "./dist/src/encoding/hex.d.ts",
+      "default": "./dist/src/encoding/hex.js"
+    },
+    "./errors.js": {
+      "types": "./dist/src/errors.d.ts",
+      "default": "./dist/src/errors.js"
+    },
+    "./flag.js": {
+      "types": "./dist/src/flag.d.ts",
+      "default": "./dist/src/flag.js"
+    },
+    "./fmt.js": {
+      "types": "./dist/src/fmt.d.ts",
+      "default": "./dist/src/fmt.js"
+    },
+    "./internal/abi.js": {
+      "types": "./dist/src/internal/abi.d.ts",
+      "default": "./dist/src/internal/abi.js"
+    },
+    "./io.js": {
+      "types": "./dist/src/io.d.ts",
+      "default": "./dist/src/io.js"
+    },
+    "./io/fs.js": {
+      "types": "./dist/src/io/fs.d.ts",
+      "default": "./dist/src/io/fs.js"
+    },
+    "./iter.js": {
+      "types": "./dist/src/iter.d.ts",
+      "default": "./dist/src/iter.js"
+    },
+    "./maps.js": {
+      "types": "./dist/src/maps.d.ts",
+      "default": "./dist/src/maps.js"
+    },
+    "./math.js": {
+      "types": "./dist/src/math.d.ts",
+      "default": "./dist/src/math.js"
+    },
+    "./math/big.js": {
+      "types": "./dist/src/math/big.d.ts",
+      "default": "./dist/src/math/big.js"
+    },
+    "./math/bits.js": {
+      "types": "./dist/src/math/bits.d.ts",
+      "default": "./dist/src/math/bits.js"
+    },
+    "./math/rand/v2.js": {
+      "types": "./dist/src/math/rand/v2.d.ts",
+      "default": "./dist/src/math/rand/v2.js"
+    },
+    "./net.js": {
+      "types": "./dist/src/net.d.ts",
+      "default": "./dist/src/net.js"
+    },
+    "./net/url.js": {
+      "types": "./dist/src/net/url.d.ts",
+      "default": "./dist/src/net/url.js"
+    },
+    "./os.js": {
+      "types": "./dist/src/os.d.ts",
+      "default": "./dist/src/os.js"
+    },
+    "./os/exec.js": {
+      "types": "./dist/src/os/exec.d.ts",
+      "default": "./dist/src/os/exec.js"
+    },
+    "./os/signal.js": {
+      "types": "./dist/src/os/signal.d.ts",
+      "default": "./dist/src/os/signal.js"
+    },
+    "./path.js": {
+      "types": "./dist/src/path.d.ts",
+      "default": "./dist/src/path.js"
+    },
+    "./path/filepath.js": {
+      "types": "./dist/src/path/filepath.d.ts",
+      "default": "./dist/src/path/filepath.js"
+    },
+    "./reflect.js": {
+      "types": "./dist/src/reflect.d.ts",
+      "default": "./dist/src/reflect.js"
+    },
+    "./regexp.js": {
+      "types": "./dist/src/regexp.d.ts",
+      "default": "./dist/src/regexp.js"
+    },
+    "./runtime.js": {
+      "types": "./dist/src/runtime.d.ts",
+      "default": "./dist/src/runtime.js"
+    },
+    "./runtime/debug.js": {
+      "types": "./dist/src/runtime/debug.d.ts",
+      "default": "./dist/src/runtime/debug.js"
+    },
+    "./runtime/metrics.js": {
+      "types": "./dist/src/runtime/metrics.d.ts",
+      "default": "./dist/src/runtime/metrics.js"
+    },
+    "./runtime/pprof.js": {
+      "types": "./dist/src/runtime/pprof.d.ts",
+      "default": "./dist/src/runtime/pprof.js"
+    },
+    "./slices.js": {
+      "types": "./dist/src/slices.d.ts",
+      "default": "./dist/src/slices.js"
+    },
+    "./sort.js": {
+      "types": "./dist/src/sort.d.ts",
+      "default": "./dist/src/sort.js"
+    },
+    "./strconv.js": {
+      "types": "./dist/src/strconv.d.ts",
+      "default": "./dist/src/strconv.js"
+    },
+    "./strings.js": {
+      "types": "./dist/src/strings.d.ts",
+      "default": "./dist/src/strings.js"
+    },
+    "./sync.js": {
+      "types": "./dist/src/sync.d.ts",
+      "default": "./dist/src/sync.js"
+    },
+    "./sync/atomic.js": {
+      "types": "./dist/src/sync/atomic.d.ts",
+      "default": "./dist/src/sync/atomic.js"
+    },
+    "./syscall.js": {
+      "types": "./dist/src/syscall.d.ts",
+      "default": "./dist/src/syscall.js"
+    },
+    "./testing.js": {
+      "types": "./dist/src/testing.d.ts",
+      "default": "./dist/src/testing.js"
+    },
+    "./time.js": {
+      "types": "./dist/src/time.d.ts",
+      "default": "./dist/src/time.js"
+    },
+    "./unicode.js": {
+      "types": "./dist/src/unicode.d.ts",
+      "default": "./dist/src/unicode.js"
+    },
+    "./unicode/utf16.js": {
+      "types": "./dist/src/unicode/utf16.d.ts",
+      "default": "./dist/src/unicode/utf16.js"
+    },
+    "./unicode/utf8.js": {
+      "types": "./dist/src/unicode/utf8.d.ts",
+      "default": "./dist/src/unicode/utf8.js"
+    },
+    "./unsafe.js": {
+      "types": "./dist/src/unsafe.d.ts",
+      "default": "./dist/src/unsafe.js"
     },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "go tool tsgo -p tsconfig.json",
+    "runtime:generate": "cd .. && go run ./internal/emit/runtime/generate -contract gostdlib/contract/runtime.json -module . -output gostdlib/test/runtime-package -profile number",
+    "runtime:check": "cd .. && go run ./internal/emit/runtime/generate -contract gostdlib/contract/runtime.json -module . -output gostdlib/test/runtime-package -profile number -check",
+    "runtime:build": "go tool tsgo -p test/runtime-package/tsconfig.json",
+    "build:provider": "go tool tsgo -p tsconfig.json",
+    "build": "npm run runtime:check && npm run runtime:build && npm run build:provider",
     "check": "npm run build && node scripts/check-public-surface.mjs && node --test \"dist/test/**/*.test.js\"",
     "clean": "node scripts/clean.mjs"
   },

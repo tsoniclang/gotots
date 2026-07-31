@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "integerRepresentations": [
+    "number"
+  ],
+  "primitiveAliases": [
+    {
+      "id": 1,
+      "export": "bool"
+    },
+    {
+      "id": 2,
+      "export": "int8"
+    },
+    {
+      "id": 3,
+      "export": "int16"
+    },
+    {
+      "id": 4,
+      "export": "int32"
+    },
+    {
+      "id": 5,
+      "export": "int64"
+    },
+    {
+      "id": 6,
+      "export": "uint8"
+    },
+    {
+      "id": 7,
+      "export": "uint16"
+    },
+    {
+      "id": 8,
+      "export": "uint32"
+    },
+    {
+      "id": 9,
+      "export": "uint64"
+    },
+    {
+      "id": 10,
+      "export": "gostring"
+    },
+    {
+      "id": 11,
+      "export": "float32"
+    },
+    {
+      "id": 12,
+      "export": "float64"
+    }
+  ],
+  "runtimeSymbols": [
+    {
+      "id": 100,
+      "export": "GoPointer"
+    },
+    {
+      "id": 200,
+      "export": "GoArray"
+    },
+    {
+      "id": 300,
+      "export": "RuntimeSlice"
+    },
+    {
+      "id": 400,
+      "export": "GoMap"
+    },
+    {
+      "id": 404,
+      "export": "GoMapValue"
+    },
+    {
+      "id": 500,
+      "export": "GoPanic"
+    },
+    {
+      "id": 801,
+      "export": "GoComplex128"
+    },
+    {
+      "id": 1000,
+      "export": "GoInterfaceValue"
+    },
+    {
+      "id": 1003,
+      "export": "GoErrorMethodToken"
+    },
+    {
+      "id": 1004,
+      "export": "GoRuntimeErrorMethodToken"
+    },
+    {
+      "id": 1005,
+      "export": "GoError"
+    },
+    {
+      "id": 1101,
+      "export": "GoReceiveChannel"
+    },
+    {
+      "id": 1200,
+      "export": "GoUnsafePointer"
+    }
+  ]
+}

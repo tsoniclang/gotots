@@ -1,19 +1,31 @@
 {
   "name": "@gotots/runtime",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
+  "gotots": {
+    "integerRepresentation": "number"
+  },
   "exports": {
-    "./scalars.js": {
-      "types": "./scalars.d.ts",
-      "default": "./scalars.js"
+    "./array.js": {
+      "types": "./array.d.ts",
+      "default": "./array.js"
     },
-    "./slice.js": {
-      "types": "./slice.d.ts",
-      "default": "./slice.js"
+    "./channel.js": {
+      "types": "./channel.d.ts",
+      "default": "./channel.js"
+    },
+    "./complex.js": {
+      "types": "./complex.d.ts",
+      "default": "./complex.js"
     },
     "./interface-value.js": {
       "types": "./interface-value.d.ts",
       "default": "./interface-value.js"
+    },
+    "./map.js": {
+      "types": "./map.d.ts",
+      "default": "./map.js"
     },
     "./panic.js": {
       "types": "./panic.d.ts",
@@ -23,21 +35,13 @@
       "types": "./pointer.d.ts",
       "default": "./pointer.js"
     },
-    "./array.js": {
-      "types": "./array.d.ts",
-      "default": "./array.js"
+    "./scalars.js": {
+      "types": "./scalars.d.ts",
+      "default": "./scalars.js"
     },
-    "./map.js": {
-      "types": "./map.d.ts",
-      "default": "./map.js"
-    },
-    "./channel.js": {
-      "types": "./channel.d.ts",
-      "default": "./channel.js"
-    },
-    "./complex.js": {
-      "types": "./complex.d.ts",
-      "default": "./complex.js"
+    "./slice.js": {
+      "types": "./slice.d.ts",
+      "default": "./slice.js"
     },
     "./unsafe-pointer.js": {
       "types": "./unsafe-pointer.d.ts",

@@ -153,6 +153,17 @@ func element(
 	)
 }
 
+func definedElement(
+	factory tsgo.Factory,
+	value tsgo.Expression,
+	index tsgo.Expression,
+) tsgo.NonNullExpression {
+	return factory.NonNullExpression(
+		element(factory, value, index),
+		tsgo.NodeFlagsNone,
+	)
+}
+
 func call(
 	factory tsgo.Factory,
 	callee tsgo.Expression,

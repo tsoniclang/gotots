@@ -309,8 +309,8 @@ func literalMethod(
 					factory,
 					runtimeProperty(factory, result, arraymember.Set),
 					nil,
-					element(factory, indexes, entry),
-					element(factory, values, entry),
+					definedElement(factory, indexes, entry),
+					definedElement(factory, values, entry),
 				)),
 			}, true),
 		),
@@ -434,7 +434,7 @@ func getMethod(
 					index,
 				),
 			),
-			factory.ReturnStatement(element(
+			factory.ReturnStatement(definedElement(
 				factory,
 				property(factory, factory.ThisExpression(), "$values"),
 				binary(

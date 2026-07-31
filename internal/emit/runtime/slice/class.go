@@ -372,6 +372,17 @@ func (b builder) index(
 	)
 }
 
+func (b builder) defined(value tsgo.Expression) tsgo.NonNullExpression {
+	return b.factory.NonNullExpression(value, tsgo.NodeFlagsNone)
+}
+
+func (b builder) indexedValue(
+	value tsgo.Expression,
+	index tsgo.Expression,
+) tsgo.NonNullExpression {
+	return b.defined(b.index(value, index))
+}
+
 func (b builder) loop(
 	limit tsgo.Expression,
 	body ...tsgo.Statement,

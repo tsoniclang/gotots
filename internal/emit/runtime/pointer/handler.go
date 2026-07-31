@@ -251,6 +251,10 @@ func (b builder) property(
 	)
 }
 
+func (b builder) defined(value tsgo.Expression) tsgo.NonNullExpression {
+	return b.factory.NonNullExpression(value, tsgo.NodeFlagsNone)
+}
+
 func (b builder) call(
 	receiver tsgo.Expression,
 	name string,
