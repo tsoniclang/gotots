@@ -29,7 +29,8 @@ func Generate(config Config) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	facetSeeds, representationSeeds, definedValueIdentities, genericOperations, err :=
+	facetSeeds, representationSeeds, definedValueIdentities, genericProjections,
+		genericOperations, err :=
 		readFacetSeeds(resolved.facetMapPath)
 	if err != nil {
 		return nil, err
@@ -74,6 +75,7 @@ func Generate(config Config) ([]byte, error) {
 			project,
 			source,
 			seed,
+			genericProjections,
 			genericOperations,
 			definedValueIdentities,
 			effectMarker,
@@ -88,6 +90,13 @@ func Generate(config Config) ([]byte, error) {
 		source,
 		modules,
 		genericOperations,
+	); err != nil {
+		client.Close()
+		return nil, err
+	}
+	if err := verifyGenericCallableProjectionBindings(
+		modules,
+		genericProjections,
 	); err != nil {
 		client.Close()
 		return nil, err
@@ -109,6 +118,7 @@ func Generate(config Config) ([]byte, error) {
 		facetSeeds,
 		representationSeeds,
 		modules,
+		genericProjections,
 		effectMarker,
 	)
 	if err != nil {
@@ -148,6 +158,7 @@ func buildModule(
 	project *tsgo.ProjectInspection,
 	source goSurface,
 	seed moduleSeed,
+	genericProjections map[string][]int,
 	genericOperations map[string][]gostdlib.GenericOperationDocument,
 	definedValueIdentities map[string]struct{},
 	effectMarker tsgo.ProjectExport,
@@ -208,6 +219,15 @@ func buildModule(
 			return gostdlib.ModuleDocument{}, err
 		}
 		binding.GenericOperations = genericOperations[binding.Identity]
+		binding.GenericTypeArguments, err = certifiedGenericCallableProjection(
+			project,
+			evidence,
+			target,
+			genericProjections,
+		)
+		if err != nil {
+			return gostdlib.ModuleDocument{}, err
+		}
 		_, identityValue := definedValueIdentities[binding.Identity]
 		if binding.Kind == gostdlib.BindingFunction || identityValue {
 			binding.Effect, err = exportCallableEffect(

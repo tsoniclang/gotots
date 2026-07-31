@@ -11,14 +11,20 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
-const facetMapSchemaVersion = 4
+const facetMapSchemaVersion = 5
 
 type facetMapDocument struct {
-	SchemaVersion          int                          `json:"schemaVersion"`
-	Representations        []providerRepresentationSeed `json:"representations,omitempty"`
-	DefinedValueIdentities []string                     `json:"definedValueIdentities,omitempty"`
-	Facets                 []facetSeed                  `json:"facets"`
-	GenericOperationSets   []genericOperationSetSeed    `json:"genericOperationSets"`
+	SchemaVersion              int                             `json:"schemaVersion"`
+	Representations            []providerRepresentationSeed    `json:"representations,omitempty"`
+	DefinedValueIdentities     []string                        `json:"definedValueIdentities,omitempty"`
+	Facets                     []facetSeed                     `json:"facets"`
+	GenericCallableProjections []genericCallableProjectionSeed `json:"genericCallableProjections"`
+	GenericOperationSets       []genericOperationSetSeed       `json:"genericOperationSets"`
+}
+
+type genericCallableProjectionSeed struct {
+	SourceIdentity string `json:"sourceIdentity"`
+	TypeParameters []int  `json:"typeParameters"`
 }
 
 type providerRepresentationSeed struct {
@@ -53,50 +59,88 @@ func readFacetSeeds(
 	[]facetSeed,
 	[]providerRepresentationSeed,
 	map[string]struct{},
+	map[string][]int,
 	map[string][]gostdlib.GenericOperationDocument,
 	error,
 ) {
 	file, err := os.Open(sourcePath)
 	if err != nil {
-		return nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	defer file.Close()
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()
 	var document facetMapDocument
 	if err := decoder.Decode(&document); err != nil {
-		return nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	var extra json.RawMessage
 	if err := decoder.Decode(&extra); err != io.EOF {
 		if err == nil {
 			err = fmt.Errorf("multiple JSON values")
 		}
-		return nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	if document.SchemaVersion != facetMapSchemaVersion {
-		return nil, nil, nil, nil, certifyError("read facet map", sourcePath, "schema is unsupported")
+		return nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, "schema is unsupported")
 	}
 	representations, representationIndex, err :=
 		validateProviderRepresentationSeeds(document.Representations)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	identities, err := validateDefinedValueIdentities(document.DefinedValueIdentities)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	facets, err := validateFacetSeeds(document.Facets, representationIndex)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
+	}
+	projections, err := validateGenericCallableProjectionSeeds(
+		document.GenericCallableProjections,
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
 	}
 	operations, err := validateGenericOperationSetSeeds(
 		document.GenericOperationSets,
 	)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
-	return facets, representations, identities, operations, nil
+	return facets, representations, identities, projections, operations, nil
+}
+
+func validateGenericCallableProjectionSeeds(
+	source []genericCallableProjectionSeed,
+) (map[string][]int, error) {
+	result := make(map[string][]int, len(source))
+	previous := ""
+	for _, seed := range source {
+		if seed.SourceIdentity == "" ||
+			previous >= seed.SourceIdentity ||
+			len(seed.TypeParameters) == 0 {
+			return nil, certifyError(
+				"configure generic callable projections",
+				seed.SourceIdentity,
+				"projection identity is incomplete or unordered",
+			)
+		}
+		previous = seed.SourceIdentity
+		parameters := append([]int(nil), seed.TypeParameters...)
+		for index, parameter := range parameters {
+			if parameter < 0 || index != 0 && parameter <= parameters[index-1] {
+				return nil, certifyError(
+					"configure generic callable projections",
+					seed.SourceIdentity,
+					"source parameter indices are invalid or unordered",
+				)
+			}
+		}
+		result[seed.SourceIdentity] = parameters
+	}
+	return result, nil
 }
 
 func validateDefinedValueIdentities(source []string) (map[string]struct{}, error) {

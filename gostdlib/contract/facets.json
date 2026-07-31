@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "representations": [
     {
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
@@ -1153,6 +1153,49 @@
       "profileKey": "c30278625496c7198c92a774ca902c537bd14851c35fbd06e171ee3f89e3602c=cooperative",
       "effect": "sync"
     }
+  ],
+  "genericCallableProjections": [
+    { "sourceIdentity": "cmp|kind=4|receiver=|name=Compare", "typeParameters": [0] },
+    { "sourceIdentity": "errors|kind=4|receiver=|name=AsType", "typeParameters": [0] },
+    { "sourceIdentity": "maps|kind=4|receiver=|name=Clone", "typeParameters": [1, 2] },
+    { "sourceIdentity": "maps|kind=4|receiver=|name=Copy", "typeParameters": [2, 3] },
+    { "sourceIdentity": "maps|kind=4|receiver=|name=Equal", "typeParameters": [2, 3] },
+    { "sourceIdentity": "maps|kind=4|receiver=|name=EqualFunc", "typeParameters": [2, 3, 4] },
+    { "sourceIdentity": "maps|kind=4|receiver=|name=Keys", "typeParameters": [1, 2] },
+    { "sourceIdentity": "maps|kind=4|receiver=|name=Values", "typeParameters": [1, 2] },
+    { "sourceIdentity": "reflect|kind=4|receiver=|name=TypeAssert", "typeParameters": [0] },
+    { "sourceIdentity": "reflect|kind=4|receiver=|name=TypeFor", "typeParameters": [0] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=AppendSeq", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearch", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearchFunc", "typeParameters": [1, 2] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Clip", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Clone", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Collect", "typeParameters": [0] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Compact", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=CompactFunc", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Compare", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=CompareFunc", "typeParameters": [2, 3] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Concat", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Contains", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=ContainsFunc", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Delete", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=DeleteFunc", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Equal", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=EqualFunc", "typeParameters": [2, 3] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Grow", "typeParameters": [0, 1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Index", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=IndexFunc", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Insert", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Repeat", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Replace", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Reverse", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Sort", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=SortFunc", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=SortStableFunc", "typeParameters": [1] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Sorted", "typeParameters": [0] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=SortedFunc", "typeParameters": [0] },
+    { "sourceIdentity": "slices|kind=4|receiver=|name=Values", "typeParameters": [1] },
+    { "sourceIdentity": "sync|kind=4|receiver=|name=OnceValue", "typeParameters": [0] }
   ],
   "genericOperationSets": [
     {

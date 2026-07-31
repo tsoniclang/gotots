@@ -788,6 +788,16 @@ the provider empty-operation assumption, or swapping capability/source ABI
 slots must fail manifest certification, TS-Go AST shape, strict typechecking,
 or differential execution.
 
+For every generic provider binding, verification also exact-joins the
+configured source-parameter projection to the selected Go declaration and the
+inspected ordinary provider call signature. Artifact tests distinguish
+`Concat<S,E> -> Concat<E>`, `maps.Clone<M,K,V> -> Clone<K,V>`, and
+`Grow<S,E> -> Grow<S,E>`, while a cooperative `SortFunc` proves that its
+profile layout remains separate. Mutations deleting a projection, selecting
+the container parameter instead of the element parameter, changing order,
+or changing provider generic arity must fail certification or strict
+typechecking.
+
 Linked-provider constant verification compiles `math.MaxFloat64` and
 `math.MaxInt64` uses through exact contextual projections. It inspects the
 TS-Go AST for one initialized projection per demanded representation, proves

@@ -15,20 +15,21 @@ import (
 )
 
 type targetBinding struct {
-	name                       string
-	sourceFile                 *ast.File
-	sourcePath                 string
-	moduleExport               bool
-	kind                       targetBindingKind
-	providerModule             string
-	providerExport             string
-	providerMember             string
-	providerAccess             gostdlib.AccessKind
-	providerRepresentation     bool
-	providerTypeRepresentation gostdlib.RepresentationKind
-	providerDefinedValue       gostdlib.DefinedValueRepresentationKind
-	providerEffect             gostdlib.EffectKind
-	providerGenericOperations  []gostdlib.GenericOperationDocument
+	name                         string
+	sourceFile                   *ast.File
+	sourcePath                   string
+	moduleExport                 bool
+	kind                         targetBindingKind
+	providerModule               string
+	providerExport               string
+	providerMember               string
+	providerAccess               gostdlib.AccessKind
+	providerRepresentation       bool
+	providerTypeRepresentation   gostdlib.RepresentationKind
+	providerDefinedValue         gostdlib.DefinedValueRepresentationKind
+	providerEffect               gostdlib.EffectKind
+	providerGenericTypeArguments []int
+	providerGenericOperations    []gostdlib.GenericOperationDocument
 }
 
 type targetBindingKind uint8

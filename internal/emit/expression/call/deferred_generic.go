@@ -39,16 +39,6 @@ func emitDeferredGeneric(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	typeArguments, typeRequests, err := genericinstance.EmitTypeArguments(
-		context,
-		children,
-		source,
-		owner,
-		instance.TypeArgs,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
 	capabilities, capabilityRequests, err := genericinstance.EmitCapabilities(
 		context,
 		source,
@@ -81,12 +71,24 @@ func emitDeferredGeneric(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	reference, callableFacet, _, err :=
+	reference, callableFacet, selection, err :=
 		cooperativecall.SelectGenericCallable(
 			context,
 			owner,
 			declarationSignature,
 			signature,
+		)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	typeArguments, typeRequests, err :=
+		genericinstance.EmitFunctionTypeArguments(
+			context,
+			children,
+			source,
+			owner,
+			instance.TypeArgs,
+			selection.Cooperative(),
 		)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err

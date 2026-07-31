@@ -47,7 +47,7 @@ func Emit(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	reference, callableFacet, _, err :=
+	reference, callableFacet, selection, err :=
 		cooperativecall.SelectGenericCallable(
 			context,
 			owner,
@@ -75,12 +75,13 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	typeArguments, typeRequests, err := genericinstance.EmitTypeArguments(
+	typeArguments, typeRequests, err := genericinstance.EmitFunctionTypeArguments(
 		context,
 		children,
 		source,
 		owner,
 		instance.TypeArgs,
+		selection.Cooperative(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err

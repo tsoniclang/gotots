@@ -55,11 +55,11 @@ func (p *ProjectInspection) CallableEffect(
 	if err != nil {
 		return CallableEffectInvalid, err
 	}
-	targetReturn, err := p.signatureReturn(targetSignature, "target")
+	targetReturn, err := p.signatureReturn(targetSignature.ID, "target")
 	if err != nil {
 		return CallableEffectInvalid, err
 	}
-	markerReturn, err := p.signatureReturn(markerSignature, "async marker")
+	markerReturn, err := p.signatureReturn(markerSignature.ID, "async marker")
 	if err != nil {
 		return CallableEffectInvalid, err
 	}
@@ -90,6 +90,25 @@ func (p *ProjectInspection) CallableEffect(
 	return CallableEffectSynchronous, nil
 }
 
+func (p *ProjectInspection) CallableTypeParameterCount(
+	target projectCallable,
+) (int, error) {
+	if p == nil || target == nil {
+		return 0, &ProjectInspectionError{
+			Operation: "callable type parameters",
+			Reason:    "target is absent",
+		}
+	}
+	signature, err := p.singleCallSignature(
+		target,
+		target.callableSubject(),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return len(signature.TypeParameters), nil
+}
+
 func (p *ProjectInspection) compositeTypes(source uint32) ([]typeResponse, error) {
 	var selected []typeResponse
 	if err := requestProjectJSON(
@@ -116,7 +135,7 @@ func (p *ProjectInspection) compositeTypes(source uint32) ([]typeResponse, error
 func (p *ProjectInspection) singleCallSignature(
 	target projectCallable,
 	subject string,
-) (uint64, error) {
+) (signatureResponse, error) {
 	seen := make(map[uint32]struct{})
 	for _, candidate := range target.callableTypeIDs() {
 		if candidate == 0 {
@@ -128,7 +147,7 @@ func (p *ProjectInspection) singleCallSignature(
 		seen[candidate] = struct{}{}
 		nonNullable, err := p.nonNullableType(candidate)
 		if err != nil {
-			return 0, err
+			return signatureResponse{}, err
 		}
 		var signatures []signatureResponse
 		if err := requestProjectJSON(
@@ -142,13 +161,13 @@ func (p *ProjectInspection) singleCallSignature(
 			},
 			&signatures,
 		); err != nil {
-			return 0, err
+			return signatureResponse{}, err
 		}
 		if len(signatures) == 0 {
 			continue
 		}
 		if len(signatures) != 1 || signatures[0].ID == 0 {
-			return 0, &ProjectInspectionError{
+			return signatureResponse{}, &ProjectInspectionError{
 				Operation: "callable effect",
 				Reason: fmt.Sprintf(
 					"%s has %d call signatures, want one",
@@ -157,9 +176,9 @@ func (p *ProjectInspection) singleCallSignature(
 				),
 			}
 		}
-		return signatures[0].ID, nil
+		return signatures[0], nil
 	}
-	return 0, &ProjectInspectionError{
+	return signatureResponse{}, &ProjectInspectionError{
 		Operation: "callable effect",
 		Reason:    subject + " has no call signature",
 	}
@@ -240,5 +259,6 @@ type getTypePropertyParams struct {
 }
 
 type signatureResponse struct {
-	ID uint64 `json:"id"`
+	ID             uint64   `json:"id"`
+	TypeParameters []uint32 `json:"typeParameters,omitempty"`
 }

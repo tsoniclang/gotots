@@ -1,7 +1,9 @@
 package gostdlib
 
+import "slices"
+
 const (
-	SchemaVersion = 6
+	SchemaVersion = 7
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -86,20 +88,21 @@ type ModuleDocument struct {
 }
 
 type BindingDocument struct {
-	Identity            string                         `json:"identity"`
-	Kind                BindingKind                    `json:"kind"`
-	Access              AccessKind                     `json:"access"`
-	Representation      RepresentationKind             `json:"representation,omitempty"`
-	DefinedValue        DefinedValueRepresentationKind `json:"definedValue,omitempty"`
-	Effect              EffectKind                     `json:"effect,omitempty"`
-	Export              string                         `json:"export"`
-	Member              string                         `json:"member,omitempty"`
-	GenericOperations   []GenericOperationDocument     `json:"genericOperations,omitempty"`
-	SourceSignature     string                         `json:"sourceSignature"`
-	SourceValue         string                         `json:"sourceValue,omitempty"`
-	SourceLocation      string                         `json:"sourceLocation"`
-	ImplementationOwner string                         `json:"implementationOwner"`
-	TargetFingerprint   string                         `json:"targetFingerprint"`
+	Identity             string                         `json:"identity"`
+	Kind                 BindingKind                    `json:"kind"`
+	Access               AccessKind                     `json:"access"`
+	Representation       RepresentationKind             `json:"representation,omitempty"`
+	DefinedValue         DefinedValueRepresentationKind `json:"definedValue,omitempty"`
+	Effect               EffectKind                     `json:"effect,omitempty"`
+	Export               string                         `json:"export"`
+	Member               string                         `json:"member,omitempty"`
+	GenericTypeArguments []int                          `json:"genericTypeArguments,omitempty"`
+	GenericOperations    []GenericOperationDocument     `json:"genericOperations,omitempty"`
+	SourceSignature      string                         `json:"sourceSignature"`
+	SourceValue          string                         `json:"sourceValue,omitempty"`
+	SourceLocation       string                         `json:"sourceLocation"`
+	ImplementationOwner  string                         `json:"implementationOwner"`
+	TargetFingerprint    string                         `json:"targetFingerprint"`
 }
 
 type Manifest struct {
@@ -281,6 +284,10 @@ func (b Binding) GenericOperations() []GenericOperationDocument {
 	return cloneGenericOperations(b.binding.GenericOperations)
 }
 
+func (b Binding) GenericTypeArguments() []int {
+	return slices.Clone(b.binding.GenericTypeArguments)
+}
+
 func (b Binding) SourceSignature() string {
 	return b.binding.SourceSignature
 }
@@ -327,6 +334,8 @@ func cloneModule(source ModuleDocument) ModuleDocument {
 	result.Bindings = make([]BindingDocument, len(source.Bindings))
 	for index, binding := range source.Bindings {
 		result.Bindings[index] = binding
+		result.Bindings[index].GenericTypeArguments =
+			slices.Clone(binding.GenericTypeArguments)
 		result.Bindings[index].GenericOperations =
 			cloneGenericOperations(binding.GenericOperations)
 	}

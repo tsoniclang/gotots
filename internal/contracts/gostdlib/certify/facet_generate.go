@@ -19,6 +19,7 @@ func buildFacetModules(
 	seeds []facetSeed,
 	representationSeeds []providerRepresentationSeed,
 	modules []gostdlib.ModuleDocument,
+	genericProjections map[string][]int,
 	effectMarker tsgo.ProjectExport,
 ) ([]gostdlib.FacetModuleDocument, error) {
 	interfaceTargets, err := providerInterfaceTargets(
@@ -131,7 +132,13 @@ func buildFacetModules(
 		}
 		facets := make([]gostdlib.FacetDocument, 0, len(selected))
 		for _, seed := range selected {
-			facet, err := buildFacet(source, seed, byName, representations)
+			facet, err := buildFacet(
+				source,
+				seed,
+				byName,
+				representations,
+				genericProjections,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -176,6 +183,7 @@ func buildFacet(
 	seed facetSeed,
 	targets map[string]tsgo.ProjectExport,
 	representations map[string]gostdlib.ProviderRepresentationDocument,
+	genericProjections map[string][]int,
 ) (gostdlib.FacetDocument, error) {
 	evidence, ok := source.objects[seed.SourceIdentity]
 	if !ok {
@@ -215,6 +223,15 @@ func buildFacet(
 	}
 	if err := validateFacetTarget(seed, target); err != nil {
 		return gostdlib.FacetDocument{}, err
+	}
+	if seed.Kind == gostdlib.FacetGenericCallableProfile {
+		if len(genericProjections[seed.SourceIdentity]) == 0 {
+			return gostdlib.FacetDocument{}, certifyError(
+				"build facet",
+				seed.SourceIdentity,
+				"generic callable profile has no ordinary provider projection",
+			)
+		}
 	}
 	owner, err := singleImplementationOwner(seed.Export, target.ImplementationOwners())
 	if err != nil {

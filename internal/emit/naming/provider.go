@@ -67,6 +67,7 @@ func selectProviderBinding(
 	base.providerTypeRepresentation = selected.Representation()
 	base.providerDefinedValue = selected.DefinedValueRepresentation()
 	base.providerEffect = selected.Effect()
+	base.providerGenericTypeArguments = selected.GenericTypeArguments()
 	base.providerGenericOperations = selected.GenericOperations()
 	return base, nil
 }

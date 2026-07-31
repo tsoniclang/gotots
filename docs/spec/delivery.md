@@ -735,6 +735,14 @@ permit exact copy and independent-zero behavior. A provider function must not
 recover a missing operation through target shape, casts, sparse values, or a
 compiler name special case.
 
+The same checkpoint certifies each generic provider binding's ordered mapping
+from selected-Go type parameters to ordinary provider target type parameters.
+Calls emit exactly that projection. Certification rejects an absent mapping,
+an out-of-range or reordered source index, a target-arity mismatch, or a
+mapping attached to a non-generic/non-function binding. Cooperative profile
+facets continue to use their profile-specific generic representation layout;
+the ordinary mapping is never reused as a profile shortcut.
+
 Certified copies of `sync` and `sync/atomic` no-copy-after-first-use values
 must allocate independent pre-first-use state. They may copy public
 configuration such as `sync.Pool.New`, but must not alias the source carrier

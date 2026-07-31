@@ -66,6 +66,66 @@ func EmitTypeArguments(
 	return targets, api.CombineRequests(requests), nil
 }
 
+func EmitFunctionTypeArguments(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	declaration *types.Func,
+	arguments *types.TypeList,
+	profiled bool,
+) ([]tsgo.TypeNode, []api.RootRequest, error) {
+	if profiled {
+		return EmitTypeArguments(
+			context,
+			children,
+			source,
+			declaration,
+			arguments,
+		)
+	}
+	projection, providerOwned, err :=
+		context.Names().ProviderGenericTypeArguments(declaration)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !providerOwned {
+		return EmitTypeArguments(
+			context,
+			children,
+			source,
+			declaration,
+			arguments,
+		)
+	}
+	if arguments == nil {
+		return nil, nil, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "provider generic callable has no source type arguments",
+		}
+	}
+	targets := make([]tsgo.TypeNode, 0, len(projection))
+	var requests []api.RootRequest
+	for _, index := range projection {
+		if index < 0 || index >= arguments.Len() {
+			return nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "provider generic type-argument projection is outside the source instance",
+			}
+		}
+		target, err := children.RepresentedType(
+			context.WithRole(api.RoleCallArgumentType),
+			source,
+			arguments.At(index),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		targets = append(targets, target.Value())
+		requests = append(requests, target.Requests()...)
+	}
+	return targets, api.CombineRequests(requests), nil
+}
+
 func emitRepresentationArgument(
 	context api.Context,
 	children api.ChildEmitter,

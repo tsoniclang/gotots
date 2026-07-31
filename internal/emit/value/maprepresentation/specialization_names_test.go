@@ -171,6 +171,12 @@ func (staticSpecializationNames) GenericCallableProfile(
 	panic("unused")
 }
 
+func (staticSpecializationNames) ProviderGenericTypeArguments(
+	*types.Func,
+) ([]int, bool, error) {
+	return nil, false, nil
+}
+
 func (staticSpecializationNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,

@@ -59,6 +59,22 @@ func validateBinding(binding BindingDocument, field string) error {
 	); err != nil {
 		return err
 	}
+	for index, parameter := range binding.GenericTypeArguments {
+		if parameter < 0 || index != 0 &&
+			parameter <= binding.GenericTypeArguments[index-1] {
+			return manifestError(
+				field+".genericTypeArguments",
+				"source parameter indices are invalid or unordered",
+			)
+		}
+	}
+	if len(binding.GenericTypeArguments) != 0 &&
+		(binding.Kind != BindingFunction || binding.Access != AccessExport) {
+		return manifestError(
+			field+".genericTypeArguments",
+			"type arguments do not belong to an exported function",
+		)
+	}
 	if len(binding.GenericOperations) != 0 &&
 		(binding.Kind != BindingFunction || binding.Access != AccessExport) {
 		return manifestError(

@@ -292,6 +292,12 @@ func (unusedNames) GenericCallableProfile(
 	panic("unused")
 }
 
+func (unusedNames) ProviderGenericTypeArguments(
+	*types.Func,
+) ([]int, bool, error) {
+	return nil, false, nil
+}
+
 func (unusedNames) PackageVariable(
 	*types.Var,
 ) (api.PackageVariableReference, error) {

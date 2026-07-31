@@ -1799,7 +1799,15 @@ Emission exact-joins:
 
 The target call writes explicit TypeScript type arguments even when Go inferred
 them and passes the declaration's ordered hidden operation functions before
-source arguments:
+source arguments. Source-emitted callables use the complete generic
+representation layout. A linked provider callable instead uses its certified
+ordered projection from Go declaration parameters to provider target
+parameters; it must not assume equal arity or ask TypeScript to infer the
+missing contract. For example, `slices.Concat[S ~[]E, E]` projects `[E]` to the
+provider's `Concat<E>`, while `slices.Grow[S ~[]E, E]` projects `[S, E]` to the
+provider overload that preserves the exact slice result type. A reached
+cooperative provider profile owns and certifies its separate complete profile
+layout rather than reusing the ordinary projection.
 
 ```go
 result := Add(int32(2), int32(3))

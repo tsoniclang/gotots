@@ -500,6 +500,12 @@ func (aggregateNames) GenericCallableProfile(
 	panic("unused")
 }
 
+func (aggregateNames) ProviderGenericTypeArguments(
+	*types.Func,
+) ([]int, bool, error) {
+	return nil, false, nil
+}
+
 func (aggregateNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,
