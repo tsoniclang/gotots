@@ -51,10 +51,13 @@ func methodReceiver(
 	}
 	signature := method.Type().(*types.Signature)
 	declared := signature.Recv().Type()
-	abiReceiver, ok := methodABIReceiver(method)
-	if !ok {
-		return api.ExpressionEmission{}, nil,
-			api.Unsupported(context, api.CategoryExpression, source)
+	abiReceiver, receiverABI, err := methodABIReceiver(
+		context,
+		method,
+		resolved.effective,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
 	}
 	_, declaredElement, _, declaredPointer := pointerType(declared)
 	_, _, _, effectivePointer := pointerType(resolved.effective)
@@ -68,6 +71,7 @@ func methodReceiver(
 			resolved,
 			method,
 			abiReceiver,
+			receiverABI,
 		)
 		return receiver, method, err
 	}
@@ -129,10 +133,13 @@ func methodSetReceiver(
 ) (api.ExpressionEmission, error) {
 	signature := method.Type().(*types.Signature)
 	declared := signature.Recv().Type()
-	abiReceiver, ok := methodABIReceiver(method)
-	if !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
+	abiReceiver, receiverABI, err := methodABIReceiver(
+		context,
+		method,
+		resolved.effective,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	abiPointer, _, _, abiIsPointer := pointerType(abiReceiver)
 	_, declaredElement, _, declaredPointer := pointerType(declared)
@@ -175,6 +182,7 @@ func methodSetReceiver(
 			method.Origin(),
 			abiPointer,
 			effectiveRaw,
+			receiverABI,
 			value,
 		)
 	case !declaredPointer &&
@@ -224,10 +232,13 @@ func MethodExpressionReceiver(
 	}
 	signature := method.Type().(*types.Signature)
 	declared := signature.Recv().Type()
-	abiReceiver, ok := methodABIReceiver(method)
-	if !ok {
-		return api.ExpressionEmission{}, nil,
-			api.Unsupported(context, api.CategoryExpression, source)
+	abiReceiver, receiverABI, err := methodABIReceiver(
+		context,
+		method,
+		resolved.effective,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
 	}
 	abiPointer, _, _, abiIsPointer := pointerType(abiReceiver)
 	_, declaredElement, _, declaredPointer := pointerType(declared)
@@ -272,6 +283,7 @@ func MethodExpressionReceiver(
 			method.Origin(),
 			abiPointer,
 			effectiveRaw,
+			receiverABI,
 			value,
 		)
 		return value, method, err

@@ -409,6 +409,17 @@ Adapters never assume that a concrete payload and a generic method origin have
 the same pointer representation, rediscover the receiver ABI, or discard
 receiver prerequisites.
 
+This rule also applies when a later address demand changes a whole pointer
+family. For example, `func Use(m *sync.Mutex) { m.Lock() }` may initially
+represent `m` directly as the provider's `Mutex | undefined`. If any selected
+source operation requires an address carrier for `*sync.Mutex`, the same
+parameter becomes `GoPointer<Mutex, MutexStorage> | undefined`; the certified
+provider method does not change. The receiver-selection owner then evaluates
+the carrier once and produces `undefined` for a nil pointer or the provider's
+typed `$fromStorage(pointer.value)` projection for a non-nil pointer. It must
+not make the provider accept `GoPointer`, dereference nil before entering the
+method, or project a receiver that is already in the certified direct ABI.
+
 Formatting a Go interface value is the one provider observation that cannot be
 recovered from the public interface contract alone. For example,
 `fmt.Sprintf("%d", 7)` boxes an exact integer, while the manual `fmt` provider

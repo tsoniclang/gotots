@@ -77,10 +77,24 @@ const (
 	MethodTargetEnvironmentFunction
 )
 
+type MethodReceiverABI uint8
+
+const (
+	MethodReceiverABIInvalid MethodReceiverABI = iota
+	MethodReceiverABISourceRepresentation
+	MethodReceiverABIContractDirect
+)
+
+func (a MethodReceiverABI) Valid() bool {
+	return a == MethodReceiverABISourceRepresentation ||
+		a == MethodReceiverABIContractDirect
+}
+
 type MethodTarget struct {
-	kind     MethodTargetKind
-	name     string
-	requests []RootRequest
+	kind        MethodTargetKind
+	name        string
+	receiverABI MethodReceiverABI
+	requests    []RootRequest
 }
 
 type RecoveryCallableReference struct {
@@ -120,20 +134,23 @@ func (r RecoveryCallableReference) Cooperative() bool {
 func NewMethodTarget(
 	kind MethodTargetKind,
 	name string,
+	receiverABI MethodReceiverABI,
 	requests ...RootRequest,
 ) (MethodTarget, error) {
 	if (kind != MethodTargetClassMember &&
 		kind != MethodTargetEnvironmentFunction) ||
-		name == "" {
+		name == "" ||
+		!receiverABI.Valid() {
 		return MethodTarget{}, &NameError{
 			Name:   name,
 			Reason: "method target is invalid",
 		}
 	}
 	return MethodTarget{
-		kind:     kind,
-		name:     name,
-		requests: slices.Clone(requests),
+		kind:        kind,
+		name:        name,
+		receiverABI: receiverABI,
+		requests:    slices.Clone(requests),
 	}, nil
 }
 
@@ -143,6 +160,10 @@ func (t MethodTarget) Kind() MethodTargetKind {
 
 func (t MethodTarget) Name() string {
 	return t.name
+}
+
+func (t MethodTarget) ReceiverABI() MethodReceiverABI {
+	return t.receiverABI
 }
 
 func (t MethodTarget) Requests() []RootRequest {

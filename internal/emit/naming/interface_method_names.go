@@ -67,6 +67,7 @@ func (n *File) MethodTarget(
 		return api.NewMethodTarget(
 			api.MethodTargetClassMember,
 			member,
+			api.MethodReceiverABISourceRepresentation,
 			dependency,
 		)
 	case targetBindingEnvironment:
@@ -81,6 +82,7 @@ func (n *File) MethodTarget(
 		return api.NewMethodTarget(
 			api.MethodTargetEnvironmentFunction,
 			reference.Name(),
+			api.MethodReceiverABISourceRepresentation,
 			reference.Requests()...,
 		)
 	case targetBindingProvider:
@@ -97,9 +99,24 @@ func (n *File) MethodTarget(
 				return api.MethodTarget{}, err
 			}
 		}
+		receiver := api.MethodReceiverTypeName(method)
+		receiverBinding, receiverOK := n.owner.byObject[receiver]
+		if !receiverOK && n.owner.registry != nil {
+			receiverBinding, receiverOK = n.owner.registry.byObject[receiver]
+		}
+		if !receiverOK ||
+			receiverBinding.kind != targetBindingProvider ||
+			receiverBinding.providerTypeRepresentation !=
+				gostdlib.RepresentationDirect {
+			return api.MethodTarget{}, &api.NameError{
+				Name:   method.Name(),
+				Reason: "provider method receiver representation is not certified direct",
+			}
+		}
 		return api.NewMethodTarget(
 			api.MethodTargetClassMember,
 			binding.providerMember,
+			api.MethodReceiverABIContractDirect,
 		)
 	case targetBindingMissingProvider:
 		return api.MethodTarget{}, &api.NameError{

@@ -64,6 +64,7 @@ func selectProviderBinding(
 	base.providerExport = selected.Export()
 	base.providerMember = selected.Member()
 	base.providerAccess = selected.Access()
+	base.providerTypeRepresentation = selected.Representation()
 	base.providerGenericOperations = selected.GenericOperations()
 	return base, nil
 }
@@ -121,6 +122,7 @@ func selectProviderRepresentationBinding(
 	base.providerExport = representation.Export()
 	base.providerAccess = gostdlib.AccessExport
 	base.providerRepresentation = true
+	base.providerTypeRepresentation = gostdlib.RepresentationDirect
 	return base, nil
 }
 

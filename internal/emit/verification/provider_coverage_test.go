@@ -2,7 +2,9 @@ package emit_test
 
 import (
 	"context"
+	"go/types"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
@@ -25,6 +27,7 @@ import (
 	"slices"
 	"encoding/binary"
 	"io/fs"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -63,6 +66,31 @@ func PathFailure(failure error) error {
 func DeferredRecovery(mutex *sync.Mutex, flag *atomic.Bool) {
 	defer mutex.Unlock()
 	defer flag.Store(false)
+}
+
+func ProviderReceivers(mutex *sync.Mutex, builder *strings.Builder) int {
+	mutex.Lock()
+	defer mutex.Unlock()
+	return builder.Len()
+}
+
+type ProviderState struct {
+	Mutex sync.Mutex
+	Builder strings.Builder
+}
+
+func StoredProviderReceivers(state *ProviderState) int {
+	state.Mutex.Lock()
+	defer state.Mutex.Unlock()
+	return state.Builder.Len()
+}
+
+func MutexAddress(state *ProviderState) *sync.Mutex {
+	return &state.Mutex
+}
+
+func BuilderAddress(state *ProviderState) *strings.Builder {
+	return &state.Builder
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
@@ -119,6 +147,10 @@ func DeferredRecovery(mutex *sync.Mutex, flag *atomic.Bool) {
 			bigOrderRoot,
 			pathFailureRoot,
 			deferredRecoveryRoot,
+			mustProviderRoot(t, scope.Lookup("ProviderReceivers")),
+			mustProviderRoot(t, scope.Lookup("StoredProviderReceivers")),
+			mustProviderRoot(t, scope.Lookup("MutexAddress")),
+			mustProviderRoot(t, scope.Lookup("BuilderAddress")),
 		},
 		options,
 	)
@@ -132,6 +164,101 @@ func DeferredRecovery(mutex *sync.Mutex, flag *atomic.Bool) {
 	}
 	assertProviderGrowCapabilityABI(t, emission)
 	assertProviderRepresentationABI(t, emission)
+	assertProviderReceiverProjection(t, emission)
+}
+
+func mustProviderRoot(t *testing.T, object types.Object) emit.Root {
+	t.Helper()
+	root, err := emit.NewRoot(object)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func assertProviderReceiverProjection(
+	t *testing.T,
+	emission emit.ProgramEmission,
+) {
+	t.Helper()
+	printed := materializeArtifacts(t, emission, t.TempDir()).printed
+	for _, stored := range []string{
+		"Mutex.Lock(GoPointer.direct<ProviderState>(state).Mutex)",
+		"Builder.Len(GoPointer.direct<ProviderState>(state).Builder)",
+	} {
+		if !strings.Contains(printed, stored) {
+			t.Fatalf("stored provider receiver lacks %q:\n%s", stored, printed)
+		}
+	}
+	for _, projected := range []string{
+		"SyncMutexOperations.$fromStorage(__gotots_receiver_",
+		"StringsBuilderOperations.$fromStorage(__gotots_receiver_",
+	} {
+		if !strings.Contains(printed, projected) {
+			t.Fatalf("stored provider receiver lacks %q:\n%s", projected, printed)
+		}
+	}
+	for _, bypass := range []string{
+		"Mutex.Lock(GoPointer.objectField",
+		"SyncMutexUnlock(GoPointer.objectField",
+		"Builder.Len(GoPointer.objectField",
+	} {
+		if strings.Contains(printed, bypass) {
+			t.Fatalf("stored provider receiver bypasses projection with %q:\n%s", bypass, printed)
+		}
+	}
+}
+
+func TestProviderReceiverAlreadyInContractABIIsNotProjected(t *testing.T) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/providerreceiver\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package providerreceiver
+
+import (
+	"strings"
+	"sync"
+)
+
+func Use(mutex *sync.Mutex, builder *strings.Builder) int {
+	mutex.Lock()
+	defer mutex.Unlock()
+	return builder.Len()
+}
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: project,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := emit.DefaultOptions()
+	options.StandardLibrary = linkedProviderCertificate(t)
+	emission, err := emit.CompileWithOptions(
+		program,
+		[]emit.Root{mustProviderRoot(t, program.Roots()[0].Types().Scope().Lookup("Use"))},
+		options,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	printed := materializeArtifacts(t, emission, t.TempDir()).printed
+	for _, direct := range []string{
+		"Mutex.Lock(mutex)",
+		"SyncMutexUnlock(__gotots_receiver_0",
+		"Builder.Len(builder)",
+	} {
+		if !strings.Contains(printed, direct) {
+			t.Fatalf("direct provider receiver lacks %q:\n%s", direct, printed)
+		}
+	}
+	if strings.Contains(printed, "$fromStorage") {
+		t.Fatalf("direct provider receiver was needlessly projected:\n%s", printed)
+	}
 }
 
 func linkedProviderCertificate(t *testing.T) *certify.Certificate {

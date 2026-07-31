@@ -15,17 +15,18 @@ import (
 )
 
 type targetBinding struct {
-	name                      string
-	sourceFile                *ast.File
-	sourcePath                string
-	moduleExport              bool
-	kind                      targetBindingKind
-	providerModule            string
-	providerExport            string
-	providerMember            string
-	providerAccess            gostdlib.AccessKind
-	providerRepresentation    bool
-	providerGenericOperations []gostdlib.GenericOperationDocument
+	name                       string
+	sourceFile                 *ast.File
+	sourcePath                 string
+	moduleExport               bool
+	kind                       targetBindingKind
+	providerModule             string
+	providerExport             string
+	providerMember             string
+	providerAccess             gostdlib.AccessKind
+	providerRepresentation     bool
+	providerTypeRepresentation gostdlib.RepresentationKind
+	providerGenericOperations  []gostdlib.GenericOperationDocument
 }
 
 type targetBindingKind uint8
@@ -325,7 +326,8 @@ func (r *Registry) reserve(
 			existing.providerExport != binding.providerExport ||
 			existing.providerMember != binding.providerMember ||
 			existing.providerAccess != binding.providerAccess ||
-			existing.providerRepresentation != binding.providerRepresentation {
+			existing.providerRepresentation != binding.providerRepresentation ||
+			existing.providerTypeRepresentation != binding.providerTypeRepresentation {
 			return &api.NameError{
 				Name:   objectName(object),
 				Reason: "declaration has conflicting target ownership",
