@@ -32,11 +32,15 @@ export class Box {
   private constructor(readonly value: number) {}
 }
 
+export interface Shape {
+  Get(): number;
+}
+
 const Hidden = 1;
 void Hidden;
 `)
 	entryPath := filepath.Join(projectDirectory, "entry.ts")
-	writeProjectFile(t, entryPath, `export { Box, Value } from "./implementation.js";
+	writeProjectFile(t, entryPath, `export { Box, Shape, Value } from "./implementation.js";
 export const count: number = 1;
 export const state: { Count: number } = { Count: 0 };
 `)
@@ -83,6 +87,26 @@ export const state: { Count: number } = { Count: 0 };
 			}
 			continue
 		}
+		switch selected.Name() {
+		case "Box":
+			if !slices.Equal(
+				projectMemberNames(selected.ValueMembers()),
+				[]string{"Make"},
+			) ||
+				!slices.Equal(
+					projectMemberNames(selected.TypeMembers()),
+					[]string{"value"},
+				) {
+				t.Fatalf("Box members = %#v", selected)
+			}
+		case "Shape":
+			if !slices.Equal(
+				projectMemberNames(selected.TypeMembers()),
+				[]string{"Get"},
+			) {
+				t.Fatalf("Shape members = %#v", selected)
+			}
+		}
 		if !slices.Equal(
 			selected.Declarations(),
 			[]string{filepath.ToSlash(implementationPath)},
@@ -94,7 +118,10 @@ export const state: { Count: number } = { Count: 0 };
 			)
 		}
 	}
-	if !slices.Equal(names, []string{"Box", "Value", "count", "state"}) {
+	if !slices.Equal(
+		names,
+		[]string{"Box", "Shape", "Value", "count", "state"},
+	) {
 		t.Fatalf("exports = %v", names)
 	}
 	renamed, err := project.Exports(renamedPath)
@@ -106,6 +133,14 @@ export const state: { Count: number } = { Count: 0 };
 		renamed[0].TypeString() != "(input: string) => number" {
 		t.Fatalf("renamed exports = %#v", renamed)
 	}
+}
+
+func projectMemberNames(members []ProjectMember) []string {
+	names := make([]string, len(members))
+	for index, member := range members {
+		names[index] = member.Name()
+	}
+	return names
 }
 
 func TestDeclarationPathRejectsMalformedHandles(t *testing.T) {

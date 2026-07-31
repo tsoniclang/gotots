@@ -36,6 +36,8 @@ type ProjectExport struct {
 	flags        uint32
 	typeString   string
 	declarations []string
+	valueMembers []ProjectMember
+	typeMembers  []ProjectMember
 }
 
 func (e ProjectExport) Name() string {
@@ -52,6 +54,14 @@ func (e ProjectExport) TypeString() string {
 
 func (e ProjectExport) Declarations() []string {
 	return slices.Clone(e.declarations)
+}
+
+func (e ProjectExport) ValueMembers() []ProjectMember {
+	return slices.Clone(e.valueMembers)
+}
+
+func (e ProjectExport) TypeMembers() []ProjectMember {
+	return slices.Clone(e.typeMembers)
 }
 
 func (c *Client) OpenProject(configFile string) (*ProjectInspection, error) {
@@ -238,27 +248,33 @@ func (p *ProjectInspection) projectExport(
 		}
 	}
 	declarationHandles := symbol.Declarations
-	var typeSymbol *symbolResponse
-	if targetType.Symbol != 0 {
-		if err := requestProjectJSON(
-			p.client,
-			"getSymbolOfType",
-			getSymbolOfTypeParams{
-				Snapshot: p.snapshot,
-				Type:     targetType.ID,
-			},
-			&typeSymbol,
-		); err != nil {
-			return ProjectExport{}, err
-		}
-		if typeSymbol != nil &&
-			len(typeSymbol.Declarations) != 0 &&
-			declarationsWithinProject(
-				typeSymbol.Declarations,
-				filepath.Dir(p.config),
-			) {
-			declarationHandles = typeSymbol.Declarations
-		}
+	targetDeclarations, found, err := p.projectTypeDeclarations(targetType)
+	if err != nil {
+		return ProjectExport{}, err
+	}
+	if found {
+		declarationHandles = targetDeclarations
+	}
+	var declaredType *typeResponse
+	if err := requestProjectJSON(
+		p.client,
+		"getDeclaredTypeOfSymbol",
+		getTypeOfSymbolParams{
+			Snapshot: p.snapshot,
+			Project:  p.project,
+			Symbol:   symbol.ID,
+		},
+		&declaredType,
+	); err != nil {
+		return ProjectExport{}, err
+	}
+	declaredDeclarations, found, err :=
+		p.projectTypeDeclarations(declaredType)
+	if err != nil {
+		return ProjectExport{}, err
+	}
+	if found {
+		declarationHandles = declaredDeclarations
 	}
 	declarations := make([]string, 0, len(declarationHandles))
 	seen := make(map[string]struct{}, len(declarationHandles))
@@ -285,11 +301,32 @@ func (p *ProjectInspection) projectExport(
 			Reason:    "export " + symbol.Name + " has no declaration owner",
 		}
 	}
+	valueMembers, err := p.projectMembers(
+		sourcePath,
+		"value members of "+symbol.Name,
+		targetType.ID,
+	)
+	if err != nil {
+		return ProjectExport{}, err
+	}
+	var typeMembers []ProjectMember
+	if declaredType != nil && declaredType.ID != 0 {
+		typeMembers, err = p.projectMembers(
+			sourcePath,
+			"type members of "+symbol.Name,
+			declaredType.ID,
+		)
+		if err != nil {
+			return ProjectExport{}, err
+		}
+	}
 	return ProjectExport{
 		name:         symbol.Name,
 		flags:        symbol.Flags,
 		typeString:   typeString,
 		declarations: declarations,
+		valueMembers: valueMembers,
+		typeMembers:  typeMembers,
 	}, nil
 }
 
@@ -423,6 +460,12 @@ type typeToStringParams struct {
 
 type getSymbolOfTypeParams struct {
 	Snapshot uint64 `json:"snapshot"`
+	Type     uint32 `json:"type"`
+}
+
+type getPropertiesOfTypeParams struct {
+	Snapshot uint64 `json:"snapshot"`
+	Project  string `json:"project"`
 	Type     uint32 `json:"type"`
 }
 
