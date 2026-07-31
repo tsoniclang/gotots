@@ -71,8 +71,9 @@ const (
 )
 
 type NameReference struct {
-	name     string
-	requests []RootRequest
+	qualifier string
+	name      string
+	requests  []RootRequest
 }
 
 func NewNameReference(name string, requests ...RootRequest) (NameReference, error) {
@@ -82,12 +83,79 @@ func NewNameReference(name string, requests ...RootRequest) (NameReference, erro
 	return NameReference{name: name, requests: slices.Clone(requests)}, nil
 }
 
+func NewQualifiedNameReference(
+	qualifier string,
+	name string,
+	requests ...RootRequest,
+) (NameReference, error) {
+	switch {
+	case qualifier == "":
+		return NameReference{}, &NameError{
+			Name:   name,
+			Reason: "reference qualifier is empty",
+		}
+	case name == "":
+		return NameReference{}, &NameError{
+			Reason: "reference name is empty",
+		}
+	}
+	return NameReference{
+		qualifier: qualifier,
+		name:      name,
+		requests:  slices.Clone(requests),
+	}, nil
+}
+
 func (r NameReference) Name() string {
 	return r.name
 }
 
+func (r NameReference) Qualifier() (string, bool) {
+	return r.qualifier, r.qualifier != ""
+}
+
 func (r NameReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
+}
+
+func (r NameReference) Expression(factory tsgo.Factory) tsgo.Expression {
+	if r.qualifier == "" {
+		return factory.Identifier(r.name)
+	}
+	return factory.PropertyAccessExpression(
+		factory.Identifier(r.qualifier),
+		nil,
+		factory.Identifier(r.name),
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func (r NameReference) EntityName(factory tsgo.Factory) tsgo.EntityName {
+	if r.qualifier == "" {
+		return factory.Identifier(r.name)
+	}
+	return factory.QualifiedName(
+		factory.Identifier(r.qualifier),
+		factory.Identifier(r.name),
+	)
+}
+
+func (r NameReference) MemberExpression(
+	factory tsgo.Factory,
+	member string,
+) (tsgo.PropertyAccessExpression, error) {
+	if member == "" {
+		return nil, &NameError{
+			Name:   r.name,
+			Reason: "reference member is empty",
+		}
+	}
+	return factory.PropertyAccessExpression(
+		r.Expression(factory),
+		nil,
+		factory.Identifier(member),
+		tsgo.NodeFlagsNone,
+	), nil
 }
 
 type MethodTargetKind uint8

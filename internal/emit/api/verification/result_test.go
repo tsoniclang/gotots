@@ -413,6 +413,49 @@ func TestNamespaceImportRequestCarriesExactPlacementPolicy(t *testing.T) {
 	}
 }
 
+func TestQualifiedNameReferenceBuildsTypedValueAndTypePaths(t *testing.T) {
+	factory := tsgo.NewFactory()
+	request, err := api.NewNamespaceImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"@gotots/gostdlib/strings.js",
+		"strings",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reference, err := api.NewQualifiedNameReference(
+		"strings",
+		"Builder",
+		request,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qualifier, qualified := reference.Qualifier()
+	value := reference.Expression(factory).(tsgo.PropertyAccessExpression)
+	entity := reference.EntityName(factory).(tsgo.QualifiedName)
+	member, err := reference.MemberExpression(factory, "String")
+	if err != nil {
+		t.Fatal(err)
+	}
+	valueName, valueNameOK := value.Name().(tsgo.Identifier)
+	memberName, memberNameOK := member.Name().(tsgo.Identifier)
+	if !qualified ||
+		qualifier != "strings" ||
+		reference.Name() != "Builder" ||
+		value.Expression().(tsgo.Identifier).Text() != "strings" ||
+		!valueNameOK ||
+		valueName.Text() != "Builder" ||
+		entity.Left().(tsgo.Identifier).Text() != "strings" ||
+		entity.Right().Text() != "Builder" ||
+		!memberNameOK ||
+		memberName.Text() != "String" ||
+		len(reference.Requests()) != 1 {
+		t.Fatalf("qualified reference = %#v", reference)
+	}
+}
+
 func TestExpressionEmissionRejectsMissingValue(t *testing.T) {
 	_, err := api.NewExpressionEmission(nil, nil, nil)
 	if err == nil {
