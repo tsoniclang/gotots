@@ -463,6 +463,10 @@ func (e ProgramEmission) Files() []TargetFile {
 	return slices.Clone(e.files)
 }
 
+func (e ProgramEmission) EnvironmentObligations() []EnvironmentObligation {
+	return slices.Clone(e.environmentObligations)
+}
+
 func (f TargetFile) OutputPath() string {
 	return f.outputPath
 }

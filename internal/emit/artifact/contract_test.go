@@ -65,6 +65,53 @@ func TestObservableFunctionContractIgnoresBody(t *testing.T) {
 	}
 }
 
+func TestContractFingerprintTracksOnlyCanonicalObservableFacets(t *testing.T) {
+	factory := tsgo.NewFactory()
+	baseline, err := ProjectContract(
+		factory,
+		[]tsgo.Statement{artifactTestFunction(factory, "value", nil)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodyOnly, err := ProjectContract(
+		factory,
+		[]tsgo.Statement{artifactTestFunction(
+			factory,
+			"value",
+			[]tsgo.Statement{factory.ReturnStatement(
+				factory.NumericLiteral("1", tsgo.TokenFlagsNone),
+			)},
+		)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renamed, err := ProjectContract(
+		factory,
+		[]tsgo.Statement{artifactTestFunction(factory, "other", nil)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baselineFingerprint, baselineOK := baseline.Fingerprint()
+	bodyFingerprint, bodyOK := bodyOnly.Fingerprint()
+	renamedFingerprint, renamedOK := renamed.Fingerprint()
+	if !baselineOK ||
+		!bodyOK ||
+		!renamedOK ||
+		len(baselineFingerprint) != 64 ||
+		baselineFingerprint != bodyFingerprint ||
+		baselineFingerprint == renamedFingerprint {
+		t.Fatalf(
+			"fingerprints baseline=%q body=%q renamed=%q",
+			baselineFingerprint,
+			bodyFingerprint,
+			renamedFingerprint,
+		)
+	}
+}
+
 func TestObservableClassContractPartitionsStaticAndInstanceFacets(t *testing.T) {
 	factory := tsgo.NewFactory()
 	class := artifactTestClass(factory, "one", "number")

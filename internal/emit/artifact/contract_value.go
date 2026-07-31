@@ -2,7 +2,11 @@ package artifact
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"hash"
 	"slices"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -108,6 +112,35 @@ func (c Contract) ExportedBindings() ([]string, bool) {
 		return nil, false
 	}
 	return slices.Clone(c.exports), true
+}
+
+func (c Contract) Fingerprint() (string, bool) {
+	if !c.initialized ||
+		c.hasFacet(api.ArtifactFacetExportSurface) != c.exportsSet {
+		return "", false
+	}
+	digest := sha256.New()
+	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
+		encoded, present := c.facet(facet)
+		_, _ = digest.Write([]byte{byte(facet)})
+		if present {
+			_, _ = digest.Write([]byte{1})
+			writeFingerprintBytes(digest, encoded)
+		} else {
+			_, _ = digest.Write([]byte{0})
+		}
+	}
+	for _, exported := range c.exports {
+		writeFingerprintBytes(digest, []byte(exported))
+	}
+	return hex.EncodeToString(digest.Sum(nil)), true
+}
+
+func writeFingerprintBytes(digest hash.Hash, value []byte) {
+	var length [8]byte
+	binary.BigEndian.PutUint64(length[:], uint64(len(value)))
+	_, _ = digest.Write(length[:])
+	_, _ = digest.Write(value)
 }
 
 func (c Contract) withOwnedFacet(

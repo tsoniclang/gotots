@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
@@ -56,7 +57,7 @@ type environmentContractBuilder struct {
 	placement     *targetplacement.Owner
 	declarations  map[types.Object]environmentDeclaration
 	stateFields   map[*types.Var]environmentStateField
-	projections   map[string]tsgo.Statement
+	projections   map[string]environmentConstantProjection
 	builtins      map[*types.Builtin]environmentBuiltin
 	requirements  map[types.Object]map[api.DeclarationRequirement]struct{}
 	building      map[types.Object]bool
@@ -163,7 +164,7 @@ func (s *programSession) requireEnvironmentPackage(
 		placement:     targetplacement.New(),
 		declarations:  make(map[types.Object]environmentDeclaration),
 		stateFields:   make(map[*types.Var]environmentStateField),
-		projections:   make(map[string]tsgo.Statement),
+		projections:   make(map[string]environmentConstantProjection),
 		builtins:      make(map[*types.Builtin]environmentBuiltin),
 		requirements: make(
 			map[types.Object]map[api.DeclarationRequirement]struct{},
@@ -251,7 +252,10 @@ func (s *programSession) environmentTargetFiles(
 		}
 		sort.Strings(projectionNames)
 		for _, name := range projectionNames {
-			statements = append(statements, builder.projections[name])
+			statements = append(
+				statements,
+				builder.projections[name].statement,
+			)
 		}
 		variables := make(
 			[]*types.Var,
@@ -405,7 +409,20 @@ func (s *programSession) applyEnvironmentRequirement(
 	if err := s.applyRootRequests(builder.placement, requests); err != nil {
 		return true, err
 	}
-	builder.projections[name] = statement
+	contract, err := artifactstate.ProjectContract(
+		s.factory,
+		[]tsgo.Statement{statement},
+	)
+	if err != nil {
+		return true, environmentContractError(selected, err)
+	}
+	builder.projections[name] = environmentConstantProjection{
+		source:     selected,
+		projection: projection,
+		name:       name,
+		statement:  statement,
+		contract:   contract,
+	}
 	return true, nil
 }
 

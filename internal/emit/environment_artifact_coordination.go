@@ -38,6 +38,14 @@ type environmentBuiltin struct {
 	environmentArtifact
 }
 
+type environmentConstantProjection struct {
+	source     *types.Const
+	projection types.BasicKind
+	name       string
+	statement  tsgo.Statement
+	contract   artifactstate.Contract
+}
+
 func (s *programSession) buildEnvironmentDeclaration(
 	builder *environmentContractBuilder,
 	object types.Object,

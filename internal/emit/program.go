@@ -39,7 +39,8 @@ const (
 )
 
 type ProgramEmission struct {
-	files []TargetFile
+	files                  []TargetFile
+	environmentObligations []EnvironmentObligation
 }
 
 type declarationSite = declarationindex.Site
@@ -170,7 +171,14 @@ func CompileWithOptions(
 	if err := session.verifyRootObligations(orderedRoots, files); err != nil {
 		return ProgramEmission{}, err
 	}
-	return ProgramEmission{files: files}, nil
+	obligations, err := session.environmentObligations()
+	if err != nil {
+		return ProgramEmission{}, err
+	}
+	return ProgramEmission{
+		files:                  files,
+		environmentObligations: obligations,
+	}, nil
 }
 
 func CompileFile(
