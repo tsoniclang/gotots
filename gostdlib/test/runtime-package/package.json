@@ -1,0 +1,19 @@
+{
+  "name": "@gotots/runtime",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./scalars.js": {
+      "types": "./scalars.d.ts",
+      "default": "./scalars.js"
+    },
+    "./slice.js": {
+      "types": "./slice.d.ts",
+      "default": "./slice.js"
+    },
+    "./interface-value.js": {
+      "types": "./interface-value.d.ts",
+      "default": "./interface-value.js"
+    }
+  }
+}
