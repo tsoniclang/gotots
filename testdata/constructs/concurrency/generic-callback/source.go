@@ -282,6 +282,47 @@ func CooperativeRecursiveGenericMethod() bool {
 	})
 }
 
+type CallbackHolder[T any] struct {
+	Apply func(T) T
+}
+
+func NewCallbackHolder[T any](apply func(T) T) *CallbackHolder[T] {
+	return &CallbackHolder[T]{Apply: apply}
+}
+
+func (holder *CallbackHolder[T]) Run(value T) T {
+	return holder.Apply(value)
+}
+
+func CloneCallbackHolder[T any](
+	holder *CallbackHolder[T],
+) *CallbackHolder[T] {
+	return &CallbackHolder[T]{Apply: holder.Apply}
+}
+
+func CooperativeStoredCallback() int32 {
+	values := make(chan int32, 1)
+	values <- 40
+	holder := NewCallbackHolder(func(value int32) int32 {
+		return value + <-values
+	})
+	return holder.Run(2)
+}
+
+func SynchronousStoredCallback() string {
+	holder := NewCallbackHolder(func(value string) string {
+		return value + "!"
+	})
+	return holder.Run("value")
+}
+
+func CloneSynchronousStoredCallback() string {
+	holder := NewCallbackHolder(func(value string) string {
+		return value + "?"
+	})
+	return CloneCallbackHolder(holder).Run("clone")
+}
+
 type MutableValue[T any] interface {
 	Change(func(T))
 }

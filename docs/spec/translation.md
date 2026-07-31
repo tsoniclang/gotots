@@ -1936,6 +1936,57 @@ method values/expressions. It never treats an opaque type-parameter
 substitution as evidence that the substituted type is a callable, and it never
 recovers the relation from target spelling.
 
+A callable stored in a generic named-struct field crosses a different,
+nominally owned boundary:
+
+```go
+type Handler[T any] struct {
+	Apply func(T) T
+}
+
+func NewHandler[T any](apply func(T) T) *Handler[T] {
+	return &Handler[T]{Apply: apply}
+}
+
+func (handler *Handler[T]) Run(value T) T {
+	return handler.Apply(value)
+}
+```
+
+The field declaration owns the one target ABI for `Handler.Apply`. If a reached
+`Handler[int32]` stores a callback that receives from a channel, the emitted
+class field and `Run` invocation use `($0: T) => Promise<T>`. `Run` awaits that
+call, and a synchronous callback is wrapped once when it enters the already
+cooperative ABI. The compiler derives this from the selected field's origin and
+instantiated `go/types` types. It does not give `Handler` an inferred hidden
+effect argument, inspect callback syntax, or repair the constructor with a cast:
+
+```ts
+export class Handler<T> {
+    public Apply:
+        (($0: T, $go$recovery?: GoRecovery) => Promise<T>) | undefined;
+}
+```
+
+The demand is bounded to that exact nominal field contract. A field with a
+different declaration identity or an unrelated `func(int32) int32` ABI remains
+synchronous.
+
+Copying the containing named value does not transfer ownership of its interior
+callable contract to the copy function:
+
+```go
+func CloneHandler[T any](source *Handler[T]) *Handler[T] {
+	return &Handler[T]{Apply: source.Apply}
+}
+```
+
+`CloneHandler` remains synchronous and has no cooperative profile solely
+because `Handler.Apply` is cooperative. Its field read and write both use the
+one `Handler.Apply` contract. Descending through `Handler` while deriving the
+generic function profile would duplicate representation ownership and is
+forbidden.
+
 When `Apply` is exported and the caller is in another Go package, its generated
 package assembly re-exports both reached bindings from the source module:
 

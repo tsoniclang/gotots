@@ -1294,10 +1294,27 @@ execution:
     artifact shape, strict typechecking, differential behavior, or
     ordinary-profile byte stability; and
 15. the selected-profile boundary: concurrency fails while the profile is
-   disabled; the cooperative selection and all output evidence name that it
-   does not reproduce asynchronous preemption. The checked-in busy-goroutine
-   counterexample receives no yield/preemption workaround and is never run as
-   if it were admitted exact behavior.
+    disabled; the cooperative selection and all output evidence name that it
+    does not reproduce asynchronous preemption. The checked-in busy-goroutine
+    counterexample receives no yield/preemption workaround and is never run as
+    if it were admitted exact behavior; and
+16. generic nominal-field callable ownership: a generic constructor stores both
+    synchronous and channel-receiving callbacks in the same declared function
+    field, and a generic receiver method invokes that field. The field
+    declaration, constructor transport, receiver invocation, and reached closed
+    ABIs exact-join through checker field identity and structural position.
+    Strict output has one Promise-returning field contract, awaits the direct
+    field call, statically adapts the synchronous provider, and matches Go for
+    both uses. An unrelated callable remains synchronous. Mutations key the
+    relation by spelling, omit the constructor edge, omit the field-read edge,
+    reverse only one side, add a hidden per-instance effect parameter, or restore
+    a generated-site cast; each fails identity, strict typechecking,
+    differential behavior, artifact shape, or broad-search evidence. A
+    copy-only generic function reads the field into a new instance while the
+    field contract is cooperative; it remains synchronous and has no generated
+    cooperative profile. A mutation that descends through the named
+    declaration's underlying struct creates that profile and fails the shape
+    gate.
 
 Interface callable ownership has a separate exact-identity gate:
 

@@ -13,13 +13,15 @@ type genericTypePair struct {
 }
 
 type callableCorrespondence struct {
-	context    api.Context
-	owner      types.Object
-	profile    *api.GenericCallableProfile
-	seen       map[genericTypePair]struct{}
-	selections map[*api.GeneratedArtifact]bool
-	requests   []api.RootRequest
-	leaf       func(*types.Signature, *types.Signature) error
+	context             api.Context
+	owner               types.Object
+	profile             *api.GenericCallableProfile
+	seen                map[genericTypePair]struct{}
+	selections          map[*api.GeneratedArtifact]bool
+	requests            []api.RootRequest
+	leaf                func(*types.Signature, *types.Signature) error
+	traverseIdentical   bool
+	stopAtNamedBoundary bool
 }
 
 func CorrespondGenericCallableABIs(
@@ -45,9 +47,10 @@ func CorrespondGenericCallableABIs(
 		}
 	}
 	correspondence := callableCorrespondence{
-		context: context,
-		owner:   owner,
-		seen:    make(map[genericTypePair]struct{}),
+		context:             context,
+		owner:               owner,
+		seen:                make(map[genericTypePair]struct{}),
+		stopAtNamedBoundary: true,
 		selections: make(
 			map[*api.GeneratedArtifact]bool,
 		),
@@ -104,11 +107,12 @@ func PropagateGenericCallableProfile(
 		}
 	}
 	correspondence := callableCorrespondence{
-		context:    context,
-		owner:      owner,
-		profile:    profile,
-		seen:       make(map[genericTypePair]struct{}),
-		selections: make(map[*api.GeneratedArtifact]bool),
+		context:             context,
+		owner:               owner,
+		profile:             profile,
+		seen:                make(map[genericTypePair]struct{}),
+		selections:          make(map[*api.GeneratedArtifact]bool),
+		stopAtNamedBoundary: true,
 	}
 	if err := correspondence.signatureMembers(
 		declaration,
@@ -182,7 +186,8 @@ func (c *callableCorrespondence) pair(
 			instantiatedCallable,
 		)
 	}
-	if types.Identical(declaration, instantiated) {
+	identical := types.Identical(declaration, instantiated)
+	if identical && !c.traverseIdentical {
 		return nil
 	}
 
@@ -225,6 +230,20 @@ func (c *callableCorrespondence) pair(
 		if !ok || declaration.Origin() != instantiated.Origin() {
 			return c.invalid()
 		}
+		if c.stopAtNamedBoundary {
+			if declaration.TypeArgs().Len() != instantiated.TypeArgs().Len() {
+				return c.invalid()
+			}
+			for index := range declaration.TypeArgs().Len() {
+				if err := c.pair(
+					declaration.TypeArgs().At(index),
+					instantiated.TypeArgs().At(index),
+				); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 		return c.pair(
 			declaration.Underlying(),
 			instantiated.Underlying(),
@@ -235,6 +254,13 @@ func (c *callableCorrespondence) pair(
 			return c.invalid()
 		}
 		for index := range declaration.NumFields() {
+			if declaration.Field(index).Id() !=
+				instantiated.Field(index).Id() ||
+				declaration.Field(index).Embedded() !=
+					instantiated.Field(index).Embedded() ||
+				declaration.Tag(index) != instantiated.Tag(index) {
+				return c.invalid()
+			}
 			if err := c.pair(
 				declaration.Field(index).Type(),
 				instantiated.Field(index).Type(),
@@ -289,8 +315,14 @@ func (c *callableCorrespondence) pair(
 		}
 		return nil
 	case *types.Basic:
+		if identical {
+			return nil
+		}
 		return c.invalid()
 	default:
+		if identical {
+			return nil
+		}
 		return nil
 	}
 }
@@ -390,118 +422,4 @@ func (c *callableCorrespondence) invalid() error {
 		Role:   api.RoleCallArgument,
 		Reason: "generic callable correspondence changed structural shape",
 	}
-}
-
-func JoinInterfaceMethodCallableABIs(
-	context api.Context,
-	selected api.InterfaceMethodCallableCorrespondence,
-) ([]api.RootRequest, error) {
-	owner, declaration, instantiated := selected.Parts()
-	if owner == nil || declaration == nil || instantiated == nil {
-		return nil, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "interface-method callable correspondence is invalid",
-		}
-	}
-	var requests []api.RootRequest
-	correspondence := callableCorrespondence{
-		context: context,
-		seen:    make(map[genericTypePair]struct{}),
-		leaf: func(
-			declaration *types.Signature,
-			instantiated *types.Signature,
-		) error {
-			declarationReference, err :=
-				context.Names().SourceCallableABI(
-					owner,
-					declaration,
-				)
-			if err != nil {
-				return err
-			}
-			instantiatedReference, err :=
-				callable.ABIReference(context, instantiated)
-			if err != nil {
-				return err
-			}
-			declarationFacet, err := api.NewCallableABIFacet(
-				declarationReference.Artifact(),
-			)
-			if err != nil {
-				return err
-			}
-			instantiatedFacet, err :=
-				context.CallableABIFacet(instantiatedReference)
-			if err != nil {
-				return err
-			}
-			declarationObservation, err :=
-				context.ObserveCooperativeCallable(
-					declarationFacet,
-				)
-			if err != nil {
-				return err
-			}
-			instantiatedObservation, err :=
-				context.ObserveCooperativeCallable(
-					instantiatedFacet,
-				)
-			if err != nil {
-				return err
-			}
-			requests = append(
-				requests,
-				declarationReference.Requests()...,
-			)
-			requests = append(
-				requests,
-				instantiatedReference.Requests()...,
-			)
-			requests = append(
-				requests,
-				declarationObservation.Requests()...,
-			)
-			requests = append(
-				requests,
-				instantiatedObservation.Requests()...,
-			)
-			cooperative := declarationObservation.Cooperative() ||
-				instantiatedObservation.Cooperative()
-			for _, candidate := range []struct {
-				facet       api.CallableFacet
-				cooperative bool
-			}{
-				{
-					facet: declarationFacet,
-					cooperative: declarationObservation.
-						Cooperative(),
-				},
-				{
-					facet: instantiatedFacet,
-					cooperative: instantiatedObservation.
-						Cooperative(),
-				},
-			} {
-				if !cooperative || candidate.cooperative {
-					continue
-				}
-				request, requestErr :=
-					api.NewCooperativeCallableRequest(
-						candidate.facet,
-					)
-				if requestErr != nil {
-					return requestErr
-				}
-				requests = append(requests, request)
-			}
-			return nil
-		},
-	}
-	if err := correspondence.signatureMembers(
-		declaration,
-		instantiated,
-	); err != nil {
-		return nil, err
-	}
-	return api.CombineRequests(requests), nil
 }

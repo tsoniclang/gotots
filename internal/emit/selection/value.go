@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -95,6 +96,15 @@ func projectFieldValue(
 		return api.ExpressionEmission{}, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	current, err = joinNominalFieldCallableABI(
+		context,
+		currentType,
+		field,
+		current,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
+	}
 	target, selected, err := namedstructstorage.FieldTarget(
 		context.WithRole(api.RoleStructField),
 		source,
@@ -133,6 +143,30 @@ func projectFieldValue(
 		return api.ExpressionEmission{}, nil, err
 	}
 	return current, field.Type(), nil
+}
+
+func joinNominalFieldCallableABI(
+	context api.Context,
+	container types.Type,
+	field *types.Var,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	requests, err := cooperative.JoinNominalFieldCallableABIs(
+		context,
+		container,
+		field,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if len(requests) == 0 {
+		return value, nil
+	}
+	return api.NewExpressionEmission(
+		value.Before(),
+		value.Value(),
+		api.CombineRequests(value.Requests(), requests),
+	)
 }
 
 func dereferenceValue(

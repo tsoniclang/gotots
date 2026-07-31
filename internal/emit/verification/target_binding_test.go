@@ -15,6 +15,52 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+func cooperativeFunctionName(function string) string {
+	start := strings.Index(function, "function ")
+	if start < 0 {
+		return ""
+	}
+	start += len("function ")
+	end := strings.IndexByte(function[start:], '<')
+	if end < 0 {
+		end = strings.IndexByte(function[start:], '(')
+	}
+	if end < 0 {
+		return ""
+	}
+	return function[start : start+end]
+}
+
+func packageAssemblyExports(
+	files []emit.TargetFile,
+	packageName string,
+	name string,
+) bool {
+	for _, file := range files {
+		if file.Kind() != emit.TargetFilePackageAssembly ||
+			file.PackageName() != packageName {
+			continue
+		}
+		for _, statement := range file.SourceFile().Statements() {
+			declaration, ok := statement.(tsgo.ExportDeclaration)
+			if !ok {
+				continue
+			}
+			exports, ok := declaration.ExportClause().(tsgo.NamedExports)
+			if !ok {
+				continue
+			}
+			for _, specifier := range exports.Elements() {
+				identifier, ok := specifier.Name().(tsgo.Identifier)
+				if ok && identifier.Text() == name {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func TestTargetBindingsOrderEagerDependenciesAndProtectIntrinsics(
 	t *testing.T,
 ) {

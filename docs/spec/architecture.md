@@ -1087,6 +1087,48 @@ ABI profiles rather than call count. Callable leaves inside arrays, slices,
 maps, pointers, structs, tuples, and nested signatures use the same
 `go/types`-proven correspondence. A type parameter itself is an opaque
 substitution boundary and does not imply a callable correspondence.
+
+A non-callable named type is also an ownership boundary. Correspondence may
+join its type arguments, but it never descends through the named declaration's
+underlying fields or methods. Those interiors belong to that named
+declaration's own representation contracts. For example, copying
+`*WatchedFiles[T]` through a generic function does not make that function own
+the callable field inside `WatchedFiles`; only a direct callable parameter,
+result, anonymous aggregate leaf, or named callable type belongs to the
+function's profile. This prevents copy-only functions from acquiring
+cooperative variants merely because an encapsulated field is cooperative.
+
+A callable leaf declared in a field of a generic named struct is owned by that
+nominal field contract, not by whichever generic function happens to construct
+or read one instance. For example:
+
+```go
+type Cache[K comparable, V any] struct {
+	parse func(K) V
+}
+
+func NewCache[K comparable, V any](parse func(K) V) *Cache[K, V] {
+	return &Cache[K, V]{parse: parse}
+}
+```
+
+The selected field object and receiver type provide an exact structural
+correspondence between the declaration's `func(K) V` and the occurrence's
+instantiated callable type. If any value transported through `Cache.parse` is
+cooperative, that declaration-owned field ABI, every structurally corresponding
+producer, and every direct field invocation converge on the Promise-returning
+contract. Synchronous providers adapt statically at their existing value
+boundary. This convergence is deliberately nominal-field-wide: one emitted
+`Cache` class cannot expose two invisible layouts for the same Go type.
+It does not authorize declaration-wide widening of an unrelated generic
+function or a per-instance effect parameter.
+
+The correspondence is established only from checker-produced named-type and
+field identity plus field ordinal. It is not inferred from the field spelling,
+target member name, constructor shape, or source text. No hidden struct-effect
+type parameter, `T | Promise<T>` union, runtime thenable test, field-flow graph,
+or per-storage callable facet is admitted.
+
 Every demand-created variant of an exported source declaration is part of that
 package's value surface. Package assembly re-exports the exact variant name
 from the declaration's source module; consumers never bypass package assembly

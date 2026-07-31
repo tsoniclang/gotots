@@ -105,6 +105,15 @@ func FieldStoreTarget(
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	receiver, err = joinNominalFieldCallableABI(
+		context,
+		receiverType,
+		field,
+		receiver,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
 	target, storageSelected, err := namedstructstorage.FieldTarget(
 		context.WithRole(api.RoleAssignmentTarget),
 		source,
@@ -356,6 +365,15 @@ func projectFieldPointer(
 	if !fieldInType(parentType, field) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	parent, err := joinNominalFieldCallableABI(
+		context,
+		parentType,
+		field,
+		parent,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	fieldRepresentation, err := pointertype.Observe(
 		context,

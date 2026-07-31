@@ -10,7 +10,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
@@ -301,6 +300,31 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 			)
 		}
 	}
+	for _, required := range []string{
+		"export class CallbackHolder<T>",
+		"Apply: (($0: T, $go$recovery?: GoRecovery) => Promise<T>)",
+		"static async Run<T>(",
+		"await __gotots_callee_",
+	} {
+		if !strings.Contains(artifacts.printed, required) {
+			t.Fatalf(
+				"generic field callable contract lacks %q:\n%s",
+				required,
+				artifacts.printed,
+			)
+		}
+	}
+	if strings.Contains(artifacts.printed, "CloneCallbackHolder$cooperative_") {
+		t.Fatal("named field interior created a copy-only generic profile")
+	}
+	clonedHolder := waveNineFunctionText(
+		t,
+		artifacts.printed,
+		"CloneCallbackHolder",
+	)
+	if strings.Contains(clonedHolder, "async") {
+		t.Fatalf("copy-only named field became cooperative:\n%s", clonedHolder)
+	}
 	if count := strings.Count(
 		artifacts.printed,
 		"function Apply$cooperative_",
@@ -389,10 +413,13 @@ import {
     SynchronousSequence,
     CooperativeGenericProfileWithNamedCallback,
     CooperativeNestedGenericMethod,
-    CooperativeRecursiveGenericMethod,
-    CooperativeGenericInterfaceMethod,
-    SynchronousGenericInterfaceMethod,
-} from "`+sourceModuleForExport(
+	    CooperativeRecursiveGenericMethod,
+	    CooperativeGenericInterfaceMethod,
+	    SynchronousGenericInterfaceMethod,
+	    CooperativeStoredCallback,
+	    SynchronousStoredCallback,
+	    CloneSynchronousStoredCallback,
+	} from "`+sourceModuleForExport(
 		t,
 		artifacts,
 		workingDirectory,
@@ -421,10 +448,13 @@ await GoScheduler.run(async () => {
         SynchronousSequence(),
         await CooperativeGenericProfileWithNamedCallback(),
         await CooperativeNestedGenericMethod(),
-        await CooperativeRecursiveGenericMethod(),
-        await CooperativeGenericInterfaceMethod(),
-        await SynchronousGenericInterfaceMethod(),
-    ].map(String).join(" "));
+	        await CooperativeRecursiveGenericMethod(),
+	        await CooperativeGenericInterfaceMethod(),
+	        await SynchronousGenericInterfaceMethod(),
+	        await CooperativeStoredCallback(),
+	        await SynchronousStoredCallback(),
+	        await CloneSynchronousStoredCallback(),
+	    ].map(String).join(" "));
 });
 `)
 	writeProgramFile(
@@ -484,10 +514,13 @@ func main() {
 		values.SynchronousSequence(),
 		values.CooperativeGenericProfileWithNamedCallback(),
 		values.CooperativeNestedGenericMethod(),
-		values.CooperativeRecursiveGenericMethod(),
-		values.CooperativeGenericInterfaceMethod(),
-		values.SynchronousGenericInterfaceMethod(),
-	)
+			values.CooperativeRecursiveGenericMethod(),
+			values.CooperativeGenericInterfaceMethod(),
+			values.SynchronousGenericInterfaceMethod(),
+			values.CooperativeStoredCallback(),
+			values.SynchronousStoredCallback(),
+			values.CloneSynchronousStoredCallback(),
+		)
 }
 `)
 	goOutput := runProgram(
@@ -549,50 +582,4 @@ func waveNineClassMemberText(
 		t.Fatalf("generated class %s member %q has no boundary", className, marker)
 	}
 	return printed[memberStart : memberStart+memberEnd+len("\n    }")]
-}
-
-func cooperativeFunctionName(function string) string {
-	start := strings.Index(function, "function ")
-	if start < 0 {
-		return ""
-	}
-	start += len("function ")
-	end := strings.IndexByte(function[start:], '<')
-	if end < 0 {
-		end = strings.IndexByte(function[start:], '(')
-	}
-	if end < 0 {
-		return ""
-	}
-	return function[start : start+end]
-}
-
-func packageAssemblyExports(
-	files []emit.TargetFile,
-	packageName string,
-	name string,
-) bool {
-	for _, file := range files {
-		if file.Kind() != emit.TargetFilePackageAssembly ||
-			file.PackageName() != packageName {
-			continue
-		}
-		for _, statement := range file.SourceFile().Statements() {
-			declaration, ok := statement.(tsgo.ExportDeclaration)
-			if !ok {
-				continue
-			}
-			exports, ok := declaration.ExportClause().(tsgo.NamedExports)
-			if !ok {
-				continue
-			}
-			for _, specifier := range exports.Elements() {
-				identifier, ok := specifier.Name().(tsgo.Identifier)
-				if ok && identifier.Text() == name {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }

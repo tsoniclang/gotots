@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/expression/mapliteral"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
@@ -47,7 +48,13 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	elements, err := emitElements(context, children, source, structType)
+	elements, err := emitElements(
+		context,
+		children,
+		source,
+		named,
+		structType,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -365,6 +372,7 @@ func emitElements(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
+	named *types.Named,
 	structType *types.Struct,
 ) ([]element, error) {
 	result := make([]element, 0, len(source.Elts))
@@ -402,7 +410,8 @@ func emitElements(
 			)
 		}
 		seen[fieldIndex] = struct{}{}
-		fieldType := structType.Field(fieldIndex).Type()
+		field := structType.Field(fieldIndex)
+		fieldType := field.Type()
 		valueType := context.TypesInfo().TypeOf(valueSource)
 		if valueType == nil || !types.AssignableTo(valueType, fieldType) {
 			return nil, api.Unsupported(
@@ -427,6 +436,22 @@ func emitElements(
 			fieldType,
 			api.ValueTransferCopy,
 			value,
+		)
+		if err != nil {
+			return nil, err
+		}
+		requests, err := cooperative.JoinNominalFieldCallableABIs(
+			context.WithRole(api.RoleCompositeElement),
+			named,
+			field,
+		)
+		if err != nil {
+			return nil, err
+		}
+		value, err = api.NewExpressionEmission(
+			value.Before(),
+			value.Value(),
+			api.CombineRequests(value.Requests(), requests),
 		)
 		if err != nil {
 			return nil, err
