@@ -1,4 +1,4 @@
-import type { bool } from "../../../support/scalars.js";
+import type { bool } from "../../../runtime/scalars.js";
 export function Run(input: bool): bool {
     let current = false;
     if (!input) {

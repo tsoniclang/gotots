@@ -522,7 +522,7 @@ func TestPrimitiveAliasImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing
 	if len(requests) != 1 ||
 		requests[0].ExportedName() != "int32" ||
 		requests[0].LocalName() != expectedLocal ||
-		requests[0].ModulePath() != "../../support/scalars.js" {
+		requests[0].ModulePath() != "../../runtime/scalars.js" {
 		t.Fatalf("primitive request = %#v", requests)
 	}
 	alias, ok := requests[0].PrimitiveAlias()

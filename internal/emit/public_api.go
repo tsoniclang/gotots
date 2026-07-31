@@ -467,6 +467,34 @@ func (e ProgramEmission) EnvironmentObligations() []EnvironmentObligation {
 	return slices.Clone(e.environmentObligations)
 }
 
+func (e ProgramEmission) RuntimePackage() (RuntimePackage, bool) {
+	return e.runtimePackage, e.runtimePackage.assembled.Valid()
+}
+
+func (p RuntimePackage) Name() string {
+	return p.assembled.Name()
+}
+
+func (p RuntimePackage) RootPath() string {
+	return p.assembled.RootPath()
+}
+
+func (p RuntimePackage) ManifestPath() string {
+	return p.assembled.ManifestPath()
+}
+
+func (p RuntimePackage) IntegerRepresentation() IntegerRepresentation {
+	return p.assembled.Profile()
+}
+
+func (p RuntimePackage) Manifest() []byte {
+	return p.assembled.Manifest()
+}
+
+func (p RuntimePackage) Fingerprint() string {
+	return p.assembled.Fingerprint()
+}
+
 func (f TargetFile) OutputPath() string {
 	return f.outputPath
 }

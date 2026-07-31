@@ -51,7 +51,7 @@ general-purpose intermediate program.
 | mutable package storage and package-local initialization bodies | package-state and passive package-assembly builders in `internal/emit`, driven by the selected `go/types.Info.InitOrder` |
 | whole-program package initialization order | one static program-initialization builder consuming the selected `types.Package` import graph |
 | target decoding and formatting | pinned `tsgo --api` `printNode` |
-| Go primitive target names and support declarations | representation owner in `internal/emit` plus generated `support/scalars.ts` |
+| Go primitive target names and support declarations | representation owner in `internal/emit` plus generated `runtime/scalars.ts` |
 | standalone runtime behavior not expressible directly | GoToTS-owned modules under generated `runtime/` |
 | output paths and atomic writes | `internal/output` |
 | runtime/manual/external ownership | explicit contracts under their named roots |
@@ -1544,7 +1544,7 @@ concerns.
 Generated support modules obey the same rule. The representation owner requests
 one canonical primitive alias by typed identity; the root emitter constructs
 the corresponding exported TS-Go `TypeAliasDeclaration` in
-`support/scalars.ts` and deduplicates it. Generated package files use canonical
+`runtime/scalars.ts` and deduplicates it. Generated package files use canonical
 relative type-only `.js` imports. No checked-in source template or external
 package supplies these declarations. Any other marker-like support declaration
 must have complete ordinary TypeScript semantics; a no-op declaration cannot
@@ -1576,13 +1576,38 @@ runtime modules. A raw module/export string may not select runtime behavior,
 and a runtime declaration may not be carried from a use-site handler as an
 opaque duplicate AST payload.
 
+All generated runtime modules and primitive aliases form one canonical local
+package rooted at `runtime/` and identified as `@gotots/runtime`. Program
+assembly emits a deterministic package manifest whose explicit exports map
+each selected `@gotots/runtime/<family>.js` subpath to the corresponding
+generated module. Product assembly links that exact package root locally; it
+does not publish, copy, or reimplement it.
+
+Generated source may use a relative import to the canonical runtime root, while
+`gostdlib` uses its declared `@gotots/runtime` peer import. Both specifiers must
+resolve to the same physical generated module, so private fields, class
+identity, method tokens, panic carriers, maps, slices, pointers, channels, and
+interface values have one TypeScript and JavaScript identity. A checked-in or
+handwritten test runtime is forbidden. Provider tests generate and compile
+their runtime fixture through the same runtime builders, integer profile, TS-Go
+encoder, and pinned printer used by ordinary program emission.
+
+`gostdlib` contributes a certified closed set of runtime symbols and primitive
+aliases required by its selected provider modules. Program assembly unions
+that set with source-program demand before computing the runtime dependency
+closure. Missing exports, an unrequested provider runtime dependency, a second
+runtime implementation, or two resolved physical owners for one runtime
+symbol fail before provider linkage.
+
 ```text
 contextual family handler
     -> Names.Runtime(closed symbol)
     -> static ESM import request + tagged definition requirement
     -> program-level dependency closure + exact symbol join
     -> internal/emit/runtime/<family> TS-Go AST builder
-    -> runtime/<family>.ts
+    -> canonical runtime/<family>.ts
+    -> deterministic @gotots/runtime package manifest
+    -> one local package link shared by generated code and gostdlib
 ```
 
 All generated runtime failures and source `panic` use one closed Go panic ABI:
@@ -1867,8 +1892,10 @@ A generated product uses deterministic ownership:
   packages/<module-key>/<package>/state.ts
   packages/<module-key>/<package>/package.ts
   externals/<contract-key>/<import-path>/index.ts
-  support/scalars.ts
+  runtime/package.json
+  runtime/scalars.ts
   runtime/<runtime-module>.ts
+  node_modules/@gotots/runtime/     local link to the exact runtime/ root
   node_modules/@gotots/gostdlib/    installed or vendored exact provider
   manifest.json
 ```
@@ -1878,9 +1905,10 @@ come from the workspace, module cache, vendor tree, or replacement directory.
 Standard-library and external routing uses resolved metadata and explicit
 contracts, never path spelling. Standard-library calls use public
 `@gotots/gostdlib/<go-import-path>.js` modules after provider verification.
-`support/scalars.ts` contains only aliases requested by the selected program,
-each defined once. `runtime/` contains only GoToTS-owned behavior required for
-exact standalone execution; neither location imports an unrelated compiler,
+`runtime/scalars.ts` contains only aliases requested by the selected program
+and certified provider contract, each defined once. `runtime/` contains only
+GoToTS-owned behavior required for exact standalone execution and is locally
+linked as `@gotots/runtime`; it does not import an unrelated compiler,
 transpiler, target, or product.
 
 ## Extension Boundary

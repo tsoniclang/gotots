@@ -13,7 +13,10 @@ import (
 
 const (
 	ProgramInitializationPath  = "program.ts"
-	ScalarSupportPath          = "support/scalars.ts"
+	RuntimePackageName         = "@gotots/runtime"
+	RuntimePackageRootPath     = "runtime"
+	RuntimePackageManifestPath = "runtime/package.json"
+	ScalarSupportPath          = "runtime/scalars.ts"
 	AnonymousStructSupportPath = "support/anonymous-structs.ts"
 	InterfaceMethodSupportPath = "support/interface-methods.ts"
 	InterfaceTypeSupportPath   = "support/interface-types.ts"

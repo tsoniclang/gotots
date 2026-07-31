@@ -582,6 +582,22 @@ The one compiler-process owner therefore treats either a process error or any
 diagnostic output as failure; tests and product gates must not invoke the
 executable through a status-only wrapper.
 
+Runtime-package verification resolves every generated relative runtime import
+and every `gostdlib` `@gotots/runtime/*` peer import and exact-joins their
+realpath, exported symbol, profile fingerprint, and declaration owner. A
+strict mixed program passes a generated slice, map, pointer, channel,
+interface value, and panic carrier through provider code and back, then
+executes identity-sensitive behavior. Mutations linking a handwritten runtime,
+copying one class, changing the integer profile, omitting a provider-required
+runtime symbol, exporting an ungenerated module, or resolving the provider and
+program to different package roots must fail before execution.
+
+The provider fixture is regenerated through the production runtime assembler
+and pinned TS-Go printer. Reproducibility compares its complete TS-Go AST,
+printed bytes, package manifest, and explicit exports to a fresh generation;
+provider tests never establish correctness against manually maintained
+JavaScript or declaration files.
+
 Primitive aliases preserve selected Go names in target source but do not prove
 runtime range or overflow. Every integer gate runs under an explicit
 compilation-wide integer selection. The default `number` gate inspects direct

@@ -209,7 +209,7 @@ func materialize(
 			result.sourceBytes += len(printed)
 		case strings.HasPrefix(file.OutputPath(), "runtime/"):
 			result.runtimeBytes += len(printed)
-		case file.OutputPath() == "support/scalars.ts":
+		case file.OutputPath() == "runtime/scalars.ts":
 			result.scalarBytes += len(printed)
 		default:
 			result.assemblyBytes += len(printed)

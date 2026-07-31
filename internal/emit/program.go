@@ -13,6 +13,7 @@ import (
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	"github.com/tsoniclang/gotots/internal/emit/runtime/gocontract"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
@@ -41,6 +42,11 @@ const (
 type ProgramEmission struct {
 	files                  []TargetFile
 	environmentObligations []EnvironmentObligation
+	runtimePackage         RuntimePackage
+}
+
+type RuntimePackage struct {
+	assembled runtimeemission.Package
 }
 
 type declarationSite = declarationindex.Site
@@ -65,6 +71,7 @@ type programSession struct {
 	genericProfiles        map[genericCallableProfileIdentity]*api.GenericCallableProfile
 	classMembers           map[*types.Func]classMemberContribution
 	goRuntime              *gocontract.Contract
+	runtimePackage         RuntimePackage
 	compareArtifactOwners  func(api.ArtifactOwner, api.ArtifactOwner) int
 	sealed                 bool
 }
@@ -178,6 +185,7 @@ func CompileWithOptions(
 	return ProgramEmission{
 		files:                  files,
 		environmentObligations: obligations,
+		runtimePackage:         session.runtimePackage,
 	}, nil
 }
 

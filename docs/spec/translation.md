@@ -2215,7 +2215,7 @@ Handlers preserve within the selected profile:
 
 The basic-type owner selects integer width from the loaded `types.Sizes`
 evidence and requests the corresponding alias from the generated
-`support/scalars.ts` module. One immutable compilation-wide profile chooses
+`runtime/scalars.ts` module. One immutable compilation-wide profile chooses
 their carrier. The default is:
 
 ```ts

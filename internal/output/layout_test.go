@@ -84,16 +84,16 @@ func TestLayoutRejectsForeignFilesAndSameModuleImports(t *testing.T) {
 
 func TestScalarSupportPathProducesCanonicalRelativeSpecifier(t *testing.T) {
 	const sourcePath = "modules/example/package/source.ts"
-	if ScalarSupportPath != "support/scalars.ts" {
-		t.Fatalf("scalar support path = %q, want support/scalars.ts", ScalarSupportPath)
+	if ScalarSupportPath != "runtime/scalars.ts" {
+		t.Fatalf("scalar support path = %q, want runtime/scalars.ts", ScalarSupportPath)
 	}
 	specifier, err := ModuleSpecifier(sourcePath, ScalarSupportPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if specifier != "../../../support/scalars.js" {
+	if specifier != "../../../runtime/scalars.js" {
 		t.Fatalf(
-			"scalar support specifier = %q, want ../../../support/scalars.js",
+			"scalar support specifier = %q, want ../../../runtime/scalars.js",
 			specifier,
 		)
 	}

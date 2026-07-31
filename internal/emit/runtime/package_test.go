@@ -1,0 +1,221 @@
+package runtime
+
+import (
+	"encoding/json"
+	"errors"
+	"slices"
+	"testing"
+
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
+	assembled, err := AssemblePackage(
+		tsgo.NewFactory(),
+		api.IntegerRepresentationNumber,
+		map[api.RuntimeSymbol]struct{}{
+			api.RuntimeStringIndex: {},
+		},
+		[]api.PrimitiveAlias{api.PrimitiveInt32},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assembled.Name() != "@gotots/runtime" ||
+		assembled.RootPath() != "runtime" ||
+		assembled.ManifestPath() != "runtime/package.json" ||
+		assembled.Profile() != api.IntegerRepresentationNumber {
+		t.Fatalf(
+			"runtime package identity = %q/%q/%q/%s",
+			assembled.Name(),
+			assembled.RootPath(),
+			assembled.ManifestPath(),
+			assembled.Profile(),
+		)
+	}
+	paths := make([]string, 0)
+	for _, file := range assembled.Files() {
+		paths = append(paths, file.OutputPath())
+	}
+	wantPaths := []string{
+		"runtime/interface-value.ts",
+		"runtime/panic.ts",
+		"runtime/scalars.ts",
+		"runtime/string.ts",
+	}
+	if !slices.Equal(paths, wantPaths) {
+		t.Fatalf("runtime files = %v, want %v", paths, wantPaths)
+	}
+	var manifest struct {
+		Name    string `json:"name"`
+		Private bool   `json:"private"`
+		Type    string `json:"type"`
+		GoToTS  struct {
+			IntegerRepresentation string `json:"integerRepresentation"`
+		} `json:"gotots"`
+		Exports map[string]struct {
+			Types   string `json:"types"`
+			Default string `json:"default"`
+		} `json:"exports"`
+	}
+	if err := json.Unmarshal(assembled.Manifest(), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Name != "@gotots/runtime" ||
+		!manifest.Private ||
+		manifest.Type != "module" ||
+		manifest.GoToTS.IntegerRepresentation != "number" {
+		t.Fatalf("runtime manifest metadata = %#v", manifest)
+	}
+	if len(manifest.Exports) != len(wantPaths) {
+		t.Fatalf(
+			"runtime manifest exports = %d, want %d",
+			len(manifest.Exports),
+			len(wantPaths),
+		)
+	}
+	scalar := manifest.Exports["./scalars.js"]
+	if scalar.Types != "./scalars.d.ts" ||
+		scalar.Default != "./scalars.js" {
+		t.Fatalf("scalar package export = %#v", scalar)
+	}
+	if assembled.Fingerprint() == "" {
+		t.Fatal("runtime package fingerprint is empty")
+	}
+}
+
+func TestAssemblePackageRejectsDuplicateAliases(t *testing.T) {
+	_, err := AssemblePackage(
+		tsgo.NewFactory(),
+		api.IntegerRepresentationNumber,
+		nil,
+		[]api.PrimitiveAlias{
+			api.PrimitiveInt32,
+			api.PrimitiveInt32,
+		},
+	)
+	if err == nil {
+		t.Fatal("duplicate primitive alias was accepted")
+	}
+}
+
+func TestDefinitionsExactJoinRequestedSymbols(t *testing.T) {
+	factory := tsgo.NewFactory()
+	index := runtimeDefinition(t, factory, api.RuntimeStringIndex)
+	slice := runtimeDefinition(t, factory, api.RuntimeStringSlice)
+	statements, err := exactDefinitions(
+		api.RuntimeModuleString,
+		[]api.RuntimeSymbol{api.RuntimeStringIndex, api.RuntimeStringSlice},
+		[]Definition{slice, index},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(statements) != 2 ||
+		statements[0] != index.Statement() ||
+		statements[1] != slice.Statement() {
+		t.Fatalf("runtime statements = %#v", statements)
+	}
+}
+
+func TestDefinitionsRejectJoinMutations(t *testing.T) {
+	factory := tsgo.NewFactory()
+	index := runtimeDefinition(t, factory, api.RuntimeStringIndex)
+	slice := runtimeDefinition(t, factory, api.RuntimeStringSlice)
+	pointer := runtimeDefinition(t, factory, api.RuntimePointer)
+	tests := []struct {
+		name        string
+		requested   []api.RuntimeSymbol
+		definitions []Definition
+	}{
+		{"missing", []api.RuntimeSymbol{api.RuntimeStringIndex, api.RuntimeStringSlice}, []Definition{index}},
+		{"duplicate", []api.RuntimeSymbol{api.RuntimeStringIndex}, []Definition{index, index}},
+		{"extra", []api.RuntimeSymbol{api.RuntimeStringIndex}, []Definition{index, slice}},
+		{"wrong module", []api.RuntimeSymbol{api.RuntimePointer}, []Definition{pointer}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := exactDefinitions(
+				api.RuntimeModuleString,
+				test.requested,
+				test.definitions,
+			)
+			var assemblyError *AssemblyError
+			if !errors.As(err, &assemblyError) {
+				t.Fatalf("error = %v, want runtime assembly error", err)
+			}
+		})
+	}
+}
+
+func TestDependencyClosureIncludesEveryTransitiveOwner(t *testing.T) {
+	closure, err := dependencyClosure(map[api.RuntimeSymbol]struct{}{
+		api.RuntimeArray:         {},
+		api.RuntimeIntegerDivide: {},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[api.RuntimeSymbol]struct{}{
+		api.RuntimeArray:             {},
+		api.RuntimeIntegerDivide:     {},
+		api.RuntimePanic:             {},
+		api.RuntimePanicValue:        {},
+		api.RuntimeInterfaceValue:    {},
+		api.RuntimeErrorMethodToken:  {},
+		api.RuntimeRuntimeErrorToken: {},
+	}
+	if len(closure) != len(want) {
+		t.Fatalf("runtime closure = %v, want %v", closure, want)
+	}
+	for symbol := range want {
+		if _, ok := closure[symbol]; !ok {
+			t.Fatalf("runtime closure omits symbol %d", symbol)
+		}
+	}
+}
+
+func TestModuleImportsExactDependencyContract(t *testing.T) {
+	factory := tsgo.NewFactory()
+	imports, err := moduleImports(
+		factory,
+		"runtime/array.ts",
+		api.RuntimeModuleArray,
+		[]api.RuntimeSymbol{api.RuntimeArray},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(imports) != 1 {
+		t.Fatalf("array runtime imports = %d, want one", len(imports))
+	}
+	declaration := imports[0].(tsgo.ImportDeclaration)
+	module := declaration.ModuleSpecifier().(tsgo.StringLiteral)
+	if module.Text() != "./panic.js" {
+		t.Fatalf("array runtime dependency = %q, want ./panic.js", module.Text())
+	}
+	bindings := declaration.ImportClause().NamedBindings().(tsgo.NamedImports).
+		Elements()
+	if len(bindings) != 1 ||
+		bindings[0].Name().Text() != "GoPanic" ||
+		bindings[0].PropertyName() != nil {
+		t.Fatalf("array runtime bindings = %#v, want direct GoPanic", bindings)
+	}
+}
+
+func runtimeDefinition(
+	t *testing.T,
+	factory tsgo.Factory,
+	symbol api.RuntimeSymbol,
+) Definition {
+	t.Helper()
+	definition, err := NewDefinition(
+		symbol,
+		factory.EmptyStatement(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return definition
+}

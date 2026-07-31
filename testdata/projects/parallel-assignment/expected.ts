@@ -1,4 +1,4 @@
-import type { int32 } from "../../../support/scalars.js";
+import type { int32 } from "../../../runtime/scalars.js";
 export function SwapLeft(left: int32, right: int32): int32 {
     const __gotots_assign_0 = right;
     const __gotots_assign_1 = left;

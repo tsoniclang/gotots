@@ -151,9 +151,9 @@ func assertPrimitiveImportDeclaration(
 		t.Fatalf("first target statement = %T, want tsgo.ImportDeclaration", statement)
 	}
 	module, ok := declaration.ModuleSpecifier().(tsgo.StringLiteral)
-	if !ok || module.Text() != "../../../support/scalars.js" {
+	if !ok || module.Text() != "../../../runtime/scalars.js" {
 		t.Fatalf(
-			"type import module = %T, want ../../../support/scalars.js",
+			"type import module = %T, want ../../../runtime/scalars.js",
 			declaration.ModuleSpecifier(),
 		)
 	}

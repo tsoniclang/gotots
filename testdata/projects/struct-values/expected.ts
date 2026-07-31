@@ -1,4 +1,4 @@
-import type { bool, int32 } from "../../../support/scalars.js";
+import type { bool, int32 } from "../../../runtime/scalars.js";
 export class Point {
     declare private readonly $goType: void;
     private constructor(public X: int32, public Visible: bool) {

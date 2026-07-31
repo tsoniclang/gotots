@@ -43,6 +43,22 @@ func TestProgramEmitsRequestedPrimitiveAliasesOnce(t *testing.T) {
 			output.ScalarSupportPath,
 		)
 	}
+	runtimePackage, ok := emission.RuntimePackage()
+	if !ok {
+		t.Fatal("program emitted no canonical runtime package")
+	}
+	if runtimePackage.Name() != "@gotots/runtime" ||
+		runtimePackage.RootPath() != "runtime" ||
+		runtimePackage.ManifestPath() != "runtime/package.json" ||
+		len(runtimePackage.Manifest()) == 0 {
+		t.Fatalf(
+			"runtime package = %q/%q/%q manifest=%d",
+			runtimePackage.Name(),
+			runtimePackage.RootPath(),
+			runtimePackage.ManifestPath(),
+			len(runtimePackage.Manifest()),
+		)
+	}
 	statements := support.SourceFile().Statements()
 	if len(statements) != 1 {
 		t.Fatalf("support statements = %d, want one requested alias", len(statements))

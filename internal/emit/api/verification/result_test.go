@@ -297,7 +297,7 @@ func TestEmissionResultsOwnImmutableTargetNodesAndRequests(t *testing.T) {
 	request, err := api.NewImportRequest(
 		factory,
 		api.ImportPhaseType,
-		"../../../support/scalars.js",
+		"../../../runtime/scalars.js",
 		"int64",
 		"int64",
 	)
@@ -341,7 +341,7 @@ func TestPrimitiveAliasRequestCarriesGeneratedSupportIdentity(t *testing.T) {
 	factory := tsgo.NewFactory()
 	request, err := api.NewPrimitiveAliasRequest(
 		factory,
-		"../../../support/scalars.js",
+		"../../../runtime/scalars.js",
 		api.PrimitiveInt64,
 		"sourceInt64",
 	)
