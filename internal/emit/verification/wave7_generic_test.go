@@ -452,6 +452,15 @@ func assertWaveSevenGenericFoundationShape(t *testing.T, printed string) {
 			printed,
 		)
 	}
+	sameStorage := targetGenericFunctionText(t, printed, "SameSliceStorage")
+	if !strings.Contains(sameStorage, "$go$equal_") ||
+		!strings.Contains(sameStorage, "$go$index_address_") ||
+		strings.Contains(sameStorage, "GoPointer.equal") {
+		t.Fatalf(
+			"generic pointer equality bypassed its selected capability:\n%s",
+			sameStorage,
+		)
+	}
 	twice := targetGenericFunctionText(t, printed, "Twice")
 	copyNames := regexp.MustCompile(`\$go\$copy_[0-9a-f]+`).
 		FindAllString(twice, -1)

@@ -151,7 +151,7 @@ func emitVariadicSlice(
 	elementType types.Type,
 	values []api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	element, err := children.RepresentedType(
+	element, err := context.ContainerStorage().ContainerStorageType(
 		context.WithRole(api.RoleCallArgument),
 		source,
 		elementType,
@@ -159,6 +159,20 @@ func emitVariadicSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	storedValues := make([]api.ExpressionEmission, 0, len(values))
+	for _, value := range values {
+		stored, storageErr := context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleCallArgument),
+			source,
+			elementType,
+			value,
+		)
+		if storageErr != nil {
+			return api.ExpressionEmission{}, storageErr
+		}
+		storedValues = append(storedValues, stored)
+	}
+	values = storedValues
 	var arguments []tsgo.Expression
 	var before []tsgo.Statement
 	var requests []api.RootRequest

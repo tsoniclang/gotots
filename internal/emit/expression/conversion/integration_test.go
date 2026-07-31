@@ -51,7 +51,8 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 				"static arrayRegion<L, T, S extends",
 				"GoPointer<Pair, GoArray<int32, 2>>",
 				"GoUnsafePointer.from(value)",
-				"GoUnsafePointer.to<int32, int32>(",
+				"GoUnsafePointer.to<GoPointer<int32, int32>>(",
+				"GoUnsafePointer.to<UnsafeBox>(",
 				"unsafe.Pointer conversion requires an environment implementation",
 				"export function GenericNilPointer<T, T$Pointer>(): T$Pointer | undefined {\n" +
 					"    return void 0;\n}",

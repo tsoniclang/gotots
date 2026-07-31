@@ -130,9 +130,10 @@ func interfaceDeclaration(
 				Reason: "environment interface method has no signature",
 			}
 		}
-		target, err := callable.EmitEnvironmentContract(
+		target, err := callable.EmitABIAdapter(
 			context,
 			children,
+			nil,
 			signature,
 		)
 		if err != nil {
@@ -357,7 +358,7 @@ func structFields(
 	var requests []api.RootRequest
 	for index := range source.NumFields() {
 		field := source.Field(index)
-		if !field.Exported() {
+		if !field.Exported() && !field.Embedded() {
 			continue
 		}
 		name := "$blank" + genericName(index)[2:]

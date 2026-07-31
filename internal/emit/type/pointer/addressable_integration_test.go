@@ -93,6 +93,7 @@ import {
     NilPointerReceiver,
     MultipleResult,
     Package,
+    PackageValueAddress,
     Parallel,
     Parameter,
     PointerReceiverOnPointer,
@@ -146,6 +147,7 @@ console.log(...DefinedSliceAddress(52));
 console.log(...StructArrayAddress(53));
 console.log(...StructSliceAddress(54));
 console.log(...Package(60));
+console.log(...PackageValueAddress(61));
 console.log(Composite(70));
 console.log(...ElidedPointerSlice(71));
 console.log(ElidedPointerArray(72));
@@ -400,6 +402,7 @@ func main() {
     fmt.Println(pointer.StructArrayAddress(53))
     fmt.Println(pointer.StructSliceAddress(54))
     fmt.Println(pointer.Package(60))
+    fmt.Println(pointer.PackageValueAddress(61))
     fmt.Println(pointer.Composite(70))
     fmt.Println(pointer.ElidedPointerSlice(71))
     fmt.Println(pointer.ElidedPointerArray(72))

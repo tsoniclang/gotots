@@ -501,3 +501,80 @@ type IntValue interface {
 		t.Fatal("closed callable facet does not correspond to its runtime token")
 	}
 }
+
+func TestPointerRepresentationCanonicalizesGenericNominalFamily(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/family", "family")
+	parameter := types.NewTypeParam(
+		types.NewTypeName(token.NoPos, sourcePackage, "T", nil),
+		types.NewInterfaceType(nil, nil).Complete(),
+	)
+	typeName := types.NewTypeName(
+		token.NoPos,
+		sourcePackage,
+		"Box",
+		nil,
+	)
+	origin := types.NewNamed(
+		typeName,
+		types.NewStruct(
+			[]*types.Var{
+				types.NewField(
+					token.NoPos,
+					sourcePackage,
+					"Value",
+					parameter,
+					false,
+				),
+			},
+			nil,
+		),
+		nil,
+	)
+	origin.SetTypeParams([]*types.TypeParam{parameter})
+	instantiated, err := types.Instantiate(
+		types.NewContext(),
+		origin,
+		[]types.Type{types.Typ[types.Int32]},
+		true,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declaration := pointerRepresentationFamily(types.NewPointer(origin))
+	occurrence := pointerRepresentationFamily(
+		types.NewPointer(instantiated),
+	)
+	if !types.Identical(declaration, occurrence) ||
+		!types.Identical(declaration.Elem(), origin) {
+		t.Fatal("generic nominal pointer family did not converge on its origin")
+	}
+}
+
+func TestCrossPackagePrivateLinkageUsesDefiningModule(t *testing.T) {
+	provider := types.NewPackage("example.com/provider", "provider")
+	consumer := types.NewPackage("example.com/consumer", "consumer")
+	private := types.NewTypeName(token.NoPos, provider, "hidden", nil)
+	public := types.NewTypeName(token.NoPos, provider, "Visible", nil)
+	for _, object := range []types.Object{private, public} {
+		types.NewNamed(object.(*types.TypeName), types.NewStruct(nil, nil), nil)
+	}
+	registry := NewRegistry()
+	registry.assemblyPathByPackage[provider] = "packages/provider/package.ts"
+	names := &File{
+		owner:        &Owner{registry: registry},
+		packageScope: consumer.Scope(),
+	}
+	binding := targetBinding{sourcePath: "modules/provider/source.ts"}
+	for object, want := range map[types.Object]string{
+		private: "modules/provider/source.ts",
+		public:  "packages/provider/package.ts",
+	} {
+		got, crossPackage, err := names.sourceReferencePath(object, binding)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want || !crossPackage {
+			t.Fatalf("%s reference path = %q/%t, want %q/true", object.Name(), got, crossPackage, want)
+		}
+	}
+}

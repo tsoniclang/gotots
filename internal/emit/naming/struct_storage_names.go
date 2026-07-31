@@ -44,6 +44,7 @@ func (n *File) pointerRepresentation(
 			Reason: "pointer-representation type is nil",
 		}
 	}
+	pointer = pointerRepresentationFamily(pointer)
 	key, err := typeidentity.BuildParameterizedKey(
 		pointer,
 		namedIdentity,
@@ -79,6 +80,19 @@ func (n *File) pointerRepresentation(
 		binding.owner,
 		definition,
 	)
+}
+
+func pointerRepresentationFamily(pointer *types.Pointer) *types.Pointer {
+	if pointer == nil {
+		return nil
+	}
+	named, ok := types.Unalias(pointer.Elem()).(*types.Named)
+	if !ok ||
+		named.Origin() == nil ||
+		named.Origin().TypeParams().Len() == 0 {
+		return pointer
+	}
+	return types.NewPointer(named.Origin())
 }
 
 func (r *Registry) internPointerRepresentation(

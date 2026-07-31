@@ -14,6 +14,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -289,7 +290,9 @@ func TestDeclarationRequirementSchedulerDeduplicatesAndUsesClosedOrder(
 		t.Fatal(err)
 	}
 
-	scheduler := newDeclarationRequirementScheduler()
+	scheduler := newDeclarationRequirementScheduler(
+		emitordering.CompareArtifactOwners,
+	)
 	scheduler.enqueue(secondZero)
 	scheduler.enqueue(firstEqual)
 	scheduler.enqueue(firstCopy)
@@ -316,7 +319,9 @@ func TestDeclarationRequirementSchedulerLookupVisitsOnlySelectedOwner(
 ) {
 	const ownerCount = 4096
 	sourcePackage := types.NewPackage("example.com/schedule-scale", "schedule")
-	scheduler := newDeclarationRequirementScheduler()
+	scheduler := newDeclarationRequirementScheduler(
+		emitordering.CompareArtifactOwners,
+	)
 	owners := make([]api.ArtifactOwner, 0, ownerCount)
 	for index := range ownerCount {
 		typeName := types.NewTypeName(

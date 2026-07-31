@@ -783,6 +783,16 @@ behavior. Constructed signatures containing type parameters compose by
 forwarding exact enclosing operation functions; they do not create an erased
 descriptor, growing object, capability factory, or per-use semantic closure.
 
+One generic named Go declaration produces one target declaration and therefore
+one receiver and parameter ABI for all of its instantiations. When an exact
+pointer representation is demanded for `*Box[T]`, declaration and concrete
+uses join the pointer family at `Box`'s generic origin, then supply the reached
+target facets through that one parameterized contract. `*Box[int32]` and
+`*Box[Item]` cannot independently choose direct and carrier ABIs for the same
+method body. A per-instantiation method body, carrier-to-facade bridge,
+identity-changing wrapper, widened union, cast, or erased pointer payload is
+forbidden.
+
 `go/types` remains the sole authority for constraints, type sets, inference,
 core types, method selection, and admissible operations. Target constraints are
 not reconstructed from Go syntax. The hidden callable list contains exactly the
@@ -803,9 +813,15 @@ One placement service applies the policy:
   whose Go names are unexported;
 - mutable package variables are fields of the package's one state object, not
   duplicate `let` declarations in source-file modules;
-- same-package generated source modules import that state object directly,
-  while cross-package references use the passive package assembly; consumers
-  import the program-initialization module before using a selected package
+- same-package generated source modules import that state object directly.
+  Cross-package references to exported source declarations use the passive
+  package assembly. A compiler-generated support artifact that must name a
+  checker-selected unexported declaration imports that declaration's defining
+  source module directly; the package assembly never republishes it. This
+  internal route is selected only from exact `types.Object` identity and its
+  registered source artifact, never from spelling, and is unavailable to an
+  ordinary cross-package Go source reference. Consumers import the
+  program-initialization module before using a selected public package
   surface;
 - reusable static declarations prefer file scope;
 - demanded named-struct static operations are incorporated into their owning
@@ -820,6 +836,14 @@ One placement service applies the policy:
   and argument-evaluation timing remain source-controlled. No top-level
   receiver function, prototype assignment, partial class, wrapper twin, or
   second method body survives;
+- source-owned artifacts schedule canonically by semantic package, target
+  source-module path, and physical declaration order inside that module.
+  Class-member, provider-contract, export, and generated-requirement ordering
+  is canonical by package, semantic object kind, receiver identity, name, and
+  exact type. Absolute `token.Pos` may order declarations only after their
+  stable source-module path agrees; it may never order declarations from
+  different files because file token allocation is load-order state rather
+  than semantic identity;
 - one canonical generated artifact represents each exact reached anonymous
   struct or specialized map shape. A shape with no local named component enters
   deterministic compilation support; a shape containing local named
@@ -1183,7 +1207,12 @@ Promise-returning yield ABI; calling `Values` itself remains synchronous.
 Non-generic environment function and method declarations observe canonical
 first-class callable ABIs in their parameter and result types. Environment
 interface declarations observe the canonical interface-method callable facet
-for each method. Therefore a blocking function value passed to
+for each method, including the same recovery envelope used by generated
+interface calls and adapters. Environment struct contracts retain every
+embedded field, including an unexported one, because the embedded promotion
+spine is part of the selected method and field contract; unrelated unexported
+non-embedded storage remains provider-private and is omitted. Therefore a
+blocking function value passed to
 `sync.WaitGroup.Go` and a blocking concrete implementation of
 `os.Signal.String` change the exact ambient contracts consumed by generated
 calls and adapters. Generic environment baselines remain declaration-scoped
@@ -1367,8 +1396,11 @@ bindings from a passive package assembly.
 Generated reads and stores use the same field identity (`$state.A`,
 `$state.A = value`, `$state.A++`). No per-variable getter/setter, mutable-cell
 wrapper, duplicated source-file binding, or source-order emulation exists.
-Same-package source modules import `state.ts`; cross-package generated code
-imports the dependency state and declarations through passive `package.ts`.
+Same-package source modules import `state.ts`; cross-package generated source
+references use the dependency state and exported declarations through passive
+`package.ts`. Compiler-owned support artifacts name a required unexported
+declaration through its defining source module as specified by the placement
+owner; this does not expose that declaration on the public package surface.
 Loading source and package modules cannot execute Go initialization early.
 
 The package assemblies and `program.ts` are sealed only after the declaration

@@ -15,14 +15,12 @@ const (
 func Build(
 	factory tsgo.Factory,
 	className string,
-	pointerName string,
 	panicName string,
 ) tsgo.ClassDeclaration {
 	target := builder{
-		factory:     factory,
-		className:   className,
-		pointerName: pointerName,
-		panicName:   panicName,
+		factory:   factory,
+		className: className,
+		panicName: panicName,
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
@@ -39,10 +37,9 @@ func Build(
 }
 
 type builder struct {
-	factory     tsgo.Factory
-	className   string
-	pointerName string
-	panicName   string
+	factory   tsgo.Factory
+	className string
+	panicName string
 }
 
 func (b builder) brand() tsgo.PropertyDeclaration {
@@ -77,7 +74,7 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 func (b builder) from() tsgo.MethodDeclaration {
 	return b.method(
 		FromName,
-		b.nullable(b.pointerType()),
+		b.nullable(b.genericType()),
 		b.nullable(b.unsafeType()),
 	)
 }
@@ -86,7 +83,7 @@ func (b builder) to() tsgo.MethodDeclaration {
 	return b.method(
 		ToName,
 		b.nullable(b.unsafeType()),
-		b.nullable(b.pointerType()),
+		b.nullable(b.genericType()),
 	)
 }
 
@@ -102,8 +99,7 @@ func (b builder) method(
 		b.id(name),
 		nil,
 		[]tsgo.TypeParameterDeclaration{
-			b.typeParameter("L"),
-			b.typeParameter("S"),
+			b.typeParameter("P"),
 		},
 		[]tsgo.ParameterDeclaration{
 			b.factory.ParameterDeclaration(
@@ -143,14 +139,8 @@ func (b builder) method(
 	)
 }
 
-func (b builder) pointerType() tsgo.TypeNode {
-	return b.factory.TypeReferenceNode(
-		b.id(b.pointerName),
-		[]tsgo.TypeNode{
-			b.factory.TypeReferenceNode(b.id("L"), nil),
-			b.factory.TypeReferenceNode(b.id("S"), nil),
-		},
-	)
+func (b builder) genericType() tsgo.TypeNode {
+	return b.factory.TypeReferenceNode(b.id("P"), nil)
 }
 
 func (b builder) unsafeType() tsgo.TypeNode {

@@ -171,12 +171,10 @@ func methodSetReceiver(
 		types.Identical(declaredElement, effectiveElement):
 		return adaptPointerMethodReceiver(
 			context,
-			children,
 			source,
 			method.Origin(),
 			abiPointer,
 			effectiveRaw,
-			declaredElement,
 			value,
 		)
 	case !declaredPointer &&
@@ -270,12 +268,10 @@ func MethodExpressionReceiver(
 		types.Identical(declaredElement, effectiveElement):
 		value, err = adaptPointerMethodReceiver(
 			context,
-			children,
 			source,
 			method.Origin(),
 			abiPointer,
 			effectiveRaw,
-			declaredElement,
 			value,
 		)
 		return value, method, err

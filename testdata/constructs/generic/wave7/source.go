@@ -132,6 +132,11 @@ func GenericSliceNonNil[S ~[]int32](value S) bool {
 	return value != nil
 }
 
+func SameSliceStorage[T any](left, right []T) bool {
+	return len(left) == len(right) &&
+		(len(left) == 0 || &left[0] == &right[0])
+}
+
 func NewBox[T any](value T) Box[T] {
 	return Box[T]{Value: value}
 }
@@ -609,6 +614,7 @@ func AuditFunctions() []int32 {
 	if !Equal(second, int32(9)) {
 		return []int32{-1}
 	}
+	values := []int32{1}
 	return []int32{
 		second,
 		doubled,
@@ -618,6 +624,8 @@ func AuditFunctions() []int32 {
 		embedded.Value,
 		boolToInt32(InferredGenericFunctionValue()),
 		boolToInt32(ExplicitGenericFunctionValue()),
+		boolToInt32(SameSliceStorage(values, values)),
+		boolToInt32(SameSliceStorage(values, []int32{1})),
 	}
 }
 

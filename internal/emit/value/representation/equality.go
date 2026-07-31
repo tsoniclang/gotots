@@ -22,12 +22,12 @@ func (owner Owner) Equal(
 	left tsgo.Expression,
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
-	if parameter, ok := api.GenericTypeParameter(sourceType); ok {
+	if api.ContainsGenericTypeParameter(sourceType) {
 		return genericoperation.Call(
 			context,
 			source,
 			api.GenericOperationEqual,
-			[]types.Type{parameter, parameter},
+			[]types.Type{sourceType, sourceType},
 			[]types.Type{types.Typ[types.Bool]},
 			[]api.ExpressionEmission{
 				api.DirectExpression(left),

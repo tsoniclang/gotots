@@ -8,6 +8,7 @@ import (
 	unsafepointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafepointer"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -56,18 +57,11 @@ func Convert(
 		)
 		return target, true, targetErr
 	}
-	targetLogical, err := children.RepresentedType(
+	targetPointerType, err := pointertype.EmitNonNilRepresented(
 		context.WithRole(api.RoleConversionOperand),
+		children,
 		source.Fun,
-		targetPointer.Elem(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	targetStorage, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		targetPointer.Elem(),
+		targetPointer,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -79,16 +73,14 @@ func Convert(
 			reference.Name(),
 			unsafepointerruntime.ToName,
 			[]tsgo.TypeNode{
-				targetLogical.Value(),
-				targetStorage.Value(),
+				targetPointerType.Value(),
 			},
 			value.Value(),
 		),
 		api.CombineRequests(
 			value.Requests(),
 			reference.Requests(),
-			targetLogical.Requests(),
-			targetStorage.Requests(),
+			targetPointerType.Requests(),
 		),
 	)
 	if err != nil {

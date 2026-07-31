@@ -568,7 +568,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/unsafe-pointer.ts",
 			"GoUnsafePointer",
 			true,
-			RuntimePointer,
 			RuntimePanic,
 		), nil
 	default:

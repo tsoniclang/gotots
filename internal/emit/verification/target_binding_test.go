@@ -399,9 +399,9 @@ func TestGenericContainerStorageBindsExactTargetFacets(t *testing.T) {
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	if artifacts.bytes > 45_000 ||
-		artifacts.nodes > 7_500 ||
-		artifacts.largest > 18_000 {
+	if artifacts.bytes > 50_000 ||
+		artifacts.nodes > 8_500 ||
+		artifacts.largest > 22_000 {
 		t.Fatalf(
 			"generic container-storage artifact bounds exceeded: bytes=%d nodes=%d largest=%d",
 			artifacts.bytes,
@@ -418,6 +418,7 @@ func TestGenericContainerStorageBindsExactTargetFacets(t *testing.T) {
 		"GoPointer<Item, Item$Storage>",
 		"GoPointer<int32, int32>",
 		"function ArrayAddress<T, T$ContainerStorage, T$Pointer>",
+		"RuntimeSlice.literal<Item$Storage>([Item.$storageOf(",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf(

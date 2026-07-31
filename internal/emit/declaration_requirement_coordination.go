@@ -475,7 +475,8 @@ func sortDeclarationRequirements(requirements []api.DeclarationRequirement) {
 }
 
 type artifactOwnerPriorityQueue struct {
-	owners []api.ArtifactOwner
+	owners  []api.ArtifactOwner
+	compare func(api.ArtifactOwner, api.ArtifactOwner) int
 }
 
 func (q *artifactOwnerPriorityQueue) push(owner api.ArtifactOwner) {
@@ -483,7 +484,7 @@ func (q *artifactOwnerPriorityQueue) push(owner api.ArtifactOwner) {
 	index := len(q.owners) - 1
 	for index > 0 {
 		parent := (index - 1) / 2
-		if emitordering.CompareArtifactOwners(q.owners[parent], owner) <= 0 {
+		if q.compare(q.owners[parent], owner) <= 0 {
 			break
 		}
 		q.owners[index] = q.owners[parent]
@@ -512,13 +513,13 @@ func (q *artifactOwnerPriorityQueue) pop() (api.ArtifactOwner, bool) {
 		right := left + 1
 		next := left
 		if right < len(q.owners) &&
-			emitordering.CompareArtifactOwners(
+			q.compare(
 				q.owners[right],
 				q.owners[left],
 			) < 0 {
 			next = right
 		}
-		if emitordering.CompareArtifactOwners(last, q.owners[next]) <= 0 {
+		if q.compare(last, q.owners[next]) <= 0 {
 			break
 		}
 		q.owners[index] = q.owners[next]
@@ -534,9 +535,14 @@ type declarationRequirementScheduler struct {
 	applied       declarationRequirementLedger
 }
 
-func newDeclarationRequirementScheduler() *declarationRequirementScheduler {
+func newDeclarationRequirementScheduler(
+	compare func(api.ArtifactOwner, api.ArtifactOwner) int,
+) *declarationRequirementScheduler {
 	return &declarationRequirementScheduler{
 		pending: newDeclarationRequirementLedger(),
+		pendingOwners: artifactOwnerPriorityQueue{
+			compare: compare,
+		},
 		applied: newDeclarationRequirementLedger(),
 	}
 }

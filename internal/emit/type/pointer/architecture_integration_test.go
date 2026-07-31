@@ -182,14 +182,14 @@ fmt.Println(pointer.StringPointer("ok").Value)
 		"goSliceAddress<Box<int32",
 		"GoPointer.view<Left, Right",
 		"goPointerHash",
-		"function StringPointer(value: gostring): Box<gostring, gostring> | undefined",
+		"function StringPointer(value: gostring): GoPointer<Box<gostring, gostring>",
 	} {
 		if !strings.Contains(typescript, required) {
 			t.Fatalf("carrier pointer output lacks %q:\n%s", required, typescript)
 		}
 	}
 	for _, forbidden := range []string{
-		"GoPointer<Box<string",
+		"GoPointer.optionalStorage",
 		"indexView",
 		"AddressView",
 		"goSliceAddressView",
@@ -264,20 +264,16 @@ fmt.Println(pointer.GenericNil())
 	}
 	if !strings.Contains(
 		typescript,
-		"Shelf.Put<int32, int32>(store.Shelf",
+		"Shelf.Put<int32, int32>(GoPointer.objectField",
 	) {
 		t.Fatalf(
 			"generic receiver did not use its declaration ABI:\n%s",
 			typescript,
 		)
 	}
-	if count := strings.Count(
-		typescript,
-		"GoPointer.optionalStorage(",
-	); count != 3 {
+	if strings.Contains(typescript, "GoPointer.optionalStorage(") {
 		t.Fatalf(
-			"carrier-to-declaration receiver bridges = %d, want 3:\n%s",
-			count,
+			"generic receiver retained a carrier-to-logical bridge:\n%s",
 			typescript,
 		)
 	}
@@ -337,11 +333,17 @@ fmt.Println(pointer.ForeignAdapter().Ready())
 	if tsOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", tsOutput, goOutput)
 	}
-	if strings.Count(typescript, "GoPointer.optionalStorage(") < 2 {
+	if strings.Contains(typescript, "GoPointer.optionalStorage(") {
 		t.Fatalf(
-			"foreign generic receiver ABI was not bridged:\n%s",
+			"foreign generic receiver retained a carrier-to-logical bridge:\n%s",
 			typescript,
 		)
+	}
+	if !strings.Contains(
+		typescript,
+		"static Set<K, V, V$Storage>(ledger: GoPointer<Ledger<K, V, V$Storage>",
+	) {
+		t.Fatalf("foreign generic method lacks the family carrier ABI:\n%s", typescript)
 	}
 	if !strings.Contains(typescript, "class $goInterfaceAdapter_") {
 		t.Fatalf("foreign generic adapter was not emitted:\n%s", typescript)

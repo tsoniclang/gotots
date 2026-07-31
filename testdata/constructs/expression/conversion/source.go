@@ -119,6 +119,15 @@ func NilUnsafePointerRoundTrip() bool {
 	return (*int32)(unsafe.Pointer(value)) == nil
 }
 
+type UnsafeBox struct {
+	Value int32
+}
+
+func NilUnsafeStructRoundTrip() bool {
+	var value *UnsafeBox
+	return (*UnsafeBox)(unsafe.Pointer(value)) == nil
+}
+
 type Bytes []byte
 type Text string
 

@@ -64,6 +64,7 @@ type programSession struct {
 	genericProfiles        map[genericCallableProfileIdentity]*api.GenericCallableProfile
 	classMembers           map[*types.Func]classMemberContribution
 	goRuntime              *gocontract.Contract
+	compareArtifactOwners  func(api.ArtifactOwner, api.ArtifactOwner) int
 	sealed                 bool
 }
 
@@ -122,7 +123,11 @@ func CompileWithOptions(
 	}
 	orderedRoots := slices.Clone(roots)
 	sort.Slice(orderedRoots, func(left, right int) bool {
-		return compareRoots(orderedRoots[left], orderedRoots[right]) < 0
+		return compareRoots(
+			orderedRoots[left],
+			orderedRoots[right],
+			session.compareArtifactOwners,
+		) < 0
 	})
 	for _, root := range orderedRoots {
 		if err := session.requireRoot(root); err != nil {
@@ -260,6 +265,7 @@ func newProgramSession(
 	if err != nil {
 		return nil, err
 	}
+	compareArtifactOwners := sourceArtifactOwnerOrder(sites)
 	session := &programSession{
 		source:          source,
 		factory:         tsgo.NewFactory(),
@@ -268,9 +274,11 @@ func newProgramSession(
 		concurrency:     options.ConcurrencySemantics,
 		registry:        registry,
 		scheduler:       newScheduler(),
-		requirements:    newDeclarationRequirementScheduler(),
+		requirements: newDeclarationRequirementScheduler(
+			compareArtifactOwners,
+		),
 		artifacts: artifactstate.NewGraph(
-			emitordering.CompareArtifactOwners,
+			compareArtifactOwners,
 		),
 		sites:                  sites,
 		emitters:               make(map[*load.Package]*emitter),
@@ -282,6 +290,7 @@ func newProgramSession(
 		genericProfiles:        make(map[genericCallableProfileIdentity]*api.GenericCallableProfile),
 		classMembers:           make(map[*types.Func]classMemberContribution),
 		goRuntime:              goRuntime,
+		compareArtifactOwners:  compareArtifactOwners,
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
@@ -368,6 +377,28 @@ func newProgramSession(
 		}
 	}
 	return session, nil
+}
+
+func sourceArtifactOwnerOrder(
+	sites map[types.Object]declarationSite,
+) func(api.ArtifactOwner, api.ArtifactOwner) int {
+	return func(left api.ArtifactOwner, right api.ArtifactOwner) int {
+		leftObject, leftSource := left.Source()
+		rightObject, rightSource := right.Source()
+		if leftSource && rightSource {
+			leftSite, leftIndexed := sites[leftObject]
+			rightSite, rightIndexed := sites[rightObject]
+			if leftIndexed && rightIndexed {
+				if order := declarationindex.CompareSites(
+					leftSite,
+					rightSite,
+				); order != 0 {
+					return order
+				}
+			}
+		}
+		return emitordering.CompareArtifactOwners(left, right)
+	}
 }
 
 func (s *programSession) emit(object types.Object) error {

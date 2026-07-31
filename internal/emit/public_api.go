@@ -147,10 +147,14 @@ func (r Root) valid() bool {
 	return r.projection == types.Invalid
 }
 
-func compareRoots(left Root, right Root) int {
-	if order := emitordering.CompareObjects(
-		left.object,
-		right.object,
+func compareRoots(
+	left Root,
+	right Root,
+	compareOwners func(api.ArtifactOwner, api.ArtifactOwner) int,
+) int {
+	if order := compareOwners(
+		api.MustSourceArtifactOwner(left.object),
+		api.MustSourceArtifactOwner(right.object),
 	); order != 0 {
 		return order
 	}

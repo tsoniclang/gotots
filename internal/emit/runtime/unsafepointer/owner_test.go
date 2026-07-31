@@ -10,7 +10,6 @@ func TestBuildCreatesUnconstructableNominalDeclaration(t *testing.T) {
 	class := Build(
 		tsgo.NewFactory(),
 		"GoUnsafePointer",
-		"GoPointer",
 		"GoPanic",
 	)
 	if class.Name().Text() != "GoUnsafePointer" ||
@@ -42,7 +41,7 @@ func TestBuildCreatesUnconstructableNominalDeclaration(t *testing.T) {
 			method.Name().(tsgo.Identifier).Text() != name ||
 			len(method.Modifiers()) != 1 ||
 			method.Modifiers()[0].Kind() != tsgo.SyntaxKindStaticKeyword ||
-			len(method.TypeParameters()) != 2 ||
+			len(method.TypeParameters()) != 1 ||
 			method.Body() == nil {
 			t.Fatalf("unsafe-pointer conversion method %q is invalid", name)
 		}

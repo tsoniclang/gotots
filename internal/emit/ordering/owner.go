@@ -2,6 +2,8 @@ package ordering
 
 import (
 	"go/types"
+	"strconv"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
@@ -27,29 +29,74 @@ func StableTypeString(source types.Type) string {
 }
 
 func CompareObjects(left types.Object, right types.Object) int {
-	leftPackage := ""
-	if left != nil && left.Pkg() != nil {
-		leftPackage = left.Pkg().Path()
-	}
-	rightPackage := ""
-	if right != nil && right.Pkg() != nil {
-		rightPackage = right.Pkg().Path()
-	}
+	leftKey := stableObjectOrderKey(left)
+	rightKey := stableObjectOrderKey(right)
 	switch {
-	case leftPackage < rightPackage:
+	case leftKey < rightKey:
 		return -1
-	case leftPackage > rightPackage:
+	case leftKey > rightKey:
 		return 1
+	case left == nil && right != nil:
+		return -1
+	case left != nil && right == nil:
+		return 1
+	case left == nil:
+		return 0
 	case left.Pos() < right.Pos():
 		return -1
 	case left.Pos() > right.Pos():
 		return 1
-	case left.Name() < right.Name():
-		return -1
-	case left.Name() > right.Name():
-		return 1
 	default:
 		return 0
+	}
+}
+
+func stableObjectOrderKey(object types.Object) string {
+	if object == nil {
+		return ""
+	}
+	var key strings.Builder
+	if object.Pkg() != nil {
+		key.WriteString(object.Pkg().Path())
+	}
+	key.WriteByte(0)
+	key.WriteString(strconv.Itoa(objectKindOrder(object)))
+	key.WriteByte(0)
+	if function, ok := object.(*types.Func); ok {
+		signature, _ := function.Type().(*types.Signature)
+		if signature != nil && signature.Recv() != nil {
+			key.WriteString(StableTypeString(signature.Recv().Type()))
+		}
+	}
+	key.WriteByte(0)
+	key.WriteString(object.Name())
+	key.WriteByte(0)
+	if object.Type() != nil {
+		key.WriteString(StableTypeString(object.Type()))
+	}
+	return key.String()
+}
+
+func objectKindOrder(object types.Object) int {
+	switch object.(type) {
+	case *types.PkgName:
+		return 1
+	case *types.Const:
+		return 2
+	case *types.TypeName:
+		return 3
+	case *types.Var:
+		return 4
+	case *types.Func:
+		return 5
+	case *types.Label:
+		return 6
+	case *types.Builtin:
+		return 7
+	case *types.Nil:
+		return 8
+	default:
+		return 9
 	}
 }
 

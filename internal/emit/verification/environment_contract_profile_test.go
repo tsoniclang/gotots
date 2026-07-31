@@ -27,6 +27,7 @@ func TestEnvironmentContractsPrintAndStrictTypecheckWithoutImplementations(
 		`package environmentcontract
 
 import (
+	"encoding/binary"
 	"context"
 	"fmt"
 	"os"
@@ -123,6 +124,10 @@ func UnsafeConstants() (uintptr, uintptr, uintptr) {
 func RuneBoundary(value byte) bool {
 	return value < utf8.RuneSelf
 }
+
+func NativeUint16(value []byte) uint16 {
+	return binary.NativeEndian.Uint16(value)
+}
 `,
 	)
 	program, err := load.Load(context.Background(), load.Request{
@@ -146,6 +151,7 @@ func RuneBoundary(value byte) bool {
 		"UnsafeRuntime",
 		"UnsafeConstants",
 		"RuneBoundary",
+		"NativeUint16",
 	}
 	roots := make([]emit.Root, 0, len(rootNames))
 	for _, name := range rootNames {
@@ -203,6 +209,7 @@ func RuneBoundary(value byte) bool {
 		"export declare function Sprint",
 		"export declare const $state",
 		"export interface Context",
+		"Err($go$recovery?: GoRecovery):",
 		"export declare const Context$contract",
 		"export declare function Context$is",
 		"export declare class Pool",
@@ -212,10 +219,12 @@ func RuneBoundary(value byte) bool {
 		"export declare function StringData(",
 		"export declare function SliceData(",
 		"export declare const RuneSelf$uint8",
+		"littleEndian: littleEndian;",
+		".littleEndian",
 		"static async String(",
 		"async String(",
 		"export interface Signal",
-		"String(): Promise<gostring>;",
+		"String($go$recovery?: GoRecovery): Promise<gostring>;",
 		"WaitGroup_Go__from_sync",
 		"async function (): Promise<void>",
 	} {

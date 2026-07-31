@@ -845,13 +845,16 @@ The call handler uses `go/types` to distinguish:
 A represented variadic callable has one ordinary final parameter whose target
 type is the represented Go slice. It is not emitted as a JavaScript rest
 parameter. A non-spread call evaluates and copies its arguments in Go order,
-then constructs that one slice argument. A spread call projects the exact
-source slice descriptor, including a defined-slice wrapper, and passes the
-descriptor directly. The multiple-result adjustment is applied before the
-variadic partition, so a final call returning the remaining fixed and
-variadic arguments is accepted exactly when the selected Go signature accepts
-it. No valid Go call is lowered through target `...` argument spreading; this
-keeps call behavior independent of host argument-count limits.
+converts every variadic element through the element family's exact container
+storage owner, then constructs that one slice argument. The call owner may not
+place a logical aggregate value directly into a storage-backed slice. A spread
+call projects the exact source slice descriptor, including a defined-slice
+wrapper, and passes the descriptor directly. The multiple-result adjustment is
+applied before the variadic partition, so a final call returning the remaining
+fixed and variadic arguments is accepted exactly when the selected Go
+signature accepts it. No valid Go call is lowered through target `...`
+argument spreading; this keeps call behavior independent of host
+argument-count limits.
 
 ```go
 type Values []int32
@@ -1331,15 +1334,16 @@ therefore forbidden. The static body receives nil, evaluates no hidden
 precondition, and panics only at the exact dereference performed by the emitted
 source body. For a pointer type whose reached representation requires
 `GoPointer`, the parameter uses that selected type instead of `Flag |
-undefined`; one exact `*Flag` never has both forms.
+undefined`; one exact `*Flag` never has both forms. A pointer to an
+instantiation of a generic named declaration uses that declaration origin's
+one parameterized pointer ABI. Concrete instantiations supply exact target
+facets to that family; they do not produce incompatible receiver signatures
+or require an identity-changing bridge.
 
-Generic selection can legitimately join two different exact pointer
-artifacts: the method origin's declaration receiver and the selected concrete
-receiver. The declaration ABI is always observed through `method.Origin()` and
-its source artifact. The concrete receiver is observed through the consuming
-artifact. If the concrete receiver is a carrier while the declaration receiver
-is direct, emission evaluates the carrier once, preserves nil, projects its
-storage, and invokes the origin member:
+Generic method selection observes the declaration receiver through
+`method.Origin()` and the concrete receiver through the consuming artifact.
+Both must join the generic origin's same pointer-representation artifact before
+the method is emitted. For example:
 
 ```go
 pointer := &registry.Ledger
@@ -1347,19 +1351,19 @@ pointer.Set(key, value)
 ```
 
 ```ts
-const receiver = GoPointer.optionalStorage(pointer);
 Ledger.Set(
-  receiver === undefined ? undefined : Ledger.$fromStorage(receiver),
+  pointer,
   key,
   value,
 );
 ```
 
-`optionalStorage` is a shared structural projection with a typed `undefined`
-overload and an inferred `S extends object` overload. It carries no semantic
-converter, type descriptor, erased value, or dynamic operation. A definitely
-nil Go pointer therefore remains valid input to a nil-checking method without
-requiring the consumer to render a foreign generic type parameter.
+The declaration's parameter is the exact parameterized carrier ABI, so nil,
+canonical address identity, and storage mutation pass through unchanged. A
+carrier-to-logical facade, optional-storage projection, or foreign type-
+parameter rendering is forbidden. If declaration and occurrence observations
+do not converge, emission fails at the family invariant rather than bridging
+the mismatch.
 
 A Go method may be declared in a different source file from its type.
 The method source artifact constructs one immutable typed TS-Go
@@ -1823,6 +1827,13 @@ source occurrence uses a type parameter. A concrete occurrence continues to
 use the existing direct owner. Concrete operation-function artifacts delegate
 back to those owners, so there is one semantic implementation for each
 operation.
+
+The same rule applies when the operation's exact type contains a type
+parameter rather than being the parameter itself. For example, equality of
+two `[]T` element addresses or two `Pair[T]` values requests the exact
+aggregate operation signature through the generic owner. It must not select a
+concrete pointer, slice, or struct shortcut that loses the enclosing generic
+representation.
 
 An operation selection is typed, not merely a broad enum value. Most selections
 need only their closed operation kind and exact function signature. A
@@ -2864,6 +2875,12 @@ The same address owner handles:
   dereference check, and returns the same canonical location without reading
   the stored value.
 
+Taking the address of a package-state field requests the exact pointer
+representation for that variable's declared type at the address owner. The
+state field remains the one storage location: a later whole-value assignment
+updates what the pointer observes, and taking the address never creates a
+source-module copy or a second cell.
+
 Map and string indexes remain non-addressable because Go declares them so.
 Unsupported aggregate representations fail before requesting storage.
 Address/index operands are evaluated once in Go order. Repeated formation of
@@ -3153,12 +3170,15 @@ its differential proof.
 `unsafe.Pointer` is a nullable nominal environment-boundary type, not a
 primitive alias or an erased payload. Pointer-to-unsafe and unsafe-to-pointer
 conversions preserve `nil` exactly. A compile-only environment profile emits
-typed static conversion calls whose non-nil paths throw one explicit unresolved
-placeholder because ordinary TypeScript cannot reinterpret Go storage. The
-placeholder never uses `any`, `unknown`, a cast, source spelling, or a fabricated
-memory model. `uintptr` conversions and other `unsafe` operations remain
-separate closed dispositions until their own exact environment contracts are
-selected. A reachable non-nil unsafe placeholder blocks publication.
+typed static conversion calls parameterized by the exact represented pointer
+type `P`; `P` may be a direct nominal class or a `GoPointer` carrier. The
+runtime boundary does not assume one pointer layout. Its non-nil paths throw
+one explicit unresolved placeholder because ordinary TypeScript cannot
+reinterpret Go storage. The placeholder never uses `any`, `unknown`, a cast,
+source spelling, or a fabricated memory model. `uintptr` conversions and
+other `unsafe` operations remain separate closed dispositions until their own
+exact environment contracts are selected. A reachable non-nil unsafe
+placeholder blocks publication.
 
 ## Failure
 

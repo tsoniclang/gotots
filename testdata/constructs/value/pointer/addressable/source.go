@@ -12,9 +12,14 @@ type Container struct {
 	Box Box
 }
 
+type PackageBox struct {
+	Count int32
+}
+
 type Count int32
 
 var Shared = Box{Count: 1}
+var WholeShared = PackageBox{Count: 1}
 var InitValue int32
 
 func init() {
@@ -203,6 +208,13 @@ func Package(value int32) (int32, bool) {
 	Shared = Box{Count: value}
 	*pointer++
 	return Shared.Count, pointer == &Shared.Count
+}
+
+func PackageValueAddress(value int32) (int32, bool) {
+	pointer := &WholeShared
+	WholeShared = PackageBox{Count: value}
+	pointer.Count++
+	return WholeShared.Count, pointer == &WholeShared
 }
 
 func Composite(value int32) int32 {
