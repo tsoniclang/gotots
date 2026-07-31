@@ -7,6 +7,46 @@ import (
 	"slices"
 )
 
+type ControlLabel struct {
+	name        string
+	breakable   bool
+	continuable bool
+}
+
+func NewControlLabel(
+	name string,
+	breakable bool,
+	continuable bool,
+) (ControlLabel, error) {
+	if name == "" || continuable && !breakable {
+		return ControlLabel{}, &InvariantError{
+			Role:   RoleLabelTarget,
+			Reason: "control-label target is invalid",
+		}
+	}
+	return ControlLabel{
+		name:        name,
+		breakable:   breakable,
+		continuable: continuable,
+	}, nil
+}
+
+func (l ControlLabel) Valid() bool {
+	return l.name != "" && (!l.continuable || l.breakable)
+}
+
+func (l ControlLabel) Name() string {
+	return l.name
+}
+
+func (l ControlLabel) Breakable() bool {
+	return l.breakable
+}
+
+func (l ControlLabel) Continuable() bool {
+	return l.continuable
+}
+
 type DeferControl struct {
 	stack string
 }

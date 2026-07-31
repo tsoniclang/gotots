@@ -26,6 +26,8 @@ type targetBinding struct {
 	providerAccess             gostdlib.AccessKind
 	providerRepresentation     bool
 	providerTypeRepresentation gostdlib.RepresentationKind
+	providerDefinedValue       gostdlib.DefinedValueRepresentationKind
+	providerEffect             gostdlib.EffectKind
 	providerGenericOperations  []gostdlib.GenericOperationDocument
 }
 
@@ -327,7 +329,8 @@ func (r *Registry) reserve(
 			existing.providerMember != binding.providerMember ||
 			existing.providerAccess != binding.providerAccess ||
 			existing.providerRepresentation != binding.providerRepresentation ||
-			existing.providerTypeRepresentation != binding.providerTypeRepresentation {
+			existing.providerTypeRepresentation != binding.providerTypeRepresentation ||
+			existing.providerDefinedValue != binding.providerDefinedValue {
 			return &api.NameError{
 				Name:   objectName(object),
 				Reason: "declaration has conflicting target ownership",

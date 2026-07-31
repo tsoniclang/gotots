@@ -214,13 +214,20 @@ func (a RuntimeArray) Copy(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		stored, err := a.storage(
+			context.WithRole(api.RoleArrayReceiver),
+			value,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		before := append(
-			value.Before(),
+			stored.Before(),
 			arrayComparisonVariable(
 				context,
 				tsgo.NodeFlagsConst,
 				sourceName,
-				a.storage(context, value.Value()),
+				stored.Value(),
 			),
 		)
 		before = append(
@@ -252,7 +259,7 @@ func (a RuntimeArray) Copy(
 			before,
 			result,
 			api.CombineRequests(
-				value.Requests(),
+				stored.Requests(),
 				elementCopy.Requests(),
 				runtimeRequests,
 			),
@@ -262,14 +269,21 @@ func (a RuntimeArray) Copy(
 		}
 		return a.wrap(context, copied)
 	}
+	stored, err := a.storage(
+		context.WithRole(api.RoleArrayReceiver),
+		value,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	copied, err := api.NewExpressionEmission(
-		value.Before(),
+		stored.Before(),
 		callMember(
 			context,
-			a.storage(context, value.Value()),
+			stored.Value(),
 			arraymember.Copy,
 		),
-		value.Requests(),
+		stored.Requests(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -322,6 +336,20 @@ func (a RuntimeArray) Equal(
 	left tsgo.Expression,
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	leftStorage, err := a.storage(
+		context.WithRole(api.RoleDefinedValue),
+		api.DirectExpression(left),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	rightStorage, err := a.storage(
+		context.WithRole(api.RoleDefinedValue),
+		api.DirectExpression(right),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	leftName, err := context.Names().Temporary(api.TemporaryArrayComparison)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -408,18 +436,19 @@ func (a RuntimeArray) Equal(
 			nil,
 		),
 	)
-	before := []tsgo.Statement{
+	before := append(leftStorage.Before(), rightStorage.Before()...)
+	before = append(before,
 		arrayComparisonVariable(
 			context,
 			tsgo.NodeFlagsConst,
 			leftName,
-			a.storage(context, left),
+			leftStorage.Value(),
 		),
 		arrayComparisonVariable(
 			context,
 			tsgo.NodeFlagsConst,
 			rightName,
-			a.storage(context, right),
+			rightStorage.Value(),
 		),
 		arrayComparisonVariable(
 			context,
@@ -457,11 +486,13 @@ func (a RuntimeArray) Equal(
 			),
 			context.Factory().Block(body, true),
 		),
-	}
+	)
 	return api.NewExpressionEmission(
 		before,
 		context.Factory().Identifier(resultName),
 		api.CombineRequests(
+			leftStorage.Requests(),
+			rightStorage.Requests(),
 			leftElement.Requests(),
 			rightElement.Requests(),
 			elementEqual.Requests(),

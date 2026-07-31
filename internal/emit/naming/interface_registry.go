@@ -3,8 +3,8 @@ package naming
 import (
 	"go/types"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
 	"github.com/tsoniclang/gotots/internal/output"
 )
 
@@ -146,7 +146,7 @@ func (r *Registry) internInterfaceMethodToken(
 		if !valid ||
 			!runtimeValid ||
 			existingRuntime != runtime ||
-			!methodidentity.Equivalent(existing.method, method) {
+			!environmentcontract.EquivalentMethods(existing.method, method) {
 			return interfaceMethodTokenBinding{}, &api.NameError{
 				Name:   existing.name,
 				Reason: "interface-method-token key joined non-identical contracts",
@@ -202,7 +202,7 @@ func (r *Registry) internInterfaceMethodCallable(
 	if existing, ok := r.interfaceMethodCallables[artifactKey]; ok {
 		_, valid := existing.owner.InterfaceMethodCallableSignature()
 		if !valid ||
-			!methodidentity.Equivalent(existing.method, method) {
+			!environmentcontract.EquivalentMethods(existing.method, method) {
 			return interfaceMethodCallableBinding{}, &api.NameError{
 				Name: existing.name,
 				Reason: "interface-method callable key joined " +

@@ -1,4 +1,4 @@
-package emit_test
+package unsafeintrinsic_test
 
 import (
 	"context"

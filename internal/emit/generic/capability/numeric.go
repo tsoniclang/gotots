@@ -117,12 +117,15 @@ func emitOrderedComparison(
 		if !valid {
 			return api.ExpressionEmission{}, shapeError(context, operation)
 		}
-		left = api.DirectExpression(
-			model.Unwrap(context.Factory(), arguments[0]),
-		)
-		right = api.DirectExpression(
-			model.Unwrap(context.Factory(), arguments[1]),
-		)
+		var err error
+		left, err = model.Project(context, left)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		right, err = model.Project(context, right)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		leftType = basic
 	}
 	var (

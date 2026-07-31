@@ -1,4 +1,4 @@
-package emit_test
+package provider_test
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -193,6 +192,7 @@ func assertProviderReceiverProjection(
 	for _, projected := range []string{
 		"SyncMutexOperations.$fromStorage(__gotots_receiver_",
 		"StringsBuilderOperations.$fromStorage(__gotots_receiver_",
+		"await sync__from_gostdlib.Mutex.Lock(",
 	} {
 		if !strings.Contains(printed, projected) {
 			t.Fatalf("stored provider receiver lacks %q:\n%s", projected, printed)
@@ -202,6 +202,7 @@ func assertProviderReceiverProjection(
 		"Mutex.Lock(GoPointer.objectField",
 		"SyncMutexUnlock(GoPointer.objectField",
 		"Builder.Len(GoPointer.objectField",
+		"await strings__from_gostdlib.Builder.Len(",
 	} {
 		if strings.Contains(printed, bypass) {
 			t.Fatalf("stored provider receiver bypasses projection with %q:\n%s", bypass, printed)
@@ -259,29 +260,6 @@ func Use(mutex *sync.Mutex, builder *strings.Builder) int {
 	if strings.Contains(printed, "$fromStorage") {
 		t.Fatalf("direct provider receiver was needlessly projected:\n%s", printed)
 	}
-}
-
-func linkedProviderCertificate(t *testing.T) *certify.Certificate {
-	t.Helper()
-	repository := repositoryRoot()
-	certificate, err := certify.Verify(certify.Config{
-		RepositoryRoot:      repository,
-		ProviderRoot:        filepath.Join(repository, "gostdlib"),
-		ManifestPath:        filepath.Join(repository, "gostdlib", "contract", "manifest.json"),
-		ModuleMapPath:       filepath.Join(repository, "gostdlib", "contract", "modules.json"),
-		FacetMapPath:        filepath.Join(repository, "gostdlib", "contract", "facets.json"),
-		RuntimeContractPath: filepath.Join(repository, "gostdlib", "contract", "runtime.json"),
-		TSConfigPath:        filepath.Join(repository, "gostdlib", "tsconfig.json"),
-		ScratchDirectory:    t.TempDir(),
-		GoBinary:            "go",
-		Backend:             "node",
-		MinimumGoVersion:    "go1.26.4",
-		MaximumGoVersion:    "go1.26.4",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return certificate
 }
 
 func assertProviderGrowCapabilityABI(

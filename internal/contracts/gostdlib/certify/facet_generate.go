@@ -9,7 +9,6 @@ import (
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
-	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -20,6 +19,7 @@ func buildFacetModules(
 	seeds []facetSeed,
 	representationSeeds []providerRepresentationSeed,
 	modules []gostdlib.ModuleDocument,
+	effectMarker tsgo.ProjectExport,
 ) ([]gostdlib.FacetModuleDocument, error) {
 	interfaceTargets, err := providerInterfaceTargets(
 		config,
@@ -116,6 +116,8 @@ func buildFacetModules(
 				seed,
 				target,
 				interfaceTargets,
+				project,
+				effectMarker,
 			)
 			if err != nil {
 				return nil, err
@@ -184,12 +186,13 @@ func buildFacet(
 		)
 	}
 	switch seed.Kind {
-	case gostdlib.FacetNamedStructOperations:
+	case gostdlib.FacetNamedStructOperations,
+		gostdlib.FacetDefinedValueOperations:
 		if _, ok := evidence.object.(*types.TypeName); !ok {
 			return gostdlib.FacetDocument{}, certifyError(
 				"build facet",
 				seed.SourceIdentity,
-				"named-struct facet does not own a type",
+				"type facet does not own a type",
 			)
 		}
 	case gostdlib.FacetRecoveryCallable,
@@ -329,6 +332,8 @@ func buildProviderRepresentation(
 	seed providerRepresentationSeed,
 	target tsgo.ProjectExport,
 	interfaceTargets map[string]tsgo.ProjectExport,
+	project *tsgo.ProjectInspection,
+	effectMarker tsgo.ProjectExport,
 ) (gostdlib.ProviderRepresentationDocument, error) {
 	implementationOwner, err := singleImplementationOwner(
 		seed.Export,
@@ -437,7 +442,7 @@ func buildProviderRepresentation(
 				)
 			}
 			if existing := methodByMember[method.Name()]; existing != nil &&
-				!methodidentity.Equivalent(existing, method) {
+				!environmentcontract.EquivalentMethods(existing, method) {
 				return gostdlib.ProviderRepresentationDocument{}, certifyError(
 					"build representation",
 					method.Name(),
@@ -459,9 +464,18 @@ func buildProviderRepresentation(
 			if err != nil {
 				return gostdlib.ProviderRepresentationDocument{}, err
 			}
+			effect, err := memberCallableEffect(
+				project,
+				targetMember,
+				effectMarker,
+			)
+			if err != nil {
+				return gostdlib.ProviderRepresentationDocument{}, err
+			}
 			document := gostdlib.ProviderRepresentationMethodDocument{
 				SourceIdentity:      contract.Identity(),
 				Member:              method.Name(),
+				Effect:              effect,
 				SourceSignature:     contract.Signature(),
 				SourceLocation:      methodEvidence.location,
 				ImplementationOwner: owner,

@@ -24,6 +24,15 @@ func (staticSpecializationNames) Reference(types.Object) (api.NameReference, err
 	panic("unused")
 }
 
+func (staticSpecializationNames) DefinedValueRepresentation(
+	*types.TypeName,
+) (api.DefinedValueRepresentation, error) {
+	return api.NewDefinedValueRepresentation(
+		api.DefinedValueRepresentationGeneratedWrapper,
+		api.NameReference{},
+	)
+}
+
 func (staticSpecializationNames) TypeReference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }

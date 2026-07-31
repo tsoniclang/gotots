@@ -36,13 +36,41 @@ export interface Shape {
   Get(): number;
 }
 
+export type AsyncCallable = (() => Promise<void>) | undefined;
+export type SyncCallable = (() => number) | undefined;
+export type InvalidEffectCallable = () => Promise<void> | void;
+export type GenericAsyncCallable<
+  Value extends (() => Promise<void>) | undefined =
+    (() => Promise<void>) | undefined,
+> = Value;
+
+export class Effects {
+  static Async(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  static Sync(): void {}
+}
+
 const Hidden = 1;
 void Hidden;
 `)
 	entryPath := filepath.Join(projectDirectory, "entry.ts")
-	writeProjectFile(t, entryPath, `export { Box, Shape, Value } from "./implementation.js";
+	writeProjectFile(t, entryPath, `export {
+  AsyncCallable,
+  Box,
+  Effects,
+  GenericAsyncCallable,
+  InvalidEffectCallable,
+  Shape,
+  SyncCallable,
+  Value,
+} from "./implementation.js";
 export const count: number = 1;
 export const state: { Count: number } = { Count: 0 };
+`)
+	markerPath := filepath.Join(projectDirectory, "effect-marker.ts")
+	writeProjectFile(t, markerPath, `export type AsyncEffectMarker = () => Promise<never>;
 `)
 	renamedPath := filepath.Join(projectDirectory, "renamed.ts")
 	writeProjectFile(t, renamedPath, `export { Value as Other } from "./implementation.js";
@@ -109,6 +137,8 @@ export const state: { Count: number } = { Count: 0 };
 			) {
 				t.Fatalf("Shape members = %#v", selected)
 			}
+		case "AsyncCallable", "Effects", "GenericAsyncCallable", "InvalidEffectCallable", "SyncCallable":
+			continue
 		}
 		if !slices.Equal(
 			selected.Declarations(),
@@ -123,7 +153,18 @@ export const state: { Count: number } = { Count: 0 };
 	}
 	if !slices.Equal(
 		names,
-		[]string{"Box", "Shape", "Value", "count", "state"},
+		[]string{
+			"AsyncCallable",
+			"Box",
+			"Effects",
+			"GenericAsyncCallable",
+			"InvalidEffectCallable",
+			"Shape",
+			"SyncCallable",
+			"Value",
+			"count",
+			"state",
+		},
 	) {
 		t.Fatalf("exports = %v", names)
 	}
@@ -140,6 +181,39 @@ export const state: { Count: number } = { Count: 0 };
 	if _, ok := exports[boxIndex].ValueMember("missing"); ok {
 		t.Fatal("missing member resolved")
 	}
+	markerExports, err := project.Exports(markerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := projectExportByName(t, markerExports, "AsyncEffectMarker")
+	async := projectExportByName(t, exports, "AsyncCallable")
+	genericAsync := projectExportByName(t, exports, "GenericAsyncCallable")
+	sync := projectExportByName(t, exports, "SyncCallable")
+	asyncEffect, err := project.CallableEffect(async, marker)
+	if err != nil || asyncEffect != CallableEffectAsynchronous {
+		t.Fatalf("async effect = %v, %v", asyncEffect, err)
+	}
+	asyncEffect, err = project.CallableEffect(genericAsync, marker)
+	if err != nil || asyncEffect != CallableEffectAsynchronous {
+		t.Fatalf("generic async effect = %v, %v", asyncEffect, err)
+	}
+	syncEffect, err := project.CallableEffect(sync, marker)
+	if err != nil || syncEffect != CallableEffectSynchronous {
+		t.Fatalf("sync effect = %v, %v", syncEffect, err)
+	}
+	effects := projectExportByName(t, exports, "Effects")
+	asyncMember, ok := effects.ValueMember("Async")
+	if !ok {
+		t.Fatal("Effects.Async is absent")
+	}
+	asyncEffect, err = project.CallableEffect(asyncMember, marker)
+	if err != nil || asyncEffect != CallableEffectAsynchronous {
+		t.Fatalf("async member effect = %v, %v", asyncEffect, err)
+	}
+	invalid := projectExportByName(t, exports, "InvalidEffectCallable")
+	if _, err := project.CallableEffect(invalid, marker); err == nil {
+		t.Fatal("union effect return was accepted")
+	}
 	renamed, err := project.Exports(renamedPath)
 	if err != nil {
 		t.Fatal(err)
@@ -149,6 +223,21 @@ export const state: { Count: number } = { Count: 0 };
 		renamed[0].TypeString() != "(input: string) => number" {
 		t.Fatalf("renamed exports = %#v", renamed)
 	}
+}
+
+func projectExportByName(
+	t *testing.T,
+	exports []ProjectExport,
+	name string,
+) ProjectExport {
+	t.Helper()
+	index := slices.IndexFunc(exports, func(selected ProjectExport) bool {
+		return selected.Name() == name
+	})
+	if index < 0 {
+		t.Fatalf("export %s is absent", name)
+	}
+	return exports[index]
 }
 
 func projectMemberNames(members []ProjectMember) []string {

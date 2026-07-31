@@ -25,6 +25,13 @@ func Emit(
 	}
 	var arguments []tsgo.TypeNode
 	var requests []api.RootRequest
+	if RequiresValueFacet(model.Type()) {
+		providerRequests, err := providerCallableRequests(context, model)
+		if err != nil {
+			return api.TypeEmission{}, true, err
+		}
+		requests = append(requests, providerRequests...)
+	}
 	if model.Type().TypeArgs().Len() != 0 {
 		arguments, requests, err = genericinstance.EmitTypeArguments(
 			context.WithRole(api.RoleDefinedTypeArgument),

@@ -48,6 +48,13 @@ func (a RuntimeArray) FromSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	storedZero, err := a.storage(
+		context.WithRole(api.RoleConversionOperand),
+		zero,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	element, err := a.loadElement(
 		context,
 		source,
@@ -111,14 +118,14 @@ func (a RuntimeArray) FromSlice(
 			nil,
 		),
 	)
-	before = append(before, zero.Before()...)
+	before = append(before, storedZero.Before()...)
 	before = append(
 		before,
 		arrayComparisonVariable(
 			context,
 			tsgo.NodeFlagsConst,
 			resultName,
-			a.storage(context, zero.Value()),
+			storedZero.Value(),
 		),
 		arrayConstructionLoop(
 			context,
@@ -143,7 +150,7 @@ func (a RuntimeArray) FromSlice(
 		api.CombineRequests(
 			operand.Requests(),
 			panicReference.Requests(),
-			zero.Requests(),
+			storedZero.Requests(),
 			elementCopy.Requests(),
 		),
 	)

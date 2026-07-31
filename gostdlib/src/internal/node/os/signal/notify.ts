@@ -43,7 +43,7 @@ const catchableSignals: readonly NodeJS.Signals[] = [
 export function notifyContext(
   parent: Context | undefined,
   signals: RuntimeSlice<Signal | undefined>,
-): [Context | undefined, CancelFunc] {
+): [Context | undefined, NonNullable<CancelFunc>] {
   const [context, cancel] = WithCancel(parent);
   const selected = selectedSignals(signals);
   let stopped = false;

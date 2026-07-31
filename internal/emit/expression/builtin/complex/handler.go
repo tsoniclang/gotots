@@ -201,14 +201,16 @@ func emitComponent(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	argumentValue := argument.Value()
 	if definedArgument {
-		argumentValue = defined.Unwrap(context.Factory(), argumentValue)
+		argument, err = defined.Project(context, argument)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	return api.NewExpressionEmission(
 		argument.Before(),
 		context.Factory().PropertyAccessExpression(
-			argumentValue,
+			argument.Value(),
 			nil,
 			context.Factory().Identifier(member),
 			tsgo.NodeFlagsNone,

@@ -372,6 +372,8 @@ func validateProviderRepresentation(
 			return manifestError(methodField+".sourceIdentity", "value is empty")
 		case method.Member == "":
 			return manifestError(methodField+".member", "value is empty")
+		case !method.Effect.Valid():
+			return manifestError(methodField+".effect", "value is invalid")
 		case method.SourceSignature == "":
 			return manifestError(methodField+".sourceSignature", "value is empty")
 		case method.SourceLocation == "":
@@ -443,6 +445,16 @@ func validateFacet(facet FacetDocument, field string) error {
 		if representation != (facet.RepresentationExport != "") {
 			return manifestError(field, "representation target shape is invalid")
 		}
+	case FacetDefinedValueOperations:
+		if len(facet.Capabilities) != 2 ||
+			facet.Capabilities[0] != FacetCapabilityProject ||
+			facet.Capabilities[1] != FacetCapabilityWrap ||
+			facet.ProfileKey != "" || facet.Effect != EffectInvalid ||
+			facet.StorageExport != "" || facet.RepresentationExport != "" ||
+			facet.StorageImplementationOwner != "" ||
+			facet.StorageTargetFingerprint != "" {
+			return manifestError(field, "defined-value facet shape is invalid")
+		}
 	case FacetRecoveryCallable:
 		if len(facet.Capabilities) != 1 ||
 			facet.Capabilities[0] != FacetCapabilityRecovery ||
@@ -490,59 +502,6 @@ func validateModule(module ModuleDocument, field string) error {
 	}
 	if !sourcePath(module.SourcePath) {
 		return manifestError(field+".sourcePath", "value is not a provider source path")
-	}
-	return nil
-}
-
-func validateBinding(binding BindingDocument, field string) error {
-	switch {
-	case binding.Identity == "":
-		return manifestError(field+".identity", "value is empty")
-	case !binding.Kind.Valid():
-		return manifestError(field+".kind", "value is invalid")
-	case !binding.Access.Valid():
-		return manifestError(field+".access", "value is invalid")
-	case binding.Export == "":
-		return manifestError(field+".export", "value is empty")
-	case binding.Access == AccessExport && binding.Member != "":
-		return manifestError(field+".member", "export access has a member")
-	case binding.Access != AccessExport && binding.Member == "":
-		return manifestError(field+".member", "member access has no member")
-	case binding.Kind == BindingType && !binding.Representation.Valid():
-		return manifestError(field+".representation", "type representation is invalid")
-	case binding.Kind != BindingType && binding.Representation != RepresentationInvalid:
-		return manifestError(field+".representation", "non-type has a representation")
-	case binding.SourceSignature == "":
-		return manifestError(field+".sourceSignature", "value is empty")
-	case binding.SourceLocation == "":
-		return manifestError(field+".sourceLocation", "value is empty")
-	case !sourcePath(binding.ImplementationOwner):
-		return manifestError(field+".implementationOwner", "value is not a provider source path")
-	case !validDigest(binding.TargetFingerprint):
-		return manifestError(field+".targetFingerprint", "value is not a sha256 digest")
-	}
-	if err := validateGenericOperations(
-		binding.GenericOperations,
-		field+".genericOperations",
-	); err != nil {
-		return err
-	}
-	if len(binding.GenericOperations) != 0 &&
-		(binding.Kind != BindingFunction || binding.Access != AccessExport) {
-		return manifestError(
-			field+".genericOperations",
-			"operations do not belong to an exported function",
-		)
-	}
-	switch binding.Access {
-	case AccessStateMember:
-		if binding.Kind != BindingVariable || binding.Export != "state" {
-			return manifestError(field+".access", "state access does not own a variable")
-		}
-	case AccessStaticMethod, AccessInstanceMethod:
-		if binding.Kind != BindingFunction {
-			return manifestError(field+".access", "method access does not own a function")
-		}
 	}
 	return nil
 }

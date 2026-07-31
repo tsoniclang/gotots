@@ -13,7 +13,7 @@ import (
 func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "facets": [],
   "genericOperationSets": [
     {
@@ -28,7 +28,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	if err := os.WriteFile(path, []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, _, operations, err := readFacetSeeds(path)
+	_, _, _, operations, err := readFacetSeeds(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 		t.Fatalf("generic operations = %#v", selected)
 	}
 
-	payload = `{"schemaVersion":3,"facets":[],"genericOperationSets":[
+	payload = `{"schemaVersion":4,"facets":[],"genericOperationSets":[
   {"sourceIdentity":"x","operations":[
     {"kind":"invented","parameters":[],"results":[{"typeParameter":0}]}
   ]}
@@ -47,7 +47,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	if err := os.WriteFile(path, []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, _, err := readFacetSeeds(path); err == nil {
+	if _, _, _, _, err := readFacetSeeds(path); err == nil {
 		t.Fatal("open provider generic operation passed")
 	}
 }

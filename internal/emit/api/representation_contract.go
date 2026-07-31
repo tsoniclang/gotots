@@ -56,6 +56,77 @@ func (o EvaluationOrder) String() string {
 	}
 }
 
+type MethodReceiverABI uint8
+
+const (
+	MethodReceiverABIInvalid MethodReceiverABI = iota
+	MethodReceiverABISourceRepresentation
+	MethodReceiverABIContractDirect
+)
+
+func (a MethodReceiverABI) Valid() bool {
+	return a == MethodReceiverABISourceRepresentation ||
+		a == MethodReceiverABIContractDirect
+}
+
+type DefinedValueRepresentationKind uint8
+
+const (
+	DefinedValueRepresentationInvalid DefinedValueRepresentationKind = iota
+	DefinedValueRepresentationGeneratedWrapper
+	DefinedValueRepresentationProviderIdentity
+	DefinedValueRepresentationProviderOperations
+)
+
+func (k DefinedValueRepresentationKind) Valid() bool {
+	return k >= DefinedValueRepresentationGeneratedWrapper &&
+		k <= DefinedValueRepresentationProviderOperations
+}
+
+type DefinedValueRepresentation struct {
+	kind        DefinedValueRepresentationKind
+	operations  NameReference
+	cooperative bool
+}
+
+func NewProviderIdentityDefinedValueRepresentation(
+	cooperative bool,
+) (DefinedValueRepresentation, error) {
+	return DefinedValueRepresentation{
+		kind:        DefinedValueRepresentationProviderIdentity,
+		cooperative: cooperative,
+	}, nil
+}
+
+func NewDefinedValueRepresentation(
+	kind DefinedValueRepresentationKind,
+	operations NameReference,
+) (DefinedValueRepresentation, error) {
+	hasOperations := operations.Name() != ""
+	if !kind.Valid() ||
+		kind == DefinedValueRepresentationProviderIdentity ||
+		(kind == DefinedValueRepresentationProviderOperations) != hasOperations {
+		return DefinedValueRepresentation{}, &NameError{
+			Name:   operations.Name(),
+			Reason: "defined-value representation is invalid",
+		}
+	}
+	return DefinedValueRepresentation{kind: kind, operations: operations}, nil
+}
+
+func (r DefinedValueRepresentation) Kind() DefinedValueRepresentationKind {
+	return r.kind
+}
+
+func (r DefinedValueRepresentation) ProviderCallableEffect() (bool, bool) {
+	return r.cooperative,
+		r.kind == DefinedValueRepresentationProviderIdentity
+}
+
+func (r DefinedValueRepresentation) Operations() (NameReference, bool) {
+	return r.operations, r.operations.Name() != ""
+}
+
 type ConcurrencySemantics uint8
 
 const (
@@ -407,90 +478,113 @@ func (e *RuntimeSymbolError) Error() string {
 	return fmt.Sprintf("runtime symbol %d is invalid", e.Symbol)
 }
 
-type ValueReceiverBinding struct {
-	method       *types.Func
-	variable     *types.Var
-	original     tsgo.Expression
-	selected     tsgo.Expression
-	copyName     string
-	copySelected bool
-}
-
-func (c Context) WithValueReceiver(
-	method *types.Func,
-	value tsgo.Expression,
-	copyName string,
-	copySelected bool,
-) (Context, error) {
-	if method == nil ||
-		method.Origin() != method ||
-		value == nil ||
-		copyName == "" ||
-		ValueReceiverTypeName(method) == nil {
-		return Context{}, &ContextError{
-			Reason: "value-receiver binding is invalid",
-		}
+func interfaceRuntimeContract(
+	symbol RuntimeSymbol,
+) (RuntimeSymbolContract, bool) {
+	var contract RuntimeSymbolContract
+	switch symbol {
+	case RuntimeInterfaceValue:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoInterfaceValue",
+			true,
+		)
+	case RuntimeInterfaceNonNil:
+		contract = runtimeContract(
+			RuntimeModuleInterface,
+			"runtime/interface.ts",
+			"goInterfaceNonNil",
+			false,
+			RuntimeInterfaceValue,
+			RuntimePanic,
+		)
+	case RuntimeInterfaceEqual:
+		contract = runtimeContract(
+			RuntimeModuleInterface,
+			"runtime/interface.ts",
+			"goInterfaceEqual",
+			false,
+			RuntimeInterfaceValue,
+		)
+	case RuntimeErrorMethodToken:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoErrorMethodToken",
+			false,
+		)
+	case RuntimeRuntimeErrorToken:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoRuntimeErrorMethodToken",
+			false,
+		)
+	case RuntimeBuiltinErrorType:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoError",
+			true,
+			RuntimeInterfaceValue,
+			RuntimeErrorMethodToken,
+		)
+	case RuntimeBuiltinErrorContract:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoError$contract",
+			false,
+			RuntimeErrorMethodToken,
+		)
+	case RuntimeBuiltinErrorGuard:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoError$is",
+			false,
+			RuntimeBuiltinErrorType,
+			RuntimeBuiltinErrorContract,
+		)
+	case RuntimeErrorType:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoRuntimeError",
+			true,
+			RuntimeInterfaceValue,
+			RuntimeErrorMethodToken,
+			RuntimeRuntimeErrorToken,
+		)
+	case RuntimeErrorContract:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoRuntimeError$contract",
+			false,
+			RuntimeErrorMethodToken,
+			RuntimeRuntimeErrorToken,
+		)
+	case RuntimeErrorGuard:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoRuntimeError$is",
+			false,
+			RuntimeErrorType,
+			RuntimeErrorContract,
+		)
+	case RuntimeInterfaceFormat:
+		contract = runtimeContract(
+			RuntimeModuleInterface,
+			"runtime/interface.ts",
+			"GoInterfaceFormat",
+			false,
+			RuntimePanic,
+		)
+	default:
+		return RuntimeSymbolContract{}, false
 	}
-	owner, ok := c.ArtifactOwner().Source()
-	signature := method.Signature()
-	if !ok ||
-		owner != method ||
-		signature == nil ||
-		signature.Recv() == nil {
-		return Context{}, &ContextError{
-			Reason: "value-receiver binding differs from artifact owner",
-		}
-	}
-	selected := value
-	if copySelected {
-		selected = c.Factory().Identifier(copyName)
-	}
-	c.valueReceiver = &ValueReceiverBinding{
-		method:       method,
-		variable:     signature.Recv(),
-		original:     value,
-		selected:     selected,
-		copyName:     copyName,
-		copySelected: copySelected,
-	}
-	return c, nil
-}
-
-func (c Context) ValueReceiver(
-	variable *types.Var,
-) (ValueReceiverBinding, bool) {
-	if c.valueReceiver == nil ||
-		variable == nil ||
-		c.valueReceiver.variable != variable {
-		return ValueReceiverBinding{}, false
-	}
-	return *c.valueReceiver, true
-}
-
-func (b ValueReceiverBinding) Method() *types.Func {
-	return b.method
-}
-
-func (b ValueReceiverBinding) Variable() *types.Var {
-	return b.variable
-}
-
-func (b ValueReceiverBinding) Value() tsgo.Expression {
-	return b.selected
-}
-
-func (b ValueReceiverBinding) OriginalValue() tsgo.Expression {
-	return b.original
-}
-
-func (b ValueReceiverBinding) CopyName() string {
-	return b.copyName
-}
-
-func (b ValueReceiverBinding) CopySelected() bool {
-	return b.copySelected
-}
-
-func (b ValueReceiverBinding) CopyRequest() (RootRequest, error) {
-	return NewValueReceiverCopyRequest(b.method)
+	return contract, true
 }

@@ -3,6 +3,7 @@ package interfaceadapter
 import (
 	"go/types"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
@@ -11,7 +12,6 @@ import (
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
-	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -218,7 +218,7 @@ func demandedMethods(
 				}
 			}
 			concrete, ok := selected.Obj().(*types.Func)
-			if !ok || !methodidentity.Equivalent(concrete, method) {
+			if !ok || !environmentcontract.EquivalentMethods(concrete, method) {
 				return nil, &api.GeneratedArtifactShapeError{
 					Reason: "adapter contract method selection is not exact",
 				}

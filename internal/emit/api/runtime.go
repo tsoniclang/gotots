@@ -70,6 +70,7 @@ const (
 	RuntimeErrorType            RuntimeSymbol = 1008
 	RuntimeErrorContract        RuntimeSymbol = 1009
 	RuntimeErrorGuard           RuntimeSymbol = 1010
+	RuntimeInterfaceFormat      RuntimeSymbol = 1011
 	RuntimeChannel              RuntimeSymbol = 1100
 	RuntimeReceiveChannel       RuntimeSymbol = 1101
 	RuntimeSendChannel          RuntimeSymbol = 1102
@@ -506,98 +507,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goNumberToBigInt",
 			false,
 		), nil
-	case RuntimeInterfaceValue:
-		return runtimeContract(
-			RuntimeModuleInterfaceValue,
-			"runtime/interface-value.ts",
-			"GoInterfaceValue",
-			true,
-		), nil
-	case RuntimeInterfaceNonNil:
-		return runtimeContract(
-			RuntimeModuleInterface,
-			"runtime/interface.ts",
-			"goInterfaceNonNil",
-			false,
-			RuntimeInterfaceValue,
-			RuntimePanic,
-		), nil
-	case RuntimeInterfaceEqual:
-		return runtimeContract(
-			RuntimeModuleInterface,
-			"runtime/interface.ts",
-			"goInterfaceEqual",
-			false,
-			RuntimeInterfaceValue,
-		), nil
-	case RuntimeErrorMethodToken:
-		return runtimeContract(
-			RuntimeModuleInterfaceValue,
-			"runtime/interface-value.ts",
-			"GoErrorMethodToken",
-			false,
-		), nil
-	case RuntimeRuntimeErrorToken:
-		return runtimeContract(
-			RuntimeModuleInterfaceValue,
-			"runtime/interface-value.ts",
-			"GoRuntimeErrorMethodToken",
-			false,
-		), nil
-	case RuntimeBuiltinErrorType:
-		return runtimeContract(
-			RuntimeModuleInterfaceValue,
-			"runtime/interface-value.ts",
-			"GoError",
-			true,
-			RuntimeInterfaceValue,
-			RuntimeErrorMethodToken,
-		), nil
-	case RuntimeBuiltinErrorContract:
-		return runtimeContract(
-			RuntimeModuleInterfaceValue,
-			"runtime/interface-value.ts",
-			"GoError$contract",
-			false,
-			RuntimeErrorMethodToken,
-		), nil
-	case RuntimeBuiltinErrorGuard:
-		return runtimeContract(
-			RuntimeModuleInterfaceValue,
-			"runtime/interface-value.ts",
-			"GoError$is",
-			false,
-			RuntimeBuiltinErrorType,
-			RuntimeBuiltinErrorContract,
-		), nil
-	case RuntimeErrorType:
-		return runtimeContract(
-			RuntimeModuleInterfaceValue,
-			"runtime/interface-value.ts",
-			"GoRuntimeError",
-			true,
-			RuntimeInterfaceValue,
-			RuntimeErrorMethodToken,
-			RuntimeRuntimeErrorToken,
-		), nil
-	case RuntimeErrorContract:
-		return runtimeContract(
-			RuntimeModuleInterfaceValue,
-			"runtime/interface-value.ts",
-			"GoRuntimeError$contract",
-			false,
-			RuntimeErrorMethodToken,
-			RuntimeRuntimeErrorToken,
-		), nil
-	case RuntimeErrorGuard:
-		return runtimeContract(
-			RuntimeModuleInterfaceValue,
-			"runtime/interface-value.ts",
-			"GoRuntimeError$is",
-			false,
-			RuntimeErrorType,
-			RuntimeErrorContract,
-		), nil
 	case RuntimeUnsafePointer:
 		return runtimeContract(
 			RuntimeModuleUnsafePointer,
@@ -648,6 +557,9 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeSlice,
 		), nil
 	default:
+		if contract, ok := interfaceRuntimeContract(symbol); ok {
+			return contract, nil
+		}
 		return concurrencyRuntimeContract(symbol)
 	}
 }

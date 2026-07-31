@@ -750,6 +750,28 @@ target type. `encoding/binary` must preserve distinct public `ByteOrder` and
 one exact internal member union. Delete ambient reconstruction and reject any
 missing representation member before emitting the linked consumer.
 
+Certify the value representation of every selected exported provider-defined
+basic, array, slice, pointer, map, channel, and receiverless-callable type in
+the same provider checkpoint. Callable identity representations are explicit
+contract entries carrying one pinned-TS-Go-certified synchronous or
+cooperative effect. Their public aliases take the declaration-origin hidden
+value facet, defaulted to the certified ordinary callable ABI; every linked
+reference supplies the canonical ABI selected by the artifact graph. All
+other families receive one private operations facet with exactly `project`
+and `wrap`; the certifier proves the public-type/underlying-type signature
+relations through the pinned TS-Go project rather than member presence or
+rendered spelling. Migrate every defined-value consumer to the one contextual
+project/wrap API and delete raw payload access. Linked emission must fail on
+an unclassified value type, absent callable effect, or target-signature drift
+instead of falling back to the source-wrapper layout.
+
+In the same checkpoint, certify the outer effect of every provider function
+and method binding from its exact pinned-TS-Go target call signature. Feed
+that fact into the existing source-callable facet so `sync.Mutex.Lock` is
+awaited while `sync.Mutex.Unlock` remains direct. Nested callback/result ABI
+effects and outer callable effects remain independent; one never infers the
+other. Delete the environment-owned-always-synchronous path.
+
 An operation kind not yet admitted by the closed provider contract remains an
 explicit strict-compilation boundary. For example, `errors.AsType[E]` requires
 the caller's canonical `interface-assert E` operation. Until that operation is

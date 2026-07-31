@@ -347,6 +347,15 @@ func (aggregateNames) Reference(object types.Object) (api.NameReference, error) 
 	return api.NewNameReference(object.Name())
 }
 
+func (aggregateNames) DefinedValueRepresentation(
+	*types.TypeName,
+) (api.DefinedValueRepresentation, error) {
+	return api.NewDefinedValueRepresentation(
+		api.DefinedValueRepresentationGeneratedWrapper,
+		api.NameReference{},
+	)
+}
+
 func (aggregateNames) TypeReference(
 	object types.Object,
 ) (api.NameReference, error) {

@@ -102,11 +102,7 @@ func Emit(
 	}
 	if definedResult {
 		for index, emission := range emissions {
-			unwrapped, unwrapErr := api.NewExpressionEmission(
-				emission.Before(),
-				defined.Unwrap(context.Factory(), emission.Value()),
-				emission.Requests(),
-			)
+			unwrapped, unwrapErr := defined.Project(context, emission)
 			if unwrapErr != nil {
 				return api.ExpressionEmission{}, true, unwrapErr
 			}

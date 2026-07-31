@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "representations": [
     {
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
@@ -16,7 +16,188 @@
       ]
     }
   ],
+  "definedValueIdentities": [
+    "context|kind=2|receiver=|name=CancelCauseFunc",
+    "context|kind=2|receiver=|name=CancelFunc",
+    "io/fs|kind=2|receiver=|name=WalkDirFunc"
+  ],
   "facets": [
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "flag|kind=2|receiver=|name=ErrorHandling",
+      "specifier": "@gotots/gostdlib/internal/facets/named-flag.js",
+      "sourcePath": "src/internal/facets/named-flag.ts",
+      "export": "FlagErrorHandlingValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "internal/abi|kind=2|receiver=|name=Kind",
+      "specifier": "@gotots/gostdlib/internal/facets/named-internal-abi.js",
+      "sourcePath": "src/internal/facets/named-internal-abi.ts",
+      "export": "InternalABIKindValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "internal/abi|kind=2|receiver=|name=NameOff",
+      "specifier": "@gotots/gostdlib/internal/facets/named-internal-abi.js",
+      "sourcePath": "src/internal/facets/named-internal-abi.ts",
+      "export": "InternalABINameOffValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "internal/abi|kind=2|receiver=|name=TFlag",
+      "specifier": "@gotots/gostdlib/internal/facets/named-internal-abi.js",
+      "sourcePath": "src/internal/facets/named-internal-abi.ts",
+      "export": "InternalABITFlagValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "internal/abi|kind=2|receiver=|name=TypeOff",
+      "specifier": "@gotots/gostdlib/internal/facets/named-internal-abi.js",
+      "sourcePath": "src/internal/facets/named-internal-abi.ts",
+      "export": "InternalABITypeOffValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "io/fs|kind=2|receiver=|name=FileMode",
+      "specifier": "@gotots/gostdlib/internal/facets/named-io-fs.js",
+      "sourcePath": "src/internal/facets/named-io-fs.ts",
+      "export": "IoFsFileModeValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "iter|kind=2|receiver=|name=Seq",
+      "specifier": "@gotots/gostdlib/internal/facets/named-iter.js",
+      "sourcePath": "src/internal/facets/named-iter.ts",
+      "export": "IterSeqValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "iter|kind=2|receiver=|name=Seq2",
+      "specifier": "@gotots/gostdlib/internal/facets/named-iter.js",
+      "sourcePath": "src/internal/facets/named-iter.ts",
+      "export": "IterSeq2ValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "math/big|kind=2|receiver=|name=Accuracy",
+      "specifier": "@gotots/gostdlib/internal/facets/named-math-big.js",
+      "sourcePath": "src/internal/facets/named-math-big.ts",
+      "export": "MathBigAccuracyValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=ChanDir",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectChanDirValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Kind",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectKindValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=StructTag",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectStructTagValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=ValueKind",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime-metrics.js",
+      "sourcePath": "src/internal/facets/named-runtime-metrics.ts",
+      "export": "RuntimeMetricsValueKindValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "syscall|kind=2|receiver=|name=Errno",
+      "specifier": "@gotots/gostdlib/internal/facets/named-syscall.js",
+      "sourcePath": "src/internal/facets/named-syscall.ts",
+      "export": "SyscallErrnoValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "syscall|kind=2|receiver=|name=Signal",
+      "specifier": "@gotots/gostdlib/internal/facets/named-syscall.js",
+      "sourcePath": "src/internal/facets/named-syscall.ts",
+      "export": "SyscallSignalValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "time|kind=2|receiver=|name=Duration",
+      "specifier": "@gotots/gostdlib/internal/facets/named-time.js",
+      "sourcePath": "src/internal/facets/named-time.ts",
+      "export": "TimeDurationValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
     {
       "kind": "named-struct-operations",
       "sourceIdentity": "encoding/binary|kind=2|receiver=|name=bigEndian",

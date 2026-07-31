@@ -5,6 +5,7 @@ import type {
 } from "@gotots/runtime/interface-value.js";
 import { GoInterfaceValue as InterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
+import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { bool } from "@gotots/runtime/scalars.js";
 import { ProviderError } from "../../runtime/error.js";
 import { ProviderChannel } from "../concurrency/channel.js";
@@ -148,8 +149,18 @@ class ValueContext extends ContextValue {
 const background = new EmptyContext();
 const todo = new EmptyContext();
 
-export type CancelFunc = () => Promise<void>;
-export type CancelCauseFunc = (cause: GoError | undefined) => Promise<void>;
+type CancelFuncABI = ((_recovery?: GoRecovery) => Promise<void>) | undefined;
+type CancelCauseFuncABI = ((
+    cause: GoError | undefined,
+    _recovery?: GoRecovery,
+  ) => Promise<void>) | undefined;
+
+export type CancelFunc<
+  $Value extends CancelFuncABI = CancelFuncABI,
+> = $Value;
+export type CancelCauseFunc<
+  $Value extends CancelCauseFuncABI = CancelCauseFuncABI,
+> = $Value;
 
 export function Background(): Context {
   return background;
@@ -159,14 +170,16 @@ export function TODO(): Context {
   return todo;
 }
 
-export function WithCancel(parent: Context | undefined): [Context, CancelFunc] {
+export function WithCancel(
+  parent: Context | undefined,
+): [Context, NonNullable<CancelFunc>] {
   const child = new CancelContext(requireParent(parent), undefined);
   return [child, async (): Promise<void> => child.cancel(canceled)];
 }
 
 export function WithCancelCause(
   parent: Context | undefined,
-): [Context, CancelCauseFunc] {
+): [Context, NonNullable<CancelCauseFunc>] {
   const child = new CancelContext(requireParent(parent), undefined);
   return [
     child,
@@ -177,7 +190,7 @@ export function WithCancelCause(
 export function WithTimeout(
   parent: Context | undefined,
   timeout: Duration,
-): [Context, CancelFunc] {
+): [Context, NonNullable<CancelFunc>] {
   const actualParent = requireParent(parent);
   const requestedDeadline = Now().Add(timeout);
   const [parentDeadline, parentHasDeadline] = actualParent.Deadline();

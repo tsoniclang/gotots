@@ -117,12 +117,12 @@ func (a RuntimeArray) EmitType(
 
 func (a RuntimeArray) storage(
 	context api.Context,
-	value tsgo.Expression,
-) tsgo.Expression {
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
 	if !a.nominal {
-		return value
+		return value, nil
 	}
-	return a.defined.Unwrap(context.Factory(), value)
+	return a.defined.Project(context, value)
 }
 
 func (a RuntimeArray) wrap(

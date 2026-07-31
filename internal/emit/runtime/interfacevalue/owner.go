@@ -18,6 +18,8 @@ func Build(
 		return nonNil(factory, valueName, panicName), nil
 	case api.RuntimeInterfaceEqual:
 		return equal(factory, valueName), nil
+	case api.RuntimeInterfaceFormat:
+		return formatClass(factory, panicName), nil
 	default:
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}

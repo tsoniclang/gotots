@@ -11,13 +11,14 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
-const facetMapSchemaVersion = 3
+const facetMapSchemaVersion = 4
 
 type facetMapDocument struct {
-	SchemaVersion        int                          `json:"schemaVersion"`
-	Representations      []providerRepresentationSeed `json:"representations,omitempty"`
-	Facets               []facetSeed                  `json:"facets"`
-	GenericOperationSets []genericOperationSetSeed    `json:"genericOperationSets"`
+	SchemaVersion          int                          `json:"schemaVersion"`
+	Representations        []providerRepresentationSeed `json:"representations,omitempty"`
+	DefinedValueIdentities []string                     `json:"definedValueIdentities,omitempty"`
+	Facets                 []facetSeed                  `json:"facets"`
+	GenericOperationSets   []genericOperationSetSeed    `json:"genericOperationSets"`
 }
 
 type providerRepresentationSeed struct {
@@ -51,46 +52,80 @@ func readFacetSeeds(
 ) (
 	[]facetSeed,
 	[]providerRepresentationSeed,
+	map[string]struct{},
 	map[string][]gostdlib.GenericOperationDocument,
 	error,
 ) {
 	file, err := os.Open(sourcePath)
 	if err != nil {
-		return nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	defer file.Close()
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()
 	var document facetMapDocument
 	if err := decoder.Decode(&document); err != nil {
-		return nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	var extra json.RawMessage
 	if err := decoder.Decode(&extra); err != io.EOF {
 		if err == nil {
 			err = fmt.Errorf("multiple JSON values")
 		}
-		return nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	if document.SchemaVersion != facetMapSchemaVersion {
-		return nil, nil, nil, certifyError("read facet map", sourcePath, "schema is unsupported")
+		return nil, nil, nil, nil, certifyError("read facet map", sourcePath, "schema is unsupported")
 	}
 	representations, representationIndex, err :=
 		validateProviderRepresentationSeeds(document.Representations)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+	identities, err := validateDefinedValueIdentities(document.DefinedValueIdentities)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 	facets, err := validateFacetSeeds(document.Facets, representationIndex)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	operations, err := validateGenericOperationSetSeeds(
 		document.GenericOperationSets,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	return facets, representations, operations, nil
+	return facets, representations, identities, operations, nil
+}
+
+func validateDefinedValueIdentities(source []string) (map[string]struct{}, error) {
+	result := make(map[string]struct{}, len(source))
+	for index, identity := range source {
+		if identity == "" {
+			return nil, certifyError(
+				"configure defined values",
+				identity,
+				"identity is empty",
+			)
+		}
+		if _, duplicate := result[identity]; duplicate {
+			return nil, certifyError(
+				"configure defined values",
+				identity,
+				"identity owner is duplicated",
+			)
+		}
+		if index != 0 && identity < source[index-1] {
+			return nil, certifyError(
+				"configure defined values",
+				identity,
+				"identities are not ordered",
+			)
+		}
+		result[identity] = struct{}{}
+	}
+	return result, nil
 }
 
 func validateProviderRepresentationSeeds(
@@ -246,6 +281,19 @@ func validateFacetSeeds(
 		}
 		if len(capabilities) == 0 {
 			return nil, certifyError("configure facets", key, "capability set is empty")
+		}
+		if seed.Kind == gostdlib.FacetDefinedValueOperations &&
+			(len(seed.Capabilities) != 2 ||
+				seed.Capabilities[0] != gostdlib.FacetCapabilityProject ||
+				seed.Capabilities[1] != gostdlib.FacetCapabilityWrap ||
+				seed.ProfileKey != "" || seed.StorageExport != "" ||
+				seed.RepresentationExport != "" ||
+				seed.Effect != gostdlib.EffectInvalid) {
+			return nil, certifyError(
+				"configure facets",
+				key,
+				"defined-value facet shape is invalid",
+			)
 		}
 		representation := false
 		for _, capability := range seed.Capabilities {

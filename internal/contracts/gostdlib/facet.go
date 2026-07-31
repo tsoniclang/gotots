@@ -10,12 +10,14 @@ type FacetKind string
 const (
 	FacetInvalid                FacetKind = ""
 	FacetNamedStructOperations  FacetKind = "named-struct-operations"
+	FacetDefinedValueOperations FacetKind = "defined-value-operations"
 	FacetRecoveryCallable       FacetKind = "recovery-callable"
 	FacetGenericCallableProfile FacetKind = "generic-callable-profile"
 )
 
 func (k FacetKind) Valid() bool {
 	return k == FacetNamedStructOperations ||
+		k == FacetDefinedValueOperations ||
 		k == FacetRecoveryCallable ||
 		k == FacetGenericCallableProfile
 }
@@ -34,6 +36,8 @@ const (
 	FacetCapabilityAssign         FacetCapability = "assign"
 	FacetCapabilityRepresentation FacetCapability = "representation"
 	FacetCapabilityRecovery       FacetCapability = "recovery"
+	FacetCapabilityProject        FacetCapability = "project"
+	FacetCapabilityWrap           FacetCapability = "wrap"
 )
 
 func (c FacetCapability) NamedStructOperation() bool {
@@ -51,6 +55,10 @@ func (c FacetCapability) NamedStructOperation() bool {
 	default:
 		return false
 	}
+}
+
+func (c FacetCapability) DefinedValueOperation() bool {
+	return c == FacetCapabilityProject || c == FacetCapabilityWrap
 }
 
 type EffectKind string
@@ -82,12 +90,13 @@ type ProviderRepresentationDocument struct {
 }
 
 type ProviderRepresentationMethodDocument struct {
-	SourceIdentity      string `json:"sourceIdentity"`
-	Member              string `json:"member"`
-	SourceSignature     string `json:"sourceSignature"`
-	SourceLocation      string `json:"sourceLocation"`
-	ImplementationOwner string `json:"implementationOwner"`
-	TargetFingerprint   string `json:"targetFingerprint"`
+	SourceIdentity      string     `json:"sourceIdentity"`
+	Member              string     `json:"member"`
+	Effect              EffectKind `json:"effect"`
+	SourceSignature     string     `json:"sourceSignature"`
+	SourceLocation      string     `json:"sourceLocation"`
+	ImplementationOwner string     `json:"implementationOwner"`
+	TargetFingerprint   string     `json:"targetFingerprint"`
 }
 
 type FacetDocument struct {
@@ -300,6 +309,10 @@ func (m ProviderRepresentationMethod) SourceIdentity() string {
 
 func (m ProviderRepresentationMethod) Member() string {
 	return m.document.Member
+}
+
+func (m ProviderRepresentationMethod) Effect() EffectKind {
+	return m.document.Effect
 }
 
 func (m ProviderRepresentationMethod) SourceSignature() string {

@@ -1,7 +1,7 @@
 package gostdlib
 
 const (
-	SchemaVersion = 4
+	SchemaVersion = 6
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -48,6 +48,19 @@ func (k RepresentationKind) Valid() bool {
 	return k == RepresentationDirect
 }
 
+type DefinedValueRepresentationKind string
+
+const (
+	DefinedValueRepresentationInvalid    DefinedValueRepresentationKind = ""
+	DefinedValueRepresentationIdentity   DefinedValueRepresentationKind = "identity"
+	DefinedValueRepresentationOperations DefinedValueRepresentationKind = "operations"
+)
+
+func (k DefinedValueRepresentationKind) Valid() bool {
+	return k == DefinedValueRepresentationIdentity ||
+		k == DefinedValueRepresentationOperations
+}
+
 type Document struct {
 	SchemaVersion    int                   `json:"schemaVersion"`
 	PackageName      string                `json:"packageName"`
@@ -73,18 +86,20 @@ type ModuleDocument struct {
 }
 
 type BindingDocument struct {
-	Identity            string                     `json:"identity"`
-	Kind                BindingKind                `json:"kind"`
-	Access              AccessKind                 `json:"access"`
-	Representation      RepresentationKind         `json:"representation,omitempty"`
-	Export              string                     `json:"export"`
-	Member              string                     `json:"member,omitempty"`
-	GenericOperations   []GenericOperationDocument `json:"genericOperations,omitempty"`
-	SourceSignature     string                     `json:"sourceSignature"`
-	SourceValue         string                     `json:"sourceValue,omitempty"`
-	SourceLocation      string                     `json:"sourceLocation"`
-	ImplementationOwner string                     `json:"implementationOwner"`
-	TargetFingerprint   string                     `json:"targetFingerprint"`
+	Identity            string                         `json:"identity"`
+	Kind                BindingKind                    `json:"kind"`
+	Access              AccessKind                     `json:"access"`
+	Representation      RepresentationKind             `json:"representation,omitempty"`
+	DefinedValue        DefinedValueRepresentationKind `json:"definedValue,omitempty"`
+	Effect              EffectKind                     `json:"effect,omitempty"`
+	Export              string                         `json:"export"`
+	Member              string                         `json:"member,omitempty"`
+	GenericOperations   []GenericOperationDocument     `json:"genericOperations,omitempty"`
+	SourceSignature     string                         `json:"sourceSignature"`
+	SourceValue         string                         `json:"sourceValue,omitempty"`
+	SourceLocation      string                         `json:"sourceLocation"`
+	ImplementationOwner string                         `json:"implementationOwner"`
+	TargetFingerprint   string                         `json:"targetFingerprint"`
 }
 
 type Manifest struct {
@@ -244,6 +259,14 @@ func (b Binding) Access() AccessKind {
 
 func (b Binding) Representation() RepresentationKind {
 	return b.binding.Representation
+}
+
+func (b Binding) DefinedValueRepresentation() DefinedValueRepresentationKind {
+	return b.binding.DefinedValue
+}
+
+func (b Binding) Effect() EffectKind {
+	return b.binding.Effect
 }
 
 func (b Binding) Export() string {

@@ -1,0 +1,139 @@
+package provider_test
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
+	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+type renderedArtifacts struct {
+	paths   []string
+	printed string
+}
+
+func materializeArtifacts(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	workingDirectory string,
+) renderedArtifacts {
+	t.Helper()
+	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close TS-Go client: %v", err)
+		}
+	})
+	var result renderedArtifacts
+	for _, file := range emission.Files() {
+		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tsgo.EncodeSourceFile(file.SourceFile()); err != nil {
+			t.Fatal(err)
+		}
+		for _, forbidden := range []string{
+			": any",
+			": unknown",
+			" as any",
+			" as unknown",
+			".call(",
+			".apply(",
+			".bind(",
+			"import(",
+		} {
+			if strings.Contains(printed, forbidden) {
+				t.Fatalf(
+					"%s contains forbidden %q:\n%s",
+					file.OutputPath(),
+					forbidden,
+					printed,
+				)
+			}
+		}
+		targetPath := filepath.Join(
+			workingDirectory,
+			filepath.FromSlash(file.OutputPath()),
+		)
+		writeProgramFile(t, targetPath, printed)
+		result.paths = append(result.paths, targetPath)
+		result.printed += "\n// " + file.OutputPath() + "\n" + printed
+	}
+	if len(result.paths) == 0 {
+		t.Fatal("provider fixture emitted no target files")
+	}
+	return result
+}
+
+func waveThreeTypecheck(
+	t *testing.T,
+	workingDirectory string,
+	paths []string,
+) {
+	t.Helper()
+	arguments := []string{
+		"--target", "es2022",
+		"--module", "nodenext",
+		"--moduleResolution", "nodenext",
+		"--strict",
+		"--outDir", filepath.Join(workingDirectory, "out"),
+	}
+	arguments = append(arguments, paths...)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := tsgo.Compile(
+		ctx,
+		repositoryRoot(),
+		workingDirectory,
+		arguments,
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func linkedProviderCertificate(t *testing.T) *certify.Certificate {
+	t.Helper()
+	repository := repositoryRoot()
+	certificate, err := certify.Verify(certify.Config{
+		RepositoryRoot:      repository,
+		ProviderRoot:        filepath.Join(repository, "gostdlib"),
+		ManifestPath:        filepath.Join(repository, "gostdlib", "contract", "manifest.json"),
+		ModuleMapPath:       filepath.Join(repository, "gostdlib", "contract", "modules.json"),
+		FacetMapPath:        filepath.Join(repository, "gostdlib", "contract", "facets.json"),
+		RuntimeContractPath: filepath.Join(repository, "gostdlib", "contract", "runtime.json"),
+		TSConfigPath:        filepath.Join(repository, "gostdlib", "tsconfig.json"),
+		ScratchDirectory:    t.TempDir(),
+		GoBinary:            "go",
+		Backend:             "node",
+		MinimumGoVersion:    "go1.26.4",
+		MaximumGoVersion:    "go1.26.4",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return certificate
+}
+
+func writeProgramFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func repositoryRoot() string {
+	return filepath.Join("..", "..", "..", "..")
+}

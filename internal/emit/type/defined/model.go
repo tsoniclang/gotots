@@ -9,8 +9,10 @@ import (
 )
 
 const (
-	BrandMember = "$goType"
-	ValueMember = "$value"
+	BrandMember   = "$goType"
+	ValueMember   = "$value"
+	ProjectMember = "$project"
+	WrapMember    = "$wrap"
 )
 
 type Model struct {
@@ -172,27 +174,58 @@ func (m Model) Channel() (*types.Chan, bool) {
 	return channel, ok && m.family == FamilyChannel
 }
 
-func (m Model) Unwrap(
-	factory tsgo.Factory,
-	value tsgo.Expression,
-) tsgo.Expression {
-	return factory.PropertyAccessExpression(
-		value,
-		nil,
-		factory.Identifier(ValueMember),
-		tsgo.NodeFlagsNone,
-	)
-}
-
 func (m Model) Project(
 	context api.Context,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	return api.NewExpressionEmission(
-		value.Before(),
-		m.Unwrap(context.Factory(), value.Value()),
-		value.Requests(),
-	)
+	representation, err := context.Names().DefinedValueRepresentation(m.typeName)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	switch representation.Kind() {
+	case api.DefinedValueRepresentationProviderIdentity:
+		return value, nil
+	case api.DefinedValueRepresentationProviderOperations:
+		operations, ok := representation.Operations()
+		if !ok {
+			return api.ExpressionEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "provider defined-value projection has no operations owner",
+			}
+		}
+		return api.NewExpressionEmission(
+			value.Before(),
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					operations.Expression(context.Factory()),
+					nil,
+					context.Factory().Identifier(ProjectMember),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{value.Value()},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(value.Requests(), operations.Requests()),
+		)
+	case api.DefinedValueRepresentationGeneratedWrapper:
+		return api.NewExpressionEmission(
+			value.Before(),
+			context.Factory().PropertyAccessExpression(
+				value.Value(),
+				nil,
+				context.Factory().Identifier(ValueMember),
+				tsgo.NodeFlagsNone,
+			),
+			value.Requests(),
+		)
+	default:
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "defined-value projection representation is invalid",
+		}
+	}
 }
 
 func (m Model) Construct(
@@ -210,6 +243,44 @@ func (m Model) Wrap(
 	context api.Context,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	representation, err := context.Names().DefinedValueRepresentation(m.typeName)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	switch representation.Kind() {
+	case api.DefinedValueRepresentationProviderIdentity:
+		return value, nil
+	case api.DefinedValueRepresentationProviderOperations:
+		operations, ok := representation.Operations()
+		if !ok {
+			return api.ExpressionEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "provider defined-value construction has no operations owner",
+			}
+		}
+		return api.NewExpressionEmission(
+			value.Before(),
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					operations.Expression(context.Factory()),
+					nil,
+					context.Factory().Identifier(WrapMember),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{value.Value()},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(value.Requests(), operations.Requests()),
+		)
+	case api.DefinedValueRepresentationGeneratedWrapper:
+	default:
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "defined-value construction representation is invalid",
+		}
+	}
 	reference, err := context.Names().Reference(m.typeName)
 	if err != nil {
 		return api.ExpressionEmission{}, err

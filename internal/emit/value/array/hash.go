@@ -14,6 +14,13 @@ func (a RuntimeArray) Hash(
 	source ast.Node,
 	value tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	stored, err := a.storage(
+		context.WithRole(api.RoleDefinedValue),
+		api.DirectExpression(value),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	arrayName, err := context.Names().Temporary(api.TemporaryArrayHash)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -83,12 +90,12 @@ func (a RuntimeArray) Hash(
 			),
 		),
 	)
-	before := []tsgo.Statement{
+	before := append(stored.Before(),
 		arrayComparisonVariable(
 			context,
 			tsgo.NodeFlagsConst,
 			arrayName,
-			a.storage(context, value),
+			stored.Value(),
 		),
 		arrayComparisonVariable(
 			context,
@@ -129,11 +136,12 @@ func (a RuntimeArray) Hash(
 			),
 			context.Factory().Block(body, true),
 		),
-	}
+	)
 	return api.NewExpressionEmission(
 		before,
 		hash,
 		api.CombineRequests(
+			stored.Requests(),
 			elementHash.Requests(),
 			element.Requests(),
 			runtime.Requests(),

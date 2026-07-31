@@ -28,6 +28,7 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 				Identity: "strings|kind=4|receiver=|name=Contains",
 				Kind:     gostdlib.BindingFunction,
 				Access:   gostdlib.AccessExport,
+				Effect:   gostdlib.EffectSynchronous,
 				Export:   "Contains",
 				GenericOperations: []gostdlib.GenericOperationDocument{{
 					Kind: gostdlib.GenericOperationCopy,
@@ -73,7 +74,8 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 		"strings|kind=4|receiver=|name=Contains",
 	)
 	if !ok || binding.Export() != "Contains" ||
-		binding.ModuleSpecifier() != "@gotots/gostdlib/strings.js" {
+		binding.ModuleSpecifier() != "@gotots/gostdlib/strings.js" ||
+		binding.Effect() != gostdlib.EffectSynchronous {
 		t.Fatalf("binding = %#v, %t", binding, ok)
 	}
 	operations := binding.GenericOperations()
@@ -137,6 +139,27 @@ func TestManifestRejectsInvalidGenericOperationShape(t *testing.T) {
 	}}
 	if _, err := gostdlib.Seal(document); err == nil {
 		t.Fatal("open generic operation passed")
+	}
+}
+
+func TestManifestRequiresEffectsExactlyOnCallableBindings(t *testing.T) {
+	document := validDocument()
+	document.Modules[0].Bindings[0].Effect = gostdlib.EffectInvalid
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("function without an effect passed")
+	}
+
+	binding := &document.Modules[0].Bindings[0]
+	binding.Kind = gostdlib.BindingType
+	binding.Representation = gostdlib.RepresentationDirect
+	binding.DefinedValue = gostdlib.DefinedValueRepresentationIdentity
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("callable identity without an effect passed")
+	}
+	binding.DefinedValue = gostdlib.DefinedValueRepresentationOperations
+	binding.Effect = gostdlib.EffectSynchronous
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("operation-represented value with a callable effect passed")
 	}
 }
 
@@ -270,6 +293,7 @@ func TestManifestOwnsClosedPrivateProviderRepresentation(t *testing.T) {
 			Methods: []gostdlib.ProviderRepresentationMethodDocument{{
 				SourceIdentity:      "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint16",
 				Member:              "Uint16",
+				Effect:              gostdlib.EffectSynchronous,
 				SourceSignature:     "func([]byte) uint16|params=|results=",
 				SourceLocation:      "encoding/binary/binary.go:1:1",
 				ImplementationOwner: "src/internal/facets/binary.ts",
@@ -313,7 +337,8 @@ func TestManifestOwnsClosedPrivateProviderRepresentation(t *testing.T) {
 	method, ok := representation.Method(
 		"encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint16",
 	)
-	if !ok || method.Member() != "Uint16" {
+	if !ok || method.Member() != "Uint16" ||
+		method.Effect() != gostdlib.EffectSynchronous {
 		t.Fatalf("method = %#v, %t", method, ok)
 	}
 	types := representation.SourceTypes()
@@ -329,11 +354,19 @@ func TestManifestOwnsClosedPrivateProviderRepresentation(t *testing.T) {
 	document.FacetModules[0].Representations[0].Methods = []gostdlib.ProviderRepresentationMethodDocument{{
 		SourceIdentity:      "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint16",
 		Member:              "Uint16",
+		Effect:              gostdlib.EffectSynchronous,
 		SourceSignature:     "func([]byte) uint16|params=|results=",
 		SourceLocation:      "encoding/binary/binary.go:1:1",
 		ImplementationOwner: "src/internal/facets/binary.ts",
 		TargetFingerprint:   digest('e'),
 	}}
+	document.FacetModules[0].Representations[0].Methods[0].Effect =
+		gostdlib.EffectInvalid
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("representation method without an effect passed")
+	}
+	document.FacetModules[0].Representations[0].Methods[0].Effect =
+		gostdlib.EffectSynchronous
 	document.FacetModules[0].Facets[0].RepresentationExport = "Missing"
 	if _, err := gostdlib.Seal(document); err == nil {
 		t.Fatal("facet with a missing representation passed")
@@ -361,6 +394,7 @@ func validDocument() gostdlib.Document {
 				Identity:            "strings|kind=4|receiver=|name=Contains",
 				Kind:                gostdlib.BindingFunction,
 				Access:              gostdlib.AccessExport,
+				Effect:              gostdlib.EffectSynchronous,
 				Export:              "Contains",
 				SourceSignature:     "func(s, substr string) bool|params=s,substr|results=",
 				SourceLocation:      "strings/strings.go:1:1",

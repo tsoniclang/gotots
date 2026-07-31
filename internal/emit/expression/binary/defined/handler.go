@@ -167,11 +167,7 @@ func operand(
 		return api.ExpressionEmission{}, err
 	}
 	if sourceModel, ok := definedtype.ResolveBasic(sourceType); ok {
-		target, err = api.NewExpressionEmission(
-			target.Before(),
-			sourceModel.Unwrap(context.Factory(), target.Value()),
-			target.Requests(),
-		)
+		target, err = sourceModel.Project(context, target)
 	}
 	return target, err
 }

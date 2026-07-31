@@ -55,7 +55,16 @@ func emitIterator(
 	}
 	targetIterator := tsgo.Expression(iterator)
 	if model, defined := definedtype.ResolveCallable(sourceType); defined {
-		targetIterator = model.Unwrap(context.Factory(), targetIterator)
+		projected, projectErr := model.Project(
+			context.WithRole(api.RoleRangeExpression),
+			api.DirectExpression(targetIterator),
+		)
+		if projectErr != nil {
+			return api.StatementEmission{}, projectErr
+		}
+		before = append(before, projected.Before()...)
+		requests = append(requests, projected.Requests()...)
+		targetIterator = projected.Value()
 	}
 	if !callable.StaticallyNonNil(context.TypesInfo(), source.X) {
 		guard, guardRequests, guardErr := callable.NilGuard(

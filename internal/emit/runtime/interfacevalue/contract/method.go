@@ -4,7 +4,7 @@ import (
 	"go/token"
 	"go/types"
 
-	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 )
 
 type MethodKind uint8
@@ -27,9 +27,9 @@ var (
 
 func Method(method *types.Func) MethodKind {
 	switch {
-	case methodidentity.Equivalent(method, errorMethod):
+	case environmentcontract.EquivalentMethods(method, errorMethod):
 		return MethodError
-	case methodidentity.Equivalent(method, runtimeErrorMethod):
+	case environmentcontract.EquivalentMethods(method, runtimeErrorMethod):
 		return MethodRuntimeError
 	default:
 		return MethodInvalid

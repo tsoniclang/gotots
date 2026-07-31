@@ -32,13 +32,15 @@ type ProjectInspection struct {
 }
 
 type ProjectExport struct {
-	name         string
-	flags        uint32
-	typeString   string
-	declarations []string
-	ownerKeys    []string
-	valueMembers []ProjectMember
-	typeMembers  []ProjectMember
+	name           string
+	flags          uint32
+	typeString     string
+	typeID         uint32
+	declaredTypeID uint32
+	declarations   []string
+	ownerKeys      []string
+	valueMembers   []ProjectMember
+	typeMembers    []ProjectMember
 }
 
 func (e ProjectExport) Name() string {
@@ -337,14 +339,23 @@ func (p *ProjectInspection) projectExport(
 		}
 	}
 	return ProjectExport{
-		name:         symbol.Name,
-		flags:        symbol.Flags,
-		typeString:   typeString,
-		declarations: declarations,
-		ownerKeys:    ownerKeys,
-		valueMembers: valueMembers,
-		typeMembers:  typeMembers,
+		name:           symbol.Name,
+		flags:          symbol.Flags,
+		typeString:     typeString,
+		typeID:         targetType.ID,
+		declaredTypeID: typeResponseID(declaredType),
+		declarations:   declarations,
+		ownerKeys:      ownerKeys,
+		valueMembers:   valueMembers,
+		typeMembers:    typeMembers,
 	}, nil
+}
+
+func typeResponseID(source *typeResponse) uint32 {
+	if source == nil {
+		return 0
+	}
+	return source.ID
 }
 
 func requestProjectJSON(
@@ -494,6 +505,9 @@ type symbolResponse struct {
 }
 
 type typeResponse struct {
-	ID     uint32 `json:"id"`
-	Symbol uint64 `json:"symbol"`
+	ID          uint32 `json:"id"`
+	Flags       uint32 `json:"flags"`
+	ObjectFlags uint32 `json:"objectFlags"`
+	Target      uint32 `json:"target"`
+	Symbol      uint64 `json:"symbol"`
 }

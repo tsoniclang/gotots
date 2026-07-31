@@ -43,7 +43,7 @@ func emitDirect(
 		0,
 		len(clauses),
 	)
-	requests := tag.target.Requests()
+	var requests []api.RootRequest
 	for _, clause := range clauses {
 		body, bodyRequests := directBody(context, clause)
 		requests = append(requests, bodyRequests...)
@@ -59,6 +59,7 @@ func emitDirect(
 		}
 		for index, expression := range clause.expressions {
 			value := expression.Value()
+			expressionRequests := expression.Requests()
 			if tag.wrapped {
 				facts, constant := context.TypesInfo().
 					Types[clause.source.List[index]]
@@ -87,7 +88,22 @@ func emitDirect(
 					value = direct.Value()
 					requests = append(requests, direct.Requests()...)
 				} else {
-					value = tag.model.Unwrap(context.Factory(), value)
+					projected, err := tag.model.Project(
+						context.WithRole(api.RoleSwitchCaseExpression),
+						api.DirectExpression(value, expressionRequests...),
+					)
+					if err != nil {
+						return api.StatementEmission{}, err
+					}
+					if len(projected.Before()) != 0 {
+						return api.StatementEmission{}, api.Unsupported(
+							context.WithRole(api.RoleSwitchCaseExpression),
+							api.CategoryExpression,
+							clause.source.List[index],
+						)
+					}
+					value = projected.Value()
+					expressionRequests = projected.Requests()
 				}
 			}
 			var statements []tsgo.Statement
@@ -100,21 +116,31 @@ func emitDirect(
 				targetClauses,
 				context.Factory().CaseClause(value, statements),
 			)
-			requests = append(requests, expression.Requests()...)
+			requests = append(requests, expressionRequests...)
 		}
 	}
-	tagValue := tag.target.Value()
+	tagTarget := tag.target
 	if tag.wrapped {
-		tagValue = tag.model.Unwrap(context.Factory(), tagValue)
+		var err error
+		tagTarget, err = tag.model.Project(
+			context.WithRole(api.RoleSwitchTag),
+			tagTarget,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 	}
 	target := tsgo.Statement(context.Factory().SwitchStatement(
-		tagValue,
+		tagTarget.Value(),
 		context.Factory().CaseBlock(targetClauses),
 	))
 	target = labeledTarget(context, targetLabel, target)
-	statements := tag.target.Before()
+	statements := tagTarget.Before()
 	statements = append(statements, target)
-	return api.NewStatementEmission(statements, requests)
+	return api.NewStatementEmission(
+		statements,
+		api.CombineRequests(requests, tagTarget.Requests()),
+	)
 }
 
 func directBody(

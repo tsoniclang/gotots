@@ -1,10 +1,21 @@
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring, int64 } from "@gotots/runtime/scalars.js";
 
 import {
   Description,
   Sample,
   Value,
+  ValueKind,
 } from "../../runtime/metrics.js";
+
+export class RuntimeMetricsValueKindValueOperations {
+  static $project(source: ValueKind): int64 {
+    return source.value;
+  }
+
+  static $wrap(source: int64): ValueKind {
+    return new ValueKind(source);
+  }
+}
 
 export class RuntimeMetricsDescriptionOperations {
   static $copy(source: Description): Description {

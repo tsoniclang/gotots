@@ -277,10 +277,21 @@ func (s *programSession) ObserveCooperativeCallable(
 			)
 		}
 	}
-	if source, ok := facet.Owner().Source(); ok &&
-		source != nil &&
+	if source, ok := facet.Owner().Source(); ok && source != nil &&
 		s.source.EnvironmentForTypes(source.Pkg()) != nil {
-		return api.NewCooperativeCallableObservation(false)
+		function, callable := source.(*types.Func)
+		if callable {
+			effect, providerOwned, err :=
+				s.registry.ProviderCallableEffect(function)
+			if err != nil {
+				return api.CooperativeCallableObservation{}, err
+			}
+			if providerOwned {
+				return api.NewCooperativeCallableObservation(
+					effect == gostdlib.EffectAsynchronous,
+				)
+			}
+		}
 	}
 	cooperative := false
 	if profile, artifact, profiled := facet.GenericProfileABI(); profiled {

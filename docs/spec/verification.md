@@ -703,6 +703,42 @@ ordinary public calls remain source-shaped while compiler operations import
 only certified private facets; public provider classes expose no dollar-prefixed
 compiler members.
 
+Provider defined-value verification independently derives the total selected
+exported non-struct named-type set from `go/types`. It exact-joins each identity
+to exactly one certified representation: callable identity with one exact
+synchronous/cooperative effect, or a private
+`defined-value-operations` facet with the ordered capabilities `project` and
+`wrap`. Through opaque pinned-TS-Go type and signature handles—not type
+strings—it verifies the operations accept and return the public provider type
+and their mutually exact underlying target type. It verifies an identity
+alias has one callable signature, includes Go nil in that callable ABI, takes
+the declaration-origin value facet, and defaults it to a return type whose
+effect equals the recorded effect. Focused linked artifacts cover a callable
+identity (`context.CancelFunc`), a generic
+callable wrapper (`iter.Seq[E]`), and a basic wrapper (`time.Duration`) in
+assignment, call, conversion, unary, binary, switch, range, equality, hash,
+and update positions that apply to their families. The rendered public modules
+must expose no dollar-prefixed compiler member.
+
+Mutations delete one representation assignment, assign both identity and an
+operations facet, mark a non-callable identity, remove or change `$project`,
+remove or change `$wrap`, redirect the facet to another public type, and
+restore one direct `.$value` consumer. Additional mutations remove the hidden
+callable value facet, move nil outside that facet, flip its effect, make
+`sync.Mutex.Lock` synchronous, or make `sync.Mutex.Unlock` asynchronous. Each
+must fail at contract
+certification, typed TS-Go artifact inspection, strict typechecking, or the
+defined-value owner search gate. The whole-product diagnostic report must
+separately count provider projection failures and reach zero before execution.
+
+Provider callable-effect verification derives every function and method
+binding from the selected Go surface and exact-joins it to one effect obtained
+from the target call signature through the pinned TS-Go API. A focused runtime
+fixture proves a contended `sync.Mutex.Lock` suspends and resumes only after
+`Unlock`, while an ordinary synchronous provider call remains byte-stable.
+Artifact inspection proves the former call is awaited and the latter is not.
+No callback parameter/result shape may be used to infer either result.
+
 Private provider-representation certification independently derives every
 represented selected-Go type's exported method set, records each concrete
 method identity once, and exact-joins the deduplicated callable union against

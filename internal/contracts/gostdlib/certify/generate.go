@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -30,7 +29,7 @@ func Generate(config Config) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	facetSeeds, representationSeeds, genericOperations, err :=
+	facetSeeds, representationSeeds, definedValueIdentities, genericOperations, err :=
 		readFacetSeeds(resolved.facetMapPath)
 	if err != nil {
 		return nil, err
@@ -63,6 +62,11 @@ func Generate(config Config) ([]byte, error) {
 		client.Close()
 		return nil, err
 	}
+	effectMarker, err := loadCallableEffectMarker(resolved, project)
+	if err != nil {
+		client.Close()
+		return nil, err
+	}
 	modules := make([]gostdlib.ModuleDocument, len(ordered))
 	for index, seed := range ordered {
 		module, buildErr := buildModule(
@@ -71,6 +75,8 @@ func Generate(config Config) ([]byte, error) {
 			source,
 			seed,
 			genericOperations,
+			definedValueIdentities,
+			effectMarker,
 		)
 		if buildErr != nil {
 			client.Close()
@@ -86,6 +92,16 @@ func Generate(config Config) ([]byte, error) {
 		client.Close()
 		return nil, err
 	}
+	modules, err = applyDefinedValueRepresentations(
+		source,
+		modules,
+		facetSeeds,
+		definedValueIdentities,
+	)
+	if err != nil {
+		client.Close()
+		return nil, err
+	}
 	facetModules, err := buildFacetModules(
 		resolved,
 		project,
@@ -93,6 +109,7 @@ func Generate(config Config) ([]byte, error) {
 		facetSeeds,
 		representationSeeds,
 		modules,
+		effectMarker,
 	)
 	if err != nil {
 		client.Close()
@@ -132,6 +149,8 @@ func buildModule(
 	source goSurface,
 	seed moduleSeed,
 	genericOperations map[string][]gostdlib.GenericOperationDocument,
+	definedValueIdentities map[string]struct{},
+	effectMarker tsgo.ProjectExport,
 ) (gostdlib.ModuleDocument, error) {
 	sourcePackage := source.packages[seed.GoImportPath]
 	if sourcePackage == nil {
@@ -189,6 +208,17 @@ func buildModule(
 			return gostdlib.ModuleDocument{}, err
 		}
 		binding.GenericOperations = genericOperations[binding.Identity]
+		_, identityValue := definedValueIdentities[binding.Identity]
+		if binding.Kind == gostdlib.BindingFunction || identityValue {
+			binding.Effect, err = exportCallableEffect(
+				project,
+				target,
+				effectMarker,
+			)
+			if err != nil {
+				return gostdlib.ModuleDocument{}, err
+			}
+		}
 		if err := addTargetOwner(targetOwners, binding); err != nil {
 			return gostdlib.ModuleDocument{}, err
 		}
@@ -198,8 +228,10 @@ func buildModule(
 			continue
 		}
 		methodBindings, err := buildMethodBindings(
+			project,
 			target,
 			sourcePackage.methodsByType[target.Name()],
+			effectMarker,
 		)
 		if err != nil {
 			return gostdlib.ModuleDocument{}, err
@@ -330,8 +362,10 @@ func buildStateBindings(
 }
 
 func buildMethodBindings(
+	project *tsgo.ProjectInspection,
 	target tsgo.ProjectExport,
 	methods []goObject,
+	effectMarker tsgo.ProjectExport,
 ) ([]gostdlib.BindingDocument, error) {
 	var result []gostdlib.BindingDocument
 	for _, method := range methods {
@@ -364,6 +398,14 @@ func buildMethodBindings(
 			access,
 			selected.Fingerprint(),
 			selected.ImplementationOwners(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		binding.Effect, err = memberCallableEffect(
+			project,
+			selected,
+			effectMarker,
 		)
 		if err != nil {
 			return nil, err
@@ -407,72 +449,6 @@ func selectMethodOwner(
 		)
 	}
 	return instance, gostdlib.AccessInstanceMethod, nil
-}
-
-func bindingDocument(
-	evidence goObject,
-	export string,
-	member string,
-	access gostdlib.AccessKind,
-	fingerprint string,
-	owners []string,
-) (gostdlib.BindingDocument, error) {
-	if fingerprint == "" {
-		return gostdlib.BindingDocument{}, certifyError(
-			"build binding",
-			evidence.contract.Identity(),
-			"target fingerprint is absent",
-		)
-	}
-	if len(owners) != 1 {
-		return gostdlib.BindingDocument{}, certifyError(
-			"build binding",
-			evidence.contract.Identity(),
-			fmt.Sprintf("target has %d implementation owners, want one", len(owners)),
-		)
-	}
-	kind, err := bindingKind(evidence.contract.Kind())
-	if err != nil {
-		return gostdlib.BindingDocument{}, err
-	}
-	representation := gostdlib.RepresentationInvalid
-	if kind == gostdlib.BindingType {
-		representation = gostdlib.RepresentationDirect
-	}
-	return gostdlib.BindingDocument{
-		Identity:            evidence.contract.Identity(),
-		Kind:                kind,
-		Access:              access,
-		Representation:      representation,
-		Export:              export,
-		Member:              member,
-		SourceSignature:     evidence.contract.Signature(),
-		SourceValue:         evidence.contract.Value(),
-		SourceLocation:      evidence.location,
-		ImplementationOwner: owners[0],
-		TargetFingerprint:   fingerprint,
-	}, nil
-}
-
-func bindingKind(source environmentcontract.ObjectKind) (gostdlib.BindingKind, error) {
-	switch source {
-	case environmentcontract.ObjectConstant:
-		return gostdlib.BindingConstant, nil
-	case environmentcontract.ObjectType:
-		return gostdlib.BindingType, nil
-	case environmentcontract.ObjectVariable:
-		return gostdlib.BindingVariable, nil
-	case environmentcontract.ObjectFunction:
-		return gostdlib.BindingFunction, nil
-	case environmentcontract.ObjectBuiltin:
-		return gostdlib.BindingBuiltin, nil
-	default:
-		return gostdlib.BindingInvalid, certifyError(
-			"build binding",
-			fmt.Sprint(source),
-			"Go object kind is unsupported",
-		)
-	}
 }
 
 func addTargetOwner(

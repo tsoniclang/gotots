@@ -80,9 +80,21 @@
       "types": "./dist/src/internal/facets/named-encoding-binary.d.ts",
       "default": "./dist/src/internal/facets/named-encoding-binary.js"
     },
+    "./internal/facets/named-flag.js": {
+      "types": "./dist/src/internal/facets/named-flag.d.ts",
+      "default": "./dist/src/internal/facets/named-flag.js"
+    },
+    "./internal/facets/named-internal-abi.js": {
+      "types": "./dist/src/internal/facets/named-internal-abi.d.ts",
+      "default": "./dist/src/internal/facets/named-internal-abi.js"
+    },
     "./internal/facets/named-io-fs.js": {
       "types": "./dist/src/internal/facets/named-io-fs.d.ts",
       "default": "./dist/src/internal/facets/named-io-fs.js"
+    },
+    "./internal/facets/named-iter.js": {
+      "types": "./dist/src/internal/facets/named-iter.d.ts",
+      "default": "./dist/src/internal/facets/named-iter.js"
     },
     "./internal/facets/named-math-big.js": {
       "types": "./dist/src/internal/facets/named-math-big.d.ts",
@@ -115,6 +127,10 @@
     "./internal/facets/named-sync.js": {
       "types": "./dist/src/internal/facets/named-sync.d.ts",
       "default": "./dist/src/internal/facets/named-sync.js"
+    },
+    "./internal/facets/named-syscall.js": {
+      "types": "./dist/src/internal/facets/named-syscall.d.ts",
+      "default": "./dist/src/internal/facets/named-syscall.js"
     },
     "./internal/facets/named-time.js": {
       "types": "./dist/src/internal/facets/named-time.d.ts",

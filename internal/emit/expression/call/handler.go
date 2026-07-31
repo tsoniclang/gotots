@@ -130,17 +130,18 @@ func emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	targetCallee := callee.Value()
-	if _, defined := definedtype.ResolveCallable(
+	if model, defined := definedtype.ResolveCallable(
 		context.TypesInfo().TypeOf(source.Fun),
 	); defined {
-		targetCallee = context.Factory().PropertyAccessExpression(
-			targetCallee,
-			nil,
-			context.Factory().Identifier(definedtype.ValueMember),
-			tsgo.NodeFlagsNone,
+		callee, err = model.Project(
+			context.WithRole(api.RoleCallCallee),
+			callee,
 		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
+	targetCallee := callee.Value()
 	before := callee.Before()
 	if static && len(before) != 0 {
 		return api.ExpressionEmission{},

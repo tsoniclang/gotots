@@ -95,21 +95,28 @@ func (Owner) BinaryUpdate(
 		rightRepresentation,
 	); wrapped {
 		var err error
-		right, err = api.NewExpressionEmission(
-			right.Before(),
-			rightModel.Unwrap(context.Factory(), right.Value()),
-			right.Requests(),
+		right, err = rightModel.Project(
+			context.WithRole(api.RoleAssignmentValue),
+			api.DirectExpression(right.Value(), right.Requests()...),
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
+		rightRequests = right.Requests()
 	}
 	right = api.DirectExpression(right.Value(), rightRequests...)
+	leftValue, err := model.Project(
+		context.WithRole(api.RoleAssignmentTarget),
+		api.DirectExpression(left),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	result, handled, err := definedbinary.ApplyUnderlying(
 		context,
 		operator,
 		underlying,
-		api.DirectExpression(model.Unwrap(context.Factory(), left)),
+		leftValue,
 		right,
 		rightConstant,
 	)
@@ -183,11 +190,18 @@ func (Owner) Increment(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	leftValue, err := model.Project(
+		context.WithRole(api.RoleAssignmentTarget),
+		api.DirectExpression(left),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	result, handled, err := definedbinary.ApplyUnderlying(
 		context,
 		binaryOperator,
 		underlying,
-		api.DirectExpression(model.Unwrap(context.Factory(), left)),
+		leftValue,
 		right,
 		one,
 	)

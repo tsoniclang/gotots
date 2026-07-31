@@ -65,6 +65,8 @@ func selectProviderBinding(
 	base.providerMember = selected.Member()
 	base.providerAccess = selected.Access()
 	base.providerTypeRepresentation = selected.Representation()
+	base.providerDefinedValue = selected.DefinedValueRepresentation()
+	base.providerEffect = selected.Effect()
 	base.providerGenericOperations = selected.GenericOperations()
 	return base, nil
 }
@@ -165,6 +167,7 @@ func selectProviderRepresentationMethod(
 	base.providerExport = owner.providerExport
 	base.providerMember = selected.Member()
 	base.providerAccess = gostdlib.AccessInstanceMethod
+	base.providerEffect = selected.Effect()
 	base.providerRepresentation = true
 	return base, nil
 }
@@ -292,4 +295,29 @@ func (r *Registry) ProviderGenericCallableEffect(
 		}
 	}
 	return selected.Effect(), true, nil
+}
+
+func (r *Registry) ProviderCallableEffect(
+	owner *types.Func,
+) (gostdlib.EffectKind, bool, error) {
+	if r == nil || owner == nil {
+		return gostdlib.EffectInvalid, false, &api.NameError{
+			Reason: "provider callable identity is invalid",
+		}
+	}
+	owner = owner.Origin()
+	binding, ok := r.byObject[owner]
+	if !ok || binding.kind == targetBindingMissingProvider {
+		return gostdlib.EffectInvalid, false, nil
+	}
+	if binding.kind != targetBindingProvider {
+		return gostdlib.EffectInvalid, false, nil
+	}
+	if !binding.providerEffect.Valid() {
+		return gostdlib.EffectInvalid, true, &api.NameError{
+			Name:   owner.Name(),
+			Reason: "certified provider callable effect is absent",
+		}
+	}
+	return binding.providerEffect, true, nil
 }

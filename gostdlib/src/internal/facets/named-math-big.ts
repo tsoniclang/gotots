@@ -1,4 +1,16 @@
-import { Float, Int } from "../../math/big.js";
+import type { int8 } from "@gotots/runtime/scalars.js";
+
+import { Accuracy, Float, Int } from "../../math/big.js";
+
+export class MathBigAccuracyValueOperations {
+  static $project(source: Accuracy): int8 {
+    return source.value;
+  }
+
+  static $wrap(source: int8): Accuracy {
+    return new Accuracy(source);
+  }
+}
 
 export type MathBigFloatStorage = Float;
 

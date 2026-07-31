@@ -10,6 +10,7 @@ type ProjectMember struct {
 	name         string
 	flags        uint32
 	typeString   string
+	typeID       uint32
 	declarations []string
 	ownerKeys    []string
 }
@@ -193,6 +194,7 @@ func (p *ProjectInspection) projectMember(
 		name:         symbol.Name,
 		flags:        symbol.Flags,
 		typeString:   typeString,
+		typeID:       selectedType.ID,
 		declarations: declarations,
 		ownerKeys:    ownerKeys,
 	}, nil

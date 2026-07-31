@@ -1,8 +1,20 @@
-import { Ticker, Time, Timer } from "../../time.js";
+import type { int64 } from "@gotots/runtime/scalars.js";
+
+import { Duration, Ticker, Time, Timer } from "../../time.js";
 import {
   timeRepresentationEqual,
   timeRepresentationHash,
 } from "../portable/time/time.js";
+
+export class TimeDurationValueOperations {
+  static $project(source: Duration): int64 {
+    return source.Nanoseconds();
+  }
+
+  static $wrap(source: int64): Duration {
+    return new Duration(source);
+  }
+}
 
 export type TimeStorage = Time;
 

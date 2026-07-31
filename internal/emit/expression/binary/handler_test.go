@@ -184,6 +184,15 @@ func (unusedNames) Reference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
 
+func (unusedNames) DefinedValueRepresentation(
+	*types.TypeName,
+) (api.DefinedValueRepresentation, error) {
+	return api.NewDefinedValueRepresentation(
+		api.DefinedValueRepresentationGeneratedWrapper,
+		api.NameReference{},
+	)
+}
+
 func (unusedNames) TypeReference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }

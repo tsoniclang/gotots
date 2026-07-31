@@ -92,6 +92,16 @@ func EmitDeferred(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	sourceType := context.TypesInfo().TypeOf(source.Fun)
+	if model, defined := definedtype.ResolveCallable(sourceType); defined {
+		callee, err = model.Project(
+			context.WithRole(api.RoleCallCallee),
+			callee,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
 	targetCallee := callee.Value()
 	before := callee.Before()
 	var requests []api.RootRequest
@@ -153,7 +163,6 @@ func EmitDeferred(
 			return api.ExpressionEmission{}, err
 		}
 	default:
-		sourceType := context.TypesInfo().TypeOf(source.Fun)
 		targetType, err := children.RepresentedType(
 			context.WithRole(api.RoleCallCallee),
 			source.Fun,
@@ -163,12 +172,6 @@ func EmitDeferred(
 			return api.ExpressionEmission{}, err
 		}
 		if _, defined := definedtype.ResolveCallable(sourceType); defined {
-			targetCallee = context.Factory().PropertyAccessExpression(
-				targetCallee,
-				nil,
-				context.Factory().Identifier(definedtype.ValueMember),
-				tsgo.NodeFlagsNone,
-			)
 			targetType, err = callable.EmitType(
 				context.WithRole(api.RoleCallCallee),
 				children,

@@ -52,11 +52,7 @@ func emitStringLength(
 		return api.ExpressionEmission{}, err
 	}
 	if definedArgument {
-		value, err = api.NewExpressionEmission(
-			value.Before(),
-			defined.Unwrap(context.Factory(), value.Value()),
-			value.Requests(),
-		)
+		value, err = defined.Project(context, value)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}

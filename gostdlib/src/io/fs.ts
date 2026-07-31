@@ -3,6 +3,7 @@ import type {
   GoInterfaceValue,
 } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
+import type { GoRecovery } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
@@ -112,11 +113,16 @@ export class PathError extends WrappedProviderError {
   }
 }
 
-export type WalkDirFunc = (
+type WalkDirFuncABI = ((
   path: gostring,
   entry: DirEntry | undefined,
   failure: GoError | undefined,
-) => GoError | undefined;
+  _recovery?: GoRecovery,
+) => Promise<GoError | undefined>) | undefined;
+
+export type WalkDirFunc<
+  $Value extends WalkDirFuncABI = WalkDirFuncABI,
+> = $Value;
 
 export const state: {
   ErrClosed: GoError;
@@ -238,18 +244,18 @@ export function Stat(
   return [information, statFailure ?? closeFailure];
 }
 
-export function WalkDir(
+export async function WalkDir(
   fileSystem: FS | undefined,
   root: gostring,
   visit: WalkDirFunc,
-): GoError | undefined {
+): Promise<GoError | undefined> {
   const [information, statFailure] = Stat(fileSystem, root);
   const rootEntry = FileInfoToDirEntry(information);
   if (statFailure !== undefined || rootEntry === undefined) {
-    return visit(root, undefined, statFailure);
+    return invokeWalkDir(visit, root, undefined, statFailure);
   }
 
-  const failure = walk(fileSystem, root, rootEntry, visit);
+  const failure = await walk(fileSystem, root, rootEntry, visit);
   if (failure === state.SkipAll) {
     return undefined;
   }
@@ -259,13 +265,13 @@ export function WalkDir(
   return failure;
 }
 
-function walk(
+async function walk(
   fileSystem: FS | undefined,
   path: string,
   entry: DirEntry,
   visit: WalkDirFunc,
-): GoError | undefined {
-  const visitFailure = visit(path, entry, undefined);
+): Promise<GoError | undefined> {
+  const visitFailure = await invokeWalkDir(visit, path, entry, undefined);
   if (visitFailure !== undefined) {
     return visitFailure;
   }
@@ -275,14 +281,14 @@ function walk(
 
   const [entries, readFailure] = ReadDir(fileSystem, path);
   if (readFailure !== undefined) {
-    return visit(path, entry, readFailure);
+    return invokeWalkDir(visit, path, entry, readFailure);
   }
   for (const child of sliceValues(entries)) {
     if (child === undefined) {
       continue;
     }
     const childPath = path === "." ? child.Name() : `${path}/${child.Name()}`;
-    const childFailure = walk(fileSystem, childPath, child, visit);
+    const childFailure = await walk(fileSystem, childPath, child, visit);
     if (childFailure === state.SkipDir && child.IsDir()) {
       continue;
     }
@@ -291,6 +297,18 @@ function walk(
     }
   }
   return undefined;
+}
+
+function invokeWalkDir(
+  visit: WalkDirFunc,
+  path: gostring,
+  entry: DirEntry | undefined,
+  failure: GoError | undefined,
+): Promise<GoError | undefined> {
+  if (visit === undefined) {
+    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
+  }
+  return visit(path, entry, failure);
 }
 
 function open(

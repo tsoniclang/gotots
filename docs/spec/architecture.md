@@ -1301,13 +1301,18 @@ typed non-executable obligation. No source body is fabricated, no environment
 package is entered into the source emitter, and no runtime Promise inspection
 or union result is admitted.
 
-The provider contract records the outer effect independently for each exact
-declaration/profile pair. For example, the cooperative profile of
-`slices.SortFunc` is `async` because its selected implementation awaits the
-comparison callback, while `slices.Values` remains synchronous because it only
+The provider contract records the outer effect independently for every
+function or method binding and every exact demand-created profile. The
+certifier derives that effect from the selected target callable signature
+through the pinned TS-Go checker API; target type spelling and an `async`
+source-text scan are not evidence. For example, `sync.Mutex.Lock` is `async`
+because its selected implementation returns `Promise<void>`, the cooperative
+profile of `slices.SortFunc` is `async` because that implementation awaits its
+comparison callback, and `slices.Values` remains synchronous because it only
 constructs and returns an iterator whose callback is cooperative. Nested
-callable ABI selection is not evidence for either decision. A linked compile
-fails if the exact reached profile has no provider-owned effect record.
+callable ABI selection is not evidence for any outer decision. A linked
+compile fails if any reached binding/profile lacks its provider-owned effect
+or if the recorded effect differs from its certified target signature.
 
 Declaration requirements are revision-owned, not an append-only global set.
 Reconstructing an artifact atomically replaces all requirements that revision
@@ -1551,15 +1556,52 @@ contract builder to represent `flag`). The compile-only profile remains the
 sole owner of ambient declaration construction, including its exported-field
 and embedded-promotion contract.
 
-Generic non-struct defined types retain one parameterized nominal wrapper.
-Every target reference carries the exact represented `go/types` type arguments,
-and every operation projects through the wrapper before applying the
-underlying-family behavior. Rejecting a generic defined callable and then
-treating it as a struct or raw function is forbidden: `iter.Seq[E]` is a
-stable `Seq<E>` class value, and invocation uses its canonical payload
-projection. Nil-capable families store `undefined` only in that payload; the
-class reference itself is never optional. This gives every reached receiver
-method one class-owned member surface without static wrap/project helpers.
+Source-emitted generic non-struct defined types retain one parameterized
+nominal wrapper. Every target reference carries the exact represented
+`go/types` type arguments, and every operation projects through the wrapper
+before applying the underlying-family behavior. Rejecting a generic defined
+callable and then treating it as a struct or raw function is forbidden: a
+source declaration `type Seq[E any] func(func(E) bool)` is a stable `Seq<E>`
+class value, and invocation uses its canonical payload projection.
+Nil-capable families store `undefined` only in that payload; the class
+reference itself is never optional. This gives every reached receiver method
+one class-owned member surface without static wrap/project helpers.
+
+A linked provider-defined non-struct type has one explicit representation in
+the certified contract. A receiverless callable with no provider-owned
+nominal surface may select `identity`; projection and wrapping are then exact
+no-ops, but its target type still has the declaration-origin hidden value
+facet whenever its canonical callable ABI can reconstruct. The provider alias
+is generic in that exact value facet and defaults to its ordinary certified
+ABI. It is never a fixed unparameterized function spelling. For example,
+`context.CancelFunc<$Value = ordinary-ABI>` is an identity alias whose linked
+consumer supplies the canonical `func()` ABI selected by the artifact graph;
+the provider certificate independently records whether the default ABI is
+synchronous or cooperative and exact-joins that choice to the pinned TS-Go
+call signature. Nil remains inside the callable ABI, not outside the named
+type.
+
+Every other selected defined value selects one private
+`defined-value-operations` facet whose closed capabilities are exactly
+`project` and `wrap`. The facet accepts and returns the clean public provider
+type plus the exact underlying target type. For example, provider `time.Duration` remains the public class
+`Duration`, while generated `d + time.Second` projects both operands through
+`TimeDurationValueOperations.$project`, performs the integer operation, and
+wraps the result through `$wrap`. The public `Duration` class does not expose
+`$value`, `$project`, or `$wrap`.
+
+The contract assignment is total over every selected exported provider type
+whose unaliased underlying Go family is basic, array, slice, pointer, map,
+channel, or receiverless signature. Identity is legal only for the
+receiverless-signature family, and every identity assignment carries one
+certified callable effect. The compiler asks the one defined-value owner for
+the certified representation before every type reference, projection, and
+wrap. That owner requests the corresponding canonical callable ABI
+synchronous or cooperative and supplies its exact hidden value-facet type
+argument. A raw payload access, provider-name test, public target-shape
+inference, fixed callable alias, Promise union, or caller-local exception is
+forbidden. Missing, duplicate, orphan, or effect-free assignments fail
+provider certification before linked emission.
 
 A generated callback that inverts source control flow, such as the callback
 implementing range-over-function, is not a new source callable and does not

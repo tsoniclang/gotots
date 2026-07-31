@@ -212,11 +212,29 @@ func (owner Owner) Hash(
 		), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
-		return (Owner{}).Hash(
+		projected, err := defined.Project(
+			context.WithRole(api.RoleDefinedValue),
+			api.DirectExpression(value),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		result, err := (Owner{}).Hash(
 			context.WithRole(api.RoleDefinedValue),
 			source,
 			defined.Underlying(),
-			defined.Unwrap(context.Factory(), value),
+			projected.Value(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			append(projected.Before(), result.Before()...),
+			result.Value(),
+			api.CombineRequests(
+				projected.Requests(),
+				result.Requests(),
+			),
 		)
 	}
 	if _, ok := complexvalue.Describe(sourceType); ok {

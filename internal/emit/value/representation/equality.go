@@ -69,22 +69,17 @@ func (owner Owner) Equal(
 		)), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
-		leftValue := api.DirectExpression(left)
-		rightValue := api.DirectExpression(right)
-		var err error
-		if defined.NilCapable() {
-			leftValue, err = defined.Project(context, leftValue)
-			if err == nil {
-				rightValue, err = defined.Project(context, rightValue)
-			}
-		} else {
-			leftValue = api.DirectExpression(
-				defined.Unwrap(context.Factory(), left),
-			)
-			rightValue = api.DirectExpression(
-				defined.Unwrap(context.Factory(), right),
-			)
+		leftValue, err := defined.Project(
+			context.WithRole(api.RoleDefinedValue),
+			api.DirectExpression(left),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
 		}
+		rightValue, err := defined.Project(
+			context.WithRole(api.RoleDefinedValue),
+			api.DirectExpression(right),
+		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
@@ -98,8 +93,10 @@ func (owner Owner) Equal(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		before := append(leftValue.Before(), rightValue.Before()...)
+		before = append(before, result.Before()...)
 		return api.NewExpressionEmission(
-			result.Before(),
+			before,
 			result.Value(),
 			api.CombineRequests(
 				leftValue.Requests(),

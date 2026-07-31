@@ -32,11 +32,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	operand, err = api.NewExpressionEmission(
-		operand.Before(),
-		model.Unwrap(context.Factory(), operand.Value()),
-		operand.Requests(),
-	)
+	operand, err = model.Project(context, operand)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
