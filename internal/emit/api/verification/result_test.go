@@ -383,8 +383,33 @@ func TestImportRequestCarriesExactPlacementPolicy(t *testing.T) {
 	if request.ModuleSpecifier().Text() != "./logic.js" {
 		t.Fatalf("module = %q, want ./logic.js", request.ModuleSpecifier().Text())
 	}
+	if request.ImportBinding() != api.ImportBindingNamed ||
+		request.NamespaceSpecifier() != nil {
+		t.Fatalf("named import binding = %d", request.ImportBinding())
+	}
 	if request.Specifier().Name().Text() != "flip" {
 		t.Fatalf("local name = %q, want flip", request.Specifier().Name().Text())
+	}
+}
+
+func TestNamespaceImportRequestCarriesExactPlacementPolicy(t *testing.T) {
+	factory := tsgo.NewFactory()
+	request, err := api.NewNamespaceImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"@gotots/gostdlib/strings.js",
+		"strings",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.Kind() != api.RootRequestImport ||
+		request.ImportBinding() != api.ImportBindingNamespace ||
+		request.ExportedName() != "" ||
+		request.LocalName() != "strings" ||
+		request.Specifier() != nil ||
+		request.NamespaceSpecifier().Name().Text() != "strings" {
+		t.Fatalf("namespace request = %#v", request)
 	}
 }
 

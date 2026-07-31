@@ -431,6 +431,50 @@ func TestValueImportDominatesTypeRequestIndependentOfOrder(t *testing.T) {
 	}
 }
 
+func TestNamespaceImportPlacementIsOneStaticBinding(t *testing.T) {
+	factory := tsgo.NewFactory()
+	typeRequest, err := api.NewNamespaceImportRequest(
+		factory,
+		api.ImportPhaseType,
+		"@gotots/gostdlib/strings.js",
+		"strings",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	valueRequest, err := api.NewNamespaceImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"@gotots/gostdlib/strings.js",
+		"strings",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if typeRequest.Owner() != valueRequest.Owner() {
+		t.Fatal("type and value namespace requests have different owners")
+	}
+	placement := targetplacement.New()
+	if err := placement.Apply([]api.RootRequest{
+		typeRequest,
+		valueRequest,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	statements := placement.Statements(factory)
+	if len(statements) != 1 {
+		t.Fatalf("namespace import declarations = %d, want one", len(statements))
+	}
+	declaration := statements[0].(tsgo.ImportDeclaration)
+	clause := declaration.ImportClause()
+	namespace, ok := clause.NamedBindings().(tsgo.NamespaceImport)
+	if !ok ||
+		clause.PhaseModifier() != 0 ||
+		namespace.Name().Text() != "strings" {
+		t.Fatalf("namespace import clause = %#v", clause)
+	}
+}
+
 func TestPrimitiveAliasImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing.T) {
 	sourcePackage := types.NewPackage("example.com/current", "current")
 	packageScope := sourcePackage.Scope()

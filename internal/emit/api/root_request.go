@@ -43,8 +43,17 @@ const (
 	ImportPhaseValue
 )
 
+type ImportBindingKind uint8
+
+const (
+	ImportBindingInvalid ImportBindingKind = iota
+	ImportBindingNamed
+	ImportBindingNamespace
+)
+
 type RootRequestOwner struct {
 	kind                   RootRequestKind
+	importBinding          ImportBindingKind
 	modulePath             string
 	exportedName           string
 	declarationRequirement DeclarationRequirement
@@ -57,6 +66,7 @@ type rootRequestPayload struct {
 	localName       string
 	moduleSpecifier tsgo.StringLiteral
 	specifier       tsgo.ImportSpecifier
+	namespace       tsgo.NamespaceImport
 	primitiveAlias  PrimitiveAlias
 	runtimeSymbol   RuntimeSymbol
 }
@@ -91,9 +101,10 @@ func NewImportRequest(
 	}
 	return RootRequest{payload: &rootRequestPayload{
 		owner: RootRequestOwner{
-			kind:         RootRequestImport,
-			modulePath:   modulePath,
-			exportedName: exportedName,
+			kind:          RootRequestImport,
+			importBinding: ImportBindingNamed,
+			modulePath:    modulePath,
+			exportedName:  exportedName,
 		},
 		importPhase:     phase,
 		localName:       localName,
@@ -103,6 +114,34 @@ func NewImportRequest(
 			propertyName,
 			factory.Identifier(localName),
 		),
+	}}, nil
+}
+
+func NewNamespaceImportRequest(
+	factory tsgo.Factory,
+	phase ImportPhase,
+	modulePath string,
+	localName string,
+) (RootRequest, error) {
+	if phase != ImportPhaseType && phase != ImportPhaseValue {
+		return RootRequest{}, &RootRequestError{Reason: "invalid import phase"}
+	}
+	if modulePath == "" {
+		return RootRequest{}, &RootRequestError{Reason: "module path is empty"}
+	}
+	if localName == "" {
+		return RootRequest{}, &RootRequestError{Reason: "local name is empty"}
+	}
+	return RootRequest{payload: &rootRequestPayload{
+		owner: RootRequestOwner{
+			kind:          RootRequestImport,
+			importBinding: ImportBindingNamespace,
+			modulePath:    modulePath,
+		},
+		importPhase:     phase,
+		localName:       localName,
+		moduleSpecifier: factory.StringLiteral(modulePath, tsgo.TokenFlagsNone),
+		namespace:       factory.NamespaceImport(factory.Identifier(localName)),
 	}}, nil
 }
 
@@ -438,6 +477,13 @@ func (r RootRequest) ImportPhase() ImportPhase {
 	return r.payload.importPhase
 }
 
+func (r RootRequest) ImportBinding() ImportBindingKind {
+	if r.payload == nil {
+		return ImportBindingInvalid
+	}
+	return r.payload.owner.importBinding
+}
+
 func (r RootRequest) ModulePath() string {
 	if r.payload == nil {
 		return ""
@@ -467,10 +513,19 @@ func (r RootRequest) ModuleSpecifier() tsgo.StringLiteral {
 }
 
 func (r RootRequest) Specifier() tsgo.ImportSpecifier {
-	if r.payload == nil {
+	if r.payload == nil ||
+		r.payload.owner.importBinding != ImportBindingNamed {
 		return nil
 	}
 	return r.payload.specifier
+}
+
+func (r RootRequest) NamespaceSpecifier() tsgo.NamespaceImport {
+	if r.payload == nil ||
+		r.payload.owner.importBinding != ImportBindingNamespace {
+		return nil
+	}
+	return r.payload.namespace
 }
 
 func (r RootRequest) PrimitiveAlias() (PrimitiveAlias, bool) {
