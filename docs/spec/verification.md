@@ -619,25 +619,30 @@ programs may link it. Verification must:
 
 1. derive the selected standard-library package and declaration universe from
    the selected `GOROOT`, never import-path spelling;
-2. exact-join every public provider module and export to its Go package,
+2. open the provider project through the pinned TS-Go project API, enumerate
+   each source-file module symbol and its exports, and resolve re-exports to
+   their ultimate declaration owners; source-text export parsing and rendered
+   declaration comparison are not evidence;
+3. exact-join every public provider module and export to its Go package,
    object identity, source signature, and selected callable/profile facets;
-3. reject missing implementations, duplicate owners, unexplained public
+4. reject missing implementations, duplicate owners, unexplained public
    exports, placeholders, and signatures widened by target convenience;
-4. inspect public declarations and fail on `$argument`, `__from_`,
+5. inspect public declarations and fail on `$argument`, `__from_`,
    `$cooperative_`, digest-bearing, receiver-concatenated, or other encoded
    compiler ABI names;
-5. compile every package as strict ESM using its published `exports` map;
-6. execute focused Go-versus-provider differentials for portable behavior,
+6. compile every package as strict ESM using its published `exports` map;
+7. execute focused Go-versus-provider differentials for portable behavior,
    Node.js filesystem/process/network/time behavior, error results, package
    state, nil receivers, and selected concurrency behavior;
-7. mutate one signature, remove one implementation, duplicate one owner,
+8. mutate one signature, remove one implementation, duplicate one owner,
    expose one internal backend module, replace one receiver static operation
-   with an unsafe instance call, and rename one public export opaquely; each
-   mutation must fail at its owning gate;
-8. produce and independently verify the canonical contract manifest, including
+   with an unsafe instance call, rename one public export opaquely, and redirect
+   one re-export to a different declaration owner; each mutation must fail at
+   its owning gate;
+9. produce and independently verify the canonical contract manifest, including
    Go version bounds, exact declaration identities, backend ownership, source
    locations, and package integrity; and
-9. report public exports, implemented exports, placeholders, source bytes,
+10. report public exports, implemented exports, placeholders, source bytes,
    emitted bytes, strict typecheck wall/RSS, test wall/RSS, and the twenty
    largest modules with parent deltas.
 
