@@ -498,8 +498,13 @@ func drainProgramSession(t *testing.T, session *programSession) {
 			}
 			continue
 		}
-		if requirements, ok := session.requirements.nextBatch(); ok {
-			if err := session.applyDeclarationRequirements(requirements); err != nil {
+		if owner, requirements, removed, ok :=
+			session.requirements.nextBatch(); ok {
+			if err := session.applyDeclarationRequirements(
+				owner,
+				requirements,
+				removed,
+			); err != nil {
 				t.Fatal(err)
 			}
 			continue
@@ -514,6 +519,9 @@ func drainProgramSession(t *testing.T, session *programSession) {
 			if err := session.emitPackageInitialization(sourcePackage); err != nil {
 				t.Fatal(err)
 			}
+			continue
+		}
+		if session.requirements.finalizeRemovals() {
 			continue
 		}
 		return

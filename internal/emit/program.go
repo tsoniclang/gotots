@@ -52,28 +52,29 @@ type RuntimePackage struct {
 type declarationSite = declarationindex.Site
 
 type programSession struct {
-	source                 *load.Program
-	factory                tsgo.Factory
-	integer                api.IntegerRepresentation
-	evaluationOrder        api.EvaluationOrder
-	concurrency            api.ConcurrencySemantics
-	registry               *emitnaming.Registry
-	scheduler              *scheduler
-	requirements           *declarationRequirementScheduler
-	artifacts              *artifactstate.Graph
-	sites                  map[types.Object]declarationSite
-	emitters               map[*load.Package]*emitter
-	builders               map[string]*targetFileBuilder
-	packageBuilders        map[*load.Package]*packageTargetBuilder
-	environmentBuilders    map[*load.Package]*environmentContractBuilder
-	packageInitializations *packageInitializationScheduler
-	genericOperations      map[genericOperationIdentity]*api.GenericOperationContract
-	genericProfiles        map[genericCallableProfileIdentity]*api.GenericCallableProfile
-	classMembers           map[*types.Func]classMemberContribution
-	goRuntime              *gocontract.Contract
-	runtimePackage         RuntimePackage
-	compareArtifactOwners  func(api.ArtifactOwner, api.ArtifactOwner) int
-	sealed                 bool
+	source                  *load.Program
+	factory                 tsgo.Factory
+	integer                 api.IntegerRepresentation
+	evaluationOrder         api.EvaluationOrder
+	concurrency             api.ConcurrencySemantics
+	registry                *emitnaming.Registry
+	scheduler               *scheduler
+	requirements            *declarationRequirementScheduler
+	artifacts               *artifactstate.Graph
+	sites                   map[types.Object]declarationSite
+	emitters                map[*load.Package]*emitter
+	builders                map[string]*targetFileBuilder
+	packageBuilders         map[*load.Package]*packageTargetBuilder
+	environmentBuilders     map[*load.Package]*environmentContractBuilder
+	packageInitializations  *packageInitializationScheduler
+	genericOperations       map[genericOperationIdentity]*api.GenericOperationContract
+	genericProfiles         map[genericCallableProfileIdentity]*api.GenericCallableProfile
+	classMembers            map[*types.Func]classMemberContribution
+	goRuntime               *gocontract.Contract
+	runtimePackage          RuntimePackage
+	compareArtifactOwners   func(api.ArtifactOwner, api.ArtifactOwner) int
+	requirementRemovalOwner api.ArtifactOwner
+	sealed                  bool
 }
 
 type targetDeclaration struct {
@@ -149,8 +150,13 @@ func CompileWithOptions(
 			}
 			continue
 		}
-		if requirements, ok := session.requirements.nextBatch(); ok {
-			if err := session.applyDeclarationRequirements(requirements); err != nil {
+		if owner, requirements, removed, ok :=
+			session.requirements.nextBatch(); ok {
+			if err := session.applyDeclarationRequirements(
+				owner,
+				requirements,
+				removed,
+			); err != nil {
 				return ProgramEmission{}, err
 			}
 			continue
@@ -167,6 +173,9 @@ func CompileWithOptions(
 			if err := session.emitPackageInitialization(sourcePackage); err != nil {
 				return ProgramEmission{}, err
 			}
+			continue
+		}
+		if session.requirements.finalizeRemovals() {
 			continue
 		}
 		break
@@ -446,10 +455,11 @@ func (s *programSession) emit(object types.Object) error {
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
@@ -476,7 +486,7 @@ func (s *programSession) applyRootRequests(
 		return &ScheduleError{Reason: "root request arrived after target files were sealed"}
 	}
 	imports := make([]api.RootRequest, 0, len(requests))
-	err := api.WalkRootRequests(requests, func(request api.RootRequest) error {
+	err := api.WalkUniqueRootRequestPayloads(requests, func(request api.RootRequest) error {
 		switch request.Kind() {
 		case api.RootRequestImport:
 			imports = append(imports, request)

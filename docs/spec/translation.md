@@ -2628,6 +2628,27 @@ the target decision is a demand-only `goArrayLocation(array)` followed by one
 typed slice view and the ordinary slice bounds operation; `array[1]` becomes
 `9`. No element is copied and no second bounds implementation exists.
 
+Pointer, array, and slice reads from their canonical dense backing use one
+demanded `GoDenseIndex.get<T>` runtime primitive:
+
+```go
+values := [1]*Node{nil}
+return values[0]
+```
+
+```ts
+const values: readonly (Node | undefined)[] = [undefined];
+return GoDenseIndex.get(values, 0);
+```
+
+The generated primitive reads the element once and checks `index in values`
+through a private generic type predicate. A present `undefined` is therefore
+returned as the exact Go nil value, while a sparse or absent slot panics. It
+does not use a non-null assertion, cast, fallback zero, semantic callback, or
+per-element specialization, and its lookup cost is O(1). Writes remain direct
+indexed lvalues after the owning bounds operation; the read primitive is not a
+setter abstraction.
+
 Composite-literal element handlers use the checker-selected expression type,
 not the presence of an explicit child type node. Thus an elided nested literal
 such as `[][]Box{{{Value: 1}}}` is dispatched as a `[]Box` literal because

@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
@@ -59,8 +58,6 @@ type environmentContractBuilder struct {
 	stateFields   map[*types.Var]environmentStateField
 	projections   map[string]environmentConstantProjection
 	builtins      map[*types.Builtin]environmentBuiltin
-	requirements  map[types.Object]map[api.DeclarationRequirement]struct{}
-	building      map[types.Object]bool
 }
 
 func (s *programSession) emitEnvironmentObject(object types.Object) error {
@@ -105,15 +102,16 @@ func (s *programSession) emitEnvironmentObject(object types.Object) error {
 	target, err := s.buildEnvironmentDeclaration(
 		builder,
 		object,
-		builder.environmentRequirements(object),
+		s.requirements.appliedFor(api.MustSourceArtifactOwner(object)),
 	)
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		api.MustSourceArtifactOwner(object),
 		target.contract,
 		target.dependencies,
+		target.requirements,
 	); err != nil {
 		return err
 	}
@@ -166,10 +164,6 @@ func (s *programSession) requireEnvironmentPackage(
 		stateFields:   make(map[*types.Var]environmentStateField),
 		projections:   make(map[string]environmentConstantProjection),
 		builtins:      make(map[*types.Builtin]environmentBuiltin),
-		requirements: make(
-			map[types.Object]map[api.DeclarationRequirement]struct{},
-		),
-		building: make(map[types.Object]bool),
 	}
 	s.environmentBuilders[sourcePackage] = builder
 	return builder, nil
@@ -232,9 +226,22 @@ func (s *programSession) environmentTargetFiles(
 		})
 		for _, builtin := range builtins {
 			target := builder.builtins[builtin]
-			if !target.emitted ||
-				len(target.signatures) == 0 ||
-				len(target.statements) == 0 {
+			if !target.emitted {
+				return nil, &ScheduleError{
+					Object: builtin.Name(),
+					Reason: "environment builtin was not emitted",
+				}
+			}
+			if len(target.signatures) == 0 {
+				if len(target.statements) != 0 {
+					return nil, &ScheduleError{
+						Object: builtin.Name(),
+						Reason: "environment builtin without overloads has declarations",
+					}
+				}
+				continue
+			}
+			if len(target.statements) == 0 {
 				return nil, &ScheduleError{
 					Object: builtin.Name(),
 					Reason: "environment builtin has no concrete overload",
@@ -295,234 +302,96 @@ func (s *programSession) environmentTargetFiles(
 	return files, nil
 }
 
-func (s *programSession) applyEnvironmentRequirement(
-	requirement api.DeclarationRequirement,
-) (bool, error) {
-	owner, sourceOwned := requirement.Owner().Source()
-	if !sourceOwned || owner == nil {
-		return false, nil
-	}
-	sourcePackage := s.source.EnvironmentForTypes(owner.Pkg())
+func (s *programSession) applyEnvironmentRequirementSet(
+	object types.Object,
+	requirements []api.DeclarationRequirement,
+) error {
+	sourcePackage := s.source.EnvironmentForTypes(object.Pkg())
 	if sourcePackage == nil {
-		return false, nil
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "environment requirement owner lost its package",
+		}
 	}
-	if err := s.require(owner); err != nil {
-		return true, err
+	builder := s.environmentBuilders[sourcePackage]
+	if builder == nil {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "environment requirement owner was not emitted",
+		}
 	}
-	builder, err := s.requireEnvironmentPackage(sourcePackage)
-	if err != nil {
-		return true, err
-	}
-	if _, _, ok := requirement.NamedStructOperation(); ok {
-		return true, nil
-	}
-	if _, ok := requirement.GenericCallableProfile(); ok {
-		return true, s.applyEnvironmentGenericCallableProfile(
+	switch selected := object.(type) {
+	case *types.Builtin:
+		return s.replaceEnvironmentBuiltin(builder, selected, requirements)
+	case *types.Const:
+		return s.replaceEnvironmentConstantProjections(
 			builder,
-			owner,
-			requirement,
+			selected,
+			requirements,
 		)
+	default:
+		if _, err := s.environmentDeclarationRequirements(
+			object,
+			requirements,
+		); err != nil {
+			return err
+		}
+		return s.reconstructEnvironmentDeclaration(builder, object)
 	}
-	if representationOwner, _, _, ok :=
-		requirement.GenericRepresentation(); ok {
-		if representationOwner != owner {
-			return true, &ScheduleError{
-				Object: owner.Name(),
-				Reason: "environment generic representation requirement is foreign",
+}
+
+func (s *programSession) environmentDeclarationRequirements(
+	object types.Object,
+	requirements []api.DeclarationRequirement,
+) ([]api.DeclarationRequirement, error) {
+	selected := make([]api.DeclarationRequirement, 0, len(requirements))
+	for _, requirement := range requirements {
+		if _, _, ok := requirement.NamedStructOperation(); ok {
+			continue
+		}
+		if profile, ok := requirement.GenericCallableProfile(); ok {
+			function, callable := object.(*types.Func)
+			if !callable ||
+				profile.Owner() != function.Origin() ||
+				function != function.Origin() {
+				return nil, &ScheduleError{
+					Object: object.Name(),
+					Reason: "environment generic callable profile requirement is invalid",
+				}
 			}
+			selected = append(selected, requirement)
+			continue
 		}
-		return true, s.applyEnvironmentDeclarationRequirement(
-			builder,
-			owner,
-			requirement,
-		)
-	}
-	if _, _, _, _, ok := requirement.CallableControl(); ok {
-		return true, s.applyEnvironmentCallableControl(
-			builder,
-			owner,
-			requirement,
-		)
-	}
-	if builtin, signature, ok := requirement.EnvironmentBuiltin(); ok {
-		if builtin != owner {
-			return true, &ScheduleError{
-				Object: owner.Name(),
-				Reason: "environment builtin requirement owner diverged",
+		if representationOwner, _, _, ok :=
+			requirement.GenericRepresentation(); ok {
+			if representationOwner != object {
+				return nil, &ScheduleError{
+					Object: object.Name(),
+					Reason: "environment generic representation requirement is foreign",
+				}
 			}
+			selected = append(selected, requirement)
+			continue
 		}
-		current := builder.builtins[builtin]
-		for _, existing := range current.signatures {
-			if types.Identical(existing, signature) {
-				return true, nil
-			}
+		owner, enclosing, callable, control, ok :=
+			requirement.CallableControl()
+		source, sourceOwned := owner.Source()
+		if ok &&
+			sourceOwned &&
+			source == object &&
+			enclosing == nil &&
+			callable == nil &&
+			control == api.CallableControlRecovery {
+			selected = append(selected, requirement)
+			continue
 		}
-		current.signatures = append(
-			append([]*types.Signature(nil), current.signatures...),
-			signature,
-		)
-		builder.builtins[builtin] = current
-		if err := s.reconstructEnvironmentBuiltin(builder, builtin); err != nil {
-			current.signatures = current.signatures[:len(current.signatures)-1]
-			builder.builtins[builtin] = current
-			return true, err
-		}
-		return true, nil
-	}
-	selected, projection, ok := requirement.ConstantProjection()
-	if !ok {
-		object := owner.Name()
-		if owner.Pkg() != nil {
-			object = owner.Pkg().Path() + "." + object
-		}
-		return true, &ScheduleError{
-			Object: object,
+		return nil, &ScheduleError{
+			Object: object.Name(),
 			Reason: fmt.Sprintf(
 				"environment declaration requirement kind %d is unsupported",
 				requirement.Kind(),
 			),
 		}
 	}
-	base, ok := s.registry.Target(selected)
-	if !ok {
-		return true, &ScheduleError{
-			Object: selected.Name(),
-			Reason: "environment constant has no target binding",
-		}
-	}
-	name, err := api.ConstantProjectionName(base.Name, projection)
-	if err != nil {
-		return true, err
-	}
-	if _, exists := builder.projections[name]; exists {
-		return true, nil
-	}
-	statement, requests, err := environmentcontract.ConstantProjection(
-		builder.context,
-		builder.emitter,
-		selected,
-		projection,
-	)
-	if err != nil {
-		return true, err
-	}
-	if err := s.applyRootRequests(builder.placement, requests); err != nil {
-		return true, err
-	}
-	contract, err := artifactstate.ProjectContract(
-		s.factory,
-		[]tsgo.Statement{statement},
-	)
-	if err != nil {
-		return true, environmentContractError(selected, err)
-	}
-	builder.projections[name] = environmentConstantProjection{
-		source:     selected,
-		projection: projection,
-		name:       name,
-		statement:  statement,
-		contract:   contract,
-	}
-	return true, nil
-}
-
-func (b *environmentContractBuilder) environmentRequirements(
-	object types.Object,
-) []api.DeclarationRequirement {
-	selected := b.requirements[object]
-	requirements := make(
-		[]api.DeclarationRequirement,
-		0,
-		len(selected),
-	)
-	for requirement := range selected {
-		requirements = append(requirements, requirement)
-	}
-	sort.Slice(requirements, func(left, right int) bool {
-		return compareDeclarationRequirements(
-			requirements[left],
-			requirements[right],
-		) < 0
-	})
-	return requirements
-}
-
-func (s *programSession) applyEnvironmentCallableControl(
-	builder *environmentContractBuilder,
-	object types.Object,
-	requirement api.DeclarationRequirement,
-) error {
-	owner, enclosing, callable, control, ok :=
-		requirement.CallableControl()
-	source, sourceOwned := owner.Source()
-	if !ok ||
-		!sourceOwned ||
-		source != object ||
-		enclosing != nil ||
-		callable != nil ||
-		control != api.CallableControlRecovery {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "environment callable-control requirement is invalid",
-		}
-	}
-	return s.applyEnvironmentDeclarationRequirement(
-		builder,
-		object,
-		requirement,
-	)
-}
-
-func (s *programSession) applyEnvironmentGenericCallableProfile(
-	builder *environmentContractBuilder,
-	object types.Object,
-	requirement api.DeclarationRequirement,
-) error {
-	function, callable := object.(*types.Func)
-	profile, profiled := requirement.GenericCallableProfile()
-	if !callable ||
-		!profiled ||
-		profile.Owner() != function.Origin() ||
-		function != function.Origin() {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "environment generic callable profile requirement is invalid",
-		}
-	}
-	return s.applyEnvironmentDeclarationRequirement(
-		builder,
-		object,
-		requirement,
-	)
-}
-
-func (s *programSession) applyEnvironmentDeclarationRequirement(
-	builder *environmentContractBuilder,
-	object types.Object,
-	requirement api.DeclarationRequirement,
-) error {
-	current := builder.requirements[object]
-	if _, duplicate := current[requirement]; duplicate {
-		return nil
-	}
-	next := make(
-		map[api.DeclarationRequirement]struct{},
-		len(current)+1,
-	)
-	for existing := range current {
-		next[existing] = struct{}{}
-	}
-	next[requirement] = struct{}{}
-	builder.requirements[object] = next
-	if builder.building[object] {
-		return nil
-	}
-	if _, emitted := builder.declarations[object]; !emitted {
-		return nil
-	}
-	if err := s.reconstructEnvironmentDeclaration(builder, object); err != nil {
-		builder.requirements[object] = current
-		return err
-	}
-	return nil
+	return selected, nil
 }

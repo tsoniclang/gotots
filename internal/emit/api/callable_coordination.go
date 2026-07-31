@@ -130,7 +130,7 @@ func (o CooperativeCallableObservation) Requests() []RootRequest {
 }
 
 func validateReferenceRequests(requests []RootRequest) error {
-	return WalkRootRequests(requests, func(RootRequest) error {
+	return WalkUniqueRootRequestPayloads(requests, func(RootRequest) error {
 		return nil
 	})
 }

@@ -9,6 +9,7 @@ import (
 	complexruntime "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
 	conversionruntime "github.com/tsoniclang/gotots/internal/emit/runtime/conversion"
 	floatruntime "github.com/tsoniclang/gotots/internal/emit/runtime/float"
+	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
 	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
@@ -89,6 +90,34 @@ func Build(
 		}
 		return definitions, nil
 	}
+	if module == api.RuntimeModuleDenseIndex {
+		if len(symbols) != 1 || symbols[0] != api.RuntimeDenseIndex {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "dense-index runtime requires exactly RuntimeDenseIndex",
+			}
+		}
+		contract, err := api.RuntimeContract(api.RuntimeDenseIndex)
+		if err != nil {
+			return nil, err
+		}
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(
+			api.RuntimeDenseIndex,
+			indexedstorage.Build(
+				factory,
+				contract.ExportedName(),
+				panicContract.ExportedName(),
+			),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
+	}
 	if module == api.RuntimeModulePointer {
 		if len(symbols) == 0 ||
 			len(symbols) > 2 ||
@@ -107,12 +136,17 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
+		denseIndexContract, err := api.RuntimeContract(api.RuntimeDenseIndex)
+		if err != nil {
+			return nil, err
+		}
 		definition, err := NewDefinition(
 			api.RuntimePointer,
 			pointerruntime.Build(
 				factory,
 				contract.ExportedName(),
 				panicContract.ExportedName(),
+				denseIndexContract.ExportedName(),
 			),
 		)
 		if err != nil {
@@ -155,9 +189,14 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
+		denseIndexContract, err := api.RuntimeContract(api.RuntimeDenseIndex)
+		if err != nil {
+			return nil, err
+		}
 		statement, err := runtimearray.BuildWithCapabilities(
 			factory,
 			panicContract.ExportedName(),
+			denseIndexContract.ExportedName(),
 			runtimearray.Capabilities{
 				Allocate: slices.Contains(
 					symbols,

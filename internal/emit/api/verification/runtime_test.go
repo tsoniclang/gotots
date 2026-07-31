@@ -24,13 +24,14 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeStringMin, 4, api.RuntimeModuleString, "runtime/string.ts", "goStringMin", false, nil},
 		{api.RuntimeStringEncodeRune, 5, api.RuntimeModuleString, "runtime/string.ts", "goStringEncodeRune", false, nil},
 		{api.RuntimeStringDecodeRune, 6, api.RuntimeModuleString, "runtime/string.ts", "goStringDecodeRune", false, nil},
-		{api.RuntimePointer, 100, api.RuntimeModulePointer, "runtime/pointer.ts", "GoPointer", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeDenseIndex, 90, api.RuntimeModuleDenseIndex, "runtime/dense-index.ts", "GoDenseIndex", false, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimePointer, 100, api.RuntimeModulePointer, "runtime/pointer.ts", "GoPointer", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeDenseIndex}},
 		{api.RuntimePointerHash, 101, api.RuntimeModulePointer, "runtime/pointer.ts", "goPointerHash", false, []api.RuntimeSymbol{api.RuntimePointer, api.RuntimeMapHash}},
-		{api.RuntimeArray, 200, api.RuntimeModuleArray, "runtime/array.ts", "GoArray", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeArray, 200, api.RuntimeModuleArray, "runtime/array.ts", "GoArray", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeDenseIndex}},
 		{api.RuntimeArrayAllocate, 201, api.RuntimeModuleArray, "runtime/array.ts", "goArrayAllocate", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeArrayView, 202, api.RuntimeModuleArray, "runtime/array.ts", "goArrayView", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeArrayLocation, 203, api.RuntimeModuleArray, "runtime/array.ts", "goArrayLocation", false, []api.RuntimeSymbol{api.RuntimeArray}},
-		{api.RuntimeSlice, 300, api.RuntimeModuleSlice, "runtime/slice.ts", "RuntimeSlice", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeSlice, 300, api.RuntimeModuleSlice, "runtime/slice.ts", "RuntimeSlice", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeDenseIndex}},
 		{api.RuntimeSliceAddress, 301, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceAddress", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimePointer}},
 		{api.RuntimeSliceStorage, 302, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceAllocate", false, []api.RuntimeSymbol{api.RuntimeSlice}},
 		{api.RuntimeSliceArrayPointer, 304, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceArrayPointer", false, []api.RuntimeSymbol{api.RuntimeSlice, api.RuntimePointer, api.RuntimeArray, api.RuntimeArrayView}},
@@ -145,8 +146,9 @@ func TestRuntimeContractDoesNotExposeDependencyBacking(t *testing.T) {
 	}
 	dependencies := contract.Dependencies()
 	dependencies[0] = api.RuntimeInvalid
-	if actual := contract.Dependencies(); len(actual) != 1 ||
-		actual[0] != api.RuntimePanic {
+	if actual := contract.Dependencies(); len(actual) != 2 ||
+		actual[0] != api.RuntimePanic ||
+		actual[1] != api.RuntimeDenseIndex {
 		t.Fatalf("runtime dependencies leaked mutable backing: %v", actual)
 	}
 }

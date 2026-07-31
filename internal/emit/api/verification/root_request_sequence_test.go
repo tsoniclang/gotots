@@ -92,6 +92,70 @@ func TestCombinedRootRequestCarrierStaysBoundedAsLeavesGrow(t *testing.T) {
 	}
 }
 
+func TestUniqueRootRequestPayloadWalkIsLinearInPersistentGraph(t *testing.T) {
+	request := namedImportRequests(t, "value")[0]
+	combined := []api.RootRequest{request}
+	for range 24 {
+		combined = api.CombineRequests(combined, combined)
+	}
+
+	visited := 0
+	if err := api.WalkUniqueRootRequestPayloads(
+		combined,
+		func(api.RootRequest) error {
+			visited++
+			return nil
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if visited != 1 {
+		t.Fatalf("visited payloads = %d, want 1", visited)
+	}
+}
+
+func TestUniqueRootRequestPayloadWalkPreservesDistinctPayloads(t *testing.T) {
+	factory := tsgo.NewFactory()
+	first, err := api.NewImportRequest(
+		factory,
+		api.ImportPhaseType,
+		"./values.js",
+		"Value",
+		"First",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := api.NewImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"./values.js",
+		"Value",
+		"Second",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var localNames []string
+	err = api.WalkUniqueRootRequestPayloads(
+		api.CombineRequests(
+			[]api.RootRequest{first},
+			[]api.RootRequest{second},
+		),
+		func(request api.RootRequest) error {
+			localNames = append(localNames, request.LocalName())
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(localNames); got != "[First Second]" {
+		t.Fatalf("visited local names = %s, want [First Second]", got)
+	}
+}
+
 func namedImportRequests(t *testing.T, names ...string) []api.RootRequest {
 	t.Helper()
 	factory := tsgo.NewFactory()

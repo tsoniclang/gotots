@@ -53,12 +53,17 @@ func buildSlice(
 	if err != nil {
 		return nil, err
 	}
+	denseIndexContract, err := api.RuntimeContract(api.RuntimeDenseIndex)
+	if err != nil {
+		return nil, err
+	}
 	class, err := NewDefinition(
 		api.RuntimeSlice,
 		runtimeslice.BuildWithCapabilities(
 			factory,
 			sliceContract.ExportedName(),
 			panicContract.ExportedName(),
+			denseIndexContract.ExportedName(),
 			capabilities,
 		),
 	)

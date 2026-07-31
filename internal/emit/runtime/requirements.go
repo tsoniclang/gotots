@@ -82,7 +82,7 @@ func DecodePackageRequirements(data []byte) (PackageRequirements, error) {
 			profile = api.IntegerRepresentationBigInt
 		default:
 			return PackageRequirements{}, &AssemblyError{
-				Reason: "runtime package requirement has unknown integer profile " +
+				Reason: "runtime package requirement has unrecognized integer profile " +
 					spelling,
 			}
 		}

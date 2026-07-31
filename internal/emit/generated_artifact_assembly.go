@@ -141,10 +141,11 @@ func (s *programSession) reconstructMapSpecialization(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
@@ -267,7 +268,8 @@ func (s *programSession) buildMapSpecializationRevision(
 		valueType.Requests(),
 		specialization.Requests(),
 	)
-	placement, dependencies, err := s.consumeArtifactRequests(owner, requests)
+	placement, dependencies, requirements, err :=
+		s.consumeArtifactRequests(owner, requests)
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -282,6 +284,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		statements:     []tsgo.Statement{statement},
 		placement:      placement,
 		dependencies:   dependencies,
+		requirements:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
@@ -355,10 +358,11 @@ func (s *programSession) reconstructGenericCapabilityArtifact(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
@@ -439,10 +443,11 @@ func (s *programSession) buildGenericCapabilityRevision(
 		return artifactRevision{}, err
 	}
 	statements := []tsgo.Statement{statement}
-	placement, dependencies, err := s.consumeArtifactRequests(
-		owner,
-		api.CombineRequests(requests, observation.Requests()),
-	)
+	placement, dependencies, requirements, err :=
+		s.consumeArtifactRequests(
+			owner,
+			api.CombineRequests(requests, observation.Requests()),
+		)
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -454,6 +459,7 @@ func (s *programSession) buildGenericCapabilityRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
+		requirements:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil

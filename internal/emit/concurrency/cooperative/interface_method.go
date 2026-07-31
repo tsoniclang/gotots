@@ -8,10 +8,9 @@ import (
 )
 
 type interfaceMethodObservations struct {
-	facets      []api.CallableFacet
-	cooperative []bool
-	any         bool
-	requests    []api.RootRequest
+	facets   []api.CallableFacet
+	any      bool
+	requests []api.RootRequest
 }
 
 func InterfaceMethodContract(
@@ -46,10 +45,9 @@ func ProviderInterfaceMethodContracts(
 		return false, false, nil, err
 	}
 	providers := interfaceMethodObservations{
-		facets:      []api.CallableFacet{provider},
-		cooperative: []bool{observation.Cooperative()},
-		any:         observation.Cooperative(),
-		requests:    observation.Requests(),
+		facets:   []api.CallableFacet{provider},
+		any:      observation.Cooperative(),
+		requests: observation.Requests(),
 	}
 	return joinInterfaceMethodContracts(context, providers, references)
 }
@@ -90,7 +88,7 @@ func InterfaceMethodValueContract(
 		abiReference.Requests(),
 		abiObservation.Requests(),
 	)
-	if providers.any && !abiObservation.Cooperative() {
+	if providers.any {
 		abiFacet, facetErr := context.CallableABIFacet(abiReference)
 		if facetErr != nil {
 			return false, false, nil, facetErr
@@ -188,10 +186,7 @@ func joinInterfaceMethodContracts(
 		targets.requests,
 	)
 	if cooperative {
-		for index, facet := range targets.facets {
-			if targets.cooperative[index] {
-				continue
-			}
+		for _, facet := range targets.facets {
 			selection, selectionErr :=
 				api.NewCooperativeCallableRequest(facet)
 			if selectionErr != nil {
@@ -245,10 +240,6 @@ func observeInterfaceMethods(
 				return interfaceMethodObservations{}, err
 			}
 			result.facets = append(result.facets, facet)
-			result.cooperative = append(
-				result.cooperative,
-				observation.Cooperative(),
-			)
 			result.any = result.any || observation.Cooperative()
 			result.requests = append(
 				result.requests,

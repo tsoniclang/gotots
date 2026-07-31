@@ -116,10 +116,11 @@ func (s *programSession) reconstructInterfaceArtifact(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
@@ -193,10 +194,11 @@ func (s *programSession) buildInterfaceArtifactRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	placement, dependencies, err := s.consumeArtifactRequests(
-		owner,
-		requests,
-	)
+	placement, dependencies, requirements, err :=
+		s.consumeArtifactRequests(
+			owner,
+			requests,
+		)
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -208,6 +210,7 @@ func (s *programSession) buildInterfaceArtifactRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
+		requirements:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
@@ -447,7 +450,7 @@ func (s *programSession) ensurePointerRepresentationBaseline(
 	if err != nil {
 		return err
 	}
-	return s.artifacts.Commit(owner, contract, nil)
+	return s.commitArtifactContract(owner, contract, nil)
 }
 
 func (s *programSession) reconstructPointerRepresentationArtifact(
@@ -474,7 +477,7 @@ func (s *programSession) reconstructPointerRepresentationArtifact(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(owner, contract, nil); err != nil {
+	if err := s.commitArtifactContract(owner, contract, nil); err != nil {
 		return err
 	}
 	s.artifacts.DiscardDirty(owner)
@@ -551,7 +554,9 @@ func (s *programSession) ResolveGenericRepresentationProfile(
 	}
 	var requirements []api.DeclarationRequirement
 	if builder := s.environmentBuilders[sourcePackage]; builder != nil {
-		requirements = builder.environmentRequirements(owner)
+		requirements = s.requirements.appliedFor(
+			api.MustSourceArtifactOwner(owner),
+		)
 	}
 	profile, err := api.SelectGenericRepresentationProfile(
 		owner,

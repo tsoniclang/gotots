@@ -368,8 +368,7 @@ func providerContract(
 		reference.Requests(),
 		abiObservation.Requests(),
 	)
-	if providerObservation.Cooperative() &&
-		!abiObservation.Cooperative() {
+	if providerObservation.Cooperative() {
 		abiFacet, facetErr := context.CallableABIFacet(reference)
 		if facetErr != nil {
 			return false, false, nil, facetErr

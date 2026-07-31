@@ -15,10 +15,11 @@ type artifactRecord struct {
 }
 
 type Graph struct {
-	records map[api.ArtifactOwner]*artifactRecord
-	reverse map[api.ArtifactDependency]map[api.ArtifactOwner]struct{}
-	dirty   artifactOwnerQueue
-	compare func(api.ArtifactOwner, api.ArtifactOwner) int
+	records      map[api.ArtifactOwner]*artifactRecord
+	reverse      map[api.ArtifactDependency]map[api.ArtifactOwner]struct{}
+	dirty        artifactOwnerQueue
+	removalDirty map[api.ArtifactOwner]struct{}
+	compare      func(api.ArtifactOwner, api.ArtifactOwner) int
 }
 
 type GraphError struct {
@@ -66,8 +67,9 @@ func NewGraph(
 		reverse: make(
 			map[api.ArtifactDependency]map[api.ArtifactOwner]struct{},
 		),
-		dirty:   newArtifactOwnerQueue(compare),
-		compare: compare,
+		dirty:        newArtifactOwnerQueue(compare),
+		removalDirty: make(map[api.ArtifactOwner]struct{}),
+		compare:      compare,
 	}
 }
 
@@ -75,6 +77,23 @@ func (g *Graph) Commit(
 	owner api.ArtifactOwner,
 	contract Contract,
 	dependencies []api.ArtifactDependency,
+) error {
+	return g.commit(owner, contract, dependencies, false)
+}
+
+func (g *Graph) CommitHistoricalReplacement(
+	owner api.ArtifactOwner,
+	contract Contract,
+	dependencies []api.ArtifactDependency,
+) error {
+	return g.commit(owner, contract, dependencies, true)
+}
+
+func (g *Graph) commit(
+	owner api.ArtifactOwner,
+	contract Contract,
+	dependencies []api.ArtifactDependency,
+	historicalReplacement bool,
 ) error {
 	if !owner.Valid() {
 		return &GraphError{Reason: "target artifact owner is invalid"}
@@ -95,13 +114,16 @@ func (g *Graph) Commit(
 	}
 
 	current := g.records[owner]
+	_, removalCaused := g.removalDirty[owner]
+	historicalAuthorized := historicalReplacement || removalCaused
 	var previousContract Contract
 	changed := changedArtifactFacets(Contract{}, nextContract)
 	if current != nil {
 		previousContract = current.contract
 		changed = changedArtifactFacets(current.contract, nextContract)
 		if len(changed) != 0 {
-			if current.history.contains(current.contract, nextContract) {
+			if current.history.contains(current.contract, nextContract) &&
+				!historicalAuthorized {
 				return &ArtifactConvergenceError{
 					Object: owner,
 					Facets: append([]api.ArtifactFacet(nil), changed...),
@@ -130,7 +152,11 @@ func (g *Graph) Commit(
 			}
 			current.facetRevisions[facet] = 1
 		}
-		return g.invalidateConsumers(owner, changed)
+		return g.invalidateConsumers(
+			owner,
+			changed,
+			historicalAuthorized,
+		)
 	}
 	if len(changed) == 0 {
 		return nil
@@ -139,12 +165,13 @@ func (g *Graph) Commit(
 	for _, facet := range changed {
 		current.facetRevisions[facet]++
 	}
-	return g.invalidateConsumers(owner, changed)
+	return g.invalidateConsumers(owner, changed, historicalAuthorized)
 }
 
 func (g *Graph) invalidateConsumers(
 	owner api.ArtifactOwner,
 	facets []api.ArtifactFacet,
+	removalCaused bool,
 ) error {
 	for _, facet := range facets {
 		dependency, dependencyError := api.NewArtifactDependency(owner, facet)
@@ -153,6 +180,9 @@ func (g *Graph) invalidateConsumers(
 		}
 		for consumer := range g.reverse[dependency] {
 			g.dirty.push(consumer)
+			if removalCaused {
+				g.removalDirty[consumer] = struct{}{}
+			}
 		}
 	}
 	return nil
@@ -191,6 +221,7 @@ func (g *Graph) NextDirty() (api.ArtifactOwner, bool) {
 
 func (g *Graph) DiscardDirty(owner api.ArtifactOwner) {
 	g.dirty.discard(owner)
+	delete(g.removalDirty, owner)
 }
 
 func (g *Graph) HasPending() bool {

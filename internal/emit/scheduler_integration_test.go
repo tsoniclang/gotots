@@ -253,8 +253,13 @@ func emittedObjectCounts(
 			}
 			continue
 		}
-		if requirements, ok := session.requirements.nextBatch(); ok {
-			if err := session.applyDeclarationRequirements(requirements); err != nil {
+		if owner, requirements, removed, ok :=
+			session.requirements.nextBatch(); ok {
+			if err := session.applyDeclarationRequirements(
+				owner,
+				requirements,
+				removed,
+			); err != nil {
 				t.Fatal(err)
 			}
 			continue

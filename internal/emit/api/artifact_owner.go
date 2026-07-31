@@ -3,6 +3,9 @@ package api
 import (
 	"fmt"
 	"go/types"
+	"slices"
+
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type ArtifactOwner struct {
@@ -364,4 +367,199 @@ func newArtifactDependencyRequest(
 			artifactDependency: dependency,
 		},
 	}}, nil
+}
+
+type NameReference struct {
+	qualifier string
+	name      string
+	requests  []RootRequest
+}
+
+func NewNameReference(name string, requests ...RootRequest) (NameReference, error) {
+	if name == "" {
+		return NameReference{}, &NameError{Reason: "reference name is empty"}
+	}
+	return NameReference{name: name, requests: slices.Clone(requests)}, nil
+}
+
+func NewQualifiedNameReference(
+	qualifier string,
+	name string,
+	requests ...RootRequest,
+) (NameReference, error) {
+	switch {
+	case qualifier == "":
+		return NameReference{}, &NameError{
+			Name:   name,
+			Reason: "reference qualifier is empty",
+		}
+	case name == "":
+		return NameReference{}, &NameError{
+			Reason: "reference name is empty",
+		}
+	}
+	return NameReference{
+		qualifier: qualifier,
+		name:      name,
+		requests:  slices.Clone(requests),
+	}, nil
+}
+
+func (r NameReference) Name() string {
+	return r.name
+}
+
+func (r NameReference) Qualifier() (string, bool) {
+	return r.qualifier, r.qualifier != ""
+}
+
+func (r NameReference) Requests() []RootRequest {
+	return slices.Clone(r.requests)
+}
+
+func (r NameReference) Expression(factory tsgo.Factory) tsgo.Expression {
+	if r.qualifier == "" {
+		return factory.Identifier(r.name)
+	}
+	return factory.PropertyAccessExpression(
+		factory.Identifier(r.qualifier),
+		nil,
+		factory.Identifier(r.name),
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func (r NameReference) EntityName(factory tsgo.Factory) tsgo.EntityName {
+	if r.qualifier == "" {
+		return factory.Identifier(r.name)
+	}
+	return factory.QualifiedName(
+		factory.Identifier(r.qualifier),
+		factory.Identifier(r.name),
+	)
+}
+
+func (r NameReference) MemberExpression(
+	factory tsgo.Factory,
+	member string,
+) (tsgo.PropertyAccessExpression, error) {
+	if member == "" {
+		return nil, &NameError{
+			Name:   r.name,
+			Reason: "reference member is empty",
+		}
+	}
+	return factory.PropertyAccessExpression(
+		r.Expression(factory),
+		nil,
+		factory.Identifier(member),
+		tsgo.NodeFlagsNone,
+	), nil
+}
+
+type rootRequestSequence struct {
+	children []RootRequest
+}
+
+type rootRequestFrame struct {
+	requests []RootRequest
+	index    int
+}
+
+func combineRootRequests(groups ...[]RootRequest) []RootRequest {
+	rootCount := 0
+	for _, group := range groups {
+		rootCount += len(group)
+	}
+	switch rootCount {
+	case 0:
+		return nil
+	case 1:
+		for _, group := range groups {
+			if len(group) != 0 {
+				return slices.Clone(group)
+			}
+		}
+		panic("non-empty root request group disappeared")
+	}
+
+	children := make([]RootRequest, 0, rootCount)
+	for _, group := range groups {
+		children = append(children, group...)
+	}
+	return []RootRequest{{
+		sequence: &rootRequestSequence{children: children},
+	}}
+}
+
+func WalkRootRequests(
+	requests []RootRequest,
+	visit func(RootRequest) error,
+) error {
+	return walkRootRequestPayloads(requests, false, visit)
+}
+
+// WalkUniqueRootRequestPayloads visits each immutable payload and persistent
+// sequence node once, preserving the order of their first occurrence.
+func WalkUniqueRootRequestPayloads(
+	requests []RootRequest,
+	visit func(RootRequest) error,
+) error {
+	return walkRootRequestPayloads(requests, true, visit)
+}
+
+func walkRootRequestPayloads(
+	requests []RootRequest,
+	unique bool,
+	visit func(RootRequest) error,
+) error {
+	if visit == nil {
+		return &RootRequestError{Reason: "root request visitor is nil"}
+	}
+	frames := []rootRequestFrame{{requests: requests}}
+	var visitedSequences map[*rootRequestSequence]struct{}
+	var visitedPayloads map[*rootRequestPayload]struct{}
+	if unique {
+		visitedSequences = make(map[*rootRequestSequence]struct{})
+		visitedPayloads = make(map[*rootRequestPayload]struct{})
+	}
+	for len(frames) != 0 {
+		frame := &frames[len(frames)-1]
+		if frame.index == len(frame.requests) {
+			frames = frames[:len(frames)-1]
+			continue
+		}
+		request := frame.requests[frame.index]
+		frame.index++
+		if request.sequence != nil {
+			if len(request.sequence.children) == 0 {
+				return &RootRequestError{
+					Reason: "root request sequence is empty",
+				}
+			}
+			if _, visited := visitedSequences[request.sequence]; visited {
+				continue
+			}
+			if unique {
+				visitedSequences[request.sequence] = struct{}{}
+			}
+			frames = append(frames, rootRequestFrame{
+				requests: request.sequence.children,
+			})
+			continue
+		}
+		if request.Kind() == RootRequestInvalid {
+			return &RootRequestError{Reason: "root request is invalid"}
+		}
+		if _, visited := visitedPayloads[request.payload]; visited {
+			continue
+		}
+		if unique {
+			visitedPayloads[request.payload] = struct{}{}
+		}
+		if err := visit(request); err != nil {
+			return err
+		}
+	}
+	return nil
 }

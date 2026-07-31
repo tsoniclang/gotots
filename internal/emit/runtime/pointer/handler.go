@@ -18,20 +18,23 @@ const (
 )
 
 type builder struct {
-	factory   tsgo.Factory
-	className string
-	panicName string
+	factory        tsgo.Factory
+	className      string
+	panicName      string
+	denseIndexName string
 }
 
 func Build(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
+	denseIndexName string,
 ) tsgo.Statement {
 	target := builder{
-		factory:   factory,
-		className: className,
-		panicName: panicName,
+		factory:        factory,
+		className:      className,
+		panicName:      panicName,
+		denseIndexName: denseIndexName,
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
@@ -249,10 +252,6 @@ func (b builder) property(
 		b.id(name),
 		tsgo.NodeFlagsNone,
 	)
-}
-
-func (b builder) defined(value tsgo.Expression) tsgo.NonNullExpression {
-	return b.factory.NonNullExpression(value, tsgo.NodeFlagsNone)
 }
 
 func (b builder) call(

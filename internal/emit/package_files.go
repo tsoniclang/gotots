@@ -488,7 +488,7 @@ func (s *programSession) publishPackageExports(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactContract(
 		builder.assemblyOwner,
 		contract,
 		dependencies,

@@ -58,11 +58,11 @@ func (r *Registry) recordInterfaceContractDemand(
 				Reason: "interface transition key joined non-identical Go types",
 			}
 		}
-		return nil, nil
-	}
-	targets[targetKey] = interfaceContractDemand{
-		source: source,
-		target: target,
+	} else {
+		targets[targetKey] = interfaceContractDemand{
+			source: source,
+			target: target,
+		}
 	}
 	reached := r.interfaceAdaptersByContract[sourceKey]
 	adapterKeys := make([]string, 0, len(reached))
@@ -137,14 +137,16 @@ func (r *Registry) interfaceAdapterContractRequests(
 		key:      directKey,
 		contract: direct,
 	}}
-	var admitted []pendingContract
+	selected := make(map[string]*types.Interface)
+	visited := make(map[string]struct{})
 	for len(pending) != 0 {
 		next := pending[0]
 		pending = pending[1:]
-		reached := r.interfaceAdaptersByContract[next.key]
-		if _, ok := reached[binding.key]; ok {
+		if _, duplicate := visited[next.key]; duplicate {
 			continue
 		}
+		visited[next.key] = struct{}{}
+		reached := r.interfaceAdaptersByContract[next.key]
 		if !types.Implements(sourceType, next.contract) {
 			return nil, &api.NameError{
 				Reason: "interface adapter reached a contract it does not implement",
@@ -155,7 +157,7 @@ func (r *Registry) interfaceAdapterContractRequests(
 			r.interfaceAdaptersByContract[next.key] = reached
 		}
 		reached[binding.key] = struct{}{}
-		admitted = append(admitted, next)
+		selected[next.key] = next.contract
 
 		targets := r.interfaceContractDemands[next.key]
 		targetKeys := make([]string, 0, len(targets))
@@ -165,11 +167,6 @@ func (r *Registry) interfaceAdapterContractRequests(
 		sort.Strings(targetKeys)
 		for _, targetKey := range targetKeys {
 			target := targets[targetKey].target
-			if existing := r.interfaceAdaptersByContract[targetKey]; existing != nil {
-				if _, ok := existing[binding.key]; ok {
-					continue
-				}
-			}
 			if types.Implements(sourceType, target) {
 				pending = append(pending, pendingContract{
 					key:      targetKey,
@@ -178,15 +175,17 @@ func (r *Registry) interfaceAdapterContractRequests(
 			}
 		}
 	}
-	sort.Slice(admitted, func(left, right int) bool {
-		return admitted[left].key < admitted[right].key
-	})
-	requests := make([]api.RootRequest, 0, len(admitted))
-	for _, contract := range admitted {
+	keys := make([]string, 0, len(selected))
+	for key := range selected {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	requests := make([]api.RootRequest, 0, len(keys))
+	for _, key := range keys {
 		request, err := api.NewInterfaceAdapterContractRequest(
 			binding.owner,
-			contract.contract,
-			contract.key,
+			selected[key],
+			key,
 		)
 		if err != nil {
 			return nil, err

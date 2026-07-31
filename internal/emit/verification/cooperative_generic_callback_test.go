@@ -266,7 +266,12 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 		artifacts.printed,
 		"FilterSequence$cooperative_",
 	)
-	for _, required := range []string{"async function", "Promise<", "await "} {
+	for _, required := range []string{
+		"export function FilterSequence$cooperative_",
+		"=> Promise<bool>",
+		"=> Promise<void>",
+		"async function",
+	} {
 		if !strings.Contains(cooperativeFilterSequence, required) {
 			t.Fatalf(
 				"cooperative generic returned literal lacks %q:\n%s",
@@ -274,6 +279,17 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 				cooperativeFilterSequence,
 			)
 		}
+	}
+	filterHeader := cooperativeFilterSequence
+	if end := strings.IndexByte(filterHeader, '\n'); end >= 0 {
+		filterHeader = filterHeader[:end]
+	}
+	if strings.Contains(filterHeader, "async") ||
+		strings.HasPrefix(filterHeader, "export async function") {
+		t.Fatalf(
+			"nested cooperative ABI widened the outer provider:\n%s",
+			filterHeader,
+		)
 	}
 	for _, required := range []string{
 		"export class Sequence<T, $Value = ",
@@ -334,8 +350,14 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 	if count := strings.Count(
 		artifacts.printed,
 		"function FilterSequence$cooperative_",
+	); count != 1 {
+		t.Fatalf("FilterSequence cooperative profile count = %d, want 1", count)
+	}
+	if count := strings.Count(
+		artifacts.printed,
+		" = FilterSequence$cooperative_",
 	); count != 2 {
-		t.Fatalf("FilterSequence cooperative profile count = %d, want 2", count)
+		t.Fatalf("FilterSequence cooperative profile uses = %d, want 2", count)
 	}
 	applyProfileName := cooperativeFunctionName(cooperativeApply)
 	if applyProfileName == "" {
@@ -537,49 +559,4 @@ func main() {
 			goOutput,
 		)
 	}
-}
-
-func waveNineFunctionWithPrefix(
-	t *testing.T,
-	printed string,
-	prefix string,
-) string {
-	t.Helper()
-	start := strings.Index(printed, "function "+prefix)
-	if start < 0 {
-		t.Fatalf("generated output lacks function prefix %s:\n%s", prefix, printed)
-	}
-	start = strings.LastIndex(printed[:start], "export ")
-	if start < 0 {
-		t.Fatalf("generated function prefix %s is not exported", prefix)
-	}
-	rest := printed[start:]
-	next := strings.Index(rest[len("export "):], "\nexport ")
-	if next < 0 {
-		return rest
-	}
-	return rest[:len("export ")+next]
-}
-
-func waveNineClassMemberText(
-	t *testing.T,
-	printed string,
-	className string,
-	marker string,
-) string {
-	t.Helper()
-	classStart := strings.Index(printed, "export class "+className)
-	if classStart < 0 {
-		t.Fatalf("generated output lacks class %s", className)
-	}
-	memberOffset := strings.Index(printed[classStart:], marker)
-	if memberOffset < 0 {
-		t.Fatalf("generated class %s lacks member marker %q", className, marker)
-	}
-	memberStart := classStart + memberOffset + 1
-	memberEnd := strings.Index(printed[memberStart:], "\n    }\n")
-	if memberEnd < 0 {
-		t.Fatalf("generated class %s member %q has no boundary", className, marker)
-	}
-	return printed[memberStart : memberStart+memberEnd+len("\n    }")]
 }

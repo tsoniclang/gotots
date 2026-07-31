@@ -15,6 +15,7 @@ import (
 type environmentArtifact struct {
 	placement       *targetplacement.Owner
 	dependencies    []api.ArtifactDependency
+	requirements    []api.DeclarationRequirement
 	contract        artifactstate.Contract
 	reconstructions uint64
 }
@@ -51,51 +52,39 @@ func (s *programSession) buildEnvironmentDeclaration(
 	object types.Object,
 	requirements []api.DeclarationRequirement,
 ) (environmentDeclaration, error) {
-	for {
-		builder.building[object] = true
-		target, err := environmentcontract.Declaration(
-			builder.context,
-			builder.emitter,
-			object,
-			requirements,
-		)
-		if err != nil {
-			delete(builder.building, object)
-			return environmentDeclaration{},
-				environmentContractError(object, err)
-		}
-		owner := api.MustSourceArtifactOwner(object)
-		placement, dependencies, err := s.consumeArtifactRequests(
-			owner,
-			target.Requests(),
-		)
-		if err != nil {
-			delete(builder.building, object)
-			return environmentDeclaration{},
-				environmentContractError(object, err)
-		}
-		current := builder.environmentRequirements(object)
-		delete(builder.building, object)
-		if len(current) != len(requirements) {
-			requirements = current
-			continue
-		}
-		contract, err := environmentDeclarationContract(s.factory, target)
-		if err != nil {
-			return environmentDeclaration{},
-				environmentContractError(object, err)
-		}
-		return environmentDeclaration{
-			object:     object,
-			name:       object.Name(),
-			statements: target.Declarations(),
-			environmentArtifact: environmentArtifact{
-				placement:    placement,
-				dependencies: dependencies,
-				contract:     contract,
-			},
-		}, nil
+	target, err := environmentcontract.Declaration(
+		builder.context,
+		builder.emitter,
+		object,
+		requirements,
+	)
+	if err != nil {
+		return environmentDeclaration{},
+			environmentContractError(object, err)
 	}
+	owner := api.MustSourceArtifactOwner(object)
+	placement, dependencies, requestedRequirements, err :=
+		s.consumeArtifactRequests(owner, target.Requests())
+	if err != nil {
+		return environmentDeclaration{},
+			environmentContractError(object, err)
+	}
+	contract, err := environmentDeclarationContract(s.factory, target)
+	if err != nil {
+		return environmentDeclaration{},
+			environmentContractError(object, err)
+	}
+	return environmentDeclaration{
+		object:     object,
+		name:       object.Name(),
+		statements: target.Declarations(),
+		environmentArtifact: environmentArtifact{
+			placement:    placement,
+			dependencies: dependencies,
+			requirements: requestedRequirements,
+			contract:     contract,
+		},
+	}, nil
 }
 
 func environmentDeclarationContract(
@@ -128,19 +117,27 @@ func (s *programSession) reconstructEnvironmentDeclaration(
 			Reason: "environment declaration was not emitted before reconstruction",
 		}
 	}
+	requirements, err := s.environmentDeclarationRequirements(
+		object,
+		s.requirements.appliedFor(api.MustSourceArtifactOwner(object)),
+	)
+	if err != nil {
+		return err
+	}
 	target, err := s.buildEnvironmentDeclaration(
 		builder,
 		object,
-		builder.environmentRequirements(object),
+		requirements,
 	)
 	if err != nil {
 		return err
 	}
 	owner := api.MustSourceArtifactOwner(object)
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		target.contract,
 		target.dependencies,
+		target.requirements,
 	); err != nil {
 		return err
 	}
@@ -159,10 +156,11 @@ func (s *programSession) emitEnvironmentStateField(
 		return err
 	}
 	owner := api.MustSourceArtifactOwner(variable)
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		target.contract,
 		target.dependencies,
+		target.requirements,
 	); err != nil {
 		return err
 	}
@@ -184,7 +182,8 @@ func (s *programSession) buildEnvironmentStateField(
 			environmentContractError(variable, err)
 	}
 	owner := api.MustSourceArtifactOwner(variable)
-	placement, dependencies, err := s.consumeArtifactRequests(owner, requests)
+	placement, dependencies, requirements, err :=
+		s.consumeArtifactRequests(owner, requests)
 	if err != nil {
 		return environmentStateField{},
 			environmentContractError(variable, err)
@@ -202,6 +201,7 @@ func (s *programSession) buildEnvironmentStateField(
 		environmentArtifact: environmentArtifact{
 			placement:    placement,
 			dependencies: dependencies,
+			requirements: requirements,
 			contract:     contract,
 		},
 	}, nil
@@ -223,10 +223,11 @@ func (s *programSession) reconstructEnvironmentStateField(
 		return err
 	}
 	owner := api.MustSourceArtifactOwner(variable)
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		target.contract,
 		target.dependencies,
+		target.requirements,
 	); err != nil {
 		return err
 	}
@@ -256,10 +257,11 @@ func (s *programSession) reconstructEnvironmentBuiltin(
 		return err
 	}
 	owner := api.MustSourceArtifactOwner(builtin)
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		target.contract,
 		target.dependencies,
+		target.requirements,
 	); err != nil {
 		return err
 	}
@@ -269,6 +271,159 @@ func (s *programSession) reconstructEnvironmentBuiltin(
 	}
 	target.emitted = current.emitted
 	builder.builtins[builtin] = target
+	return nil
+}
+
+func (s *programSession) replaceEnvironmentBuiltin(
+	builder *environmentContractBuilder,
+	builtin *types.Builtin,
+	requirements []api.DeclarationRequirement,
+) error {
+	current, emitted := builder.builtins[builtin]
+	if !emitted {
+		return &ScheduleError{
+			Object: builtin.Name(),
+			Reason: "environment builtin was not emitted before requirement replacement",
+		}
+	}
+	signatures := make([]*types.Signature, 0, len(requirements))
+	for _, requirement := range requirements {
+		owner, signature, ok := requirement.EnvironmentBuiltin()
+		if !ok || owner != builtin {
+			return &ScheduleError{
+				Object: builtin.Name(),
+				Reason: "environment builtin requirement is invalid",
+			}
+		}
+		duplicate := false
+		for _, existing := range signatures {
+			if types.Identical(existing, signature) {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			signatures = append(signatures, signature)
+		}
+	}
+	target, err := s.buildEnvironmentBuiltin(builder, builtin, signatures)
+	if err != nil {
+		return err
+	}
+	owner := api.MustSourceArtifactOwner(builtin)
+	if err := s.commitArtifactRevision(
+		owner,
+		target.contract,
+		target.dependencies,
+		target.requirements,
+	); err != nil {
+		return err
+	}
+	s.artifacts.DiscardDirty(owner)
+	target.emitted = true
+	target.reconstructions = current.reconstructions + 1
+	builder.builtins[builtin] = target
+	return nil
+}
+
+func (s *programSession) replaceEnvironmentConstantProjections(
+	builder *environmentContractBuilder,
+	selected *types.Const,
+	requirements []api.DeclarationRequirement,
+) error {
+	current, emitted := builder.declarations[selected]
+	if !emitted {
+		return &ScheduleError{
+			Object: selected.Name(),
+			Reason: "environment constant was not emitted before requirement replacement",
+		}
+	}
+	base, ok := s.registry.Target(selected)
+	if !ok {
+		return &ScheduleError{
+			Object: selected.Name(),
+			Reason: "environment constant has no target binding",
+		}
+	}
+	next := make(map[string]environmentConstantProjection, len(requirements))
+	statements := make([]tsgo.Statement, 0, len(requirements))
+	var requests []api.RootRequest
+	for _, requirement := range requirements {
+		constant, projection, ok := requirement.ConstantProjection()
+		if !ok || constant != selected {
+			return &ScheduleError{
+				Object: selected.Name(),
+				Reason: "environment constant projection requirement is invalid",
+			}
+		}
+		name, err := api.ConstantProjectionName(base.Name, projection)
+		if err != nil {
+			return err
+		}
+		statement, selectedRequests, err :=
+			environmentcontract.ConstantProjection(
+				builder.context,
+				builder.emitter,
+				selected,
+				projection,
+			)
+		if err != nil {
+			return err
+		}
+		contract, err := artifactstate.ProjectContract(
+			s.factory,
+			[]tsgo.Statement{statement},
+		)
+		if err != nil {
+			return environmentContractError(selected, err)
+		}
+		next[name] = environmentConstantProjection{
+			source:     selected,
+			projection: projection,
+			name:       name,
+			statement:  statement,
+			contract:   contract,
+		}
+		statements = append(statements, statement)
+		requests = append(requests, selectedRequests...)
+	}
+	owner := api.MustSourceArtifactOwner(selected)
+	placement, dependencies, nestedRequirements, err :=
+		s.consumeArtifactRequests(owner, requests)
+	if err != nil {
+		return err
+	}
+	var contract artifactstate.Contract
+	if len(statements) == 0 {
+		contract, err = artifactstate.ProjectCoverageContract(s.factory, nil)
+	} else {
+		contract, err = artifactstate.ProjectContract(s.factory, statements)
+	}
+	if err != nil {
+		return environmentContractError(selected, err)
+	}
+	if err := s.commitArtifactRevision(
+		owner,
+		contract,
+		dependencies,
+		nestedRequirements,
+	); err != nil {
+		return err
+	}
+	for name, projection := range builder.projections {
+		if projection.source == selected {
+			delete(builder.projections, name)
+		}
+	}
+	for name, projection := range next {
+		builder.projections[name] = projection
+	}
+	s.artifacts.DiscardDirty(owner)
+	current.placement = placement
+	current.dependencies = dependencies
+	current.requirements = nestedRequirements
+	current.reconstructions++
+	builder.declarations[selected] = current
 	return nil
 }
 
@@ -299,7 +454,8 @@ func (s *programSession) buildEnvironmentBuiltin(
 		requests = append(requests, target.Requests()...)
 	}
 	owner := api.MustSourceArtifactOwner(builtin)
-	placement, dependencies, err := s.consumeArtifactRequests(owner, requests)
+	placement, dependencies, requirements, err :=
+		s.consumeArtifactRequests(owner, requests)
 	if err != nil {
 		return environmentBuiltin{},
 			environmentContractError(builtin, err)
@@ -308,10 +464,15 @@ func (s *programSession) buildEnvironmentBuiltin(
 	for index, statement := range statements {
 		nodes[index] = statement
 	}
-	contract, err := artifactstate.ProjectFacet(
-		api.ArtifactFacetCallableSignature,
-		builder.context.Factory().SyntaxList(nodes),
-	)
+	var contract artifactstate.Contract
+	if len(nodes) == 0 {
+		contract, err = artifactstate.ProjectCoverageContract(s.factory, nil)
+	} else {
+		contract, err = artifactstate.ProjectFacet(
+			api.ArtifactFacetCallableSignature,
+			builder.context.Factory().SyntaxList(nodes),
+		)
+	}
 	if err != nil {
 		return environmentBuiltin{},
 			environmentContractError(builtin, err)
@@ -322,6 +483,7 @@ func (s *programSession) buildEnvironmentBuiltin(
 		environmentArtifact: environmentArtifact{
 			placement:    placement,
 			dependencies: dependencies,
+			requirements: requirements,
 			contract:     contract,
 		},
 	}, nil

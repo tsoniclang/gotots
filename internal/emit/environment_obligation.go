@@ -129,13 +129,26 @@ func (s *programSession) environmentObligations() (
 	var obligations []EnvironmentObligation
 	for _, builder := range builders {
 		for _, declaration := range builder.declarations {
+			var requirements []api.DeclarationRequirement
+			if _, constant := declaration.object.(*types.Const); !constant {
+				var err error
+				requirements, err = s.environmentDeclarationRequirements(
+					declaration.object,
+					s.requirements.appliedFor(
+						api.MustSourceArtifactOwner(declaration.object),
+					),
+				)
+				if err != nil {
+					return nil, err
+				}
+			}
 			obligation, err := buildEnvironmentObligation(
 				builder,
 				EnvironmentObligationDeclaration,
 				declaration.object,
 				declaration.name,
 				declaration.contract,
-				builder.environmentRequirements(declaration.object),
+				requirements,
 				types.Invalid,
 			)
 			if err != nil {
@@ -174,7 +187,7 @@ func (s *programSession) environmentObligations() (
 			obligations = append(obligations, obligation)
 		}
 		for builtin, target := range builder.builtins {
-			if !target.emitted {
+			if !target.emitted || len(target.signatures) == 0 {
 				continue
 			}
 			obligation, err := buildEnvironmentBuiltinObligation(

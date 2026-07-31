@@ -86,10 +86,11 @@ func (s *programSession) reconstructAnonymousStruct(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
@@ -167,10 +168,11 @@ func (s *programSession) buildAnonymousStructRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	placement, dependencies, err := s.consumeArtifactRequests(
-		owner,
-		emission.Requests(),
-	)
+	placement, dependencies, requirements, err :=
+		s.consumeArtifactRequests(
+			owner,
+			emission.Requests(),
+		)
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -186,6 +188,7 @@ func (s *programSession) buildAnonymousStructRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
+		requirements:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil

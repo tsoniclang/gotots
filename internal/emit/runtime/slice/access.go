@@ -61,8 +61,12 @@ func (b builder) getMethod() tsgo.MethodDeclaration {
 			nil,
 		),
 		b.returnStatement(
-			b.defined(
-				b.backingElement(b.id("backing"), b.id("numericIndex")),
+			b.indexedValue(
+				b.id("backing"),
+				b.add(
+					b.thisProperty("offset"),
+					b.id("numericIndex"),
+				),
 			),
 		),
 	)

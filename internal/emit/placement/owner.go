@@ -63,7 +63,7 @@ func (p *Owner) Requests() []api.RootRequest {
 }
 
 func (p *Owner) Apply(requests []api.RootRequest) error {
-	return api.WalkRootRequests(requests, func(request api.RootRequest) error {
+	return api.WalkUniqueRootRequestPayloads(requests, func(request api.RootRequest) error {
 		if request.Kind() != api.RootRequestImport ||
 			request.LegalScope() != api.ScopeFileImports ||
 			request.PreferredScope() != api.ScopeFileImports ||

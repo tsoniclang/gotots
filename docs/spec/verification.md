@@ -27,11 +27,18 @@ The repository always enforces:
    semantic scans are absent;
 7. maintained non-generated files stay below 600 physical lines; and
 8. semantic handlers follow the recursive domain/owner structure, root emitter
-   files contain orchestration only, and no maintained directory exceeds the
-   organization bound;
+   files contain orchestration only, and neither a directory's production
+   source set nor its test source set exceeds twenty maintained files;
 9. generated support/runtime imports resolve inside the generated product or
    an explicit Go environment contract, and no unrelated compiler, transpiler,
    target, or product appears as a semantic or verification dependency.
+
+Repository ownership walls inspect GoToTS-owned source and governance, not
+installed dependency trees, generated distribution output, or ignored scratch
+artifacts. The excluded directory set is closed and mutation-tested:
+`node_modules`/`dist` content is outside the wall, while identically worded
+adjacent `src` content must fail. A local dependency installation must neither
+fail the wall nor weaken checks over repository-owned files.
 
 ## Construct Coverage
 
@@ -238,10 +245,15 @@ independent proofs:
 Request-transport gates additionally prove that nested composition retains
 exact atomic-leaf order, rejects an invalid leaf at any depth, exposes no
 mutable child backing, and keeps the top-level carrier count bounded while the
-leaf count doubles. Restoring eager transitive flattening must fail this
-scaling mutation. Existing generated artifacts remain byte-identical, and
-large-corpus profiles report request-composition allocation and peak-RSS
-deltas separately.
+leaf count doubles. A shared-subtree fixture creates exponentially many logical
+paths to one payload and proves root consumption visits each persistent
+sequence and payload identity once. A distinct-payload foil uses the same typed
+owner with conflicting import binding or phase evidence and proves root
+canonicalization still observes and rejects the conflict. Restoring eager
+transitive flattening, tree-path traversal at a root consumer, or post-flatten
+deduplication must fail these scaling and conflict mutations. Existing
+generated artifacts remain byte-identical, and large-corpus profiles report
+request-composition allocation and peak-RSS deltas separately.
 
 The atomic request handle has a frozen pointer-scale size gate. Moving its
 immutable payload fields back into every copied transport value must fail that
@@ -264,6 +276,13 @@ Another fixture discovers a requirement during an early reconstruction,
 finishes the current dependency wave, then proves the requirement is applied
 and its exact owner reconstructed in the next wave. Rebuilding the wave after
 every discovered request must fail the wave-construction work bound.
+A removal fixture drops the last currently known consumer, discovers a later
+consumer before quiescence, and proves no provider removal occurred. A second
+fixture commits a real final removal and proves historical replacement follows
+the exact provider-to-consumer dependency chain, including package assembly,
+then is consumed. Eager removal, failure to propagate the cause, propagation
+to an unrelated dirty artifact, failure to consume authority, and later
+reintroduction must each fail at the scheduler or graph gate.
 Measure declarations, graph vertices/edges, contract bytes, revisions,
 reconstructions, final AST bytes, generation time, typecheck time/RSS, and
 runtime. Current graph state must remain O(artifacts + consumed facet edges +
@@ -661,6 +680,43 @@ programs may link it. Verification must:
 10. report public exports, implemented exports, placeholders, source bytes,
    emitted bytes, strict typecheck wall/RSS, test wall/RSS, and the twenty
    largest modules with parent deltas.
+
+The manifest gate also exact-joins every reached generic callable profile to
+its provider facet, independently verifies the recorded outer effect, and
+rejects requirements with no current root or artifact owner. A mutation that
+marks cooperative `slices.SortFunc` synchronous must leave an un-awaited call
+and fail; a mutation that marks synchronous `slices.Values` cooperative must
+introduce a spurious Promise and fail. Reconstructing a consumer so that its
+last profile use disappears must remove the declaration, obligation, and
+manifest demand rather than preserve an append-only residue.
+
+Requirement-liveness verification also reconstructs an interface adapter and
+a cooperative callable after their requested provider facets already exist.
+Repeated naming and contract queries must return the same typed obligations
+rather than suppress them as “seen.” A final-consumer profile removal waits
+for quiescence, may return the provider and its exact dependent artifact chain
+to historical base contracts exactly once, and consumes that authority at each
+reconstruction. Reintroducing that removed demand without another removal must
+fail the artifact oscillation gate. Mutations restoring eager removal,
+first-seen-only interface closure, satisfied-cooperative suppression,
+unconditional historical acceptance, dropped causal propagation, or sticky
+foreign requirements must each fail at these gates.
+
+Dense-storage verification inspects the generated TS-Go AST and proves that
+pointer, array, and slice reads call the one demanded `GoDenseIndex.get`
+definition. The generated runtime package must pass strict TypeScript with
+`noUncheckedIndexedAccess`; execution must distinguish a present
+`undefined` element from an absent sparse slot, returning the former and
+panicking for the latter. Mutations that restore a direct unchecked read,
+target non-null assertion, cast, `??` fallback, family-local reader, or linear
+membership scan must fail at the AST, staticness, ownership, or runtime gate.
+
+The linkage gate inspects the decoded TS-Go AST, not rendered text, and proves
+that every standard-library value/type/state/method/profile reference is a
+qualified provider reference with its exact manifest owner. Mutations that
+drop the qualifier, select a named import, route a static receiver operation
+through an instance call, retain an ambient standard-library target file, or
+permit a missing manifest entry must fail before TypeScript execution.
 
 Provider verification and compiler contract generation must compare canonical
 typed identities and signatures. They may not compare rendered declaration

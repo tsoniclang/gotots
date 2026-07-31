@@ -378,8 +378,7 @@ func (c *callableCorrespondence) callable(
 	if err != nil {
 		return err
 	}
-	if declarationObservation.Cooperative() &&
-		!instantiatedObservation.Cooperative() {
+	if declarationObservation.Cooperative() {
 		request, err := api.NewCooperativeCallableRequest(
 			instantiatedFacet,
 		)

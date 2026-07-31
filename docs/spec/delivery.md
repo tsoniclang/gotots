@@ -692,6 +692,19 @@ references, delete the ambient standard-library runtime path, and rerun the
 whole-product gates. Do not combine an incomplete provider with compiler
 linkage.
 
+Before that atomic linkage, close requirement liveness and provider effects:
+artifact reconstruction replaces its complete declaration-requirement set,
+final-consumer removals wait until additions, reachability, dirty
+reconstruction, and package initialization are quiescent, and removal
+authority follows only exact changed artifact-dependency facets until each
+affected reconstruction consumes it. A later-discovered consumer before the
+sweep cancels an orphan without provider churn; later reintroduction after a
+committed removal remains a convergence error. The manifest records the exact
+outer effect of every reached profile, and the provider supplies all certified
+private facets. The compile-only ambient profile remains separately selectable
+but cannot satisfy executable-product proof. Linked compilation has no ambient
+fallback.
+
 Source-available dependencies continue through ordinary direct emission.
 Reachable unresolved placeholders block publication.
 

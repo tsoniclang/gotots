@@ -61,13 +61,27 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 		if repeatErr != nil {
 			t.Fatal(repeatErr)
 		}
-		if len(repeated) != 0 {
+		if len(repeated) != 1 {
 			t.Fatalf(
-				"repeated transition %d scheduled %d requests",
+				"repeated transition %d returned %d requests, want 1",
 				occurrence,
 				len(repeated),
 			)
 		}
+	}
+	repeatedDirect, err := adapterFirst.interfaceAdapterContractRequests(
+		binding,
+		"first",
+		first,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(repeatedDirect) != 2 {
+		t.Fatalf(
+			"repeated direct demand closure requests = %d, want 2",
+			len(repeatedDirect),
+		)
 	}
 
 	transitionFirst := NewRegistry()

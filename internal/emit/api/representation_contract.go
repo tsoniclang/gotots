@@ -269,6 +269,7 @@ const (
 	RuntimeModulePanicNil
 	RuntimeModuleChannel
 	RuntimeModuleUnsafePointer
+	RuntimeModuleDenseIndex
 )
 
 func runtimeContract(

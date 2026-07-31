@@ -18,6 +18,7 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 		factory,
 		pointerClassName(t),
 		panicClassName(t),
+		denseIndexClassName(t),
 	)
 
 	class, ok := statement.(tsgo.ClassDeclaration)
@@ -79,6 +80,7 @@ func TestNilDereferenceSuccessMutationRemovesRequiredThrow(t *testing.T) {
 		tsgo.NewFactory(),
 		pointerClassName(t),
 		panicClassName(t),
+		denseIndexClassName(t),
 	).(tsgo.ClassDeclaration)
 	guard := pointerMethod(t, class, pointer.DereferenceName)
 	body := guard.Body().(tsgo.Block).Statements()
@@ -151,6 +153,7 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 			factory,
 			pointerClassName(t),
 			panicClassName(t),
+			denseIndexClassName(t),
 		),
 		tsgo.PrintOptions{},
 	)
@@ -235,6 +238,15 @@ func pointerClassName(t *testing.T) string {
 func panicClassName(t *testing.T) string {
 	t.Helper()
 	contract, err := api.RuntimeContract(api.RuntimePanic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contract.ExportedName()
+}
+
+func denseIndexClassName(t *testing.T) string {
+	t.Helper()
+	contract, err := api.RuntimeContract(api.RuntimeDenseIndex)
 	if err != nil {
 		t.Fatal(err)
 	}

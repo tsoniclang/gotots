@@ -2,14 +2,16 @@ package slice
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type builder struct {
-	factory   tsgo.Factory
-	className string
-	panicName string
+	factory        tsgo.Factory
+	className      string
+	panicName      string
+	denseIndexName string
 }
 
 type Capabilities struct {
@@ -25,11 +27,13 @@ func Build(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
+	denseIndexName string,
 ) tsgo.ClassDeclaration {
 	return BuildWithCapabilities(
 		factory,
 		className,
 		panicName,
+		denseIndexName,
 		Capabilities{},
 	)
 }
@@ -38,12 +42,14 @@ func BuildWithAddress(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
+	denseIndexName string,
 	withAddress bool,
 ) tsgo.ClassDeclaration {
 	return BuildWithCapabilities(
 		factory,
 		className,
 		panicName,
+		denseIndexName,
 		Capabilities{Address: withAddress},
 	)
 }
@@ -52,12 +58,14 @@ func BuildWithCapabilities(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
+	denseIndexName string,
 	capabilities Capabilities,
 ) tsgo.ClassDeclaration {
 	target := builder{
-		factory:   factory,
-		className: className,
-		panicName: panicName,
+		factory:        factory,
+		className:      className,
+		panicName:      panicName,
+		denseIndexName: denseIndexName,
 	}
 	members := []tsgo.ClassElement{target.constructor()}
 	members = append(
@@ -372,15 +380,16 @@ func (b builder) index(
 	)
 }
 
-func (b builder) defined(value tsgo.Expression) tsgo.NonNullExpression {
-	return b.factory.NonNullExpression(value, tsgo.NodeFlagsNone)
-}
-
 func (b builder) indexedValue(
 	value tsgo.Expression,
 	index tsgo.Expression,
-) tsgo.NonNullExpression {
-	return b.defined(b.index(value, index))
+) tsgo.CallExpression {
+	return indexedstorage.Element(
+		b.factory,
+		b.denseIndexName,
+		value,
+		index,
+	)
 }
 
 func (b builder) loop(

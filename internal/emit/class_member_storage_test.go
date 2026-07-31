@@ -82,11 +82,15 @@ func TestClassMemberContributionReconstructsTheTypeOwnedClass(t *testing.T) {
 	if err := session.scheduleDeclarationRequirement(requirement); err != nil {
 		t.Fatal(err)
 	}
-	requirements, ok := session.requirements.nextBatch()
+	owner, requirements, removed, ok := session.requirements.nextBatch()
 	if !ok {
 		t.Fatal("class-member attachment requirement was not scheduled")
 	}
-	if err := session.applyDeclarationRequirements(requirements); err != nil {
+	if err := session.applyDeclarationRequirements(
+		owner,
+		requirements,
+		removed,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -388,11 +392,11 @@ func TestAddressableStorageRejectsForeignAndForgedSameSpellingVariables(
 	if err := session.scheduleDeclarationRequirement(requirement); err != nil {
 		t.Fatal(err)
 	}
-	requirements, ok := session.requirements.nextBatch()
+	owner, requirements, removed, ok := session.requirements.nextBatch()
 	if !ok {
 		t.Fatal("foreign same-spelling requirement was not scheduled")
 	}
-	err = session.applyDeclarationRequirements(requirements)
+	err = session.applyDeclarationRequirements(owner, requirements, removed)
 	var invariant *api.InvariantError
 	if !errors.As(err, &invariant) ||
 		invariant.Reason !=
@@ -425,11 +429,11 @@ func TestAddressableStorageRejectsForeignAndForgedSameSpellingVariables(
 	if err := session.scheduleDeclarationRequirement(requirement); err != nil {
 		t.Fatal(err)
 	}
-	requirements, ok = session.requirements.nextBatch()
+	owner, requirements, removed, ok = session.requirements.nextBatch()
 	if !ok {
 		t.Fatal("forged exact-position requirement was not scheduled")
 	}
-	err = session.applyDeclarationRequirements(requirements)
+	err = session.applyDeclarationRequirements(owner, requirements, removed)
 	var nameError *api.NameError
 	if !errors.As(err, &nameError) ||
 		nameError.Reason !=

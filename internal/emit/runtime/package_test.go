@@ -3,6 +3,7 @@ package runtime
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"slices"
 	"testing"
 
@@ -159,6 +160,7 @@ func TestDependencyClosureIncludesEveryTransitiveOwner(t *testing.T) {
 	}
 	want := map[api.RuntimeSymbol]struct{}{
 		api.RuntimeArray:             {},
+		api.RuntimeDenseIndex:        {},
 		api.RuntimeIntegerDivide:     {},
 		api.RuntimePanic:             {},
 		api.RuntimePanicValue:        {},
@@ -187,20 +189,26 @@ func TestModuleImportsExactDependencyContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(imports) != 1 {
-		t.Fatalf("array runtime imports = %d, want one", len(imports))
+	if len(imports) != 2 {
+		t.Fatalf("array runtime imports = %d, want two", len(imports))
 	}
-	declaration := imports[0].(tsgo.ImportDeclaration)
-	module := declaration.ModuleSpecifier().(tsgo.StringLiteral)
-	if module.Text() != "./panic.js" {
-		t.Fatalf("array runtime dependency = %q, want ./panic.js", module.Text())
+	got := make(map[string]string, len(imports))
+	for _, statement := range imports {
+		declaration := statement.(tsgo.ImportDeclaration)
+		module := declaration.ModuleSpecifier().(tsgo.StringLiteral)
+		bindings := declaration.ImportClause().NamedBindings().(tsgo.NamedImports).
+			Elements()
+		if len(bindings) != 1 || bindings[0].PropertyName() != nil {
+			t.Fatalf("array runtime bindings = %#v, want one direct binding", bindings)
+		}
+		got[module.Text()] = bindings[0].Name().Text()
 	}
-	bindings := declaration.ImportClause().NamedBindings().(tsgo.NamedImports).
-		Elements()
-	if len(bindings) != 1 ||
-		bindings[0].Name().Text() != "GoPanic" ||
-		bindings[0].PropertyName() != nil {
-		t.Fatalf("array runtime bindings = %#v, want direct GoPanic", bindings)
+	wantImports := map[string]string{
+		"./dense-index.js": "GoDenseIndex",
+		"./panic.js":       "GoPanic",
+	}
+	if !maps.Equal(got, wantImports) {
+		t.Fatalf("array runtime imports = %v, want %v", got, wantImports)
 	}
 }
 

@@ -2,6 +2,7 @@ package pointer
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -143,6 +144,12 @@ func (b builder) elementMethod() tsgo.MethodDeclaration {
 		index,
 		tsgo.NodeFlagsNone,
 	)
+	readElement := indexedstorage.Element(
+		b.factory,
+		b.denseIndexName,
+		backing,
+		index,
+	)
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		ElementName,
@@ -186,7 +193,7 @@ func (b builder) elementMethod() tsgo.MethodDeclaration {
 					b.call(b.id(b.className), "root", backing),
 					index,
 				),
-				b.defined(element),
+				readElement,
 				element,
 			),
 		),

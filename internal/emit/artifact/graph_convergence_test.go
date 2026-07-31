@@ -89,3 +89,202 @@ func TestArtifactGraphConvergesCyclesAndRejectsOscillation(t *testing.T) {
 		t.Fatalf("oscillation error = %#v", err)
 	}
 }
+
+func TestArtifactGraphAllowsOneRequirementRemovalReversion(
+	t *testing.T,
+) {
+	object := artifactTestObject("Provider", 10)
+	owner := artifactTestOwner(object)
+	graph := NewGraph(compareArtifactTestObjects)
+	if err := graph.Commit(owner, artifactCallable("base"), nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Commit(owner, artifactCallable("profile"), nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.CommitHistoricalReplacement(
+		owner,
+		artifactCallable("base"),
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	err := graph.Commit(owner, artifactCallable("profile"), nil)
+	var convergenceError *ArtifactConvergenceError
+	if !errors.As(err, &convergenceError) ||
+		convergenceError.Object != owner {
+		t.Fatalf("reintroduced removed requirement error = %#v", err)
+	}
+}
+
+func TestRequirementRemovalAuthorityPropagatesToDirtyConsumers(
+	t *testing.T,
+) {
+	provider := artifactTestObject("Provider", 10)
+	consumer := artifactTestObject("Consumer", 20)
+	providerOwner := artifactTestOwner(provider)
+	consumerOwner := artifactTestOwner(consumer)
+	providerDependency := artifactTestDependency(
+		t,
+		provider,
+		api.ArtifactFacetCallableSignature,
+	)
+	graph := NewGraph(compareArtifactTestObjects)
+	if err := graph.Commit(
+		providerOwner,
+		artifactCallable("base"),
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Commit(
+		consumerOwner,
+		artifactCallable("consumer-base"),
+		[]api.ArtifactDependency{providerDependency},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Commit(
+		providerOwner,
+		artifactCallable("profile"),
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Commit(
+		consumerOwner,
+		artifactCallable("consumer-profile"),
+		[]api.ArtifactDependency{providerDependency},
+	); err != nil {
+		t.Fatal(err)
+	}
+	graph.DiscardDirty(consumerOwner)
+
+	if err := graph.CommitHistoricalReplacement(
+		providerOwner,
+		artifactCallable("base"),
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Commit(
+		consumerOwner,
+		artifactCallable("consumer-base"),
+		[]api.ArtifactDependency{providerDependency},
+	); err != nil {
+		t.Fatalf("removal-caused consumer reconstruction: %v", err)
+	}
+	graph.DiscardDirty(consumerOwner)
+
+	err := graph.Commit(
+		consumerOwner,
+		artifactCallable("consumer-profile"),
+		[]api.ArtifactDependency{providerDependency},
+	)
+	var convergenceError *ArtifactConvergenceError
+	if !errors.As(err, &convergenceError) ||
+		convergenceError.Object != consumerOwner {
+		t.Fatalf("consumer reintroduction error = %#v", err)
+	}
+}
+
+func TestRequirementRemovalAuthorityPropagatesTransitively(
+	t *testing.T,
+) {
+	provider := artifactTestObject("Provider", 10)
+	middle := artifactTestObject("Middle", 20)
+	leaf := artifactTestObject("Leaf", 30)
+	providerOwner := artifactTestOwner(provider)
+	middleOwner := artifactTestOwner(middle)
+	leafOwner := artifactTestOwner(leaf)
+	providerDependency := artifactTestDependency(
+		t,
+		provider,
+		api.ArtifactFacetCallableSignature,
+	)
+	middleDependency := artifactTestDependency(
+		t,
+		middle,
+		api.ArtifactFacetCallableSignature,
+	)
+	graph := NewGraph(compareArtifactTestObjects)
+	if err := graph.Commit(
+		providerOwner,
+		artifactCallable("provider-base"),
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Commit(
+		middleOwner,
+		artifactCallable("middle-base"),
+		[]api.ArtifactDependency{providerDependency},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Commit(
+		leafOwner,
+		artifactCallable("leaf-base"),
+		[]api.ArtifactDependency{middleDependency},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Commit(
+		providerOwner,
+		artifactCallable("provider-profile"),
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Commit(
+		middleOwner,
+		artifactCallable("middle-profile"),
+		[]api.ArtifactDependency{providerDependency},
+	); err != nil {
+		t.Fatal(err)
+	}
+	graph.DiscardDirty(middleOwner)
+	if err := graph.Commit(
+		leafOwner,
+		artifactCallable("leaf-profile"),
+		[]api.ArtifactDependency{middleDependency},
+	); err != nil {
+		t.Fatal(err)
+	}
+	graph.DiscardDirty(leafOwner)
+
+	if err := graph.CommitHistoricalReplacement(
+		providerOwner,
+		artifactCallable("provider-base"),
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := graph.Commit(
+		middleOwner,
+		artifactCallable("middle-base"),
+		[]api.ArtifactDependency{providerDependency},
+	); err != nil {
+		t.Fatalf("middle removal reconstruction: %v", err)
+	}
+	graph.DiscardDirty(middleOwner)
+	if err := graph.Commit(
+		leafOwner,
+		artifactCallable("leaf-base"),
+		[]api.ArtifactDependency{middleDependency},
+	); err != nil {
+		t.Fatalf("leaf removal reconstruction: %v", err)
+	}
+	graph.DiscardDirty(leafOwner)
+
+	err := graph.Commit(
+		leafOwner,
+		artifactCallable("leaf-profile"),
+		[]api.ArtifactDependency{middleDependency},
+	)
+	var convergenceError *ArtifactConvergenceError
+	if !errors.As(err, &convergenceError) ||
+		convergenceError.Object != leafOwner {
+		t.Fatalf("leaf reintroduction error = %#v", err)
+	}
+}

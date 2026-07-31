@@ -353,10 +353,17 @@ request. The request API owns one opaque immutable persistent sequence whose
 leaves are the typed requests above. Composition copies only immediate child
 roots, preserves exact source order, and neither deduplicates nor attaches
 semantic meaning to tree shape. The sequence is request transport, not source
-IR or a second fact store. Only root consumers walk its atomic leaves, once,
-before placement, scheduling, and artifact-dependency admission. A sequence
-node is never interpreted as an import, declaration requirement, or artifact
-dependency, and no mutable backing storage is exposed.
+IR or a second fact store. An ordinary order-sensitive observer may walk every
+logical leaf. A root consumer instead visits each persistent sequence identity
+and immutable payload identity once in first-occurrence order, then performs
+typed owner canonicalization while admitting placement, requirements, and
+artifact dependencies. It must not flatten the logical request tree and
+deduplicate afterward: a shared persistent subtree can represent exponentially
+many paths to the same immutable payload. Distinct payload identities remain
+observable even when they initially name the same owner, so conflicting import
+bindings and phase upgrades are still validated. A sequence node is never
+interpreted as an import, declaration requirement, or artifact dependency, and
+no mutable backing storage is exposed.
 
 Each atomic request is a bounded immutable handle to one constructor-validated
 payload. Copying or composing results shares that payload; it does not copy the
@@ -377,17 +384,21 @@ as `Box` copying requesting `Point.$copy`.
 
 An interface adapter's callable surface is also use-dependent. The adapter is
 owned once by the exact concrete dynamic Go type, while each concrete-to-
-interface conversion requests the exact completed target interface contract.
+interface conversion requests the exact completed target interface contract
+on every artifact revision that still contains that conversion.
 An interface-to-interface conversion or assertion records the exact static
 source interface and target interface. Direct concrete boxing seeds an
 adapter's reachable-contract set. A transition may add its target only when
 its source contract is already in that adapter's reachable set and
 `go/types` proves the concrete type implements the target. The target-name
-owner computes this monotone closure for existing and future adapters. Mere
-implementation of the transition's source interface is not reachability and
-must not widen an adapter that was boxed only into another contract. The final
-adapter method surface is the deterministic union of the reachable exact
-contracts. It is not the concrete type's complete receiver method set, an
+owner computes this deterministic closure for existing and future adapters.
+Its identity cache may deduplicate canonical pairs, but it must return the
+complete current request set on repeated reconstruction; discovery history
+may not suppress request transport. Mere implementation of the transition's
+source interface is not reachability and must not widen an adapter that was
+boxed only into another contract. The final adapter method surface is the
+deterministic union of exact contracts with current request owners. It is not
+the concrete type's complete receiver method set, an
 implementer union, a value-flow graph, or a runtime method lookup table.
 The adapter payload retains the exact representation selected for its concrete
 dynamic type. Each adapter method separately consumes the selected provider
@@ -618,11 +629,17 @@ consumer invalidation.
 
 The root owner keeps one open declaration assembly per emitted definition.
 Only that definition's semantic owner interprets its requirements and
-reconstructs its typed TS-Go protocol nodes. Requirements are monotonic,
-identity-deduplicated, and applied in deterministic closed-kind order;
-incompatible requirements fail rather than selecting whichever was discovered
-first. Reconstructing a declaration replaces its prior in-memory target nodes;
-it never creates a second final definition. The root resolves declaration,
+reconstructs its typed TS-Go protocol nodes. Requirements are identity-
+deduplicated and applied in deterministic closed-kind order. Each artifact
+revision replaces the foreign requirements it contributes. Intrinsic self-
+demands remain attached to that same source revision even after satisfaction
+changes the reconstructed shape; foreign requirements remain active only
+while at least one current artifact revision contributes them. Incompatible
+requirements fail rather than selecting whichever was discovered first. A
+canonicalization or reachability cache must return complete current typed
+requests and may not use “already seen” as transport suppression.
+Reconstructing a declaration replaces its prior in-memory target nodes; it
+never creates a second final definition. The root resolves declaration,
 requirement, initialization, and placement work to a fixed point before file
 sealing.
 
@@ -639,7 +656,7 @@ Every source definition that can be reconstructed owns one target artifact
 keyed by its exact `types.Object`. An artifact revision is a transaction:
 
 ```text
-authoritative Go object + Go AST/type evidence + accumulated requirements
+authoritative Go object + Go AST/type evidence + current active requirements
     -> one semantic-owner handler
     -> complete replacement TS-Go AST roots
     -> complete replacement root-request set
@@ -706,8 +723,26 @@ for each distinct changed contract. A deterministic non-semantic fingerprint may
 historical candidates, but the root must reconstruct and compare their exact
 canonical bytes before declaring a repeat; a hash alone never establishes
 equality. Repeating a prior non-current contract is a typed non-convergence
-error, not an arbitrary iteration limit or silently accepted result. Unchanged
-reconstruction adds no history. Append-only or locally changed contracts retain
+error unless the reconstruction is causally authorized by one quiescent
+final-requirement removal. Requirement additions, newly reached declarations,
+dirty artifact reconstructions, and package initialization settle before a
+removal sweep. Losing a last known consumer before that boundary records an
+orphan candidate, not an immediate deletion; a later-discovered consumer
+cancels it without reconstructing the provider. The sweep removes only
+candidates that still have no root or artifact consumer.
+
+The direct provider replacement is committed with removal authority. If one
+of its subscribed facets changes, that authority follows only the exact dirty
+dependency edges to consumers whose reconstruction is consequently required.
+Each such consumer may return to one historical contract and may propagate the
+same cause through its own changed facets. Successful reconstruction or
+explicit dirty discard consumes the authority for that owner. Reintroducing
+the superseded demand afterward therefore repeats a historical contract
+without removal authority and fails as non-convergence. This narrow causal
+chain permits a provider, package assembly, and other exact dependents to
+return to their base declarations when a last profile consumer disappears
+without weakening oscillation detection globally. Unchanged reconstruction
+adds no history or further removal authority. Locally changed contracts retain
 only a lossless encoding of their exact changed regions rather than a full
 snapshot per revision.
 Dirty owners live in one identity-deduplicated deterministic priority queue.
@@ -1229,6 +1264,22 @@ typed non-executable obligation. No source body is fabricated, no environment
 package is entered into the source emitter, and no runtime Promise inspection
 or union result is admitted.
 
+The provider contract records the outer effect independently for each exact
+declaration/profile pair. For example, the cooperative profile of
+`slices.SortFunc` is `async` because its selected implementation awaits the
+comparison callback, while `slices.Values` remains synchronous because it only
+constructs and returns an iterator whose callback is cooperative. Nested
+callable ABI selection is not evidence for either decision. A linked compile
+fails if the exact reached profile has no provider-owned effect record.
+
+Declaration requirements are revision-owned, not an append-only global set.
+Reconstructing an artifact atomically replaces all requirements that revision
+contributes; an unreferenced profile therefore cannot survive as provider
+surface. Provider obligations and manifests contain only requirements with at
+least one current root or artifact owner. Removing the last owner reconstructs
+the affected declaration and deletes the superseded facet in the same
+convergence cycle.
+
 ### Standard-Library Provider Surface
 
 Reusable standard-library behavior is published as the GoToTS-owned ESM
@@ -1311,6 +1362,15 @@ receiver-name concatenation, or another encoded ABI spelling. An internal
 facet exact-joins one public Go declaration and one provider implementation;
 it may not become a second semantic implementation.
 
+The manifest gives each internal facet one stable provider-owned module and
+export. Generated code never derives that name from a Go spelling or profile
+digest. For example, any certified cooperative `slices.SortFunc` profile may
+map to the provider-owned
+`@gotots/gostdlib/internal/facets/slices.js` export
+`SortFuncCooperative`; the exact profile key and outer effect remain manifest
+data. The internal export is an adapter to the one ordinary semantic
+implementation, not a second implementation.
+
 The selected `GOROOT` remains the declaration truth owner. For every public
 provider export, verification records and joins:
 
@@ -1328,6 +1388,17 @@ A missing implementation, mismatched signature, unexplained public export,
 duplicate owner, placeholder, or unsupported selected profile fails before
 linkage. The provider may be installed normally or vendored into the generated
 product under the same package name; generated source is identical either way.
+
+Linked compilation consumes that already-certified manifest as an explicit
+compilation input. Standard-library references become typed TS-Go namespace
+imports and property accesses (`strings.Contains`, `os.File.Read`,
+`os.state.Args`); ambient standard-library files are absent. An empty provider
+selection is the separate compile-only ambient profile, never an implicit
+fallback after a linked lookup fails. All reference forms—including values,
+types, methods, package state, generic profiles, deferred calls, and method
+values—must construct qualified TS-Go AST nodes through the canonical name
+reference API; concatenated dotted identifiers and post-print rewriting are
+forbidden.
 
 Generic non-struct defined types retain one parameterized nominal wrapper.
 Every target reference carries the exact represented `go/types` type arguments,
@@ -1708,6 +1779,16 @@ runtime owner; a generated `value!` may not substitute for a proved invariant.
 Compiler handlers still own Go evaluation order and copy boundaries; runtime
 code does not rediscover source semantics.
 
+Dense pointer, array, and slice storage shares one demanded structural
+indexed-read owner. Its generic `get<T>` reads once, proves the numeric property
+is present with an `in`-based type predicate, panics for a missing or sparse
+slot, and returns `T`. This distinction is semantic: `[undefined]` may be a
+present Go nil value, while `new Array(1)` is absent storage and must not be
+accepted as nil. The owner is O(1), carries no source type tag or semantic
+callback, and is emitted once only when one of those runtime families demands
+it. Family-local indexed-read implementations, `value!`, casts, and
+`value ?? zero` recovery are forbidden.
+
 Aggregate container operations therefore compose at the source operation
 owner. That owner emits typed TS-Go loops which call the already-selected
 zero/copy/equality/hash structures directly. Runtime array and slice classes
@@ -1867,10 +1948,15 @@ internal/emit/expression/call/
   handler_test.go
 ```
 
-No directory is pre-populated. Before a directory would exceed twenty
-maintained non-generated Go files, stop and review its truth owner; extract a
-coherent semantic sub-owner rather than mechanically splitting filenames.
-Maintained non-generated files remain below 600 physical lines.
+No directory is pre-populated. Production files and `_test.go` files are
+separate Go source sets with separate owners; neither source set may exceed
+twenty maintained non-generated files in one directory. Before either set
+would exceed that bound, stop and review its truth owner and extract a coherent
+semantic or verification sub-owner rather than mechanically splitting or
+merging unrelated filenames. An aggregate production-plus-test count is not an
+organization metric because it pressures two mutually exclusive build sets
+into one file responsibility. Maintained non-generated files remain below 600
+physical lines.
 
 There is no `ir/`, `plan/`, `lower/`, `catalog/`, `inventory/`, `legacy/`,
 `compat/`, `fallback/`, `util/`, `helpers/`, `misc/`, `common/`, or `shared/`

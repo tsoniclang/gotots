@@ -1,4 +1,4 @@
-package emit_test
+package packagestate_test
 
 import (
 	"context"

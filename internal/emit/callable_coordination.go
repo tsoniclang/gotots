@@ -413,7 +413,7 @@ func (s *programSession) reconstructCallableContractArtifact(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(owner, contract, nil); err != nil {
+	if err := s.commitArtifactContract(owner, contract, nil); err != nil {
 		return err
 	}
 	s.artifacts.DiscardDirty(owner)
@@ -437,7 +437,7 @@ func (s *programSession) ensureCallableContractBaseline(
 	if err != nil {
 		return err
 	}
-	return s.artifacts.Commit(owner, contract, nil)
+	return s.commitArtifactContract(owner, contract, nil)
 }
 
 func (s *programSession) callableContract(

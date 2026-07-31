@@ -192,8 +192,7 @@ func EmitCapabilities(
 				providerObservation.Requests(),
 				consumerObservation.Requests(),
 			)
-			if providerObservation.Cooperative() &&
-				!consumerObservation.Cooperative() {
+			if providerObservation.Cooperative() {
 				request, requestErr :=
 					api.NewCooperativeCallableRequest(consumerFacet)
 				if requestErr != nil {

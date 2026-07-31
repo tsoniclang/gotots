@@ -10,6 +10,7 @@ const (
 	RuntimeStringMin            RuntimeSymbol = 4
 	RuntimeStringEncodeRune     RuntimeSymbol = 5
 	RuntimeStringDecodeRune     RuntimeSymbol = 6
+	RuntimeDenseIndex           RuntimeSymbol = 90
 	RuntimePointer              RuntimeSymbol = 100
 	RuntimePointerHash          RuntimeSymbol = 101
 	RuntimeArray                RuntimeSymbol = 200
@@ -132,6 +133,14 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goStringDecodeRune",
 			false,
 		), nil
+	case RuntimeDenseIndex:
+		return runtimeContract(
+			RuntimeModuleDenseIndex,
+			"runtime/dense-index.ts",
+			"GoDenseIndex",
+			false,
+			RuntimePanic,
+		), nil
 	case RuntimePointer:
 		return runtimeContract(
 			RuntimeModulePointer,
@@ -139,6 +148,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoPointer",
 			true,
 			RuntimePanic,
+			RuntimeDenseIndex,
 		), nil
 	case RuntimePointerHash:
 		return runtimeContract(
@@ -156,6 +166,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoArray",
 			true,
 			RuntimePanic,
+			RuntimeDenseIndex,
 		), nil
 	case RuntimeArrayAllocate:
 		return runtimeContract(
@@ -188,6 +199,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"RuntimeSlice",
 			true,
 			RuntimePanic,
+			RuntimeDenseIndex,
 		), nil
 	case RuntimeSliceAddress:
 		return runtimeContract(

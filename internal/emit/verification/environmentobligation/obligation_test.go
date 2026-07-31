@@ -1,4 +1,4 @@
-package emit_test
+package environmentobligation_test
 
 import (
 	"context"

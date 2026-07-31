@@ -134,28 +134,18 @@ func contractJoinLeaf(
 		)
 		cooperative := declarationObservation.Cooperative() ||
 			instantiatedObservation.Cooperative()
-		for _, candidate := range []struct {
-			facet       api.CallableFacet
-			cooperative bool
-		}{
-			{
-				facet:       declarationFacet,
-				cooperative: declarationObservation.Cooperative(),
-			},
-			{
-				facet:       instantiatedFacet,
-				cooperative: instantiatedObservation.Cooperative(),
-			},
-		} {
-			if !cooperative || candidate.cooperative {
-				continue
+		if cooperative {
+			for _, candidate := range []api.CallableFacet{
+				declarationFacet,
+				instantiatedFacet,
+			} {
+				request, requestErr :=
+					api.NewCooperativeCallableRequest(candidate)
+				if requestErr != nil {
+					return requestErr
+				}
+				*requests = append(*requests, request)
 			}
-			request, requestErr :=
-				api.NewCooperativeCallableRequest(candidate.facet)
-			if requestErr != nil {
-				return requestErr
-			}
-			*requests = append(*requests, request)
 		}
 		return nil
 	}

@@ -42,6 +42,7 @@ type packageStorageRevision struct {
 	statePlacement    *targetplacement.Owner
 	assemblyPlacement *targetplacement.Owner
 	dependencies      []api.ArtifactDependency
+	requirements      []api.DeclarationRequirement
 	contract          artifactstate.Contract
 }
 
@@ -242,10 +243,11 @@ func (s *programSession) emitPackageStorage(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
@@ -313,17 +315,18 @@ func (s *programSession) buildPackageStorageRevision(
 	if err != nil {
 		return packageStorageRevision{}, err
 	}
-	statePlacement, stateDependencies, err := s.consumeArtifactRequests(
-		owner,
-		emission.StateRequests(),
-	)
+	statePlacement, stateDependencies, stateRequirements, err :=
+		s.consumeArtifactRequests(
+			owner,
+			emission.StateRequests(),
+		)
 	if err != nil {
 		return packageStorageRevision{}, err
 	}
 	if err := statePlacement.RequireTypeOnly(); err != nil {
 		return packageStorageRevision{}, err
 	}
-	assemblyPlacement, assemblyDependencies, err :=
+	assemblyPlacement, assemblyDependencies, assemblyRequirements, err :=
 		s.consumeArtifactRequests(
 			owner,
 			emission.AssemblyRequests(),
@@ -344,6 +347,10 @@ func (s *programSession) buildPackageStorageRevision(
 			stateDependencies,
 			assemblyDependencies...,
 		),
+		requirements: canonicalDeclarationRequirements(append(
+			stateRequirements,
+			assemblyRequirements...,
+		)),
 		contract: contract,
 	}, nil
 }
@@ -401,10 +408,11 @@ func (s *programSession) reconstructPackageStorage(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
