@@ -37,6 +37,7 @@ void Hidden;
 `)
 	entryPath := filepath.Join(projectDirectory, "entry.ts")
 	writeProjectFile(t, entryPath, `export { Box, Value } from "./implementation.js";
+export const count: number = 1;
 export const state: { Count: number } = { Count: 0 };
 `)
 	renamedPath := filepath.Join(projectDirectory, "renamed.ts")
@@ -70,7 +71,7 @@ export const state: { Count: number } = { Count: 0 };
 			len(selected.Declarations()) == 0 {
 			t.Fatalf("invalid export %#v", selected)
 		}
-		if selected.Name() == "state" {
+		if selected.Name() == "count" || selected.Name() == "state" {
 			if !slices.Equal(
 				selected.Declarations(),
 				[]string{filepath.ToSlash(entryPath)},
@@ -93,7 +94,7 @@ export const state: { Count: number } = { Count: 0 };
 			)
 		}
 	}
-	if !slices.Equal(names, []string{"Box", "Value", "state"}) {
+	if !slices.Equal(names, []string{"Box", "Value", "count", "state"}) {
 		t.Fatalf("exports = %v", names)
 	}
 	renamed, err := project.Exports(renamedPath)

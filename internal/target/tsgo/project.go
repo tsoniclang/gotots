@@ -251,7 +251,12 @@ func (p *ProjectInspection) projectExport(
 		); err != nil {
 			return ProjectExport{}, err
 		}
-		if typeSymbol != nil && len(typeSymbol.Declarations) != 0 {
+		if typeSymbol != nil &&
+			len(typeSymbol.Declarations) != 0 &&
+			declarationsWithinProject(
+				typeSymbol.Declarations,
+				filepath.Dir(p.config),
+			) {
 			declarationHandles = typeSymbol.Declarations
 		}
 	}
@@ -336,6 +341,25 @@ func declarationPath(handle string) (string, bool) {
 		return "", false
 	}
 	return path, true
+}
+
+func declarationsWithinProject(handles []string, root string) bool {
+	if len(handles) == 0 {
+		return false
+	}
+	for _, handle := range handles {
+		path, ok := declarationPath(handle)
+		if !ok {
+			return false
+		}
+		relative, err := filepath.Rel(root, filepath.FromSlash(path))
+		if err != nil ||
+			relative == ".." ||
+			strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return false
+		}
+	}
+	return true
 }
 
 func projectInspectionError(
