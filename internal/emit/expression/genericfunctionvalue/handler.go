@@ -116,6 +116,26 @@ func Emit(
 		target.SourceParameterReferences(context.Factory())...,
 	)
 	arguments = append(arguments, recoveryAuthority)
+	callee := reference.Expression(context.Factory())
+	calleeRequests := reference.Requests()
+	if !selection.Cooperative() {
+		recoveryReference, providerOwned, recoveryErr :=
+			context.Names().RecoveryCallable(owner)
+		if recoveryErr != nil {
+			return api.ExpressionEmission{}, true, recoveryErr
+		}
+		if providerOwned {
+			if recoveryReference.Cooperative() && !abiCooperative {
+				return api.ExpressionEmission{}, true, &api.InvariantError{
+					Role: context.Role(),
+					Reason: "asynchronous provider recovery facet has a " +
+						"synchronous generic function-value ABI",
+				}
+			}
+			callee = recoveryReference.Expression(context.Factory())
+			calleeRequests = recoveryReference.Requests()
+		}
+	}
 	controlRequest, err := api.NewDirectCallableControlRequest(
 		owner,
 		api.CallableControlRecovery,
@@ -142,7 +162,7 @@ func Emit(
 			resultType,
 			context.Factory().EqualsGreaterThanToken(),
 			context.Factory().CallExpression(
-				reference.Expression(context.Factory()),
+				callee,
 				nil,
 				typeArguments,
 				arguments,
@@ -153,7 +173,7 @@ func Emit(
 			target.Requests(),
 			typeRequests,
 			capabilityRequests,
-			reference.Requests(),
+			calleeRequests,
 			contractRequests,
 			[]api.RootRequest{controlRequest},
 		)...,

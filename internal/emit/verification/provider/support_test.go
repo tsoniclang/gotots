@@ -81,11 +81,55 @@ func waveThreeTypecheck(
 	paths []string,
 ) {
 	t.Helper()
+	providerRoot, err := filepath.Abs(
+		filepath.Join(repositoryRoot(), "gostdlib"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packageRoot := filepath.Join(
+		workingDirectory,
+		"node_modules",
+		"@gotots",
+	)
+	if err := os.MkdirAll(packageRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	providerPackage := filepath.Join(packageRoot, "gostdlib")
+	if err := os.MkdirAll(providerPackage, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	packageDocument, err := os.ReadFile(
+		filepath.Join(providerRoot, "package.json"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(providerPackage, "package.json"),
+		packageDocument,
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.CopyFS(
+		filepath.Join(providerPackage, "dist"),
+		os.DirFS(filepath.Join(providerRoot, "dist")),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(
+		"../../runtime",
+		filepath.Join(packageRoot, "runtime"),
+	); err != nil {
+		t.Fatal(err)
+	}
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
 		"--moduleResolution", "nodenext",
 		"--strict",
+		"--noUncheckedIndexedAccess",
 		"--outDir", filepath.Join(workingDirectory, "out"),
 	}
 	arguments = append(arguments, paths...)

@@ -136,7 +136,8 @@ func (n *File) InterfaceContract(
 ) (api.InterfaceContractReference, error) {
 	if typeName, interfaceType, ok := namedInterface(sourceType); ok {
 		named := types.Unalias(sourceType).(*types.Named)
-		if named.TypeArgs().Len() != 0 {
+		if named.TypeArgs().Len() != 0 ||
+			n.providerInterfaceContract(typeName) {
 			return n.generatedInterfaceContract(interfaceType)
 		}
 		return n.namedInterfaceContract(typeName)
@@ -219,7 +220,10 @@ func (n *File) generatedInterfaceContract(
 func (n *File) InterfaceType(
 	sourceType types.Type,
 ) (api.NameReference, error) {
-	if typeName, _, ok := namedInterface(sourceType); ok {
+	if typeName, interfaceType, ok := namedInterface(sourceType); ok {
+		if n.providerInterfaceContract(typeName) {
+			return n.generatedInterfaceType(interfaceType)
+		}
 		return n.TypeReference(typeName)
 	}
 	interfaceType, ok := anonymousInterface(sourceType)
@@ -234,6 +238,12 @@ func (n *File) InterfaceType(
 			Reason: "interface type is invalid",
 		}
 	}
+	return n.generatedInterfaceType(interfaceType)
+}
+
+func (n *File) generatedInterfaceType(
+	interfaceType *types.Interface,
+) (api.NameReference, error) {
 	artifactKey, err := typeidentity.BuildKey(
 		interfaceType,
 		n.generatedNamedObjectIdentity,
@@ -296,6 +306,14 @@ func (n *File) InterfaceType(
 	}
 	requests = append(requests, importRequest)
 	return api.NewNameReference(binding.name, requests...)
+}
+
+func (n *File) providerInterfaceContract(typeName *types.TypeName) bool {
+	if n == nil || n.owner == nil || n.owner.registry == nil || typeName == nil {
+		return false
+	}
+	binding, ok := n.owner.registry.byObject[typeName]
+	return ok && binding.kind == targetBindingProvider
 }
 
 func (n *File) namedInterfaceContract(

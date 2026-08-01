@@ -22,10 +22,14 @@ func TestLinkedProviderDoesNotReconstructPrivateGoRepresentation(t *testing.T) {
 	writeProgramFile(t, filepath.Join(project, "source.go"), `package providercoverage
 
 import (
+	"cmp"
 	"reflect"
 	"slices"
 	"encoding/binary"
+	"fmt"
+	"io"
 	"io/fs"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -56,6 +60,32 @@ func AppendLittle(buffer []byte, value uint32) []byte {
 
 func BigOrder() binary.ByteOrder {
 	return binary.BigEndian
+}
+
+func FileWriter(file *os.File) io.Writer {
+	return file
+}
+
+type BlockingString struct{}
+
+func (value BlockingString) String() string {
+	var mutex sync.Mutex
+	mutex.Lock()
+	return "ready"
+}
+
+func DynamicStringer(value BlockingString) fmt.Stringer {
+	return value
+}
+
+func BlockingCompare(left string, right string) int {
+	var mutex sync.Mutex
+	mutex.Lock()
+	return 0
+}
+
+func CompareValue() func(string, string) int {
+	return cmp.Compare[string]
 }
 
 func PathFailure(failure error) error {
@@ -146,6 +176,10 @@ func BuilderAddress(state *ProviderState) *strings.Builder {
 			bigOrderRoot,
 			pathFailureRoot,
 			deferredRecoveryRoot,
+			mustProviderRoot(t, scope.Lookup("FileWriter")),
+			mustProviderRoot(t, scope.Lookup("DynamicStringer")),
+			mustProviderRoot(t, scope.Lookup("BlockingCompare")),
+			mustProviderRoot(t, scope.Lookup("CompareValue")),
 			mustProviderRoot(t, scope.Lookup("ProviderReceivers")),
 			mustProviderRoot(t, scope.Lookup("StoredProviderReceivers")),
 			mustProviderRoot(t, scope.Lookup("MutexAddress")),
@@ -163,7 +197,35 @@ func BuilderAddress(state *ProviderState) *strings.Builder {
 	}
 	assertProviderGrowCapabilityABI(t, emission)
 	assertProviderRepresentationABI(t, emission)
+	assertProviderInterfaceAdapterRecoveryABI(t, emission)
 	assertProviderReceiverProjection(t, emission)
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+}
+
+func assertProviderInterfaceAdapterRecoveryABI(
+	t *testing.T,
+	emission emit.ProgramEmission,
+) {
+	t.Helper()
+	printed := materializeArtifacts(t, emission, t.TempDir()).printed
+	for _, required := range []string{
+		"BinaryBigEndianString(this.$go$value, $go$recovery)",
+		"OsFileWrite(this.$go$value, $argument0, $go$recovery)",
+		"CmpCompare<gostring>($argument0, $argument1, $go$recovery)",
+	} {
+		if !strings.Contains(printed, required) {
+			t.Fatalf("provider adapter lacks recovery facet %q:\n%s", required, printed)
+		}
+	}
+	for _, forbidden := range []string{
+		"File.Write(this.$go$value, $argument0, $go$recovery)",
+	} {
+		if strings.Contains(printed, forbidden) {
+			t.Fatalf("provider adapter bypasses recovery facet with %q:\n%s", forbidden, printed)
+		}
+	}
 }
 
 func mustProviderRoot(t *testing.T, object types.Object) emit.Root {

@@ -383,7 +383,11 @@ func emitMethod(
 				Reason: "adapter method lacks recovery authority",
 			}
 		}
-		targetCall, targetRequests, callErr := invocation.Call(
+		targetCall,
+			providerRecovery,
+			recoveryCooperative,
+			targetRequests,
+			callErr := invocation.RecoveryCall(
 			context,
 			receiver.Value(),
 			target.SourceParameterReferences(context.Factory()),
@@ -394,6 +398,9 @@ func emitMethod(
 				MethodStageInvocation,
 				callErr,
 			)
+		}
+		if providerRecovery {
+			providerCooperative = recoveryCooperative
 		}
 		call = api.DirectExpression(targetCall, targetRequests...)
 		callRequests = receiver.Requests()

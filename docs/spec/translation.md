@@ -1835,6 +1835,41 @@ only when the callable surface changes. An instantiated function value is one
 typed arrow that captures the functions once; `.bind`, `.call`, `.apply`,
 runtime inference, and monomorphized duplicate bodies are forbidden.
 
+If the instantiated function belongs to a linked provider, that arrow invokes
+the provider surface certified for every hidden argument it forwards. For
+example:
+
+```go
+func CompareValue() func(string, string) int {
+    return cmp.Compare[string]
+}
+```
+
+When the selected callable ABI carries recovery, its target shape is:
+
+```ts
+return async (
+    left: gostring,
+    right: gostring,
+    $go$recovery?: GoRecovery,
+): Promise<int64> =>
+    cmpRecovery.CmpCompare<gostring>(left, right, $go$recovery);
+```
+
+The ordinary provider export `cmp.Compare(left, right)` has no recovery slot,
+so appending `$go$recovery` to it is not an adaptation; it is an ABI error.
+The selected recovery facet remains one thin typed call to the provider's one
+semantic implementation.
+
+Provider-backed named interfaces are likewise represented inside generated
+code by the canonical generated interface contract, not by the provider's
+fixed public declaration. Given a concrete `String() string` method selected
+as cooperative, a conversion to `fmt.Stringer` produces an adapter whose
+`String(): Promise<gostring>` exactly matches that generated contract. A later
+provider call may consume it only through a certified boundary profile that
+declares the same selected ABI; TypeScript structural assignability is not
+used to erase the difference.
+
 ### Generic Operations
 
 Zero, copy, equality, hash, unary/binary operators, conversions, indexing,

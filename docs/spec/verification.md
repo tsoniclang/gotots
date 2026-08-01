@@ -828,6 +828,23 @@ share one provider module, in both request orders. Both must resolve to one
 module-owned namespace name and one import. Restoring source-package ownership,
 lazy first-visitor naming, or duplicate namespace requests must fail.
 
+The linked-provider strict fixture also transports `cmp.Compare[string]` as a
+function value while another function of the same Go signature is
+cooperative. Artifact inspection must show the wrapper forwarding recovery to
+the certified `CmpCompare<gostring>` facet and must reject a call to the
+two-argument public `cmp.Compare` export with a third argument. The same
+fixture converts synchronous and cooperative concrete values to provider-
+backed named interfaces and proves generated references use one canonical
+selected interface contract rather than the provider's fixed public interface.
+Mutations restoring either raw provider type substitution or a direct public
+call with hidden recovery must fail linked strict typechecking.
+
+For every provider callable boundary that consumes or returns an interface,
+verification exact-joins the selected canonical method facets to the certified
+boundary method facets and outer effect. A mutation that drops one method,
+changes sync to cooperative, accepts the provider's public interface without
+an exact join, or replaces adaptation with a cast must fail before execution.
+
 The same gate compiles a linked function that accepts, zeroes, copies, and
 returns `reflect.Value`. It proves that the provider import and certified
 `zero`/`copy` facets are selected, no ambient standard-library artifact is

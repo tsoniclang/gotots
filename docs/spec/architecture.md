@@ -1293,6 +1293,26 @@ apply profile-local ABI selections. Environment contracts never infer
 cooperation from source spelling or from the mere presence of a nested
 function type.
 
+A linked provider's public interface declaration is an implementation surface,
+not the selected program's semantic interface ABI. Every generated reference
+to a provider-backed named Go interface therefore uses the same canonical
+generated interface contract as any other interface value, keyed by the exact
+completed `go/types.Interface` and its selected method-callable facets. For
+example, if a concrete `fmt.Stringer.String` implementation blocks, generated
+values use `String(): Promise<gostring>` even though the provider's ordinary
+public `fmt.Stringer` remains synchronous. Substituting the public provider
+interface as the generated program type would create two truth owners and is
+forbidden.
+
+A provider callable that accepts or returns such an interface crosses an
+explicit certified boundary. Its ordinary binding is usable directly only
+when every consumed interface-method ABI is structurally identical to the
+canonical selected contract. Otherwise one exact provider profile or facet
+must own the required method set, callable effects, adaptation, and outer
+effect. A cast, `any`, `unknown`, raw structural assignment, or widening the
+public provider interface is not a boundary. The compiler never infers which
+methods a provider uses from its source text or target shape.
+
 The outer callable effect of an environment provider is never inferred merely
 because a parameter or result contains a cooperative callable. A selected
 `gostdlib` or external implementation contract must own that effect and the
@@ -1497,6 +1517,15 @@ zero elements and copy the old backing values without `any`, `unknown`, target
 shape inspection, sparse-array holes, or a compiler check for the name
 `Grow`. Removing either certified operation changes the call AST and fails the
 provider ABI gate.
+
+Recovery authority follows the same certified-boundary rule for every call
+form. A generated direct call, deferred call, selected method call, interface
+adapter method, or instantiated generic function value may pass a recovery
+argument only to a certified `recovery-callable` facet or to a selected generic
+profile whose inspected signature contains that slot. It must never append the
+argument to the ordinary public provider export. Thus a transported
+`cmp.Compare[string]` uses the certified `CmpCompare<string>` recovery facet,
+while an ordinary direct `cmp.Compare` call keeps the clean public ABI.
 
 For example, a generated zero of `sync.Mutex` does not call a `$zero` member on
 the public `sync.Mutex` class. The selected `sync.Mutex` identity plus capability
