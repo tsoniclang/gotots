@@ -508,6 +508,10 @@ The first named-struct family additionally proves:
 
 - empty structs and grouped field declarations use the same single
   representation owner;
+- every unnamed `struct{}` occurrence, including `context.Context.Done()`
+  across the linked provider boundary, exact-joins one `GoEmptyStruct` runtime
+  type; no anonymous support class, `void` element, `{}` element, or
+  provider-local marker remains;
 - two field-identical named Go structs remain incompatible in strict
   TypeScript through an erased nominal brand;
 - zero values allocate fresh nested records;

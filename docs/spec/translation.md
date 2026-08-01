@@ -1211,6 +1211,17 @@ not decide placement. A root request or digest is only an artifact key and
 must carry or validate the exact Go type; it is not a second type-identity
 model.
 
+The single fieldless unnamed type `struct{}` is the exact bounded exception:
+all occurrences are `types.Identical`, and no tag, blank field, package-private
+field, embeddedness, or component scope remains to distinguish. It therefore
+uses one GoToTS-owned nominal runtime value, `GoEmptyStruct`, rather than a
+compilation-local anonymous-struct artifact. The runtime owner supplies its
+zero, copy, equality, hash, construction, and identity storage operations.
+`gostdlib` uses that same value for standard-library contracts such as
+`context.Context.Done() <-chan struct{}`; `void`, `{}`, `object`, and a second
+provider-local empty marker are forbidden substitutes. Named empty structs
+remain distinct named Go types and continue through their named owner.
+
 Each canonical anonymous declaration owns its field storage and demanded
 static zero, copy, equality, hash, and structural-conversion members once.
 Ordinary construction may remain direct, but operation use sites are

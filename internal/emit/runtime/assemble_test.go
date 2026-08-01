@@ -96,6 +96,28 @@ func TestUnsafePointerRuntimeIsNominalAndTypedPlaceholder(t *testing.T) {
 	}
 }
 
+func TestEmptyStructRuntimeHasOneExactNominalOwner(t *testing.T) {
+	definitions, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleStruct,
+		[]api.RuntimeSymbol{api.RuntimeEmptyStruct},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 1 ||
+		definitions[0].Symbol() != api.RuntimeEmptyStruct {
+		t.Fatalf("empty-struct definitions = %#v", definitions)
+	}
+	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
+	if !ok || class.Name().Text() != "GoEmptyStruct" || len(class.Members()) != 10 {
+		t.Fatalf(
+			"empty-struct owner = %T with unexpected shape",
+			definitions[0].Statement(),
+		)
+	}
+}
+
 func TestUnsafeRuntimeExactJoinsFourIntrinsicDefinitions(t *testing.T) {
 	symbols := []api.RuntimeSymbol{
 		api.RuntimeUnsafeString,

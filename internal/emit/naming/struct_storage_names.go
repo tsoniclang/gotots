@@ -222,6 +222,9 @@ func (n *File) AnonymousStructStorage(
 			Reason: "anonymous-struct storage type is nil",
 		}
 	}
+	if structType.NumFields() == 0 {
+		return n.Runtime(api.RuntimeEmptyStruct, api.ImportPhaseType)
+	}
 	artifactKey, err := typeidentity.BuildKey(
 		structType,
 		n.generatedNamedObjectIdentity,

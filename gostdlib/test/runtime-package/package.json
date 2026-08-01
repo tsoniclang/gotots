@@ -47,6 +47,10 @@
       "types": "./slice.d.ts",
       "default": "./slice.js"
     },
+    "./struct.js": {
+      "types": "./struct.d.ts",
+      "default": "./struct.js"
+    },
     "./unsafe-pointer.js": {
       "types": "./unsafe-pointer.d.ts",
       "default": "./unsafe-pointer.js"

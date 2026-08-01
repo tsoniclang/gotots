@@ -8,8 +8,8 @@
   "maximumGoVersion": "go1.26.4",
   "goos": "linux",
   "goarch": "amd64",
-  "runtimeDigest": "ae75219a3ca68c3dd5316af5372a357a4e1024c8fa54d3b1150acc110346f286",
-  "providerDigest": "bbbeb4c969d4e6c1d51268ba03e608e8cf0b0730691073bf21670eaf6ed6d319",
+  "runtimeDigest": "db1de728c4a9cb1fa90cb50e6455943d3c891a65be39185c76a66186354755d5",
+  "providerDigest": "47dc464436a96a81dc67e7537669eed1a6e260600eda29e639738031636ea1ae",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -374,7 +374,7 @@
           "sourceSignature": "defined=context.Context|underlying=interface{Deadline() (deadline time.Time, ok bool); Done() \u003c-chan struct{}; Err() error; Value(key any) any}",
           "sourceLocation": "context/context.go:71:6",
           "implementationOwner": "src/internal/portable/context/context.ts",
-          "targetFingerprint": "f7dd2c8b485e988e924da2855c5aad82ac8610893985380d3c7d2a85ae625548"
+          "targetFingerprint": "41ed1ceae7e6e5a467bcfac8be6f32dc730f1bcd30fe28bc02c8697a28ca8ba6"
         },
         {
           "identity": "context|kind=3|receiver=|name=Canceled",
@@ -10478,5 +10478,5 @@
       ]
     }
   ],
-  "manifestDigest": "99c4b4598ad1d74bad4ee4f25ba1c8d5791eff761b49f5af1bb0c4250e3c306e"
+  "manifestDigest": "1c7fe54e9079e1fcf3fc592c7acf614159a1195081856f97881071fa36f42cc7"
 }

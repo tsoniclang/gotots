@@ -7,6 +7,7 @@ import { GoInterfaceValue as InterfaceValue } from "@gotots/runtime/interface-va
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { bool } from "@gotots/runtime/scalars.js";
+import { GoEmptyStruct } from "@gotots/runtime/struct.js";
 import { ProviderError } from "../../runtime/error.js";
 import { ProviderChannel } from "../concurrency/channel.js";
 import { After } from "../time/timer.js";
@@ -19,7 +20,7 @@ const deadlineExceeded = new ProviderError("context deadline exceeded");
 
 export interface Context extends GoInterfaceValue {
   Deadline(): [Time, bool];
-  Done(): GoReceiveChannel<void> | undefined;
+  Done(): GoReceiveChannel<GoEmptyStruct> | undefined;
   Err(): GoError | undefined;
   Value(key: GoInterfaceValue | undefined): GoInterfaceValue | undefined;
 }
@@ -30,7 +31,7 @@ abstract class ContextValue extends InterfaceValue implements Context {
   readonly $go$formatString = false;
 
   abstract Deadline(): [Time, bool];
-  abstract Done(): GoReceiveChannel<void> | undefined;
+  abstract Done(): GoReceiveChannel<GoEmptyStruct> | undefined;
   abstract Err(): GoError | undefined;
   abstract Value(key: GoInterfaceValue | undefined): GoInterfaceValue | undefined;
 
@@ -73,7 +74,11 @@ class EmptyContext extends ContextValue {
 }
 
 class CancelContext extends ContextValue {
-  readonly #done = new ProviderChannel<void>(() => undefined, () => undefined, 0);
+  readonly #done = new ProviderChannel<GoEmptyStruct>(
+    () => GoEmptyStruct.$zero(),
+    (value) => GoEmptyStruct.$copy(value),
+    0,
+  );
   #failure: GoError | undefined;
 
   constructor(
@@ -99,7 +104,7 @@ class CancelContext extends ContextValue {
     return this.parent.Deadline();
   }
 
-  Done(): GoReceiveChannel<void> {
+  Done(): GoReceiveChannel<GoEmptyStruct> {
     return this.#done;
   }
 
@@ -133,7 +138,7 @@ class ValueContext extends ContextValue {
     return this.parent.Deadline();
   }
 
-  Done(): GoReceiveChannel<void> | undefined {
+  Done(): GoReceiveChannel<GoEmptyStruct> | undefined {
     return this.parent.Done();
   }
 

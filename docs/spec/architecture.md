@@ -1313,6 +1313,14 @@ effect. A cast, `any`, `unknown`, raw structural assignment, or widening the
 public provider interface is not a boundary. The compiler never infers which
 methods a provider uses from its source text or target shape.
 
+Representation components shared by generated and provider code have one
+GoToTS runtime owner. In particular, unnamed `struct{}` is represented by the
+same nominal `GoEmptyStruct` in generated channel element types and provider
+implementations. A provider may not approximate it with `void` or a local
+marker and force a callable-boundary adapter to compensate. Provider-boundary
+profiles remain responsible only for genuine interface-method ABI differences,
+not duplicate representations of an identical Go type.
+
 The outer callable effect of an environment provider is never inferred merely
 because a parameter or result contains a cooperative callable. A selected
 `gostdlib` or external implementation contract must own that effect and the

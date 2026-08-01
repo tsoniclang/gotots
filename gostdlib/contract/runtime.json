@@ -103,6 +103,10 @@
       "export": "GoError"
     },
     {
+      "id": 1050,
+      "export": "GoEmptyStruct"
+    },
+    {
       "id": 1101,
       "export": "GoReceiveChannel"
     },

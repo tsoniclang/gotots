@@ -30,6 +30,9 @@ func (n *File) AnonymousStruct(
 			Reason: "anonymous-struct demand is invalid",
 		}
 	}
+	if structType.NumFields() == 0 {
+		return n.Runtime(api.RuntimeEmptyStruct, phase)
+	}
 	artifactKey, err := typeidentity.BuildKey(
 		structType,
 		n.generatedNamedObjectIdentity,

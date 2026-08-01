@@ -320,8 +320,17 @@ func Use(mutex *sync.Mutex, builder *strings.Builder) int {
 			t.Fatalf("direct provider receiver lacks %q:\n%s", direct, printed)
 		}
 	}
-	if strings.Contains(printed, "$fromStorage") {
-		t.Fatalf("direct provider receiver was needlessly projected:\n%s", printed)
+	for _, projection := range []string{
+		"SyncMutexOperations.$fromStorage",
+		"StringsBuilderOperations.$fromStorage",
+	} {
+		if strings.Contains(printed, projection) {
+			t.Fatalf(
+				"direct provider receiver was needlessly projected by %q:\n%s",
+				projection,
+				printed,
+			)
+		}
 	}
 }
 

@@ -72,6 +72,7 @@ const (
 	RuntimeErrorContract        RuntimeSymbol = 1009
 	RuntimeErrorGuard           RuntimeSymbol = 1010
 	RuntimeInterfaceFormat      RuntimeSymbol = 1011
+	RuntimeEmptyStruct          RuntimeSymbol = 1050
 	RuntimeChannel              RuntimeSymbol = 1100
 	RuntimeReceiveChannel       RuntimeSymbol = 1101
 	RuntimeSendChannel          RuntimeSymbol = 1102
@@ -515,6 +516,13 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/conversion.ts",
 			"goNumberToBigInt",
 			false,
+		), nil
+	case RuntimeEmptyStruct:
+		return runtimeContract(
+			RuntimeModuleStruct,
+			"runtime/struct.ts",
+			"GoEmptyStruct",
+			true,
 		), nil
 	case RuntimeUnsafePointer:
 		return runtimeContract(

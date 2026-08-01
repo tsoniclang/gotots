@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
+import type { GoEmptyStruct } from "@gotots/runtime/struct.js";
 import { ProviderError } from "../src/internal/runtime/error.js";
 import {
   AfterFunc as ContextAfterFunc,
@@ -91,6 +93,10 @@ test("After and AfterFunc schedule through the provider clock", async () => {
 
 test("Context cancellation, causes, values, and deadlines propagate", async () => {
   const root = Background();
+  const canonicalDoneOwner: {
+    Done(): GoReceiveChannel<GoEmptyStruct> | undefined;
+  } = root;
+  assert.equal(canonicalDoneOwner.Done(), undefined);
   assert.notEqual(TODO(), root);
   const key = new ProviderError("key");
   const value = new ProviderError("value");

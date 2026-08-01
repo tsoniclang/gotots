@@ -342,6 +342,7 @@ const (
 	RuntimeModuleUnsafePointer
 	RuntimeModuleDenseIndex
 	RuntimeModuleUnsafe
+	RuntimeModuleStruct
 )
 
 func runtimeContract(

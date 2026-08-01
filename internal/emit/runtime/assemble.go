@@ -7,6 +7,7 @@ import (
 	runtimearray "github.com/tsoniclang/gotots/internal/emit/runtime/array"
 	complexruntime "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
 	conversionruntime "github.com/tsoniclang/gotots/internal/emit/runtime/conversion"
+	emptystructruntime "github.com/tsoniclang/gotots/internal/emit/runtime/emptystruct"
 	floatruntime "github.com/tsoniclang/gotots/internal/emit/runtime/float"
 	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
@@ -395,6 +396,26 @@ func Build(
 			definitions = append(definitions, definition)
 		}
 		return definitions, nil
+	}
+	if module == api.RuntimeModuleStruct {
+		if len(symbols) != 1 || symbols[0] != api.RuntimeEmptyStruct {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "struct runtime requires exactly RuntimeEmptyStruct",
+			}
+		}
+		contract, err := api.RuntimeContract(api.RuntimeEmptyStruct)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(
+			api.RuntimeEmptyStruct,
+			emptystructruntime.Build(factory, contract.ExportedName()),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
 	}
 	if module == api.RuntimeModuleChannel {
 		return buildChannel(factory, symbols)
