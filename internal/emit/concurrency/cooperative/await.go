@@ -207,6 +207,19 @@ func Operation(
 	return await(context, source, target, true, false)
 }
 
+func ProviderProfileCall(
+	context api.Context,
+	source ast.Node,
+	target api.ExpressionEmission,
+	cooperative bool,
+	detached bool,
+) (api.ExpressionEmission, error) {
+	if !cooperative {
+		return target, nil
+	}
+	return await(context, source, target, !detached, false)
+}
+
 func ValueContract(
 	context api.Context,
 	signature *types.Signature,

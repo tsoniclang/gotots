@@ -147,3 +147,22 @@ func (c *Certificate) ProviderRepresentation(
 	}
 	return c.manifest.ProviderRepresentation(module, export)
 }
+
+func (c *Certificate) ProviderCallableProfile(
+	sourceIdentity string,
+	profileKey string,
+) (gostdlib.ProviderCallableProfile, bool) {
+	if !c.Valid() {
+		return gostdlib.ProviderCallableProfile{}, false
+	}
+	return c.manifest.ProviderCallableProfile(sourceIdentity, profileKey)
+}
+
+func (c *Certificate) ProviderCallableProfiles(
+	sourceIdentity string,
+) []gostdlib.ProviderCallableProfile {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.ProviderCallableProfiles(sourceIdentity)
+}

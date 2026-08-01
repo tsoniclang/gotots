@@ -214,7 +214,7 @@ export class StructTag {
   }
 }
 
-export interface Type {
+export interface Type extends GoInterfaceValue {
   Align(): int64;
   AssignableTo(u: Type | undefined): bool;
   Bits(): int64;

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -96,6 +97,11 @@ type interfaceDynamicTypeTokenBinding struct {
 	name  string
 }
 
+type providerInterfaceBridgeBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
 type interfaceContractDemand struct {
 	source *types.Interface
 	target *types.Interface
@@ -142,6 +148,9 @@ type Registry struct {
 	interfaceMethodNames         map[string]string
 	interfaceDynamicTypes        map[string]interfaceDynamicTypeTokenBinding
 	interfaceDynamicNames        map[string]string
+	providerInterfaceBridges     map[string]providerInterfaceBridgeBinding
+	providerInterfaceBridgeNames map[string]string
+	providerObjectByIdentity     map[string]types.Object
 	interfaceContracts           map[string]*types.Interface
 	interfaceAdaptersByContract  map[string]map[string]struct{}
 	interfaceContractDemands     map[string]map[string]interfaceContractDemand
@@ -174,6 +183,9 @@ func NewRegistry() *Registry {
 		interfaceMethodNames:         make(map[string]string),
 		interfaceDynamicTypes:        make(map[string]interfaceDynamicTypeTokenBinding),
 		interfaceDynamicNames:        make(map[string]string),
+		providerInterfaceBridges:     make(map[string]providerInterfaceBridgeBinding),
+		providerInterfaceBridgeNames: make(map[string]string),
+		providerObjectByIdentity:     make(map[string]types.Object),
 		interfaceContracts:           make(map[string]*types.Interface),
 		interfaceAdaptersByContract:  make(map[string]map[string]struct{}),
 		interfaceContractDemands:     make(map[string]map[string]interfaceContractDemand),
@@ -244,6 +256,9 @@ func (r *Registry) GeneratedArtifact(
 	case api.GeneratedArtifactInterfaceDynamicTypeToken:
 		binding, ok := r.interfaceDynamicTypes[artifactKey]
 		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactProviderInterfaceBridge:
+		binding, ok := r.providerInterfaceBridges[artifactKey]
+		return binding.owner, ok && binding.owner != nil
 	case api.GeneratedArtifactGenericCapability:
 		binding, ok := r.genericCapabilities[artifactKey]
 		return binding.owner, ok && binding.owner != nil
@@ -292,6 +307,10 @@ func (r *Registry) GeneratedArtifacts(
 		}
 	case api.GeneratedArtifactInterfaceDynamicTypeToken:
 		for _, binding := range r.interfaceDynamicTypes {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactProviderInterfaceBridge:
+		for _, binding := range r.providerInterfaceBridges {
 			artifacts = append(artifacts, binding.owner)
 		}
 	case api.GeneratedArtifactGenericCapability:
@@ -462,6 +481,20 @@ func (r *Registry) indexEnvironmentPackage(
 		if err := r.reserve(object, binding); err != nil {
 			return err
 		}
+		if provider != nil && (binding.kind == targetBindingProvider ||
+			binding.kind == targetBindingMissingProvider) {
+			contract, contractErr := environmentcontract.Describe(object)
+			if contractErr != nil {
+				return contractErr
+			}
+			if existing := r.providerObjectByIdentity[contract.Identity()]; existing != nil && existing != object {
+				return &api.NameError{
+					Name:   contract.Identity(),
+					Reason: "provider source identity is duplicated",
+				}
+			}
+			r.providerObjectByIdentity[contract.Identity()] = object
+		}
 		if variable, ok := object.(*types.Var); ok {
 			r.packageVariables[variable] = packageVariableBinding{
 				fieldName:    name,
@@ -518,6 +551,20 @@ func (r *Registry) indexEnvironmentPackage(
 			}
 			if err := r.reserve(method, methodBinding); err != nil {
 				return err
+			}
+			if provider != nil && (methodBinding.kind == targetBindingProvider ||
+				methodBinding.kind == targetBindingMissingProvider) {
+				contract, contractErr := environmentcontract.Describe(method)
+				if contractErr != nil {
+					return contractErr
+				}
+				if existing := r.providerObjectByIdentity[contract.Identity()]; existing != nil && existing != method {
+					return &api.NameError{
+						Name:   contract.Identity(),
+						Reason: "provider source identity is duplicated",
+					}
+				}
+				r.providerObjectByIdentity[contract.Identity()] = method
 			}
 		}
 	}

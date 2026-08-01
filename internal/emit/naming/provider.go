@@ -23,6 +23,127 @@ type standardLibraryProvider interface {
 	) (gostdlib.Facet, bool)
 	GenericCallableFacet(string, string) (gostdlib.Facet, bool)
 	ProviderRepresentation(string, string) (gostdlib.ProviderRepresentation, bool)
+	ProviderCallableProfile(string, string) (gostdlib.ProviderCallableProfile, bool)
+	ProviderCallableProfiles(string) []gostdlib.ProviderCallableProfile
+}
+
+func (r *Registry) ProviderInterface(
+	typeName *types.TypeName,
+) (gostdlib.ProviderInterface, bool, error) {
+	if r == nil || typeName == nil {
+		return gostdlib.ProviderInterface{}, false, &api.NameError{
+			Reason: "provider-interface identity is invalid",
+		}
+	}
+	binding, ok := r.byObject[typeName]
+	if !ok || binding.kind != targetBindingProvider {
+		return gostdlib.ProviderInterface{}, false, nil
+	}
+	if r.provider == nil || !r.provider.Valid() {
+		return gostdlib.ProviderInterface{}, true, &api.NameError{
+			Name:   typeName.Name(),
+			Reason: "standard-library provider certificate is invalid",
+		}
+	}
+	contract, err := environmentcontract.Describe(typeName)
+	if err != nil {
+		return gostdlib.ProviderInterface{}, true, err
+	}
+	selected, ok := r.provider.Binding(contract.Identity())
+	if !ok {
+		return gostdlib.ProviderInterface{}, true, &api.NameError{
+			Name:   contract.Identity(),
+			Reason: "provider interface binding is absent",
+		}
+	}
+	providerInterface, ok := selected.ProviderInterface()
+	if !ok {
+		return gostdlib.ProviderInterface{}, true, &api.NameError{
+			Name:   contract.Identity(),
+			Reason: "provider interface certificate is absent",
+		}
+	}
+	return providerInterface, true, nil
+}
+
+func (n *File) ProviderRepresentationOwnsMethod(
+	sourceType types.Type,
+	method *types.Func,
+) (bool, error) {
+	if n == nil || n.owner == nil || sourceType == nil || method == nil ||
+		method.Origin() == nil {
+		return false, &api.NameError{
+			Reason: "provider-representation method query is invalid",
+		}
+	}
+	named, ok := types.Unalias(sourceType).(*types.Named)
+	if !ok {
+		return false, nil
+	}
+	typeName := named.Obj()
+	binding, ok := n.owner.byObject[typeName]
+	if !ok && n.owner.registry != nil {
+		binding, ok = n.owner.registry.byObject[typeName]
+	}
+	if !ok || !binding.providerRepresentation {
+		return false, nil
+	}
+	provider := n.owner.registry.provider
+	if provider == nil || !provider.Valid() {
+		return false, &api.NameError{
+			Name:   typeName.Name(),
+			Reason: "provider representation certificate is invalid",
+		}
+	}
+	representation, ok := provider.ProviderRepresentation(
+		binding.providerModule,
+		binding.providerExport,
+	)
+	if !ok {
+		return false, &api.NameError{
+			Name:   typeName.Name(),
+			Reason: "provider representation is absent",
+		}
+	}
+	typeContract, err := environmentcontract.Describe(typeName)
+	if err != nil {
+		return false, err
+	}
+	if !slices.Contains(
+		representation.SourceTypes(),
+		typeContract.Identity(),
+	) {
+		return false, &api.NameError{
+			Name:   typeContract.Identity(),
+			Reason: "provider representation does not own the source type",
+		}
+	}
+	methodContract, err := environmentcontract.Describe(method.Origin())
+	if err != nil {
+		return false, err
+	}
+	selected, owns := representation.Method(methodContract.Identity())
+	if !owns {
+		return false, nil
+	}
+	methodBinding, ok := n.owner.byObject[method.Origin()]
+	if !ok && n.owner.registry != nil {
+		methodBinding, ok = n.owner.registry.byObject[method.Origin()]
+	}
+	if !ok || methodBinding.kind != targetBindingProvider ||
+		!methodBinding.providerRepresentation ||
+		methodBinding.providerModule != binding.providerModule ||
+		methodBinding.providerExport != binding.providerExport ||
+		methodBinding.providerMember != selected.Member() ||
+		methodBinding.providerEffect != selected.Effect() ||
+		selected.SourceIdentity() != methodContract.Identity() ||
+		selected.SourceSignature() != methodContract.Signature() {
+		return false, &api.NameError{
+			Name:   methodContract.Identity(),
+			Reason: "provider representation method certificate diverged from its target",
+		}
+	}
+	return true, nil
 }
 
 func selectProviderBinding(

@@ -105,6 +105,8 @@ func providerGenericOperationSelection(
 		operation = api.GenericOperationToContainerStorage
 	case gostdlib.GenericOperationFromContainerStorage:
 		operation = api.GenericOperationFromContainerStorage
+	case gostdlib.GenericOperationInterfaceAssertOK:
+		operation = api.GenericOperationInterfaceAssertOK
 	default:
 		return api.GenericOperationSelection{}, &ScheduleError{
 			Reason: "provider generic operation kind is invalid",
@@ -118,6 +120,7 @@ func providerGenericOperationSignature(
 	document gostdlib.GenericOperationDocument,
 ) (*types.Signature, error) {
 	parameters := api.GenericDeclarationParameters(owner)
+	declaration, _ := owner.Type().(*types.Signature)
 	var resolveType func(
 		gostdlib.GenericOperationTypeDocument,
 	) (types.Type, error)
@@ -135,6 +138,16 @@ func providerGenericOperationSignature(
 				}
 			}
 			return parameters[*reference.TypeParameter], nil
+		case gostdlib.GenericOperationTypeCallableParameter:
+			if declaration == nil || reference.CallableParameter == nil ||
+				*reference.CallableParameter < 0 ||
+				*reference.CallableParameter >= declaration.Params().Len() {
+				return nil, &ScheduleError{
+					Object: owner.Name(),
+					Reason: "provider generic operation callable parameter is invalid",
+				}
+			}
+			return declaration.Params().At(*reference.CallableParameter).Type(), nil
 		case gostdlib.GenericOperationTypeBool:
 			return types.Typ[types.Bool], nil
 		case gostdlib.GenericOperationTypeInt:

@@ -1,16 +1,19 @@
-import type { GoError } from "@gotots/runtime/interface-value.js";
+import type {
+  GoError,
+  GoInterfaceValue,
+} from "@gotots/runtime/interface-value.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { gostring, int64, uint8 } from "@gotots/runtime/scalars.js";
 
 import type { Time } from "./time.js";
 import { ProviderError } from "./internal/runtime/error.js";
 
-export interface Addr {
+export interface Addr extends GoInterfaceValue {
   Network(): gostring;
   String(): gostring;
 }
 
-export interface Conn {
+export interface Conn extends GoInterfaceValue {
   Close(): GoError | undefined;
   LocalAddr(): Addr | undefined;
   Read(b: RuntimeSlice<uint8>): [int64, GoError | undefined];
@@ -21,7 +24,7 @@ export interface Conn {
   Write(b: RuntimeSlice<uint8>): [int64, GoError | undefined];
 }
 
-export interface Listener {
+export interface Listener extends GoInterfaceValue {
   Accept(): [Conn | undefined, GoError | undefined];
   Addr(): Addr | undefined;
   Close(): GoError | undefined;

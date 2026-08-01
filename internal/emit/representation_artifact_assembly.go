@@ -10,6 +10,7 @@ import (
 	interfacedynamictype "github.com/tsoniclang/gotots/internal/emit/declaration/interfacedynamictype"
 	interfacemethodtoken "github.com/tsoniclang/gotots/internal/emit/declaration/interfacemethodtoken"
 	interfacetypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
+	providerinterfacebridge "github.com/tsoniclang/gotots/internal/emit/declaration/providerinterfacebridge"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -65,6 +66,15 @@ func (s *programSession) validateInterfaceArtifact(
 			return &ScheduleError{
 				Object: artifact.TargetName(),
 				Reason: "interface dynamic-type token has inconsistent source type",
+			}
+		}
+	case api.GeneratedArtifactProviderInterfaceBridge:
+		source, sourceOK := artifact.ProviderInterfaceBridgeType()
+		bound, boundOK := binding.ProviderInterfaceBridgeType()
+		if !sourceOK || !boundOK || !types.Identical(source, bound) {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "provider-interface bridge has inconsistent source type",
 			}
 		}
 	default:
@@ -296,6 +306,23 @@ func buildInterfaceArtifact(
 			artifact.TargetName(),
 			source,
 			adapterContracts,
+			[]tsgo.ModifierLike{
+				builder.context.Factory().ExportKeyword(),
+			},
+		)
+	case api.GeneratedArtifactProviderInterfaceBridge:
+		source, ok := artifact.ProviderInterfaceBridgeType()
+		if !ok {
+			return nil, nil, &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "provider-interface bridge source is invalid",
+			}
+		}
+		return providerinterfacebridge.Build(
+			context,
+			builder.emitter,
+			artifact.TargetName(),
+			source,
 			[]tsgo.ModifierLike{
 				builder.context.Factory().ExportKeyword(),
 			},

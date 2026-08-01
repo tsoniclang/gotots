@@ -1,4 +1,7 @@
-import type { GoError } from "@gotots/runtime/interface-value.js";
+import type {
+  GoError,
+  GoInterfaceValue,
+} from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
@@ -59,7 +62,7 @@ export const O_CREATE: int64 = nodeFileConstants.O_CREAT;
 export const O_TRUNC: int64 = nodeFileConstants.O_TRUNC;
 export const O_WRONLY: int64 = nodeFileConstants.O_WRONLY;
 
-export interface Signal {
+export interface Signal extends GoInterfaceValue {
   Signal(): void;
   String(): gostring;
 }

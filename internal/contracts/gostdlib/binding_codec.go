@@ -38,6 +38,13 @@ func validateBinding(binding BindingDocument, field string) error {
 		return manifestError(field+".effect", "callable effect is invalid")
 	case !requiresEffect && binding.Effect != EffectInvalid:
 		return manifestError(field+".effect", "non-callable has an effect")
+	case binding.ProviderInterface != nil &&
+		(binding.Kind != BindingType || binding.Access != AccessExport ||
+			binding.Representation != RepresentationDirect):
+		return manifestError(
+			field+".providerInterface",
+			"provider-interface evidence does not belong to a direct exported type",
+		)
 	case binding.SourceSignature == "":
 		return manifestError(field+".sourceSignature", "value is empty")
 	case binding.SourceLocation == "":
@@ -59,6 +66,14 @@ func validateBinding(binding BindingDocument, field string) error {
 		true,
 	); err != nil {
 		return err
+	}
+	if binding.ProviderInterface != nil {
+		if err := validateProviderInterface(
+			*binding.ProviderInterface,
+			field+".providerInterface",
+		); err != nil {
+			return err
+		}
 	}
 	seenTypeArguments := make(map[GenericTypeArgumentDocument]struct{})
 	for _, argument := range binding.GenericTypeArguments {

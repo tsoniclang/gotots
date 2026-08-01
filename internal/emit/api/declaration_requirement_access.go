@@ -176,6 +176,16 @@ func (r DeclarationRequirement) InterfaceDynamicTypeToken() (
 	)
 }
 
+func (r DeclarationRequirement) ProviderInterfaceBridge() (
+	*GeneratedArtifact,
+	bool,
+) {
+	return r.generatedDefinition(
+		DeclarationRequirementProviderInterfaceBridge,
+		GeneratedArtifactProviderInterfaceBridge,
+	)
+}
+
 func (r DeclarationRequirement) GenericCapability() (
 	*GeneratedArtifact,
 	bool,
@@ -256,7 +266,8 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementInterfaceDynamicTypeToken,
 		DeclarationRequirementGenericCapability,
 		DeclarationRequirementCallableABI,
-		DeclarationRequirementPointerRepresentation:
+		DeclarationRequirementPointerRepresentation,
+		DeclarationRequirementProviderInterfaceBridge:
 		return r.generated, true
 	default:
 		return nil, false
@@ -392,6 +403,7 @@ const (
 	DeclarationRequirementGenericRepresentation     DeclarationRequirementKind = 20
 	DeclarationRequirementInterfaceMethodCallable   DeclarationRequirementKind = 21
 	DeclarationRequirementPointerRepresentation     DeclarationRequirementKind = 22
+	DeclarationRequirementProviderInterfaceBridge   DeclarationRequirementKind = 23
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -415,7 +427,8 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementValueReceiverCopy ||
 		k == DeclarationRequirementGenericRepresentation ||
 		k == DeclarationRequirementInterfaceMethodCallable ||
-		k == DeclarationRequirementPointerRepresentation
+		k == DeclarationRequirementPointerRepresentation ||
+		k == DeclarationRequirementProviderInterfaceBridge
 }
 
 type CallableControlFacet uint8

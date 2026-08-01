@@ -862,6 +862,42 @@ boundary method facets and outer effect. A mutation that drops one method,
 changes sync to cooperative, accepts the provider's public interface without
 an exact join, or replaces adaptation with a cast must fail before execution.
 
+The same gate covers interface values nested in tuples, callbacks, containers,
+provider-owned fields, package state, and method signatures. A focused result
+fixture such as `reflect.TypeOf(any) reflect.Type` must inspect one reused
+provider-to-canonical bridge, its complete token set, nil behavior, dynamic
+identity, and sync-to-cooperative forwarding. A focused input fixture such as
+`fs.ReadFile(FS, string)` must select an exact provider profile whenever the
+canonical `FS.Open` ABI is cooperative; a mutation restoring the synchronous
+public `FS`, dropping a nested `File` conversion, or reversing an async method
+into sync must fail at certification or strict typechecking.
+
+Provider-profile verification inspects the manifest and emitted TS-Go AST. It
+proves that the profile key is reproduced from every sorted source
+interface/method identity and selected callable effect the profile executes,
+including guard-only interfaces; canonical parameter/result roots and guard
+interfaces exactly join the profile certificate; candidate selection has
+exactly one full-ABI match; a method receiver is
+present exactly once; canonical roots cross without a copy or wrapper; only
+provider-owned result roots select a bridge; and the call observes the
+certified outer effect. The linked strict matrix covers a direct interface, an
+interface nested in a variadic slice, an interface returned by a callback, a
+nested interface result, and a provider method parameter. Mutations that
+change one method effect, profile root, guard identity/order or guard method
+effect, receiver position,
+result direction, target fingerprint, or profile outer effect must fail at the
+owning certificate or AST join. Restoring inline closures, per-call adapters,
+container copying, reverse cooperative-to-synchronous projection, source-name
+matching, or a fallback to the ordinary binding must also fail.
+
+Bridge certification exact-joins every exported callable member by Go method
+identity and separately retains inaccessible-method runtime tokens. Mutations
+that infer members from spelling, omit a private token, duplicate a bridge per
+use, change a nested boundary direction, substitute structural assignability
+for the join, or expose a raw provider interface value must fail. Artifact and
+cost evidence reports bridge definitions, crossing calls, bytes, and runtime
+allocations separately so a correctness repair cannot hide repeated output.
+
 The same gate compiles a linked function that accepts, zeroes, copies, and
 returns `reflect.Value`. It proves that the provider import and certified
 `zero`/`copy` facets are selected, no ambient standard-library artifact is

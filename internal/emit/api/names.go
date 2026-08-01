@@ -6,14 +6,17 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 const (
-	StructMakeMember        = "$make"
-	StructStorageOfMember   = "$storageOf"
-	StructFromStorageMember = "$fromStorage"
-	StructStorageTypeSuffix = "$Storage"
+	StructMakeMember         = "$make"
+	StructStorageOfMember    = "$storageOf"
+	StructFromStorageMember  = "$fromStorage"
+	StructStorageTypeSuffix  = "$Storage"
+	ProviderBridgeFromMember = "$from"
+	ProviderBridgeToMember   = "$to"
 )
 
 type TemporaryKind uint8
@@ -88,6 +91,90 @@ type MethodTarget struct {
 type RecoveryCallableReference struct {
 	reference   NameReference
 	cooperative bool
+}
+
+type ProviderCallableProfileReference struct {
+	reference NameReference
+	profile   gostdlib.ProviderCallableProfile
+	guards    []types.Type
+}
+
+type ProviderCallableProfileCandidate struct {
+	profile gostdlib.ProviderCallableProfile
+	guards  []types.Type
+}
+
+func NewProviderCallableProfileCandidate(
+	profile gostdlib.ProviderCallableProfile,
+	guards []types.Type,
+) (ProviderCallableProfileCandidate, error) {
+	if !profile.Valid() || len(guards) != len(profile.GuardInterfaces()) {
+		return ProviderCallableProfileCandidate{}, &NameError{
+			Reason: "provider callable-profile candidate is invalid",
+		}
+	}
+	for _, guard := range guards {
+		if guard == nil {
+			return ProviderCallableProfileCandidate{}, &NameError{
+				Reason: "provider callable-profile candidate guard is nil",
+			}
+		}
+	}
+	return ProviderCallableProfileCandidate{
+		profile: profile,
+		guards:  slices.Clone(guards),
+	}, nil
+}
+
+func (c ProviderCallableProfileCandidate) Profile() gostdlib.ProviderCallableProfile {
+	return c.profile
+}
+
+func (c ProviderCallableProfileCandidate) Guards() []types.Type {
+	return slices.Clone(c.guards)
+}
+
+func NewProviderCallableProfileReference(
+	reference NameReference,
+	profile gostdlib.ProviderCallableProfile,
+	guards []types.Type,
+) (ProviderCallableProfileReference, error) {
+	if reference.Name() == "" || !profile.Valid() ||
+		len(guards) != len(profile.GuardInterfaces()) {
+		return ProviderCallableProfileReference{}, &NameError{
+			Reason: "provider callable-profile reference is invalid",
+		}
+	}
+	for _, guard := range guards {
+		if guard == nil {
+			return ProviderCallableProfileReference{}, &NameError{
+				Reason: "provider callable-profile guard is nil",
+			}
+		}
+	}
+	return ProviderCallableProfileReference{
+		reference: reference,
+		profile:   profile,
+		guards:    slices.Clone(guards),
+	}, nil
+}
+
+func (r ProviderCallableProfileReference) Expression(
+	factory tsgo.Factory,
+) tsgo.Expression {
+	return r.reference.Expression(factory)
+}
+
+func (r ProviderCallableProfileReference) Requests() []RootRequest {
+	return r.reference.Requests()
+}
+
+func (r ProviderCallableProfileReference) Profile() gostdlib.ProviderCallableProfile {
+	return r.profile
+}
+
+func (r ProviderCallableProfileReference) Guards() []types.Type {
+	return slices.Clone(r.guards)
 }
 
 func NewRecoveryCallableReference(
@@ -325,6 +412,7 @@ type PackageVariableReference struct {
 	stateName string
 	fieldName string
 	requests  []RootRequest
+	provider  bool
 }
 
 func NewQualifiedPackageVariableReference(
@@ -346,6 +434,25 @@ func NewQualifiedPackageVariableReference(
 		return PackageVariableReference{}, err
 	}
 	reference.qualifier = qualifier
+	return reference, nil
+}
+
+func NewProviderQualifiedPackageVariableReference(
+	qualifier string,
+	stateName string,
+	fieldName string,
+	requests ...RootRequest,
+) (PackageVariableReference, error) {
+	reference, err := NewQualifiedPackageVariableReference(
+		qualifier,
+		stateName,
+		fieldName,
+		requests...,
+	)
+	if err != nil {
+		return PackageVariableReference{}, err
+	}
+	reference.provider = true
 	return reference, nil
 }
 
@@ -379,6 +486,10 @@ func (r PackageVariableReference) FieldName() string {
 
 func (r PackageVariableReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
+}
+
+func (r PackageVariableReference) ProviderBoundary() bool {
+	return r.provider
 }
 
 func (r PackageVariableReference) Expression(
@@ -431,6 +542,19 @@ type Names interface {
 	InterfaceAdapter(types.Type, types.Type) (NameReference, error)
 	InterfaceContractDemand(types.Type, types.Type) ([]RootRequest, error)
 	InterfaceDynamicType(types.Type) (NameReference, error)
+	ProviderInterface(types.Type) (gostdlib.ProviderInterface, bool, error)
+	ProviderInterfaceBridge(types.Type) (NameReference, bool, error)
+	ProviderCallableProfile(*types.Func, string) (
+		ProviderCallableProfileReference,
+		bool,
+		error,
+	)
+	ProviderCallableProfileCandidates(*types.Func) (
+		[]ProviderCallableProfileCandidate,
+		bool,
+		error,
+	)
+	ProviderRepresentationOwnsMethod(types.Type, *types.Func) (bool, error)
 	InterfaceType(types.Type) (NameReference, error)
 	InterfaceContract(types.Type) (InterfaceContractReference, error)
 	RecoveryCallable(*types.Func) (RecoveryCallableReference, bool, error)

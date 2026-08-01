@@ -123,6 +123,64 @@ func (r *Registry) internAnonymousInterface(
 	return binding, nil
 }
 
+func (r *Registry) internProviderInterfaceBridge(
+	artifactKey string,
+	sourceType *types.Named,
+) (providerInterfaceBridgeBinding, error) {
+	if r == nil || sourceType == nil || sourceType.Obj() == nil ||
+		artifactKey == "" {
+		return providerInterfaceBridgeBinding{}, &api.NameError{
+			Reason: "provider-interface bridge canonicalization input is invalid",
+		}
+	}
+	contract, ok := sourceType.Underlying().(*types.Interface)
+	if !ok || !contract.Complete().IsMethodSet() {
+		return providerInterfaceBridgeBinding{}, &api.NameError{
+			Name:   sourceType.Obj().Name(),
+			Reason: "provider-interface bridge source is not an interface",
+		}
+	}
+	if existing, found := r.providerInterfaceBridges[artifactKey]; found {
+		existingType, valid := existing.owner.ProviderInterfaceBridgeType()
+		if !valid || !types.Identical(existingType, sourceType) {
+			return providerInterfaceBridgeBinding{}, &api.NameError{
+				Name:   existing.name,
+				Reason: "provider-interface bridge key joined non-identical Go types",
+			}
+		}
+		return existing, nil
+	}
+	name, err := interfaceTargetName("$goProviderInterfaceBridge_", artifactKey)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	if err := reserveGeneratedName(
+		r.providerInterfaceBridgeNames,
+		name,
+		artifactKey,
+		"provider-interface bridge",
+	); err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	outputPath, err := output.ProviderInterfaceBridgePath(artifactKey)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	owner, err := api.NewCompilationGeneratedArtifact(
+		api.GeneratedArtifactProviderInterfaceBridge,
+		sourceType,
+		artifactKey,
+		name,
+		outputPath,
+	)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	binding := providerInterfaceBridgeBinding{owner: owner, name: name}
+	r.providerInterfaceBridges[artifactKey] = binding
+	return binding, nil
+}
+
 func (r *Registry) internInterfaceMethodToken(
 	artifactKey string,
 	method *types.Func,

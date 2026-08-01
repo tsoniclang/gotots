@@ -10,6 +10,7 @@ import (
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	conversionexpression "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -114,7 +115,31 @@ func emit(
 	if err := validateResults(context, source, signature, discarded); err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	callee, static, err := emitCallee(context, children, source.Fun, signature)
+	var profileRequests []api.RootRequest
+	if provider, direct := calleeObject(
+		context.TypesInfo(),
+		source.Fun,
+	); direct {
+		target, selected, requests, err := emitProviderProfileFunction(
+			context,
+			children,
+			source,
+			provider,
+			signature,
+			discarded,
+			detached,
+		)
+		if selected || err != nil {
+			return target, err
+		}
+		profileRequests = requests
+	}
+	callee, static, providerBoundary, err := emitCallee(
+		context,
+		children,
+		source.Fun,
+		signature,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -208,6 +233,7 @@ func emit(
 		callee.Requests(),
 		argumentRequests,
 		guardRequests,
+		profileRequests,
 	)
 	target, err := api.NewExpressionEmission(before, call, requests)
 	if err != nil {
@@ -241,10 +267,21 @@ func emit(
 				target,
 			)
 		}
-		return cooperativecall.SourceCall(
+		target, err := cooperativecall.SourceCall(
 			context,
 			source,
 			provider,
+			target,
+		)
+		if err != nil || discarded || !providerBoundary {
+			return target, err
+		}
+		return providerboundary.FromProviderResults(
+			context,
+			children,
+			nil,
+			"",
+			signature.Results(),
 			target,
 		)
 	}
@@ -326,12 +363,12 @@ func emitCallee(
 	children api.ChildEmitter,
 	source ast.Expr,
 	signature *types.Signature,
-) (api.ExpressionEmission, bool, error) {
+) (api.ExpressionEmission, bool, bool, error) {
 	static := false
 	if object, ok := calleeObject(context.TypesInfo(), source); ok {
 		objectSignature, valid := callable.Signature(object.Type())
 		if !valid || !types.Identical(objectSignature, signature) {
-			return api.ExpressionEmission{}, false,
+			return api.ExpressionEmission{}, false, false,
 				api.Unsupported(
 					context.WithRole(api.RoleCallCallee),
 					api.CategoryExpression,
@@ -340,12 +377,12 @@ func emitCallee(
 		}
 		reference, err := context.Names().Reference(object)
 		if err != nil {
-			return api.ExpressionEmission{}, false, err
+			return api.ExpressionEmission{}, false, false, err
 		}
 		return api.DirectExpression(
 			reference.Expression(context.Factory()),
 			reference.Requests()...,
-		), true, nil
+		), true, reference.ProviderBoundary(), nil
 	} else if _, ok := directFunctionLiteral(source); ok {
 		target, err := children.Expression(
 			context.
@@ -355,13 +392,13 @@ func emitCallee(
 			source,
 		)
 		if err != nil {
-			return api.ExpressionEmission{}, false, err
+			return api.ExpressionEmission{}, false, false, err
 		}
-		return target, false, nil
+		return target, false, false, nil
 	} else if identifier, ok := source.(*ast.Ident); ok {
 		variable, valid := context.TypesInfo().Uses[identifier].(*types.Var)
 		if !valid {
-			return api.ExpressionEmission{}, false,
+			return api.ExpressionEmission{}, false, false,
 				api.Unsupported(
 					context.WithRole(api.RoleCallCallee),
 					api.CategoryExpression,
@@ -370,7 +407,7 @@ func emitCallee(
 		}
 		variableSignature, represented := callable.Signature(variable.Type())
 		if !represented || !types.Identical(variableSignature, signature) {
-			return api.ExpressionEmission{}, false,
+			return api.ExpressionEmission{}, false, false,
 				api.Unsupported(
 					context.WithRole(api.RoleCallCallee),
 					api.CategoryExpression,
@@ -385,9 +422,9 @@ func emitCallee(
 		source,
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, false, err
+		return api.ExpressionEmission{}, false, false, err
 	}
-	return target, static, nil
+	return target, static, false, nil
 }
 
 func directFunctionLiteral(source ast.Expr) (*ast.FuncLit, bool) {

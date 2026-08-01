@@ -45,6 +45,19 @@ func (facetOnlyProvider) ProviderRepresentation(
 	return gostdlib.ProviderRepresentation{}, false
 }
 
+func (facetOnlyProvider) ProviderCallableProfile(
+	string,
+	string,
+) (gostdlib.ProviderCallableProfile, bool) {
+	return gostdlib.ProviderCallableProfile{}, false
+}
+
+func (facetOnlyProvider) ProviderCallableProfiles(
+	string,
+) []gostdlib.ProviderCallableProfile {
+	return nil
+}
+
 func TestPrivateProviderDeclarationCanOwnCertifiedFacetWithoutPublicBinding(
 	t *testing.T,
 ) {

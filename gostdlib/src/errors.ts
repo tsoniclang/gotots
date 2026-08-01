@@ -1,5 +1,4 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
-import { GoPanic } from "@gotots/runtime/panic.js";
 import type { bool, gostring } from "@gotots/runtime/scalars.js";
 
 import {
@@ -28,10 +27,42 @@ export function Is(failure: GoError | undefined, target: GoError | undefined): b
   return false;
 }
 
-export function AsType<E extends GoError>(
-  _failure: GoError | undefined,
-): [E | undefined, bool] {
-  return GoPanic.raiseRuntime(
-    "errors.AsType requires a generated interface-assert capability",
-  );
+type AssertError<E> = (
+  failure: GoError | undefined,
+) => [E, bool];
+
+export function AsType<E>(
+  assertError: AssertError<E>,
+  failure: GoError | undefined,
+): [E, bool] {
+  const absent = assertError(undefined);
+  return asType(assertError, failure, absent);
+}
+
+function asType<E>(
+  assertError: AssertError<E>,
+  failure: GoError | undefined,
+  absent: [E, bool],
+): [E, bool] {
+  let current = failure;
+  while (current !== undefined) {
+    const selected = assertError(current);
+    if (selected[1]) {
+      return selected;
+    }
+    if (current instanceof WrappedProviderError) {
+      current = current.Unwrap();
+      continue;
+    }
+    if (current instanceof MessageWrappedErrors) {
+      for (const cause of current.UnwrapAll()) {
+        const nested = asType(assertError, cause, absent);
+        if (nested[1]) {
+          return nested;
+        }
+      }
+    }
+    return absent;
+  }
+  return absent;
 }

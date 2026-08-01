@@ -21,9 +21,18 @@ func TestProviderGenericCallsUseCertifiedTargetProjection(t *testing.T) {
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"slices"
 )
+
+type code int
+
+func (value code) Error() string { return "code" }
+
+func AsCode(failure error) (code, bool) {
+	return errors.AsType[code](failure)
+}
 
 func Concat(left, right []string) []string {
 	return slices.Concat(left, right)
@@ -57,6 +66,7 @@ func PrintValues(source []string) {
 	}
 	scope := program.Roots()[0].Types().Scope()
 	options := emit.DefaultOptions()
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
@@ -66,6 +76,7 @@ func PrintValues(source []string) {
 			mustProviderRoot(t, scope.Lookup("GenericClone")),
 			mustProviderRoot(t, scope.Lookup("Grow")),
 			mustProviderRoot(t, scope.Lookup("PrintValues")),
+			mustProviderRoot(t, scope.Lookup("AsCode")),
 		},
 		options,
 	)
@@ -81,6 +92,7 @@ func PrintValues(source []string) {
 		"Grow<RuntimeSlice<gostring>, gostring, gostring>(",
 		"Clone<T$ContainerStorage>(",
 		"SlicesValuesCooperative<RuntimeSlice<gostring>, gostring, gostring>(",
+		"AsType<code>($goCapability_",
 	} {
 		if !strings.Contains(printed, exact) {
 			t.Fatalf("provider generic projection lacks %q:\n%s", exact, printed)

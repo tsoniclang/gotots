@@ -29,8 +29,8 @@ func Generate(config Config) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	facetSeeds, representationSeeds, definedValueIdentities, genericProjections,
-		genericOperations, err :=
+	facetSeeds, representationSeeds, callableProfileSeeds,
+		definedValueIdentities, genericProjections, genericOperations, err :=
 		readFacetSeeds(resolved.facetMapPath)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,12 @@ func Generate(config Config) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := verifyPackageModules(providerPackage, ordered, facetSeeds); err != nil {
+	if err := verifyPackageModules(
+		providerPackage,
+		ordered,
+		facetSeeds,
+		callableProfileSeeds,
+	); err != nil {
 		return nil, err
 	}
 	paths := make([]string, len(ordered))
@@ -72,6 +77,7 @@ func Generate(config Config) ([]byte, error) {
 	for index, seed := range ordered {
 		module, buildErr := buildModule(
 			resolved,
+			selectedToolchain,
 			project,
 			source,
 			seed,
@@ -117,9 +123,11 @@ func Generate(config Config) ([]byte, error) {
 		source,
 		facetSeeds,
 		representationSeeds,
+		callableProfileSeeds,
 		modules,
 		genericProjections,
 		effectMarker,
+		selectedToolchain,
 	)
 	if err != nil {
 		client.Close()
@@ -155,6 +163,7 @@ func Generate(config Config) ([]byte, error) {
 
 func buildModule(
 	config resolvedConfig,
+	selectedToolchain toolchain,
 	project *tsgo.ProjectInspection,
 	source goSurface,
 	seed moduleSeed,
@@ -247,6 +256,18 @@ func buildModule(
 		if !ok || typeName.IsAlias() {
 			continue
 		}
+		binding.ProviderInterface, err = buildProviderInterface(
+			selectedToolchain,
+			sourcePackage,
+			typeName,
+			target,
+			project,
+			effectMarker,
+		)
+		if err != nil {
+			return gostdlib.ModuleDocument{}, err
+		}
+		bindings[len(bindings)-1] = binding
 		methodBindings, err := buildMethodBindings(
 			project,
 			target,
@@ -305,10 +326,12 @@ func verifyGenericOperationBindings(
 			)
 		}
 		signature, _ := function.Type().(*types.Signature)
-		parameterCount := 0
+		typeParameterCount := 0
+		callableParameterCount := 0
 		if signature != nil {
-			parameterCount = signature.RecvTypeParams().Len() +
+			typeParameterCount = signature.RecvTypeParams().Len() +
 				signature.TypeParams().Len()
+			callableParameterCount = signature.Params().Len()
 		}
 		for _, operation := range operations {
 			for _, reference := range append(
@@ -320,7 +343,8 @@ func verifyGenericOperationBindings(
 			) {
 				if err := verifyGenericOperationTypeParameters(
 					reference,
-					parameterCount,
+					typeParameterCount,
+					callableParameterCount,
 				); err != nil {
 					return certifyError(
 						"configure generic operations",
@@ -343,14 +367,24 @@ func verifyGenericOperationBindings(
 
 func verifyGenericOperationTypeParameters(
 	reference gostdlib.GenericOperationTypeDocument,
-	parameterCount int,
+	typeParameterCount int,
+	callableParameterCount int,
 ) error {
 	if reference.Kind == gostdlib.GenericOperationTypeParameter {
 		if reference.TypeParameter == nil ||
 			*reference.TypeParameter < 0 ||
-			*reference.TypeParameter >= parameterCount {
+			*reference.TypeParameter >= typeParameterCount {
 			return fmt.Errorf(
 				"type-parameter index is outside its Go declaration",
+			)
+		}
+	}
+	if reference.Kind == gostdlib.GenericOperationTypeCallableParameter {
+		if reference.CallableParameter == nil ||
+			*reference.CallableParameter < 0 ||
+			*reference.CallableParameter >= callableParameterCount {
+			return fmt.Errorf(
+				"callable-parameter index is outside its Go declaration",
 			)
 		}
 	}
@@ -363,7 +397,8 @@ func verifyGenericOperationTypeParameters(
 		}
 		if err := verifyGenericOperationTypeParameters(
 			*child,
-			parameterCount,
+			typeParameterCount,
+			callableParameterCount,
 		); err != nil {
 			return err
 		}

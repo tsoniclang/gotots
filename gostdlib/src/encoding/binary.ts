@@ -16,7 +16,7 @@ import {
   BigEndianOrder,
   LittleEndianOrder,
 } from "../internal/portable/encoding/binary/byte-order.js";
-import { ProviderError } from "../internal/runtime/error.js";
+import { unsupportedReflectionOperation } from "../internal/portable/encoding/binary/reflection.js";
 import type { Reader, Writer } from "../io.js";
 
 export interface ByteOrder extends GoInterfaceValue {
@@ -33,6 +33,7 @@ export interface AppendByteOrder extends GoInterfaceValue {
   AppendUint16(buffer: RuntimeSlice<uint8>, value: uint16): RuntimeSlice<uint8>;
   AppendUint32(buffer: RuntimeSlice<uint8>, value: uint32): RuntimeSlice<uint8>;
   AppendUint64(buffer: RuntimeSlice<uint8>, value: uint64): RuntimeSlice<uint8>;
+  String(): gostring;
 }
 
 interface BinaryEndian extends ByteOrder, AppendByteOrder {
@@ -57,9 +58,7 @@ export function Read(
   _order: ByteOrder | undefined,
   _data: GoInterfaceValue | undefined,
 ): GoError | undefined {
-  return new ProviderError(
-    "encoding/binary.Read requires generated reflection metadata",
-  );
+  return unsupportedReflectionOperation("Read");
 }
 
 export function Write(
@@ -67,7 +66,5 @@ export function Write(
   _order: ByteOrder | undefined,
   _data: GoInterfaceValue | undefined,
 ): GoError | undefined {
-  return new ProviderError(
-    "encoding/binary.Write requires generated reflection metadata",
-  );
+  return unsupportedReflectionOperation("Write");
 }

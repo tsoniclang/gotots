@@ -59,6 +59,7 @@ func TestUnsafeRegionIntrinsicsPrintTypecheckAndMatchGo(t *testing.T) {
 				"EmptyString",
 				"NilNonzero",
 				"NegativeLength",
+				"NilComparisons",
 			}
 			roots := make([]emit.Root, 0, len(rootNames))
 			for _, name := range rootNames {
@@ -160,6 +161,11 @@ func NilNonzero(length int) string {
 func NegativeLength(bytes []byte, length int) []byte {
 	return unsafe.Slice(&bytes[0], length)
 }
+
+func NilComparisons() (bool, bool) {
+	var zero unsafe.Pointer
+	return zero == nil, nil != zero
+}
 `)
 	return project
 }
@@ -203,6 +209,7 @@ import {
     BuildString,
     EmptyString,
     NegativeLength,
+    NilComparisons,
     SliceDataAlias,
     StringDataFirst,
 	NilNonzero,
@@ -228,6 +235,7 @@ try {
 } catch {
     negativeLength = true;
 }
+const nilComparisons = NilComparisons();
 console.log([
     bytes(BuildString(RuntimeSlice.literal([` + byteValues + `]))),
     String(AliasSlice(RuntimeSlice.literal([` + one + `, ` + one + `]))),
@@ -236,6 +244,8 @@ console.log([
     JSON.stringify(EmptyString()),
 	String(nilNonzero),
     String(negativeLength),
+    String(nilComparisons[0]),
+    String(nilComparisons[1]),
 ].join("|"));
 `
 }
@@ -279,8 +289,10 @@ func main() {
 	sliceData := values.SliceDataAlias([]byte{1, 1})
 	nilNonzero := panics(func() { values.NilNonzero(1) })
 	negative := panics(func() { values.NegativeLength([]byte{0xff, 65}, -1) })
-	fmt.Printf("%x|%d|%d|%d|%q|%t|%t\n",
-		text, alias, stringData, sliceData, values.EmptyString(), nilNonzero, negative)
+	nilZero, nilNonzeroPointer := values.NilComparisons()
+	fmt.Printf("%x|%d|%d|%d|%q|%t|%t|%t|%t\n",
+		text, alias, stringData, sliceData, values.EmptyString(), nilNonzero, negative,
+		nilZero, nilNonzeroPointer)
 }
 `)
 	return runProgram(

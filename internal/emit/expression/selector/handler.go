@@ -10,6 +10,7 @@ import (
 	methodexpression "github.com/tsoniclang/gotots/internal/emit/expression/methodexpression"
 	methodvalue "github.com/tsoniclang/gotots/internal/emit/expression/methodvalue"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 )
 
 func Emit(
@@ -57,7 +58,7 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return context.Values().FromStorage(
+		target, err := context.Values().FromStorage(
 			context,
 			source,
 			variable.Type(),
@@ -66,6 +67,18 @@ func Emit(
 				reference.Requests()...,
 			),
 		)
+		if err != nil || !reference.ProviderBoundary() {
+			return target, err
+		}
+		target, _, err = providerboundary.FromProviderValue(
+			context,
+			children,
+			nil,
+			"",
+			variable.Type(),
+			target,
+		)
+		return target, err
 	}
 	if constObject, ok := object.(*types.Const); ok &&
 		constantbinding.IsUntyped(constObject.Type()) {
@@ -86,13 +99,25 @@ func Emit(
 		reference.Requests()...,
 	)
 	if function, ok := object.(*types.Func); ok {
-		return cooperativecall.AdaptSourceValue(
+		target, err = cooperativecall.AdaptSourceValue(
 			context,
 			children,
 			source,
 			function,
 			target,
 		)
+		if err != nil || !reference.ProviderBoundary() {
+			return target, err
+		}
+		target, _, err = providerboundary.FromProviderValue(
+			context,
+			children,
+			nil,
+			"",
+			function.Type(),
+			target,
+		)
+		return target, err
 	}
 	return target, nil
 }

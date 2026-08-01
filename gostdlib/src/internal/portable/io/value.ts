@@ -3,7 +3,7 @@ import { GoPanic } from "@gotots/runtime/panic.js";
 
 export abstract class ProviderInterfaceValue extends GoInterfaceValue {
   readonly $go$methods: ReadonlySet<object> = new Set<object>();
-  readonly $go$formatString = false;
+  readonly $go$formatString: boolean = false;
 
   protected constructor(readonly $go$type: object) {
     super();

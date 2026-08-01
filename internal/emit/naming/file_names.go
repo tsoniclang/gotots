@@ -224,7 +224,7 @@ func (n *File) reference(
 		if err != nil {
 			return api.NameReference{}, err
 		}
-		return api.NewQualifiedNameReference(
+		return api.NewProviderQualifiedNameReference(
 			qualifier,
 			binding.providerExport,
 			request,
@@ -318,7 +318,7 @@ func (n *File) PackageVariable(
 		if err != nil {
 			return api.PackageVariableReference{}, err
 		}
-		return api.NewQualifiedPackageVariableReference(
+		return api.NewProviderQualifiedPackageVariableReference(
 			qualifier,
 			target.providerExport,
 			target.providerMember,

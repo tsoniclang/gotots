@@ -12,13 +12,14 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
-const facetMapSchemaVersion = 7
+const facetMapSchemaVersion = 9
 
 type facetMapDocument struct {
 	SchemaVersion              int                             `json:"schemaVersion"`
 	Representations            []providerRepresentationSeed    `json:"representations,omitempty"`
 	DefinedValueIdentities     []string                        `json:"definedValueIdentities,omitempty"`
 	Facets                     []facetSeed                     `json:"facets"`
+	ProviderCallableProfiles   []providerCallableProfileSeed   `json:"providerCallableProfiles,omitempty"`
 	GenericCallableProjections []genericCallableProjectionSeed `json:"genericCallableProjections"`
 	GenericOperationSets       []genericOperationSetSeed       `json:"genericOperationSets"`
 }
@@ -54,11 +55,29 @@ type facetSeed struct {
 	Effect               gostdlib.EffectKind        `json:"effect,omitempty"`
 }
 
+type providerCallableProfileSeed struct {
+	SourceIdentity      string                                 `json:"sourceIdentity"`
+	Specifier           string                                 `json:"specifier"`
+	SourcePath          string                                 `json:"sourcePath"`
+	Export              string                                 `json:"export"`
+	Receiver            bool                                   `json:"receiver,omitempty"`
+	CanonicalParameters []int                                  `json:"canonicalParameters"`
+	CanonicalResults    []int                                  `json:"canonicalResults,omitempty"`
+	GuardInterfaces     []string                               `json:"guardInterfaces,omitempty"`
+	Interfaces          []providerCallableProfileInterfaceSeed `json:"interfaces"`
+}
+
+type providerCallableProfileInterfaceSeed struct {
+	SourceIdentity string `json:"sourceIdentity"`
+	Export         string `json:"export"`
+}
+
 func readFacetSeeds(
 	sourcePath string,
 ) (
 	[]facetSeed,
 	[]providerRepresentationSeed,
+	[]providerCallableProfileSeed,
 	map[string]struct{},
 	map[string][]gostdlib.GenericTypeArgumentDocument,
 	map[string][]gostdlib.GenericOperationDocument,
@@ -66,51 +85,163 @@ func readFacetSeeds(
 ) {
 	file, err := os.Open(sourcePath)
 	if err != nil {
-		return nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	defer file.Close()
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()
 	var document facetMapDocument
 	if err := decoder.Decode(&document); err != nil {
-		return nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	var extra json.RawMessage
 	if err := decoder.Decode(&extra); err != io.EOF {
 		if err == nil {
 			err = fmt.Errorf("multiple JSON values")
 		}
-		return nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
+		return nil, nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, err.Error())
 	}
 	if document.SchemaVersion != facetMapSchemaVersion {
-		return nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, "schema is unsupported")
+		return nil, nil, nil, nil, nil, nil, certifyError("read facet map", sourcePath, "schema is unsupported")
 	}
 	representations, representationIndex, err :=
 		validateProviderRepresentationSeeds(document.Representations)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
+	}
+	profiles, err := validateProviderCallableProfileSeeds(
+		document.ProviderCallableProfiles,
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, err
 	}
 	identities, err := validateDefinedValueIdentities(document.DefinedValueIdentities)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 	facets, err := validateFacetSeeds(document.Facets, representationIndex)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 	projections, err := validateGenericCallableProjectionSeeds(
 		document.GenericCallableProjections,
 	)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 	operations, err := validateGenericOperationSetSeeds(
 		document.GenericOperationSets,
 	)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
-	return facets, representations, identities, projections, operations, nil
+	return facets, representations, profiles, identities, projections, operations, nil
+}
+
+func validateProviderCallableProfileSeeds(
+	source []providerCallableProfileSeed,
+) ([]providerCallableProfileSeed, error) {
+	result := append([]providerCallableProfileSeed(nil), source...)
+	sort.Slice(result, func(left, right int) bool {
+		return providerCallableProfileSeedKey(result[left]) <
+			providerCallableProfileSeedKey(result[right])
+	})
+	previous := ""
+	for index := range result {
+		seed := &result[index]
+		seed.CanonicalParameters = slices.Clone(seed.CanonicalParameters)
+		seed.CanonicalResults = slices.Clone(seed.CanonicalResults)
+		seed.GuardInterfaces = slices.Clone(seed.GuardInterfaces)
+		seed.Interfaces = slices.Clone(seed.Interfaces)
+		key := providerCallableProfileSeedKey(*seed)
+		if key == "" || key == previous || seed.SourceIdentity == "" ||
+			seed.Specifier == "" || seed.SourcePath == "" || seed.Export == "" ||
+			len(seed.CanonicalParameters) == 0 || len(seed.Interfaces) == 0 {
+			return nil, certifyError(
+				"configure provider callable profiles",
+				key,
+				"profile identity or shape is incomplete or duplicated",
+			)
+		}
+		previous = key
+		if subpath, ok := providerSubpath(seed.Specifier); !ok ||
+			!strings.HasPrefix(subpath, "./internal/facets/") ||
+			!strings.HasPrefix(seed.SourcePath, "src/internal/facets/") ||
+			!strings.HasSuffix(seed.SourcePath, ".ts") {
+			return nil, certifyError(
+				"configure provider callable profiles",
+				key,
+				"profile module is invalid",
+			)
+		}
+		if err := validateSeedIndexes(seed.CanonicalParameters); err != nil {
+			return nil, certifyError(
+				"configure provider callable profiles",
+				key,
+				"canonical parameter roots are invalid",
+			)
+		}
+		if err := validateSeedIndexes(seed.CanonicalResults); err != nil {
+			return nil, certifyError(
+				"configure provider callable profiles",
+				key,
+				"canonical result roots are invalid",
+			)
+		}
+		interfaceIdentities := make(map[string]struct{}, len(seed.Interfaces))
+		interfaceExports := make(map[string]struct{}, len(seed.Interfaces))
+		previousInterface := ""
+		for _, selected := range seed.Interfaces {
+			if selected.SourceIdentity == "" || selected.Export == "" ||
+				selected.SourceIdentity <= previousInterface {
+				return nil, certifyError(
+					"configure provider callable profiles",
+					key,
+					"profile interfaces are empty, duplicated, or unordered",
+				)
+			}
+			previousInterface = selected.SourceIdentity
+			if _, duplicate := interfaceExports[selected.Export]; duplicate {
+				return nil, certifyError(
+					"configure provider callable profiles",
+					key,
+					"profile interface export is duplicated",
+				)
+			}
+			interfaceExports[selected.Export] = struct{}{}
+			interfaceIdentities[selected.SourceIdentity] = struct{}{}
+		}
+		seenGuards := make(map[string]struct{}, len(seed.GuardInterfaces))
+		for _, identity := range seed.GuardInterfaces {
+			if _, ok := interfaceIdentities[identity]; !ok {
+				return nil, certifyError(
+					"configure provider callable profiles",
+					key,
+					"guard has no profile-interface owner",
+				)
+			}
+			if _, duplicate := seenGuards[identity]; duplicate {
+				return nil, certifyError(
+					"configure provider callable profiles",
+					key,
+					"guard interface is duplicated",
+				)
+			}
+			seenGuards[identity] = struct{}{}
+		}
+	}
+	return result, nil
+}
+
+func validateSeedIndexes(source []int) error {
+	previous := -1
+	for _, selected := range source {
+		if selected < 0 || selected <= previous {
+			return fmt.Errorf("indexes are negative, duplicated, or unordered")
+		}
+		previous = selected
+	}
+	return nil
 }
 
 func validateGenericCallableProjectionSeeds(
@@ -412,4 +543,8 @@ func facetSeedKey(seed facetSeed) string {
 
 func representationSeedKey(seed providerRepresentationSeed) string {
 	return seed.Specifier + "\x00" + seed.Export
+}
+
+func providerCallableProfileSeedKey(seed providerCallableProfileSeed) string {
+	return seed.Specifier + "\x00" + seed.SourceIdentity + "\x00" + seed.Export
 }

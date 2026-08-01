@@ -373,6 +373,7 @@ type NameReference struct {
 	qualifier string
 	name      string
 	requests  []RootRequest
+	provider  bool
 }
 
 func NewNameReference(name string, requests ...RootRequest) (NameReference, error) {
@@ -405,6 +406,23 @@ func NewQualifiedNameReference(
 	}, nil
 }
 
+func NewProviderQualifiedNameReference(
+	qualifier string,
+	name string,
+	requests ...RootRequest,
+) (NameReference, error) {
+	reference, err := NewQualifiedNameReference(
+		qualifier,
+		name,
+		requests...,
+	)
+	if err != nil {
+		return NameReference{}, err
+	}
+	reference.provider = true
+	return reference, nil
+}
+
 func (r NameReference) Name() string {
 	return r.name
 }
@@ -415,6 +433,10 @@ func (r NameReference) Qualifier() (string, bool) {
 
 func (r NameReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
+}
+
+func (r NameReference) ProviderBoundary() bool {
+	return r.provider
 }
 
 func (r NameReference) WithRequests(

@@ -181,10 +181,13 @@ func (s *programSession) genericOperationNamedIdentity(
 	owner types.Object,
 ) typeidentity.NamedObjectIdentity {
 	return func(object *types.TypeName) (string, error) {
-		if object == nil || object.Pkg() == nil {
+		if object == nil {
 			return "", &api.NameError{
-				Reason: "generic operation named type has no package identity",
+				Reason: "generic operation named type is nil",
 			}
+		}
+		if object.Pkg() == nil {
+			return typeidentity.NamedObjectKey(object)
 		}
 		if object.Parent() == object.Pkg().Scope() {
 			return typeidentity.NamedObjectKey(object)

@@ -44,8 +44,23 @@ export function notifyContext(
   parent: Context | undefined,
   signals: RuntimeSlice<Signal | undefined>,
 ): [Context | undefined, NonNullable<CancelFunc>] {
-  const [context, cancel] = WithCancel(parent);
   const selected = selectedSignals(signals);
+  return startNotification(parent, selected);
+}
+
+export async function notifyContextAsync(
+  parent: Context | undefined,
+  signals: RuntimeSlice<{ String(): Promise<string> } | undefined>,
+): Promise<[Context | undefined, NonNullable<CancelFunc>]> {
+  const selected = await selectedSignalsAsync(signals);
+  return startNotification(parent, selected);
+}
+
+function startNotification(
+  parent: Context | undefined,
+  selected: readonly NodeJS.Signals[],
+): [Context | undefined, NonNullable<CancelFunc>] {
+  const [context, cancel] = WithCancel(parent);
   let stopped = false;
 
   const stop = async (): Promise<void> => {
@@ -85,6 +100,26 @@ function selectedSignals(
       continue;
     }
     const name = nodeSignal(signal.String());
+    if (name !== undefined && !selected.includes(name)) {
+      selected.push(name);
+    }
+  }
+  return selected;
+}
+
+async function selectedSignalsAsync(
+  signals: RuntimeSlice<{ String(): Promise<string> } | undefined>,
+): Promise<NodeJS.Signals[]> {
+  const selected: NodeJS.Signals[] = [];
+  const values = sliceValues(signals);
+  if (values.length === 0) {
+    return [...catchableSignals];
+  }
+  for (const signal of values) {
+    if (signal === undefined) {
+      continue;
+    }
+    const name = nodeSignal(await signal.String());
     if (name !== undefined && !selected.includes(name)) {
       selected.push(name);
     }

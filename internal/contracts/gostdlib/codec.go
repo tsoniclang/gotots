@@ -86,12 +86,21 @@ func Parse(payload []byte) (Manifest, error) {
 	representations := make(
 		map[providerRepresentationLookup]ProviderRepresentation,
 	)
+	callableProfiles := make(
+		map[providerCallableProfileLookup]ProviderCallableProfile,
+	)
 	for _, module := range document.FacetModules {
 		for _, representation := range module.Representations {
 			representations[providerRepresentationLookup{
 				module: module.Specifier,
 				export: representation.Export,
 			}] = newProviderRepresentation(module, representation)
+		}
+		for _, profile := range module.CallableProfiles {
+			callableProfiles[providerCallableProfileLookup{
+				sourceIdentity: profile.SourceIdentity,
+				profileKey:     profile.ProfileKey,
+			}] = newProviderCallableProfile(module, profile)
 		}
 	}
 	facets := make(map[facetLookup]Facet)
@@ -114,11 +123,12 @@ func Parse(payload []byte) (Manifest, error) {
 		}
 	}
 	return Manifest{
-		document:        cloneDocument(document),
-		payload:         canonical,
-		bindings:        bindings,
-		facets:          facets,
-		representations: representations,
+		document:         cloneDocument(document),
+		payload:          canonical,
+		bindings:         bindings,
+		facets:           facets,
+		representations:  representations,
+		callableProfiles: callableProfiles,
 	}, nil
 }
 
@@ -199,9 +209,15 @@ func validateDocument(document Document, sealed bool) error {
 	}
 	previousFacetModule := ""
 	facetLookups := make(map[facetLookup]struct{})
+	callableProfileLookups := make(map[providerCallableProfileLookup]struct{})
 	for index, module := range document.FacetModules {
 		field := fmt.Sprintf("facetModules[%d]", index)
-		if err := validateFacetModule(module, field, facetLookups); err != nil {
+		if err := validateFacetModule(
+			module,
+			field,
+			facetLookups,
+			callableProfileLookups,
+		); err != nil {
 			return err
 		}
 		if previousFacetModule != "" && module.Specifier <= previousFacetModule {
@@ -220,6 +236,7 @@ func validateFacetModule(
 	module FacetModuleDocument,
 	field string,
 	lookups map[facetLookup]struct{},
+	callableProfileLookups map[providerCallableProfileLookup]struct{},
 ) error {
 	if !strings.HasPrefix(
 		module.Specifier,
@@ -231,8 +248,8 @@ func validateFacetModule(
 		!strings.HasPrefix(module.SourcePath, "src/internal/facets/") {
 		return manifestError(field+".sourcePath", "value is not a compiler-facet source")
 	}
-	if len(module.Facets) == 0 {
-		return manifestError(field+".facets", "set is empty")
+	if len(module.Facets) == 0 && len(module.CallableProfiles) == 0 {
+		return manifestError(field, "facet and callable-profile sets are empty")
 	}
 	owners := make(map[string]struct{})
 	representations := make(
@@ -264,6 +281,66 @@ func validateFacetModule(
 		}
 		owners[representation.Export] = struct{}{}
 		representations[representation.Export] = representation
+	}
+	callableInterfaces := make(
+		map[string]ProviderCallableProfileInterfaceDocument,
+		len(module.CallableInterfaces),
+	)
+	previousCallableInterface := ""
+	for index, selected := range module.CallableInterfaces {
+		selectedField := fmt.Sprintf("%s.callableInterfaces[%d]", field, index)
+		if err := validateProviderCallableProfileInterface(
+			selected,
+			selectedField,
+		); err != nil {
+			return err
+		}
+		if selected.SourceIdentity <= previousCallableInterface {
+			return manifestError(
+				field+".callableInterfaces",
+				"values are not strictly ordered",
+			)
+		}
+		previousCallableInterface = selected.SourceIdentity
+		if _, duplicate := callableInterfaces[selected.SourceIdentity]; duplicate {
+			return manifestError(selectedField+".sourceIdentity", "value is duplicated")
+		}
+		if _, duplicate := owners[selected.Export]; duplicate {
+			return manifestError(selectedField+".export", "target owner is duplicated")
+		}
+		callableInterfaces[selected.SourceIdentity] = selected
+		owners[selected.Export] = struct{}{}
+	}
+	previousProfile := ""
+	for index, profile := range module.CallableProfiles {
+		profileField := fmt.Sprintf("%s.callableProfiles[%d]", field, index)
+		if err := validateProviderCallableProfile(
+			profile,
+			profileField,
+			callableInterfaces,
+		); err != nil {
+			return err
+		}
+		key := profile.SourceIdentity + "\x00" + profile.ProfileKey
+		if previousProfile != "" && key <= previousProfile {
+			return manifestError(
+				field+".callableProfiles",
+				"profiles are not strictly ordered",
+			)
+		}
+		previousProfile = key
+		lookup := providerCallableProfileLookup{
+			sourceIdentity: profile.SourceIdentity,
+			profileKey:     profile.ProfileKey,
+		}
+		if _, duplicate := callableProfileLookups[lookup]; duplicate {
+			return manifestError(profileField, "profile identity is duplicated")
+		}
+		callableProfileLookups[lookup] = struct{}{}
+		if _, duplicate := owners[profile.Export]; duplicate {
+			return manifestError(profileField+".export", "target owner is duplicated")
+		}
+		owners[profile.Export] = struct{}{}
 	}
 	previous := ""
 	referencedRepresentations := make(map[string]struct{})

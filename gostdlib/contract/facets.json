@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 9,
   "representations": [
     {
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
@@ -20,6 +20,172 @@
     "context|kind=2|receiver=|name=CancelCauseFunc",
     "context|kind=2|receiver=|name=CancelFunc",
     "io/fs|kind=2|receiver=|name=WalkDirFunc"
+  ],
+  "providerCallableProfiles": [
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryReadCanonical",
+      "canonicalParameters": [1],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryWriteCanonical",
+      "canonicalParameters": [1],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsReadDirCanonical",
+      "canonicalParameters": [0],
+      "guardInterfaces": [
+        "io/fs|kind=2|receiver=|name=ReadDirFS",
+        "io/fs|kind=2|receiver=|name=ReadDirFile"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "export": "CanonicalReadDirFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "export": "CanonicalReadDirFile"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadFile",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsReadFileCanonical",
+      "canonicalParameters": [0],
+      "guardInterfaces": [
+        "io/fs|kind=2|receiver=|name=ReadFileFS"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
+          "export": "CanonicalReadFileFS"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=Stat",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsStatCanonical",
+      "canonicalParameters": [0],
+      "guardInterfaces": [
+        "io/fs|kind=2|receiver=|name=StatFS"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "export": "CanonicalStatFS"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=WalkDir",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsWalkDirCanonical",
+      "canonicalParameters": [0],
+      "guardInterfaces": [
+        "io/fs|kind=2|receiver=|name=ReadDirFS",
+        "io/fs|kind=2|receiver=|name=ReadDirFile",
+        "io/fs|kind=2|receiver=|name=StatFS"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "export": "CanonicalReadDirFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "export": "CanonicalReadDirFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "export": "CanonicalStatFS"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "os/signal|kind=4|receiver=|name=NotifyContext",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
+      "sourcePath": "src/internal/facets/provider-os-signal.ts",
+      "export": "OsSignalNotifyContextCanonical",
+      "canonicalParameters": [1],
+      "interfaces": [
+        {
+          "sourceIdentity": "os|kind=2|receiver=|name=Signal",
+          "export": "CanonicalSignal"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "os|kind=4|receiver=*os.Process|name=Signal",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
+      "sourcePath": "src/internal/facets/provider-os-signal.ts",
+      "export": "OsProcessSignalCanonical",
+      "receiver": true,
+      "canonicalParameters": [0],
+      "interfaces": [
+        {
+          "sourceIdentity": "os|kind=2|receiver=|name=Signal",
+          "export": "CanonicalSignal"
+        }
+      ]
+    }
   ],
   "facets": [
     {
@@ -1218,6 +1384,21 @@
             { "kind": "type-parameter", "typeParameter": 0 }
           ],
           "results": [
+            { "kind": "bool" }
+          ]
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=AsType",
+      "operations": [
+        {
+          "kind": "interface-assert-ok",
+          "parameters": [
+            { "kind": "callable-parameter", "callableParameter": 0 }
+          ],
+          "results": [
+            { "kind": "type-parameter", "typeParameter": 0 },
             { "kind": "bool" }
           ]
         }

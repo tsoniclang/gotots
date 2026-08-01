@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/types"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
@@ -91,6 +93,20 @@ func emitMethod(
 			detached,
 		)
 	}
+	target, selected, profileRequests, err := emitProviderProfileMethod(
+		context,
+		children,
+		source,
+		selector,
+		method,
+		selection,
+		signature,
+		discarded,
+		detached,
+	)
+	if selected || err != nil {
+		return target, err
+	}
 	invocation, err := methodcall.Resolve(
 		context,
 		children,
@@ -146,7 +162,7 @@ func emitMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	target, err := api.NewExpressionEmission(
+	target, err = api.NewExpressionEmission(
 		before,
 		call,
 		api.CombineRequests(
@@ -154,6 +170,7 @@ func emitMethod(
 			receiverRequests,
 			argumentRequests,
 			callRequests,
+			profileRequests,
 		),
 	)
 	if err != nil {
@@ -185,6 +202,13 @@ func emitInterfaceMethod(
 	signature *types.Signature,
 	detached bool,
 ) (api.ExpressionEmission, error) {
+	providerInterface, providerOwned, err :=
+		context.Names().ProviderInterface(selection.Recv())
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	nativeProvider := providerOwned && providerInterface.Mode() ==
+		gostdlib.ProviderInterfaceModeSealedNative
 	receiver, err := children.Expression(
 		context.
 			WithRole(api.RoleReceiverValue).
@@ -217,6 +241,27 @@ func emitInterfaceMethod(
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if nativeProvider {
+		contract, contractErr := environmentcontract.Describe(method.Origin())
+		if contractErr != nil {
+			return api.ExpressionEmission{}, contractErr
+		}
+		certificate, found := providerInterface.Method(contract.Identity())
+		member, memberErr := context.Names().InterfaceMethodName(method)
+		if memberErr != nil {
+			return api.ExpressionEmission{}, memberErr
+		}
+		if !found ||
+			certificate.Kind() != gostdlib.ProviderInterfaceMethodCallable ||
+			certificate.Member() != member ||
+			certificate.Effect() != gostdlib.EffectSynchronous {
+			return api.ExpressionEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "sealed provider interface method certificate is invalid",
+			}
+		}
+		return target, nil
 	}
 	callableReference, err :=
 		context.Names().InterfaceMethodCallable(method)

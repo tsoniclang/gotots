@@ -407,6 +407,13 @@ func NewInterfaceDynamicTypeTokenRequest(
 	return generatedDefinitionRequest(requirement, err)
 }
 
+func NewProviderInterfaceBridgeRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewProviderInterfaceBridgeRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
 func generatedDefinitionRequest(
 	requirement DeclarationRequirement,
 	err error,

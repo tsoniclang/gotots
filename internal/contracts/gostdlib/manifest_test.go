@@ -153,6 +153,44 @@ func TestManifestRejectsInvalidGenericOperationShape(t *testing.T) {
 	}
 }
 
+func TestManifestOwnsCallableParameterGenericOperation(t *testing.T) {
+	document := validDocument()
+	binding := &document.Modules[0].Bindings[0]
+	binding.GenericOperations = []gostdlib.GenericOperationDocument{{
+		Kind: gostdlib.GenericOperationInterfaceAssertOK,
+		Parameters: []gostdlib.GenericOperationTypeDocument{
+			gostdlib.GenericOperationCallableParameterReference(0),
+		},
+		Results: []gostdlib.GenericOperationTypeDocument{
+			gostdlib.GenericOperationTypeParameterReference(0),
+			gostdlib.GenericOperationBoolReference(),
+		},
+	}}
+	payload, err := gostdlib.Seal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := gostdlib.Parse(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, ok := manifest.Binding(binding.Identity)
+	if !ok {
+		t.Fatal("callable-parameter operation binding is absent")
+	}
+	operations := selected.GenericOperations()
+	if len(operations) != 1 ||
+		operations[0].Parameters[0].CallableParameter == nil ||
+		*operations[0].Parameters[0].CallableParameter != 0 {
+		t.Fatalf("callable-parameter operation = %#v", operations)
+	}
+	*operations[0].Parameters[0].CallableParameter = 9
+	next := selected.GenericOperations()[0].Parameters[0].CallableParameter
+	if next == nil || *next != 0 {
+		t.Fatal("callable-parameter operation exposed mutable storage")
+	}
+}
+
 func TestManifestRequiresEffectsExactlyOnCallableBindings(t *testing.T) {
 	document := validDocument()
 	document.Modules[0].Bindings[0].Effect = gostdlib.EffectInvalid
@@ -381,6 +419,88 @@ func TestManifestOwnsClosedPrivateProviderRepresentation(t *testing.T) {
 	document.FacetModules[0].Facets[0].RepresentationExport = "Missing"
 	if _, err := gostdlib.Seal(document); err == nil {
 		t.Fatal("facet with a missing representation passed")
+	}
+}
+
+func TestManifestOwnsProviderInterfaceSurface(t *testing.T) {
+	document := validDocument()
+	binding := &document.Modules[0].Bindings[0]
+	binding.Kind = gostdlib.BindingType
+	binding.Representation = gostdlib.RepresentationDirect
+	binding.Effect = gostdlib.EffectInvalid
+	binding.ProviderInterface = &gostdlib.ProviderInterfaceDocument{
+		Mode: gostdlib.ProviderInterfaceModeSealedNative,
+		Methods: []gostdlib.ProviderInterfaceMethodDocument{
+			{
+				SourceIdentity:      "strings|kind=4|receiver=strings.Reader|name=Read",
+				Kind:                gostdlib.ProviderInterfaceMethodCallable,
+				Member:              "Read",
+				Effect:              gostdlib.EffectSynchronous,
+				SourceSignature:     "func([]byte) (int, error)|params=|results=",
+				SourceLocation:      "strings/reader.go:2:1",
+				ImplementationOwner: "src/strings.ts",
+				TargetFingerprint:   digest('e'),
+			},
+			{
+				SourceIdentity:  "strings|kind=4|receiver=strings.Reader|name=private",
+				Kind:            gostdlib.ProviderInterfaceMethodRuntimeOnly,
+				SourceSignature: "func()|params=|results=",
+				SourceLocation:  "strings/reader.go:1:1",
+			},
+		},
+	}
+	payload, err := gostdlib.Seal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := gostdlib.Parse(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, ok := manifest.Binding(binding.Identity)
+	if !ok {
+		t.Fatal("provider interface binding is absent")
+	}
+	providerInterface, ok := selected.ProviderInterface()
+	if !ok {
+		t.Fatal("provider interface evidence is absent")
+	}
+	method, ok := providerInterface.Method(
+		"strings|kind=4|receiver=strings.Reader|name=Read",
+	)
+	if !ok || method.Member() != "Read" ||
+		method.Effect() != gostdlib.EffectSynchronous ||
+		providerInterface.Mode() != gostdlib.ProviderInterfaceModeSealedNative {
+		t.Fatalf("provider interface method = %#v, %t", method, ok)
+	}
+	methods := providerInterface.Methods()
+	methods[0] = gostdlib.ProviderInterfaceMethod{}
+	if len(providerInterface.Methods()) != 2 ||
+		providerInterface.Methods()[0].SourceIdentity() == "" {
+		t.Fatal("provider interface exposed mutable method storage")
+	}
+
+	document.Modules[0].Bindings[0].ProviderInterface.Methods[1].Member = "private"
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("runtime-only interface method with a public target passed")
+	}
+
+	document = validDocument()
+	binding = &document.Modules[0].Bindings[0]
+	binding.Kind = gostdlib.BindingType
+	binding.Representation = gostdlib.RepresentationDirect
+	binding.Effect = gostdlib.EffectInvalid
+	binding.ProviderInterface = &gostdlib.ProviderInterfaceDocument{
+		Mode: gostdlib.ProviderInterfaceModeBridge,
+		Methods: []gostdlib.ProviderInterfaceMethodDocument{{
+			SourceIdentity:  "strings|kind=4|receiver=strings.Reader|name=private",
+			Kind:            gostdlib.ProviderInterfaceMethodRuntimeOnly,
+			SourceSignature: "func()|params=|results=",
+			SourceLocation:  "strings/reader.go:1:1",
+		}},
+	}
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("open bridge interface with a sealing method passed")
 	}
 }
 

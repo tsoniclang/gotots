@@ -18,9 +18,11 @@ func buildFacetModules(
 	source goSurface,
 	seeds []facetSeed,
 	representationSeeds []providerRepresentationSeed,
+	callableProfileSeeds []providerCallableProfileSeed,
 	modules []gostdlib.ModuleDocument,
 	genericProjections map[string][]gostdlib.GenericTypeArgumentDocument,
 	effectMarker tsgo.ProjectExport,
+	selectedToolchain toolchain,
 ) ([]gostdlib.FacetModuleDocument, error) {
 	interfaceTargets, err := providerInterfaceTargets(
 		config,
@@ -44,6 +46,13 @@ func buildFacetModules(
 			seed,
 		)
 	}
+	profilesBySpecifier := make(map[string][]providerCallableProfileSeed)
+	for _, seed := range callableProfileSeeds {
+		profilesBySpecifier[seed.Specifier] = append(
+			profilesBySpecifier[seed.Specifier],
+			seed,
+		)
+	}
 	specifiers := make([]string, 0, len(bySpecifier))
 	for specifier := range bySpecifier {
 		specifiers = append(specifiers, specifier)
@@ -53,16 +62,27 @@ func buildFacetModules(
 			specifiers = append(specifiers, specifier)
 		}
 	}
+	for specifier := range profilesBySpecifier {
+		if _, selected := bySpecifier[specifier]; selected {
+			continue
+		}
+		if _, selected := representationsBySpecifier[specifier]; !selected {
+			specifiers = append(specifiers, specifier)
+		}
+	}
 	sort.Strings(specifiers)
 	result := make([]gostdlib.FacetModuleDocument, 0, len(specifiers))
 	for _, specifier := range specifiers {
 		selected := bySpecifier[specifier]
 		selectedRepresentations := representationsBySpecifier[specifier]
+		selectedProfiles := profilesBySpecifier[specifier]
 		sourcePath := ""
 		if len(selected) != 0 {
 			sourcePath = selected[0].SourcePath
 		} else if len(selectedRepresentations) != 0 {
 			sourcePath = selectedRepresentations[0].SourcePath
+		} else if len(selectedProfiles) != 0 {
+			sourcePath = selectedProfiles[0].SourcePath
 		}
 		for _, seed := range selected {
 			if seed.SourcePath != sourcePath {
@@ -79,6 +99,15 @@ func buildFacetModules(
 					"build representations",
 					specifier,
 					"one facet module has multiple source files",
+				)
+			}
+		}
+		for _, seed := range selectedProfiles {
+			if seed.SourcePath != sourcePath {
+				return nil, certifyError(
+					"build provider callable profiles",
+					specifier,
+					"one profile module has multiple source files",
 				)
 			}
 		}
@@ -130,6 +159,56 @@ func buildFacetModules(
 			representations[representation.Export] = representation
 			owned[representation.Export] = struct{}{}
 		}
+		profileDocuments := make(
+			[]gostdlib.ProviderCallableProfileDocument,
+			0,
+			len(selectedProfiles),
+		)
+		callableInterfaces := make(
+			map[string]gostdlib.ProviderCallableProfileInterfaceDocument,
+		)
+		for _, seed := range selectedProfiles {
+			built, err := buildProviderCallableProfile(
+				selectedToolchain,
+				source,
+				seed,
+				byName,
+				project,
+				effectMarker,
+			)
+			if err != nil {
+				return nil, err
+			}
+			profileDocuments = append(profileDocuments, built.profile)
+			owned[built.profile.Export] = struct{}{}
+			for _, selected := range built.interfaces {
+				prior, exists := callableInterfaces[selected.SourceIdentity]
+				if exists && !sameProviderCallableProfileInterface(prior, selected) {
+					return nil, certifyError(
+						"build provider callable profiles",
+						selected.SourceIdentity,
+						"shared callable-interface evidence disagrees",
+					)
+				}
+				callableInterfaces[selected.SourceIdentity] = selected
+				owned[selected.Export] = struct{}{}
+			}
+		}
+		callableInterfaceDocuments := make(
+			[]gostdlib.ProviderCallableProfileInterfaceDocument,
+			0,
+			len(callableInterfaces),
+		)
+		for _, selected := range callableInterfaces {
+			callableInterfaceDocuments = append(
+				callableInterfaceDocuments,
+				selected,
+			)
+		}
+		sort.Slice(callableInterfaceDocuments, func(left, right int) bool {
+			return callableInterfaceDocuments[left].SourceIdentity <
+				callableInterfaceDocuments[right].SourceIdentity
+		})
 		facets := make([]gostdlib.FacetDocument, 0, len(selected))
 		for _, seed := range selected {
 			facet, err := buildFacet(
@@ -168,11 +247,20 @@ func buildFacetModules(
 				string(facets[right].Kind) + "\x00" + facets[right].Export
 			return leftKey < rightKey
 		})
+		sort.Slice(profileDocuments, func(left, right int) bool {
+			leftKey := profileDocuments[left].SourceIdentity + "\x00" +
+				profileDocuments[left].ProfileKey
+			rightKey := profileDocuments[right].SourceIdentity + "\x00" +
+				profileDocuments[right].ProfileKey
+			return leftKey < rightKey
+		})
 		result = append(result, gostdlib.FacetModuleDocument{
-			Specifier:       specifier,
-			SourcePath:      sourcePath,
-			Representations: representationDocuments,
-			Facets:          facets,
+			Specifier:          specifier,
+			SourcePath:         sourcePath,
+			Representations:    representationDocuments,
+			CallableInterfaces: callableInterfaceDocuments,
+			CallableProfiles:   profileDocuments,
+			Facets:             facets,
 		})
 	}
 	return result, nil

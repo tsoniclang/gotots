@@ -3,6 +3,7 @@ package naming
 import (
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/output"
@@ -131,6 +132,67 @@ func (n *File) InterfaceDynamicType(
 	)
 }
 
+func (n *File) ProviderInterfaceBridge(
+	sourceType types.Type,
+) (api.NameReference, bool, error) {
+	named, ok := types.Unalias(sourceType).(*types.Named)
+	if !ok || named.Obj() == nil {
+		return api.NameReference{}, false, nil
+	}
+	contract, ok := named.Underlying().(*types.Interface)
+	if !ok || !contract.Complete().IsMethodSet() {
+		return api.NameReference{}, false, nil
+	}
+	providerInterface, providerOwned, err := n.owner.registry.ProviderInterface(
+		named.Origin().Obj(),
+	)
+	if err != nil || !providerOwned {
+		if err != nil {
+			return api.NameReference{}, providerOwned, err
+		}
+		return api.NameReference{}, false, nil
+	}
+	if providerInterface.Mode() ==
+		gostdlib.ProviderInterfaceModeSealedNative {
+		return api.NameReference{}, false, nil
+	}
+	artifactKey, err := typeidentity.BuildKey(
+		named,
+		n.generatedNamedObjectIdentity,
+	)
+	if err != nil {
+		return api.NameReference{}, true, err
+	}
+	binding, err := n.owner.registry.internProviderInterfaceBridge(
+		artifactKey,
+		named,
+	)
+	if err != nil {
+		return api.NameReference{}, true, err
+	}
+	requirement, err := api.NewProviderInterfaceBridgeRequest(binding.owner)
+	if err != nil {
+		return api.NameReference{}, true, err
+	}
+	reference, err := n.generatedValueReference(
+		binding.owner,
+		binding.name,
+		requirement,
+		api.ArtifactFacetConstructorSurface,
+	)
+	return reference, true, err
+}
+
+func (n *File) ProviderInterface(
+	sourceType types.Type,
+) (gostdlib.ProviderInterface, bool, error) {
+	named, ok := types.Unalias(sourceType).(*types.Named)
+	if !ok || named.Obj() == nil {
+		return gostdlib.ProviderInterface{}, false, nil
+	}
+	return n.owner.registry.ProviderInterface(named.Origin().Obj())
+}
+
 func (n *File) InterfaceContract(
 	sourceType types.Type,
 ) (api.InterfaceContractReference, error) {
@@ -222,6 +284,15 @@ func (n *File) InterfaceType(
 ) (api.NameReference, error) {
 	if typeName, interfaceType, ok := namedInterface(sourceType); ok {
 		if n.providerInterfaceContract(typeName) {
+			providerInterface, _, err :=
+				n.owner.registry.ProviderInterface(typeName)
+			if err != nil {
+				return api.NameReference{}, err
+			}
+			if providerInterface.Mode() ==
+				gostdlib.ProviderInterfaceModeSealedNative {
+				return n.TypeReference(typeName)
+			}
 			return n.generatedInterfaceType(interfaceType)
 		}
 		return n.TypeReference(typeName)
@@ -313,7 +384,8 @@ func (n *File) providerInterfaceContract(typeName *types.TypeName) bool {
 		return false
 	}
 	binding, ok := n.owner.registry.byObject[typeName]
-	return ok && binding.kind == targetBindingProvider
+	return ok && (binding.kind == targetBindingProvider ||
+		binding.kind == targetBindingMissingProvider)
 }
 
 func (n *File) namedInterfaceContract(

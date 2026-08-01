@@ -234,6 +234,17 @@ func NewInterfaceDynamicTypeTokenRequirement(
 	)
 }
 
+func NewProviderInterfaceBridgeRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	return newGeneratedDefinitionRequirement(
+		artifact,
+		GeneratedArtifactProviderInterfaceBridge,
+		DeclarationRequirementProviderInterfaceBridge,
+		"provider-interface bridge",
+	)
+}
+
 func newGeneratedDefinitionRequirement(
 	artifact *GeneratedArtifact,
 	artifactKind GeneratedArtifactKind,
@@ -547,6 +558,10 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementPointerRepresentation:
 		return r.validGeneratedDefinition(
 			GeneratedArtifactPointerRepresentation,
+		)
+	case DeclarationRequirementProviderInterfaceBridge:
+		return r.validGeneratedDefinition(
+			GeneratedArtifactProviderInterfaceBridge,
 		)
 	default:
 		return false

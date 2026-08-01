@@ -20,6 +20,7 @@ const (
 	GenericOperationFromStorage          GenericOperationKind = "from-storage"
 	GenericOperationToContainerStorage   GenericOperationKind = "to-container-storage"
 	GenericOperationFromContainerStorage GenericOperationKind = "from-container-storage"
+	GenericOperationInterfaceAssertOK    GenericOperationKind = "interface-assert-ok"
 )
 
 func (k GenericOperationKind) Valid() bool {
@@ -33,7 +34,8 @@ func (k GenericOperationKind) Valid() bool {
 		GenericOperationToStorage,
 		GenericOperationFromStorage,
 		GenericOperationToContainerStorage,
-		GenericOperationFromContainerStorage:
+		GenericOperationFromContainerStorage,
+		GenericOperationInterfaceAssertOK:
 		return true
 	default:
 		return false
@@ -43,20 +45,22 @@ func (k GenericOperationKind) Valid() bool {
 type GenericOperationTypeKind string
 
 const (
-	GenericOperationTypeInvalid      GenericOperationTypeKind = ""
-	GenericOperationTypeParameter    GenericOperationTypeKind = "type-parameter"
-	GenericOperationTypeBool         GenericOperationTypeKind = "bool"
-	GenericOperationTypeInt          GenericOperationTypeKind = "int"
-	GenericOperationTypeSlice        GenericOperationTypeKind = "slice"
-	GenericOperationTypeMap          GenericOperationTypeKind = "map"
-	genericOperationTypeMaximumDepth                          = 32
+	GenericOperationTypeInvalid           GenericOperationTypeKind = ""
+	GenericOperationTypeParameter         GenericOperationTypeKind = "type-parameter"
+	GenericOperationTypeBool              GenericOperationTypeKind = "bool"
+	GenericOperationTypeInt               GenericOperationTypeKind = "int"
+	GenericOperationTypeSlice             GenericOperationTypeKind = "slice"
+	GenericOperationTypeMap               GenericOperationTypeKind = "map"
+	GenericOperationTypeCallableParameter GenericOperationTypeKind = "callable-parameter"
+	genericOperationTypeMaximumDepth                               = 32
 )
 
 type GenericOperationTypeDocument struct {
-	Kind          GenericOperationTypeKind      `json:"kind"`
-	TypeParameter *int                          `json:"typeParameter,omitempty"`
-	Key           *GenericOperationTypeDocument `json:"key,omitempty"`
-	Element       *GenericOperationTypeDocument `json:"element,omitempty"`
+	Kind              GenericOperationTypeKind      `json:"kind"`
+	TypeParameter     *int                          `json:"typeParameter,omitempty"`
+	CallableParameter *int                          `json:"callableParameter,omitempty"`
+	Key               *GenericOperationTypeDocument `json:"key,omitempty"`
+	Element           *GenericOperationTypeDocument `json:"element,omitempty"`
 }
 
 func GenericOperationTypeParameterReference(
@@ -66,6 +70,16 @@ func GenericOperationTypeParameterReference(
 	return GenericOperationTypeDocument{
 		Kind:          GenericOperationTypeParameter,
 		TypeParameter: &selected,
+	}
+}
+
+func GenericOperationCallableParameterReference(
+	index int,
+) GenericOperationTypeDocument {
+	selected := index
+	return GenericOperationTypeDocument{
+		Kind:              GenericOperationTypeCallableParameter,
+		CallableParameter: &selected,
 	}
 }
 
@@ -149,6 +163,10 @@ func cloneGenericOperationType(
 	if source.TypeParameter != nil {
 		selected := *source.TypeParameter
 		result.TypeParameter = &selected
+	}
+	if source.CallableParameter != nil {
+		selected := *source.CallableParameter
+		result.CallableParameter = &selected
 	}
 	result.Key = cloneGenericOperationTypePointer(source.Key)
 	result.Element = cloneGenericOperationTypePointer(source.Element)
@@ -235,20 +253,26 @@ func validateGenericOperationType(
 	switch source.Kind {
 	case GenericOperationTypeParameter:
 		if source.TypeParameter == nil || *source.TypeParameter < 0 ||
-			source.Key != nil || source.Element != nil {
+			source.CallableParameter != nil || source.Key != nil || source.Element != nil {
 			return manifestError(field, "type-parameter expression is invalid")
 		}
+	case GenericOperationTypeCallableParameter:
+		if source.CallableParameter == nil || *source.CallableParameter < 0 ||
+			source.TypeParameter != nil || source.Key != nil || source.Element != nil {
+			return manifestError(field, "callable-parameter expression is invalid")
+		}
 	case GenericOperationTypeBool, GenericOperationTypeInt:
-		if source.TypeParameter != nil || source.Key != nil || source.Element != nil {
+		if source.TypeParameter != nil || source.CallableParameter != nil ||
+			source.Key != nil || source.Element != nil {
 			return manifestError(field, "basic type expression is invalid")
 		}
 	case GenericOperationTypeSlice:
-		if source.TypeParameter != nil || source.Key != nil {
+		if source.TypeParameter != nil || source.CallableParameter != nil || source.Key != nil {
 			return manifestError(field, "slice type expression is invalid")
 		}
 		return validateChild(source.Element, field+".element")
 	case GenericOperationTypeMap:
-		if source.TypeParameter != nil {
+		if source.TypeParameter != nil || source.CallableParameter != nil {
 			return manifestError(field, "map type expression is invalid")
 		}
 		if err := validateChild(source.Key, field+".key"); err != nil {
@@ -304,6 +328,12 @@ func validGenericOperationShape(operation GenericOperationDocument) bool {
 			len(operation.Results) == 1 &&
 			typeParameter(operation.Parameters[0]) &&
 			same(operation.Parameters[0], operation.Results[0])
+	case GenericOperationInterfaceAssertOK:
+		return len(operation.Parameters) == 1 &&
+			operation.Parameters[0].Kind == GenericOperationTypeCallableParameter &&
+			len(operation.Results) == 2 &&
+			typeParameter(operation.Results[0]) &&
+			operation.Results[1].Kind == GenericOperationTypeBool
 	default:
 		return false
 	}
@@ -332,6 +362,11 @@ func genericOperationTypeKey(source GenericOperationTypeDocument) string {
 			return "parameter(?)"
 		}
 		return "parameter(" + strconv.Itoa(*source.TypeParameter) + ")"
+	case GenericOperationTypeCallableParameter:
+		if source.CallableParameter == nil {
+			return "callable-parameter(?)"
+		}
+		return "callable-parameter(" + strconv.Itoa(*source.CallableParameter) + ")"
 	case GenericOperationTypeBool, GenericOperationTypeInt:
 		return string(source.Kind)
 	case GenericOperationTypeSlice:

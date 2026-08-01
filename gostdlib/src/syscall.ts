@@ -1,4 +1,5 @@
 import type { GoPointer } from "@gotots/runtime/pointer.js";
+import { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
@@ -10,6 +11,42 @@ import type {
 import { errnoMessage } from "./internal/node/syscall/errno.js";
 import { signalName } from "./internal/node/syscall/signal.js";
 
+const signalType = Object.freeze({});
+
+class SignalInterfaceValue extends GoInterfaceValue {
+  readonly $go$type: object = signalType;
+  readonly $go$methods: ReadonlySet<object> = new Set<object>();
+  readonly $go$formatString = true;
+
+  constructor(readonly value: int64) {
+    super();
+  }
+
+  $go$implements(contract: readonly object[]): boolean {
+    return contract.every((token: object): boolean => this.$go$methods.has(token));
+  }
+
+  $go$equal(other: GoInterfaceValue): boolean {
+    return other instanceof SignalInterfaceValue && other.value === this.value;
+  }
+
+  $go$hash(): number {
+    return this.value;
+  }
+
+  $go$format(
+    verb: string,
+    _flags: string,
+    _precision: number | undefined,
+  ): string {
+    if (verb === "T") {
+      return "syscall.Signal";
+    }
+    const name = signalName(this.value);
+    return verb === "q" ? JSON.stringify(name) : name;
+  }
+}
+
 export class Errno {
   constructor(public readonly value: uint64) {}
 
@@ -18,8 +55,10 @@ export class Errno {
   }
 }
 
-export class Signal {
-  constructor(public readonly value: int64) {}
+export class Signal extends SignalInterfaceValue {
+  constructor(value: int64) {
+    super(value);
+  }
 
   Signal(): void {}
 

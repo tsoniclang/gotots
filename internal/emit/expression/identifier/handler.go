@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 )
 
 func Emit(
@@ -48,7 +49,7 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return context.Values().FromStorage(
+		target, err := context.Values().FromStorage(
 			context,
 			source,
 			variable.Type(),
@@ -57,6 +58,18 @@ func Emit(
 				reference.Requests()...,
 			),
 		)
+		if err != nil || !reference.ProviderBoundary() {
+			return target, err
+		}
+		target, _, err = providerboundary.FromProviderValue(
+			context,
+			children,
+			nil,
+			"",
+			variable.Type(),
+			target,
+		)
+		return target, err
 	}
 	if variable, ok := object.(*types.Var); ok {
 		if selected, exists, err := context.AddressableStorage().Read(
@@ -91,13 +104,25 @@ func Emit(
 		reference.Requests()...,
 	)
 	if function, ok := object.(*types.Func); ok {
-		return cooperativecall.AdaptSourceValue(
+		target, err = cooperativecall.AdaptSourceValue(
 			context,
 			children,
 			source,
 			function,
 			target,
 		)
+		if err != nil || !reference.ProviderBoundary() {
+			return target, err
+		}
+		target, _, err = providerboundary.FromProviderValue(
+			context,
+			children,
+			nil,
+			"",
+			function.Type(),
+			target,
+		)
+		return target, err
 	}
 	return target, nil
 }

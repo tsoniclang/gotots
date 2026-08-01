@@ -33,6 +33,8 @@ func BuildValue(
 	switch symbol {
 	case api.RuntimeInterfaceValue:
 		return valueContract(factory, valueName), nil
+	case api.RuntimeProviderInterfaceBridge:
+		return providerBridgeContract(factory, valueName), nil
 	case api.RuntimeErrorMethodToken:
 		return methodToken(factory, "GoErrorMethodToken"), nil
 	case api.RuntimeRuntimeErrorToken:

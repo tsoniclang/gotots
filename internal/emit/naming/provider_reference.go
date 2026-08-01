@@ -186,6 +186,135 @@ func (n *File) providerGenericCallableProfileReference(
 	return reference, selected.Effect(), true, err
 }
 
+func (n *File) ProviderCallableProfile(
+	owner *types.Func,
+	profileKey string,
+) (api.ProviderCallableProfileReference, bool, error) {
+	if owner == nil || profileKey == "" {
+		return api.ProviderCallableProfileReference{}, false, &api.NameError{
+			Reason: "provider callable-profile identity is invalid",
+		}
+	}
+	owner = owner.Origin()
+	contract, providerOwned, err := n.providerFacetOwner(owner)
+	if err != nil || !providerOwned {
+		return api.ProviderCallableProfileReference{}, providerOwned, err
+	}
+	selected, ok := n.owner.registry.provider.ProviderCallableProfile(
+		contract.Identity(),
+		profileKey,
+	)
+	if !ok {
+		return api.ProviderCallableProfileReference{}, true, &api.NameError{
+			Name: contract.Identity(),
+			Reason: "selected standard-library callable has no certified boundary profile " +
+				strconv.Quote(profileKey),
+		}
+	}
+	if !selected.Valid() || selected.SourceIdentity() != contract.Identity() ||
+		selected.ProfileKey() != profileKey {
+		return api.ProviderCallableProfileReference{}, true, &api.NameError{
+			Name:   contract.Identity(),
+			Reason: "provider callable-profile certificate is inconsistent",
+		}
+	}
+	qualifier, request, err := n.providerImport(
+		selected.ModuleSpecifier(),
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ProviderCallableProfileReference{}, true, err
+	}
+	if n.require != nil {
+		if err := n.require(owner); err != nil {
+			return api.ProviderCallableProfileReference{}, true, err
+		}
+	}
+	reference, err := api.NewQualifiedNameReference(
+		qualifier,
+		selected.Export(),
+		request,
+	)
+	if err != nil {
+		return api.ProviderCallableProfileReference{}, true, err
+	}
+	guards, err := n.providerCallableProfileGuards(selected)
+	if err != nil {
+		return api.ProviderCallableProfileReference{}, true, err
+	}
+	result, err := api.NewProviderCallableProfileReference(
+		reference,
+		selected,
+		guards,
+	)
+	return result, true, err
+}
+
+func (n *File) ProviderCallableProfileCandidates(
+	owner *types.Func,
+) ([]api.ProviderCallableProfileCandidate, bool, error) {
+	if owner == nil {
+		return nil, false, &api.NameError{
+			Reason: "provider callable-profile owner is nil",
+		}
+	}
+	owner = owner.Origin()
+	contract, providerOwned, err := n.providerFacetOwner(owner)
+	if err != nil || !providerOwned {
+		return nil, providerOwned, err
+	}
+	profiles := n.owner.registry.provider.ProviderCallableProfiles(
+		contract.Identity(),
+	)
+	result := make([]api.ProviderCallableProfileCandidate, 0, len(profiles))
+	for _, profile := range profiles {
+		if !profile.Valid() || profile.SourceIdentity() != contract.Identity() {
+			return nil, true, &api.NameError{
+				Name:   contract.Identity(),
+				Reason: "provider callable-profile candidate is inconsistent",
+			}
+		}
+		guards, guardErr := n.providerCallableProfileGuards(profile)
+		if guardErr != nil {
+			return nil, true, guardErr
+		}
+		candidate, candidateErr := api.NewProviderCallableProfileCandidate(
+			profile,
+			guards,
+		)
+		if candidateErr != nil {
+			return nil, true, candidateErr
+		}
+		result = append(result, candidate)
+	}
+	return result, true, nil
+}
+
+func (n *File) providerCallableProfileGuards(
+	profile gostdlib.ProviderCallableProfile,
+) ([]types.Type, error) {
+	guardIdentities := profile.GuardInterfaces()
+	guards := make([]types.Type, 0, len(guardIdentities))
+	for _, identity := range guardIdentities {
+		object := n.owner.registry.providerObjectByIdentity[identity]
+		typeName, ok := object.(*types.TypeName)
+		if !ok || typeName.IsAlias() {
+			return nil, &api.NameError{
+				Name:   identity,
+				Reason: "provider callable-profile guard has no exact source interface",
+			}
+		}
+		if _, ok := types.Unalias(typeName.Type()).Underlying().(*types.Interface); !ok {
+			return nil, &api.NameError{
+				Name:   identity,
+				Reason: "provider callable-profile guard source is not an interface",
+			}
+		}
+		guards = append(guards, typeName.Type())
+	}
+	return guards, nil
+}
+
 func (n *File) RecoveryCallable(
 	owner *types.Func,
 ) (api.RecoveryCallableReference, bool, error) {

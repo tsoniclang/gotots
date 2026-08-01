@@ -585,6 +585,14 @@ func interfaceRuntimeContract(
 			false,
 			RuntimePanic,
 		)
+	case RuntimeProviderInterfaceBridge:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoProviderInterfaceBridge",
+			true,
+			RuntimeInterfaceValue,
+		)
 	default:
 		return RuntimeSymbolContract{}, false
 	}

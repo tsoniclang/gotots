@@ -1313,6 +1313,67 @@ effect. A cast, `any`, `unknown`, raw structural assignment, or widening the
 public provider interface is not a boundary. The compiler never infers which
 methods a provider uses from its source text or target shape.
 
+That boundary is recursive and representation-wide, not call-site-only. It
+also applies to interface values nested in tuples, callbacks, containers,
+provider-owned struct fields, package state, and provider method parameters or
+results. The provider certificate records the complete selected public
+interface surface by exact Go method identity, target member, callable effect,
+implementation owner, and target fingerprint. Emission consumes that sealed
+fact; it never re-inspects provider source or treats TypeScript assignability as
+the certificate.
+
+Provider-to-generated flow may use one demand-created, compilation-owned bridge
+per exact provider interface/profile. The bridge owns the canonical runtime
+method tokens, preserves nil and dynamic-value identity, forwards only
+certificate-joined methods, and recursively converts nested boundary values.
+It is emitted once and referenced at each crossing; per-use object shapes and
+wrapper definitions are forbidden. A synchronous provider method may satisfy a
+selected cooperative canonical method through a static async forward. The
+reverse is impossible: a cooperative generated method may not be projected
+into a synchronous provider parameter. Such an input requires an exact
+provider-owned profile/facet whose implementation, nested interface ABI, and
+outer effect are certified together.
+
+A provider callable profile is a sealed alternate implementation of one exact
+Go function or method, not a call-site adapter. Its certificate records the
+source callable identity, each consumed Go interface identity, every callable
+method identity and selected effect, the provider profile-interface export and
+fingerprint, the roots of the Go parameter/result signature represented in the
+canonical generated ABI, every additional interface-assertion guard consumed
+by the algorithm, and the profile's outer effect. The profile key is derived
+from the sorted identities and selected effects of **all** interfaces the
+profile can execute, including guard-only interfaces; excluding a guard would
+collapse observably different synchronous and cooperative guard ABIs. The key
+is never a hand-authored source name or rendered TypeScript signature. A method
+profile receives its ordinary provider receiver first. An interface-assertion
+guard is passed as the generated canonical type predicate, so the provider
+algorithm neither inspects target shape nor casts a value after
+`$go$implements`.
+
+The compiler selects the ordinary provider binding when the complete recursive
+public provider ABI matches. On the first mismatch it exact-matches the finite
+certified profile candidates for that source callable against the complete
+current recursive ABI, including guard interfaces, and selects exactly one
+profile
+selection for the whole callable and requires one exact certified match before
+printing the call. Roots marked canonical cross unchanged, including slices,
+tuples, callbacks, and other containers, so aliasing is preserved and no
+element-wise conversion or per-call wrapper is introduced. Results marked as
+provider-owned use the one demand-created provider-to-canonical bridge; results
+marked canonical are never wrapped again. Missing, ambiguous, partially
+matching, or unused profile evidence fails closed. Profile declarations and
+imports are demand-created, and a profile becomes unreachable without a
+compatibility path when the ordinary and canonical ABIs converge.
+
+An inaccessible Go interface method remains part of runtime satisfaction and
+method-token identity even when no generated consumer can legally invoke it.
+The provider boundary must preserve that token obligation without pretending
+that the provider's public TypeScript interface exposes the method. Consumer
+code may not fabricate an implementation because the selected Go checker has
+already enforced the package-private method set. A callable member is emitted
+only where the selected Go package can legally call it; runtime membership is
+never weakened.
+
 Representation components shared by generated and provider code have one
 GoToTS runtime owner. In particular, unnamed `struct{}` is represented by the
 same nominal `GoEmptyStruct` in generated channel element types and provider

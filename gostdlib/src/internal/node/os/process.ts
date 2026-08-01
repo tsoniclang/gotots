@@ -31,6 +31,26 @@ export function signalProcess(
   }
 }
 
+export async function signalProcessAsync(
+  receiver: ProcessValue | undefined,
+  signal: { String(): Promise<gostring> } | undefined,
+): Promise<GoError | undefined> {
+  if (receiver === undefined || signal === undefined) {
+    return nodeError("invalid", "signal");
+  }
+  const name = await signal.String();
+  const selected = nodeSignal(name);
+  if (selected === undefined) {
+    return nodeError("invalid", "signal");
+  }
+  try {
+    process.kill(receiver.Pid, selected);
+    return undefined;
+  } catch {
+    return nodeError("operation", "signal");
+  }
+}
+
 export function getProcessID(): int64 {
   return process.pid;
 }

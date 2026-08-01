@@ -161,6 +161,20 @@ func methodSetReceiver(
 			false,
 		)
 	}
+	if receiverABI == api.MethodReceiverABIContractDirect {
+		value, selected, err := projectProviderRepresentationMethodReceiver(
+			context,
+			children,
+			source,
+			resolved,
+			method,
+			root,
+			copyValue,
+		)
+		if err != nil || selected {
+			return value, err
+		}
+	}
 	value, err := projectValue(
 		context,
 		children,
@@ -262,6 +276,20 @@ func MethodExpressionReceiver(
 		)
 		return receiver, method, err
 	}
+	if receiverABI == api.MethodReceiverABIContractDirect {
+		value, selected, err := projectProviderRepresentationMethodReceiver(
+			context,
+			children,
+			source,
+			resolved,
+			method,
+			root,
+			true,
+		)
+		if err != nil || selected {
+			return value, method, err
+		}
+	}
 	value, err := projectValue(
 		context,
 		children,
@@ -316,6 +344,56 @@ func MethodExpressionReceiver(
 		value,
 	)
 	return value, method, err
+}
+
+func projectProviderRepresentationMethodReceiver(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	resolved path,
+	method *types.Func,
+	root api.ExpressionEmission,
+	copyValue bool,
+) (api.ExpressionEmission, bool, error) {
+	current := root
+	currentType := resolved.root
+	for index := 0; ; index++ {
+		owns, err := context.Names().ProviderRepresentationOwnsMethod(
+			currentType,
+			method,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, false, err
+		}
+		if owns {
+			if !copyValue {
+				return current, true, nil
+			}
+			current, err = context.Values().Transfer(
+				context.WithRole(api.RoleReceiverValue),
+				source,
+				currentType,
+				currentType,
+				api.ValueTransferCopy,
+				current,
+			)
+			return current, true, err
+		}
+		if index == len(resolved.fields) {
+			return api.ExpressionEmission{}, false, nil
+		}
+		current, currentType, err = projectFieldValue(
+			context,
+			children,
+			source,
+			currentType,
+			current,
+			resolved.fields[index],
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, false, err
+		}
+	}
 }
 
 func DirectMethodExpression(

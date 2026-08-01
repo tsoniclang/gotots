@@ -74,10 +74,12 @@ func (k EffectKind) Valid() bool {
 }
 
 type FacetModuleDocument struct {
-	Specifier       string                           `json:"specifier"`
-	SourcePath      string                           `json:"sourcePath"`
-	Representations []ProviderRepresentationDocument `json:"representations,omitempty"`
-	Facets          []FacetDocument                  `json:"facets"`
+	Specifier          string                                     `json:"specifier"`
+	SourcePath         string                                     `json:"sourcePath"`
+	Representations    []ProviderRepresentationDocument           `json:"representations,omitempty"`
+	CallableInterfaces []ProviderCallableProfileInterfaceDocument `json:"callableInterfaces,omitempty"`
+	CallableProfiles   []ProviderCallableProfileDocument          `json:"callableProfiles,omitempty"`
+	Facets             []FacetDocument                            `json:"facets"`
 }
 
 type ProviderRepresentationDocument struct {
@@ -149,6 +151,27 @@ func (m FacetModule) Representations() []ProviderRepresentation {
 	result := make([]ProviderRepresentation, len(m.document.Representations))
 	for index, representation := range m.document.Representations {
 		result[index] = newProviderRepresentation(m.document, representation)
+	}
+	return result
+}
+
+func (m FacetModule) CallableProfiles() []ProviderCallableProfile {
+	result := make([]ProviderCallableProfile, len(m.document.CallableProfiles))
+	for index, profile := range m.document.CallableProfiles {
+		result[index] = newProviderCallableProfile(m.document, profile)
+	}
+	return result
+}
+
+func (m FacetModule) CallableInterfaces() []ProviderCallableProfileInterface {
+	result := make(
+		[]ProviderCallableProfileInterface,
+		len(m.document.CallableInterfaces),
+	)
+	for index, selected := range m.document.CallableInterfaces {
+		result[index] = ProviderCallableProfileInterface{
+			document: cloneProviderCallableProfileInterface(selected),
+		}
 	}
 	return result
 }
@@ -231,6 +254,21 @@ func cloneFacetModule(source FacetModuleDocument) FacetModuleDocument {
 	)
 	for index, representation := range source.Representations {
 		result.Representations[index] = cloneProviderRepresentation(representation)
+	}
+	result.CallableInterfaces = make(
+		[]ProviderCallableProfileInterfaceDocument,
+		len(source.CallableInterfaces),
+	)
+	for index, selected := range source.CallableInterfaces {
+		result.CallableInterfaces[index] =
+			cloneProviderCallableProfileInterface(selected)
+	}
+	result.CallableProfiles = make(
+		[]ProviderCallableProfileDocument,
+		len(source.CallableProfiles),
+	)
+	for index, profile := range source.CallableProfiles {
+		result.CallableProfiles[index] = cloneProviderCallableProfile(profile)
 	}
 	result.Facets = make([]FacetDocument, len(source.Facets))
 	for index, facet := range source.Facets {

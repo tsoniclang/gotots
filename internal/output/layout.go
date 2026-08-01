@@ -179,6 +179,10 @@ func InterfaceAdapterPath(artifactKey string) (string, error) {
 	return generatedArtifactPath("interfaces/adapters", artifactKey)
 }
 
+func ProviderInterfaceBridgePath(artifactKey string) (string, error) {
+	return generatedArtifactPath("interfaces/provider-bridges", artifactKey)
+}
+
 func GenericCapabilityPath(artifactKey string) (string, error) {
 	return generatedArtifactPath("generics/capabilities", artifactKey)
 }

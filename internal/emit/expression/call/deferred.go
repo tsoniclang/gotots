@@ -82,7 +82,7 @@ func EmitDeferred(
 		)
 		static = true
 	} else {
-		callee, static, err = emitCallee(
+		callee, static, _, err = emitCallee(
 			context,
 			children,
 			source.Fun,

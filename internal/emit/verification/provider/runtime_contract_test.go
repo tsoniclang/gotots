@@ -25,15 +25,20 @@ func TestSelectedProviderContributesCertifiedRuntimeClosure(t *testing.T) {
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 	for _, required := range []string{
 		"runtime/complex.ts",
 		"export class GoComplex128",
 		"export type int32 = number;",
 		"export type float64 = number;",
+		"reflect__from_gostdlib.Type",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("provider runtime closure lacks %q:\n%s", required, artifacts.printed)
 		}
+	}
+	if strings.Contains(artifacts.printed, "$goProviderInterfaceBridge") {
+		t.Fatal("sealed reflect.Type emitted an open-interface bridge")
 	}
 }
 

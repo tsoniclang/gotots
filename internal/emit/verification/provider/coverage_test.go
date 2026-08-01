@@ -58,6 +58,10 @@ func AppendLittle(buffer []byte, value uint32) []byte {
 	return binary.LittleEndian.AppendUint32(buffer, value)
 }
 
+func NativeUint16(buffer []byte) uint16 {
+	return binary.NativeEndian.Uint16(buffer)
+}
+
 func BigOrder() binary.ByteOrder {
 	return binary.BigEndian
 }
@@ -173,6 +177,7 @@ func BuilderAddress(state *ProviderState) *strings.Builder {
 			growRoot,
 			putBigRoot,
 			appendLittleRoot,
+			mustProviderRoot(t, scope.Lookup("NativeUint16")),
 			bigOrderRoot,
 			pathFailureRoot,
 			deferredRecoveryRoot,
@@ -390,6 +395,7 @@ func assertProviderRepresentationABI(
 	}{
 		"PutBig":       {state: "BigEndian", member: "PutUint32"},
 		"AppendLittle": {state: "LittleEndian", member: "AppendUint32"},
+		"NativeUint16": {state: "NativeEndian", member: "Uint16"},
 	}
 	imports := make(map[string]bool)
 	for _, file := range emission.Files() {

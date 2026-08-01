@@ -13,7 +13,7 @@ import (
 func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-  "schemaVersion": 7,
+  "schemaVersion": 9,
   "facets": [],
   "genericOperationSets": [
     {
@@ -28,7 +28,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	if err := os.WriteFile(path, []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, _, _, _, operations, err := readFacetSeeds(path)
+	_, _, _, _, _, operations, err := readFacetSeeds(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 		t.Fatalf("generic operations = %#v", selected)
 	}
 
-	payload = `{"schemaVersion":7,"facets":[],"genericCallableProjections":[],"genericOperationSets":[
+	payload = `{"schemaVersion":9,"facets":[],"genericCallableProjections":[],"genericOperationSets":[
   {"sourceIdentity":"x","operations":[
     {"kind":"invented","parameters":[],"results":[{"kind":"type-parameter","typeParameter":0}]}
   ]}
@@ -47,7 +47,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	if err := os.WriteFile(path, []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, _, _, _, err := readFacetSeeds(path); err == nil {
+	if _, _, _, _, _, _, err := readFacetSeeds(path); err == nil {
 		t.Fatal("open provider generic operation passed")
 	}
 }
@@ -55,7 +55,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 func TestFacetMapOwnsClosedGenericCallableProjections(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-  "schemaVersion": 7,
+  "schemaVersion": 9,
   "facets": [],
   "genericCallableProjections": [
     {"sourceIdentity":"slices|kind=4|receiver=|name=Grow","typeArguments":[
@@ -68,12 +68,12 @@ func TestFacetMapOwnsClosedGenericCallableProjections(t *testing.T) {
 	if err := os.WriteFile(path, []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, _, _, projections, _, err := readFacetSeeds(path)
+	_, _, _, _, projections, _, err := readFacetSeeds(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	projections["slices|kind=4|receiver=|name=Grow"][0].TypeParameter = 9
-	_, _, _, next, _, err := readFacetSeeds(path)
+	_, _, _, _, next, _, err := readFacetSeeds(path)
 	if err != nil ||
 		next["slices|kind=4|receiver=|name=Grow"][0].TypeParameter != 0 {
 		t.Fatalf("projection source mutated: %#v, %v", next, err)
@@ -82,7 +82,7 @@ func TestFacetMapOwnsClosedGenericCallableProjections(t *testing.T) {
 	if err := os.WriteFile(path, []byte(invalid), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, _, _, _, err := readFacetSeeds(path); err == nil {
+	if _, _, _, _, _, _, err := readFacetSeeds(path); err == nil {
 		t.Fatal("open generic callable projection facet passed")
 	}
 }
@@ -126,6 +126,51 @@ func TestGenericCallableProjectionRejectsProviderArityDrift(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "provider callable has 1") {
 		t.Fatalf("wrong generic callable projection error = %v", err)
+	}
+}
+
+func TestGenericOperationRejectsCallableParameterArityDrift(t *testing.T) {
+	repository, err := filepath.Abs("../../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := filepath.Join(repository, "gostdlib")
+	source, err := os.ReadFile(filepath.Join(provider, "contract", "facets.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutated := bytes.Replace(
+		source,
+		[]byte(`{ "kind": "callable-parameter", "callableParameter": 0 }`),
+		[]byte(`{ "kind": "callable-parameter", "callableParameter": 9 }`),
+		1,
+	)
+	if bytes.Equal(mutated, source) {
+		t.Fatal("callable-parameter mutation was not applied")
+	}
+	facetMap := filepath.Join(t.TempDir(), "facets.json")
+	if err := os.WriteFile(facetMap, mutated, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err = Generate(Config{
+		RepositoryRoot:      repository,
+		ProviderRoot:        provider,
+		ManifestPath:        filepath.Join(provider, "contract", "manifest.json"),
+		ModuleMapPath:       filepath.Join(provider, "contract", "modules.json"),
+		FacetMapPath:        facetMap,
+		RuntimeContractPath: filepath.Join(provider, "contract", "runtime.json"),
+		TSConfigPath:        filepath.Join(provider, "tsconfig.json"),
+		ScratchDirectory:    t.TempDir(),
+		GoBinary:            "go",
+		Backend:             "node",
+		MinimumGoVersion:    "go1.26.4",
+		MaximumGoVersion:    "go1.26.4",
+	})
+	if err == nil || !strings.Contains(
+		err.Error(),
+		"callable-parameter index is outside its Go declaration",
+	) {
+		t.Fatalf("wrong callable-parameter error = %v", err)
 	}
 }
 

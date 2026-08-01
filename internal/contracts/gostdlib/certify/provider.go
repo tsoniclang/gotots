@@ -50,8 +50,9 @@ func verifyPackageModules(
 	document packageDocument,
 	seeds []moduleSeed,
 	facets []facetSeed,
+	profiles []providerCallableProfileSeed,
 ) error {
-	expected := make(map[string]packageExport, len(seeds)+len(facets))
+	expected := make(map[string]packageExport, len(seeds)+len(facets)+len(profiles))
 	for _, seed := range seeds {
 		subpath, ok := providerSubpath(seed.Specifier)
 		if !ok {
@@ -78,6 +79,21 @@ func verifyPackageModules(
 		}
 		if existing, duplicate := expected[subpath]; duplicate && existing != want {
 			return certifyError("verify package exports", subpath, "facet module is inconsistent")
+		}
+		expected[subpath] = want
+	}
+	for _, seed := range profiles {
+		subpath, ok := providerSubpath(seed.Specifier)
+		if !ok {
+			return certifyError("verify package exports", seed.Specifier, "specifier is invalid")
+		}
+		base := strings.TrimSuffix(seed.SourcePath, ".ts")
+		want := packageExport{
+			Types:   "./dist/" + base + ".d.ts",
+			Default: "./dist/" + base + ".js",
+		}
+		if existing, duplicate := expected[subpath]; duplicate && existing != want {
+			return certifyError("verify package exports", subpath, "profile module is inconsistent")
 		}
 		expected[subpath] = want
 	}

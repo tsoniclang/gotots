@@ -1,9 +1,12 @@
 package gostdlib
 
-import "slices"
+import (
+	"slices"
+	"strings"
+)
 
 const (
-	SchemaVersion = 9
+	SchemaVersion = 13
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -120,6 +123,7 @@ type BindingDocument struct {
 	Member               string                         `json:"member,omitempty"`
 	GenericTypeArguments []GenericTypeArgumentDocument  `json:"genericTypeArguments,omitempty"`
 	GenericOperations    []GenericOperationDocument     `json:"genericOperations,omitempty"`
+	ProviderInterface    *ProviderInterfaceDocument     `json:"providerInterface,omitempty"`
 	SourceSignature      string                         `json:"sourceSignature"`
 	SourceValue          string                         `json:"sourceValue,omitempty"`
 	SourceLocation       string                         `json:"sourceLocation"`
@@ -128,11 +132,12 @@ type BindingDocument struct {
 }
 
 type Manifest struct {
-	document        Document
-	payload         []byte
-	bindings        map[string]Binding
-	facets          map[facetLookup]Facet
-	representations map[providerRepresentationLookup]ProviderRepresentation
+	document         Document
+	payload          []byte
+	bindings         map[string]Binding
+	facets           map[facetLookup]Facet
+	representations  map[providerRepresentationLookup]ProviderRepresentation
+	callableProfiles map[providerCallableProfileLookup]ProviderCallableProfile
 }
 
 func (m Manifest) Digest() string {
@@ -236,6 +241,32 @@ func (m Manifest) ProviderRepresentation(
 	return selected, ok
 }
 
+func (m Manifest) ProviderCallableProfile(
+	sourceIdentity string,
+	profileKey string,
+) (ProviderCallableProfile, bool) {
+	selected, ok := m.callableProfiles[providerCallableProfileLookup{
+		sourceIdentity: sourceIdentity,
+		profileKey:     profileKey,
+	}]
+	return selected, ok
+}
+
+func (m Manifest) ProviderCallableProfiles(
+	sourceIdentity string,
+) []ProviderCallableProfile {
+	var result []ProviderCallableProfile
+	for lookup, selected := range m.callableProfiles {
+		if lookup.sourceIdentity == sourceIdentity {
+			result = append(result, selected)
+		}
+	}
+	slices.SortFunc(result, func(left, right ProviderCallableProfile) int {
+		return strings.Compare(left.ProfileKey(), right.ProfileKey())
+	})
+	return result
+}
+
 type Module struct {
 	document ModuleDocument
 }
@@ -310,6 +341,13 @@ func (b Binding) GenericTypeArguments() []GenericTypeArgumentDocument {
 	return slices.Clone(b.binding.GenericTypeArguments)
 }
 
+func (b Binding) ProviderInterface() (ProviderInterface, bool) {
+	if b.binding.ProviderInterface == nil {
+		return ProviderInterface{}, false
+	}
+	return newProviderInterface(*b.binding.ProviderInterface), true
+}
+
 func (b Binding) SourceSignature() string {
 	return b.binding.SourceSignature
 }
@@ -360,6 +398,10 @@ func cloneModule(source ModuleDocument) ModuleDocument {
 			slices.Clone(binding.GenericTypeArguments)
 		result.Bindings[index].GenericOperations =
 			cloneGenericOperations(binding.GenericOperations)
+		if binding.ProviderInterface != nil {
+			cloned := cloneProviderInterface(*binding.ProviderInterface)
+			result.Bindings[index].ProviderInterface = &cloned
+		}
 	}
 	return result
 }
