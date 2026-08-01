@@ -9,7 +9,7 @@
   "goos": "linux",
   "goarch": "amd64",
   "runtimeDigest": "db1de728c4a9cb1fa90cb50e6455943d3c891a65be39185c76a66186354755d5",
-  "providerDigest": "f979fc1f8d22bf79158f62209bffa7ab39268e976b84e8ea6f94fc02f0e2cded",
+  "providerDigest": "7fe62ffb35278495a98941b36b11eaad1c7342f6da791c3e4a1bba2ffea82615",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -13200,5 +13200,5 @@
       ]
     }
   ],
-  "manifestDigest": "213a89c0e78055c932f16a308531d12b953269ad35e6cf73e335b192921ad5f6"
+  "manifestDigest": "f21609b20c1527a143f76c40e40e28a73098c83873354106900d3320ecc3f391"
 }
