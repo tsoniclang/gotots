@@ -51,20 +51,24 @@ export function ContainsAny(text: gostring, characters: gostring): bool {
 }
 
 export function ContainsRune(text: gostring, rune: int32): bool {
+  return IndexRune(text, rune) >= 0;
+}
+
+export function IndexRune(text: gostring, rune: int32): int64 {
   if (!validRune(rune)) {
-    return false;
+    return -1;
   }
   if (rune === 0xfffd) {
     for (let index = 0; index < text.length; ) {
       const [decoded, width] = decodeRuneAt(text, index);
       if (decoded === rune) {
-        return true;
+        return index;
       }
       index += Math.max(1, width);
     }
-    return false;
+    return -1;
   }
-  return text.includes(encodeRune(rune));
+  return text.indexOf(encodeRune(rune));
 }
 
 export function Count(text: gostring, substring: gostring): int64 {

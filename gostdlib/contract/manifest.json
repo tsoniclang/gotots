@@ -9,7 +9,7 @@
   "goos": "linux",
   "goarch": "amd64",
   "runtimeDigest": "db1de728c4a9cb1fa90cb50e6455943d3c891a65be39185c76a66186354755d5",
-  "providerDigest": "0612e3b029644944add6b2b89ce8a45e4f749f70ab08f845395bf60406e32746",
+  "providerDigest": "d9ff7154d6c63b2fcafed96d6debef89c9cfc2598d6a4afe0eb3e751a909e000",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -9248,6 +9248,17 @@
           "targetFingerprint": "650f8cc4d21582e19f7ef110d034ff1fa03e6424eeae64112bd2f2a343ca3b1b"
         },
         {
+          "identity": "strings|kind=4|receiver=|name=IndexRune",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "IndexRune",
+          "sourceSignature": "func(s string, r rune) int|params=s,r|results=",
+          "sourceLocation": "strings/strings.go:127:6",
+          "implementationOwner": "src/internal/portable/strings/search.ts",
+          "targetFingerprint": "2a1ca39ca0fef39b1eeb44bea2605bd4091ba8654fa6bd0835b889a605eb7eab"
+        },
+        {
           "identity": "strings|kind=4|receiver=|name=Join",
           "kind": "function",
           "access": "export",
@@ -13457,5 +13468,5 @@
       ]
     }
   ],
-  "manifestDigest": "b07436b0ed86318cd4148a023f4c0f523ebc427d09f717635b9a9baeee4fbf9a"
+  "manifestDigest": "3c7a0240cde6e6eefd336d82cf00941a5dd014c5730790f193fa8341d2b42e29"
 }

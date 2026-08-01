@@ -24,6 +24,7 @@ export {
   IndexAny,
   IndexByte,
   IndexFunc,
+  IndexRune,
   LastIndex,
   LastIndexByte,
   LastIndexFunc,

@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
+import { spawnSync } from "node:child_process";
+import {
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
@@ -24,6 +32,7 @@ import {
   IndexAny,
   IndexByte,
   IndexFunc,
+  IndexRune,
   Join,
   LastIndex,
   LastIndexByte,
@@ -59,10 +68,31 @@ test("strings operate on Go UTF-8 bytes rather than JavaScript UTF-16 indexes", 
   assert.equal(ContainsRune(text, 0x03a3), true);
   assert.equal(ContainsAny(text, goText("λΣ")), true);
   assert.equal(IndexAny(text, goText("Σ")), 3);
+  assert.equal(IndexRune(text, 0x03a3), 3);
   assert.equal(Count(text, ""), 4);
   assert.deepEqual(Cut(text, goText("é")), ["A", goText("Σ"), true]);
   assert.equal(EqualFold(goText("K"), goText("K")), true);
   assert.equal(EqualFold(goText("Σ"), goText("ς")), true);
+});
+
+test("strings IndexRune agrees with Go on malformed UTF-8", (): void => {
+  const directory = mkdtempSync(join(tmpdir(), "gotots-index-rune-"));
+  const source = join(directory, "main.go");
+  try {
+    writeFileSync(source, indexRuneGoProgram);
+    const result = spawnSync("go", ["run", source], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    const malformed = String.fromCharCode(0x61, 0xff, 0xfe, 0x62);
+    const provider = [
+      IndexRune(goText("AéΣ"), 0x03a3),
+      IndexRune(malformed, 0xfffd),
+      IndexRune(goText("AéΣ"), -1),
+      IndexRune(goText("AéΣ"), 0x03bb),
+    ].join(",");
+    assert.equal(provider, result.stdout.trim());
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
 });
 
 test("strings transformations preserve invalid bytes and simple Unicode case", () => {
@@ -171,3 +201,24 @@ function hostText(value: string): string {
 function isDigit(rune: number): boolean {
   return rune >= 0x30 && rune <= 0x39;
 }
+
+const indexRuneGoProgram = `
+package main
+
+import (
+  "fmt"
+  "strings"
+  "unicode/utf8"
+)
+
+func main() {
+  text := "AéΣ"
+  malformed := string([]byte{'a', 0xff, 0xfe, 'b'})
+  fmt.Printf("%d,%d,%d,%d\\n",
+    strings.IndexRune(text, 'Σ'),
+    strings.IndexRune(malformed, utf8.RuneError),
+    strings.IndexRune(text, -1),
+    strings.IndexRune(text, 'λ'),
+  )
+}
+`;

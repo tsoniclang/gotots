@@ -131,6 +131,7 @@ test("strings exports every selected clean declaration exactly once", () => {
     "IndexAny",
     "IndexByte",
     "IndexFunc",
+    "IndexRune",
     "Join",
     "LastIndex",
     "LastIndexByte",
