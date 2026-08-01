@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "representations": [
     {
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
@@ -1204,17 +1204,17 @@
         {
           "kind": "copy",
           "parameters": [
-            { "typeParameter": 1 }
+            { "kind": "type-parameter", "typeParameter": 1 }
           ],
           "results": [
-            { "typeParameter": 1 }
+            { "kind": "type-parameter", "typeParameter": 1 }
           ]
         },
         {
           "kind": "zero",
           "parameters": [],
           "results": [
-            { "typeParameter": 1 }
+            { "kind": "type-parameter", "typeParameter": 1 }
           ]
         }
       ]

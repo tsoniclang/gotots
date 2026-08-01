@@ -778,10 +778,13 @@ unconditional historical acceptance, dropped causal propagation, or sticky
 foreign requirements must each fail at these gates.
 
 For each certified provider generic-operation set, verification proves that
-the owner is the exact selected generic function, every signature leaf names a
-valid declaration type-parameter position, operations are closed and
-canonically ordered, and the emitted call prepends one typed capability per
-record before the source arguments. The `slices.Grow` differential covers nil,
+the owner is the exact selected generic function, every recursive signature
+expression resolves from valid declaration type-parameter/basic/slice/map
+nodes, operations are closed and canonically ordered, and the emitted call
+prepends one typed capability per record before the source arguments. Mutation
+tests replace a type-parameter leaf, a basic result, a map key, and a nested
+slice element independently and require certification or strict typechecking
+to fail. The `slices.Grow` differential covers nil,
 negative growth, sufficient-capacity identity, allocation, old-element copy,
 new capacity zeros, and independent mutable zero values. Mutations deleting
 `copy`, deleting `zero`, changing type-parameter index `E` to `S`, restoring

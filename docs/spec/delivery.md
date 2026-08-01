@@ -787,6 +787,15 @@ certified and consumed by the same ABI, the provider may fail explicitly with
 the exact selected signature; returning a false match or recovering `E`
 dynamically is forbidden. Such a boundary remains a publication blocker.
 
+Complete generic provider value semantics before whole-product linkage. The
+checkpoint replaces primitive TypeScript constraints and logical/storage
+conflation with certified recursive Go signatures plus the existing typed
+capability ABI. It covers generic slices, maps, ordered comparisons, defined
+container types, and open callers; deletes direct `===`/`<` assumptions where
+Go semantics require a capability; strict-typechecks concrete and open
+logical-versus-storage fixtures; and differentially executes nil, defined
+types, aggregate values, NaN ordering, copy, mutation, and map-clone behavior.
+
 ## 5. Product Proof
 
 Run broad project differentials, deterministic regeneration, source/toolchain

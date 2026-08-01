@@ -318,11 +318,14 @@ func verifyGenericOperationBindings(
 				),
 				operation.Results...,
 			) {
-				if reference.TypeParameter >= parameterCount {
+				if err := verifyGenericOperationTypeParameters(
+					reference,
+					parameterCount,
+				); err != nil {
 					return certifyError(
 						"configure generic operations",
 						identity,
-						"type-parameter index is outside its Go declaration",
+						err.Error(),
 					)
 				}
 			}
@@ -333,6 +336,36 @@ func verifyGenericOperationBindings(
 				identity,
 				"provider export is absent",
 			)
+		}
+	}
+	return nil
+}
+
+func verifyGenericOperationTypeParameters(
+	reference gostdlib.GenericOperationTypeDocument,
+	parameterCount int,
+) error {
+	if reference.Kind == gostdlib.GenericOperationTypeParameter {
+		if reference.TypeParameter == nil ||
+			*reference.TypeParameter < 0 ||
+			*reference.TypeParameter >= parameterCount {
+			return fmt.Errorf(
+				"type-parameter index is outside its Go declaration",
+			)
+		}
+	}
+	for _, child := range []*gostdlib.GenericOperationTypeDocument{
+		reference.Key,
+		reference.Element,
+	} {
+		if child == nil {
+			continue
+		}
+		if err := verifyGenericOperationTypeParameters(
+			*child,
+			parameterCount,
+		); err != nil {
+			return err
 		}
 	}
 	return nil

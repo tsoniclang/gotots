@@ -1496,13 +1496,26 @@ public interface contains the other.
 
 A public generic-function record may additionally own one sorted closed
 generic-operation set. Each operation records its compiler operation kind and
-an exact parameter/result signature whose leaves reference the selected Go
-declaration's type-parameter positions. This metadata is part of the public
-binding certificate and is integrity-bound to that binding's provider target;
-it is not a private target export, a source scan, or a second type model. At a
-concrete call, the existing generic-operation owner instantiates those exact
-signatures from `go/types.Instance`, selects the ordinary typed capabilities,
-and prepends them through the one canonical generic-call ABI.
+an exact source-level Go signature assembled only from a closed recursive type
+expression: declaration type-parameter identity, admitted basic type, slice,
+or map. For example, `maps.Clone[M ~map[K]V, K, V]` requests conversion
+`M -> map[K]V`, construction `V -> map[K]V`, and conversion
+`map[K]V -> M`; `slices.Contains[S ~[]E, E]` requests conversion
+`S -> []E`, container restoration `E -> E` (whose target ABI is
+`E$ContainerStorage -> E`), and equality `(E, E) -> bool`. Provider code then
+operates on exact typed values and never constrains a nominal wrapper to a
+JavaScript primitive, reaches into a wrapper payload, or compares storage with
+target-language identity.
+
+The recursive expression is certificate data over the selected `go/types`
+declaration, not a target type model. Certification resolves every expression
+through that declaration, rejects foreign parameters and open expression
+kinds, and exact-joins the resulting capability order to the inspected
+provider call signature. At a concrete call, the existing generic-operation
+owner instantiates those exact signatures from `go/types.Instance`, selects
+the ordinary typed capabilities, and prepends them through the one canonical
+generic-call ABI. No provider-specific operation registry, target constraint,
+cast, or second generic body is admitted.
 
 A provider's public export for an untyped Go constant is not a universal
 runtime representation. Each generated use still requests its exact contextual

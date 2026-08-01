@@ -13,14 +13,14 @@ import (
 func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "facets": [],
   "genericOperationSets": [
     {
       "sourceIdentity": "slices|kind=4|receiver=|name=Grow",
       "operations": [
-        {"kind":"zero","parameters":[],"results":[{"typeParameter":1}]},
-        {"kind":"copy","parameters":[{"typeParameter":1}],"results":[{"typeParameter":1}]}
+        {"kind":"zero","parameters":[],"results":[{"kind":"type-parameter","typeParameter":1}]},
+        {"kind":"copy","parameters":[{"kind":"type-parameter","typeParameter":1}],"results":[{"kind":"type-parameter","typeParameter":1}]}
       ]
     }
   ]
@@ -39,9 +39,9 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 		t.Fatalf("generic operations = %#v", selected)
 	}
 
-	payload = `{"schemaVersion":6,"facets":[],"genericCallableProjections":[],"genericOperationSets":[
+	payload = `{"schemaVersion":7,"facets":[],"genericCallableProjections":[],"genericOperationSets":[
   {"sourceIdentity":"x","operations":[
-    {"kind":"invented","parameters":[],"results":[{"typeParameter":0}]}
+    {"kind":"invented","parameters":[],"results":[{"kind":"type-parameter","typeParameter":0}]}
   ]}
 ]}`
 	if err := os.WriteFile(path, []byte(payload), 0o644); err != nil {
@@ -55,7 +55,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 func TestFacetMapOwnsClosedGenericCallableProjections(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "facets": [],
   "genericCallableProjections": [
     {"sourceIdentity":"slices|kind=4|receiver=|name=Grow","typeArguments":[

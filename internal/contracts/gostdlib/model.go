@@ -3,7 +3,7 @@ package gostdlib
 import "slices"
 
 const (
-	SchemaVersion = 8
+	SchemaVersion = 9
 	PackageName   = "@gotots/gostdlib"
 )
 

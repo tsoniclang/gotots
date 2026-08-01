@@ -36,12 +36,12 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 				}},
 				GenericOperations: []gostdlib.GenericOperationDocument{{
 					Kind: gostdlib.GenericOperationCopy,
-					Parameters: []gostdlib.GenericOperationTypeDocument{{
-						TypeParameter: 0,
-					}},
-					Results: []gostdlib.GenericOperationTypeDocument{{
-						TypeParameter: 0,
-					}},
+					Parameters: []gostdlib.GenericOperationTypeDocument{
+						gostdlib.GenericOperationTypeParameterReference(0),
+					},
+					Results: []gostdlib.GenericOperationTypeDocument{
+						gostdlib.GenericOperationTypeParameterReference(0),
+					},
 				}},
 				SourceSignature:     "func(s, substr string) bool|params=s,substr|results=",
 				SourceLocation:      "strings/strings.go:1:1",
@@ -85,11 +85,13 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 	operations := binding.GenericOperations()
 	if len(operations) != 1 ||
 		operations[0].Kind != gostdlib.GenericOperationCopy ||
-		operations[0].Parameters[0].TypeParameter != 0 {
+		operations[0].Parameters[0].TypeParameter == nil ||
+		*operations[0].Parameters[0].TypeParameter != 0 {
 		t.Fatalf("generic operations = %#v", operations)
 	}
-	operations[0].Parameters[0].TypeParameter = 9
-	if binding.GenericOperations()[0].Parameters[0].TypeParameter != 0 {
+	*operations[0].Parameters[0].TypeParameter = 9
+	nextOperation := binding.GenericOperations()[0].Parameters[0]
+	if nextOperation.TypeParameter == nil || *nextOperation.TypeParameter != 0 {
 		t.Fatal("binding exposed mutable generic-operation storage")
 	}
 	typeArguments := binding.GenericTypeArguments()
@@ -130,21 +132,21 @@ func TestManifestRejectsInvalidGenericOperationShape(t *testing.T) {
 	binding := &document.Modules[0].Bindings[0]
 	binding.GenericOperations = []gostdlib.GenericOperationDocument{{
 		Kind: gostdlib.GenericOperationZero,
-		Parameters: []gostdlib.GenericOperationTypeDocument{{
-			TypeParameter: 0,
-		}},
-		Results: []gostdlib.GenericOperationTypeDocument{{
-			TypeParameter: 0,
-		}},
+		Parameters: []gostdlib.GenericOperationTypeDocument{
+			gostdlib.GenericOperationTypeParameterReference(0),
+		},
+		Results: []gostdlib.GenericOperationTypeDocument{
+			gostdlib.GenericOperationTypeParameterReference(0),
+		},
 	}}
 	if _, err := gostdlib.Seal(document); err == nil {
 		t.Fatal("zero operation with a parameter passed")
 	}
 	binding.GenericOperations = []gostdlib.GenericOperationDocument{{
 		Kind: gostdlib.GenericOperationKind("invented"),
-		Results: []gostdlib.GenericOperationTypeDocument{{
-			TypeParameter: 0,
-		}},
+		Results: []gostdlib.GenericOperationTypeDocument{
+			gostdlib.GenericOperationTypeParameterReference(0),
+		},
 	}}
 	if _, err := gostdlib.Seal(document); err == nil {
 		t.Fatal("open generic operation passed")

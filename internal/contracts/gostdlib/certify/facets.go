@@ -12,7 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
-const facetMapSchemaVersion = 6
+const facetMapSchemaVersion = 7
 
 type facetMapDocument struct {
 	SchemaVersion              int                             `json:"schemaVersion"`

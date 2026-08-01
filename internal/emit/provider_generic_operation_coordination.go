@@ -93,6 +93,22 @@ func providerGenericOperationSelection(
 		operation = api.GenericOperationCopy
 	case gostdlib.GenericOperationZero:
 		operation = api.GenericOperationZero
+	case gostdlib.GenericOperationEqual:
+		operation = api.GenericOperationEqual
+	case gostdlib.GenericOperationBinaryLess:
+		operation = api.GenericOperationBinaryLess
+	case gostdlib.GenericOperationConvert:
+		operation = api.GenericOperationConvert
+	case gostdlib.GenericOperationMapConstruct:
+		operation = api.GenericOperationMapConstruct
+	case gostdlib.GenericOperationToStorage:
+		operation = api.GenericOperationToStorage
+	case gostdlib.GenericOperationFromStorage:
+		operation = api.GenericOperationFromStorage
+	case gostdlib.GenericOperationToContainerStorage:
+		operation = api.GenericOperationToContainerStorage
+	case gostdlib.GenericOperationFromContainerStorage:
+		operation = api.GenericOperationFromContainerStorage
 	default:
 		return api.GenericOperationSelection{}, &ScheduleError{
 			Reason: "provider generic operation kind is invalid",
@@ -106,32 +122,78 @@ func providerGenericOperationSignature(
 	document gostdlib.GenericOperationDocument,
 ) (*types.Signature, error) {
 	parameters := api.GenericDeclarationParameters(owner)
-	resolve := func(
-		references []gostdlib.GenericOperationTypeDocument,
-	) (*types.Tuple, error) {
-		variables := make([]*types.Var, 0, len(references))
-		for _, reference := range references {
-			if reference.TypeParameter < 0 ||
-				reference.TypeParameter >= len(parameters) {
+	var resolveType func(
+		gostdlib.GenericOperationTypeDocument,
+	) (types.Type, error)
+	resolveType = func(
+		reference gostdlib.GenericOperationTypeDocument,
+	) (types.Type, error) {
+		switch reference.Kind {
+		case gostdlib.GenericOperationTypeParameter:
+			if reference.TypeParameter == nil ||
+				*reference.TypeParameter < 0 ||
+				*reference.TypeParameter >= len(parameters) {
 				return nil, &ScheduleError{
 					Object: owner.Name(),
 					Reason: "provider generic operation type parameter is invalid",
 				}
 			}
+			return parameters[*reference.TypeParameter], nil
+		case gostdlib.GenericOperationTypeBool:
+			return types.Typ[types.Bool], nil
+		case gostdlib.GenericOperationTypeInt:
+			return types.Typ[types.Int], nil
+		case gostdlib.GenericOperationTypeSlice:
+			if reference.Element == nil {
+				break
+			}
+			element, err := resolveType(*reference.Element)
+			if err != nil {
+				return nil, err
+			}
+			return types.NewSlice(element), nil
+		case gostdlib.GenericOperationTypeMap:
+			if reference.Key == nil || reference.Element == nil {
+				break
+			}
+			key, err := resolveType(*reference.Key)
+			if err != nil {
+				return nil, err
+			}
+			element, err := resolveType(*reference.Element)
+			if err != nil {
+				return nil, err
+			}
+			return types.NewMap(key, element), nil
+		}
+		return nil, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "provider generic operation type expression is invalid",
+		}
+	}
+	resolveTuple := func(
+		references []gostdlib.GenericOperationTypeDocument,
+	) (*types.Tuple, error) {
+		variables := make([]*types.Var, 0, len(references))
+		for _, reference := range references {
+			selected, err := resolveType(reference)
+			if err != nil {
+				return nil, err
+			}
 			variables = append(variables, types.NewVar(
 				token.NoPos,
 				owner.Pkg(),
 				"",
-				parameters[reference.TypeParameter],
+				selected,
 			))
 		}
 		return types.NewTuple(variables...), nil
 	}
-	params, err := resolve(document.Parameters)
+	params, err := resolveTuple(document.Parameters)
 	if err != nil {
 		return nil, err
 	}
-	results, err := resolve(document.Results)
+	results, err := resolveTuple(document.Results)
 	if err != nil {
 		return nil, err
 	}

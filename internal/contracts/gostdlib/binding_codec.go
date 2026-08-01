@@ -56,6 +56,7 @@ func validateBinding(binding BindingDocument, field string) error {
 	if err := validateGenericOperations(
 		binding.GenericOperations,
 		field+".genericOperations",
+		true,
 	); err != nil {
 		return err
 	}

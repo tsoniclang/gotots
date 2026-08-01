@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "packageName": "@gotots/gostdlib",
   "packageVersion": "0.0.0",
   "backend": "node",
@@ -9,7 +9,7 @@
   "goos": "linux",
   "goarch": "amd64",
   "runtimeDigest": "ae75219a3ca68c3dd5316af5372a357a4e1024c8fa54d3b1150acc110346f286",
-  "providerDigest": "42832e2ed256a2d16d55ee427efa8305c7da8a2ad5800b2443892deb9d2fd680",
+  "providerDigest": "5c514e3562c4e79b444b979872b3e58f1dbf141194817b29dc92c3c6253c8a6d",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -4511,20 +4511,23 @@
               "kind": "copy",
               "parameters": [
                 {
+                  "kind": "type-parameter",
                   "typeParameter": 1
                 }
               ],
               "results": [
                 {
+                  "kind": "type-parameter",
                   "typeParameter": 1
                 }
               ]
             },
             {
               "kind": "zero",
-              "parameters": null,
+              "parameters": [],
               "results": [
                 {
+                  "kind": "type-parameter",
                   "typeParameter": 1
                 }
               ]
@@ -8422,5 +8425,5 @@
       ]
     }
   ],
-  "manifestDigest": "3e3beebb9dd61789308dacf660506dde4bacadedec5a61fa23457ff1b662daac"
+  "manifestDigest": "5080a25e458a62ba1a31b0132d061feb4a9f4d4b51d242c780e525889f09c839"
 }
