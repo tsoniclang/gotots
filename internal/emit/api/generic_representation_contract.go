@@ -299,6 +299,49 @@ func GenericRepresentationName(
 	}
 }
 
+type GenericTypeArgumentFacet uint8
+
+const (
+	GenericTypeArgumentInvalid GenericTypeArgumentFacet = iota
+	GenericTypeArgumentLogical
+	GenericTypeArgumentStorage
+	GenericTypeArgumentContainerStorage
+	GenericTypeArgumentPointer
+)
+
+func (f GenericTypeArgumentFacet) Valid() bool {
+	return f >= GenericTypeArgumentLogical &&
+		f <= GenericTypeArgumentPointer
+}
+
+type GenericTypeArgumentProjection struct {
+	parameter int
+	facet     GenericTypeArgumentFacet
+}
+
+func NewGenericTypeArgumentProjection(
+	parameter int,
+	facet GenericTypeArgumentFacet,
+) (GenericTypeArgumentProjection, error) {
+	if parameter < 0 || !facet.Valid() {
+		return GenericTypeArgumentProjection{}, &InvariantError{
+			Reason: "generic type-argument projection is invalid",
+		}
+	}
+	return GenericTypeArgumentProjection{
+		parameter: parameter,
+		facet:     facet,
+	}, nil
+}
+
+func (p GenericTypeArgumentProjection) Parameter() int {
+	return p.parameter
+}
+
+func (p GenericTypeArgumentProjection) Facet() GenericTypeArgumentFacet {
+	return p.facet
+}
+
 type GenericRepresentationSelection struct {
 	parameter *types.TypeParam
 	facet     GenericRepresentationFacet

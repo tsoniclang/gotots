@@ -13,8 +13,8 @@ func certifiedGenericCallableProjection(
 	project *tsgo.ProjectInspection,
 	evidence goObject,
 	target tsgo.ProjectExport,
-	configured map[string][]int,
-) ([]int, error) {
+	configured map[string][]gostdlib.GenericTypeArgumentDocument,
+) ([]gostdlib.GenericTypeArgumentDocument, error) {
 	function, callable := evidence.object.(*types.Func)
 	if !callable {
 		if len(configured[evidence.contract.Identity()]) != 0 {
@@ -64,8 +64,8 @@ func certifiedGenericCallableProjection(
 			),
 		)
 	}
-	for _, parameter := range projection {
-		if parameter >= sourceCount {
+	for _, argument := range projection {
+		if argument.TypeParameter >= sourceCount || !argument.Facet.Valid() {
 			return nil, certifyError(
 				"build generic callable projection",
 				evidence.contract.Identity(),
@@ -78,9 +78,12 @@ func certifiedGenericCallableProjection(
 
 func verifyGenericCallableProjectionBindings(
 	modules []gostdlib.ModuleDocument,
-	configured map[string][]int,
+	configured map[string][]gostdlib.GenericTypeArgumentDocument,
 ) error {
-	bound := make(map[string][]int, len(configured))
+	bound := make(
+		map[string][]gostdlib.GenericTypeArgumentDocument,
+		len(configured),
+	)
 	for _, module := range modules {
 		for _, binding := range module.Bindings {
 			if len(binding.GenericTypeArguments) == 0 {

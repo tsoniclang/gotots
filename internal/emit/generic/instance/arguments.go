@@ -105,17 +105,20 @@ func EmitFunctionTypeArguments(
 	}
 	targets := make([]tsgo.TypeNode, 0, len(projection))
 	var requests []api.RootRequest
-	for _, index := range projection {
+	for _, projected := range projection {
+		index := projected.Parameter()
 		if index < 0 || index >= arguments.Len() {
 			return nil, nil, &api.InvariantError{
 				Role:   context.Role(),
 				Reason: "provider generic type-argument projection is outside the source instance",
 			}
 		}
-		target, err := children.RepresentedType(
-			context.WithRole(api.RoleCallArgumentType),
+		target, err := emitProviderTypeArgument(
+			context,
+			children,
 			source,
 			arguments.At(index),
+			projected.Facet(),
 		)
 		if err != nil {
 			return nil, nil, err
@@ -124,6 +127,43 @@ func EmitFunctionTypeArguments(
 		requests = append(requests, target.Requests()...)
 	}
 	return targets, api.CombineRequests(requests), nil
+}
+
+func emitProviderTypeArgument(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	argument types.Type,
+	facet api.GenericTypeArgumentFacet,
+) (api.TypeEmission, error) {
+	if facet == api.GenericTypeArgumentLogical {
+		return children.RepresentedType(
+			context.WithRole(api.RoleCallArgumentType),
+			source,
+			argument,
+		)
+	}
+	var representation api.GenericRepresentationFacet
+	switch facet {
+	case api.GenericTypeArgumentStorage:
+		representation = api.GenericRepresentationStorage
+	case api.GenericTypeArgumentContainerStorage:
+		representation = api.GenericRepresentationContainerStorage
+	case api.GenericTypeArgumentPointer:
+		representation = api.GenericRepresentationPointer
+	default:
+		return api.TypeEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "provider generic type-argument facet is invalid",
+		}
+	}
+	return emitRepresentationArgument(
+		context,
+		children,
+		source,
+		argument,
+		representation,
+	)
 }
 
 func emitRepresentationArgument(

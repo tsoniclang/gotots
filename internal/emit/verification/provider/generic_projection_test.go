@@ -35,6 +35,10 @@ func Clone(source map[string]int) map[string]int {
 func Grow(source []string) []string {
 	return slices.Grow(source, 1)
 }
+
+func GenericClone[T any](source []T) []T {
+	return slices.Clone(source)
+}
 `)
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: project,
@@ -51,6 +55,7 @@ func Grow(source []string) []string {
 		[]emit.Root{
 			mustProviderRoot(t, scope.Lookup("Concat")),
 			mustProviderRoot(t, scope.Lookup("Clone")),
+			mustProviderRoot(t, scope.Lookup("GenericClone")),
 			mustProviderRoot(t, scope.Lookup("Grow")),
 		},
 		options,
@@ -58,11 +63,14 @@ func Grow(source []string) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	printed := materializeArtifacts(t, emission, t.TempDir()).printed
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	printed := artifacts.printed
 	for _, exact := range []string{
 		"Concat<gostring>(",
 		"Clone<gostring, int64>(",
 		"Grow<RuntimeSlice<gostring>, gostring>(",
+		"Clone<T$ContainerStorage>(",
 	} {
 		if !strings.Contains(printed, exact) {
 			t.Fatalf("provider generic projection lacks %q:\n%s", exact, printed)
@@ -76,4 +84,5 @@ func Grow(source []string) []string {
 			t.Fatalf("provider generic projection retained %q:\n%s", superseded, printed)
 		}
 	}
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }

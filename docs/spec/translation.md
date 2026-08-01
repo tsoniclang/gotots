@@ -1810,13 +1810,30 @@ The target call writes explicit TypeScript type arguments even when Go inferred
 them and passes the declaration's ordered hidden operation functions before
 source arguments. Source-emitted callables use the complete generic
 representation layout. A linked provider callable instead uses its certified
-ordered projection from Go declaration parameters to provider target
-parameters; it must not assume equal arity or ask TypeScript to infer the
-missing contract. For example, `slices.Concat[S ~[]E, E]` projects `[E]` to the
-provider's `Concat<E>`, while `slices.Grow[S ~[]E, E]` projects `[S, E]` to the
-provider overload that preserves the exact slice result type. A reached
-cooperative provider profile owns and certifies its separate complete profile
-layout rather than reusing the ordinary projection.
+ordered projection from Go declaration parameters and their representation
+facets to provider target parameters; it must not assume equal arity, assume a
+logical representation, or ask TypeScript to infer the missing contract. For
+example, `slices.Concat[S ~[]E, E]` selects `E`'s container-storage facet for
+the provider's `Concat<EStorage>`. Thus:
+
+```go
+func CloneGeneric[T any](source []T) []T {
+    return slices.Clone(source)
+}
+```
+
+emits a call shaped as
+
+```ts
+return slices.Clone<T$ContainerStorage>(source);
+```
+
+because the surrounding slice stores `T$ContainerStorage`; `Clone<T>` would
+be ill-typed and would confuse the Go logical value with its target storage.
+`slices.Grow[S ~[]E, E]` separately projects the facets required by the
+provider overload that preserves the exact slice result type and its operation
+capabilities. A reached cooperative provider profile owns and certifies its
+separate complete profile layout rather than reusing the ordinary projection.
 
 ```go
 result := Add(int32(2), int32(3))

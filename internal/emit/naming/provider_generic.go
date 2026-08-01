@@ -2,7 +2,6 @@ package naming
 
 import (
 	"go/types"
-	"slices"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -10,7 +9,7 @@ import (
 
 func (r *Registry) ProviderGenericTypeArguments(
 	owner *types.Func,
-) ([]int, bool, error) {
+) ([]api.GenericTypeArgumentProjection, bool, error) {
 	if r == nil || owner == nil {
 		return nil, false, &api.NameError{
 			Reason: "provider generic type-argument owner is invalid",
@@ -26,18 +25,57 @@ func (r *Registry) ProviderGenericTypeArguments(
 			Reason: "provider generic type-argument projection is absent",
 		}
 	}
-	return slices.Clone(binding.providerGenericTypeArguments), true, nil
+	result := make(
+		[]api.GenericTypeArgumentProjection,
+		0,
+		len(binding.providerGenericTypeArguments),
+	)
+	for _, configured := range binding.providerGenericTypeArguments {
+		facet, ok := providerGenericTypeArgumentFacet(configured.Facet)
+		if !ok {
+			return nil, true, &api.NameError{
+				Name:   owner.Name(),
+				Reason: "provider generic type-argument facet is invalid",
+			}
+		}
+		projection, projectionErr := api.NewGenericTypeArgumentProjection(
+			configured.TypeParameter,
+			facet,
+		)
+		if projectionErr != nil {
+			return nil, true, projectionErr
+		}
+		result = append(result, projection)
+	}
+	return result, true, nil
 }
 
 func (n *File) ProviderGenericTypeArguments(
 	owner *types.Func,
-) ([]int, bool, error) {
+) ([]api.GenericTypeArgumentProjection, bool, error) {
 	if n == nil || n.owner == nil || n.owner.registry == nil {
 		return nil, false, &api.NameError{
 			Reason: "provider generic type-argument registry is invalid",
 		}
 	}
 	return n.owner.registry.ProviderGenericTypeArguments(owner)
+}
+
+func providerGenericTypeArgumentFacet(
+	facet gostdlib.GenericTypeArgumentFacet,
+) (api.GenericTypeArgumentFacet, bool) {
+	switch facet {
+	case gostdlib.GenericTypeArgumentLogical:
+		return api.GenericTypeArgumentLogical, true
+	case gostdlib.GenericTypeArgumentStorage:
+		return api.GenericTypeArgumentStorage, true
+	case gostdlib.GenericTypeArgumentContainerStorage:
+		return api.GenericTypeArgumentContainerStorage, true
+	case gostdlib.GenericTypeArgumentPointer:
+		return api.GenericTypeArgumentPointer, true
+	default:
+		return api.GenericTypeArgumentInvalid, false
+	}
 }
 
 func (r *Registry) ProviderGenericOperations(

@@ -59,14 +59,21 @@ func validateBinding(binding BindingDocument, field string) error {
 	); err != nil {
 		return err
 	}
-	for index, parameter := range binding.GenericTypeArguments {
-		if parameter < 0 || index != 0 &&
-			parameter <= binding.GenericTypeArguments[index-1] {
+	seenTypeArguments := make(map[GenericTypeArgumentDocument]struct{})
+	for _, argument := range binding.GenericTypeArguments {
+		if argument.TypeParameter < 0 || !argument.Facet.Valid() {
 			return manifestError(
 				field+".genericTypeArguments",
-				"source parameter indices are invalid or unordered",
+				"source parameter or representation facet is invalid",
 			)
 		}
+		if _, duplicate := seenTypeArguments[argument]; duplicate {
+			return manifestError(
+				field+".genericTypeArguments",
+				"target projection entry is duplicated",
+			)
+		}
+		seenTypeArguments[argument] = struct{}{}
 	}
 	if len(binding.GenericTypeArguments) != 0 &&
 		(binding.Kind != BindingFunction || binding.Access != AccessExport) {

@@ -25,12 +25,15 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 			Specifier:    "@gotots/gostdlib/strings.js",
 			SourcePath:   "src/strings.ts",
 			Bindings: []gostdlib.BindingDocument{{
-				Identity:             "strings|kind=4|receiver=|name=Contains",
-				Kind:                 gostdlib.BindingFunction,
-				Access:               gostdlib.AccessExport,
-				Effect:               gostdlib.EffectSynchronous,
-				Export:               "Contains",
-				GenericTypeArguments: []int{1},
+				Identity: "strings|kind=4|receiver=|name=Contains",
+				Kind:     gostdlib.BindingFunction,
+				Access:   gostdlib.AccessExport,
+				Effect:   gostdlib.EffectSynchronous,
+				Export:   "Contains",
+				GenericTypeArguments: []gostdlib.GenericTypeArgumentDocument{{
+					TypeParameter: 1,
+					Facet:         gostdlib.GenericTypeArgumentLogical,
+				}},
 				GenericOperations: []gostdlib.GenericOperationDocument{{
 					Kind: gostdlib.GenericOperationCopy,
 					Parameters: []gostdlib.GenericOperationTypeDocument{{
@@ -90,8 +93,8 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 		t.Fatal("binding exposed mutable generic-operation storage")
 	}
 	typeArguments := binding.GenericTypeArguments()
-	typeArguments[0] = 9
-	if binding.GenericTypeArguments()[0] != 1 {
+	typeArguments[0].TypeParameter = 9
+	if binding.GenericTypeArguments()[0].TypeParameter != 1 {
 		t.Fatal("binding exposed mutable generic-type-argument storage")
 	}
 	modules := manifest.Modules()

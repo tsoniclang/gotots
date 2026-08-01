@@ -19,7 +19,7 @@ func buildFacetModules(
 	seeds []facetSeed,
 	representationSeeds []providerRepresentationSeed,
 	modules []gostdlib.ModuleDocument,
-	genericProjections map[string][]int,
+	genericProjections map[string][]gostdlib.GenericTypeArgumentDocument,
 	effectMarker tsgo.ProjectExport,
 ) ([]gostdlib.FacetModuleDocument, error) {
 	interfaceTargets, err := providerInterfaceTargets(
@@ -183,7 +183,7 @@ func buildFacet(
 	seed facetSeed,
 	targets map[string]tsgo.ProjectExport,
 	representations map[string]gostdlib.ProviderRepresentationDocument,
-	genericProjections map[string][]int,
+	genericProjections map[string][]gostdlib.GenericTypeArgumentDocument,
 ) (gostdlib.FacetDocument, error) {
 	evidence, ok := source.objects[seed.SourceIdentity]
 	if !ok {

@@ -13,7 +13,7 @@ import (
 func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "facets": [],
   "genericOperationSets": [
     {
@@ -39,7 +39,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 		t.Fatalf("generic operations = %#v", selected)
 	}
 
-	payload = `{"schemaVersion":5,"facets":[],"genericCallableProjections":[],"genericOperationSets":[
+	payload = `{"schemaVersion":6,"facets":[],"genericCallableProjections":[],"genericOperationSets":[
   {"sourceIdentity":"x","operations":[
     {"kind":"invented","parameters":[],"results":[{"typeParameter":0}]}
   ]}
@@ -55,10 +55,13 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 func TestFacetMapOwnsClosedGenericCallableProjections(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "facets": [],
   "genericCallableProjections": [
-    {"sourceIdentity":"slices|kind=4|receiver=|name=Grow","typeParameters":[0,1]}
+    {"sourceIdentity":"slices|kind=4|receiver=|name=Grow","typeArguments":[
+      {"typeParameter":0,"facet":"logical"},
+      {"typeParameter":1,"facet":"container-storage"}
+    ]}
   ],
   "genericOperationSets": []
 }`
@@ -69,17 +72,18 @@ func TestFacetMapOwnsClosedGenericCallableProjections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	projections["slices|kind=4|receiver=|name=Grow"][0] = 9
+	projections["slices|kind=4|receiver=|name=Grow"][0].TypeParameter = 9
 	_, _, _, next, _, err := readFacetSeeds(path)
-	if err != nil || next["slices|kind=4|receiver=|name=Grow"][0] != 0 {
+	if err != nil ||
+		next["slices|kind=4|receiver=|name=Grow"][0].TypeParameter != 0 {
 		t.Fatalf("projection source mutated: %#v, %v", next, err)
 	}
-	invalid := strings.Replace(payload, "[0,1]", "[1,0]", 1)
+	invalid := strings.Replace(payload, "container-storage", "invented", 1)
 	if err := os.WriteFile(path, []byte(invalid), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, _, _, _, err := readFacetSeeds(path); err == nil {
-		t.Fatal("reordered generic callable projection passed")
+		t.Fatal("open generic callable projection facet passed")
 	}
 }
 
@@ -95,8 +99,8 @@ func TestGenericCallableProjectionRejectsProviderArityDrift(t *testing.T) {
 	}
 	mutated := bytes.Replace(
 		source,
-		[]byte(`{ "sourceIdentity": "slices|kind=4|receiver=|name=Concat", "typeParameters": [1] }`),
-		[]byte(`{ "sourceIdentity": "slices|kind=4|receiver=|name=Concat", "typeParameters": [0, 1] }`),
+		[]byte(`{ "sourceIdentity": "slices|kind=4|receiver=|name=Concat", "typeArguments": [{"typeParameter":1,"facet":"container-storage"}] }`),
+		[]byte(`{ "sourceIdentity": "slices|kind=4|receiver=|name=Concat", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] }`),
 		1,
 	)
 	if bytes.Equal(mutated, source) {

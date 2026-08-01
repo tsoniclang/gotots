@@ -28,7 +28,7 @@ type targetBinding struct {
 	providerTypeRepresentation   gostdlib.RepresentationKind
 	providerDefinedValue         gostdlib.DefinedValueRepresentationKind
 	providerEffect               gostdlib.EffectKind
-	providerGenericTypeArguments []int
+	providerGenericTypeArguments []gostdlib.GenericTypeArgumentDocument
 	providerGenericOperations    []gostdlib.GenericOperationDocument
 }
 

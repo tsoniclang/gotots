@@ -407,7 +407,11 @@ type Names interface {
 	Result(*types.Var, int) (string, error)
 	Reference(types.Object) (NameReference, error)
 	GenericCallableProfile(*GenericCallableProfile) (NameReference, error)
-	ProviderGenericTypeArguments(*types.Func) ([]int, bool, error)
+	ProviderGenericTypeArguments(*types.Func) (
+		[]GenericTypeArgumentProjection,
+		bool,
+		error,
+	)
 	TypeReference(types.Object) (NameReference, error)
 	PackageVariable(*types.Var) (PackageVariableReference, error)
 	NamedStructConstructor(*types.TypeName) (NameReference, error)

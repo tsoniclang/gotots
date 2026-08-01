@@ -790,14 +790,17 @@ slots must fail manifest certification, TS-Go AST shape, strict typechecking,
 or differential execution.
 
 For every generic provider binding, verification also exact-joins the
-configured source-parameter projection to the selected Go declaration and the
-inspected ordinary provider call signature. Artifact tests distinguish
-`Concat<S,E> -> Concat<E>`, `maps.Clone<M,K,V> -> Clone<K,V>`, and
-`Grow<S,E> -> Grow<S,E>`, while a cooperative `SortFunc` proves that its
-profile layout remains separate. Mutations deleting a projection, selecting
+configured `(source parameter, representation facet)` projection from the
+selected Go declaration to the inspected ordinary provider call signature.
+Artifact tests distinguish `Concat<S,E> -> Concat<EStorage>`,
+`maps.Clone<M,K,V> -> Clone<K,V>`, and the operation-bearing `Grow` layout,
+while a cooperative `SortFunc` proves that its profile layout remains separate.
+An open `CloneGeneric[T]` fixture must emit
+`Clone<T$ContainerStorage>` and strict-typecheck against
+`RuntimeSlice<T$ContainerStorage>`. Mutations deleting a projection, selecting
 the container parameter instead of the element parameter, changing order,
-or changing provider generic arity must fail certification or strict
-typechecking.
+changing the container-storage facet back to logical, or changing provider
+generic arity must fail certification or strict typechecking.
 
 Linked-provider constant verification compiles `math.MaxFloat64` and
 `math.MaxInt64` uses through exact contextual projections. It inspects the

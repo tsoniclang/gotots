@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
-const facetMapSchemaVersion = 5
+const facetMapSchemaVersion = 6
 
 type facetMapDocument struct {
 	SchemaVersion              int                             `json:"schemaVersion"`
@@ -23,8 +24,8 @@ type facetMapDocument struct {
 }
 
 type genericCallableProjectionSeed struct {
-	SourceIdentity string `json:"sourceIdentity"`
-	TypeParameters []int  `json:"typeParameters"`
+	SourceIdentity string                                 `json:"sourceIdentity"`
+	TypeArguments  []gostdlib.GenericTypeArgumentDocument `json:"typeArguments"`
 }
 
 type providerRepresentationSeed struct {
@@ -59,7 +60,7 @@ func readFacetSeeds(
 	[]facetSeed,
 	[]providerRepresentationSeed,
 	map[string]struct{},
-	map[string][]int,
+	map[string][]gostdlib.GenericTypeArgumentDocument,
 	map[string][]gostdlib.GenericOperationDocument,
 	error,
 ) {
@@ -114,13 +115,16 @@ func readFacetSeeds(
 
 func validateGenericCallableProjectionSeeds(
 	source []genericCallableProjectionSeed,
-) (map[string][]int, error) {
-	result := make(map[string][]int, len(source))
+) (map[string][]gostdlib.GenericTypeArgumentDocument, error) {
+	result := make(
+		map[string][]gostdlib.GenericTypeArgumentDocument,
+		len(source),
+	)
 	previous := ""
 	for _, seed := range source {
 		if seed.SourceIdentity == "" ||
 			previous >= seed.SourceIdentity ||
-			len(seed.TypeParameters) == 0 {
+			len(seed.TypeArguments) == 0 {
 			return nil, certifyError(
 				"configure generic callable projections",
 				seed.SourceIdentity,
@@ -128,17 +132,26 @@ func validateGenericCallableProjectionSeeds(
 			)
 		}
 		previous = seed.SourceIdentity
-		parameters := append([]int(nil), seed.TypeParameters...)
-		for index, parameter := range parameters {
-			if parameter < 0 || index != 0 && parameter <= parameters[index-1] {
+		arguments := slices.Clone(seed.TypeArguments)
+		seen := make(map[gostdlib.GenericTypeArgumentDocument]struct{})
+		for _, argument := range arguments {
+			if argument.TypeParameter < 0 || !argument.Facet.Valid() {
 				return nil, certifyError(
 					"configure generic callable projections",
 					seed.SourceIdentity,
-					"source parameter indices are invalid or unordered",
+					"source parameter or representation facet is invalid",
 				)
 			}
+			if _, duplicate := seen[argument]; duplicate {
+				return nil, certifyError(
+					"configure generic callable projections",
+					seed.SourceIdentity,
+					"target projection entry is duplicated",
+				)
+			}
+			seen[argument] = struct{}{}
 		}
-		result[seed.SourceIdentity] = parameters
+		result[seed.SourceIdentity] = arguments
 	}
 	return result, nil
 }

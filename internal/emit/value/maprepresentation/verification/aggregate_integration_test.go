@@ -502,7 +502,7 @@ func (aggregateNames) GenericCallableProfile(
 
 func (aggregateNames) ProviderGenericTypeArguments(
 	*types.Func,
-) ([]int, bool, error) {
+) ([]api.GenericTypeArgumentProjection, bool, error) {
 	return nil, false, nil
 }
 

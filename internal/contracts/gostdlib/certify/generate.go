@@ -158,7 +158,7 @@ func buildModule(
 	project *tsgo.ProjectInspection,
 	source goSurface,
 	seed moduleSeed,
-	genericProjections map[string][]int,
+	genericProjections map[string][]gostdlib.GenericTypeArgumentDocument,
 	genericOperations map[string][]gostdlib.GenericOperationDocument,
 	definedValueIdentities map[string]struct{},
 	effectMarker tsgo.ProjectExport,

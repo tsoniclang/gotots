@@ -173,7 +173,7 @@ func (staticSpecializationNames) GenericCallableProfile(
 
 func (staticSpecializationNames) ProviderGenericTypeArguments(
 	*types.Func,
-) ([]int, bool, error) {
+) ([]api.GenericTypeArgumentProjection, bool, error) {
 	return nil, false, nil
 }
 

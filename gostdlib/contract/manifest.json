@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "packageName": "@gotots/gostdlib",
   "packageVersion": "0.0.0",
   "backend": "node",
@@ -9,7 +9,7 @@
   "goos": "linux",
   "goarch": "amd64",
   "runtimeDigest": "ae75219a3ca68c3dd5316af5372a357a4e1024c8fa54d3b1150acc110346f286",
-  "providerDigest": "d4570ef2f90cb3e22dfa3a30f50c170342a9dffcc08efc0ae028f0a2d3fb5a15",
+  "providerDigest": "42832e2ed256a2d16d55ee427efa8305c7da8a2ad5800b2443892deb9d2fd680",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -220,7 +220,10 @@
           "effect": "sync",
           "export": "Compare",
           "genericTypeArguments": [
-            0
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[T cmp.Ordered](x T, y T) int|params=x,y|results=",
           "sourceLocation": "cmp/cmp.go:40:6",
@@ -633,7 +636,10 @@
           "effect": "sync",
           "export": "AsType",
           "genericTypeArguments": [
-            0
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[E error](err error) (E, bool)|params=err|results=,",
           "sourceLocation": "errors/wrap.go:167:6",
@@ -1385,8 +1391,14 @@
           "effect": "sync",
           "export": "Clone",
           "genericTypeArguments": [
-            1,
-            2
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[M ~map[K]V, K comparable, V any](m M) M|params=m|results=",
           "sourceLocation": "maps/maps.go:50:6",
@@ -1400,8 +1412,14 @@
           "effect": "sync",
           "export": "Copy",
           "genericTypeArguments": [
-            2,
-            3
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[M1 ~map[K]V, M2 ~map[K]V, K comparable, V any](dst M1, src M2)|params=dst,src|results=",
           "sourceLocation": "maps/maps.go:62:6",
@@ -1415,8 +1433,14 @@
           "effect": "sync",
           "export": "Equal",
           "genericTypeArguments": [
-            2,
-            3
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[M1, M2 ~map[K]V, K, V comparable](m1 M1, m2 M2) bool|params=m1,m2|results=",
           "sourceLocation": "maps/maps.go:17:6",
@@ -1430,9 +1454,18 @@
           "effect": "sync",
           "export": "EqualFunc",
           "genericTypeArguments": [
-            2,
-            3,
-            4
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 4,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[M1 ~map[K]V1, M2 ~map[K]V2, K comparable, V1, V2 any](m1 M1, m2 M2, eq func(V1, V2) bool) bool|params=m1,m2,eq|results=",
           "sourceLocation": "maps/maps.go:31:6",
@@ -1446,8 +1479,14 @@
           "effect": "sync",
           "export": "Keys",
           "genericTypeArguments": [
-            1,
-            2
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[Map ~map[K]V, K comparable, V any](m Map) iter.Seq[K]|params=m|results=",
           "sourceLocation": "maps/iter.go:25:6",
@@ -1461,8 +1500,14 @@
           "effect": "sync",
           "export": "Values",
           "genericTypeArguments": [
-            1,
-            2
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[Map ~map[K]V, K comparable, V any](m Map) iter.Seq[V]|params=m|results=",
           "sourceLocation": "maps/iter.go:38:6",
@@ -3658,7 +3703,10 @@
           "effect": "sync",
           "export": "TypeAssert",
           "genericTypeArguments": [
-            0
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[T any](v reflect.Value) (T, bool)|params=v|results=,",
           "sourceLocation": "reflect/value.go:1518:6",
@@ -3672,7 +3720,10 @@
           "effect": "sync",
           "export": "TypeFor",
           "genericTypeArguments": [
-            0
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[T any]() reflect.Type|params=|results=",
           "sourceLocation": "reflect/type.go:1388:6",
@@ -4145,7 +4196,10 @@
           "effect": "sync",
           "export": "AppendSeq",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[Slice ~[]E, E any](s Slice, seq iter.Seq[E]) Slice|params=s,seq|results=",
           "sourceLocation": "slices/iter.go:50:6",
@@ -4159,7 +4213,10 @@
           "effect": "sync",
           "export": "BinarySearch",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E cmp.Ordered](x S, target E) (int, bool)|params=x,target|results=,",
           "sourceLocation": "slices/sort.go:126:6",
@@ -4173,8 +4230,14 @@
           "effect": "sync",
           "export": "BinarySearchFunc",
           "genericTypeArguments": [
-            1,
-            2
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E, T any](x S, target T, cmp func(E, T) int) (int, bool)|params=x,target,cmp|results=,",
           "sourceLocation": "slices/sort.go:152:6",
@@ -4188,7 +4251,10 @@
           "effect": "sync",
           "export": "Clip",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S) S|params=s|results=",
           "sourceLocation": "slices/slices.go:433:6",
@@ -4202,7 +4268,10 @@
           "effect": "sync",
           "export": "Clone",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S) S|params=s|results=",
           "sourceLocation": "slices/slices.go:353:6",
@@ -4216,7 +4285,10 @@
           "effect": "sync",
           "export": "Collect",
           "genericTypeArguments": [
-            0
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[E any](seq iter.Seq[E]) []E|params=seq|results=",
           "sourceLocation": "slices/iter.go:59:6",
@@ -4230,7 +4302,10 @@
           "effect": "sync",
           "export": "Compact",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E comparable](s S) S|params=s|results=",
           "sourceLocation": "slices/slices.go:369:6",
@@ -4244,7 +4319,10 @@
           "effect": "sync",
           "export": "CompactFunc",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, eq func(E, E) bool) S|params=s,eq|results=",
           "sourceLocation": "slices/slices.go:394:6",
@@ -4258,7 +4336,10 @@
           "effect": "sync",
           "export": "Compare",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E cmp.Ordered](s1 S, s2 S) int|params=s1,s2|results=",
           "sourceLocation": "slices/slices.go:57:6",
@@ -4272,8 +4353,14 @@
           "effect": "sync",
           "export": "CompareFunc",
           "genericTypeArguments": [
-            2,
-            3
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S1 ~[]E1, S2 ~[]E2, E1, E2 any](s1 S1, s2 S2, cmp func(E1, E2) int) int|params=s1,s2,cmp|results=",
           "sourceLocation": "slices/slices.go:78:6",
@@ -4287,7 +4374,10 @@
           "effect": "sync",
           "export": "Concat",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](slices ...S) S|params=slices|results=",
           "sourceLocation": "slices/slices.go:489:6",
@@ -4301,7 +4391,10 @@
           "effect": "sync",
           "export": "Contains",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E comparable](s S, v E) bool|params=s,v|results=",
           "sourceLocation": "slices/slices.go:117:6",
@@ -4315,7 +4408,10 @@
           "effect": "sync",
           "export": "ContainsFunc",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, f func(E) bool) bool|params=s,f|results=",
           "sourceLocation": "slices/slices.go:123:6",
@@ -4329,7 +4425,10 @@
           "effect": "sync",
           "export": "Delete",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, i int, j int) S|params=s,i,j|results=",
           "sourceLocation": "slices/slices.go:222:6",
@@ -4343,7 +4442,10 @@
           "effect": "sync",
           "export": "DeleteFunc",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, del func(E) bool) S|params=s,del|results=",
           "sourceLocation": "slices/slices.go:239:6",
@@ -4357,7 +4459,10 @@
           "effect": "sync",
           "export": "Equal",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E comparable](s1 S, s2 S) bool|params=s1,s2|results=",
           "sourceLocation": "slices/slices.go:20:6",
@@ -4371,8 +4476,14 @@
           "effect": "sync",
           "export": "EqualFunc",
           "genericTypeArguments": [
-            2,
-            3
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S1 ~[]E1, S2 ~[]E2, E1, E2 any](s1 S1, s2 S2, eq func(E1, E2) bool) bool|params=s1,s2,eq|results=",
           "sourceLocation": "slices/slices.go:37:6",
@@ -4386,8 +4497,14 @@
           "effect": "sync",
           "export": "Grow",
           "genericTypeArguments": [
-            0,
-            1
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "genericOperations": [
             {
@@ -4425,7 +4542,10 @@
           "effect": "sync",
           "export": "Index",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E comparable](s S, v E) int|params=s,v|results=",
           "sourceLocation": "slices/slices.go:96:6",
@@ -4439,7 +4559,10 @@
           "effect": "sync",
           "export": "IndexFunc",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, f func(E) bool) int|params=s,f|results=",
           "sourceLocation": "slices/slices.go:107:6",
@@ -4453,7 +4576,10 @@
           "effect": "sync",
           "export": "Insert",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, i int, v ...E) S|params=s,i,v|results=",
           "sourceLocation": "slices/slices.go:135:6",
@@ -4467,7 +4593,10 @@
           "effect": "sync",
           "export": "Repeat",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](x S, count int) S|params=x,count|results=",
           "sourceLocation": "slices/slices.go:512:6",
@@ -4481,7 +4610,10 @@
           "effect": "sync",
           "export": "Replace",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, i int, j int, v ...E) S|params=s,i,j,v|results=",
           "sourceLocation": "slices/slices.go:260:6",
@@ -4495,7 +4627,10 @@
           "effect": "sync",
           "export": "Reverse",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S)|params=s|results=",
           "sourceLocation": "slices/slices.go:481:6",
@@ -4509,7 +4644,10 @@
           "effect": "sync",
           "export": "Sort",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E cmp.Ordered](x S)|params=x|results=",
           "sourceLocation": "slices/sort.go:16:6",
@@ -4523,7 +4661,10 @@
           "effect": "sync",
           "export": "SortFunc",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](x S, cmp func(a E, b E) int)|params=x,cmp|results=",
           "sourceLocation": "slices/sort.go:30:6",
@@ -4537,7 +4678,10 @@
           "effect": "sync",
           "export": "SortStableFunc",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[S ~[]E, E any](x S, cmp func(a E, b E) int)|params=x,cmp|results=",
           "sourceLocation": "slices/sort.go:37:6",
@@ -4551,7 +4695,10 @@
           "effect": "sync",
           "export": "Sorted",
           "genericTypeArguments": [
-            0
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[E cmp.Ordered](seq iter.Seq[E]) []E|params=seq|results=",
           "sourceLocation": "slices/iter.go:66:6",
@@ -4565,7 +4712,10 @@
           "effect": "sync",
           "export": "SortedFunc",
           "genericTypeArguments": [
-            0
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[E any](seq iter.Seq[E], cmp func(E, E) int) []E|params=seq,cmp|results=",
           "sourceLocation": "slices/iter.go:75:6",
@@ -4579,7 +4729,10 @@
           "effect": "sync",
           "export": "Values",
           "genericTypeArguments": [
-            1
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[Slice ~[]E, E any](s Slice) iter.Seq[E]|params=s|results=",
           "sourceLocation": "slices/iter.go:37:6",
@@ -5618,7 +5771,10 @@
           "effect": "sync",
           "export": "OnceValue",
           "genericTypeArguments": [
-            0
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            }
           ],
           "sourceSignature": "func[T any](f func() T) func() T|params=f|results=",
           "sourceLocation": "sync/oncefunc.go:46:6",
@@ -8266,5 +8422,5 @@
       ]
     }
   ],
-  "manifestDigest": "58c5021a5ce98195dd85c12d08be469027cfb40776b3b8a6f9b65a2fe9445251"
+  "manifestDigest": "3e3beebb9dd61789308dacf660506dde4bacadedec5a61fa23457ff1b662daac"
 }

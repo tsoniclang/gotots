@@ -294,7 +294,7 @@ func (unusedNames) GenericCallableProfile(
 
 func (unusedNames) ProviderGenericTypeArguments(
 	*types.Func,
-) ([]int, bool, error) {
+) ([]api.GenericTypeArgumentProjection, bool, error) {
 	return nil, false, nil
 }
 

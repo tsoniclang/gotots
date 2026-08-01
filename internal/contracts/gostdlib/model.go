@@ -3,7 +3,7 @@ package gostdlib
 import "slices"
 
 const (
-	SchemaVersion = 7
+	SchemaVersion = 8
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -63,6 +63,28 @@ func (k DefinedValueRepresentationKind) Valid() bool {
 		k == DefinedValueRepresentationOperations
 }
 
+type GenericTypeArgumentFacet string
+
+const (
+	GenericTypeArgumentInvalid          GenericTypeArgumentFacet = ""
+	GenericTypeArgumentLogical          GenericTypeArgumentFacet = "logical"
+	GenericTypeArgumentStorage          GenericTypeArgumentFacet = "storage"
+	GenericTypeArgumentContainerStorage GenericTypeArgumentFacet = "container-storage"
+	GenericTypeArgumentPointer          GenericTypeArgumentFacet = "pointer"
+)
+
+func (f GenericTypeArgumentFacet) Valid() bool {
+	return f == GenericTypeArgumentLogical ||
+		f == GenericTypeArgumentStorage ||
+		f == GenericTypeArgumentContainerStorage ||
+		f == GenericTypeArgumentPointer
+}
+
+type GenericTypeArgumentDocument struct {
+	TypeParameter int                      `json:"typeParameter"`
+	Facet         GenericTypeArgumentFacet `json:"facet"`
+}
+
 type Document struct {
 	SchemaVersion    int                   `json:"schemaVersion"`
 	PackageName      string                `json:"packageName"`
@@ -96,7 +118,7 @@ type BindingDocument struct {
 	Effect               EffectKind                     `json:"effect,omitempty"`
 	Export               string                         `json:"export"`
 	Member               string                         `json:"member,omitempty"`
-	GenericTypeArguments []int                          `json:"genericTypeArguments,omitempty"`
+	GenericTypeArguments []GenericTypeArgumentDocument  `json:"genericTypeArguments,omitempty"`
 	GenericOperations    []GenericOperationDocument     `json:"genericOperations,omitempty"`
 	SourceSignature      string                         `json:"sourceSignature"`
 	SourceValue          string                         `json:"sourceValue,omitempty"`
@@ -284,7 +306,7 @@ func (b Binding) GenericOperations() []GenericOperationDocument {
 	return cloneGenericOperations(b.binding.GenericOperations)
 }
 
-func (b Binding) GenericTypeArguments() []int {
+func (b Binding) GenericTypeArguments() []GenericTypeArgumentDocument {
 	return slices.Clone(b.binding.GenericTypeArguments)
 }
 

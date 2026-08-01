@@ -1335,14 +1335,19 @@ compile fails if any reached binding/profile lacks its provider-owned effect
 or if the recorded effect differs from its certified target signature.
 
 Every generic provider function binding also owns one ordered target
-type-argument projection. Each entry is an index into the selected Go
-function's type-parameter list, and its length exact-joins the inspected
-ordinary provider call signature. This is an ABI fact, not an emitter
-heuristic: `maps.Clone[M ~map[K]V, K, V]` projects `[K, V]`, whereas
-`slices.Grow[S ~[]E, E]` projects `[S, E]`. Generic callable-profile facets
-retain their separately certified profile layout because cooperation may add
-representation parameters. Missing, stale, inferred-by-name, or arity-only
-projections fail provider certification before emission.
+type-argument projection. Each target entry selects both an index into the
+selected Go function's type-parameter list and one closed representation facet:
+logical, storage, container-storage, or pointer. Its length exact-joins the
+inspected ordinary provider call signature. This is an ABI fact, not an
+emitter heuristic. `maps.Clone[M ~map[K]V, K, V]` currently projects logical
+`[K, V]`; `slices.Clone[S ~[]E, E]` projects the container-storage facet of
+`E`, so an open caller whose slice is `RuntimeSlice<T$ContainerStorage>` emits
+`Clone<T$ContainerStorage>`, not `Clone<T>`. `slices.Grow[S ~[]E, E]` projects
+the facets required by its separately certified operation-bearing provider
+signature. Generic callable-profile facets retain their own certified layout
+because cooperation may add representation parameters. Missing, stale,
+inferred-by-name, index-only, or arity-only projections fail provider
+certification before emission.
 
 Declaration requirements are revision-owned, not an append-only global set.
 Reconstructing an artifact atomically replaces all requirements that revision
