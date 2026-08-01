@@ -144,6 +144,11 @@ artifacts reach a fixed point.
   (`number` or `bigint`), evaluation order (`direct` or `preserve-go`), and
   concurrency semantics (`disabled` or explicitly selected `cooperative`).
   Generated files in one compilation cannot mix selections.
+- **Go build profile:** the loader-owned selected toolchain identity, `GOOS`,
+  `GOARCH`, `CGO_ENABLED`, and sorted build tags. The default is the explicitly
+  materialized host profile, not ambient shell state. Cross-target selection
+  changes source files, sizes, standard-library contracts, and runtime
+  constants as one atomic choice.
 - **manual obligation:** an exact generated declaration whose implementation
   must be supplied manually.
 - **standard-library provider:** the GoToTS-owned `@gotots/gostdlib` package.
@@ -168,6 +173,14 @@ identifies:
   receive exact contracts and explicit placeholders.
 
 No import-path prefix decides these classes.
+
+A source-available package may contain a selected bodyless native declaration.
+That declaration remains source-owned and emits one exact typed throwing
+placeholder plus one canonical obligation until an explicit provider
+implementation replaces it. It is not converted into an ambient package and
+does not prevent the rest of the source graph from being generated and
+typechecked. Executing the placeholder fails by its Go declaration identity;
+publication requires every reachable placeholder to be gone.
 
 ## Non-Negotiable Results
 

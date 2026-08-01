@@ -237,19 +237,24 @@ func emitCallableVariant(
 	if err != nil {
 		return callableVariantEmission{}, err
 	}
-	body, err := callable.EmitBody(
-		context,
-		children,
-		source,
-		source.Type,
-		source.Body,
-		signature,
-		api.RoleFunctionBody,
-	)
+	var body api.BlockEmission
+	if source.Body == nil {
+		body, err = emitExternalBody(context, function)
+	} else {
+		body, err = callable.EmitBody(
+			context,
+			children,
+			source,
+			source.Type,
+			source.Body,
+			signature,
+			api.RoleFunctionBody,
+		)
+	}
 	if err != nil {
 		return callableVariantEmission{}, err
 	}
-	if valueReceiver && copySelected {
+	if source.Body != nil && valueReceiver && copySelected {
 		body, err = prependValueReceiverCopy(
 			context,
 			children,

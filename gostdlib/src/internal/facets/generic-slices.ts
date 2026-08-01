@@ -4,7 +4,9 @@ import type { bool, int64 } from "@gotots/runtime/scalars.js";
 
 import {
   AppendSeqCooperative,
+  BinarySearchFuncCooperative,
   CollectCooperative,
+  CompareFuncCooperative,
   type CooperativeSequence,
   ContainsFuncCooperative,
   DeleteFuncCooperative,
@@ -28,9 +30,9 @@ type CooperativePredicate<E> = (
   value: E,
   recovery?: GoRecovery,
 ) => Promise<bool>;
-type CooperativeComparison<E> = (
-  left: E,
-  right: E,
+type CooperativeComparison<L, R = L> = (
+  left: L,
+  right: R,
   recovery?: GoRecovery,
 ) => Promise<int64>;
 
@@ -96,6 +98,62 @@ export async function SlicesCollectFullyCooperative<E, EStorage>(
   _recovery?: GoRecovery,
 ): Promise<RuntimeSlice<EStorage>> {
   return CollectCooperative(copyElement, toStorage, sequence);
+}
+
+export async function SlicesBinarySearchFuncCooperative<
+  S,
+  E,
+  EStorage,
+  Target,
+>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  source: S,
+  target: Target,
+  compare: CooperativeComparison<E, Target> | undefined,
+  _recovery?: GoRecovery,
+): Promise<[int64, bool]> {
+  return BinarySearchFuncCooperative(
+    toSlice,
+    copyElement,
+    fromStorage,
+    source,
+    target,
+    compare,
+  );
+}
+
+export async function SlicesCompareFuncCooperative<
+  S1,
+  S2,
+  E1,
+  E1Storage,
+  E2,
+  E2Storage,
+>(
+  leftSlice: Convert<S1, RuntimeSlice<E1Storage>>,
+  rightSlice: Convert<S2, RuntimeSlice<E2Storage>>,
+  copyLeft: CopyValue<E1>,
+  copyRight: CopyValue<E2>,
+  fromLeftStorage: FromContainerStorage<E1, E1Storage>,
+  fromRightStorage: FromContainerStorage<E2, E2Storage>,
+  left: S1,
+  right: S2,
+  compare: CooperativeComparison<E1, E2> | undefined,
+  _recovery?: GoRecovery,
+): Promise<int64> {
+  return CompareFuncCooperative(
+    leftSlice,
+    rightSlice,
+    copyLeft,
+    copyRight,
+    fromLeftStorage,
+    fromRightStorage,
+    left,
+    right,
+    compare,
+  );
 }
 
 export async function SlicesContainsFuncCooperative<S, E, EStorage>(

@@ -1,6 +1,12 @@
 import type { gostring, int64, uint64 } from "@gotots/runtime/scalars.js";
 
-import { ChanDir, Kind, StructTag, Value } from "../../reflect.js";
+import {
+  ChanDir,
+  Kind,
+  StructField,
+  StructTag,
+  Value,
+} from "../../reflect.js";
 
 export class ReflectChanDirValueOperations {
   static $project(source: ChanDir): int64 {
@@ -29,6 +35,20 @@ export class ReflectStructTagValueOperations {
 
   static $wrap(source: gostring): StructTag {
     return new StructTag(source);
+  }
+}
+
+export class ReflectStructFieldOperations {
+  static $copy(source: StructField): StructField {
+    return new StructField({
+      Name: source.Name,
+      PkgPath: source.PkgPath,
+      Type: source.Type,
+      Tag: source.Tag,
+      Offset: source.Offset,
+      Index: source.Index,
+      Anonymous: source.Anonymous,
+    });
   }
 }
 

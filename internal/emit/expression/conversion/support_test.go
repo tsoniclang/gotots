@@ -136,6 +136,7 @@ func main() {
 	fmt.Println(values.NilConversions())
 	fmt.Println(values.GenericNilPointerIsNil())
 	fmt.Println(values.NilUnsafePointerRoundTrip())
+	fmt.Println(values.NilUnsafeIntegerRoundTrip())
 }
 `)
 	return runCommand(
@@ -218,6 +219,7 @@ console.log(show(values.PointerNestedFieldConversion()));
 console.log(values.NilConversions());
 console.log(values.GenericNilPointerIsNil());
 console.log(values.NilUnsafePointerRoundTrip());
+console.log(values.NilUnsafeIntegerRoundTrip());
 `
 	return executeConversionTypeScript(
 		t,

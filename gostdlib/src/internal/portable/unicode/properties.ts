@@ -7,6 +7,14 @@ import {
   upperRanges32,
 } from "./category-data.js";
 import {
+  letterRanges16,
+  letterRanges32,
+  numberRanges16,
+  numberRanges32,
+  printRanges16,
+  printRanges32,
+} from "./classification-data.generated.js";
+import {
   digitRanges16,
   digitRanges32,
   type RangeRecord,
@@ -29,6 +37,18 @@ export function IsLower(rune: int32): boolean {
     );
   }
   return inRecords(rune, lowerRanges16) || inRecords(rune, lowerRanges32);
+}
+
+export function IsLetter(rune: int32): boolean {
+  return inRecords(rune, letterRanges16) || inRecords(rune, letterRanges32);
+}
+
+export function IsNumber(rune: int32): boolean {
+  return inRecords(rune, numberRanges16) || inRecords(rune, numberRanges32);
+}
+
+export function IsPrint(rune: int32): boolean {
+  return inRecords(rune, printRanges16) || inRecords(rune, printRanges32);
 }
 
 export function IsUpper(rune: int32): boolean {

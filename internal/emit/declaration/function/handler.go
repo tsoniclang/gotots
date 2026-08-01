@@ -33,15 +33,6 @@ func Emit(
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
-	if source.Body == nil {
-		return api.DeclarationEmission{},
-			api.ExternalFunctionObligation(
-				context,
-				source,
-				functionObject,
-				signature,
-			)
-	}
 	context, err := emitstorage.ApplyRequirements(
 		context,
 		source,

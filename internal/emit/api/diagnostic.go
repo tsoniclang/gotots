@@ -203,51 +203,6 @@ func BuiltinBoundary(
 	}
 }
 
-type ExternalFunctionObligationError struct {
-	Function  *types.Func
-	Signature *types.Signature
-	Role      Role
-	Position  token.Position
-}
-
-func (e *ExternalFunctionObligationError) Error() string {
-	name := "<unknown>"
-	if e.Function != nil {
-		name = e.Function.FullName()
-	}
-	location := e.Position.String()
-	if !e.Position.IsValid() {
-		location = "<unknown>"
-	}
-	return fmt.Sprintf(
-		"unresolved external Go function obligation %s in role %s at %s",
-		name,
-		e.Role,
-		location,
-	)
-}
-
-func ExternalFunctionObligation(
-	context Context,
-	source *ast.FuncDecl,
-	function *types.Func,
-	signature *types.Signature,
-) error {
-	if source == nil || function == nil || signature == nil ||
-		function.Type() != signature {
-		return &InvariantError{
-			Role:   context.Role(),
-			Reason: "external function obligation lacks coherent identity",
-		}
-	}
-	return &ExternalFunctionObligationError{
-		Function:  function,
-		Signature: signature,
-		Role:      context.Role(),
-		Position:  context.FileSet().Position(source.Pos()),
-	}
-}
-
 type ContextError struct {
 	Reason string
 }

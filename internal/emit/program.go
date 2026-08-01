@@ -42,9 +42,10 @@ const (
 )
 
 type ProgramEmission struct {
-	files                  []TargetFile
-	environmentObligations []EnvironmentObligation
-	runtimePackage         RuntimePackage
+	files                       []TargetFile
+	environmentObligations      []EnvironmentObligation
+	externalFunctionObligations []ExternalFunctionObligation
+	runtimePackage              RuntimePackage
 }
 
 type RuntimePackage struct {
@@ -77,6 +78,7 @@ type programSession struct {
 	compareArtifactOwners   func(api.ArtifactOwner, api.ArtifactOwner) int
 	requirementRemovalOwner api.ArtifactOwner
 	standardLibrary         *certify.Certificate
+	externalFunctions       map[*types.Func]ExternalFunctionObligation
 	sealed                  bool
 }
 
@@ -195,9 +197,10 @@ func CompileWithOptions(
 		return ProgramEmission{}, err
 	}
 	return ProgramEmission{
-		files:                  files,
-		environmentObligations: obligations,
-		runtimePackage:         session.runtimePackage,
+		files:                       files,
+		environmentObligations:      obligations,
+		externalFunctionObligations: session.externalFunctionObligations(),
+		runtimePackage:              session.runtimePackage,
 	}, nil
 }
 
@@ -321,6 +324,7 @@ func newProgramSession(
 		goRuntime:              goRuntime,
 		compareArtifactOwners:  compareArtifactOwners,
 		standardLibrary:        options.StandardLibrary,
+		externalFunctions:      make(map[*types.Func]ExternalFunctionObligation),
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
@@ -458,6 +462,9 @@ func (s *programSession) emit(object types.Object) error {
 		false,
 	)
 	if err != nil {
+		return err
+	}
+	if err := s.recordExternalFunctionObligation(site, object); err != nil {
 		return err
 	}
 	if err := s.commitArtifactRevision(

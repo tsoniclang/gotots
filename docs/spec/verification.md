@@ -654,6 +654,23 @@ verification.
 
 ## Standard-Library Provider Proof
 
+Before provider proof, a build-profile gate runs the same fixture under an
+explicit host profile, a profile carrying `noasm`, and one cross-target
+profile. It proves exact selected-file and `types.Sizes` changes, records the
+resolved profile on the loaded program, and proves shell `GOOS`, `GOARCH`,
+`CGO_ENABLED`, and `GOFLAGS` cannot alter selection. Mutating or dropping one
+profile field must change the independently derived selected-file join or fail
+provider compatibility. A `js/wasm` source graph linked to an `amd64` provider
+must fail before target emission.
+
+A bodyless-source gate covers a free function and receiver method with pointer,
+tuple-result, and generic callable shapes. It inspects the decoded TS-Go AST,
+strict-typechecks the resulting executable declarations, executes each body to
+observe the exact named runtime failure, and exact-joins one immutable program
+obligation to each source declaration. Mutations that restore compile-time
+abort, emit `declare`, drop a parameter or result, duplicate an obligation, or
+replace the typed panic with an empty/default return fail at their owning gate.
+
 The `@gotots/gostdlib` package is certified independently before generated
 programs may link it. Verification must:
 

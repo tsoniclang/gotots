@@ -414,9 +414,9 @@ func (b builder) loop(
 			tsgo.BinaryOperatorLessThanToken,
 			limit,
 		),
-		b.assign(
+		b.factory.PostfixUnaryExpression(
 			b.id("index"),
-			b.add(b.id("index"), b.number("1")),
+			tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken,
 		),
 		b.factory.Block(body, true),
 	)

@@ -3,6 +3,7 @@ package maprepresentation
 import (
 	"go/types"
 
+	gostdlib "github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
@@ -175,6 +176,38 @@ func (staticSpecializationNames) ProviderGenericTypeArguments(
 	*types.Func,
 ) ([]api.GenericTypeArgumentProjection, bool, error) {
 	return nil, false, nil
+}
+
+func (staticSpecializationNames) ProviderInterface(
+	types.Type,
+) (gostdlib.ProviderInterface, bool, error) {
+	return gostdlib.ProviderInterface{}, false, nil
+}
+
+func (staticSpecializationNames) ProviderInterfaceBridge(
+	types.Type,
+) (api.NameReference, bool, error) {
+	return api.NameReference{}, false, nil
+}
+
+func (staticSpecializationNames) ProviderCallableProfile(
+	*types.Func,
+	string,
+) (api.ProviderCallableProfileReference, bool, error) {
+	return api.ProviderCallableProfileReference{}, false, nil
+}
+
+func (staticSpecializationNames) ProviderCallableProfileCandidates(
+	*types.Func,
+) ([]api.ProviderCallableProfileCandidate, bool, error) {
+	return nil, false, nil
+}
+
+func (staticSpecializationNames) ProviderRepresentationOwnsMethod(
+	types.Type,
+	*types.Func,
+) (bool, error) {
+	return false, nil
 }
 
 func (staticSpecializationNames) ConstantProjection(

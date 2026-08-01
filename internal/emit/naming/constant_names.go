@@ -39,12 +39,6 @@ func (n *File) ConstantProjection(
 			Reason: "constant has no reserved projection owner",
 		}
 	}
-	if binding.kind == targetBindingMissingProvider {
-		return api.NameReference{}, &api.NameError{
-			Name:   selected.Name(),
-			Reason: "selected standard-library constant has no provider binding",
-		}
-	}
 	exportedName, err := api.ConstantProjectionName(
 		binding.name,
 		projection,
@@ -54,7 +48,9 @@ func (n *File) ConstantProjection(
 	}
 	localName := exportedName
 	requests := []api.RootRequest{request}
-	if binding.scheduled() && n.require != nil {
+	projectionScheduled := binding.scheduled() ||
+		binding.kind == targetBindingMissingProvider
+	if projectionScheduled && n.require != nil {
 		if err := n.require(selected); err != nil {
 			return api.NameReference{}, err
 		}
@@ -69,7 +65,7 @@ func (n *File) ConstantProjection(
 		}
 		requests = append(requests, dependency)
 	}
-	if binding.scheduled() && binding.sourcePath != n.targetPath {
+	if projectionScheduled && binding.sourcePath != n.targetPath {
 		referencePath, crossPackage, err := n.sourceReferencePath(
 			selected,
 			binding,

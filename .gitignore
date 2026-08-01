@@ -4,6 +4,7 @@
 # Project-local analysis, scratch, and generated test work
 /.analysis/
 /.temp/
+**/.temp/
 /.tests/
 
 # Editor and operating-system state

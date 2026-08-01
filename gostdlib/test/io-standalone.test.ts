@@ -11,7 +11,7 @@ import {
   Reader as BufferedReader,
   Writer as BufferedWriter,
 } from "../src/bufio.js";
-import { AsType, Is, New } from "../src/errors.js";
+import { AsType, Is, New, state as errorState } from "../src/errors.js";
 import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 import {
   bytes,
@@ -93,6 +93,14 @@ test("errors preserve sentinel identity", () => {
   );
   assert.equal(selected, first);
   assert.equal(ok, true);
+  assert.equal(Is(errorState.ErrUnsupported, errorState.ErrUnsupported), true);
+  assert.equal(Is(errorState.ErrUnsupported, New("unsupported operation")), false);
+  assert.equal(errorState.ErrUnsupported.Error(), "unsupported operation");
+  assert.equal(state.ErrShortWrite.Error(), "short write");
+  assert.equal(state.ErrShortBuffer.Error(), "short buffer");
+  assert.equal(state.ErrUnexpectedEOF.Error(), "unexpected EOF");
+  assert.equal(state.ErrNoProgress.Error(), "multiple Read calls return no data or error");
+  assert.notEqual(state.EOF, state.ErrUnexpectedEOF);
 });
 
 test("ReadFull handles exact EOF and reports unexpected EOF for short input", () => {
@@ -111,7 +119,7 @@ test("ReadFull handles exact EOF and reports unexpected EOF for short input", ()
     short,
   );
   assert.equal(shortCount, 3);
-  assert.equal(shortFailure?.Error(), "unexpected EOF");
+  assert.equal(shortFailure, state.ErrUnexpectedEOF);
 });
 
 test("Discard accepts all bytes", () => {

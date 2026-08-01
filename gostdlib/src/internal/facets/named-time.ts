@@ -1,7 +1,15 @@
-import type { int64 } from "@gotots/runtime/scalars.js";
+import type { gostring, int64 } from "@gotots/runtime/scalars.js";
 
-import { Duration, Ticker, Time, Timer } from "../../time.js";
 import {
+  Duration,
+  ParseError,
+  Ticker,
+  Time,
+  Timer,
+} from "../../time.js";
+import {
+  timeRepresentationAssign,
+  timeRepresentationCopy,
   timeRepresentationEqual,
   timeRepresentationHash,
 } from "../portable/time/time.js";
@@ -24,7 +32,11 @@ export class TimeOperations {
   }
 
   static $copy(source: Time): Time {
-    return source;
+    return timeRepresentationCopy(source);
+  }
+
+  static $assign(target: Time, source: Time): void {
+    timeRepresentationAssign(target, source);
   }
 
   static $equal(left: Time, right: Time): boolean {
@@ -40,6 +52,34 @@ export class TimeOperations {
   }
 
   static $fromStorage(source: TimeStorage): Time {
+    return source;
+  }
+}
+
+export type TimeParseErrorStorage = ParseError;
+
+export class TimeParseErrorOperations {
+  static $make(
+    layout: gostring,
+    value: gostring,
+    layoutElement: gostring,
+    valueElement: gostring,
+    message: gostring,
+  ): ParseError {
+    return new ParseError(
+      layout,
+      value,
+      layoutElement,
+      valueElement,
+      message,
+    );
+  }
+
+  static $storageOf(source: ParseError): TimeParseErrorStorage {
+    return source;
+  }
+
+  static $fromStorage(source: TimeParseErrorStorage): ParseError {
     return source;
   }
 }

@@ -10,6 +10,7 @@ import {
   Clone,
   Compare,
   Contains,
+  ContainsFunc,
   ContainsAny,
   ContainsRune,
   Count,
@@ -91,6 +92,9 @@ test("strings selected search, join, replacement, and trim functions retain boun
   assert.equal(IndexFunc("abc", (rune) => rune === 0x62), 1);
   assert.equal(IndexFunc("", undefined), -1);
   assert.throws(() => IndexFunc("x", undefined));
+  assert.equal(ContainsFunc(goText("a世界"), (rune) => rune === 0x4e16), true);
+  assert.equal(ContainsFunc("", undefined), false);
+  assert.throws(() => ContainsFunc("x", undefined));
   assert.equal(LastIndex("ababa", "ba"), 3);
   assert.equal(LastIndexByte("aba", 0x61), 2);
   assert.equal(LastIndexFunc("abca", (rune) => rune === 0x61), 3);

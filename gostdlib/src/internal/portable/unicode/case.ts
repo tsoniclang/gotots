@@ -24,7 +24,7 @@ export function ToLower(rune: int32): int32 {
   return mapCase(lowerCase, rune);
 }
 
-export function simpleFold(rune: int32): int32 {
+export function SimpleFold(rune: int32): int32 {
   if (rune < 0 || rune > 0x10ffff) {
     return rune;
   }

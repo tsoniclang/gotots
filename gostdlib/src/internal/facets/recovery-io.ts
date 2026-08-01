@@ -34,6 +34,14 @@ export function BytesBufferRead(
   return BytesBuffer.Read(receiver, destination);
 }
 
+export function BytesBufferWrite(
+  receiver: BytesBuffer | undefined,
+  source: RuntimeSlice<uint8>,
+  _recovery?: GoRecovery,
+): [int64, GoError | undefined] {
+  return BytesBuffer.Write(receiver, source);
+}
+
 export function GzipReaderClose(
   receiver: GzipReader | undefined,
   _recovery?: GoRecovery,

@@ -124,9 +124,13 @@ spelling—distinguishes workspace source, source-available dependencies,
 standard-library packages, toolchain packages, and true external boundaries.
 
 - Source-available packages are translated normally.
+- Every load resolves and records one explicit Go build profile; ambient shell
+  `GOOS`, `GOARCH`, `CGO_ENABLED`, `GOFLAGS`, and tags never select source.
 - The selected `GOROOT` defines the standard-library declarations.
 - `gostdlib` supplies manually completed behavior against generated contracts.
 - True externals receive exact typed contracts and explicit placeholders.
+- A selected bodyless source declaration emits one exact typed throwing body
+  and one canonical obligation; it never becomes an executable `declare`.
 - Generated primitive aliases and reusable runtime modules are GoToTS-owned
   output, not external environment contracts.
 - Runtime helpers exist only for Go behavior that direct TypeScript cannot

@@ -59,6 +59,51 @@ general-purpose intermediate program.
 
 No second package may recreate one of these truths.
 
+## Selected Go Build Profile
+
+Every load resolves one immutable Go build profile before invoking
+`go/packages`. The profile contains the selected toolchain identity, `GOOS`,
+`GOARCH`, `CGO_ENABLED`, and a sorted unique build-tag set. A request that does
+not name a cross-target profile resolves to the compiler's explicit host
+profile; `internal/load` still supplies every profile field to `go/packages`
+and never inherits `GOOS`, `GOARCH`, `CGO_ENABLED`, `GOFLAGS`, or tags from the
+calling shell. The resolved profile is retained on the loaded program and is
+part of every environment/provider compatibility decision and proof report.
+
+For example, a Node artifact built for `linux/amd64` may deliberately select
+the ecosystem `noasm` tag. That selects the package's admitted portable Go
+files where they exist:
+
+```go
+//go:build noasm
+
+func initCPU() {
+    cpuid = func(uint32) (uint32, uint32, uint32, uint32) {
+        return 0, 0, 0, 0
+    }
+}
+```
+
+It must not silently select `amd64` assembly declarations merely because the
+GoToTS process happens to run on an amd64 machine. Conversely, selecting
+`js/wasm` changes `runtime.GOOS`, `runtime.GOARCH`, integer sizing, source-file
+selection, and the standard-library contract together; it is invalid to load
+that source profile and then link an `amd64` provider. Build tags may select
+source, but they never authorize a compiler package-name special case or a
+fabricated function body.
+
+Source-available module dependencies remain source by default. A function
+declaration selected from such a package with no Go body is one exact native
+or external obligation owned by that declaration. The source emitter emits
+its complete statically typed callable shape with a body that raises the named
+unresolved obligation and records the canonical function identity, signature,
+position, and selected build profile once. It does not emit `declare`, erase
+the signature, infer an implementation from the package name, or stop the
+whole compilation before the environment boundary can be inspected. A
+selected implementation may later replace that obligation through an exact
+provider contract. Executing an unresolved body raises deterministically, and
+every reachable unresolved body blocks publication.
+
 ## Source Admission And Owner-Directed Traversal
 
 The selected Go toolchain is the executable language authority:

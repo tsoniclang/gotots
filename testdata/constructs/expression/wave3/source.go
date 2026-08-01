@@ -10,6 +10,21 @@ type Box struct {
 	Pair  Pair
 }
 
+type NestedZero struct {
+	Value int32
+}
+
+type CompositeZero struct {
+	Explicit int32
+	Nested   [2]NestedZero
+}
+
+func compositeWithNestedZero() int32 {
+	value := CompositeZero{Explicit: 31}
+	var zero CompositeZero
+	return value.Explicit + value.Nested[0].Value + zero.Nested[1].Value
+}
+
 type Flag bool
 type Text string
 type Float32 float32
@@ -286,7 +301,7 @@ func Audit() (
 	)
 	return numberOperators(9, 4),
 		int32(definedOperators(7, 2)),
-		storeResult,
+		storeResult + compositeWithNestedZero(),
 		calls(Counts{2, 3}) + variadicInterfaceTuple(),
 		builtins(Counts{1, 2}, Table{0: 9}),
 		logical && rightCalls == 1,

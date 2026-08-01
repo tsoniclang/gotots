@@ -1,7 +1,7 @@
 import { GoDenseIndex } from "./dense-index.js";
 import { GoPanic } from "./panic.js";
 export class RuntimeSlice<T> {
-    private constructor(private readonly backing: T[] | null, private readonly offset: number, public readonly length: number, public readonly capacity: number) {
+    private constructor(private readonly backing: T[] | null, private readonly offset: number, readonly length: number, readonly capacity: number) {
     }
     static nil<T>(): RuntimeSlice<T> {
         return new RuntimeSlice<T>(null, 0, 0, 0);
@@ -51,7 +51,7 @@ export class RuntimeSlice<T> {
         if (newLength <= this.capacity) {
             if (existingBacking === null)
                 GoPanic.raiseRuntime("slice bounds out of range");
-            for (let index = 0; index < values.length; index = index + 1) {
+            for (let index = 0; index < values.length; index++) {
                 existingBacking[this.offset + this.length + index] = GoDenseIndex.get(values, index);
             }
             return new RuntimeSlice<T>(existingBacking, this.offset, newLength, this.capacity);
@@ -62,11 +62,11 @@ export class RuntimeSlice<T> {
         }
         const backing = new Array<T>(nextCapacity).fill(zero);
         if (existingBacking !== null) {
-            for (let index = 0; index < this.length; index = index + 1) {
+            for (let index = 0; index < this.length; index++) {
                 backing[index] = GoDenseIndex.get(existingBacking, this.offset + index);
             }
         }
-        for (let index = 0; index < values.length; index = index + 1) {
+        for (let index = 0; index < values.length; index++) {
             backing[this.length + index] = GoDenseIndex.get(values, index);
         }
         return new RuntimeSlice<T>(backing, 0, newLength, nextCapacity);
@@ -82,7 +82,7 @@ export class RuntimeSlice<T> {
         if (targetBacking === sourceBacking)
             targetBacking.copyWithin(target.offset, source.offset, source.offset + count);
         else
-            for (let index = 0; index < count; index = index + 1) {
+            for (let index = 0; index < count; index++) {
                 targetBacking[target.offset + index] = GoDenseIndex.get(sourceBacking, source.offset + index);
             }
         return count;

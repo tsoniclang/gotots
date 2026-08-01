@@ -7,6 +7,7 @@ import type { Reader, Writer } from "../../../io.js";
 
 export const unexpectedEOF: GoError = new ProviderError("unexpected EOF");
 export const shortWrite: GoError = new ProviderError("short write");
+export const shortBuffer: GoError = new ProviderError("short buffer");
 export const noProgress: GoError = new ProviderError("multiple Read calls return no data or error");
 
 export function readFull(

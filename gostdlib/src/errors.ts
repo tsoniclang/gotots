@@ -7,8 +7,20 @@ import {
 } from "./internal/portable/errors/tree.js";
 import { ProviderError } from "./internal/runtime/error.js";
 
+export const state: {
+  ErrUnsupported: GoError;
+} = {
+  ErrUnsupported: new ProviderError("unsupported operation"),
+};
+
 export function New(text: gostring): GoError {
   return new ProviderError(text);
+}
+
+export function Unwrap(failure: GoError | undefined): GoError | undefined {
+  return failure instanceof WrappedProviderError
+    ? failure.Unwrap()
+    : undefined;
 }
 
 export function Is(failure: GoError | undefined, target: GoError | undefined): bool {

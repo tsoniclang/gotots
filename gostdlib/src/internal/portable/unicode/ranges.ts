@@ -42,6 +42,18 @@ export function Is(table: RangeTable | undefined, rune: int32): boolean {
   return false;
 }
 
+export function In(
+  rune: int32,
+  tables: RuntimeSlice<RangeTable | undefined>,
+): boolean {
+  for (let index = 0; index < tables.length; index += 1) {
+    if (Is(tables.get(index), rune)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function rangeTable(
   ranges16: readonly (readonly [number, number, number])[],
   ranges32: readonly (readonly [number, number, number])[],

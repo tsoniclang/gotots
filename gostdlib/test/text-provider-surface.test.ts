@@ -14,7 +14,22 @@ import * as utf16 from "../src/unicode/utf16.js";
 import * as utf8 from "../src/unicode/utf8.js";
 
 test("text provider modules expose exactly the clean selected Go names", () => {
-  assertExports(bytes, ["Buffer", "Cut", "Equal", "NewBuffer", "TrimSpace"]);
+  assertExports(bytes, [
+    "Buffer",
+    "Clone",
+    "Compare",
+    "Cut",
+    "Equal",
+    "IndexAny",
+    "IndexByte",
+    "Join",
+    "LastIndexByte",
+    "NewBuffer",
+    "Trim",
+    "TrimLeft",
+    "TrimRight",
+    "TrimSpace",
+  ]);
   assertExports(path, ["Join"]);
   assertExports(filepath, [
     "Abs",
@@ -28,6 +43,11 @@ test("text provider modules expose exactly the clean selected Go names", () => {
   ]);
   assertExports(regexp, ["Compile", "MustCompile", "Regexp"]);
   assertExports(strconv, [
+    "AppendBool",
+    "AppendFloat",
+    "AppendInt",
+    "AppendQuote",
+    "AppendUint",
     "Atoi",
     "FormatInt",
     "FormatUint",
@@ -35,29 +55,45 @@ test("text provider modules expose exactly the clean selected Go names", () => {
     "ParseFloat",
     "ParseInt",
     "ParseUint",
+    "Quote",
+    "QuoteRune",
+    "Unquote",
     "state",
   ]);
   assertExports(base64, ["Encoding", "NewEncoder", "state"]);
   assertExports(hex, ["EncodeToString"]);
   assertExports(unicode, [
+    "In",
     "Is",
     "IsDigit",
+    "IsLetter",
     "IsLower",
+    "IsNumber",
+    "IsPrint",
     "IsSpace",
     "IsUpper",
     "MaxASCII",
     "Range16",
     "Range32",
     "RangeTable",
+    "SimpleFold",
     "ToLower",
     "ToUpper",
     "state",
   ]);
   assertExports(utf8, [
+    "AppendRune",
+    "DecodeRune",
     "DecodeLastRuneInString",
     "DecodeRuneInString",
+    "EncodeRune",
+    "FullRune",
     "RuneError",
+    "RuneCount",
     "RuneSelf",
+    "RuneStart",
+    "UTFMax",
+    "ValidString",
   ]);
   assertExports(utf16, [
     "Decode",
@@ -74,6 +110,7 @@ test("strings exports every selected clean declaration exactly once", () => {
     "Clone",
     "Compare",
     "Contains",
+    "ContainsFunc",
     "ContainsAny",
     "ContainsRune",
     "Count",
@@ -154,6 +191,12 @@ test("receiver operations are class-owned static members", () => {
   ]) {
     assert.deepEqual(Object.getOwnPropertyNames(type.prototype), ["constructor"]);
   }
+  assert.deepEqual(
+    Object.getOwnPropertyNames(bytes.Buffer)
+      .filter((name) => !["length", "name", "prototype"].includes(name))
+      .sort(),
+    ["Available", "AvailableBuffer", "Grow", "Len", "Next", "Read", "Write"].sort(),
+  );
 });
 
 function assertExports(module: object, expected: readonly string[]): void {

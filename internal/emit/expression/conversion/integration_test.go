@@ -53,6 +53,8 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 				"GoUnsafePointer.from(value)",
 				"GoUnsafePointer.to<GoPointer<int32, int32>>(",
 				"GoUnsafePointer.to<UnsafeBox>(",
+				"GoUnsafePointer.toInteger(",
+				"GoUnsafePointer.fromInteger(",
 				"unsafe.Pointer conversion requires an environment implementation",
 				"export function GenericNilPointer<T, T$Pointer>(): T$Pointer | undefined {\n" +
 					"    return void 0;\n}",
@@ -106,6 +108,70 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 					targetOutput,
 					goOutput,
 				)
+			}
+		})
+	}
+}
+
+func TestUnsafePointerIntegerConversionsAreExecutableTypedBoundaries(t *testing.T) {
+	for _, testCase := range []struct {
+		name        string
+		options     emit.Options
+		integerType string
+		one         string
+	}{
+		{
+			name:        "number",
+			options:     emit.DefaultOptions(),
+			integerType: "number",
+			one:         "1",
+		},
+		{
+			name: "bigint",
+			options: emit.Options{
+				IntegerRepresentation: emit.IntegerRepresentationBigInt,
+				EvaluationOrder:       emit.EvaluationOrderDirect,
+			},
+			integerType: "bigint",
+			one:         "1n",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			emission := compileConversions(t, testCase.options)
+			workingDirectory := t.TempDir()
+			targetPaths, sourceModule, _ := printConversions(
+				t,
+				workingDirectory,
+				emission,
+			)
+			runner := `import * as values from "` + sourceModule + `";
+import { GoPanic } from "./runtime/panic.js";
+import { GoPointer } from "./runtime/pointer.js";
+
+function fails(action: () => void): boolean {
+    try {
+        action();
+        return false;
+    } catch (failure) {
+        if (failure instanceof GoPanic) return true;
+        throw failure;
+    }
+}
+
+console.log(fails(() => { values.IntegerToUnsafePointer(` + testCase.one + `); }));
+console.log(fails(() => {
+    values.UnsafePointerToInteger(
+        GoPointer.cell<` + testCase.integerType + `, ` + testCase.integerType + `>(` + testCase.one + `),
+    );
+}));
+`
+			if output := executeConversionTypeScript(
+				t,
+				workingDirectory,
+				targetPaths,
+				runner,
+			); output != "true\ntrue\n" {
+				t.Fatalf("unsafe integer boundary output = %q", output)
 			}
 		})
 	}

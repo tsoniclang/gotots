@@ -16,4 +16,16 @@ export class GoUnsafePointer {
         }
         GoPanic.raiseRuntime("unsafe.Pointer conversion requires an environment implementation");
     }
+    static fromInteger<I extends number | bigint>(value: I, zero: I): GoUnsafePointer | undefined {
+        if (value === zero) {
+            return undefined;
+        }
+        GoPanic.raiseRuntime("unsafe.Pointer conversion requires an environment implementation");
+    }
+    static toInteger<I extends number | bigint>(value: GoUnsafePointer | undefined, zero: I): I {
+        if (value === undefined) {
+            return zero;
+        }
+        GoPanic.raiseRuntime("unsafe.Pointer conversion requires an environment implementation");
+    }
 }

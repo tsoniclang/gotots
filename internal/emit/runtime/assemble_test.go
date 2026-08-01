@@ -84,7 +84,7 @@ func TestUnsafePointerRuntimeIsNominalAndTypedPlaceholder(t *testing.T) {
 	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
 	if !ok ||
 		class.Name().Text() != "GoUnsafePointer" ||
-		len(class.Members()) != 4 {
+		len(class.Members()) != 6 {
 		t.Fatalf(
 			"unsafe-pointer definition = %T with unexpected shape",
 			definitions[0].Statement(),

@@ -119,6 +119,20 @@ func NilUnsafePointerRoundTrip() bool {
 	return (*int32)(unsafe.Pointer(value)) == nil
 }
 
+func NilUnsafeIntegerRoundTrip() bool {
+	var value unsafe.Pointer
+	integer := uintptr(value)
+	return integer == 0 && unsafe.Pointer(integer) == nil
+}
+
+func UnsafePointerToInteger(value *int32) uintptr {
+	return uintptr(unsafe.Pointer(value))
+}
+
+func IntegerToUnsafePointer(value uintptr) unsafe.Pointer {
+	return unsafe.Pointer(value)
+}
+
 type UnsafeBox struct {
 	Value int32
 }

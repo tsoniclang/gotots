@@ -3,7 +3,13 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { int64, uint8 } from "@gotots/runtime/scalars.js";
 
 import { New } from "./errors.js";
-import { readFull } from "./internal/portable/io/read.js";
+import {
+  noProgress,
+  readFull,
+  shortBuffer,
+  shortWrite,
+  unexpectedEOF,
+} from "./internal/portable/io/read.js";
 import { ProviderInterfaceValue } from "./internal/portable/io/value.js";
 
 export interface Closer extends GoInterfaceValue {
@@ -41,9 +47,17 @@ class DiscardWriter extends ProviderInterfaceValue implements Writer {
 export const state: {
   Discard: Writer;
   EOF: GoError;
+  ErrShortWrite: GoError;
+  ErrShortBuffer: GoError;
+  ErrUnexpectedEOF: GoError;
+  ErrNoProgress: GoError;
 } = {
   Discard: new DiscardWriter(),
   EOF: New("EOF"),
+  ErrShortWrite: shortWrite,
+  ErrShortBuffer: shortBuffer,
+  ErrUnexpectedEOF: unexpectedEOF,
+  ErrNoProgress: noProgress,
 };
 
 export function ReadFull(

@@ -7,10 +7,7 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 		b.factory.PrivateKeyword(),
 		b.factory.ReadonlyKeyword(),
 	}
-	publicReadonly := []tsgo.ModifierLike{
-		b.factory.PublicKeyword(),
-		b.factory.ReadonlyKeyword(),
-	}
+	publicReadonly := []tsgo.ModifierLike{b.factory.ReadonlyKeyword()}
 	return b.factory.ConstructorDeclaration(
 		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
 		nil,

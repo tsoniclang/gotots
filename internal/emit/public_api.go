@@ -475,6 +475,10 @@ func (e ProgramEmission) EnvironmentObligations() []EnvironmentObligation {
 	return slices.Clone(e.environmentObligations)
 }
 
+func (e ProgramEmission) ExternalFunctionObligations() []ExternalFunctionObligation {
+	return slices.Clone(e.externalFunctionObligations)
+}
+
 func (e ProgramEmission) RuntimePackage() (RuntimePackage, bool) {
 	return e.runtimePackage, e.runtimePackage.assembled.Valid()
 }

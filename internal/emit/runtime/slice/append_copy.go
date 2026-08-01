@@ -97,41 +97,20 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 			),
 		),
 	)
-	copyAppended := b.factory.ForStatement(
-		b.factory.VariableDeclarationList(
-			[]tsgo.VariableDeclaration{
-				b.factory.VariableDeclaration(
-					b.id("index"),
-					nil,
-					nil,
-					b.number("0"),
-				),
-			},
-			tsgo.NodeFlagsLet,
-		),
-		b.binary(
-			b.id("index"),
-			tsgo.BinaryOperatorLessThanToken,
-			b.property(b.id("values"), "length"),
-		),
-		b.assign(
-			b.id("index"),
-			b.add(b.id("index"), b.number("1")),
-		),
-		b.factory.Block([]tsgo.Statement{
-			b.factory.ExpressionStatement(
-				b.assign(
-					b.index(
-						b.id("backing"),
-						b.add(
-							b.thisProperty(MemberName(MemberLength)),
-							b.id("index"),
-						),
+	copyAppended := b.loop(
+		b.property(b.id("values"), "length"),
+		b.factory.ExpressionStatement(
+			b.assign(
+				b.index(
+					b.id("backing"),
+					b.add(
+						b.thisProperty(MemberName(MemberLength)),
+						b.id("index"),
 					),
-					b.indexedValue(b.id("values"), b.id("index")),
 				),
+				b.indexedValue(b.id("values"), b.id("index")),
 			),
-		}, true),
+		),
 	)
 	statements := []tsgo.Statement{
 		b.variable(tsgo.NodeFlagsConst, "newLength", newLength),

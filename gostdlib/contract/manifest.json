@@ -9,7 +9,7 @@
   "goos": "linux",
   "goarch": "amd64",
   "runtimeDigest": "db1de728c4a9cb1fa90cb50e6455943d3c891a65be39185c76a66186354755d5",
-  "providerDigest": "6966f7b01e300736d47a154dd81673eb66934f696edce23ddaf4c1d08ed1fbde",
+  "providerDigest": "f979fc1f8d22bf79158f62209bffa7ab39268e976b84e8ea6f94fc02f0e2cded",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -148,7 +148,67 @@
           "sourceSignature": "defined=bytes.Buffer|underlying=struct{buf []byte; off int; lastRead bytes.readOp}",
           "sourceLocation": "bytes/buffer.go:20:6",
           "implementationOwner": "src/internal/portable/bytes/buffer.ts",
-          "targetFingerprint": "f2ddb122c543a6d182368869848351e3a1d7cdd4ef446e25c93039247f405ff3"
+          "targetFingerprint": "a1dbb4190749fd0caa5dfe15d8c8ccc9b4bdd5235c215461e6eefa577842da3d"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=*bytes.Buffer|name=Available",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Buffer",
+          "member": "Available",
+          "sourceSignature": "func() int|params=|results=",
+          "sourceLocation": "bytes/buffer.go:104:18",
+          "implementationOwner": "src/internal/portable/bytes/buffer.ts",
+          "targetFingerprint": "a63cb353f9cee0d6714f2e1badb4650299a8ca24e0f29733a226b45ae42001c2"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=*bytes.Buffer|name=AvailableBuffer",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Buffer",
+          "member": "AvailableBuffer",
+          "sourceSignature": "func() []byte|params=|results=",
+          "sourceLocation": "bytes/buffer.go:66:18",
+          "implementationOwner": "src/internal/portable/bytes/buffer.ts",
+          "targetFingerprint": "8c11ce0c1f3f3dbe3676fa404b188c33ac8c5ec9a7d98e2f76c0ee1b608c5c91"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=*bytes.Buffer|name=Grow",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Buffer",
+          "member": "Grow",
+          "sourceSignature": "func(n int)|params=n|results=",
+          "sourceLocation": "bytes/buffer.go:182:18",
+          "implementationOwner": "src/internal/portable/bytes/buffer.ts",
+          "targetFingerprint": "972031403669f92842f19b85c4ad7892788b45a94eba1db99b3a6619694a70ca"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=*bytes.Buffer|name=Len",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Buffer",
+          "member": "Len",
+          "sourceSignature": "func() int|params=|results=",
+          "sourceLocation": "bytes/buffer.go:97:18",
+          "implementationOwner": "src/internal/portable/bytes/buffer.ts",
+          "targetFingerprint": "cd19ab1977913507d0e5540b12e52d5a44d001da9ae94ad5e637acc22fcc5f9f"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=*bytes.Buffer|name=Next",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Buffer",
+          "member": "Next",
+          "sourceSignature": "func(n int) []byte|params=n|results=",
+          "sourceLocation": "bytes/buffer.go:358:18",
+          "implementationOwner": "src/internal/portable/bytes/buffer.ts",
+          "targetFingerprint": "48464aa0a350b1d001becb6dff755251b67df18d34cf9c0c9f4c80a9361c1bee"
         },
         {
           "identity": "bytes|kind=4|receiver=*bytes.Buffer|name=Read",
@@ -161,6 +221,40 @@
           "sourceLocation": "bytes/buffer.go:336:18",
           "implementationOwner": "src/internal/portable/bytes/buffer.ts",
           "targetFingerprint": "4fc96f627500401cf6f75f6b775c72590b9a505177077f60c09032273012aa74"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=*bytes.Buffer|name=Write",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Buffer",
+          "member": "Write",
+          "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+          "sourceLocation": "bytes/buffer.go:193:18",
+          "implementationOwner": "src/internal/portable/bytes/buffer.ts",
+          "targetFingerprint": "e2b6275b9d3bb6a12e8142b698f70b28c7765a2351fe75e330ac1e065bbf3293"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=|name=Clone",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Clone",
+          "sourceSignature": "func(b []byte) []byte|params=b|results=",
+          "sourceLocation": "bytes/bytes.go:1384:6",
+          "implementationOwner": "src/internal/portable/bytes/bytes.ts",
+          "targetFingerprint": "4535ee219b3c87e194362bf35064b61ba5d4f1631fcbee1c6c1959b2fff14f8e"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=|name=Compare",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Compare",
+          "sourceSignature": "func(a []byte, b []byte) int|params=a,b|results=",
+          "sourceLocation": "bytes/bytes.go:28:6",
+          "implementationOwner": "src/internal/portable/bytes/bytes.ts",
+          "targetFingerprint": "4a19c244e0059a289209f305ff853669b949ca4d279157c85a7fe3b087cc63df"
         },
         {
           "identity": "bytes|kind=4|receiver=|name=Cut",
@@ -185,6 +279,50 @@
           "targetFingerprint": "2ad078440ea106148d0fead0cbc91374f6e2f577e634ea88612e43a268a3d9fe"
         },
         {
+          "identity": "bytes|kind=4|receiver=|name=IndexAny",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "IndexAny",
+          "sourceSignature": "func(s []byte, chars string) int|params=s,chars|results=",
+          "sourceLocation": "bytes/bytes.go:221:6",
+          "implementationOwner": "src/internal/portable/bytes/bytes.ts",
+          "targetFingerprint": "5d49a0dd79177409cc3e42742212df9b51b9acd505c03d51bbea05e7306fdd2d"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=|name=IndexByte",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "IndexByte",
+          "sourceSignature": "func(b []byte, c byte) int|params=b,c|results=",
+          "sourceLocation": "bytes/bytes.go:97:6",
+          "implementationOwner": "src/internal/portable/bytes/bytes.ts",
+          "targetFingerprint": "06e2fb7a31109785a170bb1747845535a412068a924fd090fe3891f8a2ff1005"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=|name=Join",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Join",
+          "sourceSignature": "func(s [][]byte, sep []byte) []byte|params=s,sep|results=",
+          "sourceLocation": "bytes/bytes.go:561:6",
+          "implementationOwner": "src/internal/portable/bytes/bytes.ts",
+          "targetFingerprint": "e40c3798abc129a898ca3f32c8d5ebd68c46ece69f8579d54f635038e786d311"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=|name=LastIndexByte",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "LastIndexByte",
+          "sourceSignature": "func(s []byte, c byte) int|params=s,c|results=",
+          "sourceLocation": "bytes/bytes.go:130:6",
+          "implementationOwner": "src/internal/portable/bytes/bytes.ts",
+          "targetFingerprint": "3e76caba3f4024d7e4835b482641408d586ffb58e40149b53b87c3525d81b396"
+        },
+        {
           "identity": "bytes|kind=4|receiver=|name=NewBuffer",
           "kind": "function",
           "access": "export",
@@ -194,6 +332,39 @@
           "sourceLocation": "bytes/buffer.go:490:6",
           "implementationOwner": "src/internal/portable/bytes/buffer.ts",
           "targetFingerprint": "735a0ebd0d8742260de54a73ceec55d5389a0f54069e10b576c0f8bdde8e572c"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=|name=Trim",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Trim",
+          "sourceSignature": "func(s []byte, cutset string) []byte|params=s,cutset|results=",
+          "sourceLocation": "bytes/bytes.go:980:6",
+          "implementationOwner": "src/internal/portable/bytes/bytes.ts",
+          "targetFingerprint": "27686d96579d69930771dea33419a67431a0d3051f7d2c7212337b33cd28db65"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=|name=TrimLeft",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "TrimLeft",
+          "sourceSignature": "func(s []byte, cutset string) []byte|params=s,cutset|results=",
+          "sourceLocation": "bytes/bytes.go:999:6",
+          "implementationOwner": "src/internal/portable/bytes/bytes.ts",
+          "targetFingerprint": "f61f5b4706541ffbf8bb573ee8f2024b3da9c247f6c50110f76b1a793fd1c634"
+        },
+        {
+          "identity": "bytes|kind=4|receiver=|name=TrimRight",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "TrimRight",
+          "sourceSignature": "func(s []byte, cutset string) []byte|params=s,cutset|results=",
+          "sourceLocation": "bytes/bytes.go:1058:6",
+          "implementationOwner": "src/internal/portable/bytes/bytes.ts",
+          "targetFingerprint": "5ae450c51b3ff072de1c4f82e09f45299fd27fc2b1cdfa05d745c35be7099089"
         },
         {
           "identity": "bytes|kind=4|receiver=|name=TrimSpace",
@@ -267,6 +438,87 @@
           "sourceLocation": "cmp/cmp.go:40:6",
           "implementationOwner": "src/internal/portable/cmp/ordered.ts",
           "targetFingerprint": "0635cd9691aabf91a0df8cbf4330f6e47ef42b10f678d1d1d75c3422cc658137"
+        },
+        {
+          "identity": "cmp|kind=4|receiver=|name=Or",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Or",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 0,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "equal",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "zero",
+              "parameters": [],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            }
+          ],
+          "sourceSignature": "func[T comparable](vals ...T) T|params=vals|results=",
+          "sourceLocation": "cmp/cmp.go:69:6",
+          "implementationOwner": "src/internal/portable/cmp/or.ts",
+          "targetFingerprint": "db64fd65cfb52eaffd59b7a08dff7426860be701e778c4850f214dcf538a3539"
         }
       ]
     },
@@ -848,6 +1100,17 @@
       "sourcePath": "src/errors.ts",
       "bindings": [
         {
+          "identity": "errors|kind=3|receiver=|name=ErrUnsupported",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "ErrUnsupported",
+          "sourceSignature": "error",
+          "sourceLocation": "errors/errors.go:90:5",
+          "implementationOwner": "src/errors.ts",
+          "targetFingerprint": "70c7ce9a29e8fd9a4d6214f06405bef7c6c5ca0dc64c9a46cd4eccda83b93ac2"
+        },
+        {
           "identity": "errors|kind=4|receiver=|name=AsType",
           "kind": "function",
           "access": "export",
@@ -905,6 +1168,17 @@
           "sourceLocation": "errors/errors.go:64:6",
           "implementationOwner": "src/errors.ts",
           "targetFingerprint": "d6cd8e8ad868d3e0735481253dc939b71888010c0b4d15b3b8006e187a38b79e"
+        },
+        {
+          "identity": "errors|kind=4|receiver=|name=Unwrap",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Unwrap",
+          "sourceSignature": "func(err error) error|params=err|results=",
+          "sourceLocation": "errors/wrap.go:17:6",
+          "implementationOwner": "src/errors.ts",
+          "targetFingerprint": "4b8075710e53bb2b3947c3011182643cea1b72556a68d33775fecd12d7113387"
         }
       ]
     },
@@ -1430,6 +1704,50 @@
           "sourceLocation": "io/io.go:44:5",
           "implementationOwner": "src/io.ts",
           "targetFingerprint": "ea40fbdf8443f23cf8bef9e7146b424d52338726e9b4ac0306baa60d8e5f83a6"
+        },
+        {
+          "identity": "io|kind=3|receiver=|name=ErrNoProgress",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "ErrNoProgress",
+          "sourceSignature": "error",
+          "sourceLocation": "io/io.go:53:5",
+          "implementationOwner": "src/io.ts",
+          "targetFingerprint": "6df3983edaa63af860933929af09a883f97c4fec076407c61b6ecfba0ab288c7"
+        },
+        {
+          "identity": "io|kind=3|receiver=|name=ErrShortBuffer",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "ErrShortBuffer",
+          "sourceSignature": "error",
+          "sourceLocation": "io/io.go:35:5",
+          "implementationOwner": "src/io.ts",
+          "targetFingerprint": "c0f73f49bc5c289a0c01b10cf8bbaa6a51360a316e8c55d1f5f0074304f2328a"
+        },
+        {
+          "identity": "io|kind=3|receiver=|name=ErrShortWrite",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "ErrShortWrite",
+          "sourceSignature": "error",
+          "sourceLocation": "io/io.go:29:5",
+          "implementationOwner": "src/io.ts",
+          "targetFingerprint": "4fb2719e1c5c7a7f628a36b011cf6443b8fdc5c30c65de7e26c75fbdbca8ee75"
+        },
+        {
+          "identity": "io|kind=3|receiver=|name=ErrUnexpectedEOF",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "ErrUnexpectedEOF",
+          "sourceSignature": "error",
+          "sourceLocation": "io/io.go:48:5",
+          "implementationOwner": "src/io.ts",
+          "targetFingerprint": "a85e6dcc75c5ab94aff6b41ad9ed1b8d2a40ce09261e678a6375ba69c43a7c29"
         },
         {
           "identity": "io|kind=4|receiver=|name=ReadFull",
@@ -2627,6 +2945,28 @@
           "targetFingerprint": "63e2bc8e36eba61d74c1e18fdaf4b01da84d4d600c11a483b199f0e6f63ffb45"
         },
         {
+          "identity": "math|kind=4|receiver=|name=Float32bits",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Float32bits",
+          "sourceSignature": "func(f float32) uint32|params=f|results=",
+          "sourceLocation": "math/unsafe.go:24:6",
+          "implementationOwner": "src/internal/portable/math/scalars.ts",
+          "targetFingerprint": "af2b4aaf6282fa8bfbd3ce1907101959a08e3c206a7242647336e084df637cd0"
+        },
+        {
+          "identity": "math|kind=4|receiver=|name=Float32frombits",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Float32frombits",
+          "sourceSignature": "func(b uint32) float32|params=b|results=",
+          "sourceLocation": "math/unsafe.go:30:6",
+          "implementationOwner": "src/internal/portable/math/scalars.ts",
+          "targetFingerprint": "e88f2cef4ebfd6ed089b1149712e31075b03dbd44925eecfca1c364187203ba9"
+        },
+        {
           "identity": "math|kind=4|receiver=|name=Float64bits",
           "kind": "function",
           "access": "export",
@@ -2636,6 +2976,17 @@
           "sourceLocation": "math/unsafe.go:35:6",
           "implementationOwner": "src/internal/portable/math/scalars.ts",
           "targetFingerprint": "e492c47020ca0299cf70cb6121fea48a8dd918891a43e91b6e0920aaba080971"
+        },
+        {
+          "identity": "math|kind=4|receiver=|name=Float64frombits",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Float64frombits",
+          "sourceSignature": "func(b uint64) float64|params=b|results=",
+          "sourceLocation": "math/unsafe.go:41:6",
+          "implementationOwner": "src/internal/portable/math/scalars.ts",
+          "targetFingerprint": "74590f81797fc6f29a74e42ab1f8b905a53d48c4b7faaa4b22aa960f45cf3840"
         },
         {
           "identity": "math|kind=4|receiver=|name=Floor",
@@ -2680,6 +3031,17 @@
           "sourceLocation": "math/bits.go:34:6",
           "implementationOwner": "src/internal/portable/math/scalars.ts",
           "targetFingerprint": "7602c02dd37c4332c1e0ced47619be2bcaa0afc20b8114cf990984c2ec87ae2c"
+        },
+        {
+          "identity": "math|kind=4|receiver=|name=Log10",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Log10",
+          "sourceSignature": "func(x float64) float64|params=x|results=",
+          "sourceLocation": "math/log10.go:9:6",
+          "implementationOwner": "src/internal/portable/math/scalars.ts",
+          "targetFingerprint": "63472e44402cbeeef38f228d27782cb759e723d9aac0f6f7ff1ebd03074d0dfa"
         },
         {
           "identity": "math|kind=4|receiver=|name=Log2",
@@ -2735,6 +3097,28 @@
           "sourceLocation": "math/pow.go:48:6",
           "implementationOwner": "src/internal/portable/math/scalars.ts",
           "targetFingerprint": "fdd99b1e138aa8bca915d1e1f689c7daa8aa5a4745bdfa87479e6b28c558818a"
+        },
+        {
+          "identity": "math|kind=4|receiver=|name=Round",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Round",
+          "sourceSignature": "func(x float64) float64|params=x|results=",
+          "sourceLocation": "math/floor.go:90:6",
+          "implementationOwner": "src/internal/portable/math/scalars.ts",
+          "targetFingerprint": "5bf68922ad65122f8ea88530d3dd04dc9dfa0c24b95d1308053eaa5f7f874f95"
+        },
+        {
+          "identity": "math|kind=4|receiver=|name=Signbit",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Signbit",
+          "sourceSignature": "func(x float64) bool|params=x|results=",
+          "sourceLocation": "math/signbit.go:8:6",
+          "implementationOwner": "src/internal/portable/math/scalars.ts",
+          "targetFingerprint": "e348835d2c32e16c66c74ac4f15b553dbcf6ac93a63f8c6dca0e18987dd3692a"
         },
         {
           "identity": "math|kind=4|receiver=|name=Trunc",
@@ -2891,6 +3275,50 @@
       "sourcePath": "src/math/bits.ts",
       "bindings": [
         {
+          "identity": "math/bits|kind=4|receiver=|name=Add64",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Add64",
+          "sourceSignature": "func(x uint64, y uint64, carry uint64) (sum uint64, carryOut uint64)|params=x,y,carry|results=sum,carryOut",
+          "sourceLocation": "math/bits/bits.go:386:6",
+          "implementationOwner": "src/internal/portable/math/bits.ts",
+          "targetFingerprint": "d82545545c9410d51a4f7d2f21e45115f78e9ffc472347da507274fd086536a1"
+        },
+        {
+          "identity": "math/bits|kind=4|receiver=|name=Div64",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Div64",
+          "sourceSignature": "func(hi uint64, lo uint64, y uint64) (quo uint64, rem uint64)|params=hi,lo,y|results=quo,rem",
+          "sourceLocation": "math/bits/bits.go:518:6",
+          "implementationOwner": "src/internal/portable/math/bits.ts",
+          "targetFingerprint": "4d3b0f0791bb5941ae92bcebd085b1257ca8e8b1cb4383e86c32911041abcbe7"
+        },
+        {
+          "identity": "math/bits|kind=4|receiver=|name=Len",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Len",
+          "sourceSignature": "func(x uint) int|params=x|results=",
+          "sourceLocation": "math/bits/bits.go:302:6",
+          "implementationOwner": "src/internal/portable/math/bits.ts",
+          "targetFingerprint": "29038d754761520d3ea021d57279700c5ccd45061a06b60b3c7783febf29d319"
+        },
+        {
+          "identity": "math/bits|kind=4|receiver=|name=Mul64",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Mul64",
+          "sourceSignature": "func(x uint64, y uint64) (hi uint64, lo uint64)|params=x,y|results=hi,lo",
+          "sourceLocation": "math/bits/bits.go:470:6",
+          "implementationOwner": "src/internal/portable/math/bits.ts",
+          "targetFingerprint": "d82f28ef1e1ed6f29f6075485911533573a3d8e87fa3addf289f445566386229"
+        },
+        {
           "identity": "math/bits|kind=4|receiver=|name=OnesCount",
           "kind": "function",
           "access": "export",
@@ -2911,6 +3339,61 @@
           "sourceLocation": "math/bits/bits.go:135:6",
           "implementationOwner": "src/internal/portable/math/bits.ts",
           "targetFingerprint": "7f3767b7501349e4d8ef5290217af264c91314e478054cada7c207ffce7f6993"
+        },
+        {
+          "identity": "math/bits|kind=4|receiver=|name=OnesCount64",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "OnesCount64",
+          "sourceSignature": "func(x uint64) int|params=x|results=",
+          "sourceLocation": "math/bits/bits.go:140:6",
+          "implementationOwner": "src/internal/portable/math/bits.ts",
+          "targetFingerprint": "042f3f1d392ff2a402f0162b0c1f6fb5de055a08cb159960d5a3adfa6cc6297f"
+        },
+        {
+          "identity": "math/bits|kind=4|receiver=|name=ReverseBytes32",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "ReverseBytes32",
+          "sourceSignature": "func(x uint32) uint32|params=x|results=",
+          "sourceLocation": "math/bits/bits.go:283:6",
+          "implementationOwner": "src/internal/portable/math/bits.ts",
+          "targetFingerprint": "34abc6f4a19a2416fdb1004057b44ec8e75057a3aec52fb68a0050ed37ec0e6a"
+        },
+        {
+          "identity": "math/bits|kind=4|receiver=|name=ReverseBytes64",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "ReverseBytes64",
+          "sourceSignature": "func(x uint64) uint64|params=x|results=",
+          "sourceLocation": "math/bits/bits.go:292:6",
+          "implementationOwner": "src/internal/portable/math/bits.ts",
+          "targetFingerprint": "729439351a6f2ccb25a498425f60047ac3f81d68a43920e91d2ee514f0533993"
+        },
+        {
+          "identity": "math/bits|kind=4|receiver=|name=RotateLeft32",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "RotateLeft32",
+          "sourceSignature": "func(x uint32, k int) uint32|params=x,k|results=",
+          "sourceLocation": "math/bits/bits.go:207:6",
+          "implementationOwner": "src/internal/portable/math/bits.ts",
+          "targetFingerprint": "156b58e590048baa4bd6b3031538f9f8abae58d0d900dada79d8cf10a6e2aff0"
+        },
+        {
+          "identity": "math/bits|kind=4|receiver=|name=RotateLeft64",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "RotateLeft64",
+          "sourceSignature": "func(x uint64, k int) uint64|params=x,k|results=",
+          "sourceLocation": "math/bits/bits.go:217:6",
+          "implementationOwner": "src/internal/portable/math/bits.ts",
+          "targetFingerprint": "2a23b32ae2c032e6349f188e8f3a9b50f515324d62c79c33e2137a0a10a28ecd"
         }
       ]
     },
@@ -7910,6 +8393,52 @@
       "sourcePath": "src/sort.ts",
       "bindings": [
         {
+          "identity": "sort|kind=2|receiver=|name=Interface",
+          "kind": "type",
+          "access": "export",
+          "representation": "direct",
+          "export": "Interface",
+          "providerInterface": {
+            "mode": "bridge",
+            "methods": [
+              {
+                "sourceIdentity": "sort|kind=4|receiver=sort.Interface|name=Len",
+                "kind": "callable",
+                "member": "Len",
+                "effect": "sync",
+                "sourceSignature": "func() int|params=|results=",
+                "sourceLocation": "sort/sort.go:19:2",
+                "implementationOwner": "src/internal/portable/sort/order.ts",
+                "targetFingerprint": "3824aab7302b1f32e5ca2ceae89020356e5ecf6135d817c4bf50651590ad89ba"
+              },
+              {
+                "sourceIdentity": "sort|kind=4|receiver=sort.Interface|name=Less",
+                "kind": "callable",
+                "member": "Less",
+                "effect": "sync",
+                "sourceSignature": "func(i int, j int) bool|params=i,j|results=",
+                "sourceLocation": "sort/sort.go:38:2",
+                "implementationOwner": "src/internal/portable/sort/order.ts",
+                "targetFingerprint": "991700222eb40fce9296cc08e0c52e5b45a65623c2aceefb4c859a2741e853b7"
+              },
+              {
+                "sourceIdentity": "sort|kind=4|receiver=sort.Interface|name=Swap",
+                "kind": "callable",
+                "member": "Swap",
+                "effect": "sync",
+                "sourceSignature": "func(i int, j int)|params=i,j|results=",
+                "sourceLocation": "sort/sort.go:41:2",
+                "implementationOwner": "src/internal/portable/sort/order.ts",
+                "targetFingerprint": "17f703e0b5e357dffba83240e5c67aa26ae6dcc7eda59a459268db3bfa917f38"
+              }
+            ]
+          },
+          "sourceSignature": "defined=sort.Interface|underlying=interface{Len() int; Less(i int, j int) bool; Swap(i int, j int)}",
+          "sourceLocation": "sort/sort.go:17:6",
+          "implementationOwner": "src/internal/portable/sort/order.ts",
+          "targetFingerprint": "1ce2d126138a26686bcae25a12c078a7fe783abc75b693b86aed58fd4f6cacbd"
+        },
+        {
           "identity": "sort|kind=4|receiver=|name=Search",
           "kind": "function",
           "access": "export",
@@ -7919,6 +8448,39 @@
           "sourceLocation": "sort/search.go:58:6",
           "implementationOwner": "src/internal/portable/sort/search.ts",
           "targetFingerprint": "dd48d43220b606a3c6f075fa599a89736211477f3ed94a68a6779efd06674fe3"
+        },
+        {
+          "identity": "sort|kind=4|receiver=|name=Sort",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Sort",
+          "sourceSignature": "func(data sort.Interface)|params=data|results=",
+          "sourceLocation": "sort/sort.go:50:6",
+          "implementationOwner": "src/internal/portable/sort/order.ts",
+          "targetFingerprint": "56cf1b313bf8e50648432d0a05c501fd0a2b8b5622b396688b1903672c815633"
+        },
+        {
+          "identity": "sort|kind=4|receiver=|name=Stable",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Stable",
+          "sourceSignature": "func(data sort.Interface)|params=data|results=",
+          "sourceLocation": "sort/sort.go:233:6",
+          "implementationOwner": "src/internal/portable/sort/order.ts",
+          "targetFingerprint": "283ba57739601eb97593f3b70af9fea12f2f1fd644b3784e342e2d8948abf460"
+        },
+        {
+          "identity": "sort|kind=4|receiver=|name=Strings",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Strings",
+          "sourceSignature": "func(x []string)|params=x|results=",
+          "sourceLocation": "sort/sort.go:181:6",
+          "implementationOwner": "src/internal/portable/sort/order.ts",
+          "targetFingerprint": "a78500acdfa745215428b836ba99f548d09257587c79c036220c89a32cec0de5"
         }
       ]
     },
@@ -7937,6 +8499,72 @@
           "sourceLocation": "strconv/number.go:246:5",
           "implementationOwner": "src/strconv.ts",
           "targetFingerprint": "0af9a7d5cce98447882e4f47b5ae035d140952f47e2b27a14f0e7fe62cf3da12"
+        },
+        {
+          "identity": "strconv|kind=3|receiver=|name=ErrSyntax",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "ErrSyntax",
+          "sourceSignature": "error",
+          "sourceLocation": "strconv/number.go:249:5",
+          "implementationOwner": "src/strconv.ts",
+          "targetFingerprint": "499f1c46f8a2a71c5703f2f05a04892e19b18001c20746a254092deda12cd842"
+        },
+        {
+          "identity": "strconv|kind=4|receiver=|name=AppendBool",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "AppendBool",
+          "sourceSignature": "func(dst []byte, b bool) []byte|params=dst,b|results=",
+          "sourceLocation": "strconv/number.go:34:6",
+          "implementationOwner": "src/internal/portable/strconv/append.ts",
+          "targetFingerprint": "c39e809fe670eae50d7503a00990616b0d2f23d6ba88c51a4c34dce6ba36d445"
+        },
+        {
+          "identity": "strconv|kind=4|receiver=|name=AppendFloat",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "AppendFloat",
+          "sourceSignature": "func(dst []byte, f float64, fmt byte, prec int, bitSize int) []byte|params=dst,f,fmt,prec,bitSize|results=",
+          "sourceLocation": "strconv/number.go:195:6",
+          "implementationOwner": "src/internal/portable/strconv/append.ts",
+          "targetFingerprint": "49d3c1015212d5c4de028568395a6c7a9375c47e6af639a1fdc818c841a9aae8"
+        },
+        {
+          "identity": "strconv|kind=4|receiver=|name=AppendInt",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "AppendInt",
+          "sourceSignature": "func(dst []byte, i int64, base int) []byte|params=dst,i,base|results=",
+          "sourceLocation": "strconv/number.go:220:6",
+          "implementationOwner": "src/internal/portable/strconv/append.ts",
+          "targetFingerprint": "2a7097c1da1212e8e3e4e4c7f262610b85e697a28e47778df2b38c4d04ac5981"
+        },
+        {
+          "identity": "strconv|kind=4|receiver=|name=AppendQuote",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "AppendQuote",
+          "sourceSignature": "func(dst []byte, s string) []byte|params=dst,s|results=",
+          "sourceLocation": "strconv/quote.go:127:6",
+          "implementationOwner": "src/internal/portable/strconv/quote.ts",
+          "targetFingerprint": "1b8f61bd010b11d74d4820d3ddf405130a593bab4322d929f9616c4543691202"
+        },
+        {
+          "identity": "strconv|kind=4|receiver=|name=AppendUint",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "AppendUint",
+          "sourceSignature": "func(dst []byte, i uint64, base int) []byte|params=dst,i,base|results=",
+          "sourceLocation": "strconv/number.go:226:6",
+          "implementationOwner": "src/internal/portable/strconv/append.ts",
+          "targetFingerprint": "c3c1d7fac8d902bd07e48bc69752bfd76d826d42aea82e205f1270cc73eec15f"
         },
         {
           "identity": "strconv|kind=4|receiver=|name=Atoi",
@@ -8014,6 +8642,39 @@
           "sourceLocation": "strconv/number.go:104:6",
           "implementationOwner": "src/internal/portable/strconv/integer.ts",
           "targetFingerprint": "e1a6da37db3240b502b1983381ff3df5bbe6aaa452bba095c77d06208acdf9ba"
+        },
+        {
+          "identity": "strconv|kind=4|receiver=|name=Quote",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Quote",
+          "sourceSignature": "func(s string) string|params=s|results=",
+          "sourceLocation": "strconv/quote.go:121:6",
+          "implementationOwner": "src/internal/portable/strconv/quote.ts",
+          "targetFingerprint": "1d22f93a90deb1e5a00875f451a3efa8643389632873e8bd2ec72aba4c3ed829"
+        },
+        {
+          "identity": "strconv|kind=4|receiver=|name=QuoteRune",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "QuoteRune",
+          "sourceSignature": "func(r rune) string|params=r|results=",
+          "sourceLocation": "strconv/quote.go:163:6",
+          "implementationOwner": "src/internal/portable/strconv/quote.ts",
+          "targetFingerprint": "e3cf2d0851a677e51fee1c7f7695b949f70dc98504c39ff7fafb927a434927dd"
+        },
+        {
+          "identity": "strconv|kind=4|receiver=|name=Unquote",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Unquote",
+          "sourceSignature": "func(s string) (string, error)|params=s|results=,",
+          "sourceLocation": "strconv/quote.go:379:6",
+          "implementationOwner": "src/internal/portable/strconv/quote.ts",
+          "targetFingerprint": "1ecf47cc1079778c46c304aed42f1ef9e4763c1c1ff6cd5549e492266b957b80"
         }
       ]
     },
@@ -8218,6 +8879,17 @@
           "sourceLocation": "strings/strings.go:67:6",
           "implementationOwner": "src/internal/portable/strings/search.ts",
           "targetFingerprint": "fb439413820cf943559b370f3d478a9fe1ab0d315c1143da2f9484cb7bcd3f27"
+        },
+        {
+          "identity": "strings|kind=4|receiver=|name=ContainsFunc",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "ContainsFunc",
+          "sourceSignature": "func(s string, f func(rune) bool) bool|params=s,f|results=",
+          "sourceLocation": "strings/strings.go:77:6",
+          "implementationOwner": "src/internal/portable/strings/search.ts",
+          "targetFingerprint": "6553707094a81e2e555045c7b9b0c38ddeaa1b7eab9fa344649f6968763c415a"
         },
         {
           "identity": "strings|kind=4|receiver=|name=ContainsRune",
@@ -9403,6 +10075,28 @@
       "sourcePath": "src/time.ts",
       "bindings": [
         {
+          "identity": "time|kind=1|receiver=|name=Hour",
+          "kind": "constant",
+          "access": "export",
+          "export": "Hour",
+          "sourceSignature": "time.Duration",
+          "sourceValue": "3600000000000",
+          "sourceLocation": "time/time.go:940:2",
+          "implementationOwner": "src/internal/portable/time/duration.ts",
+          "targetFingerprint": "0b8c8c8e31a2427cd97cdfe0bcacce0365e3d7d375eb0adfc2a5cb4bae2035aa"
+        },
+        {
+          "identity": "time|kind=1|receiver=|name=Microsecond",
+          "kind": "constant",
+          "access": "export",
+          "export": "Microsecond",
+          "sourceSignature": "time.Duration",
+          "sourceValue": "1000",
+          "sourceLocation": "time/time.go:936:2",
+          "implementationOwner": "src/internal/portable/time/duration.ts",
+          "targetFingerprint": "0df97e2154dde2abde417909421c7fe931534b7bdecb1634b6331a46fa99b499"
+        },
+        {
           "identity": "time|kind=1|receiver=|name=Millisecond",
           "kind": "constant",
           "access": "export",
@@ -9423,6 +10117,17 @@
           "sourceLocation": "time/time.go:939:2",
           "implementationOwner": "src/internal/portable/time/duration.ts",
           "targetFingerprint": "6ead0313279788fc42e67ad66eb6672b4b808c2736ca19b28f2c857ae9fc1a1a"
+        },
+        {
+          "identity": "time|kind=1|receiver=|name=Nanosecond",
+          "kind": "constant",
+          "access": "export",
+          "export": "Nanosecond",
+          "sourceSignature": "time.Duration",
+          "sourceValue": "1",
+          "sourceLocation": "time/time.go:935:2",
+          "implementationOwner": "src/internal/portable/time/duration.ts",
+          "targetFingerprint": "a1384c2067a504aae7ddd48230c201382185c3e0af4d36439e5f83ab4a182728"
         },
         {
           "identity": "time|kind=1|receiver=|name=Second",
@@ -9448,6 +10153,17 @@
           "targetFingerprint": "50f330bb480b5e571ba4df4e134b1aeacd7348454bd2bd53a7ab97b217170da7"
         },
         {
+          "identity": "time|kind=2|receiver=|name=ParseError",
+          "kind": "type",
+          "access": "export",
+          "representation": "direct",
+          "export": "ParseError",
+          "sourceSignature": "defined=time.ParseError|underlying=struct{Layout string; Value string; LayoutElem string; ValueElem string; Message string}",
+          "sourceLocation": "time/format.go:841:6",
+          "implementationOwner": "src/internal/portable/time/parse-error.ts",
+          "targetFingerprint": "4bf620b1c5294d9ed1afdd37aafa9c448858be6ac2b35827afdd0c4ac7ec0d7b"
+        },
+        {
           "identity": "time|kind=2|receiver=|name=Ticker",
           "kind": "type",
           "access": "export",
@@ -9467,7 +10183,7 @@
           "sourceSignature": "defined=time.Time|underlying=struct{wall uint64; ext int64; loc *time.Location}",
           "sourceLocation": "time/time.go:140:6",
           "implementationOwner": "src/internal/portable/time/time.ts",
-          "targetFingerprint": "ba5fe7260732706c9449dc76b538656fa854ec8746062c90025b5b5b3dedbdda"
+          "targetFingerprint": "1aee5c5f699652dfeddb51226bcb38010ef1998bc64109d63284747981233959"
         },
         {
           "identity": "time|kind=2|receiver=|name=Timer",
@@ -9479,6 +10195,18 @@
           "sourceLocation": "time/sleep.go:89:6",
           "implementationOwner": "src/internal/portable/time/timer.ts",
           "targetFingerprint": "ce8860d381c627928a05314672399740d2068e1a4ad05371ad6a26ceafbe9531"
+        },
+        {
+          "identity": "time|kind=4|receiver=*time.ParseError|name=Error",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "ParseError",
+          "member": "Error",
+          "sourceSignature": "func() string|params=|results=",
+          "sourceLocation": "time/format.go:902:22",
+          "implementationOwner": "src/internal/portable/time/parse-error.ts",
+          "targetFingerprint": "f9dfc60c937cc8978f018382aa7dd67f4d02453cc3b6ab80ac61dacd8a9e668f"
         },
         {
           "identity": "time|kind=4|receiver=*time.Ticker|name=Stop",
@@ -9515,6 +10243,18 @@
           "sourceLocation": "time/sleep.go:113:17",
           "implementationOwner": "src/internal/portable/time/timer.ts",
           "targetFingerprint": "0d238d27060fbf73b4304acb28a4cb551f28e24e8ef2241e416e10bb110473ec"
+        },
+        {
+          "identity": "time|kind=4|receiver=*time.Time|name=UnmarshalText",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Time",
+          "member": "UnmarshalText",
+          "sourceSignature": "func(data []byte) error|params=data|results=",
+          "sourceLocation": "time/time.go:1644:16",
+          "implementationOwner": "src/internal/portable/time/time.ts",
+          "targetFingerprint": "fe1337bb89a512cf3095ce7c90a9700485df98084ebe2495d7255e278c98022b"
         },
         {
           "identity": "time|kind=4|receiver=time.Duration|name=Nanoseconds",
@@ -9577,6 +10317,30 @@
           "targetFingerprint": "2d35ec8e017d801b1f9bee4d1251e768b310c19450fd455adf5e0c528e5dde22"
         },
         {
+          "identity": "time|kind=4|receiver=time.Time|name=AppendFormat",
+          "kind": "function",
+          "access": "instance-method",
+          "effect": "sync",
+          "export": "Time",
+          "member": "AppendFormat",
+          "sourceSignature": "func(b []byte, layout string) []byte|params=b,layout|results=",
+          "sourceLocation": "time/format.go:655:15",
+          "implementationOwner": "src/internal/portable/time/time.ts",
+          "targetFingerprint": "26aaf2e71612fa90466867c86f3c464a40787f2af2f6da8f6a1e823dc0625bc9"
+        },
+        {
+          "identity": "time|kind=4|receiver=time.Time|name=AppendText",
+          "kind": "function",
+          "access": "instance-method",
+          "effect": "sync",
+          "export": "Time",
+          "member": "AppendText",
+          "sourceSignature": "func(b []byte) ([]byte, error)|params=b|results=,",
+          "sourceLocation": "time/time.go:1630:15",
+          "implementationOwner": "src/internal/portable/time/time.ts",
+          "targetFingerprint": "fa114737d059e101a9bc4d1cb7fbf565b17f85aa119e6d704f749d4332ec5b98"
+        },
+        {
           "identity": "time|kind=4|receiver=time.Time|name=Before",
           "kind": "function",
           "access": "instance-method",
@@ -9625,6 +10389,42 @@
           "targetFingerprint": "7245aa02170cb63edd5b84c4c498ba57fb08880ec2f41d3630596bc9c7a4c56a"
         },
         {
+          "identity": "time|kind=4|receiver=time.Time|name=MarshalJSON",
+          "kind": "function",
+          "access": "instance-method",
+          "effect": "sync",
+          "export": "Time",
+          "member": "MarshalJSON",
+          "sourceSignature": "func() ([]byte, error)|params=|results=,",
+          "sourceLocation": "time/time.go:1591:15",
+          "implementationOwner": "src/internal/portable/time/time.ts",
+          "targetFingerprint": "8c3ae4810103b07b4d0e8f4bafd7fadcbeacd8dddb51cd79ffbb0add52d89c2f"
+        },
+        {
+          "identity": "time|kind=4|receiver=time.Time|name=MarshalText",
+          "kind": "function",
+          "access": "instance-method",
+          "effect": "sync",
+          "export": "Time",
+          "member": "MarshalText",
+          "sourceSignature": "func() ([]byte, error)|params=|results=,",
+          "sourceLocation": "time/time.go:1638:15",
+          "implementationOwner": "src/internal/portable/time/time.ts",
+          "targetFingerprint": "c6f4c407907fa7c56ce23ebc9694c2b8343e035b26310ad5b1f7b729695d7ed7"
+        },
+        {
+          "identity": "time|kind=4|receiver=time.Time|name=Nanosecond",
+          "kind": "function",
+          "access": "instance-method",
+          "effect": "sync",
+          "export": "Time",
+          "member": "Nanosecond",
+          "sourceSignature": "func() int|params=|results=",
+          "sourceLocation": "time/time.go:901:15",
+          "implementationOwner": "src/internal/portable/time/time.ts",
+          "targetFingerprint": "2bd3776bb3cd4d06784227e7ed6ef78d71a2fce74c9cd2728692d656179cf1b0"
+        },
+        {
           "identity": "time|kind=4|receiver=time.Time|name=String",
           "kind": "function",
           "access": "instance-method",
@@ -9647,6 +10447,30 @@
           "sourceLocation": "time/time.go:1198:15",
           "implementationOwner": "src/internal/portable/time/time.ts",
           "targetFingerprint": "a5e1859fcb0a76b688c222810f5642601f3f02870e6de389c9c6bdfd97f92e41"
+        },
+        {
+          "identity": "time|kind=4|receiver=time.Time|name=UTC",
+          "kind": "function",
+          "access": "instance-method",
+          "effect": "sync",
+          "export": "Time",
+          "member": "UTC",
+          "sourceSignature": "func() time.Time|params=|results=",
+          "sourceLocation": "time/time.go:1368:15",
+          "implementationOwner": "src/internal/portable/time/time.ts",
+          "targetFingerprint": "dccd1d1bdc774823d6c3f51e5b659c6370698150667bebadf224a0c4568cc860"
+        },
+        {
+          "identity": "time|kind=4|receiver=time.Time|name=Unix",
+          "kind": "function",
+          "access": "instance-method",
+          "effect": "sync",
+          "export": "Time",
+          "member": "Unix",
+          "sourceSignature": "func() int64|params=|results=",
+          "sourceLocation": "time/time.go:1432:15",
+          "implementationOwner": "src/internal/portable/time/time.ts",
+          "targetFingerprint": "3a35b311311151b42cdf6154dbd26f6d543bbaeee9a494fb0e15c1bafa567bc0"
         },
         {
           "identity": "time|kind=4|receiver=time.Time|name=UnixMilli",
@@ -9726,6 +10550,28 @@
           "sourceLocation": "time/time.go:1347:6",
           "implementationOwner": "src/internal/portable/time/time.ts",
           "targetFingerprint": "97608a7588557d3c3657df43143705b030cb139e0d2c0c8aa5aa92932a201989"
+        },
+        {
+          "identity": "time|kind=4|receiver=|name=Parse",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Parse",
+          "sourceSignature": "func(layout string, value string) (time.Time, error)|params=layout,value|results=,",
+          "sourceLocation": "time/format.go:1023:6",
+          "implementationOwner": "src/internal/portable/time/parse-time.ts",
+          "targetFingerprint": "8a78807a5ab02971d5bad04000df78f8cc949c16fce5b5bf35e589e30514d30f"
+        },
+        {
+          "identity": "time|kind=4|receiver=|name=ParseDuration",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "ParseDuration",
+          "sourceSignature": "func(s string) (time.Duration, error)|params=s|results=,",
+          "sourceLocation": "time/format.go:1631:6",
+          "implementationOwner": "src/internal/portable/time/parse-duration.ts",
+          "targetFingerprint": "21a31ff7d2a6121b3a29a9d58e3ecea79093a340841c011f25dd2e47b6f2dce2"
         },
         {
           "identity": "time|kind=4|receiver=|name=Since",
@@ -9823,6 +10669,39 @@
           "targetFingerprint": "7e5670169e52e3e4abb90706bf3e0854dbfef6f058fb0fed670d92cb387d5980"
         },
         {
+          "identity": "unicode|kind=3|receiver=|name=Ideographic",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "Ideographic",
+          "sourceSignature": "*unicode.RangeTable",
+          "sourceLocation": "unicode/tables.go:8595:2",
+          "implementationOwner": "src/unicode.ts",
+          "targetFingerprint": "eefa497322b757b2ad21123c6816e4652aa0869f7109abc96af112670f0d7a46"
+        },
+        {
+          "identity": "unicode|kind=3|receiver=|name=Nd",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "Nd",
+          "sourceSignature": "*unicode.RangeTable",
+          "sourceLocation": "unicode/tables.go:5146:2",
+          "implementationOwner": "src/unicode.ts",
+          "targetFingerprint": "56691c86b181cfb5d94dd667eca984070d24990447246310c855504e6879e42b"
+        },
+        {
+          "identity": "unicode|kind=3|receiver=|name=No",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "No",
+          "sourceSignature": "*unicode.RangeTable",
+          "sourceLocation": "unicode/tables.go:5160:2",
+          "implementationOwner": "src/unicode.ts",
+          "targetFingerprint": "491797c356daeb1240497bc2db1e6b600848757860ff86828d31dca610d412dc"
+        },
+        {
           "identity": "unicode|kind=3|receiver=|name=Zs",
           "kind": "variable",
           "access": "state-member",
@@ -9832,6 +10711,17 @@
           "sourceLocation": "unicode/tables.go:5188:2",
           "implementationOwner": "src/unicode.ts",
           "targetFingerprint": "39acb1600e0d26d45a8abc72c87223ea664814cb01b560542fef812171c3ffa2"
+        },
+        {
+          "identity": "unicode|kind=4|receiver=|name=In",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "In",
+          "sourceSignature": "func(r rune, ranges ...*unicode.RangeTable) bool|params=r,ranges|results=",
+          "sourceLocation": "unicode/graphic.go:69:6",
+          "implementationOwner": "src/internal/portable/unicode/ranges.ts",
+          "targetFingerprint": "fdacc13649b25f6f778f3993ada05039a41ab0f286f97c7d08a4fdcd8e346196"
         },
         {
           "identity": "unicode|kind=4|receiver=|name=Is",
@@ -9856,6 +10746,17 @@
           "targetFingerprint": "218a90fda784b49c27516623e6f218167d53443f4873932f9e490be21a563156"
         },
         {
+          "identity": "unicode|kind=4|receiver=|name=IsLetter",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "IsLetter",
+          "sourceSignature": "func(r rune) bool|params=r|results=",
+          "sourceLocation": "unicode/graphic.go:90:6",
+          "implementationOwner": "src/internal/portable/unicode/properties.ts",
+          "targetFingerprint": "d2be7b07013c34991f7fd799b8b4ea7ecdd1b0c8e453413ffbd5fd019487d8a2"
+        },
+        {
           "identity": "unicode|kind=4|receiver=|name=IsLower",
           "kind": "function",
           "access": "export",
@@ -9865,6 +10766,28 @@
           "sourceLocation": "unicode/letter.go:193:6",
           "implementationOwner": "src/internal/portable/unicode/properties.ts",
           "targetFingerprint": "193988010bd141554edfb1914eaa891376b08dabca576b05a590aa53c9b0b5a3"
+        },
+        {
+          "identity": "unicode|kind=4|receiver=|name=IsNumber",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "IsNumber",
+          "sourceSignature": "func(r rune) bool|params=r|results=",
+          "sourceLocation": "unicode/graphic.go:104:6",
+          "implementationOwner": "src/internal/portable/unicode/properties.ts",
+          "targetFingerprint": "a6c3d8451a3c844d73f80963aa389cccb63801bfaba834b92bed4cccd3c012fc"
+        },
+        {
+          "identity": "unicode|kind=4|receiver=|name=IsPrint",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "IsPrint",
+          "sourceSignature": "func(r rune) bool|params=r|results=",
+          "sourceLocation": "unicode/graphic.go:50:6",
+          "implementationOwner": "src/internal/portable/unicode/properties.ts",
+          "targetFingerprint": "b6bf4d347838c52dd707d33ed57cb9e04b76db239e65486dc718a46656149ed1"
         },
         {
           "identity": "unicode|kind=4|receiver=|name=IsSpace",
@@ -9887,6 +10810,17 @@
           "sourceLocation": "unicode/letter.go:184:6",
           "implementationOwner": "src/internal/portable/unicode/properties.ts",
           "targetFingerprint": "ffe4d2ac7c3ecdc50c73e6bcb1a311998a331fc928fafd22c0fcca182be8d49f"
+        },
+        {
+          "identity": "unicode|kind=4|receiver=|name=SimpleFold",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "SimpleFold",
+          "sourceSignature": "func(r rune) rune|params=r|results=",
+          "sourceLocation": "unicode/letter.go:354:6",
+          "implementationOwner": "src/internal/portable/unicode/case.ts",
+          "targetFingerprint": "4525f92fc0dac26055695138c291bb7befe80c0a8d39dc8d3e118cc0ffb5d9e0"
         },
         {
           "identity": "unicode|kind=4|receiver=|name=ToLower",
@@ -10002,6 +10936,28 @@
           "targetFingerprint": "f583238330621e458d37bf7ea9309da55cbae8cfc402826129c7781f8d00eba9"
         },
         {
+          "identity": "unicode/utf8|kind=1|receiver=|name=UTFMax",
+          "kind": "constant",
+          "access": "export",
+          "export": "UTFMax",
+          "sourceSignature": "untyped int",
+          "sourceValue": "4",
+          "sourceLocation": "unicode/utf8/utf8.go:19:2",
+          "implementationOwner": "src/unicode/utf8.ts",
+          "targetFingerprint": "1064980b35d20edb24c3cacbc1aab9ac72a9a0b6431a7a1204adee054b1605fc"
+        },
+        {
+          "identity": "unicode/utf8|kind=4|receiver=|name=AppendRune",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "AppendRune",
+          "sourceSignature": "func(p []byte, r rune) []byte|params=p,r|results=",
+          "sourceLocation": "unicode/utf8/utf8.go:410:6",
+          "implementationOwner": "src/unicode/utf8.ts",
+          "targetFingerprint": "650f596eca37a6e08fdf1a149cc94f176fe766b726dc812effce23c31047eb7e"
+        },
+        {
           "identity": "unicode/utf8|kind=4|receiver=|name=DecodeLastRuneInString",
           "kind": "function",
           "access": "export",
@@ -10013,6 +10969,17 @@
           "targetFingerprint": "3ea2db2c16024455741353a4e7100484317c484fe0784e5e9ebfa945dcfd59c1"
         },
         {
+          "identity": "unicode/utf8|kind=4|receiver=|name=DecodeRune",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "DecodeRune",
+          "sourceSignature": "func(p []byte) (r rune, size int)|params=p|results=r,size",
+          "sourceLocation": "unicode/utf8/utf8.go:157:6",
+          "implementationOwner": "src/unicode/utf8.ts",
+          "targetFingerprint": "012bce77ca03dbba8f2f7f38fd0960c0c5099ce9939d4c18ef027c6b4cc69a02"
+        },
+        {
           "identity": "unicode/utf8|kind=4|receiver=|name=DecodeRuneInString",
           "kind": "function",
           "access": "export",
@@ -10022,6 +10989,61 @@
           "sourceLocation": "unicode/utf8/utf8.go:219:6",
           "implementationOwner": "src/unicode/utf8.ts",
           "targetFingerprint": "fd5363f5547d56acbe71885e7a6e8cf09b6922f90b6638c2a8067ce3ee92b282"
+        },
+        {
+          "identity": "unicode/utf8|kind=4|receiver=|name=EncodeRune",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "EncodeRune",
+          "sourceSignature": "func(p []byte, r rune) int|params=p,r|results=",
+          "sourceLocation": "unicode/utf8/utf8.go:368:6",
+          "implementationOwner": "src/unicode/utf8.ts",
+          "targetFingerprint": "edc538ea10af149ad0a73805b6137917c5082766f08d73bd276a89c4a02670fd"
+        },
+        {
+          "identity": "unicode/utf8|kind=4|receiver=|name=FullRune",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "FullRune",
+          "sourceSignature": "func(p []byte) bool|params=p|results=",
+          "sourceLocation": "unicode/utf8/utf8.go:110:6",
+          "implementationOwner": "src/unicode/utf8.ts",
+          "targetFingerprint": "846421b80a911659988d43b82ff9d323e0bff4abe1b61ff9f18169ec7714116d"
+        },
+        {
+          "identity": "unicode/utf8|kind=4|receiver=|name=RuneCount",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "RuneCount",
+          "sourceSignature": "func(p []byte) int|params=p|results=",
+          "sourceLocation": "unicode/utf8/utf8.go:434:6",
+          "implementationOwner": "src/unicode/utf8.ts",
+          "targetFingerprint": "7d304768bc9ef705d3b467711517ef887434637b719e120deabede1cccb42095"
+        },
+        {
+          "identity": "unicode/utf8|kind=4|receiver=|name=RuneStart",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "RuneStart",
+          "sourceSignature": "func(b byte) bool|params=b|results=",
+          "sourceLocation": "unicode/utf8/utf8.go:457:6",
+          "implementationOwner": "src/unicode/utf8.ts",
+          "targetFingerprint": "e15a7c48112e870f8f050333115f6b4921ae4004a450164371c2b3fc6e54a01b"
+        },
+        {
+          "identity": "unicode/utf8|kind=4|receiver=|name=ValidString",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "ValidString",
+          "sourceSignature": "func(s string) bool|params=s|results=",
+          "sourceLocation": "unicode/utf8/utf8.go:522:6",
+          "implementationOwner": "src/unicode/utf8.ts",
+          "targetFingerprint": "6c6a65ac942180b32c11a71b448fb773ab16972664d5a194694fc22bdac24378"
         }
       ]
     },
@@ -10099,6 +11121,15 @@
         },
         {
           "kind": "generic-callable-profile",
+          "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearchFunc",
+          "profileKey": "a25570c0b2684c122c9dda09271fa3a6ca4903e15e987b1410c19f95cf1adc44=cooperative",
+          "export": "SlicesBinarySearchFuncCooperative",
+          "effect": "async",
+          "implementationOwner": "src/internal/facets/generic-slices.ts",
+          "targetFingerprint": "45befdf8547e2db5bdf057ee38b172998c92dc4454277ee2eb0c25e49bace3c0"
+        },
+        {
+          "kind": "generic-callable-profile",
           "sourceIdentity": "slices|kind=4|receiver=|name=Collect",
           "profileKey": "e5c8b67a6f38dcfde6fc5d8fcca5ba4cb80f3909208a66256240dab706e89d68=cooperative",
           "export": "SlicesCollectCooperative",
@@ -10114,6 +11145,15 @@
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
           "targetFingerprint": "d8c0e49ab365fb9b5014a7866faf7022d8b3481638352afd8d40201a76ff7813"
+        },
+        {
+          "kind": "generic-callable-profile",
+          "sourceIdentity": "slices|kind=4|receiver=|name=CompareFunc",
+          "profileKey": "042595704dc8615879ac3139f8ebf6c988071f4fdca14a3ee426400a19ff8ba1=cooperative",
+          "export": "SlicesCompareFuncCooperative",
+          "effect": "async",
+          "implementationOwner": "src/internal/facets/generic-slices.ts",
+          "targetFingerprint": "879e23bbb639536c2753794c1fca7073802f3cd953fba49bd614a88ca2d4a400"
         },
         {
           "kind": "generic-callable-profile",
@@ -10724,6 +11764,16 @@
           "targetFingerprint": "1898d36225573aa7779b3d90a86babc087a04a38bf986ebea573e78125210832"
         },
         {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "reflect|kind=2|receiver=|name=StructField",
+          "capabilities": [
+            "copy"
+          ],
+          "export": "ReflectStructFieldOperations",
+          "implementationOwner": "src/internal/facets/named-reflect.ts",
+          "targetFingerprint": "655f556dcff1bdb1ab6962cb7ec073b61f11513adcaf806a94aa558daee489a8"
+        },
+        {
           "kind": "defined-value-operations",
           "sourceIdentity": "reflect|kind=2|receiver=|name=StructTag",
           "capabilities": [
@@ -11059,6 +12109,20 @@
         },
         {
           "kind": "named-struct-operations",
+          "sourceIdentity": "time|kind=2|receiver=|name=ParseError",
+          "capabilities": [
+            "make",
+            "storage"
+          ],
+          "export": "TimeParseErrorOperations",
+          "storageExport": "TimeParseErrorStorage",
+          "implementationOwner": "src/internal/facets/named-time.ts",
+          "storageImplementationOwner": "src/internal/portable/time/parse-error.ts",
+          "targetFingerprint": "4d2e92d26eb67a7afa8276659797af260c9438271bd89824d58814b0d6c93021",
+          "storageTargetFingerprint": "0078b36743464c2de1cebd49999f751e5fa0f952573d791f2bd7510e6ea6dcaa"
+        },
+        {
+          "kind": "named-struct-operations",
           "sourceIdentity": "time|kind=2|receiver=|name=Ticker",
           "capabilities": [
             "storage"
@@ -11074,6 +12138,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "time|kind=2|receiver=|name=Time",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -11084,8 +12149,8 @@
           "storageExport": "TimeStorage",
           "implementationOwner": "src/internal/facets/named-time.ts",
           "storageImplementationOwner": "src/internal/portable/time/time.ts",
-          "targetFingerprint": "8bdb218738184404acd8c476431bdaa24a3b04ac958f8ea63c88bcc1fd1aca7c",
-          "storageTargetFingerprint": "2cbdc5902057fef9e744586a5a4a04f5d294a62c7c12c8e81cb6f77ba702d68e"
+          "targetFingerprint": "1687252c7f0649c1fca7c0127fcb38be63562720dc20e8c83d909f2fdba37641",
+          "storageTargetFingerprint": "8309b916201b21552fe637f4b286257e699039db70abbca1e818a7d532a7dd72"
         },
         {
           "kind": "named-struct-operations",
@@ -11825,6 +12890,17 @@
         },
         {
           "kind": "recovery-callable",
+          "sourceIdentity": "bytes|kind=4|receiver=*bytes.Buffer|name=Write",
+          "capabilities": [
+            "recovery"
+          ],
+          "export": "BytesBufferWrite",
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/recovery-io.ts",
+          "targetFingerprint": "74f3465ba0aab368aa6c1b176b5df6097fa4975737dba24fd31e4bb1e338e760"
+        },
+        {
+          "kind": "recovery-callable",
           "sourceIdentity": "compress/gzip|kind=4|receiver=*compress/gzip.Reader|name=Close",
           "capabilities": [
             "recovery"
@@ -12035,6 +13111,17 @@
         },
         {
           "kind": "recovery-callable",
+          "sourceIdentity": "time|kind=4|receiver=*time.ParseError|name=Error",
+          "capabilities": [
+            "recovery"
+          ],
+          "export": "TimeParseErrorError",
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/recovery-value.ts",
+          "targetFingerprint": "a7db74097df76b4cfae047da6c891b681fb7a9adefbaf8b25c9ac2ec1e855243"
+        },
+        {
+          "kind": "recovery-callable",
           "sourceIdentity": "time|kind=4|receiver=*time.Ticker|name=Stop",
           "capabilities": [
             "recovery"
@@ -12057,6 +13144,50 @@
         },
         {
           "kind": "recovery-callable",
+          "sourceIdentity": "time|kind=4|receiver=time.Time|name=AppendText",
+          "capabilities": [
+            "recovery"
+          ],
+          "export": "TimeTimeAppendText",
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/recovery-value.ts",
+          "targetFingerprint": "cae28902e0d7ebf1777e430e1bd9f00c8774ae231ecd283aaf4cee574d1c6774"
+        },
+        {
+          "kind": "recovery-callable",
+          "sourceIdentity": "time|kind=4|receiver=time.Time|name=IsZero",
+          "capabilities": [
+            "recovery"
+          ],
+          "export": "TimeTimeIsZero",
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/recovery-value.ts",
+          "targetFingerprint": "1524eac58253d428029ede92dbec472d43270846e644d120d79d7c490334ceac"
+        },
+        {
+          "kind": "recovery-callable",
+          "sourceIdentity": "time|kind=4|receiver=time.Time|name=MarshalJSON",
+          "capabilities": [
+            "recovery"
+          ],
+          "export": "TimeTimeMarshalJSON",
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/recovery-value.ts",
+          "targetFingerprint": "427b06f03a57390ac613f2ce90253e5fd2f245438ca4b2ab651a93f1f4831235"
+        },
+        {
+          "kind": "recovery-callable",
+          "sourceIdentity": "time|kind=4|receiver=time.Time|name=MarshalText",
+          "capabilities": [
+            "recovery"
+          ],
+          "export": "TimeTimeMarshalText",
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/recovery-value.ts",
+          "targetFingerprint": "921d11b466c7c9886886f9c0f11c3f8af7e27bf47210fd6186a602bd703b4975"
+        },
+        {
+          "kind": "recovery-callable",
           "sourceIdentity": "time|kind=4|receiver=time.Time|name=String",
           "capabilities": [
             "recovery"
@@ -12069,5 +13200,5 @@
       ]
     }
   ],
-  "manifestDigest": "df82d43d71934c0576849a6669a7b558d066c1f44766a99a87a63733c0469783"
+  "manifestDigest": "213a89c0e78055c932f16a308531d12b953269ad35e6cf73e335b192921ad5f6"
 }

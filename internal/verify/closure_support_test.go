@@ -3,8 +3,11 @@ package verify
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -55,11 +58,13 @@ func closureRoot(
 }
 
 type closureArtifacts struct {
-	files   int
-	bytes   int
-	nodes   int
-	largest int
-	printed string
+	files            int
+	bytes            int
+	nodes            int
+	largest          int
+	printed          string
+	workingDirectory string
+	targetPaths      []string
 }
 
 func materializeClosure(
@@ -145,6 +150,13 @@ func materializeClosure(
 	arguments = append(arguments, targetPaths...)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
+	if err := os.WriteFile(
+		filepath.Join(workingDirectory, "package.json"),
+		[]byte("{\"type\":\"module\"}\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
 	if err := tsgo.Compile(
 		ctx,
 		repositoryRoot(t),
@@ -154,7 +166,76 @@ func materializeClosure(
 		t.Fatal(err)
 	}
 	result.printed = printed.String()
+	result.workingDirectory = workingDirectory
+	result.targetPaths = slices.Clone(targetPaths)
 	return result
+}
+
+func executeExternalClosure(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	artifacts closureArtifacts,
+	identity string,
+) {
+	t.Helper()
+	if artifacts.workingDirectory == "" ||
+		len(artifacts.targetPaths) == 0 || identity == "" {
+		t.Fatal("external closure execution lacks materialized evidence")
+	}
+	sourceModule := ""
+	for _, file := range emission.Files() {
+		if file.Kind() != emit.TargetFileSource ||
+			file.PackageName() != "external" {
+			continue
+		}
+		if sourceModule != "" {
+			t.Fatal("external closure has multiple source modules")
+		}
+		sourceModule = "./" + strings.TrimSuffix(
+			filepath.ToSlash(file.OutputPath()),
+			".ts",
+		) + ".js"
+	}
+	if sourceModule == "" {
+		t.Fatal("external closure source module is absent")
+	}
+	arguments := []string{
+		"--target", "es2022",
+		"--module", "nodenext",
+		"--moduleResolution", "nodenext",
+		"--strict",
+	}
+	arguments = append(arguments, artifacts.targetPaths...)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := tsgo.Compile(
+		ctx,
+		repositoryRoot(t),
+		artifacts.workingDirectory,
+		arguments,
+	); err != nil {
+		t.Fatal(err)
+	}
+	runner := fmt.Sprintf(`import { Read } from %q;
+let observed;
+try {
+    Read(undefined);
+} catch (failure) {
+    observed = failure.value.message;
+}
+if (observed !== %q) {
+    throw new Error("external failure mismatch: " + String(observed));
+}
+`, sourceModule, "unresolved external Go function "+identity)
+	runnerPath := filepath.Join(artifacts.workingDirectory, "external-runner.mjs")
+	if err := os.WriteFile(runnerPath, []byte(runner), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.CommandContext(ctx, "node", runnerPath)
+	command.Dir = artifacts.workingDirectory
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("execute external placeholder: %v\n%s", err, output)
+	}
 }
 
 func encodedClosureNodes(t *testing.T, encoded []byte) int {

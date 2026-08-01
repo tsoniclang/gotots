@@ -13,7 +13,7 @@ import (
 func TestGenericOperationIdentifiersAreTotalUniqueTargetIdentifiers(t *testing.T) {
 	targetIdentifier := regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
 	seen := make(map[string]GenericOperation)
-	for operation := GenericOperationZero; operation <= GenericOperationIndexAddress; operation++ {
+	for operation := GenericOperationZero; operation <= GenericOperationSliceFull; operation++ {
 		identifier := operation.Identifier()
 		if !targetIdentifier.MatchString(identifier) {
 			t.Fatalf(
@@ -33,14 +33,16 @@ func TestGenericOperationIdentifiersAreTotalUniqueTargetIdentifiers(t *testing.T
 		seen[identifier] = operation
 	}
 	if GenericOperationInvalid.Identifier() != "" ||
-		GenericOperation(GenericOperationIndexAddress+1).Identifier() != "" {
+		GenericOperation(GenericOperationSliceFull+1).Identifier() != "" {
 		t.Fatal("invalid generic operation has a target identifier")
 	}
 	if GenericOperationToContainerStorage != GenericOperationPointerStore+1 ||
 		GenericOperationFromContainerStorage !=
 			GenericOperationToContainerStorage+1 ||
 		GenericOperationIndexAddress !=
-			GenericOperationFromContainerStorage+1 {
+			GenericOperationFromContainerStorage+1 ||
+		GenericOperationSlice != GenericOperationIndexAddress+1 ||
+		GenericOperationSliceFull != GenericOperationSlice+1 {
 		t.Fatal("new generic operations were not appended canonically")
 	}
 }

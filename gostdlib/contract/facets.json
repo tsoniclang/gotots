@@ -473,6 +473,16 @@
     },
     {
       "kind": "named-struct-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=StructField",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectStructFieldOperations",
+      "capabilities": [
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
       "sourceIdentity": "reflect|kind=2|receiver=|name=Value",
       "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
       "sourcePath": "src/internal/facets/named-reflect.ts",
@@ -500,6 +510,7 @@
       "sourcePath": "src/internal/facets/named-time.ts",
       "export": "TimeOperations",
       "capabilities": [
+        "assign",
         "copy",
         "equal",
         "hash",
@@ -507,6 +518,18 @@
         "zero"
       ],
       "storageExport": "TimeStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "time|kind=2|receiver=|name=ParseError",
+      "specifier": "@gotots/gostdlib/internal/facets/named-time.js",
+      "sourcePath": "src/internal/facets/named-time.ts",
+      "export": "TimeParseErrorOperations",
+      "capabilities": [
+        "make",
+        "storage"
+      ],
+      "storageExport": "TimeParseErrorStorage"
     },
     {
       "kind": "named-struct-operations",
@@ -774,6 +797,17 @@
     },
     {
       "kind": "recovery-callable",
+      "sourceIdentity": "bytes|kind=4|receiver=*bytes.Buffer|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "BytesBufferWrite",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
       "sourceIdentity": "compress/gzip|kind=4|receiver=*compress/gzip.Reader|name=Close",
       "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
       "sourcePath": "src/internal/facets/recovery-io.ts",
@@ -921,6 +955,61 @@
       "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
       "sourcePath": "src/internal/facets/recovery-value.ts",
       "export": "TimeDurationString",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=*time.ParseError|name=Error",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeParseErrorError",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Time|name=AppendText",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTimeAppendText",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Time|name=IsZero",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTimeIsZero",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Time|name=MarshalJSON",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTimeMarshalJSON",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Time|name=MarshalText",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTimeMarshalText",
       "capabilities": [
         "recovery"
       ],
@@ -1213,6 +1302,15 @@
     },
     {
       "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearchFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesBinarySearchFuncCooperative",
+      "profileKey": "a25570c0b2684c122c9dda09271fa3a6ca4903e15e987b1410c19f95cf1adc44=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
       "sourceIdentity": "slices|kind=4|receiver=|name=Collect",
       "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
       "sourcePath": "src/internal/facets/generic-slices.ts",
@@ -1227,6 +1325,15 @@
       "sourcePath": "src/internal/facets/generic-slices.ts",
       "export": "SlicesCollectFullyCooperative",
       "profileKey": "463c4851d985a1488203116869cc8bc37b98bf61ec5d5484bf0df7e59ca40e58=cooperative|e5c8b67a6f38dcfde6fc5d8fcca5ba4cb80f3909208a66256240dab706e89d68=cooperative",
+      "effect": "async"
+    },
+    {
+      "kind": "generic-callable-profile",
+      "sourceIdentity": "slices|kind=4|receiver=|name=CompareFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
+      "sourcePath": "src/internal/facets/generic-slices.ts",
+      "export": "SlicesCompareFuncCooperative",
+      "profileKey": "042595704dc8615879ac3139f8ebf6c988071f4fdca14a3ee426400a19ff8ba1=cooperative",
       "effect": "async"
     },
     {
@@ -1322,6 +1429,7 @@
   ],
   "genericCallableProjections": [
     { "sourceIdentity": "cmp|kind=4|receiver=|name=Compare", "typeArguments": [{"typeParameter":0,"facet":"logical"}] },
+    { "sourceIdentity": "cmp|kind=4|receiver=|name=Or", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}] },
     { "sourceIdentity": "errors|kind=4|receiver=|name=AsType", "typeArguments": [{"typeParameter":0,"facet":"logical"}] },
     { "sourceIdentity": "maps|kind=4|receiver=|name=Clone", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}] },
     { "sourceIdentity": "maps|kind=4|receiver=|name=Copy", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"}] },
@@ -1387,6 +1495,15 @@
             { "kind": "bool" }
           ]
         }
+      ]
+    },
+    {
+      "sourceIdentity": "cmp|kind=4|receiver=|name=Or",
+      "operations": [
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "equal", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }, { "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "bool" }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "zero", "parameters": [], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] }
       ]
     },
     {

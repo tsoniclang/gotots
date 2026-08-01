@@ -8,7 +8,6 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -22,6 +21,7 @@ type Request struct {
 	Directory            string
 	Pattern              string
 	ContractDependencies bool
+	BuildProfile         BuildProfile
 }
 
 type File struct {
@@ -59,6 +59,7 @@ type Program struct {
 	byPath              map[string]*Package
 	byTypes             map[*types.Package]*Package
 	environmentByTypes  map[*types.Package]*Package
+	buildProfile        BuildProfile
 }
 
 type PackageKind uint8
@@ -111,12 +112,18 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 	if request.Pattern == "" {
 		return nil, &Error{Reason: "pattern is empty"}
 	}
+	buildProfile, err := resolveBuildProfile(request.BuildProfile)
+	if err != nil {
+		return nil, err
+	}
 
 	fileSet := token.NewFileSet()
 	loaded, err := packages.Load(&packages.Config{
-		Context: ctx,
-		Dir:     request.Directory,
-		Fset:    fileSet,
+		Context:    ctx,
+		Dir:        request.Directory,
+		Fset:       fileSet,
+		Env:        selectedBuildEnvironment(buildProfile),
+		BuildFlags: buildProfile.buildFlags(),
 		Mode: packages.NeedName |
 			packages.NeedFiles |
 			packages.NeedCompiledGoFiles |
@@ -181,8 +188,9 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 			map[*types.Package]*Package,
 			len(environmentPackages),
 		),
+		buildProfile: buildProfile,
 	}
-	toolchainKey := currentToolchainKey()
+	toolchainKey := currentToolchainKey(buildProfile)
 	byLoaded := make(map[*packages.Package]*Package, len(sourcePackages))
 	for _, current := range sourcePackages {
 		sourcePackage, err := wrapPackage(request.Pattern, current, fileSet)
@@ -282,11 +290,11 @@ func wrapEnvironmentPackage(
 	}, nil
 }
 
-func currentToolchainKey() string {
+func currentToolchainKey(profile BuildProfile) string {
 	key, err := environmentcontract.ToolchainKey(
-		runtime.Version(),
-		runtime.GOOS,
-		runtime.GOARCH,
+		profile.ToolchainVersion(),
+		profile.GOOS(),
+		profile.GOARCH(),
 	)
 	if err != nil {
 		panic(err)
@@ -438,6 +446,13 @@ func (p *Program) PackageForTypes(source *types.Package) *Package {
 
 func (p *Program) EnvironmentForTypes(source *types.Package) *Package {
 	return p.environmentByTypes[source]
+}
+
+func (p *Program) BuildProfile() BuildProfile {
+	if p == nil {
+		return BuildProfile{}
+	}
+	return p.buildProfile
 }
 
 func packageProblems(roots []*packages.Package) []string {

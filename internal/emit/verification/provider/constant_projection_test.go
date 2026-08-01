@@ -23,6 +23,7 @@ func TestLinkedProviderUntypedConstantsKeepContextualProjections(t *testing.T) {
 import "math"
 
 func MaximumInteger() int64 { return math.MaxInt64 }
+func MaximumUnsigned() uint64 { return math.MaxUint64 }
 func MaximumFloat() float64 { return math.MaxFloat64 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
@@ -34,7 +35,7 @@ func MaximumFloat() float64 { return math.MaxFloat64 }
 	}
 	scope := program.Roots()[0].Types().Scope()
 	var roots []emit.Root
-	for _, name := range []string{"MaximumInteger", "MaximumFloat"} {
+	for _, name := range []string{"MaximumInteger", "MaximumUnsigned", "MaximumFloat"} {
 		root, rootErr := emit.NewRoot(scope.Lookup(name))
 		if rootErr != nil {
 			t.Fatal(rootErr)
@@ -51,6 +52,7 @@ func MaximumFloat() float64 { return math.MaxFloat64 }
 
 	projectionFiles := 0
 	seenInteger := false
+	seenUnsigned := false
 	seenFloat := false
 	for _, file := range emission.Files() {
 		switch file.Kind() {
@@ -69,6 +71,9 @@ func MaximumFloat() float64 { return math.MaxFloat64 }
 					case "MaxInt64$int64":
 						literal, ok := declaration.Initializer().(tsgo.BigIntLiteral)
 						seenInteger = ok && literal.Text() == "9223372036854775807n"
+					case "MaxUint64$uint64":
+						literal, ok := declaration.Initializer().(tsgo.BigIntLiteral)
+						seenUnsigned = ok && literal.Text() == "18446744073709551615n"
 					case "MaxFloat64$float64":
 						literal, ok := declaration.Initializer().(tsgo.NumericLiteral)
 						seenFloat = ok && literal.Text() == "1.7976931348623157e+308"
@@ -79,11 +84,12 @@ func MaximumFloat() float64 { return math.MaxFloat64 }
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	if projectionFiles != 1 || !seenInteger || !seenFloat {
+	if projectionFiles != 1 || !seenInteger || !seenUnsigned || !seenFloat {
 		t.Fatalf(
-			"provider projections = files %d, integer %t, float %t:\n%s",
+			"provider projections = files %d, integer %t, unsigned %t, float %t:\n%s",
 			projectionFiles,
 			seenInteger,
+			seenUnsigned,
 			seenFloat,
 			artifacts.printed,
 		)

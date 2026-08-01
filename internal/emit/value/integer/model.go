@@ -199,10 +199,8 @@ func SupportsUnary(
 	operator token.Token,
 ) bool {
 	switch operator {
-	case token.ADD:
+	case token.ADD, token.SUB:
 		return representation.Valid()
-	case token.SUB:
-		return representation.Valid() && carrier.signed
 	case token.XOR:
 		return representation.Valid()
 	default:

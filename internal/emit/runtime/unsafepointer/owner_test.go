@@ -15,7 +15,7 @@ func TestBuildCreatesUnconstructableNominalDeclaration(t *testing.T) {
 	if class.Name().Text() != "GoUnsafePointer" ||
 		len(class.Modifiers()) != 1 ||
 		class.Modifiers()[0].Kind() != tsgo.SyntaxKindExportKeyword ||
-		len(class.Members()) != 4 {
+		len(class.Members()) != 6 {
 		t.Fatalf("unsafe-pointer class has unexpected shape")
 	}
 	property, ok := class.Members()[0].(tsgo.PropertyDeclaration)
@@ -44,6 +44,20 @@ func TestBuildCreatesUnconstructableNominalDeclaration(t *testing.T) {
 			len(method.TypeParameters()) != 1 ||
 			method.Body() == nil {
 			t.Fatalf("unsafe-pointer conversion method %q is invalid", name)
+		}
+		statements := method.Body().(tsgo.Block).Statements()
+		assertRuntimePanicCall(t, statements[len(statements)-1])
+	}
+	for index, name := range []string{FromIntegerName, ToIntegerName} {
+		method, ok := class.Members()[index+4].(tsgo.MethodDeclaration)
+		if !ok ||
+			method.Name().(tsgo.Identifier).Text() != name ||
+			len(method.Modifiers()) != 1 ||
+			method.Modifiers()[0].Kind() != tsgo.SyntaxKindStaticKeyword ||
+			len(method.TypeParameters()) != 1 ||
+			len(method.Parameters()) != 2 ||
+			method.Body() == nil {
+			t.Fatalf("unsafe-pointer integer method %q is invalid", name)
 		}
 		statements := method.Body().(tsgo.Block).Statements()
 		assertRuntimePanicCall(t, statements[len(statements)-1])

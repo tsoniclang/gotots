@@ -6,6 +6,7 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import { Seq } from "../iter/sequence.js";
 import {
   type BinaryLess,
+  compareLengths,
   type Convert,
   type CopyValue,
   type EqualValue,
@@ -20,8 +21,8 @@ import {
 type AsyncPredicate<T> = (
   (value: T, recovery?: GoRecovery) => Promise<bool>
 ) | undefined;
-type AsyncComparison<T> = (
-  (left: T, right: T, recovery?: GoRecovery) => Promise<int64>
+type AsyncComparison<L, R = L> = (
+  (left: L, right: R, recovery?: GoRecovery) => Promise<int64>
 ) | undefined;
 type CooperativeYield<T> = (
   value: T,
@@ -102,6 +103,82 @@ export async function CollectCooperative<E, EStorage>(
     : RuntimeSlice.literal(
       values.map((value): EStorage => toStorage(copyElement(value))),
     );
+}
+
+export async function BinarySearchFuncCooperative<
+  S,
+  E,
+  EStorage,
+  Target,
+>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  source: S,
+  target: Target,
+  compare: AsyncComparison<E, Target>,
+): Promise<[int64, bool]> {
+  const values = toSlice(source);
+  let low = 0;
+  let high = values.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    const result = await callComparison(
+      compare,
+      readElement(values, middle, copyElement, fromStorage),
+      target,
+    );
+    if (result < 0) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+  if (low === values.length) {
+    return [low, false];
+  }
+  return [
+    low,
+    await callComparison(
+      compare,
+      readElement(values, low, copyElement, fromStorage),
+      target,
+    ) === 0,
+  ];
+}
+
+export async function CompareFuncCooperative<
+  S1,
+  S2,
+  E1,
+  E1Storage,
+  E2,
+  E2Storage,
+>(
+  leftSlice: Convert<S1, RuntimeSlice<E1Storage>>,
+  rightSlice: Convert<S2, RuntimeSlice<E2Storage>>,
+  copyLeft: CopyValue<E1>,
+  copyRight: CopyValue<E2>,
+  fromLeftStorage: FromContainerStorage<E1, E1Storage>,
+  fromRightStorage: FromContainerStorage<E2, E2Storage>,
+  left: S1,
+  right: S2,
+  compare: AsyncComparison<E1, E2>,
+): Promise<int64> {
+  const leftValues = leftSlice(left);
+  const rightValues = rightSlice(right);
+  const count = Math.min(leftValues.length, rightValues.length);
+  for (let index = 0; index < count; index += 1) {
+    const result = await callComparison(
+      compare,
+      readElement(leftValues, index, copyLeft, fromLeftStorage),
+      readElement(rightValues, index, copyRight, fromRightStorage),
+    );
+    if (result !== 0) {
+      return result;
+    }
+  }
+  return compareLengths(leftValues.length, rightValues.length);
 }
 
 export async function ContainsFuncCooperative<S, E, EStorage>(
@@ -287,10 +364,10 @@ async function callPredicate<E>(
   return predicate(value);
 }
 
-async function callComparison<E>(
-  compare: AsyncComparison<E>,
-  left: E,
-  right: E,
+async function callComparison<L, R>(
+  compare: AsyncComparison<L, R>,
+  left: L,
+  right: R,
 ): Promise<int64> {
   if (compare === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");

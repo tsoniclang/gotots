@@ -41,6 +41,18 @@ test("Buffer.Read advances exactly and preserves empty-read boundaries", (): voi
   });
 });
 
+test("Buffer exposes unread length, growth, next, and write behavior", (): void => {
+  const buffer = NewBuffer(RuntimeSlice.literal([1, 2, 3]));
+  assert.equal(ByteBuffer.Len(buffer), 3);
+  assert.deepEqual(sliceValues(ByteBuffer.Next(buffer, 2)), [1, 2]);
+  assert.equal(ByteBuffer.Len(buffer), 1);
+  ByteBuffer.Grow(buffer, 4);
+  assert.equal(ByteBuffer.Available(buffer) >= 4, true);
+  assert.equal(ByteBuffer.AvailableBuffer(buffer).length, 0);
+  assert.deepEqual(ByteBuffer.Write(buffer, RuntimeSlice.literal([4, 5])), [2, undefined]);
+  assert.deepEqual(sliceValues(ByteBuffer.Next(buffer, 10)), [3, 4, 5]);
+});
+
 test("Buffer and NewBuffer agree with Go", (): void => {
   assert.equal(providerResult(), runGo(goProgram));
 });

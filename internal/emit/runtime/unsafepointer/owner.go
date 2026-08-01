@@ -9,6 +9,8 @@ const (
 	brandName             = "$go$unsafePointer"
 	FromName              = "from"
 	ToName                = "to"
+	FromIntegerName       = "fromInteger"
+	ToIntegerName         = "toInteger"
 	unresolvedPlaceholder = "unsafe.Pointer conversion requires an environment implementation"
 )
 
@@ -32,6 +34,8 @@ func Build(
 			target.constructor(),
 			target.from(),
 			target.to(),
+			target.fromInteger(),
+			target.toInteger(),
 		},
 	)
 }
@@ -84,6 +88,72 @@ func (b builder) to() tsgo.MethodDeclaration {
 		ToName,
 		b.nullable(b.unsafeType()),
 		b.nullable(b.genericType()),
+	)
+}
+
+func (b builder) fromInteger() tsgo.MethodDeclaration {
+	value := b.id("value")
+	zero := b.id("zero")
+	return b.factory.MethodDeclaration(
+		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
+		nil,
+		b.id(FromIntegerName),
+		nil,
+		[]tsgo.TypeParameterDeclaration{b.integerTypeParameter("I")},
+		[]tsgo.ParameterDeclaration{
+			b.parameter("value", b.typeReference("I")),
+			b.parameter("zero", b.typeReference("I")),
+		},
+		b.nullable(b.unsafeType()),
+		b.factory.Block(
+			[]tsgo.Statement{
+				b.factory.IfStatement(
+					b.equals(value, zero),
+					b.factory.Block(
+						[]tsgo.Statement{
+							b.factory.ReturnStatement(b.undefined()),
+						},
+						true,
+					),
+					nil,
+				),
+				b.factory.ExpressionStatement(b.unresolved()),
+			},
+			true,
+		),
+	)
+}
+
+func (b builder) toInteger() tsgo.MethodDeclaration {
+	value := b.id("value")
+	zero := b.id("zero")
+	return b.factory.MethodDeclaration(
+		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
+		nil,
+		b.id(ToIntegerName),
+		nil,
+		[]tsgo.TypeParameterDeclaration{b.integerTypeParameter("I")},
+		[]tsgo.ParameterDeclaration{
+			b.parameter("value", b.nullable(b.unsafeType())),
+			b.parameter("zero", b.typeReference("I")),
+		},
+		b.typeReference("I"),
+		b.factory.Block(
+			[]tsgo.Statement{
+				b.factory.IfStatement(
+					b.equals(value, b.undefined()),
+					b.factory.Block(
+						[]tsgo.Statement{
+							b.factory.ReturnStatement(zero),
+						},
+						true,
+					),
+					nil,
+				),
+				b.factory.ExpressionStatement(b.unresolved()),
+			},
+			true,
+		),
 	)
 }
 
@@ -140,11 +210,55 @@ func (b builder) method(
 }
 
 func (b builder) genericType() tsgo.TypeNode {
-	return b.factory.TypeReferenceNode(b.id("P"), nil)
+	return b.typeReference("P")
 }
 
 func (b builder) unsafeType() tsgo.TypeNode {
-	return b.factory.TypeReferenceNode(b.id(b.className), nil)
+	return b.typeReference(b.className)
+}
+
+func (b builder) typeReference(name string) tsgo.TypeReferenceNode {
+	return b.factory.TypeReferenceNode(b.id(name), nil)
+}
+
+func (b builder) integerType() tsgo.TypeNode {
+	return b.factory.UnionTypeNode([]tsgo.TypeNode{
+		b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
+		b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBigIntKeyword),
+	})
+}
+
+func (b builder) integerTypeParameter(name string) tsgo.TypeParameterDeclaration {
+	return b.factory.TypeParameterDeclaration(
+		nil,
+		b.id(name),
+		b.integerType(),
+		nil,
+		nil,
+	)
+}
+
+func (b builder) parameter(name string, target tsgo.TypeNode) tsgo.ParameterDeclaration {
+	return b.factory.ParameterDeclaration(
+		nil,
+		nil,
+		b.id(name),
+		nil,
+		target,
+		nil,
+	)
+}
+
+func (b builder) equals(left, right tsgo.Expression) tsgo.BinaryExpression {
+	return b.factory.BinaryExpression(
+		nil,
+		left,
+		nil,
+		b.factory.BinaryOperatorToken(
+			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+		),
+		right,
+	)
 }
 
 func (b builder) nullable(target tsgo.TypeNode) tsgo.TypeNode {

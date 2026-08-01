@@ -19,7 +19,9 @@ import {
 import {
   SlicesAppendSeqCooperative,
   SlicesAppendSeqFullyCooperative,
+  SlicesBinarySearchFuncCooperative,
   SlicesCollectCooperative,
+  SlicesCompareFuncCooperative,
   SlicesSortedCooperative,
   SlicesSortedFullyCooperative,
   SlicesValuesCooperative,
@@ -36,6 +38,7 @@ import {
   RuntimeMemStatsOperations,
 } from "../src/internal/facets/named-runtime.js";
 import {
+  ReflectStructFieldOperations,
   ReflectValueOperations,
 } from "../src/internal/facets/named-reflect.js";
 import {
@@ -59,11 +62,24 @@ import {
 } from "../src/internal/facets/named-unicode.js";
 import {
   BufioReaderRead,
+  BytesBufferWrite,
 } from "../src/internal/facets/recovery-io.js";
+import {
+  TimeParseErrorError,
+  TimeTimeAppendText,
+  TimeTimeIsZero,
+  TimeTimeMarshalJSON,
+  TimeTimeMarshalText,
+} from "../src/internal/facets/recovery-value.js";
 import { NewReader } from "../src/bufio.js";
+import { NewBuffer } from "../src/bytes.js";
 import { Description, Sample, Value } from "../src/runtime/metrics.js";
-import { Value as ReflectValue } from "../src/reflect.js";
-import { Time } from "../src/time.js";
+import {
+  StructField,
+  StructTag,
+  Value as ReflectValue,
+} from "../src/reflect.js";
+import { ParseError, Time } from "../src/time.js";
 import { Seq } from "../src/iter.js";
 import {
   Accuracy,
@@ -158,6 +174,20 @@ test("named-struct facets expose only selected static operations", (): void => {
   assert.ok(invalid instanceof ReflectValue);
   assert.equal(ReflectValueOperations.$copy(invalid), invalid);
 
+  const field = new StructField({
+    Name: "Original",
+    PkgPath: "",
+    Type: undefined,
+    Tag: new StructTag('json:"original"'),
+    Offset: 8,
+    Index: RuntimeSlice.literal([1, 2]),
+    Anonymous: false,
+  });
+  const fieldCopy = ReflectStructFieldOperations.$copy(field);
+  field.Name = "Changed";
+  assert.equal(fieldCopy.Name, "Original");
+  assert.equal(fieldCopy.Index, field.Index);
+
   const atomicBool = SyncAtomicBoolOperations.$zero();
   const atomicBoolCopy = SyncAtomicBoolOperations.$copy(atomicBool);
   assert.notEqual(atomicBoolCopy, atomicBool);
@@ -188,7 +218,13 @@ test("named-struct facets expose only selected static operations", (): void => {
     SyncAtomicInt64Operations.$storageOf(atomicInt64),
   ), atomicInt64);
   const zeroTime = new Time();
-  assert.equal(TimeOperations.$copy(zeroTime), zeroTime);
+  assert.notEqual(TimeOperations.$copy(zeroTime), zeroTime);
+  assert.equal(TimeOperations.$equal(TimeOperations.$copy(zeroTime), zeroTime), true);
+  const assignedTime = new Time();
+  const assignedTimeValue = new Time(10, 20, 30);
+  TimeOperations.$assign(assignedTime, assignedTimeValue);
+  assert.equal(TimeOperations.$equal(assignedTime, assignedTimeValue), true);
+  assert.notEqual(assignedTime, assignedTimeValue);
   assert.equal(TimeOperations.$fromStorage(
     TimeOperations.$storageOf(zeroTime),
   ), zeroTime);
@@ -250,9 +286,82 @@ test("recovery facets preserve the direct provider ABI", (): void => {
   const destination = RuntimeSlice.make<number>(1, 1, 0);
   assert.deepEqual(BufioReaderRead(reader, destination), [1, undefined]);
   assert.equal(destination.get(0), 65);
+  const buffer = NewBuffer(RuntimeSlice.nil<number>());
+  assert.deepEqual(
+    BytesBufferWrite(buffer, RuntimeSlice.literal([66, 67])),
+    [2, undefined],
+  );
+  const parseFailure = new ParseError(
+    "2006",
+    "bad",
+    "2006",
+    "bad",
+    "",
+  );
+  assert.equal(TimeParseErrorError(parseFailure), parseFailure.Error());
+  const [text, textFailure] = TimeTimeAppendText(
+    new Time(),
+    RuntimeSlice.literal([0x70, 0x3d]),
+  );
+  assert.equal(textFailure, undefined);
+  assert.equal(TimeTimeIsZero(new Time()), true);
+  const [json, jsonFailure] = TimeTimeMarshalJSON(new Time());
+  assert.equal(jsonFailure, undefined);
+  assert.equal(
+    new TextDecoder().decode(Uint8Array.from(
+      Array.from({ length: json.length }, (_, index) => json.get(index)),
+    )),
+    '"0001-01-01T00:00:00Z"',
+  );
+  const [marshaled, marshalFailure] = TimeTimeMarshalText(new Time());
+  assert.equal(marshalFailure, undefined);
+  assert.equal(
+    new TextDecoder().decode(Uint8Array.from(
+      Array.from(
+        { length: marshaled.length },
+        (_, index) => marshaled.get(index),
+      ),
+    )),
+    "0001-01-01T00:00:00Z",
+  );
+  assert.equal(
+    new TextDecoder().decode(Uint8Array.from(
+      Array.from({ length: text.length }, (_, index) => text.get(index)),
+    )),
+    "p=0001-01-01T00:00:00Z",
+  );
 });
 
 test("generic facets adapt cooperative provider implementations", async (): Promise<void> => {
+  assert.deepEqual(
+    await SlicesBinarySearchFuncCooperative(
+      sliceValue,
+      copyValue,
+      copyValue,
+      RuntimeSlice.literal([1, 3, 3, 8]),
+      "3",
+      async (value: number, target: string): Promise<number> => (
+        value - Number(target)
+      ),
+    ),
+    [1, true],
+  );
+  assert.equal(
+    await SlicesCompareFuncCooperative(
+      sliceValue,
+      sliceValue,
+      copyValue,
+      copyValue,
+      copyValue,
+      copyValue,
+      RuntimeSlice.literal([2, 4]),
+      RuntimeSlice.literal(["2", "5"]),
+      async (left: number, right: string): Promise<number> => (
+        left - Number(right)
+      ),
+    ),
+    -1,
+  );
   const source = GoMap.make<string, number>(0, 0, [["a", 1], ["b", 2]]);
   const keys: string[] = [];
   await MapsKeysCooperative<GoMapValue<string, number>, string, number>(

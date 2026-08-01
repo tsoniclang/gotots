@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"testing"
 
+	gostdlib "github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -296,6 +297,38 @@ func (unusedNames) ProviderGenericTypeArguments(
 	*types.Func,
 ) ([]api.GenericTypeArgumentProjection, bool, error) {
 	return nil, false, nil
+}
+
+func (unusedNames) ProviderInterface(
+	types.Type,
+) (gostdlib.ProviderInterface, bool, error) {
+	return gostdlib.ProviderInterface{}, false, nil
+}
+
+func (unusedNames) ProviderInterfaceBridge(
+	types.Type,
+) (api.NameReference, bool, error) {
+	return api.NameReference{}, false, nil
+}
+
+func (unusedNames) ProviderCallableProfile(
+	*types.Func,
+	string,
+) (api.ProviderCallableProfileReference, bool, error) {
+	return api.ProviderCallableProfileReference{}, false, nil
+}
+
+func (unusedNames) ProviderCallableProfileCandidates(
+	*types.Func,
+) ([]api.ProviderCallableProfileCandidate, bool, error) {
+	return nil, false, nil
+}
+
+func (unusedNames) ProviderRepresentationOwnsMethod(
+	types.Type,
+	*types.Func,
+) (bool, error) {
+	return false, nil
 }
 
 func (unusedNames) PackageVariable(

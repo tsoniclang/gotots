@@ -62,6 +62,8 @@ const (
 	GenericOperationToContainerStorage
 	GenericOperationFromContainerStorage
 	GenericOperationIndexAddress
+	GenericOperationSlice
+	GenericOperationSliceFull
 )
 
 var genericOperationIdentifiers = [...]string{
@@ -110,11 +112,13 @@ var genericOperationIdentifiers = [...]string{
 	GenericOperationToContainerStorage:   "to_container_storage",
 	GenericOperationFromContainerStorage: "from_container_storage",
 	GenericOperationIndexAddress:         "index_address",
+	GenericOperationSlice:                "slice",
+	GenericOperationSliceFull:            "slice_full",
 }
 
 func (o GenericOperation) Valid() bool {
 	return o >= GenericOperationZero &&
-		o <= GenericOperationIndexAddress
+		o <= GenericOperationSliceFull
 }
 
 func (o GenericOperation) Identifier() string {
@@ -180,6 +184,10 @@ func (o GenericOperation) String() string {
 		return "from-container-storage"
 	case GenericOperationIndexAddress:
 		return "index-address"
+	case GenericOperationSlice:
+		return "slice"
+	case GenericOperationSliceFull:
+		return "slice-full"
 	default:
 		if source, ok := o.BinaryToken(); ok {
 			return "binary-" + source.String()

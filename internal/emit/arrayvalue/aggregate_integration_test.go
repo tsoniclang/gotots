@@ -56,7 +56,7 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 					"function goArrayLocation",
 				},
 				"runtime/slice.ts": {
-					"public static $view<T>",
+					"static $view<T>",
 					"function goArraySlice",
 				},
 			} {

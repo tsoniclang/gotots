@@ -675,6 +675,15 @@ standard-library contracts, reusable manual `gostdlib`, true external
 contracts, placeholders, structural manual completion, extensions, and
 reachable-obligation checking.
 
+First make source selection explicit. Resolve one immutable build profile
+(toolchain, `GOOS`, `GOARCH`, `CGO_ENABLED`, sorted tags), pass it directly to
+`go/packages`, retain it on the loaded program, and exact-join it to provider
+metadata. Prove that ambient shell build variables cannot perturb the source
+universe. Install executable, exactly typed throwing bodies plus canonical
+obligation records for selected bodyless source declarations before attempting
+whole-product generation; declaration-only ESM modules are not a runtime
+checkpoint.
+
 Build `gostdlib` first as the independently typechecked and executable
 `@gotots/gostdlib` ESM package. Its public subpaths mirror Go import paths and
 contain ordinary named exports with Go declaration names. The first backend is

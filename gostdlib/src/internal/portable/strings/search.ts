@@ -13,10 +13,17 @@ import {
   runeCount,
   validRune,
 } from "../utf8/codec.js";
-import { simpleFold } from "../unicode/case.js";
+import { SimpleFold } from "../unicode/case.js";
 
 export function Contains(text: gostring, substring: gostring): bool {
   return text.includes(substring);
+}
+
+export function ContainsFunc(
+  text: gostring,
+  predicate: ((rune: int32) => bool) | undefined,
+): bool {
+  return IndexFunc(text, predicate) >= 0;
 }
 
 export function HasPrefix(text: gostring, prefix: gostring): bool {
@@ -184,7 +191,7 @@ function runesEqualFold(left: int32, right: int32): boolean {
   const larger = Math.max(left, right);
   const start = smaller;
   do {
-    smaller = simpleFold(smaller);
+    smaller = SimpleFold(smaller);
     if (smaller === larger) {
       return true;
     }

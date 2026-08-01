@@ -3256,12 +3256,16 @@ The call itself is emitted like any other typed call; no source spelling
 special-case exists.
 
 The language stage does not guess an implementation for a bodyless source
-function. Its callable owner records the exact selected `*types.Func`,
-`*types.Signature`, source role, and position in a typed unresolved-obligation
-diagnostic. The environment stage later converts that identity into an exact
-declaration and throwing placeholder or a selected provider implementation.
-Reachable placeholders block publication. Manual completion replaces bodies
-or declarations through structural typed TS-Go protocol ownership, never
+function. Its callable owner emits the exact selected parameter, result,
+receiver, generic, and callable-profile shape as ordinary executable
+TypeScript with a body that raises the canonical unresolved-function identity.
+The program records the exact selected `*types.Func`, `*types.Signature`,
+source role, position, and build profile once. It never emits an ambient
+`declare` function, and it never loses the rest of the source graph merely
+because one native implementation is absent. The environment stage may later
+replace that body through one selected provider implementation. Invoking an
+unresolved body fails deterministically; reachable placeholders block
+publication. Manual completion replaces typed TS-Go protocol ownership, never
 textual patches or per-file ownership.
 
 The predeclared `print` and `println` functions are implementation-defined by

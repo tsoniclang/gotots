@@ -10,6 +10,7 @@ export {
   Clone,
   Compare,
   Contains,
+  ContainsFunc,
   ContainsAny,
   ContainsRune,
   Count,

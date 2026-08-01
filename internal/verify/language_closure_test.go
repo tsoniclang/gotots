@@ -179,18 +179,51 @@ func TestWaveTenBodylessFunctionIsExactExternalObligation(t *testing.T) {
 	if !ok {
 		t.Fatal("external Read function is absent")
 	}
-	_, err := emit.Compile(
+	emission, err := emit.Compile(
 		program,
 		[]emit.Root{closureRoot(t, sourcePackage, "Read")},
 	)
-	var obligation *api.ExternalFunctionObligationError
-	signature, _ := selected.Type().(*types.Signature)
-	if !errors.As(err, &obligation) ||
-		obligation.Function != selected ||
-		obligation.Signature != signature ||
-		!obligation.Position.IsValid() {
-		t.Fatalf("external obligation = %#v", err)
+	if err != nil {
+		t.Fatal(err)
 	}
+	obligations := emission.ExternalFunctionObligations()
+	if len(obligations) != 1 {
+		t.Fatalf("external obligations = %d, want 1", len(obligations))
+	}
+	obligation := obligations[0]
+	signature, _ := selected.Type().(*types.Signature)
+	position := obligation.Position()
+	if obligation.Function() != selected ||
+		obligation.Signature() != signature ||
+		obligation.Identity() == "" ||
+		!position.IsValid() ||
+		!obligation.BuildProfile().Valid() {
+		t.Fatalf("external obligation = %#v", obligation)
+	}
+	obligations[0] = emit.ExternalFunctionObligation{}
+	if emission.ExternalFunctionObligations()[0].Identity() == "" {
+		t.Fatal("external-obligation accessor exposes backing storage")
+	}
+	artifacts := materializeClosure(t, emission)
+	for _, required := range []string{
+		"export function Read",
+		"buffer: RuntimeSlice<uint8>",
+		"int64,",
+		"GoError | undefined",
+		"GoPanic.raiseRuntime(\"unresolved external Go function ",
+	} {
+		if !strings.Contains(artifacts.printed, required) {
+			t.Fatalf(
+				"external artifact lacks %q:\n%s",
+				required,
+				artifacts.printed,
+			)
+		}
+	}
+	if strings.Contains(artifacts.printed, "declare function Read") {
+		t.Fatal("bodyless source function remained an ambient declaration")
+	}
+	executeExternalClosure(t, emission, artifacts, obligation.Identity())
 }
 
 func TestConstructFixturesCoverSelectedASTUniverse(t *testing.T) {

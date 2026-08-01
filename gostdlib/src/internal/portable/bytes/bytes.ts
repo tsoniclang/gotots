@@ -1,8 +1,28 @@
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { bool, uint8 } from "@gotots/runtime/scalars.js";
+import type { bool, gostring, int64, uint8 } from "@gotots/runtime/scalars.js";
 
 import { IsSpace } from "../unicode/properties.js";
 import { decodeRuneAt } from "../utf8/codec.js";
+
+export function Clone(source: RuntimeSlice<uint8>): RuntimeSlice<uint8> {
+  if (source.isNil()) {
+    return RuntimeSlice.nil<uint8>();
+  }
+  const target = RuntimeSlice.make<uint8>(source.length, null, 0);
+  RuntimeSlice.copy(target, source);
+  return target;
+}
+
+export function Compare(left: RuntimeSlice<uint8>, right: RuntimeSlice<uint8>): int64 {
+  const count = Math.min(left.length, right.length);
+  for (let index = 0; index < count; index += 1) {
+    const compared = left.get(index) - right.get(index);
+    if (compared !== 0) {
+      return compared < 0 ? -1 : 1;
+    }
+  }
+  return left.length === right.length ? 0 : left.length < right.length ? -1 : 1;
+}
 
 export function Cut(
   source: RuntimeSlice<uint8>,
@@ -28,6 +48,66 @@ export function Equal(left: RuntimeSlice<uint8>, right: RuntimeSlice<uint8>): bo
     }
   }
   return true;
+}
+
+export function IndexAny(source: RuntimeSlice<uint8>, characters: gostring): int64 {
+  const selected = runeSet(characters);
+  const value = toByteString(source);
+  for (let index = 0; index < value.length; ) {
+    const [rune, width] = decodeRuneAt(value, index);
+    if (selected.has(rune)) {
+      return index;
+    }
+    index += Math.max(1, width);
+  }
+  return -1;
+}
+
+export function IndexByte(source: RuntimeSlice<uint8>, value: uint8): int64 {
+  for (let index = 0; index < source.length; index += 1) {
+    if (source.get(index) === value) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+export function Join(
+  values: RuntimeSlice<RuntimeSlice<uint8>>,
+  separator: RuntimeSlice<uint8>,
+): RuntimeSlice<uint8> {
+  if (values.length === 0) {
+    return RuntimeSlice.literal<uint8>([]);
+  }
+  let result = RuntimeSlice.literal<uint8>([]);
+  for (let outer = 0; outer < values.length; outer += 1) {
+    if (outer !== 0) {
+      result = appendSlice(result, separator);
+    }
+    result = appendSlice(result, values.get(outer));
+  }
+  return result;
+}
+
+export function LastIndexByte(source: RuntimeSlice<uint8>, value: uint8): int64 {
+  for (let index = source.length - 1; index >= 0; index -= 1) {
+    if (source.get(index) === value) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+export function Trim(source: RuntimeSlice<uint8>, cutset: gostring): RuntimeSlice<uint8> {
+  return trim(source, cutset, true, true);
+}
+
+export function TrimLeft(source: RuntimeSlice<uint8>, cutset: gostring): RuntimeSlice<uint8> {
+  return trim(source, cutset, true, false);
+}
+
+export function TrimRight(source: RuntimeSlice<uint8>, cutset: gostring): RuntimeSlice<uint8> {
+  return trim(source, cutset, false, true);
 }
 
 export function TrimSpace(source: RuntimeSlice<uint8>): RuntimeSlice<uint8> {
@@ -77,6 +157,61 @@ function toByteString(source: RuntimeSlice<uint8>): string {
   let result = "";
   for (let index = 0; index < source.length; index += 1) {
     result += String.fromCharCode(source.get(index));
+  }
+  return result;
+}
+
+function appendSlice(
+  target: RuntimeSlice<uint8>,
+  source: RuntimeSlice<uint8>,
+): RuntimeSlice<uint8> {
+  const values: uint8[] = [];
+  for (let index = 0; index < source.length; index += 1) {
+    values.push(source.get(index));
+  }
+  return target.append(0, values);
+}
+
+function trim(
+  source: RuntimeSlice<uint8>,
+  cutset: gostring,
+  left: boolean,
+  right: boolean,
+): RuntimeSlice<uint8> {
+  const selected = runeSet(cutset);
+  const value = toByteString(source);
+  let start = 0;
+  let end = value.length;
+  if (left) {
+    while (start < end) {
+      const [rune, width] = decodeRuneAt(value, start);
+      if (!selected.has(rune)) {
+        break;
+      }
+      start += Math.max(1, width);
+    }
+  }
+  if (right) {
+    let index = start;
+    let lastRetained = start;
+    while (index < end) {
+      const [rune, width] = decodeRuneAt(value, index);
+      index += Math.max(1, width);
+      if (!selected.has(rune)) {
+        lastRetained = index;
+      }
+    }
+    end = lastRetained;
+  }
+  return source.slice(start, end, null);
+}
+
+function runeSet(value: gostring): Set<number> {
+  const result = new Set<number>();
+  for (let index = 0; index < value.length; ) {
+    const [rune, width] = decodeRuneAt(value, index);
+    result.add(rune);
+    index += Math.max(1, width);
   }
   return result;
 }
