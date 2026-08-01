@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import * as base64 from "../src/encoding/base64.js";
+import * as base32 from "../src/encoding/base32.js";
 import * as hex from "../src/encoding/hex.js";
 import * as bytes from "../src/bytes.js";
 import * as path from "../src/path.js";
@@ -61,7 +62,13 @@ test("text provider modules expose exactly the clean selected Go names", () => {
     "state",
   ]);
   assertExports(base64, ["Encoding", "NewEncoder", "state"]);
-  assertExports(hex, ["EncodeToString"]);
+  assertExports(base32, ["Encoding", "state"]);
+  assertExports(hex, [
+    "AppendDecode",
+    "AppendEncode",
+    "EncodedLen",
+    "EncodeToString",
+  ]);
   assertExports(unicode, [
     "In",
     "Is",
@@ -174,7 +181,7 @@ test("receiver operations are class-owned static members", () => {
     Object.getOwnPropertyNames(base64.Encoding)
       .filter((name) => !["length", "name", "prototype"].includes(name))
       .sort(),
-    ["DecodeString", "EncodeToString", "EncodedLen"].sort(),
+    ["AppendDecode", "AppendEncode", "DecodeString", "EncodeToString", "EncodedLen"].sort(),
   );
   assert.deepEqual(
     Object.getOwnPropertyNames(regexp.Regexp)
@@ -187,10 +194,17 @@ test("receiver operations are class-owned static members", () => {
     strings.Reader,
     strings.Replacer,
     base64.Encoding,
+    base32.Encoding,
     regexp.Regexp,
   ]) {
     assert.deepEqual(Object.getOwnPropertyNames(type.prototype), ["constructor"]);
   }
+  assert.deepEqual(
+    Object.getOwnPropertyNames(base32.Encoding)
+      .filter((name) => !["length", "name", "prototype"].includes(name))
+      .sort(),
+    ["AppendDecode", "AppendEncode", "EncodedLen"].sort(),
+  );
   assert.deepEqual(
     Object.getOwnPropertyNames(bytes.Buffer)
       .filter((name) => !["length", "name", "prototype"].includes(name))

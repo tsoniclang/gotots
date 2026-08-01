@@ -1,4 +1,12 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import {
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
@@ -47,6 +55,39 @@ test("base64 stream encoder flushes trailing bytes on Close", () => {
   assert.equal(writer.text(), "Zg==Zm9v");
 });
 
+test("base64 append operations preserve prefixes and URL encoding", (): void => {
+  const standard = requireEncoding(state.StdEncoding);
+  const url = requireEncoding(state.URLEncoding);
+  assert.equal(
+    byteText(Encoding.AppendEncode(standard, byteTextSlice("x"), byteTextSlice("foo"))),
+    "xZm9v",
+  );
+  assert.equal(
+    byteText(Encoding.AppendEncode(url, byteSlice([0x78]), byteSlice([0xff, 0xef]))),
+    "x_-8=",
+  );
+  const [decoded, failure] = Encoding.AppendDecode(
+    standard,
+    byteTextSlice("x"),
+    byteTextSlice("Zm9v"),
+  );
+  assert.equal(failure, undefined);
+  assert.equal(byteText(decoded), "xfoo");
+});
+
+test("base64 append operations agree with Go on corrupt input", (): void => {
+  const directory = mkdtempSync(join(tmpdir(), "gotots-base64-append-"));
+  const source = join(directory, "main.go");
+  try {
+    writeFileSync(source, base64AppendGoProgram);
+    const result = spawnSync("go", ["run", source], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(base64AppendProviderResult(), result.stdout.trim());
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
 test("hex encodes every byte with lower-case digits", () => {
   assert.equal(EncodeHex(RuntimeSlice.literal([0x00, 0x0f, 0x10, 0xff])), "000f10ff");
 });
@@ -90,3 +131,63 @@ function requireEncoding(encoding: Encoding | undefined): Encoding {
   }
   return encoding;
 }
+
+function base64AppendProviderResult(): string {
+  const standard = requireEncoding(state.StdEncoding);
+  const url = requireEncoding(state.URLEncoding);
+  const encoded = Encoding.AppendEncode(
+    url,
+    byteTextSlice("x"),
+    byteSlice([0xff, 0xef]),
+  );
+  const [decoded, decodedFailure] = Encoding.AppendDecode(
+    standard,
+    byteTextSlice("x"),
+    byteTextSlice("Zm9v"),
+  );
+  const [partial, partialFailure] = Encoding.AppendDecode(
+    standard,
+    byteTextSlice("x"),
+    byteTextSlice("Zm9v!"),
+  );
+  return [
+    byteText(encoded),
+    `${byteText(decoded)}:${decodedFailure?.Error() ?? ""}`,
+    `${byteText(partial)}:${partialFailure?.Error() ?? ""}`,
+  ].join("|");
+}
+
+function byteSlice(values: readonly number[]): RuntimeSlice<number> {
+  return RuntimeSlice.literal([...values]);
+}
+
+function byteTextSlice(value: string): RuntimeSlice<number> {
+  return byteSlice([...value].map((character): number => character.charCodeAt(0)));
+}
+
+function byteText(value: RuntimeSlice<number>): string {
+  return String.fromCharCode(...sliceValues(value));
+}
+
+const base64AppendGoProgram = `
+package main
+
+import (
+  "encoding/base64"
+  "fmt"
+)
+
+func errorText(err error) string {
+  if err == nil {
+    return ""
+  }
+  return err.Error()
+}
+
+func main() {
+  encoded := base64.URLEncoding.AppendEncode([]byte("x"), []byte{0xff, 0xef})
+  decoded, decodedErr := base64.StdEncoding.AppendDecode([]byte("x"), []byte("Zm9v"))
+  partial, partialErr := base64.StdEncoding.AppendDecode([]byte("x"), []byte("Zm9v!"))
+  fmt.Printf("%s|%s:%s|%s:%s\\n", encoded, decoded, errorText(decodedErr), partial, errorText(partialErr))
+}
+`;

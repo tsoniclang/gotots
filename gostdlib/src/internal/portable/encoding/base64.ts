@@ -9,6 +9,7 @@ import { ProviderError } from "../../runtime/error.js";
 import { byteSlice, sliceValues } from "../../runtime/slice.js";
 
 const standardAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const urlAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 let createEncoding: (alphabet: gostring, padding: number) => Encoding;
 
@@ -38,6 +39,27 @@ export class Encoding {
     source: gostring,
   ): [RuntimeSlice<uint8>, GoError | undefined] {
     return requireEncoding(receiver).#decodeString(source);
+  }
+
+  static AppendDecode(
+    receiver: Encoding | undefined,
+    destination: RuntimeSlice<uint8>,
+    source: RuntimeSlice<uint8>,
+  ): [RuntimeSlice<uint8>, GoError | undefined] {
+    const encoding = requireEncoding(receiver);
+    const [decoded, failure] = encoding.#decodeString(
+      String.fromCharCode(...sliceValues(source)),
+    );
+    return [destination.append(0, sliceValues(decoded)), failure];
+  }
+
+  static AppendEncode(
+    receiver: Encoding | undefined,
+    destination: RuntimeSlice<uint8>,
+    source: RuntimeSlice<uint8>,
+  ): RuntimeSlice<uint8> {
+    const encoded = requireEncoding(receiver).#encodeBytes(sliceValues(source));
+    return destination.append(0, byteCodes(encoded));
   }
 
   static EncodeToString(
@@ -302,4 +324,8 @@ function skipNewlines(source: gostring, start: number): number {
 
 export function standardEncoding(): Encoding {
   return createEncoding(standardAlphabet, 0x3d);
+}
+
+export function urlEncoding(): Encoding {
+  return createEncoding(urlAlphabet, 0x3d);
 }

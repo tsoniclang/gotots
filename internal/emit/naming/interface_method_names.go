@@ -3,6 +3,7 @@ package naming
 import (
 	"go/types"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
@@ -119,8 +120,12 @@ func (n *File) MethodTarget(
 			api.MethodReceiverABIContractDirect,
 		)
 	case targetBindingMissingProvider:
+		contract, err := environmentcontract.Describe(method)
+		if err != nil {
+			return api.MethodTarget{}, err
+		}
 		return api.MethodTarget{}, &api.NameError{
-			Name:   method.Name(),
+			Name:   contract.Identity(),
 			Reason: "selected standard-library method has no provider binding",
 		}
 	default:

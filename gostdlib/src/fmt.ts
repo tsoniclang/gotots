@@ -7,6 +7,7 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { gostring, int64 } from "@gotots/runtime/scalars.js";
 
 import type { Writer } from "./io.js";
+import { File, state as osState } from "./os.js";
 import { MessageWrappedError, MessageWrappedErrors } from "./internal/portable/errors/tree.js";
 import { formatOperands, formatText } from "./internal/portable/fmt/format.js";
 import { byteSlice } from "./internal/runtime/slice.js";
@@ -50,6 +51,13 @@ export function Fprintln(
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
 ): [int64, GoError | undefined] {
   return write(writer, formatOperands(arguments_, true));
+}
+
+export function Println(
+  arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
+): [int64, GoError | undefined] {
+  const text = formatOperands(arguments_, true);
+  return File.Write(osState.Stdout, byteSlice(new TextEncoder().encode(text)));
 }
 
 export function Sprint(

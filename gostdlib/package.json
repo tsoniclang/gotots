@@ -36,6 +36,10 @@
       "types": "./dist/src/encoding.d.ts",
       "default": "./dist/src/encoding.js"
     },
+    "./encoding/base32.js": {
+      "types": "./dist/src/encoding/base32.d.ts",
+      "default": "./dist/src/encoding/base32.js"
+    },
     "./encoding/base64.js": {
       "types": "./dist/src/encoding/base64.d.ts",
       "default": "./dist/src/encoding/base64.js"

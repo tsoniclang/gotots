@@ -7,6 +7,7 @@
     { "goImportPath": "compress/gzip", "specifier": "@gotots/gostdlib/compress/gzip.js", "sourcePath": "src/compress/gzip.ts" },
     { "goImportPath": "context", "specifier": "@gotots/gostdlib/context.js", "sourcePath": "src/context.ts" },
     { "goImportPath": "encoding", "specifier": "@gotots/gostdlib/encoding.js", "sourcePath": "src/encoding.ts" },
+    { "goImportPath": "encoding/base32", "specifier": "@gotots/gostdlib/encoding/base32.js", "sourcePath": "src/encoding/base32.ts" },
     { "goImportPath": "encoding/base64", "specifier": "@gotots/gostdlib/encoding/base64.js", "sourcePath": "src/encoding/base64.ts" },
     { "goImportPath": "encoding/binary", "specifier": "@gotots/gostdlib/encoding/binary.js", "sourcePath": "src/encoding/binary.ts" },
     { "goImportPath": "encoding/hex", "specifier": "@gotots/gostdlib/encoding/hex.js", "sourcePath": "src/encoding/hex.ts" },

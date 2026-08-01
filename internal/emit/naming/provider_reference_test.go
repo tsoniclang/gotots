@@ -1,6 +1,7 @@
 package naming
 
 import (
+	"errors"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -56,6 +57,50 @@ func (facetOnlyProvider) ProviderCallableProfiles(
 	string,
 ) []gostdlib.ProviderCallableProfile {
 	return nil
+}
+
+func TestMissingProviderMethodReportsCanonicalSourceIdentity(t *testing.T) {
+	selectedPackage := types.NewPackage("encoding/base64", "base64")
+	typeName := types.NewTypeName(
+		token.NoPos,
+		selectedPackage,
+		"Encoding",
+		nil,
+	)
+	named := types.NewNamed(typeName, types.NewStruct(nil, nil), nil)
+	receiver := types.NewVar(
+		token.NoPos,
+		selectedPackage,
+		"encoding",
+		types.NewPointer(named),
+	)
+	method := types.NewFunc(
+		token.NoPos,
+		selectedPackage,
+		"AppendEncode",
+		types.NewSignatureType(
+			receiver,
+			nil,
+			nil,
+			types.NewTuple(),
+			types.NewTuple(),
+			false,
+		),
+	)
+	named.AddMethod(method)
+	registry := NewRegistry()
+	registry.byObject[method] = targetBinding{kind: targetBindingMissingProvider}
+	names := &File{owner: &Owner{registry: registry}}
+
+	_, err := names.MethodTarget(method)
+	var nameError *api.NameError
+	if !errors.As(err, &nameError) {
+		t.Fatalf("error = %#v, want NameError", err)
+	}
+	want := "encoding/base64|kind=4|receiver=*encoding/base64.Encoding|name=AppendEncode"
+	if nameError.Name != want {
+		t.Fatalf("error identity = %q, want %q", nameError.Name, want)
+	}
 }
 
 func TestPrivateProviderDeclarationCanOwnCertifiedFacetWithoutPublicBinding(

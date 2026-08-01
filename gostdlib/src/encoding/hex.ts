@@ -1,1 +1,6 @@
-export { EncodeToString } from "../internal/portable/encoding/hex.js";
+export {
+  AppendDecode,
+  AppendEncode,
+  EncodedLen,
+  EncodeToString,
+} from "../internal/portable/encoding/hex.js";

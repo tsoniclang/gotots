@@ -9,7 +9,7 @@
   "goos": "linux",
   "goarch": "amd64",
   "runtimeDigest": "db1de728c4a9cb1fa90cb50e6455943d3c891a65be39185c76a66186354755d5",
-  "providerDigest": "7fe62ffb35278495a98941b36b11eaad1c7342f6da791c3e4a1bba2ffea82615",
+  "providerDigest": "8b50776e2f34ff97d1278a40da7c3403834709b750889cc9dc4ca78481fd1631",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -797,6 +797,82 @@
       ]
     },
     {
+      "goImportPath": "encoding/base32",
+      "specifier": "@gotots/gostdlib/encoding/base32.js",
+      "sourcePath": "src/encoding/base32.ts",
+      "bindings": [
+        {
+          "identity": "encoding/base32|kind=2|receiver=|name=Encoding",
+          "kind": "type",
+          "access": "export",
+          "representation": "direct",
+          "export": "Encoding",
+          "sourceSignature": "defined=encoding/base32.Encoding|underlying=struct{encode [32]byte; decodeMap [256]uint8; padChar rune}",
+          "sourceLocation": "encoding/base32/base32.go:22:6",
+          "implementationOwner": "src/internal/portable/encoding/base32.ts",
+          "targetFingerprint": "b60146b1d09a474088f5ae66a73bb17aa976d8e05069804a85be8fb7b61f3aeb"
+        },
+        {
+          "identity": "encoding/base32|kind=3|receiver=|name=HexEncoding",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "HexEncoding",
+          "sourceSignature": "*encoding/base32.Encoding",
+          "sourceLocation": "encoding/base32/base32.go:91:5",
+          "implementationOwner": "src/encoding/base32.ts",
+          "targetFingerprint": "c8576042efc502ce9ae4b940c1387ea8632ebd899546f6b5dfd3db6ba9a35b74"
+        },
+        {
+          "identity": "encoding/base32|kind=3|receiver=|name=StdEncoding",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "StdEncoding",
+          "sourceSignature": "*encoding/base32.Encoding",
+          "sourceLocation": "encoding/base32/base32.go:87:5",
+          "implementationOwner": "src/encoding/base32.ts",
+          "targetFingerprint": "2d2b314e941cfc62e5ef6070d77db42d15786cdd453283b8e276e74736a477c2"
+        },
+        {
+          "identity": "encoding/base32|kind=4|receiver=*encoding/base32.Encoding|name=AppendDecode",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Encoding",
+          "member": "AppendDecode",
+          "sourceSignature": "func(dst []byte, src []byte) ([]byte, error)|params=dst,src|results=,",
+          "sourceLocation": "encoding/base32/base32.go:405:22",
+          "implementationOwner": "src/internal/portable/encoding/base32.ts",
+          "targetFingerprint": "fb14fa753ae2fcd1cf1ee0b2eba5cbba7de5cfc4e0ce7e0f1df7fddb8d4d047e"
+        },
+        {
+          "identity": "encoding/base32|kind=4|receiver=*encoding/base32.Encoding|name=AppendEncode",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Encoding",
+          "member": "AppendEncode",
+          "sourceSignature": "func(dst []byte, src []byte) []byte|params=dst,src|results=",
+          "sourceLocation": "encoding/base32/base32.go:191:22",
+          "implementationOwner": "src/internal/portable/encoding/base32.ts",
+          "targetFingerprint": "0b5d29407c76ee075187ac68017e064638d9557ffd0c5fa330b95917c7b7f7ce"
+        },
+        {
+          "identity": "encoding/base32|kind=4|receiver=*encoding/base32.Encoding|name=EncodedLen",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Encoding",
+          "member": "EncodedLen",
+          "sourceSignature": "func(n int) int|params=n|results=",
+          "sourceLocation": "encoding/base32/base32.go:284:22",
+          "implementationOwner": "src/internal/portable/encoding/base32.ts",
+          "targetFingerprint": "3702b7739611ece234725c129fa771d1c2926a32fee890796dcad2540338464a"
+        }
+      ]
+    },
+    {
       "goImportPath": "encoding/base64",
       "specifier": "@gotots/gostdlib/encoding/base64.js",
       "sourcePath": "src/encoding/base64.ts",
@@ -810,7 +886,7 @@
           "sourceSignature": "defined=encoding/base64.Encoding|underlying=struct{encode [64]byte; decodeMap [256]uint8; padChar rune; strict bool}",
           "sourceLocation": "encoding/base64/base64.go:24:6",
           "implementationOwner": "src/internal/portable/encoding/base64.ts",
-          "targetFingerprint": "051f67d16bd7342508d66830d9c11c7ea67d468b083bc6c37432059c1e1c5f8c"
+          "targetFingerprint": "741119247516b3a04852f577d6afbc27c4d3fa148eacceee0b8e9a6dc896831e"
         },
         {
           "identity": "encoding/base64|kind=3|receiver=|name=StdEncoding",
@@ -822,6 +898,41 @@
           "sourceLocation": "encoding/base64/base64.go:119:5",
           "implementationOwner": "src/encoding/base64.ts",
           "targetFingerprint": "1f3d34db2075cede02131264b370ed4ea4d2e954d657e2c8402c912b6d5f0ea8"
+        },
+        {
+          "identity": "encoding/base64|kind=3|receiver=|name=URLEncoding",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "URLEncoding",
+          "sourceSignature": "*encoding/base64.Encoding",
+          "sourceLocation": "encoding/base64/base64.go:123:5",
+          "implementationOwner": "src/encoding/base64.ts",
+          "targetFingerprint": "231b40dcaa148acb770a546215da15171c0cf06ee9612ad439e47bb8f95840b6"
+        },
+        {
+          "identity": "encoding/base64|kind=4|receiver=*encoding/base64.Encoding|name=AppendDecode",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Encoding",
+          "member": "AppendDecode",
+          "sourceSignature": "func(dst []byte, src []byte) ([]byte, error)|params=dst,src|results=,",
+          "sourceLocation": "encoding/base64/base64.go:413:22",
+          "implementationOwner": "src/internal/portable/encoding/base64.ts",
+          "targetFingerprint": "dd27d1c57dd7a47c8d929ce4562a0162c626ec175d5cab7116edb301a36fb123"
+        },
+        {
+          "identity": "encoding/base64|kind=4|receiver=*encoding/base64.Encoding|name=AppendEncode",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Encoding",
+          "member": "AppendEncode",
+          "sourceSignature": "func(dst []byte, src []byte) []byte|params=dst,src|results=",
+          "sourceLocation": "encoding/base64/base64.go:198:22",
+          "implementationOwner": "src/internal/portable/encoding/base64.ts",
+          "targetFingerprint": "463b6cb606295a7079b3ffacca6506ba36f740b0e78e5fb49fd4c06c32db9c4e"
         },
         {
           "identity": "encoding/base64|kind=4|receiver=*encoding/base64.Encoding|name=DecodeString",
@@ -1082,6 +1193,28 @@
       "sourcePath": "src/encoding/hex.ts",
       "bindings": [
         {
+          "identity": "encoding/hex|kind=4|receiver=|name=AppendDecode",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "AppendDecode",
+          "sourceSignature": "func(dst []byte, src []byte) ([]byte, error)|params=dst,src|results=,",
+          "sourceLocation": "encoding/hex/hex.go:118:6",
+          "implementationOwner": "src/internal/portable/encoding/hex.ts",
+          "targetFingerprint": "5aab4a4df5d0e3059952c9bd990abc5720bf135bfddc19d184d8bdf9ad1b11ee"
+        },
+        {
+          "identity": "encoding/hex|kind=4|receiver=|name=AppendEncode",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "AppendEncode",
+          "sourceSignature": "func(dst []byte, src []byte) []byte|params=dst,src|results=",
+          "sourceLocation": "encoding/hex/hex.go:57:6",
+          "implementationOwner": "src/internal/portable/encoding/hex.ts",
+          "targetFingerprint": "d3db45f7c91c0c526c265acbc03488147f06b805dc6acb6738669700bbd8bf9e"
+        },
+        {
           "identity": "encoding/hex|kind=4|receiver=|name=EncodeToString",
           "kind": "function",
           "access": "export",
@@ -1091,6 +1224,17 @@
           "sourceLocation": "encoding/hex/hex.go:126:6",
           "implementationOwner": "src/internal/portable/encoding/hex.ts",
           "targetFingerprint": "eb53623cfd2bccd24e7d0ee78719c33061de29dc2ccbc08e15a8dc73efb7d5dd"
+        },
+        {
+          "identity": "encoding/hex|kind=4|receiver=|name=EncodedLen",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "EncodedLen",
+          "sourceSignature": "func(n int) int|params=n|results=",
+          "sourceLocation": "encoding/hex/hex.go:39:6",
+          "implementationOwner": "src/internal/portable/encoding/hex.ts",
+          "targetFingerprint": "507d991dd94339ac12f5f00b8599793aa37811a320bac5559e3c36b58b3ec6c0"
         }
       ]
     },
@@ -1344,6 +1488,17 @@
           "sourceLocation": "fmt/print.go:303:6",
           "implementationOwner": "src/fmt.ts",
           "targetFingerprint": "035127cddb03943aee0e2208030f4c50dee9724c5af55716fc98bf8c5c061dbb"
+        },
+        {
+          "identity": "fmt|kind=4|receiver=|name=Println",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Println",
+          "sourceSignature": "func(a ...any) (n int, err error)|params=a|results=n,err",
+          "sourceLocation": "fmt/print.go:314:6",
+          "implementationOwner": "src/fmt.ts",
+          "targetFingerprint": "85624a6b3e9e3b7efbaedf8999906c1113bc68dc2e9bfc0d030f57773ff733ec"
         },
         {
           "identity": "fmt|kind=4|receiver=|name=Sprint",
@@ -13200,5 +13355,5 @@
       ]
     }
   ],
-  "manifestDigest": "f21609b20c1527a143f76c40e40e28a73098c83873354106900d3320ecc3f391"
+  "manifestDigest": "247791aec6551a0269948581fb46632a949317492041a30d20ae639eca1adb7f"
 }

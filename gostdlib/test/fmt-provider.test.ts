@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
@@ -8,7 +9,7 @@ import {
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { uint8 } from "@gotots/runtime/scalars.js";
 
-import { Fprintln, Sprintf } from "../src/fmt.js";
+import { Fprintln, Println, Sprintf } from "../src/fmt.js";
 import type { Writer } from "../src/io.js";
 
 class FormattedValue extends GoInterfaceValue {
@@ -89,4 +90,23 @@ test("fmt Fprintln writes one Go line through io.Writer", () => {
   ]);
   assert.deepEqual(Fprintln(writer, arguments_), [9, undefined]);
   assert.equal(writer.content, "value 15\n");
+});
+
+test("fmt Println writes through the selected standard output", (): void => {
+  assert.equal(typeof Println, "function");
+  const moduleURL = new URL("../src/fmt.js", import.meta.url).href;
+  const script = `
+    import { Println } from ${JSON.stringify(moduleURL)};
+    import { RuntimeSlice } from "@gotots/runtime/slice.js";
+    const result = Println(RuntimeSlice.literal([]));
+    process.stderr.write(JSON.stringify(result));
+  `;
+  const result = spawnSync(
+    process.execPath,
+    ["--input-type=module", "--eval", script],
+    { cwd: process.cwd(), encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "\n");
+  assert.equal(result.stderr, "[1,null]");
 });
