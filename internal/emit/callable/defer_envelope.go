@@ -91,6 +91,13 @@ func emitDeferredBody(
 	if err != nil {
 		return api.BlockEmission{}, err
 	}
+	deferPopReference, err := context.Names().Runtime(
+		api.RuntimeDeferPop,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.BlockEmission{}, err
+	}
 	statements := []tsgo.Statement{
 		deferStackDeclaration(
 			context,
@@ -114,6 +121,7 @@ func emitDeferredBody(
 			returnLabel,
 			panicReference.Name(),
 			recoveryReference.Name(),
+			deferPopReference.Name(),
 			bodyCatchName,
 			deferredName,
 			recoveryName,
@@ -141,6 +149,7 @@ func emitDeferredBody(
 			resultRequests,
 			panicReference.Requests(),
 			recoveryReference.Requests(),
+			deferPopReference.Requests(),
 			finalRequests,
 		)...,
 	), nil
@@ -214,6 +223,7 @@ func deferEnvelope(
 	returnLabel string,
 	panicTypeName string,
 	recoveryTypeName string,
+	deferPopName string,
 	bodyCatchName string,
 	deferredName string,
 	recoveryName string,
@@ -251,6 +261,7 @@ func deferEnvelope(
 					panicName,
 					panicTypeName,
 					recoveryTypeName,
+					deferPopName,
 					deferredName,
 					recoveryName,
 					deferCatchName,
@@ -336,6 +347,7 @@ func drainDefers(
 	panicName string,
 	panicTypeName string,
 	recoveryTypeName string,
+	deferPopName string,
 	deferredName string,
 	recoveryName string,
 	caughtName string,
@@ -349,38 +361,12 @@ func drainDefers(
 			tsgo.NodeFlagsConst,
 			deferredName,
 			nil,
-			context.Factory().ElementAccessExpression(
-				stack,
+			context.Factory().CallExpression(
+				context.Factory().Identifier(deferPopName),
 				nil,
-				context.Factory().BinaryExpression(
-					nil,
-					context.Factory().PropertyAccessExpression(
-						stack,
-						nil,
-						context.Factory().Identifier("length"),
-						tsgo.NodeFlagsNone,
-					),
-					nil,
-					context.Factory().BinaryOperatorToken(
-						tsgo.BinaryOperatorMinusToken,
-					),
-					context.Factory().NumericLiteral(
-						"1",
-						tsgo.TokenFlagsNone,
-					),
-				),
+				nil,
+				[]tsgo.Expression{stack},
 				tsgo.NodeFlagsNone,
-			),
-		),
-		context.Factory().ExpressionStatement(
-			context.Factory().PostfixUnaryExpression(
-				context.Factory().PropertyAccessExpression(
-					stack,
-					nil,
-					context.Factory().Identifier("length"),
-					tsgo.NodeFlagsNone,
-				),
-				tsgo.PostfixUnaryExpressionOperatorKindMinusMinusToken,
 			),
 		),
 		variableStatement(

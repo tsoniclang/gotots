@@ -36,6 +36,7 @@ const (
 	RuntimeRecovery             RuntimeSymbol = 502
 	RuntimePanicNilError        RuntimeSymbol = 503
 	RuntimePanicNilValue        RuntimeSymbol = 504
+	RuntimeDeferPop             RuntimeSymbol = 505
 	RuntimeIntegerDivide        RuntimeSymbol = 600
 	RuntimeIntegerRemainder     RuntimeSymbol = 601
 	RuntimeIntegerMax           RuntimeSymbol = 602
@@ -345,6 +346,14 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			true,
 			RuntimePanic,
 			RuntimeInterfaceValue,
+		), nil
+	case RuntimeDeferPop:
+		return runtimeContract(
+			RuntimeModulePanic,
+			"runtime/panic.ts",
+			"goDeferPop",
+			false,
+			RuntimePanic,
 		), nil
 	case RuntimePanicNilError:
 		return runtimeContract(

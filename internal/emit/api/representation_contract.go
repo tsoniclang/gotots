@@ -374,6 +374,7 @@ func concurrencyRuntimeContract(
 			RuntimeSendChannel,
 			RuntimeSelectCase,
 			RuntimePanic,
+			RuntimeDenseIndex,
 		), nil
 	case RuntimeReceiveChannel:
 		return runtimeContract(

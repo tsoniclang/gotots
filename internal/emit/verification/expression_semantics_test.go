@@ -297,6 +297,7 @@ func waveThreeTypecheck(
 		"--module", "nodenext",
 		"--moduleResolution", "nodenext",
 		"--strict",
+		"--noUncheckedIndexedAccess",
 		"--outDir", filepath.Join(workingDirectory, "out"),
 	}
 	arguments = append(arguments, paths...)

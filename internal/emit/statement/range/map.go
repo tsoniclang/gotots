@@ -4,6 +4,7 @@ import (
 	"go/ast"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -83,6 +84,14 @@ func emitMapValue(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
+	denseIndex, err := context.Names().Runtime(
+		api.RuntimeDenseIndex,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	requests = append(requests, denseIndex.Requests()...)
 	keyName, err := context.Names().Temporary(api.TemporaryRangeValue)
 	if err != nil {
 		return api.StatementEmission{}, err
@@ -144,11 +153,11 @@ func emitMapValue(
 			context,
 			tsgo.NodeFlagsConst,
 			keyValue,
-			context.Factory().ElementAccessExpression(
+			indexedstorage.Element(
+				context.Factory(),
+				denseIndex.Name(),
 				keys,
-				nil,
 				index,
-				tsgo.NodeFlagsNone,
 			),
 		),
 	}

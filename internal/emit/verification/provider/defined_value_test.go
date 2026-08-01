@@ -97,4 +97,14 @@ func SequenceTotal(sequence iter.Seq[int]) int {
 			t.Fatalf("provider defined-value artifact contains %q:\n%s", forbidden, printed)
 		}
 	}
+	if count := strings.Count(
+		printed,
+		"IterSeqValueOperations.$project",
+	); count != 1 {
+		t.Fatalf(
+			"provider iterator projection count = %d, want one:\n%s",
+			count,
+			printed,
+		)
+	}
 }

@@ -153,7 +153,8 @@ For every generated file:
 5. TS-Go reparses the printed file;
 6. normalized schema-level structure matches the constructed value;
 7. source mappings and declaration ownership reconcile; and
-8. strict TypeScript resolution/typechecking succeeds.
+8. strict TypeScript resolution/typechecking succeeds with
+   `noUncheckedIndexedAccess` enabled.
 
 The Go encoder is compared against the pinned upstream TypeScript encoder over
 the same representative target graphs, including optional children, lists,

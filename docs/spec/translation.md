@@ -254,6 +254,15 @@ zero-argument closure. Invocation happens only during LIFO unwind. A deferred
 nil function therefore panics during unwind, while a nil pointer implicit
 dereference needed for a value receiver panics at registration.
 
+The compiler-owned defer stack is drained through one demanded, generic,
+checked `goDeferPop<T>(stack: T[]): T` runtime operation. Native indexed access
+is not admissible under `noUncheckedIndexedAccess`, and a target non-null
+assertion or cast would erase the proof. The operation performs one native
+`pop`, fails on the impossible empty-stack state, and returns a statically
+non-nil deferred closure. It is emitted once in `runtime/panic.ts`; each source
+function with `defer` contributes one call, not an inline guard or duplicate
+stack protocol.
+
 Exact label definitions and uses come from `go/types.Info.Defs` and `Uses`.
 Labeled `break`/`continue` and switch `fallthrough` retain their direct target
 forms. A forward edge representable by a target label and a backward edge
@@ -1868,7 +1877,10 @@ func(func(V) bool)
 func(func(K, V) bool)
 ```
 
-The range expression is evaluated once. Its yield callback is a typed arrow;
+The range expression is evaluated once. If a defined callable requires a
+representation projection, that final projected callable is also evaluated
+and captured once before both the nil guard and invocation; the guard and call
+must reference the same target binding. Its yield callback is a typed arrow;
 each invocation copies yielded values into the exact per-iteration declaration
 or assignment targets, executes the body, returns `true` to continue, and
 returns `false` for a source `break`. A source `continue` returns `true`.

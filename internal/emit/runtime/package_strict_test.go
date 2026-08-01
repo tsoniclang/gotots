@@ -18,9 +18,10 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 		tsgo.NewFactory(),
 		api.IntegerRepresentationNumber,
 		map[api.RuntimeSymbol]struct{}{
-			api.RuntimeArray:   {},
-			api.RuntimePointer: {},
-			api.RuntimeSlice:   {},
+			api.RuntimeArray:    {},
+			api.RuntimeDeferPop: {},
+			api.RuntimePointer:  {},
+			api.RuntimeSlice:    {},
 		},
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)

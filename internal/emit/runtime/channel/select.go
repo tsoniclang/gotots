@@ -105,7 +105,7 @@ func (b builder) selectAttemptBody() tsgo.Block {
 			b.factory.Block([]tsgo.Statement{
 				b.factory.IfStatement(
 					b.methodCall(
-						b.element(
+						b.denseElement(
 							b.id("cases"),
 							b.id("index"),
 						),
@@ -136,7 +136,7 @@ func (b builder) selectAttemptBody() tsgo.Block {
 			tsgo.NodeFlagsConst,
 			"selectedIndex",
 			b.numberType(),
-			b.element(
+			b.denseElement(
 				b.id("ready"),
 				b.staticCall(
 					"Math",
@@ -153,7 +153,7 @@ func (b builder) selectAttemptBody() tsgo.Block {
 			"outcome",
 			b.selectCommitType(),
 			b.methodCall(
-				b.element(b.id("cases"), b.id("selectedIndex")),
+				b.denseElement(b.id("cases"), b.id("selectedIndex")),
 				"commit",
 			),
 		),
@@ -339,7 +339,7 @@ func (b builder) selectExecutor() tsgo.ArrowFunction {
 						tsgo.NodeFlagsConst,
 						"held",
 						b.numberType(),
-						b.element(
+						b.denseElement(
 							b.id("order"),
 							b.id("remaining"),
 						),
@@ -349,7 +349,7 @@ func (b builder) selectExecutor() tsgo.ArrowFunction {
 							b.id("order"),
 							b.id("remaining"),
 						),
-						b.element(
+						b.denseElement(
 							b.id("order"),
 							b.id("swapIndex"),
 						),
@@ -379,7 +379,7 @@ func (b builder) selectExecutor() tsgo.ArrowFunction {
 						tsgo.NodeFlagsConst,
 						"caseIndex",
 						b.numberType(),
-						b.element(
+						b.denseElement(
 							b.id("order"),
 							b.id("registration"),
 						),
@@ -388,7 +388,7 @@ func (b builder) selectExecutor() tsgo.ArrowFunction {
 						b.id("cancellations"),
 						"push",
 						b.methodCall(
-							b.element(
+							b.denseElement(
 								b.id("cases"),
 								b.id("caseIndex"),
 							),

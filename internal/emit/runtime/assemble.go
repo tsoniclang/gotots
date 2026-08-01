@@ -469,6 +469,10 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
+		deferPopContract, err := api.RuntimeContract(api.RuntimeDeferPop)
+		if err != nil {
+			return nil, err
+		}
 		errorTokenContract, err := api.RuntimeContract(
 			api.RuntimeErrorMethodToken,
 		)
@@ -499,6 +503,7 @@ func Build(
 				valueContract.ExportedName(),
 				runtimeValueContract.ExportedName(),
 				recoveryContract.ExportedName(),
+				deferPopContract.ExportedName(),
 				errorTokenContract.ExportedName(),
 				runtimeErrorTokenContract.ExportedName(),
 			)

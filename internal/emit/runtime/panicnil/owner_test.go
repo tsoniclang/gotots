@@ -19,6 +19,7 @@ func TestPanicNilAndRuntimeFaultHaveDistinctDynamicIdentities(t *testing.T) {
 		"GoInterfaceValue",
 		"GoRuntimePanicValue",
 		"GoRecovery",
+		"goDeferPop",
 		"GoErrorMethodToken",
 		"GoRuntimeErrorMethodToken",
 	)
