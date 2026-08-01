@@ -81,7 +81,6 @@ func Emit(
 		source,
 		owner,
 		instance.TypeArgs,
-		selection.Cooperative(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err

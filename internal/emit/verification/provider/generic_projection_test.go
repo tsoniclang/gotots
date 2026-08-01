@@ -20,6 +20,7 @@ func TestProviderGenericCallsUseCertifiedTargetProjection(t *testing.T) {
 	writeProgramFile(t, filepath.Join(project, "source.go"), `package providerprojection
 
 import (
+	"context"
 	"maps"
 	"slices"
 )
@@ -39,6 +40,13 @@ func Grow(source []string) []string {
 func GenericClone[T any](source []T) []T {
 	return slices.Clone(source)
 }
+
+func PrintValues(source []string) {
+	_, cancel := context.WithCancel(context.Background())
+	for range slices.Values(source) {
+		cancel()
+	}
+}
 `)
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: project,
@@ -57,6 +65,7 @@ func GenericClone[T any](source []T) []T {
 			mustProviderRoot(t, scope.Lookup("Clone")),
 			mustProviderRoot(t, scope.Lookup("GenericClone")),
 			mustProviderRoot(t, scope.Lookup("Grow")),
+			mustProviderRoot(t, scope.Lookup("PrintValues")),
 		},
 		options,
 	)
@@ -71,6 +80,7 @@ func GenericClone[T any](source []T) []T {
 		"Clone<GoMapValue<gostring, int64>, gostring, int64>(",
 		"Grow<RuntimeSlice<gostring>, gostring, gostring>(",
 		"Clone<T$ContainerStorage>(",
+		"SlicesValuesCooperative<RuntimeSlice<gostring>, gostring, gostring>(",
 	} {
 		if !strings.Contains(printed, exact) {
 			t.Fatalf("provider generic projection lacks %q:\n%s", exact, printed)

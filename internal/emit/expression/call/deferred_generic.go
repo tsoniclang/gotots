@@ -71,7 +71,7 @@ func emitDeferredGeneric(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	reference, callableFacet, selection, err :=
+	reference, callableFacet, _, err :=
 		cooperativecall.SelectGenericCallable(
 			context,
 			owner,
@@ -88,7 +88,6 @@ func emitDeferredGeneric(
 			source,
 			owner,
 			instance.TypeArgs,
-			selection.Cooperative(),
 		)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err

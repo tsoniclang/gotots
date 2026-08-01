@@ -72,17 +72,7 @@ func EmitFunctionTypeArguments(
 	source ast.Node,
 	declaration *types.Func,
 	arguments *types.TypeList,
-	profiled bool,
 ) ([]tsgo.TypeNode, []api.RootRequest, error) {
-	if profiled {
-		return EmitTypeArguments(
-			context,
-			children,
-			source,
-			declaration,
-			arguments,
-		)
-	}
 	projection, providerOwned, err :=
 		context.Names().ProviderGenericTypeArguments(declaration)
 	if err != nil {
