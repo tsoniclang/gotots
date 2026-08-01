@@ -67,7 +67,10 @@ export class Signal extends SignalInterfaceValue {
   }
 }
 
+export const EAGAIN = new Errno(11);
 export const EINTR = new Errno(4);
+export const EINVAL = new Errno(22);
+export const ENOENT = new Errno(2);
 export const ENOTDIR = new Errno(20);
 export const EPERM = new Errno(1);
 export const SIGINT = new Signal(2);

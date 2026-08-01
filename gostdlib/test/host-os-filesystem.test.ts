@@ -17,6 +17,7 @@ import {
   File,
   IsNotExist,
   MkdirAll,
+  Open,
   OpenFile,
   Remove,
   RemoveAll,
@@ -57,6 +58,13 @@ test("os filesystem operations preserve Go result tuples and file state", () => 
     ]);
     assert.deepEqual(File.Read(opened, buffer), [0, ioState.EOF]);
     assert.equal(File.Close(opened), undefined);
+
+    const [openedSimply, simpleOpenError] = Open(path);
+    assert.equal(simpleOpenError, undefined);
+    assert.ok(openedSimply !== undefined);
+    assert.deepEqual(File.Read(openedSimply, buffer), [5, undefined]);
+    assert.equal(File.Close(openedSimply), undefined);
+    assert.equal(IsNotExist(Open(join(root, "missing"))[1]), true);
 
     const [information, statError] = Stat(path);
     assert.equal(statError, undefined);

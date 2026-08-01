@@ -14,8 +14,8 @@ import type {
   DirEntry,
   FS,
   FileInfo,
-  FileMode,
 } from "./io/fs.js";
+import { FileMode } from "./io/fs.js";
 export { PathError } from "./io/fs.js";
 import type { Time } from "./time.js";
 import {
@@ -178,6 +178,10 @@ export function OpenFile(
   permissions: FileMode,
 ): [File | undefined, GoError | undefined] {
   return open(name, flags, permissions, newFile);
+}
+
+export function Open(name: gostring): [File | undefined, GoError | undefined] {
+  return OpenFile(name, 0, new FileMode(0));
 }
 
 export function Remove(name: gostring): GoError | undefined {

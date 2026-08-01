@@ -9,7 +9,7 @@
   "goos": "linux",
   "goarch": "amd64",
   "runtimeDigest": "db1de728c4a9cb1fa90cb50e6455943d3c891a65be39185c76a66186354755d5",
-  "providerDigest": "8b50776e2f34ff97d1278a40da7c3403834709b750889cc9dc4ca78481fd1631",
+  "providerDigest": "0612e3b029644944add6b2b89ce8a45e4f749f70ab08f845395bf60406e32746",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -26,6 +26,17 @@
           "sourceLocation": "bufio/bufio.go:35:6",
           "implementationOwner": "src/bufio.ts",
           "targetFingerprint": "d7e992892a66f60983708cf0fca1324838703e0b0656e0a2cd840d7ee763f938"
+        },
+        {
+          "identity": "bufio|kind=2|receiver=|name=Scanner",
+          "kind": "type",
+          "access": "export",
+          "representation": "direct",
+          "export": "Scanner",
+          "sourceSignature": "defined=bufio.Scanner|underlying=struct{r io.Reader; split bufio.SplitFunc; maxTokenSize int; token []byte; buf []byte; start int; end int; err error; empties int; scanCalled bool; done bool}",
+          "sourceLocation": "bufio/scan.go:29:6",
+          "implementationOwner": "src/bufio.ts",
+          "targetFingerprint": "d456822cde633565aab23236d6e4116203de8fa9222b89dfef4476ae91696336"
         },
         {
           "identity": "bufio|kind=2|receiver=|name=Writer",
@@ -75,6 +86,42 @@
           "targetFingerprint": "600461d54e71c12197facb21c77b6a64cd48a464de1bc3b4fbe1ee5392824b40"
         },
         {
+          "identity": "bufio|kind=4|receiver=*bufio.Scanner|name=Err",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Scanner",
+          "member": "Err",
+          "sourceSignature": "func() error|params=|results=",
+          "sourceLocation": "bufio/scan.go:98:19",
+          "implementationOwner": "src/bufio.ts",
+          "targetFingerprint": "6dd7476f3e9110fbdd467e788fb92faf0e4d46dad09fc5910ac9126b9465acdb"
+        },
+        {
+          "identity": "bufio|kind=4|receiver=*bufio.Scanner|name=Scan",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Scanner",
+          "member": "Scan",
+          "sourceSignature": "func() bool|params=|results=",
+          "sourceLocation": "bufio/scan.go:139:19",
+          "implementationOwner": "src/bufio.ts",
+          "targetFingerprint": "b3c1156b13870cebeb23f236152113b4b86a6078c71af93f3d451ab2aa96ffb4"
+        },
+        {
+          "identity": "bufio|kind=4|receiver=*bufio.Scanner|name=Text",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Scanner",
+          "member": "Text",
+          "sourceSignature": "func() string|params=|results=",
+          "sourceLocation": "bufio/scan.go:114:19",
+          "implementationOwner": "src/bufio.ts",
+          "targetFingerprint": "821a3a9aa2a963be195fd6afa856d9009b7cdb0bc0f4f723a3858314040fe424"
+        },
+        {
           "identity": "bufio|kind=4|receiver=*bufio.Writer|name=Flush",
           "kind": "function",
           "access": "static-method",
@@ -120,6 +167,17 @@
           "sourceLocation": "bufio/bufio.go:62:6",
           "implementationOwner": "src/bufio.ts",
           "targetFingerprint": "79b0d56deeceac8ac9aeb5199b342f6b9d0af9e9998cc3db5b524ef187c14c1c"
+        },
+        {
+          "identity": "bufio|kind=4|receiver=|name=NewScanner",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "NewScanner",
+          "sourceSignature": "func(r io.Reader) *bufio.Scanner|params=r|results=",
+          "sourceLocation": "bufio/scan.go:89:6",
+          "implementationOwner": "src/bufio.ts",
+          "targetFingerprint": "45e1f9825e34bdfae011749e90dad54a1f50abb6a0ef9b83e11a2261cf0c36d3"
         },
         {
           "identity": "bufio|kind=4|receiver=|name=NewWriter",
@@ -4215,6 +4273,17 @@
           "sourceLocation": "os/path.go:19:6",
           "implementationOwner": "src/os.ts",
           "targetFingerprint": "8821a287342df35264c7f6de682f1e59d9d88c349be601fb382f5621f5a0d6ee"
+        },
+        {
+          "identity": "os|kind=4|receiver=|name=Open",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Open",
+          "sourceSignature": "func(name string) (*os.File, error)|params=name|results=,",
+          "sourceLocation": "os/file.go:389:6",
+          "implementationOwner": "src/os.ts",
+          "targetFingerprint": "5b7317968611016cf18d94e453f7fcd4f2bf3a55aa9c024d4f57a6361b4eb1b0"
         },
         {
           "identity": "os|kind=4|receiver=|name=OpenFile",
@@ -10057,6 +10126,17 @@
       "sourcePath": "src/syscall.ts",
       "bindings": [
         {
+          "identity": "syscall|kind=1|receiver=|name=EAGAIN",
+          "kind": "constant",
+          "access": "export",
+          "export": "EAGAIN",
+          "sourceSignature": "syscall.Errno",
+          "sourceValue": "11",
+          "sourceLocation": "syscall/zerrors_linux_amd64.go:1188:2",
+          "implementationOwner": "src/syscall.ts",
+          "targetFingerprint": "d6fb14a0f0f6311c6948132412f6980f2c2ced17e3e6f044878471acad1aa16c"
+        },
+        {
           "identity": "syscall|kind=1|receiver=|name=EINTR",
           "kind": "constant",
           "access": "export",
@@ -10066,6 +10146,28 @@
           "sourceLocation": "syscall/zerrors_linux_amd64.go:1220:2",
           "implementationOwner": "src/syscall.ts",
           "targetFingerprint": "7ca3f6667bc76546c1a5f8530d315537a07c61f49d2ee846a18a6addd0223650"
+        },
+        {
+          "identity": "syscall|kind=1|receiver=|name=EINVAL",
+          "kind": "constant",
+          "access": "export",
+          "export": "EINVAL",
+          "sourceSignature": "syscall.Errno",
+          "sourceValue": "22",
+          "sourceLocation": "syscall/zerrors_linux_amd64.go:1221:2",
+          "implementationOwner": "src/syscall.ts",
+          "targetFingerprint": "adfe22938fdc47cac8394a77cea26c71ba7d2bfa82fe5281bdf49047b457f6c6"
+        },
+        {
+          "identity": "syscall|kind=1|receiver=|name=ENOENT",
+          "kind": "constant",
+          "access": "export",
+          "export": "ENOENT",
+          "sourceSignature": "syscall.Errno",
+          "sourceValue": "2",
+          "sourceLocation": "syscall/zerrors_linux_amd64.go:1256:2",
+          "implementationOwner": "src/syscall.ts",
+          "targetFingerprint": "57d1d3493d865ae4708a04f4aff73192b086aeab8fd4097aa469ef0f64307f68"
         },
         {
           "identity": "syscall|kind=1|receiver=|name=ENOTDIR",
@@ -13355,5 +13457,5 @@
       ]
     }
   ],
-  "manifestDigest": "247791aec6551a0269948581fb46632a949317492041a30d20ae639eca1adb7f"
+  "manifestDigest": "b07436b0ed86318cd4148a023f4c0f523ebc427d09f717635b9a9baeee4fbf9a"
 }

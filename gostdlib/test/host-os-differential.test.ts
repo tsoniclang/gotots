@@ -19,6 +19,7 @@ import {
   File,
   IsNotExist,
   MkdirAll,
+  Open,
   Remove,
   Stat,
 } from "../src/os.js";
@@ -78,6 +79,12 @@ function providerResult(root: string): string {
   assert.equal(File.Close(file), undefined);
   const [information, statError] = Stat(path);
   assert.equal(statError, undefined);
+  const [opened, openError] = Open(path);
+  assert.equal(openError, undefined);
+  assert.ok(opened !== undefined);
+  const contents = RuntimeSlice.make<number>(5, null, 0);
+  assert.deepEqual(File.Read(opened, contents), [5, undefined]);
+  assert.equal(File.Close(opened), undefined);
 
   const command = Command("printf", RuntimeSlice.literal(["child"]));
   assert.ok(command !== undefined);
@@ -90,6 +97,7 @@ function providerResult(root: string): string {
     verbose.value,
     name.value,
     information?.Size(),
+    Buffer.from(sliceValues(contents)).toString("utf8"),
     child,
     missing,
     SIGINT.String(),
@@ -135,11 +143,22 @@ func main() {
   if err != nil {
     panic(err)
   }
+  opened, err := os.Open(path)
+  if err != nil {
+    panic(err)
+  }
+  contents := make([]byte, 5)
+  if _, err := opened.Read(contents); err != nil {
+    panic(err)
+  }
+  if err := opened.Close(); err != nil {
+    panic(err)
+  }
   output, err := exec.Command("printf", "child").Output()
   if err != nil {
     panic(err)
   }
   missing := os.IsNotExist(os.Remove(filepath.Join(root, "missing")))
-  fmt.Printf("%t|%s|%d|%s|%t|%s\\n", *verbose, *name, information.Size(), string(output), missing, syscall.SIGINT.String())
+  fmt.Printf("%t|%s|%d|%s|%s|%t|%s\\n", *verbose, *name, information.Size(), string(contents), string(output), missing, syscall.SIGINT.String())
 }
 `;

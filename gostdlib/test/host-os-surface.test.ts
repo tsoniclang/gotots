@@ -27,6 +27,7 @@ test("host OS modules expose only selected clean Go names", () => {
     "O_CREATE",
     "O_TRUNC",
     "O_WRONLY",
+    "Open",
     "OpenFile",
     "PathError",
     "Process",
@@ -43,7 +44,10 @@ test("host OS modules expose only selected clean Go names", () => {
   assert.deepEqual(Object.keys(signal), ["NotifyContext"]);
   assert.deepEqual(Object.keys(syscall).sort(), [
     "Credential",
+    "EAGAIN",
     "EINTR",
+    "EINVAL",
+    "ENOENT",
     "ENOTDIR",
     "EPERM",
     "Errno",
