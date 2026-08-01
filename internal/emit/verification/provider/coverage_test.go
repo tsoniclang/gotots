@@ -213,7 +213,8 @@ func assertProviderInterfaceAdapterRecoveryABI(
 	for _, required := range []string{
 		"BinaryBigEndianString(this.$go$value, $go$recovery)",
 		"OsFileWrite(this.$go$value, $argument0, $go$recovery)",
-		"CmpCompare<gostring>($argument0, $argument1, $go$recovery)",
+		"recovery_value.CmpCompare<gostring>(",
+		"$argument0, $argument1, $go$recovery);",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("provider adapter lacks recovery facet %q:\n%s", required, printed)
@@ -347,14 +348,14 @@ func assertProviderGrowCapabilityABI(
 				t.Fatalf("Grow statement = %T", body.Statements()[0])
 			}
 			call, ok := returned.Expression().(tsgo.CallExpression)
-			if !ok || len(call.Arguments()) != 4 {
+			if !ok || len(call.Arguments()) != 8 {
 				t.Fatalf(
 					"Grow return = %T with %d arguments",
 					returned.Expression(),
 					len(call.Arguments()),
 				)
 			}
-			for index := range 2 {
+			for index := range 6 {
 				if _, ok := call.Arguments()[index].(tsgo.Identifier); !ok {
 					t.Fatalf(
 						"Grow capability %d = %T",

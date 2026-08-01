@@ -9,7 +9,7 @@
   "goos": "linux",
   "goarch": "amd64",
   "runtimeDigest": "ae75219a3ca68c3dd5316af5372a357a4e1024c8fa54d3b1150acc110346f286",
-  "providerDigest": "5c514e3562c4e79b444b979872b3e58f1dbf141194817b29dc92c3c6253c8a6d",
+  "providerDigest": "bbbeb4c969d4e6c1d51268ba03e608e8cf0b0730691073bf21670eaf6ed6d319",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -225,10 +225,48 @@
               "facet": "logical"
             }
           ],
+          "genericOperations": [
+            {
+              "kind": "binary-less",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "equal",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            }
+          ],
           "sourceSignature": "func[T cmp.Ordered](x T, y T) int|params=x,y|results=",
           "sourceLocation": "cmp/cmp.go:40:6",
           "implementationOwner": "src/internal/portable/cmp/ordered.ts",
-          "targetFingerprint": "caab9da9a16c247545fd9061980984ae058346a2155340678bcf2a6b417c7603"
+          "targetFingerprint": "0635cd9691aabf91a0df8cbf4330f6e47ef42b10f678d1d1d75c3422cc658137"
         }
       ]
     },
@@ -1392,6 +1430,10 @@
           "export": "Clone",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
             },
@@ -1400,10 +1442,118 @@
               "facet": "logical"
             }
           ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "map",
+                  "key": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  },
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "map",
+                  "key": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  },
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ]
+            },
+            {
+              "kind": "map-construct",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ],
+              "results": [
+                {
+                  "kind": "map",
+                  "key": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  },
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "zero",
+              "parameters": [],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ]
+            }
+          ],
           "sourceSignature": "func[M ~map[K]V, K comparable, V any](m M) M|params=m|results=",
           "sourceLocation": "maps/maps.go:50:6",
           "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "924c7c643831bc2ec41019b1a6d7db3e7f3e69a927cecab4b2ca5d11107dd98d"
+          "targetFingerprint": "d396c66a0b4dc9c59a6191e552f4f704c9ac6d45cfd31b5c5fcb2bea18604acf"
         },
         {
           "identity": "maps|kind=4|receiver=|name=Copy",
@@ -1413,6 +1563,14 @@
           "export": "Copy",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 2,
               "facet": "logical"
             },
@@ -1421,10 +1579,86 @@
               "facet": "logical"
             }
           ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "map",
+                  "key": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  },
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 3
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "map",
+                  "key": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  },
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 3
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ]
+            }
+          ],
           "sourceSignature": "func[M1 ~map[K]V, M2 ~map[K]V, K comparable, V any](dst M1, src M2)|params=dst,src|results=",
           "sourceLocation": "maps/maps.go:62:6",
           "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "3381a55fbaed9b0d6e7318df0c86f606ec01f21d551196cae36a5e3e04e7add8"
+          "targetFingerprint": "7aeae590e7de53adb3322e6c927927169704df862d2bf6974546d92fc1364aaa"
         },
         {
           "identity": "maps|kind=4|receiver=|name=Equal",
@@ -1434,6 +1668,14 @@
           "export": "Equal",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 2,
               "facet": "logical"
             },
@@ -1442,10 +1684,74 @@
               "facet": "logical"
             }
           ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "map",
+                  "key": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  },
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 3
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "map",
+                  "key": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  },
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 3
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "equal",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            }
+          ],
           "sourceSignature": "func[M1, M2 ~map[K]V, K, V comparable](m1 M1, m2 M2) bool|params=m1,m2|results=",
           "sourceLocation": "maps/maps.go:17:6",
           "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "dc5c4a4d180184c3b5e23a0eedfa6a780ff7f6e3892c5a11a9203cda37f9fecc"
+          "targetFingerprint": "2d92f1894f3f1d8a132e42ef32fa3771edbc06d19ec52a2628ca8e3e8120f9c2"
         },
         {
           "identity": "maps|kind=4|receiver=|name=EqualFunc",
@@ -1454,6 +1760,14 @@
           "effect": "sync",
           "export": "EqualFunc",
           "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
             {
               "typeParameter": 2,
               "facet": "logical"
@@ -1467,10 +1781,86 @@
               "facet": "logical"
             }
           ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "map",
+                  "key": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  },
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 3
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "map",
+                  "key": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  },
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 4
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 4
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 4
+                }
+              ]
+            }
+          ],
           "sourceSignature": "func[M1 ~map[K]V1, M2 ~map[K]V2, K comparable, V1, V2 any](m1 M1, m2 M2, eq func(V1, V2) bool) bool|params=m1,m2,eq|results=",
           "sourceLocation": "maps/maps.go:31:6",
           "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "460caa54e3649841e2bc0fcc79a1dcaa6f5df4da7b31237005bb5578a304a182"
+          "targetFingerprint": "84f3f73de6f7966cdc5698951189954f467b2afe1d73887dbb10ee20f3955d7b"
         },
         {
           "identity": "maps|kind=4|receiver=|name=Keys",
@@ -1480,6 +1870,10 @@
           "export": "Keys",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
             },
@@ -1488,10 +1882,49 @@
               "facet": "logical"
             }
           ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "map",
+                  "key": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  },
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            }
+          ],
           "sourceSignature": "func[Map ~map[K]V, K comparable, V any](m Map) iter.Seq[K]|params=m|results=",
           "sourceLocation": "maps/iter.go:25:6",
           "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "07fe75d96b48431b44665f79fcc85595b9a82f342cdfebb96b162f29eb9bec54"
+          "targetFingerprint": "2ee9f87b2d3686eea92b728202f038232446136d06fe89749b7104e925e1b11b"
         },
         {
           "identity": "maps|kind=4|receiver=|name=Values",
@@ -1501,6 +1934,10 @@
           "export": "Values",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
             },
@@ -1509,10 +1946,49 @@
               "facet": "logical"
             }
           ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "map",
+                  "key": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  },
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ]
+            }
+          ],
           "sourceSignature": "func[Map ~map[K]V, K comparable, V any](m Map) iter.Seq[V]|params=m|results=",
           "sourceLocation": "maps/iter.go:38:6",
           "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "b0e5142c704cea0470d26f3fc49015ed3f063a0f16d890e50cca570918f7c2e9"
+          "targetFingerprint": "8038936155d1225b030ec7280bad9d75c82796c6271b2dbb43db350f58b6bd1d"
         }
       ]
     },
@@ -4197,14 +4673,115 @@
           "export": "AppendSeq",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "to-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "zero",
+              "parameters": [],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[Slice ~[]E, E any](s Slice, seq iter.Seq[E]) Slice|params=s,seq|results=",
           "sourceLocation": "slices/iter.go:50:6",
           "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "e40ac841b453528784f4689dfc66fb748775459acfbaa67fd6d0cedc9c19fc6a"
+          "targetFingerprint": "f6079a0fda38113a4dd7707c9f63d6b738f7fa134f13a52e815949b70dd490d2"
         },
         {
           "identity": "slices|kind=4|receiver=|name=BinarySearch",
@@ -4214,14 +4791,108 @@
           "export": "BinarySearch",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "binary-less",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "equal",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S ~[]E, E cmp.Ordered](x S, target E) (int, bool)|params=x,target|results=,",
           "sourceLocation": "slices/sort.go:126:6",
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "e507cbc3cc8104f6624dea5a21fe9e88bec6926ea1d4cfd8aaec5fd30e571baa"
+          "targetFingerprint": "4de43d820b380d56fc8ebdc38694b757491661eefe09edff69976c750185178b"
         },
         {
           "identity": "slices|kind=4|receiver=|name=BinarySearchFunc",
@@ -4231,18 +4902,76 @@
           "export": "BinarySearchFunc",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
             },
             {
               "typeParameter": 2,
               "facet": "logical"
             }
           ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            }
+          ],
           "sourceSignature": "func[S ~[]E, E, T any](x S, target T, cmp func(E, T) int) (int, bool)|params=x,target,cmp|results=,",
           "sourceLocation": "slices/sort.go:152:6",
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "4bd02fc69c01d34533d110fdea8ff07ddf0a85998ae38445e9a0d73017980057"
+          "targetFingerprint": "1d5d7c0d6d803cd22a189f6124bb7f294e5ddddd6038cdea3445ebfaf57ba5e6"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Clip",
@@ -4288,12 +5017,48 @@
             {
               "typeParameter": 0,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 0,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "to-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
             }
           ],
           "sourceSignature": "func[E any](seq iter.Seq[E]) []E|params=seq|results=",
           "sourceLocation": "slices/iter.go:59:6",
           "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "d191208831b8b2362be3080cc9bc7dc2f4d3cbd675b99ee58ac0ad792c06c497"
+          "targetFingerprint": "a13683852f730cafc68ee390f3846d30ea11b903cb39214cfd556799271852b5"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Compact",
@@ -4337,14 +5102,108 @@
           "export": "Compare",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "binary-less",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "equal",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S ~[]E, E cmp.Ordered](s1 S, s2 S) int|params=s1,s2|results=",
           "sourceLocation": "slices/slices.go:57:6",
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "d4fb4307822b1f4c70c21e44dec48c1d101b30d86b5cb39ab74c8266599cc4ba"
+          "targetFingerprint": "184fe3404118eb26e32e6c7e54dc1ccbab084b95684b92741f4679528de5fd3d"
         },
         {
           "identity": "slices|kind=4|receiver=|name=CompareFunc",
@@ -4354,18 +5213,132 @@
           "export": "CompareFunc",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 2,
               "facet": "logical"
             },
             {
+              "typeParameter": 2,
+              "facet": "container-storage"
+            },
+            {
               "typeParameter": 3,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 3
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S1 ~[]E1, S2 ~[]E2, E1, E2 any](s1 S1, s2 S2, cmp func(E1, E2) int) int|params=s1,s2,cmp|results=",
           "sourceLocation": "slices/slices.go:78:6",
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "d862b20e304c59fe190df87cec02b3ca1ca128513b3744b2d36a8ee28276da5a"
+          "targetFingerprint": "6eac2148fd37492f7ff0b7549833ce992c054542d0c25a836368aaab5f89adc7"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Concat",
@@ -4392,14 +5365,90 @@
           "export": "Contains",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "equal",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S ~[]E, E comparable](s S, v E) bool|params=s,v|results=",
           "sourceLocation": "slices/slices.go:117:6",
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "f27a53b4685148a045ef6beae69fa4901dcf8abd4251cc7a21cdf57fdd782ab5"
+          "targetFingerprint": "77936720fc2d49a7a8ad6942a1f66ad53d31649b8553dbf1454f5beb8be59c00"
         },
         {
           "identity": "slices|kind=4|receiver=|name=ContainsFunc",
@@ -4409,14 +5458,72 @@
           "export": "ContainsFunc",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, f func(E) bool) bool|params=s,f|results=",
           "sourceLocation": "slices/slices.go:123:6",
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "b3daa04521a791ae3ba5822a7a7f531c5283e6898a211e7efe967b2ac8ebe6b9"
+          "targetFingerprint": "de02139f1c6a6da3333ca72694dc06e964e676bda4ee839093fd00f184ccb73a"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Delete",
@@ -4443,14 +5550,115 @@
           "export": "DeleteFunc",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "to-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "zero",
+              "parameters": [],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, del func(E) bool) S|params=s,del|results=",
           "sourceLocation": "slices/slices.go:239:6",
           "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "2b733b06123106844c23334898a6ff16272fd6f980968cbdbdea6bb2969f160f"
+          "targetFingerprint": "89aa34aac3e8d410fff1b5db7f19ef23c199897d2afe8cd235a950b5b31b36ed"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Equal",
@@ -4460,14 +5668,90 @@
           "export": "Equal",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "equal",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S ~[]E, E comparable](s1 S, s2 S) bool|params=s1,s2|results=",
           "sourceLocation": "slices/slices.go:20:6",
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "37fa5437d9f11c2d6a2f903d0335d7a2db654d3bda9428c306ceecf8ad27f2b2"
+          "targetFingerprint": "cf198368ac60006ecca1b1cdd9f7f3b82837b502c0aca0262d429a2d7b48a804"
         },
         {
           "identity": "slices|kind=4|receiver=|name=EqualFunc",
@@ -4477,18 +5761,132 @@
           "export": "EqualFunc",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 2,
               "facet": "logical"
             },
             {
+              "typeParameter": 2,
+              "facet": "container-storage"
+            },
+            {
               "typeParameter": 3,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 2
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 3
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 2
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 3
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S1 ~[]E1, S2 ~[]E2, E1, E2 any](s1 S1, s2 S2, eq func(E1, E2) bool) bool|params=s1,s2,eq|results=",
           "sourceLocation": "slices/slices.go:37:6",
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "fa2910b4bf78db449e3df173d4c42e15246eb00dff292ca1c0f15a0385e582c7"
+          "targetFingerprint": "404bf4f54429e5d7f9c373a3c4491741a35723e9d62b851cf3f9e7c407554977"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Grow",
@@ -4504,11 +5902,81 @@
             {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
             }
           ],
           "genericOperations": [
             {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
               "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "to-container-storage",
               "parameters": [
                 {
                   "kind": "type-parameter",
@@ -4536,7 +6004,7 @@
           "sourceSignature": "func[S ~[]E, E any](s S, n int) S|params=s,n|results=",
           "sourceLocation": "slices/slices.go:420:6",
           "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "51a577697c5f51e75254b035736bb1d81abfcb58d16c691f8c2b8bf9d5319d21"
+          "targetFingerprint": "259be3723d28e88499994513856c2c9ff9d51b306611ab80605b41838cee4817"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Index",
@@ -4546,14 +6014,90 @@
           "export": "Index",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "equal",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S ~[]E, E comparable](s S, v E) int|params=s,v|results=",
           "sourceLocation": "slices/slices.go:96:6",
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "13941f5c958096c891cca3b9934618f89566caab2af0efd2c63164f55a705568"
+          "targetFingerprint": "f3c3874dae1a6ce461337bebe30849fd53a2b51eb09662f0e400519805995efa"
         },
         {
           "identity": "slices|kind=4|receiver=|name=IndexFunc",
@@ -4563,14 +6107,72 @@
           "export": "IndexFunc",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, f func(E) bool) int|params=s,f|results=",
           "sourceLocation": "slices/slices.go:107:6",
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "a29c5da7aad8f62343e2ae361bb6ac0d7c82cf23f1e263aafd7ef76c00eb9267"
+          "targetFingerprint": "1dd5943c21b47e1187f506df75411dc14f3fe9303be2dcb99a6e0c3df38c5b06"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Insert",
@@ -4648,14 +6250,123 @@
           "export": "Sort",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "binary-less",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "equal",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "to-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S ~[]E, E cmp.Ordered](x S)|params=x|results=",
           "sourceLocation": "slices/sort.go:16:6",
           "implementationOwner": "src/internal/portable/slices/sort.ts",
-          "targetFingerprint": "cc681fbad6842c37e4b59a3cb438e6a1fbd4103ca162d32608b3ec749c4f1b97"
+          "targetFingerprint": "db4107b5cc71acfe3d46f557395e723bbfd54396990bdeecb8158bb74c2a0c97"
         },
         {
           "identity": "slices|kind=4|receiver=|name=SortFunc",
@@ -4665,14 +6376,87 @@
           "export": "SortFunc",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "to-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](x S, cmp func(a E, b E) int)|params=x,cmp|results=",
           "sourceLocation": "slices/sort.go:30:6",
           "implementationOwner": "src/internal/portable/slices/sort.ts",
-          "targetFingerprint": "aecde0645591d32638a47620e4b6c03455ba2ce5ed0b9a8298ba8b5aa8322cb3"
+          "targetFingerprint": "4d396cf5d6f18d8d4543625b71ccf3a5f72497014737bd79be503ca387ac214a"
         },
         {
           "identity": "slices|kind=4|receiver=|name=SortStableFunc",
@@ -4682,14 +6466,87 @@
           "export": "SortStableFunc",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "to-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](x S, cmp func(a E, b E) int)|params=x,cmp|results=",
           "sourceLocation": "slices/sort.go:37:6",
           "implementationOwner": "src/internal/portable/slices/sort.ts",
-          "targetFingerprint": "cddffbc6e17a2934b1f9fd9550aa5e1ff26f3c17e87856e54fae0ede1ce8b9bf"
+          "targetFingerprint": "aa7f96a4a47cc333fb95d413400801c5cb635d6274c6fdba8a302832d3f7ec5e"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Sorted",
@@ -4701,12 +6558,99 @@
             {
               "typeParameter": 0,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 0,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "binary-less",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "equal",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "to-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
             }
           ],
           "sourceSignature": "func[E cmp.Ordered](seq iter.Seq[E]) []E|params=seq|results=",
           "sourceLocation": "slices/iter.go:66:6",
           "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "ce6320be7f7285dcdb4d2cf67a874de48477f9bbfca204b1ada04570b53fe98f"
+          "targetFingerprint": "9b832ef62b937d921be27a9c1b8cb8601a6d029dbf9632954ceeb96d8fb619a1"
         },
         {
           "identity": "slices|kind=4|receiver=|name=SortedFunc",
@@ -4718,12 +6662,63 @@
             {
               "typeParameter": 0,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 0,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "to-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
             }
           ],
           "sourceSignature": "func[E any](seq iter.Seq[E], cmp func(E, E) int) []E|params=seq,cmp|results=",
           "sourceLocation": "slices/iter.go:75:6",
           "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "96e8272666b4e7976ab61e30607b182f6e997552d2a5d4e633f77b2bee8abd7c"
+          "targetFingerprint": "5db4eec15bed73548f318c92b26c84c623a855739cb2db56889f2d916fda9912"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Values",
@@ -4733,14 +6728,72 @@
           "export": "Values",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "sourceSignature": "func[Slice ~[]E, E any](s Slice) iter.Seq[E]|params=s|results=",
           "sourceLocation": "slices/iter.go:37:6",
           "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "6648fbc94b37add0f8ed8d68c80f296d646bacff53be99c88060f727bb753e5e"
+          "targetFingerprint": "7ff9e6206cbc44373f01c92509ba21f92d68a4ee6d8984d7bd1cc815e337df48"
         }
       ]
     },
@@ -6884,7 +8937,7 @@
           "export": "MapsKeysCooperative",
           "effect": "sync",
           "implementationOwner": "src/internal/facets/generic-maps.ts",
-          "targetFingerprint": "655fa24a072a2a85e8cfecf4b90873dc71beb11a79e04e9f122f8559e5aa0458"
+          "targetFingerprint": "78e9be16dd7d8fefe24e85bbce0532ebfcd54dae6c3e4b8ef1f2b1072a250b54"
         },
         {
           "kind": "generic-callable-profile",
@@ -6893,7 +8946,7 @@
           "export": "MapsKeysFullyCooperative",
           "effect": "sync",
           "implementationOwner": "src/internal/facets/generic-maps.ts",
-          "targetFingerprint": "517464bca47bdbc55dfaefbc4f37aa36a7907f7c238d551d1d01cce062df5480"
+          "targetFingerprint": "b2ea5c9419147f7a0b011b21e8643904b30fae45d0c6a0580f865d5972ea417f"
         },
         {
           "kind": "generic-callable-profile",
@@ -6902,7 +8955,7 @@
           "export": "MapsValuesCooperative",
           "effect": "sync",
           "implementationOwner": "src/internal/facets/generic-maps.ts",
-          "targetFingerprint": "1eb1701fd538be2b820a7a6b3ee09552e75720b6d06247d01e6b41de207a4fe5"
+          "targetFingerprint": "8a5844aa8e4649cd2f4b6ac7f77ab81aee9615744c5252bb729e931cb3174601"
         },
         {
           "kind": "generic-callable-profile",
@@ -6911,7 +8964,7 @@
           "export": "MapsValuesFullyCooperative",
           "effect": "sync",
           "implementationOwner": "src/internal/facets/generic-maps.ts",
-          "targetFingerprint": "31e61b5bb21fe5c51f195a0f48dc491747fd7734f9dcd472c67ef808818505a5"
+          "targetFingerprint": "aace139429d5fa6060cefb413c25fa4b813ceb7eaff469c50201a1d76394b571"
         }
       ]
     },
@@ -6926,7 +8979,7 @@
           "export": "SlicesAppendSeqCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "05414f5aa4f19cc58a3f795f4100ea64a3fa4c96449d1fc09ac4c70277b039c6"
+          "targetFingerprint": "66edd19aa202062394b0d967ec865bb399347e66a55413648403bb3d3afd6502"
         },
         {
           "kind": "generic-callable-profile",
@@ -6935,7 +8988,7 @@
           "export": "SlicesAppendSeqFullyCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "22a16351dd255a1f16ce6ad3bc12ce019a9ff44e6fc9af081b46d4de7e613687"
+          "targetFingerprint": "84140f107a41697fb0558a601d92c313e2eccd1d204975b6db6f9aaee8ad99be"
         },
         {
           "kind": "generic-callable-profile",
@@ -6944,7 +8997,7 @@
           "export": "SlicesCollectCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "d7dadff4d2b18a714b3043a73068f2e7ed2690a8b3701c600132042e5bb606f1"
+          "targetFingerprint": "cd57c5d2894a1b7d31204224a3510af7bf159cd9c3ca9fce3ca83c292afb055d"
         },
         {
           "kind": "generic-callable-profile",
@@ -6953,7 +9006,7 @@
           "export": "SlicesCollectFullyCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "256a3fc5054f9d86b6595c943379887de121607f347cb054df224f044441d506"
+          "targetFingerprint": "d8c0e49ab365fb9b5014a7866faf7022d8b3481638352afd8d40201a76ff7813"
         },
         {
           "kind": "generic-callable-profile",
@@ -6962,7 +9015,7 @@
           "export": "SlicesContainsFuncCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "b9262acf3e167393688a24156a56ce73b1b504e2537f44e125246fd79e38006e"
+          "targetFingerprint": "af9471b61d89d6f54d2ee65402a019830a73b579c40a569f9751d92c1506d62c"
         },
         {
           "kind": "generic-callable-profile",
@@ -6971,7 +9024,7 @@
           "export": "SlicesDeleteFuncCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "3042072fa12b40682571ffdd87755ad5b74dae71e75e62a285167fe510ee613a"
+          "targetFingerprint": "359faca8b41ed802b3b48356d4c80d088f4e0357a886b22aa278af286d02746f"
         },
         {
           "kind": "generic-callable-profile",
@@ -6980,7 +9033,7 @@
           "export": "SlicesIndexFuncCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "2b66968b59c5cc37ddea18c1bfae8f9363218a8d4a33aa4b012bdb3037a746dd"
+          "targetFingerprint": "513450ecbe59696ba04bc0ad97b524003db723d76f7c0c675002a2c47105bb64"
         },
         {
           "kind": "generic-callable-profile",
@@ -6989,7 +9042,7 @@
           "export": "SlicesSortFuncCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "c49b103d166a34fb8ba38da109558eee60196793f60bde00669b9ea1c97a430c"
+          "targetFingerprint": "4bc35bf3916d97690696fe6f4c736e9404fd9acce2e8d80f6a6bd6c8fc74596f"
         },
         {
           "kind": "generic-callable-profile",
@@ -6998,7 +9051,7 @@
           "export": "SlicesSortStableFuncCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "a7d9d399a637ece6adb3ec491fcccb8b4eb5f7ebfd0708373d8d198c5faadaec"
+          "targetFingerprint": "c4a727b2542005769e36bced999b64e4a93c1ac3543a33d557e41e0f29e61be0"
         },
         {
           "kind": "generic-callable-profile",
@@ -7007,7 +9060,7 @@
           "export": "SlicesSortedCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "217ac8eaa89e9d66c8a8b15d6cae44d94a823fc94e475d103d734d6878a7d38a"
+          "targetFingerprint": "4f12b583aa7de728facc3eeb4051f38b7873d786fe49c8bd32829f6f738ebcda"
         },
         {
           "kind": "generic-callable-profile",
@@ -7016,7 +9069,7 @@
           "export": "SlicesSortedFullyCooperative",
           "effect": "async",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "2fdcbbdeadad0927df62b2710aa2a542685c9bcbe02d1dd86d42cfd430ef4540"
+          "targetFingerprint": "d9e3ad02994a63e4639c349ab901b87106b9d41ae72df01fd29787e48c5e348d"
         },
         {
           "kind": "generic-callable-profile",
@@ -7025,7 +9078,7 @@
           "export": "SlicesValuesCooperative",
           "effect": "sync",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "13a54aba993057df8a5db59c6d7a7e00d4b6d74e5c99f9731adb785f5ef81a4f"
+          "targetFingerprint": "d71336c82d3b06da18ef55ffae50bbb7f459adeaff825a1d2e81f0dd78866027"
         },
         {
           "kind": "generic-callable-profile",
@@ -7034,7 +9087,7 @@
           "export": "SlicesValuesFullyCooperative",
           "effect": "sync",
           "implementationOwner": "src/internal/facets/generic-slices.ts",
-          "targetFingerprint": "9c5a98ad65eb76b670c0aa6dd69f96222f709cdaec78d644fe9a77338f10bc0e"
+          "targetFingerprint": "bc81f6501792da52151521137f73b1facb1eb165bc710827275d2cc860544238"
         }
       ]
     },
@@ -8354,7 +10407,7 @@
           "export": "CmpCompare",
           "effect": "sync",
           "implementationOwner": "src/internal/facets/recovery-value.ts",
-          "targetFingerprint": "3fec98efdf2580d025c8a161423792865ac29d63282315d77d0e06ce407173d8"
+          "targetFingerprint": "0e58f6fae7d042738d3ed24823d2fc5d22fa34c3d66bc2b51d8f9ebdd41b97dc"
         },
         {
           "kind": "recovery-callable",
@@ -8425,5 +10478,5 @@
       ]
     }
   ],
-  "manifestDigest": "5080a25e458a62ba1a31b0132d061feb4a9f4d4b51d242c780e525889f09c839"
+  "manifestDigest": "99c4b4598ad1d74bad4ee4f25ba1c8d5791eff761b49f5af1bb0c4250e3c306e"
 }

@@ -68,8 +68,8 @@ func GenericClone[T any](source []T) []T {
 	printed := artifacts.printed
 	for _, exact := range []string{
 		"Concat<gostring>(",
-		"Clone<gostring, int64>(",
-		"Grow<RuntimeSlice<gostring>, gostring>(",
+		"Clone<GoMapValue<gostring, int64>, gostring, int64>(",
+		"Grow<RuntimeSlice<gostring>, gostring, gostring>(",
 		"Clone<T$ContainerStorage>(",
 	} {
 		if !strings.Contains(printed, exact) {
@@ -78,7 +78,7 @@ func GenericClone[T any](source []T) []T {
 	}
 	for _, superseded := range []string{
 		"Concat<RuntimeSlice<gostring>, gostring>(",
-		"Clone<GoMapValue<gostring, int64>, gostring, int64>(",
+		"Clone<gostring, int64>(",
 	} {
 		if strings.Contains(printed, superseded) {
 			t.Fatalf("provider generic projection retained %q:\n%s", superseded, printed)

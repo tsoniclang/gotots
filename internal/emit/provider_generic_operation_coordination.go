@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"go/token"
 	"go/types"
-	"sort"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -73,10 +72,7 @@ func (s *programSession) providerGenericOperationSet(
 		}
 		operations = append(operations, operation)
 	}
-	sort.Slice(operations, func(left, right int) bool {
-		return operations[left].Key() < operations[right].Key()
-	})
-	operationSet, err := api.NewGenericOperationSet(
+	operationSet, err := api.NewGenericOperationABISet(
 		function,
 		consumer,
 		operations,

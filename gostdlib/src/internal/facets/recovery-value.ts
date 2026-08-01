@@ -1,16 +1,22 @@
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { gostring } from "@gotots/runtime/scalars.js";
 
-import { Compare, type OrderedValue } from "../portable/cmp/ordered.js";
+import {
+  Compare,
+  type OrderedEquality,
+  type OrderedLess,
+} from "../portable/cmp/ordered.js";
 import { Errno, Signal } from "../../syscall.js";
 import { Duration, Ticker, Time } from "../../time.js";
 
-export function CmpCompare<T extends OrderedValue>(
+export function CmpCompare<T>(
+  less: OrderedLess<T>,
+  equal: OrderedEquality<T>,
   left: T,
   right: T,
   _recovery?: GoRecovery,
 ): number {
-  return Compare(left, right);
+  return Compare(less, equal, left, right);
 }
 
 export function SyscallErrnoError(

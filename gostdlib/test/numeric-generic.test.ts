@@ -18,11 +18,13 @@ import { OnesCount, OnesCount32 } from "../src/math/bits.js";
 import { Uint64 } from "../src/math/rand/v2.js";
 
 test("cmp.Compare follows Go ordering including NaN", (): void => {
-  assert.equal(Compare(3, 8), -1);
-  assert.equal(Compare("z", "a"), 1);
-  assert.equal(Compare(Number.NaN, 0), -1);
-  assert.equal(Compare(Number.NaN, Number.NaN), 0);
-  assert.equal(Compare(-0, 0), 0);
+  const less = <T extends number | string>(left: T, right: T): boolean => left < right;
+  const equal = <T extends number | string>(left: T, right: T): boolean => left === right;
+  assert.equal(Compare(less, equal, 3, 8), -1);
+  assert.equal(Compare(less, equal, "z", "a"), 1);
+  assert.equal(Compare(less, equal, Number.NaN, 0), -1);
+  assert.equal(Compare(less, equal, Number.NaN, Number.NaN), 0);
+  assert.equal(Compare(less, equal, -0, 0), 0);
 });
 
 test("math preserves selected scalar semantics", (): void => {

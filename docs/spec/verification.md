@@ -792,11 +792,18 @@ the provider empty-operation assumption, or swapping capability/source ABI
 slots must fail manifest certification, TS-Go AST shape, strict typechecking,
 or differential execution.
 
+The canonical order is established over declaration type-parameter identities
+before concrete instantiation. A linked map fixture substitutes key and value
+types whose concrete capability keys sort in the opposite order; restoring an
+instantiation-time sort must swap provider arguments and fail strict
+typechecking.
+
 For every generic provider binding, verification also exact-joins the
 configured `(source parameter, representation facet)` projection from the
 selected Go declaration to the inspected ordinary provider call signature.
 Artifact tests distinguish `Concat<S,E> -> Concat<EStorage>`,
-`maps.Clone<M,K,V> -> Clone<K,V>`, and the operation-bearing `Grow` layout,
+`maps.Clone<M,K,V> -> Clone<M,K,V>`, and the operation-bearing
+`Grow<S,E,EStorage>` layout,
 while a cooperative `SortFunc` proves that its profile layout remains separate.
 An open `CloneGeneric[T]` fixture must emit
 `Clone<T$ContainerStorage>` and strict-typecheck against

@@ -1,53 +1,108 @@
 import type { int64 } from "@gotots/runtime/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
-import { Compare as compareOrdered } from "../cmp/ordered.js";
-import type { OrderedValue } from "../cmp/ordered.js";
-import { sliceValues } from "../../runtime/slice.js";
+import {
+  type BinaryLess,
+  type Convert,
+  type CopyValue,
+  type EqualValue,
+  type FromContainerStorage,
+  orderedCompare,
+  readElement,
+  storeElement,
+  type ToContainerStorage,
+} from "./capabilities.js";
 import { callComparison } from "./read.js";
 
 type Comparison<T> = ((left: T, right: T) => int64) | undefined;
 
-export function Sort<T extends OrderedValue>(source: RuntimeSlice<T>): void {
-  writeSorted(source, sliceValues(source).sort(compareOrdered));
-}
-
-export function SortFunc<T>(
-  source: RuntimeSlice<T>,
-  compare: Comparison<T>,
+export function Sort<S, E, EStorage>(
+  less: BinaryLess<E>,
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  copyElement: CopyValue<E>,
+  equal: EqualValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  source: S,
 ): void {
+  const values = toSlice(source);
   writeSorted(
-    source,
-    sliceValues(source).sort(
-      (left, right): number => callComparison(compare, left, right),
+    values,
+    logicalValues(values, copyElement, fromStorage).sort(
+      (left, right): number => orderedCompare(less, equal, left, right),
     ),
+    copyElement,
+    toStorage,
   );
 }
 
-export function SortStableFunc<T>(
-  source: RuntimeSlice<T>,
-  compare: Comparison<T>,
+export function SortFunc<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  source: S,
+  compare: Comparison<E>,
 ): void {
-  const values = sliceValues(source).map(
-    (value, index): { readonly value: T; readonly index: number } => ({
+  const values = toSlice(source);
+  writeSorted(
+    values,
+    logicalValues(values, copyElement, fromStorage).sort(
+      (left, right): number => callComparison(compare, left, right),
+    ),
+    copyElement,
+    toStorage,
+  );
+}
+
+export function SortStableFunc<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  source: S,
+  compare: Comparison<E>,
+): void {
+  const values = toSlice(source);
+  const indexed = logicalValues(values, copyElement, fromStorage).map(
+    (value, index): { readonly value: E; readonly index: number } => ({
       value,
       index,
     }),
   );
-  values.sort((left, right): number => {
+  indexed.sort((left, right): number => {
     const result = callComparison(compare, left.value, right.value);
     return result === 0 ? left.index - right.index : result;
   });
   writeSorted(
-    source,
-    values.map((entry): T => entry.value),
+    values,
+    indexed.map((entry): E => entry.value),
+    copyElement,
+    toStorage,
   );
 }
 
-function writeSorted<T>(target: RuntimeSlice<T>, values: readonly T[]): void {
+function logicalValues<E, EStorage>(
+  source: RuntimeSlice<EStorage>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+): E[] {
+  const result: E[] = [];
+  for (let index = 0; index < source.length; index += 1) {
+    result.push(readElement(source, index, copyElement, fromStorage));
+  }
+  return result;
+}
+
+function writeSorted<E, EStorage>(
+  target: RuntimeSlice<EStorage>,
+  values: readonly E[],
+  copyElement: CopyValue<E>,
+  toStorage: ToContainerStorage<E, EStorage>,
+): void {
   let index = 0;
   for (const value of values) {
-    target.set(index, value);
+    storeElement(target, index, value, copyElement, toStorage);
     index += 1;
   }
 }

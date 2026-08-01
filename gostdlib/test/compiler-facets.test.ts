@@ -81,6 +81,12 @@ import { Pool } from "../src/sync.js";
 import { Builder as StringBuilder } from "../src/strings.js";
 import { state as binaryState } from "../src/encoding/binary.js";
 
+const copyValue = <T>(value: T): T => value;
+const equalValue = <T>(left: T, right: T): boolean => left === right;
+const lessNumber = (left: number, right: number): boolean => left < right;
+const sliceValue = <T>(value: RuntimeSlice<T>): RuntimeSlice<T> => value;
+const zeroNumber = (): number => 0;
+
 test("named-struct facets expose only selected static operations", (): void => {
   assert.equal(BinaryBigEndianOperations.$fromStorage(
     BinaryBigEndianOperations.$storageOf(binaryState.BigEndian),
@@ -250,6 +256,8 @@ test("generic facets adapt cooperative provider implementations", async (): Prom
   const source = GoMap.make<string, number>(0, 0, [["a", 1], ["b", 2]]);
   const keys: string[] = [];
   await MapsKeysCooperative<GoMapValue<string, number>, string, number>(
+    (value): GoMapValue<string, number> => value,
+    (value): string => value,
     source,
   ).value?.(async (key): Promise<boolean> => {
     keys.push(key);
@@ -263,18 +271,30 @@ test("generic facets adapt cooperative provider implementations", async (): Prom
     await yieldValue?.(2);
     await yieldValue?.(3);
   });
-  const values = await SlicesCollectCooperative(sequence);
+  const values = await SlicesCollectCooperative(
+    copyValue,
+    copyValue,
+    sequence,
+  );
   assert.deepEqual([values.get(0), values.get(1)], [2, 3]);
 
   const slice = RuntimeSlice.literal([3, 1, 2]);
   const yielded: number[] = [];
-  await SlicesValuesCooperative<RuntimeSlice<number>, number>(slice).value?.(
+  await SlicesValuesCooperative<RuntimeSlice<number>, number, number>(
+    sliceValue,
+    copyValue,
+    copyValue,
+    slice,
+  ).value?.(
     async (value): Promise<boolean> => {
       yielded.push(value);
       return true;
     },
   );
-  await SlicesValuesFullyCooperative<RuntimeSlice<number>, number>(
+  await SlicesValuesFullyCooperative<RuntimeSlice<number>, number, number>(
+    sliceValue,
+    copyValue,
+    copyValue,
     slice,
   ).value?.(
     async (value): Promise<boolean> => {
@@ -285,10 +305,22 @@ test("generic facets adapt cooperative provider implementations", async (): Prom
   assert.deepEqual(yielded, [3, 1, 2, 3, 1, 2]);
 
   const appended = await SlicesAppendSeqCooperative(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    zeroNumber,
     RuntimeSlice.literal([1]),
     sequence,
   );
   const fullyAppended = await SlicesAppendSeqFullyCooperative(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    zeroNumber,
     RuntimeSlice.literal([1]),
     sequence,
   );
@@ -301,8 +333,22 @@ test("generic facets adapt cooperative provider implementations", async (): Prom
     [1, 2, 3],
   );
 
-  const sorted = await SlicesSortedCooperative(sequence);
-  const fullySorted = await SlicesSortedFullyCooperative(sequence);
+  const sorted = await SlicesSortedCooperative<number, number>(
+    lessNumber,
+    copyValue,
+    equalValue,
+    copyValue,
+    copyValue,
+    sequence,
+  );
+  const fullySorted = await SlicesSortedFullyCooperative<number, number>(
+    lessNumber,
+    copyValue,
+    equalValue,
+    copyValue,
+    copyValue,
+    sequence,
+  );
   assert.deepEqual([sorted.get(0), sorted.get(1)], [2, 3]);
   assert.deepEqual([fullySorted.get(0), fullySorted.get(1)], [2, 3]);
 });

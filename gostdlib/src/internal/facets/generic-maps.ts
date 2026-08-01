@@ -11,50 +11,61 @@ import {
 type CooperativeSequence<T> = Seq<
   T,
   ((
-    yieldValue: ((value: T) => Promise<bool>) | undefined,
+    yieldValue: ((value: T, recovery?: GoRecovery) => Promise<bool>) | undefined,
+    recovery?: GoRecovery,
   ) => Promise<void>) | undefined
 >;
+type Convert<Source, Target> = (value: Source) => Target;
+type CopyValue<T> = (value: T) => T;
 
 export function MapsKeysCooperative<
-  MapType extends GoMapValue<Key, Value>,
+  MapType,
   Key,
   Value,
 >(
+  sourceMap: Convert<MapType, GoMapValue<Key, Value>>,
+  copyKey: CopyValue<Key>,
   source: MapType,
   _recovery?: GoRecovery,
 ): CooperativeSequence<Key> {
-  return KeysCooperative(source);
+  return KeysCooperative(copyKey, sourceMap(source));
 }
 
 export function MapsKeysFullyCooperative<
-  MapType extends GoMapValue<Key, Value>,
+  MapType,
   Key,
   Value,
 >(
+  sourceMap: Convert<MapType, GoMapValue<Key, Value>>,
+  copyKey: CopyValue<Key>,
   source: MapType,
   _recovery?: GoRecovery,
 ): CooperativeSequence<Key> {
-  return KeysCooperative(source);
+  return KeysCooperative(copyKey, sourceMap(source));
 }
 
 export function MapsValuesCooperative<
-  MapType extends GoMapValue<Key, Value>,
+  MapType,
   Key,
   Value,
 >(
+  sourceMap: Convert<MapType, GoMapValue<Key, Value>>,
+  copyValue: CopyValue<Value>,
   source: MapType,
   _recovery?: GoRecovery,
 ): CooperativeSequence<Value> {
-  return ValuesCooperative(source);
+  return ValuesCooperative(copyValue, sourceMap(source));
 }
 
 export function MapsValuesFullyCooperative<
-  MapType extends GoMapValue<Key, Value>,
+  MapType,
   Key,
   Value,
 >(
+  sourceMap: Convert<MapType, GoMapValue<Key, Value>>,
+  copyValue: CopyValue<Value>,
   source: MapType,
   _recovery?: GoRecovery,
 ): CooperativeSequence<Value> {
-  return ValuesCooperative(source);
+  return ValuesCooperative(copyValue, sourceMap(source));
 }

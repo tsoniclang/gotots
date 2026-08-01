@@ -246,6 +246,23 @@ func NewGenericOperationSet(
 	consumer GenericOperationConsumer,
 	operations []*GenericOperationContract,
 ) (GenericOperationSet, error) {
+	return newGenericOperationSet(owner, consumer, operations, true)
+}
+
+func NewGenericOperationABISet(
+	owner types.Object,
+	consumer GenericOperationConsumer,
+	operations []*GenericOperationContract,
+) (GenericOperationSet, error) {
+	return newGenericOperationSet(owner, consumer, operations, false)
+}
+
+func newGenericOperationSet(
+	owner types.Object,
+	consumer GenericOperationConsumer,
+	operations []*GenericOperationContract,
+	requireCanonicalIdentityOrder bool,
+) (GenericOperationSet, error) {
 	owner = GenericDeclarationOrigin(owner)
 	parameters := GenericDeclarationParameters(owner)
 	if owner == nil ||
@@ -259,12 +276,25 @@ func NewGenericOperationSet(
 	}
 	parameters = slices.Clone(parameters)
 	operations = slices.Clone(operations)
+	seen := make(map[string]struct{}, len(operations))
 	for index, operation := range operations {
 		if !operation.Valid() ||
 			operation.Owner() != owner ||
-			operation.Consumer() != consumer ||
-			index != 0 &&
-				operations[index-1].Key() >= operation.Key() {
+			operation.Consumer() != consumer {
+			return GenericOperationSet{}, &InvariantError{
+				Role:   RoleCallCallee,
+				Reason: "generic operation set is invalid",
+			}
+		}
+		if _, duplicate := seen[operation.Key()]; duplicate {
+			return GenericOperationSet{}, &InvariantError{
+				Role:   RoleCallCallee,
+				Reason: "generic operation set contains a duplicate",
+			}
+		}
+		seen[operation.Key()] = struct{}{}
+		if requireCanonicalIdentityOrder && index != 0 &&
+			operations[index-1].Key() >= operation.Key() {
 			return GenericOperationSet{}, &InvariantError{
 				Role:   RoleCallCallee,
 				Reason: "generic operation set is not canonical",

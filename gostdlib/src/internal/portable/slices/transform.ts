@@ -4,11 +4,17 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import { sliceValues } from "../../runtime/slice.js";
 import { callEquality, callPredicate } from "./read.js";
+import {
+  type Convert,
+  type CopyValue,
+  type FromContainerStorage,
+  storeElement,
+  type ToContainerStorage,
+  type Zero,
+} from "./capabilities.js";
 
 type Predicate<T> = ((value: T) => bool) | undefined;
 type Equality<T> = ((left: T, right: T) => bool) | undefined;
-type Copy<T> = (value: T) => T;
-type Zero<T> = () => T;
 
 export function Clip<T>(source: RuntimeSlice<T>): RuntimeSlice<T> {
   return source.slice(0, source.length, source.length);
@@ -63,18 +69,35 @@ export function Delete<T>(
   return resultLike(source, values);
 }
 
-export function DeleteFunc<T>(
-  source: RuntimeSlice<T>,
-  predicate: Predicate<T>,
-): RuntimeSlice<T> {
-  const values: T[] = [];
-  for (let index = 0; index < source.length; index += 1) {
-    const value = source.get(index);
+export function DeleteFunc<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  zeroElement: Zero<E>,
+  source: S,
+  predicate: Predicate<E>,
+): S {
+  const values = toSlice(source);
+  let write = 0;
+  for (let read = 0; read < values.length; read += 1) {
+    const value = fromStorage(values.get(read));
     if (!callPredicate(predicate, value)) {
-      values.push(value);
+      storeElement(values, write, value, copyElement, toStorage);
+      write += 1;
     }
   }
-  return resultLike(source, values);
+  for (let index = write; index < values.length; index += 1) {
+    storeElement(
+      values,
+      index,
+      zeroElement(),
+      copyElement,
+      toStorage,
+    );
+  }
+  return fromSlice(values.slice(0, write, null));
 }
 
 export function Insert<T>(
@@ -91,48 +114,53 @@ export function Insert<T>(
   return RuntimeSlice.literal(result);
 }
 
-export function Grow<Slice extends RuntimeSlice<Element>, Element>(
-  copy: Copy<Element>,
-  zero: Zero<Element>,
-  source: Slice,
+export function Grow<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  zeroElement: Zero<E>,
+  source: S,
   amount: int64,
-): Slice;
-export function Grow<Element>(
-  copy: Copy<Element>,
-  zero: Zero<Element>,
-  source: RuntimeSlice<Element>,
-  amount: int64,
-): RuntimeSlice<Element> {
+): S {
+  const values = toSlice(source);
   const numericAmount = globalThis.Number(amount);
   if (!Number.isSafeInteger(numericAmount) || numericAmount < 0) {
     GoPanic.raiseRuntime("cannot be negative");
   }
-  const requiredCapacity = source.length + numericAmount;
+  const requiredCapacity = values.length + numericAmount;
   if (!Number.isSafeInteger(requiredCapacity)) {
     GoPanic.raiseRuntime("cannot be negative");
   }
-  if (requiredCapacity <= source.capacity) {
+  if (requiredCapacity <= values.capacity) {
     return source;
   }
-  let nextCapacity = source.capacity === 0 ? 1 : source.capacity * 2;
+  let nextCapacity = values.capacity === 0 ? 1 : values.capacity * 2;
   while (nextCapacity < requiredCapacity) {
     nextCapacity *= 2;
   }
   if (!Number.isSafeInteger(nextCapacity)) {
     GoPanic.raiseRuntime("cannot be negative");
   }
-  const result = RuntimeSlice.make<Element>(
+  const result = RuntimeSlice.make<EStorage>(
     nextCapacity,
     nextCapacity,
-    zero(),
+    toStorage(zeroElement()),
   );
   for (let index = 0; index < nextCapacity; index += 1) {
-    result.set(index, zero());
+    result.set(index, toStorage(zeroElement()));
   }
-  for (let index = 0; index < source.length; index += 1) {
-    result.set(index, copy(source.get(index)));
+  for (let index = 0; index < values.length; index += 1) {
+    storeElement(
+      result,
+      index,
+      fromStorage(values.get(index)),
+      copyElement,
+      toStorage,
+    );
   }
-  return result.slice(0, source.length, null);
+  return fromSlice(result.slice(0, values.length, null));
 }
 
 export function Repeat<T>(

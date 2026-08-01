@@ -1494,8 +1494,9 @@ spell that internal surface `BinaryEndianRepresentation`, while public
 compiler neither reconstructs a private GOROOT struct nor pretends that either
 public interface contains the other.
 
-A public generic-function record may additionally own one sorted closed
-generic-operation set. Each operation records its compiler operation kind and
+A public generic-function record may additionally own one closed,
+source-generically ordered generic-operation set. Each operation records its
+compiler operation kind and
 an exact source-level Go signature assembled only from a closed recursive type
 expression: declaration type-parameter identity, admitted basic type, slice,
 or map. For example, `maps.Clone[M ~map[K]V, K, V]` requests conversion
@@ -1517,6 +1518,13 @@ the ordinary typed capabilities, and prepends them through the one canonical
 generic-call ABI. No provider-specific operation registry, target constraint,
 cast, or second generic body is admitted.
 
+Capability order is frozen from the certified source-generic signatures before
+instantiation. For example, `copy(K)` precedes `copy(V)` because `K` and `V`
+are declaration identities, regardless of whether a concrete call substitutes
+types whose target names or operation fingerprints sort in the opposite order.
+Re-sorting instantiated capabilities would make one provider export have a
+call-site-dependent ABI and is forbidden.
+
 A provider's public export for an untyped Go constant is not a universal
 runtime representation. Each generated use still requests its exact contextual
 projection. In linked mode the ordinary constant-value owner materializes the
@@ -1528,13 +1536,15 @@ bindings, and remain profile-aware (`math.MaxInt64` is a `bigint` literal only
 under the `bigint` profile). No provider spelling or runtime value is used to
 recover the compile-time constant.
 
-For example, selected `slices.Grow[S ~[]E, E any]` records `copy(E) E` and
-`zero() E`. A call `slices.Grow(values, 3)` therefore becomes the TS-Go AST for
-`slices.Grow(copyE, zeroE, values, 3)`. The provider can allocate independent
-zero elements and copy the old backing values without `any`, `unknown`, target
-shape inspection, sparse-array holes, or a compiler check for the name
-`Grow`. Removing either certified operation changes the call AST and fails the
-provider ABI gate.
+For example, selected `slices.Grow[S ~[]E, E any]` records conversions
+`S -> []E` and `[]E -> S`, `copy(E) E`, container restoration/storage for `E`,
+and `zero() E`. A call `slices.Grow(values, 3)` therefore prepends those six
+typed capabilities before `values, 3`. The provider preserves a named slice's
+logical wrapper, its element storage representation, independent zero values,
+and old-element copy behavior without `any`, `unknown`, target-shape
+inspection, sparse-array holes, or a compiler check for the name `Grow`.
+Removing or reordering any certified operation changes the call AST and fails
+the provider ABI gate.
 
 Recovery authority follows the same certified-boundary rule for every call
 form. A generated direct call, deferred call, selected method call, interface
