@@ -211,6 +211,16 @@ replaces the artifact's complete AST, requests, dependencies, and facet
 contract. Identical facets do nothing; oscillation fails. Final printing occurs
 only after convergence.
 
+Derived aggregate artifacts, including package export assemblies, are
+published only after declaration discovery, declaration requirements, reverse
+dependency reconstruction, package initialization discovery, and requirement
+removal have reached quiescence. An aggregate may then subscribe to the final
+facets of its members and be reconstructed by a later real member-facet
+change. The root must not commit incomplete intermediate membership as an
+aggregate revision: a declaration that first exposes a source facade and then
+settles on a private kernel must not create a false `absent -> present ->
+absent` package-export cycle.
+
 There is no text patching, shared mutable TS-Go node mutation, spelling-keyed
 dependency, unconditional rescan, or duplicate old/new path.
 

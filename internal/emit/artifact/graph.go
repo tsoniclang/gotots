@@ -3,6 +3,8 @@ package artifact
 import (
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
@@ -44,16 +46,44 @@ func (e *GraphError) Error() string {
 }
 
 type ArtifactConvergenceError struct {
-	Object api.ArtifactOwner
-	Facets []api.ArtifactFacet
+	Object      api.ArtifactOwner
+	Facets      []api.ArtifactFacet
+	Transitions []ArtifactFacetTransition
+}
+
+type ArtifactFacetTransition struct {
+	Facet               api.ArtifactFacet
+	CurrentBytes        int
+	CandidateBytes      int
+	CommonPrefixBytes   int
+	CommonSuffixBytes   int
+	CurrentDifference   string
+	CandidateDifference string
 }
 
 func (e *ArtifactConvergenceError) Error() string {
-	return fmt.Sprintf(
+	message := fmt.Sprintf(
 		"reconstruct target artifact %q: observable contract oscillates on facets %v",
 		e.Object.Name(),
 		e.Facets,
 	)
+	if len(e.Transitions) == 0 {
+		return message
+	}
+	parts := make([]string, len(e.Transitions))
+	for index, transition := range e.Transitions {
+		parts[index] = fmt.Sprintf(
+			"%s current=%dB candidate=%dB prefix=%dB suffix=%dB current-diff=%s candidate-diff=%s",
+			transition.Facet,
+			transition.CurrentBytes,
+			transition.CandidateBytes,
+			transition.CommonPrefixBytes,
+			transition.CommonSuffixBytes,
+			transition.CurrentDifference,
+			transition.CandidateDifference,
+		)
+	}
+	return message + "; " + strings.Join(parts, "; ")
 }
 
 func NewGraph(
@@ -127,6 +157,11 @@ func (g *Graph) commit(
 				return &ArtifactConvergenceError{
 					Object: owner,
 					Facets: append([]api.ArtifactFacet(nil), changed...),
+					Transitions: artifactFacetTransitions(
+						current.contract,
+						nextContract,
+						changed,
+					),
 				}
 			}
 		}
@@ -166,6 +201,42 @@ func (g *Graph) commit(
 		current.facetRevisions[facet]++
 	}
 	return g.invalidateConsumers(owner, changed, historicalAuthorized)
+}
+
+func artifactFacetTransitions(
+	current Contract,
+	candidate Contract,
+	facets []api.ArtifactFacet,
+) []ArtifactFacetTransition {
+	result := make([]ArtifactFacetTransition, 0, len(facets))
+	for _, facet := range facets {
+		currentValue, _ := current.facet(facet)
+		candidateValue, _ := candidate.facet(facet)
+		prefix := commonPrefixLength(currentValue, candidateValue)
+		suffix := commonSuffixLength(
+			currentValue[prefix:],
+			candidateValue[prefix:],
+		)
+		result = append(result, ArtifactFacetTransition{
+			Facet:               facet,
+			CurrentBytes:        len(currentValue),
+			CandidateBytes:      len(candidateValue),
+			CommonPrefixBytes:   prefix,
+			CommonSuffixBytes:   suffix,
+			CurrentDifference:   quotedDifference(currentValue, prefix),
+			CandidateDifference: quotedDifference(candidateValue, prefix),
+		})
+	}
+	return result
+}
+
+func quotedDifference(value []byte, start int) string {
+	const maximumEvidenceBytes = 96
+	if start >= len(value) {
+		return strconv.Quote("")
+	}
+	end := min(start+maximumEvidenceBytes, len(value))
+	return strconv.QuoteToASCII(string(value[start:end]))
 }
 
 func (g *Graph) invalidateConsumers(

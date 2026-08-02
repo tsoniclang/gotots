@@ -85,7 +85,10 @@ func TestArtifactGraphConvergesCyclesAndRejectsOscillation(t *testing.T) {
 	if !errors.As(err, &convergenceError) ||
 		convergenceError.Object != artifactTestOwner(first) ||
 		len(convergenceError.Facets) != 1 ||
-		convergenceError.Facets[0] != api.ArtifactFacetCallableSignature {
+		convergenceError.Facets[0] != api.ArtifactFacetCallableSignature ||
+		len(convergenceError.Transitions) != 1 ||
+		convergenceError.Transitions[0].CurrentDifference == "" ||
+		convergenceError.Transitions[0].CandidateDifference == "" {
 		t.Fatalf("oscillation error = %#v", err)
 	}
 }

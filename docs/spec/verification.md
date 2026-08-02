@@ -168,6 +168,10 @@ Tests additionally prove:
 - reconstruction replaces, rather than patches, the complete AST;
 - old requests/dependencies disappear;
 - sealed AST cannot be edited.
+- a late-reached exported generic declaration settles all intrinsic
+  requirements before its package export aggregate is published; a private
+  kernel replacing its temporary source facade neither leaks the facade nor
+  trips the genuine-oscillation gate.
 
 ## Value-Family Proof
 

@@ -157,14 +157,6 @@ func CompileWithOptions(
 			}
 			continue
 		}
-		if builders := session.packageExports.nextBatch(); len(builders) != 0 {
-			for _, builder := range builders {
-				if err := session.publishPackageExports(builder); err != nil {
-					return ProgramEmission{}, err
-				}
-			}
-			continue
-		}
 		if owner, requirements, removed, ok :=
 			session.requirements.nextBatch(); ok {
 			if err := session.applyDeclarationRequirements(
@@ -191,6 +183,14 @@ func CompileWithOptions(
 			continue
 		}
 		if session.requirements.finalizeRemovals() {
+			continue
+		}
+		if builders := session.packageExports.nextBatch(); len(builders) != 0 {
+			for _, builder := range builders {
+				if err := session.publishPackageExports(builder); err != nil {
+					return ProgramEmission{}, err
+				}
+			}
 			continue
 		}
 		break
