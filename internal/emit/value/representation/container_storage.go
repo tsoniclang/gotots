@@ -14,10 +14,12 @@ func (owner Owner) ContainerStorageType(
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
 	if parameter, generic := api.GenericTypeParameter(sourceType); generic {
-		return context.GenericParameterRepresentation(
+		return owner.genericStorageType(
+			context,
 			source,
 			parameter,
 			api.GenericRepresentationContainerStorage,
+			api.RuntimeContainerStorageType,
 		)
 	}
 	selection, err := owner.PointerRepresentation(

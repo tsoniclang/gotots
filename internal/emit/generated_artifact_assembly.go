@@ -32,6 +32,8 @@ func (s *programSession) validateGeneratedArtifact(
 		return s.validateInterfaceArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
 		return s.validateGenericCapabilityArtifact(artifact)
+	case api.GeneratedArtifactGenericConcretization:
+		return s.validateGenericConcretizationArtifact(artifact)
 	case api.GeneratedArtifactCallableABI,
 		api.GeneratedArtifactInterfaceMethodCallable:
 		return s.validateCallableContractArtifact(artifact)
@@ -39,6 +41,8 @@ func (s *programSession) validateGeneratedArtifact(
 		return s.validatePointerRepresentationArtifact(artifact)
 	case api.GeneratedArtifactProviderStatefulRepresentation:
 		return s.validateProviderStatefulArtifact(artifact)
+	case api.GeneratedArtifactDeferredCallableRegistry:
+		return s.validateDeferredCallableRegistry(artifact)
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
@@ -64,6 +68,8 @@ func (s *programSession) reconstructGeneratedArtifact(
 		err = s.reconstructInterfaceArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
 		err = s.reconstructGenericCapabilityArtifact(artifact)
+	case api.GeneratedArtifactGenericConcretization:
+		err = s.reconstructGenericConcretizationArtifact(artifact)
 	case api.GeneratedArtifactCallableABI,
 		api.GeneratedArtifactInterfaceMethodCallable:
 		err = s.reconstructCallableContractArtifact(artifact)
@@ -71,6 +77,8 @@ func (s *programSession) reconstructGeneratedArtifact(
 		err = s.reconstructPointerRepresentationArtifact(artifact)
 	case api.GeneratedArtifactProviderStatefulRepresentation:
 		err = s.reconstructProviderStatefulArtifact(artifact)
+	case api.GeneratedArtifactDeferredCallableRegistry:
+		err = s.reconstructDeferredCallableRegistry(artifact)
 	default:
 		err = &ScheduleError{
 			Object: artifact.TargetName(),

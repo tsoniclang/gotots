@@ -9,31 +9,31 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func StaticallyNonNil(info *types.Info, source ast.Expr) bool {
+func StaticallyNonNil(info api.TypeInfoView, source ast.Expr) bool {
 	switch source := source.(type) {
 	case *ast.FuncLit:
 		return true
 	case *ast.ParenExpr:
 		return StaticallyNonNil(info, source.X)
 	case *ast.Ident:
-		if info == nil {
+		if !info.Valid() {
 			return false
 		}
-		_, ok := info.Uses[source].(*types.Func)
+		_, ok := info.UseOf(source).(*types.Func)
 		return ok
 	case *ast.SelectorExpr:
-		if info == nil || info.Selections[source] != nil {
+		if !info.Valid() || info.SelectionOf(source) != nil {
 			return false
 		}
 		qualifier, ok := source.X.(*ast.Ident)
 		if !ok {
 			return false
 		}
-		packageName, ok := info.Uses[qualifier].(*types.PkgName)
+		packageName, ok := info.UseOf(qualifier).(*types.PkgName)
 		if !ok {
 			return false
 		}
-		function, ok := info.Uses[source.Sel].(*types.Func)
+		function, ok := info.UseOf(source.Sel).(*types.Func)
 		return ok && function.Pkg() == packageName.Imported()
 	default:
 		return false

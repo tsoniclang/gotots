@@ -35,7 +35,7 @@ func Emit(
 	if source == nil {
 		return api.ExpressionEmission{}, false, nil
 	}
-	calleeFacts, ok := context.TypesInfo().Types[source.Fun]
+	calleeFacts, ok := context.TypesInfo().TypeAndValue(source.Fun)
 	if !ok || !calleeFacts.IsType() {
 		return api.ExpressionEmission{}, false, nil
 	}
@@ -44,9 +44,9 @@ func Emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	targetType := context.TypesInfo().TypeOf(source)
-	resultFacts, resultOK := context.TypesInfo().Types[source]
+	resultFacts, resultOK := context.TypesInfo().TypeAndValue(source)
 	operand := source.Args[0]
-	operandFacts, operandOK := context.TypesInfo().Types[operand]
+	operandFacts, operandOK := context.TypesInfo().TypeAndValue(operand)
 	if targetType == nil ||
 		!resultOK ||
 		resultFacts.Type == nil ||

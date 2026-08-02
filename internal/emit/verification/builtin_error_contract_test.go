@@ -80,20 +80,32 @@ func Message(failure error) string {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	if !strings.Contains(
 		artifacts.printed,
-		"Error($go$recovery?: GoRecovery): Promise<gostring>;",
+		"Error(): Promise<gostring>;",
 	) {
 		t.Fatalf(
-			"canonical error contract is not cooperative:\n%s",
+			"canonical error contract is not Go-shaped and cooperative:\n%s",
 			artifacts.printed,
 		)
 	}
 	if count := strings.Count(
 		artifacts.printed,
-		"async Error($go$recovery?: GoRecovery): Promise<gostring>",
+		"async Error(): Promise<gostring>",
 	); count < 2 {
 		t.Fatalf(
-			"source error adapters did not converge on one cooperative contract: count=%d\n%s",
+			"source error adapters did not converge on one Go-shaped cooperative contract: count=%d\n%s",
 			count,
+			artifacts.printed,
+		)
+	}
+	if strings.Contains(artifacts.printed, "Error$deferred") {
+		t.Fatalf(
+			"non-recovering error methods acquired a private recovery entry:\n%s",
+			artifacts.printed,
+		)
+	}
+	if strings.Contains(artifacts.printed, "Error($go$recovery") {
+		t.Fatalf(
+			"source error contract exposes recovery authority:\n%s",
 			artifacts.printed,
 		)
 	}

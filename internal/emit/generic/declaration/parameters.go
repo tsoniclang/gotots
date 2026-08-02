@@ -8,6 +8,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -15,6 +16,7 @@ import (
 type Parameters struct {
 	context      api.Context
 	typeNodes    []tsgo.TypeParameterDeclaration
+	classOwned   bool
 	operations   []*api.GenericOperationContract
 	capabilities []genericabi.Binding[tsgo.ParameterDeclaration]
 	requests     []api.RootRequest
@@ -213,7 +215,7 @@ func EnterClassMethod(
 		return Parameters{}, err
 	}
 	if api.ValueReceiverTypeName(owner) != nil {
-		parameters.typeNodes = nil
+		parameters.classOwned = true
 	}
 	return parameters, nil
 }
@@ -263,16 +265,30 @@ func EmitOperationParameters(
 			targetErr     error
 			facetRequests []api.RootRequest
 		)
-		target, storageOperation, targetErr := emitStorageOperationType(
-			context,
-			children,
-			source,
-			operation,
-		)
+		handled := false
+		if operation.Operation() ==
+			api.GenericOperationDeferredCallableRegistry {
+			target, targetErr = deferredregistry.ContractType(
+				context.WithRole(api.RoleParameterType),
+				children,
+				source,
+				operation.Signature(),
+			)
+			handled = true
+		}
+		if !handled {
+			var storageOperation bool
+			target, storageOperation, targetErr = emitStorageOperationType(
+				context,
+				children,
+				source,
+				operation,
+			)
+			handled = storageOperation
+		}
 		if targetErr != nil {
 			return nil, nil, targetErr
 		}
-		handled := storageOperation
 		if !handled {
 			target, handled, targetErr = emitPointerOperationType(
 				context,
@@ -345,6 +361,13 @@ func (p Parameters) Context() api.Context {
 }
 
 func (p Parameters) TypeNodes() []tsgo.TypeParameterDeclaration {
+	if p.classOwned {
+		return nil
+	}
+	return append([]tsgo.TypeParameterDeclaration(nil), p.typeNodes...)
+}
+
+func (p Parameters) DetachedTypeNodes() []tsgo.TypeParameterDeclaration {
 	return append([]tsgo.TypeParameterDeclaration(nil), p.typeNodes...)
 }
 

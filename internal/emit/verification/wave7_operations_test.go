@@ -109,6 +109,8 @@ func assertGenericMethodAdapterShape(t *testing.T, printed string) {
 	for _, required := range []string{
 		"export function AuditGenericMethodAdapters",
 		"$go$binary_equal_",
+		"Same$kernel",
+		"Same$concrete_",
 		"=>",
 	} {
 		if !strings.Contains(printed, required) {
@@ -118,24 +120,34 @@ func assertGenericMethodAdapterShape(t *testing.T, printed string) {
 	if strings.Contains(printed, ".call(") ||
 		strings.Contains(printed, ".apply(") ||
 		strings.Contains(printed, ".bind(") ||
-		strings.Contains(printed, "function ComparableBox_Same") {
+		strings.Contains(printed, "function ComparableBox_Same(") {
 		t.Fatalf("generic method adapter uses dynamic callable APIs:\n%s", printed)
 	}
-	capabilityFirst := regexp.MustCompile(
-		`\.Same\(\$goCapability_[0-9a-f]+, `,
+	ordinaryKernelCapability := regexp.MustCompile(
+		`\.Same\$kernel\(\$goCapability_[0-9a-f]+`,
 	)
-	if count := len(capabilityFirst.FindAllString(printed, -1)); count != 2 {
+	if count := len(ordinaryKernelCapability.FindAllString(printed, -1)); count != 1 {
 		t.Fatalf(
-			"generic method value/expression ABI has %d capability-first calls, want 2:\n%s",
+			"generic method ordinary kernel ABI has %d capability calls, want 1:\n%s",
 			count,
 			printed,
 		)
 	}
-	receiverFirst := regexp.MustCompile(
-		`\.Same\((?:__gotots_receiver_|\$argument0), \$goCapability_`,
+	deferredKernelCapability := regexp.MustCompile(
+		`Same\$kernel\$deferred\(\$go\$recovery, \$argument0, \$goCapability_[0-9a-f]+`,
 	)
-	if receiverFirst.MatchString(printed) {
-		t.Fatalf("generic method adapter emitted receiver before capability:\n%s", printed)
+	if count := len(deferredKernelCapability.FindAllString(printed, -1)); count != 0 {
+		t.Fatalf(
+			"non-recovering generic method has %d deferred kernel calls, want zero:\n%s",
+			count,
+			printed,
+		)
+	}
+	leakedCapability := regexp.MustCompile(
+		`Same\$concrete_[0-9a-f]+\((?:\$go\$recovery, )?\$goCapability_`,
+	)
+	if leakedCapability.MatchString(printed) {
+		t.Fatalf("generic method source adapter exposes a capability:\n%s", printed)
 	}
 }
 
@@ -168,7 +180,7 @@ func TestWaveSevenBigIntGenericArithmeticExecutesDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	for _, required := range []string{
-		"export function Arithmetic<T>",
+		"export function Arithmetic$kernel<T>",
 		"$go$binary_divide_",
 		"$go$binary_remainder_",
 		"goIntegerDivide",
@@ -435,8 +447,8 @@ func assertIteratorRangeShape(t *testing.T, printed string) {
 		"range function continued iteration after loop body panic",
 		"range function continued iteration after whole loop exit",
 		"range function recovered a loop body panic and did not resume panicking",
-		"export function GenericIteratorSum<T>",
-		"export function GenericIteratorCopy<T, T$Storage>",
+		"export function GenericIteratorSum$kernel<T>",
+		"export function GenericIteratorCopy$kernel<T>",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("iterator artifact lacks %q:\n%s", required, printed)
@@ -453,7 +465,7 @@ func assertIteratorRangeShape(t *testing.T, printed string) {
 			t.Fatalf("iterator artifact contains %q:\n%s", forbidden, printed)
 		}
 	}
-	if strings.Count(printed, "export function GenericIteratorSum<T>") != 1 {
+	if strings.Count(printed, "export function GenericIteratorSum$kernel<T>") != 1 {
 		t.Fatalf("generic iterator body was duplicated:\n%s", printed)
 	}
 	if count := strings.Count(

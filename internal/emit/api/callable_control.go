@@ -7,6 +7,17 @@ import (
 	"slices"
 )
 
+const (
+	DeferredEntrySuffix                           = "$deferred"
+	GenericKernelSuffix                           = "$kernel"
+	DeferredRegistryRegisterName                  = "register"
+	DeferredRegistryResolveName                   = "resolve"
+	DeferredRegistryRegisterMethodName            = "registerMethod"
+	DeferredRegistryResolveMethodName             = "resolveMethod"
+	DeferredRegistryRegisterCooperativeMethodName = "registerCooperativeMethod"
+	DeferredRegistryResolveCooperativeMethodName  = "resolveCooperativeMethod"
+)
+
 type ControlLabel struct {
 	name        string
 	breakable   bool
@@ -102,7 +113,7 @@ func NewNamedReturnControl(
 		}
 	}
 	for _, target := range targets {
-		if target.Value() == nil {
+		if !target.Valid() {
 			return ReturnControl{}, &InvariantError{
 				Role:   RoleReturnResult,
 				Reason: "named return-control target is invalid",
@@ -402,6 +413,18 @@ func (c Context) CallableControl() CallableControlDemand {
 
 func (c Context) CallableControlFor(callable ast.Node) CallableControlDemand {
 	return c.callableControls[callable]
+}
+
+func (c Context) WithRecoveryAuthority(name string) Context {
+	if name == "" || c.recoveryAuthority != "" {
+		panic("recovery authority is invalid")
+	}
+	c.recoveryAuthority = name
+	return c
+}
+
+func (c Context) RecoveryAuthority() (string, bool) {
+	return c.recoveryAuthority, c.recoveryAuthority != ""
 }
 
 func (c Context) CallableControlRequest(

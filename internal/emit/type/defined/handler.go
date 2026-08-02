@@ -38,7 +38,7 @@ func Emit(
 			children,
 			source,
 			model.TypeName(),
-			model.Type().TypeArgs(),
+			api.TypeArgumentsFromGo(model.Type().TypeArgs()),
 		)
 		if err != nil {
 			return api.TypeEmission{}, true, err

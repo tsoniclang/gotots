@@ -332,6 +332,32 @@ is a second public generic ABI. An unsupported open export fails explicitly.
 Generic named types keep only source type parameters. Storage/copy/callable
 profiles never add target-only public type parameters.
 
+### Associated Representation Types
+
+A generic declaration keeps its source type parameters while referring to
+closed representation projections:
+
+```go
+func ArrayAddress[T any](first, second T) T {
+    values := [1]T{first}
+    pointer := &values[0]
+    values[0] = second
+    return *pointer
+}
+```
+
+The target kernel still has one `T`; it uses `GoContainerStorage<T>` for array
+slots and `GoPointerType<T>` for the element address. If a concrete `Item`
+stores as `Item$Storage`, its class declares
+`GoPointerRepresentedValue<GoPointer<Item, Item$Storage>>`. A scalar or
+identity-represented provider value uses the canonical fallback. No
+`T$Storage` or `T$Pointer` parameter is fabricated.
+
+Only the concrete type owner may emit an associated-type marker. Markers are
+demand-created, type-only, and selected from the canonical representation
+observation. They are not operation capabilities and cannot by themselves
+cause a concretization or private runtime kernel.
+
 ## Expressions
 
 Literals use checker values and selected target representations. Unary/binary
@@ -392,7 +418,11 @@ calls return nil from `recover`; only direct deferred invocation receives the
 pending panic. A nested call does not.
 
 Dynamic function-value defer consults the exact-signature typed deferred-entry
-registry. It does not alter the function type or append an argument.
+registry only for a demanded dynamic signature. A recover-capable value has a
+registered private entry; every other value falls back to ordinary invocation.
+This does not alter the function type or append an argument. A certified
+provider recovery facet follows the same rule: presence selects its private
+entry, while absence uses the ordinary provider callable.
 
 ### Channels, Goroutines, And Select
 

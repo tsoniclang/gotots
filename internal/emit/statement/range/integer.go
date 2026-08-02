@@ -101,7 +101,7 @@ func integerIterationType(
 				if !ok {
 					return nil
 				}
-				if object, ok := context.TypesInfo().Defs[identifier].(*types.Var); ok {
+				if object, ok := context.TypesInfo().DefOf(identifier).(*types.Var); ok {
 					return object.Type()
 				}
 			}

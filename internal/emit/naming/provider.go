@@ -39,7 +39,10 @@ func (r *Registry) ProviderInterface(
 		}
 	}
 	if typeName == types.Universe.Lookup("error") {
-		if r.provider == nil || !r.provider.Valid() {
+		if r.provider == nil {
+			return gostdlib.ProviderInterface{}, false, nil
+		}
+		if !r.provider.Valid() {
 			return gostdlib.ProviderInterface{}, true, &api.NameError{
 				Name:   gostdlib.LanguageErrorInterfaceIdentity,
 				Reason: "standard-library provider certificate is invalid",

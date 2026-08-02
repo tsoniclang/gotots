@@ -63,11 +63,7 @@ func EmitABIAdapter(
 	source ast.Node,
 	signature *types.Signature,
 ) (SignatureEmission, error) {
-	target, err := EmitAdapter(context, children, source, signature)
-	if err != nil {
-		return SignatureEmission{}, err
-	}
-	return withRecoveryAuthority(context, target)
+	return EmitAdapter(context, children, source, signature)
 }
 
 func (e SignatureEmission) Parameters() []tsgo.ParameterDeclaration {
@@ -87,12 +83,8 @@ func (e SignatureEmission) ParameterReferences(
 func (e SignatureEmission) SourceParameterReferences(
 	factory tsgo.Factory,
 ) []tsgo.Expression {
-	names := e.parameterNames
-	if e.recovery {
-		names = names[:len(names)-1]
-	}
-	result := make([]tsgo.Expression, 0, len(names))
-	for _, name := range names {
+	result := make([]tsgo.Expression, 0, len(e.parameterNames))
+	for _, name := range e.parameterNames {
 		result = append(result, factory.Identifier(name))
 	}
 	return result
@@ -101,10 +93,7 @@ func (e SignatureEmission) SourceParameterReferences(
 func (e SignatureEmission) RecoveryAuthorityReference(
 	factory tsgo.Factory,
 ) (tsgo.Expression, bool) {
-	if !e.recovery || len(e.parameterNames) == 0 {
-		return nil, false
-	}
-	return factory.Identifier(e.parameterNames[len(e.parameterNames)-1]), true
+	return nil, false
 }
 
 func (e SignatureEmission) Result() tsgo.TypeNode {
@@ -153,15 +142,29 @@ func EmitDeclaration(
 	parameterRole api.Role,
 	resultRole api.Role,
 ) (SignatureEmission, error) {
+	sourceSignature, err := sourceCallableSignature(context, signature)
+	if err != nil {
+		return SignatureEmission{}, err
+	}
 	if err := validateSyntax(
 		context,
 		source,
-		signature,
+		sourceSignature,
 		parameterRole,
 		resultRole,
 		true,
 	); err != nil {
 		return SignatureEmission{}, err
+	}
+	parameterName := context.Names().Parameter
+	if _, generic := context.GenericParameterOwner(); generic {
+		parameterName = func(
+			parameter *types.Var,
+			index int,
+		) (string, error) {
+			sourceParameter := sourceSignature.Params().At(index)
+			return context.Names().Parameter(sourceParameter, index)
+		}
 	}
 	return emitRepresented(
 		context,
@@ -170,9 +173,17 @@ func EmitDeclaration(
 		signature,
 		parameterRole,
 		resultRole,
-		context.Names().Parameter,
+		parameterName,
 		true,
 	)
+}
+
+func functionSignature(function *types.Func) (*types.Signature, bool) {
+	if function == nil {
+		return nil, false
+	}
+	signature, ok := function.Type().(*types.Signature)
+	return signature, ok
 }
 
 func EmitType(
@@ -181,6 +192,14 @@ func EmitType(
 	source ast.Node,
 	signature *types.Signature,
 ) (api.TypeEmission, error) {
+	signature, ok := ValueSignature(signature)
+	if !ok {
+		return api.TypeEmission{}, api.Unsupported(
+			context,
+			api.CategoryType,
+			source,
+		)
+	}
 	if context.EnvironmentContract() {
 		target, err := emitEnvironmentNonNilType(
 			context,
@@ -375,28 +394,4 @@ func emitInternalNonNilType(
 		),
 		target.Requests()...,
 	), nil
-}
-
-func withRecoveryAuthority(
-	context api.Context,
-	target SignatureEmission,
-) (SignatureEmission, error) {
-	if target.recovery {
-		return SignatureEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "callable signature already carries recovery authority",
-		}
-	}
-	parameter, requests, err := RecoveryAuthorityParameter(context)
-	if err != nil {
-		return SignatureEmission{}, err
-	}
-	target.parameters = append(target.parameters, parameter)
-	target.parameterNames = append(
-		target.parameterNames,
-		RecoveryAuthorityName,
-	)
-	target.requests = append(target.requests, requests...)
-	target.recovery = true
-	return target, nil
 }

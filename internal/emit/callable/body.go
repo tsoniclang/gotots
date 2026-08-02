@@ -26,6 +26,10 @@ func EmitBody(
 			Reason: "callable body input is nil",
 		}
 	}
+	sourceSignature, err := sourceCallableSignature(context, signature)
+	if err != nil {
+		return api.BlockEmission{}, err
+	}
 	parameterPrologue, parameterRequests, err := addressableParameterPrologue(
 		context,
 		children,
@@ -39,7 +43,7 @@ func EmitBody(
 		context,
 		children,
 		sourceType,
-		signature.Results(),
+		sourceSignature.Results(),
 	)
 	if err != nil {
 		return api.BlockEmission{}, err
@@ -88,6 +92,7 @@ func namedResultPrologue(
 	var requests []api.RootRequest
 	for index, sourceName := range names {
 		result := results.At(index)
+		resultType := context.TypesInfo().TypeOfObject(result)
 		targetName, selected := context.AddressableStorage().Name(context, result)
 		if !selected {
 			targetName, err = context.Names().Result(result, index)
@@ -100,7 +105,7 @@ func namedResultPrologue(
 			targetType, err := children.RepresentedType(
 				context.WithRole(api.RoleResultType),
 				sourceName,
-				result.Type(),
+				resultType,
 			)
 			if err != nil {
 				return nil, nil, false, err
@@ -111,7 +116,7 @@ func namedResultPrologue(
 		zero, err := context.Values().Zero(
 			context.WithRole(api.RoleNamedResultZero),
 			sourceName,
-			result.Type(),
+			resultType,
 		)
 		if err != nil {
 			return nil, nil, false, err
@@ -121,7 +126,7 @@ func namedResultPrologue(
 				context,
 				children,
 				sourceName,
-				result.Type(),
+				resultType,
 				zero,
 			)
 			if err != nil {
@@ -178,7 +183,7 @@ func namedResultSyntax(
 	for index, sourceName := range names {
 		if sourceName == nil ||
 			sourceName.Name == "" ||
-			context.TypesInfo().Defs[sourceName] != results.At(index) ||
+			context.TypesInfo().DefOf(sourceName) != results.At(index) ||
 			results.At(index).Name() == "" {
 			return nil, api.Unsupported(
 				context.WithRole(api.RoleResultType),

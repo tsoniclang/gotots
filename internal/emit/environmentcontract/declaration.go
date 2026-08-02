@@ -77,7 +77,7 @@ func callableDeclaration(
 	declarations := make([]tsgo.Statement, 0, len(variants))
 	var requests []api.RootRequest
 	for _, profile := range variants {
-		declaration, variantRequests, err :=
+		variantDeclarations, variantRequests, err :=
 			callableVariantDeclaration(
 				context,
 				children,
@@ -90,7 +90,7 @@ func callableDeclaration(
 		if err != nil {
 			return api.DeclarationEmission{}, err
 		}
-		declarations = append(declarations, declaration)
+		declarations = append(declarations, variantDeclarations...)
 		requests = append(requests, variantRequests...)
 	}
 	return api.NewDeclarationEmission(
@@ -107,7 +107,7 @@ func callableVariantDeclaration(
 	requirements []api.DeclarationRequirement,
 	profile *api.GenericCallableProfile,
 	recovery bool,
-) (tsgo.Statement, []api.RootRequest, error) {
+) ([]tsgo.Statement, []api.RootRequest, error) {
 	generic, err := enterGeneric(context, function, requirements)
 	if err != nil {
 		return nil, nil, err
@@ -145,15 +145,6 @@ func callableVariantDeclaration(
 		)
 		requests = api.CombineRequests(receiver.Requests(), requests)
 	}
-	if recovery {
-		parameter, recoveryRequests, err :=
-			callable.RecoveryAuthorityParameter(context)
-		if err != nil {
-			return nil, nil, err
-		}
-		parameters = append(parameters, parameter)
-		requests = api.CombineRequests(requests, recoveryRequests)
-	}
 	name, err := context.Names().Declare(function)
 	if err != nil {
 		return nil, nil, err
@@ -161,17 +152,39 @@ func callableVariantDeclaration(
 	if profile != nil {
 		name += profile.Suffix()
 	}
-	return context.Factory().FunctionDeclaration(
-			exportDeclare(context),
-			nil,
-			context.Factory().Identifier(name),
-			generic.parameters,
-			parameters,
-			target.Result(),
-			nil,
-		),
-		requests,
-		nil
+	declarations := []tsgo.Statement{context.Factory().FunctionDeclaration(
+		exportDeclare(context),
+		nil,
+		context.Factory().Identifier(name),
+		generic.parameters,
+		parameters,
+		target.Result(),
+		nil,
+	)}
+	if recovery {
+		recoveryParameter, recoveryRequests, recoveryErr :=
+			callable.RecoveryAuthorityParameter(context)
+		if recoveryErr != nil {
+			return nil, nil, recoveryErr
+		}
+		declarations = append(
+			declarations,
+			context.Factory().FunctionDeclaration(
+				exportDeclare(context),
+				nil,
+				context.Factory().Identifier(name+api.DeferredEntrySuffix),
+				generic.parameters,
+				append(
+					[]tsgo.ParameterDeclaration{recoveryParameter},
+					parameters...,
+				),
+				target.Result(),
+				nil,
+			),
+		)
+		requests = api.CombineRequests(requests, recoveryRequests)
+	}
+	return declarations, requests, nil
 }
 
 func requiresRecoveryAuthority(

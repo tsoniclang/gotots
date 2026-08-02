@@ -103,7 +103,7 @@ func sourceSpec(
 	}
 	for _, candidate := range declaration.Specs {
 		spec, ok := candidate.(*ast.TypeSpec)
-		if ok && context.TypesInfo().Defs[spec.Name] == typeName {
+		if ok && context.TypesInfo().DefOf(spec.Name) == typeName {
 			return spec, true
 		}
 	}

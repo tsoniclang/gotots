@@ -35,9 +35,6 @@ func TestClassMembersPreserveReceiverSemanticsDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	for _, forbidden := range []string{
-		"export function Counter_Bump",
-		"export function Counter_Read",
-		"export function Counter_Reset",
 		".bind(",
 		".call(",
 		".apply(",
@@ -412,7 +409,7 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 	for _, required := range []string{
 		"export interface GenericValue<T>",
 		"export interface IntValue",
-		"Value($go$recovery?: GoRecovery): Promise<T>",
+		"Value(): Promise<T>;",
 		"export async function GenericInterfaceAudit(): Promise<int32>",
 		"return await goInterfaceNonNil<GenericValue<T>>(__gotots_receiver_0).Value()",
 	} {
@@ -424,12 +421,9 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 			)
 		}
 	}
-	if methods := strings.Count(
-		artifacts.printed,
-		"async Value($go$recovery?: GoRecovery): Promise<",
-	); methods < 2 {
+	if methods := strings.Count(artifacts.printed, "Value$deferred"); methods != 0 {
 		t.Fatalf(
-			"generic interface adapters have %d async Value methods, want at least two:\n%s",
+			"non-recovering generic interface adapters have %d recovery entries, want zero:\n%s",
 			methods,
 			artifacts.printed,
 		)

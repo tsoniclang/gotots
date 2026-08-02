@@ -7,8 +7,10 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
-	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
+	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
+	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
+	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -30,8 +32,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	targetSignatureSource := signature
-	typeArguments := genericinstance.ReceiverTypeArguments(selected.Recv())
-	generic := signature.RecvTypeParams().Len() != 0
+	generic := genericinstance.ReceiverTypeArguments(selected.Recv()) != nil
 	if generic {
 		var err error
 		targetSignatureSource, err =
@@ -58,42 +59,37 @@ func Emit(
 		return api.ExpressionEmission{}, err
 	}
 	owner := method.Origin()
-	var (
-		memberSuffix      string
-		abiCooperative    bool
-		sourceRequests    []api.RootRequest
-		selectionRequests []api.RootRequest
-	)
 	if generic {
-		declarationSignature, ok := owner.Type().(*types.Signature)
-		if !ok {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		var facet api.CallableFacet
-		memberSuffix, facet, _, selectionRequests, err =
-			cooperativecall.SelectGenericClassMethod(
-				context,
-				owner,
-				declarationSignature,
-				targetSignatureSource,
-			)
-		if err == nil {
-			_, abiCooperative, sourceRequests, err =
-				cooperativecall.GenericValueContract(
-					context,
-					facet,
-					targetSignatureSource,
-				)
-		}
-	} else {
-		_, abiCooperative, sourceRequests, err =
-			cooperativecall.SourceValueContract(
-				context,
-				method,
-				targetSignatureSource,
-			)
+		return emitGenericMethodValue(
+			context,
+			children,
+			source,
+			receiver,
+			method,
+			targetSignatureSource,
+		)
 	}
+	methodSignature, ok := owner.Type().(*types.Signature)
+	if !ok || methodSignature.Recv() == nil {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	invocation, err := methodcall.Resolve(
+		context,
+		children,
+		source,
+		owner,
+		methodSignature,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	providerCooperative, abiCooperative, sourceRequests, err :=
+		cooperativecall.SourceValueContract(
+			context,
+			method,
+			targetSignatureSource,
+		)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -130,97 +126,30 @@ func Emit(
 			),
 		),
 	)
-	var targetTypeArguments []tsgo.TypeNode
-	var typeRequests []api.RootRequest
-	var capabilities []genericabi.Binding[tsgo.Expression]
-	var capabilityRequests []api.RootRequest
-	var operationSet api.GenericOperationSet
-	if generic {
-		var resolved bool
-		var resolveErr error
-		operationSet, resolved, resolveErr =
-			context.ResolveGenericCallable(owner)
-		if resolveErr != nil {
-			return api.ExpressionEmission{}, resolveErr
-		}
-		if !resolved ||
-			typeArguments == nil ||
-			typeArguments.Len() != len(operationSet.Parameters()) {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		targetTypeArguments, typeRequests, err =
-			genericinstance.EmitTypeArguments(
-				context,
-				children,
-				source,
-				owner,
-				typeArguments,
-			)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		capabilities, capabilityRequests, err =
-			genericinstance.EmitCapabilities(
-				context,
-				source,
-				operationSet,
-				typeArguments,
-			)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
-	controlRequest, err := api.NewDirectCallableControlRequest(
-		owner,
-		api.CallableControlRecovery,
+	call, err := invocation.Invoke(
+		context,
+		children,
+		context.Factory().Identifier(receiverName),
+		arguments,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	callArguments := arguments
-	if generic {
-		sourceArguments := targetSignature.SourceParameterReferences(
-			context.Factory(),
-		)
-		recoveryAuthority, recoveryOK :=
-			targetSignature.RecoveryAuthorityReference(context.Factory())
-		if !recoveryOK {
-			return api.ExpressionEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "generic method value lacks recovery authority",
-			}
-		}
-		sourceBindings, bindErr := genericabi.SourceParameters(
-			owner,
-			sourceArguments,
-		)
-		if bindErr != nil {
-			return api.ExpressionEmission{}, bindErr
-		}
-		callArguments, err = genericabi.JoinClassMethod(
-			owner,
-			operationSet.Operations(),
-			genericabi.Combine(
-				capabilities,
-				sourceBindings,
-			),
-		)
-		callArguments = append(callArguments, recoveryAuthority)
-	}
+	call, err = cooperativecall.SourceInterfaceProviderCall(
+		context,
+		source,
+		call,
+		providerCooperative,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if api.ValueReceiverTypeName(owner) != nil {
-		targetTypeArguments = nil
+	call, err = invocation.FromProviderResults(context, children, call)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
-	call, callRequests, err := callable.SelectedMethodCall(
-		context,
-		owner,
-		memberSuffix,
-		context.Factory().Identifier(receiverName),
-		targetTypeArguments,
-		callArguments,
+	recoveryObservation, err := context.ObserveRecoveryCallable(
+		invocation.Facet(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -231,31 +160,121 @@ func Emit(
 		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}
+	ordinary := context.Factory().ArrowFunction(
+		modifiers,
+		nil,
+		targetSignature.Parameters(),
+		resultType,
+		context.Factory().EqualsGreaterThanToken(),
+		methodValueBody(context, targetSignatureSource, call),
+	)
+	if !recoveryObservation.Recovery() {
+		return api.NewExpressionEmission(
+			before,
+			ordinary,
+			api.CombineRequests(
+				receiver.Requests(),
+				targetSignature.Requests(),
+				call.Requests(),
+				sourceRequests,
+				recoveryObservation.Requests(),
+			),
+		)
+	}
+	recovery, recoveryRequests, err :=
+		callable.RecoveryAuthorityParameter(context)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	deferredCall, err := invocation.InvokeDeferred(
+		context,
+		children,
+		source,
+		context.Factory().Identifier(receiverName),
+		arguments,
+		context.Factory().Identifier(callable.RecoveryAuthorityName),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	deferredCall, err = invocation.FromProviderResults(
+		context,
+		children,
+		deferredCall,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	registry, err := deferredregistry.Reference(
+		context,
+		source,
+		targetSignatureSource,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	deferred := context.Factory().ArrowFunction(
+		modifiers,
+		nil,
+		append(
+			[]tsgo.ParameterDeclaration{recovery},
+			targetSignature.Parameters()...,
+		),
+		resultType,
+		context.Factory().EqualsGreaterThanToken(),
+		methodValueBody(context, targetSignatureSource, deferredCall),
+	)
 	target, err := api.NewExpressionEmission(
 		before,
-		context.Factory().ArrowFunction(
-			modifiers,
+		context.Factory().CallExpression(
+			context.Factory().PropertyAccessExpression(
+				registry.Expression(context.Factory()),
+				nil,
+				context.Factory().Identifier(
+					api.DeferredRegistryRegisterName,
+				),
+				tsgo.NodeFlagsNone,
+			),
 			nil,
-			targetSignature.Parameters(),
-			resultType,
-			context.Factory().EqualsGreaterThanToken(),
-			call,
+			nil,
+			[]tsgo.Expression{ordinary, deferred},
+			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(
 			receiver.Requests(),
 			targetSignature.Requests(),
-			typeRequests,
-			capabilityRequests,
-			selectionRequests,
-			callRequests,
-			[]api.RootRequest{controlRequest},
+			call.Requests(),
+			deferredCall.Requests(),
+			recoveryRequests,
+			registry.Requests(),
 			sourceRequests,
+			recoveryObservation.Requests(),
 		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	return target, nil
+}
+
+func methodValueBody(
+	context api.Context,
+	signature *types.Signature,
+	call api.ExpressionEmission,
+) tsgo.ConciseBody {
+	statements := call.Before()
+	if signature.Results().Len() == 0 {
+		statements = append(
+			statements,
+			context.Factory().ExpressionStatement(call.Value()),
+		)
+	} else {
+		statements = append(
+			statements,
+			context.Factory().ReturnStatement(call.Value()),
+		)
+	}
+	return context.Factory().Block(statements, true)
 }
 
 func emitInterface(
@@ -342,7 +361,8 @@ func emitInterface(
 			),
 		),
 	)
-	call := context.Factory().CallExpression(
+	arguments := targetSignature.ParameterReferences(context.Factory())
+	ordinaryCall := context.Factory().CallExpression(
 		context.Factory().PropertyAccessExpression(
 			context.Factory().Identifier(receiverName),
 			nil,
@@ -351,30 +371,82 @@ func emitInterface(
 		),
 		nil,
 		nil,
-		targetSignature.ParameterReferences(context.Factory()),
+		arguments,
 		tsgo.NodeFlagsNone,
 	)
+	recovery, recoveryRequests, err :=
+		callable.RecoveryAuthorityParameter(context)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	deferredCall, err := interfaceoperation.ApplyDeferred(
+		context,
+		children,
+		source,
+		selected.Recv(),
+		api.DirectExpression(context.Factory().Identifier(receiverName)),
+		method,
+		signature,
+		cooperative,
+		arguments,
+		context.Factory().Identifier(callable.RecoveryAuthorityName),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	var modifiers []tsgo.ModifierLike
 	resultType := targetSignature.Result()
 	if cooperative {
 		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}
+	ordinary := context.Factory().ArrowFunction(
+		modifiers,
+		nil,
+		targetSignature.Parameters(),
+		resultType,
+		context.Factory().EqualsGreaterThanToken(),
+		ordinaryCall,
+	)
+	deferred := context.Factory().ArrowFunction(
+		modifiers,
+		nil,
+		append(
+			[]tsgo.ParameterDeclaration{recovery},
+			targetSignature.Parameters()...,
+		),
+		resultType,
+		context.Factory().EqualsGreaterThanToken(),
+		methodValueBody(context, signature, deferredCall),
+	)
+	registry, err := deferredregistry.Reference(context, source, signature)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	return api.NewExpressionEmission(
 		before,
-		context.Factory().ArrowFunction(
-			modifiers,
+		context.Factory().CallExpression(
+			context.Factory().PropertyAccessExpression(
+				registry.Expression(context.Factory()),
+				nil,
+				context.Factory().Identifier(
+					api.DeferredRegistryRegisterName,
+				),
+				tsgo.NodeFlagsNone,
+			),
 			nil,
-			targetSignature.Parameters(),
-			resultType,
-			context.Factory().EqualsGreaterThanToken(),
-			call,
+			nil,
+			[]tsgo.Expression{ordinary, deferred},
+			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(
 			receiver.Requests(),
 			targetSignature.Requests(),
 			nonNil.Requests(),
 			contractRequests,
+			deferredCall.Requests(),
+			recoveryRequests,
+			registry.Requests(),
 		),
 	)
 }

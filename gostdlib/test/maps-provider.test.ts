@@ -3,7 +3,9 @@ import test from "node:test";
 
 import { GoMap, type GoMapValue } from "@gotots/runtime/map.js";
 
-import { Clone } from "../src/maps.js";
+import {
+  MapsCloneKernel as Clone,
+} from "../src/internal/facets/generic-maps-kernel.js";
 
 test("maps.Clone consumes typed construction and assignment capabilities", () => {
   const source: GoMapValue<string, number> = GoMap.make<string, number>(

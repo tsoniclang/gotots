@@ -118,8 +118,7 @@ func primitive(
 }
 
 func callableValue(sourceType types.Type) bool {
-	_, ok := callable.Signature(sourceType)
-	return ok
+	return callable.IsValue(sourceType)
 }
 
 func pointerValue(sourceType types.Type) bool {

@@ -34,10 +34,12 @@ func (owner Owner) StorageType(
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
 	if parameter, generic := api.GenericTypeParameter(sourceType); generic {
-		return context.GenericParameterRepresentation(
+		return owner.genericStorageType(
+			context,
 			source,
 			parameter,
 			api.GenericRepresentationStorage,
+			api.RuntimeStorageType,
 		)
 	}
 	if panicNilRuntimeValue(context, sourceType) {
@@ -88,7 +90,7 @@ func (owner Owner) StorageType(
 					owner.children,
 					source,
 					named.Origin().Obj(),
-					named.TypeArgs(),
+					api.TypeArgumentsFromGo(named.TypeArgs()),
 				)
 			if err != nil {
 				return api.TypeEmission{}, err

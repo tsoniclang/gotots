@@ -15,6 +15,7 @@ import (
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
 	namedstruct "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	genericcapability "github.com/tsoniclang/gotots/internal/emit/generic/capability"
+	genericconcretization "github.com/tsoniclang/gotots/internal/emit/generic/concretization"
 	maprepresentation "github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -40,7 +41,7 @@ func Emit(
 					candidate,
 				)
 		}
-		typeName, ok := context.TypesInfo().Defs[spec.Name].(*types.TypeName)
+		typeName, ok := context.TypesInfo().DefOf(spec.Name).(*types.TypeName)
 		if !ok {
 			return api.StatementEmission{},
 				api.Unsupported(
@@ -182,10 +183,12 @@ func emitLexicalGeneratedArtifact(
 				Reason: "lexical anonymous-struct artifact has no struct type",
 			}
 		}
-		operations, err := lexicalAnonymousStructOperations(
-			artifact,
-			requirements,
-		)
+		operations, representationFacets, err :=
+			namedstruct.SelectAnonymousRequirements(
+				context.Role(),
+				artifact,
+				requirements,
+			)
 		if err != nil {
 			return api.DeclarationEmission{}, err
 		}
@@ -195,6 +198,7 @@ func emitLexicalGeneratedArtifact(
 			structType,
 			artifact.TargetName(),
 			operations,
+			representationFacets,
 			false,
 		)
 	case api.GeneratedArtifactMapSpecialization:
@@ -264,6 +268,25 @@ func emitLexicalGeneratedArtifact(
 			artifact,
 			requirements,
 		)
+	case api.GeneratedArtifactGenericConcretization:
+		deferred, err := exactLexicalGenericConcretizationRequirement(
+			artifact,
+			requirements,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		statements, requests, err := genericconcretization.Build(
+			context.WithRole(api.RoleLocalDeclaration),
+			children,
+			artifact,
+			nil,
+			deferred,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		return api.NewDeclarationEmission(statements, requests)
 	default:
 		anchor := artifact.LexicalAnchor()
 		anchorName := "<unknown>"
@@ -283,6 +306,56 @@ func emitLexicalGeneratedArtifact(
 			),
 		}
 	}
+}
+
+func exactLexicalGenericConcretizationRequirement(
+	artifact *api.GeneratedArtifact,
+	requirements []api.DeclarationRequirement,
+) (bool, error) {
+	if len(requirements) < 1 || len(requirements) > 2 {
+		return false, &api.InvariantError{
+			Role:   api.RoleLocalDeclaration,
+			Reason: "lexical generic concretization requirements are not exact",
+		}
+	}
+	bound, boundOK := artifact.GenericConcretization()
+	base := false
+	deferred := false
+	for _, requirement := range requirements {
+		selected, ok := requirement.GenericConcretization()
+		generated, generatedOK := requirement.GeneratedArtifact()
+		if !ok || !generatedOK || generated != artifact || !boundOK ||
+			selected != bound {
+			return false, &api.InvariantError{
+				Role:   api.RoleLocalDeclaration,
+				Reason: "lexical generic concretization received a foreign request",
+			}
+		}
+		if requirement.DeferredGenericConcretization() {
+			if deferred {
+				return false, &api.InvariantError{
+					Role:   api.RoleLocalDeclaration,
+					Reason: "lexical generic concretization has duplicate deferred demand",
+				}
+			}
+			deferred = true
+		} else {
+			if base {
+				return false, &api.InvariantError{
+					Role:   api.RoleLocalDeclaration,
+					Reason: "lexical generic concretization has duplicate definition demand",
+				}
+			}
+			base = true
+		}
+	}
+	if !base {
+		return false, &api.InvariantError{
+			Role:   api.RoleLocalDeclaration,
+			Reason: "lexical generic concretization lacks its definition demand",
+		}
+	}
+	return deferred, nil
 }
 
 func emitLexicalGenericCapability(
@@ -496,41 +569,4 @@ func emitLexicalMapSpecialization(
 			specialization.Requests(),
 		)...,
 	), nil
-}
-
-func lexicalAnonymousStructOperations(
-	artifact *api.GeneratedArtifact,
-	requirements []api.DeclarationRequirement,
-) ([]api.NamedStructOperation, error) {
-	var operations []api.NamedStructOperation
-	for _, requirement := range requirements {
-		selected, demand, ok := requirement.AnonymousStruct()
-		if !ok || selected != artifact {
-			return nil, &api.InvariantError{
-				Role:   api.RoleLocalDeclaration,
-				Reason: "lexical anonymous struct received a foreign requirement",
-			}
-		}
-		switch demand {
-		case api.AnonymousStructDemandDefinition:
-		case api.AnonymousStructDemandZero:
-			operations = append(operations, api.NamedStructOperationZero)
-		case api.AnonymousStructDemandCopy:
-			operations = append(operations, api.NamedStructOperationCopy)
-		case api.AnonymousStructDemandEqual:
-			operations = append(operations, api.NamedStructOperationEqual)
-		case api.AnonymousStructDemandHash:
-			operations = append(operations, api.NamedStructOperationHash)
-		case api.AnonymousStructDemandConvert:
-			operations = append(operations, api.NamedStructOperationConvert)
-		case api.AnonymousStructDemandStorage:
-			operations = append(operations, api.NamedStructOperationStorage)
-		default:
-			return nil, &api.InvariantError{
-				Role:   api.RoleLocalDeclaration,
-				Reason: "lexical anonymous-struct demand is invalid",
-			}
-		}
-	}
-	return operations, nil
 }

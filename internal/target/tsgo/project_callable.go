@@ -109,6 +109,25 @@ func (p *ProjectInspection) CallableTypeParameterCount(
 	return len(signature.TypeParameters), nil
 }
 
+func (p *ProjectInspection) CallableParameterCount(
+	target projectCallable,
+) (int, error) {
+	if p == nil || target == nil {
+		return 0, &ProjectInspectionError{
+			Operation: "callable parameters",
+			Reason:    "target is absent",
+		}
+	}
+	signature, err := p.singleCallSignature(
+		target,
+		target.callableSubject(),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return len(signature.Parameters), nil
+}
+
 func (p *ProjectInspection) compositeTypes(source uint32) ([]typeResponse, error) {
 	var selected []typeResponse
 	if err := requestProjectJSON(

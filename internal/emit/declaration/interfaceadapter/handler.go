@@ -12,7 +12,6 @@ import (
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
-	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -66,6 +65,7 @@ func Build(
 		0,
 		len(demanded)+6,
 	)
+	var support []tsgo.Statement
 	tokens := make([]tsgo.Expression, 0, len(demanded))
 	tokenNames := make(map[string]struct{})
 	requests := api.CombineRequests(
@@ -101,13 +101,16 @@ func Build(
 				context.Factory().Identifier(token.Name()),
 			)
 		}
-		target, methodRequests, err := emitMethod(
+		target, methodSupport, methodRequests, err := emitMethod(
 			context,
 			children,
+			name,
+			dynamicType.Name(),
 			sourceType,
 			selected.selection,
 			selected.method,
 			targets,
+			selected.contracts,
 		)
 		if err != nil {
 			methodError, staged := err.(*MethodError)
@@ -120,7 +123,8 @@ func Build(
 				Cause:  err,
 			}
 		}
-		methods = append(methods, target)
+		methods = append(methods, target...)
+		support = append(support, methodSupport...)
 		requests = append(requests, methodRequests...)
 	}
 	equal, equalRequests, err := equalMethod(
@@ -161,33 +165,35 @@ func Build(
 		format,
 	}
 	classMembers = append(classMembers, methods...)
-	return []tsgo.Statement{
-			methodSetDeclaration(context.Factory(), name, tokens),
-			context.Factory().ClassDeclaration(
-				modifiers,
-				context.Factory().Identifier(name),
-				nil,
-				[]tsgo.HeritageClause{
-					context.Factory().HeritageClause(
-						tsgo.HeritageClauseTokenKindImplementsKeyword,
-						[]tsgo.ExpressionWithTypeArguments{
-							context.Factory().ExpressionWithTypeArguments(
-								context.Factory().Identifier(
-									runtimeValue.Name(),
-								),
-								nil,
+	statements := []tsgo.Statement{
+		methodSetDeclaration(context.Factory(), name, tokens),
+		context.Factory().ClassDeclaration(
+			modifiers,
+			context.Factory().Identifier(name),
+			nil,
+			[]tsgo.HeritageClause{
+				context.Factory().HeritageClause(
+					tsgo.HeritageClauseTokenKindImplementsKeyword,
+					[]tsgo.ExpressionWithTypeArguments{
+						context.Factory().ExpressionWithTypeArguments(
+							context.Factory().Identifier(
+								runtimeValue.Name(),
 							),
-						},
-					),
-				},
-				classMembers,
-			),
-		}, api.CombineRequests(
-			requests,
-			equalRequests,
-			hashRequests,
-			formatRequests,
-		), nil
+							nil,
+						),
+					},
+				),
+			},
+			classMembers,
+		),
+	}
+	statements = append(statements, support...)
+	return statements, api.CombineRequests(
+		requests,
+		equalRequests,
+		hashRequests,
+		formatRequests,
+	), nil
 }
 
 type demandedMethod struct {
@@ -255,14 +261,18 @@ func demandedMethods(
 func emitMethod(
 	context api.Context,
 	children api.ChildEmitter,
+	adapterName string,
+	dynamicTypeName string,
 	sourceType types.Type,
 	selected *types.Selection,
 	method *types.Func,
 	targets []api.InterfaceMethodCallableReference,
-) (tsgo.MethodDeclaration, []api.RootRequest, error) {
+	contracts []*types.Func,
+) ([]tsgo.ClassElement, []tsgo.Statement, []api.RootRequest, error) {
 	sourceSignature, ok := method.Type().(*types.Signature)
-	if !ok || sourceSignature.Recv() == nil || len(targets) == 0 {
-		return nil, nil, &api.GeneratedArtifactShapeError{
+	if !ok || sourceSignature.Recv() == nil || len(targets) == 0 ||
+		len(targets) != len(contracts) {
+		return nil, nil, nil, &api.GeneratedArtifactShapeError{
 			Reason: "adapter method contract is incomplete",
 		}
 	}
@@ -281,7 +291,7 @@ func emitMethod(
 		signature,
 	)
 	if err != nil {
-		return nil, nil, methodStageError(MethodStageABI, err)
+		return nil, nil, nil, methodStageError(MethodStageABI, err)
 	}
 	root := api.DirectExpression(
 		context.Factory().PropertyAccessExpression(
@@ -300,10 +310,10 @@ func emitMethod(
 			root,
 		)
 	if err != nil {
-		return nil, nil, methodStageError(MethodStageReceiver, err)
+		return nil, nil, nil, methodStageError(MethodStageReceiver, err)
 	}
 	if resolvedMethod != method {
-		return nil, nil, &api.GeneratedArtifactShapeError{
+		return nil, nil, nil, &api.GeneratedArtifactShapeError{
 			Reason: "adapter method receiver selection is inconsistent",
 		}
 	}
@@ -319,7 +329,7 @@ func emitMethod(
 		provider, providerErr :=
 			context.Names().InterfaceMethodCallable(method)
 		if providerErr != nil {
-			return nil, nil, methodStageError(
+			return nil, nil, nil, methodStageError(
 				MethodStageContract,
 				providerErr,
 			)
@@ -341,10 +351,10 @@ func emitMethod(
 			sourceSignature,
 		)
 		if err != nil {
-			return nil, nil, methodStageError(MethodStageContract, err)
+			return nil, nil, nil, methodStageError(MethodStageContract, err)
 		}
 		if !types.Identical(invocation.Signature(), signature) {
-			return nil, nil, &api.GeneratedArtifactShapeError{
+			return nil, nil, nil, &api.GeneratedArtifactShapeError{
 				Reason: "adapter method invocation signature is inconsistent",
 			}
 		}
@@ -356,11 +366,10 @@ func emitMethod(
 			)
 	}
 	if err != nil {
-		return nil, nil, methodStageError(MethodStageContract, err)
+		return nil, nil, nil, methodStageError(MethodStageContract, err)
 	}
+	sourceArguments := target.ParameterReferences(context.Factory())
 	var call api.ExpressionEmission
-	var callRequests []api.RootRequest
-	providerBoundary := false
 	if interfaceDispatch {
 		call, err = interfaceoperation.Apply(
 			context,
@@ -369,108 +378,45 @@ func emitMethod(
 			dispatchType,
 			receiver,
 			method,
-			target.ParameterReferences(context.Factory()),
+			sourceArguments,
 			nil,
 			nil,
 		)
 		if err != nil {
-			return nil, nil, methodStageError(MethodStageInvocation, err)
+			return nil, nil, nil, methodStageError(MethodStageInvocation, err)
 		}
 	} else {
-		recovery, ok := target.RecoveryAuthorityReference(
-			context.Factory(),
-		)
-		if !ok {
-			return nil, nil, &api.GeneratedArtifactShapeError{
-				Reason: "adapter method lacks recovery authority",
-			}
-		}
-		recoveryInvocation, recoveryErr := invocation.ResolveRecovery(context)
-		if recoveryErr != nil {
-			return nil, nil, methodStageError(
-				MethodStageInvocation,
-				recoveryErr,
-			)
-		}
-		providerBoundary = recoveryInvocation.Provider()
-		sourceArguments := target.SourceParameterReferences(context.Factory())
-		var argumentBefore []tsgo.Statement
-		var argumentRequests []api.RootRequest
-		if providerBoundary {
-			converted := make([]tsgo.Expression, 0, len(sourceArguments))
-			for index, argument := range sourceArguments {
-				value, _, convertErr := providerboundary.ToProviderValue(
-					context,
-					children,
-					nil,
-					"",
-					signature.Params().At(index).Type(),
-					api.DirectExpression(argument),
-				)
-				if convertErr != nil {
-					return nil, nil, methodStageError(
-						MethodStageInvocation,
-						convertErr,
-					)
-				}
-				argumentBefore = append(argumentBefore, value.Before()...)
-				converted = append(converted, value.Value())
-				argumentRequests = append(
-					argumentRequests,
-					value.Requests()...,
-				)
-			}
-			sourceArguments = converted
-		}
-		targetCall, targetRequests, callErr := recoveryInvocation.Call(
+		call, err = invocation.Invoke(
 			context,
+			children,
 			receiver.Value(),
 			sourceArguments,
-			recovery,
-		)
-		if callErr != nil {
-			return nil, nil, methodStageError(
-				MethodStageInvocation,
-				callErr,
-			)
-		}
-		if providerBoundary {
-			providerCooperative = recoveryInvocation.Cooperative()
-		}
-		call, err = api.NewExpressionEmission(
-			argumentBefore,
-			targetCall,
-			api.CombineRequests(targetRequests, argumentRequests),
 		)
 		if err != nil {
-			return nil, nil, methodStageError(MethodStageInvocation, err)
+			return nil, nil, nil, methodStageError(
+				MethodStageInvocation,
+				err,
+			)
 		}
-		callRequests = receiver.Requests()
+		call, err = api.NewExpressionEmission(
+			append(receiver.Before(), call.Before()...),
+			call.Value(),
+			api.CombineRequests(receiver.Requests(), call.Requests()),
+		)
+		if err != nil {
+			return nil, nil, nil, methodStageError(MethodStageInvocation, err)
+		}
 	}
 	call, err = api.NewExpressionEmission(
 		call.Before(),
 		call.Value(),
 		api.CombineRequests(
 			call.Requests(),
-			callRequests,
 			contractRequests,
 		),
 	)
 	if err != nil {
-		return nil, nil, methodStageError(MethodStageInvocation, err)
-	}
-	if providerBoundary {
-		call, err = providerboundary.FromProviderResults(
-			context,
-			children,
-			nil,
-			"",
-			signature.Results(),
-			call,
-		)
-		if err != nil {
-			return nil, nil, methodStageError(MethodStageInvocation, err)
-		}
+		return nil, nil, nil, methodStageError(MethodStageInvocation, err)
 	}
 	call, err = cooperativecall.GeneratedInterfaceProviderCall(
 		context,
@@ -478,23 +424,32 @@ func emitMethod(
 		providerCooperative,
 	)
 	if err != nil {
-		return nil, nil, methodStageError(MethodStageInvocation, err)
+		return nil, nil, nil, methodStageError(MethodStageInvocation, err)
 	}
-	body := append(receiver.Before(), call.Before()...)
-	if signature.Results().Len() == 0 {
-		body = append(
-			body,
-			context.Factory().ExpressionStatement(call.Value()),
+	if !interfaceDispatch {
+		call, err = invocation.FromProviderResults(context, children, call)
+		if err != nil {
+			return nil, nil, nil, methodStageError(MethodStageInvocation, err)
+		}
+	}
+	recoveryRequired := interfaceDispatch
+	var recoveryObservationRequests []api.RootRequest
+	if !interfaceDispatch {
+		observation, observationErr := context.ObserveRecoveryCallable(
+			invocation.Facet(),
 		)
-	} else {
-		body = append(
-			body,
-			context.Factory().ReturnStatement(call.Value()),
-		)
+		if observationErr != nil {
+			return nil, nil, nil, methodStageError(
+				MethodStageContract,
+				observationErr,
+			)
+		}
+		recoveryRequired = observation.Recovery()
+		recoveryObservationRequests = observation.Requests()
 	}
 	memberName, err := context.Names().InterfaceMethodName(method)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	var modifiers []tsgo.ModifierLike
 	resultType := target.Result()
@@ -503,21 +458,141 @@ func emitMethod(
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}
 	if providerCooperative && !contractCooperative {
-		return nil, nil, &api.GeneratedArtifactShapeError{
+		return nil, nil, nil, &api.GeneratedArtifactShapeError{
 			Reason: "cooperative adapter provider has a synchronous contract",
 		}
 	}
-	return context.Factory().MethodDeclaration(
-			modifiers,
-			nil,
-			context.Factory().Identifier(memberName),
-			nil,
-			nil,
-			target.Parameters(),
-			resultType,
-			context.Factory().Block(body, true),
-		), api.CombineRequests(
+	ordinaryMember := context.Factory().MethodDeclaration(
+		modifiers,
+		nil,
+		context.Factory().Identifier(memberName),
+		nil,
+		nil,
+		target.Parameters(),
+		resultType,
+		context.Factory().Block(
+			adapterCallBody(context, signature, call),
+			true,
+		),
+	)
+	if !recoveryRequired {
+		return []tsgo.ClassElement{ordinaryMember}, nil, api.CombineRequests(
 			target.Requests(),
 			call.Requests(),
+			recoveryObservationRequests,
 		), nil
+	}
+	recovery, recoveryRequests, err :=
+		callable.RecoveryAuthorityParameter(context)
+	if err != nil {
+		return nil, nil, nil, methodStageError(MethodStageABI, err)
+	}
+	var deferredCall api.ExpressionEmission
+	if interfaceDispatch {
+		deferredCall, err = interfaceoperation.ApplyDeferred(
+			context,
+			children,
+			nil,
+			dispatchType,
+			receiver,
+			method,
+			signature,
+			contractCooperative,
+			sourceArguments,
+			context.Factory().Identifier(callable.RecoveryAuthorityName),
+		)
+	} else {
+		deferredCall, err = invocation.InvokeDeferred(
+			context,
+			children,
+			nil,
+			receiver.Value(),
+			sourceArguments,
+			context.Factory().Identifier(
+				callable.RecoveryAuthorityName,
+			),
+		)
+		if err != nil {
+			return nil, nil, nil, methodStageError(
+				MethodStageInvocation,
+				err,
+			)
+		}
+		deferredCall, err = api.NewExpressionEmission(
+			append(receiver.Before(), deferredCall.Before()...),
+			deferredCall.Value(),
+			api.CombineRequests(
+				receiver.Requests(),
+				deferredCall.Requests(),
+			),
+		)
+	}
+	if err != nil {
+		return nil, nil, nil, methodStageError(MethodStageInvocation, err)
+	}
+	if !interfaceDispatch {
+		deferredCall, err = invocation.FromProviderResults(
+			context,
+			children,
+			deferredCall,
+		)
+		if err != nil {
+			return nil, nil, nil, methodStageError(MethodStageInvocation, err)
+		}
+	}
+	members := []tsgo.ClassElement{
+		ordinaryMember,
+		context.Factory().MethodDeclaration(
+			modifiers,
+			nil,
+			context.Factory().Identifier(
+				memberName+api.DeferredEntrySuffix,
+			),
+			nil,
+			nil,
+			append(
+				[]tsgo.ParameterDeclaration{recovery},
+				target.Parameters()...,
+			),
+			resultType,
+			context.Factory().Block(
+				adapterCallBody(context, signature, deferredCall),
+				true,
+			),
+		),
+	}
+	deferredSupport, deferredSupportRequests, err := methodDeferredSupport(
+		context,
+		adapterName,
+		dynamicTypeName,
+		memberName,
+		signature,
+		target,
+		resultType,
+		contractCooperative,
+		contracts,
+	)
+	if err != nil {
+		return nil, nil, nil, methodStageError(MethodStageInvocation, err)
+	}
+	return members, deferredSupport, api.CombineRequests(
+		target.Requests(),
+		call.Requests(),
+		deferredCall.Requests(),
+		recoveryRequests,
+		deferredSupportRequests,
+		recoveryObservationRequests,
+	), nil
+}
+
+func adapterCallBody(
+	context api.Context,
+	signature *types.Signature,
+	call api.ExpressionEmission,
+) []tsgo.Statement {
+	body := call.Before()
+	if signature.Results().Len() == 0 {
+		return append(body, context.Factory().ExpressionStatement(call.Value()))
+	}
+	return append(body, context.Factory().ReturnStatement(call.Value()))
 }

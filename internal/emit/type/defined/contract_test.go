@@ -71,7 +71,7 @@ func Identity(value Node) Node { return value }
 	for _, required := range []string{
 		"export class Node {",
 		"public Next: Node | undefined",
-		"public Visit: (($go$recovery?: GoRecovery) => void) | undefined",
+		"public Visit: (() => void) | undefined",
 	} {
 		if !strings.Contains(target, required) {
 			t.Fatalf("recursive native class lacks %q:\n%s", required, target)
@@ -79,6 +79,9 @@ func Identity(value Node) Node { return value }
 	}
 	if strings.Contains(target, "$Value") {
 		t.Fatalf("recursive native class acquired a value facet:\n%s", target)
+	}
+	if strings.Contains(target, "$go$recovery") {
+		t.Fatalf("source callable field exposes recovery authority:\n%s", target)
 	}
 }
 

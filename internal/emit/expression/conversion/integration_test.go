@@ -56,7 +56,7 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 				"GoUnsafePointer.toInteger(",
 				"GoUnsafePointer.fromInteger(",
 				"unsafe.Pointer conversion requires an environment implementation",
-				"export function GenericNilPointer<T, T$Pointer>(): T$Pointer | undefined {\n" +
+				"export function GenericNilPointer<T>(): GoPointerType<T> | undefined {\n" +
 					"    return void 0;\n}",
 			} {
 				if !strings.Contains(printed, required) {

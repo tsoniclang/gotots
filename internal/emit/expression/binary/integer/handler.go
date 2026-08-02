@@ -52,7 +52,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	facts, hasFacts := context.TypesInfo().Types[source.Y]
+	facts, hasFacts := context.TypesInfo().TypeAndValue(source.Y)
 	var target api.ExpressionEmission
 	var handled bool
 	if (source.Op == token.SHL || source.Op == token.SHR) &&
@@ -188,7 +188,7 @@ func operationTypes(
 		}
 		return resultType, resultType, carrier, true
 	case source.Op == token.SHL || source.Op == token.SHR:
-		typeAndValue, ok := context.TypesInfo().Types[source.Y]
+		typeAndValue, ok := context.TypesInfo().TypeAndValue(source.Y)
 		if !ok {
 			return nil, nil, integervalue.Carrier{}, false
 		}

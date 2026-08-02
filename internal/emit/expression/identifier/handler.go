@@ -15,7 +15,7 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.Ident,
 ) (api.ExpressionEmission, error) {
-	object := context.TypesInfo().Uses[source]
+	object := context.TypesInfo().UseOf(source)
 	if object == nil {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -136,7 +136,7 @@ func emitPredeclaredBoolean(
 	context api.Context,
 	source *ast.Ident,
 ) (api.ExpressionEmission, error) {
-	typeAndValue := context.TypesInfo().Types[source]
+	typeAndValue, _ := context.TypesInfo().TypeAndValue(source)
 	sourceType := context.TypesInfo().TypeOf(source)
 	targetType := context.ExpectedType()
 	if typeAndValue.Value == nil ||

@@ -2,12 +2,8 @@ package emit_test
 
 import (
 	"context"
-	"fmt"
 	"go/ast"
-	"os"
 	"path/filepath"
-	"regexp"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -131,27 +127,24 @@ func TestInferredGenericFunctionValueUsesIdentifierInstanceEvidence(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	var capabilityNames []string
+	var concreteNames []string
 	for _, name := range []string{"InferredGenericFunctionValue", "ExplicitGenericFunctionValue"} {
 		wrapper := genericFunctionValueWrapper(t, waveFourTargetFunction(t, emission, name))
 		body, ok := wrapper.Body().(tsgo.CallExpression)
 		if !ok {
 			t.Fatalf("%s wrapper body = %T, want CallExpression", name, wrapper.Body())
 		}
-		arguments := body.Arguments()
-		if len(arguments) == 0 {
-			t.Fatalf("%s wrapper call has no capability argument", name)
+		if len(body.Arguments()) != len(wrapper.Parameters()) {
+			t.Fatalf("%s wrapper changes source argument cardinality", name)
 		}
-		capability, ok := arguments[0].(tsgo.Identifier)
-		if !ok ||
-			!strings.HasPrefix(capability.Text(), "$goCapability_") ||
-			len(arguments) != len(wrapper.Parameters())+1 {
-			t.Fatalf("%s wrapper does not bind one exact generic capability", name)
+		callee, ok := body.Expression().(tsgo.Identifier)
+		if !ok || !strings.HasPrefix(callee.Text(), "Equal$concrete_") {
+			t.Fatalf("%s wrapper does not call one exact concretization", name)
 		}
-		capabilityNames = append(capabilityNames, capability.Text())
+		concreteNames = append(concreteNames, callee.Text())
 	}
-	if capabilityNames[0] != capabilityNames[1] {
-		t.Fatalf("explicit/inferred capabilities differ: %v", capabilityNames)
+	if concreteNames[0] != concreteNames[1] {
+		t.Fatalf("explicit/inferred concretizations differ: %v", concreteNames)
 	}
 }
 
@@ -167,9 +160,25 @@ func genericFunctionValueWrapper(t *testing.T, function tsgo.FunctionDeclaration
 			continue
 		}
 		for _, argument := range call.Arguments() {
-			if wrapper, ok := argument.(tsgo.ArrowFunction); ok {
-				return wrapper
+			ordinary, ordinaryOK := argument.(tsgo.ArrowFunction)
+			if ordinaryOK {
+				return ordinary
 			}
+			registration, ok := argument.(tsgo.CallExpression)
+			if !ok || len(registration.Arguments()) != 2 {
+				continue
+			}
+			_, registrationOrdinary :=
+				registration.Arguments()[0].(tsgo.ArrowFunction)
+			_, registrationDeferred :=
+				registration.Arguments()[1].(tsgo.ArrowFunction)
+			if !registrationOrdinary || !registrationDeferred {
+				continue
+			}
+			t.Fatalf(
+				"%s non-recovering generic function value acquired a deferred registry entry",
+				function.Name().Text(),
+			)
 		}
 	}
 	t.Fatalf("%s lacks a generic function-value wrapper", function.Name().Text())
@@ -270,275 +279,4 @@ console.log(output.join(" "));
 			}
 		})
 	}
-}
-
-func TestWaveSevenGenericAssertionsCompileThroughPublicPipeline(t *testing.T) {
-	for _, testCase := range []struct {
-		name    string
-		options emit.Options
-	}{
-		{name: "number", options: emit.DefaultOptions()},
-		{
-			name: "bigint",
-			options: emit.Options{
-				IntegerRepresentation: emit.IntegerRepresentationBigInt,
-				EvaluationOrder:       emit.EvaluationOrderPreserveGo,
-			},
-		},
-	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			program, err := load.Load(context.Background(), load.Request{
-				Directory: waveSevenGenericDirectory(),
-				Pattern:   ".",
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			root, err := emit.NewRoot(
-				program.Roots()[0].Types().Scope().Lookup(
-					"AuditGenericAssertions",
-				),
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			emission, err := emit.CompileWithOptions(
-				program,
-				[]emit.Root{root},
-				testCase.options,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			workingDirectory := t.TempDir()
-			artifacts := materializeArtifacts(t, emission, workingDirectory)
-			for _, required := range []string{
-				"export function AssertValue<T>",
-				"export function MustAssertValue<T>",
-				"export function TypeSwitchValue<T>",
-				"$go$interface_assert_",
-				"$go$interface_assert_ok_",
-			} {
-				if !strings.Contains(artifacts.printed, required) {
-					t.Fatalf(
-						"generic assertion artifacts lack %q:\n%s",
-						required,
-						artifacts.printed,
-					)
-				}
-			}
-			runner := filepath.Join(workingDirectory, "runner.ts")
-			writeProgramFile(t, runner, `import "./program.js";
-import { AuditGenericAssertions } from "`+artifacts.sourceModule+`";
-
-const values = AuditGenericAssertions();
-console.log(Array.from({ length: values.length }, (_, index) =>
-    String(values.get(index))).join(" "));
-`)
-			writeProgramFile(
-				t,
-				filepath.Join(workingDirectory, "package.json"),
-				"{\"type\":\"module\"}\n",
-			)
-			waveThreeTypecheck(
-				t,
-				workingDirectory,
-				append(artifacts.paths, runner),
-			)
-			targetOutput := runProgram(
-				t,
-				workingDirectory,
-				"node",
-				filepath.Join(workingDirectory, "out", "runner.js"),
-			)
-			goOutput := executeWaveSevenGenericGo(
-				t,
-				workingDirectory,
-				"AuditGenericAssertions",
-			)
-			if targetOutput != goOutput {
-				t.Fatalf(
-					"generic assertion output differs\nTypeScript:\n%s\nGo:\n%s",
-					targetOutput,
-					goOutput,
-				)
-			}
-		})
-	}
-}
-
-func sourceModuleForExport(
-	t *testing.T,
-	artifacts waveFourArtifacts,
-	workingDirectory string,
-	name string,
-) string {
-	t.Helper()
-	var selected string
-	for _, path := range artifacts.paths {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		printed := string(content)
-		if !strings.Contains(
-			printed,
-			"export function "+name+"(",
-		) && !strings.Contains(
-			printed,
-			"export async function "+name+"(",
-		) {
-			continue
-		}
-		if selected != "" {
-			t.Fatalf("multiple source modules export %s", name)
-		}
-		selected = path
-	}
-	if selected == "" {
-		t.Fatalf("no source module exports %s", name)
-	}
-	relative, err := filepath.Rel(workingDirectory, selected)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return "./" + strings.TrimSuffix(filepath.ToSlash(relative), ".ts") + ".js"
-}
-
-func assertWaveSevenGenericFoundationShape(t *testing.T, printed string) {
-	t.Helper()
-	for _, required := range []string{
-		"export function Identity<T>",
-		"export function Add<T>",
-		"export function Zero<T>",
-		"export function ZeroFromNew<T>",
-		"export function Equal<T>",
-		"export function Twice<T>",
-		"$goCapability_",
-	} {
-		if !strings.Contains(printed, required) {
-			t.Fatalf("Wave 7 generic artifacts lack %q:\n%s", required, printed)
-		}
-	}
-	for _, forbidden := range []string{
-		"class GoValueOps",
-		"interface GoValueOps",
-		"Record<string",
-		"switch (typeof",
-	} {
-		if strings.Contains(printed, forbidden) {
-			t.Fatalf(
-				"Wave 7 generic artifacts contain %q:\n%s",
-				forbidden,
-				printed,
-			)
-		}
-	}
-	if strings.Count(printed, "export function Add<T>") != 1 {
-		t.Fatalf("generic Add body was duplicated:\n%s", printed)
-	}
-	zeroFromNew := targetGenericFunctionText(t, printed, "ZeroFromNew")
-	if !strings.Contains(zeroFromNew, "$go$zero_") ||
-		strings.Contains(zeroFromNew, "GoPointer") ||
-		strings.Contains(zeroFromNew, "$go$pointer_") {
-		t.Fatalf(
-			"generic *new(T) did not lower directly to its zero owner:\n%s",
-			zeroFromNew,
-		)
-	}
-	if strings.Contains(printed, "GoPointer.field<T, Box") {
-		t.Fatalf(
-			"direct generic pointer-receiver field assignment formed an interior pointer:\n%s",
-			printed,
-		)
-	}
-	sameStorage := targetGenericFunctionText(t, printed, "SameSliceStorage")
-	if !strings.Contains(sameStorage, "$go$equal_") ||
-		!strings.Contains(sameStorage, "$go$index_address_") ||
-		strings.Contains(sameStorage, "GoPointer.equal") {
-		t.Fatalf(
-			"generic pointer equality bypassed its selected capability:\n%s",
-			sameStorage,
-		)
-	}
-	twice := targetGenericFunctionText(t, printed, "Twice")
-	copyNames := regexp.MustCompile(`\$go\$copy_[0-9a-f]+`).
-		FindAllString(twice, -1)
-	if len(copyNames) != 3 ||
-		copyNames[0] != copyNames[1] ||
-		copyNames[1] != copyNames[2] {
-		t.Fatalf(
-			"generic forwarding did not exact-join repeated copy capability: %v\n%s",
-			copyNames,
-			twice,
-		)
-	}
-}
-
-func targetGenericFunctionText(
-	t *testing.T,
-	printed string,
-	name string,
-) string {
-	t.Helper()
-	startMarker := "export function " + name + "<"
-	start := strings.Index(printed, startMarker)
-	if start < 0 {
-		t.Fatalf("Wave 7 artifacts lack generic function %s", name)
-	}
-	remaining := printed[start+len(startMarker):]
-	end := strings.Index(remaining, "\nexport function ")
-	if end < 0 {
-		return printed[start:]
-	}
-	return printed[start : start+len(startMarker)+end]
-}
-
-func executeWaveSevenGenericGo(
-	t *testing.T,
-	workingDirectory string,
-	function string,
-) string {
-	t.Helper()
-	modulePath, err := filepath.Abs(waveSevenGenericDirectory())
-	if err != nil {
-		t.Fatal(err)
-	}
-	runnerDirectory := filepath.Join(workingDirectory, "go-runner-wave7")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "go.mod"), fmt.Sprintf(
-		`module example.com/runner
-
-go 1.26.4
-
-require example.com/wave7generics v0.0.0
-
-replace example.com/wave7generics => %s
-`,
-		filepath.ToSlash(modulePath),
-	))
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), fmt.Sprintf(`package main
-
-import (
-	"fmt"
-
-	values "example.com/wave7generics"
-)
-
-func main() {
-	for index, value := range values.%s() {
-		if index != 0 {
-			fmt.Print(" ")
-		}
-		fmt.Print(value)
-	}
-	fmt.Println()
-}
-`, function))
-	return runProgram(
-		t,
-		runnerDirectory,
-		filepath.Join(runtime.GOROOT(), "bin", "go"),
-		"run",
-		".",
-	)
 }

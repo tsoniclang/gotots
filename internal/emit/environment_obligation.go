@@ -320,6 +320,12 @@ func environmentRequirementKeys(
 				return nil, environmentRequirementError(object, requirement)
 			}
 			detail = strconv.Itoa(index) + ":" + facet.String()
+		case api.DeclarationRequirementTypeRepresentation:
+			owner, artifact, facet, ok := requirement.TypeRepresentation()
+			if !ok || owner != object || artifact != nil {
+				return nil, environmentRequirementError(object, requirement)
+			}
+			detail = facet.String()
 		case api.DeclarationRequirementCallableControl:
 			_, enclosing, callable, control, ok :=
 				requirement.CallableControl()

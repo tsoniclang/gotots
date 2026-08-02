@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	typefacet "github.com/tsoniclang/gotots/internal/emit/declaration/typefacet"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -15,6 +16,7 @@ func emitDerivedClass(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.TypeSpec,
+	sourceType types.Type,
 	basis types.Type,
 	className string,
 	fields []field,
@@ -22,6 +24,7 @@ func emitDerivedClass(
 	moduleExport bool,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
+	representationFacets []api.TypeRepresentationFacet,
 ) (api.DeclarationEmission, error) {
 	basisStorage, err := context.Values().StorageType(
 		context.WithRole(api.RoleStorageType),
@@ -167,6 +170,31 @@ func emitDerivedClass(
 			),
 		)
 	}
+	markers := typefacet.Emission{}
+	if len(representationFacets) != 0 {
+		var storageType tsgo.TypeNode
+		if storageDemanded {
+			storageType = context.Factory().TypeReferenceNode(
+				context.Factory().Identifier(
+					className+api.StructStorageTypeSuffix,
+				),
+				typeArguments,
+			)
+		}
+		markers, err = typefacet.Build(
+			context,
+			sourceType,
+			classType,
+			storageType,
+			representationFacets,
+			false,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		members = append(members, markers.Members()...)
+		requests = append(requests, markers.Requests()...)
+	}
 	var modifiers []tsgo.ModifierLike
 	if moduleExport {
 		modifiers = []tsgo.ModifierLike{context.Factory().ExportKeyword()}
@@ -176,7 +204,7 @@ func emitDerivedClass(
 			modifiers,
 			context.Factory().Identifier(className),
 			typeParameters,
-			nil,
+			markers.Heritage(),
 			members,
 		),
 	)

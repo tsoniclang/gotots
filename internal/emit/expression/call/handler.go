@@ -105,7 +105,7 @@ func emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if identifier, directIdentifier := source.Fun.(*ast.Ident); directIdentifier {
-		switch context.TypesInfo().Uses[identifier].(type) {
+		switch context.TypesInfo().UseOf(identifier).(type) {
 		case *types.Func, *types.Var:
 		default:
 			return api.ExpressionEmission{},
@@ -154,6 +154,25 @@ func emit(
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if providerBoundary {
+		var providerBefore []tsgo.Statement
+		var providerRequests []api.RootRequest
+		arguments, providerBefore, providerRequests, err =
+			providerboundary.ToProviderArguments(
+				context,
+				children,
+				signature.Params(),
+				arguments,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		argumentBefore = append(argumentBefore, providerBefore...)
+		argumentRequests = api.CombineRequests(
+			argumentRequests,
+			providerRequests,
+		)
 	}
 	if model, defined := definedtype.ResolveCallable(
 		context.TypesInfo().TypeOf(source.Fun),
@@ -328,27 +347,27 @@ func validateResults(
 	}
 }
 
-func calleeObject(info *types.Info, source ast.Expr) (*types.Func, bool) {
-	if info == nil {
+func calleeObject(info api.TypeInfoView, source ast.Expr) (*types.Func, bool) {
+	if !info.Valid() {
 		return nil, false
 	}
 	switch source := source.(type) {
 	case *ast.Ident:
-		object, ok := info.Uses[source].(*types.Func)
+		object, ok := info.UseOf(source).(*types.Func)
 		return object, ok
 	case *ast.SelectorExpr:
-		if info.Selections[source] != nil {
+		if info.SelectionOf(source) != nil {
 			return nil, false
 		}
 		qualifier, ok := source.X.(*ast.Ident)
 		if !ok {
 			return nil, false
 		}
-		packageName, ok := info.Uses[qualifier].(*types.PkgName)
+		packageName, ok := info.UseOf(qualifier).(*types.PkgName)
 		if !ok {
 			return nil, false
 		}
-		object, ok := info.Uses[source.Sel].(*types.Func)
+		object, ok := info.UseOf(source.Sel).(*types.Func)
 		if !ok || object.Pkg() != packageName.Imported() {
 			return nil, false
 		}
@@ -396,7 +415,7 @@ func emitCallee(
 		}
 		return target, false, false, nil
 	} else if identifier, ok := source.(*ast.Ident); ok {
-		variable, valid := context.TypesInfo().Uses[identifier].(*types.Var)
+		variable, valid := context.TypesInfo().UseOf(identifier).(*types.Var)
 		if !valid {
 			return api.ExpressionEmission{}, false, false,
 				api.Unsupported(
@@ -438,180 +457,4 @@ func directFunctionLiteral(source ast.Expr) (*ast.FuncLit, bool) {
 			return nil, false
 		}
 	}
-}
-
-func emitArguments(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.CallExpr,
-	signature *types.Signature,
-	captureAll bool,
-) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	if len(source.Args) == 1 {
-		if results, ok := context.TypesInfo().TypeOf(source.Args[0]).(*types.Tuple); ok {
-			if signature.Variadic() {
-				return emitVariadicMultipleArgument(
-					context,
-					children,
-					source,
-					signature,
-					results,
-					captureAll,
-				)
-			}
-			arguments, before, requests, err := emitMultipleArgument(
-				context,
-				children,
-				source,
-				signature,
-				results,
-			)
-			if err != nil || !captureAll {
-				return arguments, before, requests, err
-			}
-			return captureArgumentExpressions(
-				context,
-				arguments,
-				before,
-				requests,
-			)
-		}
-	}
-	if signature.Variadic() {
-		return emitVariadicArguments(
-			context,
-			children,
-			source,
-			signature,
-			captureAll,
-		)
-	}
-	if signature.Params().Len() != len(source.Args) {
-		return nil, nil, nil,
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	emissions := make([]api.ExpressionEmission, 0, len(source.Args))
-	requiresCapture := false
-	for index, argument := range source.Args {
-		argumentType := context.TypesInfo().TypeOf(argument)
-		if argumentType == nil ||
-			!types.AssignableTo(argumentType, signature.Params().At(index).Type()) {
-			return nil, nil, nil,
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		target, err := children.Expression(
-			context.
-				WithRole(api.RoleCallArgument).
-				WithExpectedType(signature.Params().At(index).Type()),
-			argument,
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		target, err = context.Values().Transfer(
-			context.WithRole(api.RoleCallArgument),
-			argument,
-			argumentType,
-			signature.Params().At(index).Type(),
-			api.ValueTransferCopy,
-			target,
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		if len(target.Before()) != 0 {
-			requiresCapture = true
-		}
-		emissions = append(emissions, target)
-	}
-	if requiresCapture || captureAll {
-		return captureArguments(context, children, source, signature, emissions)
-	}
-	arguments := make([]tsgo.Expression, 0, len(emissions))
-	var requests []api.RootRequest
-	for _, target := range emissions {
-		arguments = append(arguments, target.Value())
-		requests = append(requests, target.Requests()...)
-	}
-	return arguments, nil, requests, nil
-}
-
-func captureArgumentExpressions(
-	context api.Context,
-	expressions []tsgo.Expression,
-	before []tsgo.Statement,
-	requests []api.RootRequest,
-) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	arguments := make([]tsgo.Expression, 0, len(expressions))
-	for _, expression := range expressions {
-		temporaryName, err := context.Names().Temporary(
-			api.TemporaryCallArgument,
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		before = append(
-			before,
-			context.Factory().VariableStatement(
-				nil,
-				context.Factory().VariableDeclarationList(
-					[]tsgo.VariableDeclaration{
-						context.Factory().VariableDeclaration(
-							context.Factory().Identifier(temporaryName),
-							nil,
-							nil,
-							expression,
-						),
-					},
-					tsgo.NodeFlagsConst,
-				),
-			),
-		)
-		arguments = append(
-			arguments,
-			context.Factory().Identifier(temporaryName),
-		)
-	}
-	return arguments, before, requests, nil
-}
-
-func captureArguments(
-	context api.Context,
-	_ api.ChildEmitter,
-	_ *ast.CallExpr,
-	_ *types.Signature,
-	emissions []api.ExpressionEmission,
-) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	arguments := make([]tsgo.Expression, 0, len(emissions))
-	var before []tsgo.Statement
-	var requests []api.RootRequest
-	for _, emission := range emissions {
-		temporaryName, err := context.Names().Temporary(api.TemporaryCallArgument)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		declaration := context.Factory().VariableDeclaration(
-			context.Factory().Identifier(temporaryName),
-			nil,
-			nil,
-			emission.Value(),
-		)
-		before = append(before, emission.Before()...)
-		before = append(
-			before,
-			context.Factory().VariableStatement(
-				nil,
-				context.Factory().VariableDeclarationList(
-					[]tsgo.VariableDeclaration{declaration},
-					tsgo.NodeFlagsConst,
-				),
-			),
-		)
-		arguments = append(
-			arguments,
-			context.Factory().Identifier(temporaryName),
-		)
-		requests = append(requests, emission.Requests()...)
-	}
-	return arguments, before, requests, nil
 }

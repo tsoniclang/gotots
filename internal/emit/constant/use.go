@@ -22,7 +22,7 @@ func EmitUse(
 			Reason: "untyped constant use identity is invalid",
 		}
 	}
-	facts, ok := context.TypesInfo().Types[source]
+	facts, ok := context.TypesInfo().TypeAndValue(source)
 	if !ok || facts.Value == nil {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -149,7 +149,7 @@ func EmitFolded(
 	if source == nil {
 		return api.ExpressionEmission{}, false, nil
 	}
-	facts, ok := context.TypesInfo().Types[source]
+	facts, ok := context.TypesInfo().TypeAndValue(source)
 	if !ok || facts.Value == nil {
 		return api.ExpressionEmission{}, false, nil
 	}

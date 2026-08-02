@@ -245,9 +245,10 @@ func Result() int32 { return Global.Value }
 			storage.field.Type(),
 		)
 	}
-	if got := len(reference.TypeArguments()); got != 3 {
+	if got := len(reference.TypeArguments()); got != 1 ||
+		got != boxTypeParameters {
 		t.Fatalf(
-			"generic package storage facets = %d with %d reconstructions; provider parameters = %d at static revision %d, want logical/storage/pointer",
+			"generic package storage source arguments = %d with %d reconstructions; provider parameters = %d at static revision %d, want exact source arity",
 			got,
 			storage.reconstructions,
 			boxTypeParameters,

@@ -253,6 +253,28 @@ func (s *programSession) verifyRootObligations(
 	files []TargetFile,
 ) error {
 	for _, root := range roots {
+		function, genericFunction := root.object.(*types.Func)
+		if root.kind == RootExportedAPI &&
+			genericFunction &&
+			function.Signature().Recv() == nil &&
+			len(api.GenericDeclarationParameters(function)) != 0 {
+			binding, ok := s.registry.Target(root.object)
+			if !ok {
+				return &ScheduleError{
+					Object: root.object.Name(),
+					Reason: "export root has no target binding",
+				}
+			}
+			exports, ok := s.artifacts.ExportedBindings(
+				api.MustSourceArtifactOwner(root.object),
+			)
+			if !ok || !slices.Contains(exports, binding.Name) {
+				return &ScheduleError{
+					Object: root.object.Name(),
+					Reason: "export root has no exact source-facing target binding",
+				}
+			}
+		}
 		selected, ok := root.object.(*types.Const)
 		if !ok ||
 			!constantbinding.IsUntyped(selected.Type()) ||

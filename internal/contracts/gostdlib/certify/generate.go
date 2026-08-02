@@ -1,14 +1,10 @@
 package certify
 
 import (
-	"bytes"
 	"fmt"
 	"go/types"
-	"os"
-	"path"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -81,7 +77,6 @@ func Generate(config Config) ([]byte, error) {
 			project,
 			source,
 			seed,
-			seeds.genericProjections,
 			seeds.genericOperations,
 			seeds.definedValueIdentities,
 			effectMarker,
@@ -100,9 +95,9 @@ func Generate(config Config) ([]byte, error) {
 		client.Close()
 		return nil, err
 	}
-	if err := verifyGenericCallableProjectionBindings(
+	if err := verifySourceGenericCallableProjectionBindings(
+		source,
 		modules,
-		seeds.genericProjections,
 	); err != nil {
 		client.Close()
 		return nil, err
@@ -127,7 +122,7 @@ func Generate(config Config) ([]byte, error) {
 		seeds.statefulProfiles,
 		seeds.providerInterfaces,
 		modules,
-		seeds.genericProjections,
+		seeds.genericOperations,
 		effectMarker,
 		selectedToolchain,
 	)
@@ -171,7 +166,6 @@ func buildModule(
 	project *tsgo.ProjectInspection,
 	source goSurface,
 	seed moduleSeed,
-	genericProjections map[string][]gostdlib.GenericTypeArgumentDocument,
 	genericOperations map[string][]gostdlib.GenericOperationDocument,
 	definedValueIdentities map[string]struct{},
 	effectMarker tsgo.ProjectExport,
@@ -232,14 +226,23 @@ func buildModule(
 			return gostdlib.ModuleDocument{}, err
 		}
 		binding.GenericOperations = genericOperations[binding.Identity]
-		binding.GenericTypeArguments, err = certifiedGenericCallableProjection(
-			project,
-			evidence,
-			target,
-			genericProjections,
-		)
-		if err != nil {
-			return gostdlib.ModuleDocument{}, err
+		if binding.Kind == gostdlib.BindingFunction {
+			if err := verifyExportSourceCallableShape(
+				project,
+				evidence,
+				target,
+			); err != nil {
+				return gostdlib.ModuleDocument{}, err
+			}
+			binding.GenericTypeArguments, err =
+				certifiedSourceGenericCallableProjection(
+					project,
+					evidence,
+					target,
+				)
+			if err != nil {
+				return gostdlib.ModuleDocument{}, err
+			}
 		}
 		_, identityValue := definedValueIdentities[binding.Identity]
 		if binding.Kind == gostdlib.BindingFunction || identityValue {
@@ -494,6 +497,14 @@ func buildMethodBindings(
 		if err != nil {
 			return nil, err
 		}
+		if err := verifyMethodSourceCallableShape(
+			project,
+			method,
+			selected,
+			access,
+		); err != nil {
+			return nil, err
+		}
 		binding.Effect, err = memberCallableEffect(
 			project,
 			selected,
@@ -553,92 +564,4 @@ func addTargetOwner(
 	}
 	owners[key] = struct{}{}
 	return nil
-}
-
-func validateSeeds(source []moduleSeed) ([]moduleSeed, error) {
-	if len(source) == 0 {
-		return nil, certifyError("configure modules", "", "module set is empty")
-	}
-	result := append([]moduleSeed(nil), source...)
-	specifiers := make(map[string]struct{}, len(result))
-	sources := make(map[string]struct{}, len(result))
-	for index, seed := range result {
-		if seed.GoImportPath == "" || seed.GoImportPath == "." ||
-			path.Clean(seed.GoImportPath) != seed.GoImportPath ||
-			strings.HasPrefix(seed.GoImportPath, "../") ||
-			strings.HasPrefix(seed.GoImportPath, "/") {
-			return nil, certifyError(
-				"configure modules",
-				seed.GoImportPath,
-				"Go import path is not canonical",
-			)
-		}
-		if _, ok := providerSubpath(seed.Specifier); !ok ||
-			path.Clean(seed.SourcePath) != seed.SourcePath ||
-			!strings.HasPrefix(seed.SourcePath, "src/") ||
-			!strings.HasSuffix(seed.SourcePath, ".ts") {
-			return nil, certifyError("configure modules", seed.GoImportPath, "identity is incomplete")
-		}
-		if index != 0 && result[index-1].GoImportPath >= seed.GoImportPath {
-			return nil, certifyError(
-				"configure modules",
-				seed.GoImportPath,
-				"modules are not strictly ordered",
-			)
-		}
-		if _, duplicate := specifiers[seed.Specifier]; duplicate {
-			return nil, certifyError("configure modules", seed.Specifier, "specifier is duplicated")
-		}
-		if _, duplicate := sources[seed.SourcePath]; duplicate {
-			return nil, certifyError("configure modules", seed.SourcePath, "source is duplicated")
-		}
-		specifiers[seed.Specifier] = struct{}{}
-		sources[seed.SourcePath] = struct{}{}
-	}
-	return result, nil
-}
-
-func verifyPublicName(name string, targetType string) error {
-	if name == "" || targetType == "" {
-		return fmt.Errorf("public symbol identity is incomplete")
-	}
-	for _, forbidden := range []string{
-		"$argument",
-		"__from_",
-		"$cooperative_",
-		"$contract",
-		"$state",
-	} {
-		if strings.Contains(name, forbidden) || strings.Contains(targetType, forbidden) {
-			return fmt.Errorf("public symbol contains encoded ABI spelling %q", forbidden)
-		}
-	}
-	return nil
-}
-
-func compareCanonical(left []byte, right []byte) error {
-	if bytes.Equal(left, right) {
-		return nil
-	}
-	return certifyError(
-		"verify manifest",
-		"canonical bytes",
-		"checked manifest differs from independently regenerated evidence",
-	)
-}
-
-func readManifest(path string) ([]byte, gostdlib.Manifest, error) {
-	payload, err := os.ReadFile(path)
-	if err != nil {
-		return nil, gostdlib.Manifest{}, certifyError("read manifest", path, err.Error())
-	}
-	manifest, err := gostdlib.Parse(payload)
-	if err != nil {
-		return nil, gostdlib.Manifest{}, err
-	}
-	canonical, err := gostdlib.Encode(manifest)
-	if err != nil {
-		return nil, gostdlib.Manifest{}, err
-	}
-	return canonical, manifest, nil
 }

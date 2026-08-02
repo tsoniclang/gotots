@@ -20,10 +20,12 @@ func TestProviderGenericCallsUseCertifiedTargetProjection(t *testing.T) {
 	writeProgramFile(t, filepath.Join(project, "source.go"), `package providerprojection
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"maps"
 	"slices"
+	"time"
 )
 
 type code int
@@ -50,11 +52,34 @@ func GenericClone[T any](source []T) []T {
 	return slices.Clone(source)
 }
 
+func GenericCloneValue[T any]() func([]T) []T {
+	return slices.Clone[[]T, T]
+}
+
+func CompareValue() func(string, string) int {
+	return cmp.Compare[string]
+}
+
+func DeferredCompare() {
+	defer cmp.Compare("left", "right")
+}
+
 func PrintValues(source []string) {
 	_, cancel := context.WithCancel(context.Background())
 	for range slices.Values(source) {
 		cancel()
 	}
+}
+
+func GenericAddress[T any](first, second T) T {
+	values := [1]T{first}
+	pointer := &values[0]
+	values[0] = second
+	return *pointer
+}
+
+func TimeAddress() time.Time {
+	return GenericAddress(time.Time{}, time.Time{})
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
@@ -75,9 +100,13 @@ func PrintValues(source []string) {
 			mustProviderRoot(t, scope.Lookup("Concat")),
 			mustProviderRoot(t, scope.Lookup("Clone")),
 			mustProviderRoot(t, scope.Lookup("GenericClone")),
+			mustProviderRoot(t, scope.Lookup("GenericCloneValue")),
+			mustProviderRoot(t, scope.Lookup("CompareValue")),
+			mustProviderRoot(t, scope.Lookup("DeferredCompare")),
 			mustProviderRoot(t, scope.Lookup("Grow")),
 			mustProviderRoot(t, scope.Lookup("PrintValues")),
 			mustProviderRoot(t, scope.Lookup("AsCode")),
+			mustProviderRoot(t, scope.Lookup("TimeAddress")),
 		},
 		options,
 	)
@@ -88,12 +117,16 @@ func PrintValues(source []string) {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	printed := artifacts.printed
 	for _, exact := range []string{
-		"Concat<gostring>(",
-		"Clone<GoMapValue<gostring, int64>, gostring, int64>(",
-		"Grow<RuntimeSlice<gostring>, gostring, gostring>(",
-		"Clone<T$ContainerStorage>(",
+		"SlicesConcatKernel<gostring>(",
+		"MapsCloneKernel<GoMapValue<gostring, int64>, gostring, int64>(",
+		"SlicesGrowKernel<RuntimeSlice<gostring>, gostring, gostring>(",
+		"SlicesCloneKernel<GoContainerStorage<T>>(",
+		"SlicesCloneKernel<GoContainerStorage<T>>($argument0)",
+		"CmpCompareKernel<gostring>(",
 		"SlicesValuesCooperative<RuntimeSlice<gostring>, gostring, gostring>(",
-		"AsType<code>($goCapability_",
+		"ErrorsAsTypeKernel<code__from_providerprojection>($goCapability_",
+		"GenericAddress$kernel<T>",
+		"GoPointerType<T>",
 	} {
 		if !strings.Contains(printed, exact) {
 			t.Fatalf("provider generic projection lacks %q:\n%s", exact, printed)

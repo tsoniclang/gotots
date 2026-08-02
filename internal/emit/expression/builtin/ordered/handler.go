@@ -44,7 +44,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	resultType := context.TypesInfo().TypeOf(source)
-	resultFacts, factsOK := context.TypesInfo().Types[source]
+	resultFacts, factsOK := context.TypesInfo().TypeAndValue(source)
 	if resultType == nil || !factsOK || resultFacts.Type == nil ||
 		!types.Identical(resultFacts.Type, resultType) {
 		return api.ExpressionEmission{}, true,

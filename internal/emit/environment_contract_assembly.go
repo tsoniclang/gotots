@@ -166,6 +166,7 @@ func (s *programSession) requireEnvironmentPackage(
 		s,
 		s,
 		s,
+		s,
 		s.goRuntime,
 	)
 	context, err := targetEmitter.targetContext(nil, outputPath)
@@ -366,6 +367,17 @@ func (s *programSession) environmentDeclarationRequirements(
 				return nil, &ScheduleError{
 					Object: object.Name(),
 					Reason: "environment generic representation requirement is foreign",
+				}
+			}
+			selected = append(selected, requirement)
+			continue
+		}
+		if representationOwner, artifact, _, ok :=
+			requirement.TypeRepresentation(); ok {
+			if representationOwner != object || artifact != nil {
+				return nil, &ScheduleError{
+					Object: object.Name(),
+					Reason: "environment type representation requirement is foreign",
 				}
 			}
 			selected = append(selected, requirement)

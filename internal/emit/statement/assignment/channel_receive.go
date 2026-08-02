@@ -53,7 +53,7 @@ func EmitSelectedReceive(
 		}
 		targetType := target.target.SourceType()
 		if target.declaration {
-			targetType = target.object.Type()
+			targetType = target.sourceType
 		}
 		if !types.AssignableTo(values[index].sourceType, targetType) {
 			return api.StatementEmission{},
@@ -68,7 +68,7 @@ func EmitSelectedReceive(
 		var targetType types.Type
 		var mode api.ValueTransferMode
 		if target.declaration {
-			targetType = target.object.Type()
+			targetType = target.sourceType
 			mode = api.ValueTransferCopy
 		} else {
 			targetType = target.target.SourceType()
@@ -94,7 +94,7 @@ func EmitSelectedReceive(
 					context,
 					children,
 					target.identifier,
-					target.object.Type(),
+					target.sourceType,
 					api.DirectExpression(targetValue),
 				)
 				if err != nil {
@@ -107,7 +107,7 @@ func EmitSelectedReceive(
 				context.WithRole(api.RoleLocalType),
 				children,
 				target.identifier,
-				target.object.Type(),
+				target.sourceType,
 			)
 			if err != nil {
 				return api.StatementEmission{}, err

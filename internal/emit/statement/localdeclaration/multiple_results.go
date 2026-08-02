@@ -36,7 +36,7 @@ func emitMultipleResultSpec(
 	requests := capture.Requests()
 	for index, sourceName := range source.Names {
 		if sourceName.Name == "_" {
-			if object := context.TypesInfo().Defs[sourceName]; object != nil &&
+			if object := context.TypesInfo().DefOf(sourceName); object != nil &&
 				object.Name() != "_" {
 				return nil, nil, api.Unsupported(
 					context.WithRole(api.RoleLocalDeclaration),
@@ -46,8 +46,9 @@ func emitMultipleResultSpec(
 			}
 			continue
 		}
-		object, ok := context.TypesInfo().Defs[sourceName].(*types.Var)
-		if !ok || !types.AssignableTo(results.At(index).Type(), object.Type()) {
+		object, ok := context.TypesInfo().DefOf(sourceName).(*types.Var)
+		objectType := context.TypesInfo().TypeOfObject(object)
+		if !ok || !types.AssignableTo(results.At(index).Type(), objectType) {
 			return nil, nil, api.Unsupported(
 				context.WithRole(api.RoleLocalDeclaration),
 				api.CategoryStatement,
@@ -62,7 +63,7 @@ func emitMultipleResultSpec(
 			context.WithRole(api.RoleLocalValue),
 			source.Values[0],
 			results.At(index).Type(),
-			object.Type(),
+			objectType,
 			api.ValueTransferCopy,
 			api.DirectExpression(element),
 		)
@@ -72,6 +73,7 @@ func emitMultipleResultSpec(
 		selected := binding{
 			sourceName: sourceName,
 			object:     object,
+			sourceType: objectType,
 			value:      value,
 		}
 		target, targetRequests, hoisted, err := gotoLocalAssignment(

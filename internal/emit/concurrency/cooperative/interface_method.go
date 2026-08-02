@@ -193,6 +193,24 @@ func GeneratedInterfaceProviderCall(
 	return await(context, nil, target, false, true)
 }
 
+func SourceInterfaceProviderCall(
+	context api.Context,
+	source ast.Node,
+	target api.ExpressionEmission,
+	providerCooperative bool,
+) (api.ExpressionEmission, error) {
+	if source == nil {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "source interface-provider call has no source construct",
+		}
+	}
+	if !providerCooperative {
+		return target, nil
+	}
+	return await(context, source, target, false, false)
+}
+
 func joinInterfaceMethodContracts(
 	context api.Context,
 	providers interfaceMethodObservations,

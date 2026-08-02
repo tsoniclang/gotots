@@ -34,7 +34,7 @@ func emitMultipleResults(
 		}
 		targetType := target.target.SourceType()
 		if target.declaration {
-			targetType = target.object.Type()
+			targetType = target.sourceType
 		}
 		if !types.AssignableTo(results.At(index).Type(), targetType) {
 			return api.StatementEmission{},
@@ -69,7 +69,7 @@ func emitMultipleResults(
 		}
 		targetType := target.target.SourceType()
 		if target.declaration {
-			targetType = target.object.Type()
+			targetType = target.sourceType
 		}
 		mode := api.ValueTransferCopy
 		if !target.declaration {
@@ -95,7 +95,7 @@ func emitMultipleResults(
 					context,
 					children,
 					target.identifier,
-					target.object.Type(),
+					target.sourceType,
 					api.DirectExpression(element),
 				)
 				if err != nil {
@@ -115,7 +115,7 @@ func emitMultipleResults(
 				context.WithRole(api.RoleLocalType),
 				children,
 				target.identifier,
-				target.object.Type(),
+				target.sourceType,
 			)
 			if err != nil {
 				return api.StatementEmission{}, err

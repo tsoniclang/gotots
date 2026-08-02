@@ -15,7 +15,7 @@ import (
 func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 13,
+	  "schemaVersion": 15,
   "facets": [],
   "genericOperationSets": [
     {
@@ -41,7 +41,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 		t.Fatalf("generic operations = %#v", selected)
 	}
 
-	payload = `{"schemaVersion":13,"facets":[],"genericCallableProjections":[],"genericOperationSets":[
+	payload = `{"schemaVersion":15,"facets":[],"genericOperationSets":[
   {"sourceIdentity":"x","operations":[
     {"kind":"invented","parameters":[],"results":[{"kind":"type-parameter","typeParameter":0}]}
   ]}
@@ -54,18 +54,23 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	}
 }
 
-func TestFacetMapOwnsClosedGenericCallableProjections(t *testing.T) {
+func TestFacetMapOwnsClosedGenericCallableKernels(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 13,
-  "facets": [],
-  "genericCallableProjections": [
-    {"sourceIdentity":"slices|kind=4|receiver=|name=Grow","typeArguments":[
-      {"typeParameter":0,"facet":"logical"},
-      {"typeParameter":1,"facet":"container-storage"}
-    ]}
-  ],
-  "genericOperationSets": []
+	  "schemaVersion": 15,
+	  "facets": [{
+	    "kind":"generic-callable-kernel",
+	    "sourceIdentity":"slices|kind=4|receiver=|name=Grow",
+	    "capabilities":["kernel"],
+	    "genericTypeArguments":[
+	      {"typeParameter":0,"facet":"logical"},
+	      {"typeParameter":1,"facet":"container-storage"}
+	    ],
+	    "specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+	    "sourcePath":"src/internal/facets/generic-slices-kernel.ts",
+	    "export":"SlicesGrowKernel"
+	  }],
+	  "genericOperationSets": []
 }`
 	if err := os.WriteFile(path, []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
@@ -74,18 +79,18 @@ func TestFacetMapOwnsClosedGenericCallableProjections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	seeds.genericProjections["slices|kind=4|receiver=|name=Grow"][0].TypeParameter = 9
+	seeds.facets[0].GenericTypeArguments[0].TypeParameter = 9
 	next, err := readFacetSeeds(path)
 	if err != nil ||
-		next.genericProjections["slices|kind=4|receiver=|name=Grow"][0].TypeParameter != 0 {
-		t.Fatalf("projection source mutated: %#v, %v", next.genericProjections, err)
+		next.facets[0].GenericTypeArguments[0].TypeParameter != 0 {
+		t.Fatalf("kernel projection source mutated: %#v, %v", next.facets, err)
 	}
 	invalid := strings.Replace(payload, "container-storage", "invented", 1)
 	if err := os.WriteFile(path, []byte(invalid), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := readFacetSeeds(path); err == nil {
-		t.Fatal("open generic callable projection facet passed")
+		t.Fatal("open generic callable kernel projection passed")
 	}
 }
 
@@ -94,7 +99,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 ) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 13,
+	  "schemaVersion": 15,
   "facets": [],
   "providerStatefulProfiles": [{
     "sourceIdentity": "example.com/source|kind=2|receiver=|name=State",
@@ -147,7 +152,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 func TestImplementedResultRequiresContractOwner(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-  "schemaVersion": 13,
+	  "schemaVersion": 15,
   "facets": [],
   "providerCallableProfiles": [{
     "sourceIdentity": "example.com/source|kind=4|receiver=|name=Build",
@@ -175,7 +180,7 @@ func TestImplementedResultRequiresContractOwner(t *testing.T) {
 	}
 }
 
-func TestGenericCallableProjectionRejectsProviderArityDrift(t *testing.T) {
+func TestGenericCallableKernelRejectsProviderArityDrift(t *testing.T) {
 	repository, err := filepath.Abs("../../../..")
 	if err != nil {
 		t.Fatal(err)
@@ -187,12 +192,12 @@ func TestGenericCallableProjectionRejectsProviderArityDrift(t *testing.T) {
 	}
 	mutated := bytes.Replace(
 		source,
-		[]byte(`{ "sourceIdentity": "slices|kind=4|receiver=|name=Concat", "typeArguments": [{"typeParameter":1,"facet":"container-storage"}] }`),
-		[]byte(`{ "sourceIdentity": "slices|kind=4|receiver=|name=Concat", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] }`),
+		[]byte(`"sourceIdentity":"slices|kind=4|receiver=|name=Concat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}]`),
+		[]byte(`"sourceIdentity":"slices|kind=4|receiver=|name=Concat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}]`),
 		1,
 	)
 	if bytes.Equal(mutated, source) {
-		t.Fatal("generic callable projection mutation was not applied")
+		t.Fatal("generic callable kernel mutation was not applied")
 	}
 	facetMap := filepath.Join(t.TempDir(), "facets.json")
 	if err := os.WriteFile(facetMap, mutated, 0o644); err != nil {
@@ -213,8 +218,8 @@ func TestGenericCallableProjectionRejectsProviderArityDrift(t *testing.T) {
 		MinimumGoVersion:    "go1.26.4",
 		MaximumGoVersion:    "go1.26.4",
 	})
-	if err == nil || !strings.Contains(err.Error(), "provider callable has 1") {
-		t.Fatalf("wrong generic callable projection error = %v", err)
+	if err == nil || !strings.Contains(err.Error(), "projection has 2") {
+		t.Fatalf("wrong generic callable kernel error = %v", err)
 	}
 }
 

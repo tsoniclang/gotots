@@ -29,32 +29,14 @@ func emitDeferredGeneric(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	selected, ok, err := context.ResolveGenericCallable(owner)
+	operationSet, ok, err := context.ResolveGenericCallable(owner)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
 	if !ok ||
-		instance.TypeArgs == nil ||
-		instance.TypeArgs.Len() != len(selected.Parameters()) {
+		instance.TypeArgs.Len() != len(operationSet.Parameters()) {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	capabilities, capabilityRequests, err := genericinstance.EmitCapabilities(
-		context,
-		source,
-		selected,
-		instance.TypeArgs,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	capabilityArguments, err := genericabi.JoinCapabilities(
-		owner,
-		selected.Operations(),
-		capabilities,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
 	}
 	arguments, before, argumentRequests, err := emitArguments(
 		context,
@@ -71,8 +53,8 @@ func emitDeferredGeneric(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	reference, callableFacet, _, err :=
-		cooperativecall.SelectGenericCallable(
+	_, callableFacet, _, selectionRequests, err :=
+		cooperativecall.SelectGenericClassMethod(
 			context,
 			owner,
 			declarationSignature,
@@ -81,28 +63,161 @@ func emitDeferredGeneric(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	typeArguments, typeRequests, err :=
-		genericinstance.EmitFunctionTypeArguments(
-			context,
-			children,
-			source,
-			owner,
-			instance.TypeArgs,
-		)
+	requiresConcretization, err :=
+		context.GenericCallableRequiresConcretization(owner)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	arguments = append(capabilityArguments, arguments...)
-	arguments = append(
-		arguments,
-		context.Factory().Identifier(callable.RecoveryAuthorityName),
+	openConcretization := requiresConcretization &&
+		instance.TypeArgs.ContainsGenericTypeParameter()
+	var (
+		ordinaryReference      api.NameReference
+		deferredReference      api.NameReference
+		deferredTarget         api.DeferredGenericCallableReference
+		typeArguments          []tsgo.TypeNode
+		typeRequests           []api.RootRequest
+		capabilityRequests     []api.RootRequest
+		concreteRequests       []api.RootRequest
+		deferredTargetSelected bool
 	)
-	control, err := api.NewDirectCallableControlRequest(
-		owner,
-		api.CallableControlRecovery,
-	)
+	switch {
+	case requiresConcretization && !openConcretization:
+		profile, _ := callableFacet.GenericProfile()
+		concretization, concreteErr := context.ResolveGenericConcretization(
+			owner,
+			instance.TypeArgs,
+			signature,
+			profile,
+		)
+		if concreteErr != nil {
+			return api.ExpressionEmission{}, true, concreteErr
+		}
+		concreteRequests = concretization.Requests()
+		concretizationNames, available :=
+			context.Names().(api.GenericConcretizationNames)
+		if !available {
+			return api.ExpressionEmission{}, true, &api.ContextError{
+				Reason: "generic concretization names are unavailable",
+			}
+		}
+		ordinaryReference, err = api.NewNameReference(
+			concretization.Name(),
+			api.CombineRequests(
+				concretization.Requests(),
+				selectionRequests,
+			)...,
+		)
+		if err == nil {
+			deferredReference, err =
+				concretizationNames.DeferredGenericConcretization(
+					concretization.Concretization(),
+				)
+		}
+	case openConcretization:
+		kernelNames, available := context.Names().(api.GenericKernelNames)
+		if !available {
+			return api.ExpressionEmission{}, true, &api.ContextError{
+				Reason: "generic kernel names are unavailable",
+			}
+		}
+		profile, _ := callableFacet.GenericProfile()
+		ordinaryReference, err = kernelNames.GenericKernel(owner, profile)
+		if err == nil {
+			deferredTarget, err =
+				kernelNames.DeferredGenericKernel(owner, profile)
+		}
+		if err == nil {
+			deferredReference = deferredTarget.Reference()
+			deferredTargetSelected = true
+		}
+		if err == nil {
+			typeArguments, typeRequests, err =
+				genericinstance.EmitFunctionTypeArguments(
+					context,
+					children,
+					source,
+					owner,
+					instance.TypeArgs,
+				)
+		}
+		if err == nil {
+			var capabilities []genericabi.Binding[tsgo.Expression]
+			capabilities, capabilityRequests, err =
+				genericinstance.EmitCapabilities(
+					context,
+					source,
+					operationSet,
+					instance.TypeArgs,
+				)
+			if err == nil {
+				var mechanics []tsgo.Expression
+				mechanics, err = genericabi.JoinCapabilities(
+					owner,
+					operationSet.Operations(),
+					capabilities,
+				)
+				arguments = append(mechanics, arguments...)
+			}
+		}
+	default:
+		if len(operationSet.Operations()) != 0 {
+			return api.ExpressionEmission{}, true, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "generic mechanics reached a source-facing deferred call",
+			}
+		}
+		profile, profiled := callableFacet.GenericProfile()
+		if profiled {
+			ordinaryReference, err =
+				context.Names().GenericCallableProfile(profile)
+		} else {
+			ordinaryReference, err = context.Names().Reference(owner)
+		}
+		if err == nil {
+			kernelNames, available := context.Names().(api.GenericKernelNames)
+			if !available {
+				return api.ExpressionEmission{}, true, &api.ContextError{
+					Reason: "generic callable variant names are unavailable",
+				}
+			}
+			deferredTarget, err =
+				kernelNames.DeferredGenericCallable(owner, profile)
+		}
+		if err == nil {
+			deferredReference = deferredTarget.Reference()
+			deferredTargetSelected = true
+		}
+		if err == nil {
+			typeArguments, typeRequests, err =
+				genericinstance.EmitFunctionTypeArguments(
+					context,
+					children,
+					source,
+					owner,
+					instance.TypeArgs,
+				)
+		}
+	}
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
+	}
+	recoveryObservation, err :=
+		context.ObserveRecoveryCallable(callableFacet)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	reference := ordinaryReference
+	if recoveryObservation.Recovery() {
+		reference = deferredReference
+		recovery := context.Factory().Identifier(callable.RecoveryAuthorityName)
+		if deferredTargetSelected {
+			arguments, err = deferredTarget.CallArguments(recovery, arguments)
+		} else {
+			arguments = append([]tsgo.Expression{recovery}, arguments...)
+		}
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
 	}
 	cooperative, contractRequests, err :=
 		cooperativecall.GenericContract(context, callableFacet)
@@ -124,11 +239,13 @@ func emitDeferredGeneric(
 		cooperative,
 		api.CombineRequests(
 			reference.Requests(),
+			selectionRequests,
+			concreteRequests,
 			typeRequests,
 			capabilityRequests,
 			argumentRequests,
 			contractRequests,
-			[]api.RootRequest{control},
+			recoveryObservation.Requests(),
 		),
 	)
 	return target, true, err

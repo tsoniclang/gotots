@@ -33,22 +33,7 @@ func (n *File) AnonymousStruct(
 	if structType.NumFields() == 0 {
 		return n.Runtime(api.RuntimeEmptyStruct, phase)
 	}
-	artifactKey, err := typeidentity.BuildKey(
-		structType,
-		n.generatedNamedObjectIdentity,
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	placement, err := n.generatedArtifactPlacement(structType)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	binding, err := n.owner.registry.internAnonymousStruct(
-		artifactKey,
-		structType,
-		placement,
-	)
+	binding, err := n.anonymousStructBinding(structType)
 	if err != nil {
 		return api.NameReference{}, err
 	}
@@ -102,6 +87,27 @@ func (n *File) AnonymousStruct(
 	return api.NewNameReference(binding.name, requests...)
 }
 
+func (n *File) anonymousStructBinding(
+	structType *types.Struct,
+) (anonymousStructBinding, error) {
+	artifactKey, err := typeidentity.BuildKey(
+		structType,
+		n.generatedNamedObjectIdentity,
+	)
+	if err != nil {
+		return anonymousStructBinding{}, err
+	}
+	placement, err := n.generatedArtifactPlacement(structType)
+	if err != nil {
+		return anonymousStructBinding{}, err
+	}
+	return n.owner.registry.internAnonymousStruct(
+		artifactKey,
+		structType,
+		placement,
+	)
+}
+
 func anonymousStructDependencyFacets(
 	demand api.AnonymousStructDemand,
 ) []api.ArtifactFacet {
@@ -126,7 +132,14 @@ func anonymousStructDependencyFacets(
 func (n *File) generatedArtifactPlacement(
 	sourceType types.Type,
 ) (generatedArtifactPlacement, error) {
-	components := typeidentity.LocalComponents(sourceType)
+	return n.generatedArtifactPlacementForComponents(
+		typeidentity.LocalComponents(sourceType),
+	)
+}
+
+func (n *File) generatedArtifactPlacementForComponents(
+	components []*types.TypeName,
+) (generatedArtifactPlacement, error) {
 	if len(components) == 0 {
 		return generatedArtifactPlacement{
 			kind: api.GeneratedArtifactPlacementCompilation,

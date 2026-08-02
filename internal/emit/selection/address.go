@@ -19,7 +19,7 @@ func FieldAddress(
 	selected *types.Selection,
 	element types.Type,
 ) (api.ExpressionEmission, error) {
-	resolved, ok := fieldPath(selected)
+	resolved, ok := fieldPath(context, selected)
 	if !ok ||
 		!Valid(context, source, selected, types.FieldVal) ||
 		!types.Identical(resolved.effective, element) {
@@ -35,7 +35,7 @@ func FieldStoreTarget(
 	source *ast.SelectorExpr,
 	selected *types.Selection,
 ) (api.StoreTargetEmission, error) {
-	resolved, ok := fieldPath(selected)
+	resolved, ok := fieldPath(context, selected)
 	if !ok || !Valid(context, source, selected, types.FieldVal) {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -44,7 +44,7 @@ func FieldStoreTarget(
 		receiver api.ExpressionEmission
 		err      error
 	)
-	facts, hasFacts := context.TypesInfo().Types[source.X]
+	facts, hasFacts := context.TypesInfo().TypeAndValue(source.X)
 	if hasFacts && facts.Addressable() {
 		target, err := children.StoreTarget(
 			context.

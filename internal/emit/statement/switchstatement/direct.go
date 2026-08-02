@@ -61,8 +61,9 @@ func emitDirect(
 			value := expression.Value()
 			expressionRequests := expression.Requests()
 			if tag.wrapped {
-				facts, constant := context.TypesInfo().
-					Types[clause.source.List[index]]
+				facts, constant := context.TypesInfo().TypeAndValue(
+					clause.source.List[index],
+				)
 				if constant && facts.Value != nil {
 					direct, err := constantvalue.EmitValue(
 						context.

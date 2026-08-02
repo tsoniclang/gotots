@@ -236,6 +236,22 @@ func (n *File) GenericCallableProfile(
 	)
 }
 
+func (n *File) DeferredCallable(
+	owner *types.Func,
+	variantSuffix string,
+) (api.NameReference, error) {
+	if owner == nil {
+		return api.NameReference{}, &api.NameError{
+			Reason: "deferred callable owner is nil",
+		}
+	}
+	return n.derivedSourceReference(
+		owner.Origin(),
+		variantSuffix+api.DeferredEntrySuffix,
+		api.ArtifactFacetCallableSignature,
+	)
+}
+
 func (n *File) SourceCallableABI(
 	owner types.Object,
 	signature *types.Signature,

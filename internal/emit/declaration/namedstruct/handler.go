@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	typefacet "github.com/tsoniclang/gotots/internal/emit/declaration/typefacet"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -32,6 +33,7 @@ func emitClass(
 	typeName *types.TypeName,
 	operations []operationAssembly,
 	requirements []api.DeclarationRequirement,
+	representationFacets []api.TypeRepresentationFacet,
 ) (api.DeclarationEmission, error) {
 	source, ok := sourceType(
 		context,
@@ -74,6 +76,7 @@ func emitClass(
 			context,
 			children,
 			source.spec,
+			typeName.Type(),
 			source.basis,
 			className,
 			fields,
@@ -81,6 +84,7 @@ func emitClass(
 			moduleExport,
 			parameters.Nodes(),
 			parameters.References(),
+			representationFacets,
 		)
 	}
 	fields, err := fields(context, source.literal, source.structure)
@@ -91,12 +95,14 @@ func emitClass(
 		context,
 		children,
 		source.literal,
+		typeName.Type(),
 		className,
 		fields,
 		operations,
 		moduleExport,
 		parameters.Nodes(),
 		parameters.References(),
+		representationFacets,
 	)
 }
 
@@ -106,6 +112,7 @@ func EmitAnonymous(
 	structType *types.Struct,
 	className string,
 	operations []api.NamedStructOperation,
+	representationFacets []api.TypeRepresentationFacet,
 	moduleExport bool,
 ) (api.DeclarationEmission, error) {
 	if structType == nil || className == "" {
@@ -142,12 +149,14 @@ func EmitAnonymous(
 		context,
 		children,
 		nil,
+		structType,
 		className,
 		fields,
 		selected,
 		moduleExport,
 		nil,
 		nil,
+		representationFacets,
 	)
 }
 
@@ -155,12 +164,14 @@ func emitStructClass(
 	context api.Context,
 	children api.ChildEmitter,
 	source ast.Node,
+	sourceType types.Type,
 	className string,
 	fields []field,
 	operations []operationAssembly,
 	moduleExport bool,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
+	representationFacets []api.TypeRepresentationFacet,
 ) (api.DeclarationEmission, error) {
 	var storageOperation *operationAssembly
 	valueOperations := make([]operationAssembly, 0, len(operations))
@@ -186,6 +197,24 @@ func emitStructClass(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
+	classType := context.Factory().TypeReferenceNode(
+		context.Factory().Identifier(className),
+		typeArguments,
+	)
+	markers := typefacet.Emission{}
+	if len(representationFacets) != 0 {
+		markers, err = typefacet.Build(
+			context,
+			sourceType,
+			classType,
+			layout.storageType,
+			representationFacets,
+			false,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+	}
 	members := make([]tsgo.ClassElement, 0, 3+len(valueOperations))
 	members = append(members, context.Factory().PropertyDeclaration(
 		[]tsgo.ModifierLike{
@@ -201,12 +230,9 @@ func emitStructClass(
 		nil,
 	))
 	members = append(members, layout.members...)
-	requests := layout.requests
+	members = append(members, markers.Members()...)
+	requests := api.CombineRequests(layout.requests, markers.Requests())
 
-	classType := context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(className),
-		typeArguments,
-	)
 	for _, operation := range valueOperations {
 		member, operationRequests, err := emitValueOperation(
 			context,
@@ -237,7 +263,7 @@ func emitStructClass(
 			modifiers,
 			context.Factory().Identifier(className),
 			typeParameters,
-			nil,
+			markers.Heritage(),
 			members,
 		),
 	)
@@ -254,7 +280,7 @@ func sourceType(
 	}
 	for _, sourceSpec := range declaration.Specs {
 		spec, ok := sourceSpec.(*ast.TypeSpec)
-		if !ok || context.TypesInfo().Defs[spec.Name] != typeName {
+		if !ok || context.TypesInfo().DefOf(spec.Name) != typeName {
 			continue
 		}
 		named, namedOK := types.Unalias(typeName.Type()).(*types.Named)
@@ -394,7 +420,7 @@ func fields(
 			}
 			object := structType.Field(fieldIndex)
 			if object.Embedded() ||
-				context.TypesInfo().Defs[sourceName] != object ||
+				context.TypesInfo().DefOf(sourceName) != object ||
 				sourceType == nil ||
 				!types.Identical(sourceType, object.Type()) {
 				return nil, api.Unsupported(

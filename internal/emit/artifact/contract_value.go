@@ -13,8 +13,8 @@ import (
 )
 
 type Contract struct {
-	facets      [api.ArtifactFacetExportSurface + 1][]byte
-	present     uint8
+	facets      [api.ArtifactFacetCount][]byte
+	present     uint16
 	exports     []string
 	exportsSet  bool
 	initialized bool
@@ -76,7 +76,7 @@ func (c Contract) WithFacet(
 		}
 	}
 	c.facets[facet] = bytes.Clone(encoded)
-	c.present |= uint8(1) << facet
+	c.present |= uint16(1) << facet
 	return c, nil
 }
 
@@ -120,7 +120,7 @@ func (c Contract) Fingerprint() (string, bool) {
 		return "", false
 	}
 	digest := sha256.New()
-	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
+	for facet := api.ArtifactFacetCallableSignature; facet < api.ArtifactFacetCount; facet++ {
 		encoded, present := c.facet(facet)
 		_, _ = digest.Write([]byte{byte(facet)})
 		if present {
@@ -166,14 +166,14 @@ func (c Contract) withOwnedFacet(
 		}
 	}
 	c.facets[facet] = encoded
-	c.present |= uint8(1) << facet
+	c.present |= uint16(1) << facet
 	return c, nil
 }
 
 func (c Contract) facet(
 	facet api.ArtifactFacet,
 ) ([]byte, bool) {
-	if !facet.Valid() || c.present&(uint8(1)<<facet) == 0 {
+	if !facet.Valid() || c.present&(uint16(1)<<facet) == 0 {
 		return nil, false
 	}
 	return c.facets[facet], true
@@ -209,7 +209,7 @@ func changedArtifactFacets(
 	next Contract,
 ) []api.ArtifactFacet {
 	var changed []api.ArtifactFacet
-	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
+	for facet := api.ArtifactFacetCallableSignature; facet < api.ArtifactFacetCount; facet++ {
 		currentValue, currentOK := current.facet(facet)
 		nextValue, nextOK := next.facet(facet)
 		if currentOK != nextOK || !bytes.Equal(currentValue, nextValue) {

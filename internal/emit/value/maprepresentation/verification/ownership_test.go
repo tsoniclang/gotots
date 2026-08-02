@@ -2,6 +2,7 @@ package maprepresentation_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -62,12 +63,7 @@ func TestMutationGenericMapTransferCannotBypassProjectionCapability(
 	t *testing.T,
 ) {
 	emission := compileMapOwnership(t)
-	source := targetFileBySuffix(
-		t,
-		emission.Files(),
-		"source.ts",
-	).SourceFile()
-	project := targetFunction(t, source, "Project")
+	project := targetGeneratedFunction(t, emission.Files(), "Project$kernel")
 	if len(project.TypeParameters()) != 3 ||
 		project.TypeParameters()[0].Name().Text() != "M" ||
 		project.TypeParameters()[0].Constraint() != nil {
@@ -123,6 +119,27 @@ func TestMutationGenericMapTransferCannotBypassProjectionCapability(
 	}
 }
 
+func TestOpenGenericMapExportFailsWithoutAnExactSourceABI(t *testing.T) {
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: mapOwnershipDirectory(),
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = emit.Compile(loaded.Program(), roots)
+	var schedule *emit.ScheduleError
+	if !errors.As(err, &schedule) ||
+		schedule.Object != "Project" ||
+		schedule.Reason != "export root has no exact source-facing target binding" {
+		t.Fatalf("open generic map export error = %#v", err)
+	}
+}
+
 func TestMapRepresentationOwnershipStrictDifferential(t *testing.T) {
 	emission := compileMapOwnership(t)
 	workingDirectory := t.TempDir()
@@ -140,8 +157,9 @@ func TestMapRepresentationOwnershipStrictDifferential(t *testing.T) {
 		)
 	}
 	for _, required := range []string{
-		"export function Project<M, K, V>($go$convert_",
+		"export function Project$kernel<M, K, V>($go$convert_",
 		"return $go$convert_",
+		"Project$concrete_",
 	} {
 		if !strings.Contains(sourceArtifact, required) {
 			t.Fatalf(
@@ -152,6 +170,7 @@ func TestMapRepresentationOwnershipStrictDifferential(t *testing.T) {
 		}
 	}
 	for _, forbidden := range []string{
+		"export function Project<M, K, V>",
 		"M extends GoMapValue",
 		"let values = $goMap_",
 	} {
@@ -203,15 +222,38 @@ func compileMapOwnership(t *testing.T) emit.ProgramEmission {
 	if err != nil {
 		t.Fatal(err)
 	}
-	roots, err := emit.ExportedAPIRoots(loaded)
-	if err != nil {
-		t.Fatal(err)
+	var roots []emit.Root
+	for _, name := range []string{"DeclarationLifecycle", "ProjectionLifecycle"} {
+		root, rootErr := emit.NewRoot(loaded.Types().Scope().Lookup(name))
+		if rootErr != nil {
+			t.Fatal(rootErr)
+		}
+		roots = append(roots, root)
 	}
 	emission, err := emit.Compile(loaded.Program(), roots)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return emission
+}
+
+func targetGeneratedFunction(
+	t *testing.T,
+	files []emit.TargetFile,
+	prefix string,
+) tsgo.FunctionDeclaration {
+	t.Helper()
+	for _, file := range files {
+		for _, statement := range file.SourceFile().Statements() {
+			function, ok := statement.(tsgo.FunctionDeclaration)
+			if ok && function.Name() != nil &&
+				strings.HasPrefix(function.Name().Text(), prefix) {
+				return function
+			}
+		}
+	}
+	t.Fatalf("target function prefix %q is absent", prefix)
+	return nil
 }
 
 func targetLocalDeclaration(

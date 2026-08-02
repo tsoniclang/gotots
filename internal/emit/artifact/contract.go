@@ -155,6 +155,11 @@ func ProjectContract(
 					),
 				),
 			)
+		case tsgo.ExpressionStatement:
+			nodes[api.ArtifactFacetImplementation] = append(
+				nodes[api.ArtifactFacetImplementation],
+				statement,
+			)
 		default:
 			kind := tsgo.SyntaxKind(0)
 			if statement != nil {
@@ -253,13 +258,21 @@ func ProjectClassMemberContract(
 	factory tsgo.Factory,
 	members []tsgo.ClassElement,
 ) (Contract, error) {
+	return ProjectClassMemberArtifactContract(factory, members, nil)
+}
+
+func ProjectClassMemberArtifactContract(
+	factory tsgo.Factory,
+	members []tsgo.ClassElement,
+	support []tsgo.Statement,
+) (Contract, error) {
 	if len(members) == 0 {
 		return Contract{}, &ContractError{
 			Reason: "class-member artifact has no target member",
 		}
 	}
-	signatures := make([]tsgo.Node, 0, len(members))
-	implementations := make([]tsgo.Node, 0, len(members))
+	signatures := make([]tsgo.Node, 0, len(members)+len(support))
+	implementations := make([]tsgo.Node, 0, len(members)+len(support))
 	for _, member := range members {
 		projected, observable, err := projectClassMember(factory, member)
 		if err != nil {
@@ -277,6 +290,29 @@ func ProjectClassMemberContract(
 		}
 		signatures = append(signatures, projected)
 		implementations = append(implementations, member)
+	}
+	for _, statement := range support {
+		function, ok := statement.(tsgo.FunctionDeclaration)
+		if !ok || function.Name() == nil || function.Type() == nil {
+			kind := tsgo.SyntaxKind(0)
+			if statement != nil {
+				kind = statement.Kind()
+			}
+			return Contract{}, &ContractError{
+				Kind:   kind,
+				Reason: "class-member support is not an explicit function declaration",
+			}
+		}
+		signatures = append(signatures, factory.FunctionDeclaration(
+			function.Modifiers(),
+			function.AsteriskToken(),
+			function.Name(),
+			function.TypeParameters(),
+			function.Parameters(),
+			function.Type(),
+			nil,
+		))
+		implementations = append(implementations, statement)
 	}
 	signature, err := tsgo.EncodeNode(factory.SyntaxList(signatures))
 	if err != nil {

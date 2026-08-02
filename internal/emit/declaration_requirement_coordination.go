@@ -85,8 +85,61 @@ func compareDeclarationRequirements(
 			return 0
 		}
 	}
+	if left.Kind() == api.DeclarationRequirementGenericConcretization {
+		leftConcretization, leftOK := left.GenericConcretization()
+		rightConcretization, rightOK := right.GenericConcretization()
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		case !leftOK:
+			return 0
+		case leftConcretization.Key() < rightConcretization.Key():
+			return -1
+		case leftConcretization.Key() > rightConcretization.Key():
+			return 1
+		case !left.DeferredGenericConcretization() &&
+			right.DeferredGenericConcretization():
+			return -1
+		case left.DeferredGenericConcretization() &&
+			!right.DeferredGenericConcretization():
+			return 1
+		default:
+			return 0
+		}
+	}
 	if left.Kind() == api.DeclarationRequirementGenericRepresentation {
 		return compareGenericRepresentationRequirements(left, right)
+	}
+	if left.Kind() == api.DeclarationRequirementTypeRepresentation {
+		leftType, leftArtifact, leftFacet, leftOK :=
+			left.TypeRepresentation()
+		rightType, rightArtifact, rightFacet, rightOK :=
+			right.TypeRepresentation()
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		}
+		if order := emitordering.CompareObjects(leftType, rightType); order != 0 {
+			return order
+		}
+		if order := compareGeneratedArtifacts(
+			leftArtifact,
+			rightArtifact,
+		); order != 0 {
+			return order
+		}
+		switch {
+		case leftFacet < rightFacet:
+			return -1
+		case leftFacet > rightFacet:
+			return 1
+		default:
+			return 0
+		}
 	}
 	if left.Kind() == api.DeclarationRequirementGenericCallableProfile {
 		leftProfile, leftOK := left.GenericCallableProfile()

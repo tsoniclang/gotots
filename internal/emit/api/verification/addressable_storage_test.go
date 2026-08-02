@@ -146,7 +146,10 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementPointerRepresentation != 22 ||
 		DeclarationRequirementProviderInterfaceBridge != 23 ||
 		DeclarationRequirementProviderStatefulRepresentation != 24 ||
-		DeclarationRequirementKind(25).Valid() {
+		DeclarationRequirementDeferredCallableRegistry != 25 ||
+		DeclarationRequirementGenericConcretization != 26 ||
+		DeclarationRequirementTypeRepresentation != 27 ||
+		DeclarationRequirementKind(28).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }

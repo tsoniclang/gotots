@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 14,
+  "schemaVersion": 15,
   "representations": [
     {
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
@@ -1885,6 +1885,57 @@
       ]
     },
     {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=WalkDir",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsWalkDirCanonicalAsyncError",
+      "canonicalParameters": [0, 2],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "io/fs|kind=3|receiver=|name=SkipAll",
+        "io/fs|kind=3|receiver=|name=SkipDir"
+      ],
+      "guardInterfaces": [
+        "io/fs|kind=2|receiver=|name=ReadDirFS",
+        "io/fs|kind=2|receiver=|name=ReadDirFile",
+        "io/fs|kind=2|receiver=|name=StatFS"
+      ],
+      "fromProviderInterfaces": [
+        "go:universe|error",
+        "io/fs|kind=2|receiver=|name=DirEntry"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+          "export": "CanonicalDirEntryAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFSAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFileAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "export": "CanonicalReadDirFSAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "export": "CanonicalReadDirFileAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "export": "CanonicalStatFSAsyncError"
+        }
+      ]
+    },
+    {
       "sourceIdentity": "os/signal|kind=4|receiver=|name=NotifyContext",
       "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
       "sourcePath": "src/internal/facets/provider-os-signal.ts",
@@ -3579,51 +3630,46 @@
       "export": "SyncOnceValueCooperative",
       "profileKey": "c30278625496c7198c92a774ca902c537bd14851c35fbd06e171ee3f89e3602c=cooperative",
       "effect": "sync"
-    }
-  ],
-  "genericCallableProjections": [
-    { "sourceIdentity": "cmp|kind=4|receiver=|name=Compare", "typeArguments": [{"typeParameter":0,"facet":"logical"}] },
-    { "sourceIdentity": "cmp|kind=4|receiver=|name=Or", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}] },
-    { "sourceIdentity": "errors|kind=4|receiver=|name=AsType", "typeArguments": [{"typeParameter":0,"facet":"logical"}] },
-    { "sourceIdentity": "maps|kind=4|receiver=|name=Clone", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}] },
-    { "sourceIdentity": "maps|kind=4|receiver=|name=Copy", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"}] },
-    { "sourceIdentity": "maps|kind=4|receiver=|name=Equal", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"}] },
-    { "sourceIdentity": "maps|kind=4|receiver=|name=EqualFunc", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"},{"typeParameter":4,"facet":"logical"}] },
-    { "sourceIdentity": "maps|kind=4|receiver=|name=Keys", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}] },
-    { "sourceIdentity": "maps|kind=4|receiver=|name=Values", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}] },
-    { "sourceIdentity": "reflect|kind=4|receiver=|name=TypeAssert", "typeArguments": [{"typeParameter":0,"facet":"logical"}] },
-    { "sourceIdentity": "reflect|kind=4|receiver=|name=TypeFor", "typeArguments": [{"typeParameter":0,"facet":"logical"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=AppendSeq", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearch", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearchFunc", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"},{"typeParameter":2,"facet":"logical"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Clip", "typeArguments": [{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Clone", "typeArguments": [{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Collect", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Compact", "typeArguments": [{"typeParameter":1,"facet":"logical"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=CompactFunc", "typeArguments": [{"typeParameter":1,"facet":"logical"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Compare", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=CompareFunc", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":2,"facet":"container-storage"},{"typeParameter":3,"facet":"logical"},{"typeParameter":3,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Concat", "typeArguments": [{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Contains", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=ContainsFunc", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Delete", "typeArguments": [{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=DeleteFunc", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Equal", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=EqualFunc", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":2,"facet":"container-storage"},{"typeParameter":3,"facet":"logical"},{"typeParameter":3,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Grow", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Index", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=IndexFunc", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Insert", "typeArguments": [{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Repeat", "typeArguments": [{"typeParameter":1,"facet":"logical"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Replace", "typeArguments": [{"typeParameter":1,"facet":"logical"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Reverse", "typeArguments": [{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Sort", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=SortFunc", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=SortStableFunc", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Sorted", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=SortedFunc", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}] },
-    { "sourceIdentity": "slices|kind=4|receiver=|name=Values", "typeArguments": [{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}] },
-    { "sourceIdentity": "sync|kind=4|receiver=|name=OnceValue", "typeArguments": [{"typeParameter":0,"facet":"logical"}] }
+    },
+    {"kind":"generic-callable-kernel","sourceIdentity":"cmp|kind=4|receiver=|name=Compare","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-cmp-kernel.js","sourcePath":"src/internal/facets/generic-cmp-kernel.ts","export":"CmpCompareKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"cmp|kind=4|receiver=|name=Or","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-cmp-kernel.js","sourcePath":"src/internal/facets/generic-cmp-kernel.ts","export":"CmpOrKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"errors|kind=4|receiver=|name=AsType","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-errors-kernel.js","sourcePath":"src/internal/facets/generic-errors-kernel.ts","export":"ErrorsAsTypeKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Clone","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsCloneKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Copy","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsCopyKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Equal","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsEqualKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=EqualFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"},{"typeParameter":4,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsEqualFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Keys","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsKeysKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Values","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsValuesKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=AppendSeq","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesAppendSeqKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=BinarySearch","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesBinarySearchKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=BinarySearchFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesBinarySearchFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Clip","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesClipKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Clone","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCloneKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Collect","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCollectKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Compact","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompactKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=CompactFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompactFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Compare","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompareKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=CompareFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":2,"facet":"container-storage"},{"typeParameter":3,"facet":"logical"},{"typeParameter":3,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompareFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Concat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesConcatKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Contains","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesContainsKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=ContainsFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesContainsFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Delete","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesDeleteKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=DeleteFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesDeleteFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Equal","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesEqualKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=EqualFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":2,"facet":"container-storage"},{"typeParameter":3,"facet":"logical"},{"typeParameter":3,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesEqualFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Grow","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesGrowKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Index","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesIndexKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=IndexFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesIndexFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Insert","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesInsertKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Repeat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesRepeatKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Replace","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesReplaceKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Reverse","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesReverseKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Sort","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=SortFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=SortStableFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortStableFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Sorted","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortedKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=SortedFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortedFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Values","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesValuesKernel"}
   ],
   "genericOperationSets": [
     {

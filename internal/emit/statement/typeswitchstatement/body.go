@@ -21,7 +21,7 @@ func emitCaseBody(
 	var statements []tsgo.Statement
 	var requests []api.RootRequest
 	if selected.binding != nil && selected.binding.Name != "_" {
-		binding, ok := context.TypesInfo().Implicits[clause].(*types.Var)
+		binding, ok := context.TypesInfo().ImplicitOf(clause).(*types.Var)
 		if !ok || binding.Name() != selected.binding.Name {
 			return nil, nil, api.Unsupported(
 				context.WithRole(api.RoleTypeSwitchBinding),
@@ -109,7 +109,7 @@ func emitCaseBody(
 		)
 		requests = append(requests, targetType.Requests()...)
 		requests = append(requests, initial.Requests()...)
-	} else if context.TypesInfo().Implicits[clause] != nil {
+	} else if context.TypesInfo().ImplicitOf(clause) != nil {
 		return nil, nil, api.Unsupported(
 			context.WithRole(api.RoleTypeSwitchBinding),
 			api.CategoryStatement,

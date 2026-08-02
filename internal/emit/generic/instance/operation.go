@@ -9,10 +9,10 @@ import (
 func InstantiateOperation(
 	operationSet api.GenericOperationSet,
 	operation *types.Signature,
-	arguments *types.TypeList,
+	arguments api.TypeArgumentList,
 ) (*types.Signature, error) {
 	parameters := operationSet.Parameters()
-	if operation == nil || arguments == nil ||
+	if operation == nil ||
 		len(parameters) != arguments.Len() {
 		return nil, &api.InvariantError{
 			Role:   api.RoleCallCallee,

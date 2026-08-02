@@ -126,12 +126,3 @@ func arrange(
 	}
 	return before, requests, values, nil
 }
-
-func structFieldIndex(structType *types.Struct, field *types.Var) int {
-	for index := range structType.NumFields() {
-		if structType.Field(index) == field {
-			return index
-		}
-	}
-	return -1
-}

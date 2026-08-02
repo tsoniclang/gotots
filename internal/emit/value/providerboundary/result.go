@@ -1,6 +1,7 @@
 package providerboundary
 
 import (
+	"fmt"
 	"go/types"
 	"slices"
 	"strconv"
@@ -26,6 +27,87 @@ func FromProviderResults(
 		emission,
 	)
 	return target, err
+}
+
+func ToProviderArguments(
+	context api.Context,
+	children api.ChildEmitter,
+	parameters *types.Tuple,
+	sourceArguments []tsgo.Expression,
+) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
+	return toProviderArgumentsSelected(
+		context,
+		children,
+		parameters,
+		nil,
+		sourceArguments,
+	)
+}
+
+func ToProviderProfileArguments(
+	context api.Context,
+	children api.ChildEmitter,
+	parameters *types.Tuple,
+	canonical []int,
+	sourceArguments []tsgo.Expression,
+) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
+	return toProviderArgumentsSelected(
+		context,
+		children,
+		parameters,
+		canonical,
+		sourceArguments,
+	)
+}
+
+func toProviderArgumentsSelected(
+	context api.Context,
+	children api.ChildEmitter,
+	parameters *types.Tuple,
+	canonical []int,
+	sourceArguments []tsgo.Expression,
+) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
+	if parameters == nil && len(sourceArguments) == 0 {
+		return nil, nil, nil, nil
+	}
+	if parameters == nil || parameters.Len() != len(sourceArguments) {
+		parameterCount := 0
+		if parameters != nil {
+			parameterCount = parameters.Len()
+		}
+		return nil, nil, nil, &api.InvariantError{
+			Role: context.Role(),
+			Reason: fmt.Sprintf(
+				"provider argument count does not match the source contract: %d parameters, %d arguments",
+				parameterCount,
+				len(sourceArguments),
+			),
+		}
+	}
+	arguments := make([]tsgo.Expression, 0, len(sourceArguments))
+	var before []tsgo.Statement
+	var requests []api.RootRequest
+	for index, sourceArgument := range sourceArguments {
+		converted := api.DirectExpression(sourceArgument)
+		var err error
+		if !slices.Contains(canonical, index) {
+			converted, _, err = ToProviderValue(
+				context,
+				children,
+				nil,
+				"",
+				parameters.At(index).Type(),
+				converted,
+			)
+		}
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		before = append(before, converted.Before()...)
+		arguments = append(arguments, converted.Value())
+		requests = append(requests, converted.Requests()...)
+	}
+	return arguments, before, api.CombineRequests(requests), nil
 }
 
 func FromProviderProfileResults(

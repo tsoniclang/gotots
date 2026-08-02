@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	typefacet "github.com/tsoniclang/gotots/internal/emit/declaration/typefacet"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -57,20 +58,33 @@ func Emit(
 			target.Requests()...,
 		), true, nil
 	}
+	var genericRequirements []api.DeclarationRequirement
+	var representationFacets []api.TypeRepresentationFacet
 	for _, requirement := range requirements {
-		owner, _, _, ok := requirement.GenericRepresentation()
-		if !ok || owner != typeName {
+		if owner, _, _, ok := requirement.GenericRepresentation(); ok {
+			if owner != typeName {
+				return api.DeclarationEmission{}, true, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "defined type received a foreign generic representation",
+				}
+			}
+			genericRequirements = append(genericRequirements, requirement)
+			continue
+		}
+		owner, artifact, facet, ok := requirement.TypeRepresentation()
+		if !ok || owner != typeName || artifact != nil {
 			return api.DeclarationEmission{}, true, &api.InvariantError{
 				Role:   context.Role(),
 				Reason: "defined type received a foreign declaration requirement",
 			}
 		}
+		representationFacets = append(representationFacets, facet)
 	}
 	parameters, err := genericdeclaration.EnterType(
 		context,
 		source,
 		typeName,
-		requirements,
+		genericRequirements,
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, true, err
@@ -89,6 +103,7 @@ func Emit(
 		return api.DeclarationEmission{}, true, err
 	}
 	typeParameters := parameters.Nodes()
+	logicalArguments := parameters.References()
 	valueType := underlying.Value()
 	if definedtype.RequiresValueFacet(model.Type()) {
 		typeParameters = append(
@@ -101,7 +116,12 @@ func Emit(
 		valueType = definedtype.ValueTypeParameterReference(
 			context.Factory(),
 		)
+		logicalArguments = append(logicalArguments, valueType)
 	}
+	classType := context.Factory().TypeReferenceNode(
+		context.Factory().Identifier(name),
+		logicalArguments,
+	)
 	members := []tsgo.ClassElement{
 		context.Factory().PropertyDeclaration(
 			[]tsgo.ModifierLike{
@@ -136,16 +156,45 @@ func Emit(
 			context.Factory().Block(nil, true),
 		),
 	}
+	markers := typefacet.Emission{}
+	var markerRequests []api.RootRequest
+	if len(representationFacets) != 0 {
+		storage, storageErr := context.Values().StorageType(
+			context.WithRole(api.RoleStorageType),
+			source.Type,
+			model.Underlying(),
+		)
+		if storageErr != nil {
+			return api.DeclarationEmission{}, true, storageErr
+		}
+		markers, err = typefacet.Build(
+			context,
+			model.Type(),
+			classType,
+			storage.Value(),
+			representationFacets,
+			false,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, true, err
+		}
+		members = append(members, markers.Members()...)
+		markerRequests = api.CombineRequests(
+			storage.Requests(),
+			markers.Requests(),
+		)
+	}
 	return api.DirectDeclaration(
 		context.Factory().ClassDeclaration(
 			modifiers,
 			context.Factory().Identifier(name),
 			typeParameters,
-			nil,
+			markers.Heritage(),
 			members,
 		),
 		api.CombineRequests(
 			underlying.Requests(),
+			markerRequests,
 		)...,
 	), true, nil
 }
@@ -160,7 +209,7 @@ func sourceSpec(
 	}
 	for _, candidate := range declaration.Specs {
 		source, ok := candidate.(*ast.TypeSpec)
-		if !ok || context.TypesInfo().Defs[source.Name] != typeName {
+		if !ok || context.TypesInfo().DefOf(source.Name) != typeName {
 			continue
 		}
 		if source.Assign.IsValid() != typeName.IsAlias() {

@@ -414,8 +414,13 @@ func identifier(
 	context api.Context,
 	source *ast.Ident,
 ) (api.StoreTargetEmission, error) {
-	object, ok := context.TypesInfo().Uses[source].(*types.Var)
+	object, ok := context.TypesInfo().UseOf(source).(*types.Var)
 	if !ok {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	sourceType := context.TypesInfo().TypeOfObject(object)
+	if sourceType == nil {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -437,7 +442,7 @@ func identifier(
 		}
 		return api.NewStoreTargetEmission(
 			context.Factory().Identifier(receiver.CopyName()),
-			object.Type(),
+			sourceType,
 			[]api.RootRequest{request},
 		)
 	}
@@ -447,7 +452,7 @@ func identifier(
 	}
 	return api.NewStoreTargetEmission(
 		reference.Expression(context.Factory()),
-		object.Type(),
+		sourceType,
 		reference.Requests(),
 	)
 }
@@ -457,7 +462,7 @@ func field(
 	children api.ChildEmitter,
 	source *ast.SelectorExpr,
 ) (api.StoreTargetEmission, error) {
-	selection := context.TypesInfo().Selections[source]
+	selection := context.TypesInfo().SelectionOf(source)
 	if selection == nil {
 		return packageVariableSelector(context, source)
 	}
@@ -482,12 +487,12 @@ func packageVariableSelector(
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	packageName, ok := context.TypesInfo().Uses[qualifier].(*types.PkgName)
+	packageName, ok := context.TypesInfo().UseOf(qualifier).(*types.PkgName)
 	if !ok {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	variable, ok := context.TypesInfo().Uses[source.Sel].(*types.Var)
+	variable, ok := context.TypesInfo().UseOf(source.Sel).(*types.Var)
 	if !ok ||
 		variable.Pkg() != packageName.Imported() ||
 		variable.IsField() ||

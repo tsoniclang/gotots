@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 18,
+  "schemaVersion": 19,
   "packageName": "@gotots/gostdlib",
   "packageVersion": "0.0.0",
   "backend": "node",
@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "0103e9e12c1023a958dffa21518b22f0ef4bb5e9239d35f7fb767c99582b7038",
-  "providerDigest": "b356547ef6bd8f291e4901d0bc756ea621cdd2710d0a8ac980af1bbe16dfe972",
+  "providerDigest": "a525c9c3f7757307823115caf019e52002a2c635fb5f5758fbb7d0c466a118a9",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -498,8 +498,8 @@
           ],
           "sourceSignature": "func[T cmp.Ordered](x T, y T) int|params=x,y|results=",
           "sourceLocation": "cmp/cmp.go:40:6",
-          "implementationOwner": "src/internal/portable/cmp/ordered.ts",
-          "targetFingerprint": "0635cd9691aabf91a0df8cbf4330f6e47ef42b10f678d1d1d75c3422cc658137"
+          "implementationOwner": "src/cmp.ts",
+          "targetFingerprint": "65bb2c4b73f38b1a55e076bd397ad531c1b4113fcb8f0695c2db93f2220980ae"
         },
         {
           "identity": "cmp|kind=4|receiver=|name=Or",
@@ -511,10 +511,6 @@
             {
               "typeParameter": 0,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 0,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -579,8 +575,8 @@
           ],
           "sourceSignature": "func[T comparable](vals ...T) T|params=vals|results=",
           "sourceLocation": "cmp/cmp.go:69:6",
-          "implementationOwner": "src/internal/portable/cmp/or.ts",
-          "targetFingerprint": "db64fd65cfb52eaffd59b7a08dff7426860be701e778c4850f214dcf538a3539"
+          "implementationOwner": "src/cmp.ts",
+          "targetFingerprint": "eda2abfd9715166024b40dc65826b9d1ea5fa4c389f68bffc684d409399de800"
         }
       ]
     },
@@ -1416,7 +1412,7 @@
           "sourceSignature": "func[E error](err error) (E, bool)|params=err|results=,",
           "sourceLocation": "errors/wrap.go:167:6",
           "implementationOwner": "src/errors.ts",
-          "targetFingerprint": "7e36a00708f082545b04905bfeee71e6861d901c9a5e7d85d13568017a9d7cd1"
+          "targetFingerprint": "5647ed370c1b33adbd3e8d2225154b61a74061a13853d655c13b3fadd2e5454e"
         },
         {
           "identity": "errors|kind=4|receiver=|name=Is",
@@ -2682,8 +2678,8 @@
           ],
           "sourceSignature": "func[M ~map[K]V, K comparable, V any](m M) M|params=m|results=",
           "sourceLocation": "maps/maps.go:50:6",
-          "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "d396c66a0b4dc9c59a6191e552f4f704c9ac6d45cfd31b5c5fcb2bea18604acf"
+          "implementationOwner": "src/maps.ts",
+          "targetFingerprint": "34975a7bcfb53df7efbb00b7ea4f2459071461efe5d0bf6c676e4d34eaea5e44"
         },
         {
           "identity": "maps|kind=4|receiver=|name=Copy",
@@ -2787,8 +2783,8 @@
           ],
           "sourceSignature": "func[M1 ~map[K]V, M2 ~map[K]V, K comparable, V any](dst M1, src M2)|params=dst,src|results=",
           "sourceLocation": "maps/maps.go:62:6",
-          "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "7aeae590e7de53adb3322e6c927927169704df862d2bf6974546d92fc1364aaa"
+          "implementationOwner": "src/maps.ts",
+          "targetFingerprint": "69ef9a19a99598235ba19094d59fa23a1086e9422289a9c6264f4600c20c84d0"
         },
         {
           "identity": "maps|kind=4|receiver=|name=Equal",
@@ -2880,8 +2876,8 @@
           ],
           "sourceSignature": "func[M1, M2 ~map[K]V, K, V comparable](m1 M1, m2 M2) bool|params=m1,m2|results=",
           "sourceLocation": "maps/maps.go:17:6",
-          "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "2d92f1894f3f1d8a132e42ef32fa3771edbc06d19ec52a2628ca8e3e8120f9c2"
+          "implementationOwner": "src/maps.ts",
+          "targetFingerprint": "6197fbb6c7517e55779f8b4703abf5f89fb1142efbff94383205dbc60913577e"
         },
         {
           "identity": "maps|kind=4|receiver=|name=EqualFunc",
@@ -2989,8 +2985,8 @@
           ],
           "sourceSignature": "func[M1 ~map[K]V1, M2 ~map[K]V2, K comparable, V1, V2 any](m1 M1, m2 M2, eq func(V1, V2) bool) bool|params=m1,m2,eq|results=",
           "sourceLocation": "maps/maps.go:31:6",
-          "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "84f3f73de6f7966cdc5698951189954f467b2afe1d73887dbb10ee20f3955d7b"
+          "implementationOwner": "src/maps.ts",
+          "targetFingerprint": "5efb22ff41081e495c677d89a4bd01d8169803e7bba8e402ca94681bec7c11b5"
         },
         {
           "identity": "maps|kind=4|receiver=|name=Keys",
@@ -3053,8 +3049,8 @@
           ],
           "sourceSignature": "func[Map ~map[K]V, K comparable, V any](m Map) iter.Seq[K]|params=m|results=",
           "sourceLocation": "maps/iter.go:25:6",
-          "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "2ee9f87b2d3686eea92b728202f038232446136d06fe89749b7104e925e1b11b"
+          "implementationOwner": "src/maps.ts",
+          "targetFingerprint": "92b2dc7aee83ef8e8768f186c0ad7699ac7b0f895bf61fd2487e5d1254e5c259"
         },
         {
           "identity": "maps|kind=4|receiver=|name=Values",
@@ -3117,8 +3113,8 @@
           ],
           "sourceSignature": "func[Map ~map[K]V, K comparable, V any](m Map) iter.Seq[V]|params=m|results=",
           "sourceLocation": "maps/iter.go:38:6",
-          "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "8038936155d1225b030ec7280bad9d75c82796c6271b2dbb43db350f58b6bd1d"
+          "implementationOwner": "src/maps.ts",
+          "targetFingerprint": "9d67df1b22016e98fade7290e5a94a90a35f3348dc24e8e834e2178813a2fbdb"
         }
       ]
     },
@@ -6494,7 +6490,7 @@
           "sourceSignature": "defined=runtime/pprof.Profile|underlying=struct{name string; mu sync.Mutex; m map[any][]uintptr; count func() int; write func(io.Writer, int) error}",
           "sourceLocation": "runtime/pprof/pprof.go:174:6",
           "implementationOwner": "src/runtime/pprof.ts",
-          "targetFingerprint": "33426a39e79fe858b366fedb6ad9b67064217d40caad932e5c3a45fdbb051783"
+          "targetFingerprint": "5798232ac8ecce3608001c77ce23e1bb39e1e5ec09f0549b724d96c8bfe0edbe"
         },
         {
           "identity": "runtime/pprof|kind=4|receiver=*runtime/pprof.Profile|name=WriteTo",
@@ -6562,10 +6558,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -6663,8 +6655,8 @@
           ],
           "sourceSignature": "func[Slice ~[]E, E any](s Slice, seq iter.Seq[E]) Slice|params=s,seq|results=",
           "sourceLocation": "slices/iter.go:50:6",
-          "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "f6079a0fda38113a4dd7707c9f63d6b738f7fa134f13a52e815949b70dd490d2"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "bc9645a2a8384181c7dd89e7cf5e5797f812c06d40fee8009dcf568dabc00aeb"
         },
         {
           "identity": "slices|kind=4|receiver=|name=BinarySearch",
@@ -6680,10 +6672,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -6774,8 +6762,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E cmp.Ordered](x S, target E) (int, bool)|params=x,target|results=,",
           "sourceLocation": "slices/sort.go:126:6",
-          "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "4de43d820b380d56fc8ebdc38694b757491661eefe09edff69976c750185178b"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "425a73d1cf2f6b1fa011b06d11981650897c8bd8c0e209719778f5a4ce1e8789"
         },
         {
           "identity": "slices|kind=4|receiver=|name=BinarySearchFunc",
@@ -6791,10 +6779,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             },
             {
               "typeParameter": 2,
@@ -6853,8 +6837,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E, T any](x S, target T, cmp func(E, T) int) (int, bool)|params=x,target,cmp|results=,",
           "sourceLocation": "slices/sort.go:152:6",
-          "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "1d5d7c0d6d803cd22a189f6124bb7f294e5ddddd6038cdea3445ebfaf57ba5e6"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "7cd9acf6bec116841fad25bba92683b0c14ab6ad6214db4a8c8bce50877317ff"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Clip",
@@ -6864,14 +6848,18 @@
           "export": "Clip",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
-              "facet": "container-storage"
+              "facet": "logical"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S) S|params=s|results=",
           "sourceLocation": "slices/slices.go:433:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "152a0db99cbae5c7ae2d44cdf44d322278dff4a7b366531723cac94c39f72d26"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "ca86f32bad3e04be04eb5d184c02cc539a5f51fd9205748333197afc98cea040"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Clone",
@@ -6881,14 +6869,18 @@
           "export": "Clone",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
-              "facet": "container-storage"
+              "facet": "logical"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S) S|params=s|results=",
           "sourceLocation": "slices/slices.go:353:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "72ab5fc0d8826cf3062728f663099e68d14960047069a3a600992ca3a3ceb4a1"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "6f780a431f2e92bb0a1a9e198ebf94c02a09222bbc5f2dc568ddbfb85cf5ef08"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Collect",
@@ -6900,10 +6892,6 @@
             {
               "typeParameter": 0,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 0,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -6940,8 +6928,8 @@
           ],
           "sourceSignature": "func[E any](seq iter.Seq[E]) []E|params=seq|results=",
           "sourceLocation": "slices/iter.go:59:6",
-          "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "a13683852f730cafc68ee390f3846d30ea11b903cb39214cfd556799271852b5"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "0ebb7636a3bcf9f909039d563f6c01b3628f9fee69287ca7f7a88838c3e44573"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Compact",
@@ -6951,14 +6939,18 @@
           "export": "Compact",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
             }
           ],
           "sourceSignature": "func[S ~[]E, E comparable](s S) S|params=s|results=",
           "sourceLocation": "slices/slices.go:369:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "21b08de386113f87bd9ecef1c2492df741304f54375133c898867fd6d25af7fd"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "7d70dcd9de86c1f8e17c90337ee01701729ad998743cadf725f6deed17136178"
         },
         {
           "identity": "slices|kind=4|receiver=|name=CompactFunc",
@@ -6968,14 +6960,18 @@
           "export": "CompactFunc",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, eq func(E, E) bool) S|params=s,eq|results=",
           "sourceLocation": "slices/slices.go:394:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "f2e4d84f20fbd73407c55c962e1ea5639b1d156298ccf38bd26208e79a24a0b6"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "6f4934f8a5c583fb2240eb25e65552864073edd8ef13837df3ae93cbac28162a"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Compare",
@@ -6991,10 +6987,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -7085,8 +7077,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E cmp.Ordered](s1 S, s2 S) int|params=s1,s2|results=",
           "sourceLocation": "slices/slices.go:57:6",
-          "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "184fe3404118eb26e32e6c7e54dc1ccbab084b95684b92741f4679528de5fd3d"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "2e6c8f78f928493f9706c265213c529add753785c713a0d88960188a1b77b64e"
         },
         {
           "identity": "slices|kind=4|receiver=|name=CompareFunc",
@@ -7108,16 +7100,8 @@
               "facet": "logical"
             },
             {
-              "typeParameter": 2,
-              "facet": "container-storage"
-            },
-            {
               "typeParameter": 3,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 3,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -7220,8 +7204,8 @@
           ],
           "sourceSignature": "func[S1 ~[]E1, S2 ~[]E2, E1, E2 any](s1 S1, s2 S2, cmp func(E1, E2) int) int|params=s1,s2,cmp|results=",
           "sourceLocation": "slices/slices.go:78:6",
-          "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "6eac2148fd37492f7ff0b7549833ce992c054542d0c25a836368aaab5f89adc7"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "c8026a1a03b8f2e8b654546546e015ea6a64bc4b7a97a9f2c6f4fe48b30b195a"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Concat",
@@ -7231,14 +7215,18 @@
           "export": "Concat",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
-              "facet": "container-storage"
+              "facet": "logical"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](slices ...S) S|params=slices|results=",
           "sourceLocation": "slices/slices.go:489:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "b5230747f8481534f3d89baf9e947ab28b417ae35cf0782161262cfdb3f8d13f"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "5832468355381526df2f5ef40dc28107a3715135655f373c256830d870a485c3"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Contains",
@@ -7254,10 +7242,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -7330,8 +7314,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E comparable](s S, v E) bool|params=s,v|results=",
           "sourceLocation": "slices/slices.go:117:6",
-          "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "77936720fc2d49a7a8ad6942a1f66ad53d31649b8553dbf1454f5beb8be59c00"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "43c7c41ced1ed12a7fbd44fc0988000846ce1bd444cad09247dbd78b3bf4b524"
         },
         {
           "identity": "slices|kind=4|receiver=|name=ContainsFunc",
@@ -7347,10 +7331,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -7405,8 +7385,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, f func(E) bool) bool|params=s,f|results=",
           "sourceLocation": "slices/slices.go:123:6",
-          "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "de02139f1c6a6da3333ca72694dc06e964e676bda4ee839093fd00f184ccb73a"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "1eae5aa1f30a8309327fabaecd58376ec18890d86aa411ca35841a27d74e6cf2"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Delete",
@@ -7416,14 +7396,18 @@
           "export": "Delete",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
-              "facet": "container-storage"
+              "facet": "logical"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, i int, j int) S|params=s,i,j|results=",
           "sourceLocation": "slices/slices.go:222:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "b2442c02facca096b9b298602b14920de976b4ce1be4b16384bdab9943e7ff76"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "7fa56a2195977a22900f18477eb6f49ad4304adb0c57899aa61708666db1e5d9"
         },
         {
           "identity": "slices|kind=4|receiver=|name=DeleteFunc",
@@ -7439,10 +7423,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -7540,8 +7520,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, del func(E) bool) S|params=s,del|results=",
           "sourceLocation": "slices/slices.go:239:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "89aa34aac3e8d410fff1b5db7f19ef23c199897d2afe8cd235a950b5b31b36ed"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "7d895850c212577e084b3edd6f3c531927c5999ab3f2737a4e93e4d4cfba2de2"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Equal",
@@ -7557,10 +7537,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -7633,8 +7609,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E comparable](s1 S, s2 S) bool|params=s1,s2|results=",
           "sourceLocation": "slices/slices.go:20:6",
-          "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "cf198368ac60006ecca1b1cdd9f7f3b82837b502c0aca0262d429a2d7b48a804"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "2e701fe9eec034d50555fbe440a5bd1510af0c92d76e6d3dfb6edf108ddcf57a"
         },
         {
           "identity": "slices|kind=4|receiver=|name=EqualFunc",
@@ -7656,16 +7632,8 @@
               "facet": "logical"
             },
             {
-              "typeParameter": 2,
-              "facet": "container-storage"
-            },
-            {
               "typeParameter": 3,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 3,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -7768,8 +7736,8 @@
           ],
           "sourceSignature": "func[S1 ~[]E1, S2 ~[]E2, E1, E2 any](s1 S1, s2 S2, eq func(E1, E2) bool) bool|params=s1,s2,eq|results=",
           "sourceLocation": "slices/slices.go:37:6",
-          "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "404bf4f54429e5d7f9c373a3c4491741a35723e9d62b851cf3f9e7c407554977"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "8a87f14b0796fc081387c846b9997d48583772c9f1cf3b816214600fde60b887"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Grow",
@@ -7785,10 +7753,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -7886,8 +7850,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, n int) S|params=s,n|results=",
           "sourceLocation": "slices/slices.go:420:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "259be3723d28e88499994513856c2c9ff9d51b306611ab80605b41838cee4817"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "7bafa8146096fb7ae6962d53074befcd368b60c6b88fc0a3fa9c2a5431d3dac0"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Index",
@@ -7903,10 +7867,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -7979,8 +7939,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E comparable](s S, v E) int|params=s,v|results=",
           "sourceLocation": "slices/slices.go:96:6",
-          "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "f3c3874dae1a6ce461337bebe30849fd53a2b51eb09662f0e400519805995efa"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "f5d1653514560fc76a1e5e8a38c859afd5a79630eea0adb78a0e598f5a19bda9"
         },
         {
           "identity": "slices|kind=4|receiver=|name=IndexFunc",
@@ -7996,10 +7956,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -8054,8 +8010,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, f func(E) bool) int|params=s,f|results=",
           "sourceLocation": "slices/slices.go:107:6",
-          "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "1dd5943c21b47e1187f506df75411dc14f3fe9303be2dcb99a6e0c3df38c5b06"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "3a2607365d27b48ea1b9addbfe2ad23ce2a70040495b3805a9f56fd946f4ddc5"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Insert",
@@ -8065,14 +8021,18 @@
           "export": "Insert",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
-              "facet": "container-storage"
+              "facet": "logical"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, i int, v ...E) S|params=s,i,v|results=",
           "sourceLocation": "slices/slices.go:135:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "35166dfd49958a80adf80f67f8e494e0ffbca6bced22ab808a12a4933a3b3a89"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "ad326820677834df80fad29fc45c1ab4f1b718d2afbe0426a79e21e480bdf305"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Repeat",
@@ -8082,14 +8042,18 @@
           "export": "Repeat",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](x S, count int) S|params=x,count|results=",
           "sourceLocation": "slices/slices.go:512:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "d4d7430d2f96d0e26c1017c2bb8c2a0e12f5d7b33c17b57d09c56652564ca428"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "3a0770c70affd08abc51735b510070cabcd2eb896c7feb52f7cdc93573b57bc7"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Replace",
@@ -8099,14 +8063,18 @@
           "export": "Replace",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, i int, j int, v ...E) S|params=s,i,j,v|results=",
           "sourceLocation": "slices/slices.go:260:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "a744a2426965d7a6a7f15ff8f82834cb49328ded5d1ba6bb5794bd046654e990"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "47a8f4589e44c4954d4d545777e9669866e6374d94c5b5bf0f8be68ab0643b5a"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Reverse",
@@ -8116,14 +8084,18 @@
           "export": "Reverse",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
-              "facet": "container-storage"
+              "facet": "logical"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S)|params=s|results=",
           "sourceLocation": "slices/slices.go:481:6",
-          "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "9579a76ec81fcab0a1edfb5be929d2799e65eb0badb8fd2e199e1977911432db"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "6ee52163d7219bad1837ac7b0199bc4a18d70e22c41153366bc159093c820b9d"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Sort",
@@ -8139,10 +8111,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -8248,8 +8216,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E cmp.Ordered](x S)|params=x|results=",
           "sourceLocation": "slices/sort.go:16:6",
-          "implementationOwner": "src/internal/portable/slices/sort.ts",
-          "targetFingerprint": "db4107b5cc71acfe3d46f557395e723bbfd54396990bdeecb8158bb74c2a0c97"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "910d654451ff514d2ed16c99db70a3edddbf832b5b64a27da98effce4873e18b"
         },
         {
           "identity": "slices|kind=4|receiver=|name=SortFunc",
@@ -8265,10 +8233,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -8338,8 +8302,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E any](x S, cmp func(a E, b E) int)|params=x,cmp|results=",
           "sourceLocation": "slices/sort.go:30:6",
-          "implementationOwner": "src/internal/portable/slices/sort.ts",
-          "targetFingerprint": "4d396cf5d6f18d8d4543625b71ccf3a5f72497014737bd79be503ca387ac214a"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "f26db85f0e4fd1928579d6a62873be516125c25027b3c15977257e31a2837126"
         },
         {
           "identity": "slices|kind=4|receiver=|name=SortStableFunc",
@@ -8355,10 +8319,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -8428,8 +8388,8 @@
           ],
           "sourceSignature": "func[S ~[]E, E any](x S, cmp func(a E, b E) int)|params=x,cmp|results=",
           "sourceLocation": "slices/sort.go:37:6",
-          "implementationOwner": "src/internal/portable/slices/sort.ts",
-          "targetFingerprint": "aa7f96a4a47cc333fb95d413400801c5cb635d6274c6fdba8a302832d3f7ec5e"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "3f01faa2facaaeda8df548b98ec6497d67577b042656679e8a1bd527bc0aab37"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Sorted",
@@ -8441,10 +8401,6 @@
             {
               "typeParameter": 0,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 0,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -8532,8 +8488,8 @@
           ],
           "sourceSignature": "func[E cmp.Ordered](seq iter.Seq[E]) []E|params=seq|results=",
           "sourceLocation": "slices/iter.go:66:6",
-          "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "9b832ef62b937d921be27a9c1b8cb8601a6d029dbf9632954ceeb96d8fb619a1"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "ea3e601217fd4e3a3b159973333081b79df431f4d2f4a818f84dd8a77c14105b"
         },
         {
           "identity": "slices|kind=4|receiver=|name=SortedFunc",
@@ -8545,10 +8501,6 @@
             {
               "typeParameter": 0,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 0,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -8600,8 +8552,8 @@
           ],
           "sourceSignature": "func[E any](seq iter.Seq[E], cmp func(E, E) int) []E|params=seq,cmp|results=",
           "sourceLocation": "slices/iter.go:75:6",
-          "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "5db4eec15bed73548f318c92b26c84c623a855739cb2db56889f2d916fda9912"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "ecb4538002d4f10ef434f653c65b4b2681fcb3277f43092248f3328bd8451854"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Values",
@@ -8617,10 +8569,6 @@
             {
               "typeParameter": 1,
               "facet": "logical"
-            },
-            {
-              "typeParameter": 1,
-              "facet": "container-storage"
             }
           ],
           "genericOperations": [
@@ -8675,8 +8623,8 @@
           ],
           "sourceSignature": "func[Slice ~[]E, E any](s Slice) iter.Seq[E]|params=s|results=",
           "sourceLocation": "slices/iter.go:37:6",
-          "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "7ff9e6206cbc44373f01c92509ba21f92d68a4ee6d8984d7bd1cc815e337df48"
+          "implementationOwner": "src/slices.ts",
+          "targetFingerprint": "dc2f88bc05ff3a79a37802af8983f153e453302a56b51c89db70d8621ff1e063"
         }
       ]
     },
@@ -11429,6 +11377,236 @@
   ],
   "facetModules": [
     {
+      "specifier": "@gotots/gostdlib/internal/facets/generic-cmp-kernel.js",
+      "sourcePath": "src/internal/facets/generic-cmp-kernel.ts",
+      "facets": [
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "cmp|kind=4|receiver=|name=Compare",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "CmpCompareKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/cmp/ordered.ts",
+          "targetFingerprint": "3a22960d76c5e7f46a5d112501e771339a9a5d489e4945937a46ff50c4576306"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "cmp|kind=4|receiver=|name=Or",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "CmpOrKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 0,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/cmp/or.ts",
+          "targetFingerprint": "2ac34dd65953a4160292e5ea144e3979094d5dbd8a0fccef0355c5fbd3a1b8bd"
+        }
+      ]
+    },
+    {
+      "specifier": "@gotots/gostdlib/internal/facets/generic-errors-kernel.js",
+      "sourcePath": "src/internal/facets/generic-errors-kernel.ts",
+      "facets": [
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "errors|kind=4|receiver=|name=AsType",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "ErrorsAsTypeKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/facets/generic-errors-kernel.ts",
+          "targetFingerprint": "4e8d3f091f4f34f2783446614b59b60c337640601868bf5fe220174dae2ec9a4"
+        }
+      ]
+    },
+    {
+      "specifier": "@gotots/gostdlib/internal/facets/generic-maps-kernel.js",
+      "sourcePath": "src/internal/facets/generic-maps-kernel.ts",
+      "facets": [
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "maps|kind=4|receiver=|name=Clone",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "MapsCloneKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/maps/operations.ts",
+          "targetFingerprint": "c76c25f2b2286ce2b3a55acb35a8de2c480bda3ed635e4f6a64b824516268b8b"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "maps|kind=4|receiver=|name=Copy",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "MapsCopyKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/maps/operations.ts",
+          "targetFingerprint": "ab714f9ac91f870fc8fb8e83f663cb7e95049057b2f2b50cef19832721e8d7f6"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "maps|kind=4|receiver=|name=Equal",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "MapsEqualKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/maps/operations.ts",
+          "targetFingerprint": "9b9e3296e169df43ef027e4dbaf3123ac00b76fc65f955fe42d778412ff81f84"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "maps|kind=4|receiver=|name=EqualFunc",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "MapsEqualFuncKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 4,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/maps/operations.ts",
+          "targetFingerprint": "5d85f83de1e8dc8d16f4387cc211540ce77386c79120c8e0b1695b10624cf7c0"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "maps|kind=4|receiver=|name=Keys",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "MapsKeysKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/maps/operations.ts",
+          "targetFingerprint": "c6d69a8aca5dbd912935e0f719cc48b6e74b975f92b77c4afe7f83d0ffe6e8c2"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "maps|kind=4|receiver=|name=Values",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "MapsValuesKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/maps/operations.ts",
+          "targetFingerprint": "c93cc0b1aa0b70cacfefe4960efb316b1b5c393b146505de550da5bb09b4274b"
+        }
+      ]
+    },
+    {
       "specifier": "@gotots/gostdlib/internal/facets/generic-maps.js",
       "sourcePath": "src/internal/facets/generic-maps.ts",
       "facets": [
@@ -11467,6 +11645,668 @@
           "effect": "sync",
           "implementationOwner": "src/internal/facets/generic-maps.ts",
           "targetFingerprint": "aace139429d5fa6060cefb413c25fa4b813ceb7eaff469c50201a1d76394b571"
+        }
+      ]
+    },
+    {
+      "specifier": "@gotots/gostdlib/internal/facets/generic-slices-kernel.js",
+      "sourcePath": "src/internal/facets/generic-slices-kernel.ts",
+      "facets": [
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=AppendSeq",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesAppendSeqKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/sequence.ts",
+          "targetFingerprint": "f8f7ae57b10847a58d7ca061cbff6ae92932dbbc307b443ba517d670077378b6"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearch",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesBinarySearchKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "30173e6c908ae26bf5101236a2c1a89f50d6eaf239edce88e8f507e5edd5b275"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearchFunc",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesBinarySearchFuncKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "8962321c2a937b205181e9211045ad3bff5e840ddcc0657b5c1f7a417890a0de"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Clip",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesClipKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "02099230b72f132eed33770dbac7cfe576ea66dfe6fb7de17411045f1e8b5ffa"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Clone",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesCloneKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "3f9f2c1fc14fc6348bece97235df436cd4b291d7fc73babe53520e920f2dceee"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Collect",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesCollectKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 0,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/sequence.ts",
+          "targetFingerprint": "9e020d80273b6a381f4dc374325ea83e57733120ecd7efbf38376b8b36b0e53b"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Compact",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesCompactKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "cc0435ba8511a9fc51d26110affa200e1c2137ae76ef3411a3b23859afb9851b"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=CompactFunc",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesCompactFuncKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "46e558c78887d96a72672b74ce2ca822f3772242d06a1b9fb7dd75230bc13d18"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Compare",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesCompareKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "b4ebc94ef7ec0e506635868d07831baa485c57476a96a3f28174706a3e578402"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=CompareFunc",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesCompareFuncKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "container-storage"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "834825312352b96bbf85e7a7f7840db9b1f889d696306076f3b365311d4561d3"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Concat",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesConcatKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "8fe44ae2b5e4a7a8a4830bc5410302a6c3dc8ab3e1e5df9653c60ba8a0f184f6"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Contains",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesContainsKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "0d1f66cf634d0643960b6b0b9d42903e61a4ef545f3000103533395bd4cecf08"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=ContainsFunc",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesContainsFuncKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "51471a875b878f57363136e6945ff722c2e8ef630c7cd5e1ab2a577c09820d13"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Delete",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesDeleteKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "ced228dca1308af1e58332ec25b5ff0d075431eaa964949c2044e4b2fe8d851a"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=DeleteFunc",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesDeleteFuncKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "d1cf42ce760ad01a3490f98525820313ab642ed617fc8dca35ac28841cc7b697"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Equal",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesEqualKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "e5b3bcab6ea93ec050d653411af696fab4815edb227f8c12158d46dfc56a1fab"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=EqualFunc",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesEqualFuncKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "container-storage"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "ba444113e490f2e3f387b9b7dc7785950e1bc773ba3e257f37bd6de7c111f6bb"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Grow",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesGrowKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "c6cbf5d50bcd78c2aaa768c003e1c2bfb5515e3ed5230e8bf65000c0dd9364d8"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Index",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesIndexKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "4483955fbaff73eb8ab1247ab4f14fac7e7b5d47833df2bcef301d34ff43c246"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=IndexFunc",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesIndexFuncKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "3b400bda68e7393e36c3a42df3fb4d9d953f8ac2049551a700d4e46ac226a6f9"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Insert",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesInsertKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "af2a6f990a234fb08602f0a9a783a856a05d1ba271b36bf583102dc722f9372d"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Repeat",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesRepeatKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "22b49add6766726106faf52b278927d6b9c386199845caca9b253804c1c8512b"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Replace",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesReplaceKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "6d0766b4cdd9a02d3c4c682660e80900a46913c24d68c71e207f3ecab9b16613"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Reverse",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesReverseKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "ee244be77869b65f00f128c22a8cd7c1fc0f10851cb1c0ec5fb57a40cc9554dd"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Sort",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesSortKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/sort.ts",
+          "targetFingerprint": "e9bf3eb357893c7ca99adb0b326265525b3e0ff2964102c5f3e05bd52e360e3d"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=SortFunc",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesSortFuncKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/sort.ts",
+          "targetFingerprint": "56e4484e04dfe976440429672302f26625e99a39831a3a962c733c1ee71f1bf3"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=SortStableFunc",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesSortStableFuncKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/sort.ts",
+          "targetFingerprint": "672d68dd29268761c8a592f14b4c62fcba8580d030ba4debd3bb1ee9ceb28e12"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Sorted",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesSortedKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 0,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/sequence.ts",
+          "targetFingerprint": "1aeaea1812e2724700d5838ba997429d8efa156ff50f2ffec1ae13af39e8c934"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=SortedFunc",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesSortedFuncKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 0,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/sequence.ts",
+          "targetFingerprint": "b39e45c7e09a848613cce7af7ef9ee54cdcb23c7da9af712e213e3c9d46ad144"
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=Values",
+          "capabilities": [
+            "kernel"
+          ],
+          "export": "SlicesValuesKernel",
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/sequence.ts",
+          "targetFingerprint": "a5e4d44cd116ac7ff86fc41adbe49031e74f298e9a18fda3cc97ef6206012dfd"
         }
       ]
     },
@@ -20905,6 +21745,240 @@
       "callableProfiles": [
         {
           "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
+          "profileKey": "ecca0727f40d067f7068611cf1e798810b888ad7b32a710aca4cf796a7a888a8",
+          "export": "IoFsReadDirCanonicalAsyncError",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0,
+            1
+          ],
+          "guardInterfaces": [
+            "io/fs|kind=2|receiver=|name=ReadDirFS",
+            "io/fs|kind=2|receiver=|name=ReadDirFile"
+          ],
+          "fromProviderInterfaces": [
+            "go:universe|error"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "CanonicalErrorAsync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "async",
+                    "sourceSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "d1eab240904398eabf53074e3472c0cf02975e8dcdd6daa0be9d1915c4f2af78"
+                  }
+                ]
+              },
+              "targetFingerprint": "f62f77f6648605d6d0204189afb6be05987d22a6f1b8985ceff0e740ee9c5cab"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+              "export": "CanonicalDirEntryAsyncError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Info",
+                    "kind": "callable",
+                    "member": "Info",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "sourceLocation": "io/fs/fs.go:122:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "b0016db42b21c0d06aa72f2486fb14f4a882028cb080f586b8c1d203ea39ab87"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=IsDir",
+                    "kind": "callable",
+                    "member": "IsDir",
+                    "effect": "sync",
+                    "sourceSignature": "func() bool|params=|results=",
+                    "sourceLocation": "io/fs/fs.go:110:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "f3668180cd37f00fd0bdff9695731431f73adeffac6f8d68c4b63ae069541b52"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Name",
+                    "kind": "callable",
+                    "member": "Name",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "sourceLocation": "io/fs/fs.go:107:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "7347692d72958cebe9d9ca0572f384bbf425cf3f26a8ae0d53b47cf855518f58"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Type",
+                    "kind": "callable",
+                    "member": "Type",
+                    "effect": "sync",
+                    "sourceSignature": "func() io/fs.FileMode|params=|results=",
+                    "sourceLocation": "io/fs/fs.go:114:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "d733999980db1e34381632b70c46a4b0b0036ec5e8f3af8dbff0ca27099ce996"
+                  }
+                ]
+              },
+              "targetFingerprint": "a86c731b903724d38517836870dffcd48b491e0f21b66d3fd504e16edb43c3ca"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+              "export": "CanonicalFSAsyncError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "1bdb3c7bd614c7984c4060cb1f565d00ce9f836ad43f77dab266f16d2705d224"
+                  }
+                ]
+              },
+              "targetFingerprint": "1dd573c66707107fc4032e5f6661c5dc8edbc8c5f3fa277072c4f9f7dc56b0ae"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+              "export": "CanonicalFileAsyncError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Close",
+                    "kind": "callable",
+                    "member": "Close",
+                    "effect": "async",
+                    "sourceSignature": "func() error|params=|results=",
+                    "sourceLocation": "io/fs/fs.go:98:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "dc04659ab40166851a2cb04ec726c3b7c133a33e0190cdc0f1c37d65e929be2a"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) (int, error)|params=|results=,",
+                    "sourceLocation": "io/fs/fs.go:97:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "c11c63017b1873c102462cdd1c7cbbee049a458d99243832999533fe8f194562"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "sourceLocation": "io/fs/fs.go:96:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "6f85007a63094a1e51fc73e00c56cfeee7c1bb2d0859a89b33f298e88ebb8056"
+                  }
+                ]
+              },
+              "targetFingerprint": "420d2f2c2cec9eeba0675b83a3e9b638196f2542b81ac63b0ed76f2979658c8f"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+              "export": "CanonicalReadDirFSAsyncError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "1bdb3c7bd614c7984c4060cb1f565d00ce9f836ad43f77dab266f16d2705d224"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.ReadDirFS|name=ReadDir",
+                    "kind": "callable",
+                    "member": "ReadDir",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) ([]io/fs.DirEntry, error)|params=name|results=,",
+                    "sourceLocation": "io/fs/readdir.go:20:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "daf859e2152b719f6f5b653d4c8506243530d27892369c81c7634f0b6a7d6f9b"
+                  }
+                ]
+              },
+              "targetFingerprint": "d4ba6b5ae4f4c7470f9e75bc36915e6ccda273619c68cda80326ab4634b76faa"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+              "export": "CanonicalReadDirFileAsyncError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Close",
+                    "kind": "callable",
+                    "member": "Close",
+                    "effect": "async",
+                    "sourceSignature": "func() error|params=|results=",
+                    "sourceLocation": "io/fs/fs.go:98:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "dc04659ab40166851a2cb04ec726c3b7c133a33e0190cdc0f1c37d65e929be2a"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) (int, error)|params=|results=,",
+                    "sourceLocation": "io/fs/fs.go:97:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "c11c63017b1873c102462cdd1c7cbbee049a458d99243832999533fe8f194562"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "sourceLocation": "io/fs/fs.go:96:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "6f85007a63094a1e51fc73e00c56cfeee7c1bb2d0859a89b33f298e88ebb8056"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.ReadDirFile|name=ReadDir",
+                    "kind": "callable",
+                    "member": "ReadDir",
+                    "effect": "sync",
+                    "sourceSignature": "func(n int) ([]io/fs.DirEntry, error)|params=n|results=,",
+                    "sourceLocation": "io/fs/fs.go:147:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "b94f9b7bc8b81db127da03aace2bb000f3d627db936cb466dca1bfcc14cffc94"
+                  }
+                ]
+              },
+              "targetFingerprint": "2383e7180c5928eddcdb0b72bf858f341c3d015df51172e6b13eabf22eb5a3e4"
+            }
+          ],
+          "effect": "async",
+          "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+          "targetFingerprint": "14cd911310b06190b7e3f72891494606b2addfa752c26c17b53dfdd1e2f08d16"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
           "profileKey": "f179edbb91f598ba8bdc9938bc688858ba524d23431543d6779a94cac4d6d7e7",
           "export": "IoFsReadDirCanonical",
           "canonicalParameters": [
@@ -21535,6 +22609,276 @@
           "effect": "async",
           "implementationOwner": "src/internal/facets/provider-io-fs.ts",
           "targetFingerprint": "f128c76dcc8713aa08e042924f075211cd89a9a2941fcb28a57f72e4107461a8"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=4|receiver=|name=WalkDir",
+          "profileKey": "6fc735ec0bdc0c40e363230bc7c968d5d9b0954b9f844f80be1ee7a9905b75be",
+          "export": "IoFsWalkDirCanonicalAsyncError",
+          "canonicalParameters": [
+            0,
+            2
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "canonicalValues": [
+            "io/fs|kind=3|receiver=|name=SkipAll",
+            "io/fs|kind=3|receiver=|name=SkipDir"
+          ],
+          "guardInterfaces": [
+            "io/fs|kind=2|receiver=|name=ReadDirFS",
+            "io/fs|kind=2|receiver=|name=ReadDirFile",
+            "io/fs|kind=2|receiver=|name=StatFS"
+          ],
+          "fromProviderInterfaces": [
+            "go:universe|error",
+            "io/fs|kind=2|receiver=|name=DirEntry"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "CanonicalErrorAsync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "async",
+                    "sourceSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "d1eab240904398eabf53074e3472c0cf02975e8dcdd6daa0be9d1915c4f2af78"
+                  }
+                ]
+              },
+              "targetFingerprint": "f62f77f6648605d6d0204189afb6be05987d22a6f1b8985ceff0e740ee9c5cab"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+              "export": "CanonicalDirEntryAsyncError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Info",
+                    "kind": "callable",
+                    "member": "Info",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "sourceLocation": "io/fs/fs.go:122:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "b0016db42b21c0d06aa72f2486fb14f4a882028cb080f586b8c1d203ea39ab87"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=IsDir",
+                    "kind": "callable",
+                    "member": "IsDir",
+                    "effect": "sync",
+                    "sourceSignature": "func() bool|params=|results=",
+                    "sourceLocation": "io/fs/fs.go:110:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "f3668180cd37f00fd0bdff9695731431f73adeffac6f8d68c4b63ae069541b52"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Name",
+                    "kind": "callable",
+                    "member": "Name",
+                    "effect": "sync",
+                    "sourceSignature": "func() string|params=|results=",
+                    "sourceLocation": "io/fs/fs.go:107:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "7347692d72958cebe9d9ca0572f384bbf425cf3f26a8ae0d53b47cf855518f58"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.DirEntry|name=Type",
+                    "kind": "callable",
+                    "member": "Type",
+                    "effect": "sync",
+                    "sourceSignature": "func() io/fs.FileMode|params=|results=",
+                    "sourceLocation": "io/fs/fs.go:114:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "d733999980db1e34381632b70c46a4b0b0036ec5e8f3af8dbff0ca27099ce996"
+                  }
+                ]
+              },
+              "targetFingerprint": "a86c731b903724d38517836870dffcd48b491e0f21b66d3fd504e16edb43c3ca"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+              "export": "CanonicalFSAsyncError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "1bdb3c7bd614c7984c4060cb1f565d00ce9f836ad43f77dab266f16d2705d224"
+                  }
+                ]
+              },
+              "targetFingerprint": "1dd573c66707107fc4032e5f6661c5dc8edbc8c5f3fa277072c4f9f7dc56b0ae"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+              "export": "CanonicalFileAsyncError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Close",
+                    "kind": "callable",
+                    "member": "Close",
+                    "effect": "async",
+                    "sourceSignature": "func() error|params=|results=",
+                    "sourceLocation": "io/fs/fs.go:98:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "dc04659ab40166851a2cb04ec726c3b7c133a33e0190cdc0f1c37d65e929be2a"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) (int, error)|params=|results=,",
+                    "sourceLocation": "io/fs/fs.go:97:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "c11c63017b1873c102462cdd1c7cbbee049a458d99243832999533fe8f194562"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "sourceLocation": "io/fs/fs.go:96:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "6f85007a63094a1e51fc73e00c56cfeee7c1bb2d0859a89b33f298e88ebb8056"
+                  }
+                ]
+              },
+              "targetFingerprint": "420d2f2c2cec9eeba0675b83a3e9b638196f2542b81ac63b0ed76f2979658c8f"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+              "export": "CanonicalReadDirFSAsyncError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "1bdb3c7bd614c7984c4060cb1f565d00ce9f836ad43f77dab266f16d2705d224"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.ReadDirFS|name=ReadDir",
+                    "kind": "callable",
+                    "member": "ReadDir",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) ([]io/fs.DirEntry, error)|params=name|results=,",
+                    "sourceLocation": "io/fs/readdir.go:20:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "daf859e2152b719f6f5b653d4c8506243530d27892369c81c7634f0b6a7d6f9b"
+                  }
+                ]
+              },
+              "targetFingerprint": "d4ba6b5ae4f4c7470f9e75bc36915e6ccda273619c68cda80326ab4634b76faa"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+              "export": "CanonicalReadDirFileAsyncError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Close",
+                    "kind": "callable",
+                    "member": "Close",
+                    "effect": "async",
+                    "sourceSignature": "func() error|params=|results=",
+                    "sourceLocation": "io/fs/fs.go:98:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "dc04659ab40166851a2cb04ec726c3b7c133a33e0190cdc0f1c37d65e929be2a"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func([]byte) (int, error)|params=|results=,",
+                    "sourceLocation": "io/fs/fs.go:97:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "c11c63017b1873c102462cdd1c7cbbee049a458d99243832999533fe8f194562"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.File|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func() (io/fs.FileInfo, error)|params=|results=,",
+                    "sourceLocation": "io/fs/fs.go:96:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "6f85007a63094a1e51fc73e00c56cfeee7c1bb2d0859a89b33f298e88ebb8056"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.ReadDirFile|name=ReadDir",
+                    "kind": "callable",
+                    "member": "ReadDir",
+                    "effect": "sync",
+                    "sourceSignature": "func(n int) ([]io/fs.DirEntry, error)|params=n|results=,",
+                    "sourceLocation": "io/fs/fs.go:147:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "b94f9b7bc8b81db127da03aace2bb000f3d627db936cb466dca1bfcc14cffc94"
+                  }
+                ]
+              },
+              "targetFingerprint": "2383e7180c5928eddcdb0b72bf858f341c3d015df51172e6b13eabf22eb5a3e4"
+            },
+            {
+              "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+              "export": "CanonicalStatFSAsyncError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.FS|name=Open",
+                    "kind": "callable",
+                    "member": "Open",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.File, error)|params=name|results=,",
+                    "sourceLocation": "io/fs/fs.go:51:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "1bdb3c7bd614c7984c4060cb1f565d00ce9f836ad43f77dab266f16d2705d224"
+                  },
+                  {
+                    "sourceIdentity": "io/fs|kind=4|receiver=io/fs.StatFS|name=Stat",
+                    "kind": "callable",
+                    "member": "Stat",
+                    "effect": "sync",
+                    "sourceSignature": "func(name string) (io/fs.FileInfo, error)|params=name|results=,",
+                    "sourceLocation": "io/fs/stat.go:13:2",
+                    "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+                    "targetFingerprint": "891b775660f1fcb466032456317d86989ad56b34ed0737ca114b4205605e263e"
+                  }
+                ]
+              },
+              "targetFingerprint": "2457013ccdc70a0792f8bad111b124f0d752d6fba56dc8abfaa541599a2fd006"
+            }
+          ],
+          "effect": "async",
+          "implementationOwner": "src/internal/facets/provider-io-fs.ts",
+          "targetFingerprint": "9eff556372363310430046c455bddf2929300e87a81304dacd119f5b4dc12299"
         },
         {
           "sourceIdentity": "io/fs|kind=4|receiver=|name=WalkDir",
@@ -23721,5 +25065,5 @@
       ]
     }
   ],
-  "manifestDigest": "38668d0c81cb40b53b7f6eac3dd8ddbf68c049dd000a24d30ddb65b14f1e4927"
+  "manifestDigest": "573f0fb7c2405908014871a25a717880fddc272fad7031a51c6ef2a5700b9454"
 }

@@ -70,7 +70,7 @@ func EmitNonNil(
 			children,
 			source,
 			named.Origin().Obj(),
-			named.TypeArgs(),
+			api.TypeArgumentsFromGo(named.TypeArgs()),
 		)
 		if err != nil {
 			return api.TypeEmission{}, err

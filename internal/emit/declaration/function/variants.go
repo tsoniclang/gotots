@@ -6,7 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
+	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -16,9 +16,10 @@ type callableVariant struct {
 }
 
 type callableVariantEmission struct {
-	statement tsgo.Statement
-	member    tsgo.ClassElement
-	requests  []api.RootRequest
+	statements []tsgo.Statement
+	member     tsgo.ClassElement
+	members    []tsgo.ClassElement
+	requests   []api.RootRequest
 }
 
 func emitCallableVariants(
@@ -29,6 +30,13 @@ func emitCallableVariants(
 	signature *types.Signature,
 	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
+	kernel, err := genericKernelRequired(
+		function,
+		requirements,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
 	variants, err := selectCallableVariants(
 		context,
 		function,
@@ -70,32 +78,33 @@ func emitCallableVariants(
 			requirements,
 			variant,
 			cooperative,
+			kernel,
 		)
 		if err != nil {
 			return api.DeclarationEmission{}, err
 		}
-		if target.statement != nil {
-			declarations = append(declarations, target.statement)
-		}
+		declarations = append(declarations, target.statements...)
 		if target.member != nil {
 			members = append(members, target.member)
 		}
+		members = append(members, target.members...)
 		requests = append(requests, target.requests...)
 	}
 	if signature.Recv() != nil {
-		if len(declarations) != 0 || len(members) != len(variants) {
+		if len(members) != len(variants) {
 			return api.DeclarationEmission{}, &api.InvariantError{
 				Role:   context.Role(),
 				Reason: "receiver method lost its class-member form",
 			}
 		}
-		return api.ClassMemberContributionEmission(
+		return api.ClassMemberAndSupportContributionEmission(
 			api.MethodReceiverTypeName(function),
 			members,
+			declarations,
 			api.CombineRequests(requests),
 		)
 	}
-	if len(members) != 0 || len(declarations) != len(variants) {
+	if len(members) != 0 || len(declarations) < len(variants) {
 		return api.DeclarationEmission{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "free function acquired a class-member form",
@@ -105,6 +114,16 @@ func emitCallableVariants(
 		declarations,
 		api.CombineRequests(requests),
 	)
+}
+
+func genericKernelRequired(
+	function *types.Func,
+	requirements []api.DeclarationRequirement,
+) (bool, error) {
+	if function == nil || len(api.GenericDeclarationParameters(function)) == 0 {
+		return false, nil
+	}
+	return api.GenericKernelRequired(function, requirements)
 }
 
 func selectCallableVariants(
@@ -147,6 +166,7 @@ func emitCallableVariant(
 	requirements []api.DeclarationRequirement,
 	variant callableVariant,
 	cooperative bool,
+	kernel bool,
 ) (callableVariantEmission, error) {
 	var (
 		genericParameters genericdeclaration.Parameters
@@ -174,19 +194,30 @@ func emitCallableVariant(
 	}
 	context = genericParameters.Context()
 	name := ""
+	supportName := ""
 	if signature.Recv() == nil {
 		name, err = context.Names().Declare(function)
 	} else {
 		name, err = context.Names().InterfaceMethodName(function)
+		if err == nil {
+			supportName, err = context.Names().Declare(function)
+		}
 	}
 	if err != nil {
 		return callableVariantEmission{}, err
 	}
 	if variant.profile != nil {
 		name += variant.profile.Suffix()
+		supportName += variant.profile.Suffix()
+	}
+	if kernel {
+		name += api.GenericKernelSuffix
+		supportName += api.GenericKernelSuffix
 	}
 	valueReceiver := api.ValueReceiverTypeName(function) != nil
 	copySelected := false
+	deferredContext := context
+	deferredReceiverName := ""
 	if valueReceiver {
 		copySelected, err = valueReceiverCopySelected(
 			context,
@@ -206,6 +237,21 @@ func emitCallableVariant(
 		context, err = context.WithValueReceiver(
 			function,
 			context.Factory().ThisExpression(),
+			receiverName,
+			copySelected,
+		)
+		if err != nil {
+			return callableVariantEmission{}, err
+		}
+		deferredReceiverName, err = context.Names().Temporary(
+			api.TemporaryReceiverValue,
+		)
+		if err != nil {
+			return callableVariantEmission{}, err
+		}
+		deferredContext, err = deferredContext.WithValueReceiver(
+			function,
+			deferredContext.Factory().Identifier(deferredReceiverName),
 			receiverName,
 			copySelected,
 		)
@@ -254,6 +300,25 @@ func emitCallableVariant(
 	if err != nil {
 		return callableVariantEmission{}, err
 	}
+	var deferredBody api.BlockEmission
+	deferred := source.Body != nil &&
+		context.CallableControlFor(source).Recovery()
+	if deferred {
+		deferredBody, err = callable.EmitBody(
+			deferredContext.WithRecoveryAuthority(
+				callable.RecoveryAuthorityName,
+			),
+			children,
+			source,
+			source.Type,
+			source.Body,
+			signature,
+			api.RoleFunctionBody,
+		)
+		if err != nil {
+			return callableVariantEmission{}, err
+		}
+	}
 	if source.Body != nil && valueReceiver && copySelected {
 		body, err = prependValueReceiverCopy(
 			context,
@@ -265,12 +330,28 @@ func emitCallableVariant(
 		if err != nil {
 			return callableVariantEmission{}, err
 		}
+		if deferred {
+			deferredBody, err = prependValueReceiverCopy(
+				deferredContext,
+				children,
+				source,
+				signature,
+				deferredBody,
+			)
+			if err != nil {
+				return callableVariantEmission{}, err
+			}
+		}
 	}
 	var modifiers []tsgo.ModifierLike
 	if signature.Recv() == nil {
-		moduleExport, moduleErr := context.Names().ModuleExport(function)
-		if moduleErr != nil {
-			return callableVariantEmission{}, moduleErr
+		moduleExport := kernel
+		if !moduleExport {
+			var moduleErr error
+			moduleExport, moduleErr = context.Names().ModuleExport(function)
+			if moduleErr != nil {
+				return callableVariantEmission{}, moduleErr
+			}
 		}
 		if moduleExport {
 			modifiers = []tsgo.ModifierLike{
@@ -296,10 +377,11 @@ func emitCallableVariant(
 	requests := api.CombineRequests(
 		parameterRequests,
 		body.Requests(),
+		deferredBody.Requests(),
 	)
 	if signature.Recv() == nil {
-		return callableVariantEmission{
-			statement: context.Factory().FunctionDeclaration(
+		statements := []tsgo.Statement{
+			context.Factory().FunctionDeclaration(
 				modifiers,
 				nil,
 				context.Factory().Identifier(name),
@@ -308,10 +390,66 @@ func emitCallableVariant(
 				resultType,
 				body.Value(),
 			),
-			requests: requests,
+		}
+		if deferred {
+			recovery, recoveryRequests, recoveryErr :=
+				callable.RecoveryAuthorityParameter(context)
+			if recoveryErr != nil {
+				return callableVariantEmission{}, recoveryErr
+			}
+			deferredParameters := append(
+				[]tsgo.ParameterDeclaration{recovery},
+				parameters...,
+			)
+			deferredModifiers := append(
+				[]tsgo.ModifierLike{context.Factory().ExportKeyword()},
+				modifiersWithoutExport(modifiers)...,
+			)
+			statements = append(
+				statements,
+				context.Factory().FunctionDeclaration(
+					deferredModifiers,
+					nil,
+					context.Factory().Identifier(
+						name+api.DeferredEntrySuffix,
+					),
+					genericParameters.TypeNodes(),
+					deferredParameters,
+					resultType,
+					deferredBody.Value(),
+				),
+			)
+			requests = append(requests, recoveryRequests...)
+			if signature.TypeParams().Len() == 0 &&
+				!api.ContainsGenericTypeParameter(signature) {
+				registry, registryErr := deferredregistry.Reference(
+					context,
+					source,
+					signature,
+				)
+				if registryErr != nil {
+					return callableVariantEmission{}, registryErr
+				}
+				statements = append(
+					statements,
+					deferredRegistrationStatement(
+						context,
+						registry.Expression(context.Factory()),
+						context.Factory().Identifier(name),
+						context.Factory().Identifier(
+							name+api.DeferredEntrySuffix,
+						),
+					),
+				)
+				requests = append(requests, registry.Requests()...)
+			}
+		}
+		return callableVariantEmission{
+			statements: statements,
+			requests:   requests,
 		}, nil
 	}
-	return callableVariantEmission{
+	target := callableVariantEmission{
 		member: context.Factory().MethodDeclaration(
 			modifiers,
 			nil,
@@ -323,185 +461,60 @@ func emitCallableVariant(
 			body.Value(),
 		),
 		requests: requests,
-	}, nil
-}
-
-func emitVariantParameters(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.FuncDecl,
-	function *types.Func,
-	signature *types.Signature,
-	genericParameters genericdeclaration.Parameters,
-	targetSignature callable.SignatureEmission,
-	valueReceiver bool,
-) (
-	[]tsgo.ParameterDeclaration,
-	[]api.RootRequest,
-	error,
-) {
-	sourceParameters := targetSignature.Parameters()
-	var capabilityParameters []tsgo.ParameterDeclaration
-	var err error
-	if len(api.GenericDeclarationParameters(function)) != 0 {
-		capabilityParameters, err = genericabi.JoinCapabilities(
-			function,
-			genericParameters.Operations(),
-			genericParameters.Capabilities(),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
 	}
-	parameters := append(capabilityParameters, sourceParameters...)
-	requests := api.CombineRequests(
-		genericParameters.Requests(),
-		targetSignature.Requests(),
-	)
-	if signature.RecvTypeParams().Len() != 0 {
-		sourceBindings, bindErr := genericabi.SourceParameters(
-			function,
-			sourceParameters,
-		)
-		if bindErr != nil {
-			return nil, nil, bindErr
+	if deferred {
+		recovery, recoveryRequests, recoveryErr :=
+			callable.RecoveryAuthorityParameter(context)
+		if recoveryErr != nil {
+			return callableVariantEmission{}, recoveryErr
 		}
-		parameters, err = genericabi.JoinClassMethod(
-			function,
-			genericParameters.Operations(),
-			genericabi.Combine(
-				genericParameters.Capabilities(),
-				sourceBindings,
-			),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	if signature.Recv() != nil && !valueReceiver {
-		receiver, receiverRequests, err := emitReceiver(
-			context,
-			children,
-			source,
-			signature,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		parameters = append(
-			[]tsgo.ParameterDeclaration{receiver},
+		deferredParameters := append(
+			[]tsgo.ParameterDeclaration{recovery},
 			parameters...,
 		)
-		requests = append(receiverRequests, requests...)
-	}
-	if context.CallableControlFor(source).Recovery() {
-		recovery, recoveryRequests, err :=
-			callable.RecoveryAuthorityParameter(context)
-		if err != nil {
-			return nil, nil, err
-		}
-		parameters = append(parameters, recovery)
-		requests = append(requests, recoveryRequests...)
-	}
-	return parameters, requests, nil
-}
-
-func valueReceiverCopySelected(
-	context api.Context,
-	function *types.Func,
-	requirements []api.DeclarationRequirement,
-) (bool, error) {
-	selected := false
-	for _, requirement := range requirements {
-		if requirement.Kind() !=
-			api.DeclarationRequirementValueReceiverCopy {
-			continue
-		}
-		method, ok := requirement.ValueReceiverCopy()
-		if !ok || method != function || selected {
-			return false, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "function received an invalid value-receiver copy requirement",
+		if valueReceiver {
+			receiver, receiverRequests, receiverErr := emitReceiverNamed(
+				deferredContext,
+				children,
+				source,
+				signature,
+				deferredReceiverName,
+			)
+			if receiverErr != nil {
+				return callableVariantEmission{}, receiverErr
 			}
+			deferredParameters = append(
+				[]tsgo.ParameterDeclaration{recovery, receiver},
+				parameters...,
+			)
+			target.requests = append(
+				target.requests,
+				receiverRequests...,
+			)
 		}
-		selected = true
-	}
-	return selected, nil
-}
-
-func prependValueReceiverCopy(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.FuncDecl,
-	signature *types.Signature,
-	body api.BlockEmission,
-) (api.BlockEmission, error) {
-	receiver := signature.Recv()
-	if source.Recv == nil || len(source.Recv.List) != 1 {
-		return api.BlockEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "value-receiver copy prologue has no receiver syntax",
+		deferredModifiers := []tsgo.ModifierLike{
+			context.Factory().ExportKeyword(),
 		}
-	}
-	binding, ok := context.ValueReceiver(receiver)
-	if !ok || !binding.CopySelected() {
-		return api.BlockEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "value-receiver copy prologue has no selected receiver",
+		if cooperative {
+			deferredModifiers = append(
+				deferredModifiers,
+				context.Factory().AsyncKeyword(),
+			)
 		}
-	}
-	if _, addressable := context.AddressableStorage().Name(
-		context,
-		receiver,
-	); addressable {
-		return body, nil
-	}
-	copied, err := context.Values().Transfer(
-		context.WithRole(api.RoleReceiverValue),
-		source,
-		receiver.Type(),
-		receiver.Type(),
-		api.ValueTransferCopy,
-		api.DirectExpression(binding.OriginalValue()),
-	)
-	if err != nil {
-		return api.BlockEmission{}, err
-	}
-	receiverType, err := children.RepresentedType(
-		context.WithRole(api.RoleReceiverType),
-		source.Recv.List[0].Type,
-		receiver.Type(),
-	)
-	if err != nil {
-		return api.BlockEmission{}, err
-	}
-	statements := append([]tsgo.Statement(nil), copied.Before()...)
-	statements = append(
-		statements,
-		context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{
-					context.Factory().VariableDeclaration(
-						context.Factory().Identifier(
-							binding.CopyName(),
-						),
-						nil,
-						receiverType.Value(),
-						copied.Value(),
-					),
-				},
-				tsgo.NodeFlagsLet,
+		target.statements = []tsgo.Statement{
+			context.Factory().FunctionDeclaration(
+				deferredModifiers,
+				nil,
+				context.Factory().Identifier(
+					supportName+api.DeferredEntrySuffix,
+				),
+				genericParameters.DetachedTypeNodes(),
+				deferredParameters,
+				resultType,
+				deferredBody.Value(),
 			),
-		),
-	)
-	statements = append(statements, body.Value().Statements()...)
-	return api.DirectBlock(
-		context.Factory().Block(statements, true),
-		api.CombineRequests(
-			copied.Requests(),
-			receiverType.Requests(),
-			body.Requests(),
-		)...,
-	), nil
+		}
+		target.requests = append(target.requests, recoveryRequests...)
+	}
+	return target, nil
 }

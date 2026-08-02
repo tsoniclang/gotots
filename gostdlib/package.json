@@ -76,9 +76,25 @@
       "types": "./dist/src/internal/facets/generic-maps.d.ts",
       "default": "./dist/src/internal/facets/generic-maps.js"
     },
+    "./internal/facets/generic-cmp-kernel.js": {
+      "types": "./dist/src/internal/facets/generic-cmp-kernel.d.ts",
+      "default": "./dist/src/internal/facets/generic-cmp-kernel.js"
+    },
+    "./internal/facets/generic-errors-kernel.js": {
+      "types": "./dist/src/internal/facets/generic-errors-kernel.d.ts",
+      "default": "./dist/src/internal/facets/generic-errors-kernel.js"
+    },
+    "./internal/facets/generic-maps-kernel.js": {
+      "types": "./dist/src/internal/facets/generic-maps-kernel.d.ts",
+      "default": "./dist/src/internal/facets/generic-maps-kernel.js"
+    },
     "./internal/facets/generic-slices.js": {
       "types": "./dist/src/internal/facets/generic-slices.d.ts",
       "default": "./dist/src/internal/facets/generic-slices.js"
+    },
+    "./internal/facets/generic-slices-kernel.js": {
+      "types": "./dist/src/internal/facets/generic-slices-kernel.d.ts",
+      "default": "./dist/src/internal/facets/generic-slices-kernel.js"
     },
     "./internal/facets/generic-sync.js": {
       "types": "./dist/src/internal/facets/generic-sync.d.ts",

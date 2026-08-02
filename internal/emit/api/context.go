@@ -55,6 +55,7 @@ type Context struct {
 	callableEnclosing          ast.Node
 	currentCallable            ast.Node
 	currentControl             CallableControlDemand
+	recoveryAuthority          string
 	deferControl               DeferControl
 	returnControl              ReturnControl
 	gotoUses                   map[*types.Label][]token.Pos
@@ -66,9 +67,11 @@ type Context struct {
 	genericResolver            GenericCallableResolver
 	genericConsumer            GenericOperationConsumer
 	cooperativeResolver        CooperativeCallableResolver
+	recoveryResolver           RecoveryCallableResolver
 	callableFacet              CallableFacet
 	cooperative                bool
 	staticallySelectedCallable bool
+	deferredCallableSelection  bool
 	detachedInvocation         bool
 	environmentContract        bool
 	genericParameters          map[*types.TypeParam]string
@@ -164,6 +167,9 @@ func (c Context) WithLexicalTypeRequirements(
 				panic("non-lexical generated-artifact requirement reached lexical owner")
 			}
 			typeName, _, ok := requirement.NamedStructOperation()
+			if !ok {
+				typeName, _, _, ok = requirement.TypeRepresentation()
+			}
 			if !ok || typeName != anchor {
 				panic("lexical named-type requirement is inconsistent")
 			}
@@ -371,8 +377,8 @@ func (c Context) TypesPackage() *types.Package {
 	return c.typesPackage
 }
 
-func (c Context) TypesInfo() *types.Info {
-	return c.typesInfo
+func (c Context) TypesInfo() TypeInfoView {
+	return newTypeInfoView(c.typesInfo)
 }
 
 func (c Context) TypesSizes() types.Sizes {

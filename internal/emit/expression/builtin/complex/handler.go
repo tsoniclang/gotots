@@ -54,7 +54,7 @@ func emitConstruct(
 ) (api.ExpressionEmission, error) {
 	resultType := context.TypesInfo().TypeOf(source)
 	expectedType := context.ExpectedType()
-	sourceFacts, factsOK := context.TypesInfo().Types[source]
+	sourceFacts, factsOK := context.TypesInfo().TypeAndValue(source)
 	if discarded ||
 		len(source.Args) != 2 ||
 		expectedType == nil ||
@@ -166,7 +166,7 @@ func emitComponent(
 	}
 	resultType := context.TypesInfo().TypeOf(source)
 	expectedType := context.ExpectedType()
-	sourceFacts, factsOK := context.TypesInfo().Types[source]
+	sourceFacts, factsOK := context.TypesInfo().TypeAndValue(source)
 	if resultType == nil ||
 		expectedType == nil ||
 		!types.AssignableTo(resultType, expectedType) {

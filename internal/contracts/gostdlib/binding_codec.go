@@ -75,21 +75,11 @@ func validateBinding(binding BindingDocument, field string) error {
 			return err
 		}
 	}
-	seenTypeArguments := make(map[GenericTypeArgumentDocument]struct{})
-	for _, argument := range binding.GenericTypeArguments {
-		if argument.TypeParameter < 0 || !argument.Facet.Valid() {
-			return manifestError(
-				field+".genericTypeArguments",
-				"source parameter or representation facet is invalid",
-			)
-		}
-		if _, duplicate := seenTypeArguments[argument]; duplicate {
-			return manifestError(
-				field+".genericTypeArguments",
-				"target projection entry is duplicated",
-			)
-		}
-		seenTypeArguments[argument] = struct{}{}
+	if err := validateGenericTypeArguments(
+		binding.GenericTypeArguments,
+		field+".genericTypeArguments",
+	); err != nil {
+		return err
 	}
 	if len(binding.GenericTypeArguments) != 0 &&
 		(binding.Kind != BindingFunction || binding.Access != AccessExport) {
@@ -120,6 +110,26 @@ func validateBinding(binding BindingDocument, field string) error {
 				"method access does not own a function",
 			)
 		}
+	}
+	return nil
+}
+
+func validateGenericTypeArguments(
+	arguments []GenericTypeArgumentDocument,
+	field string,
+) error {
+	seen := make(map[GenericTypeArgumentDocument]struct{}, len(arguments))
+	for _, argument := range arguments {
+		if argument.TypeParameter < 0 || !argument.Facet.Valid() {
+			return manifestError(
+				field,
+				"source parameter or representation facet is invalid",
+			)
+		}
+		if _, duplicate := seen[argument]; duplicate {
+			return manifestError(field, "target projection entry is duplicated")
+		}
+		seen[argument] = struct{}{}
 	}
 	return nil
 }

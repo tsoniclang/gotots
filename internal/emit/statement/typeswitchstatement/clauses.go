@@ -184,5 +184,5 @@ func emitCaseTypes(
 func isNilCase(context api.Context, source ast.Expr) bool {
 	identifier, ok := source.(*ast.Ident)
 	return ok &&
-		context.TypesInfo().Uses[identifier] == types.Universe.Lookup("nil")
+		context.TypesInfo().UseOf(identifier) == types.Universe.Lookup("nil")
 }

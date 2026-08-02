@@ -64,6 +64,15 @@ func WithLexicalTypeRequirements(
 				}
 			}
 			anchor = typeName
+		} else if typeName, _, _, represented :=
+			requirement.TypeRepresentation(); represented {
+			if typeName == nil || requirement.Owner() != owner {
+				return api.Context{}, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "source artifact received a foreign lexical type representation",
+				}
+			}
+			anchor = typeName
 		} else {
 			continue
 		}

@@ -4,7 +4,9 @@ import test from "node:test";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 
-import { Grow } from "../src/slices.js";
+import {
+  SlicesGrowKernel as Grow,
+} from "../src/internal/facets/generic-slices-kernel.js";
 
 interface Cell {
   value: number;

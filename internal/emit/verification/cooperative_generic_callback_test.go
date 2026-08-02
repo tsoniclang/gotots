@@ -1,7 +1,6 @@
 package emit_test
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -9,48 +8,17 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
-	"github.com/tsoniclang/gotots/internal/load"
 )
 
 func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 	t *testing.T,
 ) {
-	directory := filepath.Join(
-		repositoryRoot(),
-		"testdata",
-		"constructs",
-		"concurrency",
-		"generic-callback",
-	)
-	directory, err := filepath.Abs(directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	program, err := load.Load(context.Background(), load.Request{
-		Directory: directory,
-		Pattern:   ".",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	roots, err := emit.ExportedAPIRoots(program.Roots()[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	emission, err := emit.CompileWithOptions(
-		program,
-		roots,
-		waveNineOptions(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	workingDirectory := t.TempDir()
-	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	directory, workingDirectory, emission, artifacts :=
+		genericCallbackFixture(t)
 
 	apply := waveNineFunctionText(t, artifacts.printed, "Apply")
 	for _, required := range []string{
-		"export function Apply<T>(",
+		"export function Apply$kernel<T>(",
 		"=> bool",
 		"return __gotots_callee_",
 	} {
@@ -115,7 +83,7 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 		t,
 		artifacts.printed,
 		"Box",
-		"\n    Apply(",
+		"\n    Apply$kernel(",
 	)
 	for _, forbidden := range []string{"async", "Promise<", "await "} {
 		if strings.Contains(base, forbidden) {
@@ -138,8 +106,11 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 			variant,
 		)
 	}
-	if strings.Contains(artifacts.printed, "Box_Apply") {
-		t.Fatal("generic receiver method retained a top-level receiver twin")
+	for _, line := range strings.Split(artifacts.printed, "\n") {
+		if strings.Contains(line, "function Box_Apply") &&
+			!strings.Contains(line, "$deferred") {
+			t.Fatalf("generic receiver method retained an ordinary top-level twin: %s", line)
+		}
 	}
 	synchronous := waveNineFunctionText(
 		t,
@@ -149,7 +120,7 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 	for _, required := range []string{
 		"export function SynchronousApply(",
 		"function (value: gostring): bool {",
-		"return Apply<gostring>(",
+		"return Apply$concrete_",
 	} {
 		if !strings.Contains(synchronous, required) {
 			t.Fatalf(
@@ -167,6 +138,19 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 				synchronous,
 			)
 		}
+	}
+	cooperative := waveNineFunctionText(
+		t,
+		artifacts.printed,
+		"CooperativeApply",
+	)
+	synchronousWrapper := genericConcreteCallName(t, synchronous, "Apply")
+	cooperativeWrapper := genericConcreteCallName(t, cooperative, "Apply")
+	if synchronousWrapper == cooperativeWrapper {
+		t.Fatalf(
+			"synchronous and cooperative Apply instances share wrapper %s",
+			synchronousWrapper,
+		)
 	}
 	for _, function := range []string{
 		"CooperativeApply",
@@ -304,9 +288,9 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 	}
 	for _, required := range []string{
 		"export interface MutableValue<T>",
-		"Change($argument0: (($0: T, $go$recovery?: GoRecovery) => Promise<void>)",
-		"async Change($argument0: (($0: int32, $go$recovery?: GoRecovery) => Promise<void>)",
-		"async Change($argument0: (($0: gostring, $go$recovery?: GoRecovery) => Promise<void>)",
+		"Change($argument0: (($0: T) => Promise<void>)",
+		"async Change($argument0: (($0: int32) => Promise<void>)",
+		"async Change($argument0: (($0: gostring) => Promise<void>)",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf(
@@ -318,8 +302,8 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 	}
 	for _, required := range []string{
 		"export class CallbackHolder<T>",
-		"Apply: (($0: T, $go$recovery?: GoRecovery) => Promise<T>)",
-		"static async Run<T>(",
+		"Apply: (($0: T) => Promise<T>)",
+		"static async Run$kernel<T>(",
 		"await __gotots_callee_",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
@@ -341,11 +325,23 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 	if strings.Contains(clonedHolder, "async") {
 		t.Fatalf("copy-only named field became cooperative:\n%s", clonedHolder)
 	}
-	if count := strings.Count(
-		artifacts.printed,
-		"function Apply$cooperative_",
-	); count != 1 {
-		t.Fatalf("Apply cooperative profile count = %d, want 1", count)
+	applyVariants := 0
+	applyDeferredVariants := 0
+	for _, line := range strings.Split(artifacts.printed, "\n") {
+		if !strings.Contains(line, "function Apply$cooperative_") {
+			continue
+		}
+		applyVariants++
+		if strings.Contains(line, "$deferred") {
+			applyDeferredVariants++
+		}
+	}
+	if applyVariants != 1 || applyDeferredVariants != 0 {
+		t.Fatalf(
+			"Apply cooperative variants = %d, deferred = %d; want 1/0",
+			applyVariants,
+			applyDeferredVariants,
+		)
 	}
 	if count := strings.Count(
 		artifacts.printed,
@@ -355,23 +351,23 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 	}
 	if count := strings.Count(
 		artifacts.printed,
-		" = FilterSequence$cooperative_",
+		"return FilterSequence$cooperative_",
 	); count != 2 {
-		t.Fatalf("FilterSequence cooperative profile uses = %d, want 2", count)
+		t.Fatalf("FilterSequence cooperative wrapper calls = %d, want 2", count)
 	}
 	applyProfileName := cooperativeFunctionName(cooperativeApply)
 	if applyProfileName == "" {
 		t.Fatalf("cooperative Apply function has no target name:\n%s", cooperativeApply)
 	}
-	if !packageAssemblyExports(emission.Files(), "genericcallback", applyProfileName) {
+	if packageAssemblyExports(emission.Files(), "genericcallback", applyProfileName) {
 		t.Fatalf(
-			"package assembly does not export %s",
+			"package assembly publishes private kernel %s",
 			applyProfileName,
 		)
 	}
 	for _, required := range []string{
-		"Apply<gostring>(",
-		"await Apply$cooperative_",
+		"$state.InitializerApply = Apply$concrete_",
+		"$state.CooperativeInitializerApply = await Apply$concrete_",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf(
@@ -544,6 +540,7 @@ func main() {
 			values.CloneSynchronousStoredCallback(),
 		)
 }
+
 `)
 	goOutput := runProgram(
 		t,

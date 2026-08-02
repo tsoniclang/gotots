@@ -27,6 +27,7 @@ func TestMethodTargetIsClosedAndImmutable(t *testing.T) {
 		api.MethodTargetClassMember,
 		"Read",
 		api.MethodReceiverABIContractDirect,
+		true,
 		requests...,
 	)
 	if err != nil {
@@ -38,6 +39,7 @@ func TestMethodTargetIsClosedAndImmutable(t *testing.T) {
 	if target.Kind() != api.MethodTargetClassMember ||
 		target.Name() != "Read" ||
 		target.ReceiverABI() != api.MethodReceiverABIContractDirect ||
+		!target.ProviderBoundary() ||
 		len(target.Requests()) != 1 ||
 		target.Requests()[0].Kind() != api.RootRequestArtifactDependency {
 		t.Fatal("method target exposed mutable request storage")
@@ -57,7 +59,7 @@ func TestMethodTargetRejectsInvalidDomain(t *testing.T) {
 		{kind: api.MethodTargetClassMember, name: "Read"},
 		{kind: api.MethodTargetClassMember, name: "Read", abi: api.MethodReceiverABI(255)},
 	} {
-		if _, err := api.NewMethodTarget(testCase.kind, testCase.name, testCase.abi); err == nil {
+		if _, err := api.NewMethodTarget(testCase.kind, testCase.name, testCase.abi, false); err == nil {
 			t.Fatalf("NewMethodTarget(%d, %q, %d) succeeded", testCase.kind, testCase.name, testCase.abi)
 		}
 	}

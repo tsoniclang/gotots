@@ -15,6 +15,77 @@ func SelectedMethodCall(
 	typeArguments []tsgo.TypeNode,
 	arguments []tsgo.Expression,
 ) (tsgo.CallExpression, []api.RootRequest, error) {
+	return selectedMethodCall(
+		context,
+		method,
+		memberSuffix,
+		receiver,
+		typeArguments,
+		nil,
+		arguments,
+	)
+}
+
+func SelectedDeferredMethodCall(
+	context api.Context,
+	method *types.Func,
+	memberSuffix string,
+	receiver tsgo.Expression,
+	typeArguments []tsgo.TypeNode,
+	recovery tsgo.Expression,
+	arguments []tsgo.Expression,
+) (tsgo.CallExpression, []api.RootRequest, error) {
+	if recovery == nil {
+		return nil, nil, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "selected deferred method has no recovery authority",
+		}
+	}
+	target, err := context.Names().MethodTarget(method)
+	if err != nil {
+		return nil, nil, err
+	}
+	if target.ReceiverABI() == api.MethodReceiverABISourceRepresentation {
+		reference, referenceErr := context.Names().DeferredCallable(
+			method,
+			memberSuffix,
+		)
+		if referenceErr != nil {
+			return nil, nil, referenceErr
+		}
+		callArguments := []tsgo.Expression{recovery, receiver}
+		callArguments = append(callArguments, arguments...)
+		return context.Factory().CallExpression(
+				reference.Expression(context.Factory()),
+				nil,
+				typeArguments,
+				callArguments,
+				tsgo.NodeFlagsNone,
+			), api.CombineRequests(
+				target.Requests(),
+				reference.Requests(),
+			), nil
+	}
+	return selectedMethodCall(
+		context,
+		method,
+		memberSuffix+api.DeferredEntrySuffix,
+		receiver,
+		typeArguments,
+		[]tsgo.Expression{recovery},
+		arguments,
+	)
+}
+
+func selectedMethodCall(
+	context api.Context,
+	method *types.Func,
+	memberSuffix string,
+	receiver tsgo.Expression,
+	typeArguments []tsgo.TypeNode,
+	prefixArguments []tsgo.Expression,
+	arguments []tsgo.Expression,
+) (tsgo.CallExpression, []api.RootRequest, error) {
 	if method == nil || receiver == nil {
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),
@@ -50,7 +121,7 @@ func SelectedMethodCall(
 				tsgo.NodeFlagsNone,
 			)
 			arguments = append(
-				[]tsgo.Expression{receiver},
+				append(prefixArguments, receiver),
 				arguments...,
 			)
 			requests = append(requests, reference.Requests()...)
@@ -68,10 +139,11 @@ func SelectedMethodCall(
 			context.Factory().Identifier(name),
 			tsgo.NodeFlagsNone,
 		)
+		arguments = append(prefixArguments, arguments...)
 	case api.MethodTargetEnvironmentFunction:
 		callee = context.Factory().Identifier(name)
 		arguments = append(
-			[]tsgo.Expression{receiver},
+			append(prefixArguments, receiver),
 			arguments...,
 		)
 	default:

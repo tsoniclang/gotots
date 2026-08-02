@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -15,7 +16,7 @@ func EmitTypeArguments(
 	children api.ChildEmitter,
 	source ast.Node,
 	declaration types.Object,
-	arguments *types.TypeList,
+	arguments api.TypeArgumentList,
 ) ([]tsgo.TypeNode, []api.RootRequest, error) {
 	profile, resolved, err :=
 		context.ResolveGenericRepresentationProfile(declaration)
@@ -23,8 +24,7 @@ func EmitTypeArguments(
 		return nil, nil, err
 	}
 	parameters := profile.Parameters()
-	if arguments == nil ||
-		!resolved ||
+	if !resolved ||
 		arguments.Len() != len(parameters) {
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),
@@ -59,7 +59,6 @@ func EmitTypeArguments(
 			if representationErr != nil {
 				return nil, nil, representationErr
 			}
-			targets = append(targets, representation.Value())
 			requests = append(requests, representation.Requests()...)
 		}
 	}
@@ -71,7 +70,7 @@ func EmitFunctionTypeArguments(
 	children api.ChildEmitter,
 	source ast.Node,
 	declaration *types.Func,
-	arguments *types.TypeList,
+	arguments api.TypeArgumentList,
 ) ([]tsgo.TypeNode, []api.RootRequest, error) {
 	projection, providerOwned, err :=
 		context.Names().ProviderGenericTypeArguments(declaration)
@@ -87,7 +86,7 @@ func EmitFunctionTypeArguments(
 			arguments,
 		)
 	}
-	if arguments == nil {
+	if arguments.Len() == 0 {
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "provider generic callable has no source type arguments",
@@ -163,21 +162,23 @@ func emitRepresentationArgument(
 	argument types.Type,
 	facet api.GenericRepresentationFacet,
 ) (api.TypeEmission, error) {
+	var target api.TypeEmission
+	var err error
 	switch facet {
 	case api.GenericRepresentationStorage:
-		return context.Values().StorageType(
+		target, err = context.Values().StorageType(
 			context.WithRole(api.RoleStorageType),
 			source,
 			argument,
 		)
 	case api.GenericRepresentationContainerStorage:
-		return context.ContainerStorage().ContainerStorageType(
+		target, err = context.ContainerStorage().ContainerStorageType(
 			context.WithRole(api.RoleStorageType),
 			source,
 			argument,
 		)
 	case api.GenericRepresentationPointer:
-		return pointertype.EmitNonNilRepresented(
+		target, err = pointertype.EmitNonNilRepresented(
 			context.WithRole(api.RoleCallArgumentType),
 			children,
 			source,
@@ -189,13 +190,28 @@ func emitRepresentationArgument(
 			Reason: "generic representation argument facet is invalid",
 		}
 	}
+	if err != nil {
+		return target, err
+	}
+	facetRequests, err := typeRepresentationRequests(
+		context,
+		argument,
+		facet,
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return api.DirectType(
+		target.Value(),
+		api.CombineRequests(target.Requests(), facetRequests)...,
+	), nil
 }
 
 func EmitCapabilities(
 	context api.Context,
 	source ast.Node,
 	operationSet api.GenericOperationSet,
-	arguments *types.TypeList,
+	arguments api.TypeArgumentList,
 ) ([]genericabi.Binding[tsgo.Expression], []api.RootRequest, error) {
 	targets := make(
 		[]genericabi.Binding[tsgo.Expression],
@@ -222,7 +238,20 @@ func EmitCapabilities(
 				api.GenericFunctionOperationConsumer() &&
 				operation.Operation() ==
 					api.GenericOperationConstraintMethod
-		if api.ContainsGenericTypeParameter(signature) {
+		if operation.Operation() ==
+			api.GenericOperationDeferredCallableRegistry &&
+			!api.ContainsGenericTypeParameter(signature) {
+			registry, registryErr := deferredregistry.Reference(
+				context,
+				source,
+				signature,
+			)
+			err = registryErr
+			if err == nil {
+				referenceName = registry.Name()
+				referenceRequests = registry.Requests()
+			}
+		} else if api.ContainsGenericTypeParameter(signature) {
 			reference, referenceErr := context.ProjectGenericOperation(
 				source,
 				operation,

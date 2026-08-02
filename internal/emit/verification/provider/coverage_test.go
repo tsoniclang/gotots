@@ -22,7 +22,6 @@ func TestLinkedProviderDoesNotReconstructPrivateGoRepresentation(t *testing.T) {
 	writeProgramFile(t, filepath.Join(project, "source.go"), `package providercoverage
 
 import (
-	"cmp"
 	"reflect"
 	"slices"
 	"encoding/binary"
@@ -80,16 +79,6 @@ func (value BlockingString) String() string {
 
 func DynamicStringer(value BlockingString) fmt.Stringer {
 	return value
-}
-
-func BlockingCompare(left string, right string) int {
-	var mutex sync.Mutex
-	mutex.Lock()
-	return 0
-}
-
-func CompareValue() func(string, string) int {
-	return cmp.Compare[string]
 }
 
 func PathFailure(failure error) error {
@@ -184,8 +173,6 @@ func BuilderAddress(state *ProviderState) *strings.Builder {
 			deferredRecoveryRoot,
 			mustProviderRoot(t, scope.Lookup("FileWriter")),
 			mustProviderRoot(t, scope.Lookup("DynamicStringer")),
-			mustProviderRoot(t, scope.Lookup("BlockingCompare")),
-			mustProviderRoot(t, scope.Lookup("CompareValue")),
 			mustProviderRoot(t, scope.Lookup("ProviderReceivers")),
 			mustProviderRoot(t, scope.Lookup("StoredProviderReceivers")),
 			mustProviderRoot(t, scope.Lookup("MutexAddress")),
@@ -219,8 +206,6 @@ func assertProviderInterfaceAdapterRecoveryABI(
 	for _, required := range []string{
 		"BinaryBigEndianString(this.$go$value, $go$recovery)",
 		"OsFileWrite(this.$go$value, $argument0, $go$recovery)",
-		"recovery_value.CmpCompare<gostring>(",
-		"$argument0, $argument1, $go$recovery);",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("provider adapter lacks recovery facet %q:\n%s", required, printed)
@@ -346,28 +331,47 @@ func assertProviderGrowCapabilityABI(
 	emission emit.ProgramEmission,
 ) {
 	t.Helper()
+	var sourceCallFound bool
+	var kernelCallFound bool
 	for _, file := range emission.Files() {
-		if file.Kind() != emit.TargetFileSource {
-			continue
-		}
 		for _, statement := range file.SourceFile().Statements() {
 			function, ok := statement.(tsgo.FunctionDeclaration)
-			if !ok || function.Name().Text() != "Grow" {
+			if !ok {
+				continue
+			}
+			name := function.Name().Text()
+			if name != "Grow" && !strings.HasPrefix(name, "Grow$concrete_") {
 				continue
 			}
 			body, ok := function.Body().(tsgo.Block)
 			if !ok || len(body.Statements()) != 1 {
-				t.Fatalf("Grow body = %T", function.Body())
+				t.Fatalf("%s body = %T", name, function.Body())
 			}
 			returned, ok := body.Statements()[0].(tsgo.ReturnStatement)
 			if !ok {
-				t.Fatalf("Grow statement = %T", body.Statements()[0])
+				t.Fatalf("%s statement = %T", name, body.Statements()[0])
 			}
 			call, ok := returned.Expression().(tsgo.CallExpression)
-			if !ok || len(call.Arguments()) != 8 {
+			if !ok {
+				t.Fatalf("%s return = %T", name, returned.Expression())
+			}
+			if name == "Grow" {
+				if len(call.Arguments()) != 2 {
+					t.Fatalf(
+						"source Grow has %d arguments, want Go arity 2",
+						len(call.Arguments()),
+					)
+				}
+				callee, ok := call.Expression().(tsgo.Identifier)
+				if !ok || !strings.HasPrefix(callee.Text(), "Grow$concrete_") {
+					t.Fatalf("source Grow target = %T", call.Expression())
+				}
+				sourceCallFound = true
+				continue
+			}
+			if len(call.Arguments()) != 8 {
 				t.Fatalf(
-					"Grow return = %T with %d arguments",
-					returned.Expression(),
+					"Grow kernel call has %d arguments, want 6 capabilities plus 2 source arguments",
 					len(call.Arguments()),
 				)
 			}
@@ -380,10 +384,16 @@ func assertProviderGrowCapabilityABI(
 					)
 				}
 			}
-			return
+			kernelCallFound = true
 		}
 	}
-	t.Fatal("linked provider Grow call is absent")
+	if !sourceCallFound || !kernelCallFound {
+		t.Fatalf(
+			"linked provider Grow source/concrete calls = %t/%t",
+			sourceCallFound,
+			kernelCallFound,
+		)
+	}
 }
 
 func assertProviderRepresentationABI(

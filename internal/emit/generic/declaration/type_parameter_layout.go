@@ -29,9 +29,9 @@ func EmitTypeParameterLayout(
 		parameters: make(
 			[]tsgo.TypeParameterDeclaration,
 			0,
-			len(parameters)*4,
+			len(parameters),
 		),
-		arguments: make([]tsgo.TypeNode, 0, len(parameters)*4),
+		arguments: make([]tsgo.TypeNode, 0, len(parameters)),
 	}
 	for _, parameter := range parameters {
 		name := logicalNames[parameter]
@@ -42,16 +42,6 @@ func EmitTypeParameterLayout(
 			}
 		}
 		layout.append(context, name)
-		for _, facet := range api.GenericRepresentationFacetOrder() {
-			if !profile.Requires(parameter, facet) {
-				continue
-			}
-			facetName, err := api.GenericRepresentationName(name, facet)
-			if err != nil {
-				return TypeParameterLayout{}, err
-			}
-			layout.append(context, facetName)
-		}
 	}
 	return layout, nil
 }

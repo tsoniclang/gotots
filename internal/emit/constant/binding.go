@@ -49,7 +49,7 @@ func EmitBinding(
 		}
 	}
 	if sourceName.Name == "_" ||
-		context.TypesInfo().Defs[sourceName] != selected {
+		context.TypesInfo().DefOf(sourceName) != selected {
 		return BindingEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, sourceName)
 	}

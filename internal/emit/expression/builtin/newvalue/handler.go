@@ -27,7 +27,7 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	argumentFacts, ok := context.TypesInfo().Types[source.Args[0]]
+	argumentFacts, ok := context.TypesInfo().TypeAndValue(source.Args[0])
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)

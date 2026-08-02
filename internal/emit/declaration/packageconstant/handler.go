@@ -70,7 +70,7 @@ func locateName(
 			return nil, api.Unsupported(context, api.CategoryDeclaration, spec)
 		}
 		for _, name := range spec.Names {
-			object, ok := context.TypesInfo().Defs[name].(*types.Const)
+			object, ok := context.TypesInfo().DefOf(name).(*types.Const)
 			if ok && object == selected {
 				return name, nil
 			}
@@ -146,6 +146,7 @@ func emitProjections(
 			}
 	}
 	declarations := make([]tsgo.Statement, 0, len(requirements))
+	bindings := make([]string, 0, len(requirements))
 	var requests []api.RootRequest
 	for _, requirement := range requirements {
 		constant, projection, ok := requirement.ConstantProjection()
@@ -180,10 +181,15 @@ func emitProjections(
 			declarations,
 			emission.ExportedStatement(context.Factory()),
 		)
+		bindings = append(bindings, projectionName)
 		requests = append(requests, emission.Requests()...)
 	}
 	if len(declarations) == 0 {
 		return api.CoverageOnlyDeclarationEmission(), nil
 	}
-	return api.NewDeclarationEmission(declarations, requests)
+	return api.NewDeclarationEmissionWithAdditionalPackageBindings(
+		declarations,
+		requests,
+		bindings,
+	)
 }

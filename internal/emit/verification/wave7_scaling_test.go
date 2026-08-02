@@ -128,11 +128,13 @@ func measureWaveSevenGenericScale(
 	if err != nil {
 		t.Fatal(err)
 	}
-	roots, err := emit.ExportedAPIRoots(program.Roots()[0])
+	root, err := emit.NewRoot(
+		program.Roots()[0].Types().Scope().Lookup("Audit"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	emission, err := emit.Compile(program, roots)
+	emission, err := emit.Compile(program, []emit.Root{root})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +160,7 @@ func measureWaveSevenGenericScale(
 				function.Name().Text(),
 			)
 			switch {
-			case function.Name().Text() == "Add":
+			case function.Name().Text() == "Add$kernel":
 				measurement.genericBodies++
 				measurement.genericBody, err = tsgo.EncodeNode(function)
 				if err != nil {
@@ -260,9 +262,9 @@ func waveSevenRecursiveGenericArtifacts(t *testing.T) map[string][]byte {
 		t.Fatal(err)
 	}
 	expected := map[string]bool{
-		"RecursiveAdd": false,
-		"MutualAddA":   false,
-		"MutualAddB":   false,
+		"RecursiveAdd$kernel": false,
+		"MutualAddA$kernel":   false,
+		"MutualAddB$kernel":   false,
 	}
 	result := make(map[string][]byte, len(expected))
 	for _, file := range emission.Files() {

@@ -18,7 +18,7 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.SelectorExpr,
 ) (api.ExpressionEmission, error) {
-	if selection := context.TypesInfo().Selections[source]; selection != nil {
+	if selection := context.TypesInfo().SelectionOf(source); selection != nil {
 		switch selection.Kind() {
 		case types.FieldVal:
 			return selectionvalue.FieldValue(
@@ -41,12 +41,12 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	packageName, ok := context.TypesInfo().Uses[qualifier].(*types.PkgName)
+	packageName, ok := context.TypesInfo().UseOf(qualifier).(*types.PkgName)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	object := context.TypesInfo().Uses[source.Sel]
+	object := context.TypesInfo().UseOf(source.Sel)
 	if object == nil || object.Pkg() != packageName.Imported() {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)

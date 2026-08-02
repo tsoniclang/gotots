@@ -185,6 +185,7 @@ func TestFunctionStoreTargetOwnsTypedImmutableOperations(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !target.IsAccessor() ||
+		!target.Valid() ||
 		target.AccessorArguments()[0].Value().(tsgo.Identifier).Text() !=
 			"pointer" ||
 		len(requestNames) != 2 ||
@@ -197,6 +198,11 @@ func TestFunctionStoreTargetOwnsTypedImmutableOperations(t *testing.T) {
 	if target.AccessorArguments()[0].Value().(tsgo.Identifier).Text() !=
 		"pointer" {
 		t.Fatal("function store target exposed argument backing")
+	}
+	if _, err := api.NewNamedReturnControl("return", []api.StoreTargetEmission{
+		target,
+	}); err != nil {
+		t.Fatalf("named return rejected a valid function-backed store: %v", err)
 	}
 }
 

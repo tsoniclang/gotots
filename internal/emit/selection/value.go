@@ -20,7 +20,7 @@ func FieldValue(
 	source *ast.SelectorExpr,
 	selected *types.Selection,
 ) (api.ExpressionEmission, error) {
-	resolved, ok := fieldPath(selected)
+	resolved, ok := fieldPath(context, selected)
 	if !ok || !Valid(context, source, selected, types.FieldVal) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)

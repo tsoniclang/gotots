@@ -353,9 +353,9 @@ func binaryConstantEvidenceIsIncomplete(
 	context api.Context,
 	source *ast.BinaryExpr,
 ) bool {
-	result, resultExists := context.TypesInfo().Types[source]
-	left, leftExists := context.TypesInfo().Types[source.X]
-	right, rightExists := context.TypesInfo().Types[source.Y]
+	result, resultExists := context.TypesInfo().TypeAndValue(source)
+	left, leftExists := context.TypesInfo().TypeAndValue(source.X)
+	right, rightExists := context.TypesInfo().TypeAndValue(source.Y)
 	return resultExists &&
 		result.Value == nil &&
 		leftExists &&

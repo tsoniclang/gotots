@@ -1,7 +1,6 @@
 package api
 
 import (
-	"go/ast"
 	"go/types"
 	"slices"
 )
@@ -277,28 +276,6 @@ func GenericRepresentationFacetOrder() []GenericRepresentationFacet {
 	return slices.Clone(genericRepresentationFacetOrder[:])
 }
 
-func GenericRepresentationName(
-	logical string,
-	facet GenericRepresentationFacet,
-) (string, error) {
-	if logical == "" || !facet.Valid() {
-		return "", &NameError{
-			Name:   logical,
-			Reason: "generic representation name is invalid",
-		}
-	}
-	switch facet {
-	case GenericRepresentationStorage:
-		return logical + "$Storage", nil
-	case GenericRepresentationPointer:
-		return logical + "$Pointer", nil
-	case GenericRepresentationContainerStorage:
-		return logical + "$ContainerStorage", nil
-	default:
-		panic("validated generic representation facet is unhandled")
-	}
-}
-
 type GenericTypeArgumentFacet uint8
 
 const (
@@ -554,33 +531,25 @@ func GenericRepresentationParameter(
 	return typeOwner, parameters[index], true
 }
 
-func (c Context) GenericParameterRepresentation(
-	source ast.Node,
+func (c Context) RequireGenericParameterRepresentation(
 	parameter *types.TypeParam,
 	facet GenericRepresentationFacet,
-) (TypeEmission, error) {
-	logical, ok := c.GenericParameterName(parameter)
+) ([]RootRequest, error) {
+	_, ok := c.GenericParameterName(parameter)
 	owner, selected, owned := GenericRepresentationParameter(
 		c.genericParameterOwner,
 		parameter,
 	)
 	if !ok || !owned || !facet.Valid() {
-		return TypeEmission{}, &ContextError{
+		return nil, &ContextError{
 			Reason: "generic parameter representation is unavailable",
 		}
 	}
-	name, err := GenericRepresentationName(logical, facet)
-	if err != nil {
-		return TypeEmission{}, err
-	}
 	request, err := NewGenericRepresentationRequest(owner, selected, facet)
 	if err != nil {
-		return TypeEmission{}, err
+		return nil, err
 	}
-	return DirectType(
-		c.factory.TypeReferenceNode(c.factory.Identifier(name), nil),
-		request,
-	), nil
+	return []RootRequest{request}, nil
 }
 
 func (c Context) ResolveGenericRepresentationProfile(

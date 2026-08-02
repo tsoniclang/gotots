@@ -145,7 +145,7 @@ func operand(
 ) (api.ExpressionEmission, error) {
 	sourceType := context.TypesInfo().TypeOf(source)
 	if literalConstant(source) {
-		facts, ok := context.TypesInfo().Types[source]
+		facts, ok := context.TypesInfo().TypeAndValue(source)
 		if ok && facts.Value != nil {
 			return constantvalue.EmitValue(
 				context,
@@ -314,7 +314,7 @@ func integerOperation(
 }
 
 func rightConstant(context api.Context, source ast.Expr) constant.Value {
-	facts, ok := context.TypesInfo().Types[source]
+	facts, ok := context.TypesInfo().TypeAndValue(source)
 	if !ok {
 		return nil
 	}

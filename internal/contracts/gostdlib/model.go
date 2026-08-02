@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	SchemaVersion = 18
+	SchemaVersion = 19
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -243,6 +243,17 @@ func (m Manifest) GenericCallableFacet(
 		sourceIdentity: sourceIdentity,
 		kind:           FacetGenericCallableProfile,
 		capability:     profileKey,
+	}]
+	return selected, ok
+}
+
+func (m Manifest) GenericCallableKernel(
+	sourceIdentity string,
+) (Facet, bool) {
+	selected, ok := m.facets[facetLookup{
+		sourceIdentity: sourceIdentity,
+		kind:           FacetGenericCallableKernel,
+		capability:     string(FacetCapabilityKernel),
 	}]
 	return selected, ok
 }

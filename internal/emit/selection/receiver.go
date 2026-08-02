@@ -44,12 +44,16 @@ func methodReceiver(
 	selected *types.Selection,
 	copyValue bool,
 ) (api.ExpressionEmission, *types.Func, error) {
-	resolved, method, ok := methodPath(selected)
+	resolved, method, ok := methodPath(context, selected)
 	if !ok || !Valid(context, source, selected, types.MethodVal) {
 		return api.ExpressionEmission{}, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	signature := method.Type().(*types.Signature)
+	signature, ok := contextualMethodSignature(context, method)
+	if !ok {
+		return api.ExpressionEmission{}, nil,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	declared := signature.Recv().Type()
 	abiReceiver, receiverABI, err := methodABIReceiver(
 		context,
@@ -103,7 +107,7 @@ func DirectMethodSetReceiver(
 	selected *types.Selection,
 	root api.ExpressionEmission,
 ) (api.ExpressionEmission, types.Type, *types.Func, error) {
-	resolved, method, ok := methodPath(selected)
+	resolved, method, ok := methodPath(context, selected)
 	if !ok ||
 		selected.Kind() != types.MethodVal ||
 		!types.Identical(selected.Recv(), resolved.root) {
@@ -131,7 +135,11 @@ func methodSetReceiver(
 	root api.ExpressionEmission,
 	copyValue bool,
 ) (api.ExpressionEmission, error) {
-	signature := method.Type().(*types.Signature)
+	signature, ok := contextualMethodSignature(context, method)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	declared := signature.Recv().Type()
 	abiReceiver, receiverABI, err := methodABIReceiver(
 		context,
@@ -239,12 +247,16 @@ func MethodExpressionReceiver(
 	selected *types.Selection,
 	root api.ExpressionEmission,
 ) (api.ExpressionEmission, *types.Func, error) {
-	resolved, method, ok := methodPath(selected)
+	resolved, method, ok := methodPath(context, selected)
 	if !ok || !Valid(context, source, selected, types.MethodExpr) {
 		return api.ExpressionEmission{}, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	signature := method.Type().(*types.Signature)
+	signature, ok := contextualMethodSignature(context, method)
+	if !ok {
+		return api.ExpressionEmission{}, nil,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	declared := signature.Recv().Type()
 	abiReceiver, receiverABI, err := methodABIReceiver(
 		context,
@@ -404,13 +416,28 @@ func DirectMethodExpression(
 	if !Valid(context, source, selected, types.MethodExpr) {
 		return nil, false
 	}
-	resolved, method, ok := methodPath(selected)
+	resolved, method, ok := methodPath(context, selected)
 	if !ok || len(resolved.fields) != 0 {
 		return nil, false
 	}
-	signature := method.Type().(*types.Signature)
+	signature, ok := contextualMethodSignature(context, method)
+	if !ok {
+		return nil, false
+	}
 	return method, types.Identical(
 		resolved.root,
 		signature.Recv().Type(),
 	)
+}
+
+func contextualMethodSignature(
+	context api.Context,
+	method *types.Func,
+) (*types.Signature, bool) {
+	if method == nil {
+		return nil, false
+	}
+	target := method.Type()
+	signature, ok := target.(*types.Signature)
+	return signature, ok && signature.Recv() != nil
 }

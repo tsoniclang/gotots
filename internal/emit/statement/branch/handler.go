@@ -15,7 +15,7 @@ func Emit(
 	source *ast.BranchStmt,
 ) (api.StatementEmission, error) {
 	if source.Label != nil {
-		label, ok := context.TypesInfo().Uses[source.Label].(*types.Label)
+		label, ok := context.TypesInfo().UseOf(source.Label).(*types.Label)
 		if !ok {
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)

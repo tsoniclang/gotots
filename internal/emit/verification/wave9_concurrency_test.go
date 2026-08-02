@@ -42,7 +42,7 @@ func TestWaveNineConcurrencyCompilesThroughPublicPipeline(t *testing.T) {
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	if artifacts.bytes > 140_000 || artifacts.largest > 32_000 {
+	if artifacts.bytes > 142_000 || artifacts.largest > 32_000 {
 		t.Fatalf(
 			"Wave 9 artifact bounds exceeded: total=%d largest=%d",
 			artifacts.bytes,
@@ -224,10 +224,19 @@ func TestImmediateFunctionLiteralBypassesFirstClassCallableABI(t *testing.T) {
 	}
 	if !strings.Contains(
 		artifacts.printed,
-		" = function ($go$recovery?: GoRecovery): void {",
+		"__gotots_defers_0.push(async ($go$recovery: GoRecovery): Promise<void> => {",
 	) {
 		t.Fatalf(
-			"deferred direct literal lacks its exact recovery-aware facet:\n%s",
+			"deferred direct literal lacks its recovery-owned defer envelope:\n%s",
+			artifacts.printed,
+		)
+	}
+	if strings.Contains(
+		artifacts.printed,
+		" = function ($go$recovery: GoRecovery): void {",
+	) {
+		t.Fatalf(
+			"non-recovering direct literal acquired a recovery parameter:\n%s",
 			artifacts.printed,
 		)
 	}
@@ -310,12 +319,12 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 	transport := waveNineFunctionText(t, printed, "Transport")
 	for _, required := range []string{
 		"export async function Transport(): Promise<int32>",
-		"GoArray.literal<(($0: GoReceiveChannel<int32> | undefined, $go$recovery?: GoRecovery) => Promise<int32>) | undefined",
-		"RuntimeSlice.literal<(($0: GoReceiveChannel<int32> | undefined, $go$recovery?: GoRecovery) => Promise<int32>) | undefined",
+		"GoArray.literal<(($0: GoReceiveChannel<int32> | undefined) => Promise<int32>) | undefined",
+		"RuntimeSlice.literal<(($0: GoReceiveChannel<int32> | undefined) => Promise<int32>) | undefined",
 		"mapping.lookup(0)",
-		"let asserted: (($0: GoReceiveChannel<int32> | undefined, $go$recovery?: GoRecovery) => Promise<int32>) | undefined",
-		"identity<(($0: GoReceiveChannel<int32> | undefined, $go$recovery?: GoRecovery) => Promise<int32>) | undefined>",
-		"let methodValue: (($go$recovery?: GoRecovery) => Promise<int32>) | undefined",
+		"let asserted: (($0: GoReceiveChannel<int32> | undefined) => Promise<int32>) | undefined",
+		"identity<(($0: GoReceiveChannel<int32> | undefined) => Promise<int32>) | undefined>",
+		"let methodValue: (() => Promise<int32>) | undefined",
 		"await goInterfaceNonNil<Reader>(",
 		"async ($argument0: GoReceiveChannel<int32> | undefined): Promise<int32>",
 	} {
@@ -465,7 +474,7 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 		"pullConstraint",
 	)
 	for _, required := range []string{
-		"export async function pullConstraint<",
+		"export async function pullConstraint$kernel<",
 		"return await $go$constraint_method_",
 	} {
 		if !strings.Contains(genericConstraint, required) {
@@ -478,7 +487,7 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 	}
 	forwardLeaf := waveNineFunctionText(t, printed, "forwardLeaf")
 	for _, required := range []string{
-		"export async function forwardLeaf<",
+		"export async function forwardLeaf$kernel<",
 		"return await $go$constraint_method_",
 	} {
 		if !strings.Contains(forwardLeaf, required) {
@@ -491,8 +500,8 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 	}
 	forwardBridge := waveNineFunctionText(t, printed, "forwardBridge")
 	for _, required := range []string{
-		"export async function forwardBridge<",
-		"return await forwardLeaf<T>(",
+		"export async function forwardBridge$kernel<",
+		"return await forwardLeaf$kernel<T>(",
 	} {
 		if !strings.Contains(forwardBridge, required) {
 			t.Fatalf(

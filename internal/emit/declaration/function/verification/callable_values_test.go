@@ -65,7 +65,7 @@ func TestCallableValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	if !strings.Contains(
 		printed,
-		"transform: (($0: int32, $go$recovery?: GoRecovery) => int32) | undefined",
+		"transform: (($0: int32) => int32) | undefined",
 	) || !strings.Contains(
 		printed,
 		"return function (value: int32): int32",

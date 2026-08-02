@@ -22,10 +22,10 @@ func PromiseResult(
 func ValueSignature(
 	signature *types.Signature,
 ) (*types.Signature, bool) {
-	if !Supports(signature) {
+	if signature == nil || signature.TypeParams().Len() != 0 {
 		return nil, false
 	}
-	if signature.Recv() == nil {
+	if signature.Recv() == nil && signature.RecvTypeParams().Len() == 0 {
 		return signature, true
 	}
 	return types.NewSignatureType(
@@ -102,10 +102,6 @@ func emitInlineNonNilType(
 		},
 		false,
 	)
-	if err != nil {
-		return api.TypeEmission{}, err
-	}
-	target, err = withRecoveryAuthority(context, target)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}

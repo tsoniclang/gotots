@@ -398,7 +398,7 @@ func demandBox(values []Box) *Box {
 	}
 	if got := packageExportBindings(builder.exportStatements); !equalStrings(
 		got,
-		[]string{"Box", "Writer", "Writer$contract", "Writer$is"},
+		[]string{"Box", "Writer"},
 	) {
 		t.Fatalf("initial assembly exports = %v", got)
 	}
@@ -407,7 +407,7 @@ func demandBox(values []Box) *Box {
 	)
 	if !ok || !equalStrings(
 		writerBindings,
-		[]string{"Writer", "Writer$contract", "Writer$is"},
+		[]string{"Writer"},
 	) {
 		t.Fatalf("committed Writer export surface = %v, %t", writerBindings, ok)
 	}
@@ -426,17 +426,11 @@ func demandBox(values []Box) *Box {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
-	want := []string{
-		"Box",
-		"Box$Storage",
-		"Writer",
-		"Writer$contract",
-		"Writer$is",
-	}
+	want := []string{"Box", "Writer"}
 	contractBindings, ok := session.artifacts.ExportedBindings(
 		api.MustSourceArtifactOwner(box),
 	)
-	if !ok || !equalStrings(contractBindings, []string{"Box", "Box$Storage"}) {
+	if !ok || !equalStrings(contractBindings, []string{"Box"}) {
 		t.Fatalf("committed Box export surface = %v, %t", contractBindings, ok)
 	}
 	if got := packageExportBindings(builder.exportStatements); !equalStrings(
@@ -445,18 +439,18 @@ func demandBox(values []Box) *Box {
 	) {
 		t.Fatalf("reconstructed assembly exports = %v", got)
 	}
-	if builder.exportRevisions != initialRevisions+1 {
+	if builder.exportRevisions != initialRevisions {
 		t.Fatalf(
 			"package export reconstructions = %d, want %d",
 			builder.exportRevisions,
-			initialRevisions+1,
+			initialRevisions,
 		)
 	}
 	if revision := session.artifacts.FacetRevision(
 		builder.assemblyOwner,
 		api.ArtifactFacetImplementation,
-	); revision != initialFacetRevision+1 {
-		t.Fatalf("package export facet revision = %d, want %d", revision, initialFacetRevision+1)
+	); revision != initialFacetRevision {
+		t.Fatalf("package export facet revision = %d, want %d", revision, initialFacetRevision)
 	}
 	files, err := session.targetFiles()
 	if err != nil {

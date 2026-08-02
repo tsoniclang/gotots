@@ -331,6 +331,21 @@ func RootFactory() func(string) fs.FS { return os.DirFS }
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+	if !strings.Contains(
+		artifacts.printed,
+		"strings.Reader.Read(this.$go$value, $argument0)",
+	) || !strings.Contains(artifacts.printed, ".$from(__gotots_results_") {
+		t.Fatalf(
+			"provider method adapter did not preserve the public call and bridge its result:\n%s",
+			artifacts.printed,
+		)
+	}
+	if strings.Contains(artifacts.printed, "strings.Reader.Read$deferred") {
+		t.Fatalf(
+			"private recovery mechanics leaked into the provider method surface:\n%s",
+			artifacts.printed,
+		)
+	}
 	if !strings.Contains(artifacts.printed, "IoFsReadFileCanonicalAsyncError") {
 		t.Fatalf("async-error fs.ReadFile profile is absent:\n%s", artifacts.printed)
 	}

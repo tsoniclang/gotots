@@ -38,6 +38,7 @@ func (e *emitter) context(names api.Names) (api.Context, error) {
 	return context.
 		WithGenericCallableResolver(e.generic).
 		WithCooperativeCallableResolver(e.cooperative).
+		WithRecoveryCallableResolver(e.recovery).
 		WithGoRuntimeContract(e.goRuntime), nil
 }
 

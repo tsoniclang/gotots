@@ -64,61 +64,63 @@ const (
 	GenericOperationIndexAddress
 	GenericOperationSlice
 	GenericOperationSliceFull
+	GenericOperationDeferredCallableRegistry
 )
 
 var genericOperationIdentifiers = [...]string{
-	GenericOperationInvalid:              "",
-	GenericOperationZero:                 "zero",
-	GenericOperationCopy:                 "copy",
-	GenericOperationEqual:                "equal",
-	GenericOperationHash:                 "hash",
-	GenericOperationUnaryPlus:            "unary_plus",
-	GenericOperationUnaryMinus:           "unary_minus",
-	GenericOperationUnaryNot:             "unary_not",
-	GenericOperationUnaryXor:             "unary_xor",
-	GenericOperationBinaryAdd:            "binary_add",
-	GenericOperationBinarySubtract:       "binary_subtract",
-	GenericOperationBinaryMultiply:       "binary_multiply",
-	GenericOperationBinaryDivide:         "binary_divide",
-	GenericOperationBinaryRemainder:      "binary_remainder",
-	GenericOperationBinaryAnd:            "binary_and",
-	GenericOperationBinaryOr:             "binary_or",
-	GenericOperationBinaryXor:            "binary_xor",
-	GenericOperationBinaryAndNot:         "binary_and_not",
-	GenericOperationBinaryShiftLeft:      "binary_shift_left",
-	GenericOperationBinaryShiftRight:     "binary_shift_right",
-	GenericOperationBinaryEqual:          "binary_equal",
-	GenericOperationBinaryNotEqual:       "binary_not_equal",
-	GenericOperationBinaryLess:           "binary_less",
-	GenericOperationBinaryLessEqual:      "binary_less_equal",
-	GenericOperationBinaryGreater:        "binary_greater",
-	GenericOperationBinaryGreaterEqual:   "binary_greater_equal",
-	GenericOperationLength:               "length",
-	GenericOperationCapacity:             "capacity",
-	GenericOperationConvert:              "convert",
-	GenericOperationIndex:                "index",
-	GenericOperationConstraintMethod:     "constraint_method",
-	GenericOperationMapConstruct:         "map_construct",
-	GenericOperationInterfaceAdapt:       "interface_adapt",
-	GenericOperationInterfaceAssert:      "interface_assert",
-	GenericOperationInterfaceAssertOK:    "interface_assert_ok",
-	GenericOperationClear:                "clear",
-	GenericOperationNilEqual:             "nil_equal",
-	GenericOperationToStorage:            "to_storage",
-	GenericOperationFromStorage:          "from_storage",
-	GenericOperationPointerCell:          "pointer_cell",
-	GenericOperationPointerLoad:          "pointer_load",
-	GenericOperationPointerStore:         "pointer_store",
-	GenericOperationToContainerStorage:   "to_container_storage",
-	GenericOperationFromContainerStorage: "from_container_storage",
-	GenericOperationIndexAddress:         "index_address",
-	GenericOperationSlice:                "slice",
-	GenericOperationSliceFull:            "slice_full",
+	GenericOperationInvalid:                  "",
+	GenericOperationZero:                     "zero",
+	GenericOperationCopy:                     "copy",
+	GenericOperationEqual:                    "equal",
+	GenericOperationHash:                     "hash",
+	GenericOperationUnaryPlus:                "unary_plus",
+	GenericOperationUnaryMinus:               "unary_minus",
+	GenericOperationUnaryNot:                 "unary_not",
+	GenericOperationUnaryXor:                 "unary_xor",
+	GenericOperationBinaryAdd:                "binary_add",
+	GenericOperationBinarySubtract:           "binary_subtract",
+	GenericOperationBinaryMultiply:           "binary_multiply",
+	GenericOperationBinaryDivide:             "binary_divide",
+	GenericOperationBinaryRemainder:          "binary_remainder",
+	GenericOperationBinaryAnd:                "binary_and",
+	GenericOperationBinaryOr:                 "binary_or",
+	GenericOperationBinaryXor:                "binary_xor",
+	GenericOperationBinaryAndNot:             "binary_and_not",
+	GenericOperationBinaryShiftLeft:          "binary_shift_left",
+	GenericOperationBinaryShiftRight:         "binary_shift_right",
+	GenericOperationBinaryEqual:              "binary_equal",
+	GenericOperationBinaryNotEqual:           "binary_not_equal",
+	GenericOperationBinaryLess:               "binary_less",
+	GenericOperationBinaryLessEqual:          "binary_less_equal",
+	GenericOperationBinaryGreater:            "binary_greater",
+	GenericOperationBinaryGreaterEqual:       "binary_greater_equal",
+	GenericOperationLength:                   "length",
+	GenericOperationCapacity:                 "capacity",
+	GenericOperationConvert:                  "convert",
+	GenericOperationIndex:                    "index",
+	GenericOperationConstraintMethod:         "constraint_method",
+	GenericOperationMapConstruct:             "map_construct",
+	GenericOperationInterfaceAdapt:           "interface_adapt",
+	GenericOperationInterfaceAssert:          "interface_assert",
+	GenericOperationInterfaceAssertOK:        "interface_assert_ok",
+	GenericOperationClear:                    "clear",
+	GenericOperationNilEqual:                 "nil_equal",
+	GenericOperationToStorage:                "to_storage",
+	GenericOperationFromStorage:              "from_storage",
+	GenericOperationPointerCell:              "pointer_cell",
+	GenericOperationPointerLoad:              "pointer_load",
+	GenericOperationPointerStore:             "pointer_store",
+	GenericOperationToContainerStorage:       "to_container_storage",
+	GenericOperationFromContainerStorage:     "from_container_storage",
+	GenericOperationIndexAddress:             "index_address",
+	GenericOperationSlice:                    "slice",
+	GenericOperationSliceFull:                "slice_full",
+	GenericOperationDeferredCallableRegistry: "deferred_callable_registry",
 }
 
 func (o GenericOperation) Valid() bool {
 	return o >= GenericOperationZero &&
-		o <= GenericOperationSliceFull
+		o <= GenericOperationDeferredCallableRegistry
 }
 
 func (o GenericOperation) Identifier() string {
@@ -188,6 +190,8 @@ func (o GenericOperation) String() string {
 		return "slice"
 	case GenericOperationSliceFull:
 		return "slice-full"
+	case GenericOperationDeferredCallableRegistry:
+		return "deferred-callable-registry"
 	default:
 		if source, ok := o.BinaryToken(); ok {
 			return "binary-" + source.String()

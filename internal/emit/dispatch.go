@@ -83,6 +83,7 @@ type emitter struct {
 	require     func(types.Object) error
 	generic     api.GenericCallableResolver
 	cooperative api.CooperativeCallableResolver
+	recovery    api.RecoveryCallableResolver
 	pointer     api.PointerRepresentationResolver
 	goRuntime   api.GoRuntimeContract
 }
@@ -97,6 +98,7 @@ func newEmitter(
 	require func(types.Object) error,
 	generic api.GenericCallableResolver,
 	cooperative api.CooperativeCallableResolver,
+	recovery api.RecoveryCallableResolver,
 	pointer api.PointerRepresentationResolver,
 	goRuntime api.GoRuntimeContract,
 ) *emitter {
@@ -116,6 +118,7 @@ func newEmitter(
 		require:     require,
 		generic:     generic,
 		cooperative: cooperative,
+		recovery:    recovery,
 		pointer:     pointer,
 		goRuntime:   goRuntime,
 	}
@@ -132,7 +135,7 @@ func (e *emitter) declarationObject(
 	switch source := source.(type) {
 	case *ast.FuncDecl:
 		function, ok := object.(*types.Func)
-		if !ok || context.TypesInfo().Defs[source.Name] != function {
+		if !ok || context.TypesInfo().DefOf(source.Name) != function {
 			return api.DeclarationEmission{},
 				&api.InvariantError{
 					Role:   context.Role(),

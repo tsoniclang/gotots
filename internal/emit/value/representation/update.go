@@ -325,7 +325,7 @@ func constantEvidence(
 	context api.Context,
 	source ast.Expr,
 ) constant.Value {
-	facts, ok := context.TypesInfo().Types[source]
+	facts, ok := context.TypesInfo().TypeAndValue(source)
 	if !ok {
 		return nil
 	}

@@ -13,9 +13,11 @@ import (
 )
 
 type element struct {
-	fieldIndex int
-	source     ast.Expr
-	value      api.ExpressionEmission
+	fieldIndex       int
+	declarationField *types.Var
+	selectedField    *types.Var
+	source           ast.Expr
+	value            api.ExpressionEmission
 }
 
 func Emit(
@@ -275,7 +277,7 @@ func emitRestrictedNamedStruct(
 	))
 	requests = append(requests, zero.Requests()...)
 	for index, element := range elements {
-		field := structType.Field(element.fieldIndex)
+		field := element.selectedField
 		if !field.Exported() &&
 			field.Pkg() != nil &&
 			field.Pkg() != context.TypesPackage() {
@@ -316,7 +318,7 @@ func emitRestrictedNamedStruct(
 			requests = append(requests, stored.Requests()...)
 			continue
 		}
-		name, err := context.Names().Member(field)
+		name, err := context.Names().Member(element.declarationField)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
@@ -380,22 +382,36 @@ func emitElements(
 	seen := make(map[int]struct{}, len(source.Elts))
 	keyedCount := 0
 	for sourceIndex, sourceElement := range source.Elts {
-		fieldIndex := sourceIndex
+		field, fieldOK := context.TypesInfo().StructFieldAt(source, sourceIndex)
 		valueSource := sourceElement
 		if keyed, ok := sourceElement.(*ast.KeyValueExpr); ok {
 			keyedCount++
 			identifier, identifierOK := keyed.Key.(*ast.Ident)
-			field, fieldOK := context.TypesInfo().Uses[identifier].(*types.Var)
-			if !identifierOK || !fieldOK {
+			if !identifierOK {
 				return nil, api.Unsupported(
 					context.WithRole(api.RoleCompositeElement),
 					api.CategoryExpression,
 					sourceElement,
 				)
 			}
-			fieldIndex = structFieldIndex(structType, field)
+			field, fieldOK = context.TypesInfo().StructFieldOf(source, identifier)
+			if !fieldOK {
+				return nil, api.Unsupported(
+					context.WithRole(api.RoleCompositeElement),
+					api.CategoryExpression,
+					sourceElement,
+				)
+			}
 			valueSource = keyed.Value
 		}
+		if !fieldOK {
+			return nil, api.Unsupported(
+				context.WithRole(api.RoleCompositeElement),
+				api.CategoryExpression,
+				sourceElement,
+			)
+		}
+		fieldIndex := field.Index()
 		if fieldIndex < 0 || fieldIndex >= structType.NumFields() {
 			return nil, api.Unsupported(
 				context.WithRole(api.RoleCompositeElement),
@@ -411,8 +427,8 @@ func emitElements(
 			)
 		}
 		seen[fieldIndex] = struct{}{}
-		field := structType.Field(fieldIndex)
-		fieldType := field.Type()
+		selectedField := field.Selected()
+		fieldType := selectedField.Type()
 		valueType := context.TypesInfo().TypeOf(valueSource)
 		if valueType == nil || !types.AssignableTo(valueType, fieldType) {
 			return nil, api.Unsupported(
@@ -444,7 +460,7 @@ func emitElements(
 		requests, err := cooperative.JoinNominalFieldCallableABIs(
 			context.WithRole(api.RoleCompositeElement),
 			named,
-			field,
+			selectedField,
 		)
 		if err != nil {
 			return nil, err
@@ -458,9 +474,11 @@ func emitElements(
 			return nil, err
 		}
 		result = append(result, element{
-			fieldIndex: fieldIndex,
-			source:     valueSource,
-			value:      value,
+			fieldIndex:       fieldIndex,
+			declarationField: field.Declaration(),
+			selectedField:    selectedField,
+			source:           valueSource,
+			value:            value,
 		})
 	}
 	if keyedCount != 0 && keyedCount != len(source.Elts) {

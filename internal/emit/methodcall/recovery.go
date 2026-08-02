@@ -67,7 +67,7 @@ func (i RecoveryInvocation) Call(
 		)
 	}
 	if i.direct {
-		call, requests, err := i.selection.Call(
+		call, requests, err := i.selection.DeferredCall(
 			context,
 			receiver,
 			sourceArguments,
@@ -81,11 +81,7 @@ func (i RecoveryInvocation) Call(
 			"selected-method recovery invocation is invalid",
 		)
 	}
-	arguments, err := i.selection.callArguments(sourceArguments)
-	if err != nil {
-		return nil, nil, err
-	}
-	arguments = append([]tsgo.Expression{receiver}, arguments...)
+	arguments := append([]tsgo.Expression{receiver}, sourceArguments...)
 	arguments = append(arguments, recovery)
 	call := context.Factory().CallExpression(
 		i.reference.Expression(context.Factory()),

@@ -19,7 +19,7 @@ func emitUnsafeBuiltin(
 	kind := unsafeoperation.Classify(builtin)
 	switch {
 	case kind.Constant():
-		facts, ok := context.TypesInfo().Types[source]
+		facts, ok := context.TypesInfo().TypeAndValue(source)
 		if !ok || facts.Type == nil || facts.Value == nil {
 			return api.ExpressionEmission{},
 				true,

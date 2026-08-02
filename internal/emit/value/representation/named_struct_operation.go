@@ -82,7 +82,7 @@ func (owner Owner) namedStructOperationMember(
 				owner.children,
 				source,
 				typeName,
-				named.TypeArgs(),
+				api.TypeArgumentsFromGo(named.TypeArgs()),
 			)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -92,7 +92,7 @@ func (owner Owner) namedStructOperationMember(
 				context,
 				source,
 				operationSet,
-				named.TypeArgs(),
+				api.TypeArgumentsFromGo(named.TypeArgs()),
 			)
 		if emitErr != nil {
 			return api.ExpressionEmission{}, emitErr

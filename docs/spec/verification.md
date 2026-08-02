@@ -240,10 +240,21 @@ The gate exact-joins every concretization to one
 its source-substituted signature. Direct generic bodies remain one definition.
 Concretization count grows with distinct necessary instances, not calls.
 
+The same gate inspects storage, container-storage, and pointer associated-type
+facets. It proves source generic arity is unchanged, each demanded concrete
+marker has one type owner, identity/default cases emit no marker, and every
+private kernel signature uses the canonical projection. Strict compilation is
+rerun after deleting a required marker; the mutation must fail at the concrete
+representation mismatch. Representation-only demand must not create a
+runtime kernel or concretization.
+
 Mutations add an operation parameter, operation object, public specialized
 export, target-spelling key, cast/erased payload, duplicate instance, or
-concretize a transport-only body. Open unsupported exports and intentionally
-unbounded recursive instantiation must fail deterministically.
+concretize a transport-only body. Additional mutations fabricate a hidden
+representation type parameter, omit a demanded associated-type marker, or
+materialize a marker for an undemanded identity case. Open unsupported exports
+and intentionally unbounded recursive instantiation must fail
+deterministically.
 
 ## Function-Control Proof
 
@@ -261,7 +272,11 @@ The integrated fixture covers:
 
 Signature inspection proves ordinary callable/function/interface/provider
 contracts contain no recovery parameter. Private deferred entries are present
-only for recover-capable callables or demanded dynamic signatures.
+only for recover-capable callables. Typed registries exist only for demanded
+dynamic signatures and fall back to ordinary invocation when a value has no
+registered private entry. Provider-facet tests prove both certified presence
+and certified absence; absence must not create a public/bridge-wide recovery
+entry or fail an otherwise valid call.
 
 Mutations make recovery ambient, pass authority through an ordinary source
 call, forward it one call deeper, omit registry registration, key the registry

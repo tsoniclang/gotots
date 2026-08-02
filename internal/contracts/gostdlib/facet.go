@@ -12,6 +12,7 @@ const (
 	FacetNamedStructOperations  FacetKind = "named-struct-operations"
 	FacetDefinedValueOperations FacetKind = "defined-value-operations"
 	FacetRecoveryCallable       FacetKind = "recovery-callable"
+	FacetGenericCallableKernel  FacetKind = "generic-callable-kernel"
 	FacetGenericCallableProfile FacetKind = "generic-callable-profile"
 )
 
@@ -19,6 +20,7 @@ func (k FacetKind) Valid() bool {
 	return k == FacetNamedStructOperations ||
 		k == FacetDefinedValueOperations ||
 		k == FacetRecoveryCallable ||
+		k == FacetGenericCallableKernel ||
 		k == FacetGenericCallableProfile
 }
 
@@ -36,6 +38,7 @@ const (
 	FacetCapabilityAssign         FacetCapability = "assign"
 	FacetCapabilityRepresentation FacetCapability = "representation"
 	FacetCapabilityRecovery       FacetCapability = "recovery"
+	FacetCapabilityKernel         FacetCapability = "kernel"
 	FacetCapabilityProject        FacetCapability = "project"
 	FacetCapabilityWrap           FacetCapability = "wrap"
 )
@@ -103,18 +106,19 @@ type ProviderRepresentationMethodDocument struct {
 }
 
 type FacetDocument struct {
-	Kind                       FacetKind         `json:"kind"`
-	SourceIdentity             string            `json:"sourceIdentity"`
-	Capabilities               []FacetCapability `json:"capabilities,omitempty"`
-	ProfileKey                 string            `json:"profileKey,omitempty"`
-	Export                     string            `json:"export"`
-	StorageExport              string            `json:"storageExport,omitempty"`
-	RepresentationExport       string            `json:"representationExport,omitempty"`
-	Effect                     EffectKind        `json:"effect,omitempty"`
-	ImplementationOwner        string            `json:"implementationOwner"`
-	StorageImplementationOwner string            `json:"storageImplementationOwner,omitempty"`
-	TargetFingerprint          string            `json:"targetFingerprint"`
-	StorageTargetFingerprint   string            `json:"storageTargetFingerprint,omitempty"`
+	Kind                       FacetKind                     `json:"kind"`
+	SourceIdentity             string                        `json:"sourceIdentity"`
+	Capabilities               []FacetCapability             `json:"capabilities,omitempty"`
+	ProfileKey                 string                        `json:"profileKey,omitempty"`
+	Export                     string                        `json:"export"`
+	StorageExport              string                        `json:"storageExport,omitempty"`
+	RepresentationExport       string                        `json:"representationExport,omitempty"`
+	Effect                     EffectKind                    `json:"effect,omitempty"`
+	GenericTypeArguments       []GenericTypeArgumentDocument `json:"genericTypeArguments,omitempty"`
+	ImplementationOwner        string                        `json:"implementationOwner"`
+	StorageImplementationOwner string                        `json:"storageImplementationOwner,omitempty"`
+	TargetFingerprint          string                        `json:"targetFingerprint"`
+	StorageTargetFingerprint   string                        `json:"storageTargetFingerprint,omitempty"`
 }
 
 type facetLookup struct {
@@ -249,6 +253,10 @@ func (f Facet) Effect() EffectKind {
 	return f.facet.Effect
 }
 
+func (f Facet) GenericTypeArguments() []GenericTypeArgumentDocument {
+	return slices.Clone(f.facet.GenericTypeArguments)
+}
+
 func (f Facet) ImplementationOwner() string {
 	return f.facet.ImplementationOwner
 }
@@ -300,6 +308,9 @@ func cloneFacetModule(source FacetModuleDocument) FacetModuleDocument {
 	for index, facet := range source.Facets {
 		result.Facets[index] = facet
 		result.Facets[index].Capabilities = slices.Clone(facet.Capabilities)
+		result.Facets[index].GenericTypeArguments = slices.Clone(
+			facet.GenericTypeArguments,
+		)
 	}
 	return result
 }

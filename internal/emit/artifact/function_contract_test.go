@@ -63,3 +63,36 @@ func TestObservableFunctionContractIgnoresBody(t *testing.T) {
 		t.Fatal("parameter change was absent from the callable signature")
 	}
 }
+
+func TestObservableFunctionContractSeparatesTopLevelRegistration(t *testing.T) {
+	factory := tsgo.NewFactory()
+	function := factory.FunctionDeclaration(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		nil,
+		factory.Identifier("F"),
+		nil,
+		nil,
+		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindVoidKeyword),
+		factory.Block(nil, true),
+	)
+	registration := factory.ExpressionStatement(factory.CallExpression(
+		factory.Identifier("register"),
+		nil,
+		nil,
+		[]tsgo.Expression{factory.Identifier("F")},
+		tsgo.NodeFlagsNone,
+	))
+	contract, err := ProjectContract(
+		factory,
+		[]tsgo.Statement{function, registration},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contract.hasFacet(api.ArtifactFacetCallableSignature) {
+		t.Fatal("callable signature facet is absent")
+	}
+	if !contract.hasFacet(api.ArtifactFacetImplementation) {
+		t.Fatal("top-level registration implementation facet is absent")
+	}
+}

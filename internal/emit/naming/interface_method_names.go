@@ -69,6 +69,7 @@ func (n *File) MethodTarget(
 			api.MethodTargetClassMember,
 			member,
 			api.MethodReceiverABISourceRepresentation,
+			false,
 			dependency,
 		)
 	case targetBindingEnvironment:
@@ -84,6 +85,7 @@ func (n *File) MethodTarget(
 			api.MethodTargetEnvironmentFunction,
 			reference.Name(),
 			api.MethodReceiverABISourceRepresentation,
+			false,
 			reference.Requests()...,
 		)
 	case targetBindingProvider:
@@ -118,6 +120,7 @@ func (n *File) MethodTarget(
 			api.MethodTargetClassMember,
 			binding.providerMember,
 			api.MethodReceiverABIContractDirect,
+			true,
 		)
 	case targetBindingMissingProvider:
 		contract, err := environmentcontract.Describe(method)

@@ -11,7 +11,10 @@ import {
   Reader as BufferedReader,
   Writer as BufferedWriter,
 } from "../src/bufio.js";
-import { AsType, Is, New, state as errorState } from "../src/errors.js";
+import { Is, New, state as errorState } from "../src/errors.js";
+import {
+  ErrorsAsTypeKernel as AsType,
+} from "../src/internal/facets/generic-errors-kernel.js";
 import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 import {
   bytes,

@@ -3,7 +3,10 @@ import test from "node:test";
 
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
-import { Compare, Or } from "../src/cmp.js";
+import {
+  CmpCompareKernel as Compare,
+  CmpOrKernel as Or,
+} from "../src/internal/facets/generic-cmp-kernel.js";
 import {
   Abs,
   Copysign,

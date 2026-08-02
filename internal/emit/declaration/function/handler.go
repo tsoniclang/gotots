@@ -21,7 +21,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
 
-	functionObject, ok := context.TypesInfo().Defs[source.Name].(*types.Func)
+	functionObject, ok := context.TypesInfo().DefOf(source.Name).(*types.Func)
 	if !ok {
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)

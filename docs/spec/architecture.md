@@ -381,6 +381,29 @@ Generic named types retain exactly their declared type parameters. Closed
 representation operations may be private specialized artifacts; they do not
 change public type arity.
 
+Open generic bodies refer to representation through three closed associated
+type facets owned by the representation classifier:
+
+```ts
+type GoStorage<T> = T extends GoStoredValue<infer S> ? S : T;
+type GoContainerStorage<T> = T extends GoContainerStoredValue<infer S> ? S : T;
+type GoPointerType<T> =
+  T extends GoPointerRepresentedValue<infer P> ? P : GoPointer<T, T>;
+```
+
+Concrete generated classes declare only the demanded zero-runtime
+`unique symbol` marker members. The marker target is the already-selected
+logical, storage, container-storage, or pointer representation; it never
+chooses representation itself. A provider certificate must prove an
+equivalent marker for a non-default provider representation. Identity storage
+and the canonical logical pointer carrier use the conditional fallback and
+need no marker.
+
+These facets do not add source type parameters, source value parameters,
+runtime dispatch, casts, or operation kernels. A private kernel is selected
+only when the body requires a runtime operation; representation-only demand
+remains one direct generic declaration.
+
 ## Panic, Recover, Defer, And Control
 
 `runtime/panic.ts` owns one typed Go panic carrier. Generated Go runtime
@@ -489,6 +512,13 @@ Generated inputs cross the inverse bridge only where representation differs.
 Nested callbacks, tuples, containers, fields, and results follow the same
 type-directed boundary rule. Missing or ambiguous conversion fails
 certification; TypeScript assignability alone is not semantic evidence.
+
+A provider recovery facet is an optional closed certificate for one exact Go
+callable. Presence selects that provider's private recovery-aware entry for a
+deferred call. Absence selects the ordinary source-shaped entry; it is not an
+error and cannot trigger inference, a generated bridge-wide recovery method,
+or a hidden argument. Public provider interfaces and ambient declarations
+never contain recovery authority.
 
 Representation-dependent provider generics use direct exact TypeScript when
 possible. Otherwise a reached exact instance selects a private generated

@@ -122,7 +122,8 @@ func methodABIReceiver(
 			Reason: "method target receiver ABI is invalid",
 		}
 	}
-	return signature.Recv().Type(), target.ReceiverABI(), nil
+	return signature.Recv().Type(),
+		target.ReceiverABI(), nil
 }
 
 func adaptPointerMethodReceiver(

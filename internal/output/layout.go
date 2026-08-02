@@ -191,6 +191,14 @@ func GenericCapabilityPath(artifactKey string) (string, error) {
 	return generatedArtifactPath("generics/capabilities", artifactKey)
 }
 
+func GenericConcretizationPath(artifactKey string) (string, error) {
+	return generatedArtifactPath("generics/concretizations", artifactKey)
+}
+
+func DeferredCallableRegistryPath(artifactKey string) (string, error) {
+	return generatedArtifactPath("callables/deferred", artifactKey)
+}
+
 func AnonymousInterfacePath(artifactKey string) (string, error) {
 	return generatedArtifactPath("interfaces/contracts", artifactKey)
 }

@@ -122,6 +122,19 @@ func (staticSpecializationNames) RecoveryCallable(
 	panic("unused")
 }
 
+func (staticSpecializationNames) DeferredCallable(
+	*types.Func,
+	string,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) DeferredCallableRegistry(
+	*types.Signature,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) MethodTarget(
 	*types.Func,
 ) (api.MethodTarget, error) {

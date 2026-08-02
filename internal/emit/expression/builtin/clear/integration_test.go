@@ -39,12 +39,21 @@ func TestClearBuiltinsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		"goSliceClear(values, 0)",
 		"values.clear()",
 		"clear()",
-		"export function ClearGeneric<C>",
+		"export function clearGeneric$kernel<C>",
 		"$go$clear_",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("clear artifact lacks %q:\n%s", required, printed)
 		}
+	}
+	if strings.Contains(printed, "export function clearGeneric<C>") {
+		t.Fatalf("clear artifact restored a public hidden-capability ABI:\n%s", printed)
+	}
+	if count := strings.Count(
+		printed,
+		"export function clearGeneric$concrete_",
+	); count != 2 {
+		t.Fatalf("generic clear concretizations = %d, want map and slice", count)
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeClearFile(t, runnerPath, fmt.Sprintf(`import {

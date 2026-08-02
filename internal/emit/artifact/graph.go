@@ -146,7 +146,7 @@ func (g *Graph) commit(
 
 	if len(current.history.entries) == 0 {
 		current.history.initialize(nextContract)
-		for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
+		for facet := api.ArtifactFacetCallableSignature; facet < api.ArtifactFacetCount; facet++ {
 			if !nextContract.hasFacet(facet) {
 				continue
 			}

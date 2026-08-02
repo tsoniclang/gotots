@@ -92,6 +92,17 @@ func TestPredeclaredErrorRequiresLanguageProviderInterfaceCertificate(
 	}
 }
 
+func TestPredeclaredErrorIsLanguageOwnedWithoutProvider(t *testing.T) {
+	registry := NewRegistry()
+	typeName, ok := types.Universe.Lookup("error").(*types.TypeName)
+	if !ok {
+		t.Fatal("predeclared error type is absent")
+	}
+	if _, providerOwned, err := registry.ProviderInterface(typeName); err != nil || providerOwned {
+		t.Fatalf("source-only error = provider %t, error %v", providerOwned, err)
+	}
+}
+
 func TestMissingProviderMethodReportsCanonicalSourceIdentity(t *testing.T) {
 	selectedPackage := types.NewPackage("encoding/base64", "base64")
 	typeName := types.NewTypeName(

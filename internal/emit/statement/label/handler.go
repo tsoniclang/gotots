@@ -17,7 +17,7 @@ func Emit(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	label, ok := context.TypesInfo().Defs[source.Label].(*types.Label)
+	label, ok := context.TypesInfo().DefOf(source.Label).(*types.Label)
 	if !ok {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source.Label)

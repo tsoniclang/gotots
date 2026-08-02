@@ -14,6 +14,13 @@ type StatefulProfileSelection struct {
 	requests      []api.RootRequest
 }
 
+type StatefulMethodBoundary struct {
+	method              gostdlib.ProviderStatefulProfileMethod
+	canonicalParameters []int
+	canonicalResults    []int
+	requests            []api.RootRequest
+}
+
 func ResolveStatefulProfile(
 	context api.Context,
 	source *types.Named,
@@ -156,30 +163,83 @@ func ResolveStatefulMethodEffect(
 			"provider stateful-profile method is invalid",
 		)
 	}
-	owner := api.MethodReceiverTypeName(method.Origin())
-	if owner == nil {
-		return gostdlib.EffectInvalid, false, nil, nil
-	}
-	named, ok := types.Unalias(owner.Type()).(*types.Named)
+	signature, ok := method.Origin().Type().(*types.Signature)
 	if !ok {
-		return gostdlib.EffectInvalid, false, nil, nil
+		return gostdlib.EffectInvalid, false, nil, boundaryInvariant(
+			context,
+			"provider stateful-profile method signature is invalid",
+		)
 	}
-	selection, selected, err := ResolveStatefulProfile(context, named)
+	selection, selected, err := ResolveStatefulMethodBoundary(
+		context,
+		method,
+		signature,
+	)
 	if err != nil || !selected {
 		return gostdlib.EffectInvalid, false, selection.Requests(), err
 	}
+	return selection.Method().Effect(), true, selection.Requests(), nil
+}
+
+func ResolveStatefulMethodBoundary(
+	context api.Context,
+	method *types.Func,
+	signature *types.Signature,
+) (StatefulMethodBoundary, bool, error) {
+	if method == nil || method.Origin() == nil || signature == nil {
+		return StatefulMethodBoundary{}, false, boundaryInvariant(
+			context,
+			"provider stateful-profile method boundary is invalid",
+		)
+	}
+	owner := api.MethodReceiverTypeName(method.Origin())
+	if owner == nil {
+		return StatefulMethodBoundary{}, false, nil
+	}
+	named, ok := types.Unalias(owner.Type()).(*types.Named)
+	if !ok {
+		return StatefulMethodBoundary{}, false, nil
+	}
+	selection, selected, err := ResolveStatefulProfile(context, named)
+	if err != nil || !selected {
+		return StatefulMethodBoundary{
+			requests: selection.Requests(),
+		}, false, err
+	}
 	identity, err := sourceObjectIdentity(method.Origin())
 	if err != nil {
-		return gostdlib.EffectInvalid, false, nil, err
+		return StatefulMethodBoundary{}, false, err
 	}
 	profileMethod, ok := selection.profile.Method(identity)
 	if !ok || !profileMethod.Effect().Valid() {
-		return gostdlib.EffectInvalid, false, nil, boundaryInvariant(
+		return StatefulMethodBoundary{}, false, boundaryInvariant(
 			context,
 			"selected provider stateful profile omits method "+identity,
 		)
 	}
-	return profileMethod.Effect(), true, selection.Requests(), nil
+	boundary, err := analyzeCallableProfileBoundary(context, signature)
+	if err != nil {
+		return StatefulMethodBoundary{}, false, err
+	}
+	canonical := make(map[string]struct{}, len(selection.profile.Interfaces()))
+	for _, selectedInterface := range selection.profile.Interfaces() {
+		canonical[selectedInterface.SourceIdentity()] = struct{}{}
+	}
+	return StatefulMethodBoundary{
+		method: profileMethod,
+		canonicalParameters: rootsContainingIdentities(
+			boundary.parameterInterfaces,
+			canonical,
+		),
+		canonicalResults: rootsContainingIdentities(
+			boundary.resultInterfaces,
+			canonical,
+		),
+		requests: api.CombineRequests(
+			selection.Requests(),
+			boundary.analyzer.requests,
+		),
+	}, true, nil
 }
 
 func (s StatefulProfileSelection) Profile() gostdlib.ProviderStatefulProfile {
@@ -191,6 +251,22 @@ func (s StatefulProfileSelection) TypeArguments() []types.Type {
 }
 
 func (s StatefulProfileSelection) Requests() []api.RootRequest {
+	return api.CombineRequests(s.requests)
+}
+
+func (s StatefulMethodBoundary) Method() gostdlib.ProviderStatefulProfileMethod {
+	return s.method
+}
+
+func (s StatefulMethodBoundary) CanonicalParameters() []int {
+	return append([]int(nil), s.canonicalParameters...)
+}
+
+func (s StatefulMethodBoundary) CanonicalResults() []int {
+	return append([]int(nil), s.canonicalResults...)
+}
+
+func (s StatefulMethodBoundary) Requests() []api.RootRequest {
 	return api.CombineRequests(s.requests)
 }
 

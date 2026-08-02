@@ -357,7 +357,8 @@ func TestEmbeddedInterfacePromotionUsesInterfaceDispatch(t *testing.T) {
 				"GoPointer.direct<Holder__from_embeddedinterface>",
 				").Reader;",
 				"goInterfaceNonNil",
-				".Read($go$recovery)",
+				".Read()",
+				".Read$deferred($go$recovery)",
 			} {
 				if !strings.Contains(adapter, required) {
 					t.Fatalf(
@@ -371,6 +372,7 @@ func TestEmbeddedInterfacePromotionUsesInterfaceDispatch(t *testing.T) {
 				"Reader_Read",
 				"$fromStorage(",
 				"switch (",
+				".Read($go$recovery)",
 			} {
 				if strings.Contains(adapter, forbidden) {
 					t.Fatalf(

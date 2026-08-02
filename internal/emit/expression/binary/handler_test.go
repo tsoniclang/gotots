@@ -247,6 +247,19 @@ func (unusedNames) RecoveryCallable(
 	panic("unused")
 }
 
+func (unusedNames) DeferredCallable(
+	*types.Func,
+	string,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) DeferredCallableRegistry(
+	*types.Signature,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) MethodTarget(*types.Func) (api.MethodTarget, error) {
 	panic("unused")
 }

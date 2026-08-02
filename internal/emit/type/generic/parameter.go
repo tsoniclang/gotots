@@ -46,7 +46,7 @@ func Emit(
 			children,
 			source,
 			object,
-			arguments,
+			api.TypeArgumentsFromGo(arguments),
 		)
 	if err != nil {
 		return api.TypeEmission{}, true, err

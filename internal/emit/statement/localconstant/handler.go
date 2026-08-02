@@ -37,7 +37,7 @@ func Emit(
 		}
 		declarations := make([]tsgo.VariableDeclaration, 0, len(spec.Names))
 		for _, sourceName := range spec.Names {
-			selected, ok := context.TypesInfo().Defs[sourceName].(*types.Const)
+			selected, ok := context.TypesInfo().DefOf(sourceName).(*types.Const)
 			if !ok {
 				return api.StatementEmission{},
 					api.Unsupported(

@@ -280,7 +280,7 @@ func stateGotoLocal(
 	if name == nil || name.Name == "_" {
 		return gotoLocal{}, nil
 	}
-	object, ok := context.TypesInfo().Defs[name].(*types.Var)
+	object, ok := context.TypesInfo().DefOf(name).(*types.Var)
 	if !ok {
 		return gotoLocal{}, api.Unsupported(
 			context.WithRole(api.RoleLocalDeclaration),

@@ -267,7 +267,7 @@ func sourceInterface(
 	for _, candidate := range declaration.Specs {
 		source, ok := candidate.(*ast.TypeSpec)
 		if ok &&
-			context.TypesInfo().Defs[source.Name] == typeName {
+			context.TypesInfo().DefOf(source.Name) == typeName {
 			return source, interfaceType, true
 		}
 	}

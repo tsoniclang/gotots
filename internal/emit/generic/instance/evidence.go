@@ -3,14 +3,16 @@ package instance
 import (
 	"go/ast"
 	"go/types"
+
+	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
 func FunctionEvidence(
-	info *types.Info,
+	info api.TypeInfoView,
 	source ast.Expr,
-) (*types.Func, types.Instance, bool) {
-	if info == nil || source == nil {
-		return nil, types.Instance{}, false
+) (*types.Func, api.TypeInstance, bool) {
+	if !info.Valid() || source == nil {
+		return nil, api.TypeInstance{}, false
 	}
 	base := source
 	switch selected := source.(type) {
@@ -24,17 +26,17 @@ func FunctionEvidence(
 	case *ast.Ident:
 		identifier = selected
 	case *ast.SelectorExpr:
-		if info.Selections[selected] != nil {
-			return nil, types.Instance{}, false
+		if info.SelectionOf(selected) != nil {
+			return nil, api.TypeInstance{}, false
 		}
 		identifier = selected.Sel
 	default:
-		return nil, types.Instance{}, false
+		return nil, api.TypeInstance{}, false
 	}
-	instance, instantiated := info.Instances[identifier]
-	owner, function := info.Uses[identifier].(*types.Func)
+	instance, instantiated := info.InstanceOf(identifier)
+	owner, function := info.UseOf(identifier).(*types.Func)
 	if !instantiated || !function || owner.Origin() == nil {
-		return nil, types.Instance{}, false
+		return nil, api.TypeInstance{}, false
 	}
 	return owner.Origin(), instance, true
 }

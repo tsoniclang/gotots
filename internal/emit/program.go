@@ -72,6 +72,7 @@ type programSession struct {
 	environmentBuilders     map[*load.Package]*environmentContractBuilder
 	packageInitializations  *packageInitializationScheduler
 	genericOperations       map[genericOperationIdentity]*api.GenericOperationContract
+	genericConcretizations  map[genericConcretizationIdentity]*api.GenericConcretization
 	genericProfiles         map[genericCallableProfileIdentity]*api.GenericCallableProfile
 	classMembers            map[*types.Func]classMemberContribution
 	goRuntime               *gocontract.Contract
@@ -329,6 +330,7 @@ func newProgramSession(
 		environmentBuilders:    make(map[*load.Package]*environmentContractBuilder),
 		packageInitializations: newPackageInitializationScheduler(),
 		genericOperations:      make(map[genericOperationIdentity]*api.GenericOperationContract),
+		genericConcretizations: make(map[genericConcretizationIdentity]*api.GenericConcretization),
 		genericProfiles:        make(map[genericCallableProfileIdentity]*api.GenericCallableProfile),
 		classMembers:           make(map[*types.Func]classMemberContribution),
 		goRuntime:              goRuntime,
@@ -345,6 +347,7 @@ func newProgramSession(
 			options.EvaluationOrder,
 			options.ConcurrencySemantics,
 			session.require,
+			session,
 			session,
 			session,
 			session,

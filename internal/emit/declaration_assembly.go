@@ -391,28 +391,56 @@ func (s *programSession) buildArtifactRevision(
 	var contract artifactstate.Contract
 	switch result.Disposition() {
 	case api.DeclarationDispositionMaterialized:
-		contract, err = artifactstate.ProjectContract(s.factory, statements)
+		publicName, nameErr := names.Declare(owner)
+		if nameErr != nil {
+			err = nameErr
+			break
+		}
+		contract, err = artifactstate.ProjectSourceContract(
+			s.factory,
+			publicName,
+			result.AdditionalPackageBindings(),
+			statements,
+		)
 	case api.DeclarationDispositionCoverageOnly:
 		contract, err = artifactstate.ProjectCoverageContract(
 			s.factory,
 			statements,
 		)
 	case api.DeclarationDispositionClassMemberContribution:
-		if contribution == nil || len(statements) != 0 {
+		if contribution == nil {
 			err = &ScheduleError{
 				Object: owner.Name(),
 				Reason: "class-member artifact lost its contribution",
 			}
 			break
 		}
-		contract, err = artifactstate.ProjectClassMemberContract(
+		contract, err = artifactstate.ProjectClassMemberArtifactContract(
 			s.factory,
 			contribution.members,
+			statements,
 		)
 	default:
 		err = &ScheduleError{
 			Object: owner.Name(),
 			Reason: "declaration emission disposition is invalid",
+		}
+	}
+	if err == nil {
+		if function, callable := owner.(*types.Func); callable {
+			recovery, recoveryErr := sourceCallableRecoveryRequirement(
+				function,
+				requirements,
+			)
+			if recoveryErr != nil {
+				err = recoveryErr
+			} else {
+				contract, err = artifactstate.WithCallableRecovery(
+					contract,
+					s.factory,
+					recovery,
+				)
+			}
 		}
 	}
 	if err != nil {

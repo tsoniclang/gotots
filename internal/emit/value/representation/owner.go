@@ -477,7 +477,7 @@ func ownsFreshValue(context api.Context, source ast.Node) bool {
 	case *ast.ParenExpr:
 		return ownsFreshValue(context, source.X)
 	case *ast.SelectorExpr:
-		selection := context.TypesInfo().Selections[source]
+		selection := context.TypesInfo().SelectionOf(source)
 		return selection != nil &&
 			selection.Kind() == types.FieldVal &&
 			!selection.Indirect() &&

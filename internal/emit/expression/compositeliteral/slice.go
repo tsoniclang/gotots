@@ -137,7 +137,8 @@ func emitSliceElements(
 		valueSource := sourceElement
 		if keyedElement, ok := sourceElement.(*ast.KeyValueExpr); ok {
 			keyed = true
-			keyValue := context.TypesInfo().Types[keyedElement.Key].Value
+			keyFacts, _ := context.TypesInfo().TypeAndValue(keyedElement.Key)
+			keyValue := keyFacts.Value
 			if keyValue == nil {
 				return nil, 0, false,
 					api.Unsupported(

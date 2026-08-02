@@ -18,16 +18,18 @@ func Valid(
 		source.Sel == nil ||
 		selected == nil ||
 		selected.Kind() != kind ||
-		context.TypesInfo().Selections[source] != selected ||
-		context.TypesInfo().Uses[source.Sel] != selected.Obj() {
+		context.TypesInfo().SelectionOf(source) != selected ||
+		context.TypesInfo().UseOf(source.Sel) != selected.Obj() {
 		return false
 	}
 	receiver := context.TypesInfo().TypeOf(source.X)
 	result := context.TypesInfo().TypeOf(source)
+	selectedReceiver := selected.Recv()
+	selectedResult := selected.Type()
 	return receiver != nil &&
 		result != nil &&
-		types.Identical(receiver, selected.Recv()) &&
-		types.Identical(result, selected.Type())
+		types.Identical(receiver, selectedReceiver) &&
+		types.Identical(result, selectedResult)
 }
 
 type path struct {
@@ -36,7 +38,10 @@ type path struct {
 	effective types.Type
 }
 
-func fieldPath(selected *types.Selection) (path, bool) {
+func fieldPath(
+	context api.Context,
+	selected *types.Selection,
+) (path, bool) {
 	if selected == nil || selected.Kind() != types.FieldVal {
 		return path{}, false
 	}
@@ -45,10 +50,13 @@ func fieldPath(selected *types.Selection) (path, bool) {
 		result.fields[len(result.fields)-1] != selected.Obj() {
 		return path{}, false
 	}
-	return result, true
+	return contextualPath(context, result)
 }
 
-func methodPath(selected *types.Selection) (path, *types.Func, bool) {
+func methodPath(
+	context api.Context,
+	selected *types.Selection,
+) (path, *types.Func, bool) {
 	if selected == nil ||
 		(selected.Kind() != types.MethodVal &&
 			selected.Kind() != types.MethodExpr) {
@@ -83,7 +91,24 @@ func methodPath(selected *types.Selection) (path, *types.Func, bool) {
 		signature.TypeParams().Len() != 0 {
 		return path{}, nil, false
 	}
-	return result, method, true
+	result, ok = contextualPath(context, result)
+	return result, method, ok
+}
+
+func contextualPath(context api.Context, source path) (path, bool) {
+	root := source.root
+	effective := source.effective
+	if root == nil || effective == nil {
+		return path{}, false
+	}
+	if len(source.fields) != 0 &&
+		(!types.Identical(root, source.root) ||
+			!types.Identical(effective, source.effective)) {
+		return path{}, false
+	}
+	source.root = root
+	source.effective = effective
+	return source, true
 }
 
 func selectedMethod(sourceType types.Type, index int) (*types.Func, bool) {

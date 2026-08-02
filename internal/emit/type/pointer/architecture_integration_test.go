@@ -19,7 +19,7 @@ func TestDirectNamedStructPointersAndGenericFacetsMatchGo(
 
 type Box struct { Value int32 }
 
-func Replace[T any](pointer *T, value T) T {
+func replace[T any](pointer *T, value T) T {
 	previous := *pointer
 	*pointer = value
 	return previous
@@ -33,7 +33,7 @@ func Direct(value int32) (int32, int32, bool) {
 	box := Box{Value: value}
 	pointer := &box
 	alias := pointer
-	previous := Replace(pointer, Box{Value: value + 2})
+	previous := replace(pointer, Box{Value: value + 2})
 	return previous.Value, pointer.Value, pointer == alias
 }
 
@@ -64,7 +64,8 @@ fmt.Println(pointer.NewBox(7).Value)
 	for _, required := range []string{
 		"function NewBox(value: int32): Box | undefined",
 		"static $assign(",
-		"T$Pointer",
+		"GoPointerType<T>",
+		"class Box implements GoPointerRepresentedValue<Box>",
 	} {
 		if !strings.Contains(typescript, required) {
 			t.Fatalf("direct pointer output lacks %q:\n%s", required, typescript)
@@ -93,7 +94,7 @@ type Box[T any] struct { Value T }
 type Left struct { Value int32 ` + "`json:\"left\"`" + ` }
 type Right struct { Value int32 ` + "`json:\"right\"`" + ` }
 
-func Replace[T any](pointer *T, value T) T {
+func replace[T any](pointer *T, value T) T {
 	previous := *pointer
 	*pointer = value
 	return previous
@@ -111,14 +112,14 @@ func SliceAlias(value int32) (int32, int32, bool) {
 	values := []Box[int32]{{Value: value}}
 	alias := values[:]
 	pointer := &values[0]
-	previous := Replace(pointer, Box[int32]{Value: value + 2})
+	previous := replace(pointer, Box[int32]{Value: value + 2})
 	pointer.Value++
 	return previous.Value, alias[0].Value, pointer == &alias[0]
 }
 
 func Scalar(value int32) (int32, int32) {
 	pointer := &value
-	previous := Replace(pointer, value + 3)
+	previous := replace(pointer, value + 3)
 	return previous, value
 }
 
@@ -178,11 +179,11 @@ fmt.Println(pointer.StringPointer("ok").Value)
 	for _, required := range []string{
 		"GoPointer<Box<int32",
 		"function DirectInt(value: int32): GoPointer<Box<int32",
-		"RuntimeSlice.literal<Box$Storage<int32, int32>>",
+		"RuntimeSlice.literal<Box$Storage<int32>>",
 		"goSliceAddress<Box<int32",
 		"GoPointer.view<Left, Right",
 		"goPointerHash",
-		"function StringPointer(value: gostring): GoPointer<Box<gostring, gostring>",
+		"function StringPointer(value: gostring): GoPointer<Box<gostring>, Box$Storage<gostring>>",
 	} {
 		if !strings.Contains(typescript, required) {
 			t.Fatalf("carrier pointer output lacks %q:\n%s", required, typescript)
@@ -264,7 +265,13 @@ fmt.Println(pointer.GenericNil())
 	}
 	if !strings.Contains(
 		typescript,
-		"Shelf.Put<int32, int32>(GoPointer.objectField",
+		"static Put$kernel<T>(s: GoPointer<Shelf<T>, Shelf$Storage<T>>",
+	) || !strings.Contains(
+		typescript,
+		"Put$concrete_",
+	) || !strings.Contains(
+		typescript,
+		"GoPointer.objectField<Shelf<int32>",
 	) {
 		t.Fatalf(
 			"generic receiver did not use its declaration ABI:\n%s",
@@ -341,7 +348,7 @@ fmt.Println(pointer.ForeignAdapter().Ready())
 	}
 	if !strings.Contains(
 		typescript,
-		"static Set<K, V, V$Storage>(ledger: GoPointer<Ledger<K, V, V$Storage>",
+		"static Set$kernel<K, V>(ledger: GoPointer<Ledger<K, V>, Ledger$Storage<K, V>>",
 	) {
 		t.Fatalf("foreign generic method lacks the family carrier ABI:\n%s", typescript)
 	}

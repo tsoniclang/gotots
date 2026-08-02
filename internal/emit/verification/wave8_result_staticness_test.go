@@ -128,7 +128,7 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 		t.Fatal(err)
 	}
 	artifacts := materializeArtifacts(t, emission, t.TempDir())
-	abi := "(($0: gostring, $go$recovery?: GoRecovery) => void) | undefined"
+	abi := "(($0: gostring) => void) | undefined"
 	for _, required := range []string{
 		"public Call: " + abi,
 		"$Value = " + abi,
@@ -140,6 +140,9 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 			t.Fatalf("signature-owned callable ABI lacks %q", required)
 		}
 	}
+	if strings.Contains(artifacts.printed, "($0: gostring, $go$recovery") {
+		t.Fatalf("source callable carrier exposes recovery authority")
+	}
 	ordinary := targetFunctionText(t, artifacts.printed, "recoveredTrace")
 	ordinaryCallee := regexp.MustCompile(
 		`const (__gotots_callee_[0-9]+) = invoke;`,
@@ -149,18 +152,23 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 		strings.Contains(ordinary, ordinaryCallee[1]+"($go$recovery);") {
 		t.Fatalf("ordinary invocation did not omit recovery authority:\n%s", ordinary)
 	}
-	deferredCall := regexp.MustCompile(
-		`__gotots_callee_[0-9]+\(__gotots_argument_[0-9]+, \$go\$recovery\);`,
-	)
 	for _, name := range []string{
 		"recoverFunctionField",
 		"recoverFunctionPointer",
 		"recoverFunctionSlice",
 	} {
 		target := targetFunctionText(t, artifacts.printed, name)
-		if !deferredCall.MatchString(target) {
+		callee := regexp.MustCompile(
+			`const (__gotots_callee_[0-9]+).* = `,
+		).FindStringSubmatch(target)
+		if len(callee) != 2 ||
+			!strings.Contains(target, ".resolve("+callee[1]+")") ||
+			!regexp.MustCompile(
+				`__gotots_deferred_[0-9]+\(\$go\$recovery, __gotots_argument_[0-9]+\)`,
+			).MatchString(target) ||
+			strings.Contains(target, callee[1]+"($go$recovery") {
 			t.Fatalf(
-				"deferred %s invocation did not supply recovery authority:\n%s",
+				"deferred %s invocation did not privately resolve recovery authority:\n%s",
 				name,
 				target,
 			)
@@ -175,12 +183,15 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 		`const (__gotots_callee_[0-9]+): .* = selected\.\$value;`,
 	).FindStringSubmatch(defined)
 	if len(definedCallee) != 2 ||
+		!strings.Contains(
+			defined,
+			".resolve("+definedCallee[1]+")",
+		) ||
 		!regexp.MustCompile(
-			regexp.QuoteMeta(definedCallee[1])+
-				`\(__gotots_argument_[0-9]+, \$go\$recovery\);`,
+			`__gotots_deferred_[0-9]+\(\$go\$recovery, __gotots_argument_[0-9]+\)`,
 		).MatchString(defined) {
 		t.Fatalf(
-			"defined deferred callable did not consume the signature ABI:\n%s",
+			"defined deferred callable did not consume the private registry ABI:\n%s",
 			defined,
 		)
 	}

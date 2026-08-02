@@ -18,10 +18,32 @@ func emitReceiver(
 	[]api.RootRequest,
 	error,
 ) {
+	name, err := context.Names().Parameter(
+		signature.Recv(),
+		signature.Params().Len(),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return emitReceiverNamed(context, children, source, signature, name)
+}
+
+func emitReceiverNamed(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.FuncDecl,
+	signature *types.Signature,
+	name string,
+) (
+	tsgo.ParameterDeclaration,
+	[]api.RootRequest,
+	error,
+) {
 	if source.Recv == nil ||
 		len(source.Recv.List) != 1 ||
 		len(source.Recv.List[0].Names) > 1 ||
-		signature.Recv() == nil {
+		signature.Recv() == nil ||
+		name == "" {
 		return nil, nil,
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
@@ -62,7 +84,7 @@ func emitReceiver(
 				api.Unsupported(context, api.CategoryDeclaration, field)
 		}
 	case 1:
-		if context.TypesInfo().Defs[field.Names[0]] != signature.Recv() {
+		if context.TypesInfo().DefOf(field.Names[0]) != signature.Recv() {
 			return nil, nil,
 				api.Unsupported(context, api.CategoryDeclaration, field)
 		}
@@ -73,13 +95,6 @@ func emitReceiver(
 	targetType, err := children.Type(
 		context.WithRole(api.RoleReceiverType),
 		field.Type,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	name, err := context.Names().Parameter(
-		signature.Recv(),
-		signature.Params().Len(),
 	)
 	if err != nil {
 		return nil, nil, err
