@@ -180,6 +180,10 @@
       "types": "./dist/src/internal/facets/provider-bufio-reader.d.ts",
       "default": "./dist/src/internal/facets/provider-bufio-reader.js"
     },
+    "./internal/facets/provider-bufio-scanner.js": {
+      "types": "./dist/src/internal/facets/provider-bufio-scanner.d.ts",
+      "default": "./dist/src/internal/facets/provider-bufio-scanner.js"
+    },
     "./internal/facets/provider-bufio-writer.js": {
       "types": "./dist/src/internal/facets/provider-bufio-writer.d.ts",
       "default": "./dist/src/internal/facets/provider-bufio-writer.js"

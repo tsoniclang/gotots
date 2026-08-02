@@ -1003,6 +1003,118 @@
       ]
     },
     {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewScanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "NewScannerCanonicalAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "bufio|kind=3|receiver=|name=ErrBadReadCount",
+        "bufio|kind=3|receiver=|name=ErrTooLong",
+        "io|kind=3|receiver=|name=EOF",
+        "io|kind=3|receiver=|name=ErrNoProgress"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewScanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "NewScannerCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "bufio|kind=3|receiver=|name=ErrBadReadCount",
+        "bufio|kind=3|receiver=|name=ErrTooLong",
+        "io|kind=3|receiver=|name=EOF",
+        "io|kind=3|receiver=|name=ErrNoProgress"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewScanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "NewScannerCanonicalAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "bufio|kind=3|receiver=|name=ErrBadReadCount",
+        "bufio|kind=3|receiver=|name=ErrTooLong",
+        "io|kind=3|receiver=|name=EOF",
+        "io|kind=3|receiver=|name=ErrNoProgress"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewScanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "NewScannerCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "bufio|kind=3|receiver=|name=ErrBadReadCount",
+        "bufio|kind=3|receiver=|name=ErrTooLong",
+        "io|kind=3|receiver=|name=EOF",
+        "io|kind=3|receiver=|name=ErrNoProgress"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ]
+    },
+    {
       "sourceIdentity": "bufio|kind=4|receiver=|name=NewWriter",
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
       "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
@@ -2235,6 +2347,86 @@
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
       "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
       "export": "CanonicalReaderSync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "CanonicalScannerAsync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "CanonicalScannerSync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "CanonicalScannerAsync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "CanonicalScannerSync",
       "interfaces": [
         {
           "sourceIdentity": "go:universe|error",

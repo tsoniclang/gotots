@@ -387,11 +387,10 @@ func retainedProviderInterfaces(
 				}
 			}
 		case *types.Signature:
-			return certifyError(
-				"derive provider stateful profile",
-				types.TypeString(selected, nil),
-				"retained callable ABI requires its own certified profile owner",
-			)
+			if err := collect(selected.Params()); err != nil {
+				return err
+			}
+			return collect(selected.Results())
 		case *types.Interface:
 			return certifyError(
 				"derive provider stateful profile",

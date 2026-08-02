@@ -13,6 +13,10 @@ import type {
 } from "./io.js";
 import { state as ioState } from "./io.js";
 import { ProviderError } from "./internal/runtime/error.js";
+import {
+  CanonicalScannerSync,
+  NewScannerCanonicalSync,
+} from "./internal/facets/provider-bufio-scanner.js";
 
 class BufferedReader {
   constructor(
@@ -68,82 +72,28 @@ function requireReader(receiver: Reader | undefined): Reader {
 }
 
 export class Scanner {
-  readonly #buffer: uint8[] = [];
-  #done = false;
-  #emptyReads = 0;
-  #failure: GoError | undefined;
-  #pendingFailure: GoError | undefined;
-  #token: gostring = "";
+  readonly #implementation: CanonicalScannerSync<GoError, IoReader>;
 
-  constructor(private readonly source: IoReader | undefined) {}
+  constructor(source: IoReader | undefined) {
+    this.#implementation = NewScannerCanonicalSync(
+      source,
+      state.ErrBadReadCount,
+      state.ErrTooLong,
+      ioState.EOF,
+      ioState.ErrNoProgress,
+    );
+  }
 
   static Err(receiver: Scanner | undefined): GoError | undefined {
-    return requireScanner(receiver).#failure;
+    return CanonicalScannerSync.Err(requireScanner(receiver).#implementation);
   }
 
   static Scan(receiver: Scanner | undefined): bool {
-    return requireScanner(receiver).#scan();
+    return CanonicalScannerSync.Scan(requireScanner(receiver).#implementation);
   }
 
   static Text(receiver: Scanner | undefined): gostring {
-    return requireScanner(receiver).#token;
-  }
-
-  #scan(): bool {
-    if (this.#done) {
-      return false;
-    }
-    for (;;) {
-      const newline = this.#buffer.indexOf(0x0a);
-      if (newline >= 0) {
-        this.#token = scanLine(this.#buffer.splice(0, newline + 1), true);
-        return true;
-      }
-      if (this.#pendingFailure !== undefined) {
-        if (this.#buffer.length > 0) {
-          this.#token = scanLine(this.#buffer.splice(0), false);
-          return true;
-        }
-        this.#done = true;
-        if (this.#pendingFailure !== ioState.EOF) {
-          this.#failure = this.#pendingFailure;
-        }
-        return false;
-      }
-      if (this.#buffer.length >= 64 * 1024) {
-        this.#failure = new ProviderError("bufio.Scanner: token too long");
-        this.#done = true;
-        return false;
-      }
-      if (this.source === undefined) {
-        return GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
-      }
-      const readBuffer = RuntimeSlice.make<uint8>(4096, 4096, 0);
-      const [count, failure] = this.source.Read(readBuffer);
-      if (!Number.isInteger(count) || count < 0 || count > readBuffer.length) {
-        this.#failure = new ProviderError(
-          "bufio.Scanner: Read returned impossible count",
-        );
-        this.#done = true;
-        return false;
-      }
-      for (let index = 0; index < count; index += 1) {
-        this.#buffer.push(readBuffer.get(index));
-      }
-      if (failure !== undefined) {
-        this.#pendingFailure = failure;
-      }
-      if (count === 0 && failure === undefined) {
-        this.#emptyReads += 1;
-        if (this.#emptyReads > 100) {
-          this.#failure = ioState.ErrNoProgress;
-          this.#done = true;
-          return false;
-        }
-      } else {
-        this.#emptyReads = 0;
-      }
-    }
+    return CanonicalScannerSync.Text(requireScanner(receiver).#implementation);
   }
 }
 
@@ -154,17 +104,15 @@ function requireScanner(receiver: Scanner | undefined): Scanner {
   return receiver;
 }
 
-function scanLine(source: readonly uint8[], terminated: boolean): gostring {
-  let end = source.length - (terminated ? 1 : 0);
-  if (end > 0 && source[end - 1] === 0x0d) {
-    end -= 1;
-  }
-  let result = "";
-  for (let index = 0; index < end; index += 1) {
-    result += String.fromCharCode(source[index] ?? 0);
-  }
-  return result;
-}
+export const state: {
+  ErrBadReadCount: GoError;
+  ErrTooLong: GoError;
+} = {
+  ErrBadReadCount: new ProviderError(
+    "bufio.Scanner: Read returned impossible count",
+  ),
+  ErrTooLong: new ProviderError("bufio.Scanner: token too long"),
+};
 
 class BufferedWriter {
   constructor(

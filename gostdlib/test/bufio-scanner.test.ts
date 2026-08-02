@@ -16,8 +16,14 @@ import type { int64, uint8 } from "@gotots/runtime/scalars.js";
 import {
   NewScanner,
   Scanner,
+  state as bufioState,
 } from "../src/bufio.js";
 import { New } from "../src/errors.js";
+import {
+  CanonicalScannerAsync,
+  NewScannerCanonicalAsync,
+  type CanonicalReaderSourceAsync,
+} from "../src/internal/facets/provider-bufio-scanner.js";
 import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 import { state as ioState, type Reader } from "../src/io.js";
 
@@ -48,6 +54,19 @@ class ChunkReader extends ProviderInterfaceValue implements Reader {
     }
     this.#offset += count;
     return [count, undefined];
+  }
+}
+
+class AsyncChunkReader extends ProviderInterfaceValue implements CanonicalReaderSourceAsync<GoError> {
+  readonly #source: ChunkReader;
+
+  constructor(source: string, chunkSize: number) {
+    super(chunkReaderType);
+    this.#source = new ChunkReader(source, chunkSize);
+  }
+
+  Read(destination: RuntimeSlice<uint8>): Promise<[int64, GoError | undefined]> {
+    return Promise.resolve(this.#source.Read(destination));
   }
 }
 
@@ -85,7 +104,23 @@ test("bufio Scanner reports non-EOF and bounded-token failures", (): void => {
 
   const oversized = NewScanner(new ChunkReader("x".repeat(64 * 1024), 4096));
   assert.equal(Scanner.Scan(oversized), false);
-  assert.equal(Scanner.Err(oversized)?.Error(), "bufio.Scanner: token too long");
+  assert.equal(Scanner.Err(oversized), bufioState.ErrTooLong);
+});
+
+test("bufio Scanner canonical profile awaits an asynchronous reader", async (): Promise<void> => {
+  const scanner = NewScannerCanonicalAsync(
+    new AsyncChunkReader("one\ntwo", 2),
+    bufioState.ErrBadReadCount,
+    bufioState.ErrTooLong,
+    ioState.EOF,
+    ioState.ErrNoProgress,
+  );
+  const tokens: string[] = [];
+  while (await CanonicalScannerAsync.Scan(scanner)) {
+    tokens.push(CanonicalScannerAsync.Text(scanner));
+  }
+  assert.deepEqual(tokens, ["one", "two"]);
+  assert.equal(CanonicalScannerAsync.Err(scanner), undefined);
 });
 
 function scannerProviderResult(): string {

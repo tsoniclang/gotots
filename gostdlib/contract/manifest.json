@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "0103e9e12c1023a958dffa21518b22f0ef4bb5e9239d35f7fb767c99582b7038",
-  "providerDigest": "a525c9c3f7757307823115caf019e52002a2c635fb5f5758fbb7d0c466a118a9",
+  "providerDigest": "51d48c6e75825ad5a85f57e2d0518cce168929736ca692b43f4ba843cb672f1d",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -52,6 +52,28 @@
           "sourceLocation": "bufio/bufio.go:579:6",
           "implementationOwner": "src/bufio.ts",
           "targetFingerprint": "b954808ee56b8a9625a71b9faedb90301f64da0e789beb4c3ee937dc92861f3b"
+        },
+        {
+          "identity": "bufio|kind=3|receiver=|name=ErrBadReadCount",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "ErrBadReadCount",
+          "sourceSignature": "error",
+          "sourceLocation": "bufio/scan.go:74:2",
+          "implementationOwner": "src/bufio.ts",
+          "targetFingerprint": "a33a061a5dac120879200e481b5c68ed6d1e2cb64b41de383a1f6184518f7f78"
+        },
+        {
+          "identity": "bufio|kind=3|receiver=|name=ErrTooLong",
+          "kind": "variable",
+          "access": "state-member",
+          "export": "state",
+          "member": "ErrTooLong",
+          "sourceSignature": "error",
+          "sourceLocation": "bufio/scan.go:71:2",
+          "implementationOwner": "src/bufio.ts",
+          "targetFingerprint": "dc8ca5a283882b5e6427a8ce497a7f4d71dfadff5672deb6c942a90a507e6c5f"
         },
         {
           "identity": "bufio|kind=4|receiver=*bufio.Reader|name=Read",
@@ -14026,6 +14048,623 @@
       "facets": []
     },
     {
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "callableProfiles": [
+        {
+          "sourceIdentity": "bufio|kind=4|receiver=|name=NewScanner",
+          "profileKey": "0b7d4ff90afe2b7a6995d0fab08d096710eeed6d1eb1eff1b88acf57127e9143",
+          "export": "NewScannerCanonicalSync",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "canonicalValues": [
+            "bufio|kind=3|receiver=|name=ErrBadReadCount",
+            "bufio|kind=3|receiver=|name=ErrTooLong",
+            "io|kind=3|receiver=|name=EOF",
+            "io|kind=3|receiver=|name=ErrNoProgress"
+          ],
+          "canonicalTypeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Reader"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "CanonicalErrorAsync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "async",
+                    "sourceSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "d1eab240904398eabf53074e3472c0cf02975e8dcdd6daa0be9d1915c4f2af78"
+                  }
+                ]
+              },
+              "targetFingerprint": "f62f77f6648605d6d0204189afb6be05987d22a6f1b8985ceff0e740ee9c5cab"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+              "export": "CanonicalReaderSourceSync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Reader|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "sourceLocation": "io/io.go:87:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "a248fc6dfc25ce2a9a960ebd325ee159415c37328498f67ac4f47108f7d060bf"
+                  }
+                ]
+              },
+              "targetFingerprint": "2d27cb51a8fb00d1f193bc7c8ebd07a626646b045f0a81f950f28a6e35956275"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+          "targetFingerprint": "9947e309b8825b0d81c9c73388d042b5982773ca0d685f7e47466e1fecf1c634"
+        },
+        {
+          "sourceIdentity": "bufio|kind=4|receiver=|name=NewScanner",
+          "profileKey": "332364293b7adc4b1a85b591ab9ace6e8634cd90987bc7d49508725799c7e746",
+          "export": "NewScannerCanonicalSync",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "canonicalValues": [
+            "bufio|kind=3|receiver=|name=ErrBadReadCount",
+            "bufio|kind=3|receiver=|name=ErrTooLong",
+            "io|kind=3|receiver=|name=EOF",
+            "io|kind=3|receiver=|name=ErrNoProgress"
+          ],
+          "canonicalTypeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Reader"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "CanonicalErrorSync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "80ceaef3faab12f3fd84f7627ed274ed66ea2f869d675f484a4c1818e600183f"
+                  }
+                ]
+              },
+              "targetFingerprint": "c2ef80e3e053192a4a0289286f6fd3816876ed7d4750f90e028e8aecc5ee56fb"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+              "export": "CanonicalReaderSourceSync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Reader|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "sourceLocation": "io/io.go:87:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "a248fc6dfc25ce2a9a960ebd325ee159415c37328498f67ac4f47108f7d060bf"
+                  }
+                ]
+              },
+              "targetFingerprint": "2d27cb51a8fb00d1f193bc7c8ebd07a626646b045f0a81f950f28a6e35956275"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+          "targetFingerprint": "9947e309b8825b0d81c9c73388d042b5982773ca0d685f7e47466e1fecf1c634"
+        },
+        {
+          "sourceIdentity": "bufio|kind=4|receiver=|name=NewScanner",
+          "profileKey": "91aff305e8970f93488fcd2614df2c17c661271d5e13d14950369780d2dc2be3",
+          "export": "NewScannerCanonicalAsync",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "canonicalValues": [
+            "bufio|kind=3|receiver=|name=ErrBadReadCount",
+            "bufio|kind=3|receiver=|name=ErrTooLong",
+            "io|kind=3|receiver=|name=EOF",
+            "io|kind=3|receiver=|name=ErrNoProgress"
+          ],
+          "canonicalTypeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Reader"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "CanonicalErrorAsync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "async",
+                    "sourceSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "d1eab240904398eabf53074e3472c0cf02975e8dcdd6daa0be9d1915c4f2af78"
+                  }
+                ]
+              },
+              "targetFingerprint": "f62f77f6648605d6d0204189afb6be05987d22a6f1b8985ceff0e740ee9c5cab"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+              "export": "CanonicalReaderSourceAsync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Reader|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "async",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "sourceLocation": "io/io.go:87:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "4a331fdbb22f5f5541bb573b56b870bbfa1d333b6ae7aac5a34c293b27db1916"
+                  }
+                ]
+              },
+              "targetFingerprint": "52dcca9a7b2e06d92e86485b03780691093609369bb2d1ad9d9968ae327e5660"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+          "targetFingerprint": "b19b43fa86fceec7d05ca2b9de9306117664e65129660e8ce6bee55949bffa35"
+        },
+        {
+          "sourceIdentity": "bufio|kind=4|receiver=|name=NewScanner",
+          "profileKey": "b711d1ec24eda1e8871a9f1b74d90a598a119273a63fb1772b61ef7349148db5",
+          "export": "NewScannerCanonicalAsync",
+          "canonicalParameters": [
+            0
+          ],
+          "canonicalResults": [
+            0
+          ],
+          "canonicalValues": [
+            "bufio|kind=3|receiver=|name=ErrBadReadCount",
+            "bufio|kind=3|receiver=|name=ErrTooLong",
+            "io|kind=3|receiver=|name=EOF",
+            "io|kind=3|receiver=|name=ErrNoProgress"
+          ],
+          "canonicalTypeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Reader"
+          ],
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "CanonicalErrorSync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "80ceaef3faab12f3fd84f7627ed274ed66ea2f869d675f484a4c1818e600183f"
+                  }
+                ]
+              },
+              "targetFingerprint": "c2ef80e3e053192a4a0289286f6fd3816876ed7d4750f90e028e8aecc5ee56fb"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+              "export": "CanonicalReaderSourceAsync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Reader|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "async",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "sourceLocation": "io/io.go:87:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "4a331fdbb22f5f5541bb573b56b870bbfa1d333b6ae7aac5a34c293b27db1916"
+                  }
+                ]
+              },
+              "targetFingerprint": "52dcca9a7b2e06d92e86485b03780691093609369bb2d1ad9d9968ae327e5660"
+            }
+          ],
+          "effect": "sync",
+          "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+          "targetFingerprint": "b19b43fa86fceec7d05ca2b9de9306117664e65129660e8ce6bee55949bffa35"
+        }
+      ],
+      "statefulProfiles": [
+        {
+          "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+          "profileKey": "0b7d4ff90afe2b7a6995d0fab08d096710eeed6d1eb1eff1b88acf57127e9143",
+          "export": "CanonicalScannerSync",
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "CanonicalErrorAsync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "async",
+                    "sourceSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "d1eab240904398eabf53074e3472c0cf02975e8dcdd6daa0be9d1915c4f2af78"
+                  }
+                ]
+              },
+              "targetFingerprint": "f62f77f6648605d6d0204189afb6be05987d22a6f1b8985ceff0e740ee9c5cab"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+              "export": "CanonicalReaderSourceSync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Reader|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "sourceLocation": "io/io.go:87:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "a248fc6dfc25ce2a9a960ebd325ee159415c37328498f67ac4f47108f7d060bf"
+                  }
+                ]
+              },
+              "targetFingerprint": "2d27cb51a8fb00d1f193bc7c8ebd07a626646b045f0a81f950f28a6e35956275"
+            }
+          ],
+          "typeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Reader"
+          ],
+          "fields": [],
+          "methods": [
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Err",
+              "member": "Err",
+              "effect": "sync",
+              "sourceSignature": "func() error|params=|results=",
+              "sourceLocation": "bufio/scan.go:98:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "9a1f823d9f476a02e5f0a18941dc7129e5492faf31b9c2e80536053dc340dd6d",
+              "staticTargetFingerprint": "5f5f9601cb34ac319c7a35e84e02bc779b1144215e17aa51f6229886474077d3"
+            },
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Scan",
+              "member": "Scan",
+              "effect": "sync",
+              "sourceSignature": "func() bool|params=|results=",
+              "sourceLocation": "bufio/scan.go:139:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "7af4d0be148229d106a4a7516e4a1189824ccc393d13fb473051ea821ad40cbb",
+              "staticTargetFingerprint": "bbed6850d957b3d787531ccda59e7377f4ac35fad5e4c001dde0465004f7446a"
+            },
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Text",
+              "member": "Text",
+              "effect": "sync",
+              "sourceSignature": "func() string|params=|results=",
+              "sourceLocation": "bufio/scan.go:114:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "65e3a95a19691f7d7d474f9852b7c610bb7349a7585b4f881b3f5ba10590e25e",
+              "staticTargetFingerprint": "d15e3e1eef837f88fde173fcce8c5246fa56e1c676fa89bf733d51a387cfc027"
+            }
+          ],
+          "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+          "targetFingerprint": "7f62f99242c27c6f330bd2665943ca688ba0459edc087b11be357129f94e9fc9"
+        },
+        {
+          "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+          "profileKey": "332364293b7adc4b1a85b591ab9ace6e8634cd90987bc7d49508725799c7e746",
+          "export": "CanonicalScannerSync",
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "CanonicalErrorSync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "80ceaef3faab12f3fd84f7627ed274ed66ea2f869d675f484a4c1818e600183f"
+                  }
+                ]
+              },
+              "targetFingerprint": "c2ef80e3e053192a4a0289286f6fd3816876ed7d4750f90e028e8aecc5ee56fb"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+              "export": "CanonicalReaderSourceSync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Reader|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "sync",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "sourceLocation": "io/io.go:87:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "a248fc6dfc25ce2a9a960ebd325ee159415c37328498f67ac4f47108f7d060bf"
+                  }
+                ]
+              },
+              "targetFingerprint": "2d27cb51a8fb00d1f193bc7c8ebd07a626646b045f0a81f950f28a6e35956275"
+            }
+          ],
+          "typeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Reader"
+          ],
+          "fields": [],
+          "methods": [
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Err",
+              "member": "Err",
+              "effect": "sync",
+              "sourceSignature": "func() error|params=|results=",
+              "sourceLocation": "bufio/scan.go:98:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "9a1f823d9f476a02e5f0a18941dc7129e5492faf31b9c2e80536053dc340dd6d",
+              "staticTargetFingerprint": "5f5f9601cb34ac319c7a35e84e02bc779b1144215e17aa51f6229886474077d3"
+            },
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Scan",
+              "member": "Scan",
+              "effect": "sync",
+              "sourceSignature": "func() bool|params=|results=",
+              "sourceLocation": "bufio/scan.go:139:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "7af4d0be148229d106a4a7516e4a1189824ccc393d13fb473051ea821ad40cbb",
+              "staticTargetFingerprint": "bbed6850d957b3d787531ccda59e7377f4ac35fad5e4c001dde0465004f7446a"
+            },
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Text",
+              "member": "Text",
+              "effect": "sync",
+              "sourceSignature": "func() string|params=|results=",
+              "sourceLocation": "bufio/scan.go:114:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "65e3a95a19691f7d7d474f9852b7c610bb7349a7585b4f881b3f5ba10590e25e",
+              "staticTargetFingerprint": "d15e3e1eef837f88fde173fcce8c5246fa56e1c676fa89bf733d51a387cfc027"
+            }
+          ],
+          "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+          "targetFingerprint": "7f62f99242c27c6f330bd2665943ca688ba0459edc087b11be357129f94e9fc9"
+        },
+        {
+          "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+          "profileKey": "91aff305e8970f93488fcd2614df2c17c661271d5e13d14950369780d2dc2be3",
+          "export": "CanonicalScannerAsync",
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "CanonicalErrorAsync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "async",
+                    "sourceSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "d1eab240904398eabf53074e3472c0cf02975e8dcdd6daa0be9d1915c4f2af78"
+                  }
+                ]
+              },
+              "targetFingerprint": "f62f77f6648605d6d0204189afb6be05987d22a6f1b8985ceff0e740ee9c5cab"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+              "export": "CanonicalReaderSourceAsync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Reader|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "async",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "sourceLocation": "io/io.go:87:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "4a331fdbb22f5f5541bb573b56b870bbfa1d333b6ae7aac5a34c293b27db1916"
+                  }
+                ]
+              },
+              "targetFingerprint": "52dcca9a7b2e06d92e86485b03780691093609369bb2d1ad9d9968ae327e5660"
+            }
+          ],
+          "typeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Reader"
+          ],
+          "fields": [],
+          "methods": [
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Err",
+              "member": "Err",
+              "effect": "sync",
+              "sourceSignature": "func() error|params=|results=",
+              "sourceLocation": "bufio/scan.go:98:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "9a1f823d9f476a02e5f0a18941dc7129e5492faf31b9c2e80536053dc340dd6d",
+              "staticTargetFingerprint": "d86df027f6a6923e868c5cfed24611ed0c1ea03c2465169a435d4f7718be227a"
+            },
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Scan",
+              "member": "Scan",
+              "effect": "async",
+              "sourceSignature": "func() bool|params=|results=",
+              "sourceLocation": "bufio/scan.go:139:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "335874ba4479b4fc3dad37398b02aa0f0f4810f25a67ea66d6bc313de3a033e0",
+              "staticTargetFingerprint": "f544ef379a2641530c9d9899a7b4a8131ef8a03f41b267226c71071c0ec5c08e"
+            },
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Text",
+              "member": "Text",
+              "effect": "sync",
+              "sourceSignature": "func() string|params=|results=",
+              "sourceLocation": "bufio/scan.go:114:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "65e3a95a19691f7d7d474f9852b7c610bb7349a7585b4f881b3f5ba10590e25e",
+              "staticTargetFingerprint": "74cc4913b906d1561c1718f5adb0eb497fdb58f75d2402bb923dd1a1316aa659"
+            }
+          ],
+          "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+          "targetFingerprint": "c0ab8d2585e7dafb0bcd384672eb263683b1ff737457065b469b164c0bffde2f"
+        },
+        {
+          "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+          "profileKey": "b711d1ec24eda1e8871a9f1b74d90a598a119273a63fb1772b61ef7349148db5",
+          "export": "CanonicalScannerAsync",
+          "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "CanonicalErrorSync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "sync",
+                    "sourceSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "80ceaef3faab12f3fd84f7627ed274ed66ea2f869d675f484a4c1818e600183f"
+                  }
+                ]
+              },
+              "targetFingerprint": "c2ef80e3e053192a4a0289286f6fd3816876ed7d4750f90e028e8aecc5ee56fb"
+            },
+            {
+              "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+              "export": "CanonicalReaderSourceAsync",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "io|kind=4|receiver=io.Reader|name=Read",
+                    "kind": "callable",
+                    "member": "Read",
+                    "effect": "async",
+                    "sourceSignature": "func(p []byte) (n int, err error)|params=p|results=n,err",
+                    "sourceLocation": "io/io.go:87:2",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "4a331fdbb22f5f5541bb573b56b870bbfa1d333b6ae7aac5a34c293b27db1916"
+                  }
+                ]
+              },
+              "targetFingerprint": "52dcca9a7b2e06d92e86485b03780691093609369bb2d1ad9d9968ae327e5660"
+            }
+          ],
+          "typeArguments": [
+            "go:universe|error",
+            "io|kind=2|receiver=|name=Reader"
+          ],
+          "fields": [],
+          "methods": [
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Err",
+              "member": "Err",
+              "effect": "sync",
+              "sourceSignature": "func() error|params=|results=",
+              "sourceLocation": "bufio/scan.go:98:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "9a1f823d9f476a02e5f0a18941dc7129e5492faf31b9c2e80536053dc340dd6d",
+              "staticTargetFingerprint": "d86df027f6a6923e868c5cfed24611ed0c1ea03c2465169a435d4f7718be227a"
+            },
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Scan",
+              "member": "Scan",
+              "effect": "async",
+              "sourceSignature": "func() bool|params=|results=",
+              "sourceLocation": "bufio/scan.go:139:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "335874ba4479b4fc3dad37398b02aa0f0f4810f25a67ea66d6bc313de3a033e0",
+              "staticTargetFingerprint": "f544ef379a2641530c9d9899a7b4a8131ef8a03f41b267226c71071c0ec5c08e"
+            },
+            {
+              "sourceIdentity": "bufio|kind=4|receiver=*bufio.Scanner|name=Text",
+              "member": "Text",
+              "effect": "sync",
+              "sourceSignature": "func() string|params=|results=",
+              "sourceLocation": "bufio/scan.go:114:19",
+              "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+              "instanceTargetFingerprint": "65e3a95a19691f7d7d474f9852b7c610bb7349a7585b4f881b3f5ba10590e25e",
+              "staticTargetFingerprint": "74cc4913b906d1561c1718f5adb0eb497fdb58f75d2402bb923dd1a1316aa659"
+            }
+          ],
+          "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+          "targetFingerprint": "c0ab8d2585e7dafb0bcd384672eb263683b1ff737457065b469b164c0bffde2f"
+        }
+      ],
+      "facets": []
+    },
+    {
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
       "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
       "callableProfiles": [
@@ -25065,5 +25704,5 @@
       ]
     }
   ],
-  "manifestDigest": "573f0fb7c2405908014871a25a717880fddc272fad7031a51c6ef2a5700b9454"
+  "manifestDigest": "636f15a9d68dfd83e9e7495ee2195ed03d2fd04f3c1fa6f9f7d34fb5041ed9fb"
 }
