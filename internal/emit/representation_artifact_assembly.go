@@ -1,6 +1,7 @@
 package emit
 
 import (
+	"fmt"
 	"go/token"
 	"go/types"
 
@@ -265,6 +266,13 @@ func buildInterfaceArtifact(
 			),
 		}, requests, nil
 	case api.GeneratedArtifactInterfaceDynamicTypeToken:
+		source, ok := artifact.InterfaceDynamicType()
+		if !ok {
+			return nil, nil, &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "interface dynamic-type source is invalid",
+			}
+		}
 		return []tsgo.Statement{
 			interfacedynamictype.Build(
 				builder.context.Factory(),
@@ -272,6 +280,7 @@ func buildInterfaceArtifact(
 				[]tsgo.ModifierLike{
 					builder.context.Factory().ExportKeyword(),
 				},
+				types.Comparable(source),
 			),
 		}, nil, nil
 	case api.GeneratedArtifactAnonymousInterface:
@@ -342,7 +351,10 @@ func exactInterfaceRequirement(
 	if len(requirements) != 1 {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact requires exactly one definition request",
+			Reason: fmt.Sprintf(
+				"interface artifact requires exactly one definition request, received %d",
+				len(requirements),
+			),
 		}
 	}
 	selected, ok := requirements[0].GeneratedArtifact()

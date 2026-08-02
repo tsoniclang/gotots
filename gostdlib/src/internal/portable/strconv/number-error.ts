@@ -7,7 +7,7 @@ import { ProviderError } from "../../runtime/error.js";
 export const ErrRange = new ProviderError("value out of range");
 export const ErrSyntax = new ProviderError("invalid syntax");
 
-const numberErrorType = Object.freeze({});
+const numberErrorType = Object.freeze({ comparable: true });
 
 export class NumberError extends WrappedProviderError {
   private readonly message: gostring;

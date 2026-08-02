@@ -145,7 +145,8 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementInterfaceMethodCallable != 21 ||
 		DeclarationRequirementPointerRepresentation != 22 ||
 		DeclarationRequirementProviderInterfaceBridge != 23 ||
-		DeclarationRequirementKind(24).Valid() {
+		DeclarationRequirementProviderStatefulRepresentation != 24 ||
+		DeclarationRequirementKind(25).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }

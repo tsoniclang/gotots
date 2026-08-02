@@ -21,6 +21,7 @@ type Config struct {
 	TSConfigPath        string
 	ScratchDirectory    string
 	GoBinary            string
+	BuildProfile        environmentcontract.BuildProfile
 	Backend             string
 	MinimumGoVersion    string
 	MaximumGoVersion    string
@@ -36,6 +37,7 @@ type resolvedConfig struct {
 	tsConfigPath        string
 	scratchDirectory    string
 	goBinary            string
+	buildProfile        environmentcontract.BuildProfile
 	backend             string
 	minimumGoVersion    string
 	maximumGoVersion    string
@@ -62,20 +64,18 @@ func (e *Error) Error() string {
 type toolchain struct {
 	root    string
 	version string
-	goos    string
-	goarch  string
+	profile environmentcontract.BuildProfile
 	key     string
 }
 
 type goEnvironment struct {
 	Root    string `json:"GOROOT"`
 	Version string `json:"GOVERSION"`
-	GOOS    string `json:"GOOS"`
-	GOARCH  string `json:"GOARCH"`
 }
 
 func resolveConfig(source Config) (resolvedConfig, error) {
 	result := resolvedConfig{
+		buildProfile:     source.BuildProfile,
 		backend:          source.Backend,
 		minimumGoVersion: source.MinimumGoVersion,
 		maximumGoVersion: source.MaximumGoVersion,
@@ -130,12 +130,13 @@ func resolveConfig(source Config) (resolvedConfig, error) {
 		return resolvedConfig{}, certifyError("configure", source.GoBinary, err.Error())
 	}
 	if result.backend == "" ||
+		!result.buildProfile.Valid() ||
 		!strings.HasPrefix(result.minimumGoVersion, "go") ||
 		!strings.HasPrefix(result.maximumGoVersion, "go") {
 		return resolvedConfig{}, certifyError(
 			"configure",
 			"provider policy",
-			"backend or Go version bounds are invalid",
+			"build profile, backend, or Go version bounds are invalid",
 		)
 	}
 	for _, directory := range []string{
@@ -167,10 +168,9 @@ func inspectToolchain(config resolvedConfig) (toolchain, error) {
 		"-json",
 		"GOROOT",
 		"GOVERSION",
-		"GOOS",
-		"GOARCH",
 	)
 	command.Dir = config.repositoryRoot
+	command.Env = environmentcontract.HostEnvironment()
 	payload, err := command.Output()
 	if err != nil {
 		return toolchain{}, commandError("inspect toolchain", config.goBinary, err)
@@ -181,27 +181,28 @@ func inspectToolchain(config resolvedConfig) (toolchain, error) {
 	if err := decoder.Decode(&selected); err != nil {
 		return toolchain{}, certifyError("inspect toolchain", config.goBinary, err.Error())
 	}
-	if selected.Root == "" || selected.Version == "" ||
-		selected.GOOS == "" || selected.GOARCH == "" {
+	if selected.Root == "" || selected.Version == "" {
 		return toolchain{}, certifyError(
 			"inspect toolchain",
 			config.goBinary,
 			"identity is incomplete",
 		)
 	}
-	key, err := environmentcontract.ToolchainKey(
-		selected.Version,
-		selected.GOOS,
-		selected.GOARCH,
-	)
+	if selected.Version != config.buildProfile.ToolchainVersion() {
+		return toolchain{}, certifyError(
+			"inspect toolchain",
+			config.goBinary,
+			"binary version does not match the selected build profile",
+		)
+	}
+	key, err := environmentcontract.ToolchainKey(config.buildProfile)
 	if err != nil {
 		return toolchain{}, err
 	}
 	return toolchain{
 		root:    filepath.Clean(selected.Root),
 		version: selected.Version,
-		goos:    selected.GOOS,
-		goarch:  selected.GOARCH,
+		profile: config.buildProfile,
 		key:     key,
 	}, nil
 }

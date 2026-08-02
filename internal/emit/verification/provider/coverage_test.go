@@ -127,8 +127,9 @@ func BuilderAddress(state *ProviderState) *strings.Builder {
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
-		Directory: project,
-		Pattern:   ".",
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -299,8 +300,9 @@ func Use(mutex *sync.Mutex, builder *strings.Builder) int {
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
-		Directory: project,
-		Pattern:   ".",
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
 	})
 	if err != nil {
 		t.Fatal(err)

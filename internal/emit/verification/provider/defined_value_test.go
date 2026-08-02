@@ -56,8 +56,9 @@ func SequenceTotal(sequence iter.Seq[int]) int {
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
-		Directory: project,
-		Pattern:   ".",
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -21,7 +21,7 @@ import { New } from "../src/errors.js";
 import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 import { state as ioState, type Reader } from "../src/io.js";
 
-const chunkReaderType = Object.freeze({});
+const chunkReaderType = Object.freeze({ comparable: true });
 
 class ChunkReader extends ProviderInterfaceValue implements Reader {
   #offset = 0;

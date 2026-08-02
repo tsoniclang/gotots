@@ -13,7 +13,8 @@ import { Fprintln, Println, Sprintf } from "../src/fmt.js";
 import type { Writer } from "../src/io.js";
 
 class FormattedValue extends GoInterfaceValue {
-  readonly $go$type: object = FormattedValue;
+	static readonly comparable = true;
+	readonly $go$type = FormattedValue;
   readonly $go$methods: ReadonlySet<object> = new Set<object>();
   readonly $go$formatString: boolean;
 
@@ -43,7 +44,8 @@ class FormattedValue extends GoInterfaceValue {
 }
 
 class CaptureWriter extends GoInterfaceValue implements Writer {
-  readonly $go$type: object = CaptureWriter;
+	static readonly comparable = true;
+	readonly $go$type = CaptureWriter;
   readonly $go$methods: ReadonlySet<object> = new Set<object>();
   readonly $go$formatString = false;
   content = "";

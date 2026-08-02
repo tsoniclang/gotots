@@ -71,6 +71,10 @@
       "export": "GoMap"
     },
     {
+      "id": 401,
+      "export": "GoMapHash"
+    },
+    {
       "id": 404,
       "export": "GoMapValue"
     },

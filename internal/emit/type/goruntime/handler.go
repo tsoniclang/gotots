@@ -33,9 +33,6 @@ func emit(
 	var symbol api.RuntimeSymbol
 	nilCapable := false
 	switch context.GoRuntimeType(sourceType) {
-	case api.GoRuntimeTypeBuiltinError:
-		symbol = api.RuntimeBuiltinErrorType
-		nilCapable = true
 	case api.GoRuntimeTypeError:
 		symbol = api.RuntimeErrorType
 		nilCapable = true

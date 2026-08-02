@@ -1,5 +1,7 @@
 export abstract class GoInterfaceValue {
-    abstract readonly $go$type: object;
+    abstract readonly $go$type: {
+        readonly comparable: boolean;
+    };
     abstract readonly $go$methods: ReadonlySet<object>;
     abstract $go$implements(contract: readonly object[]): boolean;
     abstract $go$equal(other: GoInterfaceValue): boolean;

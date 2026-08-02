@@ -28,6 +28,14 @@ export function SyscallErrnoError(
   return receiver.Error();
 }
 
+export function SyscallErrnoIs(
+  receiver: Errno,
+  target: GoError | undefined,
+  _recovery?: GoRecovery,
+): boolean {
+  return receiver.Is(target);
+}
+
 export function SyscallSignalSignal(
   receiver: Signal,
   _recovery?: GoRecovery,

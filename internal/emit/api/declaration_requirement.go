@@ -245,6 +245,17 @@ func NewProviderInterfaceBridgeRequirement(
 	)
 }
 
+func NewProviderStatefulRepresentationRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	return newGeneratedDefinitionRequirement(
+		artifact,
+		GeneratedArtifactProviderStatefulRepresentation,
+		DeclarationRequirementProviderStatefulRepresentation,
+		"provider stateful representation",
+	)
+}
+
 func newGeneratedDefinitionRequirement(
 	artifact *GeneratedArtifact,
 	artifactKind GeneratedArtifactKind,
@@ -562,6 +573,10 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementProviderInterfaceBridge:
 		return r.validGeneratedDefinition(
 			GeneratedArtifactProviderInterfaceBridge,
+		)
+	case DeclarationRequirementProviderStatefulRepresentation:
+		return r.validGeneratedDefinition(
+			GeneratedArtifactProviderStatefulRepresentation,
 		)
 	default:
 		return false

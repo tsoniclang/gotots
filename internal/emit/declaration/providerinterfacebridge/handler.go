@@ -3,9 +3,9 @@ package providerinterfacebridge
 import (
 	"go/types"
 
-	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -30,11 +30,16 @@ func Build(
 	if !selected {
 		return nil, nil, shapeError(name, "bridge source has no provider certificate")
 	}
-	providerType, err := context.Names().TypeReference(source.Obj())
+	providerType, err := providerTypeReference(context, source)
 	if err != nil {
 		return nil, nil, err
 	}
 	canonical, err := context.Names().InterfaceContract(source)
+	if err != nil {
+		return nil, nil, err
+	}
+	directProviderUse, compatibilityRequests, err :=
+		providerboundary.InterfaceABIExact(context, source)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -45,12 +50,15 @@ func Build(
 	if err != nil {
 		return nil, nil, err
 	}
-	panicReference, err := context.Names().Runtime(
-		api.RuntimePanic,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return nil, nil, err
+	var panicReference api.NameReference
+	if !directProviderUse {
+		panicReference, err = context.Names().Runtime(
+			api.RuntimePanic,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	members := []tsgo.ClassElement{
 		constructor(
@@ -70,6 +78,7 @@ func Build(
 			providerType,
 			canonical.TypeName(),
 			panicReference.Name(),
+			directProviderUse,
 		),
 	}
 	requests := api.CombineRequests(
@@ -77,22 +86,24 @@ func Build(
 		canonical.Requests(),
 		runtimeBase.Requests(),
 		panicReference.Requests(),
+		compatibilityRequests,
 	)
 	seen := make(map[string]struct{}, contract.NumMethods())
 	for index := range contract.NumMethods() {
 		method := contract.Method(index)
-		descriptor, describeErr := environmentcontract.Describe(method)
+		identity, signature, describeErr :=
+			gostdlib.ProviderInterfaceMethodSource(method)
 		if describeErr != nil {
 			return nil, nil, describeErr
 		}
-		certificate, found := provider.Method(descriptor.Identity())
+		certificate, found := provider.Method(identity)
 		if !found {
 			return nil, nil, shapeError(
 				name,
-				"provider certificate omitted "+descriptor.Identity(),
+				"provider certificate omitted "+identity,
 			)
 		}
-		if certificate.SourceSignature() != descriptor.Signature() {
+		if certificate.SourceSignature() != signature {
 			return nil, nil, shapeError(
 				name,
 				"provider method signature certificate drifted",
@@ -148,6 +159,19 @@ func Build(
 		members,
 	)
 	return []tsgo.Statement{declaration}, api.CombineRequests(requests), nil
+}
+
+func providerTypeReference(
+	context api.Context,
+	source *types.Named,
+) (api.NameReference, error) {
+	if source != nil && source.Obj() == types.Universe.Lookup("error") {
+		return context.Names().Runtime(
+			api.RuntimeBuiltinErrorType,
+			api.ImportPhaseType,
+		)
+	}
+	return context.Names().TypeReference(source.Obj())
 }
 
 func shapeError(artifact string, reason string) error {

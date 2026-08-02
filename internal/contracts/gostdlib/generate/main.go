@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 )
 
@@ -16,25 +19,43 @@ func main() {
 	manifest := flag.String("manifest", "", "generated provider manifest")
 	modules := flag.String("modules", "", "authoritative provider module map")
 	facets := flag.String("facets", "", "authoritative compiler-facet map")
-	runtime := flag.String("runtime", "", "generated runtime contract")
+	runtimeContract := flag.String("runtime", "", "generated runtime contract")
 	tsconfig := flag.String("tsconfig", "", "provider TypeScript project")
 	scratch := flag.String("scratch", "", "bounded certification scratch directory")
 	goBinary := flag.String("go", "go", "selected Go toolchain binary")
+	goos := flag.String("goos", runtime.GOOS, "selected source GOOS")
+	goarch := flag.String("goarch", runtime.GOARCH, "selected source GOARCH")
+	cgo := flag.Bool("cgo", false, "select cgo-enabled source")
+	tags := flag.String("tags", "", "comma-separated selected build tags")
 	backend := flag.String("backend", "", "provider backend")
 	minimumGo := flag.String("minimum-go", "", "minimum selected Go version")
 	maximumGo := flag.String("maximum-go", "", "maximum selected Go version")
 	check := flag.Bool("check", false, "verify the checked manifest without writing")
 	flag.Parse()
+	var buildTags []string
+	if *tags != "" {
+		buildTags = strings.Split(*tags, ",")
+	}
+	buildProfile, err := environmentcontract.NewBuildProfile(
+		*goos,
+		*goarch,
+		*cgo,
+		buildTags,
+	)
+	if err != nil {
+		fail(err)
+	}
 	config := certify.Config{
 		RepositoryRoot:      *repository,
 		ProviderRoot:        *provider,
 		ManifestPath:        *manifest,
 		ModuleMapPath:       *modules,
 		FacetMapPath:        *facets,
-		RuntimeContractPath: *runtime,
+		RuntimeContractPath: *runtimeContract,
 		TSConfigPath:        *tsconfig,
 		ScratchDirectory:    *scratch,
 		GoBinary:            *goBinary,
+		BuildProfile:        buildProfile,
 		Backend:             *backend,
 		MinimumGoVersion:    *minimumGo,
 		MaximumGoVersion:    *maximumGo,

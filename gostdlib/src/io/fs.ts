@@ -14,6 +14,13 @@ import type {
 } from "@gotots/runtime/scalars.js";
 
 import { New } from "../errors.js";
+import {
+  closed,
+  exists,
+  invalid,
+  notExists,
+  permission,
+} from "../internal/portable/errors/sentinel.js";
 import { WrappedProviderError } from "../internal/portable/errors/tree.js";
 import { DirectoryFile } from "../internal/portable/io/filesystem.js";
 import { ProviderInterfaceValue } from "../internal/portable/io/value.js";
@@ -72,7 +79,7 @@ export interface FileInfo extends GoInterfaceValue {
   Sys(): GoInterfaceValue | undefined;
 }
 
-const pathErrorType = Object.freeze({});
+const pathErrorType = Object.freeze({ comparable: true });
 
 export class PathError extends WrappedProviderError {
   constructor(
@@ -133,16 +140,16 @@ export const state: {
   SkipAll: GoError;
   SkipDir: GoError;
 } = {
-  ErrClosed: New("file already closed"),
-  ErrExist: New("file already exists"),
-  ErrInvalid: New("invalid argument"),
-  ErrNotExist: New("file does not exist"),
-  ErrPermission: New("permission denied"),
+  ErrClosed: closed,
+  ErrExist: exists,
+  ErrInvalid: invalid,
+  ErrNotExist: notExists,
+  ErrPermission: permission,
   SkipAll: New("skip everything and stop the walk"),
   SkipDir: New("skip this directory"),
 };
 
-const dirEntryType = Object.freeze({});
+const dirEntryType = Object.freeze({ comparable: true });
 
 class InfoDirEntry extends ProviderInterfaceValue implements DirEntry {
   constructor(private readonly information: FileInfo) {

@@ -29,6 +29,7 @@ type ProjectInspection struct {
 	snapshot uint64
 	project  string
 	config   string
+	sources  map[string]projectSourceEvidence
 }
 
 type ProjectExport struct {
@@ -37,6 +38,8 @@ type ProjectExport struct {
 	typeString     string
 	typeID         uint32
 	declaredTypeID uint32
+	typeSymbolID   uint64
+	typeParameters int
 	declarations   []string
 	ownerKeys      []string
 	valueMembers   []ProjectMember
@@ -53,6 +56,10 @@ func (e ProjectExport) Flags() uint32 {
 
 func (e ProjectExport) TypeString() string {
 	return e.typeString
+}
+
+func (e ProjectExport) TypeParameterCount() int {
+	return e.typeParameters
 }
 
 func (e ProjectExport) Declarations() []string {
@@ -112,6 +119,7 @@ func (c *Client) OpenProject(configFile string) (*ProjectInspection, error) {
 		snapshot: response.Snapshot,
 		project:  selected.ID,
 		config:   filepath.ToSlash(absolute),
+		sources:  make(map[string]projectSourceEvidence),
 	}, nil
 }
 
@@ -128,25 +136,8 @@ func (p *ProjectInspection) Exports(sourceFile string) ([]ProjectExport, error) 
 		return nil, projectInspectionError("exports", sourceFile, err)
 	}
 	sourcePath := filepath.ToSlash(absolute)
-	var encoded *sourceFileResponse
-	if err := requestProjectJSON(
-		p.client,
-		"getSourceFile",
-		getSourceFileParams{
-			Snapshot: p.snapshot,
-			Project:  p.project,
-			File:     sourcePath,
-		},
-		&encoded,
-	); err != nil {
+	if _, err := p.projectSourceEvidence(sourcePath); err != nil {
 		return nil, err
-	}
-	if encoded == nil || encoded.Data == "" {
-		return nil, &ProjectInspectionError{
-			Operation: "exports",
-			Path:      sourcePath,
-			Reason:    "source file is absent from the project",
-		}
 	}
 	var module *symbolResponse
 	if err := requestProjectJSON(
@@ -283,6 +274,14 @@ func (p *ProjectInspection) projectExport(
 	if found {
 		declarationHandles = declaredDeclarations
 	}
+	typeParameters, err := p.projectTypeParameterCount(declarationHandles)
+	if err != nil {
+		return ProjectExport{}, &ProjectInspectionError{
+			Operation: "exports",
+			Path:      sourcePath,
+			Reason:    "export " + symbol.Name + " " + err.Error(),
+		}
+	}
 	declarations := make([]string, 0, len(declarationHandles))
 	seen := make(map[string]struct{}, len(declarationHandles))
 	for _, handle := range declarationHandles {
@@ -344,11 +343,23 @@ func (p *ProjectInspection) projectExport(
 		typeString:     typeString,
 		typeID:         targetType.ID,
 		declaredTypeID: typeResponseID(declaredType),
+		typeSymbolID:   preferredTypeSymbol(declaredType, targetType),
+		typeParameters: typeParameters,
 		declarations:   declarations,
 		ownerKeys:      ownerKeys,
 		valueMembers:   valueMembers,
 		typeMembers:    typeMembers,
 	}, nil
+}
+
+func preferredTypeSymbol(primary *typeResponse, fallback *typeResponse) uint64 {
+	if primary != nil && primary.Symbol != 0 {
+		return primary.Symbol
+	}
+	if fallback != nil {
+		return fallback.Symbol
+	}
+	return 0
 }
 
 func typeResponseID(source *typeResponse) uint32 {

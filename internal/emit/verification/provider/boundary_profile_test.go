@@ -2,12 +2,195 @@ package provider_test
 
 import (
 	"context"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 )
+
+func TestStatefulProviderProfilePreservesRetainedInterfaceABI(t *testing.T) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/statefulproviderprofile\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package statefulproviderprofile
+
+import (
+	"bufio"
+	"io"
+	"sync"
+)
+
+type blockingFailure struct { mutex *sync.Mutex }
+
+func (failure *blockingFailure) Error() string {
+	failure.mutex.Lock()
+	failure.mutex.Unlock()
+	return "read failed"
+}
+
+type blockingReader struct {
+	mutex *sync.Mutex
+	data []byte
+	offset int
+}
+
+func (reader *blockingReader) Read(target []byte) (int, error) {
+	if reader.offset == len(reader.data) {
+		return 0, &blockingFailure{mutex: reader.mutex}
+	}
+	count := copy(target, reader.data[reader.offset:])
+	reader.offset += count
+	return count, nil
+}
+
+type holder struct { reader *bufio.Reader }
+
+func CompositeOnly(source io.Reader) *bufio.Reader {
+	return (&holder{reader: bufio.NewReader(source)}).reader
+}
+
+func NewBuffered(mutex *sync.Mutex, text string) *bufio.Reader {
+	return bufio.NewReader(&blockingReader{mutex: mutex, data: []byte(text)})
+}
+
+func ReadLine(mutex *sync.Mutex, text string) (string, error) {
+	selected := holder{reader: NewBuffered(mutex, text)}
+	var asReader io.Reader = selected.reader
+	_ = asReader
+	line, failure := selected.reader.ReadBytes('\n')
+	return string(line), failure
+}
+
+func Run(text string) (string, string) {
+	line, failure := ReadLine(&sync.Mutex{}, text)
+	if failure == nil {
+		return line, ""
+	}
+	return line, failure.Error()
+}
+
+type stalledReader struct{}
+
+func (*stalledReader) Read([]byte) (int, error) { return 0, nil }
+
+func NoProgress() bool {
+	_, failure := bufio.NewReader(&stalledReader{}).ReadByte()
+	return failure == io.ErrNoProgress
+}
+
+func NilConstructed() bool { return bufio.NewReader(nil) != nil }
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope := program.Roots()[0].Types().Scope()
+	options := emit.DefaultOptions()
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
+	options.StandardLibrary = linkedProviderCertificate(t)
+	emission, err := emit.CompileWithOptions(
+		program,
+		[]emit.Root{
+			mustProviderRoot(t, scope.Lookup("CompositeOnly")),
+			mustProviderRoot(t, scope.Lookup("Run")),
+			mustProviderRoot(t, scope.Lookup("NoProgress")),
+			mustProviderRoot(t, scope.Lookup("NilConstructed")),
+		},
+		options,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	assemblyPath := ""
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFilePackageAssembly &&
+			file.PackageName() == "statefulproviderprofile" {
+			assemblyPath = file.OutputPath()
+			break
+		}
+	}
+	if assemblyPath == "" {
+		t.Fatal("stateful provider package assembly is absent")
+	}
+	targetOutput := executeProviderTypeScript(
+		t,
+		workingDirectory,
+		artifacts.paths,
+		assemblyPath,
+		[]string{"NilConstructed", "NoProgress", "Run"},
+		`for (const input of ["alpha\nrest", "tail"]) {
+  const [line, failure] = await Run(input);
+  console.log(JSON.stringify(line) + " " + JSON.stringify(failure));
+}
+console.log(await NoProgress());
+console.log(await NilConstructed());
+`,
+	)
+	runnerDirectory := filepath.Join(project, "cmd", "compare")
+	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+
+import (
+	"fmt"
+
+	stateful "example.com/statefulproviderprofile"
+)
+
+func main() {
+	for _, input := range []string{"alpha\nrest", "tail"} {
+		line, failure := stateful.Run(input)
+		fmt.Printf("%q %q\n", line, failure)
+	}
+	fmt.Println(stateful.NoProgress())
+	fmt.Println(stateful.NilConstructed())
+}
+`)
+	sourceContext, sourceCancel := context.WithTimeout(
+		context.Background(),
+		2*time.Minute,
+	)
+	defer sourceCancel()
+	command := exec.CommandContext(sourceContext, "go", "run", ".")
+	command.Dir = runnerDirectory
+	sourceOutput, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("execute Go provider comparison: %v\n%s", err, sourceOutput)
+	}
+	if targetOutput != string(sourceOutput) {
+		t.Fatalf(
+			"stateful provider differential:\nGo:\n%s\nTypeScript:\n%s",
+			sourceOutput,
+			targetOutput,
+		)
+	}
+	for _, required := range []string{
+		"CanonicalReaderSync",
+		"await",
+		"ReadBytes",
+	} {
+		if !strings.Contains(artifacts.printed, required) {
+			t.Fatalf("stateful profile output lacks %q:\n%s", required, artifacts.printed)
+		}
+	}
+	if strings.Contains(artifacts.printed, "CanonicalReaderAsync") {
+		t.Fatalf("mixed profile selected asynchronous reader state:\n%s", artifacts.printed)
+	}
+	if strings.Contains(artifacts.printed, "BufioReaderRead") {
+		t.Fatal("stateful reader adapter retained the ordinary recovery target")
+	}
+}
 
 func TestProviderCallableProfilesPreserveCanonicalInterfaceABI(t *testing.T) {
 	project := t.TempDir()
@@ -30,13 +213,23 @@ import (
 
 type blockingFile struct { mutex *sync.Mutex }
 
+type blockingFileError struct { mutex *sync.Mutex }
+
+func (failure *blockingFileError) Error() string {
+	failure.mutex.Lock()
+	failure.mutex.Unlock()
+	return "read failed"
+}
+
 func (file *blockingFile) Close() error {
 	file.mutex.Lock()
 	file.mutex.Unlock()
 	return nil
 }
 
-func (file *blockingFile) Read([]byte) (int, error) { return 0, nil }
+func (file *blockingFile) Read([]byte) (int, error) {
+	return 0, &blockingFileError{mutex: file.mutex}
+}
 func (file *blockingFile) Stat() (fs.FileInfo, error) { return nil, nil }
 
 type blockingFS struct { mutex *sync.Mutex }
@@ -74,6 +267,10 @@ func Read(fileSystem fs.FS) ([]byte, error) {
 	return fs.ReadFile(fileSystem, "input")
 }
 
+func Metadata(fileSystem fs.FS) (fs.FileInfo, error) {
+	return fs.Stat(fileSystem, "input")
+}
+
 func NewFileSystem(mutex *sync.Mutex) fs.FS {
 	return &blockingFS{mutex: mutex}
 }
@@ -102,8 +299,9 @@ func NewOrder(mutex *sync.Mutex) binary.ByteOrder {
 func RootFactory() func(string) fs.FS { return os.DirFS }
 `)
 	program, err := load.Load(context.Background(), load.Request{
-		Directory: project,
-		Pattern:   ".",
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -116,6 +314,7 @@ func RootFactory() func(string) fs.FS { return os.DirFS }
 		program,
 		[]emit.Root{
 			mustProviderRoot(t, scope.Lookup("Read")),
+			mustProviderRoot(t, scope.Lookup("Metadata")),
 			mustProviderRoot(t, scope.Lookup("NewFileSystem")),
 			mustProviderRoot(t, scope.Lookup("Notify")),
 			mustProviderRoot(t, scope.Lookup("NewSignal")),
@@ -132,4 +331,10 @@ func RootFactory() func(string) fs.FS { return os.DirFS }
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+	if !strings.Contains(artifacts.printed, "IoFsReadFileCanonicalAsyncError") {
+		t.Fatalf("async-error fs.ReadFile profile is absent:\n%s", artifacts.printed)
+	}
+	if !strings.Contains(artifacts.printed, "IoFsStatCanonicalAsyncError") {
+		t.Fatalf("async-error fs.Stat profile is absent:\n%s", artifacts.printed)
+	}
 }

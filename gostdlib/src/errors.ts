@@ -5,12 +5,13 @@ import {
   MessageWrappedErrors,
   WrappedProviderError,
 } from "./internal/portable/errors/tree.js";
+import { unsupported } from "./internal/portable/errors/sentinel.js";
 import { ProviderError } from "./internal/runtime/error.js";
 
 export const state: {
   ErrUnsupported: GoError;
 } = {
-  ErrUnsupported: new ProviderError("unsupported operation"),
+  ErrUnsupported: unsupported,
 };
 
 export function New(text: gostring): GoError {
@@ -27,7 +28,7 @@ export function Is(failure: GoError | undefined, target: GoError | undefined): b
   if (failure === undefined || target === undefined) {
     return failure === target;
   }
-  if (failure.$go$equal(target)) {
+  if (target.$go$type.comparable && failure.$go$equal(target)) {
     return true;
   }
   if (failure instanceof WrappedProviderError) {

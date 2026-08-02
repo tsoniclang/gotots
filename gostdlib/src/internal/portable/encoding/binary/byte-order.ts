@@ -11,11 +11,11 @@ import type {
 import { ProviderInterfaceValue } from "../../io/value.js";
 import { sliceValues } from "../../../runtime/slice.js";
 
-const bigEndianType = Object.freeze({});
-const littleEndianType = Object.freeze({});
+const bigEndianType = Object.freeze({ comparable: true });
+const littleEndianType = Object.freeze({ comparable: true });
 
 export abstract class EndianOrder extends ProviderInterfaceValue {
-  protected constructor(typeIdentity: object) {
+	protected constructor(typeIdentity: { readonly comparable: boolean }) {
     super(typeIdentity);
   }
 

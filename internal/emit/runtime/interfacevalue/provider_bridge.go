@@ -36,7 +36,7 @@ func providerBridgeContract(
 		},
 		[]tsgo.ClassElement{
 			providerBridgeProperty(factory, interfacecontract.PayloadMember, valueType),
-			providerBridgeProperty(factory, interfacecontract.DynamicTypeMember, objectType(factory)),
+			providerBridgeProperty(factory, interfacecontract.DynamicTypeMember, interfacecontract.DynamicType(factory)),
 			providerBridgeMethodsProperty(factory),
 			providerBridgeProperty(factory, interfacecontract.FormatStringMember, booleanType(factory)),
 			providerBridgeConstructor(factory, valueType),

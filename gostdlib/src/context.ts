@@ -3,6 +3,7 @@ export {
   Background,
   type CancelCauseFunc,
   type CancelFunc,
+  Cause,
   type Context,
   state,
   TODO,

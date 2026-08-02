@@ -40,6 +40,68 @@ func buildProviderInterface(
 			"selected Go interface is not a non-empty method set",
 		)
 	}
+	return buildProviderInterfaceContract(
+		interfaceType,
+		target,
+		project,
+		effectMarker,
+		func(method *types.Func) (providerInterfaceMethodSource, error) {
+			contract, err := environmentcontract.Describe(method)
+			if err != nil {
+				return providerInterfaceMethodSource{}, err
+			}
+			location, selected, err := selectedGoSourceLocation(
+				selectedToolchain.root,
+				sourcePackage.selected.Fset,
+				method.Pos(),
+			)
+			if err != nil {
+				return providerInterfaceMethodSource{}, certifyError(
+					"build provider interface",
+					contract.Identity(),
+					err.Error(),
+				)
+			}
+			if !selected {
+				return providerInterfaceMethodSource{}, certifyError(
+					"build provider interface",
+					contract.Identity(),
+					"method is outside the selected GOROOT",
+				)
+			}
+			return providerInterfaceMethodSource{
+				identity:  contract.Identity(),
+				signature: contract.Signature(),
+				location:  location,
+			}, nil
+		},
+	)
+}
+
+type providerInterfaceMethodSource struct {
+	identity  string
+	signature string
+	location  string
+}
+
+type providerInterfaceMethodSourceOwner func(
+	*types.Func,
+) (providerInterfaceMethodSource, error)
+
+func buildProviderInterfaceContract(
+	interfaceType *types.Interface,
+	target tsgo.ProjectExport,
+	project *tsgo.ProjectInspection,
+	effectMarker tsgo.ProjectExport,
+	sourceOwner providerInterfaceMethodSourceOwner,
+) (*gostdlib.ProviderInterfaceDocument, error) {
+	if interfaceType == nil || sourceOwner == nil {
+		return nil, certifyError(
+			"build provider interface",
+			"",
+			"interface method evidence owner is incomplete",
+		)
+	}
 	methods := make(
 		[]gostdlib.ProviderInterfaceMethodDocument,
 		0,
@@ -48,33 +110,14 @@ func buildProviderInterface(
 	mode := gostdlib.ProviderInterfaceModeBridge
 	for index := range interfaceType.NumMethods() {
 		method := interfaceType.Method(index).Origin()
-		contract, err := environmentcontract.Describe(method)
+		source, err := sourceOwner(method)
 		if err != nil {
 			return nil, err
 		}
-		location, selected, err := selectedGoSourceLocation(
-			selectedToolchain.root,
-			sourcePackage.selected.Fset,
-			method.Pos(),
-		)
-		if err != nil {
-			return nil, certifyError(
-				"build provider interface",
-				contract.Identity(),
-				err.Error(),
-			)
-		}
-		if !selected {
-			return nil, certifyError(
-				"build provider interface",
-				contract.Identity(),
-				"method is outside the selected GOROOT",
-			)
-		}
 		document := gostdlib.ProviderInterfaceMethodDocument{
-			SourceIdentity:  contract.Identity(),
-			SourceSignature: contract.Signature(),
-			SourceLocation:  location,
+			SourceIdentity:  source.identity,
+			SourceSignature: source.signature,
+			SourceLocation:  source.location,
 		}
 		if !method.Exported() {
 			mode = gostdlib.ProviderInterfaceModeSealedNative
@@ -86,7 +129,7 @@ func buildProviderInterface(
 		if !ok || !member.Visible() {
 			return nil, certifyError(
 				"build provider interface",
-				contract.Identity(),
+				source.identity,
 				"exported Go method has no visible provider member",
 			)
 		}

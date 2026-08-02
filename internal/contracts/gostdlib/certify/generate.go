@@ -29,9 +29,7 @@ func Generate(config Config) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	facetSeeds, representationSeeds, callableProfileSeeds,
-		definedValueIdentities, genericProjections, genericOperations, err :=
-		readFacetSeeds(resolved.facetMapPath)
+	seeds, err := readFacetSeeds(resolved.facetMapPath)
 	if err != nil {
 		return nil, err
 	}
@@ -46,8 +44,10 @@ func Generate(config Config) ([]byte, error) {
 	if err := verifyPackageModules(
 		providerPackage,
 		ordered,
-		facetSeeds,
-		callableProfileSeeds,
+		seeds.facets,
+		seeds.callableProfiles,
+		seeds.statefulProfiles,
+		seeds.providerInterfaces,
 	); err != nil {
 		return nil, err
 	}
@@ -81,9 +81,9 @@ func Generate(config Config) ([]byte, error) {
 			project,
 			source,
 			seed,
-			genericProjections,
-			genericOperations,
-			definedValueIdentities,
+			seeds.genericProjections,
+			seeds.genericOperations,
+			seeds.definedValueIdentities,
 			effectMarker,
 		)
 		if buildErr != nil {
@@ -95,14 +95,14 @@ func Generate(config Config) ([]byte, error) {
 	if err := verifyGenericOperationBindings(
 		source,
 		modules,
-		genericOperations,
+		seeds.genericOperations,
 	); err != nil {
 		client.Close()
 		return nil, err
 	}
 	if err := verifyGenericCallableProjectionBindings(
 		modules,
-		genericProjections,
+		seeds.genericProjections,
 	); err != nil {
 		client.Close()
 		return nil, err
@@ -110,8 +110,8 @@ func Generate(config Config) ([]byte, error) {
 	modules, err = applyDefinedValueRepresentations(
 		source,
 		modules,
-		facetSeeds,
-		definedValueIdentities,
+		seeds.facets,
+		seeds.definedValueIdentities,
 	)
 	if err != nil {
 		client.Close()
@@ -121,11 +121,13 @@ func Generate(config Config) ([]byte, error) {
 		resolved,
 		project,
 		source,
-		facetSeeds,
-		representationSeeds,
-		callableProfileSeeds,
+		seeds.facets,
+		seeds.representations,
+		seeds.callableProfiles,
+		seeds.statefulProfiles,
+		seeds.providerInterfaces,
 		modules,
-		genericProjections,
+		seeds.genericProjections,
 		effectMarker,
 		selectedToolchain,
 	)
@@ -152,8 +154,10 @@ func Generate(config Config) ([]byte, error) {
 		GoVersion:        selectedToolchain.version,
 		MinimumGoVersion: resolved.minimumGoVersion,
 		MaximumGoVersion: resolved.maximumGoVersion,
-		GOOS:             selectedToolchain.goos,
-		GOARCH:           selectedToolchain.goarch,
+		GOOS:             selectedToolchain.profile.GOOS(),
+		GOARCH:           selectedToolchain.profile.GOARCH(),
+		CGOEnabled:       selectedToolchain.profile.CgoEnabled(),
+		BuildTags:        selectedToolchain.profile.Tags(),
 		RuntimeDigest:    runtimeDigest,
 		ProviderDigest:   integrity,
 		Modules:          modules,
@@ -336,12 +340,12 @@ func verifyGenericOperationBindings(
 		for _, operation := range operations {
 			for _, reference := range append(
 				append(
-					[]gostdlib.GenericOperationTypeDocument(nil),
+					[]gostdlib.ContractTypeDocument(nil),
 					operation.Parameters...,
 				),
 				operation.Results...,
 			) {
-				if err := verifyGenericOperationTypeParameters(
+				if err := verifyContractTypeParameters(
 					reference,
 					typeParameterCount,
 					callableParameterCount,
@@ -365,12 +369,12 @@ func verifyGenericOperationBindings(
 	return nil
 }
 
-func verifyGenericOperationTypeParameters(
-	reference gostdlib.GenericOperationTypeDocument,
+func verifyContractTypeParameters(
+	reference gostdlib.ContractTypeDocument,
 	typeParameterCount int,
 	callableParameterCount int,
 ) error {
-	if reference.Kind == gostdlib.GenericOperationTypeParameter {
+	if reference.Kind == gostdlib.ContractTypeParameter {
 		if reference.TypeParameter == nil ||
 			*reference.TypeParameter < 0 ||
 			*reference.TypeParameter >= typeParameterCount {
@@ -379,7 +383,7 @@ func verifyGenericOperationTypeParameters(
 			)
 		}
 	}
-	if reference.Kind == gostdlib.GenericOperationTypeCallableParameter {
+	if reference.Kind == gostdlib.ContractTypeCallableParameter {
 		if reference.CallableParameter == nil ||
 			*reference.CallableParameter < 0 ||
 			*reference.CallableParameter >= callableParameterCount {
@@ -388,14 +392,14 @@ func verifyGenericOperationTypeParameters(
 			)
 		}
 	}
-	for _, child := range []*gostdlib.GenericOperationTypeDocument{
+	for _, child := range []*gostdlib.ContractTypeDocument{
 		reference.Key,
 		reference.Element,
 	} {
 		if child == nil {
 			continue
 		}
-		if err := verifyGenericOperationTypeParameters(
+		if err := verifyContractTypeParameters(
 			*child,
 			typeParameterCount,
 			callableParameterCount,

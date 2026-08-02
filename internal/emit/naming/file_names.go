@@ -185,6 +185,16 @@ func (n *File) reference(
 			Reason: "package variable requires package-state reference",
 		}
 	}
+	if typeName, ok := object.(*types.TypeName); ok {
+		reference, profiled, err := n.providerStatefulRepresentation(
+			typeName,
+			phase,
+			facet,
+		)
+		if err != nil || profiled {
+			return reference, err
+		}
+	}
 	binding, ok := n.owner.byObject[object]
 	if !ok && n.owner.registry != nil {
 		binding, ok = n.owner.registry.byObject[object]

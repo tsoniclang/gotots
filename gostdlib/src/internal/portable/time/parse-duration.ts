@@ -15,10 +15,10 @@ const second = 1_000n * millisecond;
 const minute = 60n * second;
 const hour = 60n * minute;
 
-const parseDurationErrorType = Object.freeze({});
+const parseDurationErrorType = Object.freeze({ comparable: true });
 
 class ParseDurationError extends ProviderError {
-  override readonly $go$type: object = parseDurationErrorType;
+  override readonly $go$type = parseDurationErrorType;
 
   constructor(message: string, value: string) {
     super(`time: ${message} ${timeQuote(value)}`);

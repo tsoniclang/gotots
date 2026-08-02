@@ -198,7 +198,8 @@ func (n *File) InterfaceContract(
 ) (api.InterfaceContractReference, error) {
 	if typeName, interfaceType, ok := namedInterface(sourceType); ok {
 		named := types.Unalias(sourceType).(*types.Named)
-		if named.TypeArgs().Len() != 0 ||
+		if predeclaredError(typeName) ||
+			named.TypeArgs().Len() != 0 ||
 			n.providerInterfaceContract(typeName) {
 			return n.generatedInterfaceContract(interfaceType)
 		}
@@ -283,6 +284,9 @@ func (n *File) InterfaceType(
 	sourceType types.Type,
 ) (api.NameReference, error) {
 	if typeName, interfaceType, ok := namedInterface(sourceType); ok {
+		if predeclaredError(typeName) {
+			return n.generatedInterfaceType(interfaceType)
+		}
 		if n.providerInterfaceContract(typeName) {
 			providerInterface, _, err :=
 				n.owner.registry.ProviderInterface(typeName)
@@ -501,6 +505,22 @@ func (n *File) generatedValueReference(
 	requirement api.RootRequest,
 	facet api.ArtifactFacet,
 ) (api.NameReference, error) {
+	return n.generatedReference(
+		artifact,
+		name,
+		requirement,
+		facet,
+		api.ImportPhaseValue,
+	)
+}
+
+func (n *File) generatedReference(
+	artifact *api.GeneratedArtifact,
+	name string,
+	requirement api.RootRequest,
+	facet api.ArtifactFacet,
+	phase api.ImportPhase,
+) (api.NameReference, error) {
 	requests := []api.RootRequest{requirement}
 	if artifact.Placement() == api.GeneratedArtifactPlacementLexical {
 		return api.NewNameReference(name, requests...)
@@ -528,7 +548,7 @@ func (n *File) generatedValueReference(
 	}
 	request, err := api.NewImportRequest(
 		n.factory,
-		api.ImportPhaseValue,
+		phase,
 		modulePath,
 		name,
 		name,
@@ -604,6 +624,10 @@ func namedInterface(
 	}
 	source = source.Complete()
 	return named.Origin().Obj(), source, source.IsMethodSet()
+}
+
+func predeclaredError(typeName *types.TypeName) bool {
+	return typeName != nil && typeName == types.Universe.Lookup("error")
 }
 
 func anonymousInterface(sourceType types.Type) (*types.Interface, bool) {

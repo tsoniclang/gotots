@@ -94,14 +94,53 @@ type RecoveryCallableReference struct {
 }
 
 type ProviderCallableProfileReference struct {
-	reference NameReference
-	profile   gostdlib.ProviderCallableProfile
-	guards    []types.Type
+	reference     NameReference
+	profile       gostdlib.ProviderCallableProfile
+	guards        []types.Type
+	contracts     []types.Type
+	fromProvider  []NameReference
+	values        []types.Object
+	typeArguments []types.Type
 }
 
 type ProviderCallableProfileCandidate struct {
 	profile gostdlib.ProviderCallableProfile
 	guards  []types.Type
+}
+
+type ProviderStatefulProfileCandidate struct {
+	profile       gostdlib.ProviderStatefulProfile
+	typeArguments []types.Type
+}
+
+func NewProviderStatefulProfileCandidate(
+	profile gostdlib.ProviderStatefulProfile,
+	typeArguments []types.Type,
+) (ProviderStatefulProfileCandidate, error) {
+	if !profile.Valid() || len(typeArguments) != len(profile.TypeArguments()) {
+		return ProviderStatefulProfileCandidate{}, &NameError{
+			Reason: "provider stateful-profile candidate is invalid",
+		}
+	}
+	for _, selected := range typeArguments {
+		if selected == nil {
+			return ProviderStatefulProfileCandidate{}, &NameError{
+				Reason: "provider stateful-profile interface is nil",
+			}
+		}
+	}
+	return ProviderStatefulProfileCandidate{
+		profile:       profile,
+		typeArguments: slices.Clone(typeArguments),
+	}, nil
+}
+
+func (c ProviderStatefulProfileCandidate) Profile() gostdlib.ProviderStatefulProfile {
+	return c.profile
+}
+
+func (c ProviderStatefulProfileCandidate) TypeArguments() []types.Type {
+	return slices.Clone(c.typeArguments)
 }
 
 func NewProviderCallableProfileCandidate(
@@ -138,9 +177,17 @@ func NewProviderCallableProfileReference(
 	reference NameReference,
 	profile gostdlib.ProviderCallableProfile,
 	guards []types.Type,
+	contracts []types.Type,
+	fromProvider []NameReference,
+	values []types.Object,
+	typeArguments []types.Type,
 ) (ProviderCallableProfileReference, error) {
 	if reference.Name() == "" || !profile.Valid() ||
-		len(guards) != len(profile.GuardInterfaces()) {
+		len(guards) != len(profile.GuardInterfaces()) ||
+		len(contracts) != len(profile.ContractInterfaces()) ||
+		len(fromProvider) != len(profile.FromProviderInterfaces()) ||
+		len(values) != len(profile.CanonicalValues()) ||
+		len(typeArguments) != len(profile.CanonicalTypeArguments()) {
 		return ProviderCallableProfileReference{}, &NameError{
 			Reason: "provider callable-profile reference is invalid",
 		}
@@ -152,10 +199,44 @@ func NewProviderCallableProfileReference(
 			}
 		}
 	}
+	for _, contract := range contracts {
+		if contract == nil {
+			return ProviderCallableProfileReference{}, &NameError{
+				Reason: "provider callable-profile contract is nil",
+			}
+		}
+	}
+	for _, bridge := range fromProvider {
+		if bridge.Name() == "" {
+			return ProviderCallableProfileReference{}, &NameError{
+				Reason: "provider callable-profile from-provider bridge is empty",
+			}
+		}
+	}
+	for _, value := range values {
+		variable, ok := value.(*types.Var)
+		if !ok || variable.IsField() || variable.Pkg() == nil ||
+			variable.Parent() != variable.Pkg().Scope() {
+			return ProviderCallableProfileReference{}, &NameError{
+				Reason: "provider callable-profile canonical value is invalid",
+			}
+		}
+	}
+	for _, argument := range typeArguments {
+		if argument == nil {
+			return ProviderCallableProfileReference{}, &NameError{
+				Reason: "provider callable-profile type argument is nil",
+			}
+		}
+	}
 	return ProviderCallableProfileReference{
-		reference: reference,
-		profile:   profile,
-		guards:    slices.Clone(guards),
+		reference:     reference,
+		profile:       profile,
+		guards:        slices.Clone(guards),
+		contracts:     slices.Clone(contracts),
+		fromProvider:  slices.Clone(fromProvider),
+		values:        slices.Clone(values),
+		typeArguments: slices.Clone(typeArguments),
 	}, nil
 }
 
@@ -175,6 +256,22 @@ func (r ProviderCallableProfileReference) Profile() gostdlib.ProviderCallablePro
 
 func (r ProviderCallableProfileReference) Guards() []types.Type {
 	return slices.Clone(r.guards)
+}
+
+func (r ProviderCallableProfileReference) Contracts() []types.Type {
+	return slices.Clone(r.contracts)
+}
+
+func (r ProviderCallableProfileReference) FromProviderBridges() []NameReference {
+	return slices.Clone(r.fromProvider)
+}
+
+func (r ProviderCallableProfileReference) CanonicalValues() []types.Object {
+	return slices.Clone(r.values)
+}
+
+func (r ProviderCallableProfileReference) CanonicalTypeArguments() []types.Type {
+	return slices.Clone(r.typeArguments)
 }
 
 func NewRecoveryCallableReference(
@@ -554,6 +651,16 @@ type Names interface {
 		bool,
 		error,
 	)
+	ProviderStatefulProfileCandidates(*types.TypeName) (
+		[]ProviderStatefulProfileCandidate,
+		bool,
+		error,
+	)
+	ProviderStatefulProfileTarget(
+		*types.TypeName,
+		string,
+		ImportPhase,
+	) (NameReference, error)
 	ProviderRepresentationOwnsMethod(types.Type, *types.Func) (bool, error)
 	InterfaceType(types.Type) (NameReference, error)
 	InterfaceContract(types.Type) (InterfaceContractReference, error)

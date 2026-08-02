@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -148,6 +149,55 @@ func emitProviderProfileInvocation(
 	detached bool,
 ) (api.ExpressionEmission, error) {
 	reference := selection.Reference()
+	typeArguments := make([]tsgo.TypeNode, 0, len(reference.CanonicalTypeArguments()))
+	for _, sourceType := range reference.CanonicalTypeArguments() {
+		represented, err := interfacetype.EmitNonNil(
+			context.WithRole(api.RoleCallTypeArgument),
+			children,
+			source,
+			sourceType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		typeArguments = append(typeArguments, represented.Value())
+		requests = append(requests, represented.Requests()...)
+	}
+	for _, object := range reference.CanonicalValues() {
+		variable, ok := object.(*types.Var)
+		if !ok {
+			return api.ExpressionEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "provider callable-profile canonical value is not a variable",
+			}
+		}
+		value, err := context.Names().PackageVariable(variable)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		raw, err := api.NewExpressionEmission(
+			nil,
+			value.Expression(context.Factory()),
+			value.Requests(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		converted, _, err := providerboundary.FromProviderValue(
+			context,
+			children,
+			nil,
+			"",
+			variable.Type(),
+			raw,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		before = append(before, converted.Before()...)
+		arguments = append(arguments, converted.Value())
+		requests = append(requests, converted.Requests()...)
+	}
 	for _, guardType := range reference.Guards() {
 		guard, err := context.Names().InterfaceContract(guardType)
 		if err != nil {
@@ -159,12 +209,27 @@ func emitProviderProfileInvocation(
 		)
 		requests = append(requests, guard.Requests()...)
 	}
+	for _, contractType := range reference.Contracts() {
+		contract, err := context.Names().InterfaceContract(contractType)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		arguments = append(
+			arguments,
+			context.Factory().Identifier(contract.ContractName()),
+		)
+		requests = append(requests, contract.Requests()...)
+	}
+	for _, bridge := range reference.FromProviderBridges() {
+		arguments = append(arguments, bridge.Expression(context.Factory()))
+		requests = append(requests, bridge.Requests()...)
+	}
 	target, err := api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
 			reference.Expression(context.Factory()),
 			nil,
-			nil,
+			typeArguments,
 			arguments,
 			tsgo.NodeFlagsNone,
 		),

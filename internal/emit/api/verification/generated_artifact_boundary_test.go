@@ -222,8 +222,9 @@ func TestGeneratedArtifactDomainsArePinned(t *testing.T) {
 		GeneratedArtifactInterfaceMethodCallable != 9 ||
 		GeneratedArtifactPointerRepresentation != 10 ||
 		GeneratedArtifactProviderInterfaceBridge != 11 ||
+		GeneratedArtifactProviderStatefulRepresentation != 12 ||
 		GeneratedArtifactInvalid.Valid() ||
-		GeneratedArtifactKind(12).Valid() {
+		GeneratedArtifactKind(13).Valid() {
 		t.Fatal("generated-artifact kind IDs drifted")
 	}
 	if GeneratedArtifactPlacementCompilation != 1 ||

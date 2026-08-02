@@ -48,6 +48,7 @@ const (
 	RoleCallCallee            Role = "call-callee"
 	RoleCallArgument          Role = "call-argument"
 	RoleCallArgumentType      Role = "call-argument-type"
+	RoleCallTypeArgument      Role = "call-type-argument"
 	RoleFunctionLiteralBody   Role = "function-literal-body"
 	RoleCallableParameter     Role = "callable-parameter-type"
 	RoleCallableResult        Role = "callable-result-type"

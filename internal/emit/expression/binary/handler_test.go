@@ -324,6 +324,20 @@ func (unusedNames) ProviderCallableProfileCandidates(
 	return nil, false, nil
 }
 
+func (unusedNames) ProviderStatefulProfileCandidates(
+	*types.TypeName,
+) ([]api.ProviderStatefulProfileCandidate, bool, error) {
+	return nil, false, nil
+}
+
+func (unusedNames) ProviderStatefulProfileTarget(
+	*types.TypeName,
+	string,
+	api.ImportPhase,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) ProviderRepresentationOwnsMethod(
 	types.Type,
 	*types.Func,

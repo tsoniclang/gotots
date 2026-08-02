@@ -186,6 +186,16 @@ func (r DeclarationRequirement) ProviderInterfaceBridge() (
 	)
 }
 
+func (r DeclarationRequirement) ProviderStatefulRepresentation() (
+	*GeneratedArtifact,
+	bool,
+) {
+	return r.generatedDefinition(
+		DeclarationRequirementProviderStatefulRepresentation,
+		GeneratedArtifactProviderStatefulRepresentation,
+	)
+}
+
 func (r DeclarationRequirement) GenericCapability() (
 	*GeneratedArtifact,
 	bool,
@@ -267,7 +277,8 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementGenericCapability,
 		DeclarationRequirementCallableABI,
 		DeclarationRequirementPointerRepresentation,
-		DeclarationRequirementProviderInterfaceBridge:
+		DeclarationRequirementProviderInterfaceBridge,
+		DeclarationRequirementProviderStatefulRepresentation:
 		return r.generated, true
 	default:
 		return nil, false
@@ -381,29 +392,30 @@ func (d MapSpecializationDemand) Valid() bool {
 type DeclarationRequirementKind uint8
 
 const (
-	DeclarationRequirementInvalid                   DeclarationRequirementKind = 0
-	DeclarationRequirementNamedStructOperation      DeclarationRequirementKind = 1
-	DeclarationRequirementAddressableStorage        DeclarationRequirementKind = 2
-	DeclarationRequirementConstantProjection        DeclarationRequirementKind = 3
-	DeclarationRequirementLocalConstantProjection   DeclarationRequirementKind = 4
-	DeclarationRequirementGenericOperation          DeclarationRequirementKind = 5
-	DeclarationRequirementAnonymousStruct           DeclarationRequirementKind = 6
-	DeclarationRequirementMapSpecialization         DeclarationRequirementKind = 7
-	DeclarationRequirementInterfaceAdapter          DeclarationRequirementKind = 8
-	DeclarationRequirementAnonymousInterface        DeclarationRequirementKind = 9
-	DeclarationRequirementInterfaceMethodToken      DeclarationRequirementKind = 10
-	DeclarationRequirementInterfaceDynamicTypeToken DeclarationRequirementKind = 11
-	DeclarationRequirementGenericCapability         DeclarationRequirementKind = 12
-	DeclarationRequirementCallableControl           DeclarationRequirementKind = 13
-	DeclarationRequirementCooperativeCallable       DeclarationRequirementKind = 14
-	DeclarationRequirementCallableABI               DeclarationRequirementKind = 15
-	DeclarationRequirementGenericCallableProfile    DeclarationRequirementKind = 17
-	DeclarationRequirementClassMethod               DeclarationRequirementKind = 18
-	DeclarationRequirementValueReceiverCopy         DeclarationRequirementKind = 19
-	DeclarationRequirementGenericRepresentation     DeclarationRequirementKind = 20
-	DeclarationRequirementInterfaceMethodCallable   DeclarationRequirementKind = 21
-	DeclarationRequirementPointerRepresentation     DeclarationRequirementKind = 22
-	DeclarationRequirementProviderInterfaceBridge   DeclarationRequirementKind = 23
+	DeclarationRequirementInvalid                        DeclarationRequirementKind = 0
+	DeclarationRequirementNamedStructOperation           DeclarationRequirementKind = 1
+	DeclarationRequirementAddressableStorage             DeclarationRequirementKind = 2
+	DeclarationRequirementConstantProjection             DeclarationRequirementKind = 3
+	DeclarationRequirementLocalConstantProjection        DeclarationRequirementKind = 4
+	DeclarationRequirementGenericOperation               DeclarationRequirementKind = 5
+	DeclarationRequirementAnonymousStruct                DeclarationRequirementKind = 6
+	DeclarationRequirementMapSpecialization              DeclarationRequirementKind = 7
+	DeclarationRequirementInterfaceAdapter               DeclarationRequirementKind = 8
+	DeclarationRequirementAnonymousInterface             DeclarationRequirementKind = 9
+	DeclarationRequirementInterfaceMethodToken           DeclarationRequirementKind = 10
+	DeclarationRequirementInterfaceDynamicTypeToken      DeclarationRequirementKind = 11
+	DeclarationRequirementGenericCapability              DeclarationRequirementKind = 12
+	DeclarationRequirementCallableControl                DeclarationRequirementKind = 13
+	DeclarationRequirementCooperativeCallable            DeclarationRequirementKind = 14
+	DeclarationRequirementCallableABI                    DeclarationRequirementKind = 15
+	DeclarationRequirementGenericCallableProfile         DeclarationRequirementKind = 17
+	DeclarationRequirementClassMethod                    DeclarationRequirementKind = 18
+	DeclarationRequirementValueReceiverCopy              DeclarationRequirementKind = 19
+	DeclarationRequirementGenericRepresentation          DeclarationRequirementKind = 20
+	DeclarationRequirementInterfaceMethodCallable        DeclarationRequirementKind = 21
+	DeclarationRequirementPointerRepresentation          DeclarationRequirementKind = 22
+	DeclarationRequirementProviderInterfaceBridge        DeclarationRequirementKind = 23
+	DeclarationRequirementProviderStatefulRepresentation DeclarationRequirementKind = 24
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -428,7 +440,8 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementGenericRepresentation ||
 		k == DeclarationRequirementInterfaceMethodCallable ||
 		k == DeclarationRequirementPointerRepresentation ||
-		k == DeclarationRequirementProviderInterfaceBridge
+		k == DeclarationRequirementProviderInterfaceBridge ||
+		k == DeclarationRequirementProviderStatefulRepresentation
 }
 
 type CallableControlFacet uint8

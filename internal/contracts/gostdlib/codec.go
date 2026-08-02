@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"slices"
 	"strings"
+
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 )
 
 type ManifestError struct {
@@ -89,6 +92,10 @@ func Parse(payload []byte) (Manifest, error) {
 	callableProfiles := make(
 		map[providerCallableProfileLookup]ProviderCallableProfile,
 	)
+	statefulProfiles := make(
+		map[providerStatefulProfileLookup]ProviderStatefulProfile,
+	)
+	providerInterfaces := make(map[string]ProviderInterfaceBinding)
 	for _, module := range document.FacetModules {
 		for _, representation := range module.Representations {
 			representations[providerRepresentationLookup{
@@ -101,6 +108,16 @@ func Parse(payload []byte) (Manifest, error) {
 				sourceIdentity: profile.SourceIdentity,
 				profileKey:     profile.ProfileKey,
 			}] = newProviderCallableProfile(module, profile)
+		}
+		for _, profile := range module.StatefulProfiles {
+			statefulProfiles[providerStatefulProfileLookup{
+				sourceIdentity: profile.SourceIdentity,
+				profileKey:     profile.ProfileKey,
+			}] = newProviderStatefulProfile(module, profile)
+		}
+		for _, selected := range module.ProviderInterfaces {
+			providerInterfaces[selected.SourceIdentity] =
+				newProviderInterfaceBinding(module, selected)
 		}
 	}
 	facets := make(map[facetLookup]Facet)
@@ -123,12 +140,14 @@ func Parse(payload []byte) (Manifest, error) {
 		}
 	}
 	return Manifest{
-		document:         cloneDocument(document),
-		payload:          canonical,
-		bindings:         bindings,
-		facets:           facets,
-		representations:  representations,
-		callableProfiles: callableProfiles,
+		document:           cloneDocument(document),
+		payload:            canonical,
+		bindings:           bindings,
+		facets:             facets,
+		representations:    representations,
+		providerInterfaces: providerInterfaces,
+		callableProfiles:   callableProfiles,
+		statefulProfiles:   statefulProfiles,
 	}, nil
 }
 
@@ -140,6 +159,18 @@ func Encode(manifest Manifest) ([]byte, error) {
 }
 
 func validateDocument(document Document, sealed bool) error {
+	if document.BuildTags == nil {
+		return manifestError("buildTags", "set is absent")
+	}
+	if _, err := environmentcontract.NewBuildProfileForToolchain(
+		document.GoVersion,
+		document.GOOS,
+		document.GOARCH,
+		document.CGOEnabled,
+		document.BuildTags,
+	); err != nil {
+		return manifestError("buildProfile", err.Error())
+	}
 	switch {
 	case document.SchemaVersion != SchemaVersion:
 		return manifestError("schemaVersion", "unsupported schema")
@@ -155,10 +186,6 @@ func validateDocument(document Document, sealed bool) error {
 		return manifestError("minimumGoVersion", "value is invalid")
 	case !strings.HasPrefix(document.MaximumGoVersion, "go"):
 		return manifestError("maximumGoVersion", "value is invalid")
-	case document.GOOS == "":
-		return manifestError("goos", "value is empty")
-	case document.GOARCH == "":
-		return manifestError("goarch", "value is empty")
 	case !validDigest(document.RuntimeDigest):
 		return manifestError("runtimeDigest", "value is not a sha256 digest")
 	case !validDigest(document.ProviderDigest):
@@ -210,6 +237,8 @@ func validateDocument(document Document, sealed bool) error {
 	previousFacetModule := ""
 	facetLookups := make(map[facetLookup]struct{})
 	callableProfileLookups := make(map[providerCallableProfileLookup]struct{})
+	statefulProfileLookups := make(map[providerStatefulProfileLookup]struct{})
+	providerInterfaceLookups := make(map[string]struct{})
 	for index, module := range document.FacetModules {
 		field := fmt.Sprintf("facetModules[%d]", index)
 		if err := validateFacetModule(
@@ -217,6 +246,8 @@ func validateDocument(document Document, sealed bool) error {
 			field,
 			facetLookups,
 			callableProfileLookups,
+			statefulProfileLookups,
+			providerInterfaceLookups,
 		); err != nil {
 			return err
 		}
@@ -237,6 +268,8 @@ func validateFacetModule(
 	field string,
 	lookups map[facetLookup]struct{},
 	callableProfileLookups map[providerCallableProfileLookup]struct{},
+	statefulProfileLookups map[providerStatefulProfileLookup]struct{},
+	providerInterfaceLookups map[string]struct{},
 ) error {
 	if !strings.HasPrefix(
 		module.Specifier,
@@ -248,8 +281,13 @@ func validateFacetModule(
 		!strings.HasPrefix(module.SourcePath, "src/internal/facets/") {
 		return manifestError(field+".sourcePath", "value is not a compiler-facet source")
 	}
-	if len(module.Facets) == 0 && len(module.CallableProfiles) == 0 {
-		return manifestError(field, "facet and callable-profile sets are empty")
+	if len(module.Facets) == 0 && len(module.CallableProfiles) == 0 &&
+		len(module.StatefulProfiles) == 0 &&
+		len(module.ProviderInterfaces) == 0 {
+		return manifestError(
+			field,
+			"facet, provider-interface, and callable-profile sets are empty",
+		)
 	}
 	owners := make(map[string]struct{})
 	representations := make(
@@ -282,42 +320,50 @@ func validateFacetModule(
 		owners[representation.Export] = struct{}{}
 		representations[representation.Export] = representation
 	}
-	callableInterfaces := make(
-		map[string]ProviderCallableProfileInterfaceDocument,
-		len(module.CallableInterfaces),
-	)
-	previousCallableInterface := ""
-	for index, selected := range module.CallableInterfaces {
-		selectedField := fmt.Sprintf("%s.callableInterfaces[%d]", field, index)
-		if err := validateProviderCallableProfileInterface(
+	previousProviderInterface := ""
+	for index, selected := range module.ProviderInterfaces {
+		selectedField := fmt.Sprintf("%s.providerInterfaces[%d]", field, index)
+		if err := validateProviderInterfaceBinding(
 			selected,
 			selectedField,
 		); err != nil {
 			return err
 		}
-		if selected.SourceIdentity <= previousCallableInterface {
+		if selected.SourceIdentity <= previousProviderInterface {
 			return manifestError(
-				field+".callableInterfaces",
+				field+".providerInterfaces",
 				"values are not strictly ordered",
 			)
 		}
-		previousCallableInterface = selected.SourceIdentity
-		if _, duplicate := callableInterfaces[selected.SourceIdentity]; duplicate {
-			return manifestError(selectedField+".sourceIdentity", "value is duplicated")
+		previousProviderInterface = selected.SourceIdentity
+		if _, duplicate := providerInterfaceLookups[selected.SourceIdentity]; duplicate {
+			return manifestError(
+				selectedField+".sourceIdentity",
+				"value is duplicated",
+			)
 		}
 		if _, duplicate := owners[selected.Export]; duplicate {
 			return manifestError(selectedField+".export", "target owner is duplicated")
 		}
-		callableInterfaces[selected.SourceIdentity] = selected
+		providerInterfaceLookups[selected.SourceIdentity] = struct{}{}
 		owners[selected.Export] = struct{}{}
 	}
+	profileInterfaceTargets := make(
+		map[string]ProviderCallableProfileInterfaceDocument,
+	)
+	callableProfileTargets := make(map[string]ProviderCallableProfileDocument)
+	statefulProfileTargets := make(map[string]ProviderStatefulProfileDocument)
 	previousProfile := ""
 	for index, profile := range module.CallableProfiles {
 		profileField := fmt.Sprintf("%s.callableProfiles[%d]", field, index)
-		if err := validateProviderCallableProfile(
-			profile,
+		if err := validateProviderCallableProfile(profile, profileField); err != nil {
+			return err
+		}
+		if err := recordProviderProfileInterfaceTargets(
+			profile.Interfaces,
 			profileField,
-			callableInterfaces,
+			profileInterfaceTargets,
+			owners,
 		); err != nil {
 			return err
 		}
@@ -337,10 +383,53 @@ func validateFacetModule(
 			return manifestError(profileField, "profile identity is duplicated")
 		}
 		callableProfileLookups[lookup] = struct{}{}
-		if _, duplicate := owners[profile.Export]; duplicate {
-			return manifestError(profileField+".export", "target owner is duplicated")
+		if err := recordProviderCallableProfileTarget(
+			profile,
+			profileField,
+			callableProfileTargets,
+			owners,
+		); err != nil {
+			return err
 		}
-		owners[profile.Export] = struct{}{}
+	}
+	previousStatefulProfile := ""
+	for index, profile := range module.StatefulProfiles {
+		profileField := fmt.Sprintf("%s.statefulProfiles[%d]", field, index)
+		if err := validateProviderStatefulProfile(profile, profileField); err != nil {
+			return err
+		}
+		if err := recordProviderProfileInterfaceTargets(
+			profile.Interfaces,
+			profileField,
+			profileInterfaceTargets,
+			owners,
+		); err != nil {
+			return err
+		}
+		key := profile.SourceIdentity + "\x00" + profile.ProfileKey
+		if previousStatefulProfile != "" && key <= previousStatefulProfile {
+			return manifestError(
+				field+".statefulProfiles",
+				"profiles are not strictly ordered",
+			)
+		}
+		previousStatefulProfile = key
+		lookup := providerStatefulProfileLookup{
+			sourceIdentity: profile.SourceIdentity,
+			profileKey:     profile.ProfileKey,
+		}
+		if _, duplicate := statefulProfileLookups[lookup]; duplicate {
+			return manifestError(profileField, "profile identity is duplicated")
+		}
+		statefulProfileLookups[lookup] = struct{}{}
+		if err := recordProviderStatefulProfileTarget(
+			profile,
+			profileField,
+			statefulProfileTargets,
+			owners,
+		); err != nil {
+			return err
+		}
 	}
 	previous := ""
 	referencedRepresentations := make(map[string]struct{})
@@ -402,6 +491,117 @@ func validateFacetModule(
 	return nil
 }
 
+func recordProviderProfileInterfaceTargets(
+	interfaces []ProviderCallableProfileInterfaceDocument,
+	field string,
+	targets map[string]ProviderCallableProfileInterfaceDocument,
+	owners map[string]struct{},
+) error {
+	for index, selected := range interfaces {
+		selectedField := fmt.Sprintf("%s.interfaces[%d]", field, index)
+		prior, exists := targets[selected.Export]
+		if exists {
+			if !sameProviderCallableProfileInterface(prior, selected) {
+				return manifestError(
+					selectedField+".export",
+					"shared target interface evidence disagrees",
+				)
+			}
+			continue
+		}
+		if _, duplicate := owners[selected.Export]; duplicate {
+			return manifestError(selectedField+".export", "target owner is duplicated")
+		}
+		targets[selected.Export] = selected
+		owners[selected.Export] = struct{}{}
+	}
+	return nil
+}
+
+func recordProviderCallableProfileTarget(
+	profile ProviderCallableProfileDocument,
+	field string,
+	targets map[string]ProviderCallableProfileDocument,
+	owners map[string]struct{},
+) error {
+	prior, exists := targets[profile.Export]
+	if exists {
+		if !sameProviderCallableProfileTarget(prior, profile) {
+			return manifestError(
+				field+".export",
+				"shared callable target evidence disagrees",
+			)
+		}
+		return nil
+	}
+	if _, duplicate := owners[profile.Export]; duplicate {
+		return manifestError(field+".export", "target owner is duplicated")
+	}
+	targets[profile.Export] = profile
+	owners[profile.Export] = struct{}{}
+	return nil
+}
+
+func sameProviderCallableProfileTarget(
+	left ProviderCallableProfileDocument,
+	right ProviderCallableProfileDocument,
+) bool {
+	return left.SourceIdentity == right.SourceIdentity &&
+		left.Export == right.Export &&
+		left.Required == right.Required &&
+		left.Receiver == right.Receiver &&
+		left.Effect == right.Effect &&
+		left.ImplementationOwner == right.ImplementationOwner &&
+		left.TargetFingerprint == right.TargetFingerprint &&
+		slices.Equal(left.CanonicalParameters, right.CanonicalParameters) &&
+		slices.Equal(left.CanonicalResults, right.CanonicalResults) &&
+		slices.Equal(left.CanonicalValues, right.CanonicalValues) &&
+		slices.Equal(left.CanonicalTypeArguments, right.CanonicalTypeArguments) &&
+		slices.Equal(left.GuardInterfaces, right.GuardInterfaces) &&
+		slices.Equal(left.ContractInterfaces, right.ContractInterfaces) &&
+		slices.Equal(left.FromProviderInterfaces, right.FromProviderInterfaces) &&
+		slices.Equal(
+			left.ImplementedResultInterfaces,
+			right.ImplementedResultInterfaces,
+		)
+}
+
+func recordProviderStatefulProfileTarget(
+	profile ProviderStatefulProfileDocument,
+	field string,
+	targets map[string]ProviderStatefulProfileDocument,
+	owners map[string]struct{},
+) error {
+	prior, exists := targets[profile.Export]
+	if exists {
+		if !sameProviderStatefulProfileTarget(prior, profile) {
+			return manifestError(
+				field+".export",
+				"shared stateful target evidence disagrees",
+			)
+		}
+		return nil
+	}
+	if _, duplicate := owners[profile.Export]; duplicate {
+		return manifestError(field+".export", "target owner is duplicated")
+	}
+	targets[profile.Export] = profile
+	owners[profile.Export] = struct{}{}
+	return nil
+}
+
+func sameProviderStatefulProfileTarget(
+	left ProviderStatefulProfileDocument,
+	right ProviderStatefulProfileDocument,
+) bool {
+	return left.SourceIdentity == right.SourceIdentity &&
+		left.Export == right.Export &&
+		left.ImplementationOwner == right.ImplementationOwner &&
+		left.TargetFingerprint == right.TargetFingerprint &&
+		slices.Equal(left.TypeArguments, right.TypeArguments) &&
+		slices.Equal(left.Methods, right.Methods)
+}
+
 func validateProviderRepresentation(
 	representation ProviderRepresentationDocument,
 	field string,
@@ -444,29 +644,11 @@ func validateProviderRepresentation(
 	}
 	for index, method := range representation.Methods {
 		methodField := fmt.Sprintf("%s.methods[%d]", field, index)
-		switch {
-		case method.SourceIdentity == "":
-			return manifestError(methodField+".sourceIdentity", "value is empty")
-		case method.Member == "":
-			return manifestError(methodField+".member", "value is empty")
-		case !method.Effect.Valid():
-			return manifestError(methodField+".effect", "value is invalid")
-		case method.SourceSignature == "":
-			return manifestError(methodField+".sourceSignature", "value is empty")
-		case method.SourceLocation == "":
-			return manifestError(methodField+".sourceLocation", "value is empty")
-		case !sourcePath(method.ImplementationOwner):
-			return manifestError(
-				methodField+".implementationOwner",
-				"value is not a provider source path",
-			)
-		case !validDigest(method.TargetFingerprint):
-			return manifestError(
-				methodField+".targetFingerprint",
-				"value is not a sha256 digest",
-			)
-		case index != 0 && method.SourceIdentity <=
-			representation.Methods[index-1].SourceIdentity:
+		if err := validateProviderRepresentationMethod(method, methodField); err != nil {
+			return err
+		}
+		if index != 0 && method.SourceIdentity <=
+			representation.Methods[index-1].SourceIdentity {
 			return manifestError(
 				field+".methods",
 				"methods are not strictly ordered",

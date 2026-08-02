@@ -69,9 +69,7 @@ func dynamicTypeProperty(
 		[]tsgo.ModifierLike{factory.ReadonlyKeyword()},
 		factory.Identifier(interfacecontract.DynamicTypeMember),
 		nil,
-		factory.KeywordTypeNode(
-			tsgo.KeywordTypeSyntaxKindObjectKeyword,
-		),
+		interfacecontract.DynamicType(factory),
 		factory.Identifier(dynamicTypeName),
 	)
 }

@@ -203,6 +203,20 @@ func (staticSpecializationNames) ProviderCallableProfileCandidates(
 	return nil, false, nil
 }
 
+func (staticSpecializationNames) ProviderStatefulProfileCandidates(
+	*types.TypeName,
+) ([]api.ProviderStatefulProfileCandidate, bool, error) {
+	return nil, false, nil
+}
+
+func (staticSpecializationNames) ProviderStatefulProfileTarget(
+	*types.TypeName,
+	string,
+	api.ImportPhase,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) ProviderRepresentationOwnsMethod(
 	types.Type,
 	*types.Func,

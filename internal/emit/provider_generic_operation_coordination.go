@@ -122,13 +122,13 @@ func providerGenericOperationSignature(
 	parameters := api.GenericDeclarationParameters(owner)
 	declaration, _ := owner.Type().(*types.Signature)
 	var resolveType func(
-		gostdlib.GenericOperationTypeDocument,
+		gostdlib.ContractTypeDocument,
 	) (types.Type, error)
 	resolveType = func(
-		reference gostdlib.GenericOperationTypeDocument,
+		reference gostdlib.ContractTypeDocument,
 	) (types.Type, error) {
 		switch reference.Kind {
-		case gostdlib.GenericOperationTypeParameter:
+		case gostdlib.ContractTypeParameter:
 			if reference.TypeParameter == nil ||
 				*reference.TypeParameter < 0 ||
 				*reference.TypeParameter >= len(parameters) {
@@ -138,7 +138,7 @@ func providerGenericOperationSignature(
 				}
 			}
 			return parameters[*reference.TypeParameter], nil
-		case gostdlib.GenericOperationTypeCallableParameter:
+		case gostdlib.ContractTypeCallableParameter:
 			if declaration == nil || reference.CallableParameter == nil ||
 				*reference.CallableParameter < 0 ||
 				*reference.CallableParameter >= declaration.Params().Len() {
@@ -148,11 +148,11 @@ func providerGenericOperationSignature(
 				}
 			}
 			return declaration.Params().At(*reference.CallableParameter).Type(), nil
-		case gostdlib.GenericOperationTypeBool:
+		case gostdlib.ContractTypeBool:
 			return types.Typ[types.Bool], nil
-		case gostdlib.GenericOperationTypeInt:
+		case gostdlib.ContractTypeInt:
 			return types.Typ[types.Int], nil
-		case gostdlib.GenericOperationTypeSlice:
+		case gostdlib.ContractTypeSlice:
 			if reference.Element == nil {
 				break
 			}
@@ -161,7 +161,7 @@ func providerGenericOperationSignature(
 				return nil, err
 			}
 			return types.NewSlice(element), nil
-		case gostdlib.GenericOperationTypeMap:
+		case gostdlib.ContractTypeMap:
 			if reference.Key == nil || reference.Element == nil {
 				break
 			}
@@ -181,7 +181,7 @@ func providerGenericOperationSignature(
 		}
 	}
 	resolveTuple := func(
-		references []gostdlib.GenericOperationTypeDocument,
+		references []gostdlib.ContractTypeDocument,
 	) (*types.Tuple, error) {
 		variables := make([]*types.Var, 0, len(references))
 		for _, reference := range references {

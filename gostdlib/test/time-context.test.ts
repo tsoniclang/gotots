@@ -4,9 +4,11 @@ import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { GoEmptyStruct } from "@gotots/runtime/struct.js";
 import { ProviderError } from "../src/internal/runtime/error.js";
+import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 import {
   AfterFunc as ContextAfterFunc,
   Background,
+  Cause,
   state,
   TODO,
   WithCancel,
@@ -14,6 +16,7 @@ import {
   WithTimeout,
   WithValue,
 } from "../src/context.js";
+import type { Context } from "../src/context.js";
 import {
   After,
   AfterFunc,
@@ -35,6 +38,30 @@ import {
   UnixMilli,
   Until,
 } from "../src/time.js";
+
+const testContextType = Object.freeze({ comparable: true });
+
+class NilDoneFailedContext extends ProviderInterfaceValue implements Context {
+  constructor(private readonly failure: ProviderError) {
+    super(testContextType);
+  }
+
+  Deadline(): [Time, boolean] {
+    return [new Time(), false];
+  }
+
+  Done(): undefined {
+    return undefined;
+  }
+
+  Err(): ProviderError {
+    return this.failure;
+  }
+
+  Value(): undefined {
+    return undefined;
+  }
+}
 
 test("ParseDuration preserves Go units, fractions, and diagnostics", (): void => {
   const valid: ReadonlyArray<readonly [string, number]> = [
@@ -208,6 +235,23 @@ test("Context cancellation, causes, values, and deadlines propagate", async () =
   } = root;
   assert.equal(canonicalDoneOwner.Done(), undefined);
   assert.notEqual(TODO(), root);
+  const ignoredFailure = new ProviderError("ignored without Done");
+  const [neverCanceled, cancelNever] = WithCancel(
+    new NilDoneFailedContext(ignoredFailure),
+  );
+  assert.equal(neverCanceled.Err(), undefined);
+  await cancelNever();
+  assert.equal(neverCanceled.Err(), state.Canceled);
+
+  const [closedParent, closeParent] = WithCancel(root);
+  await closeParent();
+  const [closedChild] = WithCancel(closedParent);
+  assert.equal(closedChild.Err(), state.Canceled);
+
+  const [futureParent, closeFutureParent] = WithCancel(root);
+  const [futureChild] = WithCancel(futureParent);
+  await closeFutureParent();
+  assert.equal(futureChild.Err(), state.Canceled);
   const key = new ProviderError("key");
   const value = new ProviderError("value");
   const valued = WithValue(root, key, value);
@@ -229,11 +273,13 @@ test("Context cancellation, causes, values, and deadlines propagate", async () =
   const cause = new ProviderError("cause");
   const [caused, cancelCause] = WithCancelCause(root);
   await cancelCause(cause);
-  assert.equal(caused.Err(), cause);
+  assert.equal(caused.Err(), state.Canceled);
+  assert.equal(Cause(caused), cause);
 
   const [timed, stop] = WithTimeout(root, new Duration(1_000_000));
   const [, deadlineOpen] = await timed.Done()!.receive();
   assert.equal(deadlineOpen, false);
   assert.match(timed.Err()!.Error(), /deadline exceeded/u);
+  assert.equal(Cause(timed), state.DeadlineExceeded);
   await stop();
 });

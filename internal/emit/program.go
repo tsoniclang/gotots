@@ -68,6 +68,7 @@ type programSession struct {
 	emitters                map[*load.Package]*emitter
 	builders                map[string]*targetFileBuilder
 	packageBuilders         map[*load.Package]*packageTargetBuilder
+	packageExports          *packageExportScheduler
 	environmentBuilders     map[*load.Package]*environmentContractBuilder
 	packageInitializations  *packageInitializationScheduler
 	genericOperations       map[genericOperationIdentity]*api.GenericOperationContract
@@ -152,6 +153,14 @@ func CompileWithOptions(
 		if object, ok := session.scheduler.next(); ok {
 			if err := session.emit(object); err != nil {
 				return ProgramEmission{}, err
+			}
+			continue
+		}
+		if builders := session.packageExports.nextBatch(); len(builders) != 0 {
+			for _, builder := range builders {
+				if err := session.publishPackageExports(builder); err != nil {
+					return ProgramEmission{}, err
+				}
 			}
 			continue
 		}
@@ -316,6 +325,7 @@ func newProgramSession(
 		emitters:               make(map[*load.Package]*emitter),
 		builders:               make(map[string]*targetFileBuilder),
 		packageBuilders:        make(map[*load.Package]*packageTargetBuilder),
+		packageExports:         newPackageExportScheduler(),
 		environmentBuilders:    make(map[*load.Package]*environmentContractBuilder),
 		packageInitializations: newPackageInitializationScheduler(),
 		genericOperations:      make(map[genericOperationIdentity]*api.GenericOperationContract),

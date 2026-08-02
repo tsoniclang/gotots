@@ -42,79 +42,79 @@ func (k GenericOperationKind) Valid() bool {
 	}
 }
 
-type GenericOperationTypeKind string
+type ContractTypeKind string
 
 const (
-	GenericOperationTypeInvalid           GenericOperationTypeKind = ""
-	GenericOperationTypeParameter         GenericOperationTypeKind = "type-parameter"
-	GenericOperationTypeBool              GenericOperationTypeKind = "bool"
-	GenericOperationTypeInt               GenericOperationTypeKind = "int"
-	GenericOperationTypeSlice             GenericOperationTypeKind = "slice"
-	GenericOperationTypeMap               GenericOperationTypeKind = "map"
-	GenericOperationTypeCallableParameter GenericOperationTypeKind = "callable-parameter"
-	genericOperationTypeMaximumDepth                               = 32
+	ContractTypeInvalid           ContractTypeKind = ""
+	ContractTypeParameter         ContractTypeKind = "type-parameter"
+	ContractTypeBool              ContractTypeKind = "bool"
+	ContractTypeInt               ContractTypeKind = "int"
+	ContractTypeSlice             ContractTypeKind = "slice"
+	ContractTypeMap               ContractTypeKind = "map"
+	ContractTypeCallableParameter ContractTypeKind = "callable-parameter"
+	contractTypeMaximumDepth                       = 32
 )
 
-type GenericOperationTypeDocument struct {
-	Kind              GenericOperationTypeKind      `json:"kind"`
-	TypeParameter     *int                          `json:"typeParameter,omitempty"`
-	CallableParameter *int                          `json:"callableParameter,omitempty"`
-	Key               *GenericOperationTypeDocument `json:"key,omitempty"`
-	Element           *GenericOperationTypeDocument `json:"element,omitempty"`
+type ContractTypeDocument struct {
+	Kind              ContractTypeKind      `json:"kind"`
+	TypeParameter     *int                  `json:"typeParameter,omitempty"`
+	CallableParameter *int                  `json:"callableParameter,omitempty"`
+	Key               *ContractTypeDocument `json:"key,omitempty"`
+	Element           *ContractTypeDocument `json:"element,omitempty"`
 }
 
-func GenericOperationTypeParameterReference(
+func ContractTypeParameterReference(
 	index int,
-) GenericOperationTypeDocument {
+) ContractTypeDocument {
 	selected := index
-	return GenericOperationTypeDocument{
-		Kind:          GenericOperationTypeParameter,
+	return ContractTypeDocument{
+		Kind:          ContractTypeParameter,
 		TypeParameter: &selected,
 	}
 }
 
-func GenericOperationCallableParameterReference(
+func ContractCallableParameterReference(
 	index int,
-) GenericOperationTypeDocument {
+) ContractTypeDocument {
 	selected := index
-	return GenericOperationTypeDocument{
-		Kind:              GenericOperationTypeCallableParameter,
+	return ContractTypeDocument{
+		Kind:              ContractTypeCallableParameter,
 		CallableParameter: &selected,
 	}
 }
 
-func GenericOperationBoolReference() GenericOperationTypeDocument {
-	return GenericOperationTypeDocument{Kind: GenericOperationTypeBool}
+func ContractBoolReference() ContractTypeDocument {
+	return ContractTypeDocument{Kind: ContractTypeBool}
 }
 
-func GenericOperationIntReference() GenericOperationTypeDocument {
-	return GenericOperationTypeDocument{Kind: GenericOperationTypeInt}
+func ContractIntReference() ContractTypeDocument {
+	return ContractTypeDocument{Kind: ContractTypeInt}
 }
 
-func GenericOperationSliceReference(
-	element GenericOperationTypeDocument,
-) GenericOperationTypeDocument {
-	return GenericOperationTypeDocument{
-		Kind:    GenericOperationTypeSlice,
-		Element: cloneGenericOperationTypePointer(&element),
+func ContractSliceReference(
+	element ContractTypeDocument,
+) ContractTypeDocument {
+	return ContractTypeDocument{
+		Kind:    ContractTypeSlice,
+		Element: cloneContractTypePointer(&element),
 	}
 }
 
-func GenericOperationMapReference(
-	key GenericOperationTypeDocument,
-	element GenericOperationTypeDocument,
-) GenericOperationTypeDocument {
-	return GenericOperationTypeDocument{
-		Kind:    GenericOperationTypeMap,
-		Key:     cloneGenericOperationTypePointer(&key),
-		Element: cloneGenericOperationTypePointer(&element),
+func ContractMapReference(
+	key ContractTypeDocument,
+	element ContractTypeDocument,
+) ContractTypeDocument {
+	return ContractTypeDocument{
+		Kind:    ContractTypeMap,
+		Key:     cloneContractTypePointer(&key),
+		Element: cloneContractTypePointer(&element),
 	}
 }
 
 type GenericOperationDocument struct {
-	Kind       GenericOperationKind           `json:"kind"`
-	Parameters []GenericOperationTypeDocument `json:"parameters"`
-	Results    []GenericOperationTypeDocument `json:"results"`
+	Kind       GenericOperationKind   `json:"kind"`
+	Parameters []ContractTypeDocument `json:"parameters"`
+	Results    []ContractTypeDocument `json:"results"`
 }
 
 func CanonicalGenericOperations(
@@ -140,25 +140,25 @@ func cloneGenericOperations(
 	result := make([]GenericOperationDocument, len(source))
 	for index, operation := range source {
 		result[index] = operation
-		result[index].Parameters = cloneGenericOperationTypes(operation.Parameters)
-		result[index].Results = cloneGenericOperationTypes(operation.Results)
+		result[index].Parameters = cloneContractTypes(operation.Parameters)
+		result[index].Results = cloneContractTypes(operation.Results)
 	}
 	return result
 }
 
-func cloneGenericOperationTypes(
-	source []GenericOperationTypeDocument,
-) []GenericOperationTypeDocument {
-	result := make([]GenericOperationTypeDocument, len(source))
+func cloneContractTypes(
+	source []ContractTypeDocument,
+) []ContractTypeDocument {
+	result := make([]ContractTypeDocument, len(source))
 	for index := range source {
-		result[index] = cloneGenericOperationType(source[index])
+		result[index] = cloneContractType(source[index])
 	}
 	return result
 }
 
-func cloneGenericOperationType(
-	source GenericOperationTypeDocument,
-) GenericOperationTypeDocument {
+func cloneContractType(
+	source ContractTypeDocument,
+) ContractTypeDocument {
 	result := source
 	if source.TypeParameter != nil {
 		selected := *source.TypeParameter
@@ -168,18 +168,18 @@ func cloneGenericOperationType(
 		selected := *source.CallableParameter
 		result.CallableParameter = &selected
 	}
-	result.Key = cloneGenericOperationTypePointer(source.Key)
-	result.Element = cloneGenericOperationTypePointer(source.Element)
+	result.Key = cloneContractTypePointer(source.Key)
+	result.Element = cloneContractTypePointer(source.Element)
 	return result
 }
 
-func cloneGenericOperationTypePointer(
-	source *GenericOperationTypeDocument,
-) *GenericOperationTypeDocument {
+func cloneContractTypePointer(
+	source *ContractTypeDocument,
+) *ContractTypeDocument {
 	if source == nil {
 		return nil
 	}
-	result := cloneGenericOperationType(*source)
+	result := cloneContractType(*source)
 	return &result
 }
 
@@ -195,21 +195,21 @@ func validateGenericOperations(
 			return manifestError(selected+".kind", "value is invalid")
 		}
 		for parameterIndex := range operation.Parameters {
-			if err := validateGenericOperationType(
+			if err := validateContractType(
 				operation.Parameters[parameterIndex],
 				selected+".parameters["+strconv.Itoa(parameterIndex)+"]",
 				0,
-				make(map[*GenericOperationTypeDocument]struct{}),
+				make(map[*ContractTypeDocument]struct{}),
 			); err != nil {
 				return err
 			}
 		}
 		for resultIndex := range operation.Results {
-			if err := validateGenericOperationType(
+			if err := validateContractType(
 				operation.Results[resultIndex],
 				selected+".results["+strconv.Itoa(resultIndex)+"]",
 				0,
-				make(map[*GenericOperationTypeDocument]struct{}),
+				make(map[*ContractTypeDocument]struct{}),
 			); err != nil {
 				return err
 			}
@@ -226,17 +226,17 @@ func validateGenericOperations(
 	return nil
 }
 
-func validateGenericOperationType(
-	source GenericOperationTypeDocument,
+func validateContractType(
+	source ContractTypeDocument,
 	field string,
 	depth int,
-	stack map[*GenericOperationTypeDocument]struct{},
+	stack map[*ContractTypeDocument]struct{},
 ) error {
-	if depth > genericOperationTypeMaximumDepth {
+	if depth > contractTypeMaximumDepth {
 		return manifestError(field, "type expression is too deep")
 	}
 	validateChild := func(
-		child *GenericOperationTypeDocument,
+		child *ContractTypeDocument,
 		childField string,
 	) error {
 		if child == nil {
@@ -246,32 +246,32 @@ func validateGenericOperationType(
 			return manifestError(childField, "type expression is cyclic")
 		}
 		stack[child] = struct{}{}
-		err := validateGenericOperationType(*child, childField, depth+1, stack)
+		err := validateContractType(*child, childField, depth+1, stack)
 		delete(stack, child)
 		return err
 	}
 	switch source.Kind {
-	case GenericOperationTypeParameter:
+	case ContractTypeParameter:
 		if source.TypeParameter == nil || *source.TypeParameter < 0 ||
 			source.CallableParameter != nil || source.Key != nil || source.Element != nil {
 			return manifestError(field, "type-parameter expression is invalid")
 		}
-	case GenericOperationTypeCallableParameter:
+	case ContractTypeCallableParameter:
 		if source.CallableParameter == nil || *source.CallableParameter < 0 ||
 			source.TypeParameter != nil || source.Key != nil || source.Element != nil {
 			return manifestError(field, "callable-parameter expression is invalid")
 		}
-	case GenericOperationTypeBool, GenericOperationTypeInt:
+	case ContractTypeBool, ContractTypeInt:
 		if source.TypeParameter != nil || source.CallableParameter != nil ||
 			source.Key != nil || source.Element != nil {
 			return manifestError(field, "basic type expression is invalid")
 		}
-	case GenericOperationTypeSlice:
+	case ContractTypeSlice:
 		if source.TypeParameter != nil || source.CallableParameter != nil || source.Key != nil {
 			return manifestError(field, "slice type expression is invalid")
 		}
 		return validateChild(source.Element, field+".element")
-	case GenericOperationTypeMap:
+	case ContractTypeMap:
 		if source.TypeParameter != nil || source.CallableParameter != nil {
 			return manifestError(field, "map type expression is invalid")
 		}
@@ -286,15 +286,15 @@ func validateGenericOperationType(
 }
 
 func validGenericOperationShape(operation GenericOperationDocument) bool {
-	same := func(left, right GenericOperationTypeDocument) bool {
-		return genericOperationTypeKey(left) == genericOperationTypeKey(right)
+	same := func(left, right ContractTypeDocument) bool {
+		return contractTypeKey(left) == contractTypeKey(right)
 	}
-	typeParameter := func(source GenericOperationTypeDocument) bool {
-		return source.Kind == GenericOperationTypeParameter
+	typeParameter := func(source ContractTypeDocument) bool {
+		return source.Kind == ContractTypeParameter
 	}
 	booleanResult := func() bool {
 		return len(operation.Results) == 1 &&
-			operation.Results[0].Kind == GenericOperationTypeBool
+			operation.Results[0].Kind == ContractTypeBool
 	}
 	switch operation.Kind {
 	case GenericOperationCopy:
@@ -313,13 +313,13 @@ func validGenericOperationShape(operation GenericOperationDocument) bool {
 	case GenericOperationMapConstruct:
 		if len(operation.Parameters) < 1 || len(operation.Parameters) > 2 ||
 			len(operation.Results) != 1 ||
-			operation.Results[0].Kind != GenericOperationTypeMap ||
+			operation.Results[0].Kind != ContractTypeMap ||
 			operation.Results[0].Element == nil ||
 			!same(operation.Parameters[0], *operation.Results[0].Element) {
 			return false
 		}
 		return len(operation.Parameters) == 1 ||
-			operation.Parameters[1].Kind == GenericOperationTypeInt
+			operation.Parameters[1].Kind == ContractTypeInt
 	case GenericOperationToStorage,
 		GenericOperationFromStorage,
 		GenericOperationToContainerStorage,
@@ -330,10 +330,10 @@ func validGenericOperationShape(operation GenericOperationDocument) bool {
 			same(operation.Parameters[0], operation.Results[0])
 	case GenericOperationInterfaceAssertOK:
 		return len(operation.Parameters) == 1 &&
-			operation.Parameters[0].Kind == GenericOperationTypeCallableParameter &&
+			operation.Parameters[0].Kind == ContractTypeCallableParameter &&
 			len(operation.Results) == 2 &&
 			typeParameter(operation.Results[0]) &&
-			operation.Results[1].Kind == GenericOperationTypeBool
+			operation.Results[1].Kind == ContractTypeBool
 	default:
 		return false
 	}
@@ -345,41 +345,41 @@ func genericOperationDocumentKey(operation GenericOperationDocument) string {
 	result.WriteString("|p")
 	for _, parameter := range operation.Parameters {
 		result.WriteByte(':')
-		result.WriteString(genericOperationTypeKey(parameter))
+		result.WriteString(contractTypeKey(parameter))
 	}
 	result.WriteString("|r")
 	for _, selected := range operation.Results {
 		result.WriteByte(':')
-		result.WriteString(genericOperationTypeKey(selected))
+		result.WriteString(contractTypeKey(selected))
 	}
 	return result.String()
 }
 
-func genericOperationTypeKey(source GenericOperationTypeDocument) string {
+func contractTypeKey(source ContractTypeDocument) string {
 	switch source.Kind {
-	case GenericOperationTypeParameter:
+	case ContractTypeParameter:
 		if source.TypeParameter == nil {
 			return "parameter(?)"
 		}
 		return "parameter(" + strconv.Itoa(*source.TypeParameter) + ")"
-	case GenericOperationTypeCallableParameter:
+	case ContractTypeCallableParameter:
 		if source.CallableParameter == nil {
 			return "callable-parameter(?)"
 		}
 		return "callable-parameter(" + strconv.Itoa(*source.CallableParameter) + ")"
-	case GenericOperationTypeBool, GenericOperationTypeInt:
+	case ContractTypeBool, ContractTypeInt:
 		return string(source.Kind)
-	case GenericOperationTypeSlice:
+	case ContractTypeSlice:
 		if source.Element == nil {
 			return "slice(?)"
 		}
-		return "slice(" + genericOperationTypeKey(*source.Element) + ")"
-	case GenericOperationTypeMap:
+		return "slice(" + contractTypeKey(*source.Element) + ")"
+	case ContractTypeMap:
 		if source.Key == nil || source.Element == nil {
 			return "map(?,?)"
 		}
-		return "map(" + genericOperationTypeKey(*source.Key) + "," +
-			genericOperationTypeKey(*source.Element) + ")"
+		return "map(" + contractTypeKey(*source.Key) + "," +
+			contractTypeKey(*source.Element) + ")"
 	default:
 		return "invalid"
 	}

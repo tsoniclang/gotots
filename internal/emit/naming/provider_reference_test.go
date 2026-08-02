@@ -46,6 +46,12 @@ func (facetOnlyProvider) ProviderRepresentation(
 	return gostdlib.ProviderRepresentation{}, false
 }
 
+func (facetOnlyProvider) ProviderInterface(
+	string,
+) (gostdlib.ProviderInterfaceBinding, bool) {
+	return gostdlib.ProviderInterfaceBinding{}, false
+}
+
 func (facetOnlyProvider) ProviderCallableProfile(
 	string,
 	string,
@@ -57,6 +63,33 @@ func (facetOnlyProvider) ProviderCallableProfiles(
 	string,
 ) []gostdlib.ProviderCallableProfile {
 	return nil
+}
+
+func (facetOnlyProvider) ProviderStatefulProfile(
+	string,
+	string,
+) (gostdlib.ProviderStatefulProfile, bool) {
+	return gostdlib.ProviderStatefulProfile{}, false
+}
+
+func (facetOnlyProvider) ProviderStatefulProfiles(
+	string,
+) []gostdlib.ProviderStatefulProfile {
+	return nil
+}
+
+func TestPredeclaredErrorRequiresLanguageProviderInterfaceCertificate(
+	t *testing.T,
+) {
+	registry := NewRegistry()
+	registry.provider = facetOnlyProvider{}
+	typeName, ok := types.Universe.Lookup("error").(*types.TypeName)
+	if !ok {
+		t.Fatal("predeclared error type is absent")
+	}
+	if _, providerOwned, err := registry.ProviderInterface(typeName); err == nil || !providerOwned {
+		t.Fatalf("missing language interface = provider %t, error %v", providerOwned, err)
+	}
 }
 
 func TestMissingProviderMethodReportsCanonicalSourceIdentity(t *testing.T) {

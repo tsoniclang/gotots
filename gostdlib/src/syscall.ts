@@ -1,5 +1,8 @@
 import type { GoPointer } from "@gotots/runtime/pointer.js";
-import { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
+import {
+  type GoError,
+  GoInterfaceValue,
+} from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
@@ -10,11 +13,17 @@ import type {
 } from "@gotots/runtime/scalars.js";
 import { errnoMessage } from "./internal/node/syscall/errno.js";
 import { signalName } from "./internal/node/syscall/signal.js";
+import {
+  exists,
+  notExists,
+  permission,
+  unsupported,
+} from "./internal/portable/errors/sentinel.js";
 
-const signalType = Object.freeze({});
+const signalType = Object.freeze({ comparable: true });
 
 class SignalInterfaceValue extends GoInterfaceValue {
-  readonly $go$type: object = signalType;
+  readonly $go$type = signalType;
   readonly $go$methods: ReadonlySet<object> = new Set<object>();
   readonly $go$formatString = true;
 
@@ -52,6 +61,31 @@ export class Errno {
 
   Error(): gostring {
     return errnoMessage(this.value);
+  }
+
+  Is(target: GoError | undefined): bool {
+    if (target === permission) {
+      return this.value === 13 || this.value === 1;
+    }
+    if (target === exists) {
+      return this.value === 17 || this.value === 39;
+    }
+    if (target === notExists) {
+      return this.value === 2;
+    }
+    if (target === unsupported) {
+      return this.value === 38 || this.value === 95;
+    }
+    return false;
+  }
+
+  Temporary(): bool {
+    return this.value === 4 || this.value === 24 || this.value === 23
+      || this.Timeout();
+  }
+
+  Timeout(): bool {
+    return this.value === 11 || this.value === 110;
   }
 }
 

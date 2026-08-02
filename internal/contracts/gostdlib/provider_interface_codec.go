@@ -2,6 +2,27 @@ package gostdlib
 
 import "fmt"
 
+func validateProviderInterfaceBinding(
+	selected ProviderInterfaceBindingDocument,
+	field string,
+) error {
+	switch {
+	case selected.SourceIdentity == "":
+		return manifestError(field+".sourceIdentity", "value is empty")
+	case selected.Export == "":
+		return manifestError(field+".export", "value is empty")
+	case !validDigest(selected.TargetFingerprint):
+		return manifestError(
+			field+".targetFingerprint",
+			"value is not a sha256 digest",
+		)
+	}
+	return validateProviderInterface(
+		selected.ProviderInterface,
+		field+".providerInterface",
+	)
+}
+
 func validateProviderInterface(
 	providerInterface ProviderInterfaceDocument,
 	field string,

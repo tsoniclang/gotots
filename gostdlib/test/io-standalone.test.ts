@@ -25,8 +25,8 @@ import {
   type Writer,
 } from "../src/io.js";
 
-const memoryReaderType = Object.freeze({});
-const memoryWriterType = Object.freeze({});
+const memoryReaderType = Object.freeze({ comparable: true });
+const memoryWriterType = Object.freeze({ comparable: true });
 
 class MemoryReader extends ProviderInterfaceValue implements Reader {
   private offset = 0;

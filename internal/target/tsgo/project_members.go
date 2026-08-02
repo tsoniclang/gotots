@@ -2,17 +2,28 @@ package tsgo
 
 import (
 	"path/filepath"
+	"slices"
 	"sort"
-	"strings"
+)
+
+type ProjectMemberAccess uint8
+
+const (
+	ProjectMemberAccessInvalid ProjectMemberAccess = iota
+	ProjectMemberAccessPublic
+	ProjectMemberAccessNonPublic
 )
 
 type ProjectMember struct {
 	name         string
+	symbolID     uint64
 	flags        uint32
 	typeString   string
 	typeID       uint32
+	handles      []string
 	declarations []string
 	ownerKeys    []string
+	access       ProjectMemberAccess
 }
 
 func (m ProjectMember) Name() string {
@@ -36,7 +47,7 @@ func (m ProjectMember) ImplementationOwners() []string {
 }
 
 func (m ProjectMember) Visible() bool {
-	return m.name != "" && !strings.HasPrefix(m.name, "\uFFFD#")
+	return m.name != "" && m.access == ProjectMemberAccessPublic
 }
 
 func (p *ProjectInspection) projectTypeDeclarations(
@@ -190,14 +201,31 @@ func (p *ProjectInspection) projectMember(
 			Reason:    "member " + symbol.Name + " " + err.Error(),
 		}
 	}
+	access, err := p.projectMemberAccess(symbol.Declarations)
+	if err != nil {
+		return ProjectMember{}, &ProjectInspectionError{
+			Operation: operation,
+			Path:      sourcePath,
+			Reason:    "member " + symbol.Name + " " + err.Error(),
+		}
+	}
 	return ProjectMember{
 		name:         symbol.Name,
+		symbolID:     symbol.ID,
 		flags:        symbol.Flags,
 		typeString:   typeString,
 		typeID:       selectedType.ID,
+		handles:      sortedStrings(symbol.Declarations),
 		declarations: declarations,
 		ownerKeys:    ownerKeys,
+		access:       access,
 	}, nil
+}
+
+func sortedStrings(source []string) []string {
+	result := slices.Clone(source)
+	slices.Sort(result)
+	return result
 }
 
 func projectDeclarationPaths(

@@ -24,12 +24,26 @@ func TestProjectExportsUseTSGoSymbolsAndDeclarationOwners(t *testing.T) {
   return input.length;
 }
 
-export class Box {
+export class Box<Left, Right> {
   static Make(value: number): Box {
     return new Box(value);
   }
 
   private constructor(readonly value: number) {}
+}
+
+export class MemberAccess {
+  #ecmaPrivate = 1;
+  private tsPrivate = 2;
+  protected inherited = 3;
+  public visible = 4;
+
+  constructor(private readonly parameterPrivate = 5) {}
+
+  method(): number {
+    return this.#ecmaPrivate + this.tsPrivate + this.inherited + this.visible +
+      this.parameterPrivate;
+  }
 }
 
 export interface Shape {
@@ -62,6 +76,7 @@ void Hidden;
   Effects,
   GenericAsyncCallable,
   InvalidEffectCallable,
+  MemberAccess,
   Shape,
   SyncCallable,
   Value,
@@ -159,6 +174,7 @@ export const state: { Count: number } = { Count: 0 };
 			"Effects",
 			"GenericAsyncCallable",
 			"InvalidEffectCallable",
+			"MemberAccess",
 			"Shape",
 			"SyncCallable",
 			"Value",
@@ -174,12 +190,34 @@ export const state: { Count: number } = { Count: 0 };
 	if boxIndex < 0 {
 		t.Fatal("Box export is absent")
 	}
+	if exports[boxIndex].TypeParameterCount() != 2 {
+		t.Fatalf("Box type parameters = %d", exports[boxIndex].TypeParameterCount())
+	}
 	makeMember, ok := exports[boxIndex].ValueMember("Make")
 	if !ok || makeMember.Fingerprint() == "" || !makeMember.Visible() {
 		t.Fatalf("Box.Make member = %#v, %t", makeMember, ok)
 	}
 	if _, ok := exports[boxIndex].ValueMember("missing"); ok {
 		t.Fatal("missing member resolved")
+	}
+	memberAccess := projectExportByName(t, exports, "MemberAccess")
+	visibleMembers := make([]string, 0)
+	nonPublicMembers := 0
+	for _, member := range memberAccess.TypeMembers() {
+		if member.Visible() {
+			visibleMembers = append(visibleMembers, member.Name())
+			continue
+		}
+		nonPublicMembers++
+	}
+	if !slices.Equal(visibleMembers, []string{"method", "visible"}) ||
+		nonPublicMembers != 4 {
+		t.Fatalf(
+			"MemberAccess visibility = public %v, non-public %d; members %#v",
+			visibleMembers,
+			nonPublicMembers,
+			memberAccess.TypeMembers(),
+		)
 	}
 	markerExports, err := project.Exports(markerPath)
 	if err != nil {

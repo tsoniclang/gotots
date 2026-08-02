@@ -69,6 +69,7 @@ func StartClient(moduleDirectory string, workingDirectory string) (*Client, erro
 	}
 
 	command := exec.Command(toolPath, "--api", "--async", "--cwd", workingDirectory)
+	command.Env = nativeToolEnvironment()
 	client := &Client{command: command}
 	command.Stderr = &client.stderr
 	client.stdin, err = command.StdinPipe()

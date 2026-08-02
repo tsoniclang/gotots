@@ -5,7 +5,9 @@ export abstract class ProviderInterfaceValue extends GoInterfaceValue {
   readonly $go$methods: ReadonlySet<object> = new Set<object>();
   readonly $go$formatString: boolean = false;
 
-  protected constructor(readonly $go$type: object) {
+	protected constructor(
+		readonly $go$type: { readonly comparable: boolean },
+	) {
     super();
   }
 

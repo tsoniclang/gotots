@@ -19,8 +19,6 @@ func Test(
 	value tsgo.Expression,
 ) (api.ExpressionEmission, error) {
 	switch context.GoRuntimeType(targetType) {
-	case api.GoRuntimeTypeBuiltinError:
-		return runtimeInterfaceTest(context, api.RuntimeBuiltinErrorGuard, value)
 	case api.GoRuntimeTypeError:
 		return runtimeInterfaceTest(context, api.RuntimeErrorGuard, value)
 	case api.GoRuntimeTypePanicNilPointer:
@@ -98,8 +96,6 @@ func Extract(
 	value tsgo.Expression,
 ) (api.ExpressionEmission, error) {
 	switch context.GoRuntimeType(targetType) {
-	case api.GoRuntimeTypeBuiltinError:
-		return runtimeInterfaceExtract(context, api.RuntimeBuiltinErrorType, value)
 	case api.GoRuntimeTypeError:
 		return runtimeInterfaceExtract(context, api.RuntimeErrorType, value)
 	case api.GoRuntimeTypePanicNilPointer:

@@ -1,11 +1,12 @@
 import type { GoError, GoInterfaceValue } from "@gotots/runtime/interface-value.js";
+import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { int64, uint8 } from "@gotots/runtime/scalars.js";
 
 import { New } from "./errors.js";
 import {
   noProgress,
-  readFull,
+  readFullSync,
   shortBuffer,
   shortWrite,
   unexpectedEOF,
@@ -32,7 +33,7 @@ export interface ReadWriter extends Reader, Writer {}
 
 export interface ReadWriteCloser extends Reader, Writer, Closer {}
 
-const discardType = Object.freeze({});
+const discardType = Object.freeze({ comparable: true });
 
 class DiscardWriter extends ProviderInterfaceValue implements Writer {
   constructor() {
@@ -65,7 +66,12 @@ export function ReadFull(
   buffer: RuntimeSlice<uint8>,
 ): [int64, GoError | undefined] {
   if (reader === undefined) {
-    return [0, New("invalid nil Reader")];
+    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
-  return readFull(reader, buffer, state.EOF);
+  return readFullSync(
+    (destination) => reader.Read(destination),
+    buffer,
+    state.EOF,
+    state.ErrUnexpectedEOF,
+  );
 }

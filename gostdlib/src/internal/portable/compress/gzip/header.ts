@@ -1,11 +1,15 @@
-import type { GoError } from "@gotots/runtime/interface-value.js";
+import type {
+  GoError,
+  GoInterfaceValue,
+} from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { uint8 } from "@gotots/runtime/scalars.js";
+import type { int64, uint8 } from "@gotots/runtime/scalars.js";
 
 import type { Reader } from "../../../../io.js";
 import { state as ioState } from "../../../../io.js";
 import { byteSlice } from "../../../runtime/slice.js";
 import { ProviderError } from "../../../runtime/error.js";
+import { goInterfaceEqual } from "../../../runtime/interface.js";
 import { unexpectedEOF } from "../../io/read.js";
 
 export interface GzipHeader {
@@ -16,149 +20,319 @@ export interface GzipHeader {
   readonly operatingSystem: uint8;
 }
 
-export class GzipSource {
-  private readonly consumed: number[] = [];
-  private readonly pending: number[] = [];
-  private terminalFailure: GoError | undefined;
+export type GzipSourceStep<Result, Failure> =
+  | {
+    readonly kind: "done";
+    readonly result: Result;
+  }
+  | {
+    readonly kind: "read";
+    readonly destination: RuntimeSlice<uint8>;
+    readonly resume: (
+      count: int64,
+      failure: Failure | undefined,
+    ) => GzipSourceStep<Result, Failure>;
+  };
 
-  constructor(private readonly source: Reader) {}
+type ExactRead<Failure> =
+  | { readonly kind: "values"; readonly values: readonly number[] }
+  | { readonly kind: "failure"; readonly failure: Failure }
+  | { readonly kind: "read" };
+
+type HeaderPhase =
+  | "fixed"
+  | "extra-length"
+  | "extra"
+  | "name"
+  | "comment"
+  | "checksum"
+  | "done";
+
+export class GzipSourceState<Failure extends GoInterfaceValue> {
+  private readonly consumed: number[] = [];
+  private readonly headerBytes: number[] = [];
+  private readonly pending: number[] = [];
+  private terminalFailure: Failure | undefined;
+  private phase: HeaderPhase = "fixed";
+  private flags = 0;
+  private extraLength = 0;
+  private extra = RuntimeSlice.nil<uint8>();
+  private readonly name: number[] = [];
+  private readonly comment: number[] = [];
+  private modificationTimeSeconds = 0;
+  private operatingSystem: uint8 = 0;
+  private emptyReads = 0;
+
+  constructor(
+    private readonly eof: Failure,
+    private readonly unexpectedEOF: Failure,
+    private readonly noProgress: Failure,
+    private readonly invalidHeader: () => Failure,
+  ) {}
+
+  beginHeader(): GzipSourceStep<
+    [GzipHeader | undefined, Failure | undefined],
+    Failure
+  > {
+    return this.advanceHeader();
+  }
+
+  beginDrain(): GzipSourceStep<
+    [RuntimeSlice<uint8>, Failure | undefined],
+    Failure
+  > {
+    this.pending.length = 0;
+    return this.advanceDrain();
+  }
+
+  private advanceHeader(): GzipSourceStep<
+    [GzipHeader | undefined, Failure | undefined],
+    Failure
+  > {
+    for (;;) {
+      switch (this.phase) {
+        case "fixed": {
+          const fixed = this.takeExact(10);
+          if (fixed.kind !== "values") {
+            return this.resolveHeaderRead(fixed);
+          }
+          if (
+            fixed.values[0] !== 0x1f
+            || fixed.values[1] !== 0x8b
+            || fixed.values[2] !== 8
+            || ((fixed.values[3] ?? 0) & 0xe0) !== 0
+          ) {
+            return done([undefined, undefined]);
+          }
+          this.flags = fixed.values[3] ?? 0;
+          this.modificationTimeSeconds = (
+            (fixed.values[4] ?? 0)
+            + (fixed.values[5] ?? 0) * 0x100
+            + (fixed.values[6] ?? 0) * 0x1_0000
+            + (fixed.values[7] ?? 0) * 0x1_000_000
+          ) >>> 0;
+          this.operatingSystem = fixed.values[9] ?? 0;
+          this.phase = (this.flags & 0x04) === 0 ? "name" : "extra-length";
+          break;
+        }
+        case "extra-length": {
+          const length = this.takeExact(2);
+          if (length.kind !== "values") {
+            return this.resolveHeaderRead(length);
+          }
+          this.extraLength =
+            (length.values[0] ?? 0) | ((length.values[1] ?? 0) << 8);
+          this.phase = "extra";
+          break;
+        }
+        case "extra": {
+          const extra = this.takeExact(this.extraLength);
+          if (extra.kind !== "values") {
+            return this.resolveHeaderRead(extra);
+          }
+          this.extra = byteSlice(extra.values);
+          this.phase = "name";
+          break;
+        }
+        case "name": {
+          if ((this.flags & 0x08) === 0) {
+            this.phase = "comment";
+            break;
+          }
+          const next = this.takeExact(1);
+          if (next.kind !== "values") {
+            return this.resolveHeaderRead(next);
+          }
+          const value = next.values[0] ?? 0;
+          if (value === 0) {
+            this.phase = "comment";
+            break;
+          }
+          if (this.name.length >= 511) {
+            return done([undefined, this.invalidHeader()]);
+          }
+          this.name.push(value);
+          break;
+        }
+        case "comment": {
+          if ((this.flags & 0x10) === 0) {
+            this.phase = "checksum";
+            break;
+          }
+          const next = this.takeExact(1);
+          if (next.kind !== "values") {
+            return this.resolveHeaderRead(next);
+          }
+          const value = next.values[0] ?? 0;
+          if (value === 0) {
+            this.phase = "checksum";
+            break;
+          }
+          if (this.comment.length >= 511) {
+            return done([undefined, this.invalidHeader()]);
+          }
+          this.comment.push(value);
+          break;
+        }
+        case "checksum": {
+          if ((this.flags & 0x02) !== 0) {
+            const checksum = this.takeExact(2);
+            if (checksum.kind !== "values") {
+              return this.resolveHeaderRead(checksum);
+            }
+            const expected =
+              (checksum.values[0] ?? 0) | ((checksum.values[1] ?? 0) << 8);
+            const actual = crc32(this.headerBytes.slice(0, -2)) & 0xffff;
+            if (expected !== actual) {
+              return done([undefined, this.invalidHeader()]);
+            }
+          }
+          this.phase = "done";
+          break;
+        }
+        case "done":
+          return done([{
+            comment: String.fromCharCode(...this.comment),
+            extra: this.extra,
+            modificationTimeSeconds: this.modificationTimeSeconds,
+            name: String.fromCharCode(...this.name),
+            operatingSystem: this.operatingSystem,
+          }, undefined]);
+      }
+    }
+  }
+
+  private resolveHeaderRead(
+    result: Exclude<ExactRead<Failure>, { readonly kind: "values" }>,
+  ): GzipSourceStep<
+    [GzipHeader | undefined, Failure | undefined],
+    Failure
+  > {
+    if (result.kind === "failure") {
+      return done([undefined, result.failure]);
+    }
+    return this.read(() => this.advanceHeader());
+  }
+
+  private advanceDrain(): GzipSourceStep<
+    [RuntimeSlice<uint8>, Failure | undefined],
+    Failure
+  > {
+    if (this.terminalFailure !== undefined) {
+      return done([byteSlice(this.consumed), this.terminalFailure]);
+    }
+    return this.read(() => this.advanceDrain());
+  }
+
+  private takeExact(count: number): ExactRead<Failure> {
+    if (this.pending.length >= count) {
+      const values = this.pending.splice(0, count);
+      this.headerBytes.push(...values);
+      return { kind: "values", values };
+    }
+    if (this.terminalFailure === undefined) {
+      return { kind: "read" };
+    }
+    return {
+      kind: "failure",
+      failure: this.pending.length > 0 && goInterfaceEqual(
+        this.terminalFailure,
+        this.eof,
+      )
+        ? this.unexpectedEOF
+        : this.terminalFailure,
+    };
+  }
+
+  private read<Result>(
+    resume: () => GzipSourceStep<Result, Failure>,
+  ): GzipSourceStep<Result, Failure> {
+    const destination = RuntimeSlice.make<uint8>(4096, 4096, 0);
+    return {
+      kind: "read",
+      destination,
+      resume: (count, failure) => {
+        if (count === 0 && failure === undefined) {
+          this.emptyReads += 1;
+          if (this.emptyReads >= 100) {
+            this.terminalFailure = this.noProgress;
+          }
+        } else {
+          this.emptyReads = 0;
+        }
+        if (failure !== undefined) {
+          this.terminalFailure = failure;
+        }
+        for (let index = 0; index < count; index += 1) {
+          const value = destination.get(index);
+          this.pending.push(value);
+          this.consumed.push(value);
+        }
+        return resume();
+      },
+    };
+  }
+}
+
+export function runGzipSourceSync<Result, Failure>(
+  initial: GzipSourceStep<Result, Failure>,
+  readSource: (
+    destination: RuntimeSlice<uint8>,
+  ) => [int64, Failure | undefined],
+): Result {
+  let current = initial;
+  while (current.kind === "read") {
+    const [count, failure] = readSource(current.destination);
+    current = current.resume(count, failure);
+  }
+  return current.result;
+}
+
+export async function runGzipSourceAsync<Result, Failure>(
+  initial: GzipSourceStep<Result, Failure>,
+  readSource: (
+    destination: RuntimeSlice<uint8>,
+  ) => Promise<[int64, Failure | undefined]>,
+): Promise<Result> {
+  let current = initial;
+  while (current.kind === "read") {
+    const [count, failure] = await readSource(current.destination);
+    current = current.resume(count, failure);
+  }
+  return current.result;
+}
+
+export class GzipSource {
+  private readonly state: GzipSourceState<GoError>;
+
+  constructor(private readonly source: Reader) {
+    this.state = new GzipSourceState(
+      ioState.EOF,
+      unexpectedEOF,
+      ioState.ErrNoProgress,
+      () => new ProviderError("gzip: invalid header"),
+    );
+  }
 
   ReadHeader(): [GzipHeader | undefined, GoError | undefined] {
-    const [fixed, fixedFailure] = this.readExact(10);
-    if (fixedFailure !== undefined) {
-      return [undefined, fixedFailure];
-    }
-    if (
-      fixed[0] !== 0x1f
-      || fixed[1] !== 0x8b
-      || fixed[2] !== 8
-      || ((fixed[3] ?? 0) & 0xe0) !== 0
-    ) {
-      return [undefined, undefined];
-    }
-
-    const flags = fixed[3] ?? 0;
-    let extra = RuntimeSlice.nil<uint8>();
-    if ((flags & 0x04) !== 0) {
-      const [lengthBytes, lengthFailure] = this.readExact(2);
-      if (lengthFailure !== undefined) {
-        return [undefined, lengthFailure];
-      }
-      const length = (lengthBytes[0] ?? 0) | ((lengthBytes[1] ?? 0) << 8);
-      const [extraBytes, extraFailure] = this.readExact(length);
-      if (extraFailure !== undefined) {
-        return [undefined, extraFailure];
-      }
-      extra = byteSlice(extraBytes);
-    }
-
-    const [name, nameFailure] = (flags & 0x08) === 0
-      ? ["", undefined] as const
-      : this.readLatin1String();
-    if (nameFailure !== undefined) {
-      return [undefined, nameFailure];
-    }
-
-    const [comment, commentFailure] = (flags & 0x10) === 0
-      ? ["", undefined] as const
-      : this.readLatin1String();
-    if (commentFailure !== undefined) {
-      return [undefined, commentFailure];
-    }
-
-    if ((flags & 0x02) !== 0) {
-      const [checksum, checksumFailure] = this.readExact(2);
-      if (checksumFailure !== undefined) {
-        return [undefined, checksumFailure];
-      }
-      const expected = (checksum[0] ?? 0) | ((checksum[1] ?? 0) << 8);
-      const actual = crc32(this.consumed.slice(0, -2)) & 0xffff;
-      if (expected !== actual) {
-        return [undefined, new ProviderError("gzip: invalid header")];
-      }
-    }
-
-    const modificationTimeSeconds = (
-      (fixed[4] ?? 0)
-      + (fixed[5] ?? 0) * 0x100
-      + (fixed[6] ?? 0) * 0x1_0000
-      + (fixed[7] ?? 0) * 0x1_000_000
-    ) >>> 0;
-    return [{
-      comment,
-      extra,
-      modificationTimeSeconds,
-      name,
-      operatingSystem: fixed[9] ?? 0,
-    }, undefined];
+    return runGzipSourceSync(
+      this.state.beginHeader(),
+      (destination) => this.source.Read(destination),
+    );
   }
 
   Drain(): [RuntimeSlice<uint8>, GoError | undefined] {
-    while (this.terminalFailure === undefined) {
-      this.fill();
-      if (this.pending.length === 0 && this.terminalFailure === undefined) {
-        continue;
-      }
-      this.pending.length = 0;
-    }
-    return [byteSlice(this.consumed), this.terminalFailure];
+    return runGzipSourceSync(
+      this.state.beginDrain(),
+      (destination) => this.source.Read(destination),
+    );
   }
+}
 
-  private readExact(count: number): [number[], GoError | undefined] {
-    const values: number[] = [];
-    while (values.length < count) {
-      if (this.pending.length === 0) {
-        this.fill();
-      }
-      while (this.pending.length > 0 && values.length < count) {
-        const value = this.pending.shift();
-        if (value !== undefined) {
-          values.push(value);
-        }
-      }
-      if (values.length < count && this.terminalFailure !== undefined) {
-        return [
-          values,
-          values.length > 0 && this.terminalFailure === ioState.EOF
-            ? unexpectedEOF
-            : this.terminalFailure,
-        ];
-      }
-    }
-    return [values, undefined];
-  }
-
-  private readLatin1String(): [string, GoError | undefined] {
-    const values: number[] = [];
-    for (;;) {
-      const [bytes, failure] = this.readExact(1);
-      if (failure !== undefined) {
-        return ["", failure];
-      }
-      const value = bytes[0] ?? 0;
-      if (value === 0) {
-        return [String.fromCharCode(...values), undefined];
-      }
-      if (values.length >= 511) {
-        return ["", new ProviderError("gzip: invalid header")];
-      }
-      values.push(value);
-    }
-  }
-
-  private fill(): void {
-    if (this.terminalFailure !== undefined) {
-      return;
-    }
-    const buffer = RuntimeSlice.make<uint8>(4096, 4096, 0);
-    const [count, failure] = this.source.Read(buffer);
-    for (let index = 0; index < count; index += 1) {
-      const value = buffer.get(index);
-      this.pending.push(value);
-      this.consumed.push(value);
-    }
-    this.terminalFailure = failure;
-  }
+function done<Result, Failure>(
+  result: Result,
+): GzipSourceStep<Result, Failure> {
+  return { kind: "done", result };
 }
 
 function crc32(values: readonly number[]): number {

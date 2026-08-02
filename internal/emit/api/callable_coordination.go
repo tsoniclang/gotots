@@ -154,7 +154,7 @@ func (r GenericOperationReference) Requests() []RootRequest {
 
 type CooperativeCallableResolver interface {
 	ObserveCooperativeCallable(
-		ArtifactOwner,
+		Context,
 		CallableFacet,
 	) (CooperativeCallableObservation, error)
 }
@@ -298,7 +298,7 @@ func (c Context) ObserveCooperativeCallable(
 		}
 	}
 	observation, err := c.cooperativeResolver.ObserveCooperativeCallable(
-		c.artifactOwner,
+		c,
 		facet,
 	)
 	if err != nil || c.genericCallableProfile == nil {

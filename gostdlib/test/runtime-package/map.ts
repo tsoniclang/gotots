@@ -62,6 +62,38 @@ export class GoMap<K extends boolean | number | bigint | string, V> {
         return this.values !== undefined ? Array.from(this.values.keys()) : [];
     }
 }
+export class GoMapHash {
+    private static readonly objects: WeakMap<object, number> = new WeakMap<object, number>;
+    private static nextObject: number = 1;
+    static boolean(value: boolean): number {
+        return value ? 1 : 0;
+    }
+    static number(value: number): number {
+        return Math.trunc(value) >>> 0;
+    }
+    static bigint(value: bigint): number {
+        return globalThis.Number(BigInt.asUintN(32, value));
+    }
+    static string(value: string): number {
+        let hash = 2166136261;
+        for (let index = 0; index < value.length; index++) {
+            hash = GoMapHash.mix(hash, value.charCodeAt(index));
+        }
+        return hash;
+    }
+    static object(value: object): number {
+        let result = GoMapHash.objects.get(value);
+        if (result === undefined) {
+            result = GoMapHash.nextObject;
+            GoMapHash.nextObject++;
+            GoMapHash.objects.set(value, result);
+        }
+        return result;
+    }
+    static mix(hash: number, next: number): number {
+        return Math.imul(hash ^ next, 16777619) >>> 0;
+    }
+}
 export interface GoMapValue<K, V> {
     lookup(key: K): V;
     lookupOk(key: K): [

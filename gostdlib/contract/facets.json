@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 9,
+  "schemaVersion": 14,
   "representations": [
     {
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
@@ -21,7 +21,1190 @@
     "context|kind=2|receiver=|name=CancelFunc",
     "io/fs|kind=2|receiver=|name=WalkDirFunc"
   ],
+  "providerInterfaces": [
+    {
+      "sourceIdentity": "go:universe|error",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ProviderErrorInterface"
+    }
+  ],
+  "providerProtocols": [
+    {
+      "name": "error-is",
+      "protocol": {
+        "methods": [
+          {
+            "name": "Is",
+            "parameters": [
+              { "kind": "callable-parameter", "callableParameter": 1 }
+            ],
+            "results": [
+              { "kind": "bool" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "error-unwrap",
+      "protocol": {
+        "methods": [
+          {
+            "name": "Unwrap",
+            "results": [
+              { "kind": "callable-parameter", "callableParameter": 0 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "error-unwrap-many",
+      "protocol": {
+        "methods": [
+          {
+            "name": "Unwrap",
+            "results": [
+              {
+                "kind": "slice",
+                "element": {
+                  "kind": "callable-parameter",
+                  "callableParameter": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
   "providerCallableProfiles": [
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalSync",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsSync", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapSync", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManySync", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncIs",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsAsync", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapSync", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManySync", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncUnwrap",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsSync", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapAsync", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManySync", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncUnwrapMany",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsSync", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapSync", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManyAsync", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncIsUnwrap",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsAsync", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapAsync", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManySync", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncIsUnwrapMany",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsAsync", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapSync", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManyAsync", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncUnwrapBoth",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsSync", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapAsync", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManyAsync", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncAll",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsAsync", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapAsync", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManyAsync", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncErrorSync",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsSyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapSyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManySyncAsyncError", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncErrorAsyncIs",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsAsyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapSyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManySyncAsyncError", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncErrorAsyncUnwrap",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsSyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapAsyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManySyncAsyncError", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncErrorAsyncUnwrapMany",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsSyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapSyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManyAsyncAsyncError", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncErrorAsyncIsUnwrap",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsAsyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapAsyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManySyncAsyncError", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncErrorAsyncIsUnwrapMany",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsAsyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapSyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManyAsyncAsyncError", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncErrorAsyncUnwrapBoth",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsSyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapAsyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManyAsyncAsyncError", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonicalAsyncErrorAsyncAll",
+      "required": true,
+      "canonicalParameters": [0, 1],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ],
+      "protocols": [
+        { "protocol": "error-is", "export": "ProviderErrorIsAsyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapAsyncAsyncError", "valueParameter": 0 },
+        { "protocol": "error-unwrap-many", "export": "ProviderErrorUnwrapManyAsyncAsyncError", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Unwrap",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsUnwrapCanonicalSync",
+      "required": true,
+      "canonicalParameters": [0],
+      "protocols": [
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapSync", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Unwrap",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsUnwrapCanonicalAsync",
+      "required": true,
+      "canonicalParameters": [0],
+      "protocols": [
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapAsync", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Unwrap",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsUnwrapCanonicalAsyncErrorSync",
+      "required": true,
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ],
+      "protocols": [
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapSyncAsyncError", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Unwrap",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsUnwrapCanonicalAsyncErrorAsync",
+      "required": true,
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ],
+      "protocols": [
+        { "protocol": "error-unwrap", "export": "ProviderErrorUnwrapAsyncAsyncError", "valueParameter": 0 }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithCancel",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithCancelCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": ["context|kind=3|receiver=|name=Canceled"],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": ["context|kind=2|receiver=|name=Context"],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithCancel",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithCancelCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": ["context|kind=3|receiver=|name=Canceled"],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": ["context|kind=2|receiver=|name=Context"],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithCancelCause",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithCancelCauseCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0, 1],
+      "canonicalValues": ["context|kind=3|receiver=|name=Canceled"],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": ["context|kind=2|receiver=|name=Context"],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithCancelCause",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithCancelCauseCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0, 1],
+      "canonicalValues": ["context|kind=3|receiver=|name=Canceled"],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": ["context|kind=2|receiver=|name=Context"],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithTimeout",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithTimeoutCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "context|kind=3|receiver=|name=Canceled",
+        "context|kind=3|receiver=|name=DeadlineExceeded"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": ["context|kind=2|receiver=|name=Context"],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithTimeout",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithTimeoutCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "context|kind=3|receiver=|name=Canceled",
+        "context|kind=3|receiver=|name=DeadlineExceeded"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": ["context|kind=2|receiver=|name=Context"],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=AfterFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextAfterFuncCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=AfterFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextAfterFuncCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=Cause",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextCauseCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=Cause",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextCauseCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithValue",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithValueCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": [
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "CanonicalContextSync"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithValue",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithValueCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": [
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "CanonicalContextSync"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofStartCPUProfileCanonicalSyncWriterSyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofStartCPUProfileCanonicalAsyncWriterSyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetAsync" }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofStartCPUProfileCanonicalSyncWriterAsyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofStartCPUProfileCanonicalAsyncWriterAsyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetAsync" }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=*runtime/pprof.Profile|name=WriteTo",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofProfileWriteToCanonicalSyncWriterSyncError",
+      "receiver": true,
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=*runtime/pprof.Profile|name=WriteTo",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofProfileWriteToCanonicalAsyncWriterSyncError",
+      "receiver": true,
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetAsync" }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=*runtime/pprof.Profile|name=WriteTo",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofProfileWriteToCanonicalSyncWriterAsyncError",
+      "receiver": true,
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=*runtime/pprof.Profile|name=WriteTo",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofProfileWriteToCanonicalAsyncWriterAsyncError",
+      "receiver": true,
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetAsync" }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprint",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintCanonicalAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprint",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintCanonicalAsyncOrdinaryError",
+      "canonicalParameters": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "guardInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprint",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintf",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintfCanonicalAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintf",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintfCanonicalAsyncOrdinaryError",
+      "canonicalParameters": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "guardInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintf",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintfCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintln",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintlnCanonicalAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintln",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintlnCanonicalAsyncOrdinaryError",
+      "canonicalParameters": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "guardInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintln",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintlnCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewReader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "NewReaderCanonicalAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=ErrNoProgress"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewReader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "NewReaderCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=ErrNoProgress"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewReader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "NewReaderCanonicalAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=ErrNoProgress"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewReader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "NewReaderCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=ErrNoProgress"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewWriter",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "NewWriterCanonicalAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=ErrShortWrite"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewWriter",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "NewWriterCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=ErrShortWrite"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewWriter",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "NewWriterCanonicalAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=ErrShortWrite"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewWriter",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "NewWriterCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=ErrShortWrite"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "compress/gzip|kind=4|receiver=|name=NewReader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip.js",
+      "sourcePath": "src/internal/facets/provider-compress-gzip.ts",
+      "export": "GzipNewReaderCanonicalReadAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0, 1],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=EOF",
+        "io|kind=3|receiver=|name=ErrNoProgress",
+        "io|kind=3|receiver=|name=ErrUnexpectedEOF"
+      ],
+      "canonicalTypeArguments": [
+        "compress/flate|kind=2|receiver=|name=Reader",
+        "go:universe|error",
+        "io|kind=2|receiver=|name=ReadCloser"
+      ],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "compress/flate|kind=2|receiver=|name=Reader",
+          "export": "CanonicalFlateReaderReadAsync"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=ReadCloser",
+          "export": "CanonicalReadCloserReadAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "compress/gzip|kind=4|receiver=|name=NewReader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip.js",
+      "sourcePath": "src/internal/facets/provider-compress-gzip.ts",
+      "export": "GzipNewReaderCanonicalCloseAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [0, 1],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=EOF",
+        "io|kind=3|receiver=|name=ErrNoProgress",
+        "io|kind=3|receiver=|name=ErrUnexpectedEOF"
+      ],
+      "canonicalTypeArguments": [
+        "compress/flate|kind=2|receiver=|name=Reader",
+        "go:universe|error",
+        "io|kind=2|receiver=|name=ReadCloser"
+      ],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "compress/flate|kind=2|receiver=|name=Reader",
+          "export": "CanonicalFlateReaderSync"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=ReadCloser",
+          "export": "CanonicalReadCloserCloseAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "os|kind=4|receiver=|name=IsNotExist",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-error.js",
+      "sourcePath": "src/internal/facets/provider-os-error.ts",
+      "export": "OsIsNotExistCanonicalAsyncErrorSync",
+      "required": true,
+      "canonicalParameters": [0],
+      "canonicalValues": [
+        "io/fs|kind=3|receiver=|name=ErrNotExist"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        }
+      ],
+      "protocols": [
+        {
+          "protocol": "error-unwrap",
+          "export": "ProviderErrorUnwrapSyncAsyncError",
+          "valueParameter": 0
+        },
+        {
+          "protocol": "error-unwrap-many",
+          "export": "ProviderErrorUnwrapManySyncAsyncError",
+          "valueParameter": 0
+        }
+      ]
+    },
     {
       "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
       "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
@@ -36,6 +1219,202 @@
       ]
     },
     {
+      "sourceIdentity": "io|kind=4|receiver=|name=ReadFull",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-read.js",
+      "sourcePath": "src/internal/facets/provider-io-read.ts",
+      "export": "IoReadFullCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=EOF",
+        "io|kind=3|receiver=|name=ErrUnexpectedEOF"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io|kind=4|receiver=|name=ReadFull",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-read.js",
+      "sourcePath": "src/internal/facets/provider-io-read.ts",
+      "export": "IoReadFullCanonicalAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=EOF",
+        "io|kind=3|receiver=|name=ErrUnexpectedEOF"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io|kind=4|receiver=|name=ReadFull",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-read.js",
+      "sourcePath": "src/internal/facets/provider-io-read.ts",
+      "export": "IoReadFullCanonicalSync",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=EOF",
+        "io|kind=3|receiver=|name=ErrUnexpectedEOF"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io|kind=4|receiver=|name=ReadFull",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-read.js",
+      "sourcePath": "src/internal/facets/provider-io-read.ts",
+      "export": "IoReadFullCanonicalAsync",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=EOF",
+        "io|kind=3|receiver=|name=ErrUnexpectedEOF"
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryReadCanonicalOrderSyncReaderSyncError",
+      "canonicalParameters": [0, 1],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryReadCanonicalOrderAsyncReaderSyncError",
+      "canonicalParameters": [0, 1],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryReadCanonicalOrderSyncReaderAsyncError",
+      "canonicalParameters": [0, 1],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryReadCanonicalOrderAsyncReaderAsyncError",
+      "canonicalParameters": [0, 1],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ]
+    },
+    {
       "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
       "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
       "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
@@ -45,6 +1424,250 @@
         {
           "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
           "export": "CanonicalByteOrder"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryReadCanonicalSyncReaderSyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryReadCanonicalAsyncReaderSyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryReadCanonicalSyncReaderAsyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryReadCanonicalAsyncReaderAsyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryWriteCanonicalSyncWriterSyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryWriteCanonicalAsyncWriterSyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryWriteCanonicalSyncWriterAsyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryWriteCanonicalAsyncWriterAsyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryWriteCanonicalOrderSyncWriterSyncError",
+      "canonicalParameters": [0, 1],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryWriteCanonicalOrderAsyncWriterSyncError",
+      "canonicalParameters": [0, 1],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryWriteCanonicalOrderSyncWriterAsyncError",
+      "canonicalParameters": [0, 1],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetSync"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryWriteCanonicalOrderAsyncWriterAsyncError",
+      "canonicalParameters": [0, 1],
+      "canonicalResults": [0],
+      "contractInterfaces": ["go:universe|error"],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
         }
       ]
     },
@@ -102,6 +1725,79 @@
       ]
     },
     {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsReadDirCanonicalAsyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [0, 1],
+      "guardInterfaces": [
+        "io/fs|kind=2|receiver=|name=ReadDirFS",
+        "io/fs|kind=2|receiver=|name=ReadDirFile"
+      ],
+      "fromProviderInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+          "export": "CanonicalDirEntryAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFSAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFileAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "export": "CanonicalReadDirFSAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "export": "CanonicalReadDirFileAsyncError"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadFile",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsReadFileCanonicalAsyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "canonicalValues": [
+        "io|kind=3|receiver=|name=EOF"
+      ],
+      "guardInterfaces": [
+        "io/fs|kind=2|receiver=|name=ReadFileFS"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFSAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFileAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
+          "export": "CanonicalReadFileFSAsyncError"
+        }
+      ]
+    },
+    {
       "sourceIdentity": "io/fs|kind=4|receiver=|name=Stat",
       "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
       "sourcePath": "src/internal/facets/provider-io-fs.ts",
@@ -122,6 +1818,35 @@
         {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
           "export": "CanonicalStatFS"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=Stat",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsStatCanonicalAsyncError",
+      "canonicalParameters": [0],
+      "canonicalResults": [1],
+      "guardInterfaces": [
+        "io/fs|kind=2|receiver=|name=StatFS"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFSAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFileAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "export": "CanonicalStatFSAsyncError"
         }
       ]
     },
@@ -173,6 +1898,80 @@
       ]
     },
     {
+      "sourceIdentity": "os/signal|kind=4|receiver=|name=NotifyContext",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
+      "sourcePath": "src/internal/facets/provider-os-signal.ts",
+      "export": "OsSignalNotifyContextCanonicalContext",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": ["context|kind=3|receiver=|name=Canceled"],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": ["context|kind=2|receiver=|name=Context"],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "os/signal|kind=4|receiver=|name=NotifyContext",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
+      "sourcePath": "src/internal/facets/provider-os-signal.ts",
+      "export": "OsSignalNotifyContextCanonicalContext",
+      "canonicalParameters": [0],
+      "canonicalResults": [0],
+      "canonicalValues": ["context|kind=3|receiver=|name=Canceled"],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": ["context|kind=2|receiver=|name=Context"],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" }
+      ]
+    },
+    {
+      "sourceIdentity": "os/signal|kind=4|receiver=|name=NotifyContext",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
+      "sourcePath": "src/internal/facets/provider-os-signal.ts",
+      "export": "OsSignalNotifyContextCanonicalContextSignal",
+      "canonicalParameters": [0, 1],
+      "canonicalResults": [0],
+      "canonicalValues": ["context|kind=3|receiver=|name=Canceled"],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": ["context|kind=2|receiver=|name=Context"],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" },
+        { "sourceIdentity": "os|kind=2|receiver=|name=Signal", "export": "CanonicalSignal" }
+      ]
+    },
+    {
+      "sourceIdentity": "os/signal|kind=4|receiver=|name=NotifyContext",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
+      "sourcePath": "src/internal/facets/provider-os-signal.ts",
+      "export": "OsSignalNotifyContextCanonicalContextSignal",
+      "canonicalParameters": [0, 1],
+      "canonicalResults": [0],
+      "canonicalValues": ["context|kind=3|receiver=|name=Canceled"],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": ["context|kind=2|receiver=|name=Context"],
+      "interfaces": [
+        { "sourceIdentity": "context|kind=2|receiver=|name=Context", "export": "CanonicalContextSync" },
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" },
+        { "sourceIdentity": "os|kind=2|receiver=|name=Signal", "export": "CanonicalSignal" }
+      ]
+    },
+    {
       "sourceIdentity": "os|kind=4|receiver=*os.Process|name=Signal",
       "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
       "sourcePath": "src/internal/facets/provider-os-signal.ts",
@@ -184,6 +1983,350 @@
           "sourceIdentity": "os|kind=2|receiver=|name=Signal",
           "export": "CanonicalSignal"
         }
+      ]
+    },
+    {
+      "sourceIdentity": "os|kind=4|receiver=*os.Process|name=Signal",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
+      "sourcePath": "src/internal/facets/provider-os-signal.ts",
+      "export": "OsProcessSignalCanonical",
+      "receiver": true,
+      "canonicalParameters": [0],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "os|kind=2|receiver=|name=Signal",
+          "export": "CanonicalSignal"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
+      "export": "Base64NewEncoderCanonicalSync",
+      "canonicalParameters": [1],
+      "canonicalResults": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "contractInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "implementedResultInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=WriteCloser", "export": "CanonicalWriteCloserSync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
+      "export": "Base64NewEncoderCanonicalSync",
+      "canonicalParameters": [1],
+      "canonicalResults": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "contractInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "implementedResultInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=WriteCloser", "export": "CanonicalWriteCloserSync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
+      "export": "Base64NewEncoderCanonicalAsync",
+      "canonicalParameters": [1],
+      "canonicalResults": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "contractInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "implementedResultInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=WriteCloser", "export": "CanonicalWriteCloserAsync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetAsync" }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
+      "export": "Base64NewEncoderCanonicalSyncWriteAsyncClose",
+      "canonicalParameters": [1],
+      "canonicalResults": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "contractInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "implementedResultInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorSync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=WriteCloser", "export": "CanonicalWriteCloserSyncWriteAsyncClose" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
+      "export": "Base64NewEncoderCanonicalSyncWriteAsyncClose",
+      "canonicalParameters": [1],
+      "canonicalResults": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "contractInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "implementedResultInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=WriteCloser", "export": "CanonicalWriteCloserSyncWriteAsyncClose" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetSync" }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
+      "export": "Base64NewEncoderCanonicalAsync",
+      "canonicalParameters": [1],
+      "canonicalResults": [0],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "contractInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "implementedResultInterfaces": ["io|kind=2|receiver=|name=WriteCloser"],
+      "interfaces": [
+        { "sourceIdentity": "go:universe|error", "export": "CanonicalErrorAsync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=WriteCloser", "export": "CanonicalWriteCloserAsync" },
+        { "sourceIdentity": "io|kind=2|receiver=|name=Writer", "export": "CanonicalWriterTargetAsync" }
+      ]
+    }
+  ],
+  "providerStatefulProfiles": [
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "CanonicalReaderAsync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "CanonicalReaderSync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "CanonicalReaderAsync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceAsync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "CanonicalReaderSync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReaderSourceSync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "CanonicalWriterAsync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "CanonicalWriterSync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetSync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "CanonicalWriterAsync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetAsync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "CanonicalWriterSync",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorSync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriterTargetSync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ]
+    },
+    {
+      "sourceIdentity": "compress/gzip|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip.js",
+      "sourcePath": "src/internal/facets/provider-compress-gzip.ts",
+      "export": "CanonicalGzipReaderReadAsync",
+      "interfaces": [
+        {
+          "sourceIdentity": "compress/flate|kind=2|receiver=|name=Reader",
+          "export": "CanonicalFlateReaderReadAsync"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=ReadCloser",
+          "export": "CanonicalReadCloserReadAsync"
+        }
+      ],
+      "typeArguments": [
+        "compress/flate|kind=2|receiver=|name=Reader",
+        "go:universe|error",
+        "io|kind=2|receiver=|name=ReadCloser"
+      ]
+    },
+    {
+      "sourceIdentity": "compress/gzip|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip.js",
+      "sourcePath": "src/internal/facets/provider-compress-gzip.ts",
+      "export": "CanonicalGzipReaderCloseAsync",
+      "interfaces": [
+        {
+          "sourceIdentity": "compress/flate|kind=2|receiver=|name=Reader",
+          "export": "CanonicalFlateReaderSync"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=ReadCloser",
+          "export": "CanonicalReadCloserCloseAsync"
+        }
+      ],
+      "typeArguments": [
+        "compress/flate|kind=2|receiver=|name=Reader",
+        "go:universe|error",
+        "io|kind=2|receiver=|name=ReadCloser"
       ]
     }
   ],
@@ -911,6 +3054,17 @@
       "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
       "sourcePath": "src/internal/facets/recovery-value.ts",
       "export": "SyscallErrnoError",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "syscall|kind=4|receiver=syscall.Errno|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "SyscallErrnoIs",
       "capabilities": [
         "recovery"
       ],

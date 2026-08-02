@@ -2,6 +2,7 @@ package contract
 
 const (
 	DynamicTypeMember       = "$go$type"
+	DynamicTypeComparable   = "comparable"
 	MethodsMember           = "$go$methods"
 	ImplementsMember        = "$go$implements"
 	EqualMember             = "$go$equal"

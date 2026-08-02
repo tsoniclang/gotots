@@ -261,4 +261,5 @@ type getTypePropertyParams struct {
 type signatureResponse struct {
 	ID             uint64   `json:"id"`
 	TypeParameters []uint32 `json:"typeParameters,omitempty"`
+	Parameters     []uint64 `json:"parameters,omitempty"`
 }

@@ -13,7 +13,7 @@ export type NodeErrorKind =
   | "operation"
   | "permission";
 
-const nodeProviderErrorType = Object.freeze({});
+const nodeProviderErrorType = Object.freeze({ comparable: true });
 
 export class NodeProviderError extends WrappedProviderError {
   constructor(

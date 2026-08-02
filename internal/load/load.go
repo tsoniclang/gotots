@@ -123,7 +123,7 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 		Dir:        request.Directory,
 		Fset:       fileSet,
 		Env:        selectedBuildEnvironment(buildProfile),
-		BuildFlags: buildProfile.buildFlags(),
+		BuildFlags: buildProfile.BuildFlags(),
 		Mode: packages.NeedName |
 			packages.NeedFiles |
 			packages.NeedCompiledGoFiles |
@@ -291,11 +291,7 @@ func wrapEnvironmentPackage(
 }
 
 func currentToolchainKey(profile BuildProfile) string {
-	key, err := environmentcontract.ToolchainKey(
-		profile.ToolchainVersion(),
-		profile.GOOS(),
-		profile.GOARCH(),
-	)
+	key, err := environmentcontract.ToolchainKey(profile)
 	if err != nil {
 		panic(err)
 	}

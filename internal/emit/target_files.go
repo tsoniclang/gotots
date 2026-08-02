@@ -17,6 +17,7 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		return nil, &ScheduleError{Reason: "target files were sealed more than once"}
 	}
 	if s.scheduler.hasPending() ||
+		s.packageExports.hasPending() ||
 		s.requirements.hasPending() ||
 		s.artifacts.HasPending() ||
 		s.packageInitializations.hasPending() {

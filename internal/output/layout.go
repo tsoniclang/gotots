@@ -183,6 +183,10 @@ func ProviderInterfaceBridgePath(artifactKey string) (string, error) {
 	return generatedArtifactPath("interfaces/provider-bridges", artifactKey)
 }
 
+func ProviderStatefulRepresentationPath(artifactKey string) (string, error) {
+	return generatedArtifactPath("providers/stateful-representations", artifactKey)
+}
+
 func GenericCapabilityPath(artifactKey string) (string, error) {
 	return generatedArtifactPath("generics/capabilities", artifactKey)
 }

@@ -5,7 +5,7 @@ import type { int64, uint8 } from "@gotots/runtime/scalars.js";
 import type { DirEntry, File, FileInfo } from "../../../io/fs.js";
 import { ProviderInterfaceValue } from "./value.js";
 
-const directoryFileType = Object.freeze({});
+const directoryFileType = Object.freeze({ comparable: true });
 
 export abstract class DirectoryFile extends ProviderInterfaceValue implements File {
   protected constructor() {

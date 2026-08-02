@@ -14,7 +14,7 @@ type fixedCooperativeResolver struct {
 }
 
 func (r fixedCooperativeResolver) ObserveCooperativeCallable(
-	_ ArtifactOwner,
+	_ Context,
 	facet CallableFacet,
 ) (CooperativeCallableObservation, error) {
 	artifact, ok := facet.ABI()

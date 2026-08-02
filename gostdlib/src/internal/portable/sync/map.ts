@@ -2,17 +2,11 @@ import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { bool } from "@gotots/runtime/scalars.js";
 
+import { goInterfaceEqual } from "../../runtime/interface.js";
+
 interface Entry {
   readonly key: GoInterfaceValue | undefined;
   value: GoInterfaceValue | undefined;
-}
-
-function equal(
-  left: GoInterfaceValue | undefined,
-  right: GoInterfaceValue | undefined,
-): boolean {
-  return left === right
-    || (left !== undefined && right !== undefined && left.$go$equal(right));
 }
 
 export class Map {
@@ -24,7 +18,7 @@ export class Map {
 
   static Delete(receiver: Map | undefined, key: GoInterfaceValue | undefined): void {
     const entries = Map.#require(receiver).#entries;
-    const index = entries.findIndex((entry) => equal(entry.key, key));
+    const index = entries.findIndex((entry) => goInterfaceEqual(entry.key, key));
     if (index >= 0) {
       entries.splice(index, 1);
     }
@@ -34,7 +28,9 @@ export class Map {
     receiver: Map | undefined,
     key: GoInterfaceValue | undefined,
   ): [GoInterfaceValue | undefined, bool] {
-    const entry = Map.#require(receiver).#entries.find((candidate) => equal(candidate.key, key));
+    const entry = Map.#require(receiver).#entries.find(
+      (candidate) => goInterfaceEqual(candidate.key, key),
+    );
     return entry === undefined ? [undefined, false] : [entry.value, true];
   }
 
@@ -44,7 +40,9 @@ export class Map {
     value: GoInterfaceValue | undefined,
   ): [GoInterfaceValue | undefined, bool] {
     const map = Map.#require(receiver);
-    const entry = map.#entries.find((candidate) => equal(candidate.key, key));
+    const entry = map.#entries.find(
+      (candidate) => goInterfaceEqual(candidate.key, key),
+    );
     if (entry !== undefined) {
       return [entry.value, true];
     }
@@ -75,7 +73,9 @@ export class Map {
     value: GoInterfaceValue | undefined,
   ): void {
     const map = Map.#require(receiver);
-    const entry = map.#entries.find((candidate) => equal(candidate.key, key));
+    const entry = map.#entries.find(
+      (candidate) => goInterfaceEqual(candidate.key, key),
+    );
     if (entry === undefined) {
       map.#entries.push({ key, value });
     } else {

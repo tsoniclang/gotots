@@ -2,6 +2,7 @@ package gostdlib_test
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
@@ -18,6 +19,7 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 		MaximumGoVersion: "go1.26.4",
 		GOOS:             "linux",
 		GOARCH:           "amd64",
+		BuildTags:        []string{"noasm"},
 		RuntimeDigest:    digest('a'),
 		ProviderDigest:   digest('c'),
 		Modules: []gostdlib.ModuleDocument{{
@@ -36,11 +38,11 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 				}},
 				GenericOperations: []gostdlib.GenericOperationDocument{{
 					Kind: gostdlib.GenericOperationCopy,
-					Parameters: []gostdlib.GenericOperationTypeDocument{
-						gostdlib.GenericOperationTypeParameterReference(0),
+					Parameters: []gostdlib.ContractTypeDocument{
+						gostdlib.ContractTypeParameterReference(0),
 					},
-					Results: []gostdlib.GenericOperationTypeDocument{
-						gostdlib.GenericOperationTypeParameterReference(0),
+					Results: []gostdlib.ContractTypeDocument{
+						gostdlib.ContractTypeParameterReference(0),
 					},
 				}},
 				SourceSignature:     "func(s, substr string) bool|params=s,substr|results=",
@@ -73,6 +75,12 @@ func TestManifestRoundTripIsCanonicalAndImmutable(t *testing.T) {
 	}
 	if manifest.Digest() == "" || manifest.GoVersion() != "go1.26.4" {
 		t.Fatalf("manifest identity is incomplete: %#v", manifest)
+	}
+	profile, ok := manifest.BuildProfile()
+	if !ok || profile.CgoEnabled() ||
+		profile.GOOS() != "linux" || profile.GOARCH() != "amd64" ||
+		!slices.Equal(profile.Tags(), []string{"noasm"}) {
+		t.Fatalf("manifest build profile = %#v, %t", profile, ok)
 	}
 	binding, ok := manifest.Binding(
 		"strings|kind=4|receiver=|name=Contains",
@@ -132,11 +140,11 @@ func TestManifestRejectsInvalidGenericOperationShape(t *testing.T) {
 	binding := &document.Modules[0].Bindings[0]
 	binding.GenericOperations = []gostdlib.GenericOperationDocument{{
 		Kind: gostdlib.GenericOperationZero,
-		Parameters: []gostdlib.GenericOperationTypeDocument{
-			gostdlib.GenericOperationTypeParameterReference(0),
+		Parameters: []gostdlib.ContractTypeDocument{
+			gostdlib.ContractTypeParameterReference(0),
 		},
-		Results: []gostdlib.GenericOperationTypeDocument{
-			gostdlib.GenericOperationTypeParameterReference(0),
+		Results: []gostdlib.ContractTypeDocument{
+			gostdlib.ContractTypeParameterReference(0),
 		},
 	}}
 	if _, err := gostdlib.Seal(document); err == nil {
@@ -144,8 +152,8 @@ func TestManifestRejectsInvalidGenericOperationShape(t *testing.T) {
 	}
 	binding.GenericOperations = []gostdlib.GenericOperationDocument{{
 		Kind: gostdlib.GenericOperationKind("invented"),
-		Results: []gostdlib.GenericOperationTypeDocument{
-			gostdlib.GenericOperationTypeParameterReference(0),
+		Results: []gostdlib.ContractTypeDocument{
+			gostdlib.ContractTypeParameterReference(0),
 		},
 	}}
 	if _, err := gostdlib.Seal(document); err == nil {
@@ -158,12 +166,12 @@ func TestManifestOwnsCallableParameterGenericOperation(t *testing.T) {
 	binding := &document.Modules[0].Bindings[0]
 	binding.GenericOperations = []gostdlib.GenericOperationDocument{{
 		Kind: gostdlib.GenericOperationInterfaceAssertOK,
-		Parameters: []gostdlib.GenericOperationTypeDocument{
-			gostdlib.GenericOperationCallableParameterReference(0),
+		Parameters: []gostdlib.ContractTypeDocument{
+			gostdlib.ContractCallableParameterReference(0),
 		},
-		Results: []gostdlib.GenericOperationTypeDocument{
-			gostdlib.GenericOperationTypeParameterReference(0),
-			gostdlib.GenericOperationBoolReference(),
+		Results: []gostdlib.ContractTypeDocument{
+			gostdlib.ContractTypeParameterReference(0),
+			gostdlib.ContractBoolReference(),
 		},
 	}}
 	payload, err := gostdlib.Seal(document)
@@ -504,6 +512,68 @@ func TestManifestOwnsProviderInterfaceSurface(t *testing.T) {
 	}
 }
 
+func TestManifestOwnsLanguageProviderInterfaceBinding(t *testing.T) {
+	document := validDocument()
+	document.FacetModules = []gostdlib.FacetModuleDocument{{
+		Specifier:  "@gotots/gostdlib/internal/facets/provider-error.js",
+		SourcePath: "src/internal/facets/provider-error.ts",
+		ProviderInterfaces: []gostdlib.ProviderInterfaceBindingDocument{{
+			SourceIdentity: gostdlib.LanguageErrorInterfaceIdentity,
+			Export:         "ProviderErrorInterface",
+			ProviderInterface: gostdlib.ProviderInterfaceDocument{
+				Mode: gostdlib.ProviderInterfaceModeBridge,
+				Methods: []gostdlib.ProviderInterfaceMethodDocument{{
+					SourceIdentity:      gostdlib.LanguageErrorMethodIdentity,
+					Kind:                gostdlib.ProviderInterfaceMethodCallable,
+					Member:              "Error",
+					Effect:              gostdlib.EffectSynchronous,
+					SourceSignature:     "func() string",
+					SourceLocation:      "builtin",
+					ImplementationOwner: "src/internal/facets/provider-error.ts",
+					TargetFingerprint:   digest('e'),
+				}},
+			},
+			TargetFingerprint: digest('f'),
+		}},
+	}}
+	payload, err := gostdlib.Seal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := gostdlib.Parse(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, ok := manifest.ProviderInterface(
+		gostdlib.LanguageErrorInterfaceIdentity,
+	)
+	if !ok || selected.Export() != "ProviderErrorInterface" ||
+		selected.ModuleSpecifier() !=
+			"@gotots/gostdlib/internal/facets/provider-error.js" ||
+		selected.TargetFingerprint() != digest('f') {
+		t.Fatalf("language provider interface = %#v, %t", selected, ok)
+	}
+	providerInterface := selected.ProviderInterface()
+	method, ok := providerInterface.Method(gostdlib.LanguageErrorMethodIdentity)
+	if !ok || method.Member() != "Error" ||
+		method.Effect() != gostdlib.EffectSynchronous {
+		t.Fatalf("language provider method = %#v, %t", method, ok)
+	}
+	methods := providerInterface.Methods()
+	methods[0] = gostdlib.ProviderInterfaceMethod{}
+	if providerInterface.Methods()[0].SourceIdentity() == "" {
+		t.Fatal("language provider interface exposed mutable method storage")
+	}
+
+	document.FacetModules = append(
+		document.FacetModules,
+		document.FacetModules[0],
+	)
+	if _, err := gostdlib.Seal(document); err == nil {
+		t.Fatal("duplicate language provider-interface owner passed")
+	}
+}
+
 func validDocument() gostdlib.Document {
 	return gostdlib.Document{
 		SchemaVersion:    gostdlib.SchemaVersion,
@@ -515,6 +585,7 @@ func validDocument() gostdlib.Document {
 		MaximumGoVersion: "go1.26.4",
 		GOOS:             "linux",
 		GOARCH:           "amd64",
+		BuildTags:        []string{},
 		RuntimeDigest:    digest('a'),
 		ProviderDigest:   digest('c'),
 		Modules: []gostdlib.ModuleDocument{{

@@ -112,9 +112,7 @@ func panicNilValue(
 				},
 				factory.Identifier(interfacecontract.DynamicTypeMember),
 				nil,
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindObjectKeyword,
-				),
+				interfacecontract.DynamicType(factory),
 				factory.Identifier(errorName),
 			),
 			panicNilCreate(

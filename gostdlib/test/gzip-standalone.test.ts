@@ -14,7 +14,7 @@ import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 import { bytes } from "../src/internal/runtime/slice.js";
 import { state, type Reader } from "../src/io.js";
 
-const memoryReaderType = Object.freeze({});
+const memoryReaderType = Object.freeze({ comparable: true });
 
 class MemoryReader extends ProviderInterfaceValue implements Reader {
   private offset = 0;

@@ -35,7 +35,8 @@ import {
 import { Testing } from "../src/testing.js";
 
 class BufferWriter extends GoInterfaceValue {
-  readonly $go$type: object = BufferWriter;
+	static readonly comparable = true;
+	readonly $go$type = BufferWriter;
   readonly $go$methods: ReadonlySet<object> = new Set<object>();
   readonly $go$formatString = false;
   readonly bytes: number[] = [];
@@ -85,13 +86,13 @@ test("runtime process observations are populated", () => {
   assert.ok(previous > 0);
 });
 
-test("runtime profiles write concrete provider observations", () => {
+test("runtime profiles write concrete provider observations", async () => {
   const writer = new BufferWriter();
   assert.equal(StartCPUProfile(writer), undefined);
   const duplicate = StartCPUProfile(writer);
   assert.notEqual(duplicate, undefined);
   assert.match(duplicate?.Error() ?? "", /already in use/u);
-  StopCPUProfile();
+  await StopCPUProfile();
   assert.ok(writer.bytes.length > 0);
   assert.deepEqual(writer.bytes.slice(0, 2), [0x1f, 0x8b]);
   assert.ok(gunzipSync(Uint8Array.from(writer.bytes)).length > 0);

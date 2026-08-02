@@ -195,7 +195,7 @@ function validateAttributes(
   return undefined;
 }
 
-const captureWriterType = Object.freeze({});
+const captureWriterType = Object.freeze({ comparable: true });
 
 class CaptureWriter extends ProviderInterfaceValue implements Writer {
   readonly #content: number[] = [];

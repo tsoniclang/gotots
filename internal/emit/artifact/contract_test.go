@@ -471,6 +471,63 @@ func TestObservableContractRejectsInferenceDependentSurface(t *testing.T) {
 	}
 }
 
+func TestObservableContractAllowsOneTypeAndValueBindingWithTheSameName(
+	t *testing.T,
+) {
+	factory := tsgo.NewFactory()
+	name := factory.Identifier("State")
+	valueType := factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindNumberKeyword,
+	)
+	contract, err := ProjectContract(factory, []tsgo.Statement{
+		factory.TypeAliasDeclaration(
+			[]tsgo.ModifierLike{factory.ExportKeyword()},
+			name,
+			nil,
+			valueType,
+		),
+		factory.VariableStatement(
+			[]tsgo.ModifierLike{factory.ExportKeyword()},
+			factory.VariableDeclarationList(
+				[]tsgo.VariableDeclaration{factory.VariableDeclaration(
+					name,
+					nil,
+					valueType,
+					factory.NumericLiteral("1", tsgo.TokenFlagsNone),
+				)},
+				tsgo.NodeFlagsConst,
+			),
+		),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exports, ok := contract.ExportedBindings()
+	if !ok || len(exports) != 1 || exports[0] != "State" {
+		t.Fatalf("split declaration exports = %v, present=%t", exports, ok)
+	}
+}
+
+func TestObservableContractRejectsDuplicateDeclarationSpace(t *testing.T) {
+	factory := tsgo.NewFactory()
+	alias := func() tsgo.Statement {
+		return factory.TypeAliasDeclaration(
+			[]tsgo.ModifierLike{factory.ExportKeyword()},
+			factory.Identifier("State"),
+			nil,
+			factory.KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindNumberKeyword,
+			),
+		)
+	}
+	_, err := ProjectContract(factory, []tsgo.Statement{alias(), alias()})
+	var contractError *ContractError
+	if !errors.As(err, &contractError) ||
+		contractError.Reason != "export binding duplicates a target declaration space" {
+		t.Fatalf("duplicate declaration error = %#v", err)
+	}
+}
+
 func artifactTestFunction(
 	factory tsgo.Factory,
 	name string,

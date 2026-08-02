@@ -55,6 +55,21 @@ test("base64 stream encoder flushes trailing bytes on Close", () => {
   assert.equal(writer.text(), "Zg==Zm9v");
 });
 
+test("base64 stream encoder preserves Go write chunk boundaries", () => {
+  const writer = new CapturingWriter();
+  const encoder = NewEncoder(requireEncoding(state.StdEncoding), writer);
+  const source = RuntimeSlice.literal(
+    Array.from({ length: 1540 }, (_, index): number => index & 0xff),
+  );
+  assert.deepEqual(encoder.Write(source), [1540, undefined]);
+  assert.equal(encoder.Close(), undefined);
+  assert.deepEqual(writer.lengths(), [1024, 1024, 4, 4]);
+  assert.equal(
+    writer.text(),
+    Encoding.EncodeToString(requireEncoding(state.StdEncoding), source),
+  );
+});
+
 test("base64 append operations preserve prefixes and URL encoding", (): void => {
   const standard = requireEncoding(state.StdEncoding);
   const url = requireEncoding(state.URLEncoding);
@@ -93,10 +108,12 @@ test("hex encodes every byte with lower-case digits", () => {
 });
 
 class CapturingWriter extends GoInterfaceValue implements Writer {
-  readonly $go$type: object = CapturingWriter;
+  static readonly comparable = true;
+  readonly $go$type = CapturingWriter;
   readonly $go$methods: ReadonlySet<object> = new Set<object>();
   readonly $go$formatString = false;
   private readonly bytes: number[] = [];
+  private readonly writeLengths: number[] = [];
 
   $go$implements(contract: readonly object[]): boolean {
     return contract.every((token) => this.$go$methods.has(token));
@@ -115,8 +132,13 @@ class CapturingWriter extends GoInterfaceValue implements Writer {
   }
 
   Write(buffer: RuntimeSlice<number>): [number, GoError | undefined] {
+    this.writeLengths.push(buffer.length);
     this.bytes.push(...sliceValues(buffer));
     return [buffer.length, undefined];
+  }
+
+  lengths(): readonly number[] {
+    return this.writeLengths;
   }
 
   text(): string {

@@ -532,6 +532,20 @@ func (aggregateNames) ProviderCallableProfileCandidates(
 	return nil, false, nil
 }
 
+func (aggregateNames) ProviderStatefulProfileCandidates(
+	*types.TypeName,
+) ([]api.ProviderStatefulProfileCandidate, bool, error) {
+	return nil, false, nil
+}
+
+func (aggregateNames) ProviderStatefulProfileTarget(
+	*types.TypeName,
+	string,
+	api.ImportPhase,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (aggregateNames) ProviderRepresentationOwnsMethod(
 	types.Type,
 	*types.Func,

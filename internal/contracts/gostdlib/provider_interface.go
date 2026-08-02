@@ -1,6 +1,11 @@
 package gostdlib
 
-import "slices"
+import (
+	"go/types"
+	"slices"
+
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+)
 
 type ProviderInterfaceMode string
 
@@ -9,6 +14,26 @@ const (
 	ProviderInterfaceModeBridge       ProviderInterfaceMode = "bridge"
 	ProviderInterfaceModeSealedNative ProviderInterfaceMode = "sealed-native"
 )
+
+func ProviderInterfaceMethodSource(
+	method *types.Func,
+) (string, string, error) {
+	if method != nil && method.Origin() == languageErrorMethod() {
+		return LanguageErrorMethodIdentity, "func() string", nil
+	}
+	contract, err := environmentcontract.Describe(method)
+	if err != nil {
+		return "", "", err
+	}
+	return contract.Identity(), contract.Signature(), nil
+}
+
+func languageErrorMethod() *types.Func {
+	typeName, _ := types.Universe.Lookup("error").(*types.TypeName)
+	named, _ := types.Unalias(typeName.Type()).(*types.Named)
+	contract, _ := named.Underlying().(*types.Interface)
+	return contract.Complete().Method(0).Origin()
+}
 
 func (m ProviderInterfaceMode) Valid() bool {
 	return m == ProviderInterfaceModeBridge ||
@@ -31,6 +56,53 @@ func (k ProviderInterfaceMethodKind) Valid() bool {
 type ProviderInterfaceDocument struct {
 	Mode    ProviderInterfaceMode             `json:"mode"`
 	Methods []ProviderInterfaceMethodDocument `json:"methods"`
+}
+
+const (
+	LanguageErrorInterfaceIdentity = "go:universe|error"
+	LanguageErrorMethodIdentity    = "go:universe|error|method=Error"
+)
+
+type ProviderInterfaceBindingDocument struct {
+	SourceIdentity    string                    `json:"sourceIdentity"`
+	Export            string                    `json:"export"`
+	ProviderInterface ProviderInterfaceDocument `json:"providerInterface"`
+	TargetFingerprint string                    `json:"targetFingerprint"`
+}
+
+type ProviderInterfaceBinding struct {
+	module   FacetModuleDocument
+	document ProviderInterfaceBindingDocument
+}
+
+func newProviderInterfaceBinding(
+	module FacetModuleDocument,
+	document ProviderInterfaceBindingDocument,
+) ProviderInterfaceBinding {
+	return ProviderInterfaceBinding{
+		module:   facetModuleIdentity(module),
+		document: cloneProviderInterfaceBinding(document),
+	}
+}
+
+func (b ProviderInterfaceBinding) SourceIdentity() string {
+	return b.document.SourceIdentity
+}
+
+func (b ProviderInterfaceBinding) ModuleSpecifier() string {
+	return b.module.Specifier
+}
+
+func (b ProviderInterfaceBinding) Export() string {
+	return b.document.Export
+}
+
+func (b ProviderInterfaceBinding) ProviderInterface() ProviderInterface {
+	return newProviderInterface(b.document.ProviderInterface)
+}
+
+func (b ProviderInterfaceBinding) TargetFingerprint() string {
+	return b.document.TargetFingerprint
 }
 
 type ProviderInterfaceMethodDocument struct {
@@ -128,5 +200,13 @@ func cloneProviderInterface(
 ) ProviderInterfaceDocument {
 	result := source
 	result.Methods = slices.Clone(source.Methods)
+	return result
+}
+
+func cloneProviderInterfaceBinding(
+	source ProviderInterfaceBindingDocument,
+) ProviderInterfaceBindingDocument {
+	result := source
+	result.ProviderInterface = cloneProviderInterface(source.ProviderInterface)
 	return result
 }

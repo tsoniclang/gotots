@@ -13,17 +13,46 @@ import (
 )
 
 func TestToolchainKeyIsExactAndMachineIndependent(t *testing.T) {
-	wantBytes := sha256.Sum256([]byte("go1.26.4\x00linux\x00amd64"))
+	profile, err := environment.NewBuildProfileForToolchain(
+		"go1.26.4",
+		"linux",
+		"amd64",
+		false,
+		[]string{"noasm"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantBytes := sha256.Sum256([]byte(
+		"go1.26.4\x00linux\x00amd64\x000\x00noasm",
+	))
 	want := hex.EncodeToString(wantBytes[:])
-	got, err := environment.ToolchainKey("go1.26.4", "linux", "amd64")
+	got, err := environment.ToolchainKey(profile)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got != want {
 		t.Fatalf("toolchain key = %q, want %q", got, want)
 	}
-	if _, err := environment.ToolchainKey("", "linux", "amd64"); err == nil {
+	if _, err := environment.ToolchainKey(environment.BuildProfile{}); err == nil {
 		t.Fatal("empty toolchain version was accepted")
+	}
+	withCgo, err := environment.NewBuildProfileForToolchain(
+		"go1.26.4",
+		"linux",
+		"amd64",
+		true,
+		[]string{"noasm"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withCgoKey, err := environment.ToolchainKey(withCgo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withCgoKey == got {
+		t.Fatal("CGO selection did not change the toolchain key")
 	}
 }
 

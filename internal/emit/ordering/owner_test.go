@@ -62,3 +62,36 @@ func TestCompareObjectsOrdersSameNamedMethodsByReceiverIdentity(t *testing.T) {
 		t.Fatal("same-named methods ignored receiver identity")
 	}
 }
+
+func TestCompareObjectsDoesNotFormatTypesWhenIdentityFieldsDecideOrder(
+	t *testing.T,
+) {
+	sourcePackage := types.NewPackage("example.com/provider", "provider")
+	alpha := types.NewVar(
+		token.Pos(200),
+		sourcePackage,
+		"Alpha",
+		types.NewSlice(types.Typ[types.Int]),
+	)
+	beta := types.NewVar(
+		token.Pos(10),
+		sourcePackage,
+		"Beta",
+		types.NewSlice(types.Typ[types.String]),
+	)
+	formatted := 0
+	order := compareObjects(
+		alpha,
+		beta,
+		func(types.Type) string {
+			formatted++
+			return ""
+		},
+	)
+	if order >= 0 {
+		t.Fatal("semantic name order was not preserved")
+	}
+	if formatted != 0 {
+		t.Fatalf("formatted types = %d, want zero", formatted)
+	}
+}

@@ -42,6 +42,7 @@ func Compile(
 	}
 	command := exec.CommandContext(ctx, toolPath, arguments...)
 	command.Dir = workingDirectory
+	command.Env = nativeToolEnvironment()
 	output, runErr := command.CombinedOutput()
 	diagnostics := strings.TrimSpace(string(output))
 	if runErr == nil && diagnostics == "" {

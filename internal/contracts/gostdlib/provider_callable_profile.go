@@ -14,24 +14,32 @@ type providerCallableProfileLookup struct {
 }
 
 type ProviderCallableProfileDocument struct {
-	SourceIdentity      string     `json:"sourceIdentity"`
-	ProfileKey          string     `json:"profileKey"`
-	Export              string     `json:"export"`
-	Receiver            bool       `json:"receiver,omitempty"`
-	CanonicalParameters []int      `json:"canonicalParameters"`
-	CanonicalResults    []int      `json:"canonicalResults"`
-	GuardInterfaces     []string   `json:"guardInterfaces,omitempty"`
-	Interfaces          []string   `json:"interfaces"`
-	Effect              EffectKind `json:"effect"`
-	ImplementationOwner string     `json:"implementationOwner"`
-	TargetFingerprint   string     `json:"targetFingerprint"`
+	SourceIdentity              string                                     `json:"sourceIdentity"`
+	ProfileKey                  string                                     `json:"profileKey"`
+	Export                      string                                     `json:"export"`
+	Required                    bool                                       `json:"required,omitempty"`
+	Receiver                    bool                                       `json:"receiver,omitempty"`
+	CanonicalParameters         []int                                      `json:"canonicalParameters"`
+	CanonicalResults            []int                                      `json:"canonicalResults"`
+	CanonicalValues             []string                                   `json:"canonicalValues,omitempty"`
+	CanonicalTypeArguments      []string                                   `json:"canonicalTypeArguments,omitempty"`
+	GuardInterfaces             []string                                   `json:"guardInterfaces,omitempty"`
+	ContractInterfaces          []string                                   `json:"contractInterfaces,omitempty"`
+	FromProviderInterfaces      []string                                   `json:"fromProviderInterfaces,omitempty"`
+	ImplementedResultInterfaces []string                                   `json:"implementedResultInterfaces,omitempty"`
+	Interfaces                  []ProviderCallableProfileInterfaceDocument `json:"interfaces"`
+	Effect                      EffectKind                                 `json:"effect"`
+	ImplementationOwner         string                                     `json:"implementationOwner"`
+	TargetFingerprint           string                                     `json:"targetFingerprint"`
 }
 
 type ProviderCallableProfileInterfaceDocument struct {
-	SourceIdentity    string                    `json:"sourceIdentity"`
-	Export            string                    `json:"export"`
-	ProviderInterface ProviderInterfaceDocument `json:"providerInterface"`
-	TargetFingerprint string                    `json:"targetFingerprint"`
+	SourceIdentity         string                             `json:"sourceIdentity"`
+	Export                 string                             `json:"export"`
+	Protocol               *ProviderProtocolInterfaceDocument `json:"protocol,omitempty"`
+	ProtocolValueParameter *int                               `json:"protocolValueParameter,omitempty"`
+	ProviderInterface      ProviderInterfaceDocument          `json:"providerInterface"`
+	TargetFingerprint      string                             `json:"targetFingerprint"`
 }
 
 type ProviderCallableProfile struct {
@@ -55,11 +63,8 @@ func newProviderCallableProfile(
 	module FacetModuleDocument,
 	profile ProviderCallableProfileDocument,
 ) ProviderCallableProfile {
-	module.Facets = nil
-	module.Representations = nil
-	module.CallableProfiles = nil
 	return ProviderCallableProfile{
-		module:  module,
+		module:  facetModuleIdentity(module),
 		profile: cloneProviderCallableProfile(profile),
 	}
 }
@@ -80,6 +85,10 @@ func (p ProviderCallableProfile) Export() string {
 	return p.profile.Export
 }
 
+func (p ProviderCallableProfile) Required() bool {
+	return p.profile.Required
+}
+
 func (p ProviderCallableProfile) Receiver() bool {
 	return p.profile.Receiver
 }
@@ -92,17 +101,33 @@ func (p ProviderCallableProfile) CanonicalResults() []int {
 	return slices.Clone(p.profile.CanonicalResults)
 }
 
+func (p ProviderCallableProfile) CanonicalValues() []string {
+	return slices.Clone(p.profile.CanonicalValues)
+}
+
+func (p ProviderCallableProfile) CanonicalTypeArguments() []string {
+	return slices.Clone(p.profile.CanonicalTypeArguments)
+}
+
 func (p ProviderCallableProfile) GuardInterfaces() []string {
 	return slices.Clone(p.profile.GuardInterfaces)
 }
 
+func (p ProviderCallableProfile) ContractInterfaces() []string {
+	return slices.Clone(p.profile.ContractInterfaces)
+}
+
+func (p ProviderCallableProfile) FromProviderInterfaces() []string {
+	return slices.Clone(p.profile.FromProviderInterfaces)
+}
+
+func (p ProviderCallableProfile) ImplementedResultInterfaces() []string {
+	return slices.Clone(p.profile.ImplementedResultInterfaces)
+}
+
 func (p ProviderCallableProfile) Interfaces() []ProviderCallableProfileInterface {
 	result := make([]ProviderCallableProfileInterface, 0, len(p.profile.Interfaces))
-	for _, identity := range p.profile.Interfaces {
-		selected, ok := p.interfaceDocument(identity)
-		if !ok {
-			return nil
-		}
+	for _, selected := range p.profile.Interfaces {
 		result = append(result, ProviderCallableProfileInterface{
 			document: cloneProviderCallableProfileInterface(selected),
 		})
@@ -113,35 +138,19 @@ func (p ProviderCallableProfile) Interfaces() []ProviderCallableProfileInterface
 func (p ProviderCallableProfile) Interface(
 	sourceIdentity string,
 ) (ProviderCallableProfileInterface, bool) {
-	if _, found := slices.BinarySearch(p.profile.Interfaces, sourceIdentity); !found {
-		return ProviderCallableProfileInterface{}, false
-	}
-	selected, found := p.interfaceDocument(sourceIdentity)
-	if !found {
-		return ProviderCallableProfileInterface{}, false
-	}
-	return ProviderCallableProfileInterface{
-		document: cloneProviderCallableProfileInterface(selected),
-	}, true
-}
-
-func (p ProviderCallableProfile) interfaceDocument(
-	sourceIdentity string,
-) (ProviderCallableProfileInterfaceDocument, bool) {
 	index, found := slices.BinarySearchFunc(
-		p.module.CallableInterfaces,
+		p.profile.Interfaces,
 		sourceIdentity,
-		func(
-			selected ProviderCallableProfileInterfaceDocument,
-			identity string,
-		) int {
+		func(selected ProviderCallableProfileInterfaceDocument, identity string) int {
 			return strings.Compare(selected.SourceIdentity, identity)
 		},
 	)
 	if !found {
-		return ProviderCallableProfileInterfaceDocument{}, false
+		return ProviderCallableProfileInterface{}, false
 	}
-	return p.module.CallableInterfaces[index], true
+	return ProviderCallableProfileInterface{
+		document: cloneProviderCallableProfileInterface(p.profile.Interfaces[index]),
+	}, true
 }
 
 func (p ProviderCallableProfile) Effect() EffectKind {
@@ -166,6 +175,23 @@ func (i ProviderCallableProfileInterface) SourceIdentity() string {
 
 func (i ProviderCallableProfileInterface) Export() string {
 	return i.document.Export
+}
+
+func (i ProviderCallableProfileInterface) Protocol() (
+	ProviderProtocolInterfaceDocument,
+	bool,
+) {
+	if i.document.Protocol == nil {
+		return ProviderProtocolInterfaceDocument{}, false
+	}
+	return cloneProviderProtocolInterface(*i.document.Protocol), true
+}
+
+func (i ProviderCallableProfileInterface) ProtocolValueParameter() (int, bool) {
+	if i.document.ProtocolValueParameter == nil {
+		return 0, false
+	}
+	return *i.document.ProtocolValueParameter, true
 }
 
 func (i ProviderCallableProfileInterface) ProviderInterface() ProviderInterface {
@@ -241,14 +267,63 @@ func BuildProviderCallableProfileKey(
 	return hex.EncodeToString(digest[:]), nil
 }
 
+func BuildImplementedResultProfileKey(
+	source []ProviderCallableProfileKeyInterface,
+	implementedResultInterfaces []string,
+) (string, error) {
+	base, err := BuildProviderCallableProfileKey(source)
+	if err != nil || len(implementedResultInterfaces) == 0 {
+		return base, err
+	}
+	if !sort.StringsAreSorted(implementedResultInterfaces) {
+		return "", &ManifestError{
+			Field:  "providerCallableProfileKey.implementedResultInterfaces",
+			Reason: "identities are not strictly ordered",
+		}
+	}
+	var payload strings.Builder
+	payload.WriteString("provider-callable-profile-implemented-results/v1\n")
+	payload.WriteString("base=")
+	payload.WriteString(base)
+	payload.WriteByte('\n')
+	previous := ""
+	for _, identity := range implementedResultInterfaces {
+		if identity == "" || identity == previous {
+			return "", &ManifestError{
+				Field:  "providerCallableProfileKey.implementedResultInterfaces",
+				Reason: "identities are empty or duplicated",
+			}
+		}
+		previous = identity
+		payload.WriteString("interface=")
+		payload.WriteString(identity)
+		payload.WriteByte('\n')
+	}
+	digest := sha256.Sum256([]byte(payload.String()))
+	return hex.EncodeToString(digest[:]), nil
+}
+
 func cloneProviderCallableProfile(
 	source ProviderCallableProfileDocument,
 ) ProviderCallableProfileDocument {
 	result := source
 	result.CanonicalParameters = slices.Clone(source.CanonicalParameters)
 	result.CanonicalResults = slices.Clone(source.CanonicalResults)
+	result.CanonicalValues = slices.Clone(source.CanonicalValues)
+	result.CanonicalTypeArguments = slices.Clone(source.CanonicalTypeArguments)
 	result.GuardInterfaces = slices.Clone(source.GuardInterfaces)
-	result.Interfaces = slices.Clone(source.Interfaces)
+	result.ContractInterfaces = slices.Clone(source.ContractInterfaces)
+	result.FromProviderInterfaces = slices.Clone(source.FromProviderInterfaces)
+	result.ImplementedResultInterfaces = slices.Clone(
+		source.ImplementedResultInterfaces,
+	)
+	result.Interfaces = make(
+		[]ProviderCallableProfileInterfaceDocument,
+		len(source.Interfaces),
+	)
+	for index, selected := range source.Interfaces {
+		result.Interfaces[index] = cloneProviderCallableProfileInterface(selected)
+	}
 	return result
 }
 
@@ -256,6 +331,14 @@ func cloneProviderCallableProfileInterface(
 	source ProviderCallableProfileInterfaceDocument,
 ) ProviderCallableProfileInterfaceDocument {
 	result := source
+	if source.Protocol != nil {
+		protocol := cloneProviderProtocolInterface(*source.Protocol)
+		result.Protocol = &protocol
+	}
+	if source.ProtocolValueParameter != nil {
+		parameter := *source.ProtocolValueParameter
+		result.ProtocolValueParameter = &parameter
+	}
 	result.ProviderInterface = cloneProviderInterface(source.ProviderInterface)
 	return result
 }

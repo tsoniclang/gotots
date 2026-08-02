@@ -1,4 +1,6 @@
+import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
+import type { GoEmptyStruct } from "@gotots/runtime/struct.js";
 import { WithCancel } from "../../../../context.js";
 import type {
   CancelFunc,
@@ -45,7 +47,8 @@ export function notifyContext(
   signals: RuntimeSlice<Signal | undefined>,
 ): [Context | undefined, NonNullable<CancelFunc>] {
   const selected = selectedSignals(signals);
-  return startNotification(parent, selected);
+  const [context, cancel] = WithCancel(parent);
+  return startNotification(context, cancel, selected);
 }
 
 export async function notifyContextAsync(
@@ -53,14 +56,19 @@ export async function notifyContextAsync(
   signals: RuntimeSlice<{ String(): Promise<string> } | undefined>,
 ): Promise<[Context | undefined, NonNullable<CancelFunc>]> {
   const selected = await selectedSignalsAsync(signals);
-  return startNotification(parent, selected);
+  const [context, cancel] = WithCancel(parent);
+  return startNotification(context, cancel, selected);
 }
 
-function startNotification(
-  parent: Context | undefined,
+interface NotificationContext {
+  Done(): GoReceiveChannel<GoEmptyStruct> | undefined;
+}
+
+export function startNotification<Value extends NotificationContext>(
+  context: Value,
+  cancel: () => Promise<void>,
   selected: readonly NodeJS.Signals[],
-): [Context | undefined, NonNullable<CancelFunc>] {
-  const [context, cancel] = WithCancel(parent);
+): [Value, () => Promise<void>] {
   let stopped = false;
 
   const stop = async (): Promise<void> => {
@@ -87,7 +95,7 @@ function startNotification(
   return [context, stop];
 }
 
-function selectedSignals(
+export function selectedSignals(
   signals: RuntimeSlice<Signal | undefined>,
 ): NodeJS.Signals[] {
   const selected: NodeJS.Signals[] = [];
@@ -107,7 +115,7 @@ function selectedSignals(
   return selected;
 }
 
-async function selectedSignalsAsync(
+export async function selectedSignalsAsync(
   signals: RuntimeSlice<{ String(): Promise<string> } | undefined>,
 ): Promise<NodeJS.Signals[]> {
   const selected: NodeJS.Signals[] = [];

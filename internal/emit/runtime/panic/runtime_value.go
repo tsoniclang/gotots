@@ -29,6 +29,16 @@ func runtimePanicValue(
 			),
 		},
 		[]tsgo.ClassElement{
+			factory.PropertyDeclaration(
+				[]tsgo.ModifierLike{
+					factory.StaticKeyword(),
+					factory.ReadonlyKeyword(),
+				},
+				factory.Identifier(interfacecontract.DynamicTypeComparable),
+				nil,
+				factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
+				factory.TrueLiteral(),
+			),
 			factory.ConstructorDeclaration(
 				nil,
 				nil,
@@ -50,9 +60,7 @@ func runtimePanicValue(
 				[]tsgo.ModifierLike{factory.ReadonlyKeyword()},
 				factory.Identifier(interfacecontract.DynamicTypeMember),
 				nil,
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindObjectKeyword,
-				),
+				interfacecontract.DynamicType(factory),
 				factory.Identifier(className),
 			),
 			factory.PropertyDeclaration(

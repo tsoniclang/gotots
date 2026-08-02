@@ -215,7 +215,7 @@ export function directoryFileSystem(root: gostring): FS {
   return new NodeDirectoryFS(root);
 }
 
-const directoryFileSystemType = Object.freeze({});
+const directoryFileSystemType = Object.freeze({ comparable: true });
 
 class NodeDirectoryFS extends ProviderInterfaceValue implements FS {
   constructor(private readonly root: string) {
@@ -244,7 +244,7 @@ class NodeDirectoryFS extends ProviderInterfaceValue implements FS {
   }
 }
 
-const fileSystemFileType = Object.freeze({});
+const fileSystemFileType = Object.freeze({ comparable: true });
 
 class NodeFileSystemFile extends ProviderInterfaceValue implements FsFile {
   constructor(
@@ -269,7 +269,7 @@ class NodeFileSystemFile extends ProviderInterfaceValue implements FsFile {
   }
 }
 
-const fileInfoType = Object.freeze({});
+const fileInfoType = Object.freeze({ comparable: true });
 
 class NodeFileInfo extends ProviderInterfaceValue implements FileInfo {
   constructor(
@@ -310,7 +310,7 @@ class NodeFileInfo extends ProviderInterfaceValue implements FileInfo {
   }
 }
 
-const directoryEntryType = Object.freeze({});
+const directoryEntryType = Object.freeze({ comparable: true });
 
 class NodeDirectoryEntry extends ProviderInterfaceValue implements DirEntry {
   constructor(

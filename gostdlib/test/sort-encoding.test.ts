@@ -21,7 +21,7 @@ import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 import { sliceValues } from "../src/internal/runtime/slice.js";
 import { Search, Sort, Stable, Strings, type Interface } from "../src/sort.js";
 
-const sortableType = Object.freeze({});
+const sortableType = Object.freeze({ comparable: true });
 
 class Sortable extends ProviderInterfaceValue implements Interface {
   constructor(readonly values: { readonly key: number; readonly label: string }[]) {

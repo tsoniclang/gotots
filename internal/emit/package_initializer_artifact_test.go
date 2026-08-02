@@ -412,6 +412,12 @@ func demandBox(values []Box) *Box {
 		t.Fatalf("committed Writer export surface = %v, %t", writerBindings, ok)
 	}
 	initialRevisions := builder.exportRevisions
+	if initialRevisions != 0 {
+		t.Fatalf(
+			"initial package export reconstructions = %d, want one batched publication",
+			initialRevisions,
+		)
+	}
 	initialFacetRevision := session.artifacts.FacetRevision(
 		builder.assemblyOwner,
 		api.ArtifactFacetImplementation,

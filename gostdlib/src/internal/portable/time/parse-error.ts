@@ -8,7 +8,7 @@ import type { gostring } from "@gotots/runtime/scalars.js";
 import { ProviderInterfaceValue } from "../io/value.js";
 import { timeQuote } from "./quote.js";
 
-const parseErrorType = Object.freeze({});
+const parseErrorType = Object.freeze({ comparable: true });
 
 export class ParseError extends ProviderInterfaceValue implements GoError {
   override readonly $go$methods: ReadonlySet<object> = new Set<object>([

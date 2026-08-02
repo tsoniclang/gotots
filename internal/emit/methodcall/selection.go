@@ -196,44 +196,21 @@ func (s Selection) RecoveryCall(
 	[]api.RootRequest,
 	error,
 ) {
-	if recovery == nil {
-		return nil, false, false, nil, invariant(
-			context,
-			"selected-method recovery invocation has no authority",
-		)
-	}
-	reference, providerOwned, err :=
-		context.Names().RecoveryCallable(s.owner)
+	invocation, err := s.ResolveRecovery(context)
 	if err != nil {
-		return nil, providerOwned, false, nil, err
+		return nil, false, false, nil, err
 	}
-	if !providerOwned {
-		call, requests, callErr := s.Call(
-			context,
-			receiver,
-			sourceArguments,
-			recovery,
-		)
-		return call, false, false, requests, callErr
-	}
-	arguments, err := s.callArguments(sourceArguments)
-	if err != nil {
-		return nil, true, reference.Cooperative(), nil, err
-	}
-	arguments = append([]tsgo.Expression{receiver}, arguments...)
-	arguments = append(arguments, recovery)
-	call := context.Factory().CallExpression(
-		reference.Expression(context.Factory()),
-		nil,
-		s.typeArguments,
-		arguments,
-		tsgo.NodeFlagsNone,
+	call, requests, err := invocation.Call(
+		context,
+		receiver,
+		sourceArguments,
+		recovery,
 	)
 	return call,
-		true,
-		reference.Cooperative(),
-		api.CombineRequests(s.Requests(), reference.Requests()),
-		nil
+		invocation.Provider(),
+		invocation.Cooperative(),
+		requests,
+		err
 }
 
 func (s Selection) callArguments(

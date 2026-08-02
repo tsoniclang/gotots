@@ -13,6 +13,7 @@ import (
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -257,7 +258,19 @@ func genericOperationParameterIdentity(
 }
 
 func (s *programSession) ObserveCooperativeCallable(
+	context api.Context,
+	facet api.CallableFacet,
+) (api.CooperativeCallableObservation, error) {
+	return s.observeCooperativeCallable(
+		context.ArtifactOwner(),
+		&context,
+		facet,
+	)
+}
+
+func (s *programSession) observeCooperativeCallable(
 	consumer api.ArtifactOwner,
+	context *api.Context,
 	facet api.CallableFacet,
 ) (api.CooperativeCallableObservation, error) {
 	if !consumer.Valid() || !facet.Valid() {
@@ -284,6 +297,24 @@ func (s *programSession) ObserveCooperativeCallable(
 		s.source.EnvironmentForTypes(source.Pkg()) != nil {
 		function, callable := source.(*types.Func)
 		if callable {
+			var profileRequests []api.RootRequest
+			if context != nil && function.Signature().Recv() != nil {
+				effect, selected, requests, err :=
+					providerboundary.ResolveStatefulMethodEffect(
+						*context,
+						function,
+					)
+				if err != nil {
+					return api.CooperativeCallableObservation{}, err
+				}
+				profileRequests = requests
+				if selected {
+					return api.NewCooperativeCallableObservation(
+						effect == gostdlib.EffectAsynchronous,
+						profileRequests...,
+					)
+				}
+			}
 			effect, providerOwned, err :=
 				s.registry.ProviderCallableEffect(function)
 			if err != nil {
@@ -292,6 +323,7 @@ func (s *programSession) ObserveCooperativeCallable(
 			if providerOwned {
 				return api.NewCooperativeCallableObservation(
 					effect == gostdlib.EffectAsynchronous,
+					profileRequests...,
 				)
 			}
 		}

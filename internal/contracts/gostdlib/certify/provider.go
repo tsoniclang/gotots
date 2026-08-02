@@ -51,8 +51,14 @@ func verifyPackageModules(
 	seeds []moduleSeed,
 	facets []facetSeed,
 	profiles []providerCallableProfileSeed,
+	statefulProfiles []providerStatefulProfileSeed,
+	providerInterfaces []providerInterfaceSeed,
 ) error {
-	expected := make(map[string]packageExport, len(seeds)+len(facets)+len(profiles))
+	expected := make(
+		map[string]packageExport,
+		len(seeds)+len(facets)+len(profiles)+len(statefulProfiles)+
+			len(providerInterfaces),
+	)
 	for _, seed := range seeds {
 		subpath, ok := providerSubpath(seed.Specifier)
 		if !ok {
@@ -94,6 +100,44 @@ func verifyPackageModules(
 		}
 		if existing, duplicate := expected[subpath]; duplicate && existing != want {
 			return certifyError("verify package exports", subpath, "profile module is inconsistent")
+		}
+		expected[subpath] = want
+	}
+	for _, seed := range statefulProfiles {
+		subpath, ok := providerSubpath(seed.Specifier)
+		if !ok {
+			return certifyError("verify package exports", seed.Specifier, "specifier is invalid")
+		}
+		base := strings.TrimSuffix(seed.SourcePath, ".ts")
+		want := packageExport{
+			Types:   "./dist/" + base + ".d.ts",
+			Default: "./dist/" + base + ".js",
+		}
+		if existing, duplicate := expected[subpath]; duplicate && existing != want {
+			return certifyError(
+				"verify package exports",
+				subpath,
+				"stateful-profile module is inconsistent",
+			)
+		}
+		expected[subpath] = want
+	}
+	for _, seed := range providerInterfaces {
+		subpath, ok := providerSubpath(seed.Specifier)
+		if !ok {
+			return certifyError("verify package exports", seed.Specifier, "specifier is invalid")
+		}
+		base := strings.TrimSuffix(seed.SourcePath, ".ts")
+		want := packageExport{
+			Types:   "./dist/" + base + ".d.ts",
+			Default: "./dist/" + base + ".js",
+		}
+		if existing, duplicate := expected[subpath]; duplicate && existing != want {
+			return certifyError(
+				"verify package exports",
+				subpath,
+				"provider-interface module is inconsistent",
+			)
 		}
 		expected[subpath] = want
 	}

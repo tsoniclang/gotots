@@ -20,6 +20,7 @@ const (
 	GeneratedArtifactInterfaceMethodCallable
 	GeneratedArtifactPointerRepresentation
 	GeneratedArtifactProviderInterfaceBridge
+	GeneratedArtifactProviderStatefulRepresentation
 )
 
 func (k GeneratedArtifactKind) Valid() bool {
@@ -33,7 +34,8 @@ func (k GeneratedArtifactKind) Valid() bool {
 		k == GeneratedArtifactCallableABI ||
 		k == GeneratedArtifactInterfaceMethodCallable ||
 		k == GeneratedArtifactPointerRepresentation ||
-		k == GeneratedArtifactProviderInterfaceBridge
+		k == GeneratedArtifactProviderInterfaceBridge ||
+		k == GeneratedArtifactProviderStatefulRepresentation
 }
 
 type GeneratedArtifactPlacement uint8
@@ -369,6 +371,18 @@ func (o *GeneratedArtifact) ProviderInterfaceBridgeType() (*types.Named, bool) {
 	return source, interfaceType && source.Obj() != nil
 }
 
+func (o *GeneratedArtifact) ProviderStatefulRepresentationType() (*types.Named, bool) {
+	if o == nil || o.kind != GeneratedArtifactProviderStatefulRepresentation {
+		return nil, false
+	}
+	source, ok := types.Unalias(o.sourceType).(*types.Named)
+	if !ok || source.Obj() == nil {
+		return nil, false
+	}
+	_, interfaceType := source.Underlying().(*types.Interface)
+	return source, !interfaceType
+}
+
 func (o *GeneratedArtifact) ArtifactKey() string {
 	if o == nil {
 		return ""
@@ -507,6 +521,13 @@ func validGeneratedArtifactType(
 		}
 		contract, ok := source.Underlying().(*types.Interface)
 		return ok && contract.Complete().IsMethodSet()
+	case GeneratedArtifactProviderStatefulRepresentation:
+		source, ok := types.Unalias(sourceType).(*types.Named)
+		if !ok || source.Obj() == nil {
+			return false
+		}
+		_, interfaceType := source.Underlying().(*types.Interface)
+		return !interfaceType
 	default:
 		return false
 	}

@@ -9,11 +9,21 @@ import (
 	"strings"
 )
 
-func ToolchainKey(version string, goos string, goarch string) (string, error) {
-	if version == "" || goos == "" || goarch == "" {
+func ToolchainKey(profile BuildProfile) (string, error) {
+	if !profile.Valid() {
 		return "", &ContractError{Reason: "toolchain identity is incomplete"}
 	}
-	digest := sha256.Sum256([]byte(version + "\x00" + goos + "\x00" + goarch))
+	cgo := "0"
+	if profile.CgoEnabled() {
+		cgo = "1"
+	}
+	digest := sha256.Sum256([]byte(
+		profile.ToolchainVersion() + "\x00" +
+			profile.GOOS() + "\x00" +
+			profile.GOARCH() + "\x00" +
+			cgo + "\x00" +
+			strings.Join(profile.Tags(), "\x00"),
+	))
 	return hex.EncodeToString(digest[:]), nil
 }
 

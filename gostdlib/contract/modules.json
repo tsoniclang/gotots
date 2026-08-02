@@ -4,6 +4,7 @@
     { "goImportPath": "bufio", "specifier": "@gotots/gostdlib/bufio.js", "sourcePath": "src/bufio.ts" },
     { "goImportPath": "bytes", "specifier": "@gotots/gostdlib/bytes.js", "sourcePath": "src/bytes.ts" },
     { "goImportPath": "cmp", "specifier": "@gotots/gostdlib/cmp.js", "sourcePath": "src/cmp.ts" },
+    { "goImportPath": "compress/flate", "specifier": "@gotots/gostdlib/compress/flate.js", "sourcePath": "src/compress/flate.ts" },
     { "goImportPath": "compress/gzip", "specifier": "@gotots/gostdlib/compress/gzip.js", "sourcePath": "src/compress/gzip.ts" },
     { "goImportPath": "context", "specifier": "@gotots/gostdlib/context.js", "sourcePath": "src/context.ts" },
     { "goImportPath": "encoding", "specifier": "@gotots/gostdlib/encoding.js", "sourcePath": "src/encoding.ts" },

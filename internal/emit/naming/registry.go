@@ -102,6 +102,11 @@ type providerInterfaceBridgeBinding struct {
 	name  string
 }
 
+type providerStatefulRepresentationBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
 type interfaceContractDemand struct {
 	source *types.Interface
 	target *types.Interface
@@ -127,73 +132,77 @@ type Target struct {
 }
 
 type Registry struct {
-	provider                     standardLibraryProvider
-	providerImportNameByModule   map[string]string
-	byObject                     map[types.Object]targetBinding
-	memberNameByObject           map[*types.Var]string
-	packageVariables             map[*types.Var]packageVariableBinding
-	assemblyPathByPackage        map[*types.Package]string
-	importQualifierByPackage     map[*types.Package]string
-	anonymousStructs             map[string]anonymousStructBinding
-	anonymousStructNames         map[string]string
-	mapSpecializations           map[string]mapSpecializationBinding
-	mapSpecializationNames       map[string]string
-	interfaceAdapters            map[string]interfaceAdapterBinding
-	interfaceAdapterNames        map[string]string
-	anonymousInterfaces          map[string]anonymousInterfaceBinding
-	anonymousInterfaceNames      map[string]string
-	interfaceMethodCallables     map[string]interfaceMethodCallableBinding
-	interfaceMethodCallableNames map[string]string
-	interfaceMethodTokens        map[string]interfaceMethodTokenBinding
-	interfaceMethodNames         map[string]string
-	interfaceDynamicTypes        map[string]interfaceDynamicTypeTokenBinding
-	interfaceDynamicNames        map[string]string
-	providerInterfaceBridges     map[string]providerInterfaceBridgeBinding
-	providerInterfaceBridgeNames map[string]string
-	providerObjectByIdentity     map[string]types.Object
-	interfaceContracts           map[string]*types.Interface
-	interfaceAdaptersByContract  map[string]map[string]struct{}
-	interfaceContractDemands     map[string]map[string]interfaceContractDemand
-	genericCapabilities          map[string]genericCapabilityBinding
-	genericCapabilityNames       map[string]string
-	callableABIs                 map[string]callableABIBinding
-	callableABINames             map[string]string
-	pointerRepresentations       map[string]pointerRepresentationBinding
+	provider                            standardLibraryProvider
+	providerImportNameByModule          map[string]string
+	byObject                            map[types.Object]targetBinding
+	memberNameByObject                  map[*types.Var]string
+	packageVariables                    map[*types.Var]packageVariableBinding
+	assemblyPathByPackage               map[*types.Package]string
+	importQualifierByPackage            map[*types.Package]string
+	anonymousStructs                    map[string]anonymousStructBinding
+	anonymousStructNames                map[string]string
+	mapSpecializations                  map[string]mapSpecializationBinding
+	mapSpecializationNames              map[string]string
+	interfaceAdapters                   map[string]interfaceAdapterBinding
+	interfaceAdapterNames               map[string]string
+	anonymousInterfaces                 map[string]anonymousInterfaceBinding
+	anonymousInterfaceNames             map[string]string
+	interfaceMethodCallables            map[string]interfaceMethodCallableBinding
+	interfaceMethodCallableNames        map[string]string
+	interfaceMethodTokens               map[string]interfaceMethodTokenBinding
+	interfaceMethodNames                map[string]string
+	interfaceDynamicTypes               map[string]interfaceDynamicTypeTokenBinding
+	interfaceDynamicNames               map[string]string
+	providerInterfaceBridges            map[string]providerInterfaceBridgeBinding
+	providerInterfaceBridgeNames        map[string]string
+	providerStatefulRepresentations     map[string]providerStatefulRepresentationBinding
+	providerStatefulRepresentationNames map[string]string
+	providerObjectByIdentity            map[string]types.Object
+	interfaceContracts                  map[string]*types.Interface
+	interfaceAdaptersByContract         map[string]map[string]struct{}
+	interfaceContractDemands            map[string]map[string]interfaceContractDemand
+	genericCapabilities                 map[string]genericCapabilityBinding
+	genericCapabilityNames              map[string]string
+	callableABIs                        map[string]callableABIBinding
+	callableABINames                    map[string]string
+	pointerRepresentations              map[string]pointerRepresentationBinding
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
-		byObject:                     make(map[types.Object]targetBinding),
-		providerImportNameByModule:   make(map[string]string),
-		memberNameByObject:           make(map[*types.Var]string),
-		packageVariables:             make(map[*types.Var]packageVariableBinding),
-		assemblyPathByPackage:        make(map[*types.Package]string),
-		importQualifierByPackage:     make(map[*types.Package]string),
-		anonymousStructs:             make(map[string]anonymousStructBinding),
-		anonymousStructNames:         make(map[string]string),
-		mapSpecializations:           make(map[string]mapSpecializationBinding),
-		mapSpecializationNames:       make(map[string]string),
-		interfaceAdapters:            make(map[string]interfaceAdapterBinding),
-		interfaceAdapterNames:        make(map[string]string),
-		anonymousInterfaces:          make(map[string]anonymousInterfaceBinding),
-		anonymousInterfaceNames:      make(map[string]string),
-		interfaceMethodCallables:     make(map[string]interfaceMethodCallableBinding),
-		interfaceMethodCallableNames: make(map[string]string),
-		interfaceMethodTokens:        make(map[string]interfaceMethodTokenBinding),
-		interfaceMethodNames:         make(map[string]string),
-		interfaceDynamicTypes:        make(map[string]interfaceDynamicTypeTokenBinding),
-		interfaceDynamicNames:        make(map[string]string),
-		providerInterfaceBridges:     make(map[string]providerInterfaceBridgeBinding),
-		providerInterfaceBridgeNames: make(map[string]string),
-		providerObjectByIdentity:     make(map[string]types.Object),
-		interfaceContracts:           make(map[string]*types.Interface),
-		interfaceAdaptersByContract:  make(map[string]map[string]struct{}),
-		interfaceContractDemands:     make(map[string]map[string]interfaceContractDemand),
-		genericCapabilities:          make(map[string]genericCapabilityBinding),
-		genericCapabilityNames:       make(map[string]string),
-		callableABIs:                 make(map[string]callableABIBinding),
-		callableABINames:             make(map[string]string),
-		pointerRepresentations:       make(map[string]pointerRepresentationBinding),
+		byObject:                            make(map[types.Object]targetBinding),
+		providerImportNameByModule:          make(map[string]string),
+		memberNameByObject:                  make(map[*types.Var]string),
+		packageVariables:                    make(map[*types.Var]packageVariableBinding),
+		assemblyPathByPackage:               make(map[*types.Package]string),
+		importQualifierByPackage:            make(map[*types.Package]string),
+		anonymousStructs:                    make(map[string]anonymousStructBinding),
+		anonymousStructNames:                make(map[string]string),
+		mapSpecializations:                  make(map[string]mapSpecializationBinding),
+		mapSpecializationNames:              make(map[string]string),
+		interfaceAdapters:                   make(map[string]interfaceAdapterBinding),
+		interfaceAdapterNames:               make(map[string]string),
+		anonymousInterfaces:                 make(map[string]anonymousInterfaceBinding),
+		anonymousInterfaceNames:             make(map[string]string),
+		interfaceMethodCallables:            make(map[string]interfaceMethodCallableBinding),
+		interfaceMethodCallableNames:        make(map[string]string),
+		interfaceMethodTokens:               make(map[string]interfaceMethodTokenBinding),
+		interfaceMethodNames:                make(map[string]string),
+		interfaceDynamicTypes:               make(map[string]interfaceDynamicTypeTokenBinding),
+		interfaceDynamicNames:               make(map[string]string),
+		providerInterfaceBridges:            make(map[string]providerInterfaceBridgeBinding),
+		providerInterfaceBridgeNames:        make(map[string]string),
+		providerStatefulRepresentations:     make(map[string]providerStatefulRepresentationBinding),
+		providerStatefulRepresentationNames: make(map[string]string),
+		providerObjectByIdentity:            make(map[string]types.Object),
+		interfaceContracts:                  make(map[string]*types.Interface),
+		interfaceAdaptersByContract:         make(map[string]map[string]struct{}),
+		interfaceContractDemands:            make(map[string]map[string]interfaceContractDemand),
+		genericCapabilities:                 make(map[string]genericCapabilityBinding),
+		genericCapabilityNames:              make(map[string]string),
+		callableABIs:                        make(map[string]callableABIBinding),
+		callableABINames:                    make(map[string]string),
+		pointerRepresentations:              make(map[string]pointerRepresentationBinding),
 	}
 }
 
@@ -259,6 +268,9 @@ func (r *Registry) GeneratedArtifact(
 	case api.GeneratedArtifactProviderInterfaceBridge:
 		binding, ok := r.providerInterfaceBridges[artifactKey]
 		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactProviderStatefulRepresentation:
+		binding, ok := r.providerStatefulRepresentations[artifactKey]
+		return binding.owner, ok && binding.owner != nil
 	case api.GeneratedArtifactGenericCapability:
 		binding, ok := r.genericCapabilities[artifactKey]
 		return binding.owner, ok && binding.owner != nil
@@ -311,6 +323,10 @@ func (r *Registry) GeneratedArtifacts(
 		}
 	case api.GeneratedArtifactProviderInterfaceBridge:
 		for _, binding := range r.providerInterfaceBridges {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactProviderStatefulRepresentation:
+		for _, binding := range r.providerStatefulRepresentations {
 			artifacts = append(artifacts, binding.owner)
 		}
 	case api.GeneratedArtifactGenericCapability:

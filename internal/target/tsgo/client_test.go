@@ -10,6 +10,10 @@ import (
 )
 
 func TestNativePrintNodeRoundTrip(t *testing.T) {
+	t.Setenv("GOOS", "js")
+	t.Setenv("GOARCH", "wasm")
+	t.Setenv("CGO_ENABLED", "1")
+	t.Setenv("GOFLAGS", "-tags=ambientmustnotselect")
 	workingDirectory := t.TempDir()
 	client, err := StartClient(repositoryRoot(), workingDirectory)
 	if err != nil {

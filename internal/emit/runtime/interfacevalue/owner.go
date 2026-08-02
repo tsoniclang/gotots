@@ -280,9 +280,7 @@ func valueContract(
 				},
 				factory.Identifier(interfacecontract.DynamicTypeMember),
 				nil,
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindObjectKeyword,
-				),
+				interfacecontract.DynamicType(factory),
 				nil,
 			),
 			factory.PropertyDeclaration(

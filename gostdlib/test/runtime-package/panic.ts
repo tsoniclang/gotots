@@ -16,9 +16,12 @@ export class GoPanic {
     }
 }
 export class GoRuntimePanicValue implements GoInterfaceValue {
+    static readonly comparable: boolean = true;
     constructor(public readonly message: string) {
     }
-    readonly $go$type: object = GoRuntimePanicValue;
+    readonly $go$type: {
+        readonly comparable: boolean;
+    } = GoRuntimePanicValue;
     readonly $go$methods: ReadonlySet<object> = new Set<object>([GoErrorMethodToken, GoRuntimeErrorMethodToken]);
     $go$implements(contract: readonly object[]): boolean {
         return contract.every((token: object): boolean => this.$go$methods.has(token));

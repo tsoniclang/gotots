@@ -414,6 +414,13 @@ func NewProviderInterfaceBridgeRequest(
 	return generatedDefinitionRequest(requirement, err)
 }
 
+func NewProviderStatefulRepresentationRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewProviderStatefulRepresentationRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
 func generatedDefinitionRequest(
 	requirement DeclarationRequirement,
 	err error,

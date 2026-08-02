@@ -114,8 +114,24 @@ func toMethod(
 	providerType api.NameReference,
 	canonicalType string,
 	panicName string,
+	directProviderUse bool,
 ) tsgo.MethodDeclaration {
 	value := factory.Identifier("value")
+	var finalReturn tsgo.Statement
+	if directProviderUse {
+		finalReturn = factory.ReturnStatement(value)
+	} else {
+		finalReturn = factory.ReturnStatement(
+			panicruntime.Call(
+				factory,
+				panicName,
+				factory.StringLiteral(
+					"provider interface received a foreign implementation",
+					tsgo.TokenFlagsNone,
+				),
+			),
+		)
+	}
 	return factory.MethodDeclaration(
 		[]tsgo.ModifierLike{factory.StaticKeyword()},
 		nil,
@@ -171,16 +187,7 @@ func toMethod(
 					),
 					nil,
 				),
-				factory.ReturnStatement(
-					panicruntime.Call(
-						factory,
-						panicName,
-						factory.StringLiteral(
-							"provider interface received a foreign implementation",
-							tsgo.TokenFlagsNone,
-						),
-					),
-				),
+				finalReturn,
 			},
 			true,
 		),

@@ -498,6 +498,14 @@ func drainProgramSession(t *testing.T, session *programSession) {
 			}
 			continue
 		}
+		if builders := session.packageExports.nextBatch(); len(builders) != 0 {
+			for _, builder := range builders {
+				if err := session.publishPackageExports(builder); err != nil {
+					t.Fatal(err)
+				}
+			}
+			continue
+		}
 		if owner, requirements, removed, ok :=
 			session.requirements.nextBatch(); ok {
 			if err := session.applyDeclarationRequirements(

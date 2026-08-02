@@ -22,6 +22,7 @@ const contextSurface: Same<
   keyof typeof context,
   | "AfterFunc"
   | "Background"
+  | "Cause"
   | "state"
   | "TODO"
   | "WithCancel"

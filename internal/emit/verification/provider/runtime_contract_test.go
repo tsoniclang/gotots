@@ -91,8 +91,9 @@ func ReflectType(value any) reflect.Type { return reflect.TypeOf(value) }
 func Identity(value int) int { return value }
 `)
 	program, err := load.Load(context.Background(), load.Request{
-		Directory: project,
-		Pattern:   ".",
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
 	})
 	if err != nil {
 		t.Fatal(err)

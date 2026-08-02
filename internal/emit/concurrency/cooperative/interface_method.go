@@ -27,6 +27,28 @@ func InterfaceMethodContract(
 	return observations.any, observations.requests, nil
 }
 
+func ElevateInterfaceMethodContract(
+	context api.Context,
+	reference api.InterfaceMethodCallableReference,
+) ([]api.RootRequest, error) {
+	observations, err := observeInterfaceMethods(
+		context,
+		[]api.InterfaceMethodCallableReference{reference},
+	)
+	if err != nil {
+		return nil, err
+	}
+	requests := observations.requests
+	for _, facet := range observations.facets {
+		request, err := api.NewCooperativeCallableRequest(facet)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, request)
+	}
+	return api.CombineRequests(requests), nil
+}
+
 func ProviderInterfaceMethodContracts(
 	context api.Context,
 	provider api.CallableFacet,

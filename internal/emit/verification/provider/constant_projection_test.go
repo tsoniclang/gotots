@@ -27,8 +27,9 @@ func MaximumUnsigned() uint64 { return math.MaxUint64 }
 func MaximumFloat() float64 { return math.MaxFloat64 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
-		Directory: project,
-		Pattern:   ".",
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
 	})
 	if err != nil {
 		t.Fatal(err)

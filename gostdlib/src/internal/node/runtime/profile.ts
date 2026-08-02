@@ -11,6 +11,21 @@ export interface CpuSample {
   readonly cpuAtStart: number;
 }
 
+export const ProfileNameKey: unique symbol = Symbol("gotots.pprof.profile-name");
+
+export interface ProfileIdentity {
+  readonly [ProfileNameKey]: string;
+}
+
+type CpuProfileWrite = (content: Uint8Array) => Promise<void>;
+
+interface CpuProfileSession {
+  readonly sample: CpuSample;
+  readonly write: CpuProfileWrite;
+}
+
+let activeCpuProfile: CpuProfileSession | undefined;
+
 export function startCpuSample(): CpuSample {
   return {
     startedAt: Date.now(),
@@ -25,6 +40,25 @@ export function finishCpuSample(sample: CpuSample): Uint8Array {
     stoppedAt,
     Math.max(0, cpuSeconds() - sample.cpuAtStart),
   );
+}
+
+export function beginCpuProfile(write: CpuProfileWrite): boolean {
+  if (activeCpuProfile !== undefined) {
+    return false;
+  }
+  activeCpuProfile = {
+    sample: startCpuSample(),
+    write,
+  };
+  return true;
+}
+
+export async function finishCpuProfile(): Promise<void> {
+  const session = activeCpuProfile;
+  activeCpuProfile = undefined;
+  if (session !== undefined) {
+    await session.write(finishCpuSample(session.sample));
+  }
 }
 
 export function profileSnapshot(name: string): Uint8Array {

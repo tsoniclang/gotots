@@ -213,76 +213,182 @@ export function NewEncoder(
   return new Base64Encoder(encoding, writer);
 }
 
-class Base64Encoder extends ProviderInterfaceValue implements WriteCloser {
-  private readonly pending: uint8[] = [];
-  private failure: GoError | undefined;
-
-  constructor(
-    private readonly encoding: Encoding | undefined,
-    private readonly writer: Writer | undefined,
-  ) {
-    super(Base64Encoder);
+export type Base64EncoderStep<Result, Failure> =
+  | {
+    readonly kind: "done";
+    readonly result: Result;
   }
+  | {
+    readonly kind: "write";
+    readonly output: RuntimeSlice<uint8>;
+    readonly resume: (
+      failure: Failure | undefined,
+    ) => Base64EncoderStep<Result, Failure>;
+  };
 
-  Write(source: RuntimeSlice<uint8>): [int64, GoError | undefined] {
-    if (this.failure !== undefined) {
-      return [0, this.failure];
+export class Base64EncoderState<Failure> {
+  readonly #pending: uint8[] = [];
+  #failure: Failure | undefined;
+
+  constructor(private readonly encoding: Encoding | undefined) {}
+
+  beginWrite(
+    source: RuntimeSlice<uint8>,
+  ): Base64EncoderStep<[int64, Failure | undefined], Failure> {
+    if (this.#failure !== undefined) {
+      return done([0, this.#failure]);
     }
     const values = sliceValues(source);
     let consumed = 0;
-    if (this.pending.length > 0) {
-      while (consumed < values.length && this.pending.length < 3) {
-        this.pending.push(values[consumed] ?? 0);
+    if (this.#pending.length > 0) {
+      while (consumed < values.length && this.#pending.length < 3) {
+        this.#pending.push(values[consumed] ?? 0);
         consumed += 1;
       }
-      if (this.pending.length < 3) {
-        return [consumed, undefined];
+      if (this.#pending.length < 3) {
+        return done([consumed, undefined]);
       }
-      const encoded = Encoding.EncodeToString(
-        this.encoding,
-        byteSlice(this.pending),
-      );
-      const [, error] = requireWriter(this.writer).Write(byteSlice(byteCodes(encoded)));
-      if (error !== undefined) {
-        this.failure = error;
-        return [consumed, error];
-      }
-      this.pending.length = 0;
+      const output = this.#encode(this.#pending);
+      return write(output, (failure) => {
+        if (failure !== undefined) {
+          return this.#failWrite(consumed, failure);
+        }
+        this.#pending.length = 0;
+        return this.#writeInterior(values, consumed);
+      });
     }
+    return this.#writeInterior(values, consumed);
+  }
 
-    const completeLength = Math.floor((values.length - consumed) / 3) * 3;
-    if (completeLength > 0) {
-      const complete = values.slice(consumed, consumed + completeLength);
-      const encoded = Encoding.EncodeToString(this.encoding, byteSlice(complete));
-      const [, error] = requireWriter(this.writer).Write(byteSlice(byteCodes(encoded)));
-      if (error !== undefined) {
-        this.failure = error;
-        return [consumed, error];
-      }
-      consumed += completeLength;
+  beginClose(): Base64EncoderStep<Failure | undefined, Failure> {
+    if (this.#failure !== undefined || this.#pending.length === 0) {
+      return done(this.#failure);
     }
+    const output = this.#encode(this.#pending);
+    return write(output, (failure) => {
+      this.#failure = failure;
+      this.#pending.length = 0;
+      return done(failure);
+    });
+  }
+
+  #writeInterior(
+    values: readonly uint8[],
+    consumed: number,
+  ): Base64EncoderStep<[int64, Failure | undefined], Failure> {
+    const completeLength = Math.min(
+      Math.floor((values.length - consumed) / 3) * 3,
+      768,
+    );
+    if (completeLength === 0) {
+      return this.#finishWrite(values, consumed);
+    }
+    const output = this.#encode(
+      values.slice(consumed, consumed + completeLength),
+    );
+    return write(output, (failure) => {
+      if (failure !== undefined) {
+        return this.#failWrite(consumed, failure);
+      }
+      return this.#writeInterior(values, consumed + completeLength);
+    });
+  }
+
+  #finishWrite(
+    values: readonly uint8[],
+    consumed: number,
+  ): Base64EncoderStep<[int64, Failure | undefined], Failure> {
     while (consumed < values.length) {
-      this.pending.push(values[consumed] ?? 0);
+      this.#pending.push(values[consumed] ?? 0);
       consumed += 1;
     }
-    return [consumed, undefined];
+    return done([consumed, undefined]);
+  }
+
+  #failWrite(
+    consumed: number,
+    failure: Failure,
+  ): Base64EncoderStep<[int64, Failure | undefined], Failure> {
+    this.#failure = failure;
+    return done([consumed, failure]);
+  }
+
+  #encode(source: readonly uint8[]): RuntimeSlice<uint8> {
+    return byteSlice(byteCodes(Encoding.EncodeToString(
+      this.encoding,
+      byteSlice(source),
+    )));
+  }
+}
+
+export function runBase64EncoderSync<Result, Failure>(
+  initial: Base64EncoderStep<Result, Failure>,
+  writeOutput: (
+    output: RuntimeSlice<uint8>,
+  ) => [int64, Failure | undefined],
+): Result {
+  let current = initial;
+  while (current.kind === "write") {
+    const result = writeOutput(current.output);
+    current = current.resume(result[1]);
+  }
+  return current.result;
+}
+
+export async function runBase64EncoderAsync<Result, Failure>(
+  initial: Base64EncoderStep<Result, Failure>,
+  writeOutput: (
+    output: RuntimeSlice<uint8>,
+  ) => Promise<[int64, Failure | undefined]>,
+): Promise<Result> {
+  let current = initial;
+  while (current.kind === "write") {
+    const result = await writeOutput(current.output);
+    current = current.resume(result[1]);
+  }
+  return current.result;
+}
+
+class Base64Encoder extends ProviderInterfaceValue implements WriteCloser {
+  static readonly comparable = true;
+  readonly #state: Base64EncoderState<GoError>;
+
+  constructor(
+    encoding: Encoding | undefined,
+    private readonly writer: Writer | undefined,
+  ) {
+    super(Base64Encoder);
+    this.#state = new Base64EncoderState(encoding);
+  }
+
+  Write(source: RuntimeSlice<uint8>): [int64, GoError | undefined] {
+    return runBase64EncoderSync(
+      this.#state.beginWrite(source),
+      (output) => requireWriter(this.writer).Write(output),
+    );
   }
 
   Close(): GoError | undefined {
-    if (this.failure !== undefined) {
-      return this.failure;
-    }
-    if (this.pending.length > 0) {
-      const encoded = Encoding.EncodeToString(
-        this.encoding,
-        byteSlice(this.pending),
-      );
-      const [, error] = requireWriter(this.writer).Write(byteSlice(byteCodes(encoded)));
-      this.failure = error;
-      this.pending.length = 0;
-    }
-    return this.failure;
+    return runBase64EncoderSync(
+      this.#state.beginClose(),
+      (output) => requireWriter(this.writer).Write(output),
+    );
   }
+}
+
+function done<Result, Failure>(
+  result: Result,
+): Base64EncoderStep<Result, Failure> {
+  return { kind: "done", result };
+}
+
+function write<Result, Failure>(
+  output: RuntimeSlice<uint8>,
+  resume: (
+    failure: Failure | undefined,
+  ) => Base64EncoderStep<Result, Failure>,
+): Base64EncoderStep<Result, Failure> {
+  return { kind: "write", output, resume };
 }
 
 function requireEncoding(encoding: Encoding | undefined): Encoding {

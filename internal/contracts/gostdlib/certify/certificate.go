@@ -148,6 +148,15 @@ func (c *Certificate) ProviderRepresentation(
 	return c.manifest.ProviderRepresentation(module, export)
 }
 
+func (c *Certificate) ProviderInterface(
+	sourceIdentity string,
+) (gostdlib.ProviderInterfaceBinding, bool) {
+	if !c.Valid() {
+		return gostdlib.ProviderInterfaceBinding{}, false
+	}
+	return c.manifest.ProviderInterface(sourceIdentity)
+}
+
 func (c *Certificate) ProviderCallableProfile(
 	sourceIdentity string,
 	profileKey string,
@@ -165,4 +174,23 @@ func (c *Certificate) ProviderCallableProfiles(
 		return nil
 	}
 	return c.manifest.ProviderCallableProfiles(sourceIdentity)
+}
+
+func (c *Certificate) ProviderStatefulProfile(
+	sourceIdentity string,
+	profileKey string,
+) (gostdlib.ProviderStatefulProfile, bool) {
+	if !c.Valid() {
+		return gostdlib.ProviderStatefulProfile{}, false
+	}
+	return c.manifest.ProviderStatefulProfile(sourceIdentity, profileKey)
+}
+
+func (c *Certificate) ProviderStatefulProfiles(
+	sourceIdentity string,
+) []gostdlib.ProviderStatefulProfile {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.ProviderStatefulProfiles(sourceIdentity)
 }

@@ -36,10 +36,10 @@ import {
 import { state as ioState } from "../src/io.js";
 import { Time } from "../src/time.js";
 
-const infoType = Object.freeze({});
-const entryType = Object.freeze({});
-const fileType = Object.freeze({});
-const fileSystemType = Object.freeze({});
+const infoType = Object.freeze({ comparable: true });
+const entryType = Object.freeze({ comparable: true });
+const fileType = Object.freeze({ comparable: true });
+const fileSystemType = Object.freeze({ comparable: true });
 
 class TestInfo extends ProviderInterfaceValue implements FileInfo {
   constructor(

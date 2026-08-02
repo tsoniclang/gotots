@@ -74,12 +74,13 @@ func (k EffectKind) Valid() bool {
 }
 
 type FacetModuleDocument struct {
-	Specifier          string                                     `json:"specifier"`
-	SourcePath         string                                     `json:"sourcePath"`
-	Representations    []ProviderRepresentationDocument           `json:"representations,omitempty"`
-	CallableInterfaces []ProviderCallableProfileInterfaceDocument `json:"callableInterfaces,omitempty"`
-	CallableProfiles   []ProviderCallableProfileDocument          `json:"callableProfiles,omitempty"`
-	Facets             []FacetDocument                            `json:"facets"`
+	Specifier          string                             `json:"specifier"`
+	SourcePath         string                             `json:"sourcePath"`
+	Representations    []ProviderRepresentationDocument   `json:"representations,omitempty"`
+	ProviderInterfaces []ProviderInterfaceBindingDocument `json:"providerInterfaces,omitempty"`
+	CallableProfiles   []ProviderCallableProfileDocument  `json:"callableProfiles,omitempty"`
+	StatefulProfiles   []ProviderStatefulProfileDocument  `json:"statefulProfiles,omitempty"`
+	Facets             []FacetDocument                    `json:"facets"`
 }
 
 type ProviderRepresentationDocument struct {
@@ -131,6 +132,13 @@ type FacetModule struct {
 	document FacetModuleDocument
 }
 
+func facetModuleIdentity(source FacetModuleDocument) FacetModuleDocument {
+	return FacetModuleDocument{
+		Specifier:  source.Specifier,
+		SourcePath: source.SourcePath,
+	}
+}
+
 func (m FacetModule) Specifier() string {
 	return m.document.Specifier
 }
@@ -155,6 +163,14 @@ func (m FacetModule) Representations() []ProviderRepresentation {
 	return result
 }
 
+func (m FacetModule) ProviderInterfaces() []ProviderInterfaceBinding {
+	result := make([]ProviderInterfaceBinding, len(m.document.ProviderInterfaces))
+	for index, selected := range m.document.ProviderInterfaces {
+		result[index] = newProviderInterfaceBinding(m.document, selected)
+	}
+	return result
+}
+
 func (m FacetModule) CallableProfiles() []ProviderCallableProfile {
 	result := make([]ProviderCallableProfile, len(m.document.CallableProfiles))
 	for index, profile := range m.document.CallableProfiles {
@@ -163,27 +179,32 @@ func (m FacetModule) CallableProfiles() []ProviderCallableProfile {
 	return result
 }
 
-func (m FacetModule) CallableInterfaces() []ProviderCallableProfileInterface {
-	result := make(
-		[]ProviderCallableProfileInterface,
-		len(m.document.CallableInterfaces),
-	)
-	for index, selected := range m.document.CallableInterfaces {
-		result[index] = ProviderCallableProfileInterface{
-			document: cloneProviderCallableProfileInterface(selected),
-		}
+func (m FacetModule) StatefulProfiles() []ProviderStatefulProfile {
+	result := make([]ProviderStatefulProfile, len(m.document.StatefulProfiles))
+	for index, profile := range m.document.StatefulProfiles {
+		result[index] = newProviderStatefulProfile(m.document, profile)
 	}
 	return result
 }
 
 type Facet struct {
-	module FacetModuleDocument
-	facet  FacetDocument
+	module         FacetModuleDocument
+	facet          FacetDocument
+	representation ProviderRepresentationDocument
 }
 
 func newFacet(module FacetModuleDocument, facet FacetDocument) Facet {
-	module.Facets = nil
-	return Facet{module: module, facet: facet}
+	result := Facet{module: facetModuleIdentity(module), facet: facet}
+	if facet.RepresentationExport == "" {
+		return result
+	}
+	for _, representation := range module.Representations {
+		if representation.Export == facet.RepresentationExport {
+			result.representation = cloneProviderRepresentation(representation)
+			break
+		}
+	}
+	return result
 }
 
 func (f Facet) Kind() FacetKind {
@@ -218,12 +239,10 @@ func (f Facet) Representation() (ProviderRepresentation, bool) {
 	if f.facet.RepresentationExport == "" {
 		return ProviderRepresentation{}, false
 	}
-	for _, representation := range f.module.Representations {
-		if representation.Export == f.facet.RepresentationExport {
-			return newProviderRepresentation(f.module, representation), true
-		}
+	if f.representation.Export != f.facet.RepresentationExport {
+		return ProviderRepresentation{}, false
 	}
-	return ProviderRepresentation{}, false
+	return newProviderRepresentation(f.module, f.representation), true
 }
 
 func (f Facet) Effect() EffectKind {
@@ -255,13 +274,13 @@ func cloneFacetModule(source FacetModuleDocument) FacetModuleDocument {
 	for index, representation := range source.Representations {
 		result.Representations[index] = cloneProviderRepresentation(representation)
 	}
-	result.CallableInterfaces = make(
-		[]ProviderCallableProfileInterfaceDocument,
-		len(source.CallableInterfaces),
+	result.ProviderInterfaces = make(
+		[]ProviderInterfaceBindingDocument,
+		len(source.ProviderInterfaces),
 	)
-	for index, selected := range source.CallableInterfaces {
-		result.CallableInterfaces[index] =
-			cloneProviderCallableProfileInterface(selected)
+	for index, selected := range source.ProviderInterfaces {
+		result.ProviderInterfaces[index] =
+			cloneProviderInterfaceBinding(selected)
 	}
 	result.CallableProfiles = make(
 		[]ProviderCallableProfileDocument,
@@ -269,6 +288,13 @@ func cloneFacetModule(source FacetModuleDocument) FacetModuleDocument {
 	)
 	for index, profile := range source.CallableProfiles {
 		result.CallableProfiles[index] = cloneProviderCallableProfile(profile)
+	}
+	result.StatefulProfiles = make(
+		[]ProviderStatefulProfileDocument,
+		len(source.StatefulProfiles),
+	)
+	for index, profile := range source.StatefulProfiles {
+		result.StatefulProfiles[index] = cloneProviderStatefulProfile(profile)
 	}
 	result.Facets = make([]FacetDocument, len(source.Facets))
 	for index, facet := range source.Facets {
@@ -287,10 +313,8 @@ func newProviderRepresentation(
 	module FacetModuleDocument,
 	representation ProviderRepresentationDocument,
 ) ProviderRepresentation {
-	module.Facets = nil
-	module.Representations = nil
 	return ProviderRepresentation{
-		module:         module,
+		module:         facetModuleIdentity(module),
 		representation: cloneProviderRepresentation(representation),
 	}
 }

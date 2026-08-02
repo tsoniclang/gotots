@@ -236,6 +236,13 @@ func emitLexicalGeneratedArtifact(
 			),
 		), nil
 	case api.GeneratedArtifactInterfaceDynamicTypeToken:
+		sourceType, ok := artifact.InterfaceDynamicType()
+		if !ok {
+			return api.DeclarationEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "lexical interface dynamic-type artifact has no Go type",
+			}
+		}
 		if err := exactLexicalInterfaceRequirement(
 			artifact,
 			requirements,
@@ -247,6 +254,7 @@ func emitLexicalGeneratedArtifact(
 				context.Factory(),
 				artifact.TargetName(),
 				nil,
+				types.Comparable(sourceType),
 			),
 		), nil
 	case api.GeneratedArtifactGenericCapability:

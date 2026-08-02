@@ -6,10 +6,10 @@ import {
 
 import type { Errno } from "../../../syscall.js";
 
-const errnoType = Object.freeze({});
+const errnoType = Object.freeze({ comparable: true });
 
 class ErrnoError extends GoInterfaceValue implements GoError {
-  readonly $go$type: object = errnoType;
+  readonly $go$type = errnoType;
   readonly $go$methods: ReadonlySet<object> = new Set<object>([
     GoErrorMethodToken,
   ]);

@@ -12,6 +12,7 @@ import (
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -359,6 +360,7 @@ func emitMethod(
 	}
 	var call api.ExpressionEmission
 	var callRequests []api.RootRequest
+	providerBoundary := false
 	if interfaceDispatch {
 		call, err = interfaceoperation.Apply(
 			context,
@@ -383,14 +385,47 @@ func emitMethod(
 				Reason: "adapter method lacks recovery authority",
 			}
 		}
-		targetCall,
-			providerRecovery,
-			recoveryCooperative,
-			targetRequests,
-			callErr := invocation.RecoveryCall(
+		recoveryInvocation, recoveryErr := invocation.ResolveRecovery(context)
+		if recoveryErr != nil {
+			return nil, nil, methodStageError(
+				MethodStageInvocation,
+				recoveryErr,
+			)
+		}
+		providerBoundary = recoveryInvocation.Provider()
+		sourceArguments := target.SourceParameterReferences(context.Factory())
+		var argumentBefore []tsgo.Statement
+		var argumentRequests []api.RootRequest
+		if providerBoundary {
+			converted := make([]tsgo.Expression, 0, len(sourceArguments))
+			for index, argument := range sourceArguments {
+				value, _, convertErr := providerboundary.ToProviderValue(
+					context,
+					children,
+					nil,
+					"",
+					signature.Params().At(index).Type(),
+					api.DirectExpression(argument),
+				)
+				if convertErr != nil {
+					return nil, nil, methodStageError(
+						MethodStageInvocation,
+						convertErr,
+					)
+				}
+				argumentBefore = append(argumentBefore, value.Before()...)
+				converted = append(converted, value.Value())
+				argumentRequests = append(
+					argumentRequests,
+					value.Requests()...,
+				)
+			}
+			sourceArguments = converted
+		}
+		targetCall, targetRequests, callErr := recoveryInvocation.Call(
 			context,
 			receiver.Value(),
-			target.SourceParameterReferences(context.Factory()),
+			sourceArguments,
 			recovery,
 		)
 		if callErr != nil {
@@ -399,10 +434,17 @@ func emitMethod(
 				callErr,
 			)
 		}
-		if providerRecovery {
-			providerCooperative = recoveryCooperative
+		if providerBoundary {
+			providerCooperative = recoveryInvocation.Cooperative()
 		}
-		call = api.DirectExpression(targetCall, targetRequests...)
+		call, err = api.NewExpressionEmission(
+			argumentBefore,
+			targetCall,
+			api.CombineRequests(targetRequests, argumentRequests),
+		)
+		if err != nil {
+			return nil, nil, methodStageError(MethodStageInvocation, err)
+		}
 		callRequests = receiver.Requests()
 	}
 	call, err = api.NewExpressionEmission(
@@ -416,6 +458,19 @@ func emitMethod(
 	)
 	if err != nil {
 		return nil, nil, methodStageError(MethodStageInvocation, err)
+	}
+	if providerBoundary {
+		call, err = providerboundary.FromProviderResults(
+			context,
+			children,
+			nil,
+			"",
+			signature.Results(),
+			call,
+		)
+		if err != nil {
+			return nil, nil, methodStageError(MethodStageInvocation, err)
+		}
 	}
 	call, err = cooperativecall.GeneratedInterfaceProviderCall(
 		context,

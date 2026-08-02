@@ -3,10 +3,12 @@ package gostdlib
 import (
 	"slices"
 	"strings"
+
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 )
 
 const (
-	SchemaVersion = 13
+	SchemaVersion = 18
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -98,6 +100,8 @@ type Document struct {
 	MaximumGoVersion string                `json:"maximumGoVersion"`
 	GOOS             string                `json:"goos"`
 	GOARCH           string                `json:"goarch"`
+	CGOEnabled       bool                  `json:"cgoEnabled"`
+	BuildTags        []string              `json:"buildTags"`
 	RuntimeDigest    string                `json:"runtimeDigest"`
 	ProviderDigest   string                `json:"providerDigest"`
 	Modules          []ModuleDocument      `json:"modules"`
@@ -132,12 +136,14 @@ type BindingDocument struct {
 }
 
 type Manifest struct {
-	document         Document
-	payload          []byte
-	bindings         map[string]Binding
-	facets           map[facetLookup]Facet
-	representations  map[providerRepresentationLookup]ProviderRepresentation
-	callableProfiles map[providerCallableProfileLookup]ProviderCallableProfile
+	document           Document
+	payload            []byte
+	bindings           map[string]Binding
+	facets             map[facetLookup]Facet
+	representations    map[providerRepresentationLookup]ProviderRepresentation
+	providerInterfaces map[string]ProviderInterfaceBinding
+	callableProfiles   map[providerCallableProfileLookup]ProviderCallableProfile
+	statefulProfiles   map[providerStatefulProfileLookup]ProviderStatefulProfile
 }
 
 func (m Manifest) Digest() string {
@@ -174,6 +180,17 @@ func (m Manifest) GOOS() string {
 
 func (m Manifest) GOARCH() string {
 	return m.document.GOARCH
+}
+
+func (m Manifest) BuildProfile() (environmentcontract.BuildProfile, bool) {
+	profile, err := environmentcontract.NewBuildProfileForToolchain(
+		m.document.GoVersion,
+		m.document.GOOS,
+		m.document.GOARCH,
+		m.document.CGOEnabled,
+		m.document.BuildTags,
+	)
+	return profile, err == nil
 }
 
 func (m Manifest) RuntimeDigest() string {
@@ -241,6 +258,13 @@ func (m Manifest) ProviderRepresentation(
 	return selected, ok
 }
 
+func (m Manifest) ProviderInterface(
+	sourceIdentity string,
+) (ProviderInterfaceBinding, bool) {
+	selected, ok := m.providerInterfaces[sourceIdentity]
+	return selected, ok
+}
+
 func (m Manifest) ProviderCallableProfile(
 	sourceIdentity string,
 	profileKey string,
@@ -262,6 +286,32 @@ func (m Manifest) ProviderCallableProfiles(
 		}
 	}
 	slices.SortFunc(result, func(left, right ProviderCallableProfile) int {
+		return strings.Compare(left.ProfileKey(), right.ProfileKey())
+	})
+	return result
+}
+
+func (m Manifest) ProviderStatefulProfile(
+	sourceIdentity string,
+	profileKey string,
+) (ProviderStatefulProfile, bool) {
+	selected, ok := m.statefulProfiles[providerStatefulProfileLookup{
+		sourceIdentity: sourceIdentity,
+		profileKey:     profileKey,
+	}]
+	return selected, ok
+}
+
+func (m Manifest) ProviderStatefulProfiles(
+	sourceIdentity string,
+) []ProviderStatefulProfile {
+	var result []ProviderStatefulProfile
+	for lookup, selected := range m.statefulProfiles {
+		if lookup.sourceIdentity == sourceIdentity {
+			result = append(result, selected)
+		}
+	}
+	slices.SortFunc(result, func(left, right ProviderStatefulProfile) int {
 		return strings.Compare(left.ProfileKey(), right.ProfileKey())
 	})
 	return result
@@ -378,6 +428,7 @@ func (b Binding) ModuleSpecifier() string {
 
 func cloneDocument(source Document) Document {
 	result := source
+	result.BuildTags = slices.Clone(source.BuildTags)
 	result.Modules = make([]ModuleDocument, len(source.Modules))
 	for index, module := range source.Modules {
 		result.Modules[index] = cloneModule(module)

@@ -13,6 +13,11 @@ type ContractError struct {
 	Reason string
 }
 
+const (
+	contractExportTypeSpace uint8 = 1 << iota
+	contractExportValueSpace
+)
+
 func (e *ContractError) Error() string {
 	return fmt.Sprintf(
 		"project observable contract for TS-Go kind %d: %s",
@@ -31,7 +36,17 @@ func ProjectContract(
 		}
 	}
 	nodes := make(map[api.ArtifactFacet][]tsgo.Node)
-	var exports []string
+	exportSpaces := make(map[string]uint8)
+	addExport := func(name string, spaces uint8, kind tsgo.SyntaxKind) error {
+		if name == "" || spaces == 0 || exportSpaces[name]&spaces != 0 {
+			return &ContractError{
+				Kind:   kind,
+				Reason: "export binding duplicates a target declaration space",
+			}
+		}
+		exportSpaces[name] |= spaces
+		return nil
+	}
 	for _, statement := range statements {
 		switch statement := statement.(type) {
 		case tsgo.FunctionDeclaration:
@@ -53,7 +68,13 @@ func ProjectContract(
 					nil,
 				),
 			)
-			exports = append(exports, statement.Name().Text())
+			if err := addExport(
+				statement.Name().Text(),
+				contractExportValueSpace,
+				statement.Kind(),
+			); err != nil {
+				return Contract{}, err
+			}
 		case tsgo.ClassDeclaration:
 			classFacets, err := projectClassContract(factory, statement)
 			if err != nil {
@@ -62,19 +83,37 @@ func ProjectContract(
 			for facet, node := range classFacets {
 				nodes[facet] = append(nodes[facet], node)
 			}
-			exports = append(exports, statement.Name().Text())
+			if err := addExport(
+				statement.Name().Text(),
+				contractExportTypeSpace|contractExportValueSpace,
+				statement.Kind(),
+			); err != nil {
+				return Contract{}, err
+			}
 		case tsgo.InterfaceDeclaration:
 			nodes[api.ArtifactFacetInstanceTypeSurface] = append(
 				nodes[api.ArtifactFacetInstanceTypeSurface],
 				statement,
 			)
-			exports = append(exports, statement.Name().Text())
+			if err := addExport(
+				statement.Name().Text(),
+				contractExportTypeSpace,
+				statement.Kind(),
+			); err != nil {
+				return Contract{}, err
+			}
 		case tsgo.TypeAliasDeclaration:
 			nodes[api.ArtifactFacetInstanceTypeSurface] = append(
 				nodes[api.ArtifactFacetInstanceTypeSurface],
 				statement,
 			)
-			exports = append(exports, statement.Name().Text())
+			if err := addExport(
+				statement.Name().Text(),
+				contractExportTypeSpace,
+				statement.Kind(),
+			); err != nil {
+				return Contract{}, err
+			}
 		case tsgo.VariableStatement:
 			declarations := statement.DeclarationList().Declarations()
 			projected := make([]tsgo.VariableDeclaration, len(declarations))
@@ -92,7 +131,13 @@ func ProjectContract(
 						Reason: "observable value binding name is not an identifier",
 					}
 				}
-				exports = append(exports, name.Text())
+				if err := addExport(
+					name.Text(),
+					contractExportValueSpace,
+					declaration.Kind(),
+				); err != nil {
+					return Contract{}, err
+				}
 				projected[index] = factory.VariableDeclaration(
 					declaration.Name(),
 					declaration.ExclamationToken(),
@@ -120,6 +165,10 @@ func ProjectContract(
 				Reason: "declaration form has no closed observable projection",
 			}
 		}
+	}
+	exports := make([]string, 0, len(exportSpaces))
+	for name := range exportSpaces {
+		exports = append(exports, name)
 	}
 	sort.Strings(exports)
 	exportSpecifiers := make([]tsgo.ExportSpecifier, len(exports))

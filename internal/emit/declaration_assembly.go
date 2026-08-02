@@ -190,6 +190,10 @@ func (s *programSession) applyDeclarationRequirements(
 				}
 			}
 		}
+		if removed && len(requirements) == 0 &&
+			generatedOwner.Placement() == api.GeneratedArtifactPlacementCompilation {
+			return s.retireCompilationGeneratedArtifact(generatedOwner)
+		}
 		return s.reconstructGeneratedArtifact(generatedOwner)
 	}
 	if _, _, initializerOwned := owner.PackageInitializer(); initializerOwned {

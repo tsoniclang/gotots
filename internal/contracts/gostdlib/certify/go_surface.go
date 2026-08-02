@@ -67,8 +67,9 @@ func loadGoSurface(
 			packages.NeedTypes |
 			packages.NeedSyntax |
 			packages.NeedTypesSizes,
-		Dir: config.repositoryRoot,
-		Env: exactGoEnvironment(selectedToolchain, shim),
+		Dir:        config.repositoryRoot,
+		Env:        exactGoEnvironment(selectedToolchain, shim),
+		BuildFlags: selectedToolchain.profile.BuildFlags(),
 	}, ordered...)
 	if err != nil {
 		return goSurface{}, certifyError("load Go surface", strings.Join(ordered, ","), err.Error())
@@ -270,7 +271,9 @@ func standardPackages(
 	config resolvedConfig,
 	selectedToolchain toolchain,
 ) (map[string]struct{}, error) {
-	command := exec.Command(config.goBinary, "list", "std")
+	arguments := append([]string{"list"}, selectedToolchain.profile.BuildFlags()...)
+	arguments = append(arguments, "std")
+	command := exec.Command(config.goBinary, arguments...)
 	command.Dir = config.repositoryRoot
 	command.Env = exactGoEnvironment(selectedToolchain, filepath.Dir(config.goBinary))
 	output, err := command.StdoutPipe()
@@ -314,8 +317,9 @@ func exactGoPath(config resolvedConfig) (string, error) {
 }
 
 func exactGoEnvironment(selectedToolchain toolchain, binaryDirectory string) []string {
-	result := make([]string, 0, len(os.Environ())+3)
-	for _, value := range os.Environ() {
+	selected := selectedToolchain.profile.Environment(os.Environ())
+	result := make([]string, 0, len(selected)+3)
+	for _, value := range selected {
 		if strings.HasPrefix(value, "PATH=") ||
 			strings.HasPrefix(value, "GOROOT=") ||
 			strings.HasPrefix(value, "GOTOOLCHAIN=") {

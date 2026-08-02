@@ -8,6 +8,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { state as errorState } from "../src/errors.js";
+import { state as fsState } from "../src/io/fs.js";
 import {
   Credential,
   EAGAIN,
@@ -32,6 +34,12 @@ test("syscall constants and value types preserve selected Linux identities", () 
   assert.equal(EAGAIN.Error(), "resource temporarily unavailable");
   assert.equal(EINVAL.Error(), "invalid argument");
   assert.equal(ENOENT.Error(), "no such file or directory");
+  assert.equal(EPERM.Is(fsState.ErrPermission), true);
+  assert.equal(ENOENT.Is(fsState.ErrNotExist), true);
+  assert.equal(EINVAL.Is(errorState.ErrUnsupported), false);
+  assert.equal(EAGAIN.Timeout(), true);
+  assert.equal(EINTR.Temporary(), true);
+  assert.equal(EINVAL.Temporary(), false);
   assert.equal(SIGINT.String(), "interrupt");
   assert.equal(SIGTERM.String(), "terminated");
   assert.equal(new Signal(99).String(), "signal 99");
@@ -59,7 +67,9 @@ test("syscall selected errno constants agree with Go", (): void => {
 package main
 
 import (
+  "errors"
   "fmt"
+  "io/fs"
   "syscall"
 )
 
@@ -74,6 +84,14 @@ func main() {
   } {
     fmt.Printf("%d:%s|", value, value.Error())
   }
+  fmt.Printf("%t:%t:%t:%t:%t:%t",
+    syscall.EPERM.Is(fs.ErrPermission),
+    syscall.ENOENT.Is(fs.ErrNotExist),
+    syscall.EINVAL.Is(errors.ErrUnsupported),
+    syscall.EAGAIN.Timeout(),
+    syscall.EINTR.Temporary(),
+    syscall.EINVAL.Temporary(),
+  )
 }
 `;
   try {
@@ -82,7 +100,14 @@ func main() {
     assert.equal(result.status, 0, result.stderr);
     const provider = [EPERM, ENOENT, EINTR, EAGAIN, EINVAL, ENOTDIR]
       .map((value): string => `${value.value}:${value.Error()}|`)
-      .join("");
+      .join("") + [
+        EPERM.Is(fsState.ErrPermission),
+        ENOENT.Is(fsState.ErrNotExist),
+        EINVAL.Is(errorState.ErrUnsupported),
+        EAGAIN.Timeout(),
+        EINTR.Temporary(),
+        EINVAL.Temporary(),
+      ].join(":");
     assert.equal(provider, result.stdout);
   } finally {
     rmSync(directory, { force: true, recursive: true });

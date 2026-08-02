@@ -1,11 +1,13 @@
 package gostdlib
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 func validateProviderCallableProfile(
 	profile ProviderCallableProfileDocument,
 	field string,
-	interfaces map[string]ProviderCallableProfileInterfaceDocument,
 ) error {
 	switch {
 	case profile.SourceIdentity == "":
@@ -15,7 +17,7 @@ func validateProviderCallableProfile(
 	case profile.Export == "":
 		return manifestError(field+".export", "value is empty")
 	case len(profile.CanonicalParameters) == 0:
-		return manifestError(field+".canonicalParameters", "set is empty")
+		return manifestError(field+".canonicalParameters", "no canonical parameter exists")
 	case len(profile.Interfaces) == 0:
 		return manifestError(field+".interfaces", "set is empty")
 	case !profile.Effect.Valid():
@@ -43,27 +45,69 @@ func validateProviderCallableProfile(
 	); err != nil {
 		return err
 	}
+	for index, identity := range profile.CanonicalValues {
+		if identity == "" || index != 0 && identity <= profile.CanonicalValues[index-1] {
+			return manifestError(
+				field+".canonicalValues",
+				"values are empty, duplicated, or not strictly ordered",
+			)
+		}
+	}
 	keyInterfaces := make(
 		[]ProviderCallableProfileKeyInterface,
 		0,
 		len(profile.Interfaces),
 	)
 	interfaceIdentities := make(map[string]struct{}, len(profile.Interfaces))
+	protocolIdentities := make(map[string]struct{})
 	previous := ""
-	for index, identity := range profile.Interfaces {
+	for index, selected := range profile.Interfaces {
 		selectedField := fmt.Sprintf("%s.interfaces[%d]", field, index)
-		if identity == "" {
-			return manifestError(selectedField, "value is empty")
+		if err := validateProviderCallableProfileInterface(
+			selected,
+			selectedField,
+		); err != nil {
+			return err
 		}
+		identity := selected.SourceIdentity
 		if identity <= previous {
 			return manifestError(field+".interfaces", "values are not strictly ordered")
 		}
 		previous = identity
-		selected, ok := interfaces[identity]
-		if !ok {
-			return manifestError(selectedField, "callable-interface definition is absent")
-		}
 		interfaceIdentities[identity] = struct{}{}
+		if selected.Protocol != nil {
+			protocolIdentities[identity] = struct{}{}
+			if selected.ProtocolValueParameter == nil {
+				return manifestError(
+					selectedField+".protocolValueParameter",
+					"value is absent",
+				)
+			}
+			if _, found := slices.BinarySearch(
+				profile.CanonicalParameters,
+				*selected.ProtocolValueParameter,
+			); !found {
+				return manifestError(
+					field+".canonicalParameters",
+					"protocol value parameter is not a canonical root",
+				)
+			}
+			parameters, err := ProviderProtocolCallableParameters(*selected.Protocol)
+			if err != nil {
+				return err
+			}
+			for _, parameter := range parameters {
+				if _, found := slices.BinarySearch(
+					profile.CanonicalParameters,
+					parameter,
+				); !found {
+					return manifestError(
+						field+".canonicalParameters",
+						"protocol callable parameter is not a canonical root",
+					)
+				}
+			}
+		}
 		methods := make(
 			[]ProviderCallableProfileKeyMethod,
 			0,
@@ -86,7 +130,26 @@ func validateProviderCallableProfile(
 			Methods:        methods,
 		})
 	}
-	key, err := BuildProviderCallableProfileKey(keyInterfaces)
+	seenTypeArguments := make(map[string]struct{}, len(profile.CanonicalTypeArguments))
+	for index, identity := range profile.CanonicalTypeArguments {
+		if _, ok := interfaceIdentities[identity]; !ok {
+			return manifestError(
+				fmt.Sprintf("%s.canonicalTypeArguments[%d]", field, index),
+				"value has no profile-interface evidence",
+			)
+		}
+		if _, duplicate := seenTypeArguments[identity]; duplicate {
+			return manifestError(
+				fmt.Sprintf("%s.canonicalTypeArguments[%d]", field, index),
+				"value is duplicated",
+			)
+		}
+		seenTypeArguments[identity] = struct{}{}
+	}
+	key, err := BuildImplementedResultProfileKey(
+		keyInterfaces,
+		profile.ImplementedResultInterfaces,
+	)
 	if err != nil {
 		return err
 	}
@@ -104,7 +167,90 @@ func validateProviderCallableProfile(
 		}
 		seenGuards[identity] = struct{}{}
 	}
+	if profile.Required != (len(protocolIdentities) != 0) {
+		return manifestError(
+			field+".required",
+			"value disagrees with semantic protocol evidence",
+		)
+	}
+	for identity := range protocolIdentities {
+		if _, guarded := seenGuards[identity]; !guarded {
+			return manifestError(
+				field+".guardInterfaces",
+				"semantic protocol is not a generated guard",
+			)
+		}
+	}
+	seenContracts := make(map[string]struct{}, len(profile.ContractInterfaces))
+	for index, identity := range profile.ContractInterfaces {
+		contractField := fmt.Sprintf("%s.contractInterfaces[%d]", field, index)
+		if _, ok := interfaceIdentities[identity]; !ok {
+			return manifestError(contractField, "value has no profile-interface evidence")
+		}
+		if _, duplicate := seenContracts[identity]; duplicate {
+			return manifestError(contractField, "value is duplicated")
+		}
+		seenContracts[identity] = struct{}{}
+	}
+	previousBridge := ""
+	for index, identity := range profile.FromProviderInterfaces {
+		bridgeField := fmt.Sprintf("%s.fromProviderInterfaces[%d]", field, index)
+		if identity <= previousBridge {
+			return manifestError(
+				field+".fromProviderInterfaces",
+				"values are empty, duplicated, or not strictly ordered",
+			)
+		}
+		previousBridge = identity
+		if _, ok := interfaceIdentities[identity]; !ok {
+			return manifestError(bridgeField, "value has no profile-interface evidence")
+		}
+	}
+	previousImplemented := ""
+	for index, identity := range profile.ImplementedResultInterfaces {
+		implementedField := fmt.Sprintf(
+			"%s.implementedResultInterfaces[%d]",
+			field,
+			index,
+		)
+		if identity <= previousImplemented {
+			return manifestError(
+				field+".implementedResultInterfaces",
+				"values are empty, duplicated, or not strictly ordered",
+			)
+		}
+		previousImplemented = identity
+		if _, ok := seenContracts[identity]; !ok {
+			return manifestError(
+				implementedField,
+				"value is not a contract interface",
+			)
+		}
+	}
 	return nil
+}
+
+func sameProviderCallableProfileInterface(
+	left ProviderCallableProfileInterfaceDocument,
+	right ProviderCallableProfileInterfaceDocument,
+) bool {
+	protocolsEqual := left.Protocol == nil && right.Protocol == nil
+	if left.Protocol != nil && right.Protocol != nil {
+		protocolsEqual = sameProviderProtocolInterface(*left.Protocol, *right.Protocol)
+	}
+	return left.SourceIdentity == right.SourceIdentity &&
+		left.Export == right.Export &&
+		protocolsEqual &&
+		sameOptionalIndex(
+			left.ProtocolValueParameter,
+			right.ProtocolValueParameter,
+		) &&
+		left.TargetFingerprint == right.TargetFingerprint &&
+		left.ProviderInterface.Mode == right.ProviderInterface.Mode &&
+		slices.Equal(
+			left.ProviderInterface.Methods,
+			right.ProviderInterface.Methods,
+		)
 }
 
 func validateProviderCallableProfileInterface(
@@ -127,6 +273,34 @@ func validateProviderCallableProfileInterface(
 			"profile interface must expose the complete callable method set",
 		)
 	}
+	if selected.Protocol != nil {
+		if selected.ProtocolValueParameter == nil ||
+			*selected.ProtocolValueParameter < 0 {
+			return manifestError(
+				field+".protocolValueParameter",
+				"value is absent or negative",
+			)
+		}
+		canonical, err := CanonicalProviderProtocolInterface(*selected.Protocol)
+		if err != nil {
+			return err
+		}
+		identity, err := BuildProviderProtocolInterfaceIdentity(canonical)
+		if err != nil {
+			return err
+		}
+		if identity != selected.SourceIdentity {
+			return manifestError(
+				field+".sourceIdentity",
+				"value does not match protocol evidence",
+			)
+		}
+	} else if selected.ProtocolValueParameter != nil {
+		return manifestError(
+			field+".protocolValueParameter",
+			"named interface has a protocol value parameter",
+		)
+	}
 	if err := validateProviderInterface(
 		selected.ProviderInterface,
 		field+".providerInterface",
@@ -142,6 +316,13 @@ func validateProviderCallableProfileInterface(
 		}
 	}
 	return nil
+}
+
+func sameOptionalIndex(left *int, right *int) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
 }
 
 func validateProfileIndexes(source []int, field string) error {

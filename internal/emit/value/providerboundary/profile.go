@@ -4,6 +4,7 @@ import (
 	"go/types"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
@@ -15,6 +16,38 @@ import (
 type CallableProfileSelection struct {
 	reference api.ProviderCallableProfileReference
 	requests  []api.RootRequest
+}
+
+func InterfaceABIExact(
+	context api.Context,
+	source *types.Named,
+) (bool, []api.RootRequest, error) {
+	if source == nil || source.Obj() == nil {
+		return false, nil, boundaryInvariant(
+			context,
+			"provider interface source is invalid",
+		)
+	}
+	if _, ok := source.Underlying().(*types.Interface); !ok {
+		return false, nil, boundaryInvariant(
+			context,
+			"provider interface source is not an interface",
+		)
+	}
+	analyzer := &profileBoundaryAnalyzer{
+		context:  context,
+		nodes:    make(map[string]*profileBoundaryInterface),
+		building: make(map[string]bool),
+		visited:  make(map[profileTypeVisit]struct{}),
+	}
+	if err := analyzer.collectRootType(
+		source,
+		make(map[string]struct{}),
+	); err != nil {
+		return false, nil, err
+	}
+	return len(analyzer.affectedInterfaces()) == 0,
+		api.CombineRequests(analyzer.requests), nil
 }
 
 func ResolveCallableProfile(
@@ -39,7 +72,11 @@ func ResolveCallableProfile(
 	}
 	canonicalParameters := affectedRoots(base.parameterInterfaces, base.affected)
 	canonicalResults := affectedRoots(base.resultInterfaces, base.affected)
-	if len(canonicalParameters) == 0 {
+	required := false
+	for _, candidate := range candidates {
+		required = required || candidate.Profile().Required()
+	}
+	if len(canonicalParameters) == 0 && !required {
 		return CallableProfileSelection{
 			requests: api.CombineRequests(base.analyzer.requests),
 		}, false, nil
@@ -47,11 +84,24 @@ func ResolveCallableProfile(
 	var matches []matchedProfile
 	var mismatches []string
 	for _, candidate := range candidates {
+		if required && !candidate.Profile().Required() {
+			continue
+		}
+		expectedParameters := slices.Clone(canonicalParameters)
+		if candidate.Profile().Required() {
+			semanticParameters, parameterErr := requiredProfileParameters(
+				candidate.Profile(),
+			)
+			if parameterErr != nil {
+				return CallableProfileSelection{}, false, parameterErr
+			}
+			expectedParameters = mergeIndexes(expectedParameters, semanticParameters)
+		}
 		selected, matchesCurrent, mismatch, matchErr := matchCallableProfileCandidate(
 			context,
 			signature,
 			candidate,
-			canonicalParameters,
+			expectedParameters,
 			canonicalResults,
 		)
 		if matchErr != nil {
@@ -66,6 +116,15 @@ func ResolveCallableProfile(
 			)
 		}
 	}
+	var exactMatches []matchedProfile
+	for _, selected := range matches {
+		if !selected.elevated {
+			exactMatches = append(exactMatches, selected)
+		}
+	}
+	if len(exactMatches) != 0 {
+		matches = exactMatches
+	}
 	if len(matches) != 1 {
 		reason := "provider callable has no exact certified boundary profile"
 		if len(matches) > 1 {
@@ -76,6 +135,12 @@ func ResolveCallableProfile(
 			return CallableProfileSelection{}, false, identityErr
 		}
 		reason += " for " + identity
+		reason += " with affected interfaces [" +
+			strings.Join(sortedIdentitySet(base.affected), ", ") + "]"
+		reason += " and canonical parameters [" +
+			joinIndexes(canonicalParameters) + "]"
+		reason += " and canonical results [" +
+			joinIndexes(canonicalResults) + "]"
 		if len(mismatches) != 0 {
 			reason += " (" + strings.Join(mismatches, "; ") + ")"
 		}
@@ -104,6 +169,57 @@ func ResolveCallableProfile(
 	}, true, nil
 }
 
+func requiredProfileParameters(
+	profile gostdlib.ProviderCallableProfile,
+) ([]int, error) {
+	var result []int
+	for _, selected := range profile.Interfaces() {
+		protocol, ok := selected.Protocol()
+		if !ok {
+			continue
+		}
+		parameters, err := gostdlib.ProviderProtocolCallableParameters(protocol)
+		if err != nil {
+			return nil, err
+		}
+		result = mergeIndexes(result, parameters)
+	}
+	return result, nil
+}
+
+func mergeIndexes(left []int, right []int) []int {
+	seen := make(map[int]struct{}, len(left)+len(right))
+	for _, index := range left {
+		seen[index] = struct{}{}
+	}
+	for _, index := range right {
+		seen[index] = struct{}{}
+	}
+	result := make([]int, 0, len(seen))
+	for index := range seen {
+		result = append(result, index)
+	}
+	sort.Ints(result)
+	return result
+}
+
+func sortedIdentitySet(source map[string]struct{}) []string {
+	result := make([]string, 0, len(source))
+	for identity := range source {
+		result = append(result, identity)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func joinIndexes(source []int) string {
+	result := make([]string, len(source))
+	for index, value := range source {
+		result[index] = strconv.Itoa(value)
+	}
+	return strings.Join(result, ", ")
+}
+
 type callableProfileBoundary struct {
 	analyzer            *profileBoundaryAnalyzer
 	parameterInterfaces []map[string]struct{}
@@ -114,6 +230,7 @@ type callableProfileBoundary struct {
 type matchedProfile struct {
 	profile  gostdlib.ProviderCallableProfile
 	requests []api.RootRequest
+	elevated bool
 }
 
 func analyzeCallableProfileBoundary(
@@ -129,9 +246,8 @@ func analyzeCallableProfileBoundary(
 	parameterInterfaces := make([]map[string]struct{}, signature.Params().Len())
 	for index := range signature.Params().Len() {
 		parameterInterfaces[index] = make(map[string]struct{})
-		if err := analyzer.collectType(
+		if err := analyzer.collectRootType(
 			signature.Params().At(index).Type(),
-			"",
 			parameterInterfaces[index],
 		); err != nil {
 			return callableProfileBoundary{}, err
@@ -144,9 +260,8 @@ func analyzeCallableProfileBoundary(
 	resultInterfaces := make([]map[string]struct{}, resultLength)
 	for index := range resultLength {
 		resultInterfaces[index] = make(map[string]struct{})
-		if err := analyzer.collectType(
+		if err := analyzer.collectRootType(
 			signature.Results().At(index).Type(),
-			"",
 			resultInterfaces[index],
 		); err != nil {
 			return callableProfileBoundary{}, err
@@ -169,13 +284,31 @@ func matchCallableProfileCandidate(
 ) (matchedProfile, bool, string, error) {
 	profile := candidate.Profile()
 	if profile.Receiver() != (signature.Recv() != nil) ||
-		!slices.Equal(profile.CanonicalParameters(), canonicalParameters) ||
-		!slices.Equal(profile.CanonicalResults(), canonicalResults) {
+		!slices.Equal(profile.CanonicalParameters(), canonicalParameters) {
 		return matchedProfile{}, false, "receiver or canonical roots differ", nil
 	}
 	selected, err := analyzeCallableProfileBoundary(context, signature)
 	if err != nil {
 		return matchedProfile{}, false, "", err
+	}
+	implemented := make(
+		map[string]struct{},
+		len(profile.ImplementedResultInterfaces()),
+	)
+	for _, identity := range profile.ImplementedResultInterfaces() {
+		implemented[identity] = struct{}{}
+	}
+	implementedResults := rootsContainingIdentities(
+		selected.resultInterfaces,
+		implemented,
+	)
+	allowedResults := mergeIndexes(
+		canonicalResults,
+		implementedResults,
+	)
+	if !indexesSubset(profile.CanonicalResults(), allowedResults) ||
+		!indexesSubset(implementedResults, profile.CanonicalResults()) {
+		return matchedProfile{}, false, "receiver or canonical roots differ", nil
 	}
 	guardIdentities := make(map[string]struct{}, len(profile.GuardInterfaces()))
 	for _, identity := range profile.GuardInterfaces() {
@@ -188,7 +321,11 @@ func matchCallableProfileCandidate(
 			boundaryIdentities[selectedInterface.SourceIdentity()] = struct{}{}
 		}
 	}
-	if !sameIdentitySet(boundaryIdentities, selected.affected) {
+	expectedBoundaryIdentities := cloneIdentitySet(selected.affected)
+	for identity := range implemented {
+		expectedBoundaryIdentities[identity] = struct{}{}
+	}
+	if !sameIdentitySet(boundaryIdentities, expectedBoundaryIdentities) {
 		return matchedProfile{}, false, "affected interface set differs", nil
 	}
 	guardTypes := candidate.Guards()
@@ -205,25 +342,72 @@ func matchCallableProfileCandidate(
 			return matchedProfile{}, false, "", err
 		}
 	}
+	canonicalIdentities := identitiesAtRoots(
+		selected.parameterInterfaces,
+		profile.CanonicalParameters(),
+	)
+	for identity := range identitiesAtRoots(
+		selected.resultInterfaces,
+		profile.CanonicalResults(),
+	) {
+		canonicalIdentities[identity] = struct{}{}
+	}
+	for identity := range guardIdentities {
+		canonicalIdentities[identity] = struct{}{}
+	}
+	providerResultIdentities := identitiesAtRoots(
+		selected.resultInterfaces,
+		indexesDifference(canonicalResults, profile.CanonicalResults()),
+	)
 	keyInterfaces := make(
 		[]gostdlib.ProviderCallableProfileKeyInterface,
 		0,
 		len(profileInterfaces),
 	)
+	elevatedProfile := false
 	for _, selectedInterface := range profileInterfaces {
 		node := selected.analyzer.nodes[selectedInterface.SourceIdentity()]
-		matchesInterface, mismatch := profileInterfaceMatches(
-			node,
-			selectedInterface.ProviderInterface(),
-		)
+		identity := selectedInterface.SourceIdentity()
+		_, mayElevate := implemented[identity]
+		_, canonical := canonicalIdentities[identity]
+		_, providerResult := providerResultIdentities[identity]
+		var elevation profileEffectElevation
+		if mayElevate {
+			elevation = func(
+				method profileBoundaryMethod,
+			) ([]api.RootRequest, error) {
+				return cooperativecall.ElevateInterfaceMethodContract(
+					context,
+					method.reference,
+				)
+			}
+		}
+		matchesInterface, mismatch, keyInterface, requests, elevated, matchErr :=
+			matchProfileInterface(
+				node,
+				selectedInterface.ProviderInterface(),
+				elevation,
+				providerResult && !canonical && !mayElevate,
+			)
+		if matchErr != nil {
+			return matchedProfile{}, false, "", matchErr
+		}
 		if !matchesInterface {
 			return matchedProfile{}, false,
 				"interface ABI differs for " + selectedInterface.SourceIdentity() +
 					": " + mismatch, nil
 		}
-		keyInterfaces = append(keyInterfaces, node.keyInterface())
+		selected.analyzer.requests = append(
+			selected.analyzer.requests,
+			requests...,
+		)
+		elevatedProfile = elevatedProfile || elevated
+		keyInterfaces = append(keyInterfaces, keyInterface)
 	}
-	profileKey, err := gostdlib.BuildProviderCallableProfileKey(keyInterfaces)
+	profileKey, err := gostdlib.BuildImplementedResultProfileKey(
+		keyInterfaces,
+		profile.ImplementedResultInterfaces(),
+	)
 	if err != nil {
 		return matchedProfile{}, false, "", err
 	}
@@ -233,7 +417,67 @@ func matchCallableProfileCandidate(
 	return matchedProfile{
 		profile:  profile,
 		requests: selected.analyzer.requests,
+		elevated: elevatedProfile,
 	}, true, "", nil
+}
+
+func rootsContainingIdentities(
+	roots []map[string]struct{},
+	identities map[string]struct{},
+) []int {
+	result := make([]int, 0, len(roots))
+	for index, root := range roots {
+		for identity := range identities {
+			if _, found := root[identity]; found {
+				result = append(result, index)
+				break
+			}
+		}
+	}
+	return result
+}
+
+func identitiesAtRoots(
+	roots []map[string]struct{},
+	indexes []int,
+) map[string]struct{} {
+	result := make(map[string]struct{})
+	for _, index := range indexes {
+		if index < 0 || index >= len(roots) {
+			continue
+		}
+		for identity := range roots[index] {
+			result[identity] = struct{}{}
+		}
+	}
+	return result
+}
+
+func indexesSubset(subset []int, superset []int) bool {
+	for _, index := range subset {
+		if _, found := slices.BinarySearch(superset, index); !found {
+			return false
+		}
+	}
+	return true
+}
+
+func indexesDifference(left []int, right []int) []int {
+	result := make([]int, 0, len(left))
+	for _, index := range left {
+		if _, found := slices.BinarySearch(right, index); !found {
+			result = append(result, index)
+		}
+	}
+	return result
+}
+
+func cloneIdentitySet(source map[string]struct{}) map[string]struct{} {
+	result := make(map[string]struct{}, len(source))
+	for identity := range source {
+		result[identity] = struct{}{}
+	}
+	return result
 }
 
 func (s CallableProfileSelection) Reference() api.ProviderCallableProfileReference {
@@ -264,10 +508,19 @@ type profileBoundaryInterface struct {
 	directMismatch bool
 }
 
+func (a *profileBoundaryAnalyzer) collectRootType(
+	source types.Type,
+	root map[string]struct{},
+) error {
+	a.visited = make(map[profileTypeVisit]struct{})
+	return a.collectType(source, "", root)
+}
+
 type profileBoundaryMethod struct {
 	identity  string
 	signature string
 	effect    gostdlib.EffectKind
+	reference api.InterfaceMethodCallableReference
 }
 
 func (a *profileBoundaryAnalyzer) collectType(
@@ -305,10 +558,28 @@ func (a *profileBoundaryAnalyzer) collectType(
 				if parent != "" {
 					a.nodes[parent].children[identity] = struct{}{}
 				}
-				return a.ensureInterface(selected, identity, provider)
+				interfaceType := selected.Underlying().(*types.Interface).Complete()
+				return a.ensureInterface(
+					interfaceType,
+					identity,
+					provider,
+					func(method *types.Func) (string, string, error) {
+						return gostdlib.ProviderInterfaceMethodSource(method)
+					},
+				)
 			}
 		}
 		return a.collectType(selected.Underlying(), parent, root)
+	case *types.Struct:
+		for index := range selected.NumFields() {
+			if err := a.collectType(
+				selected.Field(index).Type(),
+				parent,
+				root,
+			); err != nil {
+				return err
+			}
+		}
 	case *types.Interface:
 		selected = selected.Complete()
 		for index := range selected.NumMethods() {
@@ -370,6 +641,43 @@ func (a *profileBoundaryAnalyzer) collectProfileInterface(
 	source types.Type,
 	certificate gostdlib.ProviderCallableProfileInterface,
 ) error {
+	if protocol, synthetic := certificate.Protocol(); synthetic {
+		interfaceType, ok := types.Unalias(source).(*types.Interface)
+		if !ok {
+			return boundaryInvariant(
+				a.context,
+				"provider callable-profile protocol is not an anonymous interface",
+			)
+		}
+		identity, err := gostdlib.BuildProviderProtocolInterfaceIdentity(protocol)
+		if err != nil {
+			return err
+		}
+		if identity != certificate.SourceIdentity() {
+			return boundaryInvariant(
+				a.context,
+				"provider callable-profile protocol identity diverged from its certificate",
+			)
+		}
+		return a.ensureInterface(
+			interfaceType.Complete(),
+			identity,
+			certificate.ProviderInterface(),
+			func(method *types.Func) (string, string, error) {
+				document, ok := gostdlib.ProviderProtocolMethod(
+					protocol,
+					method.Name(),
+				)
+				if !ok {
+					return "", "", boundaryInvariant(
+						a.context,
+						"provider protocol method is absent from its certificate",
+					)
+				}
+				return gostdlib.ProviderProtocolMethodSource(identity, document)
+			},
+		)
+	}
 	named, ok := types.Unalias(source).(*types.Named)
 	if !ok || named.Obj() == nil {
 		return boundaryInvariant(
@@ -394,18 +702,24 @@ func (a *profileBoundaryAnalyzer) collectProfileInterface(
 		)
 	}
 	return a.ensureInterface(
-		named,
+		named.Underlying().(*types.Interface).Complete(),
 		identity,
 		certificate.ProviderInterface(),
+		func(method *types.Func) (string, string, error) {
+			return gostdlib.ProviderInterfaceMethodSource(method)
+		},
 	)
 }
 
+type profileMethodSource func(*types.Func) (string, string, error)
+
 func (a *profileBoundaryAnalyzer) ensureInterface(
-	named *types.Named,
-	identity string,
+	interfaceType *types.Interface,
+	interfaceIdentity string,
 	provider gostdlib.ProviderInterface,
+	methodSource profileMethodSource,
 ) error {
-	if a.nodes[identity] != nil {
+	if a.nodes[interfaceIdentity] != nil {
 		return nil
 	}
 	if provider.Mode() != gostdlib.ProviderInterfaceModeBridge {
@@ -415,16 +729,22 @@ func (a *profileBoundaryAnalyzer) ensureInterface(
 		)
 	}
 	node := &profileBoundaryInterface{
-		identity: identity,
+		identity: interfaceIdentity,
 		children: make(map[string]struct{}),
 	}
-	a.nodes[identity] = node
-	if a.building[identity] {
+	a.nodes[interfaceIdentity] = node
+	if a.building[interfaceIdentity] {
 		return nil
 	}
-	a.building[identity] = true
-	defer delete(a.building, identity)
-	interfaceType := named.Underlying().(*types.Interface).Complete()
+	a.building[interfaceIdentity] = true
+	defer delete(a.building, interfaceIdentity)
+	if interfaceType == nil || methodSource == nil {
+		return boundaryInvariant(
+			a.context,
+			"provider callable-profile interface evidence is incomplete",
+		)
+	}
+	interfaceType = interfaceType.Complete()
 	if len(provider.Methods()) != interfaceType.NumMethods() {
 		return boundaryInvariant(
 			a.context,
@@ -433,12 +753,12 @@ func (a *profileBoundaryAnalyzer) ensureInterface(
 	}
 	for index := range interfaceType.NumMethods() {
 		method := interfaceType.Method(index).Origin()
-		contract, err := environmentcontract.Describe(method)
+		methodIdentity, sourceSignature, err := methodSource(method)
 		if err != nil {
 			return err
 		}
-		certificate, ok := provider.Method(contract.Identity())
-		if !ok || certificate.SourceSignature() != contract.Signature() ||
+		certificate, ok := provider.Method(methodIdentity)
+		if !ok || certificate.SourceSignature() != sourceSignature ||
 			certificate.Kind() != gostdlib.ProviderInterfaceMethodCallable {
 			return boundaryInvariant(
 				a.context,
@@ -464,15 +784,20 @@ func (a *profileBoundaryAnalyzer) ensureInterface(
 		node.directMismatch = node.directMismatch ||
 			certificate.Effect() != effect
 		node.methods = append(node.methods, profileBoundaryMethod{
-			identity:  contract.Identity(),
-			signature: contract.Signature(),
+			identity:  methodIdentity,
+			signature: sourceSignature,
 			effect:    effect,
+			reference: callableReference,
 		})
-		signature, ok := method.Type().(*types.Signature)
+		methodSignature, ok := method.Type().(*types.Signature)
 		if !ok {
 			return boundaryInvariant(a.context, "provider interface method type is invalid")
 		}
-		if err := a.collectSignature(signature, identity, nil); err != nil {
+		if err := a.collectSignature(
+			methodSignature,
+			interfaceIdentity,
+			nil,
+		); err != nil {
 			return err
 		}
 	}
@@ -507,20 +832,6 @@ func (a *profileBoundaryAnalyzer) affectedInterfaces() map[string]struct{} {
 	return affected
 }
 
-func (i *profileBoundaryInterface) keyInterface() gostdlib.ProviderCallableProfileKeyInterface {
-	methods := make([]gostdlib.ProviderCallableProfileKeyMethod, len(i.methods))
-	for index, method := range i.methods {
-		methods[index] = gostdlib.ProviderCallableProfileKeyMethod{
-			SourceIdentity: method.identity,
-			Effect:         method.effect,
-		}
-	}
-	return gostdlib.ProviderCallableProfileKeyInterface{
-		SourceIdentity: i.identity,
-		Methods:        methods,
-	}
-}
-
 func affectedRoots(
 	roots []map[string]struct{},
 	affected map[string]struct{},
@@ -537,37 +848,93 @@ func affectedRoots(
 	return result
 }
 
-func profileInterfaceMatches(
+type profileEffectElevation func(
+	profileBoundaryMethod,
+) ([]api.RootRequest, error)
+
+func matchProfileInterface(
 	node *profileBoundaryInterface,
 	provider gostdlib.ProviderInterface,
-) (bool, string) {
+	elevate profileEffectElevation,
+	providerResult bool,
+) (
+	bool,
+	string,
+	gostdlib.ProviderCallableProfileKeyInterface,
+	[]api.RootRequest,
+	bool,
+	error,
+) {
 	if node == nil {
-		return false, "source interface evidence is absent"
+		return false, "source interface evidence is absent",
+			gostdlib.ProviderCallableProfileKeyInterface{}, nil, false, nil
 	}
 	if provider.Mode() != gostdlib.ProviderInterfaceModeBridge {
-		return false, "provider interface is not a complete bridge"
+		return false, "provider interface is not a complete bridge",
+			gostdlib.ProviderCallableProfileKeyInterface{}, nil, false, nil
 	}
 	if len(provider.Methods()) != len(node.methods) {
-		return false, "method counts differ"
+		return false, "method counts differ",
+			gostdlib.ProviderCallableProfileKeyInterface{}, nil, false, nil
 	}
+	keyMethods := make(
+		[]gostdlib.ProviderCallableProfileKeyMethod,
+		0,
+		len(node.methods),
+	)
+	var requests []api.RootRequest
+	introducedElevation := false
 	for _, method := range node.methods {
 		selected, ok := provider.Method(method.identity)
 		if !ok {
-			return false, "method is absent: " + method.identity
+			return false, "method is absent: " + method.identity,
+				gostdlib.ProviderCallableProfileKeyInterface{}, nil, false, nil
 		}
 		if selected.Kind() != gostdlib.ProviderInterfaceMethodCallable {
-			return false, "method is not callable: " + method.identity
+			return false, "method is not callable: " + method.identity,
+				gostdlib.ProviderCallableProfileKeyInterface{}, nil, false, nil
 		}
 		if selected.SourceSignature() != method.signature {
-			return false, "source signature differs: " + method.identity
+			return false, "source signature differs: " + method.identity,
+				gostdlib.ProviderCallableProfileKeyInterface{}, nil, false, nil
 		}
 		if selected.Effect() != method.effect {
-			return false, "effect differs for " + method.identity +
-				" (source=" + string(method.effect) +
-				", provider=" + string(selected.Effect()) + ")"
+			implementedElevation := elevate != nil &&
+				method.effect == gostdlib.EffectSynchronous &&
+				selected.Effect() == gostdlib.EffectAsynchronous
+			providerBridge := providerResult &&
+				method.effect == gostdlib.EffectAsynchronous &&
+				selected.Effect() == gostdlib.EffectSynchronous
+			if !implementedElevation && !providerBridge {
+				return false, "effect differs for " + method.identity +
+						" (source=" + string(method.effect) +
+						", provider=" + string(selected.Effect()) + ")",
+					gostdlib.ProviderCallableProfileKeyInterface{}, nil, false, nil
+			}
+			introducedElevation = introducedElevation || implementedElevation
 		}
+		if elevate != nil &&
+			selected.Effect() == gostdlib.EffectAsynchronous {
+			selectedRequests, err := elevate(method)
+			if err != nil {
+				return false, "", gostdlib.ProviderCallableProfileKeyInterface{}, nil,
+					false, err
+			}
+			if len(selectedRequests) == 0 {
+				return false, "effect elevation has no owning request: " + method.identity,
+					gostdlib.ProviderCallableProfileKeyInterface{}, nil, false, nil
+			}
+			requests = append(requests, selectedRequests...)
+		}
+		keyMethods = append(keyMethods, gostdlib.ProviderCallableProfileKeyMethod{
+			SourceIdentity: method.identity,
+			Effect:         selected.Effect(),
+		})
 	}
-	return true, ""
+	return true, "", gostdlib.ProviderCallableProfileKeyInterface{
+		SourceIdentity: node.identity,
+		Methods:        keyMethods,
+	}, api.CombineRequests(requests), introducedElevation, nil
 }
 
 func sameIdentitySet(left map[string]struct{}, right map[string]struct{}) bool {
@@ -583,6 +950,9 @@ func sameIdentitySet(left map[string]struct{}, right map[string]struct{}) bool {
 }
 
 func sourceObjectIdentity(object types.Object) (string, error) {
+	if object == types.Universe.Lookup("error") {
+		return gostdlib.LanguageErrorInterfaceIdentity, nil
+	}
 	contract, err := environmentcontract.Describe(object)
 	if err != nil {
 		return "", err

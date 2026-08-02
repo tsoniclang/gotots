@@ -23,8 +23,11 @@ type standardLibraryProvider interface {
 	) (gostdlib.Facet, bool)
 	GenericCallableFacet(string, string) (gostdlib.Facet, bool)
 	ProviderRepresentation(string, string) (gostdlib.ProviderRepresentation, bool)
+	ProviderInterface(string) (gostdlib.ProviderInterfaceBinding, bool)
 	ProviderCallableProfile(string, string) (gostdlib.ProviderCallableProfile, bool)
 	ProviderCallableProfiles(string) []gostdlib.ProviderCallableProfile
+	ProviderStatefulProfile(string, string) (gostdlib.ProviderStatefulProfile, bool)
+	ProviderStatefulProfiles(string) []gostdlib.ProviderStatefulProfile
 }
 
 func (r *Registry) ProviderInterface(
@@ -34,6 +37,25 @@ func (r *Registry) ProviderInterface(
 		return gostdlib.ProviderInterface{}, false, &api.NameError{
 			Reason: "provider-interface identity is invalid",
 		}
+	}
+	if typeName == types.Universe.Lookup("error") {
+		if r.provider == nil || !r.provider.Valid() {
+			return gostdlib.ProviderInterface{}, true, &api.NameError{
+				Name:   gostdlib.LanguageErrorInterfaceIdentity,
+				Reason: "standard-library provider certificate is invalid",
+			}
+		}
+		selected, ok := r.provider.ProviderInterface(
+			gostdlib.LanguageErrorInterfaceIdentity,
+		)
+		if !ok || selected.SourceIdentity() !=
+			gostdlib.LanguageErrorInterfaceIdentity {
+			return gostdlib.ProviderInterface{}, true, &api.NameError{
+				Name:   gostdlib.LanguageErrorInterfaceIdentity,
+				Reason: "language provider-interface certificate is absent",
+			}
+		}
+		return selected.ProviderInterface(), true, nil
 	}
 	binding, ok := r.byObject[typeName]
 	if !ok || binding.kind != targetBindingProvider {

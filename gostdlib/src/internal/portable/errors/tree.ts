@@ -10,7 +10,7 @@ export abstract class WrappedProviderError extends ProviderInterfaceValue implem
     GoErrorMethodToken,
   ]);
 
-  protected constructor(typeIdentity: object) {
+	protected constructor(typeIdentity: { readonly comparable: boolean }) {
     super(typeIdentity);
   }
 
@@ -27,7 +27,7 @@ export abstract class WrappedProviderError extends ProviderInterfaceValue implem
   }
 }
 
-const messageWrappedErrorType = Object.freeze({});
+const messageWrappedErrorType = Object.freeze({ comparable: true });
 
 export class MessageWrappedError extends WrappedProviderError {
   constructor(
@@ -46,7 +46,7 @@ export class MessageWrappedError extends WrappedProviderError {
   }
 }
 
-const messageWrappedErrorsType = Object.freeze({});
+const messageWrappedErrorsType = Object.freeze({ comparable: true });
 
 export class MessageWrappedErrors extends ProviderInterfaceValue implements GoError {
   override readonly $go$methods: ReadonlySet<object> = new Set<object>([

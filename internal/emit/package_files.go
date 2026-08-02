@@ -325,7 +325,11 @@ func (s *programSession) sourceCallableIsCooperative(
 func (s *programSession) callableFacetIsCooperative(
 	facet api.CallableFacet,
 ) (bool, error) {
-	observation, err := s.ObserveCooperativeCallable(facet.Owner(), facet)
+	observation, err := s.observeCooperativeCallable(
+		facet.Owner(),
+		nil,
+		facet,
+	)
 	if err != nil {
 		return false, err
 	}
@@ -354,7 +358,8 @@ func (s *programSession) recordPackageExport(
 		return nil
 	}
 	builder.exportObjects[object] = struct{}{}
-	return s.publishPackageExports(builder)
+	s.packageExports.enqueue(builder)
+	return nil
 }
 
 func (s *programSession) reconstructPackageExports(

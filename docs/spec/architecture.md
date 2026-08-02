@@ -1379,36 +1379,150 @@ into a synchronous provider parameter. Such an input requires an exact
 provider-owned profile/facet whose implementation, nested interface ABI, and
 outer effect are certified together.
 
-A provider callable profile is a sealed alternate implementation of one exact
-Go function or method, not a call-site adapter. Its certificate records the
-source callable identity, each consumed Go interface identity, every callable
-method identity and selected effect, the provider profile-interface export and
-fingerprint, the roots of the Go parameter/result signature represented in the
-canonical generated ABI, every additional interface-assertion guard consumed
-by the algorithm, and the profile's outer effect. The profile key is derived
-from the sorted identities and selected effects of **all** interfaces the
-profile can execute, including guard-only interfaces; excluding a guard would
-collapse observably different synchronous and cooperative guard ABIs. The key
-is never a hand-authored source name or rendered TypeScript signature. A method
-profile receives its ordinary provider receiver first. An interface-assertion
-guard is passed as the generated canonical type predicate, so the provider
-algorithm neither inspects target shape nor casts a value after
-`$go$implements`.
+A provider callable whose implementation must execute generated interface
+values uses one certified **canonical boundary callable**, not a finite profile
+matrix. Boundary modules live under `gostdlib/src/internal/boundaries/` and are
+discovered from the provider source tree; no function, method, interface,
+parameter, result, guard, effect, or implementation variant is selected by a
+handwritten JSON entry.
 
-The compiler selects the ordinary provider binding when the complete recursive
-public provider ABI matches. On the first mismatch it exact-matches the finite
-certified profile candidates for that source callable against the complete
-current recursive ABI, including guard interfaces, and selects exactly one
-profile
-selection for the whole callable and requires one exact certified match before
-printing the call. Roots marked canonical cross unchanged, including slices,
-tuples, callbacks, and other containers, so aliasing is preserved and no
-element-wise conversion or per-call wrapper is introduced. Results marked as
-provider-owned use the one demand-created provider-to-canonical bridge; results
-marked canonical are never wrapped again. Missing, ambiguous, partially
-matching, or unused profile evidence fails closed. Profile declarations and
-imports are demand-created, and a profile becomes unreachable without a
-compatibility path when the ordinary and canonical ABIs converge.
+Every boundary callable's final parameter directly implements the one marker
+contract:
+
+```ts
+export interface CanonicalBoundaryPolicy<Source> {
+    readonly $go$canonicalBoundarySource?: Source;
+}
+```
+
+`Source` is `typeof` the ordinary public provider function or method. The
+pinned TS-Go checker resolves that property to the exact public target symbol;
+certification joins it to exactly one ordinary provider binding and therefore
+to exactly one selected-Go object identity and signature. Equal spelling,
+structural assignability, declaration text, module convention, or a duplicate
+marker cannot establish the join. The boundary callable has exactly the source
+callable's explicit parameters—plus an explicit receiver first for a method—
+followed by the policy parameter. Arity or source-symbol drift fails
+certification.
+
+The policy contains only direct instances of closed capability contracts:
+
+```ts
+export interface FromProviderRequest<Provider, Canonical> {
+    readonly $go$fromProviderSource?: Provider;
+    $from(value: Provider | undefined): Canonical | undefined;
+}
+
+export interface InterfaceGuardRequest<Source, Narrowed> {
+    readonly $go$guardSource?: Source;
+    (value: GoInterfaceValue | undefined): value is Narrowed;
+}
+```
+
+The first generic argument resolves through the same TS-Go symbol join to an
+exact selected-Go interface identity. At emission, `FromProviderRequest`
+materializes the one demand-created provider-to-canonical bridge for that
+identity and `InterfaceGuardRequest` materializes the generated canonical type
+predicate. Property names choose only fields in the typed target object; they
+never select semantic behavior. Extra properties, indirect wrappers, missing
+markers, unknown source symbols, duplicate capabilities, and unrequested
+runtime values fail certification or strict typechecking.
+
+The source parameters, nested callback parameters/results, containers, tuples,
+and provider method values already use the canonical generated representation.
+They cross unchanged. Provider-created interface values cross only through a
+requested `FromProviderRequest`; optional Go interface assertions use only a
+requested `InterfaceGuardRequest`. No parameter/result index lists, explicit
+canonical-value lists, protocol seeds, candidate keys, method-effect
+cross-products, or ordinary-binding fallback exist in this path.
+
+One boundary implementation handles synchronous and cooperative generated
+implementations through a statically typed recursive `Awaitable<T> = T |
+Promise<T>` contract and unconditionally `await`s operations whose selected
+interface method may be cooperative. This is not runtime Promise inspection:
+both alternatives are checked by TypeScript and JavaScript `await` has the same
+result for an immediate value. The boundary callable's own effect is derived
+independently from its inspected signature. A direct public provider API may
+share the same semantic kernel, but the algorithm is defined once; an internal
+boundary export cannot become a duplicate implementation.
+
+For `io/fs.WalkDir`, the policy requests provider-to-canonical bridges for
+provider-created `error` and `DirEntry` values and exact guards for `StatFS`,
+`ReadDirFS`, and `ReadDirFile`. The same implementation accepts a synchronous
+filesystem and callback or cooperative versions of either, while preserving
+`SkipDir`, `SkipAll`, nil, equality, callback errors, and fallback traversal.
+Adding another effect combination does not add another provider export or
+certificate row.
+
+The runtime interface dynamic-type token owns Go dynamic comparability once per
+concrete type. Its typed immutable contract contains `comparable: boolean`,
+derived from `types.Comparable` for generated types and explicitly certified
+for provider-owned values. Every boxed value refers to that shared token;
+provider bridges preserve the same token. Operations such as `errors.Is` read
+`target.$go$type.comparable` before invoking `$go$equal`, exactly matching Go's
+rule that a non-comparable target skips direct interface equality. A duplicate
+per-value flag, exception probing around equality, type-name table, or provider-
+specific comparability test is forbidden.
+
+The compiler uses a certified boundary callable unconditionally when one is
+owned by the source binding; otherwise it uses the ordinary provider binding.
+There is no ABI-dependent candidate selection and no compatibility fallback.
+The generated boundary call contains the ordinary source arguments plus one
+TS-Go-AST object literal whose fields are exactly the certified capabilities.
+The object and every requested bridge/guard are demand-created and deduplicated
+by typed identity.
+
+A provider-owned named concrete type that retains an interface value across a
+call boundary requires a stateful provider representation profile when that
+interface's canonical callable ABI differs from the provider's public ABI.
+This is a representation decision for the named Go type, not a constructor or
+method-call exception. The certificate exact-joins the selected Go type, every
+recursively retained named interface, every currently supplied source method,
+every direct exported source field, the alternate target type/value export,
+each target member and callable effect, the complete retained-interface
+profile key, and the implementation owner and target fingerprints. Field
+evidence records the Go field name, direct struct ordinal, embedding fact,
+exact selected-Go type, and source location. The target must expose exactly
+the certified public instance fields and instance/static method pairings;
+omitted, extra, inaccessible, or type-drifted fields fail certification or the
+mandatory strict generated-use check. Promoted access remains source-shaped:
+for embedded `Header`, Go `reader.Comment` emits `reader.Header.Comment`; the
+profile does not flatten or duplicate promoted members. Omitted, extra, or
+inaccessible retained interfaces and partially covered method sets fail
+certification.
+
+Every profile-capable named type has one demand-created compilation-owned
+alias artifact with stable type and value identity. All generated type
+references, receiver-operation references, constructor results, interface
+adapters, fields, parameters, and results for that Go type depend on this one
+artifact. The artifact resolves to the ordinary public provider export when
+the complete recursive ABIs match, or to exactly one certified stateful
+profile when they differ. It reconstructs transactionally when a subscribed
+interface-method callable facet changes and requeues consumers only when its
+observable type, value, or callable surface changes. A per-value union,
+runtime Promise/shape branch, cast, eager materialization, direct private
+profile import from a consumer, or independently selected constructor/method
+profile is forbidden.
+
+For example, `bufio.Reader` retains `io.Reader` in `rd` and `error` in `err`.
+If the selected generated `io.Reader.Read` and `error.Error` contracts are
+cooperative while the ordinary provider contracts are synchronous, every
+`*bufio.Reader` use names one generated alias of the certified cooperative
+reader profile. `bufio.NewReader` selects the matching callable profile,
+passes the canonical reader unchanged, and returns that exact represented
+type; `Read`, `ReadByte`, and `ReadBytes` use the method effects certified on
+the same profile. If both retained interfaces return to the ordinary ABI, the
+same generated alias resolves to the public `bufio.Reader` and no cooperative
+profile remains reachable. No source body from GOROOT is translated to obtain
+either implementation.
+
+Provider-created interface values inside a stateful profile must also use an
+exact certified canonical implementation or an explicit canonical value input
+owned by that profile. A provider error with synchronous `Error` cannot be
+returned as a cooperative canonical `error`; identity, nil, equality, method
+tokens, recovery, and callable effect all remain part of the boundary. Hidden
+converter callbacks, stored semantic operations, and target-shape recovery are
+forbidden.
 
 An inaccessible Go interface method remains part of runtime satisfaction and
 method-token identity even when no generated consumer can legally invoke it.
@@ -2277,6 +2391,8 @@ runtime/                            minimal reusable Go-semantics runtime
 gostdlib/                           reusable `@gotots/gostdlib` package
   src/<go-import-path>.ts           ordinary public named exports
   src/internal/node/                Node.js-backed implementation owners
+  src/internal/boundaries/          typed canonical boundary callables
+  src/internal/certify/             checker-visible marker contracts
   test/                             contract and behavior differentials
 
 testdata/constructs/                minimal construct-case fixtures

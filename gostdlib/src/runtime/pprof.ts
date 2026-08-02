@@ -2,17 +2,21 @@ import type { GoError } from "@gotots/runtime/interface-value.js";
 import type { gostring, int64 } from "@gotots/runtime/scalars.js";
 import type { Writer } from "../io.js";
 import {
-  finishCpuSample,
+  beginCpuProfile,
+  finishCpuProfile,
   knownProfile,
+  ProfileNameKey,
   profileSnapshot,
-  startCpuSample,
-  type CpuSample,
 } from "../internal/node/runtime/profile.js";
 import { ProviderError } from "../internal/runtime/error.js";
 import { byteSlice } from "../internal/runtime/slice.js";
 
 export class Profile {
-  constructor(private readonly name: gostring) {}
+  readonly [ProfileNameKey]: gostring;
+
+  constructor(name: gostring) {
+    this[ProfileNameKey] = name;
+  }
 
   static WriteTo(
     receiver: Profile | undefined,
@@ -23,12 +27,9 @@ export class Profile {
     if (receiver === undefined || w === undefined) {
       return new ProviderError("pprof: nil profile or writer");
     }
-    return write(w, profileSnapshot(receiver.name));
+    return write(w, profileSnapshot(receiver[ProfileNameKey]));
   }
 }
-
-let activeWriter: Writer | undefined;
-let activeSample: CpuSample | undefined;
 
 export function Lookup(name: gostring): Profile | undefined {
   return knownProfile(name) ? new Profile(name) : undefined;
@@ -38,22 +39,16 @@ export function StartCPUProfile(w: Writer | undefined): GoError | undefined {
   if (w === undefined) {
     return new ProviderError("pprof: nil writer");
   }
-  if (activeWriter !== undefined) {
+  if (!beginCpuProfile(async (content): Promise<void> => {
+    write(w, content);
+  })) {
     return new ProviderError("cpu profiling already in use");
   }
-  activeWriter = w;
-  activeSample = startCpuSample();
   return undefined;
 }
 
-export function StopCPUProfile(): void {
-  const writer = activeWriter;
-  const sample = activeSample;
-  activeWriter = undefined;
-  activeSample = undefined;
-  if (writer !== undefined && sample !== undefined) {
-    write(writer, finishCpuSample(sample));
-  }
+export async function StopCPUProfile(): Promise<void> {
+  await finishCpuProfile();
 }
 
 function write(writer: Writer, content: Uint8Array): GoError | undefined {

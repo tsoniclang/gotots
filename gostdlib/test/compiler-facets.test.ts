@@ -65,6 +65,7 @@ import {
   BytesBufferWrite,
 } from "../src/internal/facets/recovery-io.js";
 import {
+  SyscallErrnoIs,
   TimeParseErrorError,
   TimeTimeAppendText,
   TimeTimeIsZero,
@@ -73,6 +74,7 @@ import {
 } from "../src/internal/facets/recovery-value.js";
 import { NewReader } from "../src/bufio.js";
 import { NewBuffer } from "../src/bytes.js";
+import { state as fsState } from "../src/io/fs.js";
 import { Description, Sample, Value } from "../src/runtime/metrics.js";
 import {
   StructField,
@@ -94,6 +96,7 @@ import {
   Uint64 as AtomicUint64,
 } from "../src/sync/atomic.js";
 import { Pool } from "../src/sync.js";
+import { EPERM } from "../src/syscall.js";
 import { Builder as StringBuilder } from "../src/strings.js";
 import { state as binaryState } from "../src/encoding/binary.js";
 
@@ -275,7 +278,7 @@ test("recovery facets preserve the direct provider ABI", (): void => {
       destination.set(0, 65);
       return [1, undefined];
     },
-    $go$type: Object.freeze({}),
+		$go$type: Object.freeze({ comparable: true }),
     $go$methods: new Set<object>(),
     $go$implements(): boolean { return true; },
     $go$equal(other): boolean { return this === other; },
@@ -291,6 +294,7 @@ test("recovery facets preserve the direct provider ABI", (): void => {
     BytesBufferWrite(buffer, RuntimeSlice.literal([66, 67])),
     [2, undefined],
   );
+  assert.equal(SyscallErrnoIs(EPERM, fsState.ErrPermission), true);
   const parseFailure = new ParseError(
     "2006",
     "bad",
