@@ -547,6 +547,16 @@ Mutable package variables live in one state module. Checker
 `types.Info.InitOrder` and the package import graph determine package and
 program initialization order; target import order does not.
 
+The package assembly exports the exact observable contract of each exported
+Go declaration. That contract contains the source-facing binding and any
+demand-created associated representation binding required to use it across a
+package boundary. For example, `type Item struct { Value int }` exports only
+`Item` until a reached pointer or container operation materializes
+`Item$Storage`; the assembly then exports both from the same defining module.
+Private kernels, temporaries, and undemanded representation facets are never
+published. The declaration handler owns this set; the package assembly does
+not infer it from spelling or scan printed statements.
+
 Generated support is GoToTS-owned under `runtime/` and demand-created. The
 same physical runtime package is linked into generated code and `gostdlib`,
 so class identity, panic carriers, maps, slices, pointers, channels, and

@@ -208,7 +208,13 @@ func emitDerivedClass(
 			members,
 		),
 	)
-	return api.NewDeclarationEmission(declarations, requests)
+	return declarationEmission(
+		declarations,
+		requests,
+		className,
+		storageDemanded,
+		moduleExport,
+	)
 }
 
 func derivedConstructor(

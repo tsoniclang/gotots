@@ -267,7 +267,13 @@ func emitStructClass(
 			members,
 		),
 	)
-	return api.NewDeclarationEmission(declarations, requests)
+	return declarationEmission(
+		declarations,
+		requests,
+		className,
+		storageOperation != nil,
+		moduleExport,
+	)
 }
 
 func sourceType(

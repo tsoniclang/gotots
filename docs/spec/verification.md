@@ -118,7 +118,8 @@ The gate asserts:
 - source type-parameter count/order equals Go;
 - variadic representation is one semantic slot;
 - every source call supplies exactly the source argument cardinality;
-- package exports expose no private support declaration;
+- package exports expose each demanded cross-package representation binding
+  exactly once and expose no private or undemanded support declaration;
 - indirect callable/interface ABI changes only result Awaitability;
 - private deferred/concretized/facade helpers claim no source identity.
 

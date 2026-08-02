@@ -362,7 +362,13 @@ type Box struct {
 	Value int32
 }
 
+type Derived Box
+
 func demandBox(values []Box) *Box {
+	return &values[0]
+}
+
+func demandDerived(values []Derived) *Derived {
 	return &values[0]
 }
 `),
@@ -380,7 +386,9 @@ func demandBox(values []Box) *Box {
 	sourcePackage := program.Roots()[0]
 	writer := sourcePackage.Types().Scope().Lookup("Writer")
 	box := sourcePackage.Types().Scope().Lookup("Box")
+	derived := sourcePackage.Types().Scope().Lookup("Derived")
 	demandBox := sourcePackage.Types().Scope().Lookup("demandBox")
+	demandDerived := sourcePackage.Types().Scope().Lookup("demandDerived")
 	session, err := newProgramSession(program, DefaultOptions())
 	if err != nil {
 		t.Fatal(err)
@@ -391,6 +399,9 @@ func demandBox(values []Box) *Box {
 	if err := session.require(box); err != nil {
 		t.Fatal(err)
 	}
+	if err := session.require(derived); err != nil {
+		t.Fatal(err)
+	}
 	drainProgramSession(t, session)
 	builder := session.packageBuilders[sourcePackage]
 	if builder == nil {
@@ -398,7 +409,7 @@ func demandBox(values []Box) *Box {
 	}
 	if got := packageExportBindings(builder.exportStatements); !equalStrings(
 		got,
-		[]string{"Box", "Writer"},
+		[]string{"Box", "Box$Storage", "Derived", "Writer"},
 	) {
 		t.Fatalf("initial assembly exports = %v", got)
 	}
@@ -425,13 +436,38 @@ func demandBox(values []Box) *Box {
 	if err := session.require(demandBox); err != nil {
 		t.Fatal(err)
 	}
+	if err := session.require(demandDerived); err != nil {
+		t.Fatal(err)
+	}
 	drainProgramSession(t, session)
-	want := []string{"Box", "Writer"}
+	want := []string{
+		"Box",
+		"Box$Storage",
+		"Derived",
+		"Derived$Storage",
+		"Writer",
+	}
 	contractBindings, ok := session.artifacts.ExportedBindings(
 		api.MustSourceArtifactOwner(box),
 	)
-	if !ok || !equalStrings(contractBindings, []string{"Box"}) {
+	if !ok || !equalStrings(
+		contractBindings,
+		[]string{"Box", "Box$Storage"},
+	) {
 		t.Fatalf("committed Box export surface = %v, %t", contractBindings, ok)
+	}
+	derivedBindings, ok := session.artifacts.ExportedBindings(
+		api.MustSourceArtifactOwner(derived),
+	)
+	if !ok || !equalStrings(
+		derivedBindings,
+		[]string{"Derived", "Derived$Storage"},
+	) {
+		t.Fatalf(
+			"committed Derived export surface = %v, %t",
+			derivedBindings,
+			ok,
+		)
 	}
 	if got := packageExportBindings(builder.exportStatements); !equalStrings(
 		got,
@@ -439,18 +475,22 @@ func demandBox(values []Box) *Box {
 	) {
 		t.Fatalf("reconstructed assembly exports = %v", got)
 	}
-	if builder.exportRevisions != initialRevisions {
+	if builder.exportRevisions != initialRevisions+1 {
 		t.Fatalf(
-			"package export reconstructions = %d, want %d",
+			"package export reconstructions = %d, want %d after storage demand",
 			builder.exportRevisions,
-			initialRevisions,
+			initialRevisions+1,
 		)
 	}
 	if revision := session.artifacts.FacetRevision(
 		builder.assemblyOwner,
 		api.ArtifactFacetImplementation,
-	); revision != initialFacetRevision {
-		t.Fatalf("package export facet revision = %d, want %d", revision, initialFacetRevision)
+	); revision != initialFacetRevision+1 {
+		t.Fatalf(
+			"package export facet revision = %d, want %d after storage demand",
+			revision,
+			initialFacetRevision+1,
+		)
 	}
 	files, err := session.targetFiles()
 	if err != nil {
