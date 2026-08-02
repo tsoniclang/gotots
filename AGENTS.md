@@ -97,6 +97,14 @@ representation of the source program.
 - Ordinary statically selected receiver methods must not accidentally become
   target-language virtual dispatch. Genuine interface dispatch must be O(1)
   per call and must not expand with implementer count.
+- Every source-facing callable preserves its selected Go value-parameter
+  order and cardinality. A value receiver may become `this`, a pointer receiver
+  may become one explicit first parameter, and a variadic slot may use its one
+  exact target representation. Recovery authorities, operation dictionaries,
+  provider policies, bridges, scheduler/effect state, and other compiler
+  mechanics must not appear as translated source parameters. Source generic
+  arity is likewise exact; representation facets and callable profiles stay in
+  private support artifacts or finite exact concretizations.
 - No semantic recovery through `any`, `unknown`, unchecked casts, reflection,
   spelling lookup, source scans, or runtime semantic dispatch.
 - Definitions are emitted once. References may repeat. All helper and import

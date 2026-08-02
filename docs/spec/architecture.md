@@ -1,2514 +1,535 @@
-# Direct Compiler Architecture
+# Architecture
 
 ## Design Rule
 
-Use the simplest architecture that remains exact and scalable:
+GoToTS is a direct, context-aware Go-to-TypeScript compiler:
 
 ```text
-Go syntax/type truth
-┌─────────────────────────┐
-│ ast.File / ast.Node     │
-│ types.Info / Package   │
-└────────────┬────────────┘
-             │
-             ▼
-    contextual emitter
-             │
-             ▼
-typed values generated from the pinned
-official TS-Go external AST protocol
-             │
-             ▼
-pinned tsgo --api printNode
-┌─────────────────────────┐
-│ real TS-Go AST decoder  │
-│ real NodeFactory        │
-│ real Printer            │
-└────────────┬────────────┘
-             │
-             ▼
-       TypeScript text
+selected Go packages
+    -> one Go AST and one coherent go/types graph
+    -> one owner-directed emission walk
+    -> typed values of the pinned TS-Go external AST protocol
+    -> pinned TS-Go decoder, factory, and printer
+    -> strict ESM TypeScript
 ```
 
-The contextual emitter is a traversal and construction service, not a phase
-pipeline. It may follow authoritative references to relevant Go declarations,
-query the existing checker graph, and inspect package relationships while
-handling a source occurrence. It must not materialize those answers into a
-general-purpose intermediate program.
+The Go AST and `go/types` graph are the only source-semantic model. Typed
+TS-Go protocol values under construction are the only target model. There is
+no source inventory, semantic IR, operation IR, call graph, lowering plan,
+handwritten TypeScript AST, text emitter, or post-print rewrite.
+
+Handlers may inspect the current Go node, its ancestors, the selected package
+graph, and existing checker evidence. They may create typed TS-Go AST nodes and
+closed root requests. They must not copy source meaning into a second model or
+rerun the checker.
 
 ## Authoritative Owners
 
-| Concern | Sole owner |
+| Truth | Sole owner |
 |---|---|
-| selected packages, files, overlays, build tags | `internal/load` using `go/packages` |
-| Go syntax and source positions | standard `go/ast` and `go/token` |
-| binding, type, constant, instance, method selection | one coherent `go/types` graph |
-| contextual traversal and translation | `internal/emit` |
-| external target node kinds, fields, encoding, protocol version | pinned TS-Go schema/protocol under `schema/tsgo` |
-| typed target protocol values and factories | generated `internal/target/tsgo` |
-| target lexical placement and deduplication | scoped builders in `internal/emit` |
-| canonical generated-type identity | one generated-artifact registry in `internal/emit/naming`, indexed and named by a full canonical Go-type digest that never includes generated target spelling, then exact-joined by `types.Identical` |
-| mutable package storage and package-local initialization bodies | package-state and passive package-assembly builders in `internal/emit`, driven by the selected `go/types.Info.InitOrder` |
-| whole-program package initialization order | one static program-initialization builder consuming the selected `types.Package` import graph |
-| target decoding and formatting | pinned `tsgo --api` `printNode` |
-| Go primitive target names and support declarations | representation owner in `internal/emit` plus generated `runtime/scalars.ts` |
-| standalone runtime behavior not expressible directly | GoToTS-owned modules under generated `runtime/` |
-| output paths and atomic writes | `internal/output` |
-| runtime/manual/external ownership | explicit contracts under their named roots |
-| independent checks | `internal/verify` |
+| selected source files and package classes | selected toolchain plus `go/packages` metadata |
+| Go syntax and validity | selected toolchain parser and type checker |
+| bindings, types, constants, instances, selections, signatures | the one selected `go/types` graph |
+| construct meaning in context | the semantic handler selected by the parent-owned child role |
+| Go callable value/type-parameter shape | selected `go/types.Signature` and declaration |
+| target representation of a Go type | one representation owner keyed by canonical Go type identity |
+| zero, copy, equality, hash, conversion, and arithmetic | the corresponding value-family owner |
+| target declaration and later revisions | one declaration assembly keyed by exact Go identity |
+| imports, placement, sealing, and printing | root emitter |
+| cooperative callable effect | callable artifact plus canonical indirect-call ABI |
+| panic carrier and deferred recovery entry | `runtime/panic.ts` plus the callable's private deferred entry |
+| provider implementation | certified `@gotots/gostdlib` export |
+| provider/generated conversion | generated static facade for the selected Go callable or type |
+| target AST shape and ordering | pinned TS-Go schema and generated protocol bindings |
 
-No second package may recreate one of these truths.
+One fact may have many references but one producer. A second workaround in the
+same semantic class reopens its owner.
 
-## Selected Go Build Profile
+## Source Selection
 
-Every load resolves one immutable Go build profile before invoking
-`go/packages`. The profile contains the selected toolchain identity, `GOOS`,
-`GOARCH`, `CGO_ENABLED`, and a sorted unique build-tag set. A request that does
-not name a cross-target profile resolves to the compiler's explicit host
-profile; `internal/load` still supplies every profile field to `go/packages`
-and never inherits `GOOS`, `GOARCH`, `CGO_ENABLED`, `GOFLAGS`, or tags from the
-calling shell. The resolved profile is retained on the loaded program and is
-part of every environment/provider compatibility decision and proof report.
+Every compilation records an immutable Go build profile:
 
-For example, a Node artifact built for `linux/amd64` may deliberately select
-the ecosystem `noasm` tag. That selects the package's admitted portable Go
-files where they exist:
+- selected Go executable and toolchain fingerprint;
+- `GOOS`, `GOARCH`, and `CGO_ENABLED`;
+- sorted build tags and explicit build flags;
+- module/workspace roots and overlays.
 
-```go
-//go:build noasm
+Ambient shell values do not silently change selection. The loader uses
+toolchain metadata, not import-path spelling, to distinguish:
 
-func initCPU() {
-    cpuid = func(uint32) (uint32, uint32, uint32, uint32) {
-        return 0, 0, 0, 0
-    }
-}
-```
+- workspace and source-available dependency packages, which are translated;
+- standard-library packages, whose declarations come from the selected
+  `GOROOT` and whose behavior comes from `gostdlib`;
+- toolchain/language pseudo-packages, which have explicit compiler ownership;
+- true native, cgo, platform, or unavailable boundaries, which receive exact
+  obligations or typed unsupported diagnostics.
 
-It must not silently select `amd64` assembly declarations merely because the
-GoToTS process happens to run on an amd64 machine. Conversely, selecting
-`js/wasm` changes `runtime.GOOS`, `runtime.GOARCH`, integer sizing, source-file
-selection, and the standard-library contract together; it is invalid to load
-that source profile and then link an `amd64` provider. Build tags may select
-source, but they never authorize a compiler package-name special case or a
-fabricated function body.
+A load fails on parse/type errors, inconsistent package identity, an
+unavailable selected file, or build-profile drift.
 
-Source-available module dependencies remain source by default. A function
-declaration selected from such a package with no Go body is one exact native
-or external obligation owned by that declaration. The source emitter emits
-its complete statically typed callable shape with a body that raises the named
-unresolved obligation and records the canonical function identity, signature,
-position, and selected build profile once. It does not emit `declare`, erase
-the signature, infer an implementation from the package name, or stop the
-whole compilation before the environment boundary can be inspected. A
-selected implementation may later replace that obligation through an exact
-provider contract. Executing an unresolved body raises deterministically, and
-every reachable unresolved body blocks publication.
+## Owner-Directed Dispatch
 
-## Source Admission And Owner-Directed Traversal
+The root has category dispatchers for declarations, statements, expressions,
+types, and parent-owned syntax. A dispatcher selects one handler and never
+recursively walks the node.
 
-The selected Go toolchain is the executable language authority:
-
-- `go/parser` admits syntactically valid selected files;
-- `go/ast` supplies the typed syntax shape; and
-- one coherent `go/types` graph proves bindings and semantic validity.
-
-Any selected-package parse or type error blocks emission. Parser-recovery
-`BadExpr`, `BadStmt`, and `BadDecl` nodes are diagnostic evidence only and
-never enter a translation handler.
-
-The written Go specification and its EBNF explain the language. GoToTS must not
-copy that grammar into a production parser or generate a second production
-visitor from it. Invalid syntax fails before emission. For example,
-`somefunc(if condition {})` cannot produce a call argument because
-`CallExpr.Args` contains `ast.Expr` values and `ast.IfStmt` is an `ast.Stmt`.
-
-Production traversal uses these components:
+Each handler owns a closed child contract:
 
 ```text
-Emitter
-  owns the session, shared services, and category dispatchers
-
-Dispatcher
-  routes one explicitly requested declaration, statement, expression, or type
-  to exactly one semantic-owner Handler; it never descends automatically
-
-Handler
-  interprets the complete construct case, accounts for every direct field,
-  consumes inseparable syntax, delegates independent children with explicit
-  roles and context, and constructs target values
-
-ChildEmitter
-  narrow callback implemented by Emitter and used by handlers to request
-  contextual child dispatch without importing the root or sibling handlers
+parent node
+    -> child field
+    -> semantic role
+    -> dispatch category
+    -> order
+    -> expected result shape and legal placement
 ```
 
-A handler owns a closed child contract. Every direct source field is handled in
-one of five ways:
+The parent consumes inseparable syntax itself and delegates each independently
+meaningful child exactly once. For example, a call owner decides which child is
+the callee, which are ordinary arguments, whether the last argument is
+variadic expansion, and the expected parameter type of each argument. An
+identifier child never scans upward to rediscover that role.
 
-1. syntax inseparable from the parent rule is consumed directly by the owner;
-2. a semantically independent child is delegated exactly once with a closed
-   role and context;
-3. an optional absent child is explicitly accepted;
-4. non-semantic metadata is assigned to its named owner; or
-5. an impossible shape fails with a typed malformed-AST diagnostic.
+The selected Go parser/checker rejects grammatically or semantically illegal
+children. Production does not duplicate the Go grammar. Verification derives
+the selected toolchain's AST fields and forms and exact-joins them to handlers
+and parent-owned dispositions.
 
-Direct owner consumption is not a hidden recursive visit. The owner names the
-field and its semantic use explicitly. For example, a call owner may consume
-callee syntax as a conversion target or built-in identity rather than routing
-it through ordinary value-expression handling.
+## Project Structure
 
-Use `go/ast`'s static child type when it is already exact. Narrow explicitly
-when an AST field is broader than the grammar or semantic role. For example,
-`IfStmt.Else` has static type `ast.Stmt`, but its handler accepts only `nil`, a
-block, or another `if`; it must not send an arbitrary value to the general
-statement dispatcher.
+The directory tree grows by semantic ownership, not by a flat file per syntax
+node:
 
-No `ast.Walk`, `ast.Inspect`, generated visitor, or equivalent generic walker
-may drive production emission or recurse on behalf of a handler. A bounded
-read-only query may inspect the authoritative Go graph for a representation
-decision, but it must not emit nodes, duplicate source state, or bypass the
-owning handler. Generic visitors are reserved for independent verification,
-selected-toolchain contract reconciliation, and other non-producing checks.
+```text
+cmd/gotots/                         CLI only
+internal/load/                      selected toolchain/package graph
+internal/emit/
+  root/                             orchestration, placement, convergence
+  declaration/
+    function/
+    variable/
+    constant/
+    type/
+  expression/
+    call/
+    selector/
+    index/
+    operator/
+    literal/
+  statement/
+    assignment/
+    branch/
+    loop/
+    range/
+    defer/
+    select/
+  type/
+    basic/
+    defined/
+    aggregate/
+    signature/
+    interface/
+  value/
+    zero/
+    copy/
+    equality/
+    conversion/
+  provider/
+    contract/
+    facade/
+    obligation/
+  runtime/
+    panic/
+    pointer/
+    map/
+    channel/
+internal/target/tsgo/               generated protocol bindings/encoder
+internal/verify/                    independent walls and product gates
+schema/tsgo/                        pinned external TS-Go contract
+gostdlib/                           standalone manually maintained provider
+```
 
-## Allowed Emission State
+Nesting is introduced when a semantic owner has multiple independent
+sub-owners. Root files orchestrate; they do not accumulate feature logic.
+Maintained non-generated files stay focused and below 600 physical lines.
 
-An emission session may retain:
+## Emission Context And Results
 
-- selected package/file references and the shared `types.Info`;
-- one immutable compilation-wide profile containing closed, independent
-  semantic-policy axes;
-- a stack of source context and target lexical builders;
-- deterministic mappings from typed Go objects to target names/declarations;
-- already-created typed TS-Go protocol AST values;
-- typed root requests for placement, declaration requirements, and artifact
-  dependencies;
-- opaque immutable composition nodes used only to retain ordered root-request
-  leaves without copying transitive child lists;
-- canonical encoded TS-Go observable contract facets plus their deterministic
-  reverse-dependency and dirty sets;
-- source-map/provenance links; and
+A handler receives immutable context:
+
+- current lexical and artifact owner;
+- parent-assigned role and expected result shape;
+- exact `go/types` evidence;
+- target scope capabilities;
+- selected compilation/build profiles;
+- a narrow child-emitter interface.
+
+It returns typed TS-Go AST values plus closed requests:
+
+- imports and support modules;
+- placement at a preferred legal scope;
+- declaration requirements;
+- observable-facet dependencies;
 - typed diagnostics.
 
-It may not retain:
+It does not receive arbitrary mutable target ancestors. The root owns file,
+class, function, block, and expression builders.
 
-- copied source occurrences or a parallel parent graph;
-- a catalog-produced inventory of the current program;
-- normalized semantic operations;
-- a target-independent semantic model;
-- a representation or whole-program plan consumed by a later lowering pass;
-- target source fragments; or
-- a second checker-derived fact store.
+### Placement
 
-A narrow memoized answer is allowed only when its key is the authoritative Go
-object, its value is directly needed target state, and recomputation would
-produce the same answer. It is a cache, not a new identity domain.
+Every prerequisite names:
 
-Target names are keyed by `types.Object`, not source spelling. A declaration
-that shadows an ancestor receives a deterministic distinct target name because
-JavaScript/TypeScript lexical declarations have a temporal dead zone before
-their textual declaration while the new Go variable is not in scope during
-the right side of its short declaration. The lexical name service emits the
-portable ASCII identifier subset accepted by strict TypeScript. Non-ASCII Go
-identifier runes are escaped deterministically. Escaped spellings are not
-assumed to be injective: every target namespace, including package import
-qualifiers, allocates from the escaped candidates as one globally checked
-collision domain with deterministic Go-identity ordering.
-Every pinned TS-Go keyword spelling and strict-binding name is escaped at this
-same boundary; the keyword set is generated from the pinned `SyntaxKind`
-contract rather than copied into the emitter.
-Names are distinct across the same or ancestor/descendant lexical declaration
-spaces in either source order so a target declaration remains valid throughout
-the complete enclosing block. Sibling scopes and distinct functions may reuse
-a target name.
-Shadow suffixes and compiler-created prefixes are distinct, and allocation
-excludes every portable source-name base in the loaded package before emission;
-there is no claim that a valid cross-target identifier namespace is impossible
-for Go source to spell. Compiler-created names and all collision decisions are
-owned by this one service. The service derives its target-name index once from
-the authoritative `go/types` scope tree in outer-to-inner order. This is an
-O(n log n) target-name cache keyed by `types.Object`, not a source inventory or
-semantic plan; declaration and reference lookup during emission is O(1)
-average.
+1. its semantic execution boundary;
+2. all legal scopes;
+3. its preferred scope.
 
-Multiple package `init` declarations are the one legal same-spelling
-package-level definition family that is not represented as ordinary lookup
-members of the package scope. The same name service assigns those exact
-`*types.Func` identities in canonical source-module-path and physical
-declaration order before scheduling. Cross-file `token.Pos` allocation,
-checker map iteration, root order, and demand order never select which
-initializer receives a collision suffix.
+The root inserts at the preferred legal scope, not merely the nearest legal
+scope. Static imports always go to file scope even if discovered in a function.
+Evaluation-sensitive temporaries remain at the exact expression/statement
+boundary. When an expression needs statements, its result carries those
+prerequisites so the parent can either place them legally or choose an
+expression-only construction. Dynamic imports are forbidden.
 
-Representation consistency has one owner inside `internal/emit`. On the first
-request for a Go type, object, or method, that owner queries the complete
-selected Go AST/type graph, chooses the exact target form, and creates or
-reserves its TS-Go declaration. Every later use retrieves that same target
-state by authoritative Go identity. Source-semantic and base representation
-decisions are final when selected; they are never serialized into a plan or
-consumed by a later lowering stage. A genuinely use-dependent target
-obligation may nevertheless reconstruct an open target artifact. If that
-reconstruction changes a consumer-visible TS-Go contract facet, the root
-reconstructs only consumers that recorded a dependency on that exact facet
-before sealing.
+## Revisable Target Artifacts
 
-Compilation policy is selected once at the compilation entry point and is
-immutable for the complete dependency closure. Each axis is a closed typed
-choice. The initial integer-representation axis selects `number` (the default)
-or `bigint`. The initial evaluation-order axis selects `direct` (the default)
-or `preserve-go`. The initial concurrency-semantics axis selects `disabled`
-(the default) or the explicitly requested `cooperative` profile. Handlers query
-the typed profile carried by their context; they never inspect CLI flags or
-independently select behavior. A generated file set may not mix selections.
-Every selected axis is part of reproducibility evidence and any eventual
-output manifest.
+Emission is open until every requested target artifact reaches a fixed point.
+One declaration assembly owns the complete pre-seal TS-Go AST for one Go
+definition. A later semantic demand may request a revised constructor, member,
+modifier, copy operation, interface adapter, helper import, or callable effect.
 
-`direct` evaluation emits target expressions without introducing temporaries
-solely to preserve the source order of expressions that target reshaping
-reorders. It applies equally to literals, calls, and other expressions; no
-purity or side-effect heuristic selects behavior. For example, a keyed
-`Point{Visible: visible(), X: x()}` represented by a positional
-`Point(X, Visible)` constructor emits `new Point(x(), visible())`. This is an
-intentional profile boundary and is not exact Go behavior when the calls'
-effects expose their order. `preserve-go` evaluates `visible()` and `x()` into
-source-ordered temporaries before constructing `Point`, preserving Go behavior.
-Temporaries required by target syntax or independently selected semantics such
-as parallel assignment are unaffected by this axis.
+References subscribe to closed observable facets such as:
 
-## Definition Scheduling
+- callable signature;
+- instance surface;
+- static surface;
+- constructor surface;
+- exported value surface.
 
-Emission is demand-driven from explicit executable, exported-API, test, and
-extension roots plus Go package initialization roots. A resolved reference
-enqueues its authoritative Go object for emission. The scheduler stores only
-`pending` and `emitted` Go identities and direct links to their target
-declarations; it does not copy call edges into a source graph.
+Body-only changes do not invalidate users. When a facet changes structurally,
+the root requeues only its reverse subscribers. Reconstruction transactionally
+replaces the artifact's complete AST, requests, dependencies, and facet
+contract. Identical facets do nothing; oscillation fails. Final printing occurs
+only after convergence.
 
-Root intent is a closed typed part of the request and is not discarded after
-object selection. Whole-file coverage, exported Go API, ordinary declaration
-demand, and explicit constant-representation demand are distinct. This matters
-when a source declaration has no single runtime form: an unused exported
-untyped constant is a compile-time-only Go contract and therefore has no target
-declaration, while an explicit constant-representation root names and
-materializes exactly one concrete projection. A generic representation request
-for an untyped constant is invalid. Only a typed compile-time-only disposition
-may publish an explicit empty observable contract; an empty concrete
-representation root is a gate failure.
+There is no text patching, shared mutable TS-Go node mutation, spelling-keyed
+dependency, unconditional rescan, or duplicate old/new path.
 
-Reaching any source-available package also reaches that package's complete
-initialization obligation. This includes every package variable, including an
-unexported or otherwise unreferenced variable whose initializer has effects,
-and every admitted `init` function. Reachability may prune packages, but it
-must not prune initialization within a reached package. The selected
-`go/types.Info.InitOrder` is the sole variable-initializer order; the emitter
-does not infer order from files, imports, references, or source positions.
+## Source-Shape Conservation
 
-Function values, interface conversions, callbacks, reflection contracts,
-generic instantiations, initialization, runtime helpers, manual obligations,
-and external contracts add work through explicit typed rules at the construct
-that exposes them. A definition is emitted at most once per required target
-specialization. Cycles reserve target declarations before bodies are emitted.
+Every target callable that claims a Go source identity directly projects the
+selected `go/types.Signature`.
 
-Consequently, every generated/manual/external obligation reached by the work
-queue is product-reachable and must be resolved. Unselected declarations need
-not become placeholders merely because they share a source package. A
-library-generation request makes its selected public API an explicit root.
+- Ordinary value parameters preserve order and cardinality.
+- A value receiver may become TypeScript `this`.
+- A pointer receiver may become one explicit first parameter so nil reaches the
+  Go method body.
+- A variadic parameter remains one semantic slot, represented either as the Go
+  slice value or one TypeScript rest parameter.
+- A cooperative result may become `Promise<R>` or `Awaitable<R>`.
+- Source type parameters preserve order and cardinality.
 
-## Context And Placement
+No source-facing declaration, function value, interface method, environment
+callable, package export, or ordinary call gains a recovery authority,
+operation function, provider policy, bridge set, scheduler state, storage
+facet, profile selector, or digest-named parameter/variant.
 
-Each handler receives an immutable contextual view:
+Compiler-owned private support definitions may have implementation parameters
+only when they claim no Go source identity and are not exposed through package
+assembly. Every generated source call still has the source argument list.
 
-```text
-source package/file/node
-parent-supplied grammatical role
-expected Go type and result arity
-expression/statement/declaration position
-lexical and control-flow boundary
-current target scope identities and capabilities
-shared go/types evidence
-generated TS-Go protocol factories
+## Callable Representation
+
+### Direct Calls
+
+A statically selected function, method, or immediately invoked literal uses its
+exact callable artifact. If the body blocks under the cooperative profile, its
+result is Promise-bearing and exact direct callers emit `await`. Synchronous
+direct paths stay synchronous.
+
+### Indirect Calls
+
+The compiler does not build a transport/dataflow graph to predict which
+function implementation reaches a variable, field, interface, or container.
+Under the cooperative profile, each receiver-free Go function signature has
+one canonical indirect target ABI:
+
+```ts
+type Awaitable<T> = T | Promise<T>;
+type GoFunc<A, R> = (argument: A) => Awaitable<R>;
 ```
 
-Children do not walk upward to guess their role. Parents already know why a
-child exists and pass that fact explicitly. A parent may select a specialized
-child entry point when ordinary expression dispatch would be semantically
-wrong, such as a store target, condition, call callee, type expression, or
-comma-ok result.
+The same rule applies recursively to callable parameters/results and to
+interface methods. An indirect call unconditionally `await`s the result.
+This is statically typed and performs no thenable inspection. A synchronous
+implementation is directly assignable; an asynchronous implementation is also
+assignable. Under the disabled-concurrency profile the ABI is synchronous and
+blocking constructs fail at their owner.
 
-### Value Transfer
+Named function types retain exactly their source type parameters. They do not
+gain a hidden payload/effect type parameter. Method values and method
+expressions create typed wrappers with the exact receiver-free Go signature;
+they never use `.call`, `.apply`, or `.bind`.
 
-One value-transfer owner is the only authority for moving an emitted value
-across a typed Go boundary. Its input is the source occurrence, actual
-`go/types.Type`, destination `go/types.Type`, closed copy-ownership mode, and
-typed TS-Go expression. The copy mode records whether this boundary performs
-the Go value copy or only adapts representation because the value is already
-fresh or a typed destination operation (such as aggregate map storage)
-performs the copy exactly once. It first requires
-`types.AssignableTo(actual, destination)`, then composes, in order:
+This single ABI replaces callable-profile matrices, public cooperative
+variants, effect-dependent named-type arity, and runtime Promise detection.
 
-1. the exact source representation projection when actual and destination
-   representations differ;
-2. the destination Go value-copy operation at its declared single owner; and
-3. the exact destination representation construction when required.
+## Values And Representations
 
-Arguments, returns, assignments, declarations, aggregate elements, map
-entries, channel transfers, and generated generic calls all use this owner.
-They do not call a target-only copy function and do not independently
-special-case defined callable, slice, map, pointer, channel, basic, or array
-families. Explicit Go conversions remain owned by the conversion handler and
-are not inferred from assignment.
+The representation owner chooses the smallest exact direct TypeScript shape.
+Defaults prefer readable source and no semantic machinery:
 
-An expected type guides child representation but is not itself a transfer.
-Root expression dispatch therefore never boxes, copies, or wraps a result merely
-because `Context.ExpectedType` is present. The parent that owns the actual Go
-boundary invokes the value-transfer owner exactly once. Synthesized values that
-do not pass through expression dispatch—including captured multi-result tuple
-elements—enter that same owner directly. No expression-level pre-adapter,
-tuple-specific adapter, or target-shape probe may coexist with this route.
+- integer profile defaults to `number`; `bigint` is an explicit profile;
+- evaluation defaults to direct TypeScript evaluation; `preserve-go` enables
+  additional ordering temporaries;
+- copy, pointer, interface, map, channel, and runtime support is demanded only
+  when a selected occurrence requires it.
 
-For `type Value []byte`, passing `Value` to a `[]byte` parameter is admitted by
-`go/types` and produces the static payload projection `value.$value`; passing
-an unnamed `[]byte` to a `Value` destination produces one `new Value(...)`.
-Passing one defined slice type to a different defined slice type is rejected
-before target construction. No cast, structural target assignability,
-spelling comparison, or dynamic wrapper inspection participates.
+GoToTS-owned scalar aliases preserve Go type identity for future consumers
+while mapping to ordinary TypeScript primitives. Generated output imports no
+unrelated compiler.
 
-The root emitter owns mutable target builders, declaration assemblies, the
-artifact dependency graph, and the placement service. Handlers cannot mutate
-an arbitrary target ancestor. They return typed TS-Go protocol AST values and,
-when additional target statements, declarations, imports, changes to an owned
-declaration, or dependencies on another artifact are required, typed requests
-with:
+Nil-capable values use `undefined` unless their family requires a distinct
+carrier. Zero, copy, equality, hashing, conversion, and mutation are each owned
+once by the value family. A class gains `$copy` only when the compilation
+requests copying that class; revisable artifact reconstruction adds it before
+seal.
 
-1. exact target nodes or an exact declaration identity plus closed requirement;
-2. legal scopes;
-3. the preferred scope;
-4. the execution/evaluation constraint; and
-5. a typed deduplication owner where repetition is legal; and
-6. for a dependency, the authoritative provider identity and one closed
-   observable facet.
+Pointers identify addressable locations, not merely values. A direct value is
+used when no address/alias semantics are demanded. A pointer carrier is
+introduced at the owning addressable location only when mutation, aliasing,
+address comparison, or nil pointer behavior requires it. Read-only scalar
+arguments do not become carriers merely because Go's source type is a pointer
+when the checker and use contract prove direct representation exact.
 
-Name reservation and placement are separate operations. The authoritative
-name owner indexes stable target names from the selected `go/types` scope tree
-before emission; a handler reserves or references that indexed name while
-constructing its target node. The handler returns any associated placement
-request in its emission result. Only the root placement owner consumes requests
-and mutates a target builder. No `Context` capability may silently install an
-import or hoisted declaration while a child is being translated.
+Maps use one canonical generated `GoMap<K,V>` runtime type because JavaScript
+`Map` does not preserve Go key equality, zero-on-miss, comma-ok, copy, or
+iteration semantics for all Go keys. Source-facing variables keep their Go
+names; runtime class names are stable semantic names, never per-site hashes.
 
-Composing child results does not flatten and recopy every transitive root
-request. The request API owns one opaque immutable persistent sequence whose
-leaves are the typed requests above. Composition copies only immediate child
-roots, preserves exact source order, and neither deduplicates nor attaches
-semantic meaning to tree shape. The sequence is request transport, not source
-IR or a second fact store. An ordinary order-sensitive observer may walk every
-logical leaf. A root consumer instead visits each persistent sequence identity
-and immutable payload identity once in first-occurrence order, then performs
-typed owner canonicalization while admitting placement, requirements, and
-artifact dependencies. It must not flatten the logical request tree and
-deduplicate afterward: a shared persistent subtree can represent exponentially
-many paths to the same immutable payload. Distinct payload identities remain
-observable even when they initially name the same owner, so conflicting import
-bindings and phase upgrades are still validated. A sequence node is never
-interpreted as an import, declaration requirement, or artifact dependency, and
-no mutable backing storage is exposed.
+## Structs, Methods, And Embedding
 
-Each atomic request is a bounded immutable handle to one constructor-validated
-payload. Copying or composing results shares that payload; it does not copy the
-request's owner, TS-Go import nodes, requirement, or dependency. Payloads are
-never mutated after their constructor returns.
+A Go struct is emitted as a TypeScript class when that preserves its selected
+value and method behavior. Fields are initialized to Go zero values.
 
-A use-dependent target obligation is a declaration requirement keyed by the
-authoritative `types.Object` and a closed requirement kind. It is owned by the
-semantic handler and generated source-file module containing that declaration,
-not by the first caller. The first admitted requirement family is a named
-struct's static zero/copy/equality operation, keyed by its exact
-`types.TypeName` and closed operation kind. The operation is incorporated into
-the owning class and callers use the statically selected Go type
-(`Box.$copy(value)`), never an instance. A defined-basic wrapper instead
-composes equality directly from its underlying value and has no operation
-requirement. Applying one requirement may produce further typed requests, such
-as `Box` copying requesting `Point.$copy`.
+- value-receiver methods are instance methods using `this`;
+- pointer-receiver methods are class-owned static/unbound methods whose first
+  parameter is the represented receiver;
+- nil pointer receivers enter the body; dereference panics only where Go would;
+- ordinary concrete calls use the exact `go/types.Selection`, not target
+  virtual lookup.
 
-An interface adapter's callable surface is also use-dependent. The adapter is
-owned once by the exact concrete dynamic Go type, while each concrete-to-
-interface conversion requests the exact completed target interface contract
-on every artifact revision that still contains that conversion.
-An interface-to-interface conversion or assertion records the exact static
-source interface and target interface. Direct concrete boxing seeds an
-adapter's reachable-contract set. A transition may add its target only when
-its source contract is already in that adapter's reachable set and
-`go/types` proves the concrete type implements the target. The target-name
-owner computes this deterministic closure for existing and future adapters.
-Its identity cache may deduplicate canonical pairs, but it must return the
-complete current request set on repeated reconstruction; discovery history
-may not suppress request transport. Mere implementation of the transition's
-source interface is not reachability and must not widen an adapter that was
-boxed only into another contract. The final adapter method surface is the
-deterministic union of exact contracts with current request owners. It is not
-the concrete type's complete receiver method set, an
-implementer union, a value-flow graph, or a runtime method lookup table.
-The adapter payload retains the exact representation selected for its concrete
-dynamic type. Each adapter method separately consumes the selected provider
-method's origin-owned receiver ABI. If those representations differ, the one
-receiver-selection owner emits the same typed, nil-preserving prerequisites as
-an ordinary selected call, and the adapter places them before invocation.
-Adapters never assume that a concrete payload and a generic method origin have
-the same pointer representation, rediscover the receiver ABI, or discard
-receiver prerequisites.
+Embedding does not automatically mean `extends`. Native inheritance is used
+only when one proved spine preserves promoted field/method selection, nil
+behavior, value copying, construction, shadowing, and addressability. Otherwise
+the embedded field remains composition and promoted access follows the exact
+selection path. A type may `implements` an interface only as a target
+declaration aid; Go interface satisfaction remains structural and checker-owned.
 
-This rule also applies when a later address demand changes a whole pointer
-family. For example, `func Use(m *sync.Mutex) { m.Lock() }` may initially
-represent `m` directly as the provider's `Mutex | undefined`. If any selected
-source operation requires an address carrier for `*sync.Mutex`, the same
-parameter becomes `GoPointer<Mutex, MutexStorage> | undefined`; the certified
-provider method does not change. The receiver-selection owner then evaluates
-the carrier once and produces `undefined` for a nil pointer or the provider's
-typed `$fromStorage(pointer.value)` projection for a non-nil pointer. It must
-not make the provider accept `GoPointer`, dereference nil before entering the
-method, or project a receiver that is already in the certified direct ABI.
+## Interfaces
 
-Formatting a Go interface value is the one provider observation that cannot be
-recovered from the public interface contract alone. For example,
-`fmt.Sprintf("%d", 7)` boxes an exact integer, while the manual `fmt` provider
-receives only `GoInterfaceValue`. The interface adapter therefore owns one
-intrinsic `$go$format` operation over its exact statically typed payload. The
-operation receives the parsed verb, flags, and precision and returns one
-unpadded Go rendering; `%T` uses the adapter's canonical dynamic Go type.
-`fmt` remains the sole owner of directive parsing, argument indexing, width,
-padding, writer behavior, and `%w` error construction.
+Every reached concrete-to-interface conversion requests one typed adapter for
+the exact concrete dynamic type. The adapter owns:
 
-This intrinsic is the static substitute for the narrow reflection that Go's
-`fmt` performs. It is not a general reflection API and does not expose the
-payload on `GoInterfaceValue`. Generated adapters select behavior directly from
-their authoritative `go/types.Type`; provider-owned interface values implement
-the same closed operation explicitly. An unsupported dynamic type/verb pair
-raises an explicit Go runtime failure. Using `any`, `unknown`, a payload cast,
-`String(object)`, object-shape inspection, a runtime type-name registry, or a
-call-site formatter special case is forbidden.
+- canonical runtime type metadata;
+- exact demanded method tokens;
+- the represented payload;
+- Go equality/comparability behavior;
+- native constant-size dispatch methods.
 
-The operation is constant-size per concrete adapter and is emitted only once
-with that adapter. A source program that adds formatting calls may enlarge the
-reached adapters but may not duplicate format bodies per call or per interface
-contract. If complete static rendering for a new Go family becomes available,
-the family owner replaces that adapter branch; no fallback formatter survives.
+Interface calls are O(1) and do not emit implementer switches. Adapter methods
+invoke the exact concrete owner, preserving value-copy and pointer semantics.
+Interfaces carry no `any`, `unknown`, reflective lookup, source-name tests,
+or erased payload recovery.
 
-Construction admits each `(concrete adapter, contract)` pair at most once and
-propagates only newly reachable pairs through transitions indexed by source
-contract. Repeated occurrences of an already-known conversion or assertion
-perform no global adapter scan and schedule no duplicate reconstruction.
+Under the cooperative profile, interface method results use the canonical
+`Awaitable` callable rule. A synchronous concrete method and an asynchronous
+one satisfy the same generated method contract without profile variants.
 
-This demand state is target-construction state: closed interface types and
-canonical type-identity keys enter through typed root requests and are consumed
-only to reconstruct generated adapter AST. It never answers a Go semantic
-question; `go/types.Implements`, completed interface method sets, and exact
-method selections remain the sole truth. Adding or removing an unrelated
-concrete receiver method cannot alter an adapter unless that method enters a
-demanded interface contract.
+## Generics
 
-A generated artifact that consumes a generic source declaration resolves that
-declaration's ABI identities through the canonical source owner, not through
-the consumer's lexical scope. For example, `OrderedSet[T]` calling
-`OrderedMap[K,V].Set` observes the receiver representation owned by the
-`OrderedMap.Set` origin and the concrete representation owned by
-`OrderedMap[T,struct{}]` separately. Relaxing lexical identity, copying the
-foreign parameter spelling `K`, or assigning a consumer-local identity is
-forbidden.
-
-Addressable local storage is the second admitted requirement family. An
-address expression identifies the exact `*types.Var` whose storage becomes
-observable and requests that storage from the enclosing reconstructible
-artifact: either the exact source `*types.Func` or the exact checker-produced
-package initializer. That owner reconstructs its whole typed TS-Go artifact
-with a cell only at each requested variable's lexical declaration. Parameters
-and receivers keep their observable callable parameters and receive one
-body-local cell; local variables and named results are declared directly as
-cells. A function-literal local inside a package initializer therefore requests
-the package-initializer artifact while retaining its cell inside the literal.
-Reads, stores, captures, and address formation all query that one
-identity-keyed selection. No source prepass, escape-analysis copy, blanket
-local wrapping, or second body emitter may select storage.
-
-The concrete storage representation is installed once by the root emitter as
-a typed `api.Context` capability. Construct handlers consume only that
-capability; in particular, the generic assignment owner imports neither the
-storage implementation nor the pointer runtime. This keeps assignment ordering
-independent of the selected value representation while retaining one storage
-truth owner.
-
-Logical value representation and addressable storage representation are
-separate facets of the same value-family owner, but separation is not emitted
-until an exact use requires it. A named-struct object is already a stable,
-mutable JavaScript location. Therefore an ordinary `*S` whose reached uses are
-nil, identity, field access, `new(S)`, `&S{}`, `&local`, or receiver calls is
-represented directly as `S | undefined`. `&local` makes that exact local keep
-one stable `S` object; later whole-value assignment copies fields into that
-object instead of rebinding it. Unaddressed values continue to rebind at Go
-copy boundaries. No `$Storage`, `$make`, `$storageOf`, `$fromStorage`, or
-`GoPointer.dereference` surface is emitted for this ordinary class-reference
-case.
-
-`GoPointer<Logical, Storage>` remains the one explicit location protocol where
-direct class identity is insufficient: pointers to scalars, pointers to
-pointers, array or slice elements, interior field locations, and pointer
-conversions that require a typed representation view. `Logical` preserves Go's
-named-type identity, while `Storage` is the canonical mutable representation
-shared by every admitted pointer type whose Go base types are identical under
-the selected toolchain's pointer-conversion rule. The runtime reads and writes
-only `Storage`; load and store sites ask the value-family owner to convert
-between `Logical` and `Storage`. The runtime never receives semantic conversion
-callbacks.
-
-A named or generated struct gains a canonical storage record and logical
-getters/setters only when a reached conversion or location operation proves
-that direct class identity cannot preserve the required alias. The declaration
-is then reconstructed once from that complete demand set. A pointer conversion
-requests the storage facet from both endpoint declarations and is admitted only
-when their independently constructed canonical storage types match the exact
-Go conversion evidence. Struct tags do not enter that storage facet; field
-identity, order, package identity, and recursively represented field storage
-do. The selected representation is compilation-wide for each exact pointer
-type, so one `*S` never has both direct-class and carrier forms.
-
-```text
-Go *Left / *Right (underlying bases identical ignoring tags)
-        |
-        v
-GoPointer<Left, LeftStorage> --typed view--> GoPointer<Right, RightStorage>
-        |                                      |
-        +-------- LeftStorage == RightStorage--+
-```
-
-The view operation may allocate a constant-size pointer facade, but it reuses
-the same opaque canonical address and the same typed storage accessors. It
-does not copy the pointee, inspect a value shape, recover an erased payload, or
-carry a source/target conversion function. Removing the final conversion or
-interior-location demand reconstructs the declarations back to the direct
-class-reference form; demand is not a permanent widening flag.
-
-A defined array follows the same split without growing its nominal wrapper.
-Its generated class is the logical type and contains only its brand,
-constructor, and underlying value. Its canonical pointer storage is the
-underlying `GoArray<Element, Length>`. Indexing, pointer projection, and
-whole-array stores operate on that storage; they do not demand duplicate
-`get`/`set` methods on the nominal class.
-
-Open generic declarations use the same representation decisions without
-pretending that a source type parameter is its own whole-value storage,
-container-slot storage, or pointer type. Each source `*types.TypeParam` always
-owns one logical target type parameter. A declaration gains a whole-storage
-facet only when a canonical struct/location record can differ from the logical
-type, a container-storage facet only when an array or slice slot can differ
-from both, and a pointer facet only when an exact `*T` value is represented.
-These are immutable target type parameters keyed by the source parameter
-identity and facet kind, not runtime descriptors:
-
-```text
-Go T                         -> target T
-whole storage of T needed    -> target T$Storage
-array/slice slot of T needed -> target T$ContainerStorage
-Go *T needed                 -> target T$Pointer
-```
-
-At each concrete instantiation the ordinary representation owner supplies the
-exact selected facet types. For a direct named struct `Item` with no
-carrier-requiring use, `T$Storage = Item$Storage`,
-`T$ContainerStorage = Item`, and `T$Pointer = Item` when the pointer facet is
-otherwise demanded. If a reached use requires a canonical location carrier,
-container storage and pointer become `Item$Storage` and
-`GoPointer<Item, Item$Storage>`. For a scalar, whole and container storage are
-the scalar and the pointer is its exact carrier. The pointer facet is the
-non-nil representation; an exact Go `*T` occurrence is
-`T$Pointer | undefined`. A declaration that demands no additional facet
-retains only `T`.
-
-Whole-storage and container-storage conversion are distinct closed generic
-operations. Indexed address formation is another closed operation over the
-source collection, index, and result pointer. It always requests the canonical
-array/slice location carrier: a slot may later be rebound, so returning its
-current class object would make an existing pointer observe the old value.
-Generic pointer load, store, construction, equality, conversion, and indexed
-address formation therefore use exact typed signatures; they do not inspect a
-facet, carry semantic callbacks, recover an erased payload, or introduce a
-second generic body.
-
-For example:
+Go type parameters remain TypeScript type parameters when the body is directly
+expressible and exact:
 
 ```go
-type Item struct{ Value int32 }
-type Arena[T any] struct{ data []T }
-func (a *Arena[T]) At(i int) *T { return &a.data[i] }
+func Identity[T any](value T) T { return value }
 ```
 
 ```ts
-class Arena<T, T$ContainerStorage, T$Pointer> {
-  data: RuntimeSlice<T$ContainerStorage>;
-  At(
-    i: int,
-    indexAddress: (
-      value: RuntimeSlice<T$ContainerStorage>,
-      index: int,
-    ) => T$Pointer | undefined,
-  ): T$Pointer | undefined {
-    return indexAddress(this.data, i);
-  }
+export function Identity<T>(value: T): T {
+  return value;
 }
 ```
 
-`Arena<Item>` supplies `Item$Storage` and
-`GoPointer<Item, Item$Storage>` because `At` takes a slot address.
-`Arena<int32>` supplies `int32` plus `GoPointer<int32, int32>`. Both concrete
-capabilities return a canonical backing/index carrier, and one generic body
-remains strictly typed. A generic `Bag[T]` that stores and reads `[]T` without
-taking an element address instead supplies plain `Item` for
-`T$ContainerStorage`; it does not acquire whole storage speculatively.
+The source declaration never receives operation dictionaries/functions for
+copy, zero, arithmetic, equality, conversion, methods, channels, or iteration.
 
-Facet demand propagates structurally through reached generic declarations and
-instantiations. For example, if `Box[T]` contains `*T`, every represented
-`Box[X]` supplies the exact pointer facet for `X`; if `Outer[T]` contains
-`Box[T]`, its use of `Box` requests and forwards that same facet. The canonical
-facet ordering is source parameter order and, within one parameter, logical,
-whole storage when demanded, container storage when demanded, then pointer
-when demanded. Structural comparison of that closed list drives the existing
-artifact fixed point. No conditional target type, erased payload, universal
-representation bag, per-use wrapper, or declaration-wide speculative facet is
-admitted.
+When an operation cannot be expressed exactly over open `T`, the declaration
+owner emits one private concretization for each exact reached
+`go/types.Instance`. It re-emits the same Go AST under the checker-produced
+substitution and calls the existing concrete semantic owner directly. Its
+value parameters are the source parameters after substitution. It is keyed by
+Go declaration identity plus exact type arguments, not source position or
+target spelling.
 
-When a reached generic struct requires canonical storage and a field's logical
-and storage facets may differ, the class stores only the storage facet. It
-publishes one typed static whole-storage projection independent of field
-count; the field-selection owner accesses the selected property and applies
-the declaration-level `to-storage` or `from-storage` capability at the use
-site. The class does not emit per-field accessor methods, retain converter
-callbacks or descriptors, keep a second logical cache, or inspect a type
-argument at runtime. Construction similarly converts each field once at the
-caller and invokes the storage-valued constructor surface with explicit
-canonical type arguments. A storage-facet surface change requeues field and
-construction consumers through the existing observable artifact facets; no
-unconditional rescan or per-instantiation class body is introduced.
+Direct generic bodies are emitted once. Concretizations grow only with
+distinct reached instances that require them. Recursive requests exact-join;
+an unbounded chain, unsupported open exported case, or representation
+disagreement fails explicitly. No erased payload, operation bag, hidden source
+parameter, runtime type switch, or alternate semantic path exists.
 
-A slice-to-array pointer conversion is one typed region view over the slice's
-existing backing store. The slice runtime validates the requested length and
-returns canonical backing identity plus absolute offset; the array runtime
-constructs an offset-aware fixed-length view; the pointer runtime keys the
-location by that same backing and offset. A whole-array store copies the
-already value-copied source into the region. No layer copies the conversion
-operand, passes a semantic callback, or creates a second address identity.
-For length zero, a nil slice produces a nil pointer while a non-nil empty slice
-produces a non-nil pointer, matching Go.
+Generic named types retain exactly their declared type parameters. Closed
+representation operations may be private specialized artifacts; they do not
+change public type arity.
 
-Slicing an array value or pointer-to-array uses the inverse view over that same
-canonical storage. The array owner exposes one demand-only typed
-`backing + offset` location; the slice owner constructs one descriptor with
-the array length as its initial length and capacity, then applies the ordinary
-slice-bounds operation. The result aliases the array in both directions and
-does not copy elements. Programs without array slicing emit neither the array
-location facet nor the array-to-slice view facet.
+## Panic, Recover, Defer, And Control
 
-Every executable Go function body, including each package `init` declaration,
-is a reconstructible artifact. Package initialization may impose ordering and
-an exported generated entry name, but it does not own a second emission or
-requirement lifecycle. A body-only storage reconstruction leaves the
-mechanically projected callable signature unchanged and therefore publishes no
-consumer invalidation.
+`runtime/panic.ts` owns one typed Go panic carrier. Generated Go runtime
+faults and source `panic` enter through that carrier; unrelated host
+exceptions are rethrown unchanged.
 
-The root owner keeps one open declaration assembly per emitted definition.
-Only that definition's semantic owner interprets its requirements and
-reconstructs its typed TS-Go protocol nodes. Requirements are identity-
-deduplicated and applied in deterministic closed-kind order. Each artifact
-revision replaces the foreign requirements it contributes. Intrinsic self-
-demands remain attached to that same source revision even after satisfaction
-changes the reconstructed shape; foreign requirements remain active only
-while at least one current artifact revision contributes them. Incompatible
-requirements fail rather than selecting whichever was discovered first. A
-canonicalization or reachability cache must return complete current typed
-requests and may not use “already seen” as transport suppression.
-Reconstructing a declaration replaces its prior in-memory target nodes; it
-never creates a second final definition. The root resolves declaration,
-requirement, initialization, and placement work to a fixed point before file
-sealing.
+A source callable containing `recover` has:
 
-A fact already available from the Go declaration or selected `go/types`
-evidence is not a legitimate late requirement. For example, source export
-identity and the target module policy determine accessibility without waiting
-for a later use. Late requirements are reserved for obligations that genuinely
-arise from reached uses, such as a requested value operation, interface
-adapter, generic specialization, callback adapter, or runtime-type carrier.
+1. its ordinary source-facing entry with the exact Go signature, where
+   `recover()` returns nil; and
+2. one private deferred-entry artifact that accepts the invocation-local
+   recovery authority.
 
-## Observable Artifact Propagation
+Both may share a private body implementation. The private entry claims no Go
+source identity and is never exported as the source callable.
 
-Every source definition that can be reconstructed owns one target artifact
-keyed by its exact `types.Object`. An artifact revision is a transaction:
+A statically known `defer f(args)` captures copied arguments immediately and
+selects `f`'s private deferred entry when one exists. Transported function
+values use one exact-signature typed deferred-entry registry. A recover-capable
+function/literal registers its ordinary value and private deferred entry when
+the value is formed; defer lookup falls back to ordinary invocation when no
+entry exists. Registries are generated only for demanded signatures and use no
+`any`, `unknown`, dynamic properties, or `.call/.apply/.bind`.
+
+Interface and provider deferred calls use equivalent private adapter/facade
+entries. Source method/function signatures remain unchanged.
+
+The invocation-local defer stack captures values at the statement, drains LIFO
+on return or panic, preserves named-result mutation and panic replacement, and
+awaits only entries whose typed internal contract is Promise-bearing.
+`recover` one call below the deferred entry receives no authority.
+
+Native target control is used where structurally exact. Only genuinely
+non-structural `goto` selects a linear statement state machine assembled from
+already-created TS-Go statements. No CFG or control IR is retained.
+
+## Cooperative Channels And Goroutines
+
+Concurrency is disabled by default. Selecting `cooperative` explicitly
+accepts race-free cooperative semantics: execution may switch at modeled
+synchronization operations but does not emulate asynchronous Go preemption.
+
+One `GoChannel<T>` runtime identity owns capacity, FIFO buffering, close
+state, and insertion-ordered live send/receive offers. Direct operations and
+`select` alternatives use the same queues. Nil channels block; close and
+closed-channel behavior use the Go panic carrier. Element zero/copy comes from
+the concrete value owner; an unresolved generic operation concretizes its
+owning callable.
+
+The scheduler separately owns goroutine lifecycle, settlement, uncaught panic,
+main return, and deadlock. A `go` statement evaluates and copies callee and
+arguments immediately, then schedules one typed closure.
+
+Send/receive sites are O(1) apart from value copy. A `select` is O(case
+count), commits once, cancels alternatives in O(1) each, uses fair ready
+selection, and retains storage only for buffered values plus live blocked
+operations. A default-only ready decision stays synchronous.
+
+## Provider And External Boundary
+
+`@gotots/gostdlib` is a standalone, manually maintainable strict-ESM package.
+Public subpaths mirror Go import paths and named exports preserve Go names:
 
 ```text
-authoritative Go object + Go AST/type evidence + current active requirements
-    -> one semantic-owner handler
-    -> complete replacement TS-Go AST roots
-    -> complete replacement root-request set
-    -> complete replacement artifact-dependency set
-    -> mechanically projected observable contract
+"strings" -> @gotots/gostdlib/strings.js
+"io/fs"   -> @gotots/gostdlib/io/fs.js
 ```
 
-No consumer receives a mutable provider node. A reference records a dependency
-on the smallest closed provider facet it consumes:
+Its public declarations preserve selected Go source arity. Host backends remain
+private and do not alter public module names.
 
-- `CallableSignature` for a call or function value;
-- `ConstructorSurface` for construction;
-- `InstanceTypeSurface` for an instance type/member contract;
-- `StaticSurface` for a statically selected class operation; and
-- `ValueSurface` for an exported target value.
+The selected `GOROOT` remains declaration truth. A provider certificate
+exact-joins:
 
-An artifact with a typed compile-time-only disposition may provide an explicit
-empty contract while still consuming dependencies. This includes whole-file
-and exported-Go-API accounting for an unused untyped constant. It is
-reconstructed when a provider facet changes, but cannot dirty downstream
-artifacts because it provides no facet. No generic declaration constructor may
-emit an empty result. An absent contract is invalid, and an explicit concrete
-representation root is forbidden from ending with an empty contract; source
-accounting is therefore not confused with failed projection.
-
-The facet enum is closed. A new facet requires a concrete source example,
-canonical projection, consumer rule, equality proof, and mutation test; string
-facets and catch-all dependencies are forbidden.
-
-The canonical contract is derived mechanically from the artifact's typed
-TS-Go AST, never restated by a handler. Function and method projections retain
-modifiers, names, type parameters, parameters, and explicit return types while
-removing bodies. Class projections partition constructors, instance members,
-and static members; member bodies and explicitly typed property initializers
-are removed. Interface and type-alias structure is already contract-only.
-Variable projections retain binding, modifiers, declaration flags, and
-explicit type while removing initializers. A declaration whose visible target
-type depends on TypeScript inference fails at this boundary: silently dropping
-its body or initializer would make implementation bytes masquerade as a stable
-contract. Exact encoded TS-Go structure is the equality authority. A hash may
-only accelerate comparison; it cannot establish equality.
-
-The root replaces an artifact's reverse edges when a reconstruction commits,
-compares each old and new facet structurally, and queues only consumers
-subscribed to changed facets. Duplicate edges and dirty entries collapse by
-typed identity. Dirty artifacts are processed in deterministic Go-object
-order. An initial publication establishes a baseline and does not notify
-consumers. A body-only change therefore commits without rebuilding callers:
-
-```go
-func Value() int32 { return source }
-func Use() int32  { return Value() }
+```text
+Go package/object identity + go/types signature
+    <-> public provider module/export
+    <-> implementation owner and inspected target signature
 ```
 
-Changing only `Value`'s emitted body leaves its `CallableSignature` projection
-unchanged, so `Use` remains untouched. If a later target obligation changes
-`Value` from `Value(): number` to `Value(flag: boolean): number`, the callable
-facet changes, `Use` is reconstructed, and any resulting change to `Use`'s own
-callable facet propagates to its callers.
-
-Cycles are permitted only when structural contracts converge. The root retains
-the current exact canonical bytes and a losslessly compressed reverse delta
-for each distinct changed contract. A deterministic non-semantic fingerprint may index
-historical candidates, but the root must reconstruct and compare their exact
-canonical bytes before declaring a repeat; a hash alone never establishes
-equality. Repeating a prior non-current contract is a typed non-convergence
-error unless the reconstruction is causally authorized by one quiescent
-final-requirement removal. Requirement additions, newly reached declarations,
-dirty artifact reconstructions, and package initialization settle before a
-removal sweep. Losing a last known consumer before that boundary records an
-orphan candidate, not an immediate deletion; a later-discovered consumer
-cancels it without reconstructing the provider. The sweep removes only
-candidates that still have no root or artifact consumer.
-
-The direct provider replacement is committed with removal authority. If one
-of its subscribed facets changes, that authority follows only the exact dirty
-dependency edges to consumers whose reconstruction is consequently required.
-Each such consumer may return to one historical contract and may propagate the
-same cause through its own changed facets. Successful reconstruction or
-explicit dirty discard consumes the authority for that owner. Reintroducing
-the superseded demand afterward therefore repeats a historical contract
-without removal authority and fails as non-convergence. This narrow causal
-chain permits a provider, package assembly, and other exact dependents to
-return to their base declarations when a last profile consumer disappears
-without weakening oscillation detection globally. Unchanged reconstruction
-adds no history or further removal authority. Locally changed contracts retain
-only a lossless encoding of their exact changed regions rather than a full
-snapshot per revision.
-Dirty owners live in one identity-deduplicated deterministic priority queue.
-Each wave is ordered provider-before-consumer from the exact current facet
-edges, so a fan-in consumer observes all settled providers once; unrelated
-ready owners use exact Go-object order as the tie-breaker. A cyclic remainder
-uses that same order to choose one deterministic break point and remains
-subject to exact oscillation detection. A wave completes against one applied
-requirement snapshot; requirements discovered during reconstruction are
-identity-deduplicated and applied before constructing the next wave. They never
-cause the current dependency order to be rebuilt after each artifact. Queue and wave construction are
-`O((artifacts + consumed facet edges) log artifacts)`, not repeated full-set
-minimum scans. Sealing requires empty declaration, requirement, initialization,
-placement, and dirty-artifact queues.
-
-This graph is target-assembly coordination, not a semantic IR or call graph. It
-contains only authoritative Go definition identities, closed target-contract
-facets, and reverse invalidation edges discovered while constructing actual
-TS-Go references. It does not copy source statements, infer whole-program
-meaning, perform name lookup, or decide reachability.
-
-## Generic Capability Fixed Point
-
-Go type parameters remain TypeScript type parameters. They are never erased,
-boxed into a universal payload, or expanded into one body per reached
-instantiation. Operations that TypeScript cannot perform while preserving the
-exact Go type travel through a statically typed target capability parameter:
-
-```go
-func Add[T ~int32](left, right T) T { return left + right }
-```
+Generated source never calls a provider kernel with extra source arguments.
+When canonical generated values require conversion, guards, runtime tokens,
+copy/zero operations, or a specialized generic implementation, the compiler
+emits one static facade for that selected callable/type:
 
 ```ts
-export function Add<T>(
-  $go$binary_add: (left: T, right: T) => T,
-  left: T,
-  right: T,
-): T {
-  return $go$binary_add(left, right);
+export async function WalkDir(
+  fileSystem: FS,
+  root: gostring,
+  visit: WalkDirFunc,
+): Promise<GoError | undefined> {
+  return fromProviderError(
+    await provider.WalkDir(toProviderFS(fileSystem), root, toProviderVisit(visit)),
+  );
 }
 ```
 
-This operation function is target ABI, not source analysis. The one ordinary
-emission walk discovers a closed operation demand while constructing the actual
-TS-Go body. That demand is a typed declaration requirement owned by the exact
-generic `types.Object`. Its identity is `(typed operation selection, exact
-receiver-free signature)` within that owner. The selection is the closed
-operation kind plus exact semantic evidence that kind requires; a constraint
-method includes its selected `*types.Func`, so two same-signature methods do not
-collapse. Source position is not identity, so repeated uses exact-join one
-hidden parameter. Reconstruction adds the corresponding hidden function
-parameter to the same declaration. No prewalk, copied constraint model,
-operation IR, capability object, or runtime registry exists.
-
-The program session exposes only the current canonical generic callable
-contract to a call handler. A call records a `CallableSignature` dependency,
-reads the exact ordered `types.Info.Instances` arguments, and supplies one
-hidden operation function per demanded semantic signature before ordinary
-arguments. A concrete instantiation requests one reconstructible function
-artifact keyed by `(typed operation selection, exact instantiated signature)`.
-A signature
-still containing the caller's type parameters projects one hidden operation
-function on that caller and forwards it. Cross-parameter operations such as
-`Shift[T, U](T, U) T` therefore remain one exact `(T, U) => T` function; they
-are not forced into a per-parameter object. Recursive and mutually recursive
-calls use the ordinary artifact fixed point. Identical contracts do not
-propagate, and a repeated non-current contract remains a convergence failure.
-
-Each concrete operation artifact delegates to the existing authoritative
-value/operator/method owner. It may not restate zero, copy, equality, hashing,
-numeric, conversion, indexing, method, interface, channel, or iterator
-behavior. Constructed signatures containing type parameters compose by
-forwarding exact enclosing operation functions; they do not create an erased
-descriptor, growing object, capability factory, or per-use semantic closure.
-
-One generic named Go declaration produces one target declaration and therefore
-one receiver and parameter ABI for all of its instantiations. When an exact
-pointer representation is demanded for `*Box[T]`, declaration and concrete
-uses join the pointer family at `Box`'s generic origin, then supply the reached
-target facets through that one parameterized contract. `*Box[int32]` and
-`*Box[Item]` cannot independently choose direct and carrier ABIs for the same
-method body. A per-instantiation method body, carrier-to-facade bridge,
-identity-changing wrapper, widened union, cast, or erased pointer payload is
-forbidden.
-
-`go/types` remains the sole authority for constraints, type sets, inference,
-core types, method selection, and admissible operations. Target constraints are
-not reconstructed from Go syntax. The hidden callable list contains exactly the
-distinct operations demanded by the emitted declaration body. An unused
-function, duplicate same-signature function, optional operation, throwing
-invalid-operation function, string lookup, or universal operation bag is
-forbidden.
-
-One placement service applies the policy:
-
-- imports always enter file import scope; dynamic imports are forbidden;
-- one imported binding has one placement identity independent of whether a
-  requester needs its type or value namespace; a value import dominates a
-  type-only request for the same module, export, and local binding, in either
-  request order, because the value import supplies both namespaces;
-- every emitted immutable package declaration is exported from its generated
-  source-file module for static intra-package linking, including declarations
-  whose Go names are unexported;
-- mutable package variables are fields of the package's one state object, not
-  duplicate `let` declarations in source-file modules;
-- same-package generated source modules import that state object directly.
-  Cross-package references to exported source declarations use the passive
-  package assembly. A compiler-generated support artifact that must name a
-  checker-selected unexported declaration imports that declaration's defining
-  source module directly; the package assembly never republishes it. This
-  internal route is selected only from exact `types.Object` identity and its
-  registered source artifact, never from spelling, and is unavailable to an
-  ordinary cross-package Go source reference. Consumers import the
-  program-initialization module before using a selected public package
-  surface;
-- reusable static declarations prefer file scope;
-- demanded named-struct static operations are incorporated into their owning
-  class in a fixed operation order; no top-level sibling helper or instance
-  operation is emitted;
-- every reached concrete receiver body is incorporated into its exact named
-  type's class, even when the Go method and type declarations are in different
-  files. The method source artifact owns one typed class-member contribution;
-  the type artifact owns the one reconstructed class declaration. A value
-  receiver contributes an instance member. A pointer receiver contributes a
-  class-owned static member with an explicit selected pointer parameter so nil
-  and argument-evaluation timing remain source-controlled. No top-level
-  receiver function, prototype assignment, partial class, wrapper twin, or
-  second method body survives;
-- source-owned artifacts schedule canonically by semantic package, target
-  source-module path, and physical declaration order inside that module.
-  Class-member, provider-contract, export, and generated-requirement ordering
-  is canonical by package, semantic object kind, receiver identity, name, and
-  exact type. Absolute `token.Pos` may order declarations only after their
-  stable source-module path agrees; it may never order declarations from
-  different files because file token allocation is load-order state rather
-  than semantic identity;
-- one canonical generated artifact represents each exact reached anonymous
-  struct or specialized map shape. A shape with no local named component enters
-  deterministic compilation support; a shape containing local named
-  components is emitted immediately after the deepest declaration that makes
-  every component legally nameable, inside the exact reconstructible source
-  artifact;
-- a package initializer is a first-class artifact owned by its selected
-  `(*types.Package, *types.Initializer)` identity. Its first LHS variable is
-  only a source-declaration anchor, never its owner; multi-result initializers
-  remain one artifact, and checker-produced blank LHS targets remain legal;
-- function-wide declarations enter the function prologue only when their
-  lifetime is function-wide;
-- evaluation-dependent temporaries remain immediately inside the branch,
-  loop, short-circuit arm, deferred closure, or statement where they execute;
-- no request may cross a semantic execution boundary merely because a wider
-  scope is syntactically legal.
-
-This permits hoisting without maintaining a separate target IR.
-
-Creating a typed TS-Go node is not finalizing or printing its containing file.
-The root emitter seals each target file only after declaration, requirement,
-initialization, placement, and dirty-artifact queues are empty. A sealed file
-accepts no further request. Before sealing, an already-created class or other
-declaration may be replaced only by its one semantic owner using freshly
-constructed typed TS-Go protocol nodes and the complete accumulated requirement
-set. The replacement transaction also replaces that artifact's root requests
-and dependencies and publishes its mechanically derived observable contract.
-Other handlers can request a closed obligation or record a typed dependency but
-cannot receive or mutate the target declaration.
-
-A class-member contribution is immutable typed TS-Go AST, not a declaration
-patch. Its method owner retains the source body, callable requirements, and
-imports; the containing type subscribes to that contribution's exact observable
-facet and reconstructs the complete class in deterministic semantic-method
-order. Changing only a method body reconstructs the type artifact but does not
-requeue callers whose subscribed callable signature is unchanged. Changing a
-method signature changes that facet and requeues its exact users. This is the
-same canonical artifact graph used for static value operations, not a parallel
-method registry or source prepass.
-
-This is controlled pre-seal target assembly, not mutable class reopening.
-There is no target-text patch, prototype assignment, arbitrary AST callback,
-post-print insertion, or editable on-disk AST authority. A future disk cache
-may retain only immutable, fully fingerprinted sealed artifacts; any changed
-input or requirement regenerates the declaration through its owner.
-
-Under `preserve-go`, a keyed composite captures child values in Go source order
-before consuming them in target constructor order. If any child emission has
-prerequisite statements, its parent still places those statements at the
-required execution boundary and captures values required to make the target
-AST representable. Under `direct`, the composite itself creates no prerequisite
-statements solely for field reordering, so an enclosing call remains a direct
-call when its other children are direct. Package-level initialization order and
-atomic multi-value operations are separate semantic contracts and remain exact
-under both profiles. Package-level initializers use the selected checker
-graph's exact initialization order and append their TS-Go statements to one
-package-assembly function body. Whole-program order consumes the selected
-package import graph directly; it does not infer order from target imports or
-construct a parallel semantic graph.
-
-## Cooperative Concurrency
-
-Concurrency is disabled unless the compilation entry explicitly selects the
-**race-free cooperative Go** profile. Disabled compilation fails at the exact
-channel, goroutine, or select construct owner. Selecting the cooperative
-profile is an explicit source-program precondition, not an inferred property:
-execution may switch at modeled synchronization operations, but the compiler
-does not claim asynchronous Go preemption.
-
-For example, this race-free program is outside the cooperative profile:
-
-```go
-started := make(chan struct{})
-go func() {
-    close(started)
-    for {
-    }
-}()
-<-started
-```
-
-Go may preempt the looping goroutine and let the receiver return; the
-cooperative target cannot. Soundly detecting that requirement would need the
-forbidden whole-program effect/dataflow analysis, and emulating it would need
-preemption. GoToTS therefore neither admits a hidden yield heuristic nor
-describes this program as exact under the cooperative selection.
-
-Two separate semantic owners assemble declarations into the same
-demand-selected `runtime/channel.ts` output module:
-
-- the channel owner controls channel identity, value transfer, queues, close,
-  direction views, and select alternatives; and
-- the scheduler owner controls goroutine lifecycle, blocked/runnable counts,
-  program settlement, first uncaught panic, main return, and deadlock.
-
-Sharing an output module does not merge these responsibilities.
-`GoChannel<T>` is the canonical runtime identity for a channel value.
-Send-only and receive-only target views expose only operations admitted by the
-selected `types.ChanDir`; conversion between views does not allocate or change
-identity. The channel owner contains:
-
-- capacity, a FIFO buffer, one insertion-ordered live sender-offer set, one
-  insertion-ordered live receiver-offer set, and closed state. Direct
-  operations and `select` alternatives enter the same typed queues, so arrival
-  order cannot be changed by operation kind;
-- exact element zero and copy functions selected from the ordinary value
-  owner, including generic operation functions when `T` is a type parameter;
-- send, receive, close, equality-by-canonical-identity, and select
-  registration/commit operations.
-
-Each queued sender owns typed success and close-failure commits; each queued
-receiver owns one typed value/`ok` commit. A select alternative adds its
-atomic claim and O(1) cancellation to that same offer. There is no parallel
-listener registry, direct-versus-select queue, historical head-index storage,
-operation tag, or erased task. Removing a selected alternative deletes its
-live offer, so storage is bounded by current buffer contents and current
-blocked operations rather than historical traffic.
-
-Nil channels are represented by `undefined`. Send or receive on nil blocks;
-closing nil, sending on closed, and closing closed channels raise the one Go
-panic carrier. Closing wakes blocked receivers with buffered values first and
-then `(zero, false)`, and wakes blocked senders with the send-on-closed panic.
-No payload crosses `any`, `unknown`, a cast, or an erased task queue.
-
-Blocking changes existing observable artifact facets rather than creating a
-call graph. A concrete source function, method, or literal body owns one source
-callable facet. A body that directly blocks, or calls a cooperative callable,
-receives one closed declaration requirement; its `CallableSignature` becomes
-`Promise`-returning and its body becomes `async`. Exact direct source calls
-subscribe to that concrete source facet and add `await` only in its reverse
-closure.
-
-Each checker-produced `types.Initializer` is also an exact callable owner.
-Its package-initializer facet is keyed by the existing
-`(types.Package, *types.Initializer)` artifact identity; no package variable,
-synthetic `types.Func`, or package-wide effect flag substitutes for it. If an
-initializer directly blocks or invokes a cooperative direct/generic callable,
-that initializer reconstructs with `await`. The passive package
-`$initialize` function becomes `async` exactly when one initializer or source
-`init` function in that package is cooperative. The program-initialization
-module awaits exactly those package calls in Go package order. Thus
-cooperation crosses initializer, package, and program assembly through the
-same closed facet requirements without a call graph or unconditional async
-tax.
-
-First-class function values use one different owner: a canonical generated
-callable ABI artifact keyed by the exact receiver-free `go/types.Signature`
-after represented generic arguments are selected. Every value call subscribes
-to that ABI once, regardless of whether the value came through a local,
-parameter, result, package variable, field, pointer, array, slice, map,
-interface assertion, method value/expression, or generic aggregate. A blocking
-provider used as a value selects the ABI cooperative. Synchronous providers
-adapt statically when that exact ABI is cooperative. Storage locations never
-receive callable facets and no AST-shape resolver, dataflow graph, or effect IR
-tracks transport. Structural contract equality terminates recursive cycles.
-An immediately invoked function literal is also statically selected: its call
-observes the literal's exact source facet and never routes through the
-first-class callable ABI. Only a function value that is transported through a
-value location uses that ABI. Functions, immediately invoked literals, and
-callable ABIs that remain nonblocking retain byte-identical synchronous
-declarations and calls.
-
-The callable-ABI reference preserves its semantic identity domain. A closed
-signature containing no declaration-local named type or ambient type parameter
-uses the canonical compilation ABI even when referenced from inside a generic
-profile. A signature containing either uses a declaration-scoped ABI keyed by
-that exact generic owner. Inside a profile, declaration-scoped ABIs and
-explicitly selected closed ABIs acquire profile ownership; unrelated canonical
-ABIs remain canonical and continue to observe their own global contract. Thus
-a profile-local returned `func(T)` cannot widen the ordinary generic
-declaration, while passing an unrelated synchronous `func(int32)` to a
-cooperative canonical `func(int32)` ABI still emits the required static
-adapter. The typed ABI reference carries this distinction; callers may not
-reconstruct it from target names, artifact-key spelling, or profile presence.
-
-An interface method is not a first-class function-value ABI. Its callable
-state is owned by canonical interface-method artifacts keyed by exact Go
-method identity and receiver-free signature. A non-generic method has one such
-artifact. A method of a generic interface has a parameter-ordinal-normalized
-family artifact; a closed instantiation additionally has its exact concrete
-signature artifact. Open signatures containing ambient type parameters never
-receive runtime method-set tokens. Runtime tokens exist only for closed
-signatures, while callable observation may use the generic family and closed
-facets together. Callable-family artifacts are contract-only compiler state:
-they participate in exact reverse dependencies but emit no TypeScript
-declaration.
-
-A concrete adapter observes the selected source-method facets and every
-demanded target-interface facet. If the source or any demanded target facet is
-cooperative, the adapter selects every demanded target facet as cooperative;
-one generated adapter method cannot expose contradictory call contracts
-through two interfaces. Interface declarations, direct interface calls,
-deferred interface calls, adapters, and constraint-method capabilities observe
-only interface-method callable facets. Runtime interface contracts additionally
-request the closed token. An unrelated function or differently named method
-with the same receiver-free signature cannot change that interface method.
-
-Callable leaves nested in a generic interface-method signature are part of
-that same method contract. For example:
-
-```go
-type Value[T any] interface { Change(func(T)) }
-```
-
-If a `Value[int32].Change` call supplies a callback that must block, the exact
-closed `func(int32)` ABI and the declaration-owned `func(T)` ABI converge
-through the `Change` method family. The generated `Value<T>` declaration,
-every reached closed use, and every demanded adapter then expose the same
-Promise-returning callback ABI. Synchronous callbacks adapt statically at that
-boundary. No adapter-local parameter shape, union result, cast, thenable test,
-or declaration-spelling inference may repair a mismatch. Callable leaves are
-paired by structural position in the checker-produced origin and selected
-method signatures, including nested containers; a type parameter itself
-remains opaque.
-
-Only taking a method value or method expression crosses from the
-interface-method callable facet into the canonical first-class callable ABI.
-That wrapper observes the exact callable family as its provider and widens the
-function-value ABI when
-necessary; widening never flows back from the function ABI into direct
-interface dispatch. Interface-method callable state is an observable generated
-artifact facet, so a synchronous-to-cooperative change invalidates exact
-subscribers through the ordinary reverse artifact graph.
-
-There is one selected-method invocation plan for source calls and generated
-adapters. It owns generic receiver type arguments, exact generic operation
-capabilities, recovery-control parameters, class-versus-environment target
-selection, and cooperative source observation. Generated adapters may not
-bypass that plan with a raw member call.
-
-Generic instantiation does not create a second callable-effect model. At each
-generic function or generic-receiver-method use, the selected
-`go/types.Instance` supplies an exact structural correspondence between
-callable leaves in the declaration signature and callable leaves in the
-instantiated signature. That correspondence selects a closed callable-ABI
-profile for that use. The ordinary profile keeps the source declaration's
-ordinary target name and its declaration-owned callable-ABI baseline.
-Declaration-intrinsic cooperation flows only outward to the corresponding
-concrete ABI. For example, a generic function that always returns a
-channel-reading literal has a cooperative returned-callable ABI for every
-instantiation. A concrete call-site ABI never widens that baseline in the
-reverse direction. Each distinct reached profile whose concrete callback
-requires a cooperative ABI where the declaration baseline is synchronous
-requests one additional source-owned variant keyed by the declaration
-identity and the sorted canonical override-facet identities. The variant is
-reconstructed from the same Go declaration through the ordinary handler with
-only those deviations selected; it is not a copied semantic model or a
-separately lowered body.
-
-For example, a synchronous
-`Apply[T](value T, predicate func(T) bool)` use selects `Apply`, while a use
-whose concrete predicate ABI is cooperative selects a deterministic
-`Apply$cooperative_<profile>` variant. Calls inside the variant await only the
-callable ABI facets selected by its profile. The variant itself becomes
-`async` only when its body actually reaches one of those calls or another
-cooperative operation; merely accepting a cooperative callback does not make
-an unused callback execute. A synchronous provider may be adapted statically
-when a selected profile requires a cooperative callable ABI.
-
-No declaration-wide cooperative bit may widen all instantiations. No call
-returns `T | Promise<T>`, checks for a thenable, selects a variant at runtime,
-or recovers a profile from target spelling. Profiles are demand-created,
-deduplicated by canonical identity, and bounded by distinct reached callable
-ABI profiles rather than call count. Callable leaves inside arrays, slices,
-maps, pointers, structs, tuples, and nested signatures use the same
-`go/types`-proven correspondence. A type parameter itself is an opaque
-substitution boundary and does not imply a callable correspondence.
-
-A non-callable named type is also an ownership boundary. Correspondence may
-join its type arguments, but it never descends through the named declaration's
-underlying fields or methods. Those interiors belong to that named
-declaration's own representation contracts. For example, copying
-`*WatchedFiles[T]` through a generic function does not make that function own
-the callable field inside `WatchedFiles`; only a direct callable parameter,
-result, anonymous aggregate leaf, or named callable type belongs to the
-function's profile. This prevents copy-only functions from acquiring
-cooperative variants merely because an encapsulated field is cooperative.
-
-A callable leaf declared in a field of a generic named struct is owned by that
-nominal field contract, not by whichever generic function happens to construct
-or read one instance. For example:
-
-```go
-type Cache[K comparable, V any] struct {
-	parse func(K) V
-}
-
-func NewCache[K comparable, V any](parse func(K) V) *Cache[K, V] {
-	return &Cache[K, V]{parse: parse}
-}
-```
-
-The selected field object and receiver type provide an exact structural
-correspondence between the declaration's `func(K) V` and the occurrence's
-instantiated callable type. If any value transported through `Cache.parse` is
-cooperative, that declaration-owned field ABI, every structurally corresponding
-producer, and every direct field invocation converge on the Promise-returning
-contract. Synchronous providers adapt statically at their existing value
-boundary. This convergence is deliberately nominal-field-wide: one emitted
-`Cache` class cannot expose two invisible layouts for the same Go type.
-It does not authorize declaration-wide widening of an unrelated generic
-function or a per-instance effect parameter.
-
-The correspondence is established only from checker-produced named-type and
-field identity plus field ordinal. It is not inferred from the field spelling,
-target member name, constructor shape, or source text. No hidden struct-effect
-type parameter, `T | Promise<T>` union, runtime thenable test, field-flow graph,
-or per-storage callable facet is admitted.
-
-Every demand-created variant of an exported source declaration is part of that
-package's value surface. Package assembly re-exports the exact variant name
-from the declaration's source module; consumers never bypass package assembly
-or infer a profile export from spelling. Export cardinality therefore grows
-with distinct reached profiles, not calls or importing files.
-Direct calls, deferred calls, generic receiver calls, instantiated function
-values, and generic method values/expressions all select through this same
-owner. A callable returned intrinsically cooperative by the declaration
-selects the ordinary source name and propagates that fact to its concrete
-value ABI; it does not create a duplicate variant.
-
-Callable definitions lexically nested inside a demand-created generic profile
-are owned by that profile as well as by their source AST identity. A nested
-literal that blocks in one reached profile therefore requests a profile-local
-callable ABI; it cannot widen the same literal, its enclosing declaration, or
-an open callable ABI in the ordinary profile. Profile-local ABI cooperation
-propagates only through the exact declaration-to-instantiation correspondence
-to the matching closed callable ABI. This remains ordinary reverse-artifact
-coordination, not a call graph or a second effect model.
-
-A named Go value whose represented underlying can change with a callable
-profile while its declared Go type arguments remain unchanged must preserve
-that selected representation through its wrapper. This decision belongs to
-the named declaration origin, so every reference agrees with the
-declaration's arity. A callable reached only through a type parameter or a
-nominal struct field does not create another facet: its ordinary type
-argument or nominal declaration already owns that representation. The
-generated class has one statically typed hidden value-facet parameter,
-defaulted to the ordinary represented underlying type, and its value field
-uses that parameter. A profile use supplies the exact selected underlying
-type. For example,
-`Seq[T] func(func(T) bool)` may be represented as
-`Seq<T, $Value = ((yield: (T) => boolean) => void)>`; a cooperative profile
-selects the same class with a Promise-returning `$Value`. The parameter is
-absent from `Cache[T] map[string]T`, including
-`Cache[StructContainingCallback]`, because `T` already carries the selected
-representation and the declaration origin has no independent callable ABI.
-Intersections, casts, erased payloads, runtime Promise tests, per-use wrapper
-definitions, instantiated-argument arity inference, and declaration-wide
-widening are forbidden.
-
-An environment-owned generic function has no retained body and therefore
-cannot be reconstructed as a source variant. Its environment contract emits a
-separate demand-created ambient declaration for each reached callable profile.
-That declaration applies the same exact nested callable-ABI substitutions and
-uses the same deterministic profile suffix, but contains no body and claims no
-provider execution behavior. For example, a cooperative range callback passed
-through the result of `slices.Values` selects an ambient
-`Values$cooperative_<profile>` declaration whose returned iterator accepts the
-Promise-returning yield ABI; calling `Values` itself remains synchronous.
-
-Non-generic environment function and method declarations observe canonical
-first-class callable ABIs in their parameter and result types. Environment
-interface declarations observe the canonical interface-method callable facet
-for each method, including the same recovery envelope used by generated
-interface calls and adapters. Environment struct contracts retain every
-embedded field, including an unexported one, because the embedded promotion
-spine is part of the selected method and field contract; unrelated unexported
-non-embedded storage remains provider-private and is omitted. Therefore a
-blocking function value passed to
-`sync.WaitGroup.Go` and a blocking concrete implementation of
-`os.Signal.String` change the exact ambient contracts consumed by generated
-calls and adapters. Generic environment baselines remain declaration-scoped
-and synchronous; only their explicit demand-created profile declarations
-apply profile-local ABI selections. Environment contracts never infer
-cooperation from source spelling or from the mere presence of a nested
-function type.
-
-A linked provider's public interface declaration is an implementation surface,
-not the selected program's semantic interface ABI. Every generated reference
-to a provider-backed named Go interface therefore uses the same canonical
-generated interface contract as any other interface value, keyed by the exact
-completed `go/types.Interface` and its selected method-callable facets. For
-example, if a concrete `fmt.Stringer.String` implementation blocks, generated
-values use `String(): Promise<gostring>` even though the provider's ordinary
-public `fmt.Stringer` remains synchronous. Substituting the public provider
-interface as the generated program type would create two truth owners and is
-forbidden.
-
-A provider callable that accepts or returns such an interface crosses an
-explicit certified boundary. Its ordinary binding is usable directly only
-when every consumed interface-method ABI is structurally identical to the
-canonical selected contract. Otherwise one exact provider profile or facet
-must own the required method set, callable effects, adaptation, and outer
-effect. A cast, `any`, `unknown`, raw structural assignment, or widening the
-public provider interface is not a boundary. The compiler never infers which
-methods a provider uses from its source text or target shape.
-
-That boundary is recursive and representation-wide, not call-site-only. It
-also applies to interface values nested in tuples, callbacks, containers,
-provider-owned struct fields, package state, and provider method parameters or
-results. The provider certificate records the complete selected public
-interface surface by exact Go method identity, target member, callable effect,
-implementation owner, and target fingerprint. Emission consumes that sealed
-fact; it never re-inspects provider source or treats TypeScript assignability as
-the certificate.
-
-Provider-to-generated flow may use one demand-created, compilation-owned bridge
-per exact provider interface/profile. The bridge owns the canonical runtime
-method tokens, preserves nil and dynamic-value identity, forwards only
-certificate-joined methods, and recursively converts nested boundary values.
-It is emitted once and referenced at each crossing; per-use object shapes and
-wrapper definitions are forbidden. A synchronous provider method may satisfy a
-selected cooperative canonical method through a static async forward. The
-reverse is impossible: a cooperative generated method may not be projected
-into a synchronous provider parameter. Such an input requires an exact
-provider-owned profile/facet whose implementation, nested interface ABI, and
-outer effect are certified together.
-
-A provider callable whose implementation must execute generated interface
-values uses one certified **canonical boundary callable**, not a finite profile
-matrix. Boundary modules live under `gostdlib/src/internal/boundaries/` and are
-discovered from the provider source tree; no function, method, interface,
-parameter, result, guard, effect, or implementation variant is selected by a
-handwritten JSON entry.
-
-Every boundary callable's final parameter directly implements the one marker
-contract:
-
-```ts
-export interface CanonicalBoundaryPolicy<Source> {
-    readonly $go$canonicalBoundarySource?: Source;
-}
-```
-
-`Source` is `typeof` the ordinary public provider function or method. The
-pinned TS-Go checker resolves that property to the exact public target symbol;
-certification joins it to exactly one ordinary provider binding and therefore
-to exactly one selected-Go object identity and signature. Equal spelling,
-structural assignability, declaration text, module convention, or a duplicate
-marker cannot establish the join. The boundary callable has exactly the source
-callable's explicit parameters—plus an explicit receiver first for a method—
-followed by the policy parameter. Arity or source-symbol drift fails
-certification.
-
-The policy contains only direct instances of closed capability contracts:
-
-```ts
-export interface FromProviderRequest<Provider, Canonical> {
-    readonly $go$fromProviderSource?: Provider;
-    $from(value: Provider | undefined): Canonical | undefined;
-}
-
-export interface InterfaceGuardRequest<Source, Narrowed> {
-    readonly $go$guardSource?: Source;
-    (value: GoInterfaceValue | undefined): value is Narrowed;
-}
-```
-
-The first generic argument resolves through the same TS-Go symbol join to an
-exact selected-Go interface identity. At emission, `FromProviderRequest`
-materializes the one demand-created provider-to-canonical bridge for that
-identity and `InterfaceGuardRequest` materializes the generated canonical type
-predicate. Property names choose only fields in the typed target object; they
-never select semantic behavior. Extra properties, indirect wrappers, missing
-markers, unknown source symbols, duplicate capabilities, and unrequested
-runtime values fail certification or strict typechecking.
-
-The source parameters, nested callback parameters/results, containers, tuples,
-and provider method values already use the canonical generated representation.
-They cross unchanged. Provider-created interface values cross only through a
-requested `FromProviderRequest`; optional Go interface assertions use only a
-requested `InterfaceGuardRequest`. No parameter/result index lists, explicit
-canonical-value lists, protocol seeds, candidate keys, method-effect
-cross-products, or ordinary-binding fallback exist in this path.
-
-One boundary implementation handles synchronous and cooperative generated
-implementations through a statically typed recursive `Awaitable<T> = T |
-Promise<T>` contract and unconditionally `await`s operations whose selected
-interface method may be cooperative. This is not runtime Promise inspection:
-both alternatives are checked by TypeScript and JavaScript `await` has the same
-result for an immediate value. The boundary callable's own effect is derived
-independently from its inspected signature. A direct public provider API may
-share the same semantic kernel, but the algorithm is defined once; an internal
-boundary export cannot become a duplicate implementation.
-
-For `io/fs.WalkDir`, the policy requests provider-to-canonical bridges for
-provider-created `error` and `DirEntry` values and exact guards for `StatFS`,
-`ReadDirFS`, and `ReadDirFile`. The same implementation accepts a synchronous
-filesystem and callback or cooperative versions of either, while preserving
-`SkipDir`, `SkipAll`, nil, equality, callback errors, and fallback traversal.
-Adding another effect combination does not add another provider export or
-certificate row.
-
-The runtime interface dynamic-type token owns Go dynamic comparability once per
-concrete type. Its typed immutable contract contains `comparable: boolean`,
-derived from `types.Comparable` for generated types and explicitly certified
-for provider-owned values. Every boxed value refers to that shared token;
-provider bridges preserve the same token. Operations such as `errors.Is` read
-`target.$go$type.comparable` before invoking `$go$equal`, exactly matching Go's
-rule that a non-comparable target skips direct interface equality. A duplicate
-per-value flag, exception probing around equality, type-name table, or provider-
-specific comparability test is forbidden.
-
-The compiler uses a certified boundary callable unconditionally when one is
-owned by the source binding; otherwise it uses the ordinary provider binding.
-There is no ABI-dependent candidate selection and no compatibility fallback.
-The generated boundary call contains the ordinary source arguments plus one
-TS-Go-AST object literal whose fields are exactly the certified capabilities.
-The object and every requested bridge/guard are demand-created and deduplicated
-by typed identity.
-
-A provider-owned named concrete type that retains an interface value across a
-call boundary requires a stateful provider representation profile when that
-interface's canonical callable ABI differs from the provider's public ABI.
-This is a representation decision for the named Go type, not a constructor or
-method-call exception. The certificate exact-joins the selected Go type, every
-recursively retained named interface, every currently supplied source method,
-every direct exported source field, the alternate target type/value export,
-each target member and callable effect, the complete retained-interface
-profile key, and the implementation owner and target fingerprints. Field
-evidence records the Go field name, direct struct ordinal, embedding fact,
-exact selected-Go type, and source location. The target must expose exactly
-the certified public instance fields and instance/static method pairings;
-omitted, extra, inaccessible, or type-drifted fields fail certification or the
-mandatory strict generated-use check. Promoted access remains source-shaped:
-for embedded `Header`, Go `reader.Comment` emits `reader.Header.Comment`; the
-profile does not flatten or duplicate promoted members. Omitted, extra, or
-inaccessible retained interfaces and partially covered method sets fail
-certification.
-
-Every profile-capable named type has one demand-created compilation-owned
-alias artifact with stable type and value identity. All generated type
-references, receiver-operation references, constructor results, interface
-adapters, fields, parameters, and results for that Go type depend on this one
-artifact. The artifact resolves to the ordinary public provider export when
-the complete recursive ABIs match, or to exactly one certified stateful
-profile when they differ. It reconstructs transactionally when a subscribed
-interface-method callable facet changes and requeues consumers only when its
-observable type, value, or callable surface changes. A per-value union,
-runtime Promise/shape branch, cast, eager materialization, direct private
-profile import from a consumer, or independently selected constructor/method
-profile is forbidden.
-
-For example, `bufio.Reader` retains `io.Reader` in `rd` and `error` in `err`.
-If the selected generated `io.Reader.Read` and `error.Error` contracts are
-cooperative while the ordinary provider contracts are synchronous, every
-`*bufio.Reader` use names one generated alias of the certified cooperative
-reader profile. `bufio.NewReader` selects the matching callable profile,
-passes the canonical reader unchanged, and returns that exact represented
-type; `Read`, `ReadByte`, and `ReadBytes` use the method effects certified on
-the same profile. If both retained interfaces return to the ordinary ABI, the
-same generated alias resolves to the public `bufio.Reader` and no cooperative
-profile remains reachable. No source body from GOROOT is translated to obtain
-either implementation.
-
-Provider-created interface values inside a stateful profile must also use an
-exact certified canonical implementation or an explicit canonical value input
-owned by that profile. A provider error with synchronous `Error` cannot be
-returned as a cooperative canonical `error`; identity, nil, equality, method
-tokens, recovery, and callable effect all remain part of the boundary. Hidden
-converter callbacks, stored semantic operations, and target-shape recovery are
-forbidden.
-
-An inaccessible Go interface method remains part of runtime satisfaction and
-method-token identity even when no generated consumer can legally invoke it.
-The provider boundary must preserve that token obligation without pretending
-that the provider's public TypeScript interface exposes the method. Consumer
-code may not fabricate an implementation because the selected Go checker has
-already enforced the package-private method set. A callable member is emitted
-only where the selected Go package can legally call it; runtime membership is
-never weakened.
-
-Representation components shared by generated and provider code have one
-GoToTS runtime owner. In particular, unnamed `struct{}` is represented by the
-same nominal `GoEmptyStruct` in generated channel element types and provider
-implementations. A provider may not approximate it with `void` or a local
-marker and force a callable-boundary adapter to compensate. Provider-boundary
-profiles remain responsible only for genuine interface-method ABI differences,
-not duplicate representations of an identical Go type.
-
-The outer callable effect of an environment provider is never inferred merely
-because a parameter or result contains a cooperative callable. A selected
-`gostdlib` or external implementation contract must own that effect and the
-matching implementation. Until then, the ambient declaration is an explicit
-typed non-executable obligation. No source body is fabricated, no environment
-package is entered into the source emitter, and no runtime Promise inspection
-or union result is admitted.
-
-The provider contract records the outer effect independently for every
-function or method binding and every exact demand-created profile. The
-certifier derives that effect from the selected target callable signature
-through the pinned TS-Go checker API; target type spelling and an `async`
-source-text scan are not evidence. For example, `sync.Mutex.Lock` is `async`
-because its selected implementation returns `Promise<void>`, the cooperative
-profile of `slices.SortFunc` is `async` because that implementation awaits its
-comparison callback, and `slices.Values` remains synchronous because it only
-constructs and returns an iterator whose callback is cooperative. Nested
-callable ABI selection is not evidence for any outer decision. A linked
-compile fails if any reached binding/profile lacks its provider-owned effect
-or if the recorded effect differs from its certified target signature.
-
-Every generic provider function binding also owns one ordered target
-type-argument projection. Each target entry selects both an index into the
-selected Go function's type-parameter list and one closed representation facet:
-logical, storage, container-storage, or pointer. Its length exact-joins the
-inspected ordinary provider call signature. This is an ABI fact, not an
-emitter heuristic. `maps.Clone[M ~map[K]V, K, V]` currently projects logical
-`[K, V]`; `slices.Clone[S ~[]E, E]` projects the container-storage facet of
-`E`, so an open caller whose slice is `RuntimeSlice<T$ContainerStorage>` emits
-`Clone<T$ContainerStorage>`, not `Clone<T>`. `slices.Grow[S ~[]E, E]` projects
-the facets required by its separately certified operation-bearing provider
-signature. Generic callable-profile facets retain their own certified layout
-because cooperation may add representation parameters. Missing, stale,
-inferred-by-name, index-only, or arity-only projections fail provider
-certification before emission.
-
-Declaration requirements are revision-owned, not an append-only global set.
-Reconstructing an artifact atomically replaces all requirements that revision
-contributes; an unreferenced profile therefore cannot survive as provider
-surface. Provider obligations and manifests contain only requirements with at
-least one current root or artifact owner. Removing the last owner reconstructs
-the affected declaration and deletes the superseded facet in the same
-convergence cycle.
-
-### Standard-Library Provider Surface
-
-Reusable standard-library behavior is published as the GoToTS-owned ESM
-package `@gotots/gostdlib`. The public package name is independent of the
-selected host. A Node.js-backed build, a future browser-backed build, and any
-other exact implementation all expose the same public module specifiers:
-
-```text
-Go import          provider module
-"strings"       -> @gotots/gostdlib/strings.js
-"os"            -> @gotots/gostdlib/os.js
-"os/exec"       -> @gotots/gostdlib/os/exec.js
-"path/filepath" -> @gotots/gostdlib/path/filepath.js
-```
-
-The implementation backend is package metadata and internal source ownership;
-`node`, a platform name, a contract digest, and a toolchain digest never enter
-an ordinary public module specifier or export name. The Node.js implementation
-may import `node:` modules only inside the provider package. Generated source
-does not import `node:` modules directly.
-
-Each public module is an ordinary hand-maintainable TypeScript module with
-named exports. Package functions retain their Go declaration names and source
-parameter names. Exported types retain their Go names. A generated consumer
-uses one namespace import under the source Go package qualifier, so ordinary
-calls remain source-shaped:
-
-```ts
-import * as strings from "@gotots/gostdlib/strings.js";
-import * as os from "@gotots/gostdlib/os.js";
-
-strings.Contains(text, suffix);
-const [directory, err] = os.Getwd();
-```
-
-An imported type-name collision uses an ordinary explicit alias such as
-`File as OsFile`; it never uses `__from_`, an opaque digest, or traversal-order
-numbering. Parameter fallbacks use `argument0`, `argument1`, and so on only
-when the selected Go declaration genuinely has no source name. Dollar-prefixed
-compiler names are forbidden on the public provider surface.
-
-A receiver operation that cannot be represented as an exact native instance
-method is a static member of its declaring type with an explicit first
-`receiver` parameter:
-
-```ts
-export class File {
-    static Read(
-        receiver: File | undefined,
-        buffer: RuntimeSlice<uint8>,
-    ): [int64, GoError | undefined];
-}
-
-const [count, readErr] = os.File.Read(file, buffer);
-```
-
-This preserves Go nil-receiver entry and statically selected concrete method
-semantics. It does not create JavaScript virtual dispatch or dereference the
-receiver before entering the method. A native instance method is admissible
-only when the ordinary representation proof already establishes exact nil,
-copy, promotion, and dispatch behavior for that receiver family.
-
-Mutable package variables live in one exported `state` object, allowing exact
-read and write behavior without attempting to assign through an immutable ESM
-namespace binding:
-
-```ts
-export const state: {
-    Args: RuntimeSlice<gostring>;
-    Stdout: File | undefined;
-};
-
-const first = os.state.Args.get(0);
-```
-
-Compiler-only recovery, cooperative, specialization, interface, and generated
-operation facets live behind non-public internal modules. They do not rename
-the ordinary API with `$cooperative_<digest>`, `$is`, `$contract`, `$state`,
-receiver-name concatenation, or another encoded ABI spelling. An internal
-facet exact-joins one public Go declaration and one provider implementation;
-it may not become a second semantic implementation.
-
-The manifest gives each internal facet one stable provider-owned module and
-export. Generated code never derives that name from a Go spelling or profile
-digest. For example, any certified cooperative `slices.SortFunc` profile may
-map to the provider-owned
-`@gotots/gostdlib/internal/facets/slices.js` export
-`SortFuncCooperative`; the exact profile key and outer effect remain manifest
-data. The internal export is an adapter to the one ordinary semantic
-implementation, not a second implementation.
-
-A certified provider module owns exactly one namespace import in each generated
-file. Public modules normally inherit the source package spelling (`strings`,
-`os`). Internal facet modules may intentionally serve declarations from more
-than one Go package (`sync` and `sync/atomic` can share `recovery-sync.js`), so
-their namespace identity and preallocated qualifier come from the certified
-target module specifier, never from whichever source declaration is visited
-first. Module-stem collisions are resolved once in sorted module order. Import
-identity, alias selection, and emitted references therefore remain independent
-of root order and contributing Go package.
-
-The checked provider contract has two disjoint surfaces. Public module records
-own ordinary Go declarations. Compiler-facet records own only an exact selected
-capability of one such declaration or represented type. A compiler-facet record
-contains the canonical selected-Go object identity, a closed facet kind, a
-sorted non-empty capability set, one stable internal module/export, the exact
-TS-Go project fingerprint and implementation owner, and—only for callable
-facets—the independently selected outer `sync` or `async` effect. Named-struct
-facets may additionally own one storage-type export and its separate
-fingerprint. The valid capabilities are the compiler's closed operation names
-(`make`, `zero`, `copy`, `equal`, `hash`, `convert`, `storage`, and `assign`),
-the exact generic callable profile key, or `recovery`; arbitrary strings are
-rejected.
-
-A private selected-Go named type may use a provider representation only through
-one certified representation record. The record owns one internal type export,
-closed sorted sets of exact selected-Go type and supporting-interface
-identities, and an exact binding for every externally selectable method in
-those types' method sets. The certifier derives those method sets from
-`go/types`, proves that every represented type implements each supporting
-interface, requires every shared target member to have one callable contract,
-and exact-joins the concrete-method union plus the already-certified interface
-target surfaces to the target type inspected through the pinned TS-Go project
-API. Facets reference that record; they do not repeat its method set, substitute
-one supporting interface for the concrete surface, or infer anything from
-variable spelling or target shape during compilation.
-
-For example, `encoding/binary.bigEndian`, `littleEndian`, and `nativeEndian`
-share one private representation whose target surface contains the exact union
-of `Uint*`, `PutUint*`, `AppendUint*`, `String`, and `GoString`. The provider may
-spell that internal surface `BinaryEndianRepresentation`, while public
-`ByteOrder` and `AppendByteOrder` remain exact, distinct Go interfaces. Thus
-`binary.BigEndian.PutUint32(b, v)` is a direct typed member call and returning
-`binary.BigEndian` as `ByteOrder` uses the ordinary interface adapter; the
-compiler neither reconstructs a private GOROOT struct nor pretends that either
-public interface contains the other.
-
-A public generic-function record may additionally own one closed,
-source-generically ordered generic-operation set. Each operation records its
-compiler operation kind and
-an exact source-level Go signature assembled only from a closed recursive type
-expression: declaration type-parameter identity, admitted basic type, slice,
-or map. For example, `maps.Clone[M ~map[K]V, K, V]` requests conversion
-`M -> map[K]V`, construction `V -> map[K]V`, and conversion
-`map[K]V -> M`; `slices.Contains[S ~[]E, E]` requests conversion
-`S -> []E`, container restoration `E -> E` (whose target ABI is
-`E$ContainerStorage -> E`), and equality `(E, E) -> bool`. Provider code then
-operates on exact typed values and never constrains a nominal wrapper to a
-JavaScript primitive, reaches into a wrapper payload, or compares storage with
-target-language identity.
-
-The recursive expression is certificate data over the selected `go/types`
-declaration, not a target type model. Certification resolves every expression
-through that declaration, rejects foreign parameters and open expression
-kinds, and exact-joins the resulting capability order to the inspected
-provider call signature. At a concrete call, the existing generic-operation
-owner instantiates those exact signatures from `go/types.Instance`, selects
-the ordinary typed capabilities, and prepends them through the one canonical
-generic-call ABI. No provider-specific operation registry, target constraint,
-cast, or second generic body is admitted.
-
-Capability order is frozen from the certified source-generic signatures before
-instantiation. For example, `copy(K)` precedes `copy(V)` because `K` and `V`
-are declaration identities, regardless of whether a concrete call substitutes
-types whose target names or operation fingerprints sort in the opposite order.
-Re-sorting instantiated capabilities would make one provider export have a
-call-site-dependent ABI and is forbidden.
-
-A provider's public export for an untyped Go constant is not a universal
-runtime representation. Each generated use still requests its exact contextual
-projection. In linked mode the ordinary constant-value owner materializes the
-canonical `go/constant.Value` once per demanded basic representation under
-`support/constant-projections/<toolchain>/<package>/index.ts`. Typed constants
-continue to use their certified public provider export. Projection modules
-contain initialized `export const` declarations, never ambient `declare`
-bindings, and remain profile-aware (`math.MaxInt64` is a `bigint` literal only
-under the `bigint` profile). No provider spelling or runtime value is used to
-recover the compile-time constant.
-
-For example, selected `slices.Grow[S ~[]E, E any]` records conversions
-`S -> []E` and `[]E -> S`, `copy(E) E`, container restoration/storage for `E`,
-and `zero() E`. A call `slices.Grow(values, 3)` therefore prepends those six
-typed capabilities before `values, 3`. The provider preserves a named slice's
-logical wrapper, its element storage representation, independent zero values,
-and old-element copy behavior without `any`, `unknown`, target-shape
-inspection, sparse-array holes, or a compiler check for the name `Grow`.
-Removing or reordering any certified operation changes the call AST and fails
-the provider ABI gate.
-
-Recovery authority follows the same certified-boundary rule for every call
-form. A generated direct call, deferred call, selected method call, interface
-adapter method, or instantiated generic function value may pass a recovery
-argument only to a certified `recovery-callable` facet or to a selected generic
-profile whose inspected signature contains that slot. It must never append the
-argument to the ordinary public provider export. Thus a transported
-`cmp.Compare[string]` uses the certified `CmpCompare<string>` recovery facet,
-while an ordinary direct `cmp.Compare` call keeps the clean public ABI.
-
-For example, a generated zero of `sync.Mutex` does not call a `$zero` member on
-the public `sync.Mutex` class. The selected `sync.Mutex` identity plus capability
-`zero` exact-joins a private `MutexOperations` export, and the typed TS-Go AST
-calls `syncFacets.MutexOperations.$zero()`. Ordinary calls still use
-`sync.Mutex.Lock(receiver)`. Likewise, a cooperative `slices.SortFunc` use joins
-its exact profile key to `SortFuncCooperative`; a deferred provider call joins
-`recovery` to a provider adapter whose explicit last parameter is the recovery
-authority. No caller invents a private module, export, effect, operation set,
-type-parameter reference, or storage type from source spelling.
-
-For `sync` and `sync/atomic` values whose Go contract forbids copying after
-first use, a certified `copy` facet covers exactly the remaining admissible
-pre-first-use operation. It creates independent zero synchronization state;
-it never returns or embeds the source carrier. Public pre-use configuration is
-copied where Go copies it (`sync.Pool.New`). The provider does not define or
-claim behavior for a source program that violates the selected Go package's
-post-first-use copy restriction. `strings.Builder` follows the same ownership
-rule: copying its admissible zero state creates a fresh empty builder; a
-non-zero copy remains outside the selected Go contract.
-
-Construction is a represented-type operation too. A composite literal such as
-`unicode.Range16{Lo: 1}` selects the certified `make` facet and emits
-`unicodeFacets.Range16Operations.$make(1, ...)`; it never assumes that the clean
-public provider class exposes compiler members. Source-emitted structs continue
-to use their demand-created class operation. This distinction is selected from
-canonical declaration ownership, not package spelling.
-
-The selected `GOROOT` remains the declaration truth owner. For every public
-provider export, verification records and joins:
-
-```text
-Go import path + exact object identity + selected signature/profile
-    <-> public module subpath + named export
-    <-> provider implementation owner
-```
-
-The provider package carries a canonical machine-readable contract manifest
-with the selected Go versions, declaration identities, signatures, backend
-ownership, and implementation source locations. Digests belong in that
-manifest and package integrity metadata, not in source-level names.
-A missing implementation, mismatched signature, unexplained public export,
-duplicate owner, placeholder, or unsupported selected profile fails before
-linkage. The provider may be installed normally or vendored into the generated
-product under the same package name; generated source is identical either way.
-
-Linked compilation consumes that already-certified manifest as an explicit
-compilation input. Standard-library references become typed TS-Go namespace
-imports and property accesses (`strings.Contains`, `os.File.Read`,
-`os.state.Args`); ambient standard-library files are absent. An empty provider
-selection is the separate compile-only ambient profile, never an implicit
-fallback after a linked lookup fails. All reference forms—including values,
-types, methods, package state, generic profiles, deferred calls, and method
-values—must construct qualified TS-Go AST nodes through the canonical name
-reference API; concatenated dotted identifiers and post-print rewriting are
-forbidden.
-
-The two profiles are also disjoint inside compilation. Once an exact public
-binding or private facet has joined the selected provider certificate, its
-source artifact is a provider-coverage owner used only for requirement
-liveness. The compiler must not reconstruct an ambient declaration and then
-discard its file. In particular, it must not expose or resolve a provider
-type's private representation merely to validate a linked reference
-(`reflect.Value` contains the unexported embedded `reflect.flag`, but linked
-code imports the certified provider `Value` and never asks the ambient
-contract builder to represent `flag`). The compile-only profile remains the
-sole owner of ambient declaration construction, including its exported-field
-and embedded-promotion contract.
-
-Source-emitted generic non-struct defined types retain one parameterized
-nominal wrapper. Every target reference carries the exact represented
-`go/types` type arguments, and every operation projects through the wrapper
-before applying the underlying-family behavior. Rejecting a generic defined
-callable and then treating it as a struct or raw function is forbidden: a
-source declaration `type Seq[E any] func(func(E) bool)` is a stable `Seq<E>`
-class value, and invocation uses its canonical payload projection.
-Nil-capable families store `undefined` only in that payload; the class
-reference itself is never optional. This gives every reached receiver method
-one class-owned member surface without static wrap/project helpers.
-
-A linked provider-defined non-struct type has one explicit representation in
-the certified contract. A receiverless callable with no provider-owned
-nominal surface may select `identity`; projection and wrapping are then exact
-no-ops, but its target type still has the declaration-origin hidden value
-facet whenever its canonical callable ABI can reconstruct. The provider alias
-is generic in that exact value facet and defaults to its ordinary certified
-ABI. It is never a fixed unparameterized function spelling. For example,
-`context.CancelFunc<$Value = ordinary-ABI>` is an identity alias whose linked
-consumer supplies the canonical `func()` ABI selected by the artifact graph;
-the provider certificate independently records whether the default ABI is
-synchronous or cooperative and exact-joins that choice to the pinned TS-Go
-call signature. Nil remains inside the callable ABI, not outside the named
-type.
-
-Every other selected defined value selects one private
-`defined-value-operations` facet whose closed capabilities are exactly
-`project` and `wrap`. The facet accepts and returns the clean public provider
-type plus the exact underlying target type. For example, provider `time.Duration` remains the public class
-`Duration`, while generated `d + time.Second` projects both operands through
-`TimeDurationValueOperations.$project`, performs the integer operation, and
-wraps the result through `$wrap`. The public `Duration` class does not expose
-`$value`, `$project`, or `$wrap`.
-
-The contract assignment is total over every selected exported provider type
-whose unaliased underlying Go family is basic, array, slice, pointer, map,
-channel, or receiverless signature. Identity is legal only for the
-receiverless-signature family, and every identity assignment carries one
-certified callable effect. The compiler asks the one defined-value owner for
-the certified representation before every type reference, projection, and
-wrap. That owner requests the corresponding canonical callable ABI
-synchronous or cooperative and supplies its exact hidden value-facet type
-argument. A raw payload access, provider-name test, public target-shape
-inference, fixed callable alias, Promise union, or caller-local exception is
-forbidden. Missing, duplicate, orphan, or effect-free assignments fail
-provider certification before linked emission.
-
-A generated callback that inverts source control flow, such as the callback
-implementing range-over-function, is not a new source callable and does not
-attribute blocking work directly to the enclosing source function. Its
-cooperative boundary is the canonical callable ABI of the exact callback
-signature. Blocking work in the generated callback selects that ABI
-cooperative; the iterator provider observes and awaits the same ABI; invoking
-the iterator observes its own callable ABI and only then propagates cooperation
-to the enclosing source callable. This is one ordinary facet-dependency chain,
-not a callback-specific call graph. The generated callback is `async` exactly
-when its ABI is cooperative, and unrelated callable signatures remain
-byte-identical.
-
-A `go` statement evaluates and value-copies the callee and every argument
-immediately in source order, then schedules exactly one typed
-`() => Promise<void>` closure. Main return stops the selected program without
-waiting for remaining goroutines. A panic escaping any goroutine terminates the
-selected program with the shared panic carrier.
-
-`select` evaluates channel operands and send values exactly once in source
-order. It creates one typed alternative per communication clause. The runtime
-uniformly chooses one currently ready alternative, commits it once, and
-cancels all other registrations. If no case is initially ready, alternatives
-are registered in a fair permutation as active offers in the same channel
-queues used by direct operations. This preserves FIFO ordering across direct
-and selected waiters, permits select-to-select rendezvous, and prevents
-same-channel source-arm bias. Closing a channel rejects a queued selected send
-through that select's own typed completion path; it does not throw from the
-goroutine performing `close`. A receive target location is evaluated only
-after its clause wins. A select with a default invokes the channel owner's
-synchronous fair ready-choice/commit operation: one ready communication wins,
-or `default` wins when none is ready. Selection itself adds no `Promise`,
-`async`, `await`, scheduler dependency, or cooperative callable requirement;
-operand or send-value evaluation may independently require cooperation. A
-select without a default invokes the blocking operation only when no
-communication is ready and then participates in scheduler deadlock detection.
-Nil-channel alternatives never become ready.
-
-Channel send and receive call sites are O(1), apart from the selected element
-copy. A select site and registration are O(number of clauses). Runtime source
-size is independent of element type, channel count, goroutine count, and
-select-site count. Queue storage is O(buffer capacity plus live blocked
-operations), never O(historical operations).
-
-## Package State And Assembly
-
-TypeScript ESM imported bindings cannot be assigned by another module, while
-Go package variables are mutable from every file in their package. Therefore
-every reached package has one package assembly, and a package with mutable
-variables additionally has one state module. Every compilation also has one
-program-initialization module:
-
-```text
-packages/<module-key>/<module-relative-package>/state.ts
-packages/<module-key>/<module-relative-package>/package.ts
-program.ts
-```
-
-The state module owns storage. It emits one generated class whose public
-`declare` fields are typed from the authoritative package-scope `types.Var`
-objects, and one state instance:
-
-```go
-var Counter int
-```
-
-```ts
-export class $PackageState {
-  declare Counter: int32;
-}
-
-export const $state = new $PackageState();
-```
-
-`declare` is intentional: it is erased JavaScript and avoids importing runtime
-source declarations into the state module. The state module may use type-only
-imports and primitive-alias imports, but it must have no runtime dependency on
-a generated source-file module. It contains no initializer and no cast from an
-empty object.
-
-The package assembly is passive at module evaluation. It imports the state and
-required source declarations and exports one `$initialize` function when the
-package has initialization work. That function assigns the exact Go zero to
-every state field before any package initializer runs, then emits initializer
-assignments in `go/types.Info.InitOrder`. Admitted `init` functions follow in
-the selected toolchain loader's file order and declaration order within each
-file; the emitter preserves that evidence and does not rescan the filesystem
-or sort a second file list. For example:
-
-```go
-var B = 4
-var A = B + 1
-
-func Read() int { return A + B }
-```
-
-becomes structurally:
-
-```ts
-import { Read } from "../../modules/<module-key>/<package>/read.js";
-import { $state } from "./state.js";
-
-export function $initialize(): void {
-  $state.A = 0;
-  $state.B = 0;
-  $state.B = 4;
-  $state.A = $state.B + 1;
-}
-
-export { $state, Read };
-```
-
-Under the cooperative profile, an initializer that reaches a cooperative
-callable instead emits structurally:
-
-```ts
-export async function $initialize(): Promise<void> {
-  $state.Values = await Map(values, asyncValueAdapter);
-}
-```
-
-Synchronous packages retain the byte-identical `(): void` form. Package
-assembly derives this choice only from exact initializer and source-`init`
-facets already closed by the artifact scheduler.
-
-The program-initialization module is the sole executor. Go does not use a
-depth-first module walk: from all packages sorted by import path, it repeatedly
-initializes the first package whose imports are already initialized. ESM
-dependency evaluation is depth-first and can produce a different order for
-independent branches. Therefore no package assembly executes initialization at
-top level and target import order is never treated as Go initialization order.
-
-The program builder applies Go's algorithm directly to the reached
-`types.Package` identities and their selected `Imports()` edges, then filters
-the resulting order to packages with initialization work. It emits static
-imports and one direct call per such package:
-
-```ts
-import { $initialize as $initialize_registry } from "./packages/<key>/registry/package.js";
-import { $initialize as $initialize_y } from "./packages/<key>/y/package.js";
-import { $initialize as $initialize_b } from "./packages/<key>/b/package.js";
-
-await $initialize_registry();
-$initialize_y();
-$initialize_b();
-```
-
-Only cooperative package calls receive `await`; the module uses ESM top-level
-await so each package completes before the next Go-ordered package begins.
-
-There is no runtime registry, idempotence flag, callback table, dynamic import,
-or alternate package graph. ESM evaluates `program.ts` once, so each direct
-call executes once. A consumer imports `program.ts` for effects before using
-bindings from a passive package assembly.
-
-Generated reads and stores use the same field identity (`$state.A`,
-`$state.A = value`, `$state.A++`). No per-variable getter/setter, mutable-cell
-wrapper, duplicated source-file binding, or source-order emulation exists.
-Same-package source modules import `state.ts`; cross-package generated source
-references use the dependency state and exported declarations through passive
-`package.ts`. Compiler-owned support artifacts name a required unexported
-declaration through its defining source module as specified by the placement
-owner; this does not expose that declaration on the public package surface.
-Loading source and package modules cannot execute Go initialization early.
-
-The package assemblies and `program.ts` are sealed only after the declaration
-scheduler, package initialization work, and placement requests reach a fixed
-point. A consumer that omits `program.ts` is outside the executable output
-contract. Package-state, assembly, and program-initialization nodes are
-constructed through the same typed TS-Go protocol factories and printed by the
-same pinned printer as every other target file.
-
-## Target Construction
-
-`schema/tsgo/` pins one exact TS-Go revision and its official external AST
-schema, protocol version, encoder contract, and relevant API definitions
-byte-for-byte. A generator mechanically creates node-specific Go types,
-closed child interfaces, factories, and the binary encoder in
-`internal/target/tsgo`. Generation is total over the pinned schema; there is no
-manually selected target-node profile or second schema.
-
-Schema-invalid target children must be unrepresentable through ordinary typed
-factory calls. A generic handwritten `Node`, runtime kind-switch validator,
-field-shape inference, or special-case wire classifier is not an acceptable
-substitute. Encoding layout comes only from the pinned official protocol and
-must not be inferred from coincidental field shapes.
-
-GoToTS starts one persistent exact pinned `tsgo --api --async` process for a
-compilation. It sends validated binary AST values to the official `printNode`
-endpoint. TS-Go then decodes them through its real AST factory and prints them
-through its real printer. GoToTS has no formatter and does not fork, import
-through, or expose TS-Go's Go `internal` packages.
-
-The TS-Go command is a pinned Go tool dependency, not a PATH lookup. Its module
-revision is joined to `schema/tsgo/manifest.json` and its executable build
-identity is checked before the first request. Missing or mismatched tools fail
-closed; there is no compatible-version fallback.
-
-No production code may concatenate TypeScript, inject raw
-expressions/statements, patch formatted text, or carry an alternate target
-tree. Imports, trivia, escaping, precedence, and punctuation are TS-Go
-concerns.
-
-Generated support modules obey the same rule. The representation owner requests
-one canonical primitive alias by typed identity; the root emitter constructs
-the corresponding exported TS-Go `TypeAliasDeclaration` in
-`runtime/scalars.ts` and deduplicates it. Generated package files use canonical
-relative type-only `.js` imports. No checked-in source template or external
-package supplies these declarations. Any other marker-like support declaration
-must have complete ordinary TypeScript semantics; a no-op declaration cannot
-delegate missing behavior to an external tool.
-
-Every compilation entry point returns the complete reachable target-file set,
-including generated support/runtime modules and source dependencies. A
-file-root convenience may choose roots from one Go file, but it must not return
-only that file's TypeScript module or discard any requested artifact. Consumers
-never reconstruct omitted support from imports.
-
-Runtime support follows the same typed placement model. A contextual handler
-requests a closed runtime symbol from the name owner. That symbol fixes:
-
-- its one `runtime/<family>.ts` output owner;
-- its exported target name and allowed type/value uses;
-- its closed runtime-symbol dependencies;
-- the family builder that constructs its declaration as typed TS-Go AST; and
-- its deterministic deduplication identity.
-
-The source-file placement owner receives the resulting ordinary static import
-at the requested type or value phase and upgrades type to value when both are
-needed in one file.
-The program target-file owner independently collects the tagged runtime
-symbols, computes their cycle-free transitive dependency closure, exact-joins
-every requested export to one generated definition, emits each demanded
-runtime module once, and creates canonical relative static ESM imports between
-runtime modules. A raw module/export string may not select runtime behavior,
-and a runtime declaration may not be carried from a use-site handler as an
-opaque duplicate AST payload.
-
-All generated runtime modules and primitive aliases form one canonical local
-package rooted at `runtime/` and identified as `@gotots/runtime`. Program
-assembly emits a deterministic package manifest whose explicit exports map
-each selected `@gotots/runtime/<family>.js` subpath to the corresponding
-generated module. Product assembly links that exact package root locally; it
-does not publish, copy, or reimplement it.
-
-Generated source may use a relative import to the canonical runtime root, while
-`gostdlib` uses its declared `@gotots/runtime` peer import. Both specifiers must
-resolve to the same physical generated module, so private fields, class
-identity, method tokens, panic carriers, maps, slices, pointers, channels, and
-interface values have one TypeScript and JavaScript identity. A checked-in or
-handwritten test runtime is forbidden. Provider tests generate and compile
-their runtime fixture through the same runtime builders, integer profile, TS-Go
-encoder, and pinned printer used by ordinary program emission.
-
-`gostdlib` contributes a certified closed set of runtime symbols and primitive
-aliases required by its selected provider modules. Program assembly unions
-that set with source-program demand before computing the runtime dependency
-closure. Missing exports, an unrequested provider runtime dependency, a second
-runtime implementation, or two resolved physical owners for one runtime
-symbol fail before provider linkage.
-
-```text
-contextual family handler
-    -> Names.Runtime(closed symbol)
-    -> static ESM import request + tagged definition requirement
-    -> program-level dependency closure + exact symbol join
-    -> internal/emit/runtime/<family> TS-Go AST builder
-    -> canonical runtime/<family>.ts
-    -> deterministic @gotots/runtime package manifest
-    -> one local package link shared by generated code and gostdlib
-```
-
-All generated runtime failures and source `panic` use one closed Go panic ABI:
-
-```text
-family runtime guard or source panic(value)
-    -> GoPanic.raiseRuntime(message) or GoPanic.raise(value)
-    -> one runtime/panic.ts owner
-    -> one statically typed thrown GoPanic carrier
-```
-
-A family runtime must not throw a host `Error`/`RangeError` or depend on an
-implicit JavaScript exception for Go panic behavior. The panic module is the
-only generated runtime owner allowed to create and initially throw a
-`GoPanic`. A callable unwind envelope may only rethrow an unrecognized caught
-host exception unchanged; it may not inspect, convert, or recover that value.
-The carrier owns one exact represented empty-interface payload. Runtime faults
-and `panic(nil)` enter through distinct GoToTS-owned runtime-error dynamic
-values. Both implement the canonical `error`, `interface { Error() string }`,
-and `runtime.Error` method contracts, while `panic(nil)` alone carries the
-canonical `*runtime.PanicNilError` dynamic identity and represented payload.
-Source non-nil values enter through ordinary represented-interface conversion.
-There is no generic or erased carrier payload.
-
-`recover` consumes an invocation-local `GoRecovery` authority. Only the direct
-call of a deferred function receives that optional, statically typed authority.
-An ordinary call, a call made by that deferred function, and `recover` outside
-deferred execution receive no authority and return nil. Function and method
-values consume one canonical generated callable ABI contract keyed by their
-exact `go/types.Signature`. Recovery is one optional final facet of that
-contract: direct ordinary calls omit it and deferred invocation supplies it.
-The ABI is not re-keyed for a variable, field, pointer, slice, map, interface
-adapter, defined callable wrapper, or other carrier. Those locations store the
-same callable value; they do not own recovery semantics. No per-storage
-recovery identity, storage/dataflow graph, ambient global, module flag,
-async-local store, dynamic property, cast, `.call`, `.apply`, or `.bind` may
-select recovery.
-
-Callable control is a demand-selected facet of the exact source function
-artifact. Encountering `defer`, `recover`, or non-structural `goto` requests
-reconstruction of that exact callable, including an independently anchored
-function literal. The final callable owner assembles typed TS-Go AST in this
-order:
-
-```text
-lexical declarations and addressable storage
-    -> optional goto control structure
-    -> return and named-result normalization
-    -> defer/panic unwind envelope
-    -> final typed TS-Go function body
-```
-
-This is target assembly in the existing declaration fixed point, not a source
-prewalk or retained control model. No CFG, lowering IR, semantic plan, source
-inventory, second checker, or second Go-AST traversal is retained. A callable
-without a selected control facet has byte-identical target AST.
-
-Emission context carries exactly one canonical `ArtifactOwner`. Addressable
-storage derives its `*types.Func` from that owner rather than retaining a second
-function-owner field. Callable-control requirements use the same owner and
-carry the exact enclosing source artifact plus callable anchor; both the start
-and end of a function literal must be contained by that enclosing artifact.
-The selected callable map and current callable/facets are ephemeral
-reconstruction facts only and are discarded with the emission context.
-
-A `defer f(x)` registration evaluates and captures the callee, selected
-receiver, and copied arguments immediately at the source statement. It pushes
-one typed closure onto an invocation-local stack. The callable envelope drains
-that stack LIFO on every normal return and panic exit. A later panic replaces
-the pending panic without skipping older deferred calls; a direct successful
-`recover` consumes the pending panic. Explicit returns in a named-result
-function assign copied values to the named result locations before unwind, and
-one trailing result read occurs after deferred mutation.
-
-Labels are keyed only by exact `*types.Label` definition/use identity. Native
-target labels own labeled `break` and `continue`, switch fallthrough remains at
-the switch-clause owner, and structurally representable goto edges use direct
-target labels. Only genuinely non-structural edges select a whole-function
-linear state machine assembled from the already-created TS-Go statements.
-State and generated size are linear in source statements and exact labels.
-Every ordered statement list, including a block and a switch or type-switch
-clause body, delegates to the same statement-sequence control owner. When a
-generated state machine is nested inside a source loop, range, switch, or type
-switch, that source construct receives a typed lexical target label so an
-unlabeled source `break` or `continue` cannot be captured by the generated
-dispatch loop or switch. This target is target-assembly context only; it is not
-a persisted source-control graph.
-
-Runtime classes may encapsulate JavaScript storage only when that storage is
-the smallest exact representation of a Go value family. They may expose
-ordinary statically typed methods, but no reflection, dynamic operation name,
-erased payload recovery, target non-null assertion, `.call`/`.apply`/`.bind`,
-per-use semantic closure, or stored semantic callback/strategy. Passing a
-statically typed hash, equality, copy, zero, conversion, or dispatch function
-into a runtime value still constitutes runtime semantic dispatch and is
-forbidden. Nullable storage is narrowed by explicit control flow at the
-runtime owner; a generated `value!` may not substitute for a proved invariant.
-Compiler handlers still own Go evaluation order and copy boundaries; runtime
-code does not rediscover source semantics.
-
-Dense pointer, array, and slice storage shares one demanded structural
-indexed-read owner. Its generic `get<T>` reads once, proves the numeric property
-is present with an `in`-based type predicate, panics for a missing or sparse
-slot, and returns `T`. This distinction is semantic: `[undefined]` may be a
-present Go nil value, while `new Array(1)` is absent storage and must not be
-accepted as nil. The owner is O(1), carries no source type tag or semantic
-callback, and is emitted once only when one of those runtime families demands
-it. Family-local indexed-read implementations, `value!`, casts, and
-`value ?? zero` recovery are forbidden.
-
-Aggregate container operations therefore compose at the source operation
-owner. That owner emits typed TS-Go loops which call the already-selected
-zero/copy/equality/hash structures directly. Runtime array and slice classes
-may expose only typed structural primitives needed to allocate, validate,
-grow, and access storage. They may not receive a semantic operation as a
-function parameter, retain one as a field, or create a second per-element-type
-dispatch owner. Runtime members used only by `clear` or slice-spread append are
-selected by closed demand and are absent from an artifact that does not use
-the operation.
-
-The pointer runtime is the one exception for typed location accessors because a
-Go pointer is itself a first-class reference to mutable storage rather than a
-copied value. Its closed factories may capture only statically typed read and
-write access to an already-selected local, field, array element, or slice
-backing element. They may not capture source nodes, names, type metadata,
-operation tags, or semantic decisions. A canonical opaque address token owns
-equality; payloads never pass through `any`, `unknown`, reflection, or dynamic
-shape inspection.
-
-Setter-backed stores have one target contract shared by arrays, slices, maps,
-and future setter representations. The store-target owner returns typed
-TS-Go receiver and argument expressions with their prerequisite statements;
-the assignment owner alone orders and conditionally captures them before the
-right side, then constructs the final member call. A family-specific
-assignment handler is forbidden. Likewise, one builtin-object dispatcher owns
-semantic dispatch for `new`, `make`, `len`, `cap`, `append`, `copy`, and
-`delete`; family sub-owners consume the already-resolved `*types.Builtin`
-rather than rediscovering it from spelling.
-
-## Package And Output Shape
-
-Every source-available Go file has one checkout-independent target path:
-
-```text
-modules/<sha256(module-path NUL module-version)>/<module-relative-package>/<source-base>.ts
-```
-
-Its package-owned assembly and conditional mutable state use the same semantic
-module key and module-relative package under the separate `packages/` root:
-
-```text
-packages/<sha256(module-path NUL module-version)>/<module-relative-package>/state.ts
-packages/<sha256(module-path NUL module-version)>/<module-relative-package>/package.ts
-```
-
-The compilation-owned initialization entry has the checkout-independent path
-`program.ts`.
-
-The full digest is an opaque semantic-module owner, not a shortened display
-identifier. Generated value imports use canonical relative `.js` specifiers.
-Every cross-package imported binding uses a deterministic package-qualified
-local alias even when its source spelling is currently unshadowed. This keeps
-the reference exact when a local declaration has the same spelling and prevents
-unrelated lexical traversal order from selecting whether qualification occurs.
-Same-package cross-file references retain their reserved package name.
-
-The source tree is organized recursively by authoritative responsibility. This
-is a growth rule, not a prediction of every construct. Create a directory only
-when its first real owner is implemented:
-
-```text
-cmd/gotots/                         CLI composition only
-
-schema/tsgo/                        exact pinned TS-Go external contract
-  manifest.json                     revision, protocol, paths, exact digests
-  upstream/                         byte-exact upstream schema/protocol inputs
-
-internal/load/                      project and selected-toolchain loading
-
-internal/emit/                      session, scheduling, closed dispatch only
-  dispatch.go                       emitter plus closed typed dispatch
-  declaration_assembly.go           roots, demands, and artifact reconstruction
-  artifact/                         target-contract coordination authority
-    contract.go                     mechanical TS-Go observable projections
-    graph.go                        facet edges, revisions, and fixed point
-  naming/                           exact Go-identity target names and generated-artifact registry
-    registry.go                     immutable target lookup and canonical generated-artifact ownership
-    file_names.go                   one file/scope name service implementing `api.Names`
-  placement/                        deterministic static import/request placement
-  verification/                     public-surface program/session integration tests
-  target_files.go                   source/support/program file sealing
-  package_state.go                  package storage and initialization owner
-  storage/                          exact identity-selected local cell access
-  api/                              narrow handler contracts
-    context.go
-    role.go
-    result.go
-    root_request.go
-    artifact_dependency.go
-    children.go
-  <domain>/                         declaration, statement, expression, type
-    <semantic-owner>/               assignment, call, index, function, ...
-      <sub-owner>/                  only after an evidenced ownership split
-      verification/                 end-to-end construct tests when the owner has a substantial matrix
-  expression/address/               address formation and location projection
-  runtime/pointer/                  one typed canonical-location runtime owner
-
-internal/target/tsgo/               official-protocol target boundary
-  generate/                         schema/protocol binding generator
-  *_generated.go                    typed nodes, factories, encoder
-  client.go                         persistent tsgo API process
-  print.go                          printNode request boundary
-  contract_test.go                  pinned schema/binding totality
-  encoder_test.go                   upstream encoder differential
-  client_test.go                    native printNode round trip
-
-internal/output/                    deterministic paths and atomic writes
-internal/contracts/                 environment/manual/external contracts
-internal/verify/                    independent gates and harnesses
-
-runtime/                            minimal reusable Go-semantics runtime
-gostdlib/                           reusable `@gotots/gostdlib` package
-  src/<go-import-path>.ts           ordinary public named exports
-  src/internal/node/                Node.js-backed implementation owners
-  src/internal/boundaries/          typed canonical boundary callables
-  src/internal/certify/             checker-visible marker contracts
-  test/                             contract and behavior differentials
-
-testdata/constructs/                minimal construct-case fixtures
-  <domain>/<semantic-owner>/<case>/
-    source.go
-    expected.ts
-testdata/projects/                  multi-file/package/project fixtures
-```
-
-`internal/emit` contains only orchestration and services that genuinely span
-semantic owners. A handler package imports `internal/emit/api` and
-`internal/target/tsgo`; it does not import the root emitter or a sibling
-handler. The root emitter imports handlers and implements `api.ChildEmitter`.
-This fixed dependency direction prevents cycles and hidden semantic coupling:
-
-```text
-internal/emit
-    -> internal/emit/<domain>/<semantic-owner>
-        -> internal/emit/api
-        -> internal/target/tsgo
-```
-
-The `api` package contains immutable Go AST/type references, parent roles,
-target results, placement requests, and typed diagnostics only. It must not
-become a semantic IR, property bag, copied source model, or second dispatcher.
-
-The split follows semantic ownership, not one file per AST type or construct
-fixture. For example, `statement/assignment` owns ordinary, parallel,
-compound, multi-result, and store-target assignment semantics until evidence
-requires a coherent sub-owner. If `expression/call` later becomes substantial,
-it may split into evidenced `builtin/`, `method/`, or `interface/` owners.
-
-The first concrete owners therefore have ordinary focused files rather than a
-file per contextual case:
-
-```text
-internal/emit/statement/assignment/
-  handler.go
-  handler_test.go
-
-internal/emit/expression/call/
-  handler.go
-  handler_test.go
-```
-
-No directory is pre-populated. Production files and `_test.go` files are
-separate Go source sets with separate owners; neither source set may exceed
-twenty maintained non-generated files in one directory. Before either set
-would exceed that bound, stop and review its truth owner and extract a coherent
-semantic or verification sub-owner rather than mechanically splitting or
-merging unrelated filenames. An aggregate production-plus-test count is not an
-organization metric because it pressures two mutually exclusive build sets
-into one file responsibility. Maintained non-generated files remain below 600
-physical lines.
-
-There is no `ir/`, `plan/`, `lower/`, `catalog/`, `inventory/`, `legacy/`,
-`compat/`, `fallback/`, `util/`, `helpers/`, `misc/`, `common/`, or `shared/`
-production package. A new directory requires a named owner, dependency
-direction, smallest motivating construct case, and split/deletion criterion.
-
-Construct fixtures follow the same discovery-driven organization. The ordinary
-typed Go test beside the handler names its fixture and supplies context. There
-is no JSON case manifest, per-program inventory, or second coverage registry.
-A fixture adds more files, packages, modules, or expected outputs only when the
-case itself requires them.
-
-A generated product uses deterministic ownership:
-
-```text
-<output>/
-  program.ts
-  modules/<module-key>/<package>/<source-file>.ts
-  packages/<module-key>/<package>/state.ts
-  packages/<module-key>/<package>/package.ts
-  externals/<contract-key>/<import-path>/index.ts
-  runtime/package.json
-  runtime/scalars.ts
-  runtime/<runtime-module>.ts
-  node_modules/@gotots/runtime/     local link to the exact runtime/ root
-  node_modules/@gotots/gostdlib/    installed or vendored exact provider
-  manifest.json
-```
-
-Source-available dependencies go under `modules`, regardless of whether they
-come from the workspace, module cache, vendor tree, or replacement directory.
-Standard-library and external routing uses resolved metadata and explicit
-contracts, never path spelling. Standard-library calls use public
-`@gotots/gostdlib/<go-import-path>.js` modules after provider verification.
-`runtime/scalars.ts` contains only aliases requested by the selected program
-and certified provider contract, each defined once. `runtime/` contains only
-GoToTS-owned behavior required for exact standalone execution and is locally
-linked as `@gotots/runtime`; it does not import an unrelated compiler,
-transpiler, target, or product.
-
-## Extension Boundary
-
-An extension may:
-
-- claim an explicit typed package/declaration/operation contract;
-- inspect the same read-only Go node and `go/types` evidence supplied to the
-  ordinary handler;
-- construct exact typed TS-Go protocol AST values through the same generated
-  factories; and
-- submit the same typed placement requests.
-
-It may not rerun loading or typechecking, scan source text, patch output text,
-invent target node shapes, or create an alternate translation pipeline.
-
-## Complexity
-
-The default traversal is O(number of selected Go AST nodes plus emitted TS-Go
-AST nodes). Indexed object/name/import lookup must be O(1) average or O(log n).
-No emitted call or declaration may grow with the number of interface
-implementers, packages, or unrelated definitions.
-
-Any broader analysis or helper mechanism requires a concrete Go counterexample,
-one owner, an asymptotic/storage bound, generated-size evidence, and a deletion
-condition. If it duplicates the Go graph or could be replaced by a local
-`go/types` query during emission, it is rejected.
+The facade has the source value parameters. Required bridges and operations
+are statically imported at module scope or closed over by private
+compiler-owned helpers. No policy object, bridge set, capability function,
+profile key, or recovery authority appears at a generated call site.
+
+Provider-created interface values cross one certified static bridge preserving
+nil, dynamic identity, method tokens, equality, and canonical callable ABI.
+Generated inputs cross the inverse bridge only where representation differs.
+Nested callbacks, tuples, containers, fields, and results follow the same
+type-directed boundary rule. Missing or ambiguous conversion fails
+certification; TypeScript assignability alone is not semantic evidence.
+
+Representation-dependent provider generics use direct exact TypeScript when
+possible. Otherwise a reached exact instance selects a private generated
+facade/concretization or private provider kernel. Public/provider and generated
+source callables retain source arity.
+
+Compile-only mode emits exact typed throwing placeholders and canonical
+obligations. Linked mode uses certified provider facades. These are explicit
+profiles, never fallback paths in one compilation. Publication requires every
+reachable obligation to be implemented.
+
+## Package, Runtime, And Target Output
+
+Each Go package emits deterministic ESM modules plus one package assembly.
+Mutable package variables live in one state module. Checker
+`types.Info.InitOrder` and the package import graph determine package and
+program initialization order; target import order does not.
+
+Generated support is GoToTS-owned under `runtime/` and demand-created. The
+same physical runtime package is linked into generated code and `gostdlib`,
+so class identity, panic carriers, maps, slices, pointers, channels, and
+interface tokens are unique.
+
+Every target file is built from exact generated bindings for the pinned TS-Go
+external AST protocol. The encoder validates required fields and discriminants.
+Pinned TS-Go decodes, constructs real nodes, and prints. No target text exists
+before printing, and no post-print mutation is allowed.
+
+## Complexity And Failure
+
+Ordinary source growth must produce proportional target growth. In particular:
+
+- concrete/interface calls are constant-size in implementer count;
+- generic direct bodies do not grow with call count;
+- concretizations grow with distinct necessary exact instances;
+- provider facades grow with distinct selected boundary contracts;
+- fixed-point work is bounded by changed artifact facets and reverse edges;
+- runtime source is independent of runtime value count.
+
+Unknown syntax, missing checker evidence, unsupported representation,
+unbounded concretization, unresolved provider conversion, non-convergence,
+schema drift, or blocked strict typing fails with a typed diagnostic at the
+owning construct. There is no heuristic recovery, compatibility path, dynamic
+semantic dispatch, or threshold increase in place of a fix.
