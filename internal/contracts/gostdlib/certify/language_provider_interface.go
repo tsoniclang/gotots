@@ -4,6 +4,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -78,7 +79,7 @@ func buildLanguageProviderInterface(
 				)
 			}
 			methodIdentity, signature, err :=
-				gostdlib.ProviderInterfaceMethodSource(method)
+				gostdlibsource.ProviderInterfaceMethod(method)
 			if err != nil {
 				return providerInterfaceMethodSource{}, err
 			}

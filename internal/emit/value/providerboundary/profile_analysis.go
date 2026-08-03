@@ -6,6 +6,7 @@ import (
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 )
@@ -86,7 +87,7 @@ func (a *profileBoundaryAnalyzer) collectType(
 					identity,
 					provider,
 					func(method *types.Func) (string, string, error) {
-						return gostdlib.ProviderInterfaceMethodSource(method)
+						return gostdlibsource.ProviderInterfaceMethod(method)
 					},
 				)
 			}
@@ -228,7 +229,7 @@ func (a *profileBoundaryAnalyzer) collectProfileInterface(
 		identity,
 		certificate.ProviderInterface(),
 		func(method *types.Func) (string, string, error) {
-			return gostdlib.ProviderInterfaceMethodSource(method)
+			return gostdlibsource.ProviderInterfaceMethod(method)
 		},
 	)
 }

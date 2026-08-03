@@ -366,8 +366,7 @@ func validateProviderCallableProfileSeeds(
 		if key == "" || key == previousKey ||
 			seed.SourceIdentity == "" ||
 			seed.Specifier == "" || seed.SourcePath == "" || seed.Export == "" ||
-			len(seed.CanonicalParameters) == 0 ||
-			len(seed.Interfaces)+len(seed.Protocols) == 0 {
+			len(seed.CanonicalParameters) == 0 {
 			return nil, certifyError(
 				"configure provider callable profiles",
 				key,

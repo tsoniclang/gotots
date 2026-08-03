@@ -123,7 +123,7 @@ func matchStatefulProfileCandidate(
 		}
 		keys = append(keys, keyInterface)
 	}
-	key, err := gostdlib.BuildProviderCallableProfileKey(keys)
+	key, err := gostdlib.BuildProviderCallableProfileKey(keys, nil)
 	if err != nil {
 		return StatefulProfileSelection{}, false, "", err
 	}

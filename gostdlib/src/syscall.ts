@@ -14,10 +14,7 @@ import type {
 import { errnoMessage } from "./internal/node/syscall/errno.js";
 import { signalName } from "./internal/node/syscall/signal.js";
 import {
-  exists,
-  notExists,
-  permission,
-  unsupported,
+  errnoMatchesSentinel,
 } from "./internal/portable/errors/sentinel.js";
 
 const signalType = Object.freeze({ comparable: true });
@@ -64,19 +61,7 @@ export class Errno {
   }
 
   Is(target: GoError | undefined): bool {
-    if (target === permission) {
-      return this.value === 13 || this.value === 1;
-    }
-    if (target === exists) {
-      return this.value === 17 || this.value === 39;
-    }
-    if (target === notExists) {
-      return this.value === 2;
-    }
-    if (target === unsupported) {
-      return this.value === 38 || this.value === 95;
-    }
-    return false;
+    return errnoMatchesSentinel(this.value, target);
   }
 
   Temporary(): bool {

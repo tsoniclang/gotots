@@ -96,8 +96,9 @@ func (p *ProjectInspection) BoundaryPolicy(
 			"target has no policy parameter",
 		)
 	}
-	policyType, err := p.symbolType(
+	policyType, err := p.projectSymbolType(
 		signature.Parameters[len(signature.Parameters)-1],
+		"boundary policy",
 	)
 	if err != nil {
 		return ProjectBoundaryPolicy{}, err
@@ -323,29 +324,6 @@ func (p *ProjectInspection) projectTypeIdentity(
 		declarations: declarations,
 		ownerKeys:    owners,
 	}, nil
-}
-
-func (p *ProjectInspection) symbolType(symbol uint64) (typeResponse, error) {
-	if symbol == 0 {
-		return typeResponse{}, boundaryPolicyError("parameter symbol is absent")
-	}
-	var selected *typeResponse
-	if err := requestProjectJSON(
-		p.client,
-		"getTypeOfSymbol",
-		getTypeOfSymbolParams{
-			Snapshot: p.snapshot,
-			Project:  p.project,
-			Symbol:   symbol,
-		},
-		&selected,
-	); err != nil {
-		return typeResponse{}, err
-	}
-	if selected == nil || selected.ID == 0 {
-		return typeResponse{}, boundaryPolicyError("parameter type is absent")
-	}
-	return *selected, nil
 }
 
 func boundaryPolicyError(reason string) error {

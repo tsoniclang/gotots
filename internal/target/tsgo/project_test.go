@@ -61,6 +61,15 @@ export type GenericAsyncCallable<
     (() => Promise<void>) | undefined,
 > = Value;
 
+export function Invoke(
+  direct: (value: number) => boolean,
+  cooperative: (value: number) => boolean | Promise<boolean>,
+): Promise<void> {
+  void direct;
+  void cooperative;
+  return Promise.resolve();
+}
+
 export class Effects {
   static Async(): Promise<void> {
     return Promise.resolve();
@@ -81,6 +90,7 @@ void Hidden;
   Effects,
   GenericAsyncCallable,
   InvalidEffectCallable,
+  Invoke,
   MemberAccess,
   Shape,
   SyncCallable,
@@ -167,7 +177,7 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			) {
 				t.Fatalf("Shape members = %#v", selected)
 			}
-		case "AsyncCallable", "AwaitableCallable", "AwaitableUnionCallable", "Effects", "GenericAsyncCallable", "InvalidEffectCallable", "SyncCallable":
+		case "AsyncCallable", "AwaitableCallable", "AwaitableUnionCallable", "Effects", "GenericAsyncCallable", "InvalidEffectCallable", "Invoke", "SyncCallable":
 			continue
 		}
 		if !slices.Equal(
@@ -191,6 +201,7 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			"Effects",
 			"GenericAsyncCallable",
 			"InvalidEffectCallable",
+			"Invoke",
 			"MemberAccess",
 			"Shape",
 			"SyncCallable",
@@ -241,6 +252,19 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 		t.Fatal(err)
 	}
 	marker := projectExportByName(t, markerExports, "AsyncEffectMarker")
+	invoke := projectExportByName(t, exports, "Invoke")
+	directParameterEffect, err := project.CallableParameterEffect(invoke, 0, marker)
+	if err != nil || directParameterEffect != CallableEffectSynchronous {
+		t.Fatalf("direct parameter effect = %v, %v", directParameterEffect, err)
+	}
+	cooperativeParameterEffect, err := project.CallableParameterEffect(invoke, 1, marker)
+	if err != nil || cooperativeParameterEffect != CallableEffectAwaitable {
+		t.Fatalf(
+			"cooperative parameter effect = %v, %v",
+			cooperativeParameterEffect,
+			err,
+		)
+	}
 	async := projectExportByName(t, exports, "AsyncCallable")
 	awaitable := projectExportByName(t, exports, "AwaitableCallable")
 	awaitableUnion := projectExportByName(t, exports, "AwaitableUnionCallable")

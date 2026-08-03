@@ -234,8 +234,8 @@ export function WithValue(
 
 export function AfterFunc(
   ctx: Context | undefined,
-  f: (() => Promise<void>) | undefined,
-): () => Promise<bool> {
+  f: (() => Awaitable<void>) | undefined,
+): () => bool {
   const done = requireParent(ctx).Done();
   let stopped = false;
   let started = false;
@@ -250,7 +250,7 @@ export function AfterFunc(
       }
     });
   }
-  return async (): Promise<bool> => {
+  return (): bool => {
     if (started || stopped) {
       return false;
     }

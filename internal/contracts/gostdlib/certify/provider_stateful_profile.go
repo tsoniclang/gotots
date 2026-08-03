@@ -118,7 +118,7 @@ func buildProviderStatefulProfile(
 	if err != nil {
 		return providerStatefulProfileBuild{}, err
 	}
-	profileKey, err := gostdlib.BuildProviderCallableProfileKey(keyInterfaces)
+	profileKey, err := gostdlib.BuildProviderCallableProfileKey(keyInterfaces, nil)
 	if err != nil {
 		return providerStatefulProfileBuild{}, err
 	}

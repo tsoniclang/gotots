@@ -204,9 +204,25 @@
       "types": "./dist/src/internal/facets/provider-runtime-pprof.d.ts",
       "default": "./dist/src/internal/facets/provider-runtime-pprof.js"
     },
+    "./internal/facets/provider-regexp.js": {
+      "types": "./dist/src/internal/facets/provider-regexp.d.ts",
+      "default": "./dist/src/internal/facets/provider-regexp.js"
+    },
     "./internal/facets/provider-os-signal.js": {
       "types": "./dist/src/internal/facets/provider-os-signal.d.ts",
       "default": "./dist/src/internal/facets/provider-os-signal.js"
+    },
+    "./internal/facets/provider-sort.js": {
+      "types": "./dist/src/internal/facets/provider-sort.d.ts",
+      "default": "./dist/src/internal/facets/provider-sort.js"
+    },
+    "./internal/facets/provider-strings.js": {
+      "types": "./dist/src/internal/facets/provider-strings.d.ts",
+      "default": "./dist/src/internal/facets/provider-strings.js"
+    },
+    "./internal/facets/provider-syscall.js": {
+      "types": "./dist/src/internal/facets/provider-syscall.d.ts",
+      "default": "./dist/src/internal/facets/provider-syscall.js"
     },
     "./internal/facets/recovery-encoding-binary.js": {
       "types": "./dist/src/internal/facets/recovery-encoding-binary.d.ts",

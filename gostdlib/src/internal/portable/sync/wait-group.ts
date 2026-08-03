@@ -1,4 +1,4 @@
-import type { int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int64 } from "@gotots/runtime/scalars.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 
 export class WaitGroup {
@@ -27,7 +27,7 @@ export class WaitGroup {
 
   static Go(
     receiver: WaitGroup | undefined,
-    f: (() => Promise<void>) | undefined,
+    f: (() => Awaitable<void>) | undefined,
   ): void {
     WaitGroup.Add(receiver, 1);
     void (async (): Promise<void> => {

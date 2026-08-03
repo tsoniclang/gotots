@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -98,6 +99,16 @@ func buildProviderCallableProfile(
 		return providerCallableProfileBuild{}, err
 	}
 	effect, err := exportCallableEffect(project, profileTarget, effectMarker)
+	if err != nil {
+		return providerCallableProfileBuild{}, err
+	}
+	callableParameters, keyCallables, err := buildProfileCallableParameters(
+		seed,
+		signature,
+		profileTarget,
+		project,
+		effectMarker,
+	)
 	if err != nil {
 		return providerCallableProfileBuild{}, err
 	}
@@ -239,6 +250,7 @@ func buildProviderCallableProfile(
 	}
 	profileKey, err := gostdlib.BuildImplementedResultProfileKey(
 		keyInterfaces,
+		keyCallables,
 		seed.ImplementedResultInterfaces,
 	)
 	if err != nil {
@@ -265,11 +277,67 @@ func buildProviderCallableProfile(
 				seed.ImplementedResultInterfaces,
 			),
 			Interfaces:          interfaces,
+			CallableParameters:  callableParameters,
 			Effect:              effect,
 			ImplementationOwner: owner,
 			TargetFingerprint:   profileTarget.Fingerprint(),
 		},
 	}, nil
+}
+
+func buildProfileCallableParameters(
+	seed providerCallableProfileSeed,
+	signature *types.Signature,
+	target tsgo.ProjectExport,
+	project *tsgo.ProjectInspection,
+	effectMarker tsgo.ProjectExport,
+) (
+	[]gostdlib.ProviderCallableParameterDocument,
+	[]gostdlib.ProviderCallableProfileKeyCallable,
+	error,
+) {
+	var documents []gostdlib.ProviderCallableParameterDocument
+	var keys []gostdlib.ProviderCallableProfileKeyCallable
+	targetOffset := 0
+	if seed.Receiver {
+		targetOffset = 1
+	}
+	for _, parameter := range seed.CanonicalParameters {
+		if _, callable := gostdlibsource.DirectCallableParameterSignature(
+			signature.Params().At(parameter).Type(),
+		); !callable {
+			continue
+		}
+		effect, err := parameterCallableEffect(
+			project,
+			target,
+			parameter+targetOffset,
+			effectMarker,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		if effect != gostdlib.EffectSynchronous &&
+			effect != gostdlib.EffectAwaitable {
+			return nil, nil, certifyError(
+				"build provider callable profile",
+				seed.SourceIdentity,
+				"transported callable parameter is neither direct nor awaitable",
+			)
+		}
+		documents = append(
+			documents,
+			gostdlib.ProviderCallableParameterDocument{
+				Parameter: parameter,
+				Effect:    effect,
+			},
+		)
+		keys = append(keys, gostdlib.ProviderCallableProfileKeyCallable{
+			Parameter: parameter,
+			Effect:    effect,
+		})
+	}
+	return documents, keys, nil
 }
 
 func validateImplementedResultInterfaces(
@@ -340,7 +408,7 @@ func buildProtocolProviderInterface(
 	project *tsgo.ProjectInspection,
 	effectMarker tsgo.ProjectExport,
 ) (*gostdlib.ProviderInterfaceDocument, error) {
-	interfaceType, err := gostdlib.ResolveProviderProtocolInterface(protocol, owner)
+	interfaceType, err := gostdlibsource.ResolveProviderProtocolInterface(protocol, owner)
 	if err != nil {
 		return nil, err
 	}

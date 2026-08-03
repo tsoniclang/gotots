@@ -155,6 +155,11 @@ type Names interface {
 		bool,
 		error,
 	)
+	ProviderCallableParameters(*types.Func) (
+		[]gostdlib.ProviderCallableParameterDocument,
+		bool,
+		error,
+	)
 	ProviderStatefulProfileCandidates(*types.TypeName) (
 		[]ProviderStatefulProfileCandidate,
 		bool,

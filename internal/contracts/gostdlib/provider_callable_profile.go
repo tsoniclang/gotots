@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -27,7 +28,8 @@ type ProviderCallableProfileDocument struct {
 	ContractInterfaces          []string                                   `json:"contractInterfaces,omitempty"`
 	FromProviderInterfaces      []string                                   `json:"fromProviderInterfaces,omitempty"`
 	ImplementedResultInterfaces []string                                   `json:"implementedResultInterfaces,omitempty"`
-	Interfaces                  []ProviderCallableProfileInterfaceDocument `json:"interfaces"`
+	Interfaces                  []ProviderCallableProfileInterfaceDocument `json:"interfaces,omitempty"`
+	CallableParameters          []ProviderCallableParameterDocument         `json:"callableParameters,omitempty"`
 	Effect                      EffectKind                                 `json:"effect"`
 	ImplementationOwner         string                                     `json:"implementationOwner"`
 	TargetFingerprint           string                                     `json:"targetFingerprint"`
@@ -53,7 +55,7 @@ func (p ProviderCallableProfile) Valid() bool {
 		p.module.Specifier != "" &&
 		p.profile.Export != "" &&
 		len(p.profile.CanonicalParameters) != 0 &&
-		len(p.profile.Interfaces) != 0 &&
+		len(p.profile.Interfaces)+len(p.profile.CallableParameters) != 0 &&
 		p.profile.Effect.Valid() &&
 		p.profile.ImplementationOwner != "" &&
 		p.profile.TargetFingerprint != ""
@@ -135,6 +137,10 @@ func (p ProviderCallableProfile) Interfaces() []ProviderCallableProfileInterface
 	return result
 }
 
+func (p ProviderCallableProfile) CallableParameters() []ProviderCallableParameterDocument {
+	return slices.Clone(p.profile.CallableParameters)
+}
+
 func (p ProviderCallableProfile) Interface(
 	sourceIdentity string,
 ) (ProviderCallableProfileInterface, bool) {
@@ -212,8 +218,14 @@ type ProviderCallableProfileKeyMethod struct {
 	Effect         EffectKind
 }
 
+type ProviderCallableProfileKeyCallable struct {
+	Parameter int
+	Effect    EffectKind
+}
+
 func BuildProviderCallableProfileKey(
 	source []ProviderCallableProfileKeyInterface,
+	callableParameters []ProviderCallableProfileKeyCallable,
 ) (string, error) {
 	interfaces := make([]ProviderCallableProfileKeyInterface, len(source))
 	for index, selected := range source {
@@ -229,8 +241,18 @@ func BuildProviderCallableProfileKey(
 	sort.Slice(interfaces, func(left, right int) bool {
 		return interfaces[left].SourceIdentity < interfaces[right].SourceIdentity
 	})
+	callables := slices.Clone(callableParameters)
+	sort.Slice(callables, func(left, right int) bool {
+		return callables[left].Parameter < callables[right].Parameter
+	})
+	if len(interfaces)+len(callables) == 0 {
+		return "", &ManifestError{
+			Field:  "providerCallableProfileKey",
+			Reason: "transported interfaces and callables are absent",
+		}
+	}
 	var payload strings.Builder
-	payload.WriteString("provider-callable-profile/v1\n")
+	payload.WriteString("provider-callable-profile/v2\n")
 	previousInterface := ""
 	for _, selected := range interfaces {
 		if selected.SourceIdentity == "" ||
@@ -263,15 +285,32 @@ func BuildProviderCallableProfileKey(
 			payload.WriteByte('\n')
 		}
 	}
+	previousParameter := -1
+	for _, selected := range callables {
+		if selected.Parameter < 0 || selected.Parameter <= previousParameter ||
+			(selected.Effect != EffectSynchronous && selected.Effect != EffectAwaitable) {
+			return "", &ManifestError{
+				Field:  "providerCallableProfileKey.callableParameters",
+				Reason: "parameters are negative, duplicated, or have invalid effects",
+			}
+		}
+		previousParameter = selected.Parameter
+		payload.WriteString("callable-parameter=")
+		payload.WriteString(strconv.Itoa(selected.Parameter))
+		payload.WriteString("|effect=")
+		payload.WriteString(string(selected.Effect))
+		payload.WriteByte('\n')
+	}
 	digest := sha256.Sum256([]byte(payload.String()))
 	return hex.EncodeToString(digest[:]), nil
 }
 
 func BuildImplementedResultProfileKey(
 	source []ProviderCallableProfileKeyInterface,
+	callableParameters []ProviderCallableProfileKeyCallable,
 	implementedResultInterfaces []string,
 ) (string, error) {
-	base, err := BuildProviderCallableProfileKey(source)
+	base, err := BuildProviderCallableProfileKey(source, callableParameters)
 	if err != nil || len(implementedResultInterfaces) == 0 {
 		return base, err
 	}
@@ -324,6 +363,7 @@ func cloneProviderCallableProfile(
 	for index, selected := range source.Interfaces {
 		result.Interfaces[index] = cloneProviderCallableProfileInterface(selected)
 	}
+	result.CallableParameters = slices.Clone(source.CallableParameters)
 	return result
 }
 

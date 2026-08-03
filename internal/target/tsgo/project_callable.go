@@ -24,6 +24,19 @@ type projectCallable interface {
 	callableSubject() string
 }
 
+type projectCallableType struct {
+	typeID  uint32
+	subject string
+}
+
+func (t projectCallableType) callableTypeIDs() []uint32 {
+	return []uint32{t.typeID}
+}
+
+func (t projectCallableType) callableSubject() string {
+	return t.subject
+}
+
 func (e ProjectExport) callableTypeIDs() []uint32 {
 	return []uint32{e.declaredTypeID, e.typeID}
 }
@@ -213,6 +226,81 @@ func (p *ProjectInspection) CallableParameterCount(
 		return 0, err
 	}
 	return len(signature.Parameters), nil
+}
+
+func (p *ProjectInspection) CallableParameterEffect(
+	target projectCallable,
+	parameter int,
+	asyncMarker ProjectExport,
+) (CallableEffect, error) {
+	if p == nil || target == nil {
+		return CallableEffectInvalid, &ProjectInspectionError{
+			Operation: "callable parameter effect",
+			Reason:    "target is absent",
+		}
+	}
+	signature, err := p.singleCallSignature(target, target.callableSubject())
+	if err != nil {
+		return CallableEffectInvalid, err
+	}
+	if parameter < 0 || parameter >= len(signature.Parameters) {
+		return CallableEffectInvalid, &ProjectInspectionError{
+			Operation: "callable parameter effect",
+			Reason: fmt.Sprintf(
+				"%s parameter %d is outside %d parameters",
+				target.callableSubject(),
+				parameter,
+				len(signature.Parameters),
+			),
+		}
+	}
+	parameterType, err := p.projectSymbolType(
+		signature.Parameters[parameter],
+		"callable parameter effect",
+	)
+	if err != nil {
+		return CallableEffectInvalid, err
+	}
+	return p.CallableEffect(projectCallableType{
+		typeID: parameterType.ID,
+		subject: fmt.Sprintf(
+			"%s parameter %d",
+			target.callableSubject(),
+			parameter,
+		),
+	}, asyncMarker)
+}
+
+func (p *ProjectInspection) projectSymbolType(
+	symbol uint64,
+	operation string,
+) (typeResponse, error) {
+	if symbol == 0 {
+		return typeResponse{}, &ProjectInspectionError{
+			Operation: operation,
+			Reason:    "parameter symbol is absent",
+		}
+	}
+	var selected *typeResponse
+	if err := requestProjectJSON(
+		p.client,
+		"getTypeOfSymbol",
+		getTypeOfSymbolParams{
+			Snapshot: p.snapshot,
+			Project:  p.project,
+			Symbol:   symbol,
+		},
+		&selected,
+	); err != nil {
+		return typeResponse{}, err
+	}
+	if selected == nil || selected.ID == 0 {
+		return typeResponse{}, &ProjectInspectionError{
+			Operation: operation,
+			Reason:    "parameter type is absent",
+		}
+	}
+	return *selected, nil
 }
 
 func (p *ProjectInspection) compositeTypes(source uint32) ([]typeResponse, error) {

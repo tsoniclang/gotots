@@ -70,7 +70,8 @@ func validateProviderStatefulProfile(
 	}
 	if _, err := providerProfileBoundaryEffect(
 		profile.Interfaces,
-		field+".interfaces",
+		nil,
+		field,
 	); err != nil {
 		return err
 	}
@@ -96,7 +97,7 @@ func validateProviderStatefulProfile(
 			"values do not exact-join retained interfaces",
 		)
 	}
-	wantKey, err := BuildProviderCallableProfileKey(keyInterfaces)
+	wantKey, err := BuildProviderCallableProfileKey(keyInterfaces, nil)
 	if err != nil {
 		return err
 	}

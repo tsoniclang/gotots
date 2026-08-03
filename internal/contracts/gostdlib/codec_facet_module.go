@@ -120,7 +120,8 @@ func validateFacetModule(
 		previousProfile = key
 		boundaryEffect, err := providerProfileBoundaryEffect(
 			profile.Interfaces,
-			profileField+".interfaces",
+			profile.CallableParameters,
+			profileField,
 		)
 		if err != nil {
 			return err
@@ -166,7 +167,8 @@ func validateFacetModule(
 		previousStatefulProfile = key
 		boundaryEffect, err := providerProfileBoundaryEffect(
 			profile.Interfaces,
-			profileField+".interfaces",
+			nil,
+			profileField,
 		)
 		if err != nil {
 			return err
@@ -328,6 +330,7 @@ func sameProviderCallableProfileTarget(
 		slices.Equal(left.CanonicalResults, right.CanonicalResults) &&
 		slices.Equal(left.CanonicalValues, right.CanonicalValues) &&
 		slices.Equal(left.CanonicalTypeArguments, right.CanonicalTypeArguments) &&
+		slices.Equal(left.CallableParameters, right.CallableParameters) &&
 		slices.Equal(left.GuardInterfaces, right.GuardInterfaces) &&
 		slices.Equal(left.ContractInterfaces, right.ContractInterfaces) &&
 		slices.Equal(left.FromProviderInterfaces, right.FromProviderInterfaces) &&

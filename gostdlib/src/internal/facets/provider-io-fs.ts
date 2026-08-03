@@ -152,6 +152,15 @@ export interface CanonicalStatFS extends CanonicalFS {
   ): Awaitable<[CanonicalFileInfo | undefined, CanonicalError | undefined]>;
 }
 
+export function IoFsFileInfoToDirEntryCanonical(
+  information: CanonicalFileInfo | undefined,
+  dirEntryContract: readonly object[],
+): CanonicalDirEntry | undefined {
+  return information === undefined
+    ? undefined
+    : new CanonicalInfoDirEntry<CanonicalError>(information, dirEntryContract);
+}
+
 export async function IoFsReadFileCanonical(
   fileSystem: CanonicalFS | undefined,
   name: gostring,

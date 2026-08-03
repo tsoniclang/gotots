@@ -4,6 +4,7 @@ import type {
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
+  Awaitable,
   bool,
   gostring,
   int64,
@@ -25,7 +26,22 @@ type MatchRecord = {
   readonly ranges: readonly (ByteRange | undefined)[];
 };
 
+type ReplacementPart = {
+  readonly prefix: gostring;
+  readonly match: gostring;
+};
+
+type ReplacementPlan = {
+  readonly parts: readonly ReplacementPart[];
+  readonly suffix: gostring;
+};
+
 let createRegexp: (pattern: CompiledPattern) => Regexp;
+let replaceAllStringFuncCooperative: (
+  receiver: Regexp | undefined,
+  source: gostring,
+  replacement: ((match: gostring) => Awaitable<gostring>) | undefined,
+) => Promise<gostring>;
 
 export class Regexp {
   readonly #pattern: CompiledPattern;
@@ -36,6 +52,22 @@ export class Regexp {
 
   static {
     createRegexp = (pattern: CompiledPattern): Regexp => new Regexp(pattern);
+    replaceAllStringFuncCooperative = async (
+      receiver,
+      source,
+      replacement,
+    ): Promise<gostring> => {
+      const regexp = requireRegexp(receiver);
+      let result = "";
+      const plan = regexp.#replacementPlan(source);
+      for (const part of plan.parts) {
+        if (replacement === undefined) {
+          GoPanic.raiseRuntime("call of nil replacement function");
+        }
+        result += part.prefix + await replacement(part.match);
+      }
+      return result + plan.suffix;
+    };
   }
 
   static FindStringSubmatch(
@@ -65,30 +97,21 @@ export class Regexp {
     return regexp.#replace(source, (match) => regexp.#expand(replacement, source, match));
   }
 
-  static async ReplaceAllStringFunc(
+  static ReplaceAllStringFunc(
     receiver: Regexp | undefined,
     source: gostring,
-    replacement: ((match: gostring) => Promise<gostring>) | undefined,
-  ): Promise<gostring> {
+    replacement: ((match: gostring) => gostring) | undefined,
+  ): gostring {
     const regexp = requireRegexp(receiver);
-    const matches = regexp.#matches(source, -1);
     let result = "";
-    let lastEnd = 0;
-    for (const match of matches) {
-      const whole = match.ranges[0];
-      if (whole === undefined) {
-        continue;
+    const plan = regexp.#replacementPlan(source);
+    for (const part of plan.parts) {
+      if (replacement === undefined) {
+        GoPanic.raiseRuntime("call of nil replacement function");
       }
-      result += source.slice(lastEnd, whole[0]);
-      if (whole[1] > lastEnd || whole[0] === 0) {
-        if (replacement === undefined) {
-          GoPanic.raiseRuntime("call of nil replacement function");
-        }
-        result += await replacement(source.slice(whole[0], whole[1]));
-      }
-      lastEnd = whole[1];
+      result += part.prefix + replacement(part.match);
     }
-    return result + source.slice(lastEnd);
+    return result + plan.suffix;
   }
 
   static Split(
@@ -177,6 +200,28 @@ export class Regexp {
     return result + source.slice(lastEnd);
   }
 
+  #replacementPlan(source: gostring): ReplacementPlan {
+    const parts: ReplacementPart[] = [];
+    let lastEnd = 0;
+    for (const match of this.#matches(source, -1)) {
+      const whole = match.ranges[0];
+      if (whole === undefined) {
+        continue;
+      }
+      if (whole[1] > lastEnd || whole[0] === 0) {
+        parts.push({
+          prefix: source.slice(lastEnd, whole[0]),
+          match: source.slice(whole[0], whole[1]),
+        });
+      }
+      lastEnd = whole[1];
+    }
+    return {
+      parts,
+      suffix: source.slice(lastEnd),
+    };
+  }
+
   #expand(template: gostring, source: gostring, match: MatchRecord): gostring {
     let result = "";
     for (let index = 0; index < template.length; ) {
@@ -208,6 +253,8 @@ export class Regexp {
     return result;
   }
 }
+
+export { replaceAllStringFuncCooperative as ReplaceAllStringFuncCooperative };
 
 export function Compile(expression: gostring): [Regexp | undefined, GoError | undefined] {
   try {

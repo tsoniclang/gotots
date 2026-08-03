@@ -210,6 +210,12 @@ func (staticSpecializationNames) ProviderCallableProfileCandidates(
 	return nil, false, nil
 }
 
+func (staticSpecializationNames) ProviderCallableParameters(
+	*types.Func,
+) ([]gostdlib.ProviderCallableParameterDocument, bool, error) {
+	return nil, false, nil
+}
+
 func (staticSpecializationNames) ProviderStatefulProfileCandidates(
 	*types.TypeName,
 ) ([]api.ProviderStatefulProfileCandidate, bool, error) {

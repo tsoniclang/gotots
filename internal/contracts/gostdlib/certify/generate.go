@@ -130,6 +130,14 @@ func Generate(config Config) ([]byte, error) {
 		client.Close()
 		return nil, err
 	}
+	if err := verifyProviderBoundaryCoverage(
+		source,
+		modules,
+		facetModules,
+	); err != nil {
+		client.Close()
+		return nil, err
+	}
 	if err := client.Close(); err != nil {
 		return nil, err
 	}
@@ -248,6 +256,15 @@ func buildModule(
 			binding.Effect, err = exportCallableEffect(
 				project,
 				target,
+				effectMarker,
+			)
+			if err != nil {
+				return gostdlib.ModuleDocument{}, err
+			}
+			binding.CallableParameters, err = exportCallableParameters(
+				evidence,
+				target,
+				project,
 				effectMarker,
 			)
 			if err != nil {
@@ -507,6 +524,16 @@ func buildMethodBindings(
 		binding.Effect, err = memberCallableEffect(
 			project,
 			selected,
+			effectMarker,
+		)
+		if err != nil {
+			return nil, err
+		}
+		binding.CallableParameters, err = memberCallableParameters(
+			method,
+			selected,
+			access,
+			project,
 			effectMarker,
 		)
 		if err != nil {

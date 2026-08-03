@@ -3,6 +3,7 @@ import { GoPanic } from "@gotots/runtime/panic.js";
 import { GoPointer } from "@gotots/runtime/pointer.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
+  Awaitable,
   bool,
   gostring,
   int64,
@@ -15,7 +16,7 @@ export interface ErrorHandlingValue {
 }
 
 export interface FlagSetValue {
-  Usage: (() => Promise<void>) | undefined;
+  Usage: (() => Awaitable<void>) | undefined;
 }
 
 interface BooleanBinding {

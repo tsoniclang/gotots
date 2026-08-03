@@ -130,10 +130,11 @@ func verifyProductionFile(relative string, sourcePath string) error {
 			if !strings.HasPrefix(relative, "internal/load/") &&
 				!strings.HasPrefix(relative, "internal/contracts/environment/") &&
 				!strings.HasPrefix(relative, "internal/contracts/gostdlib/certify/") &&
+				!strings.HasPrefix(relative, "internal/contracts/gostdlib/sourcecontract/") &&
 				!strings.HasPrefix(relative, "internal/emit/") {
 				return &wallError{
 					source: relative,
-					reason: "Go semantic graph import is outside load/emit",
+					reason: "Go semantic graph import is outside an approved owner",
 				}
 			}
 		}

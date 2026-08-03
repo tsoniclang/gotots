@@ -71,6 +71,24 @@ func verifyPublicName(name string, targetType string) error {
 	return nil
 }
 
+func verifyProviderBoundaryCoverage(
+	source goSurface,
+	modules []gostdlib.ModuleDocument,
+	facets []gostdlib.FacetModuleDocument,
+) error {
+	if err := verifyCallableParameterBindings(source, modules); err != nil {
+		return err
+	}
+	if err := verifyCallableParameterProfileCoverage(
+		source,
+		modules,
+		facets,
+	); err != nil {
+		return err
+	}
+	return verifyInterfaceParameterProfileCoverage(source, modules, facets)
+}
+
 func compareCanonical(left []byte, right []byte) error {
 	if bytes.Equal(left, right) {
 		return nil

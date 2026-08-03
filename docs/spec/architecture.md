@@ -38,6 +38,8 @@ rerun the checker.
 | imports, placement, sealing, and printing | root emitter |
 | cooperative callable effect | callable artifact plus canonical indirect-call ABI |
 | panic carrier and deferred recovery entry | `runtime/panic.ts` plus the callable's private deferred entry |
+| provider boundary meaning of selected Go types | `internal/contracts/gostdlib/sourcecontract` |
+| immutable provider certificate documents | `internal/contracts/gostdlib` |
 | provider implementation | certified `@gotots/gostdlib` export |
 | provider/generated conversion | generated static facade for the selected Go callable or type |
 | target AST shape and ordering | pinned TS-Go schema and generated protocol bindings |
@@ -103,6 +105,9 @@ node:
 ```text
 cmd/gotots/                         CLI only
 internal/load/                      selected toolchain/package graph
+internal/contracts/gostdlib/        immutable provider certificate documents
+  sourcecontract/                   selected-Go-type boundary interpretation
+  certify/                          Go/provider exact joins and generation
 internal/emit/
   root/                             orchestration, placement, convergence
   declaration/
@@ -495,6 +500,14 @@ Go package/object identity + go/types signature
     <-> implementation owner and inspected target signature
 ```
 
+The immutable certificate package contains no `go/ast` or `go/types` graph.
+`internal/contracts/gostdlib/sourcecontract` is the sole focused owner that
+interprets selected Go signatures as provider-boundary contracts; certifiers
+and emitters consume that same owner. It distinguishes unnamed direct
+callbacks from named callable values, describes interface methods, and resolves
+typed provider protocols. No consumer repeats those decisions or moves them
+into serialized documents.
+
 Generated source never calls a provider kernel with extra source arguments.
 When canonical generated values require conversion, guards, runtime tokens,
 copy/zero operations, or a specialized generic implementation, the compiler
@@ -552,6 +565,13 @@ creates an inward facade obligation by itself. Missing, duplicate, extra, mixed-
 effect, or wrong-direction certificates fail contract generation before source
 emission. Emission consumes this certified set and cannot discover profiles one
 call site at a time.
+
+An unnamed function parameter is a directly transported callable. A named
+function type is instead certified once by its defined-value representation and
+all uses reference that owner; it is not reclassified as a fresh direct callback
+at every parameter. If a recursively nested callable shape has no typed path
+representation in the current contract schema, certification rejects the
+provider surface explicitly rather than flattening it into its outer effect.
 
 For example, cooperative `sort.Sort(data sort.Interface)` requires one private
 facade whose `Len`, `Less`, and `Swap` inputs use the canonical `Awaitable` method

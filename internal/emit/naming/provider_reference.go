@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
@@ -471,6 +472,29 @@ func (n *File) ProviderCallableProfileCandidates(
 	return result, true, nil
 }
 
+func (n *File) ProviderCallableParameters(
+	owner *types.Func,
+) ([]gostdlib.ProviderCallableParameterDocument, bool, error) {
+	if owner == nil {
+		return nil, false, &api.NameError{
+			Reason: "provider callable owner is nil",
+		}
+	}
+	owner = owner.Origin()
+	contract, providerOwned, err := n.providerFacetOwner(owner)
+	if err != nil || !providerOwned {
+		return nil, providerOwned, err
+	}
+	binding, ok := n.owner.registry.provider.Binding(contract.Identity())
+	if !ok || binding.Kind() != gostdlib.BindingFunction {
+		return nil, true, &api.NameError{
+			Name:   contract.Identity(),
+			Reason: "provider callable binding evidence is absent",
+		}
+	}
+	return binding.CallableParameters(), true, nil
+}
+
 func (n *File) providerCallableProfileGuards(
 	owner *types.Func,
 	profile gostdlib.ProviderCallableProfile,
@@ -501,7 +525,7 @@ func (n *File) providerCallableProfileGuards(
 		}
 		protocol, synthetic := certificate.Protocol()
 		if synthetic {
-			selected, err := gostdlib.ResolveProviderProtocolInterface(
+			selected, err := gostdlibsource.ResolveProviderProtocolInterface(
 				protocol,
 				signature,
 			)

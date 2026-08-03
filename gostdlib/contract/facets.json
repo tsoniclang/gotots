@@ -1058,6 +1058,168 @@
           "export": "CanonicalWriter"
         }
       ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=FileInfoToDirEntry",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsFileInfoToDirEntryCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "contractInterfaces": [
+        "io/fs|kind=2|receiver=|name=DirEntry"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+          "export": "CanonicalDirEntry"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "CanonicalFileInfo"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "regexp|kind=4|receiver=*regexp.Regexp|name=ReplaceAllStringFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-regexp.js",
+      "sourcePath": "src/internal/facets/provider-regexp.ts",
+      "export": "RegexpReplaceAllStringFuncCanonical",
+      "receiver": true,
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "sort|kind=4|receiver=|name=Search",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
+      "sourcePath": "src/internal/facets/provider-sort.ts",
+      "export": "SortSearchCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "sort|kind=4|receiver=|name=Sort",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
+      "sourcePath": "src/internal/facets/provider-sort.ts",
+      "export": "SortCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
+          "export": "SortInterfaceCanonical"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "sort|kind=4|receiver=|name=Stable",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
+      "sourcePath": "src/internal/facets/provider-sort.ts",
+      "export": "SortStableCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
+          "export": "SortInterfaceCanonical"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=ContainsFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsContainsFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=IndexFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsIndexFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=LastIndexFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsLastIndexFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=Map",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsMapCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=TrimFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsTrimFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=TrimLeftFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsTrimLeftFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=TrimRightFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsTrimRightFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "syscall|kind=4|receiver=syscall.Errno|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-syscall.js",
+      "sourcePath": "src/internal/facets/provider-syscall.ts",
+      "export": "SyscallErrnoIsCanonical",
+      "receiver": true,
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ]
     }
   ],
   "providerStatefulProfiles": [

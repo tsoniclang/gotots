@@ -399,6 +399,12 @@ func (aggregateNames) ProviderCallableProfileCandidates(
 	return nil, false, nil
 }
 
+func (aggregateNames) ProviderCallableParameters(
+	*types.Func,
+) ([]gostdlib.ProviderCallableParameterDocument, bool, error) {
+	return nil, false, nil
+}
+
 func (aggregateNames) ProviderStatefulProfileCandidates(
 	*types.TypeName,
 ) ([]api.ProviderStatefulProfileCandidate, bool, error) {

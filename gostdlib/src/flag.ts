@@ -2,6 +2,7 @@ import type { GoError } from "@gotots/runtime/interface-value.js";
 import type { GoPointer } from "@gotots/runtime/pointer.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
+  Awaitable,
   bool,
   gostring,
   int64,
@@ -20,7 +21,7 @@ export class ErrorHandling {
 export const ContinueOnError = new ErrorHandling(0);
 
 export class FlagSet {
-  Usage: (() => Promise<void>) | undefined = undefined;
+  Usage: (() => Awaitable<void>) | undefined = undefined;
 
   static Bool(
     receiver: FlagSet | undefined,

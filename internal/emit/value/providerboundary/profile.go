@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
@@ -69,6 +70,25 @@ func ResolveCallableProfile(
 		return CallableProfileSelection{}, false, err
 	}
 	canonicalParameters := affectedRoots(base.parameterInterfaces, base.affected)
+	var callableEvidence []gostdlib.ProviderCallableParameterDocument
+	if len(profileCallableParameterRoots(signature)) != 0 {
+		var callableOwned bool
+		callableEvidence, callableOwned, err =
+			context.Names().ProviderCallableParameters(owner.Origin())
+		if err != nil || !callableOwned {
+			return CallableProfileSelection{}, false, err
+		}
+	}
+	callableParameters, mismatchedCallables, err :=
+		profileCallableParameterBoundary(
+			context,
+			signature,
+			callableEvidence,
+		)
+	if err != nil {
+		return CallableProfileSelection{}, false, err
+	}
+	canonicalParameters = mergeIndexes(canonicalParameters, mismatchedCallables)
 	canonicalResults := affectedRoots(base.resultInterfaces, base.affected)
 	required := false
 	for _, candidate := range candidates {
@@ -128,6 +148,8 @@ func ResolveCallableProfile(
 			strings.Join(sortedIdentitySet(base.affected), ", ") + "]"
 		reason += " and canonical parameters [" +
 			joinIndexes(canonicalParameters) + "]"
+		reason += " and callable parameters [" +
+			joinIndexes(callableParameters) + "]"
 		reason += " and canonical results [" +
 			joinIndexes(canonicalResults) + "]"
 		if len(mismatches) != 0 {
@@ -297,6 +319,16 @@ func matchCallableProfileCandidate(
 	if !slices.Equal(profile.CanonicalResults(), requiredResults) {
 		return matchedProfile{}, false, "receiver or canonical roots differ", nil
 	}
+	profileCallables := profile.CallableParameters()
+	if !profileCallablesAccept(
+		context,
+		signature,
+		canonicalParameters,
+		profileCallables,
+	) {
+		return matchedProfile{}, false, "transported callable effects differ", nil
+	}
+	keyCallables := profileKeyCallables(profileCallables)
 	guardIdentities := make(map[string]struct{}, len(profile.GuardInterfaces()))
 	for _, identity := range profile.GuardInterfaces() {
 		guardIdentities[identity] = struct{}{}
@@ -353,6 +385,7 @@ func matchCallableProfileCandidate(
 	}
 	profileKey, err := gostdlib.BuildImplementedResultProfileKey(
 		keyInterfaces,
+		keyCallables,
 		profile.ImplementedResultInterfaces(),
 	)
 	if err != nil {
@@ -365,6 +398,108 @@ func matchCallableProfileCandidate(
 		profile:  profile,
 		requests: selected.analyzer.requests,
 	}, true, "", nil
+}
+
+func profileCallableParameterRoots(signature *types.Signature) []int {
+	if signature == nil || signature.Params() == nil {
+		return nil
+	}
+	var result []int
+	for index := range signature.Params().Len() {
+		if _, callable := gostdlibsource.DirectCallableParameterSignature(
+			signature.Params().At(index).Type(),
+		); callable {
+			result = append(result, index)
+		}
+	}
+	return result
+}
+
+func profileCallableParameterBoundary(
+	context api.Context,
+	signature *types.Signature,
+	evidence []gostdlib.ProviderCallableParameterDocument,
+) ([]int, []int, error) {
+	roots := profileCallableParameterRoots(signature)
+	if len(roots) != len(evidence) {
+		return nil, nil, boundaryInvariant(
+			context,
+			"provider callable-parameter evidence does not exact-join the source signature",
+		)
+	}
+	expected := gostdlib.EffectSynchronous
+	if context.ConcurrencySemantics() == api.ConcurrencySemanticsCooperative {
+		expected = gostdlib.EffectAwaitable
+	}
+	var mismatched []int
+	for index, root := range roots {
+		selected := evidence[index]
+		if selected.Parameter != root || !selected.Effect.Valid() {
+			return nil, nil, boundaryInvariant(
+				context,
+				"provider callable-parameter evidence diverged from the source signature",
+			)
+		}
+		if !providerCallableEffectAccepts(selected.Effect, expected) {
+			mismatched = append(mismatched, root)
+		}
+	}
+	return roots, mismatched, nil
+}
+
+func profileCallablesAccept(
+	context api.Context,
+	signature *types.Signature,
+	canonicalParameters []int,
+	callables []gostdlib.ProviderCallableParameterDocument,
+) bool {
+	var roots []int
+	for _, parameter := range canonicalParameters {
+		if _, callable := gostdlibsource.DirectCallableParameterSignature(
+			signature.Params().At(parameter).Type(),
+		); callable {
+			roots = append(roots, parameter)
+		}
+	}
+	if len(roots) != len(callables) {
+		return false
+	}
+	expected := gostdlib.EffectSynchronous
+	if context.ConcurrencySemantics() == api.ConcurrencySemanticsCooperative {
+		expected = gostdlib.EffectAwaitable
+	}
+	for index, root := range roots {
+		if callables[index].Parameter != root ||
+			!providerCallableEffectAccepts(callables[index].Effect, expected) {
+			return false
+		}
+	}
+	return true
+}
+
+func profileKeyCallables(
+	source []gostdlib.ProviderCallableParameterDocument,
+) []gostdlib.ProviderCallableProfileKeyCallable {
+	result := make(
+		[]gostdlib.ProviderCallableProfileKeyCallable,
+		len(source),
+	)
+	for index, selected := range source {
+		result[index] = gostdlib.ProviderCallableProfileKeyCallable{
+			Parameter: selected.Parameter,
+			Effect:    selected.Effect,
+		}
+	}
+	return result
+}
+
+func providerCallableEffectAccepts(
+	provider gostdlib.EffectKind,
+	generated gostdlib.EffectKind,
+) bool {
+	return provider == generated ||
+		provider == gostdlib.EffectAwaitable &&
+			generated == gostdlib.EffectSynchronous
 }
 
 func rootsContainingIdentities(

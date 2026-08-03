@@ -331,6 +331,12 @@ func (unusedNames) ProviderCallableProfileCandidates(
 	return nil, false, nil
 }
 
+func (unusedNames) ProviderCallableParameters(
+	*types.Func,
+) ([]gostdlib.ProviderCallableParameterDocument, bool, error) {
+	return nil, false, nil
+}
+
 func (unusedNames) ProviderStatefulProfileCandidates(
 	*types.TypeName,
 ) ([]api.ProviderStatefulProfileCandidate, bool, error) {

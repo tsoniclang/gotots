@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	SchemaVersion = 20
+	SchemaVersion = 21
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -117,22 +117,23 @@ type ModuleDocument struct {
 }
 
 type BindingDocument struct {
-	Identity             string                         `json:"identity"`
-	Kind                 BindingKind                    `json:"kind"`
-	Access               AccessKind                     `json:"access"`
-	Representation       RepresentationKind             `json:"representation,omitempty"`
-	DefinedValue         DefinedValueRepresentationKind `json:"definedValue,omitempty"`
-	Effect               EffectKind                     `json:"effect,omitempty"`
-	Export               string                         `json:"export"`
-	Member               string                         `json:"member,omitempty"`
-	GenericTypeArguments []GenericTypeArgumentDocument  `json:"genericTypeArguments,omitempty"`
-	GenericOperations    []GenericOperationDocument     `json:"genericOperations,omitempty"`
-	ProviderInterface    *ProviderInterfaceDocument     `json:"providerInterface,omitempty"`
-	SourceSignature      string                         `json:"sourceSignature"`
-	SourceValue          string                         `json:"sourceValue,omitempty"`
-	SourceLocation       string                         `json:"sourceLocation"`
-	ImplementationOwner  string                         `json:"implementationOwner"`
-	TargetFingerprint    string                         `json:"targetFingerprint"`
+	Identity             string                              `json:"identity"`
+	Kind                 BindingKind                         `json:"kind"`
+	Access               AccessKind                          `json:"access"`
+	Representation       RepresentationKind                  `json:"representation,omitempty"`
+	DefinedValue         DefinedValueRepresentationKind      `json:"definedValue,omitempty"`
+	Effect               EffectKind                          `json:"effect,omitempty"`
+	Export               string                              `json:"export"`
+	Member               string                              `json:"member,omitempty"`
+	GenericTypeArguments []GenericTypeArgumentDocument       `json:"genericTypeArguments,omitempty"`
+	GenericOperations    []GenericOperationDocument          `json:"genericOperations,omitempty"`
+	CallableParameters   []ProviderCallableParameterDocument `json:"callableParameters,omitempty"`
+	ProviderInterface    *ProviderInterfaceDocument          `json:"providerInterface,omitempty"`
+	SourceSignature      string                              `json:"sourceSignature"`
+	SourceValue          string                              `json:"sourceValue,omitempty"`
+	SourceLocation       string                              `json:"sourceLocation"`
+	ImplementationOwner  string                              `json:"implementationOwner"`
+	TargetFingerprint    string                              `json:"targetFingerprint"`
 }
 
 type Manifest struct {
@@ -390,6 +391,10 @@ func (b Binding) GenericTypeArguments() []GenericTypeArgumentDocument {
 	return slices.Clone(b.binding.GenericTypeArguments)
 }
 
+func (b Binding) CallableParameters() []ProviderCallableParameterDocument {
+	return slices.Clone(b.binding.CallableParameters)
+}
+
 func (b Binding) ProviderInterface() (ProviderInterface, bool) {
 	if b.binding.ProviderInterface == nil {
 		return ProviderInterface{}, false
@@ -448,6 +453,8 @@ func cloneModule(source ModuleDocument) ModuleDocument {
 			slices.Clone(binding.GenericTypeArguments)
 		result.Bindings[index].GenericOperations =
 			cloneGenericOperations(binding.GenericOperations)
+		result.Bindings[index].CallableParameters =
+			slices.Clone(binding.CallableParameters)
 		if binding.ProviderInterface != nil {
 			cloned := cloneProviderInterface(*binding.ProviderInterface)
 			result.Bindings[index].ProviderInterface = &cloned

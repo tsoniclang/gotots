@@ -29,17 +29,17 @@ test("regexp compiles selected RE2 forms and returns submatches", () => {
   assert.equal(Regexp.MatchString(MustCompile("^[\\w,\\s-]+$"), "A_,- "), true);
 });
 
-test("regexp replacement expands captures and supports async callbacks", async () => {
+test("regexp replacement expands captures and invokes callbacks directly", () => {
   const words = MustCompile("([a-z]+)=([0-9]+)");
   assert.equal(
     Regexp.ReplaceAllString(words, "a=1 b=2", "$2:$1"),
     "1:a 2:b",
   );
   assert.equal(
-    await Regexp.ReplaceAllStringFunc(
+    Regexp.ReplaceAllStringFunc(
       MustCompile("[0-9]+"),
       "a1b22",
-      async (match) => `[${match}]`,
+      (match) => `[${match}]`,
     ),
     "a[1]b[22]",
   );

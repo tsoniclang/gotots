@@ -4,6 +4,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -92,7 +93,7 @@ func Build(
 	for index := range contract.NumMethods() {
 		method := contract.Method(index)
 		identity, signature, describeErr :=
-			gostdlib.ProviderInterfaceMethodSource(method)
+			gostdlibsource.ProviderInterfaceMethod(method)
 		if describeErr != nil {
 			return nil, nil, describeErr
 		}

@@ -48,6 +48,7 @@ func TestStatefulProfilePreservesCertifiedTypeArgumentOrder(t *testing.T) {
 				}},
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

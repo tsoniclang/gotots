@@ -1,4 +1,5 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
+import type { Awaitable } from "@gotots/runtime/scalars.js";
 
 export class Once {
   #state: "idle" | "running" | "done" = "idle";
@@ -6,7 +7,7 @@ export class Once {
 
   static async Do(
     receiver: Once | undefined,
-    f: (() => Promise<void>) | undefined,
+    f: (() => Awaitable<void>) | undefined,
   ): Promise<void> {
     if (receiver === undefined) {
       throw new TypeError("Once.Do called with nil receiver");
@@ -34,13 +35,13 @@ export class Once {
 }
 
 export function OnceFunc(
-  f: (() => Promise<void>) | undefined,
+  f: (() => Awaitable<void>) | undefined,
 ): () => Promise<void> {
   let result: Promise<void> | undefined;
   return (): Promise<void> => {
     result ??= f === undefined
       ? Promise.reject(GoPanic.createRuntime("sync.OnceFunc called with nil function"))
-      : f();
+      : Promise.resolve(f());
     return result;
   };
 }

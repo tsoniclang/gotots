@@ -1,6 +1,6 @@
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { bool } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool } from "@gotots/runtime/scalars.js";
 import {
   cancelSchedule,
   schedule,
@@ -19,9 +19,9 @@ export class Timer {
   readonly #channel: ProviderChannel<Time> | undefined;
   #handle: ClockHandle | undefined;
   #active = false;
-  readonly #action: (() => Promise<void>) | undefined;
+  readonly #action: (() => Awaitable<void>) | undefined;
 
-  constructor(duration?: Duration, action?: () => Promise<void>) {
+  constructor(duration?: Duration, action?: () => Awaitable<void>) {
     this.#action = action;
     if (action === undefined) {
       this.#channel = new ProviderChannel<Time>(
@@ -121,9 +121,9 @@ export function After(d: Duration): GoReceiveChannel<Time> {
 
 export function AfterFunc(
   d: Duration,
-  f: (() => Promise<void>) | undefined,
+  f: (() => Awaitable<void>) | undefined,
 ): Timer {
-  const invoke = f ?? (async (): Promise<void> => {
+  const invoke = f ?? (() => {
     GoPanic.raiseRuntime("time.AfterFunc called with nil function");
   });
   return new Timer(d, invoke);

@@ -18,8 +18,8 @@ func validateProviderCallableProfile(
 		return manifestError(field+".export", "value is empty")
 	case len(profile.CanonicalParameters) == 0:
 		return manifestError(field+".canonicalParameters", "no canonical parameter exists")
-	case len(profile.Interfaces) == 0:
-		return manifestError(field+".interfaces", "set is empty")
+	case len(profile.Interfaces)+len(profile.CallableParameters) == 0:
+		return manifestError(field, "transported interfaces and callables are absent")
 	case !profile.Effect.Valid():
 		return manifestError(field+".effect", "value is invalid")
 	case !sourcePath(profile.ImplementationOwner):
@@ -130,9 +130,42 @@ func validateProviderCallableProfile(
 			Methods:        methods,
 		})
 	}
+	keyCallables := make(
+		[]ProviderCallableProfileKeyCallable,
+		0,
+		len(profile.CallableParameters),
+	)
+	previousParameter := -1
+	for index, selected := range profile.CallableParameters {
+		callableField := fmt.Sprintf("%s.callableParameters[%d]", field, index)
+		if selected.Parameter < 0 || selected.Parameter <= previousParameter {
+			return manifestError(
+				field+".callableParameters",
+				"parameters are negative, duplicated, or not strictly ordered",
+			)
+		}
+		if selected.Effect != EffectSynchronous && selected.Effect != EffectAwaitable {
+			return manifestError(callableField+".effect", "value is invalid")
+		}
+		if _, found := slices.BinarySearch(
+			profile.CanonicalParameters,
+			selected.Parameter,
+		); !found {
+			return manifestError(
+				callableField+".parameter",
+				"value is not a canonical parameter root",
+			)
+		}
+		previousParameter = selected.Parameter
+		keyCallables = append(keyCallables, ProviderCallableProfileKeyCallable{
+			Parameter: selected.Parameter,
+			Effect:    selected.Effect,
+		})
+	}
 	if _, err := providerProfileBoundaryEffect(
 		profile.Interfaces,
-		field+".interfaces",
+		profile.CallableParameters,
+		field,
 	); err != nil {
 		return err
 	}
@@ -154,6 +187,7 @@ func validateProviderCallableProfile(
 	}
 	key, err := BuildImplementedResultProfileKey(
 		keyInterfaces,
+		keyCallables,
 		profile.ImplementedResultInterfaces,
 	)
 	if err != nil {
@@ -238,6 +272,7 @@ func validateProviderCallableProfile(
 
 func providerProfileBoundaryEffect(
 	interfaces []ProviderCallableProfileInterfaceDocument,
+	callables []ProviderCallableParameterDocument,
 	field string,
 ) (EffectKind, error) {
 	effect := EffectInvalid
@@ -261,10 +296,33 @@ func providerProfileBoundaryEffect(
 			}
 			if method.Effect != effect {
 				return EffectInvalid, manifestError(
-					field,
+					field+".interfaces",
 					"profile mixes direct and cooperative transported methods",
 				)
 			}
+		}
+	}
+	for index, callable := range callables {
+		callableField := fmt.Sprintf(
+			"%s.callableParameters[%d].effect",
+			field,
+			index,
+		)
+		if callable.Effect != EffectSynchronous && callable.Effect != EffectAwaitable {
+			return EffectInvalid, manifestError(
+				callableField,
+				"transported callable is neither direct nor awaitable",
+			)
+		}
+		if effect == EffectInvalid {
+			effect = callable.Effect
+			continue
+		}
+		if callable.Effect != effect {
+			return EffectInvalid, manifestError(
+				field,
+				"profile mixes direct and cooperative transported callables",
+			)
 		}
 	}
 	if effect == EffectInvalid {

@@ -362,6 +362,11 @@ interface facade, remove `sort.Search`'s callback facade, change a callback from
 certificate for one effect; each must fail certification with the exact Go
 callable and root identity.
 
+The same gate distinguishes unnamed direct callbacks from named function-value
+representations. A mutation that inserts a nested callable below a direct
+callback must either produce a typed nested-path certificate or fail at contract
+generation; observing only the outer function result is not sufficient proof.
+
 Mutations split direct/select queues, use historical queue storage, omit
 cancellation, bias source order, treat nil as ready, settle before pending
 Promises, globalize all functions as async, restore callable-profile variants,
@@ -375,6 +380,11 @@ typecheck time/RSS, and representative runtime.
 Provider certification independently loads the selected `GOROOT`, resolves
 exact Go objects/signatures, and inspects the strict TS provider project.
 It exact-joins each public export and private compiler kernel to one owner.
+Architecture walls reject `go/ast` or `go/types` imports from immutable
+provider-document files; only the focused source-contract and certification
+owners may inspect the selected Go graph. A mutation that restores any of the
+callable, interface-method, or protocol-resolution helpers to the document
+package must fail the wall.
 
 Required source and artifact fixtures include ordinary functions, value/pointer
 methods, interfaces in both directions, callbacks, nested containers,

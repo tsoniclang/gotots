@@ -57,6 +57,19 @@ func memberCallableEffect(
 	return providerEffect(selected)
 }
 
+func parameterCallableEffect(
+	project *tsgo.ProjectInspection,
+	target tsgo.ProjectExport,
+	parameter int,
+	marker tsgo.ProjectExport,
+) (gostdlib.EffectKind, error) {
+	selected, err := project.CallableParameterEffect(target, parameter, marker)
+	if err != nil {
+		return gostdlib.EffectInvalid, err
+	}
+	return providerEffect(selected)
+}
+
 func providerEffect(source tsgo.CallableEffect) (gostdlib.EffectKind, error) {
 	switch source {
 	case tsgo.CallableEffectSynchronous:
