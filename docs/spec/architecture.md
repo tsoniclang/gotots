@@ -523,6 +523,13 @@ Nested callbacks, tuples, containers, fields, and results follow the same
 type-directed boundary rule. Missing or ambiguous conversion fails
 certification; TypeScript assignability alone is not semantic evidence.
 
+A provider-owned named callable may use a direct identity representation only
+through a typed value facet. Every generated-source reference supplies the
+canonical callable type derived from the selected Go signature; the provider
+export's private ABI default is never a generated-source annotation. This
+keeps values as ordinary functions while allowing a static adapter exactly at
+a provider crossing when parameter or result representations differ.
+
 A provider recovery facet is an optional closed certificate for one exact Go
 callable. Presence selects that provider's private recovery-aware entry for a
 deferred call. Absence selects the ordinary source-shaped entry; it is not an

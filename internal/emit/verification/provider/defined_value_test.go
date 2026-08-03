@@ -73,11 +73,17 @@ func SequenceTotal(sequence iter.Seq[int]) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	printed := materializeArtifacts(t, emission, t.TempDir()).printed
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+	printed := artifacts.printed
 	for _, required := range []string{
 		"TimeDurationValueOperations.$project",
 		"TimeDurationValueOperations.$wrap",
 		"IterSeqValueOperations.$project",
+		"context__from_gostdlib.CancelFunc<",
+		"fs__from_gostdlib.WalkDirFunc<",
+		"WalkDirFunc<(($0: gostring, $1: $goInterface_",
 		"const __gotots_callee_0 = cancel;",
 		"const __gotots_callee_1 = callback;",
 		"await __gotots_callee_0();",

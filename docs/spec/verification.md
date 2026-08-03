@@ -375,6 +375,11 @@ For each generated static facade, proof records:
 
 The source-shape gate verifies facade arity. Artifact inspection proves calls
 contain only source arguments and support is imported at module scope.
+Provider-owned named-callable fixtures additionally prove that every generated
+source annotation supplies its canonical typed value facet and never inherits
+the provider ABI default. Removing that facet must fail strict typechecking at
+a callback parameter or result whose canonical interface representation
+differs from the provider representation.
 
 Mutations add a runtime policy object, omit/misroute a bridge, select by Go or
 target spelling, accept structural assignability without certification,

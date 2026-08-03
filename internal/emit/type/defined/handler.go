@@ -44,9 +44,11 @@ func Emit(
 			return api.TypeEmission{}, true, err
 		}
 	}
-	_, profiled := context.GenericCallableProfile()
-	if RequiresValueFacet(model.Type()) &&
-		(profiled || model.Type().TypeArgs().Len() != 0) {
+	explicitValueFacet, err := requiresExplicitValueFacet(context, model)
+	if err != nil {
+		return api.TypeEmission{}, true, err
+	}
+	if explicitValueFacet {
 		underlying, err := valueFacetType(
 			context,
 			children,
@@ -67,6 +69,29 @@ func Emit(
 		target,
 		api.CombineRequests(reference.Requests(), requests)...,
 	), true, nil
+}
+
+func requiresExplicitValueFacet(
+	context api.Context,
+	model Model,
+) (bool, error) {
+	if !RequiresValueFacet(model.Type()) {
+		return false, nil
+	}
+	if _, profiled := context.GenericCallableProfile(); profiled {
+		return true, nil
+	}
+	if model.Type().TypeArgs().Len() != 0 {
+		return true, nil
+	}
+	representation, err := context.Names().DefinedValueRepresentation(
+		model.TypeName(),
+	)
+	if err != nil {
+		return false, err
+	}
+	_, providerIdentity := representation.ProviderCallableEffect()
+	return providerIdentity, nil
 }
 
 func valueFacetType(
