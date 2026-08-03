@@ -212,6 +212,14 @@ func (e *ContextError) Error() string {
 	return "create emission context: " + e.Reason
 }
 
+type RootRequestError struct {
+	Reason string
+}
+
+func (e *RootRequestError) Error() string {
+	return fmt.Sprintf("create root request: %s", e.Reason)
+}
+
 type InvariantError struct {
 	Role   Role
 	Reason string

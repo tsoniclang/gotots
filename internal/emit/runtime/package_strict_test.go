@@ -19,10 +19,11 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 		api.IntegerRepresentationNumber,
 		api.ConcurrencySemanticsDisabled,
 		map[api.RuntimeSymbol]struct{}{
-			api.RuntimeArray:    {},
-			api.RuntimeDeferPop: {},
-			api.RuntimePointer:  {},
-			api.RuntimeSlice:    {},
+			api.RuntimeArray:         {},
+			api.RuntimeDeferPop:      {},
+			api.RuntimePointer:       {},
+			api.RuntimeSlice:         {},
+			api.RuntimeUnsafePointer: {},
 		},
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)

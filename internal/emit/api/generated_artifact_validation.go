@@ -95,6 +95,13 @@ func (o *GeneratedArtifact) ReflectionType() (
 	return o.sourceType, o.reflectionType, true
 }
 
+func (o *GeneratedArtifact) UnsafeCodecType() (types.Type, bool) {
+	if o == nil || o.kind != GeneratedArtifactUnsafeCodec {
+		return nil, false
+	}
+	return o.sourceType, o.sourceType != nil
+}
+
 func (o *GeneratedArtifact) GenericCapability() (
 	*types.Signature,
 	GenericOperationSelection,
@@ -327,6 +334,8 @@ func validGeneratedArtifactType(
 		_, interfaceType := source.Underlying().(*types.Interface)
 		return !interfaceType
 	case GeneratedArtifactReflectionType:
+		return sourceType != nil && !ContainsGenericTypeParameter(sourceType)
+	case GeneratedArtifactUnsafeCodec:
 		return sourceType != nil && !ContainsGenericTypeParameter(sourceType)
 	default:
 		return false

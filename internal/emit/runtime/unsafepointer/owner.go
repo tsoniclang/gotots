@@ -1,302 +1,197 @@
 package unsafepointer
 
-import (
-	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
-)
+import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 const (
-	brandName             = "$go$unsafePointer"
-	FromName              = "from"
-	ToName                = "to"
-	FromIntegerName       = "fromInteger"
-	ToIntegerName         = "toInteger"
-	unresolvedPlaceholder = "unsafe.Pointer conversion requires an environment implementation"
+	FromName        = "from"
+	ToName          = "to"
+	FromIntegerName = "fromInteger"
+	ToIntegerName   = "toInteger"
+	addressName     = "address"
+	atName          = "at"
 )
 
 func Build(
 	factory tsgo.Factory,
 	className string,
+	codecName string,
 	panicName string,
+	pointerName string,
+	pointerMemoryName string,
+	denseIndexName string,
 ) tsgo.ClassDeclaration {
 	target := builder{
-		factory:   factory,
-		className: className,
-		panicName: panicName,
+		factory:           factory,
+		className:         className,
+		codecName:         codecName,
+		panicName:         panicName,
+		pointerName:       pointerName,
+		pointerMemoryName: pointerMemoryName,
+		denseIndexName:    denseIndexName,
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		target.id(className),
+		factory.Identifier(className),
 		nil,
 		nil,
 		[]tsgo.ClassElement{
-			target.brand(),
+			target.nextBaseProperty(),
+			target.rootsProperty(),
+			target.locationsProperty(),
+			target.allocationsProperty(),
 			target.constructor(),
+			target.addressGetter(),
+			target.flush(),
+			target.refresh(),
+			target.at(),
 			target.from(),
 			target.to(),
 			target.fromInteger(),
+			target.toIntegerNumberOverload(),
+			target.toIntegerBigIntOverload(),
 			target.toInteger(),
 		},
 	)
 }
 
-type builder struct {
-	factory   tsgo.Factory
-	className string
-	panicName string
-}
-
-func (b builder) brand() tsgo.PropertyDeclaration {
+func (b builder) nextBaseProperty() tsgo.PropertyDeclaration {
 	return b.factory.PropertyDeclaration(
 		[]tsgo.ModifierLike{
-			b.factory.DeclareKeyword(),
 			b.factory.PrivateKeyword(),
+			b.factory.StaticKeyword(),
+		},
+		b.id("nextBase"),
+		nil,
+		b.numberType(),
+		b.number("4096"),
+	)
+}
+
+func (b builder) rootsProperty() tsgo.PropertyDeclaration {
+	target := b.typeReference("WeakMap", b.objectType(), b.unsafeType())
+	return b.staticCollectionProperty("roots", target, "WeakMap")
+}
+
+func (b builder) locationsProperty() tsgo.PropertyDeclaration {
+	target := b.typeReference("WeakMap", b.objectType(), b.unsafeType())
+	return b.staticCollectionProperty("locations", target, "WeakMap")
+}
+
+func (b builder) allocationsProperty() tsgo.PropertyDeclaration {
+	target := b.factory.ArrayTypeNode(b.unsafeType())
+	return b.factory.PropertyDeclaration(
+		[]tsgo.ModifierLike{
+			b.factory.PrivateKeyword(),
+			b.factory.StaticKeyword(),
 			b.factory.ReadonlyKeyword(),
 		},
-		b.id(brandName),
+		b.id("allocations"),
 		nil,
-		b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindVoidKeyword),
+		target,
+		b.factory.ArrayLiteralExpression(nil, false),
+	)
+}
+
+func (b builder) staticCollectionProperty(
+	name string,
+	target tsgo.TypeNode,
+	constructor string,
+) tsgo.PropertyDeclaration {
+	return b.factory.PropertyDeclaration(
+		[]tsgo.ModifierLike{
+			b.factory.PrivateKeyword(),
+			b.factory.StaticKeyword(),
+			b.factory.ReadonlyKeyword(),
+		},
+		b.id(name),
 		nil,
+		target,
+		b.factory.NewExpression(b.id(constructor), nil, nil),
 	)
 }
 
 func (b builder) constructor() tsgo.ConstructorDeclaration {
+	privateReadonly := []tsgo.ModifierLike{
+		b.factory.PrivateKeyword(),
+		b.factory.ReadonlyKeyword(),
+	}
 	return b.factory.ConstructorDeclaration(
 		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
 		nil,
+		[]tsgo.ParameterDeclaration{
+			b.parameter("base", b.numberType(), privateReadonly),
+			b.parameter("offset", b.numberType(), privateReadonly),
+			b.parameter("length", b.numberType(), privateReadonly),
+			b.parameter("readBytes", b.readBytesType(), privateReadonly),
+			b.parameter("writeBytes", b.writeBytesType(), privateReadonly),
+			b.parameter("children", b.childrenType(), privateReadonly),
+			b.parameter("flushes", b.callbackArrayType(), privateReadonly),
+			b.parameter("refreshes", b.callbackArrayType(), privateReadonly),
+		},
 		nil,
-		nil,
-		b.factory.Block(
-			[]tsgo.Statement{
-				b.factory.ExpressionStatement(b.unresolved()),
-			},
-			true,
-		),
+		b.factory.Block([]tsgo.Statement{
+			b.factory.ExpressionStatement(b.call(
+				b.property(b.id(b.className), "locations"),
+				"set",
+				b.factory.ThisExpression(),
+				b.factory.ThisExpression(),
+			)),
+		}, true),
 	)
 }
 
-func (b builder) from() tsgo.MethodDeclaration {
+func (b builder) callbackArrayType() tsgo.TypeNode {
+	return b.factory.ArrayTypeNode(
+		b.factory.FunctionTypeNode(nil, nil, b.voidType()),
+	)
+}
+
+func (b builder) flush() tsgo.MethodDeclaration {
+	return b.callbackMethod("flush", "flushes")
+}
+
+func (b builder) refresh() tsgo.MethodDeclaration {
+	return b.callbackMethod("refresh", "refreshes")
+}
+
+func (b builder) callbackMethod(name string, property string) tsgo.MethodDeclaration {
+	callback := b.id("callback")
 	return b.method(
-		FromName,
-		b.nullable(b.genericType()),
-		b.nullable(b.unsafeType()),
-	)
-}
-
-func (b builder) to() tsgo.MethodDeclaration {
-	return b.method(
-		ToName,
-		b.nullable(b.unsafeType()),
-		b.nullable(b.genericType()),
-	)
-}
-
-func (b builder) fromInteger() tsgo.MethodDeclaration {
-	value := b.id("value")
-	zero := b.id("zero")
-	return b.factory.MethodDeclaration(
-		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
+		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
+		name,
 		nil,
-		b.id(FromIntegerName),
 		nil,
-		[]tsgo.TypeParameterDeclaration{b.integerTypeParameter("I")},
-		[]tsgo.ParameterDeclaration{
-			b.parameter("value", b.typeReference("I")),
-			b.parameter("zero", b.typeReference("I")),
-		},
-		b.nullable(b.unsafeType()),
-		b.factory.Block(
-			[]tsgo.Statement{
-				b.factory.IfStatement(
-					b.equals(value, zero),
-					b.factory.Block(
-						[]tsgo.Statement{
-							b.factory.ReturnStatement(b.undefined()),
-						},
-						true,
-					),
+		b.voidType(),
+		b.factory.ForOfStatement(
+			nil,
+			b.factory.VariableDeclarationList(
+				[]tsgo.VariableDeclaration{b.factory.VariableDeclaration(
+					callback,
 					nil,
-				),
-				b.factory.ExpressionStatement(b.unresolved()),
-			},
-			true,
-		),
-	)
-}
-
-func (b builder) toInteger() tsgo.MethodDeclaration {
-	value := b.id("value")
-	zero := b.id("zero")
-	return b.factory.MethodDeclaration(
-		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
-		nil,
-		b.id(ToIntegerName),
-		nil,
-		[]tsgo.TypeParameterDeclaration{b.integerTypeParameter("I")},
-		[]tsgo.ParameterDeclaration{
-			b.parameter("value", b.nullable(b.unsafeType())),
-			b.parameter("zero", b.typeReference("I")),
-		},
-		b.typeReference("I"),
-		b.factory.Block(
-			[]tsgo.Statement{
-				b.factory.IfStatement(
-					b.equals(value, b.undefined()),
-					b.factory.Block(
-						[]tsgo.Statement{
-							b.factory.ReturnStatement(zero),
-						},
-						true,
-					),
 					nil,
-				),
-				b.factory.ExpressionStatement(b.unresolved()),
-			},
-			true,
-		),
-	)
-}
-
-func (b builder) method(
-	name string,
-	parameterType tsgo.TypeNode,
-	resultType tsgo.TypeNode,
-) tsgo.MethodDeclaration {
-	value := b.id("value")
-	return b.factory.MethodDeclaration(
-		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
-		nil,
-		b.id(name),
-		nil,
-		[]tsgo.TypeParameterDeclaration{
-			b.typeParameter("P"),
-		},
-		[]tsgo.ParameterDeclaration{
-			b.factory.ParameterDeclaration(
-				nil,
-				nil,
-				value,
-				nil,
-				parameterType,
-				nil,
+					nil,
+				)},
+				tsgo.NodeFlagsConst,
 			),
-		},
-		resultType,
-		b.factory.Block(
-			[]tsgo.Statement{
-				b.factory.IfStatement(
-					b.factory.BinaryExpression(
-						nil,
-						value,
-						nil,
-						b.factory.BinaryOperatorToken(
-							tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-						),
-						b.undefined(),
-					),
-					b.factory.Block(
-						[]tsgo.Statement{
-							b.factory.ReturnStatement(b.undefined()),
-						},
-						true,
-					),
-					nil,
-				),
-				b.factory.ExpressionStatement(b.unresolved()),
-			},
-			true,
+			b.property(b.factory.ThisExpression(), property),
+			b.factory.Block([]tsgo.Statement{b.factory.ExpressionStatement(
+				b.factory.CallExpression(callback, nil, nil, nil, tsgo.NodeFlagsNone),
+			)}, true),
 		),
 	)
 }
 
-func (b builder) genericType() tsgo.TypeNode {
-	return b.typeReference("P")
-}
-
-func (b builder) unsafeType() tsgo.TypeNode {
-	return b.typeReference(b.className)
-}
-
-func (b builder) typeReference(name string) tsgo.TypeReferenceNode {
-	return b.factory.TypeReferenceNode(b.id(name), nil)
-}
-
-func (b builder) integerType() tsgo.TypeNode {
-	return b.factory.UnionTypeNode([]tsgo.TypeNode{
-		b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
-		b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBigIntKeyword),
-	})
-}
-
-func (b builder) integerTypeParameter(name string) tsgo.TypeParameterDeclaration {
-	return b.factory.TypeParameterDeclaration(
-		nil,
-		b.id(name),
-		b.integerType(),
+func (b builder) addressGetter() tsgo.GetAccessorDeclaration {
+	return b.factory.GetAccessorDeclaration(
+		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
+		b.id(addressName),
 		nil,
 		nil,
+		b.numberType(),
+		b.factory.Block([]tsgo.Statement{b.factory.ReturnStatement(b.binary(
+			b.property(b.factory.ThisExpression(), "base"),
+			tsgo.BinaryOperatorPlusToken,
+			b.property(b.factory.ThisExpression(), "offset"),
+		))}, true),
 	)
-}
-
-func (b builder) parameter(name string, target tsgo.TypeNode) tsgo.ParameterDeclaration {
-	return b.factory.ParameterDeclaration(
-		nil,
-		nil,
-		b.id(name),
-		nil,
-		target,
-		nil,
-	)
-}
-
-func (b builder) equals(left, right tsgo.Expression) tsgo.BinaryExpression {
-	return b.factory.BinaryExpression(
-		nil,
-		left,
-		nil,
-		b.factory.BinaryOperatorToken(
-			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-		),
-		right,
-	)
-}
-
-func (b builder) nullable(target tsgo.TypeNode) tsgo.TypeNode {
-	return b.factory.UnionTypeNode([]tsgo.TypeNode{
-		target,
-		b.factory.KeywordTypeNode(
-			tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-		),
-	})
-}
-
-func (b builder) typeParameter(
-	name string,
-) tsgo.TypeParameterDeclaration {
-	return b.factory.TypeParameterDeclaration(
-		nil,
-		b.id(name),
-		nil,
-		nil,
-		nil,
-	)
-}
-
-func (b builder) unresolved() tsgo.CallExpression {
-	return panicruntime.Call(
-		b.factory,
-		b.panicName,
-		b.factory.StringLiteral(
-			unresolvedPlaceholder,
-			tsgo.TokenFlagsNone,
-		),
-	)
-}
-
-func (b builder) undefined() tsgo.Expression {
-	return b.id("undefined")
-}
-
-func (b builder) id(name string) tsgo.Identifier {
-	return b.factory.Identifier(name)
 }

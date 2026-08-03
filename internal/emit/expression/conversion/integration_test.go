@@ -39,6 +39,7 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 				".call(",
 				".apply(",
 				".bind(",
+				"unsafe.Pointer conversion requires an environment implementation",
 			} {
 				if strings.Contains(printed, forbidden) {
 					t.Fatalf("conversion artifact contains %q:\n%s", forbidden, printed)
@@ -50,12 +51,13 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 				"private readonly $offset: number",
 				"static arrayRegion<L, T, S extends",
 				"GoPointer<Pair, GoArray<int32, 2>>",
-				"GoUnsafePointer.from(value)",
-				"GoUnsafePointer.to<GoPointer<int32, int32>>(",
-				"GoUnsafePointer.to<UnsafeBox>(",
+				"GoUnsafePointer.from<int32, int32>(value, $goUnsafeCodec_",
+				"GoUnsafePointer.to<int32, int32>(",
+				"GoUnsafePointer.to<UnsafeBox, UnsafeBox$Storage>(",
 				"GoUnsafePointer.toInteger(",
 				"GoUnsafePointer.fromInteger(",
-				"unsafe.Pointer conversion requires an environment implementation",
+				"export const $goUnsafeCodec_",
+				"new GoUnsafeCodec<",
 				"export function String(value: gostring): gostring",
 				"globalThis.String.fromCharCode",
 				"export function GenericNilPointer<T>(): GoPointerType<T> | undefined {\n" +
@@ -118,7 +120,7 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 	}
 }
 
-func TestUnsafePointerIntegerConversionsAreExecutableTypedBoundaries(t *testing.T) {
+func TestUnsafePointerIntegerConversionsEnforceLiveAddressBoundary(t *testing.T) {
 	for _, testCase := range []struct {
 		name        string
 		options     emit.Options
@@ -175,8 +177,77 @@ console.log(fails(() => {
 				workingDirectory,
 				targetPaths,
 				runner,
-			); output != "true\ntrue\n" {
+			); output != "true\nfalse\n" {
 				t.Fatalf("unsafe integer boundary output = %q", output)
+			}
+		})
+	}
+}
+
+func TestUnsafePointerMemoryAliasesAndOffsetsDifferentially(t *testing.T) {
+	for _, testCase := range []struct {
+		name        string
+		options     emit.Options
+		integerType string
+		integerZero string
+		integerMark string
+		values      string
+	}{
+		{
+			name:        "number",
+			options:     emit.DefaultOptions(),
+			integerType: "number",
+			integerZero: "0",
+			values:      "1, 2, 3, 4, 5, 6, 7, 8",
+		},
+		{
+			name: "bigint",
+			options: emit.Options{
+				IntegerRepresentation: emit.IntegerRepresentationBigInt,
+				EvaluationOrder:       emit.EvaluationOrderDirect,
+			},
+			integerType: "bigint",
+			integerZero: "0n",
+			integerMark: "n",
+			values:      "1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			emission := compileConversions(t, testCase.options)
+			workingDirectory := t.TempDir()
+			targetPaths, sourceModule, _ := printConversions(
+				t,
+				workingDirectory,
+				emission,
+			)
+			runner := `import { GoArray } from "./runtime/array.js";
+import { GoPointer } from "./runtime/pointer.js";
+import * as values from "` + sourceModule + `";
+
+const scalar = GoPointer.cell<` + testCase.integerType + `, ` + testCase.integerType + `>(16909060` + testCase.integerMark + `);
+const bytes = GoPointer.cell<GoArray<` + testCase.integerType + `, 8>, GoArray<` + testCase.integerType + `, 8>>(
+    GoArray.literal<` + testCase.integerType + `, 8>(8, ` + testCase.integerZero + `, [0, 1, 2, 3, 4, 5, 6, 7], [` + testCase.values + `]),
+);
+console.log(String(values.UnsafePointerAliases(scalar)));
+console.log(String(values.UnsafePointerOffset(bytes)));
+console.log(String(values.UnsafePointerSafeThenUnsafe(scalar)));
+console.log(String(values.UnsafeStructLayout()));
+console.log(String(values.UnsafeStringHeaderLength()));
+console.log(String(values.UnsafeSliceHeaderMutation()));
+`
+			targetOutput := executeConversionTypeScript(
+				t,
+				workingDirectory,
+				targetPaths,
+				runner,
+			)
+			goOutput := runUnsafePointerMemoryGo(t, workingDirectory)
+			if targetOutput != goOutput {
+				t.Fatalf(
+					"unsafe-pointer output differs\nTypeScript:\n%s\nGo:\n%s",
+					targetOutput,
+					goOutput,
+				)
 			}
 		})
 	}

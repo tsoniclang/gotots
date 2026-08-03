@@ -54,6 +54,7 @@ func TestAccessorReadPreservesReceiverPrerequisitesAndRequests(t *testing.T) {
 		types.NewPackage("example.com/accessor", "accessor"),
 		&types.Info{},
 		types.SizesFor("gc", "amd64"),
+		api.MemoryByteOrderLittleEndian,
 		factory,
 		services,
 		services,

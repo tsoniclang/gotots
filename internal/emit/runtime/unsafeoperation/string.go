@@ -21,7 +21,7 @@ func (b builder) stringFunction(name string) tsgo.FunctionDeclaration {
 		b.binary(offset, tsgo.BinaryOperatorPlusToken, index),
 	)
 	character := b.call(
-		b.id("String"),
+		b.property(b.id("globalThis"), "String"),
 		"fromCharCode",
 		nil,
 		b.globalCall("Number", byteValue),

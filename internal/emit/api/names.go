@@ -119,6 +119,10 @@ type ReflectionNames interface {
 	ReflectionTypeOf(types.Type, *types.TypeName) (NameReference, error)
 }
 
+type UnsafeCodecNames interface {
+	UnsafeCodec(types.Type) (NameReference, error)
+}
+
 func NewProviderStatefulProfileCandidate(
 	profile gostdlib.ProviderStatefulProfile,
 	typeArguments []types.Type,

@@ -21,6 +21,7 @@ const (
 	InterfaceMethodSupportPath = "support/interface-methods.ts"
 	InterfaceTypeSupportPath   = "support/interface-types.ts"
 	ReflectionTypeSupportPath  = "support/reflection-types.ts"
+	UnsafeCodecSupportPath     = "support/unsafe-codecs.ts"
 )
 
 func EnvironmentContractPath(

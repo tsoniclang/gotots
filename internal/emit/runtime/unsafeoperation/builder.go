@@ -12,6 +12,7 @@ type builder struct {
 	sliceName         string
 	sliceRegionName   string
 	denseIndexName    string
+	unsafeSliceName   string
 }
 
 func Build(factory tsgo.Factory, symbol api.RuntimeSymbol) (tsgo.Statement, error) {
@@ -39,6 +40,10 @@ func Build(factory tsgo.Factory, symbol api.RuntimeSymbol) (tsgo.Statement, erro
 	if err != nil {
 		return nil, err
 	}
+	unsafeSlice, err := api.RuntimeContract(api.RuntimeUnsafeSlice)
+	if err != nil {
+		return nil, err
+	}
 	b := builder{
 		factory:           factory,
 		pointerName:       pointer.ExportedName(),
@@ -46,6 +51,7 @@ func Build(factory tsgo.Factory, symbol api.RuntimeSymbol) (tsgo.Statement, erro
 		sliceName:         slice.ExportedName(),
 		sliceRegionName:   sliceRegion.ExportedName(),
 		denseIndexName:    denseIndex.ExportedName(),
+		unsafeSliceName:   unsafeSlice.ExportedName(),
 	}
 	switch symbol {
 	case api.RuntimeUnsafeString:
@@ -56,6 +62,8 @@ func Build(factory tsgo.Factory, symbol api.RuntimeSymbol) (tsgo.Statement, erro
 		return b.stringDataFunction(contract.ExportedName()), nil
 	case api.RuntimeUnsafeSliceData:
 		return b.sliceDataFunction(contract.ExportedName()), nil
+	case api.RuntimeUnsafeSliceHeader:
+		return b.sliceHeaderFunction(contract.ExportedName()), nil
 	default:
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}

@@ -16,6 +16,7 @@ import (
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	storagefacetruntime "github.com/tsoniclang/gotots/internal/emit/runtime/storagefacet"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
+	unsafecodecruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafecodec"
 	unsaferuntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafeoperation"
 	unsafepointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafepointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -200,7 +201,8 @@ func Build(
 			seen[symbol] = struct{}{}
 			if symbol != api.RuntimePointer &&
 				symbol != api.RuntimePointerHash &&
-				symbol != api.RuntimePointerRegion {
+				symbol != api.RuntimePointerRegion &&
+				symbol != api.RuntimePointerUnsafeMemory {
 				return nil, &api.RuntimeSymbolError{Symbol: symbol}
 			}
 		}
@@ -224,7 +226,12 @@ func Build(
 				panicContract.ExportedName(),
 				denseIndexContract.ExportedName(),
 				pointerruntime.Capabilities{
-					Region: slices.Contains(symbols, api.RuntimePointerRegion),
+					Region: slices.Contains(symbols, api.RuntimePointerRegion) ||
+						slices.Contains(symbols, api.RuntimePointerUnsafeMemory),
+					UnsafeMemory: slices.Contains(
+						symbols,
+						api.RuntimePointerUnsafeMemory,
+					),
 				},
 			),
 		)
@@ -252,6 +259,12 @@ func Build(
 				)
 			case api.RuntimePointerRegion:
 				statement = pointerruntime.Region(
+					factory,
+					selected.ExportedName(),
+					contract.ExportedName(),
+				)
+			case api.RuntimePointerUnsafeMemory:
+				statement = pointerruntime.UnsafeMemory(
 					factory,
 					selected.ExportedName(),
 					contract.ExportedName(),
@@ -485,13 +498,29 @@ func Build(
 		return buildChannel(factory, symbols)
 	}
 	if module == api.RuntimeModuleUnsafePointer {
-		if len(symbols) != 1 || symbols[0] != api.RuntimeUnsafePointer {
+		if len(symbols) != 2 ||
+			symbols[0] != api.RuntimeUnsafeCodec ||
+			symbols[1] != api.RuntimeUnsafePointer {
 			return nil, &AssemblyError{
 				Module: module,
-				Reason: "unsafe-pointer runtime requires exactly RuntimeUnsafePointer",
+				Reason: "unsafe-pointer runtime requires codec before pointer",
 			}
 		}
-		contract, err := api.RuntimeContract(api.RuntimeUnsafePointer)
+		codecContract, err := api.RuntimeContract(api.RuntimeUnsafeCodec)
+		if err != nil {
+			return nil, err
+		}
+		pointerContract, err := api.RuntimeContract(api.RuntimeUnsafePointer)
+		if err != nil {
+			return nil, err
+		}
+		goPointerContract, err := api.RuntimeContract(api.RuntimePointer)
+		if err != nil {
+			return nil, err
+		}
+		pointerMemoryContract, err := api.RuntimeContract(
+			api.RuntimePointerUnsafeMemory,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -499,19 +528,37 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
-		statement := unsafepointerruntime.Build(
-			factory,
-			contract.ExportedName(),
-			panicContract.ExportedName(),
-		)
-		definition, err := NewDefinition(
-			api.RuntimeUnsafePointer,
-			statement,
+		denseIndexContract, err := api.RuntimeContract(api.RuntimeDenseIndex)
+		if err != nil {
+			return nil, err
+		}
+		codecDefinition, err := NewDefinition(
+			api.RuntimeUnsafeCodec,
+			unsafecodecruntime.Build(
+				factory,
+				codecContract.ExportedName(),
+				panicContract.ExportedName(),
+			),
 		)
 		if err != nil {
 			return nil, err
 		}
-		return []Definition{definition}, nil
+		pointerDefinition, err := NewDefinition(
+			api.RuntimeUnsafePointer,
+			unsafepointerruntime.Build(
+				factory,
+				pointerContract.ExportedName(),
+				codecContract.ExportedName(),
+				panicContract.ExportedName(),
+				goPointerContract.ExportedName(),
+				pointerMemoryContract.ExportedName(),
+				denseIndexContract.ExportedName(),
+			),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{codecDefinition, pointerDefinition}, nil
 	}
 	if module == api.RuntimeModuleUnsafe {
 		definitions := make([]Definition, 0, len(symbols))

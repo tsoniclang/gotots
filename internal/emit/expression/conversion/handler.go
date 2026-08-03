@@ -108,6 +108,13 @@ func Emit(
 		}
 		return target, true, nil
 	}
+	if err := unsafepointerconversion.Prepare(
+		context,
+		sourceType,
+		targetType,
+	); err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	operandExpected := operandFacts.Type
 	if _, interfaceTarget := interfacetype.Resolve(targetType); interfaceTarget {
 		operandExpected = interfacevalue.DynamicType(operandExpected)

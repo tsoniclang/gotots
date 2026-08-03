@@ -246,6 +246,17 @@ func NewReflectionTypeRequirement(
 	)
 }
 
+func NewUnsafeCodecRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	return newGeneratedDefinitionRequirement(
+		artifact,
+		GeneratedArtifactUnsafeCodec,
+		DeclarationRequirementUnsafeCodec,
+		"unsafe codec",
+	)
+}
+
 func NewProviderInterfaceBridgeRequirement(
 	artifact *GeneratedArtifact,
 ) (DeclarationRequirement, error) {

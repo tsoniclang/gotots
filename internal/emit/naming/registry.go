@@ -140,6 +140,11 @@ type reflectionTypeBinding struct {
 	name  string
 }
 
+type unsafeCodecBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
 type Target struct {
 	Name       string
 	SourcePath string
@@ -187,6 +192,8 @@ type Registry struct {
 	pointerRepresentations              map[string]pointerRepresentationBinding
 	reflectionTypes                     map[string]reflectionTypeBinding
 	reflectionTypeNames                 map[string]string
+	unsafeCodecs                        map[string]unsafeCodecBinding
+	unsafeCodecNames                    map[string]string
 }
 
 func NewRegistry() *Registry {
@@ -231,6 +238,8 @@ func NewRegistry() *Registry {
 		pointerRepresentations:              make(map[string]pointerRepresentationBinding),
 		reflectionTypes:                     make(map[string]reflectionTypeBinding),
 		reflectionTypeNames:                 make(map[string]string),
+		unsafeCodecs:                        make(map[string]unsafeCodecBinding),
+		unsafeCodecNames:                    make(map[string]string),
 	}
 }
 
@@ -317,6 +326,9 @@ func (r *Registry) GeneratedArtifact(
 	case api.GeneratedArtifactReflectionType:
 		binding, ok := r.reflectionTypes[artifactKey]
 		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactUnsafeCodec:
+		binding, ok := r.unsafeCodecs[artifactKey]
+		return binding.owner, ok && binding.owner != nil
 	default:
 		return nil, false
 	}
@@ -388,6 +400,10 @@ func (r *Registry) GeneratedArtifacts(
 		}
 	case api.GeneratedArtifactReflectionType:
 		for _, binding := range r.reflectionTypes {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactUnsafeCodec:
+		for _, binding := range r.unsafeCodecs {
 			artifacts = append(artifacts, binding.owner)
 		}
 	}

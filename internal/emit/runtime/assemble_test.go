@@ -106,27 +106,38 @@ func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
 	}
 }
 
-func TestUnsafePointerRuntimeIsNominalAndTypedPlaceholder(t *testing.T) {
+func TestUnsafePointerRuntimeHasCodecAndMemoryOwner(t *testing.T) {
 	definitions, err := Build(
 		tsgo.NewFactory(),
 		api.RuntimeModuleUnsafePointer,
-		[]api.RuntimeSymbol{api.RuntimeUnsafePointer},
+		[]api.RuntimeSymbol{
+			api.RuntimeUnsafeCodec,
+			api.RuntimeUnsafePointer,
+		},
 		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(definitions) != 1 ||
-		definitions[0].Symbol() != api.RuntimeUnsafePointer {
+	if len(definitions) != 2 ||
+		definitions[0].Symbol() != api.RuntimeUnsafeCodec ||
+		definitions[1].Symbol() != api.RuntimeUnsafePointer {
 		t.Fatalf("unsafe-pointer definitions = %#v", definitions)
 	}
-	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
+	codec, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
+	if !ok || codec.Name().Text() != "GoUnsafeCodec" || len(codec.Members()) != 8 {
+		t.Fatalf(
+			"unsafe-codec definition = %T with unexpected shape",
+			definitions[0].Statement(),
+		)
+	}
+	class, ok := definitions[1].Statement().(tsgo.ClassDeclaration)
 	if !ok ||
 		class.Name().Text() != "GoUnsafePointer" ||
-		len(class.Members()) != 6 {
+		len(class.Members()) != 15 {
 		t.Fatalf(
 			"unsafe-pointer definition = %T with unexpected shape",
-			definitions[0].Statement(),
+			definitions[1].Statement(),
 		)
 	}
 	if len(class.Modifiers()) != 1 ||
@@ -164,6 +175,7 @@ func TestUnsafeRuntimeExactJoinsFourIntrinsicDefinitions(t *testing.T) {
 		api.RuntimeUnsafeSlice,
 		api.RuntimeUnsafeStringData,
 		api.RuntimeUnsafeSliceData,
+		api.RuntimeUnsafeSliceHeader,
 	}
 	definitions, err := Build(
 		tsgo.NewFactory(),

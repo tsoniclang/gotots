@@ -13,15 +13,16 @@ import (
 	interfacetypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
 	providerinterfacebridge "github.com/tsoniclang/gotots/internal/emit/declaration/providerinterfacebridge"
 	reflectiontypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/reflectiontype"
+	unsafecodecdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/unsafecodec"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func (s *programSession) validateInterfaceArtifact(
+func (s *programSession) validateRepresentationArtifact(
 	artifact *api.GeneratedArtifact,
 ) error {
 	if !artifact.Valid() {
-		return &ScheduleError{Reason: "interface artifact is invalid"}
+		return &ScheduleError{Reason: "representation artifact is invalid"}
 	}
 	binding, ok := s.registry.GeneratedArtifact(
 		artifact.Kind(),
@@ -30,7 +31,7 @@ func (s *programSession) validateInterfaceArtifact(
 	if !ok || binding != artifact {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact has no exact canonical binding",
+			Reason: "representation artifact has no exact canonical binding",
 		}
 	}
 	switch artifact.Kind() {
@@ -89,36 +90,45 @@ func (s *programSession) validateInterfaceArtifact(
 				Reason: "reflection type has inconsistent source contract",
 			}
 		}
+	case api.GeneratedArtifactUnsafeCodec:
+		source, sourceOK := artifact.UnsafeCodecType()
+		bound, boundOK := binding.UnsafeCodecType()
+		if !sourceOK || !boundOK || !types.Identical(source, bound) {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "unsafe codec has inconsistent source type",
+			}
+		}
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact kind is invalid",
+			Reason: "representation artifact kind is invalid",
 		}
 	}
 	return nil
 }
 
-func (s *programSession) reconstructInterfaceArtifact(
+func (s *programSession) reconstructRepresentationArtifact(
 	artifact *api.GeneratedArtifact,
 ) error {
 	if s.sealed {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact reconstructed after target files were sealed",
+			Reason: "representation artifact reconstructed after target files were sealed",
 		}
 	}
-	if err := s.validateInterfaceArtifact(artifact); err != nil {
+	if err := s.validateRepresentationArtifact(artifact); err != nil {
 		return err
 	}
 	if artifact.Placement() != api.GeneratedArtifactPlacementCompilation {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "lexical interface artifact must reconstruct through its source artifact",
+			Reason: "lexical representation artifact must reconstruct through its source artifact",
 		}
 	}
 	builder, err := s.compilationGeneratedArtifactBuilder(
 		artifact,
-		"interface artifact",
+		"representation artifact",
 	)
 	if err != nil {
 		return err
@@ -129,7 +139,7 @@ func (s *programSession) reconstructInterfaceArtifact(
 	if exists {
 		temporaryStart = builder.declarations[index].temporaryStart
 	}
-	revision, err := s.buildInterfaceArtifactRevision(
+	revision, err := s.buildRepresentationArtifactRevision(
 		builder,
 		artifact,
 		temporaryStart,
@@ -167,7 +177,7 @@ func (s *programSession) reconstructInterfaceArtifact(
 	return nil
 }
 
-func (s *programSession) buildInterfaceArtifactRevision(
+func (s *programSession) buildRepresentationArtifactRevision(
 	builder *targetFileBuilder,
 	artifact *api.GeneratedArtifact,
 	temporaryStart emitnaming.TemporarySnapshot,
@@ -177,7 +187,7 @@ func (s *programSession) buildInterfaceArtifactRevision(
 	if !ok {
 		return artifactRevision{}, &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact has no concrete name owner",
+			Reason: "representation artifact has no concrete name owner",
 		}
 	}
 	if !reconstruction {
@@ -202,12 +212,12 @@ func (s *programSession) buildInterfaceArtifactRevision(
 			requirements,
 		)
 	} else {
-		err = exactInterfaceRequirement(requirements, artifact)
+		err = exactRepresentationRequirement(requirements, artifact)
 	}
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	statements, requests, err := buildInterfaceArtifact(
+	statements, requests, err := buildRepresentationArtifact(
 		builder,
 		context,
 		artifact,
@@ -238,7 +248,7 @@ func (s *programSession) buildInterfaceArtifactRevision(
 	}, nil
 }
 
-func buildInterfaceArtifact(
+func buildRepresentationArtifact(
 	builder *targetFileBuilder,
 	context api.Context,
 	artifact *api.GeneratedArtifact,
@@ -349,15 +359,21 @@ func buildInterfaceArtifact(
 		)
 	case api.GeneratedArtifactReflectionType:
 		return reflectiontypedeclaration.Build(context, artifact)
+	case api.GeneratedArtifactUnsafeCodec:
+		return unsafecodecdeclaration.Build(
+			context,
+			builder.emitter,
+			artifact,
+		)
 	default:
 		return nil, nil, &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact kind is invalid",
+			Reason: "representation artifact kind is invalid",
 		}
 	}
 }
 
-func exactInterfaceRequirement(
+func exactRepresentationRequirement(
 	requirements []api.DeclarationRequirement,
 	artifact *api.GeneratedArtifact,
 ) error {
@@ -365,7 +381,7 @@ func exactInterfaceRequirement(
 		return &ScheduleError{
 			Object: artifact.TargetName(),
 			Reason: fmt.Sprintf(
-				"interface artifact requires exactly one definition request, received %d",
+				"representation artifact requires exactly one definition request, received %d",
 				len(requirements),
 			),
 		}
@@ -374,7 +390,7 @@ func exactInterfaceRequirement(
 	if !ok || selected != artifact {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact received a foreign requirement",
+			Reason: "representation artifact received a foreign requirement",
 		}
 	}
 	return nil

@@ -119,6 +119,7 @@ const (
 	DeclarationRequirementGenericConcretization          DeclarationRequirementKind = 26
 	DeclarationRequirementTypeRepresentation             DeclarationRequirementKind = 27
 	DeclarationRequirementReflectionType                 DeclarationRequirementKind = 28
+	DeclarationRequirementUnsafeCodec                    DeclarationRequirementKind = 29
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -147,7 +148,8 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementDeferredCallableRegistry ||
 		k == DeclarationRequirementGenericConcretization ||
 		k == DeclarationRequirementTypeRepresentation ||
-		k == DeclarationRequirementReflectionType
+		k == DeclarationRequirementReflectionType ||
+		k == DeclarationRequirementUnsafeCodec
 }
 
 type CallableControlFacet uint8

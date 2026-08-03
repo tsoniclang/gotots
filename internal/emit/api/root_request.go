@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -415,6 +414,13 @@ func NewReflectionTypeRequest(
 	return generatedDefinitionRequest(requirement, err)
 }
 
+func NewUnsafeCodecRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewUnsafeCodecRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
 func NewProviderInterfaceBridgeRequest(
 	artifact *GeneratedArtifact,
 ) (RootRequest, error) {
@@ -588,12 +594,4 @@ func (r RootRequest) ArtifactDependency() (ArtifactDependency, bool) {
 		return ArtifactDependency{}, false
 	}
 	return dependency, true
-}
-
-type RootRequestError struct {
-	Reason string
-}
-
-func (e *RootRequestError) Error() string {
-	return fmt.Sprintf("create root request: %s", e.Reason)
 }

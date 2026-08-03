@@ -9,6 +9,9 @@ type RuntimeSymbolContract struct {
 }
 
 func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
+	if contract, ok := unsafeRuntimeContract(symbol); ok {
+		return contract, nil
+	}
 	switch symbol {
 	case RuntimeAwaitable:
 		return runtimeContract(
@@ -520,55 +523,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/struct.ts",
 			"GoEmptyStruct",
 			true,
-		), nil
-	case RuntimeUnsafePointer:
-		return runtimeContract(
-			RuntimeModuleUnsafePointer,
-			"runtime/unsafe-pointer.ts",
-			"GoUnsafePointer",
-			true,
-			RuntimePanic,
-		), nil
-	case RuntimeUnsafeString:
-		return runtimeContract(
-			RuntimeModuleUnsafe,
-			"runtime/unsafe.ts",
-			"goUnsafeString",
-			false,
-			RuntimePointerRegion,
-			RuntimePointer,
-			RuntimeDenseIndex,
-		), nil
-	case RuntimeUnsafeSlice:
-		return runtimeContract(
-			RuntimeModuleUnsafe,
-			"runtime/unsafe.ts",
-			"goUnsafeSlice",
-			false,
-			RuntimePointerRegion,
-			RuntimePointer,
-			RuntimeSliceRegion,
-			RuntimeSlice,
-		), nil
-	case RuntimeUnsafeStringData:
-		return runtimeContract(
-			RuntimeModuleUnsafe,
-			"runtime/unsafe.ts",
-			"goUnsafeStringData",
-			false,
-			RuntimePointerRegion,
-			RuntimePointer,
-		), nil
-	case RuntimeUnsafeSliceData:
-		return runtimeContract(
-			RuntimeModuleUnsafe,
-			"runtime/unsafe.ts",
-			"goUnsafeSliceData",
-			false,
-			RuntimePointerRegion,
-			RuntimePointer,
-			RuntimeSliceRegion,
-			RuntimeSlice,
 		), nil
 	default:
 		if contract, ok := interfaceRuntimeContract(symbol); ok {

@@ -357,7 +357,9 @@ func artifactKinds(kind api.DeclarationRequirementKind) bool {
 		kind == api.DeclarationRequirementInterfaceDynamicTypeToken ||
 		kind == api.DeclarationRequirementGenericCapability ||
 		kind == api.DeclarationRequirementCallableABI ||
-		kind == api.DeclarationRequirementPointerRepresentation
+		kind == api.DeclarationRequirementPointerRepresentation ||
+		kind == api.DeclarationRequirementReflectionType ||
+		kind == api.DeclarationRequirementUnsafeCodec
 }
 
 func compareGeneratedArtifacts(

@@ -341,6 +341,7 @@ func staticSpecializationContext(
 		types.NewPackage("example.com/specialization", "specialization"),
 		&types.Info{},
 		types.SizesFor("gc", "amd64"),
+		api.MemoryByteOrderLittleEndian,
 		tsgo.NewFactory(),
 		staticSpecializationNames{},
 		values,

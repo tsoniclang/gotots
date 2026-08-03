@@ -86,6 +86,95 @@ func runtimeContract(
 	}
 }
 
+func unsafeRuntimeContract(
+	symbol RuntimeSymbol,
+) (RuntimeSymbolContract, bool) {
+	var contract RuntimeSymbolContract
+	switch symbol {
+	case RuntimePointerUnsafeMemory:
+		contract = runtimeContract(
+			RuntimeModulePointer,
+			"runtime/pointer.ts",
+			"goPointerUnsafeMemory",
+			false,
+			RuntimePointerRegion,
+		)
+	case RuntimeUnsafeCodec:
+		contract = runtimeContract(
+			RuntimeModuleUnsafePointer,
+			"runtime/unsafe-pointer.ts",
+			"GoUnsafeCodec",
+			true,
+			RuntimePanic,
+		)
+	case RuntimeUnsafePointer:
+		contract = runtimeContract(
+			RuntimeModuleUnsafePointer,
+			"runtime/unsafe-pointer.ts",
+			"GoUnsafePointer",
+			true,
+			RuntimePanic,
+			RuntimeUnsafeCodec,
+			RuntimePointer,
+			RuntimePointerUnsafeMemory,
+			RuntimeDenseIndex,
+		)
+	case RuntimeUnsafeString:
+		contract = runtimeContract(
+			RuntimeModuleUnsafe,
+			"runtime/unsafe.ts",
+			"goUnsafeString",
+			false,
+			RuntimePointerRegion,
+			RuntimePointer,
+			RuntimeDenseIndex,
+		)
+	case RuntimeUnsafeSlice:
+		contract = runtimeContract(
+			RuntimeModuleUnsafe,
+			"runtime/unsafe.ts",
+			"goUnsafeSlice",
+			false,
+			RuntimePointerRegion,
+			RuntimePointer,
+			RuntimeSliceRegion,
+			RuntimeSlice,
+		)
+	case RuntimeUnsafeStringData:
+		contract = runtimeContract(
+			RuntimeModuleUnsafe,
+			"runtime/unsafe.ts",
+			"goUnsafeStringData",
+			false,
+			RuntimePointerRegion,
+			RuntimePointer,
+		)
+	case RuntimeUnsafeSliceData:
+		contract = runtimeContract(
+			RuntimeModuleUnsafe,
+			"runtime/unsafe.ts",
+			"goUnsafeSliceData",
+			false,
+			RuntimePointerRegion,
+			RuntimePointer,
+			RuntimeSliceRegion,
+			RuntimeSlice,
+		)
+	case RuntimeUnsafeSliceHeader:
+		contract = runtimeContract(
+			RuntimeModuleUnsafe,
+			"runtime/unsafe.ts",
+			"goUnsafeSliceHeader",
+			false,
+			RuntimeUnsafeSlice,
+			RuntimeSlice,
+		)
+	default:
+		return RuntimeSymbolContract{}, false
+	}
+	return contract, true
+}
+
 func concurrencyRuntimeContract(
 	symbol RuntimeSymbol,
 ) (RuntimeSymbolContract, error) {

@@ -52,7 +52,12 @@ func fromCharCode(
 ) tsgo.CallExpression {
 	return methodCall(
 		factory,
-		factory.Identifier("String"),
+		factory.PropertyAccessExpression(
+			factory.Identifier("globalThis"),
+			nil,
+			factory.Identifier("String"),
+			tsgo.NodeFlagsNone,
+		),
 		"fromCharCode",
 		values,
 	)

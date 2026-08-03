@@ -201,6 +201,7 @@ Each type/value family has focused differentials and mutations:
 | arrays | length, zero, value copy, index/address, nested elements |
 | slices | nil, make, append, capacity, overlap copy, slicing, bounds, element storage |
 | pointers | nil, alias, read/store, equality, local/field/index addresses, read-only direct proof |
+| unsafe pointers | typed-pointer round trip, live safe/unsafe aliasing, array/struct reinterpretation, slice/string headers, virtual-address arithmetic, fabricated/out-of-range rejection |
 | maps | nil, set/get/comma-ok/delete/clear, key equality/hash, zero-on-miss, iteration |
 | strings | bytes/runes, indexing, range, slicing, conversions |
 | defined types | identity, projection/wrap, methods, nil-capable families |
@@ -208,6 +209,20 @@ Each type/value family has focused differentials and mutations:
 Every test inspects generated source and reports bytes/AST nodes. A mutation
 that always emits copy carriers/helpers, uses JavaScript identity for Go map
 keys, drops nil checks, or restores a target non-null assertion must fail.
+
+Unsafe-pointer proof runs under both integer profiles and at the selected
+GOOS/GOARCH. It exact-compares `unsafe.Sizeof`, `Alignof`, and `Offsetof` facts
+used by each codec against the selected Go toolchain; different source
+spellings of the same type must select the same artifact. Differential cases
+mutate a value through a safe alias and an unsafe alias in both orders, cross
+array elements by virtual-address arithmetic, reinterpret nested/padded
+structs, and exercise slice/string data headers. Mutations swap field offsets,
+detach writes from the source location, allocate a second codec for one type,
+accept a fabricated integer, recover a payload through `object`/`unknown`, or
+restore the universal runtime-throwing conversion path. Each must fail at its
+owning gate. Product evidence reports conversion counts by source/target type,
+codec count and bytes, largest codecs, virtual-memory runtime bytes, strict
+typecheck time/RSS, and representative execution results.
 
 ## Struct, Receiver, And Embedding Proof
 

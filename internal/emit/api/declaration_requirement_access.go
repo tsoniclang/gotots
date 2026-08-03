@@ -182,6 +182,13 @@ func (r DeclarationRequirement) ReflectionType() (*GeneratedArtifact, bool) {
 	)
 }
 
+func (r DeclarationRequirement) UnsafeCodec() (*GeneratedArtifact, bool) {
+	return r.generatedDefinition(
+		DeclarationRequirementUnsafeCodec,
+		GeneratedArtifactUnsafeCodec,
+	)
+}
+
 func (r DeclarationRequirement) ProviderInterfaceBridge() (
 	*GeneratedArtifact,
 	bool,
@@ -297,7 +304,8 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementProviderStatefulRepresentation,
 		DeclarationRequirementDeferredCallableRegistry,
 		DeclarationRequirementGenericConcretization,
-		DeclarationRequirementReflectionType:
+		DeclarationRequirementReflectionType,
+		DeclarationRequirementUnsafeCodec:
 		return r.generated, true
 	case DeclarationRequirementTypeRepresentation:
 		if r.generated != nil {

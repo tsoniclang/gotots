@@ -6,7 +6,16 @@ import (
 	"go/types"
 	"slices"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+type MemoryByteOrder = environmentcontract.ByteOrder
+
+const (
+	MemoryByteOrderInvalid      = environmentcontract.ByteOrderInvalid
+	MemoryByteOrderLittleEndian = environmentcontract.ByteOrderLittleEndian
+	MemoryByteOrderBigEndian    = environmentcontract.ByteOrderBigEndian
 )
 
 type AddressableStorage interface {
@@ -29,6 +38,7 @@ type Context struct {
 	typesPackage               *types.Package
 	typesInfo                  *types.Info
 	typesSizes                 types.Sizes
+	memoryByteOrder            MemoryByteOrder
 	factory                    tsgo.Factory
 	names                      Names
 	values                     Values
@@ -184,6 +194,7 @@ func NewContext(
 	typesPackage *types.Package,
 	typesInfo *types.Info,
 	typesSizes types.Sizes,
+	memoryByteOrder MemoryByteOrder,
 	factory tsgo.Factory,
 	names Names,
 	values Values,
@@ -203,6 +214,8 @@ func NewContext(
 		return Context{}, &ContextError{Reason: "types info is nil"}
 	case typesSizes == nil:
 		return Context{}, &ContextError{Reason: "types sizes are nil"}
+	case !memoryByteOrder.Valid():
+		return Context{}, &ContextError{Reason: "memory byte order is invalid"}
 	case names == nil:
 		return Context{}, &ContextError{Reason: "name owner is nil"}
 	case values == nil:
@@ -226,6 +239,7 @@ func NewContext(
 		typesPackage:      typesPackage,
 		typesInfo:         typesInfo,
 		typesSizes:        typesSizes,
+		memoryByteOrder:   memoryByteOrder,
 		factory:           factory,
 		names:             names,
 		values:            values,
@@ -382,6 +396,10 @@ func (c Context) TypesInfo() TypeInfoView {
 
 func (c Context) TypesSizes() types.Sizes {
 	return c.typesSizes
+}
+
+func (c Context) MemoryByteOrder() MemoryByteOrder {
+	return c.memoryByteOrder
 }
 
 func (c Context) Factory() tsgo.Factory {

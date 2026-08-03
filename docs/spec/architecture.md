@@ -317,6 +317,41 @@ address comparison, or nil pointer behavior requires it. Read-only scalar
 arguments do not become carriers merely because Go's source type is a pointer
 when the checker and use contract prove direct representation exact.
 
+### Unsafe Pointer Memory
+
+`unsafe.Pointer` is a typed compilation policy over the selected toolchain's
+layout, not a JavaScript cast and not a host address. Every participating Go
+pointer requests the carrier representation. Each conversion site selects one
+canonical statically typed codec for the pointer's storage type directly from
+`go/types` and `types.Sizes`; the codec is emitted once and contains the exact
+basic, array, struct, string, slice, and pointer layout operations it needs.
+Generated source callables retain their Go parameters: codecs are private
+support references at conversion expressions, never hidden source arguments.
+
+The runtime unsafe pointer is a pair of a live addressable memory view and a
+byte offset. A view reads the current source location and commits writes back
+through that location, so safe and unsafe aliases observe one value. A
+pointer-to-`uintptr` conversion uses a deterministic virtual address assigned
+to that live view; arithmetic and conversion back recover the same view and
+offset. It never claims to expose a process address. Numeric fabrication that
+does not identify a live generated view fails closed, as do offsets or layouts
+outside the selected allocation. Native FFI owns a separate provider boundary
+and may not infer a host pointer from the virtual integer.
+
+For example, `*(*uint32)(unsafe.Pointer(&bytes[4]))` selects the byte-element
+source codec, the `uint32` target codec, and a view rooted in the slice backing
+array at offset four; the produced TypeScript reads four little-endian bytes
+through that view. `(*Header)(unsafe.Pointer(&bytes[0]))` selects the canonical
+`Header` struct codec using the selected GOOS/GOARCH field offsets. A slice or
+string header conversion uses its canonical data-pointer/length/capacity
+layout; it is not recognized by package, field name, or source spelling.
+
+There is one unsafe-memory owner. Package overrides, source-pattern rewrites,
+opaque `object` payload recovery, `any`/`unknown`, unchecked casts, host-shape
+inspection, per-target registries, and an ordinary throwing placeholder are
+forbidden. A not-yet-supported layout family is rejected while translating
+the exact conversion occurrence rather than emitted as code that fails later.
+
 Maps use one canonical generated `GoMap<K,V>` runtime type because JavaScript
 `Map` does not preserve Go key equality, zero-on-miss, comma-ok, copy, or
 iteration semantics for all Go keys. Source-facing variables keep their Go

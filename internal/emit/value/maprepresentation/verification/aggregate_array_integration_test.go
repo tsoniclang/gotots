@@ -142,6 +142,7 @@ func productionAggregateContext(
 		pkg,
 		&types.Info{},
 		types.SizesFor("gc", "amd64"),
+		api.MemoryByteOrderLittleEndian,
 		tsgo.NewFactory(),
 		&aggregateNames{},
 		representation.Owner{},

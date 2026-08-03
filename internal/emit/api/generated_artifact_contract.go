@@ -23,6 +23,7 @@ const (
 	GeneratedArtifactDeferredCallableRegistry
 	GeneratedArtifactGenericConcretization
 	GeneratedArtifactReflectionType
+	GeneratedArtifactUnsafeCodec
 )
 
 func (k GeneratedArtifactKind) Valid() bool {
@@ -40,7 +41,8 @@ func (k GeneratedArtifactKind) Valid() bool {
 		k == GeneratedArtifactProviderStatefulRepresentation ||
 		k == GeneratedArtifactDeferredCallableRegistry ||
 		k == GeneratedArtifactGenericConcretization ||
-		k == GeneratedArtifactReflectionType
+		k == GeneratedArtifactReflectionType ||
+		k == GeneratedArtifactUnsafeCodec
 }
 
 type GeneratedArtifactPlacement uint8

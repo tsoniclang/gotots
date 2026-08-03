@@ -68,7 +68,10 @@ func EmitRepresented(
 }
 
 func SupportsUnsafePointer(sourceType types.Type) bool {
-	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	if sourceType == nil {
+		return false
+	}
+	basic, ok := types.Unalias(sourceType).Underlying().(*types.Basic)
 	return ok && basic.Kind() == types.UnsafePointer
 }
 

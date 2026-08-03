@@ -66,3 +66,43 @@ func (b builder) sliceDataFunction(name string) tsgo.FunctionDeclaration {
 		}, true),
 	)
 }
+
+func (b builder) sliceHeaderFunction(name string) tsgo.FunctionDeclaration {
+	logical := b.typeL()
+	storage := b.typeS()
+	whole := b.id("whole")
+	return b.factory.FunctionDeclaration(
+		[]tsgo.ModifierLike{b.factory.ExportKeyword()}, nil, b.id(name),
+		[]tsgo.TypeParameterDeclaration{
+			b.typeParameter("L", nil),
+			b.typeParameter("S", nil),
+		},
+		[]tsgo.ParameterDeclaration{
+			b.parameter("pointer", b.optionalPointerType(logical, storage)),
+			b.parameter("length", b.integerType()),
+			b.parameter("capacity", b.integerType()),
+		},
+		b.sliceType(storage),
+		b.factory.Block([]tsgo.Statement{
+			b.variable(
+				tsgo.NodeFlagsConst,
+				"whole",
+				b.sliceType(storage),
+				b.directCall(
+					b.unsafeSliceName,
+					[]tsgo.TypeNode{logical, storage},
+					b.id("pointer"),
+					b.id("capacity"),
+				),
+			),
+			b.factory.ReturnStatement(b.call(
+				whole,
+				runtimeslice.MemberName(runtimeslice.MemberSlice),
+				nil,
+				b.number("0"),
+				b.id("length"),
+				b.factory.NullLiteral(),
+			)),
+		}, true),
+	)
+}

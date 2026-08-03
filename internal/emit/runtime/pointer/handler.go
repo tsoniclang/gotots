@@ -3,24 +3,29 @@ package pointer
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 const (
-	AddressName     = "$go$address"
-	CellName        = "cell"
-	CellValueName   = "value"
-	DereferenceName = "dereference"
-	DirectName      = "direct"
-	EqualName       = "equal"
-	ViewName        = "view"
-	FieldName       = "field"
-	ObjectFieldName = "objectField"
-	ElementName     = "element"
-	IndexName       = "index"
-	ArrayRegionName = "arrayRegion"
-	RegionName      = "$go$region"
-	RegionMethod    = "region"
+	AddressName      = "$go$address"
+	CellName         = "cell"
+	CellValueName    = "value"
+	DereferenceName  = "dereference"
+	DirectName       = "direct"
+	EqualName        = "equal"
+	ViewName         = "view"
+	FieldName        = "field"
+	ObjectFieldName  = "objectField"
+	ElementName      = "element"
+	IndexName        = "index"
+	ArrayRegionName  = "arrayRegion"
+	RegionName       = "$go$region"
+	RegionMethod     = "region"
+	UnsafeMemoryName = "$go$unsafeMemory"
+	UnsafeViewName   = "$go$unsafeView"
+	UnsafeBindName   = "$go$unsafeBind"
+	unsafeSyncName   = "$go$unsafeSync"
 )
 
 type Capabilities struct {
-	Region bool
+	Region       bool
+	UnsafeMemory bool
 }
 
 type builder struct {
@@ -82,6 +87,15 @@ func BuildWithCapabilities(
 	}
 	if capabilities.Region {
 		members = append(members, target.regionMethod())
+	}
+	if capabilities.UnsafeMemory {
+		members = append(
+			members,
+			target.unsafeSyncProperty(),
+			target.unsafeBindMethod(),
+			target.unsafeMemoryMethod(),
+			target.unsafeViewMethod(),
+		)
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},

@@ -149,6 +149,49 @@ func main() {
 	)
 }
 
+func runUnsafePointerMemoryGo(t *testing.T, workingDirectory string) string {
+	t.Helper()
+	modulePath, err := filepath.Abs(conversionFixtureDirectory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runnerDirectory := filepath.Join(workingDirectory, "go-runner-unsafe-pointer")
+	writeFile(t, filepath.Join(runnerDirectory, "go.mod"), `module example.com/runner
+
+go 1.26.4
+
+require example.com/conversion v0.0.0
+
+replace example.com/conversion => `+filepath.ToSlash(modulePath)+`
+`)
+	writeFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+
+import (
+	"fmt"
+
+	values "example.com/conversion"
+)
+
+func main() {
+	scalar := uint32(0x01020304)
+	bytes := [8]byte{1, 2, 3, 4, 5, 6, 7, 8}
+	fmt.Println(values.UnsafePointerAliases(&scalar))
+	fmt.Println(values.UnsafePointerOffset(&bytes))
+	fmt.Println(values.UnsafePointerSafeThenUnsafe(&scalar))
+	fmt.Println(values.UnsafeStructLayout())
+	fmt.Println(values.UnsafeStringHeaderLength())
+	fmt.Println(values.UnsafeSliceHeaderMutation())
+}
+`)
+	return runCommand(
+		t,
+		runnerDirectory,
+		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		"run",
+		".",
+	)
+}
+
 func runConversionTypeScript(
 	t *testing.T,
 	workingDirectory string,

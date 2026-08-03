@@ -15,12 +15,17 @@ import (
 )
 
 func (e *emitter) context(names api.Names) (api.Context, error) {
+	byteOrder, err := e.source.Program().BuildProfile().ByteOrder()
+	if err != nil {
+		return api.Context{}, err
+	}
 	context, err := api.NewContext(
 		api.RoleFileDeclaration,
 		e.source.FileSet(),
 		e.source.Types(),
 		e.source.TypesInfo(),
 		e.source.TypesSizes(),
+		byteOrder,
 		e.factory,
 		names,
 		e.values,

@@ -28,6 +28,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimePointer, 100, api.RuntimeModulePointer, "runtime/pointer.ts", "GoPointer", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeDenseIndex}},
 		{api.RuntimePointerHash, 101, api.RuntimeModulePointer, "runtime/pointer.ts", "goPointerHash", false, []api.RuntimeSymbol{api.RuntimePointer, api.RuntimeMapHash}},
 		{api.RuntimePointerRegion, 102, api.RuntimeModulePointer, "runtime/pointer.ts", "goPointerRegion", false, []api.RuntimeSymbol{api.RuntimePointer, api.RuntimePanic}},
+		{api.RuntimePointerUnsafeMemory, 103, api.RuntimeModulePointer, "runtime/pointer.ts", "goPointerUnsafeMemory", false, []api.RuntimeSymbol{api.RuntimePointerRegion}},
 		{api.RuntimeArray, 200, api.RuntimeModuleArray, "runtime/array.ts", "GoArray", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeDenseIndex}},
 		{api.RuntimeArrayAllocate, 201, api.RuntimeModuleArray, "runtime/array.ts", "goArrayAllocate", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeArrayView, 202, api.RuntimeModuleArray, "runtime/array.ts", "goArrayView", false, []api.RuntimeSymbol{api.RuntimeArray}},
@@ -98,11 +99,13 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeScheduler, 1105, api.RuntimeModuleChannel, "runtime/channel.ts", "GoScheduler", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeSelectReady, 1106, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectReady", false, []api.RuntimeSymbol{api.RuntimeSelectAttempt}},
 		{api.RuntimeSelectAttempt, 1107, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectAttempt", false, []api.RuntimeSymbol{api.RuntimeSelectCase}},
-		{api.RuntimeUnsafePointer, 1200, api.RuntimeModuleUnsafePointer, "runtime/unsafe-pointer.ts", "GoUnsafePointer", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeUnsafeCodec, 1199, api.RuntimeModuleUnsafePointer, "runtime/unsafe-pointer.ts", "GoUnsafeCodec", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeUnsafePointer, 1200, api.RuntimeModuleUnsafePointer, "runtime/unsafe-pointer.ts", "GoUnsafePointer", true, []api.RuntimeSymbol{api.RuntimePanic, api.RuntimeUnsafeCodec, api.RuntimePointer, api.RuntimePointerUnsafeMemory, api.RuntimeDenseIndex}},
 		{api.RuntimeUnsafeString, 1210, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeString", false, []api.RuntimeSymbol{api.RuntimePointerRegion, api.RuntimePointer, api.RuntimeDenseIndex}},
 		{api.RuntimeUnsafeSlice, 1211, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeSlice", false, []api.RuntimeSymbol{api.RuntimePointerRegion, api.RuntimePointer, api.RuntimeSliceRegion, api.RuntimeSlice}},
 		{api.RuntimeUnsafeStringData, 1212, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeStringData", false, []api.RuntimeSymbol{api.RuntimePointerRegion, api.RuntimePointer}},
 		{api.RuntimeUnsafeSliceData, 1213, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeSliceData", false, []api.RuntimeSymbol{api.RuntimePointerRegion, api.RuntimePointer, api.RuntimeSliceRegion, api.RuntimeSlice}},
+		{api.RuntimeUnsafeSliceHeader, 1214, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeSliceHeader", false, []api.RuntimeSymbol{api.RuntimeUnsafeSlice, api.RuntimeSlice}},
 		{api.RuntimeAwaitable, 1300, api.RuntimeModuleScalar, "runtime/scalars.ts", "Awaitable", true, nil},
 	}
 	for _, test := range tests {

@@ -251,6 +251,8 @@ func (r DeclarationRequirement) Valid() bool {
 		)
 	case DeclarationRequirementReflectionType:
 		return r.validGeneratedDefinition(GeneratedArtifactReflectionType)
+	case DeclarationRequirementUnsafeCodec:
+		return r.validGeneratedDefinition(GeneratedArtifactUnsafeCodec)
 	case DeclarationRequirementGenericCapability:
 		return r.operation == NamedStructOperationInvalid &&
 			r.typeName == nil &&
