@@ -44,6 +44,18 @@ func verifyRepresentationReferences(
 }
 
 func validateFacetTarget(seed facetSeed, target tsgo.ProjectExport) error {
+	if seed.Kind == gostdlib.FacetReflectionTypeOperations {
+		for _, member := range []string{"$create", "$typeOf"} {
+			if _, ok := target.ValueMember(member); !ok {
+				return certifyError(
+					"build facet",
+					seed.Export+"."+member,
+					"reflection-type operation member is absent",
+				)
+			}
+		}
+		return nil
+	}
 	if seed.Kind == gostdlib.FacetDefinedValueOperations {
 		for _, member := range []string{"$project", "$wrap"} {
 			if _, ok := target.ValueMember(member); !ok {

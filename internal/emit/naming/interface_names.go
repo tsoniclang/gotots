@@ -124,12 +124,44 @@ func (n *File) InterfaceDynamicType(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	return n.generatedValueReference(
+	reference, err := n.generatedValueReference(
 		binding.owner,
 		binding.name,
 		requirement,
 		api.ArtifactFacetValueSurface,
 	)
+	if err != nil || n.owner.registry.reflectionContract == nil {
+		return reference, err
+	}
+	reflection, err := n.ReflectionType(
+		sourceType,
+		n.owner.registry.reflectionContract,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	reflectionOwner := reflectionArtifact(n.owner.registry, sourceType)
+	if reflectionOwner != nil && n.artifactOwner.Valid() &&
+		n.artifactOwner == api.MustGeneratedArtifactOwner(reflectionOwner) {
+		return reference, nil
+	}
+	return reference.WithRequests(api.CombineRequests(
+		reference.Requests(),
+		reflection.Requests(),
+	)...)
+}
+
+func reflectionArtifact(
+	registry *Registry,
+	sourceType types.Type,
+) *api.GeneratedArtifact {
+	for _, binding := range registry.reflectionTypes {
+		bound, _, ok := binding.owner.ReflectionType()
+		if ok && types.Identical(bound, sourceType) {
+			return binding.owner
+		}
+	}
+	return nil
 }
 
 func (n *File) ProviderInterfaceBridge(

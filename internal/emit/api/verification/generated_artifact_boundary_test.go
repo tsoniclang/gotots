@@ -225,8 +225,9 @@ func TestGeneratedArtifactDomainsArePinned(t *testing.T) {
 		GeneratedArtifactProviderStatefulRepresentation != 12 ||
 		GeneratedArtifactDeferredCallableRegistry != 13 ||
 		GeneratedArtifactGenericConcretization != 14 ||
+		GeneratedArtifactReflectionType != 15 ||
 		GeneratedArtifactInvalid.Valid() ||
-		GeneratedArtifactKind(15).Valid() {
+		GeneratedArtifactKind(16).Valid() {
 		t.Fatal("generated-artifact kind IDs drifted")
 	}
 	if GeneratedArtifactPlacementCompilation != 1 ||

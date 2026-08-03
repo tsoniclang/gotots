@@ -113,6 +113,12 @@ type ProviderStatefulProfileCandidate struct {
 	typeArguments []types.Type
 }
 
+type ReflectionNames interface {
+	ReflectionType(types.Type, *types.TypeName) (NameReference, error)
+	ReflectionOperations(*types.TypeName) (NameReference, error)
+	ReflectionTypeOf(types.Type, *types.TypeName) (NameReference, error)
+}
+
 func NewProviderStatefulProfileCandidate(
 	profile gostdlib.ProviderStatefulProfile,
 	typeArguments []types.Type,

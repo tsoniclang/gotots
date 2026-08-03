@@ -7,6 +7,26 @@ import {
   StructTag,
   Value,
 } from "../../reflect.js";
+import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
+import type { Type } from "../../reflect.js";
+import {
+  createRuntimeType,
+  runtimeTypeOf,
+  type RuntimeTypeMetadata,
+} from "../portable/reflect/runtime-type.js";
+
+export class ReflectTypeMetadataOperations {
+  static $create(
+    metadata: RuntimeTypeMetadata,
+    methodTokens: readonly object[],
+  ): Type {
+    return createRuntimeType(metadata, methodTokens);
+  }
+
+  static $typeOf(value: GoInterfaceValue | undefined): Type | undefined {
+    return runtimeTypeOf(value);
+  }
+}
 
 export class ReflectChanDirValueOperations {
   static $project(source: ChanDir): int64 {

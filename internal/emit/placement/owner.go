@@ -163,6 +163,14 @@ func (p *Owner) Statements(factory tsgo.Factory) []tsgo.Statement {
 				panic("namespace import group has multiple owners")
 			}
 			bindings = requests[0].NamespaceSpecifier()
+		case api.ImportBindingSideEffect:
+			statements = append(statements, factory.ImportDeclaration(
+				nil,
+				nil,
+				requests[0].ModuleSpecifier(),
+				nil,
+			))
+			continue
 		default:
 			panic("import group has invalid binding kind")
 		}

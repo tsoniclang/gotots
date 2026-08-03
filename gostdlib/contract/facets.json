@@ -1444,6 +1444,16 @@
       ]
     },
     {
+      "kind": "reflection-type-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectTypeMetadataOperations",
+      "capabilities": [
+        "metadata"
+      ]
+    },
+    {
       "kind": "defined-value-operations",
       "sourceIdentity": "reflect|kind=2|receiver=|name=Kind",
       "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",

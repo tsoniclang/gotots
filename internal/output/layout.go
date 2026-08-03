@@ -20,6 +20,7 @@ const (
 	AnonymousStructSupportPath = "support/anonymous-structs.ts"
 	InterfaceMethodSupportPath = "support/interface-methods.ts"
 	InterfaceTypeSupportPath   = "support/interface-types.ts"
+	ReflectionTypeSupportPath  = "support/reflection-types.ts"
 )
 
 func EnvironmentContractPath(

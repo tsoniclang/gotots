@@ -419,6 +419,24 @@ func TestNamespaceImportRequestCarriesExactPlacementPolicy(t *testing.T) {
 	}
 }
 
+func TestSideEffectImportRequestCarriesExactPlacementPolicy(t *testing.T) {
+	factory := tsgo.NewFactory()
+	request, err := api.NewSideEffectImportRequest(factory, "./reflection-types.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.Kind() != api.RootRequestImport ||
+		request.ImportPhase() != api.ImportPhaseValue ||
+		request.ImportBinding() != api.ImportBindingSideEffect ||
+		request.ExportedName() != "" ||
+		request.LocalName() != "" ||
+		request.Specifier() != nil ||
+		request.NamespaceSpecifier() != nil ||
+		request.ModuleSpecifier().Text() != "./reflection-types.js" {
+		t.Fatalf("side-effect request = %#v", request)
+	}
+}
+
 func TestQualifiedNameReferenceBuildsTypedValueAndTypePaths(t *testing.T) {
 	factory := tsgo.NewFactory()
 	request, err := api.NewNamespaceImportRequest(

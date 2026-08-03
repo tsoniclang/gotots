@@ -264,6 +264,18 @@ func validateFacetSeeds(
 		if len(capabilities) == 0 {
 			return nil, certifyError("configure facets", key, "capability set is empty")
 		}
+		if seed.Kind == gostdlib.FacetReflectionTypeOperations &&
+			(len(seed.Capabilities) != 1 ||
+				seed.Capabilities[0] != gostdlib.FacetCapabilityMetadata ||
+				seed.StorageExport != "" ||
+				seed.RepresentationExport != "" ||
+				seed.Effect != gostdlib.EffectInvalid) {
+			return nil, certifyError(
+				"configure facets",
+				key,
+				"reflection-type facet shape is invalid",
+			)
+		}
 		if seed.Kind == gostdlib.FacetDefinedValueOperations &&
 			(len(seed.Capabilities) != 2 ||
 				seed.Capabilities[0] != gostdlib.FacetCapabilityProject ||

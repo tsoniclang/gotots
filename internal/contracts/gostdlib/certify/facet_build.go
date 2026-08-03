@@ -40,6 +40,22 @@ func buildFacet(
 				"type facet does not own a type",
 			)
 		}
+	case gostdlib.FacetReflectionTypeOperations:
+		typeName, ok := evidence.object.(*types.TypeName)
+		if !ok {
+			return gostdlib.FacetDocument{}, certifyError(
+				"build facet",
+				seed.SourceIdentity,
+				"reflection-type facet does not own a type",
+			)
+		}
+		if _, ok := typeName.Type().Underlying().(*types.Interface); !ok {
+			return gostdlib.FacetDocument{}, certifyError(
+				"build facet",
+				seed.SourceIdentity,
+				"reflection-type facet owner is not an interface",
+			)
+		}
 	case gostdlib.FacetRecoveryCallable,
 		gostdlib.FacetGenericCallableKernel:
 		if _, ok := evidence.object.(*types.Func); !ok {

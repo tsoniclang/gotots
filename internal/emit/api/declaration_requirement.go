@@ -235,6 +235,17 @@ func NewInterfaceDynamicTypeTokenRequirement(
 	)
 }
 
+func NewReflectionTypeRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	return newGeneratedDefinitionRequirement(
+		artifact,
+		GeneratedArtifactReflectionType,
+		DeclarationRequirementReflectionType,
+		"reflection type",
+	)
+}
+
 func NewProviderInterfaceBridgeRequirement(
 	artifact *GeneratedArtifact,
 ) (DeclarationRequirement, error) {

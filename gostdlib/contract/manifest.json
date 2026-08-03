@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "53c48d50cc04099630b385188c0b571b69ba579a817f035c5261eee5b327d4fc",
-  "providerDigest": "e3ab107b364ba4798956d125eb8a69dc45eb1a1dd4b0e4d15455ef22cb32b231",
+  "providerDigest": "a163aac6094d9371b3a2e0ff52aec733fc4c3635de919cc7144e89c9fc510e55",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -13313,6 +13313,16 @@
           "targetFingerprint": "14402617fb0554922561a161c68467d2d46e4d496847016afd2a9a545ceb1d01"
         },
         {
+          "kind": "reflection-type-operations",
+          "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
+          "capabilities": [
+            "metadata"
+          ],
+          "export": "ReflectTypeMetadataOperations",
+          "implementationOwner": "src/internal/facets/named-reflect.ts",
+          "targetFingerprint": "cc5eabed8d3538071e3bbef14a9c53517528aacfeb0a864beddcd21399fd2410"
+        },
+        {
           "kind": "named-struct-operations",
           "sourceIdentity": "reflect|kind=2|receiver=|name=Value",
           "capabilities": [
@@ -18756,5 +18766,5 @@
       ]
     }
   ],
-  "manifestDigest": "8c6410460bfcd733fa60afb0f9df68dcdb091f812cb31599daee67e81d068701"
+  "manifestDigest": "bb7bf37261ccb82da9a3feca9eb1676ab9f7aefba6c6ff7a2788d3ef506c077a"
 }

@@ -22,6 +22,7 @@ const (
 	GeneratedArtifactProviderStatefulRepresentation
 	GeneratedArtifactDeferredCallableRegistry
 	GeneratedArtifactGenericConcretization
+	GeneratedArtifactReflectionType
 )
 
 func (k GeneratedArtifactKind) Valid() bool {
@@ -38,7 +39,8 @@ func (k GeneratedArtifactKind) Valid() bool {
 		k == GeneratedArtifactProviderInterfaceBridge ||
 		k == GeneratedArtifactProviderStatefulRepresentation ||
 		k == GeneratedArtifactDeferredCallableRegistry ||
-		k == GeneratedArtifactGenericConcretization
+		k == GeneratedArtifactGenericConcretization ||
+		k == GeneratedArtifactReflectionType
 }
 
 type GeneratedArtifactPlacement uint8
@@ -68,6 +70,33 @@ type GeneratedArtifact struct {
 	generic        GenericOperationSelection
 	runtime        RuntimeSymbol
 	concretization *GenericConcretization
+	reflectionType *types.TypeName
+}
+
+func NewCompilationReflectionTypeArtifact(
+	sourceType types.Type,
+	reflectionType *types.TypeName,
+	artifact string,
+	targetName string,
+	outputPath string,
+) (*GeneratedArtifact, error) {
+	if sourceType == nil || reflectionType == nil || reflectionType.IsAlias() ||
+		artifact == "" || targetName == "" || outputPath == "" {
+		return nil, &RootRequestError{Reason: "reflection-type artifact is invalid"}
+	}
+	contract, ok := reflectionType.Type().Underlying().(*types.Interface)
+	if !ok || !contract.Complete().IsMethodSet() {
+		return nil, &RootRequestError{Reason: "reflection-type contract is invalid"}
+	}
+	return &GeneratedArtifact{
+		kind:           GeneratedArtifactReflectionType,
+		sourceType:     sourceType,
+		artifact:       artifact,
+		targetName:     targetName,
+		placement:      GeneratedArtifactPlacementCompilation,
+		outputPath:     outputPath,
+		reflectionType: reflectionType,
+	}, nil
 }
 
 func NewCompilationGeneratedArtifact(

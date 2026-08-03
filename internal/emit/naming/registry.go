@@ -130,6 +130,11 @@ type pointerRepresentationBinding struct {
 	owner *api.GeneratedArtifact
 }
 
+type reflectionTypeBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
 type Target struct {
 	Name       string
 	SourcePath string
@@ -174,6 +179,9 @@ type Registry struct {
 	deferredCallableRegistries          map[string]deferredCallableRegistryBinding
 	deferredCallableRegistryNames       map[string]string
 	pointerRepresentations              map[string]pointerRepresentationBinding
+	reflectionTypes                     map[string]reflectionTypeBinding
+	reflectionTypeNames                 map[string]string
+	reflectionContract                  *types.TypeName
 }
 
 func NewRegistry() *Registry {
@@ -215,6 +223,8 @@ func NewRegistry() *Registry {
 		deferredCallableRegistries:          make(map[string]deferredCallableRegistryBinding),
 		deferredCallableRegistryNames:       make(map[string]string),
 		pointerRepresentations:              make(map[string]pointerRepresentationBinding),
+		reflectionTypes:                     make(map[string]reflectionTypeBinding),
+		reflectionTypeNames:                 make(map[string]string),
 	}
 }
 
@@ -298,6 +308,9 @@ func (r *Registry) GeneratedArtifact(
 	case api.GeneratedArtifactPointerRepresentation:
 		binding, ok := r.pointerRepresentations[artifactKey]
 		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactReflectionType:
+		binding, ok := r.reflectionTypes[artifactKey]
+		return binding.owner, ok && binding.owner != nil
 	default:
 		return nil, false
 	}
@@ -365,6 +378,10 @@ func (r *Registry) GeneratedArtifacts(
 		}
 	case api.GeneratedArtifactPointerRepresentation:
 		for _, binding := range r.pointerRepresentations {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactReflectionType:
+		for _, binding := range r.reflectionTypes {
 			artifacts = append(artifacts, binding.owner)
 		}
 	}

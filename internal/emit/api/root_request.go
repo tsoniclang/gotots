@@ -48,6 +48,7 @@ const (
 	ImportBindingInvalid ImportBindingKind = iota
 	ImportBindingNamed
 	ImportBindingNamespace
+	ImportBindingSideEffect
 )
 
 type RootRequestOwner struct {
@@ -404,6 +405,13 @@ func NewInterfaceDynamicTypeTokenRequest(
 	artifact *GeneratedArtifact,
 ) (RootRequest, error) {
 	requirement, err := NewInterfaceDynamicTypeTokenRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewReflectionTypeRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewReflectionTypeRequirement(artifact)
 	return generatedDefinitionRequest(requirement, err)
 }
 

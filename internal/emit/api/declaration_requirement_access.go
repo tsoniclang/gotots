@@ -175,6 +175,13 @@ func (r DeclarationRequirement) InterfaceDynamicTypeToken() (
 	)
 }
 
+func (r DeclarationRequirement) ReflectionType() (*GeneratedArtifact, bool) {
+	return r.generatedDefinition(
+		DeclarationRequirementReflectionType,
+		GeneratedArtifactReflectionType,
+	)
+}
+
 func (r DeclarationRequirement) ProviderInterfaceBridge() (
 	*GeneratedArtifact,
 	bool,
@@ -289,7 +296,8 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementProviderInterfaceBridge,
 		DeclarationRequirementProviderStatefulRepresentation,
 		DeclarationRequirementDeferredCallableRegistry,
-		DeclarationRequirementGenericConcretization:
+		DeclarationRequirementGenericConcretization,
+		DeclarationRequirementReflectionType:
 		return r.generated, true
 	case DeclarationRequirementTypeRepresentation:
 		if r.generated != nil {

@@ -102,6 +102,17 @@ func validateFacet(facet FacetDocument, field string) error {
 		); err != nil {
 			return err
 		}
+	case FacetReflectionTypeOperations:
+		if len(facet.Capabilities) != 1 ||
+			facet.Capabilities[0] != FacetCapabilityMetadata ||
+			facet.Effect != EffectInvalid ||
+			len(facet.CallableParameters) != 0 ||
+			len(facet.GenericTypeArguments) != 0 ||
+			facet.StorageExport != "" || facet.RepresentationExport != "" ||
+			facet.StorageImplementationOwner != "" ||
+			facet.StorageTargetFingerprint != "" {
+			return manifestError(field, "reflection-type facet shape is invalid")
+		}
 	}
 	return nil
 }

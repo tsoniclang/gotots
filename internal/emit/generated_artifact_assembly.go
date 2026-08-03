@@ -28,7 +28,8 @@ func (s *programSession) validateGeneratedArtifact(
 		api.GeneratedArtifactAnonymousInterface,
 		api.GeneratedArtifactInterfaceMethodToken,
 		api.GeneratedArtifactInterfaceDynamicTypeToken,
-		api.GeneratedArtifactProviderInterfaceBridge:
+		api.GeneratedArtifactProviderInterfaceBridge,
+		api.GeneratedArtifactReflectionType:
 		return s.validateInterfaceArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
 		return s.validateGenericCapabilityArtifact(artifact)
@@ -64,7 +65,8 @@ func (s *programSession) reconstructGeneratedArtifact(
 		api.GeneratedArtifactAnonymousInterface,
 		api.GeneratedArtifactInterfaceMethodToken,
 		api.GeneratedArtifactInterfaceDynamicTypeToken,
-		api.GeneratedArtifactProviderInterfaceBridge:
+		api.GeneratedArtifactProviderInterfaceBridge,
+		api.GeneratedArtifactReflectionType:
 		err = s.reconstructInterfaceArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
 		err = s.reconstructGenericCapabilityArtifact(artifact)

@@ -8,18 +8,20 @@ import (
 type FacetKind string
 
 const (
-	FacetInvalid                FacetKind = ""
-	FacetNamedStructOperations  FacetKind = "named-struct-operations"
-	FacetDefinedValueOperations FacetKind = "defined-value-operations"
-	FacetRecoveryCallable       FacetKind = "recovery-callable"
-	FacetGenericCallableKernel  FacetKind = "generic-callable-kernel"
+	FacetInvalid                  FacetKind = ""
+	FacetNamedStructOperations    FacetKind = "named-struct-operations"
+	FacetDefinedValueOperations   FacetKind = "defined-value-operations"
+	FacetRecoveryCallable         FacetKind = "recovery-callable"
+	FacetGenericCallableKernel    FacetKind = "generic-callable-kernel"
+	FacetReflectionTypeOperations FacetKind = "reflection-type-operations"
 )
 
 func (k FacetKind) Valid() bool {
 	return k == FacetNamedStructOperations ||
 		k == FacetDefinedValueOperations ||
 		k == FacetRecoveryCallable ||
-		k == FacetGenericCallableKernel
+		k == FacetGenericCallableKernel ||
+		k == FacetReflectionTypeOperations
 }
 
 type FacetCapability string
@@ -39,6 +41,7 @@ const (
 	FacetCapabilityKernel         FacetCapability = "kernel"
 	FacetCapabilityProject        FacetCapability = "project"
 	FacetCapabilityWrap           FacetCapability = "wrap"
+	FacetCapabilityMetadata       FacetCapability = "metadata"
 )
 
 func (c FacetCapability) NamedStructOperation() bool {

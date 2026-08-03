@@ -83,6 +83,18 @@ func (o *GeneratedArtifact) InterfaceDynamicType() (types.Type, bool) {
 	return o.sourceType, interfaceAdapterType(o.sourceType)
 }
 
+func (o *GeneratedArtifact) ReflectionType() (
+	types.Type,
+	*types.TypeName,
+	bool,
+) {
+	if o == nil || o.kind != GeneratedArtifactReflectionType ||
+		o.reflectionType == nil {
+		return nil, nil, false
+	}
+	return o.sourceType, o.reflectionType, true
+}
+
 func (o *GeneratedArtifact) GenericCapability() (
 	*types.Signature,
 	GenericOperationSelection,
@@ -222,7 +234,9 @@ func (o *GeneratedArtifact) Valid() bool {
 		(o.kind != GeneratedArtifactInterfaceMethodToken &&
 			o.runtime != RuntimeInvalid) ||
 		(o.kind == GeneratedArtifactGenericConcretization) !=
-			(o.concretization != nil) {
+			(o.concretization != nil) ||
+		(o.kind == GeneratedArtifactReflectionType) !=
+			(o.reflectionType != nil) {
 		return false
 	}
 	switch o.placement {
@@ -312,6 +326,8 @@ func validGeneratedArtifactType(
 		}
 		_, interfaceType := source.Underlying().(*types.Interface)
 		return !interfaceType
+	case GeneratedArtifactReflectionType:
+		return sourceType != nil && !ContainsGenericTypeParameter(sourceType)
 	default:
 		return false
 	}

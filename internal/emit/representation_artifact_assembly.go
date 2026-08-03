@@ -12,6 +12,7 @@ import (
 	interfacemethodtoken "github.com/tsoniclang/gotots/internal/emit/declaration/interfacemethodtoken"
 	interfacetypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
 	providerinterfacebridge "github.com/tsoniclang/gotots/internal/emit/declaration/providerinterfacebridge"
+	reflectiontypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/reflectiontype"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -76,6 +77,16 @@ func (s *programSession) validateInterfaceArtifact(
 			return &ScheduleError{
 				Object: artifact.TargetName(),
 				Reason: "provider-interface bridge has inconsistent source type",
+			}
+		}
+	case api.GeneratedArtifactReflectionType:
+		source, reflectionType, sourceOK := artifact.ReflectionType()
+		bound, boundReflectionType, boundOK := binding.ReflectionType()
+		if !sourceOK || !boundOK || !types.Identical(source, bound) ||
+			reflectionType != boundReflectionType {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "reflection type has inconsistent source contract",
 			}
 		}
 	default:
@@ -336,6 +347,8 @@ func buildInterfaceArtifact(
 				builder.context.Factory().ExportKeyword(),
 			},
 		)
+	case api.GeneratedArtifactReflectionType:
+		return reflectiontypedeclaration.Build(context, artifact)
 	default:
 		return nil, nil, &ScheduleError{
 			Object: artifact.TargetName(),

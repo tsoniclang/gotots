@@ -3,6 +3,11 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "paths": {
+      "@gotots/runtime/*.js": [
+        "./test/runtime-package/*.ts"
+      ]
+    },
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,

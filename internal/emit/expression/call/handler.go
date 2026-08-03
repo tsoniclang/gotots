@@ -37,6 +37,23 @@ func emit(
 	discarded bool,
 ) (api.ExpressionEmission, error) {
 	context, detached := context.TakeDetachedInvocation()
+	if target, handled, err := emitReflectionTypeOf(
+		context,
+		children,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := emitReflectionTypeFor(
+		context,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
 	if target, handled, err := emitGeneric(
 		context,
 		children,
