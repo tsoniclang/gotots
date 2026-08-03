@@ -65,7 +65,7 @@ func emitStringLength(
 	))
 	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
 		length = context.Factory().CallExpression(
-			context.Factory().Identifier("BigInt"),
+			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{length},

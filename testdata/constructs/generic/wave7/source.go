@@ -66,6 +66,10 @@ type EmbeddedBox[T any] struct {
 	Box[T]
 }
 
+type ConcreteBox Box[int32]
+
+type DerivedBox[T any] Box[T]
+
 type Alias[T any] = Box[T]
 
 type Node[T any] struct {
@@ -620,6 +624,14 @@ func LocalTypeCapability() int32 {
 	return GenericMapValue(entry{value: 24})
 }
 
+func DefinedInstantiatedGeneric() int32 {
+	value := ConcreteBox{Value: 7}
+	value.Value += 2
+	generic := DerivedBox[int32]{Value: 10}
+	generic.Value += 3
+	return value.Value + generic.Value
+}
+
 func AuditGenericMethodAdapters() []int32 {
 	first := ComparableBox[int32]{Value: 17}
 	equal := ComparableBox[int32]{Value: 17}
@@ -769,6 +781,7 @@ func Audit() []int32 {
 		definedMapValue,
 		nilDefinedMapValue,
 		LocalTypeCapability(),
+		DefinedInstantiatedGeneric(),
 	}
 }
 

@@ -319,12 +319,34 @@ type TargetIntrinsic uint8
 const (
 	TargetIntrinsicInvalid TargetIntrinsic = iota
 	TargetIntrinsicNumber
+	TargetIntrinsicString
+	TargetIntrinsicBigInt
+	TargetIntrinsicMath
+	TargetIntrinsicObject
+	TargetIntrinsicPromise
+	TargetIntrinsicError
 )
+
+func (i TargetIntrinsic) Valid() bool {
+	return i >= TargetIntrinsicNumber && i <= TargetIntrinsicError
+}
 
 func (i TargetIntrinsic) String() string {
 	switch i {
 	case TargetIntrinsicNumber:
 		return "Number"
+	case TargetIntrinsicString:
+		return "String"
+	case TargetIntrinsicBigInt:
+		return "BigInt"
+	case TargetIntrinsicMath:
+		return "Math"
+	case TargetIntrinsicObject:
+		return "Object"
+	case TargetIntrinsicPromise:
+		return "Promise"
+	case TargetIntrinsicError:
+		return "Error"
 	default:
 		return fmt.Sprintf("target-intrinsic(%d)", i)
 	}
@@ -333,7 +355,7 @@ func (i TargetIntrinsic) String() string {
 func (i TargetIntrinsic) Expression(
 	factory tsgo.Factory,
 ) tsgo.PropertyAccessExpression {
-	if i != TargetIntrinsicNumber {
+	if !i.Valid() {
 		panic("invalid target intrinsic")
 	}
 	return factory.PropertyAccessExpression(
@@ -342,4 +364,29 @@ func (i TargetIntrinsic) Expression(
 		factory.Identifier(i.String()),
 		tsgo.NodeFlagsNone,
 	)
+}
+
+func (i TargetIntrinsic) UnshadowedExpression(
+	factory tsgo.Factory,
+) tsgo.Identifier {
+	if !i.Valid() {
+		panic("invalid target intrinsic")
+	}
+	return factory.Identifier(i.String())
+}
+
+func (i TargetIntrinsic) ReservesTypeName() bool {
+	return i == TargetIntrinsicObject || i == TargetIntrinsicPromise
+}
+
+func IsReservedTargetTypeName(name string) bool {
+	return name == TargetIntrinsicObject.String() ||
+		name == TargetIntrinsicPromise.String()
+}
+
+func (i TargetIntrinsic) TypeName(factory tsgo.Factory) tsgo.Identifier {
+	if !i.ReservesTypeName() {
+		panic("invalid target intrinsic")
+	}
+	return factory.Identifier(i.String())
 }

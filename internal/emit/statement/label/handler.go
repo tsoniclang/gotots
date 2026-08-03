@@ -31,11 +31,14 @@ func Emit(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
+	childContext := context.
+		WithRole(api.RoleLabelTarget).
+		WithControlLabel(label, target)
+	if breakable {
+		childContext = childContext.WithStatementLabel(name)
+	}
 	emission, err := children.Statement(
-		context.
-			WithRole(api.RoleLabelTarget).
-			WithControlLabel(label, target).
-			WithStatementLabel(name),
+		childContext,
 		source.Stmt,
 	)
 	if err != nil {

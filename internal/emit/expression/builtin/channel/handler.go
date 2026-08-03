@@ -358,7 +358,7 @@ func emitMeasure(
 	return api.NewExpressionEmission(
 		target.Before(),
 		context.Factory().CallExpression(
-			context.Factory().Identifier("BigInt"),
+			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{target.Value()},

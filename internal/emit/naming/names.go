@@ -261,7 +261,8 @@ func (n *Owner) preallocateScope(
 				suffix := n.generatedSuffix(base, rank-1)
 				candidate = base + "__shadow_" + strconv.FormatUint(suffix, 10)
 			}
-			if activeNames[candidate] == 0 {
+			if activeNames[candidate] == 0 &&
+				!reservedTargetTypeName(object, candidate) {
 				break
 			}
 			rank++
@@ -292,6 +293,11 @@ func (n *Owner) preallocateScope(
 			activeCounts[base] = original
 		}
 	}
+}
+
+func reservedTargetTypeName(object types.Object, name string) bool {
+	_, typeName := object.(*types.TypeName)
+	return typeName && api.IsReservedTargetTypeName(name)
 }
 
 func (n *Owner) generatedSuffix(base string, index uint64) uint64 {

@@ -82,6 +82,21 @@ Broad walls reject:
 - imports from unpinned TS-Go internals;
 - `any`, `unknown`, unchecked casts, reflection, and dynamic shape tests.
 
+An adversarial target-intrinsic fixture declares a Go `String` object while a
+conversion in the same module requires the target `String.fromCharCode`.
+Strict artifacts retain the Go name and qualify the host value through
+`globalThis`. A second fixture declares a Go generic type named `Promise` while
+emitting a cooperative callable: the Go type is target-renamed, while the
+callable retains idiomatic global `Promise<T>`. A closed contract test
+enumerates every supported host value and reserved host type identity.
+Replacing a qualified host value with a bare identifier, or removing the host
+type reservation, must fail strict typechecking or the intrinsic-shape gate.
+The same artifact inspection declares a Go `Object` type: the declaration is
+target-renamed because TS-Go rejects a class named `Object`, its source module
+uses `globalThis.Object.freeze`, and independently generated support modules
+use direct `Object.freeze`. Moving either form across that lexical boundary
+must fail the strict, shape, or source-size/AST-node gate.
+
 ## Closed Child Proof
 
 For each contextual handler:
@@ -211,6 +226,13 @@ prototype patch or duplicate top-level twin. Mutations force `extends` across
 a field-shadow/copy/nil counterexample, use virtual target selection for an
 ordinary concrete call, or copy every receiver unconditionally.
 
+Defined-over-generic fixtures cover concrete and generic derived structs.
+Strict artifacts use the basis storage field types, concrete accessors project
+one field directly, and generic selections use canonical storage without
+restoring a logical basis. Restoring `$basis.field`, omitting a required field
+storage conversion, or giving a generic `$make` a logical field parameter must
+fail strict typechecking or the artifact-shape gate.
+
 ## Interface Proof
 
 The differential matrix covers nil interface, typed nil, value/pointer
@@ -280,6 +302,10 @@ fixture covers fallthrough into a returning clause, fallthrough through a
 middle default, source `break`, and `continue` to an enclosing loop. Removing
 the callable's unreachable-end guard must restore a missing-return diagnostic;
 ordinary result functions ending in a direct return must not gain the guard.
+A nested-control fixture labels a non-breakable `if` containing both a switch
+and a loop while non-structural gotos target the label. Artifact inspection
+requires exactly one emitted target label on the direct `if`; propagating its
+target-label capability to either nested breakable child must fail the gate.
 
 Signature inspection proves ordinary callable/function/interface/provider
 contracts contain no recovery parameter. Private deferred entries are present

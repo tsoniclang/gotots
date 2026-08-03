@@ -105,7 +105,7 @@ func Apply(
 		))
 		if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
 			target = context.Factory().CallExpression(
-				context.Factory().Identifier("BigInt"),
+				api.TargetIntrinsicBigInt.Expression(context.Factory()),
 				nil,
 				nil,
 				[]tsgo.Expression{target},

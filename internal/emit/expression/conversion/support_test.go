@@ -108,6 +108,7 @@ func main() {
 	fmt.Println(real(values.ConstantComplex()), imag(values.ConstantComplex()))
 	fmt.Println(values.IntegerStringSummary())
 	fmt.Println(values.BytesStringSummary())
+	fmt.Println(values.ShadowedStringIntrinsic())
 	fmt.Println(values.RunesStringSummary())
 	fmt.Println(values.StringBytesSummary())
 	fmt.Println(values.StringRunesSummary())
@@ -191,6 +192,7 @@ const constantComplex = values.ConstantComplex();
 console.log(constantComplex.real, constantComplex.imag);
 console.log(show(values.IntegerStringSummary()));
 console.log(show(values.BytesStringSummary()));
+console.log(values.ShadowedStringIntrinsic());
 console.log(show(values.RunesStringSummary()));
 console.log(show(values.StringBytesSummary()));
 console.log(show(values.StringRunesSummary()));

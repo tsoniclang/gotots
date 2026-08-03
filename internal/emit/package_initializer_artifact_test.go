@@ -6,7 +6,6 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -329,10 +328,17 @@ func Run() int32 {
 		)
 	}
 	result, ok := callable.Type().(tsgo.TypeReferenceNode)
-	if !ok || result.TypeName().(tsgo.Identifier).Text() != "Promise" {
+	if !ok {
 		t.Fatalf(
 			"package callable result = %T, want Promise",
 			callable.Type(),
+		)
+	}
+	promise, ok := result.TypeName().(tsgo.Identifier)
+	if !ok || promise.Text() != api.TargetIntrinsicPromise.String() {
+		t.Fatalf(
+			"package callable result name = %T, want Promise",
+			result.TypeName(),
 		)
 	}
 	if session.requirements.hasPending() ||
@@ -541,56 +547,4 @@ func demandDerived(values []Derived) *Derived {
 		graphError.Facet != api.ArtifactFacetExportSurface {
 		t.Fatalf("omitted export-surface mutation error = %#v", err)
 	}
-}
-
-func packageExportBindings(statements []tsgo.Statement) []string {
-	var names []string
-	for _, statement := range statements {
-		declaration, ok := statement.(tsgo.ExportDeclaration)
-		if !ok {
-			continue
-		}
-		exports, ok := declaration.ExportClause().(tsgo.NamedExports)
-		if !ok {
-			continue
-		}
-		for _, specifier := range exports.Elements() {
-			name, ok := specifier.Name().(tsgo.Identifier)
-			if ok {
-				names = append(names, name.Text())
-			}
-		}
-	}
-	sort.Strings(names)
-	return names
-}
-
-func packageInitializerForVariable(
-	t *testing.T,
-	sourcePackage *load.Package,
-	variable *types.Var,
-) *types.Initializer {
-	t.Helper()
-	var selected *types.Initializer
-	for _, initializer := range sourcePackage.TypesInfo().InitOrder {
-		for _, target := range initializer.Lhs {
-			if target != variable {
-				continue
-			}
-			if selected != nil {
-				t.Fatalf(
-					"variable %s belongs to multiple package initializers",
-					variable.Name(),
-				)
-			}
-			selected = initializer
-		}
-	}
-	if selected == nil {
-		t.Fatalf(
-			"variable %s has no package initializer",
-			variable.Name(),
-		)
-	}
-	return selected
 }

@@ -206,7 +206,7 @@ func representMeasure(
 	return api.NewExpressionEmission(
 		value.Before(),
 		context.Factory().CallExpression(
-			context.Factory().Identifier("BigInt"),
+			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{value.Value()},

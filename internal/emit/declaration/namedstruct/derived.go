@@ -38,7 +38,7 @@ func emitDerivedClass(
 		context,
 		children,
 		fields,
-		false,
+		true,
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -73,7 +73,6 @@ func emitDerivedClass(
 		basis,
 		className,
 		classType,
-		basisStorage.Value(),
 		layoutFields,
 		typeParameters,
 		typeArguments,
@@ -83,22 +82,21 @@ func emitDerivedClass(
 	}
 	members = append(members, makeMember)
 	requests = append(requests, makeRequests...)
-	for _, selected := range layoutFields {
-		if selected.field.blank {
-			continue
+	if len(typeParameters) == 0 {
+		for _, selected := range layoutFields {
+			if selected.field.blank {
+				continue
+			}
+			getter, setter, memberRequests, err := storageFieldMembers(
+				context,
+				selected,
+			)
+			if err != nil {
+				return api.DeclarationEmission{}, err
+			}
+			members = append(members, getter, setter)
+			requests = append(requests, memberRequests...)
 		}
-		getter, setter, memberRequests, err := derivedFieldMembers(
-			context,
-			source,
-			basis,
-			basisStorage.Value(),
-			selected,
-		)
-		if err != nil {
-			return api.DeclarationEmission{}, err
-		}
-		members = append(members, getter, setter)
-		requests = append(requests, memberRequests...)
 	}
 
 	storageDemanded := false
@@ -121,7 +119,6 @@ func emitDerivedClass(
 			fields,
 			className,
 			classType,
-			basisStorage.Value(),
 			operation,
 			typeParameters,
 			typeArguments,
@@ -246,7 +243,6 @@ func derivedMakeMethod(
 	basis types.Type,
 	className string,
 	classType tsgo.TypeNode,
-	storageType tsgo.TypeNode,
 	fields []layoutField,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
@@ -257,12 +253,16 @@ func derivedMakeMethod(
 		name := context.Factory().Identifier(
 			"$field" + strconv.Itoa(index),
 		)
+		parameterType := selected.logicalType
+		if len(typeParameters) != 0 {
+			parameterType = selected.storageType
+		}
 		parameters = append(parameters, context.Factory().ParameterDeclaration(
 			nil,
 			nil,
 			name,
 			nil,
-			selected.logicalType,
+			parameterType,
 			nil,
 		))
 		values = append(values, name)
@@ -272,9 +272,9 @@ func derivedMakeMethod(
 		source,
 		basis,
 		className,
-		storageType,
 		fields,
 		values,
+		len(typeParameters) != 0,
 		typeArguments,
 	)
 	if err != nil {
@@ -300,11 +300,54 @@ func derivedConstructBody(
 	source ast.Node,
 	basis types.Type,
 	className string,
-	_ tsgo.TypeNode,
 	fields []layoutField,
 	values []tsgo.Expression,
+	valuesStored bool,
 	typeArguments []tsgo.TypeNode,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
+	if completeDerivedStorage(basis, fields) {
+		var body []tsgo.Statement
+		properties := make([]tsgo.ObjectLiteralElementLike, 0, len(fields))
+		var requests []api.RootRequest
+		for index, selected := range fields {
+			stored := api.DirectExpression(values[index])
+			var err error
+			if !valuesStored {
+				stored, err = context.Values().ToStorage(
+					context.WithRole(api.RoleStructAssignField),
+					selected.field.source,
+					selected.field.object.Type(),
+					stored,
+				)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+			body = append(body, stored.Before()...)
+			properties = append(
+				properties,
+				context.Factory().PropertyAssignment(
+					nil,
+					context.Factory().Identifier(selected.field.name),
+					nil,
+					selected.storageType,
+					stored.Value(),
+				),
+			)
+			requests = append(requests, stored.Requests()...)
+		}
+		body = append(body, context.Factory().ReturnStatement(
+			context.Factory().NewExpression(
+				context.Factory().Identifier(className),
+				typeArguments,
+				[]tsgo.Expression{context.Factory().ObjectLiteralExpression(
+					properties,
+					true,
+				)},
+			),
+		))
+		return body, requests, nil
+	}
 	zero, err := context.Values().Zero(
 		context.WithRole(api.RoleStructZeroField),
 		source,
@@ -313,16 +356,39 @@ func derivedConstructBody(
 	if err != nil {
 		return nil, nil, err
 	}
-	body, basisValue := captureDerivedValue(context, "$basis", zero)
+	storage, err := context.Values().ToStorage(
+		context.WithRole(api.RoleStorageType),
+		source,
+		basis,
+		zero,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	body, storageValue := captureDerivedValue(context, "$storage", storage)
+	requests := append([]api.RootRequest(nil), storage.Requests()...)
 	for index, selected := range fields {
 		if selected.field.blank {
 			continue
 		}
+		stored := api.DirectExpression(values[index])
+		if !valuesStored {
+			stored, err = context.Values().ToStorage(
+				context.WithRole(api.RoleStructAssignField),
+				selected.field.source,
+				selected.field.object.Type(),
+				stored,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+		body = append(body, stored.Before()...)
 		body = append(body, context.Factory().ExpressionStatement(
 			context.Factory().BinaryExpression(
 				nil,
 				context.Factory().PropertyAccessExpression(
-					basisValue,
+					storageValue,
 					nil,
 					context.Factory().Identifier(selected.field.name),
 					tsgo.NodeFlagsNone,
@@ -331,116 +397,22 @@ func derivedConstructBody(
 				context.Factory().BinaryOperatorToken(
 					tsgo.BinaryOperatorEqualsToken,
 				),
-				values[index],
+				stored.Value(),
 			),
 		))
+		requests = append(requests, stored.Requests()...)
 	}
-	stored, err := context.Values().ToStorage(
-		context.WithRole(api.RoleStorageType),
-		source,
-		basis,
-		api.DirectExpression(basisValue),
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	body = append(body, stored.Before()...)
 	body = append(body, context.Factory().ReturnStatement(
 		context.Factory().NewExpression(
 			context.Factory().Identifier(className),
 			typeArguments,
-			[]tsgo.Expression{stored.Value()},
+			[]tsgo.Expression{storageValue},
 		),
 	))
-	return body, api.CombineRequests(
-		zero.Requests(),
-		stored.Requests(),
-	), nil
+	return body, requests, nil
 }
 
-func derivedFieldMembers(
-	context api.Context,
-	source ast.Node,
-	basis types.Type,
-	_ tsgo.TypeNode,
-	selected layoutField,
-) (
-	tsgo.GetAccessorDeclaration,
-	tsgo.SetAccessorDeclaration,
-	[]api.RootRequest,
-	error,
-) {
-	storage := context.Factory().PropertyAccessExpression(
-		context.Factory().ThisExpression(),
-		nil,
-		context.Factory().Identifier(derivedStorageMember),
-		tsgo.NodeFlagsNone,
-	)
-	read, err := context.Values().FromStorage(
-		context.WithRole(api.RoleStructField),
-		source,
-		basis,
-		api.DirectExpression(storage),
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	readBody, readValue := captureDerivedValue(context, "$basis", read)
-	readBody = append(readBody, context.Factory().ReturnStatement(
-		context.Factory().PropertyAccessExpression(
-			readValue,
-			nil,
-			context.Factory().Identifier(selected.field.name),
-			tsgo.NodeFlagsNone,
-		),
-	))
-	write, err := context.Values().FromStorage(
-		context.WithRole(api.RoleStructAssignField),
-		source,
-		basis,
-		api.DirectExpression(storage),
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	writeBody, writeValue := captureDerivedValue(context, "$basis", write)
-	value := context.Factory().Identifier("$value")
-	writeBody = append(writeBody, context.Factory().ExpressionStatement(
-		context.Factory().BinaryExpression(
-			nil,
-			context.Factory().PropertyAccessExpression(
-				writeValue,
-				nil,
-				context.Factory().Identifier(selected.field.name),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			context.Factory().BinaryOperatorToken(
-				tsgo.BinaryOperatorEqualsToken,
-			),
-			value,
-		),
-	))
-	return context.Factory().GetAccessorDeclaration(
-			[]tsgo.ModifierLike{context.Factory().PublicKeyword()},
-			context.Factory().Identifier(selected.field.name),
-			nil,
-			nil,
-			selected.logicalType,
-			context.Factory().Block(readBody, true),
-		),
-		context.Factory().SetAccessorDeclaration(
-			[]tsgo.ModifierLike{context.Factory().PublicKeyword()},
-			context.Factory().Identifier(selected.field.name),
-			nil,
-			[]tsgo.ParameterDeclaration{parameter(
-				context,
-				"$value",
-				selected.logicalType,
-			)},
-			nil,
-			context.Factory().Block(writeBody, true),
-		),
-		api.CombineRequests(read.Requests(), write.Requests()),
-		nil
+func completeDerivedStorage(basis types.Type, fields []layoutField) bool {
+	structure, ok := basis.Underlying().(*types.Struct)
+	return ok && structure.NumFields() == len(fields)
 }

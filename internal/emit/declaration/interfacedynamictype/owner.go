@@ -1,6 +1,7 @@
 package interfacedynamictype
 
 import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -10,6 +11,37 @@ func Build(
 	name string,
 	modifiers []tsgo.ModifierLike,
 	comparable bool,
+) tsgo.VariableStatement {
+	return build(
+		factory,
+		name,
+		modifiers,
+		comparable,
+		api.TargetIntrinsicObject.Expression(factory),
+	)
+}
+
+func BuildIsolated(
+	factory tsgo.Factory,
+	name string,
+	modifiers []tsgo.ModifierLike,
+	comparable bool,
+) tsgo.VariableStatement {
+	return build(
+		factory,
+		name,
+		modifiers,
+		comparable,
+		api.TargetIntrinsicObject.UnshadowedExpression(factory),
+	)
+}
+
+func build(
+	factory tsgo.Factory,
+	name string,
+	modifiers []tsgo.ModifierLike,
+	comparable bool,
+	object tsgo.Expression,
 ) tsgo.VariableStatement {
 	comparableValue := tsgo.Expression(factory.FalseLiteral())
 	if comparable {
@@ -25,7 +57,7 @@ func Build(
 					interfacecontract.DynamicType(factory),
 					factory.CallExpression(
 						factory.PropertyAccessExpression(
-							factory.Identifier("Object"),
+							object,
 							nil,
 							factory.Identifier("freeze"),
 							tsgo.NodeFlagsNone,

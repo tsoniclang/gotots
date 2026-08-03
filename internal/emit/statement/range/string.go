@@ -204,7 +204,7 @@ func profileRune(
 		return value
 	}
 	return context.Factory().CallExpression(
-		context.Factory().Identifier("BigInt"),
+		api.TargetIntrinsicBigInt.Expression(context.Factory()),
 		nil,
 		nil,
 		[]tsgo.Expression{value},

@@ -289,7 +289,7 @@ func normalizeBigInt(
 	}
 	return factory.CallExpression(
 		factory.PropertyAccessExpression(
-			factory.Identifier("BigInt"),
+			api.TargetIntrinsicBigInt.Expression(factory),
 			nil,
 			factory.Identifier(member),
 			tsgo.NodeFlagsNone,

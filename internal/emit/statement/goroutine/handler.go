@@ -46,7 +46,7 @@ func Emit(
 		nil,
 		nil,
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier("Promise"),
+			api.TargetIntrinsicPromise.TypeName(context.Factory()),
 			[]tsgo.TypeNode{
 				context.Factory().KeywordTypeNode(
 					tsgo.KeywordTypeSyntaxKindVoidKeyword,

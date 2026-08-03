@@ -60,6 +60,19 @@ Names are reserved by exact `types.Object` identity in deterministic package
 and source order. Target-only collision suffixes are stable and readable.
 Source spelling never acts as semantic identity.
 
+Target host intrinsics have one closed identity owner. Value references use
+`globalThis.<name>`, so a valid Go declaration such as
+`func String(string) Token` keeps its source-shaped name without shadowing the
+target `String.fromCharCode` used by an unrelated conversion. Host type names
+remain idiomatic when TypeScript defines an unambiguous global type: generated
+async signatures use `Promise<T>`, and a conflicting Go type declaration is
+deterministically target-renamed. TypeScript's forbidden target class name
+`Object` is reserved by the same closed owner. Bare host value intrinsics are
+forbidden in source-facing generated modules. A structurally isolated support
+or runtime module that admits no Go declaration may use the direct host
+identifier; the artifact-placement owner, not a spelling heuristic, selects
+that form.
+
 ### Constants
 
 A typed constant emits one binding at its selected type. An untyped constant
@@ -210,6 +223,13 @@ emitted.
 
 Anonymous fields remain storage. Native `extends` is admitted only for a
 proved semantic spine; otherwise promoted access follows composition.
+
+A defined struct whose basis already has canonical storage projects that
+storage directly. A complete visible field layout constructs the storage
+object once; a partial layout starts from the basis zero storage so hidden
+fields retain Go zero values. Concrete field accessors convert only the
+selected field, while generic selections remain storage-shaped. The derived
+owner never reconstructs a logical basis merely to read or write one field.
 
 ### Receivers
 
@@ -386,6 +406,14 @@ lexical scopes and parent-assigned break/continue targets.
 - labels use exact `types.Label` identities;
 - native target control is preferred when exact;
 - only non-structural goto uses the linear target state machine.
+
+A source label is attached exactly once to its direct statement. A directly
+labeled loop, switch, type switch, or select may consume the target-label
+capability while emitting that statement. A non-breakable direct statement
+such as `if` is wrapped by the label owner after its body is emitted; it must
+not pass a reusable target label to nested breakable statements. The control
+label used to resolve source `break`, `continue`, and `goto` identities remains
+available independently and never selects a target label by spelling.
 
 An explicit Go `fallthrough` never becomes an implicit TypeScript case fall.
 The switch owner selects one clause, then executes ordered clause blocks under

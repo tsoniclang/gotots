@@ -70,7 +70,7 @@ func variable(
 
 func bigInt(context api.Context, value tsgo.Expression) tsgo.CallExpression {
 	return context.Factory().CallExpression(
-		context.Factory().Identifier("BigInt"),
+		api.TargetIntrinsicBigInt.Expression(context.Factory()),
 		nil,
 		nil,
 		[]tsgo.Expression{value},

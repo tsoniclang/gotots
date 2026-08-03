@@ -14,7 +14,7 @@ func PromiseResult(
 	result tsgo.TypeNode,
 ) tsgo.TypeNode {
 	return factory.TypeReferenceNode(
-		factory.Identifier("Promise"),
+		api.TargetIntrinsicPromise.TypeName(factory),
 		[]tsgo.TypeNode{result},
 	)
 }

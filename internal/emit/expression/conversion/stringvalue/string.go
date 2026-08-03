@@ -66,7 +66,7 @@ func sliceToString(
 	case sliceBytes:
 		encoded = callMember(
 			context,
-			context.Factory().Identifier("String"),
+			api.TargetIntrinsicString.Expression(context.Factory()),
 			"fromCharCode",
 			context.Factory().CallExpression(
 				api.TargetIntrinsicNumber.Expression(context.Factory()),

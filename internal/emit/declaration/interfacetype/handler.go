@@ -67,6 +67,7 @@ func Emit(
 		parameters.Nodes(),
 		parameters.References(),
 		len(parameters.Nodes()) == 0,
+		api.TargetIntrinsicObject.Expression(context.Factory()),
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, true, err
@@ -93,6 +94,29 @@ func Build(
 		nil,
 		nil,
 		true,
+		api.TargetIntrinsicObject.Expression(context.Factory()),
+	)
+}
+
+func BuildIsolated(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	name string,
+	interfaceType *types.Interface,
+	modifiers []tsgo.ModifierLike,
+) ([]tsgo.Statement, []api.RootRequest, error) {
+	return build(
+		context,
+		children,
+		source,
+		name,
+		interfaceType,
+		modifiers,
+		nil,
+		nil,
+		true,
+		api.TargetIntrinsicObject.UnshadowedExpression(context.Factory()),
 	)
 }
 
@@ -106,6 +130,7 @@ func build(
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
 	emitRuntimeContract bool,
+	object tsgo.Expression,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	if name == "" ||
 		interfaceType == nil ||
@@ -232,7 +257,13 @@ func build(
 	if emitRuntimeContract {
 		statements = append(
 			statements,
-			contractDeclaration(context.Factory(), name, modifiers, tokens),
+			contractDeclaration(
+				context.Factory(),
+				name,
+				modifiers,
+				tokens,
+				object,
+			),
 			guardDeclaration(
 				context.Factory(),
 				name,

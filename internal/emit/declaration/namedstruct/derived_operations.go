@@ -16,7 +16,6 @@ func emitDerivedValueOperation(
 	fields []field,
 	className string,
 	classType tsgo.TypeNode,
-	storageType tsgo.TypeNode,
 	assembly operationAssembly,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
@@ -47,9 +46,9 @@ func emitDerivedValueOperation(
 			source,
 			basis,
 			className,
-			storageType,
 			nil,
 			nil,
+			false,
 			typeArguments,
 		)
 	case api.NamedStructOperationCopy:

@@ -105,12 +105,7 @@ func unreachableResultEnd(context api.Context) tsgo.ThrowStatement {
 	factory := context.Factory()
 	return factory.ThrowStatement(
 		factory.NewExpression(
-			factory.PropertyAccessExpression(
-				factory.Identifier(api.TargetGlobalAnchorName),
-				nil,
-				factory.Identifier("Error"),
-				tsgo.NodeFlagsNone,
-			),
+			api.TargetIntrinsicError.Expression(factory),
 			nil,
 			[]tsgo.Expression{
 				factory.StringLiteral(

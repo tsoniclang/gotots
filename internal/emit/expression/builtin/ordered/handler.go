@@ -241,7 +241,7 @@ func mathCall(
 	factory := context.Factory()
 	return factory.CallExpression(
 		factory.PropertyAccessExpression(
-			factory.Identifier("Math"),
+			api.TargetIntrinsicMath.Expression(factory),
 			nil,
 			factory.Identifier(member),
 			tsgo.NodeFlagsNone,

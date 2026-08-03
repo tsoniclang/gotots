@@ -56,6 +56,8 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 				"GoUnsafePointer.toInteger(",
 				"GoUnsafePointer.fromInteger(",
 				"unsafe.Pointer conversion requires an environment implementation",
+				"export function String(value: gostring): gostring",
+				"globalThis.String.fromCharCode",
 				"export function GenericNilPointer<T>(): GoPointerType<T> | undefined {\n" +
 					"    return void 0;\n}",
 			} {
@@ -66,6 +68,9 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 						printed,
 					)
 				}
+			}
+			if strings.Contains(printed, "+= String.fromCharCode") {
+				t.Fatalf("string conversion uses a shadowable target intrinsic:\n%s", printed)
 			}
 			if got := strings.Count(
 				printed,

@@ -161,6 +161,14 @@ func BytesStringSummary() int32 {
 		int32(text[1])
 }
 
+func String(value string) string {
+	return value
+}
+
+func ShadowedStringIntrinsic() string {
+	return string([]byte{'A'}) + String("B")
+}
+
 func RunesStringSummary() int32 {
 	text := string([]rune{'A', 'é', '😀'})
 	return int32(len(text))*100000000 +

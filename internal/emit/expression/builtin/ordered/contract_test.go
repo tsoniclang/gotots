@@ -26,9 +26,14 @@ func TestOrderedBuiltinASTAndDemandDefinitionsAreExact(t *testing.T) {
 		t.Fatalf("number max = %T, want call", numberMax)
 	}
 	numberMember := numberCall.Expression().(tsgo.PropertyAccessExpression)
-	if numberMember.Expression().(tsgo.Identifier).Text() != "Math" ||
+	mathMember, ok := numberMember.Expression().(tsgo.PropertyAccessExpression)
+	if !ok ||
+		mathMember.Expression().(tsgo.Identifier).Text() !=
+			api.TargetGlobalAnchorName ||
+		mathMember.Name().(tsgo.Identifier).Text() !=
+			api.TargetIntrinsicMath.String() ||
 		numberMember.Name().(tsgo.Identifier).Text() != "max" {
-		t.Fatal("number max does not call Math.max")
+		t.Fatal("number max does not call globalThis.Math.max")
 	}
 	if _, ok := returnExpression(
 		t,
@@ -72,8 +77,8 @@ func TestOrderedBuiltinASTAndDemandDefinitionsAreExact(t *testing.T) {
 		"goIntegerMin",
 		"goStringMax",
 		"goStringMin",
-		"Math.max",
-		"Math.min",
+		"globalThis.Math.max",
+		"globalThis.Math.min",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("ordered artifact lacks %q:\n%s", required, printed)

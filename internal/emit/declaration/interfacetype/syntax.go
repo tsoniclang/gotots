@@ -10,6 +10,7 @@ func contractDeclaration(
 	name string,
 	modifiers []tsgo.ModifierLike,
 	tokens []tsgo.Expression,
+	object tsgo.Expression,
 ) tsgo.VariableStatement {
 	return factory.VariableStatement(
 		modifiers,
@@ -21,7 +22,7 @@ func contractDeclaration(
 					readonlyObjectArray(factory),
 					factory.CallExpression(
 						factory.PropertyAccessExpression(
-							factory.Identifier("Object"),
+							object,
 							nil,
 							factory.Identifier("freeze"),
 							tsgo.NodeFlagsNone,

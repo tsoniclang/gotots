@@ -299,6 +299,7 @@ func TestWaveEightStateGotoCompilesThroughPublicPipeline(t *testing.T) {
 		"GotoVoidAudit":                 true,
 		"GotoWithDefer":                 true,
 		"LabeledControl":                true,
+		"NestedNonBreakableLabel":       true,
 	}
 	for _, root := range roots {
 		if names[root.Object().Name()] {
@@ -337,6 +338,7 @@ import {
     GotoVoidAudit,
     GotoWithDefer,
     LabeledControl,
+    NestedNonBreakableLabel,
 } from "`+artifacts.sourceModule+`";
 
 console.log(
@@ -363,6 +365,7 @@ console.log(
     String(FallthroughLoopControl(5)),
     String(FallthroughReturn(0)),
     String(FallthroughReturn(2)),
+    String(NestedNonBreakableLabel(1, 5)),
 );
 `)
 	writeProgramFile(
@@ -582,6 +585,7 @@ func main() {
 		values.FallthroughLoopControl(5),
 		values.FallthroughReturn(0),
 		values.FallthroughReturn(2),
+		values.NestedNonBreakableLabel(1, 5),
 	)
 }
 `)

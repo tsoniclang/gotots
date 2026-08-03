@@ -54,7 +54,7 @@ func CopyString(
 	))
 	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
 		character = context.Factory().CallExpression(
-			context.Factory().Identifier("BigInt"),
+			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{character},
@@ -81,7 +81,11 @@ func CopyString(
 			tsgo.NodeFlagsConst,
 			countName,
 			context.Factory().CallExpression(
-				sliceProperty(context, context.Factory().Identifier("Math"), "min"),
+				sliceProperty(
+					context,
+					api.TargetIntrinsicMath.Expression(context.Factory()),
+					"min",
+				),
 				nil,
 				nil,
 				[]tsgo.Expression{

@@ -332,7 +332,6 @@ func storageMembers(
 		}
 		getter, setter, fieldRequests, err := storageFieldMembers(
 			context,
-			source,
 			selected,
 		)
 		if err != nil {

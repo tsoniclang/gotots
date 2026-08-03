@@ -53,6 +53,50 @@ func TestFallthroughReturnHasExactUnreachableEndGuard(t *testing.T) {
 	}
 }
 
+func TestNonBreakableSourceLabelIsEmittedOnce(t *testing.T) {
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: waveEightControlDirectory(),
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := emit.NewRoot(
+		program.Roots()[0].Types().Scope().Lookup(
+			"NestedNonBreakableLabel",
+		),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(program, []emit.Root{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifacts := materializeArtifacts(t, emission, t.TempDir())
+	target := targetFunctionText(
+		t,
+		artifacts.printed,
+		"NestedNonBreakableLabel",
+	)
+	labelStart := strings.Index(target, "outer__label_")
+	if labelStart < 0 {
+		t.Fatalf("non-breakable source label is absent:\n%s", target)
+	}
+	labelEnd := strings.Index(target[labelStart:], ":")
+	if labelEnd < 0 {
+		t.Fatalf("non-breakable source label is malformed:\n%s", target)
+	}
+	label := target[labelStart : labelStart+labelEnd+1]
+	if count := strings.Count(target, label); count != 1 {
+		t.Fatalf(
+			"non-breakable source label occurrences = %d, want one:\n%s",
+			count,
+			target,
+		)
+	}
+}
+
 func waveEightControlDirectory() string {
 	return filepath.Join(
 		repositoryRoot(),

@@ -127,8 +127,8 @@ func TestLexicalReceiverMutationsFailStrictTypeScript(t *testing.T) {
 		},
 		{
 			className: "derivedRange",
-			useBefore: "$basis.derivedRange = $field1;",
-			useAfter:  "$basis.derivedRange = derivedRange;",
+			useBefore: "derivedRange: $field1.$value",
+			useAfter:  "derivedRange: derivedRange.$value",
 		},
 	} {
 		t.Run(testCase.className+"-factory-binding", func(t *testing.T) {

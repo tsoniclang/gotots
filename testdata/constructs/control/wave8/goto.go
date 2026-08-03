@@ -485,3 +485,34 @@ func FallthroughReturn(value int) int {
 		return 20
 	}
 }
+
+func NestedNonBreakableLabel(state, limit int) int {
+	total := 0
+	if state > 0 {
+		switch state {
+		case 1:
+			goto outer
+		case 2:
+			goto done
+		}
+	}
+	total++
+outer:
+	if total < limit {
+		switch total {
+		case 0:
+			total++
+		default:
+			total += 2
+		}
+		for total < limit && total < 3 {
+			total++
+			break
+		}
+	}
+done:
+	if total < limit {
+		total++
+	}
+	return total
+}
