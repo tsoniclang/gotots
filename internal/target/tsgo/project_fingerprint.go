@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 )
+
+const typeFlagUniqueESSymbol uint32 = 1 << 14
 
 type projectSymbolFingerprint struct {
 	Name       string                     `json:"name"`
@@ -50,11 +53,11 @@ func (e ProjectExport) TypeMember(name string) (ProjectMember, bool) {
 }
 
 func (m ProjectMember) Fingerprint() string {
-	if m.name == "" || m.typeString == "" || len(m.ownerKeys) == 0 {
+	if m.fingerprintName == "" || m.typeString == "" || len(m.ownerKeys) == 0 {
 		return ""
 	}
 	return fingerprintProjectSymbol(projectMemberFingerprint{
-		Name:   m.name,
+		Name:   m.fingerprintName,
 		Flags:  m.flags,
 		Type:   m.typeString,
 		Owners: slices.Clone(m.ownerKeys),
@@ -70,13 +73,122 @@ func visibleMemberFingerprints(
 			continue
 		}
 		result = append(result, projectMemberFingerprint{
-			Name:   member.name,
+			Name:   member.fingerprintName,
 			Flags:  member.flags,
 			Type:   member.typeString,
 			Owners: slices.Clone(member.ownerKeys),
 		})
 	}
+	sort.Slice(result, func(left int, right int) bool {
+		return result[left].Name < result[right].Name
+	})
 	return result
+}
+
+type projectComputedMemberKey struct {
+	Name   string   `json:"name"`
+	Owners []string `json:"owners"`
+}
+
+func (p *ProjectInspection) projectMemberFingerprintName(
+	displayName string,
+	handles []string,
+) (string, error) {
+	canonical := ""
+	computedDeclarations := 0
+	for _, handle := range handles {
+		key, found, err := p.projectComputedMemberKey(handle)
+		if err != nil {
+			return "", err
+		}
+		if !found {
+			continue
+		}
+		computedDeclarations++
+		selected := "computed:" + fingerprintProjectSymbol(key)
+		if canonical != "" && canonical != selected {
+			return "", fmt.Errorf("computed member declarations disagree")
+		}
+		canonical = selected
+	}
+	if canonical == "" {
+		return displayName, nil
+	}
+	if computedDeclarations != len(handles) {
+		return "", fmt.Errorf("computed member declarations are mixed")
+	}
+	return canonical, nil
+}
+
+func (p *ProjectInspection) projectComputedMemberKey(
+	handle string,
+) (projectComputedMemberKey, bool, error) {
+	declaration, _, sourcePath, err := parseProjectNodeHandle(handle)
+	if err != nil {
+		return projectComputedMemberKey{}, false, err
+	}
+	source, err := p.projectSourceEvidence(sourcePath)
+	if err != nil {
+		return projectComputedMemberKey{}, false, err
+	}
+	var computedName uint32
+	for _, child := range source.directChildren(declaration) {
+		if source.nodes[child].kind != uint32(SyntaxKindComputedPropertyName) {
+			continue
+		}
+		if computedName != 0 {
+			return projectComputedMemberKey{}, false, fmt.Errorf(
+				"declaration has multiple computed names",
+			)
+		}
+		computedName = child
+	}
+	if computedName == 0 {
+		return projectComputedMemberKey{}, false, nil
+	}
+	expressions := source.directChildren(computedName)
+	if len(expressions) != 1 {
+		return projectComputedMemberKey{}, false, fmt.Errorf(
+			"computed member name has %d expressions, want one",
+			len(expressions),
+		)
+	}
+	keyType, err := p.typeAtProjectNode(
+		sourcePath,
+		expressions[0],
+		"computed member key",
+	)
+	if err != nil {
+		return projectComputedMemberKey{}, false, err
+	}
+	if keyType.Flags&typeFlagUniqueESSymbol == 0 {
+		return projectComputedMemberKey{}, false, nil
+	}
+	keySymbol, err := p.symbolAtProjectNode(
+		sourcePath,
+		expressions[0],
+		"computed unique-symbol member key",
+	)
+	if err != nil {
+		return projectComputedMemberKey{}, false, err
+	}
+	declarations, err := projectDeclarationPaths(
+		sourcePath,
+		"computed unique-symbol member key",
+		keySymbol.Name,
+		keySymbol.Declarations,
+	)
+	if err != nil {
+		return projectComputedMemberKey{}, false, err
+	}
+	owners, err := projectOwnerKeys(declarations, filepath.Dir(p.config))
+	if err != nil {
+		return projectComputedMemberKey{}, false, err
+	}
+	return projectComputedMemberKey{
+		Name:   keySymbol.Name,
+		Owners: owners,
+	}, true, nil
 }
 
 func findProjectMember(

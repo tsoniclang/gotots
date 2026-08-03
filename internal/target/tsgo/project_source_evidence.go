@@ -11,6 +11,7 @@ import (
 type projectNodeEvidence struct {
 	kind   uint32
 	parent uint32
+	data   uint32
 }
 
 type projectSourceEvidence struct {
@@ -97,6 +98,9 @@ func decodeProjectSourceEvidence(
 			),
 			parent: binary.LittleEndian.Uint32(
 				raw[offset+nodeOffsetParent:],
+			),
+			data: binary.LittleEndian.Uint32(
+				raw[offset+nodeOffsetData:],
 			),
 		}
 		if nodes[index].parent >= uint32(nodeCount) {

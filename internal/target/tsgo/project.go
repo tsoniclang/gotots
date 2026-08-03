@@ -40,6 +40,8 @@ type ProjectExport struct {
 	declaredTypeID uint32
 	typeSymbolID   uint64
 	typeParameters int
+	exportHandles  []string
+	handles        []string
 	declarations   []string
 	ownerKeys      []string
 	valueMembers   []ProjectMember
@@ -345,6 +347,8 @@ func (p *ProjectInspection) projectExport(
 		declaredTypeID: typeResponseID(declaredType),
 		typeSymbolID:   preferredTypeSymbol(declaredType, targetType),
 		typeParameters: typeParameters,
+		exportHandles:  sortedStrings(symbol.Declarations),
+		handles:        sortedStrings(declarationHandles),
 		declarations:   declarations,
 		ownerKeys:      ownerKeys,
 		valueMembers:   valueMembers,

@@ -381,6 +381,14 @@ the provider ABI default. Removing that facet must fail strict typechecking at
 a callback parameter or result whose canonical interface representation
 differs from the provider representation.
 
+Certification separately mutates the provider facet itself: adding a
+constraint, removing or making the default non-callable, or wrapping the alias
+body must fail against pinned TS-Go AST/checker evidence. The effect certificate
+comes from the private default ABI while the alias remains polymorphic. An
+allocation-order mutation inserts an unrelated computed `unique symbol` member
+and must leave every unaffected provider fingerprint byte-identical even when
+TS-Go's diagnostic/display spelling changes.
+
 Mutations add a runtime policy object, omit/misroute a bridge, select by Go or
 target spelling, accept structural assignability without certification,
 duplicate a provider owner, append generic/recovery operations to the public

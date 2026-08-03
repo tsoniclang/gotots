@@ -245,8 +245,17 @@ func buildModule(
 			}
 		}
 		_, identityValue := definedValueIdentities[binding.Identity]
-		if binding.Kind == gostdlib.BindingFunction || identityValue {
+		if binding.Kind == gostdlib.BindingFunction {
 			binding.Effect, err = exportCallableEffect(
+				project,
+				target,
+				effectMarker,
+			)
+			if err != nil {
+				return gostdlib.ModuleDocument{}, err
+			}
+		} else if identityValue {
+			binding.Effect, err = exportCallableValueFacetEffect(
 				project,
 				target,
 				effectMarker,

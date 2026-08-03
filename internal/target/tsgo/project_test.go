@@ -87,6 +87,18 @@ export const state: { Count: number } = { Count: 0 };
 	markerPath := filepath.Join(projectDirectory, "effect-marker.ts")
 	writeProjectFile(t, markerPath, `export type AsyncEffectMarker = () => Promise<never>;
 `)
+	facetPath := filepath.Join(projectDirectory, "facets.ts")
+	writeProjectFile(t, facetPath, `type AsyncABI = (() => Promise<void>) | undefined;
+
+export type AsyncFacet<Value = AsyncABI> = Value;
+export type ConstrainedFacet<Value extends AsyncABI = AsyncABI> = Value;
+export type MissingDefaultFacet<Value> = Value;
+export type NonCallableDefaultFacet<Value = number> = Value;
+export type WrappedFacet<Value = AsyncABI> = [Value][0];
+`)
+	facetEntryPath := filepath.Join(projectDirectory, "facet-entry.ts")
+	writeProjectFile(t, facetEntryPath, `export { AsyncFacet } from "./facets.js";
+`)
 	renamedPath := filepath.Join(projectDirectory, "renamed.ts")
 	writeProjectFile(t, renamedPath, `export { Value as Other } from "./implementation.js";
 `)
@@ -235,6 +247,35 @@ export const state: { Count: number } = { Count: 0 };
 	if err != nil || asyncEffect != CallableEffectAsynchronous {
 		t.Fatalf("generic async effect = %v, %v", asyncEffect, err)
 	}
+	facetExports, err := project.Exports(facetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	asyncFacet := projectExportByName(t, facetExports, "AsyncFacet")
+	asyncEffect, err = project.CallableValueFacetEffect(asyncFacet, marker)
+	if err != nil || asyncEffect != CallableEffectAsynchronous {
+		t.Fatalf("async facet effect = %v, %v", asyncEffect, err)
+	}
+	reexportedFacets, err := project.Exports(facetEntryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reexportedFacet := projectExportByName(t, reexportedFacets, "AsyncFacet")
+	asyncEffect, err = project.CallableValueFacetEffect(reexportedFacet, marker)
+	if err != nil || asyncEffect != CallableEffectAsynchronous {
+		t.Fatalf("re-exported async facet effect = %v, %v", asyncEffect, err)
+	}
+	for _, name := range []string{
+		"ConstrainedFacet",
+		"MissingDefaultFacet",
+		"NonCallableDefaultFacet",
+		"WrappedFacet",
+	} {
+		selected := projectExportByName(t, facetExports, name)
+		if _, err := project.CallableValueFacetEffect(selected, marker); err == nil {
+			t.Fatalf("malformed callable facet %s was accepted", name)
+		}
+	}
 	syncEffect, err := project.CallableEffect(sync, marker)
 	if err != nil || syncEffect != CallableEffectSynchronous {
 		t.Fatalf("sync effect = %v, %v", syncEffect, err)
@@ -294,6 +335,75 @@ func TestDeclarationPathRejectsMalformedHandles(t *testing.T) {
 	}
 	if path, ok := declarationPath("12.34./project/source.ts"); !ok || path != "/project/source.ts" {
 		t.Fatalf("declaration path = %q, %t", path, ok)
+	}
+}
+
+func TestProjectFingerprintCanonicalizesComputedUniqueSymbolKeys(t *testing.T) {
+	fingerprint := func(prefix string) (string, string) {
+		t.Helper()
+		directory := t.TempDir()
+		writeProjectFile(t, filepath.Join(directory, "tsconfig.json"), `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true
+  },
+  "include": ["*.ts"]
+}
+`)
+		implementation := filepath.Join(directory, "implementation.ts")
+		writeProjectFile(t, implementation, prefix+`
+export const ProfileNameKey: unique symbol = Symbol("profile-name");
+export class Profile {
+  readonly [ProfileNameKey]: string = "profile";
+}
+`)
+		client, err := StartClient(repositoryRoot(), directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			if err := client.Close(); err != nil {
+				t.Errorf("close client: %v", err)
+			}
+		})
+		project, err := client.OpenProject(filepath.Join(directory, "tsconfig.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		exports, err := project.Exports(implementation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		profile := projectExportByName(t, exports, "Profile")
+		members := profile.TypeMembers()
+		if len(members) != 1 {
+			t.Fatalf("Profile members = %#v", members)
+		}
+		return profile.Fingerprint(), members[0].Name()
+	}
+
+	baselineFingerprint, baselineDisplay := fingerprint("")
+	shiftedFingerprint, shiftedDisplay := fingerprint(
+		`export const EarlierKey: unique symbol = Symbol("earlier");
+export class Earlier {
+  readonly [EarlierKey]: string = "earlier";
+}
+`,
+	)
+	if baselineDisplay == shiftedDisplay {
+		t.Fatalf(
+			"unique-symbol allocation-order control did not change display spelling %q",
+			baselineDisplay,
+		)
+	}
+	if baselineFingerprint != shiftedFingerprint {
+		t.Fatalf(
+			"computed unique-symbol fingerprint drifted: %s != %s",
+			baselineFingerprint,
+			shiftedFingerprint,
+		)
 	}
 }
 

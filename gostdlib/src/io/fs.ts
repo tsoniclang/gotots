@@ -128,7 +128,7 @@ type WalkDirFuncABI = ((
 ) => Promise<GoError | undefined>) | undefined;
 
 export type WalkDirFunc<
-  $Value extends WalkDirFuncABI = WalkDirFuncABI,
+  $Value = WalkDirFuncABI,
 > = $Value;
 
 export const state: {

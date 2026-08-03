@@ -15,15 +15,16 @@ const (
 )
 
 type ProjectMember struct {
-	name         string
-	symbolID     uint64
-	flags        uint32
-	typeString   string
-	typeID       uint32
-	handles      []string
-	declarations []string
-	ownerKeys    []string
-	access       ProjectMemberAccess
+	name            string
+	fingerprintName string
+	symbolID        uint64
+	flags           uint32
+	typeString      string
+	typeID          uint32
+	handles         []string
+	declarations    []string
+	ownerKeys       []string
+	access          ProjectMemberAccess
 }
 
 func (m ProjectMember) Name() string {
@@ -209,16 +210,28 @@ func (p *ProjectInspection) projectMember(
 			Reason:    "member " + symbol.Name + " " + err.Error(),
 		}
 	}
+	fingerprintName, err := p.projectMemberFingerprintName(
+		symbol.Name,
+		symbol.Declarations,
+	)
+	if err != nil {
+		return ProjectMember{}, &ProjectInspectionError{
+			Operation: operation,
+			Path:      sourcePath,
+			Reason:    "member " + symbol.Name + " " + err.Error(),
+		}
+	}
 	return ProjectMember{
-		name:         symbol.Name,
-		symbolID:     symbol.ID,
-		flags:        symbol.Flags,
-		typeString:   typeString,
-		typeID:       selectedType.ID,
-		handles:      sortedStrings(symbol.Declarations),
-		declarations: declarations,
-		ownerKeys:    ownerKeys,
-		access:       access,
+		name:            symbol.Name,
+		fingerprintName: fingerprintName,
+		symbolID:        symbol.ID,
+		flags:           symbol.Flags,
+		typeString:      typeString,
+		typeID:          selectedType.ID,
+		handles:         sortedStrings(symbol.Declarations),
+		declarations:    declarations,
+		ownerKeys:       ownerKeys,
+		access:          access,
 	}, nil
 }
 

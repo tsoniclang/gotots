@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "0103e9e12c1023a958dffa21518b22f0ef4bb5e9239d35f7fb767c99582b7038",
-  "providerDigest": "51d48c6e75825ad5a85f57e2d0518cce168929736ca692b43f4ba843cb672f1d",
+  "providerDigest": "ce68d8b8aff51c24bc74f6905177322de7ae5c821b5e194ee843eeffd3abef9e",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -6512,7 +6512,7 @@
           "sourceSignature": "defined=runtime/pprof.Profile|underlying=struct{name string; mu sync.Mutex; m map[any][]uintptr; count func() int; write func(io.Writer, int) error}",
           "sourceLocation": "runtime/pprof/pprof.go:174:6",
           "implementationOwner": "src/runtime/pprof.ts",
-          "targetFingerprint": "5798232ac8ecce3608001c77ce23e1bb39e1e5ec09f0549b724d96c8bfe0edbe"
+          "targetFingerprint": "5a6ca29b4b63eb99c82b0797ea1b4865780e4d9721e17a863387d6d0061f8a0a"
         },
         {
           "identity": "runtime/pprof|kind=4|receiver=*runtime/pprof.Profile|name=WriteTo",
@@ -25704,5 +25704,5 @@
       ]
     }
   ],
-  "manifestDigest": "636f15a9d68dfd83e9e7495ee2195ed03d2fd04f3c1fa6f9f7d34fb5041ed9fb"
+  "manifestDigest": "189a1b36cbcb4473a7368f71b50d960c0ebbe1c1778a2cbe18716a20b466a473"
 }

@@ -530,6 +530,24 @@ export's private ABI default is never a generated-source annotation. This
 keeps values as ordinary functions while allowing a static adapter exactly at
 a provider crossing when parameter or result representations differ.
 
+The certified provider form is exactly one unconstrained identity facet with a
+callable default:
+
+```ts
+export type WalkDirFunc<Value = PrivateWalkDirABI> = Value;
+```
+
+The pinned TS-Go AST must prove one type parameter, no constraint or expression,
+one default type, and a type-alias body resolving to that same parameter. The
+TS-Go checker derives the provider effect from the default ABI, not from the
+polymorphic alias. A constraint, absent/non-callable default, or wrapped alias
+body fails certification rather than narrowing the canonical generated value.
+
+Provider fingerprints use semantic member identities. A public computed
+`unique symbol` member is keyed by the checker-resolved symbol and its project
+owner; TS-Go's allocation-dependent display spelling is never persisted as
+contract identity.
+
 A provider recovery facet is an optional closed certificate for one exact Go
 callable. Presence selects that provider's private recovery-aware entry for a
 deferred call. Absence selects the ordinary source-shaped entry; it is not an

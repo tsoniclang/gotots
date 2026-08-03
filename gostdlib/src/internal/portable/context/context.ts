@@ -177,10 +177,10 @@ type CancelCauseFuncABI = ((
   ) => Promise<void>) | undefined;
 
 export type CancelFunc<
-  $Value extends CancelFuncABI = CancelFuncABI,
+  $Value = CancelFuncABI,
 > = $Value;
 export type CancelCauseFunc<
-  $Value extends CancelCauseFuncABI = CancelCauseFuncABI,
+  $Value = CancelCauseFuncABI,
 > = $Value;
 
 export function Background(): Context {
