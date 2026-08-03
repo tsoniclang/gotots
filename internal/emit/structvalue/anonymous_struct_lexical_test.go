@@ -195,7 +195,7 @@ func compileLexicalArtifactProgram(
 func nestedFunctionExpression(
 	t *testing.T,
 	outer tsgo.FunctionDeclaration,
-) tsgo.FunctionExpression {
+) tsgo.ArrowFunction {
 	t.Helper()
 	body := outer.Body().(tsgo.Block).Statements()
 	if len(body) == 0 {
@@ -209,7 +209,7 @@ func nestedFunctionExpression(
 	if len(declarations) != 1 {
 		t.Fatalf("nested function declarations = %d", len(declarations))
 	}
-	inner, ok := declarations[0].Initializer().(tsgo.FunctionExpression)
+	inner, ok := declarations[0].Initializer().(tsgo.ArrowFunction)
 	if !ok {
 		t.Fatalf("nested function initializer = %T", declarations[0].Initializer())
 	}
@@ -260,7 +260,7 @@ func assertPackageInitializerLexicalPlacement(
 	emission emit.ProgramEmission,
 ) {
 	t.Helper()
-	var initializers []tsgo.FunctionExpression
+	var initializers []tsgo.ArrowFunction
 	for _, file := range emission.Files() {
 		if file.Kind() != emit.TargetFilePackageAssembly {
 			continue
@@ -310,9 +310,9 @@ func assertPackageInitializerLexicalPlacement(
 
 func initializerFunctionExpression(
 	expression tsgo.Expression,
-) tsgo.FunctionExpression {
+) tsgo.ArrowFunction {
 	switch expression := expression.(type) {
-	case tsgo.FunctionExpression:
+	case tsgo.ArrowFunction:
 		return expression
 	case tsgo.BinaryExpression:
 		return initializerFunctionExpression(expression.Right())
@@ -384,17 +384,16 @@ func mutateNestedAnonymousClassToFunctionTop(
 			outerStatements := outerBody.Statements()
 			variable := outerStatements[0].(tsgo.VariableStatement)
 			declaration := variable.DeclarationList().Declarations()[0]
-			inner := declaration.Initializer().(tsgo.FunctionExpression)
+			inner := declaration.Initializer().(tsgo.ArrowFunction)
 			innerBody := inner.Body().(tsgo.Block)
 			innerStatements := innerBody.Statements()
 			anonymous := innerStatements[1].(tsgo.ClassDeclaration)
-			inner = factory.FunctionExpression(
+			inner = factory.ArrowFunction(
 				inner.Modifiers(),
-				inner.AsteriskToken(),
-				inner.Name(),
 				inner.TypeParameters(),
 				inner.Parameters(),
 				inner.Type(),
+				inner.EqualsGreaterThanToken(),
 				factory.Block(
 					append(
 						[]tsgo.Statement{innerStatements[0]},

@@ -388,6 +388,20 @@ func PointerReceiverOnPointer(value int32) int32 {
 	return box.Count
 }
 
+func TypeSwitchPointerReceiver(value any) int32 {
+	switch selected := value.(type) {
+	case Box:
+		selected.Add(5)
+		return selected.Count
+	default:
+		return -1
+	}
+}
+
+func TypeSwitchPointerReceiverAudit(value int32) int32 {
+	return TypeSwitchPointerReceiver(Box{Count: value})
+}
+
 func NilPointerReceiver() bool {
 	var box *Box
 	return box.Nil()

@@ -154,13 +154,13 @@ func assertCallableScalingTree(t *testing.T, source tsgo.SourceFile, count int) 
 			continue
 		}
 		for _, declaration := range variables.DeclarationList().Declarations() {
-			if _, ok := declaration.Initializer().(tsgo.FunctionExpression); ok {
+			if _, ok := declaration.Initializer().(tsgo.ArrowFunction); ok {
 				literals++
 			}
 		}
 	}
 	if literals != count {
-		t.Fatalf("Nested function expressions = %d, want %d", literals, count)
+		t.Fatalf("Nested arrow functions = %d, want %d", literals, count)
 	}
 
 	run := targetFunction(t, source, "Run")

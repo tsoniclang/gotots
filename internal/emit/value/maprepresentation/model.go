@@ -114,6 +114,32 @@ func (m Model) StoreReceiver(
 	return m.defined.Project(context, value)
 }
 
+func (m Model) TransferKey(
+	context api.Context,
+	source ast.Expr,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if m.source == nil || source == nil {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "map key transfer input is invalid",
+		}
+	}
+	sourceType := context.TypesInfo().TypeOf(source)
+	if sourceType == nil || !types.AssignableTo(sourceType, m.Key()) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return context.Values().Transfer(
+		context,
+		source,
+		sourceType,
+		m.Key(),
+		api.ValueTransferRepresentation,
+		value,
+	)
+}
+
 func (m Model) WrapConverted(
 	context api.Context,
 	value api.ExpressionEmission,

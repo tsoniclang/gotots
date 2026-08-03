@@ -79,13 +79,12 @@ func Emit(
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}
 	ordinary := api.DirectExpression(
-		context.Factory().FunctionExpression(
+		context.Factory().ArrowFunction(
 			modifiers,
-			nil,
-			nil,
 			nil,
 			parameters,
 			resultType,
+			context.Factory().EqualsGreaterThanToken(),
 			body.Value(),
 		),
 		api.CombineRequests(
@@ -203,16 +202,15 @@ func emitDeferredLiteral(
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}
 	return api.DirectExpression(
-		context.Factory().FunctionExpression(
+		context.Factory().ArrowFunction(
 			modifiers,
-			nil,
-			nil,
 			nil,
 			append(
 				[]tsgo.ParameterDeclaration{recovery},
 				targetSignature.Parameters()...,
 			),
 			resultType,
+			context.Factory().EqualsGreaterThanToken(),
 			body.Value(),
 		),
 		api.CombineRequests(

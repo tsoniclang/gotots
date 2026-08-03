@@ -59,7 +59,7 @@ func TestNamedResultsOwnZerosAndBareReturns(t *testing.T) {
 	nested := targetFunction(t, targetFile, "Nested")
 	declaration := nested.Body().(tsgo.Block).Statements()[1].(tsgo.VariableStatement)
 	literal := declaration.DeclarationList().Declarations()[0].
-		Initializer().(tsgo.FunctionExpression)
+		Initializer().(tsgo.ArrowFunction)
 	literalStatements := literal.Body().(tsgo.Block).Statements()
 	if len(literalStatements) != 3 {
 		t.Fatalf("nested literal statements = %d, want own zero, store, and return", len(literalStatements))

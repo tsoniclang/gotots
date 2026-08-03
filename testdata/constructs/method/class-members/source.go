@@ -9,6 +9,7 @@ func Audit() []int32 {
 	expression := Counter.Bump
 	expressionResult := expression(counter)
 	beforeReset := counter.Read()
+	captured := counter.Capture()
 	counter.Reset(9)
 	return []int32{
 		direct,
@@ -17,6 +18,7 @@ func Audit() []int32 {
 		secondBound,
 		expressionResult,
 		beforeReset,
+		captured,
 		counter.Value,
 	}
 }

@@ -308,7 +308,7 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 	unbuffered := waveNineFunctionText(t, printed, "Unbuffered")
 	for _, required := range []string{
 		"export async function Unbuffered(): Promise<int32>",
-		"async function (): Promise<void>",
+		"async (): Promise<void> =>",
 		"GoScheduler.spawn(async (): Promise<void>",
 		"await __gotots_callee_",
 	} {

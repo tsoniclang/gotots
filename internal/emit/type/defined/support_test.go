@@ -115,6 +115,10 @@ func main() {
 	fmt.Println(values.IntFromCount(values.CountWithLiteral(values.CountFromInt(5))))
 	fmt.Println(values.IntFromCount(values.CountVariableShift(values.OtherFromCount(values.CountFromInt(3)))))
 	fmt.Println(values.IntFromCount(values.CountVariableShiftUpdate(values.OtherFromCount(values.CountFromInt(4)))))
+	fmt.Println(
+		values.IntFromCount(values.CountShiftUntyped(values.CountFromInt(1))),
+		values.IntFromCount(values.CountShiftTyped(values.CountFromInt(2))),
+	)
 	fmt.Println(values.IntFromCount(values.FoldedCount()))
 	fmt.Println(values.LocalTypes(6))
 	fmt.Println(values.IntFromCount(values.CountUpdate(values.CountFromInt(4))))
@@ -194,6 +198,7 @@ console.log(String(values.IntFromCount(values.UntypedConstantValue())));
 console.log(String(values.IntFromCount(values.CountWithLiteral(values.CountFromInt(5` + suffix + `)))));
 console.log(String(values.IntFromCount(values.CountVariableShift(values.OtherFromCount(values.CountFromInt(3` + suffix + `))))));
 console.log(String(values.IntFromCount(values.CountVariableShiftUpdate(values.OtherFromCount(values.CountFromInt(4` + suffix + `))))));
+console.log(String(values.IntFromCount(values.CountShiftUntyped(values.CountFromInt(1` + suffix + `)))), String(values.IntFromCount(values.CountShiftTyped(values.CountFromInt(2` + suffix + `)))));
 console.log(String(values.IntFromCount(values.FoldedCount())));
 console.log(String(values.LocalTypes(6` + suffix + `)));
 console.log(String(values.IntFromCount(values.CountUpdate(values.CountFromInt(4` + suffix + `)))));

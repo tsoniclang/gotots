@@ -36,6 +36,7 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 		"export class Box",
 		"static Add(box:",
 		"static Nil(box:",
+		"selected$storage",
 	} {
 		if !strings.Contains(target, required) {
 			t.Fatalf("addressable pointer artifact lacks %q:\n%s", required, target)
@@ -98,6 +99,7 @@ import {
     Parameter,
     PointerReceiverOnPointer,
     PointerReceiverOnValue,
+	TypeSwitchPointerReceiverAudit,
     PointerField,
     PointerToPointer,
     ProjectionDoesNotRetarget,
@@ -177,6 +179,7 @@ try {
 }
 console.log(PointerReceiverOnValue(80));
 console.log(PointerReceiverOnPointer(90));
+console.log(TypeSwitchPointerReceiverAudit(95));
 try {
     Box.Add(undefined, 1);
     console.log(false);
@@ -434,6 +437,7 @@ func main() {
     fmt.Println(panicked)
     fmt.Println(pointer.PointerReceiverOnValue(80))
     fmt.Println(pointer.PointerReceiverOnPointer(90))
+	fmt.Println(pointer.TypeSwitchPointerReceiverAudit(95))
     pointerReceiverPanicked := false
     func() {
         defer func() {

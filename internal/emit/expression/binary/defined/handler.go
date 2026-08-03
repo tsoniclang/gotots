@@ -156,8 +156,10 @@ func operand(
 		}
 	}
 	expected := sourceType
+	projectContextual := false
 	if types.AssignableTo(sourceType, model.Type()) {
 		expected = model.Type()
+		projectContextual = true
 	}
 	target, err := children.Expression(
 		context.WithExpectedType(expected),
@@ -168,6 +170,8 @@ func operand(
 	}
 	if sourceModel, ok := definedtype.ResolveBasic(sourceType); ok {
 		target, err = sourceModel.Project(context, target)
+	} else if projectContextual {
+		target, err = model.Project(context, target)
 	}
 	return target, err
 }

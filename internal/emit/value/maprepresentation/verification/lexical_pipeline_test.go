@@ -128,7 +128,7 @@ func assertLexicalMapArtifacts(
 	}
 	if !strings.Contains(
 		source[nestedLiteralStart:],
-		"function (): int32 {\n        class Key",
+		"(): int32 => {\n        class Key",
 	) ||
 		!strings.Contains(
 			source[nestedLiteralStart:],
@@ -136,7 +136,7 @@ func assertLexicalMapArtifacts(
 		) {
 		t.Fatal("nested function-literal map class escaped its lexical body")
 	}
-	if !strings.Contains(assembly, "function (): int32 {\n        class Key") ||
+	if !strings.Contains(assembly, "(): int32 => {\n        class Key") ||
 		!strings.Contains(assembly, "class $goMap_") {
 		t.Fatal("package initializer map class escaped its function literal")
 	}

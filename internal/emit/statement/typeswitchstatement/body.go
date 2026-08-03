@@ -44,14 +44,6 @@ func emitCaseBody(
 		if err != nil {
 			return nil, nil, err
 		}
-		targetType, err := children.RepresentedType(
-			context.WithRole(api.RoleTypeSwitchBinding),
-			clause,
-			binding.Type(),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
 		initial := api.DirectExpression(value)
 		if len(typesInCase) == 1 && !typesInCase[0].nilCase {
 			if api.ContainsGenericTypeParameter(binding.Type()) {
@@ -90,6 +82,36 @@ func emitCaseBody(
 				clause,
 			)
 		}
+		targetName := name
+		var targetType tsgo.TypeNode
+		if storageName, addressable := context.AddressableStorage().Name(
+			context,
+			binding,
+		); addressable {
+			targetName = storageName
+			initial, err = context.AddressableStorage().Cell(
+				context.WithRole(api.RoleTypeSwitchBinding),
+				children,
+				clause,
+				binding.Type(),
+				initial,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+		} else {
+			represented, typeErr := children.RepresentedType(
+				context.WithRole(api.RoleTypeSwitchBinding),
+				clause,
+				binding.Type(),
+			)
+			if typeErr != nil {
+				return nil, nil, typeErr
+			}
+			targetType = represented.Value()
+			requests = append(requests, represented.Requests()...)
+		}
+		statements = append(statements, initial.Before()...)
 		statements = append(
 			statements,
 			context.Factory().VariableStatement(
@@ -97,9 +119,9 @@ func emitCaseBody(
 				context.Factory().VariableDeclarationList(
 					[]tsgo.VariableDeclaration{
 						context.Factory().VariableDeclaration(
-							context.Factory().Identifier(name),
+							context.Factory().Identifier(targetName),
 							nil,
-							targetType.Value(),
+							targetType,
 							initial.Value(),
 						),
 					},
@@ -107,7 +129,6 @@ func emitCaseBody(
 				),
 			),
 		)
-		requests = append(requests, targetType.Requests()...)
 		requests = append(requests, initial.Requests()...)
 	} else if context.TypesInfo().ImplicitOf(clause) != nil {
 		return nil, nil, api.Unsupported(

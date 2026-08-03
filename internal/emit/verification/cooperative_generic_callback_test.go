@@ -119,7 +119,7 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 	)
 	for _, required := range []string{
 		"export function SynchronousApply(",
-		"function (value: gostring): bool {",
+		"(value: gostring): bool => {",
 		"return Apply$concrete_",
 	} {
 		if !strings.Contains(synchronous, required) {
@@ -209,7 +209,7 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 	)
 	for _, required := range []string{
 		"=> Promise<T>",
-		"return async function",
+		"return async ():",
 	} {
 		if !strings.Contains(makeReceiver, required) {
 			t.Fatalf(
@@ -254,7 +254,7 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 		"export function FilterSequence$cooperative_",
 		"=> Promise<bool>",
 		"=> Promise<void>",
-		"async function",
+		"new Sequence(async (",
 	} {
 		if !strings.Contains(cooperativeFilterSequence, required) {
 			t.Fatalf(

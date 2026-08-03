@@ -232,7 +232,7 @@ func NativeUint16(value []byte) uint16 {
 		"export interface Signal",
 		"String(): Promise<gostring>;",
 		"WaitGroup_Go__from_sync",
-		"async function (): Promise<void>",
+		"async (): Promise<void> =>",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf(

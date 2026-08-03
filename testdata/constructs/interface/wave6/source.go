@@ -161,6 +161,7 @@ func equalityAndMaps() []int32 {
 	values[complexKey] = 70
 	values[arrayKey] = 80
 	values[nil] = 90
+	delete(values, Counter{Value: 3})
 
 	return []int32{
 		boolValue(first == same),

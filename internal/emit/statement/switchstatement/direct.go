@@ -14,6 +14,9 @@ func directEligible(
 	tag tagEmission,
 	clauses []clauseEmission,
 ) bool {
+	if tag.expressionless {
+		return false
+	}
 	equalityType := tag.sourceType
 	if tag.wrapped {
 		equalityType = tag.model.Underlying()

@@ -293,6 +293,12 @@ proves that doing so cannot change Go behavior; uncertainty retains the
 carrier. Representation is selected once and propagated to all users through
 observable facets.
 
+Storage demand is joined back to the declaration of every addressable binding,
+including parameters, locals, named results, range variables, and implicit
+type-switch case bindings. The binding owner emits the carrier; a later address
+or implicit pointer-receiver call may request it, but may never fabricate a
+carrier name at the use site.
+
 ### Interfaces
 
 An interface value is nil or a canonical dynamic-type token plus represented
@@ -392,6 +398,10 @@ use checker-selected target types and canonical interface metadata.
 
 Short-circuit arms, conditional branches introduced by translation, and
 function literals retain prerequisites inside the arm where Go evaluates them.
+Go function literals emit TypeScript arrow functions because Go closures have
+lexical receiver capture and no call-site-bound `this`. A JavaScript `function`
+expression is not an equivalent fallback: inside a native receiver method it
+would detach a captured Go receiver when passed as a callback.
 
 ## Statements And Control
 
@@ -420,6 +430,13 @@ The switch owner selects one clause, then executes ordered clause blocks under
 one break label; fallthrough advances to the next block without re-evaluating
 its case expressions. A Go `break` exits that label, while `continue` still
 targets the enclosing source loop.
+
+An expressionless Go switch whose case expressions have no prerequisites and
+whose clauses do not fall through emits an ordered `if`/`else if` chain inside
+that break label. It never emits `switch (true)`: TypeScript may incorrectly
+narrow a Go boolean mutated through a closure or a prior loop iteration to the
+literal `false`. Cases with prerequisites or fallthrough use the general
+single-selection lowering above, which preserves conditional evaluation.
 
 The selected Go checker proves that every result-bearing function has no
 reachable end. If exact target control lowering hides that proof from the

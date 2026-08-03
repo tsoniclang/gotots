@@ -9,10 +9,20 @@ func (counter Counter) Read() int32 {
 	return counter.Value
 }
 
+func (counter Counter) Capture() int32 {
+	return invoke(func() int32 {
+		return counter.Value
+	})
+}
+
 func (counter *Counter) Reset(value int32) {
 	counter.Value = value
 }
 
 func (counter Counter) unused() int32 {
 	return counter.Value + 99
+}
+
+func invoke(callback func() int32) int32 {
+	return callback()
 }
