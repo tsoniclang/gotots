@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	statementsequence "github.com/tsoniclang/gotots/internal/emit/statement/sequence"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -68,6 +69,10 @@ func EmitBody(
 	}
 	statements := append(parameterPrologue, prologue...)
 	statements = append(statements, body.Value().Statements()...)
+	if sourceSignature.Results().Len() != 0 &&
+		resultEndGuardRequired(statements) {
+		statements = append(statements, unreachableResultEnd(context))
+	}
 	return api.DirectBlock(
 		context.Factory().Block(statements, true),
 		api.CombineRequests(
@@ -76,6 +81,45 @@ func EmitBody(
 			body.Requests(),
 		)...,
 	), nil
+}
+
+func resultEndGuardRequired(statements []tsgo.Statement) bool {
+	if !statementsequence.FallsThrough(statements) || len(statements) == 0 {
+		return false
+	}
+	return !isNativeSwitch(statements[len(statements)-1])
+}
+
+func isNativeSwitch(statement tsgo.Statement) bool {
+	switch statement := statement.(type) {
+	case tsgo.SwitchStatement:
+		return true
+	case tsgo.LabeledStatement:
+		return isNativeSwitch(statement.Statement())
+	default:
+		return false
+	}
+}
+
+func unreachableResultEnd(context api.Context) tsgo.ThrowStatement {
+	factory := context.Factory()
+	return factory.ThrowStatement(
+		factory.NewExpression(
+			factory.PropertyAccessExpression(
+				factory.Identifier(api.TargetGlobalAnchorName),
+				nil,
+				factory.Identifier("Error"),
+				tsgo.NodeFlagsNone,
+			),
+			nil,
+			[]tsgo.Expression{
+				factory.StringLiteral(
+					"unreachable Go function end",
+					tsgo.TokenFlagsNone,
+				),
+			},
+		),
+	)
 }
 
 func namedResultPrologue(

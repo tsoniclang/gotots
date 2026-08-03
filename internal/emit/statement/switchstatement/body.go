@@ -13,6 +13,7 @@ func emitClauseBody(
 	source *ast.CaseClause,
 	allowFallthrough bool,
 	targetLabel string,
+	fallthroughLowering bool,
 ) ([]api.StatementEmission, bool, error) {
 	if source == nil {
 		return nil, false,
@@ -33,19 +34,32 @@ func emitClauseBody(
 		}
 		statements = append(statements, sourceStatement)
 	}
-	bodyContext := context.
-		WithRole(api.RoleSwitchCaseStatement).
-		EnterBreakable()
-	if context.CallableControl().Goto() {
+	bodyContext := context.WithRole(api.RoleSwitchCaseStatement)
+	if context.CallableControl().Goto() || fallthroughLowering {
 		bodyContext = context.
 			WithRole(api.RoleSwitchCaseStatement).
 			EnterBreakableTarget(targetLabel)
+	} else {
+		bodyContext = bodyContext.EnterBreakable()
 	}
 	target, err := children.Statements(bodyContext, source, statements)
 	if err != nil {
 		return nil, false, err
 	}
 	return []api.StatementEmission{target}, fallthroughIndex >= 0, nil
+}
+
+func requiresFallthroughLowering(source *ast.SwitchStmt) bool {
+	if source == nil || source.Body == nil {
+		return false
+	}
+	for _, node := range source.Body.List {
+		clause, ok := node.(*ast.CaseClause)
+		if ok && finalFallthrough(clause.Body) >= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func finalFallthrough(source []ast.Stmt) int {

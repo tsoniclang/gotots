@@ -23,6 +23,9 @@ func directEligible(
 		return false
 	}
 	for _, clause := range clauses {
+		if clause.fallsThrough {
+			return false
+		}
 		for _, expression := range clause.expressions {
 			if len(expression.Before()) != 0 {
 				return false

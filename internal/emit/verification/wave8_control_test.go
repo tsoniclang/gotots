@@ -277,6 +277,8 @@ func TestWaveEightStateGotoCompilesThroughPublicPipeline(t *testing.T) {
 	selected := roots[:0]
 	names := map[string]bool{
 		"FallthroughControl":            true,
+		"FallthroughLoopControl":        true,
+		"FallthroughReturn":             true,
 		"GotoDeferRange":                true,
 		"GotoDeferRangeAudit":           true,
 		"GotoFromRange":                 true,
@@ -316,6 +318,8 @@ func TestWaveEightStateGotoCompilesThroughPublicPipeline(t *testing.T) {
 	writeProgramFile(t, runner, `import "./program.js";
 import {
     FallthroughControl,
+    FallthroughLoopControl,
+    FallthroughReturn,
     GotoDeferRangeAudit,
     GotoFromRangeAudit,
     GotoNestedState,
@@ -356,6 +360,9 @@ console.log(
     String(LabeledControl(5)),
     String(FallthroughControl(1)),
     String(FallthroughControl(2)),
+    String(FallthroughLoopControl(5)),
+    String(FallthroughReturn(0)),
+    String(FallthroughReturn(2)),
 );
 `)
 	writeProgramFile(
@@ -572,6 +579,9 @@ func main() {
 		values.LabeledControl(5),
 		values.FallthroughControl(1),
 		values.FallthroughControl(2),
+		values.FallthroughLoopControl(5),
+		values.FallthroughReturn(0),
+		values.FallthroughReturn(2),
 	)
 }
 `)
@@ -581,15 +591,5 @@ func main() {
 		filepath.Join(runtime.GOROOT(), "bin", "go"),
 		"run",
 		".",
-	)
-}
-
-func waveEightControlDirectory() string {
-	return filepath.Join(
-		repositoryRoot(),
-		"testdata",
-		"constructs",
-		"control",
-		"wave8",
 	)
 }

@@ -450,3 +450,38 @@ func FallthroughControl(value int) int {
 	}
 	return value
 }
+
+func FallthroughLoopControl(limit int) int {
+	total := 0
+	for index := 0; index < limit; index++ {
+		switch index {
+		case 0:
+			total++
+			fallthrough
+		case 1:
+			total += 10
+			continue
+		case 2:
+			total += 100
+			break
+		default:
+			total += 1000
+			fallthrough
+		case 3:
+			total += 10000
+		}
+		total += 100000
+	}
+	return total
+}
+
+func FallthroughReturn(value int) int {
+	switch value {
+	case 0:
+		fallthrough
+	case 1:
+		return 10
+	default:
+		return 20
+	}
+}

@@ -95,7 +95,7 @@ func emitStateGoto(
 			statements = append(statements, emission.Statements()...)
 			requests = append(requests, emission.Requests()...)
 		}
-		if targetSequenceFallsThrough(statements) {
+		if FallsThrough(statements) {
 			statements = append(
 				statements,
 				stateTransition(

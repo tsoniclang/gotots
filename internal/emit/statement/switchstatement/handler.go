@@ -39,6 +39,15 @@ func Emit(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
+	fallthroughLowering := requiresFallthroughLowering(source)
+	if fallthroughLowering && targetLabel == "" {
+		targetLabel, err = context.Names().Temporary(
+			api.TemporaryControlTarget,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+	}
 	initializer, err := emitInitializer(context, children, source)
 	if err != nil {
 		return api.StatementEmission{}, err
@@ -53,6 +62,7 @@ func Emit(
 		source,
 		tag,
 		targetLabel,
+		fallthroughLowering,
 	)
 	if err != nil {
 		return api.StatementEmission{}, err
@@ -140,6 +150,7 @@ func emitClauses(
 	source *ast.SwitchStmt,
 	tag tagEmission,
 	targetLabel string,
+	fallthroughLowering bool,
 ) ([]clauseEmission, error) {
 	clauses := make([]clauseEmission, 0, len(source.Body.List))
 	defaultSeen := false
@@ -183,6 +194,7 @@ func emitClauses(
 			sourceClause,
 			index+1 < len(source.Body.List),
 			targetLabel,
+			fallthroughLowering,
 		)
 		if err != nil {
 			return nil, err

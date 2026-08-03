@@ -275,6 +275,12 @@ The integrated fixture covers:
 - labels, fallthrough, break/continue, structural and non-structural goto;
 - composition with loops, range, switches, and concurrency.
 
+Strict target compilation enables `noFallthroughCasesInSwitch`. A differential
+fixture covers fallthrough into a returning clause, fallthrough through a
+middle default, source `break`, and `continue` to an enclosing loop. Removing
+the callable's unreachable-end guard must restore a missing-return diagnostic;
+ordinary result functions ending in a direct return must not gain the guard.
+
 Signature inspection proves ordinary callable/function/interface/provider
 contracts contain no recovery parameter. Private deferred entries are present
 only for recover-capable callables. Typed registries exist only for demanded

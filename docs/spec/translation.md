@@ -387,6 +387,19 @@ lexical scopes and parent-assigned break/continue targets.
 - native target control is preferred when exact;
 - only non-structural goto uses the linear target state machine.
 
+An explicit Go `fallthrough` never becomes an implicit TypeScript case fall.
+The switch owner selects one clause, then executes ordered clause blocks under
+one break label; fallthrough advances to the next block without re-evaluating
+its case expressions. A Go `break` exits that label, while `continue` still
+targets the enclosing source loop.
+
+The selected Go checker proves that every result-bearing function has no
+reachable end. If exact target control lowering hides that proof from the
+TypeScript checker, the callable owner appends one unreachable `throw`; it does
+so only when the emitted target statement sequence can still fall through.
+The guard never changes the callable signature, returns a fabricated value, or
+introduces a runtime policy parameter.
+
 ### Defer, Panic, And Recover
 
 ```go
