@@ -2,7 +2,6 @@ package naming
 
 import (
 	"go/types"
-	"sort"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -77,21 +76,29 @@ func (n *File) ReflectionTypeOf(
 		}
 	}
 	registry := n.owner.registry
-	if registry.reflectionContract != nil &&
-		registry.reflectionContract != reflectionType {
-		return api.NameReference{}, &api.NameError{
-			Name:   reflectionType.Name(),
-			Reason: "reflection contract joined non-identical selected-Go types",
-		}
-	}
-	registry.reflectionContract = reflectionType
 	operations, err := n.ReflectionOperations(reflectionType)
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	readiness, err := n.ReflectionType(argumentType, reflectionType)
+	staticType, err := n.ReflectionType(argumentType, reflectionType)
 	if err != nil {
 		return api.NameReference{}, err
+	}
+	readiness := staticType.Requests()
+	if _, isInterface := types.Unalias(argumentType).Underlying().(*types.Interface); isInterface {
+		contract, key, contractErr := n.canonicalInterfaceContract(argumentType)
+		if contractErr != nil {
+			return api.NameReference{}, contractErr
+		}
+		dynamicReadiness, demandErr := registry.recordInterfaceReflectionDemand(
+			key,
+			contract,
+			reflectionType,
+		)
+		if demandErr != nil {
+			return api.NameReference{}, demandErr
+		}
+		readiness = api.CombineRequests(readiness, dynamicReadiness)
 	}
 	modulePath, err := output.ModuleSpecifier(
 		n.targetPath,
@@ -106,29 +113,9 @@ func (n *File) ReflectionTypeOf(
 	}
 	requests := api.CombineRequests(
 		operations.Requests(),
-		readiness.Requests(),
+		readiness,
 		[]api.RootRequest{initialize},
 	)
-	keys := make([]string, 0, len(registry.interfaceDynamicTypes))
-	for key := range registry.interfaceDynamicTypes {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		dynamic := registry.interfaceDynamicTypes[key]
-		sourceType, ok := dynamic.owner.InterfaceDynamicType()
-		if !ok {
-			return api.NameReference{}, &api.NameError{
-				Name:   dynamic.name,
-				Reason: "dynamic type has no canonical Go source type",
-			}
-		}
-		reflection, err := n.ReflectionType(sourceType, reflectionType)
-		if err != nil {
-			return api.NameReference{}, err
-		}
-		requests = append(requests, reflection.Requests()...)
-	}
 	return operations.WithRequests(api.CombineRequests(requests)...)
 }
 

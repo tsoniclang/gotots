@@ -280,6 +280,20 @@ differential test. Scaling holds call sites constant and bounds descriptor
 bytes/AST nodes by canonical types plus fields/methods, with no type-pair or
 call-site cross-product.
 
+Reachability tests exercise both discovery orders: adapter before reflection
+demand and reflection demand before adapter. They exact-join the descriptors
+against concrete adapters reaching the observed interface contract and prove
+that an adapter reaching only an unrelated contract emits no descriptor. A
+mutation restoring a compilation-wide dynamic-type sweep must fail the exact
+descriptor set and generated-byte bound.
+
+Descriptor-shape tests reject repeated default-valued properties, explicit
+top-level `[ordinal]` field indexes, and self-only relation arrays. They compare
+the provider-materialized defaults against Go for named/unnamed, exported/
+unexported, tagged/untagged, embedded, nonzero-offset, and non-comparable
+cases. Product evidence reports descriptor roots, recursive relation types,
+field records, descriptor bytes, and the largest descriptor module separately.
+
 ## Generic Proof
 
 Fixtures cover:

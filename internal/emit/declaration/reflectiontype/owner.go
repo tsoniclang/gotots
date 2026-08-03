@@ -105,20 +105,32 @@ func metadataExpression(
 	properties := []tsgo.ObjectLiteralElementLike{
 		stringProperty(factory, "identity", identity),
 		numberProperty(factory, "kind", int64(description.kind)),
-		stringProperty(factory, "name", description.name),
-		stringProperty(factory, "pkgPath", description.pkgPath),
+	}
+	if description.name != "" {
+		properties = append(properties, stringProperty(factory, "name", description.name))
+	}
+	if description.pkgPath != "" {
+		properties = append(properties, stringProperty(factory, "pkgPath", description.pkgPath))
+	}
+	properties = append(properties,
 		stringProperty(factory, "text", description.text),
 		numberProperty(factory, "size", description.size),
 		numberProperty(factory, "align", description.align),
-		numberProperty(factory, "fieldAlign", description.fieldAlign),
-		numberProperty(factory, "bits", description.bits),
-		booleanProperty(factory, "comparable", types.Comparable(sourceType)),
-		numberProperty(factory, "length", description.length),
-		numberProperty(factory, "chanDir", description.chanDir),
-		booleanProperty(factory, "variadic", description.variadic),
-		stringArrayProperty(factory, "assignableTo", []string{identity}),
-		stringArrayProperty(factory, "convertibleTo", []string{identity}),
-		stringArrayProperty(factory, "implements", []string{identity}),
+	)
+	if description.bits != 0 {
+		properties = append(properties, numberProperty(factory, "bits", description.bits))
+	}
+	if !types.Comparable(sourceType) {
+		properties = append(properties, booleanProperty(factory, "comparable", false))
+	}
+	if description.length != 0 {
+		properties = append(properties, numberProperty(factory, "length", description.length))
+	}
+	if description.chanDir != 0 {
+		properties = append(properties, numberProperty(factory, "chanDir", description.chanDir))
+	}
+	if description.variadic {
+		properties = append(properties, booleanProperty(factory, "variadic", true))
 	}
 	var requests []api.RootRequest
 	if interfaceDynamicType(sourceType) {
@@ -186,7 +198,6 @@ type typeDescription struct {
 	text       string
 	size       int64
 	align      int64
-	fieldAlign int64
 	bits       int64
 	length     int64
 	chanDir    int64
@@ -202,10 +213,9 @@ func describe(sizes types.Sizes, source types.Type) (typeDescription, error) {
 		return typeDescription{}, fmt.Errorf("describe reflection type: source is invalid")
 	}
 	result := typeDescription{
-		text:       types.TypeString(source, packageQualifier),
-		size:       sizes.Sizeof(source),
-		align:      int64(sizes.Alignof(source)),
-		fieldAlign: int64(sizes.Alignof(source)),
+		text:  types.TypeString(source, packageQualifier),
+		size:  sizes.Sizeof(source),
+		align: int64(sizes.Alignof(source)),
 	}
 	underlying := types.Unalias(source).Underlying()
 	if named, ok := types.Unalias(source).(*types.Named); ok && named.Obj() != nil {
@@ -323,25 +333,27 @@ func fieldMetadata(
 		if !field.Exported() && field.Pkg() != nil {
 			pkgPath = field.Pkg().Path()
 		}
-		fields = append(fields, factory.ObjectLiteralExpression(
-			[]tsgo.ObjectLiteralElementLike{
-				stringProperty(factory, "name", field.Name()),
-				stringProperty(factory, "pkgPath", pkgPath),
-				expressionProperty(
-					factory,
-					"type",
-					arrow(factory, targetType, reference.Expression(factory)),
-				),
-				stringProperty(factory, "tag", structType.Tag(index)),
-				numberProperty(factory, "offset", offsets[index]),
-				expressionProperty(factory, "index", factory.ArrayLiteralExpression(
-					[]tsgo.Expression{factory.NumericLiteral(strconv.Itoa(index), tsgo.TokenFlagsNone)},
-					false,
-				)),
-				booleanProperty(factory, "anonymous", field.Embedded()),
-			},
-			true,
-		))
+		properties := []tsgo.ObjectLiteralElementLike{
+			stringProperty(factory, "name", field.Name()),
+			expressionProperty(
+				factory,
+				"type",
+				arrow(factory, targetType, reference.Expression(factory)),
+			),
+		}
+		if pkgPath != "" {
+			properties = append(properties, stringProperty(factory, "pkgPath", pkgPath))
+		}
+		if tag := structType.Tag(index); tag != "" {
+			properties = append(properties, stringProperty(factory, "tag", tag))
+		}
+		if offsets[index] != 0 {
+			properties = append(properties, numberProperty(factory, "offset", offsets[index]))
+		}
+		if field.Embedded() {
+			properties = append(properties, booleanProperty(factory, "anonymous", true))
+		}
+		fields = append(fields, factory.ObjectLiteralExpression(properties, true))
 		requests = append(requests, reference.Requests()...)
 	}
 	return factory.ArrayLiteralExpression(fields, true), requests, nil
@@ -394,25 +406,6 @@ func booleanProperty(factory tsgo.Factory, name string, value bool) tsgo.Propert
 	)
 }
 
-func stringArrayProperty(
-	factory tsgo.Factory,
-	name string,
-	values []string,
-) tsgo.PropertyAssignment {
-	expressions := make([]tsgo.Expression, 0, len(values))
-	for _, value := range values {
-		expressions = append(expressions, factory.StringLiteral(value, tsgo.TokenFlagsNone))
-	}
-	return typedExpressionProperty(
-		factory,
-		name,
-		factory.ArrayTypeNode(
-			factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword),
-		),
-		factory.ArrayLiteralExpression(expressions, false),
-	)
-}
-
 func expressionProperty(
 	factory tsgo.Factory,
 	name string,
@@ -452,9 +445,6 @@ func arrow(
 		nil,
 		factory.TypeReferenceNode(returnType.EntityName(factory), nil),
 		factory.EqualsGreaterThanToken(),
-		factory.Block(
-			[]tsgo.Statement{factory.ReturnStatement(value)},
-			true,
-		),
+		factory.ParenthesizedExpression(value),
 	)
 }

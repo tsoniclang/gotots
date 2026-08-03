@@ -27,12 +27,12 @@ import { ProviderError } from "../../runtime/error.js";
 
 export interface RuntimeStructFieldMetadata {
   readonly name: gostring;
-  readonly pkgPath: gostring;
   readonly type: () => Type;
-  readonly tag: gostring;
-  readonly offset: uint64;
-  readonly index: readonly int64[];
-  readonly anonymous: bool;
+  readonly pkgPath?: gostring;
+  readonly tag?: gostring;
+  readonly offset?: uint64;
+  readonly index?: readonly int64[];
+  readonly anonymous?: bool;
 }
 
 export interface RuntimeMethodMetadata {
@@ -45,17 +45,16 @@ export interface RuntimeMethodMetadata {
 export interface RuntimeTypeMetadata {
   readonly identity: gostring;
   readonly kind: uint64;
-  readonly name: gostring;
-  readonly pkgPath: gostring;
   readonly text: gostring;
   readonly size: uint64;
   readonly align: int64;
-  readonly fieldAlign: int64;
-  readonly bits: int64;
-  readonly comparable: bool;
-  readonly length: int64;
-  readonly chanDir: int64;
-  readonly variadic: bool;
+  readonly name?: gostring;
+  readonly pkgPath?: gostring;
+  readonly bits?: int64;
+  readonly comparable?: bool;
+  readonly length?: int64;
+  readonly chanDir?: int64;
+  readonly variadic?: bool;
   readonly dynamicType?: GoInterfaceValue["$go$type"];
   readonly elem?: () => Type;
   readonly key?: () => Type;
@@ -63,9 +62,6 @@ export interface RuntimeTypeMetadata {
   readonly methods?: () => readonly RuntimeMethodMetadata[];
   readonly inputs?: () => readonly Type[];
   readonly outputs?: () => readonly Type[];
-  readonly assignableTo: readonly gostring[];
-  readonly convertibleTo: readonly gostring[];
-  readonly implements: readonly gostring[];
 }
 
 const runtimeTypeDynamicType = Object.freeze({ comparable: true });
@@ -111,15 +107,15 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   Align(): int64 { return this.metadata.align; }
 
   AssignableTo(target: Type | undefined): bool {
-    return target instanceof RuntimeType &&
-      this.metadata.assignableTo.includes(target.metadata.identity);
+    return this.identical(target);
   }
 
   Bits(): int64 {
-    if (this.metadata.bits === 0) {
+    const bits = this.metadata.bits ?? 0;
+    if (bits === 0) {
       return invalidTypeOperation(this.metadata.text, "Bits");
     }
-    return this.metadata.bits;
+    return bits;
   }
 
   CanSeq(): bool {
@@ -134,14 +130,13 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     if (this.metadata.kind !== 18) {
       return invalidTypeOperation(this.metadata.text, "ChanDir");
     }
-    return new ChanDir(this.metadata.chanDir);
+    return new ChanDir(this.metadata.chanDir ?? 0);
   }
 
-  Comparable(): bool { return this.metadata.comparable; }
+  Comparable(): bool { return this.metadata.comparable ?? true; }
 
   ConvertibleTo(target: Type | undefined): bool {
-    return target instanceof RuntimeType &&
-      this.metadata.convertibleTo.includes(target.metadata.identity);
+    return this.identical(target);
   }
 
   Elem(): Type | undefined {
@@ -154,10 +149,10 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     if (selected === undefined) {
       return invalidTypeOperation(this.metadata.text, "Field");
     }
-    return materializeField(selected);
+    return materializeField(selected, Number(index));
   }
 
-  FieldAlign(): int64 { return this.metadata.fieldAlign; }
+  FieldAlign(): int64 { return this.metadata.align; }
 
   FieldByIndex(index: RuntimeSlice<int64>): StructField {
     let current: Type = this;
@@ -173,12 +168,14 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   }
 
   FieldByName(name: gostring): [StructField, bool] {
-    const selected = this.structFields().find(
+    const fields = this.structFields();
+    const index = fields.findIndex(
       (field: RuntimeStructFieldMetadata): boolean => field.name === name,
     );
+    const selected = fields[index];
     return selected === undefined
       ? [zeroStructField(), false]
-      : [materializeField(selected), true];
+      : [materializeField(selected, index), true];
   }
 
   FieldByNameFunc(
@@ -187,12 +184,14 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     if (match === undefined) {
       return invalidTypeOperation(this.metadata.text, "FieldByNameFunc");
     }
-    const selected = this.structFields().find(
+    const fields = this.structFields();
+    const index = fields.findIndex(
       (field: RuntimeStructFieldMetadata): boolean => match(field.name),
     );
+    const selected = fields[index];
     return selected === undefined
       ? [zeroStructField(), false]
-      : [materializeField(selected), true];
+      : [materializeField(selected, index), true];
   }
 
   Fields(): Seq<StructField> {
@@ -200,21 +199,22 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     return new Seq<StructField>(
       async (yieldValue): Promise<void> => {
         if (yieldValue === undefined) return;
-        for (const field of fields) {
-          if (!await yieldValue(materializeField(field))) return;
+        for (let index = 0; index < fields.length; index++) {
+          const field = fields[index];
+          if (field !== undefined &&
+            !await yieldValue(materializeField(field, index))) return;
         }
       },
     );
   }
 
   Implements(target: Type | undefined): bool {
-    return target instanceof RuntimeType &&
-      this.metadata.implements.includes(target.metadata.identity);
+    return this.identical(target);
   }
 
   In(index: int64): Type | undefined { return sequenceAt(this.inputs(), index, "In"); }
   Ins(): Seq<Type | undefined> { return typeSequence(this.inputs()); }
-  IsVariadic(): bool { return this.metadata.variadic; }
+  IsVariadic(): bool { return this.metadata.variadic ?? false; }
 
   Key(): Type | undefined {
     return this.metadata.key?.() ?? invalidTypeOperation(this.metadata.text, "Key");
@@ -226,7 +226,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     if (this.metadata.kind !== 17) {
       return invalidTypeOperation(this.metadata.text, "Len");
     }
-    return this.metadata.length;
+    return this.metadata.length ?? 0;
   }
 
   Method(index: int64): Method {
@@ -258,7 +258,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     );
   }
 
-  Name(): gostring { return this.metadata.name; }
+  Name(): gostring { return this.metadata.name ?? ""; }
   NumField(): int64 { return this.structFields().length; }
   NumIn(): int64 { return this.inputs().length; }
   NumMethod(): int64 { return this.runtimeMethods().length; }
@@ -288,7 +288,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     return numeric < 0n || numeric >= (1n << BigInt(bits));
   }
 
-  PkgPath(): gostring { return this.metadata.pkgPath; }
+  PkgPath(): gostring { return this.metadata.pkgPath ?? ""; }
   Size(): uint64 { return this.metadata.size; }
   String(): gostring { return this.metadata.text; }
 
@@ -302,6 +302,11 @@ export class RuntimeType extends GoInterfaceValue implements Type {
       return invalidTypeOperation(this.metadata.text, "Field");
     }
     return this.metadata.fields ?? [];
+  }
+
+  private identical(target: Type | undefined): target is RuntimeType {
+    return target instanceof RuntimeType &&
+      this.metadata.identity === target.metadata.identity;
   }
 }
 
@@ -324,15 +329,18 @@ export function runtimeTypeOf(
     : runtimeTypesByDynamicType.get(value.$go$type);
 }
 
-function materializeField(field: RuntimeStructFieldMetadata): StructField {
+function materializeField(
+  field: RuntimeStructFieldMetadata,
+  ordinal: number,
+): StructField {
   return new StructField({
     Name: field.name,
-    PkgPath: field.pkgPath,
+    PkgPath: field.pkgPath ?? "",
     Type: field.type(),
-    Tag: new StructTag(field.tag),
-    Offset: field.offset,
-    Index: RuntimeSlice.literal([...field.index]),
-    Anonymous: field.anonymous,
+    Tag: new StructTag(field.tag ?? ""),
+    Offset: field.offset ?? 0,
+    Index: RuntimeSlice.literal([...(field.index ?? [ordinal])]),
+    Anonymous: field.anonymous ?? false,
   });
 }
 

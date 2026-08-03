@@ -6,6 +6,7 @@ import (
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -60,8 +61,26 @@ func emitReflectionTypeOf(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	argumentType := context.TypesInfo().TypeOf(source.Args[0])
+	if argumentType == nil {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if basic, ok := types.Unalias(argumentType).(*types.Basic); ok &&
+		basic.Kind() == types.UntypedNil {
+		zero, zeroErr := context.Values().Zero(
+			context,
+			source,
+			signature.Results().At(0).Type(),
+		)
+		return zero, true, zeroErr
+	}
+	if api.ContainsGenericTypeParameter(argumentType) {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	operations, err := names.ReflectionTypeOf(
-		signature.Params().At(0).Type(),
+		argumentType,
 		reflectionType.Obj(),
 	)
 	if err != nil {
@@ -116,8 +135,7 @@ func emitReflectionTypeFor(
 		return api.ExpressionEmission{}, false, nil
 	}
 	if discarded || detached || len(source.Args) != 0 ||
-		instance.TypeArgs.Len() != 1 ||
-		instance.TypeArgs.ContainsGenericTypeParameter() {
+		instance.TypeArgs.Len() != 1 {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -138,6 +156,22 @@ func emitReflectionTypeFor(
 		return api.ExpressionEmission{}, true, &api.ContextError{
 			Reason: "reflection names are unavailable",
 		}
+	}
+	if instance.TypeArgs.ContainsGenericTypeParameter() {
+		witnessType := types.NewPointer(instance.TypeArgs.At(0))
+		witness, err := context.Values().Zero(context, source, witnessType)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		emission, err := genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationReflectionType,
+			[]types.Type{witnessType},
+			[]types.Type{signature.Results().At(0).Type()},
+			[]api.ExpressionEmission{witness},
+		)
+		return emission, true, err
 	}
 	reference, err := names.ReflectionType(
 		instance.TypeArgs.At(0),

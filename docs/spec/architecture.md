@@ -381,6 +381,17 @@ body whose type argument is still open requests one private typed runtime-type
 operation through the existing generic concretization/capability owner; it does
 not attempt to recover an erased TypeScript type argument.
 
+Reflection visibility follows typed value reachability, not compilation-wide
+adapter existence. A static `TypeFor[T]` or concrete `TypeOf(value)` requests
+the exact concrete descriptor. A `TypeOf` or `ValueOf` whose operand has an
+interface type subscribes the existing canonical interface-contract demand;
+every concrete adapter that reaches that contract, whether discovered before
+or after the observation, requests its descriptor. Interface-to-interface
+transitions preserve that closure. An unrelated adapter must not acquire
+reflection metadata merely because the compilation contains another
+reflection call. A registry-wide descriptor sweep, source-spelling scan,
+points-to side model, and post-generation registration pass are forbidden.
+
 Portable `reflect.Type` and `reflect.Value` behavior belongs to the `reflect`
 provider implementation over those descriptors. Generated per-type adapters
 own typed access to represented values, fields, elements, maps, pointers, and
@@ -394,6 +405,17 @@ Metadata growth is linear in reached canonical types plus their actual
 fields/methods; it may not grow by type-pair, call-site, implementer, or package
 cross-product. An unsupported reflection operation fails at its closed
 operation owner rather than falling back to host reflection.
+
+The descriptor record is sparse but named: mandatory identity/kind/text/size/
+alignment facts are explicit, while closed contract defaults and absent
+kind-specific facts are omitted. A top-level struct-field ordinal is derived
+from its canonical field order unless an operation requires a different index
+path. Empty tags, package paths, zero offsets, and false embeddedness are not
+repeated. This is a source-size representation rule only; the provider exposes
+the complete Go reflection result. Per-type self-only assignability,
+convertibility, or implementation arrays are forbidden: those relations must
+be derived exactly from the canonical type graph when supported, or the
+operation must fail at its owner.
 
 ## Generics
 

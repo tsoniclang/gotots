@@ -66,6 +66,7 @@ const (
 	GenericOperationSliceFull
 	GenericOperationDeferredCallableRegistry
 	GenericOperationAppendSpread
+	GenericOperationReflectionType
 )
 
 var genericOperationIdentifiers = [...]string{
@@ -118,11 +119,12 @@ var genericOperationIdentifiers = [...]string{
 	GenericOperationSliceFull:                "slice_full",
 	GenericOperationDeferredCallableRegistry: "deferred_callable_registry",
 	GenericOperationAppendSpread:             "append_spread",
+	GenericOperationReflectionType:           "reflection_type",
 }
 
 func (o GenericOperation) Valid() bool {
 	return o >= GenericOperationZero &&
-		o <= GenericOperationAppendSpread
+		o <= GenericOperationReflectionType
 }
 
 func (o GenericOperation) Identifier() string {
@@ -196,6 +198,8 @@ func (o GenericOperation) String() string {
 		return "deferred-callable-registry"
 	case GenericOperationAppendSpread:
 		return "append-spread"
+	case GenericOperationReflectionType:
+		return "reflection-type"
 	default:
 		if source, ok := o.BinaryToken(); ok {
 			return "binary-" + source.String()

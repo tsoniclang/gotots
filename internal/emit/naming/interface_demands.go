@@ -100,6 +100,56 @@ func (r *Registry) recordInterfaceContractDemand(
 	return requests, nil
 }
 
+func (r *Registry) recordInterfaceReflectionDemand(
+	sourceKey string,
+	source *types.Interface,
+	reflectionType *types.TypeName,
+) ([]api.RootRequest, error) {
+	if r == nil || sourceKey == "" || source == nil ||
+		reflectionType == nil || reflectionType.IsAlias() {
+		return nil, &api.NameError{
+			Reason: "interface reflection demand is invalid",
+		}
+	}
+	if existing, ok := r.interfaceReflectionDemands[sourceKey]; ok {
+		if !types.Identical(existing.source, source) ||
+			existing.reflectionType != reflectionType {
+			return nil, &api.NameError{
+				Reason: "interface reflection key joined non-identical contracts",
+			}
+		}
+	} else {
+		r.interfaceReflectionDemands[sourceKey] = interfaceReflectionDemand{
+			source:         source,
+			reflectionType: reflectionType,
+		}
+	}
+	reached := r.interfaceAdaptersByContract[sourceKey]
+	adapterKeys := make([]string, 0, len(reached))
+	for adapterKey := range reached {
+		adapterKeys = append(adapterKeys, adapterKey)
+	}
+	sort.Strings(adapterKeys)
+	var requests []api.RootRequest
+	for _, adapterKey := range adapterKeys {
+		binding, ok := r.interfaceAdapters[adapterKey]
+		if !ok {
+			return nil, &api.NameError{
+				Reason: "interface reflection reachability has no adapter owner",
+			}
+		}
+		selected, err := r.interfaceAdapterReflectionRequest(
+			binding,
+			reflectionType,
+		)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, selected)
+	}
+	return requests, nil
+}
+
 func (r *Registry) interfaceAdapterContractRequests(
 	binding interfaceAdapterBinding,
 	directKey string,
@@ -191,6 +241,42 @@ func (r *Registry) interfaceAdapterContractRequests(
 			return nil, err
 		}
 		requests = append(requests, request)
+		if demand, ok := r.interfaceReflectionDemands[key]; ok {
+			reflection, reflectionErr := r.interfaceAdapterReflectionRequest(
+				binding,
+				demand.reflectionType,
+			)
+			if reflectionErr != nil {
+				return nil, reflectionErr
+			}
+			requests = append(requests, reflection)
+		}
 	}
 	return requests, nil
+}
+
+func (r *Registry) interfaceAdapterReflectionRequest(
+	binding interfaceAdapterBinding,
+	reflectionType *types.TypeName,
+) (api.RootRequest, error) {
+	if binding.owner == nil || binding.key == "" || reflectionType == nil {
+		return api.RootRequest{}, &api.NameError{
+			Reason: "interface adapter reflection owner is invalid",
+		}
+	}
+	sourceType, ok := binding.owner.InterfaceAdapterType()
+	if !ok {
+		return api.RootRequest{}, &api.NameError{
+			Reason: "interface adapter reflection owner has no source type",
+		}
+	}
+	reflection, err := r.internReflectionType(
+		binding.key,
+		sourceType,
+		reflectionType,
+	)
+	if err != nil {
+		return api.RootRequest{}, err
+	}
+	return api.NewReflectionTypeRequest(reflection.owner)
 }

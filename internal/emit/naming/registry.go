@@ -106,6 +106,11 @@ type interfaceContractDemand struct {
 	target *types.Interface
 }
 
+type interfaceReflectionDemand struct {
+	source         *types.Interface
+	reflectionType *types.TypeName
+}
+
 type genericCapabilityBinding struct {
 	owner *api.GeneratedArtifact
 	name  string
@@ -170,6 +175,7 @@ type Registry struct {
 	interfaceContracts                  map[string]*types.Interface
 	interfaceAdaptersByContract         map[string]map[string]struct{}
 	interfaceContractDemands            map[string]map[string]interfaceContractDemand
+	interfaceReflectionDemands          map[string]interfaceReflectionDemand
 	genericCapabilities                 map[string]genericCapabilityBinding
 	genericCapabilityNames              map[string]string
 	genericConcretizations              map[string]genericConcretizationBinding
@@ -181,7 +187,6 @@ type Registry struct {
 	pointerRepresentations              map[string]pointerRepresentationBinding
 	reflectionTypes                     map[string]reflectionTypeBinding
 	reflectionTypeNames                 map[string]string
-	reflectionContract                  *types.TypeName
 }
 
 func NewRegistry() *Registry {
@@ -214,6 +219,7 @@ func NewRegistry() *Registry {
 		interfaceContracts:                  make(map[string]*types.Interface),
 		interfaceAdaptersByContract:         make(map[string]map[string]struct{}),
 		interfaceContractDemands:            make(map[string]map[string]interfaceContractDemand),
+		interfaceReflectionDemands:          make(map[string]interfaceReflectionDemand),
 		genericCapabilities:                 make(map[string]genericCapabilityBinding),
 		genericCapabilityNames:              make(map[string]string),
 		genericConcretizations:              make(map[string]genericConcretizationBinding),

@@ -400,6 +400,8 @@ func emitValue(
 			)
 		}
 		return target, nil
+	case api.GenericOperationReflectionType:
+		return emitReflectionType(context, operation, signature, arguments)
 	case api.GenericOperationConstraintMethod:
 		return emitConstraintMethod(
 			context,
