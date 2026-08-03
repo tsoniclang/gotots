@@ -2,7 +2,7 @@ import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int64, uint8 } from "@gotots/runtime/scalars.js";
 
 import {
   Base64EncoderState,
@@ -39,8 +39,8 @@ export interface CanonicalWriteCloserAsync<
   Write(
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, Failure | undefined]>;
-  Close(recovery?: GoRecovery): Promise<Failure | undefined>;
+  ): Awaitable<[int64, Failure | undefined]>;
+  Close(recovery?: GoRecovery): Awaitable<Failure | undefined>;
 }
 
 export interface CanonicalWriteCloserSyncWriteAsyncClose<
@@ -49,8 +49,8 @@ export interface CanonicalWriteCloserSyncWriteAsyncClose<
   Write(
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): [int64, Failure | undefined];
-  Close(recovery?: GoRecovery): Promise<Failure | undefined>;
+  ): Awaitable<[int64, Failure | undefined]>;
+  Close(recovery?: GoRecovery): Awaitable<Failure | undefined>;
 }
 
 const canonicalBase64EncoderType = Object.freeze({ comparable: true });

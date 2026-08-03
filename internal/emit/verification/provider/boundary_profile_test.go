@@ -176,7 +176,7 @@ func main() {
 		)
 	}
 	for _, required := range []string{
-		"CanonicalReaderSync",
+		"CanonicalReaderAsync",
 		"await",
 		"ReadBytes",
 	} {
@@ -184,8 +184,8 @@ func main() {
 			t.Fatalf("stateful profile output lacks %q:\n%s", required, artifacts.printed)
 		}
 	}
-	if strings.Contains(artifacts.printed, "CanonicalReaderAsync") {
-		t.Fatalf("mixed profile selected asynchronous reader state:\n%s", artifacts.printed)
+	if strings.Contains(artifacts.printed, "CanonicalReaderSync") {
+		t.Fatalf("cooperative profile retained a synchronous reader permutation:\n%s", artifacts.printed)
 	}
 	if strings.Contains(artifacts.printed, "BufioReaderRead") {
 		t.Fatal("stateful reader adapter retained the ordinary recovery target")

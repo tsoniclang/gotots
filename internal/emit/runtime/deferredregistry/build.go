@@ -6,13 +6,11 @@ import (
 )
 
 const (
-	sourceType                    = "Source"
-	deferredType                  = "Deferred"
-	methodDeferredType            = "MethodDeferred"
-	cooperativeMethodDeferredType = "CooperativeMethodDeferred"
-	entriesMember                 = "$entries"
-	methodEntriesMember           = "$methodEntries"
-	cooperativeEntriesMember      = "$cooperativeMethodEntries"
+	sourceType          = "Source"
+	deferredType        = "Deferred"
+	methodDeferredType  = "MethodDeferred"
+	entriesMember       = "$entries"
+	methodEntriesMember = "$methodEntries"
 )
 
 func Build(
@@ -27,7 +25,6 @@ func Build(
 			typeParameter(factory, sourceType, objectType(factory)),
 			typeParameter(factory, deferredType, nil),
 			typeParameter(factory, methodDeferredType, nil),
-			typeParameter(factory, cooperativeMethodDeferredType, nil),
 		},
 		nil,
 		[]tsgo.ClassElement{
@@ -47,24 +44,6 @@ func Build(
 				api.DeferredRegistryResolveMethodName,
 				interfaceValueName,
 				methodDeferredType,
-			),
-			methodEntries(
-				factory,
-				cooperativeEntriesMember,
-				cooperativeMethodDeferredType,
-			),
-			registerMethod(
-				factory,
-				cooperativeEntriesMember,
-				api.DeferredRegistryRegisterCooperativeMethodName,
-				cooperativeMethodDeferredType,
-			),
-			resolveMethod(
-				factory,
-				cooperativeEntriesMember,
-				api.DeferredRegistryResolveCooperativeMethodName,
-				interfaceValueName,
-				cooperativeMethodDeferredType,
 			),
 		},
 	)

@@ -11,14 +11,9 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-type callableVariant struct {
-	profile *api.GenericCallableProfile
-}
-
 type callableVariantEmission struct {
 	statements []tsgo.Statement
 	member     tsgo.ClassElement
-	members    []tsgo.ClassElement
 	requests   []api.RootRequest
 }
 
@@ -37,61 +32,38 @@ func emitCallableVariants(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-	variants, err := selectCallableVariants(
+	facet, err := api.NewSourceCallableFacet(function)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	cooperative, err := cooperativeRequirement(
 		context,
-		function,
+		facet,
 		requirements,
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-	declarations := make([]tsgo.Statement, 0, len(variants))
-	members := make([]tsgo.ClassElement, 0, len(variants))
-	var requests []api.RootRequest
-	for _, variant := range variants {
-		facet, err := variant.facet(function)
-		if err != nil {
-			return api.DeclarationEmission{}, err
-		}
-		cooperative, err := cooperativeRequirement(
-			context,
-			facet,
-			requirements,
-		)
-		if err != nil {
-			return api.DeclarationEmission{}, err
-		}
-		variantContext := context.WithCooperativeCallable(
-			facet,
-			cooperative,
-		)
-		if variant.profile != nil {
-			variantContext = variantContext.
-				WithGenericCallableProfile(variant.profile)
-		}
-		target, err := emitCallableVariant(
-			variantContext,
-			children,
-			source,
-			function,
-			signature,
-			requirements,
-			variant,
-			cooperative,
-			kernel,
-		)
-		if err != nil {
-			return api.DeclarationEmission{}, err
-		}
-		declarations = append(declarations, target.statements...)
-		if target.member != nil {
-			members = append(members, target.member)
-		}
-		members = append(members, target.members...)
-		requests = append(requests, target.requests...)
+	target, err := emitCallableVariant(
+		context.WithCooperativeCallable(facet, cooperative),
+		children,
+		source,
+		function,
+		signature,
+		requirements,
+		cooperative,
+		kernel,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	declarations := target.statements
+	var members []tsgo.ClassElement
+	if target.member != nil {
+		members = append([]tsgo.ClassElement{target.member}, members...)
 	}
 	if signature.Recv() != nil {
-		if len(members) != len(variants) {
+		if len(members) != 1 {
 			return api.DeclarationEmission{}, &api.InvariantError{
 				Role:   context.Role(),
 				Reason: "receiver method lost its class-member form",
@@ -101,10 +73,10 @@ func emitCallableVariants(
 			api.MethodReceiverTypeName(function),
 			members,
 			declarations,
-			api.CombineRequests(requests),
+			api.CombineRequests(target.requests),
 		)
 	}
-	if len(members) != 0 || len(declarations) < len(variants) {
+	if len(members) != 0 || len(declarations) < 1 {
 		return api.DeclarationEmission{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "free function acquired a class-member form",
@@ -112,7 +84,7 @@ func emitCallableVariants(
 	}
 	return api.NewDeclarationEmission(
 		declarations,
-		api.CombineRequests(requests),
+		api.CombineRequests(target.requests),
 	)
 }
 
@@ -126,37 +98,6 @@ func genericKernelRequired(
 	return api.GenericKernelRequired(function, requirements)
 }
 
-func selectCallableVariants(
-	context api.Context,
-	function *types.Func,
-	requirements []api.DeclarationRequirement,
-) ([]callableVariant, error) {
-	ordered, err := api.SelectGenericCallableProfiles(
-		function,
-		requirements,
-	)
-	if err != nil {
-		return nil, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: err.Error(),
-		}
-	}
-	variants := make([]callableVariant, 1, len(ordered)+1)
-	for _, profile := range ordered {
-		variants = append(variants, callableVariant{profile: profile})
-	}
-	return variants, nil
-}
-
-func (v callableVariant) facet(
-	function *types.Func,
-) (api.CallableFacet, error) {
-	if v.profile != nil {
-		return api.NewGenericCallableProfileFacet(v.profile)
-	}
-	return api.NewSourceCallableFacet(function)
-}
-
 func emitCallableVariant(
 	context api.Context,
 	children api.ChildEmitter,
@@ -164,7 +105,6 @@ func emitCallableVariant(
 	function *types.Func,
 	signature *types.Signature,
 	requirements []api.DeclarationRequirement,
-	variant callableVariant,
 	cooperative bool,
 	kernel bool,
 ) (callableVariantEmission, error) {
@@ -205,10 +145,6 @@ func emitCallableVariant(
 	}
 	if err != nil {
 		return callableVariantEmission{}, err
-	}
-	if variant.profile != nil {
-		name += variant.profile.Suffix()
-		supportName += variant.profile.Suffix()
 	}
 	if kernel {
 		name += api.GenericKernelSuffix

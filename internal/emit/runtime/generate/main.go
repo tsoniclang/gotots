@@ -21,12 +21,21 @@ func main() {
 	moduleDirectory := flag.String("module", ".", "GoToTS module directory")
 	outputDirectory := flag.String("output", "", "runtime package output directory")
 	profileName := flag.String("profile", "number", "integer representation")
+	concurrencyName := flag.String(
+		"concurrency",
+		"disabled",
+		"concurrency semantics",
+	)
 	check := flag.Bool("check", false, "verify output without changing it")
 	flag.Parse()
 	if *contractPath == "" || *outputDirectory == "" {
 		fail("contract and output are required")
 	}
 	profile, err := integerProfile(*profileName)
+	if err != nil {
+		fail(err.Error())
+	}
+	concurrency, err := concurrencyProfile(*concurrencyName)
 	if err != nil {
 		fail(err.Error())
 	}
@@ -50,6 +59,7 @@ func main() {
 	assembled, err := runtimeemission.AssemblePackage(
 		tsgo.NewFactory(),
 		profile,
+		concurrency,
 		requirements.RuntimeSymbols(),
 		requirements.PrimitiveAliases(),
 	)
@@ -96,6 +106,20 @@ func main() {
 	expected["package.json"] = assembled.Manifest()
 	if err := synchronize(*outputDirectory, expected, *check); err != nil {
 		fail(err.Error())
+	}
+}
+
+func concurrencyProfile(value string) (api.ConcurrencySemantics, error) {
+	switch value {
+	case api.ConcurrencySemanticsDisabled.String():
+		return api.ConcurrencySemanticsDisabled, nil
+	case api.ConcurrencySemanticsCooperative.String():
+		return api.ConcurrencySemanticsCooperative, nil
+	default:
+		return api.ConcurrencySemanticsInvalid, fmt.Errorf(
+			"concurrency profile %q is invalid",
+			value,
+		)
 	}
 }
 

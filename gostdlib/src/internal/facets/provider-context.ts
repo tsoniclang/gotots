@@ -3,7 +3,7 @@ import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoMapHash } from "@gotots/runtime/map.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
-import type { bool } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool } from "@gotots/runtime/scalars.js";
 import { GoEmptyStruct } from "@gotots/runtime/struct.js";
 
 import { ProviderChannel } from "../portable/concurrency/channel.js";
@@ -20,13 +20,15 @@ export type {
 
 export interface CanonicalContextSync<Failure extends GoInterfaceValue>
   extends GoInterfaceValue {
-  Deadline(recovery?: GoRecovery): [Time, bool];
-  Done(recovery?: GoRecovery): GoReceiveChannel<GoEmptyStruct> | undefined;
-  Err(recovery?: GoRecovery): Failure | undefined;
+  Deadline(recovery?: GoRecovery): Awaitable<[Time, bool]>;
+  Done(
+    recovery?: GoRecovery,
+  ): Awaitable<GoReceiveChannel<GoEmptyStruct> | undefined>;
+  Err(recovery?: GoRecovery): Awaitable<Failure | undefined>;
   Value(
     key: GoInterfaceValue | undefined,
     recovery?: GoRecovery,
-  ): GoInterfaceValue | undefined;
+  ): Awaitable<GoInterfaceValue | undefined>;
 }
 
 abstract class ContextValue<Failure extends GoInterfaceValue>
@@ -40,16 +42,16 @@ abstract class ContextValue<Failure extends GoInterfaceValue>
   }
 
 	abstract readonly $go$type: { readonly comparable: boolean };
-  abstract Deadline(recovery?: GoRecovery): [Time, bool];
+  abstract Deadline(recovery?: GoRecovery): Awaitable<[Time, bool]>;
   abstract Done(
     recovery?: GoRecovery,
-  ): GoReceiveChannel<GoEmptyStruct> | undefined;
-  abstract Err(recovery?: GoRecovery): Failure | undefined;
-  abstract Cause(): Failure | undefined;
+  ): Awaitable<GoReceiveChannel<GoEmptyStruct> | undefined>;
+  abstract Err(recovery?: GoRecovery): Awaitable<Failure | undefined>;
+  abstract Cause(): Awaitable<Failure | undefined>;
   abstract Value(
     key: GoInterfaceValue | undefined,
     recovery?: GoRecovery,
-  ): GoInterfaceValue | undefined;
+  ): Awaitable<GoInterfaceValue | undefined>;
 
   $go$implements(contract: readonly object[]): boolean {
     return contract.every((method) => this.$go$methods.has(method));
@@ -91,26 +93,28 @@ class ValueContext<
     this.#value = value;
   }
 
-  Deadline(recovery?: GoRecovery): [Time, bool] {
+  Deadline(recovery?: GoRecovery): Awaitable<[Time, bool]> {
     return this.#parent.Deadline(recovery);
   }
 
-  Done(recovery?: GoRecovery): GoReceiveChannel<GoEmptyStruct> | undefined {
+  Done(
+    recovery?: GoRecovery,
+  ): Awaitable<GoReceiveChannel<GoEmptyStruct> | undefined> {
     return this.#parent.Done(recovery);
   }
 
-  Err(recovery?: GoRecovery): Failure | undefined {
+  Err(recovery?: GoRecovery): Awaitable<Failure | undefined> {
     return this.#parent.Err(recovery);
   }
 
-  Cause(): Failure | undefined {
+  Cause(): Awaitable<Failure | undefined> {
     return contextCause(this.#parent);
   }
 
   Value(
     key: GoInterfaceValue | undefined,
     recovery?: GoRecovery,
-  ): GoInterfaceValue | undefined {
+  ): Awaitable<GoInterfaceValue | undefined> {
     return goInterfaceEqual(this.#key, key)
       ? this.#value
       : this.#parent.Value(key, recovery);
@@ -143,40 +147,44 @@ class CancelContext<
     contract: readonly object[],
   ) {
     super(contract);
+  }
+
+  async Initialize(): Promise<this> {
     propagateCancel(
-      parent.Done(),
+      await this.parent.Done(),
       this.#done,
-      () => parent.Err(),
-      () => contextCause(parent),
+      () => this.parent.Err(),
+      () => contextCause(this.parent),
       (failure, cause) => this.cancel(failure, cause),
     );
+    return this;
   }
 
   readonly $go$type = CancelContext;
 
-  Deadline(): [Time, bool] {
+  Deadline(): Awaitable<[Time, bool]> {
     if (this.deadline !== undefined) {
       return [this.deadline, true];
     }
     return this.parent.Deadline();
   }
 
-  Done(): GoReceiveChannel<GoEmptyStruct> {
+  Done(): Awaitable<GoReceiveChannel<GoEmptyStruct>> {
     return this.#done;
   }
 
-  Err(): Failure | undefined {
+  Err(): Awaitable<Failure | undefined> {
     return this.#failure;
   }
 
-  Cause(): Failure | undefined {
+  Cause(): Awaitable<Failure | undefined> {
     return this.#cause;
   }
 
   Value(
     key: GoInterfaceValue | undefined,
     recovery?: GoRecovery,
-  ): GoInterfaceValue | undefined {
+  ): Awaitable<GoInterfaceValue | undefined> {
     return this.parent.Value(key, recovery);
   }
 
@@ -216,43 +224,46 @@ export function ContextWithValueCanonicalSync<
   return new ValueContext(parent, key, value, contextContract);
 }
 
-export function ContextWithCancelCanonicalSync<
+export async function ContextWithCancelCanonicalSync<
   Failure extends GoInterfaceValue,
   Parent extends CanonicalContextSync<Failure>,
 >(
   parent: Parent | undefined,
   canceled: Failure | undefined,
   contextContract: readonly object[],
-): [CanonicalContextSync<Failure>, (_recovery?: GoRecovery) => Promise<void>] {
+): Promise<[
+  CanonicalContextSync<Failure>,
+  (_recovery?: GoRecovery) => Awaitable<void>,
+]> {
   const requiredCanceled = requireFailure(canceled);
-  const child = new CancelContext<Failure, Parent>(
+  const child = await new CancelContext<Failure, Parent>(
     requireParent(parent),
     undefined,
     contextContract,
-  );
+  ).Initialize();
   return [
     child,
     async (): Promise<void> => child.cancel(requiredCanceled, requiredCanceled),
   ];
 }
 
-export function ContextWithCancelCauseCanonicalSync<
+export async function ContextWithCancelCauseCanonicalSync<
   Failure extends GoInterfaceValue,
   Parent extends CanonicalContextSync<Failure>,
 >(
   parent: Parent | undefined,
   canceled: Failure | undefined,
   contextContract: readonly object[],
-): [
+): Promise<[
   CanonicalContextSync<Failure>,
-  (cause: Failure | undefined, _recovery?: GoRecovery) => Promise<void>,
-] {
+  (cause: Failure | undefined, _recovery?: GoRecovery) => Awaitable<void>,
+]> {
   const requiredCanceled = requireFailure(canceled);
-  const child = new CancelContext<Failure, Parent>(
+  const child = await new CancelContext<Failure, Parent>(
     requireParent(parent),
     undefined,
     contextContract,
-  );
+  ).Initialize();
   return [
     child,
     async (cause: Failure | undefined): Promise<void> =>
@@ -260,7 +271,7 @@ export function ContextWithCancelCauseCanonicalSync<
   ];
 }
 
-export function ContextWithTimeoutCanonicalSync<
+export async function ContextWithTimeoutCanonicalSync<
   Failure extends GoInterfaceValue,
   Parent extends CanonicalContextSync<Failure>,
 >(
@@ -269,20 +280,23 @@ export function ContextWithTimeoutCanonicalSync<
   canceled: Failure | undefined,
   deadlineExceeded: Failure | undefined,
   contextContract: readonly object[],
-): [CanonicalContextSync<Failure>, (_recovery?: GoRecovery) => Promise<void>] {
+): Promise<[
+  CanonicalContextSync<Failure>,
+  (_recovery?: GoRecovery) => Awaitable<void>,
+]> {
   const actualParent = requireParent(parent);
   const requiredCanceled = requireFailure(canceled);
   const requiredDeadline = requireFailure(deadlineExceeded);
   const requestedDeadline = Now().Add(timeout);
-  const [parentDeadline, parentHasDeadline] = actualParent.Deadline();
+  const [parentDeadline, parentHasDeadline] = await actualParent.Deadline();
   const deadline = parentHasDeadline && parentDeadline.Before(requestedDeadline)
     ? parentDeadline
     : requestedDeadline;
-  const child = new CancelContext<Failure, Parent>(
+  const child = await new CancelContext<Failure, Parent>(
     actualParent,
     deadline,
     contextContract,
-  );
+  ).Initialize();
   void After(deadline.Sub(Now())).receive().then(() =>
     child.cancel(requiredDeadline, requiredDeadline));
   return [
@@ -291,14 +305,14 @@ export function ContextWithTimeoutCanonicalSync<
   ];
 }
 
-export function ContextAfterFuncCanonicalSync<
+export async function ContextAfterFuncCanonicalSync<
   Failure extends GoInterfaceValue,
   Parent extends CanonicalContextSync<Failure>,
 >(
   parent: Parent | undefined,
-  callback: (() => Promise<void>) | undefined,
-): () => Promise<bool> {
-  const done = requireParent(parent).Done();
+  callback: (() => Awaitable<void>) | undefined,
+): Promise<() => Awaitable<bool>> {
+  const done = await requireParent(parent).Done();
   let stopped = false;
   let started = false;
   if (done !== undefined) {
@@ -321,11 +335,11 @@ export function ContextAfterFuncCanonicalSync<
   };
 }
 
-export function ContextCauseCanonicalSync<
+export async function ContextCauseCanonicalSync<
   Failure extends GoInterfaceValue,
   Parent extends CanonicalContextSync<Failure>,
->(parent: Parent | undefined): Failure | undefined {
-  return contextCause(requireParent(parent));
+>(parent: Parent | undefined): Promise<Failure | undefined> {
+  return await contextCause(requireParent(parent));
 }
 
 function requireParent<
@@ -347,8 +361,8 @@ function requireFailure<Failure extends GoInterfaceValue>(
   return failure;
 }
 
-function contextCause<Failure extends GoInterfaceValue>(
+async function contextCause<Failure extends GoInterfaceValue>(
   source: CanonicalContextSync<Failure>,
-): Failure | undefined {
-  return source instanceof ContextValue ? source.Cause() : source.Err();
+): Promise<Failure | undefined> {
+  return await (source instanceof ContextValue ? source.Cause() : source.Err());
 }

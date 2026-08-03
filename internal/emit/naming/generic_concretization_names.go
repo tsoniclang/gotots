@@ -11,9 +11,8 @@ import (
 
 func (n *File) GenericKernel(
 	owner *types.Func,
-	profile *api.GenericCallableProfile,
 ) (api.NameReference, error) {
-	if !validGenericKernelOwner(owner, profile) {
+	if !validGenericKernelOwner(owner) {
 		return api.NameReference{}, &api.NameError{
 			Reason: "generic kernel owner is invalid",
 		}
@@ -24,27 +23,19 @@ func (n *File) GenericKernel(
 		return api.NameReference{}, err
 	}
 	if providerOwned {
-		if profile != nil {
-			return n.GenericCallableProfile(profile)
-		}
 		return n.providerGenericKernelReference(owner, selected)
-	}
-	variantSuffix := ""
-	if profile != nil {
-		variantSuffix = profile.Suffix()
 	}
 	return n.derivedSourceReference(
 		owner,
-		variantSuffix+api.GenericKernelSuffix,
+		api.GenericKernelSuffix,
 		api.ArtifactFacetCallableSignature,
 	)
 }
 
 func (n *File) DeferredGenericKernel(
 	owner *types.Func,
-	profile *api.GenericCallableProfile,
 ) (api.DeferredGenericCallableReference, error) {
-	if !validGenericKernelOwner(owner, profile) {
+	if !validGenericKernelOwner(owner) {
 		return api.DeferredGenericCallableReference{}, &api.NameError{
 			Reason: "deferred generic kernel owner is invalid",
 		}
@@ -55,16 +46,6 @@ func (n *File) DeferredGenericKernel(
 		return api.DeferredGenericCallableReference{}, err
 	}
 	if providerOwned {
-		if profile != nil {
-			reference, profileErr := n.GenericCallableProfile(profile)
-			if profileErr != nil {
-				return api.DeferredGenericCallableReference{}, profileErr
-			}
-			return api.NewDeferredGenericCallableReference(
-				reference,
-				api.DeferredGenericRecoveryLast,
-			)
-		}
 		reference, referenceErr :=
 			n.providerGenericKernelReference(owner, selected)
 		if referenceErr != nil {
@@ -75,13 +56,9 @@ func (n *File) DeferredGenericKernel(
 			api.DeferredGenericRecoveryOmitted,
 		)
 	}
-	variantSuffix := ""
-	if profile != nil {
-		variantSuffix = profile.Suffix()
-	}
 	reference, err := n.derivedSourceReference(
 		owner,
-		variantSuffix+api.GenericKernelSuffix+api.DeferredEntrySuffix,
+		api.GenericKernelSuffix+api.DeferredEntrySuffix,
 		api.ArtifactFacetCallableSignature,
 	)
 	if err != nil {
@@ -95,9 +72,8 @@ func (n *File) DeferredGenericKernel(
 
 func (n *File) DeferredGenericCallable(
 	owner *types.Func,
-	profile *api.GenericCallableProfile,
 ) (api.DeferredGenericCallableReference, error) {
-	if !validGenericKernelOwner(owner, profile) {
+	if !validGenericKernelOwner(owner) {
 		return api.DeferredGenericCallableReference{}, &api.NameError{
 			Reason: "deferred generic callable owner is invalid",
 		}
@@ -107,16 +83,6 @@ func (n *File) DeferredGenericCallable(
 		return api.DeferredGenericCallableReference{}, err
 	}
 	if providerOwned {
-		if profile != nil {
-			reference, profileErr := n.GenericCallableProfile(profile)
-			if profileErr != nil {
-				return api.DeferredGenericCallableReference{}, profileErr
-			}
-			return api.NewDeferredGenericCallableReference(
-				reference,
-				api.DeferredGenericRecoveryLast,
-			)
-		}
 		_, recoveryOwned := n.owner.registry.provider.Facet(
 			contract.Identity(),
 			gostdlib.FacetRecoveryCallable,
@@ -146,13 +112,9 @@ func (n *File) DeferredGenericCallable(
 			api.DeferredGenericRecoveryOmitted,
 		)
 	}
-	variantSuffix := ""
-	if profile != nil {
-		variantSuffix = profile.Suffix()
-	}
 	reference, err := n.derivedSourceReference(
 		owner,
-		variantSuffix+api.DeferredEntrySuffix,
+		api.DeferredEntrySuffix,
 		api.ArtifactFacetCallableSignature,
 	)
 	if err != nil {
@@ -166,10 +128,8 @@ func (n *File) DeferredGenericCallable(
 
 func validGenericKernelOwner(
 	owner *types.Func,
-	profile *api.GenericCallableProfile,
 ) bool {
-	return owner != nil && owner.Origin() == owner &&
-		(profile == nil || profile.Valid() && profile.Owner() == owner)
+	return owner != nil && owner.Origin() == owner
 }
 
 func (n *File) providerGenericKernelReference(

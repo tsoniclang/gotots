@@ -230,7 +230,7 @@ func NativeUint16(value []byte) uint16 {
 		"static async String(",
 		"async String(",
 		"export interface Signal",
-		"String(): Promise<gostring>;",
+		"String(): Awaitable<gostring>;",
 		"WaitGroup_Go__from_sync",
 		"async (): Promise<void> =>",
 	} {
@@ -247,7 +247,7 @@ func NativeUint16(value []byte) uint16 {
 		artifacts.printed,
 		"export declare function WaitGroup_Go(",
 	)
-	if !strings.Contains(waitGroupGo, "=> Promise<void>") {
+	if !strings.Contains(waitGroupGo, "=> Awaitable<void>") {
 		t.Fatalf(
 			"cooperative environment callback stayed synchronous:\n%s",
 			waitGroupGo,

@@ -15,7 +15,7 @@ import (
 func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 15,
+	  "schemaVersion": 16,
   "facets": [],
   "genericOperationSets": [
     {
@@ -41,7 +41,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 		t.Fatalf("generic operations = %#v", selected)
 	}
 
-	payload = `{"schemaVersion":15,"facets":[],"genericOperationSets":[
+	payload = `{"schemaVersion":16,"facets":[],"genericOperationSets":[
   {"sourceIdentity":"x","operations":[
     {"kind":"invented","parameters":[],"results":[{"kind":"type-parameter","typeParameter":0}]}
   ]}
@@ -57,7 +57,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 func TestFacetMapOwnsClosedGenericCallableKernels(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 15,
+	  "schemaVersion": 16,
 	  "facets": [{
 	    "kind":"generic-callable-kernel",
 	    "sourceIdentity":"slices|kind=4|receiver=|name=Grow",
@@ -99,7 +99,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 ) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 15,
+	  "schemaVersion": 16,
   "facets": [],
   "providerStatefulProfiles": [{
     "sourceIdentity": "example.com/source|kind=2|receiver=|name=State",
@@ -152,7 +152,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 func TestImplementedResultRequiresContractOwner(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 15,
+	  "schemaVersion": 16,
   "facets": [],
   "providerCallableProfiles": [{
     "sourceIdentity": "example.com/source|kind=4|receiver=|name=Build",
@@ -316,7 +316,7 @@ func TestRepresentationCertificationRejectsNonInterfaceSource(t *testing.T) {
 	}
 }
 
-func TestNamedStructFacetRejectsAbsentCapabilityMember(t *testing.T) {
+func TestStatefulNamedStructProfileRejectsAbsentCapabilityMember(t *testing.T) {
 	repository, err := filepath.Abs("../../../..")
 	if err != nil {
 		t.Fatal(err)
@@ -335,6 +335,18 @@ func TestNamedStructFacetRejectsAbsentCapabilityMember(t *testing.T) {
       ]`),
 		[]byte(`"export": "IoFsPathErrorOperations",
       "capabilities": [
+        "hash",
+        "storage"
+      ]`),
+		1,
+	)
+	mutated = bytes.Replace(
+		mutated,
+		[]byte(`"operations": [
+        "make",
+        "storage"
+      ]`),
+		[]byte(`"operations": [
         "hash",
         "storage"
       ]`),
@@ -363,7 +375,7 @@ func TestNamedStructFacetRejectsAbsentCapabilityMember(t *testing.T) {
 		MaximumGoVersion:    "go1.26.4",
 	})
 	if err == nil ||
-		!strings.Contains(err.Error(), "IoFsPathErrorOperations.$hash") ||
+		!strings.Contains(err.Error(), "CanonicalPathError.$hash") ||
 		!strings.Contains(err.Error(), "absent") {
 		t.Fatalf("wrong absent capability error = %v", err)
 	}

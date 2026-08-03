@@ -119,7 +119,6 @@ type Names interface {
 	Parameter(*types.Var, int) (string, error)
 	Result(*types.Var, int) (string, error)
 	Reference(types.Object) (NameReference, error)
-	GenericCallableProfile(*GenericCallableProfile) (NameReference, error)
 	ProviderGenericTypeArguments(*types.Func) (
 		[]GenericTypeArgumentProjection,
 		bool,

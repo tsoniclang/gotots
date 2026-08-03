@@ -1,10 +1,7 @@
-import type {
-  GoError,
-  GoInterfaceValue,
-} from "@gotots/runtime/interface-value.js";
+import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { Awaitable, gostring } from "@gotots/runtime/scalars.js";
 
 import type {
   CancelFunc,
@@ -16,12 +13,14 @@ import {
   selectedSignals,
   selectedSignalsAsync,
   startNotification,
+  startNotificationAsync,
 } from "../node/os/signal/notify.js";
 import type { Process, Signal } from "../../os.js";
 import {
   ContextWithCancelCanonicalSync,
 } from "./provider-context.js";
 import type { CanonicalContextSync } from "./provider-context.js";
+import type { CanonicalErrorAsync } from "./provider-io-contract.js";
 
 export type { CanonicalContextSync } from "./provider-context.js";
 export type {
@@ -30,8 +29,8 @@ export type {
 } from "./provider-io-contract.js";
 
 export interface CanonicalSignal extends GoInterfaceValue {
-  Signal(recovery?: GoRecovery): void;
-  String(recovery?: GoRecovery): Promise<gostring>;
+  Signal(recovery?: GoRecovery): Awaitable<void>;
+  String(recovery?: GoRecovery): Awaitable<gostring>;
 }
 
 export async function OsSignalNotifyContextCanonical(
@@ -41,7 +40,7 @@ export async function OsSignalNotifyContextCanonical(
   return notifyContextAsync(parent, signals);
 }
 
-export function OsSignalNotifyContextCanonicalContext<
+export async function OsSignalNotifyContextCanonicalContext<
   Failure extends GoInterfaceValue,
   Parent extends CanonicalContextSync<Failure>,
 >(
@@ -49,17 +48,17 @@ export function OsSignalNotifyContextCanonicalContext<
   signals: RuntimeSlice<Signal | undefined>,
   canceled: Failure | undefined,
   contextContract: readonly object[],
-): [
+): Promise<[
   CanonicalContextSync<Failure>,
-  (_recovery?: GoRecovery) => Promise<void>,
-] {
+  NonNullable<CancelFunc>,
+]> {
   const selected = selectedSignals(signals);
-  const [context, cancel] = ContextWithCancelCanonicalSync<Failure, Parent>(
+  const [context, cancel] = await ContextWithCancelCanonicalSync<Failure, Parent>(
     parent,
     canceled,
     contextContract,
   );
-  return startNotification(context, cancel, selected);
+  return startNotificationAsync(context, cancel, selected);
 }
 
 export async function OsSignalNotifyContextCanonicalContextSignal<
@@ -72,20 +71,20 @@ export async function OsSignalNotifyContextCanonicalContextSignal<
   contextContract: readonly object[],
 ): Promise<[
   CanonicalContextSync<Failure>,
-  (_recovery?: GoRecovery) => Promise<void>,
+  NonNullable<CancelFunc>,
 ]> {
   const selected = await selectedSignalsAsync(signals);
-  const [context, cancel] = ContextWithCancelCanonicalSync<Failure, Parent>(
+  const [context, cancel] = await ContextWithCancelCanonicalSync<Failure, Parent>(
     parent,
     canceled,
     contextContract,
   );
-  return startNotification(context, cancel, selected);
+  return startNotificationAsync(context, cancel, selected);
 }
 
 export async function OsProcessSignalCanonical(
   receiver: Process | undefined,
   signal: CanonicalSignal | undefined,
-): Promise<GoError | undefined> {
+): Promise<CanonicalErrorAsync | undefined> {
   return signalProcessAsync(receiver, signal);
 }

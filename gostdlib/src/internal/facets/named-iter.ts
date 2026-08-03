@@ -1,25 +1,21 @@
 import { Seq, Seq2 } from "../../iter.js";
 
 export class IterSeqValueOperations {
-  static $project<T, Implementation>(source: Seq<T, Implementation>): Implementation {
+  static $project<T>(source: Seq<T>): Seq<T>["value"] {
     return source.value;
   }
 
-  static $wrap<T, Implementation>(source: Implementation): Seq<T, Implementation> {
-    return new Seq<T, Implementation>(source);
+  static $wrap<T>(source: Seq<T>["value"]): Seq<T> {
+    return new Seq<T>(source);
   }
 }
 
 export class IterSeq2ValueOperations {
-  static $project<K, V, Implementation>(
-    source: Seq2<K, V, Implementation>,
-  ): Implementation {
+  static $project<K, V>(source: Seq2<K, V>): Seq2<K, V>["value"] {
     return source.value;
   }
 
-  static $wrap<K, V, Implementation>(
-    source: Implementation,
-  ): Seq2<K, V, Implementation> {
-    return new Seq2<K, V, Implementation>(source);
+  static $wrap<K, V>(source: Seq2<K, V>["value"]): Seq2<K, V> {
+    return new Seq2<K, V>(source);
   }
 }

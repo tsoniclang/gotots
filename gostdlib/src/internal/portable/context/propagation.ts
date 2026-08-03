@@ -1,25 +1,26 @@
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoEmptyStruct } from "@gotots/runtime/struct.js";
+import type { Awaitable } from "@gotots/runtime/scalars.js";
 
 export function propagateCancel<Failure>(
   parentDone: GoReceiveChannel<GoEmptyStruct> | undefined,
   childDone: GoReceiveChannel<GoEmptyStruct>,
-  parentFailure: () => Failure | undefined,
-  parentCause: () => Failure | undefined,
+  parentFailure: () => Awaitable<Failure | undefined>,
+  parentCause: () => Awaitable<Failure | undefined>,
   cancel: (failure: Failure, cause: Failure) => void,
 ): void {
   if (parentDone === undefined) {
     return;
   }
-  const applyParent = (): void => {
-    const failure = parentFailure();
+  const applyParent = async (): Promise<void> => {
+    const failure = await parentFailure();
     if (failure === undefined) {
       GoPanic.raiseRuntime("context: internal error: missing cancel error");
     }
-    cancel(failure, parentCause() ?? failure);
+    cancel(failure, (await parentCause()) ?? failure);
   };
-  const parentCase = parentDone.$selectReceive(() => applyParent());
+  const parentCase = parentDone.$selectReceive(() => void applyParent());
   if (parentCase.ready()) {
     parentCase.commit();
     return;

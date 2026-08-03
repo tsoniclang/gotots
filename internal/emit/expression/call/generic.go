@@ -52,11 +52,6 @@ func emitGeneric(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	declarationSignature, ok := owner.Type().(*types.Signature)
-	if !ok {
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
 	requiresConcretization, err :=
 		context.GenericCallableRequiresConcretization(owner)
 	if err != nil {
@@ -73,45 +68,34 @@ func emitGeneric(
 	openConcretization := requiresConcretization &&
 		instance.TypeArgs.ContainsGenericTypeParameter()
 	if requiresConcretization && !openConcretization {
-		_, facet, _, selectionRequests, selectionErr :=
-			cooperativecall.SelectGenericClassMethod(
-				context,
-				owner,
-				declarationSignature,
-				signature,
-			)
+		facet, selectionErr := cooperativecall.SelectGenericClassMethod(
+			context,
+			owner,
+		)
 		if selectionErr != nil {
 			return api.ExpressionEmission{}, true, selectionErr
 		}
-		profile, _ := facet.GenericProfile()
 		concrete, concreteErr := context.ResolveGenericConcretization(
 			owner,
 			instance.TypeArgs,
 			signature,
-			profile,
 		)
 		if concreteErr != nil {
 			return api.ExpressionEmission{}, true, concreteErr
 		}
 		reference, err = api.NewNameReference(
 			concrete.Name(),
-			api.CombineRequests(
-				concrete.Requests(),
-				selectionRequests,
-			)...,
+			concrete.Requests()...,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
 		callableFacet = facet
 	} else if openConcretization {
-		_, facet, _, variantRequests, selectionErr :=
-			cooperativecall.SelectGenericClassMethod(
-				context,
-				owner,
-				declarationSignature,
-				signature,
-			)
+		facet, selectionErr := cooperativecall.SelectGenericClassMethod(
+			context,
+			owner,
+		)
 		if selectionErr != nil {
 			return api.ExpressionEmission{}, true, selectionErr
 		}
@@ -121,8 +105,7 @@ func emitGeneric(
 				Reason: "generic kernel names are unavailable",
 			}
 		}
-		profile, _ := facet.GenericProfile()
-		reference, err = kernelNames.GenericKernel(owner, profile)
+		reference, err = kernelNames.GenericKernel(owner)
 		callableFacet = facet
 		typeArguments, typeRequests, err =
 			genericinstance.EmitFunctionTypeArguments(
@@ -151,10 +134,7 @@ func emitGeneric(
 			if capabilityErr != nil {
 				return api.ExpressionEmission{}, true, capabilityErr
 			}
-			mechanicReqs = api.CombineRequests(
-				variantRequests,
-				capabilityRequests,
-			)
+			mechanicReqs = capabilityRequests
 		}
 	} else {
 		if len(operationSet.Operations()) != 0 {
@@ -163,13 +143,8 @@ func emitGeneric(
 				Reason: "generic mechanics reached a source-facing callable",
 			}
 		}
-		selected, facet, _, selectionErr :=
-			cooperativecall.SelectGenericCallable(
-				context,
-				owner,
-				declarationSignature,
-				signature,
-			)
+		selected, facet, selectionErr :=
+			cooperativecall.SelectGenericCallable(context, owner)
 		if selectionErr != nil {
 			return api.ExpressionEmission{}, true, selectionErr
 		}

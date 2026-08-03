@@ -29,6 +29,23 @@ func (n *File) NamedStructOperation(
 		return api.NameReference{}, err
 	}
 	if providerOwned {
+		statefulReference, profiled, statefulErr := n.providerStatefulOperation(
+			typeName,
+			capability,
+			api.ImportPhaseValue,
+			api.ArtifactFacetStaticSurface,
+		)
+		if statefulErr != nil {
+			return api.NameReference{}, statefulErr
+		}
+		if profiled {
+			return statefulReference.WithRequests(
+				api.CombineRequests(
+					statefulReference.Requests(),
+					[]api.RootRequest{request},
+				)...,
+			)
+		}
 		return providerReference.WithRequests(
 			api.CombineRequests(
 				providerReference.Requests(),
@@ -61,6 +78,18 @@ func (n *File) NamedStructConstructor(
 		return api.NameReference{}, err
 	}
 	if providerOwned {
+		statefulReference, profiled, statefulErr := n.providerStatefulOperation(
+			typeName,
+			gostdlib.FacetCapabilityMake,
+			api.ImportPhaseValue,
+			api.ArtifactFacetStaticSurface,
+		)
+		if statefulErr != nil {
+			return api.NameReference{}, statefulErr
+		}
+		if profiled {
+			return statefulReference, nil
+		}
 		return providerReference, nil
 	}
 	return n.Reference(typeName)

@@ -73,7 +73,6 @@ type programSession struct {
 	packageInitializations  *packageInitializationScheduler
 	genericOperations       map[genericOperationIdentity]*api.GenericOperationContract
 	genericConcretizations  map[genericConcretizationIdentity]*api.GenericConcretization
-	genericProfiles         map[genericCallableProfileIdentity]*api.GenericCallableProfile
 	classMembers            map[*types.Func]classMemberContribution
 	goRuntime               *gocontract.Contract
 	runtimePackage          RuntimePackage
@@ -331,7 +330,6 @@ func newProgramSession(
 		packageInitializations: newPackageInitializationScheduler(),
 		genericOperations:      make(map[genericOperationIdentity]*api.GenericOperationContract),
 		genericConcretizations: make(map[genericConcretizationIdentity]*api.GenericConcretization),
-		genericProfiles:        make(map[genericCallableProfileIdentity]*api.GenericCallableProfile),
 		classMembers:           make(map[*types.Func]classMemberContribution),
 		goRuntime:              goRuntime,
 		compareArtifactOwners:  compareArtifactOwners,

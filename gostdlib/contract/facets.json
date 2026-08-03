@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 15,
+  "schemaVersion": 16,
   "representations": [
     {
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
@@ -1787,59 +1787,6 @@
       "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
       "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
       "sourcePath": "src/internal/facets/provider-io-fs.ts",
-      "export": "IoFsReadDirCanonical",
-      "canonicalParameters": [0],
-      "guardInterfaces": [
-        "io/fs|kind=2|receiver=|name=ReadDirFS",
-        "io/fs|kind=2|receiver=|name=ReadDirFile"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "export": "CanonicalFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
-          "export": "CanonicalFile"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
-          "export": "CanonicalReadDirFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
-          "export": "CanonicalReadDirFile"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadFile",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
-      "sourcePath": "src/internal/facets/provider-io-fs.ts",
-      "export": "IoFsReadFileCanonical",
-      "canonicalParameters": [0],
-      "guardInterfaces": [
-        "io/fs|kind=2|receiver=|name=ReadFileFS"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "export": "CanonicalFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
-          "export": "CanonicalFile"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
-          "export": "CanonicalReadFileFS"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
-      "sourcePath": "src/internal/facets/provider-io-fs.ts",
       "export": "IoFsReadDirCanonicalAsyncError",
       "canonicalParameters": [0],
       "canonicalResults": [0, 1],
@@ -1866,6 +1813,10 @@
         {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
           "export": "CanonicalFileAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "CanonicalFileInfo"
         },
         {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
@@ -1904,6 +1855,10 @@
           "export": "CanonicalFileAsyncError"
         },
         {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "CanonicalFileInfo"
+        },
+        {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
           "export": "CanonicalReadFileFSAsyncError"
         }
@@ -1913,33 +1868,9 @@
       "sourceIdentity": "io/fs|kind=4|receiver=|name=Stat",
       "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
       "sourcePath": "src/internal/facets/provider-io-fs.ts",
-      "export": "IoFsStatCanonical",
-      "canonicalParameters": [0],
-      "guardInterfaces": [
-        "io/fs|kind=2|receiver=|name=StatFS"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "export": "CanonicalFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
-          "export": "CanonicalFile"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
-          "export": "CanonicalStatFS"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "io/fs|kind=4|receiver=|name=Stat",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
-      "sourcePath": "src/internal/facets/provider-io-fs.ts",
       "export": "IoFsStatCanonicalAsyncError",
       "canonicalParameters": [0],
-      "canonicalResults": [1],
+      "canonicalResults": [0, 1],
       "guardInterfaces": [
         "io/fs|kind=2|receiver=|name=StatFS"
       ],
@@ -1957,42 +1888,12 @@
           "export": "CanonicalFileAsyncError"
         },
         {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "CanonicalFileInfo"
+        },
+        {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
           "export": "CanonicalStatFSAsyncError"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "io/fs|kind=4|receiver=|name=WalkDir",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
-      "sourcePath": "src/internal/facets/provider-io-fs.ts",
-      "export": "IoFsWalkDirCanonical",
-      "canonicalParameters": [0],
-      "guardInterfaces": [
-        "io/fs|kind=2|receiver=|name=ReadDirFS",
-        "io/fs|kind=2|receiver=|name=ReadDirFile",
-        "io/fs|kind=2|receiver=|name=StatFS"
-      ],
-      "interfaces": [
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
-          "export": "CanonicalFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
-          "export": "CanonicalFile"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
-          "export": "CanonicalReadDirFS"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
-          "export": "CanonicalReadDirFile"
-        },
-        {
-          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
-          "export": "CanonicalStatFS"
         }
       ]
     },
@@ -2013,7 +1914,9 @@
         "io/fs|kind=2|receiver=|name=StatFS"
       ],
       "fromProviderInterfaces": [
-        "go:universe|error",
+        "go:universe|error"
+      ],
+      "contractInterfaces": [
         "io/fs|kind=2|receiver=|name=DirEntry"
       ],
       "interfaces": [
@@ -2032,6 +1935,10 @@
         {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
           "export": "CanonicalFileAsyncError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "CanonicalFileInfo"
         },
         {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
@@ -2141,24 +2048,11 @@
       "export": "OsProcessSignalCanonical",
       "receiver": true,
       "canonicalParameters": [0],
-      "interfaces": [
-        {
-          "sourceIdentity": "os|kind=2|receiver=|name=Signal",
-          "export": "CanonicalSignal"
-        }
-      ]
-    },
-    {
-      "sourceIdentity": "os|kind=4|receiver=*os.Process|name=Signal",
-      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
-      "sourcePath": "src/internal/facets/provider-os-signal.ts",
-      "export": "OsProcessSignalCanonical",
-      "receiver": true,
-      "canonicalParameters": [0],
+      "canonicalResults": [0],
       "interfaces": [
         {
           "sourceIdentity": "go:universe|error",
-          "export": "CanonicalErrorSync"
+          "export": "CanonicalErrorAsync"
         },
         {
           "sourceIdentity": "os|kind=2|receiver=|name=Signal",
@@ -2570,6 +2464,25 @@
         "compress/flate|kind=2|receiver=|name=Reader",
         "go:universe|error",
         "io|kind=2|receiver=|name=ReadCloser"
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=2|receiver=|name=PathError",
+      "specifier": "@gotots/gostdlib/internal/facets/named-io-fs.js",
+      "sourcePath": "src/internal/facets/named-io-fs.ts",
+      "export": "CanonicalPathError",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalErrorAsync"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error"
+      ],
+      "operations": [
+        "make",
+        "storage"
       ]
     }
   ],
@@ -3641,186 +3554,6 @@
       "capabilities": [
         "recovery"
       ],
-      "effect": "sync"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "maps|kind=4|receiver=|name=Keys",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-maps.js",
-      "sourcePath": "src/internal/facets/generic-maps.ts",
-      "export": "MapsKeysCooperative",
-      "profileKey": "aa2e21194a2d3328597e14f3ca5998266a104afacc0ba2162588b7942d5cd653=cooperative",
-      "effect": "sync"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "maps|kind=4|receiver=|name=Keys",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-maps.js",
-      "sourcePath": "src/internal/facets/generic-maps.ts",
-      "export": "MapsKeysFullyCooperative",
-      "profileKey": "aa2e21194a2d3328597e14f3ca5998266a104afacc0ba2162588b7942d5cd653=cooperative|ef5cb30187984705b87503620f43c4522f10605f9b386f9f6df9b301978a7738=cooperative",
-      "effect": "sync"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "maps|kind=4|receiver=|name=Values",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-maps.js",
-      "sourcePath": "src/internal/facets/generic-maps.ts",
-      "export": "MapsValuesCooperative",
-      "profileKey": "965fc01e67df151e5b283a6bc5cd988f0e819c509cb310b56ba4631c8f9533ec=cooperative",
-      "effect": "sync"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "maps|kind=4|receiver=|name=Values",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-maps.js",
-      "sourcePath": "src/internal/facets/generic-maps.ts",
-      "export": "MapsValuesFullyCooperative",
-      "profileKey": "965fc01e67df151e5b283a6bc5cd988f0e819c509cb310b56ba4631c8f9533ec=cooperative|c3a257d7ce8b651159ff2e3c62b7161627f720bfc6b0cb28f65f5915ecf7d056=cooperative",
-      "effect": "sync"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=AppendSeq",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesAppendSeqCooperative",
-      "profileKey": "625d99cc3a4a8041a6c210aff3a339db4e83cf34c18dbe41a42fa48cf59f77ab=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=AppendSeq",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesAppendSeqFullyCooperative",
-      "profileKey": "625d99cc3a4a8041a6c210aff3a339db4e83cf34c18dbe41a42fa48cf59f77ab=cooperative|f729115bf3e3995f96e7e344375769cd4b0a973dceaa98d59427a06f0fa3f074=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearchFunc",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesBinarySearchFuncCooperative",
-      "profileKey": "a25570c0b2684c122c9dda09271fa3a6ca4903e15e987b1410c19f95cf1adc44=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=Collect",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesCollectCooperative",
-      "profileKey": "e5c8b67a6f38dcfde6fc5d8fcca5ba4cb80f3909208a66256240dab706e89d68=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=Collect",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesCollectFullyCooperative",
-      "profileKey": "463c4851d985a1488203116869cc8bc37b98bf61ec5d5484bf0df7e59ca40e58=cooperative|e5c8b67a6f38dcfde6fc5d8fcca5ba4cb80f3909208a66256240dab706e89d68=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=CompareFunc",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesCompareFuncCooperative",
-      "profileKey": "042595704dc8615879ac3139f8ebf6c988071f4fdca14a3ee426400a19ff8ba1=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=ContainsFunc",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesContainsFuncCooperative",
-      "profileKey": "98f3effe694159cd5fcdf4894738038a38beff8b733aebf56102260f34dc227e=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=DeleteFunc",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesDeleteFuncCooperative",
-      "profileKey": "026708ea596ca95841f50135eac06712b5d2e0aee950329cfab8fad8b55049d0=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=IndexFunc",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesIndexFuncCooperative",
-      "profileKey": "9014504e4639e10692a74a28a9b3c11107e87b1aea32c765ce0f1142f4329b54=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=SortFunc",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesSortFuncCooperative",
-      "profileKey": "f9086f9314839d7450dc53d220168964ca4b935e0b995136a4fceb36d02868a7=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=SortStableFunc",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesSortStableFuncCooperative",
-      "profileKey": "4c38e810dd7be44174703a3dfe388af078747cca1c11be0db66281a5493daeb3=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=Sorted",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesSortedCooperative",
-      "profileKey": "1bcecf0698ae7e007b8fbf07b9e01ec5913c886b85743bfd0d8726501d67fbbe=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=Sorted",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesSortedFullyCooperative",
-      "profileKey": "1bcecf0698ae7e007b8fbf07b9e01ec5913c886b85743bfd0d8726501d67fbbe=cooperative|fb2488bb05450d70e9d3a3b060575c3f2ff9052f56ba075e968dfe9e6d84fdbe=cooperative",
-      "effect": "async"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=Values",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesValuesCooperative",
-      "profileKey": "652217bd97327bcf74dac90763c1f154a7d8bbcf536ce7e832bdaf968a702881=cooperative",
-      "effect": "sync"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "slices|kind=4|receiver=|name=Values",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-slices.js",
-      "sourcePath": "src/internal/facets/generic-slices.ts",
-      "export": "SlicesValuesFullyCooperative",
-      "profileKey": "652217bd97327bcf74dac90763c1f154a7d8bbcf536ce7e832bdaf968a702881=cooperative|cdd8b52d8c59de6acb71522442974fa2016409e18b1d99841c9cd34a1fe8561d=cooperative",
-      "effect": "sync"
-    },
-    {
-      "kind": "generic-callable-profile",
-      "sourceIdentity": "sync|kind=4|receiver=|name=OnceValue",
-      "specifier": "@gotots/gostdlib/internal/facets/generic-sync.js",
-      "sourcePath": "src/internal/facets/generic-sync.ts",
-      "export": "SyncOnceValueCooperative",
-      "profileKey": "c30278625496c7198c92a774ca902c537bd14851c35fbd06e171ee3f89e3602c=cooperative",
       "effect": "sync"
     },
     {"kind":"generic-callable-kernel","sourceIdentity":"cmp|kind=4|receiver=|name=Compare","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-cmp-kernel.js","sourcePath":"src/internal/facets/generic-cmp-kernel.ts","export":"CmpCompareKernel"},

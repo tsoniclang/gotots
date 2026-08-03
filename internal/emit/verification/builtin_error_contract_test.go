@@ -80,10 +80,10 @@ func Message(failure error) string {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	if !strings.Contains(
 		artifacts.printed,
-		"Error(): Promise<gostring>;",
+		"Error(): Awaitable<gostring>;",
 	) {
 		t.Fatalf(
-			"canonical error contract is not Go-shaped and cooperative:\n%s",
+			"canonical error contract is not source-shaped and awaitable:\n%s",
 			artifacts.printed,
 		)
 	}

@@ -52,7 +52,10 @@ export interface Shape {
 
 export type AsyncCallable = (() => Promise<void>) | undefined;
 export type SyncCallable = (() => number) | undefined;
-export type InvalidEffectCallable = () => Promise<void> | void;
+export type AwaitableCallable = () => void | Promise<void>;
+export type AwaitableUnionCallable = () =>
+  string | undefined | Promise<string | undefined>;
+export type InvalidEffectCallable = () => string | Promise<void>;
 export type GenericAsyncCallable<
   Value extends (() => Promise<void>) | undefined =
     (() => Promise<void>) | undefined,
@@ -72,6 +75,8 @@ void Hidden;
 	entryPath := filepath.Join(projectDirectory, "entry.ts")
 	writeProjectFile(t, entryPath, `export {
   AsyncCallable,
+  AwaitableCallable,
+  AwaitableUnionCallable,
   Box,
   Effects,
   GenericAsyncCallable,
@@ -87,8 +92,7 @@ export const state: { Count: number } = { Count: 0 };
 	markerPath := filepath.Join(projectDirectory, "effect-marker.ts")
 	writeProjectFile(t, markerPath, `export type AsyncEffectMarker = () => Promise<never>;
 `)
-	facetPath := filepath.Join(projectDirectory, "facets.ts")
-	writeProjectFile(t, facetPath, `type AsyncABI = (() => Promise<void>) | undefined;
+	writeProjectFile(t, filepath.Join(projectDirectory, "facets.ts"), `type AsyncABI = (() => Promise<void>) | undefined;
 
 export type AsyncFacet<Value = AsyncABI> = Value;
 export type ConstrainedFacet<Value extends AsyncABI = AsyncABI> = Value;
@@ -96,8 +100,7 @@ export type MissingDefaultFacet<Value> = Value;
 export type NonCallableDefaultFacet<Value = number> = Value;
 export type WrappedFacet<Value = AsyncABI> = [Value][0];
 `)
-	facetEntryPath := filepath.Join(projectDirectory, "facet-entry.ts")
-	writeProjectFile(t, facetEntryPath, `export { AsyncFacet } from "./facets.js";
+	writeProjectFile(t, filepath.Join(projectDirectory, "facet-entry.ts"), `export { AsyncFacet } from "./facets.js";
 `)
 	renamedPath := filepath.Join(projectDirectory, "renamed.ts")
 	writeProjectFile(t, renamedPath, `export { Value as Other } from "./implementation.js";
@@ -164,7 +167,7 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			) {
 				t.Fatalf("Shape members = %#v", selected)
 			}
-		case "AsyncCallable", "Effects", "GenericAsyncCallable", "InvalidEffectCallable", "SyncCallable":
+		case "AsyncCallable", "AwaitableCallable", "AwaitableUnionCallable", "Effects", "GenericAsyncCallable", "InvalidEffectCallable", "SyncCallable":
 			continue
 		}
 		if !slices.Equal(
@@ -182,6 +185,8 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 		names,
 		[]string{
 			"AsyncCallable",
+			"AwaitableCallable",
+			"AwaitableUnionCallable",
 			"Box",
 			"Effects",
 			"GenericAsyncCallable",
@@ -237,44 +242,25 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 	}
 	marker := projectExportByName(t, markerExports, "AsyncEffectMarker")
 	async := projectExportByName(t, exports, "AsyncCallable")
+	awaitable := projectExportByName(t, exports, "AwaitableCallable")
+	awaitableUnion := projectExportByName(t, exports, "AwaitableUnionCallable")
 	genericAsync := projectExportByName(t, exports, "GenericAsyncCallable")
 	sync := projectExportByName(t, exports, "SyncCallable")
 	asyncEffect, err := project.CallableEffect(async, marker)
 	if err != nil || asyncEffect != CallableEffectAsynchronous {
 		t.Fatalf("async effect = %v, %v", asyncEffect, err)
 	}
+	awaitableEffect, err := project.CallableEffect(awaitable, marker)
+	if err != nil || awaitableEffect != CallableEffectAwaitable {
+		t.Fatalf("awaitable effect = %v, %v", awaitableEffect, err)
+	}
+	awaitableEffect, err = project.CallableEffect(awaitableUnion, marker)
+	if err != nil || awaitableEffect != CallableEffectAwaitable {
+		t.Fatalf("awaitable union effect = %v, %v", awaitableEffect, err)
+	}
 	asyncEffect, err = project.CallableEffect(genericAsync, marker)
 	if err != nil || asyncEffect != CallableEffectAsynchronous {
 		t.Fatalf("generic async effect = %v, %v", asyncEffect, err)
-	}
-	facetExports, err := project.Exports(facetPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	asyncFacet := projectExportByName(t, facetExports, "AsyncFacet")
-	asyncEffect, err = project.CallableValueFacetEffect(asyncFacet, marker)
-	if err != nil || asyncEffect != CallableEffectAsynchronous {
-		t.Fatalf("async facet effect = %v, %v", asyncEffect, err)
-	}
-	reexportedFacets, err := project.Exports(facetEntryPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	reexportedFacet := projectExportByName(t, reexportedFacets, "AsyncFacet")
-	asyncEffect, err = project.CallableValueFacetEffect(reexportedFacet, marker)
-	if err != nil || asyncEffect != CallableEffectAsynchronous {
-		t.Fatalf("re-exported async facet effect = %v, %v", asyncEffect, err)
-	}
-	for _, name := range []string{
-		"ConstrainedFacet",
-		"MissingDefaultFacet",
-		"NonCallableDefaultFacet",
-		"WrappedFacet",
-	} {
-		selected := projectExportByName(t, facetExports, name)
-		if _, err := project.CallableValueFacetEffect(selected, marker); err == nil {
-			t.Fatalf("malformed callable facet %s was accepted", name)
-		}
 	}
 	syncEffect, err := project.CallableEffect(sync, marker)
 	if err != nil || syncEffect != CallableEffectSynchronous {
@@ -375,6 +361,12 @@ export class Profile {
 		exports, err := project.Exports(implementation)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if prefix != "" {
+			earlier := projectExportByName(t, exports, "Earlier")
+			if len(earlier.TypeMembers()) != 1 {
+				t.Fatal("allocation-order control member is absent")
+			}
 		}
 		profile := projectExportByName(t, exports, "Profile")
 		members := profile.TypeMembers()

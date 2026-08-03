@@ -12,7 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestEnvironmentGenericCallableProfileIsTypedAndBodyless(
+func TestEnvironmentGenericCallableContractIsCanonicalAndBodyless(
 	t *testing.T,
 ) {
 	project := t.TempDir()
@@ -58,9 +58,7 @@ func Sum(values []int32, input <-chan int32) int32 {
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	baseCount := 0
-	profileCount := 0
-	profileName := ""
+	contractCount := 0
 	for _, file := range emission.Files() {
 		if file.Kind() != emit.TargetFileEnvironmentContract {
 			continue
@@ -71,47 +69,42 @@ func Sum(values []int32, input <-chan int32) int32 {
 				continue
 			}
 			name := function.Name().Text()
-			switch {
-			case name == "Values":
-				baseCount++
-			case strings.HasPrefix(name, "Values$cooperative_"):
-				profileCount++
-				profileName = name
+			if name == "Values" {
+				contractCount++
 				if function.Body() != nil {
-					t.Fatal("environment callable profile acquired a body")
+					t.Fatal("environment callable contract acquired a body")
 				}
 			}
 		}
 	}
-	if baseCount != 1 || profileCount != 1 {
+	if contractCount != 1 {
 		t.Fatalf(
-			"environment Values declarations base=%d profile=%d, want 1/1:\n%s",
-			baseCount,
-			profileCount,
+			"environment Values declarations=%d, want 1:\n%s",
+			contractCount,
 			artifacts.printed,
 		)
 	}
-	if !strings.Contains(artifacts.printed, profileName) {
+	if strings.Contains(artifacts.printed, "Values$cooperative_") {
+		t.Fatalf("environment callable profile survived:\n%s", artifacts.printed)
+	}
+	if !strings.Contains(artifacts.printed, "Awaitable<bool>") {
 		t.Fatalf(
-			"environment callable profile is absent:\n%s",
+			"environment contract lacks canonical cooperative yield ABI:\n%s",
 			artifacts.printed,
 		)
 	}
-	if !strings.Contains(artifacts.printed, "Promise<bool>") {
-		t.Fatalf(
-			"environment profile declaration lacks cooperative yield ABI:\n%s",
-			artifacts.printed,
-		)
-	}
-	base := environmentDeclarationLine(
+	contract := environmentDeclarationLine(
 		t,
 		artifacts.printed,
 		"export declare function Values<",
 	)
-	if strings.Contains(base, "Promise<") {
+	if !strings.Contains(
+		contract,
+		"export declare function Values<$T0, $T1>($argument0: $T0): Seq__from_iter<$T1>;",
+	) {
 		t.Fatalf(
-			"environment base declaration was widened:\n%s",
-			base,
+			"environment source contract is not source-shaped:\n%s",
+			contract,
 		)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -152,7 +145,7 @@ func environmentDeclarationLine(
 	return printed[start : start+end]
 }
 
-func TestInterfaceMethodTokenIsolatedFromUnrelatedValueABI(t *testing.T) {
+func TestInterfaceMethodAwaitableABIIsStableAcrossUnrelatedValues(t *testing.T) {
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: waveNineConcurrencyDirectory(),
 		Pattern:   ".",
@@ -241,19 +234,19 @@ func TestInterfaceMethodTokenIsolatedFromUnrelatedValueABI(t *testing.T) {
 			expandedContract,
 		)
 	}
-	for _, target := range []string{baselineCall, baselineContract} {
-		for _, forbidden := range []string{"async", "Promise<", "await "} {
-			if strings.Contains(target, forbidden) {
-				t.Fatalf(
-					"synchronous interface artifact acquired %q:\n%s",
-					forbidden,
-					target,
-				)
-			}
+	for _, required := range []string{
+		"export async function DirectSynchronousInterface(): Promise<int32>",
+		"return await goInterfaceNonNil<Reader>",
+	} {
+		if !strings.Contains(baselineCall, required) {
+			t.Fatalf("interface call lacks %q:\n%s", required, baselineCall)
 		}
 	}
-	if !strings.Contains(expandedArtifacts.printed, "Promise<int32>") {
-		t.Fatal("unrelated cooperative func() int32 ABI was not selected")
+	if !strings.Contains(baselineContract, "Next(): Awaitable<int32>;") {
+		t.Fatalf("interface contract lacks canonical Awaitable ABI:\n%s", baselineContract)
+	}
+	if strings.Contains(baselineContract, "Next(): Promise<int32>;") {
+		t.Fatal("interface contract retained a blocking-only method profile")
 	}
 }
 

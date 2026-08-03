@@ -1,5 +1,6 @@
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
+import type { Awaitable } from "@gotots/runtime/scalars.js";
 import type { GoEmptyStruct } from "@gotots/runtime/struct.js";
 import { WithCancel } from "../../../../context.js";
 import type {
@@ -53,7 +54,7 @@ export function notifyContext(
 
 export async function notifyContextAsync(
   parent: Context | undefined,
-  signals: RuntimeSlice<{ String(): Promise<string> } | undefined>,
+  signals: RuntimeSlice<{ String(): Awaitable<string> } | undefined>,
 ): Promise<[Context | undefined, NonNullable<CancelFunc>]> {
   const selected = await selectedSignalsAsync(signals);
   const [context, cancel] = WithCancel(parent);
@@ -66,9 +67,37 @@ interface NotificationContext {
 
 export function startNotification<Value extends NotificationContext>(
   context: Value,
-  cancel: () => Promise<void>,
+  cancel: NonNullable<CancelFunc>,
   selected: readonly NodeJS.Signals[],
-): [Value, () => Promise<void>] {
+): [Value, NonNullable<CancelFunc>] {
+  return startNotificationWithDone(context, cancel, selected, context.Done());
+}
+
+interface AwaitableNotificationContext {
+  Done(): Awaitable<GoReceiveChannel<GoEmptyStruct> | undefined>;
+}
+
+export async function startNotificationAsync<
+  Value extends AwaitableNotificationContext,
+>(
+  context: Value,
+  cancel: NonNullable<CancelFunc>,
+  selected: readonly NodeJS.Signals[],
+): Promise<[Value, NonNullable<CancelFunc>]> {
+  return startNotificationWithDone(
+    context,
+    cancel,
+    selected,
+    await context.Done(),
+  );
+}
+
+function startNotificationWithDone<Value>(
+  context: Value,
+  cancel: NonNullable<CancelFunc>,
+  selected: readonly NodeJS.Signals[],
+  done: GoReceiveChannel<GoEmptyStruct> | undefined,
+): [Value, NonNullable<CancelFunc>] {
   let stopped = false;
 
   const stop = async (): Promise<void> => {
@@ -88,7 +117,6 @@ export function startNotification<Value extends NotificationContext>(
   for (const signal of selected) {
     process.once(signal, onSignal);
   }
-  const done = context?.Done();
   if (done !== undefined) {
     void done.receive().then(stop);
   }
@@ -116,7 +144,7 @@ export function selectedSignals(
 }
 
 export async function selectedSignalsAsync(
-  signals: RuntimeSlice<{ String(): Promise<string> } | undefined>,
+  signals: RuntimeSlice<{ String(): Awaitable<string> } | undefined>,
 ): Promise<NodeJS.Signals[]> {
   const selected: NodeJS.Signals[] = [];
   const values = sliceValues(signals);

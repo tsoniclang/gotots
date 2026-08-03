@@ -1,9 +1,7 @@
 package gostdlib
 
 func validateBinding(binding BindingDocument, field string) error {
-	requiresEffect := binding.Kind == BindingFunction ||
-		(binding.Kind == BindingType &&
-			binding.DefinedValue == DefinedValueRepresentationIdentity)
+	requiresEffect := binding.Kind == BindingFunction
 	switch {
 	case binding.Identity == "":
 		return manifestError(field+".identity", "value is empty")

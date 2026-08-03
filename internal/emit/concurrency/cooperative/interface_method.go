@@ -24,29 +24,8 @@ func InterfaceMethodContract(
 	if err != nil {
 		return false, nil, err
 	}
-	return observations.any, observations.requests, nil
-}
-
-func ElevateInterfaceMethodContract(
-	context api.Context,
-	reference api.InterfaceMethodCallableReference,
-) ([]api.RootRequest, error) {
-	observations, err := observeInterfaceMethods(
-		context,
-		[]api.InterfaceMethodCallableReference{reference},
-	)
-	if err != nil {
-		return nil, err
-	}
-	requests := observations.requests
-	for _, facet := range observations.facets {
-		request, err := api.NewCooperativeCallableRequest(facet)
-		if err != nil {
-			return nil, err
-		}
-		requests = append(requests, request)
-	}
-	return api.CombineRequests(requests), nil
+	return context.ConcurrencySemantics() ==
+		api.ConcurrencySemanticsCooperative, observations.requests, nil
 }
 
 func ProviderInterfaceMethodContracts(
@@ -55,11 +34,9 @@ func ProviderInterfaceMethodContracts(
 	references []api.InterfaceMethodCallableReference,
 ) (bool, bool, []api.RootRequest, error) {
 	if _, source := provider.SourceFunction(); !source {
-		if _, profile := provider.GenericProfile(); !profile {
-			return false, false, nil, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "interface-method provider facet is invalid",
-			}
+		return false, false, nil, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "interface-method provider facet is invalid",
 		}
 	}
 	observation, err := context.ObserveCooperativeCallable(provider)
@@ -110,20 +87,10 @@ func InterfaceMethodValueContract(
 		abiReference.Requests(),
 		abiObservation.Requests(),
 	)
-	if providers.any {
-		abiFacet, facetErr := context.CallableABIFacet(abiReference)
-		if facetErr != nil {
-			return false, false, nil, facetErr
-		}
-		selection, selectionErr :=
-			api.NewCooperativeCallableRequest(abiFacet)
-		if selectionErr != nil {
-			return false, false, nil, selectionErr
-		}
-		requests = append(requests, selection)
-	}
+	canonical := context.ConcurrencySemantics() ==
+		api.ConcurrencySemanticsCooperative
 	return providers.any,
-		providers.any || abiObservation.Cooperative(),
+		canonical,
 		requests,
 		nil
 }
@@ -150,7 +117,8 @@ func InterfaceMethodCall(
 			observations.requests,
 		),
 	)
-	if err != nil || !observations.any {
+	if err != nil || context.ConcurrencySemantics() !=
+		api.ConcurrencySemanticsCooperative {
 		return target, err
 	}
 	return await(context, source, target, !detached, false)
@@ -176,7 +144,8 @@ func GeneratedInterfaceMethodCall(
 			observations.requests,
 		),
 	)
-	if err != nil || !observations.any {
+	if err != nil || context.ConcurrencySemantics() !=
+		api.ConcurrencySemanticsCooperative {
 		return target, err
 	}
 	return await(context, nil, target, true, true)
@@ -220,21 +189,12 @@ func joinInterfaceMethodContracts(
 	if err != nil {
 		return false, false, nil, err
 	}
-	cooperative := providers.any || targets.any
+	cooperative := context.ConcurrencySemantics() ==
+		api.ConcurrencySemanticsCooperative
 	requests := api.CombineRequests(
 		providers.requests,
 		targets.requests,
 	)
-	if cooperative {
-		for _, facet := range targets.facets {
-			selection, selectionErr :=
-				api.NewCooperativeCallableRequest(facet)
-			if selectionErr != nil {
-				return false, false, nil, selectionErr
-			}
-			requests = append(requests, selection)
-		}
-	}
 	return providers.any, cooperative, requests, nil
 }
 

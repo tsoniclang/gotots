@@ -2,12 +2,69 @@ package certify
 
 import (
 	"go/types"
+	"slices"
 	"sort"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func buildStatefulProfileOperations(
+	seed providerStatefulProfileSeed,
+	facets []facetSeed,
+	target tsgo.ProjectExport,
+) ([]gostdlib.FacetCapability, error) {
+	var expected []gostdlib.FacetCapability
+	found := false
+	for _, facet := range facets {
+		if facet.SourceIdentity != seed.SourceIdentity ||
+			facet.Kind != gostdlib.FacetNamedStructOperations {
+			continue
+		}
+		if found {
+			return nil, certifyError(
+				"build provider stateful profile",
+				seed.SourceIdentity,
+				"named-struct operation owner is duplicated",
+			)
+		}
+		found = true
+		for _, capability := range facet.Capabilities {
+			if capability.NamedStructOperation() &&
+				capability != gostdlib.FacetCapabilityRepresentation {
+				expected = append(expected, capability)
+			}
+		}
+	}
+	sort.Slice(expected, func(left, right int) bool {
+		return expected[left] < expected[right]
+	})
+	if !slices.Equal(expected, seed.Operations) {
+		return nil, certifyError(
+			"build provider stateful profile",
+			seed.SourceIdentity,
+			"profile operations do not exact-join the named-struct facet",
+		)
+	}
+	for _, capability := range expected {
+		members, err := facetCapabilityMembers(capability)
+		if err != nil {
+			return nil, err
+		}
+		for _, name := range members {
+			member, ok := target.ValueMember(name)
+			if !ok || !member.Visible() {
+				return nil, certifyError(
+					"build provider stateful profile",
+					seed.Export+"."+name,
+					"profile operation member is absent",
+				)
+			}
+		}
+	}
+	return slices.Clone(expected), nil
+}
 
 func buildStatefulProfileFields(
 	selectedToolchain toolchain,
@@ -89,9 +146,10 @@ func verifyStatefulProfileTargetMembers(
 	target tsgo.ProjectExport,
 	fields []gostdlib.ProviderStatefulProfileFieldDocument,
 	methods []gostdlib.ProviderStatefulProfileMethodDocument,
+	operations []gostdlib.FacetCapability,
 ) error {
 	instance := make(map[string]struct{}, len(fields)+len(methods))
-	statics := make(map[string]struct{}, len(methods))
+	statics := make(map[string]struct{}, len(methods)+len(operations))
 	for _, field := range fields {
 		instance[field.Member] = struct{}{}
 	}
@@ -105,6 +163,22 @@ func verifyStatefulProfileTargetMembers(
 		}
 		instance[method.Member] = struct{}{}
 		statics[method.Member] = struct{}{}
+	}
+	for _, capability := range operations {
+		members, err := facetCapabilityMembers(capability)
+		if err != nil {
+			return err
+		}
+		for _, member := range members {
+			if _, duplicate := statics[member]; duplicate {
+				return certifyError(
+					"build provider stateful profile",
+					member,
+					"profile operation and method target members collide",
+				)
+			}
+			statics[member] = struct{}{}
+		}
 	}
 	if err := exactJoinStatefulMembers(target.TypeMembers(), instance, "instance"); err != nil {
 		return err

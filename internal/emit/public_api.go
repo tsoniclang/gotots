@@ -521,6 +521,10 @@ func (p RuntimePackage) IntegerRepresentation() IntegerRepresentation {
 	return p.assembled.Profile()
 }
 
+func (p RuntimePackage) ConcurrencySemantics() ConcurrencySemantics {
+	return p.assembled.Concurrency()
+}
+
 func (p RuntimePackage) Manifest() []byte {
 	return p.assembled.Manifest()
 }

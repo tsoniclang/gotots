@@ -124,64 +124,6 @@ func ContractType(
 					undefined,
 				}),
 			),
-			context.Factory().MethodSignatureDeclaration(
-				nil,
-				context.Factory().Identifier(
-					api.DeferredRegistryRegisterCooperativeMethodName,
-				),
-				nil,
-				nil,
-				[]tsgo.ParameterDeclaration{
-					parameter(
-						context.Factory(),
-						context.Factory().Identifier("method"),
-						context.Factory().KeywordTypeNode(
-							tsgo.KeywordTypeSyntaxKindObjectKeyword,
-						),
-					),
-					parameter(
-						context.Factory(),
-						context.Factory().Identifier("dynamicType"),
-						context.Factory().KeywordTypeNode(
-							tsgo.KeywordTypeSyntaxKindObjectKeyword,
-						),
-					),
-					parameter(
-						context.Factory(),
-						context.Factory().Identifier("deferred"),
-						contract.cooperativeMethodDeferred,
-					),
-				},
-				context.Factory().KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindVoidKeyword,
-				),
-			),
-			context.Factory().MethodSignatureDeclaration(
-				nil,
-				context.Factory().Identifier(
-					api.DeferredRegistryResolveCooperativeMethodName,
-				),
-				nil,
-				nil,
-				[]tsgo.ParameterDeclaration{
-					parameter(
-						context.Factory(),
-						context.Factory().Identifier("method"),
-						context.Factory().KeywordTypeNode(
-							tsgo.KeywordTypeSyntaxKindObjectKeyword,
-						),
-					),
-					parameter(
-						context.Factory(),
-						context.Factory().Identifier("receiver"),
-						contract.interfaceValue,
-					),
-				},
-				context.Factory().UnionTypeNode([]tsgo.TypeNode{
-					contract.cooperativeMethodDeferred,
-					undefined,
-				}),
-			),
 		}),
 		contract.requests...,
 	), nil

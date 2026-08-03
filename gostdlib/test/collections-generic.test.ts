@@ -317,10 +317,7 @@ test("maps functions use the semantic GoMapValue contract", (): void => {
 });
 
 test("cooperative collection facets have one typed internal owner", async (): Promise<void> => {
-  const sequence = new Seq<
-    number,
-    ((yieldValue: ((value: number) => Promise<boolean>) | undefined) => Promise<void>) | undefined
-  >(async (yieldValue): Promise<void> => {
+  const sequence = new Seq<number>(async (yieldValue): Promise<void> => {
     if (yieldValue !== undefined) {
       await yieldValue(3);
       await yieldValue(1);

@@ -15,6 +15,7 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 	assembled, err := AssemblePackage(
 		tsgo.NewFactory(),
 		api.IntegerRepresentationNumber,
+		api.ConcurrencySemanticsDisabled,
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeStringIndex: {},
 		},
@@ -90,6 +91,7 @@ func TestAssemblePackageRejectsDuplicateAliases(t *testing.T) {
 	_, err := AssemblePackage(
 		tsgo.NewFactory(),
 		api.IntegerRepresentationNumber,
+		api.ConcurrencySemanticsDisabled,
 		nil,
 		[]api.PrimitiveAlias{
 			api.PrimitiveInt32,
@@ -98,6 +100,47 @@ func TestAssemblePackageRejectsDuplicateAliases(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatal("duplicate primitive alias was accepted")
+	}
+}
+
+func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
+	factory := tsgo.NewFactory()
+	without, err := AssemblePackage(
+		factory,
+		api.IntegerRepresentationNumber,
+		api.ConcurrencySemanticsCooperative,
+		nil,
+		[]api.PrimitiveAlias{api.PrimitiveInt32},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withoutStatements := without.Files()[0].SourceFile().Statements()
+	if len(withoutStatements) != 1 ||
+		withoutStatements[0].(tsgo.TypeAliasDeclaration).Name().Text() != "int32" {
+		t.Fatalf("undemanded scalar support = %#v", withoutStatements)
+	}
+
+	with, err := AssemblePackage(
+		factory,
+		api.IntegerRepresentationNumber,
+		api.ConcurrencySemanticsCooperative,
+		map[api.RuntimeSymbol]struct{}{api.RuntimeAwaitable: {}},
+		[]api.PrimitiveAlias{api.PrimitiveInt32},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withStatements := with.Files()[0].SourceFile().Statements()
+	if len(withStatements) != 2 {
+		t.Fatalf("demanded scalar support statements = %d, want two", len(withStatements))
+	}
+	wantNames := []string{"Awaitable", "int32"}
+	for index, statement := range withStatements {
+		declaration, ok := statement.(tsgo.TypeAliasDeclaration)
+		if !ok || declaration.Name().Text() != wantNames[index] {
+			t.Fatalf("scalar support statement %d = %#v, want %s", index, statement, wantNames[index])
+		}
 	}
 }
 

@@ -33,10 +33,6 @@ func (r DeclarationRequirement) Valid() bool {
 		r.pointerCarrier {
 		return false
 	}
-	if r.kind != DeclarationRequirementGenericCallableProfile &&
-		r.genericProfile != nil {
-		return false
-	}
 	if r.kind != DeclarationRequirementGenericConcretization &&
 		r.concretizationDeferred {
 		return false
@@ -178,23 +174,6 @@ func (r DeclarationRequirement) Valid() bool {
 		concretization, ok := r.generated.GenericConcretization()
 		return ok && concretization.Valid() &&
 			r.owner == r.generated.ReconstructionOwner()
-	case DeclarationRequirementGenericCallableProfile:
-		if !r.owner.Valid() ||
-			r.operation != NamedStructOperationInvalid ||
-			r.typeName != nil ||
-			r.variable != nil ||
-			r.constant != nil ||
-			r.projection != types.Invalid ||
-			r.generated != nil ||
-			r.anonymousDemand != AnonymousStructDemandInvalid ||
-			r.mapDemand != MapSpecializationDemandInvalid ||
-			r.genericOperation != nil ||
-			!r.genericProfile.Valid() {
-			return false
-		}
-		source, sourceOK := r.owner.Source()
-		return sourceOK &&
-			source == r.genericProfile.Owner()
 	case DeclarationRequirementGenericRepresentation:
 		if r.operation != NamedStructOperationInvalid ||
 			r.typeName != nil ||

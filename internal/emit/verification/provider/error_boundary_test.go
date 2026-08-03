@@ -250,16 +250,25 @@ func main() { fmt.Println(protocol.Result()) }
 		)
 	}
 	for _, required := range []string{
-		"ErrorsIsCanonicalAsyncIs",
+		"ErrorsIsCanonicalAsyncErrorAsyncAll",
 		"async Is(",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("cooperative errors.Is output lacks %q:\n%s", required, artifacts.printed)
 		}
 	}
+	for _, forbidden := range []string{
+		"ErrorsIsCanonicalAsyncIs(",
+		"ErrorsIsCanonicalAsyncUnwrap(",
+		"ErrorsIsCanonicalAsyncUnwrapMany(",
+	} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("cooperative errors.Is retained partial profile %q:\n%s", forbidden, artifacts.printed)
+		}
+	}
 }
 
-func TestErrorsIsDoesNotInvokeCooperativeErrorMethod(t *testing.T) {
+func TestErrorsIsUsesCanonicalCooperativeProtocolWithoutInvokingError(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
@@ -327,7 +336,7 @@ func Result() bool {
 		artifacts.paths,
 		assemblyPath,
 		[]string{"Result"},
-		"console.log(Result());\n",
+		"console.log(await Result());\n",
 	)
 	runnerDirectory := filepath.Join(project, "cmd", "compare")
 	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
@@ -359,7 +368,7 @@ func main() { fmt.Println(comparison.Result()) }
 		)
 	}
 	for _, required := range []string{
-		"ErrorsIsCanonicalAsyncErrorSync",
+		"ErrorsIsCanonicalAsyncErrorAsyncAll",
 		"async Error(",
 	} {
 		if !strings.Contains(artifacts.printed, required) {

@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	SchemaVersion = 19
+	SchemaVersion = 20
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -231,18 +231,6 @@ func (m Manifest) Facet(
 		sourceIdentity: sourceIdentity,
 		kind:           kind,
 		capability:     string(capability),
-	}]
-	return selected, ok
-}
-
-func (m Manifest) GenericCallableFacet(
-	sourceIdentity string,
-	profileKey string,
-) (Facet, bool) {
-	selected, ok := m.facets[facetLookup{
-		sourceIdentity: sourceIdentity,
-		kind:           FacetGenericCallableProfile,
-		capability:     profileKey,
 	}]
 	return selected, ok
 }

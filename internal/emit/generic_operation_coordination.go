@@ -1,8 +1,6 @@
 package emit
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"go/ast"
 	"go/types"
 	"sort"
@@ -11,56 +9,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 )
-
-type genericCallableProfileIdentity struct {
-	owner *types.Func
-	key   string
-}
-
-func (s *programSession) ResolveGenericCallableProfile(
-	owner *types.Func,
-	selection api.GenericCallableProfileSelection,
-) (*api.GenericCallableProfile, error) {
-	if owner == nil {
-		return nil, &ScheduleError{
-			Reason: "generic callable profile owner is nil",
-		}
-	}
-	owner = owner.Origin()
-	_, sourceOwned := s.sites[owner]
-	environmentOwned :=
-		s.source.EnvironmentForTypes(owner.Pkg()) != nil
-	if (!sourceOwned && !environmentOwned) ||
-		len(api.GenericDeclarationParameters(owner)) == 0 ||
-		!selection.Valid() ||
-		!selection.Cooperative() {
-		return nil, &ScheduleError{
-			Object: owner.Name(),
-			Reason: "generic callable profile identity is invalid",
-		}
-	}
-	identity := genericCallableProfileIdentity{
-		owner: owner,
-		key:   selection.Key(),
-	}
-	if existing := s.genericProfiles[identity]; existing != nil {
-		return existing, nil
-	}
-	digest := sha256.Sum256([]byte(
-		"generic-callable-profile|" + selection.Key(),
-	))
-	suffix := "$cooperative_" + hex.EncodeToString(digest[:10])
-	profile, err := api.NewGenericCallableProfile(
-		owner,
-		selection,
-		suffix,
-	)
-	if err != nil {
-		return nil, err
-	}
-	s.genericProfiles[identity] = profile
-	return profile, nil
-}
 
 func (s *programSession) ResolveGenericOperationSet(
 	declaration types.Object,

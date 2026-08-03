@@ -54,7 +54,6 @@ func (s *programSession) ResolveGenericConcretization(
 	placement api.GeneratedArtifactPlacement,
 	lexicalOwner api.ArtifactOwner,
 	anchor *types.TypeName,
-	profile *api.GenericCallableProfile,
 ) (*api.GenericConcretization, error) {
 	if owner == nil || owner.Origin() != owner || arguments.Len() == 0 ||
 		signature == nil ||
@@ -101,18 +100,6 @@ func (s *programSession) ResolveGenericConcretization(
 	identity.WriteByte(':')
 	identity.WriteString(ownerIdentity)
 	identity.WriteByte('|')
-	if profile == nil {
-		identity.WriteString("synchronous")
-	} else {
-		if !profile.Valid() || profile.Owner() != owner {
-			return nil, &ScheduleError{
-				Object: owner.Name(),
-				Reason: "generic concretization profile is invalid",
-			}
-		}
-		identity.WriteString("profile|")
-		identity.WriteString(profile.Key())
-	}
 	namedIdentity := s.genericConcretizationNamedIdentity(
 		placement,
 		lexicalOwner,
@@ -151,8 +138,7 @@ func (s *programSession) ResolveGenericConcretization(
 		}
 		if existing.Placement() != placement ||
 			existing.LexicalOwner() != lexicalOwner ||
-			existing.LexicalAnchor() != anchor ||
-			!sameGenericConcretizationProfile(existing, profile) {
+			existing.LexicalAnchor() != anchor {
 			return nil, &ScheduleError{
 				Object: owner.Name(),
 				Reason: "generic concretization key joined different placements",
@@ -179,21 +165,12 @@ func (s *programSession) ResolveGenericConcretization(
 		placement,
 		lexicalOwner,
 		anchor,
-		profile,
 	)
 	if err != nil {
 		return nil, err
 	}
 	s.genericConcretizations[selection] = concretization
 	return concretization, nil
-}
-
-func sameGenericConcretizationProfile(
-	concretization *api.GenericConcretization,
-	profile *api.GenericCallableProfile,
-) bool {
-	selected, profiled := concretization.Profile()
-	return profiled == (profile != nil) && (!profiled || selected == profile)
 }
 
 func (s *programSession) genericConcretizationNamedIdentity(

@@ -4,7 +4,6 @@ import (
 	"go/ast"
 	"go/types"
 
-	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
@@ -246,7 +245,7 @@ func emitProviderProfileInvocation(
 		context,
 		source,
 		target,
-		reference.Profile().Effect() == gostdlib.EffectAsynchronous,
+		reference.Profile().Effect().MaySuspend(),
 		detached,
 	)
 	if err != nil || discarded {

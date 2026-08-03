@@ -106,7 +106,7 @@ await GoScheduler.run(async () => {
 	}
 }
 
-func TestWaveNineLeavesUnrelatedCallableABIByteStable(t *testing.T) {
+func TestWaveNineKeepsTransportedCallableABIByteStableAcrossRoots(t *testing.T) {
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: waveNineConcurrencyDirectory(),
 		Pattern:   ".",
@@ -168,14 +168,21 @@ func TestWaveNineLeavesUnrelatedCallableABIByteStable(t *testing.T) {
 			concurrentFunction,
 		)
 	}
-	for _, forbidden := range []string{"async", "Promise<", "GoScheduler"} {
-		if strings.Contains(synchronousFunction, forbidden) {
+	for _, required := range []string{
+		"export async function WhollySynchronous(): Promise<gostring>",
+		"(($0: gostring) => Awaitable<gostring>) | undefined",
+		"return await __gotots_callee_",
+	} {
+		if !strings.Contains(synchronousFunction, required) {
 			t.Fatalf(
-				"synchronous callable contract contains %q:\n%s",
-				forbidden,
+				"transported callable contract lacks %q:\n%s",
+				required,
 				synchronousFunction,
 			)
 		}
+	}
+	if strings.Contains(synchronousFunction, "$cooperative_") {
+		t.Fatalf("transported callable retained a profile variant:\n%s", synchronousFunction)
 	}
 }
 
@@ -319,12 +326,12 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 	transport := waveNineFunctionText(t, printed, "Transport")
 	for _, required := range []string{
 		"export async function Transport(): Promise<int32>",
-		"GoArray.literal<(($0: GoReceiveChannel<int32> | undefined) => Promise<int32>) | undefined",
-		"RuntimeSlice.literal<(($0: GoReceiveChannel<int32> | undefined) => Promise<int32>) | undefined",
+		"GoArray.literal<(($0: GoReceiveChannel<int32> | undefined) => Awaitable<int32>) | undefined",
+		"RuntimeSlice.literal<(($0: GoReceiveChannel<int32> | undefined) => Awaitable<int32>) | undefined",
 		"mapping.lookup(0)",
-		"let asserted: (($0: GoReceiveChannel<int32> | undefined) => Promise<int32>) | undefined",
-		"identity<(($0: GoReceiveChannel<int32> | undefined) => Promise<int32>) | undefined>",
-		"let methodValue: (() => Promise<int32>) | undefined",
+		"let asserted: (($0: GoReceiveChannel<int32> | undefined) => Awaitable<int32>) | undefined",
+		"identity<(($0: GoReceiveChannel<int32> | undefined) => Awaitable<int32>) | undefined>",
+		"let methodValue: (() => Awaitable<int32>) | undefined",
 		"await goInterfaceNonNil<Reader>(",
 		"async ($argument0: GoReceiveChannel<int32> | undefined): Promise<int32>",
 	} {
@@ -512,17 +519,21 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 		}
 	}
 	staticConstraint := waveNineFunctionText(t, printed, "readStatic")
-	for _, forbidden := range []string{"async", "Promise<", "await "} {
-		if strings.Contains(staticConstraint, forbidden) {
+	for _, required := range []string{
+		"export async function readStatic$kernel<",
+		"($0: T) => Awaitable<int64>",
+		"return await $go$constraint_method_",
+	} {
+		if !strings.Contains(staticConstraint, required) {
 			t.Fatalf(
-				"synchronous generic constraint acquired %q:\n%s",
-				forbidden,
+				"transported generic constraint lacks %q:\n%s",
+				required,
 				staticConstraint,
 			)
 		}
 	}
 	if !strings.Contains(printed, "PackageReceiver") ||
-		!strings.Contains(printed, "Promise<int32>") {
+		!strings.Contains(printed, "Awaitable<int32>") {
 		t.Fatal("function-valued package storage lacks its cooperative ABI")
 	}
 }

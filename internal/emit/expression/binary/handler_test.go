@@ -300,12 +300,6 @@ func (unusedNames) SourceCallableABI(
 	panic("unused")
 }
 
-func (unusedNames) GenericCallableProfile(
-	*api.GenericCallableProfile,
-) (api.NameReference, error) {
-	panic("unused")
-}
-
 func (unusedNames) ProviderGenericTypeArguments(
 	*types.Func,
 ) ([]api.GenericTypeArgumentProjection, bool, error) {

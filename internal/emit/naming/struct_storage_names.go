@@ -149,6 +149,23 @@ func (n *File) NamedStructStorage(
 		return api.NameReference{}, err
 	}
 	if providerOwned {
+		statefulReference, profiled, statefulErr := n.providerStatefulOperation(
+			typeName,
+			gostdlib.FacetCapabilityStorage,
+			api.ImportPhaseType,
+			api.ArtifactFacetInstanceTypeSurface,
+		)
+		if statefulErr != nil {
+			return api.NameReference{}, statefulErr
+		}
+		if profiled {
+			return statefulReference.WithRequests(
+				api.CombineRequests(
+					statefulReference.Requests(),
+					[]api.RootRequest{request},
+				)...,
+			)
+		}
 		return providerReference.WithRequests(
 			api.CombineRequests(
 				providerReference.Requests(),

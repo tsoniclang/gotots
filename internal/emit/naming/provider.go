@@ -21,7 +21,6 @@ type standardLibraryProvider interface {
 		gostdlib.FacetKind,
 		gostdlib.FacetCapability,
 	) (gostdlib.Facet, bool)
-	GenericCallableFacet(string, string) (gostdlib.Facet, bool)
 	ProviderRepresentation(string, string) (gostdlib.ProviderRepresentation, bool)
 	ProviderInterface(string) (gostdlib.ProviderInterfaceBinding, bool)
 	ProviderCallableProfile(string, string) (gostdlib.ProviderCallableProfile, bool)
@@ -397,51 +396,6 @@ func providerBindingKind(
 			Reason: "provider object kind is unsupported",
 		}
 	}
-}
-
-func (r *Registry) ProviderGenericCallableEffect(
-	owner *types.Func,
-	profileKey string,
-) (gostdlib.EffectKind, bool, error) {
-	if r == nil || owner == nil || profileKey == "" {
-		return gostdlib.EffectInvalid, false, &api.NameError{
-			Reason: "provider generic-callable identity is invalid",
-		}
-	}
-	owner = owner.Origin()
-	binding, ok := r.byObject[owner]
-	if !ok {
-		return gostdlib.EffectInvalid, false, &api.NameError{
-			Name:   owner.Name(),
-			Reason: "provider generic-callable owner has no target binding",
-		}
-	}
-	if binding.kind != targetBindingProvider &&
-		binding.kind != targetBindingMissingProvider {
-		return gostdlib.EffectInvalid, false, nil
-	}
-	if r.provider == nil || !r.provider.Valid() {
-		return gostdlib.EffectInvalid, true, &api.NameError{
-			Name:   owner.Name(),
-			Reason: "standard-library provider certificate is invalid",
-		}
-	}
-	contract, err := environmentcontract.Describe(owner)
-	if err != nil {
-		return gostdlib.EffectInvalid, true, err
-	}
-	selected, ok := r.provider.GenericCallableFacet(
-		contract.Identity(),
-		profileKey,
-	)
-	if !ok || selected.SourceIdentity() != contract.Identity() ||
-		selected.ProfileKey() != profileKey || !selected.Effect().Valid() {
-		return gostdlib.EffectInvalid, true, &api.NameError{
-			Name:   contract.Identity(),
-			Reason: "certified provider generic-callable effect is absent or inconsistent",
-		}
-	}
-	return selected.Effect(), true, nil
 }
 
 func (r *Registry) ProviderCallableEffect(

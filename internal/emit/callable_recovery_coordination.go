@@ -57,12 +57,6 @@ func recoveryFacetSource(
 	if function, ok := facet.SourceFunction(); ok {
 		return function.Origin(), true
 	}
-	if profile, ok := facet.GenericProfile(); ok {
-		return profile.Owner().Origin(), true
-	}
-	if profile, _, ok := facet.GenericProfileABI(); ok {
-		return profile.Owner().Origin(), true
-	}
 	return nil, false
 }
 

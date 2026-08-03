@@ -33,7 +33,6 @@ type DeclarationRequirement struct {
 	genericFacet           GenericRepresentationFacet
 	typeRepresentation     TypeRepresentationFacet
 	pointerCarrier         bool
-	genericProfile         *GenericCallableProfile
 	concretizationDeferred bool
 	enclosing              ast.Node
 	callable               ast.Node

@@ -139,14 +139,14 @@ func main() {
 	}
 	if !strings.Contains(
 		artifacts.printed,
-		"OsSignalNotifyContextCanonicalContext<",
+		"OsSignalNotifyContextCanonicalContextSignal<",
 	) {
-		t.Fatalf("NotifyContext output lacks context profile:\n%s", artifacts.printed)
+		t.Fatalf("NotifyContext output lacks canonical cooperative profile:\n%s", artifacts.printed)
 	}
 	if strings.Contains(
 		artifacts.printed,
-		"OsSignalNotifyContextCanonicalContextSignal",
+		"OsSignalNotifyContextCanonicalContext<",
 	) {
-		t.Fatalf("NotifyContext output canonicalized an exact signal:\n%s", artifacts.printed)
+		t.Fatalf("NotifyContext output retained a partial context profile:\n%s", artifacts.printed)
 	}
 }

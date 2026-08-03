@@ -257,12 +257,9 @@ func validateFacetSeeds(
 			!strings.HasSuffix(seed.SourcePath, ".ts") {
 			return nil, certifyError("configure facets", key, "facet module is invalid")
 		}
-		capabilities := make([]string, 0, len(seed.Capabilities)+1)
+		capabilities := make([]string, 0, len(seed.Capabilities))
 		for _, capability := range seed.Capabilities {
 			capabilities = append(capabilities, string(capability))
-		}
-		if seed.ProfileKey != "" {
-			capabilities = append(capabilities, seed.ProfileKey)
 		}
 		if len(capabilities) == 0 {
 			return nil, certifyError("configure facets", key, "capability set is empty")
@@ -271,7 +268,7 @@ func validateFacetSeeds(
 			(len(seed.Capabilities) != 2 ||
 				seed.Capabilities[0] != gostdlib.FacetCapabilityProject ||
 				seed.Capabilities[1] != gostdlib.FacetCapabilityWrap ||
-				seed.ProfileKey != "" || seed.StorageExport != "" ||
+				seed.StorageExport != "" ||
 				seed.RepresentationExport != "" ||
 				seed.Effect != gostdlib.EffectInvalid) {
 			return nil, certifyError(
@@ -337,7 +334,7 @@ func validateGenericFacetSeedShape(seed facetSeed, key string) error {
 	if seed.Kind == gostdlib.FacetGenericCallableKernel {
 		if len(seed.Capabilities) != 1 ||
 			seed.Capabilities[0] != gostdlib.FacetCapabilityKernel ||
-			len(seed.GenericTypeArguments) == 0 || seed.ProfileKey != "" ||
+			len(seed.GenericTypeArguments) == 0 ||
 			seed.Effect != gostdlib.EffectInvalid || seed.StorageExport != "" ||
 			seed.RepresentationExport != "" {
 			return certifyError(

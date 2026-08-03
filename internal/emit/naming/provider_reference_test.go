@@ -32,13 +32,6 @@ func (facetOnlyProvider) Facet(
 	return gostdlib.Facet{}, false
 }
 
-func (facetOnlyProvider) GenericCallableFacet(
-	string,
-	string,
-) (gostdlib.Facet, bool) {
-	return gostdlib.Facet{}, false
-}
-
 func (facetOnlyProvider) ProviderRepresentation(
 	string,
 	string,

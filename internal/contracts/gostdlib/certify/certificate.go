@@ -128,16 +128,6 @@ func (c *Certificate) Facet(
 	return c.manifest.Facet(sourceIdentity, kind, capability)
 }
 
-func (c *Certificate) GenericCallableFacet(
-	sourceIdentity string,
-	profileKey string,
-) (gostdlib.Facet, bool) {
-	if !c.Valid() {
-		return gostdlib.Facet{}, false
-	}
-	return c.manifest.GenericCallableFacet(sourceIdentity, profileKey)
-}
-
 func (c *Certificate) ProviderRepresentation(
 	module string,
 	export string,

@@ -30,40 +30,45 @@ func (f PackageFile) SourceFile() tsgo.SourceFile {
 }
 
 type Package struct {
-	files        []PackageFile
-	manifest     []byte
-	fingerprint  string
-	profile      api.IntegerRepresentation
-	packageValid bool
+	files       []PackageFile
+	manifest    []byte
+	fingerprint string
+	integer     api.IntegerRepresentation
+	concurrency api.ConcurrencySemantics
+	valid       bool
 }
 
 func (p Package) Valid() bool {
-	return p.packageValid
+	return p.valid
 }
 
 func (p Package) Name() string {
-	if !p.packageValid {
+	if !p.valid {
 		return ""
 	}
 	return targetoutput.RuntimePackageName
 }
 
 func (p Package) RootPath() string {
-	if !p.packageValid {
+	if !p.valid {
 		return ""
 	}
 	return targetoutput.RuntimePackageRootPath
 }
 
 func (p Package) ManifestPath() string {
-	if !p.packageValid {
+	if !p.valid {
 		return ""
 	}
 	return targetoutput.RuntimePackageManifestPath
 }
 
 func (p Package) Profile() api.IntegerRepresentation {
-	return p.profile
+	return p.integer
+}
+
+func (p Package) Concurrency() api.ConcurrencySemantics {
+	return p.concurrency
 }
 
 func (p Package) Files() []PackageFile {
@@ -80,19 +85,25 @@ func (p Package) Fingerprint() string {
 
 func AssemblePackage(
 	factory tsgo.Factory,
-	profile api.IntegerRepresentation,
+	integer api.IntegerRepresentation,
+	concurrency api.ConcurrencySemantics,
 	requested map[api.RuntimeSymbol]struct{},
 	aliases []api.PrimitiveAlias,
 ) (Package, error) {
-	if !profile.Valid() {
+	if !integer.Valid() {
 		return Package{}, &AssemblyError{
 			Reason: "runtime package integer profile is invalid",
+		}
+	}
+	if !concurrency.Valid() {
+		return Package{}, &AssemblyError{
+			Reason: "runtime package concurrency profile is invalid",
 		}
 	}
 	aliases = slices.Clone(aliases)
 	slices.Sort(aliases)
 	for index, alias := range aliases {
-		if _, _, err := api.PrimitiveAliasRepresentation(alias, profile); err != nil {
+		if _, _, err := api.PrimitiveAliasRepresentation(alias, integer); err != nil {
 			return Package{}, err
 		}
 		if index != 0 && alias == aliases[index-1] {
@@ -135,20 +146,36 @@ func AssemblePackage(
 		return modules[left] < modules[right]
 	})
 	files := make([]PackageFile, 0, len(modules)+1)
-	if len(aliases) != 0 {
-		statements := make([]tsgo.Statement, 0, len(aliases))
-		for _, alias := range aliases {
-			name, keyword, err := api.PrimitiveAliasRepresentation(alias, profile)
-			if err != nil {
-				return Package{}, err
-			}
-			statements = append(statements, factory.TypeAliasDeclaration(
-				[]tsgo.ModifierLike{factory.ExportKeyword()},
-				factory.Identifier(name),
-				nil,
-				factory.KeywordTypeNode(keyword),
-			))
+	statements := make([]tsgo.Statement, 0, len(aliases)+1)
+	if symbols := byModule[api.RuntimeModuleScalar]; len(symbols) != 0 {
+		slices.Sort(symbols)
+		definitions, err := Build(factory, api.RuntimeModuleScalar, symbols)
+		if err != nil {
+			return Package{}, err
 		}
+		statements, err = exactDefinitions(
+			api.RuntimeModuleScalar,
+			symbols,
+			definitions,
+		)
+		if err != nil {
+			return Package{}, err
+		}
+		delete(byModule, api.RuntimeModuleScalar)
+	}
+	for _, alias := range aliases {
+		name, keyword, err := api.PrimitiveAliasRepresentation(alias, integer)
+		if err != nil {
+			return Package{}, err
+		}
+		statements = append(statements, factory.TypeAliasDeclaration(
+			[]tsgo.ModifierLike{factory.ExportKeyword()},
+			factory.Identifier(name),
+			nil,
+			factory.KeywordTypeNode(keyword),
+		))
+	}
+	if len(statements) != 0 {
 		file, err := packageSourceFile(
 			factory,
 			targetoutput.ScalarSupportPath,
@@ -160,6 +187,9 @@ func AssemblePackage(
 		files = append(files, file)
 	}
 	for _, module := range modules {
+		if module == api.RuntimeModuleScalar {
+			continue
+		}
 		symbols := byModule[module]
 		slices.Sort(symbols)
 		definitions, err := Build(factory, module, symbols)
@@ -192,17 +222,40 @@ func AssemblePackage(
 	sort.Slice(files, func(left, right int) bool {
 		return files[left].outputPath < files[right].outputPath
 	})
-	manifest, fingerprint, err := packageManifest(profile, files)
+	manifest, fingerprint, err := packageManifest(integer, concurrency, files)
 	if err != nil {
 		return Package{}, err
 	}
 	return Package{
-		files:        files,
-		manifest:     manifest,
-		fingerprint:  fingerprint,
-		profile:      profile,
-		packageValid: true,
+		files:       files,
+		manifest:    manifest,
+		fingerprint: fingerprint,
+		integer:     integer,
+		concurrency: concurrency,
+		valid:       true,
 	}, nil
+}
+
+func awaitableType(
+	factory tsgo.Factory,
+) tsgo.Statement {
+	parameter := factory.Identifier("T")
+	value := factory.TypeReferenceNode(parameter, nil)
+	result := factory.UnionTypeNode([]tsgo.TypeNode{
+		value,
+		factory.TypeReferenceNode(
+			api.TargetIntrinsicPromise.TypeName(factory),
+			[]tsgo.TypeNode{value},
+		),
+	})
+	return factory.TypeAliasDeclaration(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		factory.Identifier("Awaitable"),
+		[]tsgo.TypeParameterDeclaration{
+			factory.TypeParameterDeclaration(nil, parameter, nil, nil, nil),
+		},
+		result,
+	)
 }
 
 func dependencyClosure(
@@ -379,6 +432,7 @@ type packageExport struct {
 
 type packageMetadata struct {
 	IntegerRepresentation string `json:"integerRepresentation"`
+	ConcurrencySemantics  string `json:"concurrencySemantics"`
 }
 
 type packageDocument struct {
@@ -391,7 +445,8 @@ type packageDocument struct {
 }
 
 func packageManifest(
-	profile api.IntegerRepresentation,
+	integer api.IntegerRepresentation,
+	concurrency api.ConcurrencySemantics,
 	files []PackageFile,
 ) ([]byte, string, error) {
 	exports := make(map[string]packageExport, len(files))
@@ -429,7 +484,8 @@ func packageManifest(
 		Private: true,
 		Type:    "module",
 		GoToTS: packageMetadata{
-			IntegerRepresentation: profile.String(),
+			IntegerRepresentation: integer.String(),
+			ConcurrencySemantics:  concurrency.String(),
 		},
 		Exports: exports,
 	}

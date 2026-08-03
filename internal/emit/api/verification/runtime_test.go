@@ -103,6 +103,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeUnsafeSlice, 1211, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeSlice", false, []api.RuntimeSymbol{api.RuntimePointerRegion, api.RuntimePointer, api.RuntimeSliceRegion, api.RuntimeSlice}},
 		{api.RuntimeUnsafeStringData, 1212, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeStringData", false, []api.RuntimeSymbol{api.RuntimePointerRegion, api.RuntimePointer}},
 		{api.RuntimeUnsafeSliceData, 1213, api.RuntimeModuleUnsafe, "runtime/unsafe.ts", "goUnsafeSliceData", false, []api.RuntimeSymbol{api.RuntimePointerRegion, api.RuntimePointer, api.RuntimeSliceRegion, api.RuntimeSlice}},
+		{api.RuntimeAwaitable, 1300, api.RuntimeModuleScalar, "runtime/scalars.ts", "Awaitable", true, nil},
 	}
 	for _, test := range tests {
 		if uint16(test.symbol) != test.id {

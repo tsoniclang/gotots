@@ -3,7 +3,6 @@ package emit
 import (
 	"go/types"
 
-	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
@@ -32,21 +31,6 @@ func (s *programSession) observeCooperativeCallable(
 			Reason: "cooperative callable facet is invalid",
 		}
 	}
-	if profile, profiled := facet.GenericProfile(); profiled {
-		effect, providerOwned, err :=
-			s.registry.ProviderGenericCallableEffect(
-				profile.Owner(),
-				profile.Selection().Key(),
-			)
-		if err != nil {
-			return api.CooperativeCallableObservation{}, err
-		}
-		if providerOwned {
-			return api.NewCooperativeCallableObservation(
-				effect == gostdlib.EffectAsynchronous,
-			)
-		}
-	}
 	if source, ok := facet.Owner().Source(); ok && source != nil &&
 		s.source.EnvironmentForTypes(source.Pkg()) != nil {
 		function, callable := source.(*types.Func)
@@ -64,7 +48,7 @@ func (s *programSession) observeCooperativeCallable(
 				profileRequests = requests
 				if selected {
 					return api.NewCooperativeCallableObservation(
-						effect == gostdlib.EffectAsynchronous,
+						effect.MaySuspend(),
 						profileRequests...,
 					)
 				}
@@ -76,17 +60,13 @@ func (s *programSession) observeCooperativeCallable(
 			}
 			if providerOwned {
 				return api.NewCooperativeCallableObservation(
-					effect == gostdlib.EffectAsynchronous,
+					effect.MaySuspend(),
 					profileRequests...,
 				)
 			}
 		}
 	}
 	cooperative := false
-	if profile, artifact, profiled := facet.GenericProfileABI(); profiled {
-		selected, found := profile.Selection().ABI(artifact)
-		cooperative = found && selected
-	}
 	for _, requirement := range s.requirements.appliedFor(
 		facet.Owner(),
 	) {
@@ -113,8 +93,7 @@ func (s *programSession) observeCooperativeCallable(
 			api.CallableFacetABI,
 			api.CallableFacetInterfaceMethod,
 			api.CallableFacetGenericCapability,
-			api.CallableFacetGenericOperation,
-			api.CallableFacetGenericProfile:
+			api.CallableFacetGenericOperation:
 			request, err := api.NewOwnedArtifactDependencyRequest(
 				facet.Owner(),
 				api.ArtifactFacetCallableSignature,
@@ -327,40 +306,8 @@ func callableContractDefinition(
 func callableContractFacet(
 	facet api.CallableFacet,
 ) (*api.GeneratedArtifact, bool) {
-	if _, _, profiled := facet.GenericProfileABI(); profiled {
-		return nil, false
-	}
 	if artifact, ok := facet.ABI(); ok {
 		return artifact, true
 	}
 	return facet.InterfaceMethod()
-}
-
-func compareGenericProfileABIs(
-	left api.CallableFacet,
-	right api.CallableFacet,
-) (int, bool) {
-	leftProfile, leftABI, leftOK := left.GenericProfileABI()
-	rightProfile, rightABI, rightOK := right.GenericProfileABI()
-	if leftOK != rightOK {
-		if leftOK {
-			return 1, true
-		}
-		return -1, true
-	}
-	if !leftOK {
-		return 0, false
-	}
-	switch {
-	case leftProfile.Key() < rightProfile.Key():
-		return -1, true
-	case leftProfile.Key() > rightProfile.Key():
-		return 1, true
-	case leftABI.ArtifactKey() < rightABI.ArtifactKey():
-		return -1, true
-	case leftABI.ArtifactKey() > rightABI.ArtifactKey():
-		return 1, true
-	default:
-		return 0, true
-	}
 }

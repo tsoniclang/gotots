@@ -14,8 +14,8 @@ func TestRuntimeRegistryOwnsOneGenericInstanceImplementation(t *testing.T) {
 		"GoInterfaceValue",
 	)
 	if class.Name().Text() != "GoDeferredRegistry" ||
-		len(class.TypeParameters()) != 4 ||
-		len(class.Members()) != 9 {
+		len(class.TypeParameters()) != 3 ||
+		len(class.Members()) != 6 {
 		t.Fatalf(
 			"registry shape = %s/%d/%d",
 			class.Name().Text(),

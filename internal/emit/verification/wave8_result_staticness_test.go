@@ -131,14 +131,16 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 	abi := "(($0: gostring) => void) | undefined"
 	for _, required := range []string{
 		"public Call: " + abi,
-		"$Value = " + abi,
-		"public readonly $value: $Value",
+		"public readonly $value: " + abi,
 		"GoPointer<" + abi + ", " + abi + ">",
 		"RuntimeSlice.literal<" + abi + ">",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("signature-owned callable ABI lacks %q", required)
 		}
+	}
+	if strings.Contains(artifacts.printed, "$Value =") {
+		t.Fatal("callable carrier exposed a representation-only type parameter")
 	}
 	if strings.Contains(artifacts.printed, "($0: gostring, $go$recovery") {
 		t.Fatalf("source callable carrier exposes recovery authority")

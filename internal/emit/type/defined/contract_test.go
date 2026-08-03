@@ -2,7 +2,6 @@ package defined_test
 
 import (
 	"context"
-	"go/types"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,50 +9,9 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
-	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
-
-func TestCallableValueFacetDetectionIsStructural(t *testing.T) {
-	signature := types.NewSignatureType(
-		nil,
-		nil,
-		nil,
-		types.NewTuple(),
-		types.NewTuple(),
-		false,
-	)
-	for name, sourceType := range map[string]types.Type{
-		"direct": signature,
-		"nested": types.NewMap(
-			types.Typ[types.String],
-			types.NewSlice(types.NewArray(signature, 2)),
-		),
-	} {
-		named := types.NewNamed(
-			types.NewTypeName(0, nil, name, nil),
-			sourceType,
-			nil,
-		)
-		if !definedtype.RequiresValueFacet(named) {
-			t.Fatalf("%s callable leaf was not detected", name)
-		}
-	}
-	for name, sourceType := range map[string]types.Type{
-		"basic":  types.Typ[types.Int32],
-		"struct": types.NewStruct(nil, nil),
-	} {
-		named := types.NewNamed(
-			types.NewTypeName(0, nil, name, nil),
-			sourceType,
-			nil,
-		)
-		if definedtype.RequiresValueFacet(named) {
-			t.Fatalf("%s acquired a callable value facet", name)
-		}
-	}
-}
 
 func TestRecursiveStructWithCallableKeepsNativeClassShape(t *testing.T) {
 	target := compileDefinedSource(t, `package spelling
@@ -85,7 +43,7 @@ func Identity(value Node) Node { return value }
 	}
 }
 
-func TestGenericValueFacetArityFollowsDeclarationOrigin(t *testing.T) {
+func TestGenericDefinedArityFollowsDeclarationOrigin(t *testing.T) {
 	target := compileDefinedSource(t, `package spelling
 
 type CallbackHolder struct {

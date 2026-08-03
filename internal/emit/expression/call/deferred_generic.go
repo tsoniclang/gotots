@@ -48,18 +48,10 @@ func emitDeferredGeneric(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	declarationSignature, ok := owner.Type().(*types.Signature)
-	if !ok {
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	_, callableFacet, _, selectionRequests, err :=
-		cooperativecall.SelectGenericClassMethod(
-			context,
-			owner,
-			declarationSignature,
-			signature,
-		)
+	callableFacet, err := cooperativecall.SelectGenericClassMethod(
+		context,
+		owner,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
@@ -82,12 +74,10 @@ func emitDeferredGeneric(
 	)
 	switch {
 	case requiresConcretization && !openConcretization:
-		profile, _ := callableFacet.GenericProfile()
 		concretization, concreteErr := context.ResolveGenericConcretization(
 			owner,
 			instance.TypeArgs,
 			signature,
-			profile,
 		)
 		if concreteErr != nil {
 			return api.ExpressionEmission{}, true, concreteErr
@@ -102,10 +92,7 @@ func emitDeferredGeneric(
 		}
 		ordinaryReference, err = api.NewNameReference(
 			concretization.Name(),
-			api.CombineRequests(
-				concretization.Requests(),
-				selectionRequests,
-			)...,
+			concretization.Requests()...,
 		)
 		if err == nil {
 			deferredReference, err =
@@ -120,11 +107,10 @@ func emitDeferredGeneric(
 				Reason: "generic kernel names are unavailable",
 			}
 		}
-		profile, _ := callableFacet.GenericProfile()
-		ordinaryReference, err = kernelNames.GenericKernel(owner, profile)
+		ordinaryReference, err = kernelNames.GenericKernel(owner)
 		if err == nil {
 			deferredTarget, err =
-				kernelNames.DeferredGenericKernel(owner, profile)
+				kernelNames.DeferredGenericKernel(owner)
 		}
 		if err == nil {
 			deferredReference = deferredTarget.Reference()
@@ -166,13 +152,7 @@ func emitDeferredGeneric(
 				Reason: "generic mechanics reached a source-facing deferred call",
 			}
 		}
-		profile, profiled := callableFacet.GenericProfile()
-		if profiled {
-			ordinaryReference, err =
-				context.Names().GenericCallableProfile(profile)
-		} else {
-			ordinaryReference, err = context.Names().Reference(owner)
-		}
+		ordinaryReference, err = context.Names().Reference(owner)
 		if err == nil {
 			kernelNames, available := context.Names().(api.GenericKernelNames)
 			if !available {
@@ -181,7 +161,7 @@ func emitDeferredGeneric(
 				}
 			}
 			deferredTarget, err =
-				kernelNames.DeferredGenericCallable(owner, profile)
+				kernelNames.DeferredGenericCallable(owner)
 		}
 		if err == nil {
 			deferredReference = deferredTarget.Reference()
@@ -239,7 +219,6 @@ func emitDeferredGeneric(
 		cooperative,
 		api.CombineRequests(
 			reference.Requests(),
-			selectionRequests,
 			concreteRequests,
 			typeRequests,
 			capabilityRequests,

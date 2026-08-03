@@ -97,6 +97,21 @@ func validateProviderStatefulProfile(
 	if profile.ProfileKey != wantKey {
 		return manifestError(field+".profileKey", "value does not match interface evidence")
 	}
+	for index, capability := range profile.Operations {
+		if !capability.NamedStructOperation() ||
+			capability == FacetCapabilityRepresentation {
+			return manifestError(
+				fmt.Sprintf("%s.operations[%d]", field, index),
+				"value is not a concrete named-struct operation",
+			)
+		}
+		if index != 0 && capability <= profile.Operations[index-1] {
+			return manifestError(
+				field+".operations",
+				"values are duplicated or not strictly ordered",
+			)
+		}
+	}
 	for index, selected := range profile.Fields {
 		selectedField := fmt.Sprintf("%s.fields[%d]", field, index)
 		switch {

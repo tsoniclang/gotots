@@ -99,13 +99,7 @@ func Resolve(
 			"generic selected-method representation is unresolved",
 		)
 	}
-	memberSuffix, facet, _, selectionRequests, err :=
-		cooperativecall.SelectGenericClassMethod(
-			context,
-			owner,
-			declaration,
-			concrete,
-		)
+	facet, err := cooperativecall.SelectGenericClassMethod(context, owner)
 	if err != nil {
 		return Selection{}, err
 	}
@@ -117,12 +111,10 @@ func Resolve(
 	}
 	if requiresConcretization &&
 		!typeArgumentList.ContainsGenericTypeParameter() {
-		profile, _ := facet.GenericProfile()
 		concretization, concreteErr := context.ResolveGenericConcretization(
 			owner,
 			typeArgumentList,
 			selected,
-			profile,
 		)
 		if concreteErr != nil {
 			return Selection{}, concreteErr
@@ -132,13 +124,10 @@ func Resolve(
 			signature:      concrete,
 			facet:          facet,
 			target:         target,
-			memberSuffix:   memberSuffix + concretization.Concretization().Suffix(),
+			memberSuffix:   concretization.Concretization().Suffix(),
 			concretized:    true,
 			concretization: concretization,
-			requests: api.CombineRequests(
-				selectionRequests,
-				concretization.Requests(),
-			),
+			requests:       concretization.Requests(),
 		})
 	}
 	typeArguments, typeRequests, err :=
@@ -175,13 +164,11 @@ func Resolve(
 		signature:     concrete,
 		facet:         facet,
 		target:        target,
-		memberSuffix:  memberSuffix,
 		typeArguments: slices.Clone(typeArguments),
 		openKernel:    requiresConcretization,
 		operations:    slices.Clone(operationSet.Operations()),
 		capabilities:  slices.Clone(capabilities),
 		requests: api.CombineRequests(
-			selectionRequests,
 			typeRequests,
 			projectionRequests,
 		),

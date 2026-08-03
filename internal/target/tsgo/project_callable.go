@@ -10,10 +10,13 @@ const (
 	CallableEffectInvalid CallableEffect = iota
 	CallableEffectSynchronous
 	CallableEffectAsynchronous
+	CallableEffectAwaitable
 )
 
 func (e CallableEffect) Valid() bool {
-	return e == CallableEffectSynchronous || e == CallableEffectAsynchronous
+	return e == CallableEffectSynchronous ||
+		e == CallableEffectAsynchronous ||
+		e == CallableEffectAwaitable
 }
 
 type projectCallable interface {
@@ -74,13 +77,12 @@ func (p *ProjectInspection) CallableEffect(
 		if err != nil {
 			return CallableEffectInvalid, err
 		}
-		for _, member := range members {
-			if member.Target == markerReturn.Target {
-				return CallableEffectInvalid, &ProjectInspectionError{
-					Operation: "callable effect",
-					Reason:    "target return type has multiple effect alternatives",
-				}
-			}
+		awaitable, err := p.awaitableEffect(members, markerReturn.Target)
+		if err != nil {
+			return CallableEffectInvalid, err
+		}
+		if awaitable {
+			return CallableEffectAwaitable, nil
 		}
 		return CallableEffectSynchronous, nil
 	}
@@ -88,6 +90,91 @@ func (p *ProjectInspection) CallableEffect(
 		return CallableEffectAsynchronous, nil
 	}
 	return CallableEffectSynchronous, nil
+}
+
+func (p *ProjectInspection) awaitableEffect(
+	members []typeResponse,
+	promiseTarget uint32,
+) (bool, error) {
+	containsPromise := false
+	for _, member := range members {
+		containsPromise = containsPromise || member.Target == promiseTarget
+	}
+	if !containsPromise {
+		return false, nil
+	}
+	var promised *typeResponse
+	var direct []typeResponse
+	for index := range members {
+		member := &members[index]
+		if member.Target == promiseTarget {
+			if promised != nil {
+				return false, &ProjectInspectionError{
+					Operation: "callable effect",
+					Reason:    "target return type has duplicate Promise alternatives",
+				}
+			}
+			promised = member
+			continue
+		}
+		direct = append(direct, *member)
+	}
+	if promised == nil {
+		return false, nil
+	}
+	if len(direct) == 0 {
+		return false, &ProjectInspectionError{
+			Operation: "callable effect",
+			Reason:    "target return type has no direct alternative",
+		}
+	}
+	arguments, err := p.typeArguments(promised.ID)
+	if err != nil {
+		return false, err
+	}
+	if len(arguments) != 1 {
+		return false, &ProjectInspectionError{
+			Operation: "callable effect",
+			Reason:    "target return type is not T | Promise<T>",
+		}
+	}
+	if len(direct) == 1 && arguments[0].ID == direct[0].ID {
+		return true, nil
+	}
+	if arguments[0].Flags&typeFlagUnionOrIntersection == 0 {
+		return false, &ProjectInspectionError{
+			Operation: "callable effect",
+			Reason:    "target return type is not T | Promise<T>",
+		}
+	}
+	argumentMembers, err := p.compositeTypes(arguments[0].ID)
+	if err != nil {
+		return false, err
+	}
+	if !sameTypeMembers(direct, argumentMembers) {
+		return false, &ProjectInspectionError{
+			Operation: "callable effect",
+			Reason:    "target return type is not T | Promise<T>",
+		}
+	}
+	return true, nil
+}
+
+func sameTypeMembers(left []typeResponse, right []typeResponse) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	identities := make(map[uint32]int, len(left))
+	for _, member := range left {
+		identities[member.ID]++
+	}
+	for _, member := range right {
+		if identities[member.ID] == 0 {
+			return false
+		}
+		identities[member.ID]--
+	}
+	return true
 }
 
 func (p *ProjectInspection) CallableTypeParameterCount(

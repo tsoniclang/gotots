@@ -108,7 +108,6 @@ const (
 	DeclarationRequirementCallableControl                DeclarationRequirementKind = 13
 	DeclarationRequirementCooperativeCallable            DeclarationRequirementKind = 14
 	DeclarationRequirementCallableABI                    DeclarationRequirementKind = 15
-	DeclarationRequirementGenericCallableProfile         DeclarationRequirementKind = 17
 	DeclarationRequirementClassMethod                    DeclarationRequirementKind = 18
 	DeclarationRequirementValueReceiverCopy              DeclarationRequirementKind = 19
 	DeclarationRequirementGenericRepresentation          DeclarationRequirementKind = 20
@@ -137,7 +136,6 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementCallableControl ||
 		k == DeclarationRequirementCooperativeCallable ||
 		k == DeclarationRequirementCallableABI ||
-		k == DeclarationRequirementGenericCallableProfile ||
 		k == DeclarationRequirementClassMethod ||
 		k == DeclarationRequirementValueReceiverCopy ||
 		k == DeclarationRequirementGenericRepresentation ||

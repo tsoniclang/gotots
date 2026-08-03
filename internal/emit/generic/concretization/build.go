@@ -62,24 +62,9 @@ func Build(
 			Reason: "generic concretization operation set is unresolved",
 		}
 	}
-	variantSuffix := ""
 	facet, err := api.NewSourceCallableFacet(owner)
 	if err != nil {
 		return nil, nil, err
-	}
-	var variantRequests []api.RootRequest
-	profile, profiled := concretization.Profile()
-	if profiled {
-		variantSuffix = profile.Suffix()
-		facet, err = api.NewGenericCallableProfileFacet(profile)
-		if err != nil {
-			return nil, nil, err
-		}
-		request, requestErr := api.NewGenericCallableProfileRequest(profile)
-		if requestErr != nil {
-			return nil, nil, requestErr
-		}
-		variantRequests = []api.RootRequest{request}
 	}
 	observation, err := context.ObserveCooperativeCallable(facet)
 	if err != nil {
@@ -110,7 +95,7 @@ func Build(
 				Reason: "generic kernel names are unavailable",
 			}
 		}
-		kernel, nameErr := kernelNames.GenericKernel(owner, profile)
+		kernel, nameErr := kernelNames.GenericKernel(owner)
 		if nameErr != nil {
 			return nil, nil, nameErr
 		}
@@ -145,7 +130,7 @@ func Build(
 		callRequests = kernel.Requests()
 		if deferred {
 			deferredKernel, deferredErr :=
-				kernelNames.DeferredGenericKernel(owner, profile)
+				kernelNames.DeferredGenericKernel(owner)
 			if deferredErr != nil {
 				return nil, nil, deferredErr
 			}
@@ -209,7 +194,7 @@ func Build(
 		call, callRequests, err = callable.SelectedMethodCall(
 			context,
 			owner,
-			variantSuffix+api.GenericKernelSuffix,
+			api.GenericKernelSuffix,
 			sourceArguments[0],
 			typeArguments,
 			mechanics,
@@ -222,7 +207,7 @@ func Build(
 				callable.SelectedDeferredMethodCall(
 					context,
 					owner,
-					variantSuffix+api.GenericKernelSuffix,
+					api.GenericKernelSuffix,
 					sourceArguments[0],
 					typeArguments,
 					context.Factory().Identifier(
@@ -288,7 +273,6 @@ func Build(
 	}
 	return statements, api.CombineRequests(
 		targetSignature.Requests(),
-		variantRequests,
 		capabilityRequests,
 		typeRequests,
 		callRequests,

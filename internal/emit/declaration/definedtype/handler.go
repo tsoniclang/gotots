@@ -105,19 +105,6 @@ func Emit(
 	typeParameters := parameters.Nodes()
 	logicalArguments := parameters.References()
 	valueType := underlying.Value()
-	if definedtype.RequiresValueFacet(model.Type()) {
-		typeParameters = append(
-			typeParameters,
-			definedtype.ValueTypeParameterDeclaration(
-				context.Factory(),
-				underlying.Value(),
-			),
-		)
-		valueType = definedtype.ValueTypeParameterReference(
-			context.Factory(),
-		)
-		logicalArguments = append(logicalArguments, valueType)
-	}
 	classType := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(name),
 		logicalArguments,

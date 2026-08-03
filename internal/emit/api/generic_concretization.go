@@ -16,7 +16,6 @@ type GenericConcretization struct {
 	placement    GeneratedArtifactPlacement
 	lexicalOwner ArtifactOwner
 	anchor       *types.TypeName
-	profile      *GenericCallableProfile
 }
 
 func NewGenericConcretization(
@@ -28,7 +27,6 @@ func NewGenericConcretization(
 	placement GeneratedArtifactPlacement,
 	lexicalOwner ArtifactOwner,
 	anchor *types.TypeName,
-	profile *GenericCallableProfile,
 ) (*GenericConcretization, error) {
 	target := &GenericConcretization{
 		owner:        owner,
@@ -39,7 +37,6 @@ func NewGenericConcretization(
 		placement:    placement,
 		lexicalOwner: lexicalOwner,
 		anchor:       anchor,
-		profile:      profile,
 	}
 	if !target.Valid() {
 		return nil, &InvariantError{
@@ -100,9 +97,7 @@ func (c *GenericConcretization) Valid() bool {
 		return false
 	}
 	instantiated, err := instantiateGenericCallable(c.owner, c.arguments)
-	return err == nil && types.Identical(instantiated, c.signature) &&
-		(c.profile == nil ||
-			(c.profile.Valid() && c.profile.Owner() == c.owner))
+	return err == nil && types.Identical(instantiated, c.signature)
 }
 
 func localTypeComponents(sourceType types.Type) []*types.TypeName {
@@ -229,13 +224,6 @@ func (c *GenericConcretization) LexicalAnchor() *types.TypeName {
 	return c.anchor
 }
 
-func (c *GenericConcretization) Profile() (*GenericCallableProfile, bool) {
-	if !c.Valid() || c.profile == nil {
-		return nil, false
-	}
-	return c.profile, true
-}
-
 func InstantiateGenericCallable(
 	owner *types.Func,
 	arguments TypeArgumentList,
@@ -306,18 +294,9 @@ type GenericConcretizationNames interface {
 }
 
 type GenericKernelNames interface {
-	GenericKernel(
-		*types.Func,
-		*GenericCallableProfile,
-	) (NameReference, error)
-	DeferredGenericCallable(
-		*types.Func,
-		*GenericCallableProfile,
-	) (DeferredGenericCallableReference, error)
-	DeferredGenericKernel(
-		*types.Func,
-		*GenericCallableProfile,
-	) (DeferredGenericCallableReference, error)
+	GenericKernel(*types.Func) (NameReference, error)
+	DeferredGenericCallable(*types.Func) (DeferredGenericCallableReference, error)
+	DeferredGenericKernel(*types.Func) (DeferredGenericCallableReference, error)
 }
 
 type DeferredGenericRecoveryPlacement uint8

@@ -1,5 +1,5 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
-import type { gostring, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, gostring, int64 } from "@gotots/runtime/scalars.js";
 import { nodeError } from "./error.js";
 import { nodeSignal } from "./signal.js";
 
@@ -33,7 +33,7 @@ export function signalProcess(
 
 export async function signalProcessAsync(
   receiver: ProcessValue | undefined,
-  signal: { String(): Promise<gostring> } | undefined,
+  signal: { String(): Awaitable<gostring> } | undefined,
 ): Promise<GoError | undefined> {
   if (receiver === undefined || signal === undefined) {
     return nodeError("invalid", "signal");

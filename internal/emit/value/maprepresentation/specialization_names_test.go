@@ -179,12 +179,6 @@ func (staticSpecializationNames) SourceCallableABI(
 	panic("unused")
 }
 
-func (staticSpecializationNames) GenericCallableProfile(
-	*api.GenericCallableProfile,
-) (api.NameReference, error) {
-	panic("unused")
-}
-
 func (staticSpecializationNames) ProviderGenericTypeArguments(
 	*types.Func,
 ) ([]api.GenericTypeArgumentProjection, bool, error) {

@@ -204,12 +204,9 @@ func validateFacetModule(
 			}
 			owners[target] = struct{}{}
 		}
-		capabilities := make([]string, 0, len(facet.Capabilities)+1)
+		capabilities := make([]string, 0, len(facet.Capabilities))
 		for _, capability := range facet.Capabilities {
 			capabilities = append(capabilities, string(capability))
-		}
-		if facet.ProfileKey != "" {
-			capabilities = append(capabilities, facet.ProfileKey)
 		}
 		for _, capability := range capabilities {
 			lookup := facetLookup{
@@ -342,6 +339,7 @@ func sameProviderStatefulProfileTarget(
 		left.ImplementationOwner == right.ImplementationOwner &&
 		left.TargetFingerprint == right.TargetFingerprint &&
 		slices.Equal(left.TypeArguments, right.TypeArguments) &&
+		slices.Equal(left.Operations, right.Operations) &&
 		slices.Equal(left.Methods, right.Methods)
 }
 

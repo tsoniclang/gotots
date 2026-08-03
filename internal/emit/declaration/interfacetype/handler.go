@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -185,24 +184,13 @@ func build(
 		if err != nil {
 			return nil, nil, err
 		}
-		cooperative, contractRequests, err :=
-			cooperativecall.InterfaceMethodContract(
-				context,
-				callableReference,
-			)
-		if err != nil {
-			return nil, nil, err
-		}
 		memberName, err := context.Names().InterfaceMethodName(method)
 		if err != nil {
 			return nil, nil, err
 		}
-		resultType := target.Result()
-		if cooperative {
-			resultType = callable.PromiseResult(
-				context.Factory(),
-				resultType,
-			)
+		resultType, err := callable.IndirectResult(context, target.Result())
+		if err != nil {
+			return nil, nil, err
 		}
 		members = append(
 			members,
@@ -212,14 +200,15 @@ func build(
 				nil,
 				nil,
 				target.Parameters(),
-				resultType,
+				resultType.Value(),
 			),
 		)
 		requests = append(
 			requests,
 			target.Requests()...,
 		)
-		requests = append(requests, contractRequests...)
+		requests = append(requests, resultType.Requests()...)
+		requests = append(requests, callableReference.Requests()...)
 		if emitRuntimeContract {
 			token, tokenErr :=
 				context.Names().InterfaceMethodToken(method)

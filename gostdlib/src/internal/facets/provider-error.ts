@@ -4,7 +4,7 @@ import type {
 } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { bool } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool } from "@gotots/runtime/scalars.js";
 
 import {
   MessageWrappedErrors,
@@ -24,7 +24,7 @@ export interface ProviderErrorIsSync extends GoInterfaceValue {
 }
 
 export interface ProviderErrorIsAsync extends GoInterfaceValue {
-  Is(target: GoError | undefined, recovery?: GoRecovery): Promise<bool>;
+  Is(target: GoError | undefined, recovery?: GoRecovery): Awaitable<bool>;
 }
 
 export interface ProviderErrorUnwrapSync extends GoInterfaceValue {
@@ -32,7 +32,7 @@ export interface ProviderErrorUnwrapSync extends GoInterfaceValue {
 }
 
 export interface ProviderErrorUnwrapAsync extends GoInterfaceValue {
-  Unwrap(recovery?: GoRecovery): Promise<GoError | undefined>;
+  Unwrap(recovery?: GoRecovery): Awaitable<GoError | undefined>;
 }
 
 export interface ProviderErrorUnwrapManySync extends GoInterfaceValue {
@@ -40,7 +40,7 @@ export interface ProviderErrorUnwrapManySync extends GoInterfaceValue {
 }
 
 export interface ProviderErrorUnwrapManyAsync extends GoInterfaceValue {
-  Unwrap(recovery?: GoRecovery): Promise<RuntimeSlice<GoError | undefined>>;
+  Unwrap(recovery?: GoRecovery): Awaitable<RuntimeSlice<GoError | undefined>>;
 }
 
 export interface ProviderErrorIsSyncAsyncError extends GoInterfaceValue {
@@ -51,7 +51,7 @@ export interface ProviderErrorIsAsyncAsyncError extends GoInterfaceValue {
   Is(
     target: CanonicalErrorAsync | undefined,
     recovery?: GoRecovery,
-  ): Promise<bool>;
+  ): Awaitable<bool>;
 }
 
 export interface ProviderErrorUnwrapSyncAsyncError extends GoInterfaceValue {
@@ -59,7 +59,7 @@ export interface ProviderErrorUnwrapSyncAsyncError extends GoInterfaceValue {
 }
 
 export interface ProviderErrorUnwrapAsyncAsyncError extends GoInterfaceValue {
-  Unwrap(recovery?: GoRecovery): Promise<CanonicalErrorAsync | undefined>;
+  Unwrap(recovery?: GoRecovery): Awaitable<CanonicalErrorAsync | undefined>;
 }
 
 export interface ProviderErrorUnwrapManySyncAsyncError extends GoInterfaceValue {
@@ -71,7 +71,7 @@ export interface ProviderErrorUnwrapManySyncAsyncError extends GoInterfaceValue 
 export interface ProviderErrorUnwrapManyAsyncAsyncError extends GoInterfaceValue {
   Unwrap(
     recovery?: GoRecovery,
-  ): Promise<RuntimeSlice<CanonicalErrorAsync | undefined>>;
+  ): Awaitable<RuntimeSlice<CanonicalErrorAsync | undefined>>;
 }
 
 type InterfaceGuard<Value extends GoInterfaceValue> = (

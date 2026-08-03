@@ -16,6 +16,7 @@ type ProviderStatefulProfileDocument struct {
 	Export              string                                     `json:"export"`
 	Interfaces          []ProviderCallableProfileInterfaceDocument `json:"interfaces"`
 	TypeArguments       []string                                   `json:"typeArguments"`
+	Operations          []FacetCapability                          `json:"operations,omitempty"`
 	Fields              []ProviderStatefulProfileFieldDocument     `json:"fields"`
 	Methods             []ProviderStatefulProfileMethodDocument    `json:"methods"`
 	ImplementationOwner string                                     `json:"implementationOwner"`
@@ -98,6 +99,16 @@ func (p ProviderStatefulProfile) Interfaces() []ProviderCallableProfileInterface
 
 func (p ProviderStatefulProfile) TypeArguments() []string {
 	return slices.Clone(p.profile.TypeArguments)
+}
+
+func (p ProviderStatefulProfile) Operations() []FacetCapability {
+	return slices.Clone(p.profile.Operations)
+}
+
+func (p ProviderStatefulProfile) SupportsOperation(
+	capability FacetCapability,
+) bool {
+	return slices.Contains(p.profile.Operations, capability)
 }
 
 func (p ProviderStatefulProfile) Interface(
@@ -254,6 +265,7 @@ func cloneProviderStatefulProfile(
 		result.Interfaces[index] = cloneProviderCallableProfileInterface(selected)
 	}
 	result.TypeArguments = slices.Clone(source.TypeArguments)
+	result.Operations = slices.Clone(source.Operations)
 	result.Fields = slices.Clone(source.Fields)
 	result.Methods = slices.Clone(source.Methods)
 	return result

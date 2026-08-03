@@ -49,12 +49,9 @@ export {
   TrimSuffix,
 } from "./internal/portable/strings/transform.js";
 
-type AsyncYield = ((value: gostring) => Promise<boolean>) | undefined;
-type AsyncSequence = (yieldValue: AsyncYield) => Promise<void>;
-
-export function Lines(text: gostring): Seq<gostring, AsyncSequence | undefined> {
-  return new Seq<gostring, AsyncSequence | undefined>(
-    async (yieldValue: AsyncYield): Promise<void> => {
+export function Lines(text: gostring): Seq<gostring> {
+  return new Seq<gostring>(
+    async (yieldValue): Promise<void> => {
       if (yieldValue === undefined) {
         GoPanic.raiseRuntime("call of nil yield function");
       }

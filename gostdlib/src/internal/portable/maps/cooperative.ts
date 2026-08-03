@@ -1,24 +1,16 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { GoMapValue } from "@gotots/runtime/map.js";
-import type { bool } from "@gotots/runtime/scalars.js";
 
 import { Seq } from "../iter/sequence.js";
 
-type CooperativeSequence<T> = Seq<
-  T,
-  ((
-    yieldValue: ((value: T, recovery?: GoRecovery) => Promise<bool>) | undefined,
-    recovery?: GoRecovery,
-  ) => Promise<void>) | undefined
->;
+type CooperativeSequence<T> = Seq<T>;
 type CopyValue<T> = (value: T) => T;
 
 export function KeysCooperative<K, V>(
   copyKey: CopyValue<K>,
   source: GoMapValue<K, V>,
 ): CooperativeSequence<K> {
-  return new Seq<K, CooperativeSequence<K>["value"]>(
+  return new Seq<K>(
     async (yieldValue): Promise<void> => {
       if (yieldValue === undefined) {
         GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
@@ -36,7 +28,7 @@ export function ValuesCooperative<K, V>(
   copyValue: CopyValue<V>,
   source: GoMapValue<K, V>,
 ): CooperativeSequence<V> {
-  return new Seq<V, CooperativeSequence<V>["value"]>(
+  return new Seq<V>(
     async (yieldValue): Promise<void> => {
       if (yieldValue === undefined) {
         GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");

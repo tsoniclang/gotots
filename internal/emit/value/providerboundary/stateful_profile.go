@@ -109,11 +109,9 @@ func matchStatefulProfileCandidate(
 	)
 	for _, selected := range profileInterfaces {
 		node := analyzer.nodes[selected.SourceIdentity()]
-		matched, mismatch, keyInterface, _, _, err := matchProfileInterface(
+		matched, mismatch, keyInterface, err := matchProfileInterface(
 			node,
 			selected.ProviderInterface(),
-			nil,
-			false,
 		)
 		if err != nil {
 			return StatefulProfileSelection{}, false, "", err

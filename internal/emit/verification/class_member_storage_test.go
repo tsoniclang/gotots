@@ -409,7 +409,8 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 	for _, required := range []string{
 		"export interface GenericValue<T>",
 		"export interface IntValue",
-		"Value(): Promise<T>;",
+		"Value(): Awaitable<T>;",
+		"Value(): Awaitable<int32>;",
 		"export async function GenericInterfaceAudit(): Promise<int32>",
 		"return await goInterfaceNonNil<GenericValue<T>>(__gotots_receiver_0).Value()",
 	} {
@@ -439,6 +440,10 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 	}
 	if strings.Contains(artifacts.printed, "$goInterfaceCallable_") {
 		t.Fatal("contract-only interface callable leaked into TypeScript output")
+	}
+	if strings.Contains(artifacts.printed, "Value(): Promise<T>;") ||
+		strings.Contains(artifacts.printed, "Value$cooperative_") {
+		t.Fatal("generic interface retained a callable profile variant")
 	}
 	runner := filepath.Join(workingDirectory, "runner.ts")
 	writeProgramFile(t, runner, `import "./program.js";

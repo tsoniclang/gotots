@@ -13,15 +13,13 @@ const (
 	FacetDefinedValueOperations FacetKind = "defined-value-operations"
 	FacetRecoveryCallable       FacetKind = "recovery-callable"
 	FacetGenericCallableKernel  FacetKind = "generic-callable-kernel"
-	FacetGenericCallableProfile FacetKind = "generic-callable-profile"
 )
 
 func (k FacetKind) Valid() bool {
 	return k == FacetNamedStructOperations ||
 		k == FacetDefinedValueOperations ||
 		k == FacetRecoveryCallable ||
-		k == FacetGenericCallableKernel ||
-		k == FacetGenericCallableProfile
+		k == FacetGenericCallableKernel
 }
 
 type FacetCapability string
@@ -70,10 +68,17 @@ const (
 	EffectInvalid      EffectKind = ""
 	EffectSynchronous  EffectKind = "sync"
 	EffectAsynchronous EffectKind = "async"
+	EffectAwaitable    EffectKind = "awaitable"
 )
 
 func (k EffectKind) Valid() bool {
-	return k == EffectSynchronous || k == EffectAsynchronous
+	return k == EffectSynchronous ||
+		k == EffectAsynchronous ||
+		k == EffectAwaitable
+}
+
+func (k EffectKind) MaySuspend() bool {
+	return k == EffectAsynchronous || k == EffectAwaitable
 }
 
 type FacetModuleDocument struct {
@@ -109,7 +114,6 @@ type FacetDocument struct {
 	Kind                       FacetKind                     `json:"kind"`
 	SourceIdentity             string                        `json:"sourceIdentity"`
 	Capabilities               []FacetCapability             `json:"capabilities,omitempty"`
-	ProfileKey                 string                        `json:"profileKey,omitempty"`
 	Export                     string                        `json:"export"`
 	StorageExport              string                        `json:"storageExport,omitempty"`
 	RepresentationExport       string                        `json:"representationExport,omitempty"`
@@ -221,10 +225,6 @@ func (f Facet) SourceIdentity() string {
 
 func (f Facet) Capabilities() []FacetCapability {
 	return slices.Clone(f.facet.Capabilities)
-}
-
-func (f Facet) ProfileKey() string {
-	return f.facet.ProfileKey
 }
 
 func (f Facet) ModuleSpecifier() string {

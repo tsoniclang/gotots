@@ -125,7 +125,8 @@ func valueCall(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if !observation.Cooperative() {
+	if context.ConcurrencySemantics() !=
+		api.ConcurrencySemanticsCooperative {
 		return target, nil
 	}
 	return await(context, source, target, propagate, generated)
@@ -284,11 +285,9 @@ func GenericValueContract(
 	signature *types.Signature,
 ) (bool, bool, []api.RootRequest, error) {
 	if _, source := provider.SourceFunction(); !source {
-		if _, profile := provider.GenericProfile(); !profile {
-			return false, false, nil, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "generic value provider facet is invalid",
-			}
+		return false, false, nil, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic value provider facet is invalid",
 		}
 	}
 	return providerContract(context, provider, signature)

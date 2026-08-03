@@ -81,9 +81,6 @@ func ApplyDeferred(
 		return api.ExpressionEmission{}, err
 	}
 	resolveName := api.DeferredRegistryResolveMethodName
-	if cooperative {
-		resolveName = api.DeferredRegistryResolveCooperativeMethodName
-	}
 	guarded := context.Factory().CallExpression(
 		context.Factory().Identifier(nonNil.Name()),
 		nil,

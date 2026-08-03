@@ -523,25 +523,19 @@ Nested callbacks, tuples, containers, fields, and results follow the same
 type-directed boundary rule. Missing or ambiguous conversion fails
 certification; TypeScript assignability alone is not semantic evidence.
 
-A provider-owned named callable may use a direct identity representation only
-through a typed value facet. Every generated-source reference supplies the
-canonical callable type derived from the selected Go signature; the provider
-export's private ABI default is never a generated-source annotation. This
-keeps values as ordinary functions while allowing a static adapter exactly at
-a provider crossing when parameter or result representations differ.
+A provider-owned named callable has the source type-parameter arity and the
+canonical indirect callable representation. A provider-private callable ABI is
+not a source type argument, default, constraint, or alternate public alias.
+When provider parameter or result representations differ from generated ones,
+the static provider facade owns one typed adapter at the crossing; ordinary
+generated declarations and values never inherit the provider ABI.
 
-The certified provider form is exactly one unconstrained identity facet with a
-callable default:
-
-```ts
-export type WalkDirFunc<Value = PrivateWalkDirABI> = Value;
-```
-
-The pinned TS-Go AST must prove one type parameter, no constraint or expression,
-one default type, and a type-alias body resolving to that same parameter. The
-TS-Go checker derives the provider effect from the default ABI, not from the
-polymorphic alias. A constraint, absent/non-callable default, or wrapped alias
-body fails certification rather than narrowing the canonical generated value.
+For example, Go `io/fs.WalkDirFunc` remains one non-generic generated callable
+type whose result is `Awaitable<error>`. The provider may implement its private
+visitor over provider `DirEntry` and `GoError` values, but the generated facade
+statically bridges that private visitor to the canonical source type. It does
+not expose `WalkDirFunc<Value = PrivateABI>` or require a generated use to
+supply an implementation type.
 
 Provider fingerprints use semantic member identities. A public computed
 `unique symbol` member is keyed by the checker-resolved symbol and its project

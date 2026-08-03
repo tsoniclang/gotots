@@ -12,7 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
-const facetMapSchemaVersion = 15
+const facetMapSchemaVersion = 16
 
 type facetMapDocument struct {
 	SchemaVersion            int                           `json:"schemaVersion"`
@@ -44,7 +44,6 @@ type facetSeed struct {
 	SourceIdentity       string                                 `json:"sourceIdentity"`
 	Capabilities         []gostdlib.FacetCapability             `json:"capabilities,omitempty"`
 	GenericTypeArguments []gostdlib.GenericTypeArgumentDocument `json:"genericTypeArguments,omitempty"`
-	ProfileKey           string                                 `json:"profileKey,omitempty"`
 	Specifier            string                                 `json:"specifier"`
 	SourcePath           string                                 `json:"sourcePath"`
 	Export               string                                 `json:"export"`
@@ -87,15 +86,6 @@ type providerCallableProtocolSeed struct {
 type providerProtocolSeed struct {
 	Name     string                                     `json:"name"`
 	Protocol gostdlib.ProviderProtocolInterfaceDocument `json:"protocol"`
-}
-
-type providerStatefulProfileSeed struct {
-	SourceIdentity string                                 `json:"sourceIdentity"`
-	Specifier      string                                 `json:"specifier"`
-	SourcePath     string                                 `json:"sourcePath"`
-	Export         string                                 `json:"export"`
-	Interfaces     []providerCallableProfileInterfaceSeed `json:"interfaces"`
-	TypeArguments  []string                               `json:"typeArguments"`
 }
 
 type providerInterfaceSeed struct {
@@ -203,6 +193,7 @@ func validateProviderStatefulProfileSeeds(
 		seed := &result[index]
 		seed.Interfaces = slices.Clone(seed.Interfaces)
 		seed.TypeArguments = slices.Clone(seed.TypeArguments)
+		seed.Operations = slices.Clone(seed.Operations)
 		key := providerStatefulProfileSeedKey(*seed)
 		if key == "" || key == previous || seed.SourceIdentity == "" ||
 			seed.Specifier == "" || seed.SourcePath == "" || seed.Export == "" ||
@@ -271,6 +262,17 @@ func validateProviderStatefulProfileSeeds(
 				key,
 				"type arguments do not exact-join retained interfaces",
 			)
+		}
+		for operationIndex, capability := range seed.Operations {
+			if !capability.NamedStructOperation() ||
+				capability == gostdlib.FacetCapabilityRepresentation ||
+				operationIndex != 0 && capability <= seed.Operations[operationIndex-1] {
+				return nil, certifyError(
+					"configure provider stateful profiles",
+					key,
+					"operations are invalid, duplicated, or unordered",
+				)
+			}
 		}
 	}
 	return result, nil

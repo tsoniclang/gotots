@@ -305,12 +305,6 @@ func environmentRequirementKeys(
 	for _, requirement := range requirements {
 		var detail string
 		switch requirement.Kind() {
-		case api.DeclarationRequirementGenericCallableProfile:
-			profile, ok := requirement.GenericCallableProfile()
-			if !ok {
-				return nil, environmentRequirementError(object, requirement)
-			}
-			detail = profile.Key()
 		case api.DeclarationRequirementGenericRepresentation:
 			owner, parameter, facet, ok :=
 				requirement.GenericRepresentation()

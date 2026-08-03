@@ -82,17 +82,16 @@ func (k DefinedValueRepresentationKind) Valid() bool {
 }
 
 type DefinedValueRepresentation struct {
-	kind        DefinedValueRepresentationKind
-	operations  NameReference
-	cooperative bool
+	kind       DefinedValueRepresentationKind
+	operations NameReference
 }
 
-func NewProviderIdentityDefinedValueRepresentation(
-	cooperative bool,
-) (DefinedValueRepresentation, error) {
+func NewProviderIdentityDefinedValueRepresentation() (
+	DefinedValueRepresentation,
+	error,
+) {
 	return DefinedValueRepresentation{
-		kind:        DefinedValueRepresentationProviderIdentity,
-		cooperative: cooperative,
+		kind: DefinedValueRepresentationProviderIdentity,
 	}, nil
 }
 
@@ -114,11 +113,6 @@ func NewDefinedValueRepresentation(
 
 func (r DefinedValueRepresentation) Kind() DefinedValueRepresentationKind {
 	return r.kind
-}
-
-func (r DefinedValueRepresentation) ProviderCallableEffect() (bool, bool) {
-	return r.cooperative,
-		r.kind == DefinedValueRepresentationProviderIdentity
 }
 
 func (r DefinedValueRepresentation) Operations() (NameReference, bool) {

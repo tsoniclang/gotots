@@ -158,6 +158,7 @@ func BuilderAddress(state *ProviderState) *strings.Builder {
 	}
 	certificate := linkedProviderCertificate(t)
 	options := emit.DefaultOptions()
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = certificate
 	emission, err := emit.CompileWithOptions(
 		program,

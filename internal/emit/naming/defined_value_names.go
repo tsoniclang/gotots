@@ -27,15 +27,7 @@ func (n *File) DefinedValueRepresentation(
 	}
 	switch binding.providerDefinedValue {
 	case gostdlib.DefinedValueRepresentationIdentity:
-		if !binding.providerEffect.Valid() {
-			return api.DefinedValueRepresentation{}, &api.NameError{
-				Name:   typeName.Name(),
-				Reason: "provider callable effect is uncertified",
-			}
-		}
-		return api.NewProviderIdentityDefinedValueRepresentation(
-			binding.providerEffect == gostdlib.EffectAsynchronous,
-		)
+		return api.NewProviderIdentityDefinedValueRepresentation()
 	case gostdlib.DefinedValueRepresentationOperations:
 		reference, providerOwned, err := n.providerFacetReference(
 			typeName,

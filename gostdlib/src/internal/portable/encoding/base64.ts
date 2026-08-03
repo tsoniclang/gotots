@@ -1,7 +1,12 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring, int64, uint8 } from "@gotots/runtime/scalars.js";
+import type {
+  Awaitable,
+  gostring,
+  int64,
+  uint8,
+} from "@gotots/runtime/scalars.js";
 
 import type { WriteCloser, Writer } from "../../../io.js";
 import { ProviderInterfaceValue } from "../io/value.js";
@@ -339,7 +344,7 @@ export async function runBase64EncoderAsync<Result, Failure>(
   initial: Base64EncoderStep<Result, Failure>,
   writeOutput: (
     output: RuntimeSlice<uint8>,
-  ) => Promise<[int64, Failure | undefined]>,
+  ) => Awaitable<[int64, Failure | undefined]>,
 ): Promise<Result> {
   let current = initial;
   while (current.kind === "write") {

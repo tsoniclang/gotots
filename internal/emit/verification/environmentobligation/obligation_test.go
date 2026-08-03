@@ -153,12 +153,11 @@ func Values(values []int32, input <-chan int32) int32 {
 		)
 	}
 	requirements := values.Requirements()
-	if len(requirements) == 0 {
-		t.Fatal("generic slices.Values obligation lacks typed requirements")
-	}
-	requirements[0] = "mutated"
-	if values.Requirements()[0] == "mutated" {
-		t.Fatal("environment obligation exposed requirement backing storage")
+	if len(requirements) != 0 {
+		t.Fatalf(
+			"generic slices.Values obligation exposes private compiler requirements: %v",
+			requirements,
+		)
 	}
 	obligations[0] = emit.EnvironmentObligation{}
 	if emission.EnvironmentObligations()[0].Identity() == "" {

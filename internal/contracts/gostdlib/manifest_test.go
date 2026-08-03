@@ -210,8 +210,8 @@ func TestManifestRequiresEffectsExactlyOnCallableBindings(t *testing.T) {
 	binding.Kind = gostdlib.BindingType
 	binding.Representation = gostdlib.RepresentationDirect
 	binding.DefinedValue = gostdlib.DefinedValueRepresentationIdentity
-	if _, err := gostdlib.Seal(document); err == nil {
-		t.Fatal("callable identity without an effect passed")
+	if _, err := gostdlib.Seal(document); err != nil {
+		t.Fatalf("canonical callable identity was rejected: %v", err)
 	}
 	binding.DefinedValue = gostdlib.DefinedValueRepresentationOperations
 	binding.Effect = gostdlib.EffectSynchronous

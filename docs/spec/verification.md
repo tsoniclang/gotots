@@ -375,19 +375,17 @@ For each generated static facade, proof records:
 
 The source-shape gate verifies facade arity. Artifact inspection proves calls
 contain only source arguments and support is imported at module scope.
-Provider-owned named-callable fixtures additionally prove that every generated
-source annotation supplies its canonical typed value facet and never inherits
-the provider ABI default. Removing that facet must fail strict typechecking at
-a callback parameter or result whose canonical interface representation
-differs from the provider representation.
+Provider-owned named-callable fixtures prove that generated annotations retain
+the source type-parameter arity and canonical `Awaitable` result recursively.
+They also inspect the provider facade and prove that a differing provider
+callback ABI is adapted there, not exposed as a public type parameter, default,
+constraint, profile alias, or generated call argument. Removing the bridge or
+substituting the private provider ABI must fail strict typechecking at the
+callback parameter or result boundary.
 
-Certification separately mutates the provider facet itself: adding a
-constraint, removing or making the default non-callable, or wrapping the alias
-body must fail against pinned TS-Go AST/checker evidence. The effect certificate
-comes from the private default ABI while the alias remains polymorphic. An
-allocation-order mutation inserts an unrelated computed `unique symbol` member
-and must leave every unaffected provider fingerprint byte-identical even when
-TS-Go's diagnostic/display spelling changes.
+An allocation-order mutation inserts an unrelated computed `unique symbol`
+member and must leave every unaffected provider fingerprint byte-identical
+even when TS-Go's diagnostic/display spelling changes.
 
 Mutations add a runtime policy object, omit/misroute a bridge, select by Go or
 target spelling, accept structural assignability without certification,

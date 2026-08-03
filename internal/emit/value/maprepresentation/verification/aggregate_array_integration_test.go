@@ -368,12 +368,6 @@ func (aggregateNames) SourceCallableABI(
 	panic("unused")
 }
 
-func (aggregateNames) GenericCallableProfile(
-	*api.GenericCallableProfile,
-) (api.NameReference, error) {
-	panic("unused")
-}
-
 func (aggregateNames) ProviderGenericTypeArguments(
 	*types.Func,
 ) ([]api.GenericTypeArgumentProjection, bool, error) {

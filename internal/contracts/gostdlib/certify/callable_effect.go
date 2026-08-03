@@ -45,18 +45,6 @@ func exportCallableEffect(
 	return providerEffect(selected)
 }
 
-func exportCallableValueFacetEffect(
-	project *tsgo.ProjectInspection,
-	target tsgo.ProjectExport,
-	marker tsgo.ProjectExport,
-) (gostdlib.EffectKind, error) {
-	selected, err := project.CallableValueFacetEffect(target, marker)
-	if err != nil {
-		return gostdlib.EffectInvalid, err
-	}
-	return providerEffect(selected)
-}
-
 func memberCallableEffect(
 	project *tsgo.ProjectInspection,
 	target tsgo.ProjectMember,
@@ -75,6 +63,8 @@ func providerEffect(source tsgo.CallableEffect) (gostdlib.EffectKind, error) {
 		return gostdlib.EffectSynchronous, nil
 	case tsgo.CallableEffectAsynchronous:
 		return gostdlib.EffectAsynchronous, nil
+	case tsgo.CallableEffectAwaitable:
+		return gostdlib.EffectAwaitable, nil
 	default:
 		return gostdlib.EffectInvalid, certifyError(
 			"inspect callable effect",

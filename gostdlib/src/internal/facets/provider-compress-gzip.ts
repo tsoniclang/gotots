@@ -2,7 +2,7 @@ import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int64, uint8 } from "@gotots/runtime/scalars.js";
 
 import { Header } from "../../compress/gzip.js";
 import { decodeGzip } from "../node/compress/gzip/decode.js";
@@ -45,8 +45,8 @@ export interface CanonicalFlateReaderReadAsync<
   Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, Failure | undefined]>;
-  ReadByte(recovery?: GoRecovery): [uint8, Failure | undefined];
+  ): Awaitable<[int64, Failure | undefined]>;
+  ReadByte(recovery?: GoRecovery): Awaitable<[uint8, Failure | undefined]>;
 }
 
 export interface CanonicalReadCloserReadAsync<
@@ -55,8 +55,8 @@ export interface CanonicalReadCloserReadAsync<
   Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, Failure | undefined]>;
-  Close(recovery?: GoRecovery): Failure | undefined;
+  ): Awaitable<[int64, Failure | undefined]>;
+  Close(recovery?: GoRecovery): Awaitable<Failure | undefined>;
 }
 
 export interface CanonicalReadCloserCloseAsync<
@@ -65,8 +65,8 @@ export interface CanonicalReadCloserCloseAsync<
   Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): [int64, Failure | undefined];
-  Close(recovery?: GoRecovery): Promise<Failure | undefined>;
+  ): Awaitable<[int64, Failure | undefined]>;
+  Close(recovery?: GoRecovery): Awaitable<Failure | undefined>;
 }
 
 class CanonicalGzipPayload<Failure extends CanonicalErrorAsync> {

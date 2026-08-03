@@ -6,7 +6,7 @@ import type {
 import { GoInterfaceValue as InterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
-import type { bool } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool } from "@gotots/runtime/scalars.js";
 import { GoEmptyStruct } from "@gotots/runtime/struct.js";
 import { ProviderError } from "../../runtime/error.js";
 import { goInterfaceEqual } from "../../runtime/interface.js";
@@ -170,18 +170,10 @@ class ValueContext extends ContextValue {
 const background = new EmptyContext();
 const todo = new EmptyContext();
 
-type CancelFuncABI = ((_recovery?: GoRecovery) => Promise<void>) | undefined;
-type CancelCauseFuncABI = ((
-    cause: GoError | undefined,
-    _recovery?: GoRecovery,
-  ) => Promise<void>) | undefined;
-
-export type CancelFunc<
-  $Value = CancelFuncABI,
-> = $Value;
-export type CancelCauseFunc<
-  $Value = CancelCauseFuncABI,
-> = $Value;
+export type CancelFunc = (() => Awaitable<void>) | undefined;
+export type CancelCauseFunc = ((
+  cause: GoError | undefined,
+) => Awaitable<void>) | undefined;
 
 export function Background(): Context {
   return background;

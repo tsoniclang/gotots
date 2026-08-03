@@ -348,19 +348,6 @@ func (s *programSession) environmentDeclarationRequirements(
 			}
 			continue
 		}
-		if profile, ok := requirement.GenericCallableProfile(); ok {
-			function, callable := object.(*types.Func)
-			if !callable ||
-				profile.Owner() != function.Origin() ||
-				function != function.Origin() {
-				return nil, &ScheduleError{
-					Object: object.Name(),
-					Reason: "environment generic callable profile requirement is invalid",
-				}
-			}
-			selected = append(selected, requirement)
-			continue
-		}
 		if representationOwner, _, _, ok :=
 			requirement.GenericRepresentation(); ok {
 			if representationOwner != object {

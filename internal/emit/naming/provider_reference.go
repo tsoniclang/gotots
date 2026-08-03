@@ -137,54 +137,6 @@ func (n *File) providerFacetTargetReference(
 	return reference, true, err
 }
 
-func (n *File) providerGenericCallableProfileReference(
-	owner *types.Func,
-	profileKey string,
-) (api.NameReference, gostdlib.EffectKind, bool, error) {
-	contract, providerOwned, err := n.providerFacetOwner(owner)
-	if err != nil || !providerOwned {
-		return api.NameReference{}, gostdlib.EffectInvalid, providerOwned, err
-	}
-	selected, ok := n.owner.registry.provider.GenericCallableFacet(
-		contract.Identity(),
-		profileKey,
-	)
-	if !ok {
-		return api.NameReference{}, gostdlib.EffectInvalid, true, &api.NameError{
-			Name: contract.Identity(),
-			Reason: "selected generic standard-library callable has no certified provider profile " +
-				strconv.Quote(profileKey),
-		}
-	}
-	if selected.SourceIdentity() != contract.Identity() ||
-		selected.Kind() != gostdlib.FacetGenericCallableProfile ||
-		selected.ProfileKey() != profileKey ||
-		!selected.Effect().Valid() {
-		return api.NameReference{}, gostdlib.EffectInvalid, true, &api.NameError{
-			Name:   contract.Identity(),
-			Reason: "provider generic-callable facet does not match its selected source owner",
-		}
-	}
-	qualifier, request, err := n.providerImport(
-		selected.ModuleSpecifier(),
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.NameReference{}, gostdlib.EffectInvalid, true, err
-	}
-	if n.require != nil {
-		if err := n.require(owner); err != nil {
-			return api.NameReference{}, gostdlib.EffectInvalid, true, err
-		}
-	}
-	reference, err := api.NewQualifiedNameReference(
-		qualifier,
-		selected.Export(),
-		request,
-	)
-	return reference, selected.Effect(), true, err
-}
-
 func (n *File) ProviderCallableProfile(
 	owner *types.Func,
 	profileKey string,

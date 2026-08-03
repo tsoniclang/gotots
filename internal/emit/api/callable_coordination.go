@@ -227,50 +227,10 @@ func (c Context) WithCooperativeCallableABI(
 	return c
 }
 
-func (c Context) WithGenericCallableProfile(
-	profile *GenericCallableProfile,
-) Context {
-	if !c.artifactOwner.Valid() ||
-		!profile.Valid() ||
-		c.artifactOwner != MustSourceArtifactOwner(profile.Owner()) {
-		panic("generic callable profile boundary is invalid")
-	}
-	c.genericCallableProfile = profile
-	return c
-}
-
-func (c Context) GenericCallableProfile() (
-	*GenericCallableProfile,
-	bool,
-) {
-	return c.genericCallableProfile, c.genericCallableProfile != nil
-}
-
 func (c Context) CallableABIFacet(
 	reference CallableABIReference,
 ) (CallableFacet, error) {
-	artifact := reference.Artifact()
-	if c.genericCallableProfile != nil {
-		if sourceOwner, scoped := reference.SourceOwner(); scoped {
-			if sourceOwner != c.genericCallableProfile.Owner() {
-				return CallableFacet{}, &ContextError{
-					Reason: "callable ABI scope is foreign to the generic profile",
-				}
-			}
-			return NewGenericProfileCallableABIFacet(
-				c.genericCallableProfile,
-				artifact,
-			)
-		}
-		if _, selected :=
-			c.genericCallableProfile.Selection().ABI(artifact); selected {
-			return NewGenericProfileCallableABIFacet(
-				c.genericCallableProfile,
-				artifact,
-			)
-		}
-	}
-	return NewCallableABIFacet(artifact)
+	return NewCallableABIFacet(reference.Artifact())
 }
 
 func (c Context) IsCooperative() bool {
@@ -295,25 +255,9 @@ func (c Context) ObserveCooperativeCallable(
 			Reason: "cooperative callable consumer has no artifact owner",
 		}
 	}
-	observation, err := c.cooperativeResolver.ObserveCooperativeCallable(
+	return c.cooperativeResolver.ObserveCooperativeCallable(
 		c,
 		facet,
-	)
-	if err != nil || c.genericCallableProfile == nil {
-		return observation, err
-	}
-	artifact, abi := facet.ABI()
-	if !abi {
-		return observation, nil
-	}
-	cooperative, selected :=
-		c.genericCallableProfile.Selection().ABI(artifact)
-	if !selected {
-		return observation, nil
-	}
-	return NewCooperativeCallableObservation(
-		cooperative,
-		observation.Requests()...,
 	)
 }
 

@@ -20,6 +20,7 @@ func buildProviderStatefulProfile(
 	seed providerStatefulProfileSeed,
 	targets map[string]tsgo.ProjectExport,
 	bindings map[string]gostdlib.BindingDocument,
+	facets []facetSeed,
 	project *tsgo.ProjectInspection,
 	effectMarker tsgo.ProjectExport,
 ) (providerStatefulProfileBuild, error) {
@@ -132,6 +133,10 @@ func buildProviderStatefulProfile(
 	if err != nil {
 		return providerStatefulProfileBuild{}, err
 	}
+	operations, err := buildStatefulProfileOperations(seed, facets, target)
+	if err != nil {
+		return providerStatefulProfileBuild{}, err
+	}
 	fields, err := buildStatefulProfileFields(
 		selectedToolchain,
 		source,
@@ -142,7 +147,12 @@ func buildProviderStatefulProfile(
 	if err != nil {
 		return providerStatefulProfileBuild{}, err
 	}
-	if err := verifyStatefulProfileTargetMembers(target, fields, methods); err != nil {
+	if err := verifyStatefulProfileTargetMembers(
+		target,
+		fields,
+		methods,
+		operations,
+	); err != nil {
 		return providerStatefulProfileBuild{}, err
 	}
 	return providerStatefulProfileBuild{
@@ -152,6 +162,7 @@ func buildProviderStatefulProfile(
 			Export:              seed.Export,
 			Interfaces:          interfaces,
 			TypeArguments:       slices.Clone(seed.TypeArguments),
+			Operations:          slices.Clone(operations),
 			Fields:              fields,
 			Methods:             methods,
 			ImplementationOwner: implementationOwner,

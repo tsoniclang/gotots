@@ -271,6 +271,7 @@ func buildFacetModules(
 				seed,
 				byName,
 				bindingDocuments,
+				selected,
 				project,
 				effectMarker,
 			)

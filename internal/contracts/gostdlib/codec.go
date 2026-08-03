@@ -119,12 +119,9 @@ func Parse(payload []byte) (Manifest, error) {
 	facets := make(map[facetLookup]Facet)
 	for _, module := range document.FacetModules {
 		for _, facet := range module.Facets {
-			capabilities := make([]string, 0, len(facet.Capabilities)+1)
+			capabilities := make([]string, 0, len(facet.Capabilities))
 			for _, capability := range facet.Capabilities {
 				capabilities = append(capabilities, string(capability))
-			}
-			if facet.ProfileKey != "" {
-				capabilities = append(capabilities, facet.ProfileKey)
 			}
 			for _, capability := range capabilities {
 				facets[facetLookup{

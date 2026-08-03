@@ -67,6 +67,7 @@ const (
 	RuntimeModuleStruct
 	RuntimeModuleStorage
 	RuntimeModuleDeferredRegistry
+	RuntimeModuleScalar
 )
 
 func runtimeContract(

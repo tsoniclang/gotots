@@ -1,12 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { GoMap, type GoMapValue } from "@gotots/runtime/map.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
-import {
-  MapsKeysCooperative,
-} from "../src/internal/facets/generic-maps.js";
 import {
   MathBigFloatOperations,
   MathBigIntOperations,
@@ -16,17 +12,6 @@ import {
   BinaryLittleEndianOperations,
   BinaryNativeEndianOperations,
 } from "../src/internal/facets/named-encoding-binary.js";
-import {
-  SlicesAppendSeqCooperative,
-  SlicesAppendSeqFullyCooperative,
-  SlicesBinarySearchFuncCooperative,
-  SlicesCollectCooperative,
-  SlicesCompareFuncCooperative,
-  SlicesSortedCooperative,
-  SlicesSortedFullyCooperative,
-  SlicesValuesCooperative,
-  SlicesValuesFullyCooperative,
-} from "../src/internal/facets/generic-slices.js";
 import {
   RuntimeMetricsDescriptionOperations,
   RuntimeMetricsSampleOperations,
@@ -82,7 +67,6 @@ import {
   Value as ReflectValue,
 } from "../src/reflect.js";
 import { ParseError, Time } from "../src/time.js";
-import { Seq } from "../src/iter.js";
 import {
   Accuracy,
   Float as BigFloat,
@@ -100,11 +84,6 @@ import { EPERM } from "../src/syscall.js";
 import { Builder as StringBuilder } from "../src/strings.js";
 import { state as binaryState } from "../src/encoding/binary.js";
 
-const copyValue = <T>(value: T): T => value;
-const equalValue = <T>(left: T, right: T): boolean => left === right;
-const lessNumber = (left: number, right: number): boolean => left < right;
-const sliceValue = <T>(value: RuntimeSlice<T>): RuntimeSlice<T> => value;
-const zeroNumber = (): number => 0;
 
 test("named-struct facets expose only selected static operations", (): void => {
   assert.equal(BinaryBigEndianOperations.$fromStorage(
@@ -334,134 +313,4 @@ test("recovery facets preserve the direct provider ABI", (): void => {
     )),
     "p=0001-01-01T00:00:00Z",
   );
-});
-
-test("generic facets adapt cooperative provider implementations", async (): Promise<void> => {
-  assert.deepEqual(
-    await SlicesBinarySearchFuncCooperative(
-      sliceValue,
-      copyValue,
-      copyValue,
-      RuntimeSlice.literal([1, 3, 3, 8]),
-      "3",
-      async (value: number, target: string): Promise<number> => (
-        value - Number(target)
-      ),
-    ),
-    [1, true],
-  );
-  assert.equal(
-    await SlicesCompareFuncCooperative(
-      sliceValue,
-      sliceValue,
-      copyValue,
-      copyValue,
-      copyValue,
-      copyValue,
-      RuntimeSlice.literal([2, 4]),
-      RuntimeSlice.literal(["2", "5"]),
-      async (left: number, right: string): Promise<number> => (
-        left - Number(right)
-      ),
-    ),
-    -1,
-  );
-  const source = GoMap.make<string, number>(0, 0, [["a", 1], ["b", 2]]);
-  const keys: string[] = [];
-  await MapsKeysCooperative<GoMapValue<string, number>, string, number>(
-    (value): GoMapValue<string, number> => value,
-    (value): string => value,
-    source,
-  ).value?.(async (key): Promise<boolean> => {
-    keys.push(key);
-    return true;
-  });
-  assert.deepEqual(keys.sort(), ["a", "b"]);
-
-  const sequence = new Seq<number, (
-    yieldValue: ((value: number) => Promise<boolean>) | undefined,
-  ) => Promise<void>>(async (yieldValue): Promise<void> => {
-    await yieldValue?.(2);
-    await yieldValue?.(3);
-  });
-  const values = await SlicesCollectCooperative(
-    copyValue,
-    copyValue,
-    sequence,
-  );
-  assert.deepEqual([values.get(0), values.get(1)], [2, 3]);
-
-  const slice = RuntimeSlice.literal([3, 1, 2]);
-  const yielded: number[] = [];
-  await SlicesValuesCooperative<RuntimeSlice<number>, number, number>(
-    sliceValue,
-    copyValue,
-    copyValue,
-    slice,
-  ).value?.(
-    async (value): Promise<boolean> => {
-      yielded.push(value);
-      return true;
-    },
-  );
-  await SlicesValuesFullyCooperative<RuntimeSlice<number>, number, number>(
-    sliceValue,
-    copyValue,
-    copyValue,
-    slice,
-  ).value?.(
-    async (value): Promise<boolean> => {
-      yielded.push(value);
-      return true;
-    },
-  );
-  assert.deepEqual(yielded, [3, 1, 2, 3, 1, 2]);
-
-  const appended = await SlicesAppendSeqCooperative(
-    sliceValue,
-    sliceValue,
-    copyValue,
-    copyValue,
-    copyValue,
-    zeroNumber,
-    RuntimeSlice.literal([1]),
-    sequence,
-  );
-  const fullyAppended = await SlicesAppendSeqFullyCooperative(
-    sliceValue,
-    sliceValue,
-    copyValue,
-    copyValue,
-    copyValue,
-    zeroNumber,
-    RuntimeSlice.literal([1]),
-    sequence,
-  );
-  assert.deepEqual(
-    [appended.get(0), appended.get(1), appended.get(2)],
-    [1, 2, 3],
-  );
-  assert.deepEqual(
-    [fullyAppended.get(0), fullyAppended.get(1), fullyAppended.get(2)],
-    [1, 2, 3],
-  );
-
-  const sorted = await SlicesSortedCooperative<number, number>(
-    lessNumber,
-    copyValue,
-    equalValue,
-    copyValue,
-    copyValue,
-    sequence,
-  );
-  const fullySorted = await SlicesSortedFullyCooperative<number, number>(
-    lessNumber,
-    copyValue,
-    equalValue,
-    copyValue,
-    copyValue,
-    sequence,
-  );
-  assert.deepEqual([sorted.get(0), sorted.get(1)], [2, 3]);
-  assert.deepEqual([fullySorted.get(0), fullySorted.get(1)], [2, 3]);
 });

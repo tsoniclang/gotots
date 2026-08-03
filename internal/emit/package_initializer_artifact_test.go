@@ -306,9 +306,9 @@ func Run() int32 {
 	}
 	storage := builder.storage[index]
 	if storage.owner != api.MustSourceArtifactOwner(variable) ||
-		storage.reconstructions != 1 {
+		storage.reconstructions != 0 {
 		t.Fatalf(
-			"package callable owner/reconstructions = %q/%d, want exact owner/1",
+			"package callable owner/reconstructions = %q/%d, want exact owner/0",
 			storage.owner.Name(),
 			storage.reconstructions,
 		)
@@ -330,14 +330,14 @@ func Run() int32 {
 	result, ok := callable.Type().(tsgo.TypeReferenceNode)
 	if !ok {
 		t.Fatalf(
-			"package callable result = %T, want Promise",
+			"package callable result = %T, want Awaitable<value>",
 			callable.Type(),
 		)
 	}
-	promise, ok := result.TypeName().(tsgo.Identifier)
-	if !ok || promise.Text() != api.TargetIntrinsicPromise.String() {
+	awaitable, ok := result.TypeName().(tsgo.Identifier)
+	if !ok || awaitable.Text() != "Awaitable" {
 		t.Fatalf(
-			"package callable result name = %T, want Promise",
+			"package callable result name = %T, want Awaitable",
 			result.TypeName(),
 		)
 	}

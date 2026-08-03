@@ -123,7 +123,7 @@ func TimeAddress() time.Time {
 		"SlicesCloneKernel<GoContainerStorage<T>>(",
 		"SlicesCloneKernel<GoContainerStorage<T>>($argument0)",
 		"CmpCompareKernel<gostring>(",
-		"SlicesValuesCooperative<RuntimeSlice<gostring>, gostring, gostring>(",
+		"SlicesValuesKernel<RuntimeSlice<gostring>, gostring, gostring>(",
 		"ErrorsAsTypeKernel<code__from_providerprojection>($goCapability_",
 		"GenericAddress$kernel<T>",
 		"GoPointerType<T>",
@@ -135,6 +135,8 @@ func TimeAddress() time.Time {
 	for _, superseded := range []string{
 		"Concat<RuntimeSlice<gostring>, gostring>(",
 		"Clone<gostring, int64>(",
+		"SlicesValuesCooperative<",
+		"SlicesValuesFullyCooperative<",
 	} {
 		if strings.Contains(printed, superseded) {
 			t.Fatalf("provider generic projection retained %q:\n%s", superseded, printed)

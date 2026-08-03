@@ -241,54 +241,14 @@ func emitEnvironmentNonNilType(
 	source ast.Node,
 	signature *types.Signature,
 ) (api.TypeEmission, error) {
-	profile, profiled := context.GenericCallableProfile()
-	if !profiled {
-		if _, generic := context.GenericParameterOwner(); !generic {
-			return EmitNonNilType(
-				context,
-				children,
-				source,
-				signature,
-			)
-		}
-		return EmitInternalNonNilType(
-			context,
-			children,
-			source,
-			signature,
-		)
-	}
-	reference, err := ABIReference(context, signature)
-	if err != nil {
-		return api.TypeEmission{}, err
-	}
-	cooperative, selected :=
-		profile.Selection().ABI(reference.Artifact())
-	if !selected {
-		return EmitInternalNonNilType(
-			context,
-			children,
-			source,
-			signature,
-		)
-	}
-	target, err := emitInternalNonNilType(
+	return EmitInlineAwaitableType(
 		context,
 		children,
 		source,
 		signature,
-		cooperative,
+		context.ConcurrencySemantics() ==
+			api.ConcurrencySemanticsCooperative,
 	)
-	if err != nil {
-		return api.TypeEmission{}, err
-	}
-	return api.DirectType(
-		target.Value(),
-		api.CombineRequests(
-			reference.Requests(),
-			target.Requests(),
-		)...,
-	), nil
 }
 
 func EmitNonNilType(
@@ -297,48 +257,20 @@ func EmitNonNilType(
 	source ast.Node,
 	signature *types.Signature,
 ) (api.TypeEmission, error) {
-	reference, err := ABIReference(context, signature)
-	if err != nil {
-		return api.TypeEmission{}, err
-	}
-	facet, err := context.CallableABIFacet(reference)
-	if err != nil {
-		return api.TypeEmission{}, err
-	}
-	observation, err := context.ObserveCooperativeCallable(facet)
-	if err != nil {
-		return api.TypeEmission{}, err
-	}
-	target, err := EmitInlineNonNilType(
+	return EmitInlineAwaitableType(
 		context,
 		children,
 		source,
 		signature,
-		observation.Cooperative(),
+		context.ConcurrencySemantics() ==
+			api.ConcurrencySemanticsCooperative,
 	)
-	if err != nil {
-		return api.TypeEmission{}, err
-	}
-	return api.DirectType(
-		target.Value(),
-		api.CombineRequests(
-			reference.Requests(),
-			observation.Requests(),
-			target.Requests(),
-		)...,
-	), nil
 }
 
 func ABIReference(
 	context api.Context,
 	signature *types.Signature,
 ) (api.CallableABIReference, error) {
-	if profile, profiled := context.GenericCallableProfile(); profiled {
-		return context.Names().SourceCallableABI(
-			profile.Owner(),
-			signature,
-		)
-	}
 	if owner, generic := context.GenericParameterOwner(); generic {
 		return context.Names().SourceCallableABI(owner, signature)
 	}

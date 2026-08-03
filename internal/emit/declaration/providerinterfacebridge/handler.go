@@ -182,5 +182,5 @@ func shapeError(artifact string, reason string) error {
 }
 
 func providerCooperative(method gostdlib.ProviderInterfaceMethod) bool {
-	return method.Effect() == gostdlib.EffectAsynchronous
+	return method.Effect().MaySuspend()
 }

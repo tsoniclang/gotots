@@ -2,6 +2,7 @@ import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
+  Awaitable,
   gostring,
   int64,
   uint8,
@@ -14,7 +15,7 @@ export interface CanonicalErrorSync extends GoInterfaceValue {
 }
 
 export interface CanonicalErrorAsync extends GoInterfaceValue {
-  Error(recovery?: GoRecovery): Promise<gostring>;
+  Error(recovery?: GoRecovery): Awaitable<gostring>;
 }
 
 const canonicalBoundaryErrorType = Object.freeze({ comparable: true });
@@ -68,7 +69,7 @@ export interface CanonicalReaderSourceAsync<
   Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, Failure | undefined]>;
+  ): Awaitable<[int64, Failure | undefined]>;
 }
 
 export interface CanonicalWriterTargetSync<
@@ -86,5 +87,5 @@ export interface CanonicalWriterTargetAsync<
   Write(
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, Failure | undefined]>;
+  ): Awaitable<[int64, Failure | undefined]>;
 }

@@ -107,6 +107,7 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 	runtimePackage, err := runtimeemission.AssemblePackage(
 		s.factory,
 		s.integer,
+		s.concurrency,
 		requirements.runtimeSymbols,
 		requirements.aliases(),
 	)

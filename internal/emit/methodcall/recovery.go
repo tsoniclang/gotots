@@ -1,7 +1,6 @@
 package methodcall
 
 import (
-	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -30,7 +29,7 @@ func (s Selection) ResolveRecovery(
 			requests:  profileRequests,
 			provider:  true,
 			direct:    true,
-			async:     profileEffect == gostdlib.EffectAsynchronous,
+			async:     profileEffect.MaySuspend(),
 		}, nil
 	}
 	reference, provider, err := context.Names().RecoveryCallable(s.owner)

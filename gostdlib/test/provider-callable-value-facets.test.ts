@@ -5,24 +5,20 @@ import type { CancelCauseFunc } from "../src/context.js";
 import type { WalkDirFunc } from "../src/io/fs.js";
 
 interface CanonicalFailure {
-  Error(): Promise<string>;
+  Error(): string | Promise<string>;
 }
 
 interface CanonicalEntry {
-  Name(): Promise<string>;
+  Name(): string | Promise<string>;
 }
 
-test("provider callable value facets accept canonical generated signatures", async () => {
-  const cancel: NonNullable<CancelCauseFunc<
-    ((cause: CanonicalFailure | undefined) => Promise<void>) | undefined
-  >> = async () => {};
-  const walk: NonNullable<WalkDirFunc<
-    ((
-      path: string,
-      entry: CanonicalEntry | undefined,
-      failure: CanonicalFailure | undefined,
-    ) => Promise<CanonicalFailure | undefined>) | undefined
-  >> = async (_path, _entry, failure) => failure;
+test("provider named callables keep source arity", async () => {
+  const cancel: NonNullable<CancelCauseFunc> = async () => {};
+  const walk: NonNullable<WalkDirFunc> = async (
+    _path,
+    _entry,
+    failure,
+  ) => failure;
 
   await cancel(undefined);
   assert.equal(await walk(".", undefined, undefined), undefined);

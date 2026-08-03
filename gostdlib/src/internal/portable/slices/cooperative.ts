@@ -24,17 +24,7 @@ type AsyncPredicate<T> = (
 type AsyncComparison<L, R = L> = (
   (left: L, right: R, recovery?: GoRecovery) => Promise<int64>
 ) | undefined;
-type CooperativeYield<T> = (
-  value: T,
-  recovery?: GoRecovery,
-) => Promise<bool>;
-export type CooperativeSequence<T> = Seq<
-  T,
-  ((
-    yieldValue: CooperativeYield<T> | undefined,
-    recovery?: GoRecovery,
-  ) => Promise<void>) | undefined
->;
+export type CooperativeSequence<T> = Seq<T>;
 
 export async function AppendSeqCooperative<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
@@ -310,7 +300,7 @@ export function ValuesCooperative<S, E, EStorage>(
   source: S,
 ): CooperativeSequence<E> {
   const values = toSlice(source);
-  return new Seq<E, CooperativeSequence<E>["value"]>(
+  return new Seq<E>(
     async (yieldValue): Promise<void> => {
       if (yieldValue === undefined) {
         GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");

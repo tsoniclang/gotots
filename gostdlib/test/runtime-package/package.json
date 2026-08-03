@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "gotots": {
-    "integerRepresentation": "number"
+    "integerRepresentation": "number",
+    "concurrencySemantics": "cooperative"
   },
   "exports": {
     "./array.js": {

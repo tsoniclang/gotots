@@ -8,14 +8,12 @@ import (
 )
 
 const (
-	DeferredEntrySuffix                           = "$deferred"
-	GenericKernelSuffix                           = "$kernel"
-	DeferredRegistryRegisterName                  = "register"
-	DeferredRegistryResolveName                   = "resolve"
-	DeferredRegistryRegisterMethodName            = "registerMethod"
-	DeferredRegistryResolveMethodName             = "resolveMethod"
-	DeferredRegistryRegisterCooperativeMethodName = "registerCooperativeMethod"
-	DeferredRegistryResolveCooperativeMethodName  = "resolveCooperativeMethod"
+	DeferredEntrySuffix                = "$deferred"
+	GenericKernelSuffix                = "$kernel"
+	DeferredRegistryRegisterName       = "register"
+	DeferredRegistryResolveName        = "resolve"
+	DeferredRegistryRegisterMethodName = "registerMethod"
+	DeferredRegistryResolveMethodName  = "resolveMethod"
 )
 
 type ControlLabel struct {

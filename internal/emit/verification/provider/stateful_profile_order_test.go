@@ -125,16 +125,15 @@ func main() { fmt.Println(profile.Consume()) }
 			targetOutput,
 		)
 	}
-	if !strings.Contains(artifacts.printed, "bufio__from_gostdlib.NewReader") {
-		t.Fatalf("ordinary synchronous provider path is absent:\n%s", artifacts.printed)
+	if !strings.Contains(artifacts.printed, "CanonicalReaderAsync") {
+		t.Fatalf("canonical cooperative provider state is absent:\n%s", artifacts.printed)
 	}
 	for _, forbidden := range []string{
 		"CanonicalReaderSync",
-		"CanonicalReaderAsync",
-		"await $goProviderState",
+		"bufio__from_gostdlib.NewReader(",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
-			t.Fatalf("synchronous state profile contains %q:\n%s", forbidden, artifacts.printed)
+			t.Fatalf("cooperative state profile contains stale path %q:\n%s", forbidden, artifacts.printed)
 		}
 	}
 }

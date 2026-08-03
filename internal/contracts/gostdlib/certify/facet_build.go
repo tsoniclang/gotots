@@ -39,8 +39,7 @@ func buildFacet(
 			)
 		}
 	case gostdlib.FacetRecoveryCallable,
-		gostdlib.FacetGenericCallableKernel,
-		gostdlib.FacetGenericCallableProfile:
+		gostdlib.FacetGenericCallableKernel:
 		if _, ok := evidence.object.(*types.Func); !ok {
 			return gostdlib.FacetDocument{}, certifyError(
 				"build facet",
@@ -59,17 +58,6 @@ func buildFacet(
 	}
 	if err := validateFacetTarget(seed, target); err != nil {
 		return gostdlib.FacetDocument{}, err
-	}
-	if seed.Kind == gostdlib.FacetGenericCallableProfile {
-		function, _ := evidence.object.(*types.Func)
-		signature, _ := function.Type().(*types.Signature)
-		if signature == nil || signature.TypeParams().Len() == 0 {
-			return gostdlib.FacetDocument{}, certifyError(
-				"build facet",
-				seed.SourceIdentity,
-				"generic callable profile owner is not generic",
-			)
-		}
 	}
 	if seed.Kind == gostdlib.FacetGenericCallableKernel {
 		operations := genericOperations[seed.SourceIdentity]
@@ -91,7 +79,6 @@ func buildFacet(
 		Kind:                 seed.Kind,
 		SourceIdentity:       seed.SourceIdentity,
 		Capabilities:         append([]gostdlib.FacetCapability(nil), seed.Capabilities...),
-		ProfileKey:           seed.ProfileKey,
 		Export:               seed.Export,
 		StorageExport:        seed.StorageExport,
 		RepresentationExport: seed.RepresentationExport,

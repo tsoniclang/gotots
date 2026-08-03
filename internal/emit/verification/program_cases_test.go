@@ -204,11 +204,14 @@ func TestCooperativeIteratorCallbackPropagatesThroughCallableABIs(
 		artifacts.printed,
 		"SynchronousAudit",
 	)
-	for _, forbidden := range []string{"async", "Promise<", "await "} {
-		if strings.Contains(synchronous, forbidden) {
+	for _, required := range []string{
+		"export async function SynchronousAudit(): Promise<int32>",
+		"await __gotots_range_",
+	} {
+		if !strings.Contains(synchronous, required) {
 			t.Fatalf(
-				"synchronous iterator artifact contains %q:\n%s",
-				forbidden,
+				"canonical iterator artifact lacks %q:\n%s",
+				required,
 				synchronous,
 			)
 		}
@@ -219,7 +222,7 @@ import { CooperativeAudit, SynchronousAudit } from "`+artifacts.sourceModule+`";
 import { GoScheduler } from "./runtime/channel.js";
 
 await GoScheduler.run(async () => {
-    console.log(String(await CooperativeAudit()) + " " + String(SynchronousAudit()));
+	    console.log(String(await CooperativeAudit()) + " " + String(await SynchronousAudit()));
 });
 `)
 	writeProgramFile(

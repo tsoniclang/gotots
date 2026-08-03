@@ -68,6 +68,7 @@ func SequenceTotal(sequence iter.Seq[int]) int {
 		t.Fatal(err)
 	}
 	options := emit.DefaultOptions()
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(program, roots, options)
 	if err != nil {
@@ -81,9 +82,8 @@ func SequenceTotal(sequence iter.Seq[int]) int {
 		"TimeDurationValueOperations.$project",
 		"TimeDurationValueOperations.$wrap",
 		"IterSeqValueOperations.$project",
-		"context__from_gostdlib.CancelFunc<",
-		"fs__from_gostdlib.WalkDirFunc<",
-		"WalkDirFunc<(($0: gostring, $1: $goInterface_",
+		"context__from_gostdlib.CancelFunc",
+		"fs__from_gostdlib.WalkDirFunc",
 		"const __gotots_callee_0 = cancel;",
 		"const __gotots_callee_1 = callback;",
 		"await __gotots_callee_0();",

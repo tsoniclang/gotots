@@ -10,6 +10,13 @@ type RuntimeSymbolContract struct {
 
 func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 	switch symbol {
+	case RuntimeAwaitable:
+		return runtimeContract(
+			RuntimeModuleScalar,
+			"runtime/scalars.ts",
+			"Awaitable",
+			true,
+		), nil
 	case RuntimeStringIndex:
 		return runtimeContract(
 			RuntimeModuleString,

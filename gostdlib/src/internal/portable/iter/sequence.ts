@@ -1,16 +1,15 @@
-import type { bool } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool } from "@gotots/runtime/scalars.js";
+type Yield<T> = (value: T) => Awaitable<bool>;
+type Yield2<K, V> = (key: K, value: V) => Awaitable<bool>;
 
-export class Seq<
-  T,
-  Implementation = ((yieldValue: ((value: T) => bool) | undefined) => void) | undefined,
-> {
-  constructor(readonly value: Implementation) {}
+export class Seq<T> {
+  constructor(
+    readonly value: ((yieldValue: Yield<T> | undefined) => Awaitable<void>) | undefined,
+  ) {}
 }
 
-export class Seq2<
-  K,
-  V,
-  Implementation = ((yieldValue: ((key: K, value: V) => bool) | undefined) => void) | undefined,
-> {
-  constructor(readonly value: Implementation) {}
+export class Seq2<K, V> {
+  constructor(
+    readonly value: ((yieldValue: Yield2<K, V> | undefined) => Awaitable<void>) | undefined,
+  ) {}
 }

@@ -53,7 +53,7 @@ func (n *File) RecoveryCallable(
 	}
 	result, err := api.NewRecoveryCallableReference(
 		reference,
-		selected.Effect() == gostdlib.EffectAsynchronous,
+		selected.Effect().MaySuspend(),
 	)
 	return result, true, err
 }

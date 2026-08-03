@@ -72,12 +72,13 @@ func Decode(mutex *sync.Mutex) error {
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
-	selected := "EncodingBinaryReadCanonicalAsyncReaderAsyncError"
+	selected := "EncodingBinaryReadCanonicalOrderAsyncReaderAsyncError"
 	if !strings.Contains(artifacts.printed, selected) {
 		t.Fatalf("binary profile output lacks %q:\n%s", selected, artifacts.printed)
 	}
 	for _, rejected := range []string{
 		"EncodingBinaryReadCanonical(",
+		"EncodingBinaryReadCanonicalAsyncReaderAsyncError",
 		"EncodingBinaryReadCanonicalSyncReaderSyncError",
 		"EncodingBinaryReadCanonicalAsyncReaderSyncError",
 		"EncodingBinaryReadCanonicalSyncReaderAsyncError",

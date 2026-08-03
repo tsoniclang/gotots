@@ -9,12 +9,11 @@ import (
 )
 
 type callableContract struct {
-	source                    tsgo.TypeNode
-	deferred                  tsgo.TypeNode
-	methodDeferred            tsgo.TypeNode
-	cooperativeMethodDeferred tsgo.TypeNode
-	interfaceValue            tsgo.TypeNode
-	requests                  []api.RootRequest
+	source         tsgo.TypeNode
+	deferred       tsgo.TypeNode
+	methodDeferred tsgo.TypeNode
+	interfaceValue tsgo.TypeNode
+	requests       []api.RootRequest
 }
 
 func Build(
@@ -48,7 +47,6 @@ func Build(
 		contract.source,
 		contract.deferred,
 		contract.methodDeferred,
-		contract.cooperativeMethodDeferred,
 	}
 	registryType := factory.TypeReferenceNode(
 		runtimeRegistry.EntityName(factory),
@@ -87,14 +85,17 @@ func callableTypes(
 		return callableContract{}, err
 	}
 	result := target.Result()
-	sourceResult := result
+	sourceResult := api.DirectType(result)
 	if cooperative {
-		sourceResult = callable.PromiseResult(context.Factory(), result)
+		sourceResult, err = callable.IndirectResult(context, result)
+		if err != nil {
+			return callableContract{}, err
+		}
 	}
 	source := context.Factory().FunctionTypeNode(
 		nil,
 		target.Parameters(),
-		sourceResult,
+		sourceResult.Value(),
 	)
 	recovery, recoveryRequests, err :=
 		callable.RecoveryAuthorityParameter(context)
@@ -107,7 +108,7 @@ func callableTypes(
 			[]tsgo.ParameterDeclaration{recovery},
 			target.Parameters()...,
 		),
-		sourceResult,
+		sourceResult.Value(),
 	)
 	runtimeValue, err := context.Names().Runtime(
 		api.RuntimeInterfaceValue,
@@ -120,6 +121,10 @@ func callableTypes(
 		runtimeValue.EntityName(context.Factory()),
 		nil,
 	)
+	methodResult, err := callable.IndirectResult(context, result)
+	if err != nil {
+		return callableContract{}, err
+	}
 	methodDeferred := context.Factory().FunctionTypeNode(
 		nil,
 		append(
@@ -133,31 +138,17 @@ func callableTypes(
 			},
 			target.Parameters()...,
 		),
-		result,
-	)
-	cooperativeMethodDeferred := context.Factory().FunctionTypeNode(
-		nil,
-		append(
-			[]tsgo.ParameterDeclaration{
-				recovery,
-				parameter(
-					context.Factory(),
-					context.Factory().Identifier("receiver"),
-					interfaceValue,
-				),
-			},
-			target.Parameters()...,
-		),
-		callable.PromiseResult(context.Factory(), result),
+		methodResult.Value(),
 	)
 	return callableContract{
-		source:                    source,
-		deferred:                  deferred,
-		methodDeferred:            methodDeferred,
-		cooperativeMethodDeferred: cooperativeMethodDeferred,
-		interfaceValue:            interfaceValue,
+		source:         source,
+		deferred:       deferred,
+		methodDeferred: methodDeferred,
+		interfaceValue: interfaceValue,
 		requests: api.CombineRequests(
 			target.Requests(),
+			sourceResult.Requests(),
+			methodResult.Requests(),
 			recoveryRequests,
 			runtimeValue.Requests(),
 		),

@@ -28,7 +28,7 @@ func validateFacet(facet FacetDocument, field string) error {
 	}
 	switch facet.Kind {
 	case FacetNamedStructOperations:
-		if len(facet.Capabilities) == 0 || facet.ProfileKey != "" ||
+		if len(facet.Capabilities) == 0 ||
 			facet.Effect != EffectInvalid || len(facet.GenericTypeArguments) != 0 {
 			return manifestError(field, "named-struct facet shape is invalid")
 		}
@@ -58,7 +58,7 @@ func validateFacet(facet FacetDocument, field string) error {
 		if len(facet.Capabilities) != 2 ||
 			facet.Capabilities[0] != FacetCapabilityProject ||
 			facet.Capabilities[1] != FacetCapabilityWrap ||
-			facet.ProfileKey != "" || facet.Effect != EffectInvalid ||
+			facet.Effect != EffectInvalid ||
 			len(facet.GenericTypeArguments) != 0 ||
 			facet.StorageExport != "" || facet.RepresentationExport != "" ||
 			facet.StorageImplementationOwner != "" ||
@@ -68,7 +68,7 @@ func validateFacet(facet FacetDocument, field string) error {
 	case FacetRecoveryCallable:
 		if len(facet.Capabilities) != 1 ||
 			facet.Capabilities[0] != FacetCapabilityRecovery ||
-			facet.ProfileKey != "" || !facet.Effect.Valid() ||
+			!facet.Effect.Valid() ||
 			len(facet.GenericTypeArguments) != 0 ||
 			facet.StorageExport != "" ||
 			facet.RepresentationExport != "" ||
@@ -79,7 +79,7 @@ func validateFacet(facet FacetDocument, field string) error {
 	case FacetGenericCallableKernel:
 		if len(facet.Capabilities) != 1 ||
 			facet.Capabilities[0] != FacetCapabilityKernel ||
-			facet.ProfileKey != "" || facet.Effect != EffectInvalid ||
+			facet.Effect != EffectInvalid ||
 			len(facet.GenericTypeArguments) == 0 ||
 			facet.StorageExport != "" || facet.RepresentationExport != "" ||
 			facet.StorageImplementationOwner != "" ||
@@ -92,32 +92,8 @@ func validateFacet(facet FacetDocument, field string) error {
 		); err != nil {
 			return err
 		}
-	case FacetGenericCallableProfile:
-		if len(facet.Capabilities) != 0 ||
-			!validProfileKey(facet.ProfileKey) ||
-			!facet.Effect.Valid() || len(facet.GenericTypeArguments) != 0 ||
-			facet.StorageExport != "" ||
-			facet.RepresentationExport != "" ||
-			facet.StorageImplementationOwner != "" ||
-			facet.StorageTargetFingerprint != "" {
-			return manifestError(field, "generic-callable facet shape is invalid")
-		}
 	}
 	return nil
-}
-
-func validProfileKey(value string) bool {
-	if value == "" || strings.ContainsAny(value, "\x00\r\n\t ") {
-		return false
-	}
-	for _, part := range strings.Split(value, "|") {
-		key, selected, ok := strings.Cut(part, "=")
-		if !ok || len(key) != sha256.Size*2 || selected != "cooperative" ||
-			!validDigest(key) {
-			return false
-		}
-	}
-	return true
 }
 
 func validateModule(module ModuleDocument, field string) error {

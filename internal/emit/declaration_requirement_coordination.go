@@ -141,24 +141,6 @@ func compareDeclarationRequirements(
 			return 0
 		}
 	}
-	if left.Kind() == api.DeclarationRequirementGenericCallableProfile {
-		leftProfile, leftOK := left.GenericCallableProfile()
-		rightProfile, rightOK := right.GenericCallableProfile()
-		switch {
-		case !leftOK && rightOK:
-			return -1
-		case leftOK && !rightOK:
-			return 1
-		case !leftOK:
-			return 0
-		case leftProfile.Key() < rightProfile.Key():
-			return -1
-		case leftProfile.Key() > rightProfile.Key():
-			return 1
-		default:
-			return 0
-		}
-	}
 	if left.Kind() == api.DeclarationRequirementCooperativeCallable {
 		leftFacet, leftOK := left.CooperativeCallable()
 		rightFacet, rightOK := right.CooperativeCallable()
@@ -182,22 +164,6 @@ func compareDeclarationRequirements(
 			case leftLiteral.Pos() > rightLiteral.Pos():
 				return 1
 			}
-			leftProfile, leftProfiled :=
-				leftFacet.FunctionLiteralProfile()
-			rightProfile, rightProfiled :=
-				rightFacet.FunctionLiteralProfile()
-			switch {
-			case !leftProfiled && rightProfiled:
-				return -1
-			case leftProfiled && !rightProfiled:
-				return 1
-			case leftProfiled &&
-				leftProfile.Key() < rightProfile.Key():
-				return -1
-			case leftProfiled &&
-				leftProfile.Key() > rightProfile.Key():
-				return 1
-			}
 		}
 		if leftOperation, ok := leftFacet.GenericOperation(); ok {
 			rightOperation, _ := rightFacet.GenericOperation()
@@ -205,21 +171,6 @@ func compareDeclarationRequirements(
 			case leftOperation.Key() < rightOperation.Key():
 				return -1
 			case leftOperation.Key() > rightOperation.Key():
-				return 1
-			}
-		}
-		if order, profiled := compareGenericProfileABIs(
-			leftFacet,
-			rightFacet,
-		); profiled && order != 0 {
-			return order
-		}
-		if leftProfile, ok := leftFacet.GenericProfile(); ok {
-			rightProfile, _ := rightFacet.GenericProfile()
-			switch {
-			case leftProfile.Key() < rightProfile.Key():
-				return -1
-			case leftProfile.Key() > rightProfile.Key():
 				return 1
 			}
 		}

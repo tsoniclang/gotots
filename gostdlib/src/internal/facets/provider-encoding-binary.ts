@@ -5,6 +5,7 @@ import type {
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
+  Awaitable,
   gostring,
   uint16,
   uint32,
@@ -45,21 +46,21 @@ export interface CanonicalByteOrder extends GoInterfaceValue {
     buffer: RuntimeSlice<uint8>,
     value: uint16,
     recovery?: GoRecovery,
-  ): void;
+  ): Awaitable<void>;
   PutUint32(
     buffer: RuntimeSlice<uint8>,
     value: uint32,
     recovery?: GoRecovery,
-  ): void;
+  ): Awaitable<void>;
   PutUint64(
     buffer: RuntimeSlice<uint8>,
     value: uint64,
     recovery?: GoRecovery,
-  ): void;
-  String(recovery?: GoRecovery): Promise<gostring>;
-  Uint16(buffer: RuntimeSlice<uint8>, recovery?: GoRecovery): uint16;
-  Uint32(buffer: RuntimeSlice<uint8>, recovery?: GoRecovery): uint32;
-  Uint64(buffer: RuntimeSlice<uint8>, recovery?: GoRecovery): uint64;
+  ): Awaitable<void>;
+  String(recovery?: GoRecovery): Awaitable<gostring>;
+  Uint16(buffer: RuntimeSlice<uint8>, recovery?: GoRecovery): Awaitable<uint16>;
+  Uint32(buffer: RuntimeSlice<uint8>, recovery?: GoRecovery): Awaitable<uint32>;
+  Uint64(buffer: RuntimeSlice<uint8>, recovery?: GoRecovery): Awaitable<uint64>;
 }
 
 export function EncodingBinaryReadCanonical(

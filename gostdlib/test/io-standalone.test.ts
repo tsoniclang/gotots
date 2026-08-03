@@ -89,7 +89,7 @@ test("errors preserve sentinel identity", () => {
   assert.equal(first.Error(), "first");
   const [selected, ok] = AsType<GoError | undefined>(
     (failure): [GoError | undefined, boolean] => [
-      failure,
+      failure === first ? first : undefined,
       failure === first,
     ],
     first,

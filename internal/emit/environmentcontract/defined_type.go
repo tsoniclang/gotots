@@ -37,19 +37,6 @@ func definedDeclaration(
 	typeParameters := generic.parameters
 	logicalArguments := append([]tsgo.TypeNode(nil), generic.arguments...)
 	valueType := target.Value()
-	if definedmodel.RequiresValueFacet(typeName.Type()) {
-		typeParameters = append(
-			typeParameters,
-			definedmodel.ValueTypeParameterDeclaration(
-				context.Factory(),
-				target.Value(),
-			),
-		)
-		valueType = definedmodel.ValueTypeParameterReference(
-			context.Factory(),
-		)
-		logicalArguments = append(logicalArguments, valueType)
-	}
 	classType := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(name),
 		logicalArguments,

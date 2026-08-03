@@ -3,7 +3,7 @@ import type {
   GoInterfaceValue,
 } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int64, uint8 } from "@gotots/runtime/scalars.js";
 
 import type { Reader } from "../../../../io.js";
 import { state as ioState } from "../../../../io.js";
@@ -292,7 +292,7 @@ export async function runGzipSourceAsync<Result, Failure>(
   initial: GzipSourceStep<Result, Failure>,
   readSource: (
     destination: RuntimeSlice<uint8>,
-  ) => Promise<[int64, Failure | undefined]>,
+  ) => Awaitable<[int64, Failure | undefined]>,
 ): Promise<Result> {
   let current = initial;
   while (current.kind === "read") {

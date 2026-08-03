@@ -6,6 +6,7 @@ import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
+  Awaitable,
   bool,
   gostring,
   int64,
@@ -97,6 +98,22 @@ export class PathError extends WrappedProviderError {
     return receiver.Error();
   }
 
+  static $make(
+    operation: gostring,
+    path: gostring,
+    failure: GoError | undefined,
+  ): PathError {
+    return new PathError(operation, path, failure);
+  }
+
+  static $storageOf(source: PathError): PathError {
+    return source;
+  }
+
+  static $fromStorage(source: PathError): PathError {
+    return source;
+  }
+
   Error(): gostring {
     const detail = this.Err?.Error() ?? "<nil>";
     if (this.Op === "") {
@@ -120,16 +137,34 @@ export class PathError extends WrappedProviderError {
   }
 }
 
-type WalkDirFuncABI = ((
-  path: gostring,
-  entry: DirEntry | undefined,
-  failure: GoError | undefined,
-  _recovery?: GoRecovery,
-) => Promise<GoError | undefined>) | undefined;
+interface WalkDirError extends GoInterfaceValue {
+  Error(): Awaitable<gostring>;
+}
 
-export type WalkDirFunc<
-  $Value = WalkDirFuncABI,
-> = $Value;
+interface WalkDirFileInfo extends GoInterfaceValue {
+  Name(): Awaitable<gostring>;
+  Size(): Awaitable<int64>;
+  Mode(): Awaitable<FileMode>;
+  ModTime(): Awaitable<Time>;
+  IsDir(): Awaitable<bool>;
+  Sys(): Awaitable<GoInterfaceValue | undefined>;
+}
+
+interface WalkDirEntry extends GoInterfaceValue {
+  Name(): Awaitable<gostring>;
+  IsDir(): Awaitable<bool>;
+  Type(): Awaitable<FileMode>;
+  Info(): Awaitable<[
+    WalkDirFileInfo | undefined,
+    WalkDirError | undefined,
+  ]>;
+}
+
+export type WalkDirFunc = ((
+  path: gostring,
+  entry: WalkDirEntry | undefined,
+  failure: WalkDirError | undefined,
+) => Awaitable<WalkDirError | undefined>) | undefined;
 
 export const state: {
   ErrClosed: GoError;
@@ -255,7 +290,7 @@ export async function WalkDir(
   fileSystem: FS | undefined,
   root: gostring,
   visit: WalkDirFunc,
-): Promise<GoError | undefined> {
+): Promise<WalkDirError | undefined> {
   const [information, statFailure] = Stat(fileSystem, root);
   const rootEntry = FileInfoToDirEntry(information);
   if (statFailure !== undefined || rootEntry === undefined) {
@@ -277,7 +312,7 @@ async function walk(
   path: string,
   entry: DirEntry,
   visit: WalkDirFunc,
-): Promise<GoError | undefined> {
+): Promise<WalkDirError | undefined> {
   const visitFailure = await invokeWalkDir(visit, path, entry, undefined);
   if (visitFailure !== undefined) {
     return visitFailure;
@@ -306,16 +341,16 @@ async function walk(
   return undefined;
 }
 
-function invokeWalkDir(
+async function invokeWalkDir(
   visit: WalkDirFunc,
   path: gostring,
-  entry: DirEntry | undefined,
-  failure: GoError | undefined,
-): Promise<GoError | undefined> {
+  entry: WalkDirEntry | undefined,
+  failure: WalkDirError | undefined,
+): Promise<WalkDirError | undefined> {
   if (visit === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
-  return visit(path, entry, failure);
+  return await visit(path, entry, failure);
 }
 
 function open(

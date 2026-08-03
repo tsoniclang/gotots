@@ -21,7 +21,6 @@ func JoinInterfaceMethodCallableABIs(
 	}
 	var requests []api.RootRequest
 	correspondence := callableCorrespondence{
-		context:             context,
 		seen:                make(map[genericTypePair]struct{}),
 		stopAtNamedBoundary: true,
 		leaf: contractJoinLeaf(
@@ -57,7 +56,6 @@ func JoinNominalFieldCallableABIs(
 	owner, declaration, instantiated := selected.Parts()
 	var requests []api.RootRequest
 	correspondence := callableCorrespondence{
-		context:             context,
 		seen:                make(map[genericTypePair]struct{}),
 		traverseIdentical:   true,
 		stopAtNamedBoundary: true,

@@ -19,6 +19,30 @@ func PromiseResult(
 	)
 }
 
+func IndirectResult(
+	context api.Context,
+	result tsgo.TypeNode,
+) (api.TypeEmission, error) {
+	if context.ConcurrencySemantics() !=
+		api.ConcurrencySemanticsCooperative {
+		return api.DirectType(result), nil
+	}
+	reference, err := context.Names().Runtime(
+		api.RuntimeAwaitable,
+		api.ImportPhaseType,
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return api.DirectType(
+		context.Factory().TypeReferenceNode(
+			context.Factory().Identifier(reference.Name()),
+			[]tsgo.TypeNode{result},
+		),
+		reference.Requests()...,
+	), nil
+}
+
 func ValueSignature(
 	signature *types.Signature,
 ) (*types.Signature, bool) {
@@ -66,21 +90,36 @@ func EmitInlineAwaitableType(
 	signature *types.Signature,
 	awaitable bool,
 ) (api.TypeEmission, error) {
-	return emitInlineNonNilType(
+	target, err := emitRepresented(
 		context,
 		children,
 		source,
 		signature,
-		func(result tsgo.TypeNode) tsgo.TypeNode {
-			if awaitable {
-				return context.Factory().UnionTypeNode([]tsgo.TypeNode{
-					result,
-					PromiseResult(context.Factory(), result),
-				})
-			}
-			return result
+		api.RoleCallableParameter,
+		api.RoleCallableResult,
+		func(_ *types.Var, index int) (string, error) {
+			return "$" + strconv.Itoa(index), nil
 		},
+		false,
 	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	result := api.DirectType(target.Result())
+	if awaitable {
+		result, err = IndirectResult(context, target.Result())
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+	}
+	return api.DirectType(
+		context.Factory().FunctionTypeNode(
+			nil,
+			target.Parameters(),
+			result.Value(),
+		),
+		api.CombineRequests(target.Requests(), result.Requests())...,
+	), nil
 }
 
 func emitInlineNonNilType(

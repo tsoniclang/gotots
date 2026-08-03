@@ -13,7 +13,6 @@ type GenericCallableResolver interface {
 		GeneratedArtifactPlacement,
 		ArtifactOwner,
 		*types.TypeName,
-		*GenericCallableProfile,
 	) (*GenericConcretization, error)
 	GenericCallableRequiresConcretization(*types.Func) (bool, error)
 	ResolveGenericOperationSet(
@@ -26,10 +25,6 @@ type GenericCallableResolver interface {
 		GenericOperationSelection,
 		*types.Signature,
 	) (*GenericOperationContract, error)
-	ResolveGenericCallableProfile(
-		*types.Func,
-		GenericCallableProfileSelection,
-	) (*GenericCallableProfile, error)
 	ResolveGenericRepresentationProfile(
 		types.Object,
 	) (GenericRepresentationProfile, bool, error)
@@ -50,7 +45,6 @@ func (c Context) ResolveGenericConcretization(
 	owner *types.Func,
 	arguments TypeArgumentList,
 	signature *types.Signature,
-	profile *GenericCallableProfile,
 ) (GenericConcretizationReference, error) {
 	if c.genericResolver == nil {
 		return GenericConcretizationReference{}, &ContextError{
@@ -75,7 +69,6 @@ func (c Context) ResolveGenericConcretization(
 		placement,
 		lexicalOwner,
 		anchor,
-		profile,
 	)
 	if err != nil {
 		return GenericConcretizationReference{}, err
@@ -298,26 +291,6 @@ func (c Context) ResolveGenericCallable(
 	return c.genericResolver.ResolveGenericOperationSet(
 		function.Origin(),
 		GenericFunctionOperationConsumer(),
-	)
-}
-
-func (c Context) ResolveGenericCallableProfile(
-	function *types.Func,
-	selection GenericCallableProfileSelection,
-) (*GenericCallableProfile, error) {
-	if c.genericResolver == nil {
-		return nil, &ContextError{
-			Reason: "generic callable profile resolver is unavailable",
-		}
-	}
-	if function == nil || !selection.Valid() || !selection.Cooperative() {
-		return nil, &ContextError{
-			Reason: "generic callable profile selection is invalid",
-		}
-	}
-	return c.genericResolver.ResolveGenericCallableProfile(
-		function.Origin(),
-		selection,
 	)
 }
 

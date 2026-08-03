@@ -3,7 +3,7 @@ import type {
   GoInterfaceValue,
 } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int64, uint8 } from "@gotots/runtime/scalars.js";
 
 import { ProviderError } from "../../runtime/error.js";
 import { goInterfaceEqual } from "../../runtime/interface.js";
@@ -42,7 +42,7 @@ export function readFullSync<Failure extends GoInterfaceValue>(
 export async function readFullAsync<Failure extends GoInterfaceValue>(
   read: (
     destination: RuntimeSlice<uint8>,
-  ) => Promise<[int64, Failure | undefined]>,
+  ) => Awaitable<[int64, Failure | undefined]>,
   destination: RuntimeSlice<uint8>,
   eof: Failure,
   unexpected: Failure,

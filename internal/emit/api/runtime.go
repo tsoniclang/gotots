@@ -97,4 +97,5 @@ const (
 	RuntimeUnsafeSlice             RuntimeSymbol = 1211
 	RuntimeUnsafeStringData        RuntimeSymbol = 1212
 	RuntimeUnsafeSliceData         RuntimeSymbol = 1213
+	RuntimeAwaitable               RuntimeSymbol = 1300
 )

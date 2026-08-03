@@ -138,9 +138,6 @@ func methodDeferredSupport(
 		context.Factory().Block(body, true),
 	)}
 	registerName := api.DeferredRegistryRegisterMethodName
-	if cooperative {
-		registerName = api.DeferredRegistryRegisterCooperativeMethodName
-	}
 	requests := api.CombineRequests(
 		recoveryRequests,
 		runtimeValue.Requests(),

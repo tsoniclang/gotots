@@ -138,7 +138,7 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementCooperativeCallable != 14 ||
 		DeclarationRequirementCallableABI != 15 ||
 		DeclarationRequirementKind(16).Valid() ||
-		DeclarationRequirementGenericCallableProfile != 17 ||
+		DeclarationRequirementKind(17).Valid() ||
 		DeclarationRequirementClassMethod != 18 ||
 		DeclarationRequirementValueReceiverCopy != 19 ||
 		DeclarationRequirementGenericRepresentation != 20 ||
