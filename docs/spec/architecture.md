@@ -541,6 +541,25 @@ for either boundary effect, and no certificate may mix synchronous and
 `Awaitable` transported methods. Ordinary direct provider calls that need no
 semantic protocol use their regular binding and require no duplicate profile.
 
+Certification derives one total directional boundary-obligation set from the
+selected Go signatures and the inspected provider project. Each source
+parameter is inspected recursively for generated values that the provider will
+invoke: named interface methods and callable values, including callables nested
+inside another callable. Their canonical direct or cooperative effect is joined
+exactly to one ordinary binding or one private facade certificate. A source
+result is an outward conversion owned by that selected binding/facade; it never
+creates an inward facade obligation by itself. Missing, duplicate, extra, mixed-
+effect, or wrong-direction certificates fail contract generation before source
+emission. Emission consumes this certified set and cannot discover profiles one
+call site at a time.
+
+For example, cooperative `sort.Sort(data sort.Interface)` requires one private
+facade whose `Len`, `Less`, and `Swap` inputs use the canonical `Awaitable` method
+ABI. Cooperative `sort.Search(n, predicate func(int) bool)` requires one private
+facade whose predicate result is `Awaitable<bool>`. The public `Sort` and
+`Search` exports remain direct and source-shaped, and neither facade adds a
+source parameter or runtime policy object.
+
 For example, Go `io/fs.WalkDirFunc` remains one non-generic generated callable
 type whose result is `Awaitable<error>`. The provider may implement its private
 visitor over provider `DirEntry` and `GoError` values, but the generated facade

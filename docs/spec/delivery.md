@@ -228,13 +228,19 @@ Source-Shape Conservation. It is replaced in this dependency order:
 
 ### E. Static Provider Facades
 
+- derive the complete directional interface/callback obligation set from the
+  selected Go surface and inspected provider project before emission;
+- exact-join every obligation to the ordinary binding or one private facade,
+  and reject every missing, duplicate, extra, mixed-effect, or result-triggered
+  certificate;
 - make generated calls retain source arguments;
 - generate one typed facade per selected provider boundary;
 - import exact bridges/guards/private kernels statically;
 - migrate stateful types, callbacks, nested interfaces, generic instances, and
   deferred entries;
 - delete `CanonicalBoundaryPolicy`, runtime policy objects, profile matrices,
-  hand-authored overrides, and ordinary-binding fallback.
+  hand-authored overrides, ordinary-binding fallback, and call-site-first
+  profile discovery.
 
 ### F. End-To-End Reproof
 

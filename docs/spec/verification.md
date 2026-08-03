@@ -351,6 +351,17 @@ is uniform: all transported methods are synchronous for direct mode or all are
 per mode. Mutations adding a second certificate in either mode or mixing the
 two effects inside one certificate fail before emission.
 
+The certifier independently derives a total directional obligation multiset
+over every provider callable. It recursively records inward interface-method and
+callable-value effects by source parameter root, including nested callbacks,
+then exact-joins that multiset to ordinary bindings and private facade
+certificates. Result roots are verified as conversions on the selected target
+but do not enter the inward obligation set. Mutations remove `sort.Sort`'s
+interface facade, remove `sort.Search`'s callback facade, change a callback from
+`Awaitable` to synchronous, add an unneeded result-only facade, or add a second
+certificate for one effect; each must fail certification with the exact Go
+callable and root identity.
+
 Mutations split direct/select queues, use historical queue storage, omit
 cancellation, bias source order, treat nil as ready, settle before pending
 Promises, globalize all functions as async, restore callable-profile variants,
@@ -396,7 +407,8 @@ even when TS-Go's diagnostic/display spelling changes.
 Mutations add a runtime policy object, omit/misroute a bridge, select by Go or
 target spelling, accept structural assignability without certification,
 duplicate a provider owner, append generic/recovery operations to the public
-call, expose a private kernel, or silently fall back to ambient mode.
+call, expose a private kernel, discover a missing profile only during source
+emission, or silently fall back to ambient mode.
 
 `gostdlib` runs focused Go-versus-provider differentials and strict ESM tests
 independently. Generated product linkage proves the same physical runtime
