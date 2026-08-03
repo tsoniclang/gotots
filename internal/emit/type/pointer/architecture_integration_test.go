@@ -43,19 +43,27 @@ func DirectMap(value int32) (int32, bool) {
 	values := map[*Box]int32{pointer: 1}
 	return values[alias], pointer == alias
 }
+
+func Boolean(value bool) (bool, bool) {
+	pointer := &value
+	previous := replace(pointer, !value)
+	return previous, value
+}
 `
 	typescript, goOutput, tsOutput := compileAndRunPointerArchitecture(
 		t,
 		source,
-		`import { Direct, DirectMap, NewBox } from "__SOURCE__";
+		`import { Boolean, Direct, DirectMap, NewBox } from "__SOURCE__";
 
 console.log(...Direct(40));
 console.log(...DirectMap(41));
 console.log(NewBox(7)?.Value);
+console.log(...Boolean(true));
 `,
 		`fmt.Println(pointer.Direct(40))
 fmt.Println(pointer.DirectMap(41))
 fmt.Println(pointer.NewBox(7).Value)
+fmt.Println(pointer.Boolean(true))
 `,
 	)
 	if tsOutput != goOutput {

@@ -91,7 +91,7 @@ func Build(
 			return nil, pointerErr
 		}
 		logical := valueType(factory)
-		return projectionAlias(
+		return nonDistributiveProjectionAlias(
 			factory,
 			contract.ExportedName(),
 			value.ExportedName(),
@@ -170,6 +170,54 @@ func projectionAlias(
 	fallback tsgo.TypeNode,
 ) tsgo.TypeAliasDeclaration {
 	valueType := valueType(factory)
+	return projectionAliasFromTypes(
+		factory,
+		name,
+		valueType,
+		factory.TypeReferenceNode(
+			factory.Identifier(contract),
+			[]tsgo.TypeNode{
+				factory.InferTypeNode(
+					typeParameter(factory, storageParameter),
+				),
+			},
+		),
+		fallback,
+	)
+}
+
+func nonDistributiveProjectionAlias(
+	factory tsgo.Factory,
+	name string,
+	contract string,
+	fallback tsgo.TypeNode,
+) tsgo.TypeAliasDeclaration {
+	valueType := valueType(factory)
+	return projectionAliasFromTypes(
+		factory,
+		name,
+		factory.TupleTypeNode([]tsgo.TypeNode{valueType}),
+		factory.TupleTypeNode([]tsgo.TypeNode{
+			factory.TypeReferenceNode(
+				factory.Identifier(contract),
+				[]tsgo.TypeNode{
+					factory.InferTypeNode(
+						typeParameter(factory, storageParameter),
+					),
+				},
+			),
+		}),
+		fallback,
+	)
+}
+
+func projectionAliasFromTypes(
+	factory tsgo.Factory,
+	name string,
+	checkType tsgo.TypeNode,
+	extendsType tsgo.TypeNode,
+	fallback tsgo.TypeNode,
+) tsgo.TypeAliasDeclaration {
 	storageType := factory.TypeReferenceNode(
 		factory.Identifier(storageParameter),
 		nil,
@@ -181,15 +229,8 @@ func projectionAlias(
 			typeParameter(factory, valueParameter),
 		},
 		factory.ConditionalTypeNode(
-			valueType,
-			factory.TypeReferenceNode(
-				factory.Identifier(contract),
-				[]tsgo.TypeNode{
-					factory.InferTypeNode(
-						typeParameter(factory, storageParameter),
-					),
-				},
-			),
+			checkType,
+			extendsType,
 			storageType,
 			fallback,
 		),

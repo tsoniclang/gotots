@@ -61,7 +61,22 @@ func TestPointerProjectionFallsBackToCanonicalLogicalCarrier(t *testing.T) {
 	if !ok {
 		t.Fatalf("pointer projection = %T, want conditional type", alias.Type())
 	}
-	contract, ok := conditional.ExtendsType().(tsgo.TypeReferenceNode)
+	check, ok := conditional.CheckType().(tsgo.TupleTypeNode)
+	if !ok || len(check.Elements()) != 1 ||
+		typeReferenceName(check.Elements()[0]) != "T" {
+		t.Fatalf(
+			"pointer projection check = %#v, want non-distributive [T]",
+			conditional.CheckType(),
+		)
+	}
+	extends, ok := conditional.ExtendsType().(tsgo.TupleTypeNode)
+	if !ok || len(extends.Elements()) != 1 {
+		t.Fatalf(
+			"pointer projection extends = %#v, want one-element tuple",
+			conditional.ExtendsType(),
+		)
+	}
+	contract, ok := extends.Elements()[0].(tsgo.TypeReferenceNode)
 	if !ok || identifierText(contract.TypeName()) != "GoPointerRepresentedValue" ||
 		len(contract.TypeArguments()) != 1 {
 		t.Fatalf("pointer projection contract = %#v", conditional.ExtendsType())

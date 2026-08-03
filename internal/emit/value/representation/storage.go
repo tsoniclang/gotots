@@ -8,6 +8,7 @@ import (
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -17,6 +18,9 @@ func (owner Owner) RequiresStorageProjection(
 ) bool {
 	if panicNilRuntimeValue(context, sourceType) {
 		return false
+	}
+	if model, ok := maprepresentation.Source(context, sourceType); ok {
+		return model.Nominal()
 	}
 	if _, ok := definedStorageModel(sourceType); ok {
 		return true
@@ -47,6 +51,15 @@ func (owner Owner) StorageType(
 			context,
 			source,
 			sourceType,
+		)
+	}
+	if model, ok := maprepresentation.Source(context, sourceType); ok &&
+		model.Nominal() {
+		return maprepresentation.EmitType(
+			context.WithRole(api.RoleDefinedUnderlyingType),
+			owner.children,
+			source,
+			model.Map(),
 		)
 	}
 	if defined, ok := definedStorageModel(sourceType); ok {
@@ -133,6 +146,10 @@ func (owner Owner) ToStorage(
 	if panicNilRuntimeValue(context, sourceType) {
 		return value, nil
 	}
+	if model, ok := maprepresentation.Source(context, sourceType); ok &&
+		model.Nominal() {
+		return model.ReadReceiver(context, source, value)
+	}
 	if defined, ok := definedStorageModel(sourceType); ok {
 		projected, err := defined.Project(context, value)
 		if err != nil {
@@ -200,6 +217,10 @@ func (owner Owner) FromStorage(
 	}
 	if panicNilRuntimeValue(context, sourceType) {
 		return value, nil
+	}
+	if model, ok := maprepresentation.Source(context, sourceType); ok &&
+		model.Nominal() {
+		return model.Wrap(context, value)
 	}
 	if defined, ok := definedStorageModel(sourceType); ok {
 		restored, err := owner.FromStorage(
