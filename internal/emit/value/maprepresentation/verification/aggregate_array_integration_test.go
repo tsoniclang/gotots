@@ -426,6 +426,12 @@ func (aggregateNames) ProviderRepresentationOwnsMethod(
 	return false, nil
 }
 
+func (aggregateNames) ConstantValue(
+	*types.Const,
+) (api.NameReference, bool, error) {
+	panic("unused")
+}
+
 func (aggregateNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,

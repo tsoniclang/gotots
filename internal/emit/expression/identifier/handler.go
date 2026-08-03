@@ -38,7 +38,8 @@ func Emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if constObject, ok := object.(*types.Const); ok &&
-		constantbinding.IsUntyped(constObject.Type()) {
+		(constantbinding.IsUntyped(constObject.Type()) ||
+			constantbinding.RequiresDeferredBinding(constObject)) {
 		return constantbinding.EmitUse(context, source, constObject)
 	}
 	if variable, ok := object.(*types.Var); ok &&

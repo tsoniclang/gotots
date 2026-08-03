@@ -76,6 +76,20 @@ func IsUntyped(sourceType types.Type) bool {
 	return ok && basic.Info()&types.IsUntyped != 0
 }
 
+// RequiresDeferredBinding reports whether materializing a package constant at
+// ESM module evaluation would invoke the package-local runtime representation
+// of a defined basic type. Those constants use a typed value thunk so legal Go
+// same-package file cycles cannot observe an uninitialized target class.
+func RequiresDeferredBinding(selected *types.Const) bool {
+	if selected == nil || selected.Pkg() == nil ||
+		selected.Parent() != selected.Pkg().Scope() ||
+		IsUntyped(selected.Type()) {
+		return false
+	}
+	_, ok := definedtype.ResolveBasic(selected.Type())
+	return ok
+}
+
 func emitBool(
 	context api.Context,
 	source ast.Node,

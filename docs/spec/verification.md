@@ -451,6 +451,18 @@ declarations against its own generated cooperative runtime. Mutating either
 profile selection, or substituting the direct harness into the cooperative
 product, must fail at the exact interface method effect.
 
+Provider packaging begins from an empty emitted-output tree. A package
+artifact contains exactly current source-owned outputs; deleting a source
+module and rebuilding removes its emitted JavaScript and declaration files.
+
+Constant verification includes an executing two-file same-package cycle where
+a defined-basic constant depends on its class while a method in the class file
+uses that constant. The emitted source artifact must contain a deferred typed
+value thunk, the package assembly must expose an ordinary `const`, strict ESM
+must typecheck, and Node execution must match Go. A direct eager constructor in
+the provider file is the required mutation foil. Large-value scaling separately
+proves payload bytes are materialized once rather than once per use.
+
 ## Environment And Obligation Proof
 
 Compile-only fixtures inspect deterministic package, environment, runtime, and

@@ -10,12 +10,13 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-// EmitObject emits a package-level constant. A typed constant becomes one direct
-// binding materialized from its checker value. An untyped constant has no single
-// runtime type, so it is never emitted directly: it is projected once per
-// required target basic representation, each projection scheduled by a use site
-// through the constant-projection declaration requirement. An untyped constant
-// with no requirements yet contributes no statements; its projections arrive by
+// EmitObject emits a package-level constant. A primitive typed constant becomes
+// one direct binding. A defined-basic constant becomes one ESM-cycle-safe typed
+// value thunk and an assembly-owned public const. An untyped constant has no
+// single runtime type, so it is projected once per required target basic
+// representation, each projection scheduled by a use site through the
+// constant-projection declaration requirement. An untyped constant with no
+// requirements yet contributes no statements; its projections arrive by
 // artifact reconstruction as uses demand them.
 func EmitObject(
 	context api.Context,
@@ -88,6 +89,32 @@ func emitTypedBinding(
 	sourceName *ast.Ident,
 	selected *types.Const,
 ) (api.DeclarationEmission, error) {
+	if constantbinding.RequiresDeferredBinding(selected) {
+		deferred, err := constantbinding.EmitDeferredBinding(
+			context,
+			children,
+			sourceName,
+			selected,
+			api.RolePackageConstantType,
+			api.RolePackageConstantValue,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		baseName, err := context.Names().Declare(selected)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		deferredName, err := constantbinding.DeferredBindingName(baseName)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		return api.NewDeclarationEmissionWithAdditionalPackageBindings(
+			[]tsgo.Statement{deferred.Declaration()},
+			deferred.Requests(),
+			[]string{deferredName},
+		)
+	}
 	binding, err := constantbinding.EmitBinding(
 		context,
 		children,

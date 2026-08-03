@@ -71,6 +71,7 @@ type packageTargetBuilder struct {
 	assemblyContext    api.Context
 	statePlacement     *targetplacement.Owner
 	assemblyPlacement  *targetplacement.Owner
+	exportPlacement    *targetplacement.Owner
 	storage            []packageStorage
 	storageByObject    map[*types.Var]int
 	initialization     []packageInitializationArtifact
@@ -161,6 +162,7 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 		assemblyContext:    assemblyContext,
 		statePlacement:     targetplacement.New(),
 		assemblyPlacement:  targetplacement.New(),
+		exportPlacement:    targetplacement.New(),
 		storageByObject:    make(map[*types.Var]int),
 		initializerByOwner: make(map[api.ArtifactOwner]int),
 		exportObjects:      make(map[types.Object]struct{}),

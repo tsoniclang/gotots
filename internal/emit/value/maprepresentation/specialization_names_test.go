@@ -237,6 +237,12 @@ func (staticSpecializationNames) ProviderRepresentationOwnsMethod(
 	return false, nil
 }
 
+func (staticSpecializationNames) ConstantValue(
+	*types.Const,
+) (api.NameReference, bool, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,

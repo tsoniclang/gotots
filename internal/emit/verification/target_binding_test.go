@@ -61,7 +61,7 @@ func packageAssemblyExports(
 	return false
 }
 
-func TestTargetBindingsOrderEagerDependenciesAndProtectIntrinsics(
+func TestTargetBindingsDeferConstructedConstantsAndProtectIntrinsics(
 	t *testing.T,
 ) {
 	directory, err := filepath.Abs(targetBindingDirectory())
@@ -177,13 +177,17 @@ func assertTargetBindingAST(t *testing.T, emission emit.ProgramEmission) {
 				if statement.Name().Text() == "Number" {
 					classIndex = index
 				}
-			case tsgo.VariableStatement:
-				for _, declaration := range statement.
-					DeclarationList().
-					Declarations() {
-					name, ok := declaration.Name().(tsgo.Identifier)
-					if ok && name.Text() == "Before" {
-						constantIndex = index
+			case tsgo.FunctionDeclaration:
+				if statement.Name().Text() == "Before$constant" {
+					constantIndex = index
+					body := statement.Body().(tsgo.Block).Statements()
+					if len(body) != 1 {
+						t.Fatalf("constant thunk body statements = %d, want one", len(body))
+					}
+					returned := body[0].(tsgo.ReturnStatement).Expression()
+					constructed, ok := returned.(tsgo.NewExpression)
+					if !ok || constructed.Expression().(tsgo.Identifier).Text() != "Number" {
+						t.Fatalf("constant thunk returns %T, want new Number", returned)
 					}
 				}
 			}
@@ -191,13 +195,6 @@ func assertTargetBindingAST(t *testing.T, emission emit.ProgramEmission) {
 		if classIndex < 0 || constantIndex < 0 {
 			t.Fatalf(
 				"target declarations absent: class=%d constant=%d",
-				classIndex,
-				constantIndex,
-			)
-		}
-		if classIndex >= constantIndex {
-			t.Fatalf(
-				"eager dependency order = class %d, constant %d",
 				classIndex,
 				constantIndex,
 			)

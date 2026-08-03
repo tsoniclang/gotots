@@ -192,6 +192,7 @@ type Names interface {
 		types.Object,
 		*types.Signature,
 	) (CallableABIReference, error)
+	ConstantValue(*types.Const) (NameReference, bool, error)
 	ConstantProjection(*types.Const, types.BasicKind) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)

@@ -389,6 +389,12 @@ func (unusedNames) AnonymousStructStorage(
 	panic("unused")
 }
 
+func (unusedNames) ConstantValue(
+	*types.Const,
+) (api.NameReference, bool, error) {
+	panic("unused")
+}
+
 func (unusedNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,

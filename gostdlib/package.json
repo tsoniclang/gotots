@@ -387,7 +387,7 @@
     "runtime:check": "cd .. && go run ./internal/emit/runtime/generate -contract gostdlib/contract/runtime.json -module . -output gostdlib/test/runtime-package -profile number -concurrency disabled -check",
     "runtime:build": "go tool tsgo -p test/runtime-package/tsconfig.json",
     "build:provider": "go tool tsgo -p tsconfig.json",
-    "build": "npm run unicode:check && npm run contract:check && npm run runtime:check && npm run runtime:build && npm run build:provider",
+    "build": "npm run clean && npm run unicode:check && npm run contract:check && npm run runtime:check && npm run runtime:build && npm run build:provider",
     "check": "npm run build && node scripts/check-public-surface.mjs && node --test \"dist/test/**/*.test.js\"",
     "clean": "node scripts/clean.mjs"
   },

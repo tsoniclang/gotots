@@ -81,7 +81,8 @@ func Emit(
 		return target, err
 	}
 	if constObject, ok := object.(*types.Const); ok &&
-		constantbinding.IsUntyped(constObject.Type()) {
+		(constantbinding.IsUntyped(constObject.Type()) ||
+			constantbinding.RequiresDeferredBinding(constObject)) {
 		return constantbinding.EmitUse(context, source, constObject)
 	}
 	switch object.(type) {
