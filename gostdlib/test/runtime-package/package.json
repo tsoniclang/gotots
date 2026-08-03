@@ -5,7 +5,7 @@
   "type": "module",
   "gotots": {
     "integerRepresentation": "number",
-    "concurrencySemantics": "cooperative"
+    "concurrencySemantics": "disabled"
   },
   "exports": {
     "./array.js": {

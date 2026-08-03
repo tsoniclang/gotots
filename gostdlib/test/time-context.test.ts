@@ -30,6 +30,7 @@ import {
   Parse,
   ParseDuration,
   Since,
+  Sleep,
   Second,
   Ticker,
   Now,
@@ -226,6 +227,17 @@ test("After and AfterFunc schedule through the provider clock", async () => {
   await new Promise<void>((resolve) => setTimeout(resolve, 5));
   assert.equal(called, true);
   assert.equal(timer.C, undefined);
+});
+
+test("Sleep delays positive durations and accepts non-positive durations", async () => {
+  const order: string[] = [];
+  const sleeping = Sleep(new Duration(1_000_000)).then(() => order.push("awake"));
+  order.push("scheduled");
+  await sleeping;
+  assert.deepEqual(order, ["scheduled", "awake"]);
+
+  await Sleep(new Duration(0));
+  await Sleep(new Duration(-1));
 });
 
 test("Context cancellation, causes, values, and deadlines propagate", async () => {

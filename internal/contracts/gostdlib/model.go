@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	SchemaVersion = 21
+	SchemaVersion = 22
 	PackageName   = "@gotots/gostdlib"
 )
 

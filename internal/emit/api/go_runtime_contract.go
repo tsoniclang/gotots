@@ -256,6 +256,7 @@ func interfaceRuntimeContract(
 			true,
 			RuntimeInterfaceValue,
 			RuntimeErrorMethodToken,
+			RuntimeAwaitable,
 		)
 	case RuntimeBuiltinErrorContract:
 		contract = runtimeContract(
@@ -283,6 +284,7 @@ func interfaceRuntimeContract(
 			RuntimeInterfaceValue,
 			RuntimeErrorMethodToken,
 			RuntimeRuntimeErrorToken,
+			RuntimeAwaitable,
 		)
 	case RuntimeErrorContract:
 		contract = runtimeContract(

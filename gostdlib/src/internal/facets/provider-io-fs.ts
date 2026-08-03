@@ -26,10 +26,11 @@ import {
 } from "../runtime/slice.js";
 import { goInterfaceEqual } from "../runtime/interface.js";
 import { ProviderInterfaceValue } from "../portable/io/value.js";
-
-type InterfaceGuard<Value extends GoInterfaceValue> = (
-  value: GoInterfaceValue | undefined,
-) => value is Value;
+import type {
+  FromProviderBridge,
+  InterfaceContract,
+  InterfaceGuard,
+} from "./provider-support.js";
 
 export interface CanonicalFileInfo extends GoInterfaceValue {
   IsDir(recovery?: GoRecovery): Awaitable<boolean>;
@@ -70,13 +71,6 @@ class CanonicalInfoDirEntry<
   async Type(): Promise<FileMode> {
     return (await this.information.Mode()).Type();
   }
-}
-
-interface FromProviderBridge<
-  Provider extends GoInterfaceValue,
-  Canonical extends GoInterfaceValue,
-> {
-  $from(value: Provider | undefined): Canonical | undefined;
 }
 
 export interface CanonicalFile extends GoInterfaceValue {
@@ -154,7 +148,7 @@ export interface CanonicalStatFS extends CanonicalFS {
 
 export function IoFsFileInfoToDirEntryCanonical(
   information: CanonicalFileInfo | undefined,
-  dirEntryContract: readonly object[],
+  dirEntryContract: InterfaceContract,
 ): CanonicalDirEntry | undefined {
   return information === undefined
     ? undefined
@@ -268,8 +262,8 @@ export async function IoFsWalkDirCanonical(
   isReadDirFS: InterfaceGuard<CanonicalReadDirFS>,
   isReadDirFile: InterfaceGuard<CanonicalReadDirFile>,
   isStatFS: InterfaceGuard<CanonicalStatFS>,
+  dirEntryContract: InterfaceContract,
   errorBridge: FromProviderBridge<GoError, CanonicalError>,
-  dirEntryContract: readonly object[],
 ): Promise<CanonicalError | undefined> {
   const [information, statFailure] = await IoFsStatCanonical(
     fileSystem,

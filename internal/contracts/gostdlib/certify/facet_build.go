@@ -19,6 +19,8 @@ func buildFacet(
 	targets map[string]tsgo.ProjectExport,
 	representations map[string]gostdlib.ProviderRepresentationDocument,
 	genericOperations map[string][]gostdlib.GenericOperationDocument,
+	bindings map[string]gostdlib.BindingDocument,
+	effectMarker tsgo.ProjectExport,
 ) (gostdlib.FacetDocument, error) {
 	evidence, ok := source.objects[seed.SourceIdentity]
 	if !ok {
@@ -59,6 +61,9 @@ func buildFacet(
 	if err := validateFacetTarget(seed, target); err != nil {
 		return gostdlib.FacetDocument{}, err
 	}
+	effect := seed.Effect
+	var callableParameters []gostdlib.ProviderCallableParameterDocument
+	var err error
 	if seed.Kind == gostdlib.FacetGenericCallableKernel {
 		operations := genericOperations[seed.SourceIdentity]
 		if err := verifyGenericKernelProjection(
@@ -67,6 +72,36 @@ func buildFacet(
 			target,
 			seed.GenericTypeArguments,
 			operations,
+		); err != nil {
+			return gostdlib.FacetDocument{}, err
+		}
+		effect, err = exportCallableEffect(project, target, effectMarker)
+		if err != nil {
+			return gostdlib.FacetDocument{}, err
+		}
+		callableParameters, err = genericKernelCallableParameters(
+			evidence,
+			target,
+			len(operations),
+			project,
+			effectMarker,
+		)
+		if err != nil {
+			return gostdlib.FacetDocument{}, err
+		}
+		binding, ok := bindings[seed.SourceIdentity]
+		if !ok {
+			return gostdlib.FacetDocument{}, certifyError(
+				"build generic callable kernel",
+				seed.SourceIdentity,
+				"public binding is absent",
+			)
+		}
+		if err := verifyGenericKernelCallableContract(
+			seed.SourceIdentity,
+			binding,
+			effect,
+			callableParameters,
 		); err != nil {
 			return gostdlib.FacetDocument{}, err
 		}
@@ -82,7 +117,8 @@ func buildFacet(
 		Export:               seed.Export,
 		StorageExport:        seed.StorageExport,
 		RepresentationExport: seed.RepresentationExport,
-		Effect:               seed.Effect,
+		Effect:               effect,
+		CallableParameters:   callableParameters,
 		GenericTypeArguments: slices.Clone(seed.GenericTypeArguments),
 		ImplementationOwner:  owner,
 		TargetFingerprint:    target.Fingerprint(),

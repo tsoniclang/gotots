@@ -111,18 +111,19 @@ type ProviderRepresentationMethodDocument struct {
 }
 
 type FacetDocument struct {
-	Kind                       FacetKind                     `json:"kind"`
-	SourceIdentity             string                        `json:"sourceIdentity"`
-	Capabilities               []FacetCapability             `json:"capabilities,omitempty"`
-	Export                     string                        `json:"export"`
-	StorageExport              string                        `json:"storageExport,omitempty"`
-	RepresentationExport       string                        `json:"representationExport,omitempty"`
-	Effect                     EffectKind                    `json:"effect,omitempty"`
-	GenericTypeArguments       []GenericTypeArgumentDocument `json:"genericTypeArguments,omitempty"`
-	ImplementationOwner        string                        `json:"implementationOwner"`
-	StorageImplementationOwner string                        `json:"storageImplementationOwner,omitempty"`
-	TargetFingerprint          string                        `json:"targetFingerprint"`
-	StorageTargetFingerprint   string                        `json:"storageTargetFingerprint,omitempty"`
+	Kind                       FacetKind                           `json:"kind"`
+	SourceIdentity             string                              `json:"sourceIdentity"`
+	Capabilities               []FacetCapability                   `json:"capabilities,omitempty"`
+	Export                     string                              `json:"export"`
+	StorageExport              string                              `json:"storageExport,omitempty"`
+	RepresentationExport       string                              `json:"representationExport,omitempty"`
+	Effect                     EffectKind                          `json:"effect,omitempty"`
+	CallableParameters         []ProviderCallableParameterDocument `json:"callableParameters,omitempty"`
+	GenericTypeArguments       []GenericTypeArgumentDocument       `json:"genericTypeArguments,omitempty"`
+	ImplementationOwner        string                              `json:"implementationOwner"`
+	StorageImplementationOwner string                              `json:"storageImplementationOwner,omitempty"`
+	TargetFingerprint          string                              `json:"targetFingerprint"`
+	StorageTargetFingerprint   string                              `json:"storageTargetFingerprint,omitempty"`
 }
 
 type facetLookup struct {
@@ -253,6 +254,10 @@ func (f Facet) Effect() EffectKind {
 	return f.facet.Effect
 }
 
+func (f Facet) CallableParameters() []ProviderCallableParameterDocument {
+	return slices.Clone(f.facet.CallableParameters)
+}
+
 func (f Facet) GenericTypeArguments() []GenericTypeArgumentDocument {
 	return slices.Clone(f.facet.GenericTypeArguments)
 }
@@ -308,6 +313,9 @@ func cloneFacetModule(source FacetModuleDocument) FacetModuleDocument {
 	for index, facet := range source.Facets {
 		result.Facets[index] = facet
 		result.Facets[index].Capabilities = slices.Clone(facet.Capabilities)
+		result.Facets[index].CallableParameters = slices.Clone(
+			facet.CallableParameters,
+		)
 		result.Facets[index].GenericTypeArguments = slices.Clone(
 			facet.GenericTypeArguments,
 		)

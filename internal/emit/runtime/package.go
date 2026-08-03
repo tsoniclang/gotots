@@ -149,7 +149,12 @@ func AssemblePackage(
 	statements := make([]tsgo.Statement, 0, len(aliases)+1)
 	if symbols := byModule[api.RuntimeModuleScalar]; len(symbols) != 0 {
 		slices.Sort(symbols)
-		definitions, err := Build(factory, api.RuntimeModuleScalar, symbols)
+		definitions, err := Build(
+			factory,
+			api.RuntimeModuleScalar,
+			symbols,
+			concurrency,
+		)
 		if err != nil {
 			return Package{}, err
 		}
@@ -192,7 +197,7 @@ func AssemblePackage(
 		}
 		symbols := byModule[module]
 		slices.Sort(symbols)
-		definitions, err := Build(factory, module, symbols)
+		definitions, err := Build(factory, module, symbols, concurrency)
 		if err != nil {
 			return Package{}, err
 		}

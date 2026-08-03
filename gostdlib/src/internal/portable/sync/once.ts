@@ -46,29 +46,14 @@ export function OnceFunc(
   };
 }
 
-export function OnceValue<T>(f: (() => T) | undefined): () => T {
-  let complete = false;
-  let value: T;
-  let panic: GoPanic | undefined;
-  return (): T => {
-    if (!complete) {
-      try {
-        if (f === undefined) {
-          GoPanic.raiseRuntime("sync.OnceValue called with nil function");
-        }
-        value = f();
-        complete = true;
-      } catch (caught) {
-        if (caught instanceof GoPanic) {
-          panic = caught;
-          complete = true;
-        }
-        throw caught;
-      }
-    }
-    if (panic !== undefined) {
-      throw panic;
-    }
-    return value;
+export function OnceValue<T>(
+  f: (() => Awaitable<T>) | undefined,
+): () => Promise<T> {
+  let result: Promise<T> | undefined;
+  return (): Promise<T> => {
+    result ??= f === undefined
+      ? Promise.reject(GoPanic.createRuntime("sync.OnceValue called with nil function"))
+      : Promise.resolve().then(f);
+    return result;
   };
 }

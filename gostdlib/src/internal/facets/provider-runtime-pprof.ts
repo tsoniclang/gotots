@@ -12,6 +12,7 @@ import {
   type CanonicalError,
   type CanonicalWriter,
 } from "./provider-io-contract.js";
+import type { InterfaceContract } from "./provider-support.js";
 
 export type {
   CanonicalError,
@@ -20,7 +21,7 @@ export type {
 
 export function PprofStartCPUProfileCanonical(
   writer: CanonicalWriter<CanonicalError> | undefined,
-  errorContract: readonly object[],
+  errorContract: InterfaceContract,
 ): CanonicalError | undefined {
   if (writer === undefined) {
     return new CanonicalBoundaryError("pprof: nil writer", errorContract);
@@ -40,7 +41,7 @@ export async function PprofProfileWriteToCanonical(
   receiver: ProfileIdentity | undefined,
   writer: CanonicalWriter<CanonicalError> | undefined,
   debug: int64,
-  errorContract: readonly object[],
+  errorContract: InterfaceContract,
 ): Promise<CanonicalError | undefined> {
   void debug;
   if (receiver === undefined || writer === undefined) {
@@ -58,7 +59,7 @@ function writeResult(
   count: int64,
   content: Uint8Array,
   failure: CanonicalError | undefined,
-  errorContract: readonly object[],
+  errorContract: InterfaceContract,
 ): CanonicalError | undefined {
   if (failure !== undefined) {
     return failure;

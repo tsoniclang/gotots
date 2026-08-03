@@ -33,8 +33,10 @@ const contextSurface: Same<
 
 const syncSurface: Same<
   keyof typeof sync,
+  | "Cond"
   | "Map"
   | "Mutex"
+  | "NewCond"
   | "Once"
   | "OnceFunc"
   | "OnceValue"
@@ -66,6 +68,7 @@ const timeSurface: Same<
   | "ParseError"
   | "Since"
   | "Second"
+  | "Sleep"
   | "Ticker"
   | "Time"
   | "Timer"

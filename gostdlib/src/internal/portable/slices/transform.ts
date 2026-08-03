@@ -1,5 +1,5 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { bool, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool, int64 } from "@gotots/runtime/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import { sliceValues } from "../../runtime/slice.js";
@@ -13,8 +13,8 @@ import {
   type Zero,
 } from "./capabilities.js";
 
-type Predicate<T> = ((value: T) => bool) | undefined;
-type Equality<T> = ((left: T, right: T) => bool) | undefined;
+type Predicate<T> = ((value: T) => Awaitable<bool>) | undefined;
+type Equality<T> = ((left: T, right: T) => Awaitable<bool>) | undefined;
 
 export function Clip<T>(source: RuntimeSlice<T>): RuntimeSlice<T> {
   return source.slice(0, source.length, source.length);
@@ -30,14 +30,23 @@ export function Compact<T>(source: RuntimeSlice<T>): RuntimeSlice<T> {
   return compactBy(source, (left, right): bool => left === right);
 }
 
-export function CompactFunc<T>(
+export async function CompactFunc<T>(
   source: RuntimeSlice<T>,
   equal: Equality<T>,
-): RuntimeSlice<T> {
-  return compactBy(
-    source,
-    (left, right): bool => callEquality(equal, left, right),
-  );
+): Promise<RuntimeSlice<T>> {
+  if (source.length < 2) {
+    return source;
+  }
+  let previous = source.get(0);
+  const values: T[] = [previous];
+  for (let index = 1; index < source.length; index += 1) {
+    const value = source.get(index);
+    if (!await callEquality(equal, previous, value)) {
+      values.push(value);
+      previous = value;
+    }
+  }
+  return resultLike(source, values);
 }
 
 export function Concat<T>(
@@ -69,7 +78,7 @@ export function Delete<T>(
   return resultLike(source, values);
 }
 
-export function DeleteFunc<S, E, EStorage>(
+export async function DeleteFunc<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   fromSlice: Convert<RuntimeSlice<EStorage>, S>,
   copyElement: CopyValue<E>,
@@ -78,12 +87,12 @@ export function DeleteFunc<S, E, EStorage>(
   zeroElement: Zero<E>,
   source: S,
   predicate: Predicate<E>,
-): S {
+): Promise<S> {
   const values = toSlice(source);
   let write = 0;
   for (let read = 0; read < values.length; read += 1) {
     const value = fromStorage(values.get(read));
-    if (!callPredicate(predicate, value)) {
+    if (!await callPredicate(predicate, value)) {
       storeElement(values, write, value, copyElement, toStorage);
       write += 1;
     }

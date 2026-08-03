@@ -1,4 +1,4 @@
-import type { int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int64 } from "@gotots/runtime/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import {
@@ -14,7 +14,7 @@ import {
 } from "./capabilities.js";
 import { callComparison } from "./read.js";
 
-type Comparison<T> = ((left: T, right: T) => int64) | undefined;
+type Comparison<T> = ((left: T, right: T) => Awaitable<int64>) | undefined;
 
 export function Sort<S, E, EStorage>(
   less: BinaryLess<E>,
@@ -36,49 +36,41 @@ export function Sort<S, E, EStorage>(
   );
 }
 
-export function SortFunc<S, E, EStorage>(
+export async function SortFunc<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   copyElement: CopyValue<E>,
   fromStorage: FromContainerStorage<E, EStorage>,
   toStorage: ToContainerStorage<E, EStorage>,
   source: S,
   compare: Comparison<E>,
-): void {
+): Promise<void> {
   const values = toSlice(source);
   writeSorted(
     values,
-    logicalValues(values, copyElement, fromStorage).sort(
-      (left, right): number => callComparison(compare, left, right),
+    await sortValues(
+      logicalValues(values, copyElement, fromStorage),
+      compare,
     ),
     copyElement,
     toStorage,
   );
 }
 
-export function SortStableFunc<S, E, EStorage>(
+export async function SortStableFunc<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   copyElement: CopyValue<E>,
   fromStorage: FromContainerStorage<E, EStorage>,
   toStorage: ToContainerStorage<E, EStorage>,
   source: S,
   compare: Comparison<E>,
-): void {
-  const values = toSlice(source);
-  const indexed = logicalValues(values, copyElement, fromStorage).map(
-    (value, index): { readonly value: E; readonly index: number } => ({
-      value,
-      index,
-    }),
-  );
-  indexed.sort((left, right): number => {
-    const result = callComparison(compare, left.value, right.value);
-    return result === 0 ? left.index - right.index : result;
-  });
-  writeSorted(
-    values,
-    indexed.map((entry): E => entry.value),
+): Promise<void> {
+  await SortFunc(
+    toSlice,
     copyElement,
+    fromStorage,
     toStorage,
+    source,
+    compare,
   );
 }
 
@@ -105,4 +97,39 @@ function writeSorted<E, EStorage>(
     storeElement(target, index, value, copyElement, toStorage);
     index += 1;
   }
+}
+
+export async function sortValues<E>(
+  values: readonly E[],
+  compare: Comparison<E>,
+): Promise<E[]> {
+  if (values.length < 2) {
+    return [...values];
+  }
+  const middle = Math.floor(values.length / 2);
+  const left = await sortValues(values.slice(0, middle), compare);
+  const right = await sortValues(values.slice(middle), compare);
+  const result: E[] = [];
+  const leftIterator = left[Symbol.iterator]();
+  const rightIterator = right[Symbol.iterator]();
+  let leftStep = leftIterator.next();
+  let rightStep = rightIterator.next();
+  while (!leftStep.done && !rightStep.done) {
+    if (await callComparison(compare, leftStep.value, rightStep.value) <= 0) {
+      result.push(leftStep.value);
+      leftStep = leftIterator.next();
+    } else {
+      result.push(rightStep.value);
+      rightStep = rightIterator.next();
+    }
+  }
+  while (!leftStep.done) {
+    result.push(leftStep.value);
+    leftStep = leftIterator.next();
+  }
+  while (!rightStep.done) {
+    result.push(rightStep.value);
+    rightStep = rightIterator.next();
+  }
+  return result;
 }

@@ -84,11 +84,13 @@ func emitCaseBody(
 		}
 		targetName := name
 		var targetType tsgo.TypeNode
+		flags := tsgo.NodeFlagsLet
 		if storageName, addressable := context.AddressableStorage().Name(
 			context,
 			binding,
 		); addressable {
 			targetName = storageName
+			flags = tsgo.NodeFlagsConst
 			initial, err = context.AddressableStorage().Cell(
 				context.WithRole(api.RoleTypeSwitchBinding),
 				children,
@@ -125,7 +127,7 @@ func emitCaseBody(
 							initial.Value(),
 						),
 					},
-					tsgo.NodeFlagsConst,
+					flags,
 				),
 			),
 		)

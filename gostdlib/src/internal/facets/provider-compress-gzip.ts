@@ -20,6 +20,7 @@ import type {
   CanonicalError,
   CanonicalReader,
 } from "./provider-io-contract.js";
+import type { InterfaceContract } from "./provider-support.js";
 
 export type {
   CanonicalError,
@@ -203,7 +204,7 @@ async function initializeGzipReader<Failure extends CanonicalError>(
   eof: Failure | undefined,
   unexpectedEOF: Failure | undefined,
   noProgress: Failure | undefined,
-  errorContract: readonly object[],
+  errorContract: InterfaceContract,
 ): Promise<[
   Header | undefined,
   CanonicalGzipReaderState<Failure> | undefined,
@@ -260,7 +261,7 @@ export async function GzipNewReaderCanonical<
   eof: Failure | undefined,
   unexpectedEOF: Failure | undefined,
   noProgress: Failure | undefined,
-  errorContract: readonly object[],
+  errorContract: InterfaceContract,
 ): Promise<[
   CanonicalGzipReader<FlateReader, Failure, ReadCloser> | undefined,
   CanonicalError | undefined,

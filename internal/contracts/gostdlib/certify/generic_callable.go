@@ -105,6 +105,44 @@ func verifyGenericKernelProjection(
 	)
 }
 
+func verifyGenericKernelCallableContract(
+	identity string,
+	binding gostdlib.BindingDocument,
+	effect gostdlib.EffectKind,
+	parameters []gostdlib.ProviderCallableParameterDocument,
+) error {
+	if binding.Kind != gostdlib.BindingFunction {
+		return certifyError(
+			"verify generic callable kernel",
+			identity,
+			"public binding is not a function",
+		)
+	}
+	if effect != binding.Effect {
+		return certifyError(
+			"verify generic callable kernel",
+			identity,
+			fmt.Sprintf(
+				"kernel effect %q does not match public effect %q",
+				effect,
+				binding.Effect,
+			),
+		)
+	}
+	if !slices.Equal(parameters, binding.CallableParameters) {
+		return certifyError(
+			"verify generic callable kernel",
+			identity,
+			fmt.Sprintf(
+				"kernel callable parameters %#v do not match public parameters %#v",
+				parameters,
+				binding.CallableParameters,
+			),
+		)
+	}
+	return nil
+}
+
 func verifyGenericKernelShape(
 	identity string,
 	signature *types.Signature,

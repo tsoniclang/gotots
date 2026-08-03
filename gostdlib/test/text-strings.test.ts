@@ -47,6 +47,7 @@ import {
   ReplaceAll,
   Replacer,
   Split,
+  SplitN,
   ToLower,
   ToUpper,
   ToValidUTF8,
@@ -146,6 +147,13 @@ test("strings splitting, replacement, and repetition follow Go boundaries", () =
   assert.deepEqual(
     sliceValues(Split(goText("éΣ"), "")).map(hostText),
     ["é", "Σ"],
+  );
+  assert.equal(SplitN("a,b", ",", 0).isNil(), true);
+  assert.deepEqual(sliceValues(SplitN("a,b,c", ",", 2)), ["a", "b,c"]);
+  assert.deepEqual(sliceValues(SplitN("a,b,c", ",", -1)), ["a", "b", "c"]);
+  assert.deepEqual(
+    sliceValues(SplitN(goText("éΣx"), "", 2)).map(hostText),
+    ["é", "Σx"],
   );
   assert.equal(Replace(goText("é"), "", ".", -1), `.${goText("é")}.`);
   assert.equal(Replace("aaaa", "aa", "b", 1), "baa");

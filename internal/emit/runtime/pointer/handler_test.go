@@ -110,6 +110,7 @@ func TestPointerRuntimeBuildExactJoinsItsFrozenSymbol(t *testing.T) {
 		factory,
 		api.RuntimeModulePointer,
 		[]api.RuntimeSymbol{api.RuntimePointer},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -126,6 +127,7 @@ func TestPointerRuntimeBuildExactJoinsItsFrozenSymbol(t *testing.T) {
 			factory,
 			api.RuntimeModulePointer,
 			symbols,
+			api.ConcurrencySemanticsDisabled,
 		)
 		var assemblyError *runtimeemission.AssemblyError
 		if !errors.As(err, &assemblyError) {

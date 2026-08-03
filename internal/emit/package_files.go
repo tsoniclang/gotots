@@ -201,7 +201,13 @@ func (s *programSession) packageAssemblyFile(
 		initialization = append(initialization, storage.zeroStatements...)
 	}
 	for _, artifact := range builder.initialization {
-		initialization = append(initialization, artifact.statements...)
+		if len(artifact.statements) == 0 {
+			continue
+		}
+		initialization = append(
+			initialization,
+			s.factory.Block(artifact.statements, true),
+		)
 	}
 	for _, initFunction := range builder.initFunctions {
 		cooperative, err := s.sourceCallableIsCooperative(

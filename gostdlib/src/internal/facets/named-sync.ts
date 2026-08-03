@@ -1,4 +1,24 @@
-import { Map, Mutex, Once, Pool, RWMutex, WaitGroup } from "../../sync.js";
+import { Cond, Map, Mutex, Once, Pool, RWMutex, WaitGroup } from "../../sync.js";
+
+export type SyncCondStorage = Cond;
+
+export class SyncCondOperations {
+  static $zero(): Cond {
+    return new Cond();
+  }
+
+  static $copy(source: Cond): Cond {
+    return new Cond(source.L);
+  }
+
+  static $storageOf(source: Cond): SyncCondStorage {
+    return source;
+  }
+
+  static $fromStorage(source: SyncCondStorage): Cond {
+    return source;
+  }
+}
 
 export type SyncMapStorage = Map;
 

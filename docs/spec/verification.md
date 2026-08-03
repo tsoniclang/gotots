@@ -261,6 +261,9 @@ Fixtures cover:
 - operations that are directly expressible over open parameters;
 - operations requiring exact concretization;
 - iterator functions.
+- builtin operations whose accepted type set has disjoint target
+  representations, including `append([]byte, B...)` for
+  `B ~[]byte | ~string`.
 
 The gate exact-joins every concretization to one
 `(declaration identity, ordered exact type arguments)` instance and proves
@@ -282,6 +285,11 @@ representation type parameter, omit a demanded associated-type marker, or
 materialize a marker for an undemanded identity case. Open unsupported exports
 and intentionally unbounded recursive instantiation must fail
 deterministically.
+
+For representation-disjoint builtins, mutations bypass the internal operation,
+collapse its concrete families, add it to the source facade, or select it by
+runtime type/spelling. Each must fail at AST shape, strict typecheck,
+differential behavior, or the generic-operation ownership gate.
 
 ## Function-Control Proof
 
@@ -410,6 +418,18 @@ constraint, profile alias, or generated call argument. Removing the bridge or
 substituting the private provider ABI must fail strict typechecking at the
 callback parameter or result boundary.
 
+The facade-support gate exact-joins the ordered private suffix after source,
+receiver, and canonical value parameters: guards, contracts, then
+provider-to-generated bridges. Mutations swap two support classes, substitute
+one structurally similar marker, omit one dependency, or add a policy-object
+parameter; each fails contract generation at the exact parameter identity.
+
+For every generic provider kernel, certification also exact-joins the kernel's
+outer effect and callback-parameter effects to the public binding document.
+Mutations change either side between synchronous and `Awaitable`, restore a
+separate cooperative kernel, or expose a capability as a public source
+parameter; each fails before emission.
+
 An allocation-order mutation inserts an unrelated computed `unique symbol`
 member and must leave every unaffected provider fingerprint byte-identical
 even when TS-Go's diagnostic/display spelling changes.
@@ -423,6 +443,13 @@ emission, or silently fall back to ambient mode.
 `gostdlib` runs focused Go-versus-provider differentials and strict ESM tests
 independently. Generated product linkage proves the same physical runtime
 module is used by provider and generated code.
+
+Provider-source strict typechecking uses the generated direct-profile runtime
+harness. Runtime generation tests separately inspect direct and cooperative
+contracts, and the linked cooperative product must strict-typecheck provider
+declarations against its own generated cooperative runtime. Mutating either
+profile selection, or substituting the direct harness into the cooperative
+product, must fail at the exact interface method effect.
 
 ## Environment And Obligation Proof
 

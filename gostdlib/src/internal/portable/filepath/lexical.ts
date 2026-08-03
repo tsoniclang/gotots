@@ -16,6 +16,15 @@ export function Dir(path: gostring): gostring {
   return slashDir(path);
 }
 
+export function Ext(path: gostring): gostring {
+  for (let index = path.length - 1; index >= 0 && path[index] !== "/"; index -= 1) {
+    if (path[index] === ".") {
+      return path.slice(index);
+    }
+  }
+  return "";
+}
+
 export function FromSlash(path: gostring): gostring {
   return path;
 }

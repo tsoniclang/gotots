@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 21,
+  "schemaVersion": 22,
   "packageName": "@gotots/gostdlib",
   "packageVersion": "0.0.0",
   "backend": "node",
@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "53c48d50cc04099630b385188c0b571b69ba579a817f035c5261eee5b327d4fc",
-  "providerDigest": "8e0a387113b116deeeb042947a4d835dcbf021519faf50408628a43e8e38e31a",
+  "providerDigest": "ac90a42ad55dfcac8df2222f30a25394dfbf2deb5c3f373238bfaa7ff184de6b",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -2908,7 +2908,7 @@
           "identity": "maps|kind=4|receiver=|name=EqualFunc",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "EqualFunc",
           "genericTypeArguments": [
             {
@@ -3011,13 +3011,13 @@
           "callableParameters": [
             {
               "parameter": 2,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[M1 ~map[K]V1, M2 ~map[K]V2, K comparable, V1, V2 any](m1 M1, m2 M2, eq func(V1, V2) bool) bool|params=m1,m2,eq|results=",
           "sourceLocation": "maps/maps.go:31:6",
           "implementationOwner": "src/maps.ts",
-          "targetFingerprint": "5efb22ff41081e495c677d89a4bd01d8169803e7bba8e402ca94681bec7c11b5"
+          "targetFingerprint": "55a42d9e4b570f5982f25342c1a786ee57a498a90ff85a3f3320462487c3dc0f"
         },
         {
           "identity": "maps|kind=4|receiver=|name=Keys",
@@ -4596,6 +4596,17 @@
           "sourceLocation": "path/filepath/path.go:147:6",
           "implementationOwner": "src/internal/node/filepath/filesystem.ts",
           "targetFingerprint": "7ab6c802b916cd050b261b3e3b8570016d735c77f79cfeb79a8c46f947ee41b5"
+        },
+        {
+          "identity": "path/filepath|kind=4|receiver=|name=Ext",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "Ext",
+          "sourceSignature": "func(path string) string|params=path|results=",
+          "sourceLocation": "path/filepath/path.go:138:6",
+          "implementationOwner": "src/internal/portable/filepath/lexical.ts",
+          "targetFingerprint": "c48651f0c75e2954ebe0d6aa03bcdf5d487182f974ef35328710e1dcf189c468"
         },
         {
           "identity": "path/filepath|kind=4|receiver=|name=FromSlash",
@@ -6585,7 +6596,7 @@
           "identity": "slices|kind=4|receiver=|name=AppendSeq",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "AppendSeq",
           "genericTypeArguments": [
             {
@@ -6693,7 +6704,7 @@
           "sourceSignature": "func[Slice ~[]E, E any](s Slice, seq iter.Seq[E]) Slice|params=s,seq|results=",
           "sourceLocation": "slices/iter.go:50:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "c1b00b0f1475aa322e81574768b91b968da9fef4f39dde77a17442100498bf27"
+          "targetFingerprint": "9905f3a58b479493117d091c7ea1f7146cb5d4ab3152bbeeb9282201e0dddecf"
         },
         {
           "identity": "slices|kind=4|receiver=|name=BinarySearch",
@@ -6806,7 +6817,7 @@
           "identity": "slices|kind=4|receiver=|name=BinarySearchFunc",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "BinarySearchFunc",
           "genericTypeArguments": [
             {
@@ -6875,13 +6886,13 @@
           "callableParameters": [
             {
               "parameter": 2,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[S ~[]E, E, T any](x S, target T, cmp func(E, T) int) (int, bool)|params=x,target,cmp|results=,",
           "sourceLocation": "slices/sort.go:152:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "7cd9acf6bec116841fad25bba92683b0c14ab6ad6214db4a8c8bce50877317ff"
+          "targetFingerprint": "193fdc694d792253c8ddf10c1e432cced0d74c9e9aa541ce0fbfe2758b369bbb"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Clip",
@@ -6929,7 +6940,7 @@
           "identity": "slices|kind=4|receiver=|name=Collect",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "Collect",
           "genericTypeArguments": [
             {
@@ -6972,7 +6983,7 @@
           "sourceSignature": "func[E any](seq iter.Seq[E]) []E|params=seq|results=",
           "sourceLocation": "slices/iter.go:59:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "ecc7026c541035a58d053d9dc1167a1eb709e4578cfd7dc2ea10bff19dd08d79"
+          "targetFingerprint": "2635e1417a0d175f20e0688e11a853653b25937c18d859fa69edc531b8dd29fc"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Compact",
@@ -6999,7 +7010,7 @@
           "identity": "slices|kind=4|receiver=|name=CompactFunc",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "CompactFunc",
           "genericTypeArguments": [
             {
@@ -7014,13 +7025,13 @@
           "callableParameters": [
             {
               "parameter": 1,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, eq func(E, E) bool) S|params=s,eq|results=",
           "sourceLocation": "slices/slices.go:394:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "6f4934f8a5c583fb2240eb25e65552864073edd8ef13837df3ae93cbac28162a"
+          "targetFingerprint": "04dae3b13e7fd6ad6c3778a8797ad2b93ed55ff5269f19ab902cb835013f928f"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Compare",
@@ -7133,7 +7144,7 @@
           "identity": "slices|kind=4|receiver=|name=CompareFunc",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "CompareFunc",
           "genericTypeArguments": [
             {
@@ -7254,13 +7265,13 @@
           "callableParameters": [
             {
               "parameter": 2,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[S1 ~[]E1, S2 ~[]E2, E1, E2 any](s1 S1, s2 S2, cmp func(E1, E2) int) int|params=s1,s2,cmp|results=",
           "sourceLocation": "slices/slices.go:78:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "c8026a1a03b8f2e8b654546546e015ea6a64bc4b7a97a9f2c6f4fe48b30b195a"
+          "targetFingerprint": "4df35c8d0f1d973e1f6d11b7297bbb053312c7787676a61a7f35b5d115bfd15c"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Concat",
@@ -7376,7 +7387,7 @@
           "identity": "slices|kind=4|receiver=|name=ContainsFunc",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "ContainsFunc",
           "genericTypeArguments": [
             {
@@ -7441,13 +7452,13 @@
           "callableParameters": [
             {
               "parameter": 1,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, f func(E) bool) bool|params=s,f|results=",
           "sourceLocation": "slices/slices.go:123:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "1eae5aa1f30a8309327fabaecd58376ec18890d86aa411ca35841a27d74e6cf2"
+          "targetFingerprint": "d7f9b22a11c46f8ce3c19ead2b93cbc50fb42e843456a29e2d97a945687edece"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Delete",
@@ -7474,7 +7485,7 @@
           "identity": "slices|kind=4|receiver=|name=DeleteFunc",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "DeleteFunc",
           "genericTypeArguments": [
             {
@@ -7582,13 +7593,13 @@
           "callableParameters": [
             {
               "parameter": 1,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, del func(E) bool) S|params=s,del|results=",
           "sourceLocation": "slices/slices.go:239:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "7d895850c212577e084b3edd6f3c531927c5999ab3f2737a4e93e4d4cfba2de2"
+          "targetFingerprint": "9b7db319ae8fcefa6eb67526323059216b28c8afab84c87be92ab4bc9ac43a14"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Equal",
@@ -7683,7 +7694,7 @@
           "identity": "slices|kind=4|receiver=|name=EqualFunc",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "EqualFunc",
           "genericTypeArguments": [
             {
@@ -7804,13 +7815,13 @@
           "callableParameters": [
             {
               "parameter": 2,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[S1 ~[]E1, S2 ~[]E2, E1, E2 any](s1 S1, s2 S2, eq func(E1, E2) bool) bool|params=s1,s2,eq|results=",
           "sourceLocation": "slices/slices.go:37:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "8a87f14b0796fc081387c846b9997d48583772c9f1cf3b816214600fde60b887"
+          "targetFingerprint": "a8d276ca1058663be60f479a41da23d31e81442c03916689c9a0de213fb20ad8"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Grow",
@@ -8019,7 +8030,7 @@
           "identity": "slices|kind=4|receiver=|name=IndexFunc",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "IndexFunc",
           "genericTypeArguments": [
             {
@@ -8084,13 +8095,13 @@
           "callableParameters": [
             {
               "parameter": 1,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](s S, f func(E) bool) int|params=s,f|results=",
           "sourceLocation": "slices/slices.go:107:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "3a2607365d27b48ea1b9addbfe2ad23ce2a70040495b3805a9f56fd946f4ddc5"
+          "targetFingerprint": "2ecb4be8a5ffa12e2830a3a154abac821b5ff972d64a9dcd5245eb1c9bb2d0af"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Insert",
@@ -8302,7 +8313,7 @@
           "identity": "slices|kind=4|receiver=|name=SortFunc",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "SortFunc",
           "genericTypeArguments": [
             {
@@ -8382,19 +8393,19 @@
           "callableParameters": [
             {
               "parameter": 1,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](x S, cmp func(a E, b E) int)|params=x,cmp|results=",
           "sourceLocation": "slices/sort.go:30:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "f26db85f0e4fd1928579d6a62873be516125c25027b3c15977257e31a2837126"
+          "targetFingerprint": "320a88d7c57c4711658fa9dca0d387188969a9bc6e5c0bfb8aeed991bf17611b"
         },
         {
           "identity": "slices|kind=4|receiver=|name=SortStableFunc",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "SortStableFunc",
           "genericTypeArguments": [
             {
@@ -8474,19 +8485,19 @@
           "callableParameters": [
             {
               "parameter": 1,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[S ~[]E, E any](x S, cmp func(a E, b E) int)|params=x,cmp|results=",
           "sourceLocation": "slices/sort.go:37:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "3f01faa2facaaeda8df548b98ec6497d67577b042656679e8a1bd527bc0aab37"
+          "targetFingerprint": "3fa724b447e41e55d3e86a4efa10015cb2fcb2afd9b310655ab7bb9df2ba05e9"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Sorted",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "Sorted",
           "genericTypeArguments": [
             {
@@ -8580,13 +8591,13 @@
           "sourceSignature": "func[E cmp.Ordered](seq iter.Seq[E]) []E|params=seq|results=",
           "sourceLocation": "slices/iter.go:66:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "ac0d9ade4d931a36aafe1abe82bf939cb1f38683731b0b7a7a65f639572c160a"
+          "targetFingerprint": "2e3643b8e8ce162f7984c8d0af6dec8dc57effe458cd4a5689af7ba63073da08"
         },
         {
           "identity": "slices|kind=4|receiver=|name=SortedFunc",
           "kind": "function",
           "access": "export",
-          "effect": "sync",
+          "effect": "async",
           "export": "SortedFunc",
           "genericTypeArguments": [
             {
@@ -8644,13 +8655,13 @@
           "callableParameters": [
             {
               "parameter": 1,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[E any](seq iter.Seq[E], cmp func(E, E) int) []E|params=seq,cmp|results=",
           "sourceLocation": "slices/iter.go:75:6",
           "implementationOwner": "src/slices.ts",
-          "targetFingerprint": "82b83bef2c03bcb6f2465ef8a96e998d1eb8c243e86d0487308e09542ae32efd"
+          "targetFingerprint": "e87966232cc0919bcc63394c1b43f89b828aac5f0eb51d376db321182021da98"
         },
         {
           "identity": "slices|kind=4|receiver=|name=Values",
@@ -9535,6 +9546,17 @@
           "targetFingerprint": "2c10c67235f7da3b71aa3a21c780484f7b37f7a51159565eb19fe28e0022222f"
         },
         {
+          "identity": "strings|kind=4|receiver=|name=SplitN",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "SplitN",
+          "sourceSignature": "func(s string, sep string, n int) []string|params=s,sep,n|results=",
+          "sourceLocation": "strings/strings.go:333:6",
+          "implementationOwner": "src/internal/portable/strings/split.ts",
+          "targetFingerprint": "70571a83cb40aad728042e1d4e52793ab6f5db9f306cb547d2db6423e97f0806"
+        },
+        {
           "identity": "strings|kind=4|receiver=|name=ToLower",
           "kind": "function",
           "access": "export",
@@ -9692,6 +9714,53 @@
       "sourcePath": "src/sync.ts",
       "bindings": [
         {
+          "identity": "sync|kind=2|receiver=|name=Cond",
+          "kind": "type",
+          "access": "export",
+          "representation": "direct",
+          "export": "Cond",
+          "sourceSignature": "defined=sync.Cond|underlying=struct{noCopy sync.noCopy; L sync.Locker; notify sync.notifyList; checker sync.copyChecker}",
+          "sourceLocation": "sync/cond.go:37:6",
+          "implementationOwner": "src/internal/portable/sync/cond.ts",
+          "targetFingerprint": "94b49b0c8a9cd863e3b4643a77f46ef22173078d86e8a8385f3a87b22c5edf8a"
+        },
+        {
+          "identity": "sync|kind=2|receiver=|name=Locker",
+          "kind": "type",
+          "access": "export",
+          "representation": "direct",
+          "export": "Locker",
+          "providerInterface": {
+            "mode": "bridge",
+            "methods": [
+              {
+                "sourceIdentity": "sync|kind=4|receiver=sync.Locker|name=Lock",
+                "kind": "callable",
+                "member": "Lock",
+                "effect": "awaitable",
+                "sourceSignature": "func()|params=|results=",
+                "sourceLocation": "sync/mutex.go:38:2",
+                "implementationOwner": "src/internal/portable/sync/cond.ts",
+                "targetFingerprint": "7756373111ffd32751251fc6269527d22c5103dc5927d7633ba9b6fa4a4974df"
+              },
+              {
+                "sourceIdentity": "sync|kind=4|receiver=sync.Locker|name=Unlock",
+                "kind": "callable",
+                "member": "Unlock",
+                "effect": "awaitable",
+                "sourceSignature": "func()|params=|results=",
+                "sourceLocation": "sync/mutex.go:39:2",
+                "implementationOwner": "src/internal/portable/sync/cond.ts",
+                "targetFingerprint": "eaaeb649f56494c09353d4eafa503f247a20d33c811c282080bc319f33afd330"
+              }
+            ]
+          },
+          "sourceSignature": "defined=sync.Locker|underlying=interface{Lock(); Unlock()}",
+          "sourceLocation": "sync/mutex.go:37:6",
+          "implementationOwner": "src/internal/portable/sync/cond.ts",
+          "targetFingerprint": "356e4325ad0224cd1a442084a94ea0eda1f14e92e6a4b9cdf5319dc434c2a50f"
+        },
+        {
           "identity": "sync|kind=2|receiver=|name=Map",
           "kind": "type",
           "access": "export",
@@ -9756,6 +9825,42 @@
           "sourceLocation": "sync/waitgroup.go:48:6",
           "implementationOwner": "src/internal/portable/sync/wait-group.ts",
           "targetFingerprint": "39adb30755db209c32d8e86e5bf9a3c3f9fdb24f6b102698be33f344eeeaebf8"
+        },
+        {
+          "identity": "sync|kind=4|receiver=*sync.Cond|name=Broadcast",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Cond",
+          "member": "Broadcast",
+          "sourceSignature": "func()|params=|results=",
+          "sourceLocation": "sync/cond.go:91:16",
+          "implementationOwner": "src/internal/portable/sync/cond.ts",
+          "targetFingerprint": "fefcf303cd24eea81246a8cc7578639abf795c9478c1e36ad0d4965d20dcdfcd"
+        },
+        {
+          "identity": "sync|kind=4|receiver=*sync.Cond|name=Signal",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "sync",
+          "export": "Cond",
+          "member": "Signal",
+          "sourceSignature": "func()|params=|results=",
+          "sourceLocation": "sync/cond.go:82:16",
+          "implementationOwner": "src/internal/portable/sync/cond.ts",
+          "targetFingerprint": "0e1a2f9d74e365c0a4bbf5008b74a4ed1fde1d8f92cbec75f18b10a492e04bcf"
+        },
+        {
+          "identity": "sync|kind=4|receiver=*sync.Cond|name=Wait",
+          "kind": "function",
+          "access": "static-method",
+          "effect": "async",
+          "export": "Cond",
+          "member": "Wait",
+          "sourceSignature": "func()|params=|results=",
+          "sourceLocation": "sync/cond.go:67:16",
+          "implementationOwner": "src/internal/portable/sync/cond.ts",
+          "targetFingerprint": "d715c7245354793e9439788b6bc18b40ce7e8d48e63e0beb2e3242233c870fa4"
         },
         {
           "identity": "sync|kind=4|receiver=*sync.Map|name=Clear",
@@ -10004,6 +10109,17 @@
           "targetFingerprint": "6563d89c84dbd3fc5ef6b50030e3098355c14fc93205f162088a1b27cdbfaacc"
         },
         {
+          "identity": "sync|kind=4|receiver=|name=NewCond",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "NewCond",
+          "sourceSignature": "func(l sync.Locker) *sync.Cond|params=l|results=",
+          "sourceLocation": "sync/cond.go:48:6",
+          "implementationOwner": "src/internal/portable/sync/cond.ts",
+          "targetFingerprint": "d20cc1cd89c2c8436081b9585da178b6777d15bcadedecac4857c0fe6cbe5c95"
+        },
+        {
           "identity": "sync|kind=4|receiver=|name=OnceFunc",
           "kind": "function",
           "access": "export",
@@ -10035,13 +10151,13 @@
           "callableParameters": [
             {
               "parameter": 0,
-              "effect": "sync"
+              "effect": "awaitable"
             }
           ],
           "sourceSignature": "func[T any](f func() T) func() T|params=f|results=",
           "sourceLocation": "sync/oncefunc.go:46:6",
           "implementationOwner": "src/internal/portable/sync/once.ts",
-          "targetFingerprint": "6b2927821867eb6a8ee1c373bd6fa59fd77c46556c89e876fcdbc2dc31ae32d8"
+          "targetFingerprint": "ee13ae71a14d98a472157ddab5a078f9499a1fce272b164f3389387598031c2f"
         }
       ]
     },
@@ -11087,6 +11203,17 @@
           "targetFingerprint": "c2a7dc71ad3a5fcfd3b7669a2fa2e20e0d341a9d74f7d3b53e78e4b3fa10af7c"
         },
         {
+          "identity": "time|kind=4|receiver=|name=Sleep",
+          "kind": "function",
+          "access": "export",
+          "effect": "async",
+          "export": "Sleep",
+          "sourceSignature": "func(d time.Duration)|params=d|results=",
+          "sourceLocation": "time/sleep.go:14:6",
+          "implementationOwner": "src/internal/portable/time/timer.ts",
+          "targetFingerprint": "846ac3aa313de6b712b0db73d99d795f9aaf14deefebe134c72f7deb50101689"
+        },
+        {
           "identity": "time|kind=4|receiver=|name=Unix",
           "kind": "function",
           "access": "export",
@@ -11515,6 +11642,17 @@
           "targetFingerprint": "846421b80a911659988d43b82ff9d323e0bff4abe1b61ff9f18169ec7714116d"
         },
         {
+          "identity": "unicode/utf8|kind=4|receiver=|name=FullRuneInString",
+          "kind": "function",
+          "access": "export",
+          "effect": "sync",
+          "export": "FullRuneInString",
+          "sourceSignature": "func(s string) bool|params=s|results=",
+          "sourceLocation": "unicode/utf8/utf8.go:130:6",
+          "implementationOwner": "src/unicode/utf8.ts",
+          "targetFingerprint": "ca891e328b544f58d92d87942de4082b250c07a1d53b84a21a3fe98830d305c8"
+        },
+        {
           "identity": "unicode/utf8|kind=4|receiver=|name=RuneCount",
           "kind": "function",
           "access": "export",
@@ -11568,6 +11706,7 @@
             "kernel"
           ],
           "export": "CmpCompareKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11584,6 +11723,7 @@
             "kernel"
           ],
           "export": "CmpOrKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11610,6 +11750,7 @@
             "kernel"
           ],
           "export": "ErrorsAsTypeKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11632,6 +11773,7 @@
             "kernel"
           ],
           "export": "MapsCloneKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11656,6 +11798,7 @@
             "kernel"
           ],
           "export": "MapsCopyKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11684,6 +11827,7 @@
             "kernel"
           ],
           "export": "MapsEqualKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11712,6 +11856,13 @@
             "kernel"
           ],
           "export": "MapsEqualFuncKernel",
+          "effect": "async",
+          "callableParameters": [
+            {
+              "parameter": 2,
+              "effect": "awaitable"
+            }
+          ],
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11735,7 +11886,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/maps/operations.ts",
-          "targetFingerprint": "5d85f83de1e8dc8d16f4387cc211540ce77386c79120c8e0b1695b10624cf7c0"
+          "targetFingerprint": "e5738c3b7dcd46a450d7953a768d01885e2af5ff15bcd8f74574e6745709435d"
         },
         {
           "kind": "generic-callable-kernel",
@@ -11744,6 +11895,7 @@
             "kernel"
           ],
           "export": "MapsKeysKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11768,6 +11920,7 @@
             "kernel"
           ],
           "export": "MapsValuesKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11798,6 +11951,7 @@
             "kernel"
           ],
           "export": "SlicesAppendSeqKernel",
+          "effect": "async",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11813,7 +11967,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "f8f7ae57b10847a58d7ca061cbff6ae92932dbbc307b443ba517d670077378b6"
+          "targetFingerprint": "f3b5236c43e1675608301b1697491b82af3ac0ec690afe38c04d33349df6bd10"
         },
         {
           "kind": "generic-callable-kernel",
@@ -11822,6 +11976,7 @@
             "kernel"
           ],
           "export": "SlicesBinarySearchKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11846,6 +12001,13 @@
             "kernel"
           ],
           "export": "SlicesBinarySearchFuncKernel",
+          "effect": "async",
+          "callableParameters": [
+            {
+              "parameter": 2,
+              "effect": "awaitable"
+            }
+          ],
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11865,7 +12027,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "8962321c2a937b205181e9211045ad3bff5e840ddcc0657b5c1f7a417890a0de"
+          "targetFingerprint": "e29bdee449a1215dff23f33b0e118eb0256fd01178ea324e0251343a69cca3c5"
         },
         {
           "kind": "generic-callable-kernel",
@@ -11874,6 +12036,7 @@
             "kernel"
           ],
           "export": "SlicesClipKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 1,
@@ -11890,6 +12053,7 @@
             "kernel"
           ],
           "export": "SlicesCloneKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 1,
@@ -11906,6 +12070,7 @@
             "kernel"
           ],
           "export": "SlicesCollectKernel",
+          "effect": "async",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11917,7 +12082,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "ba7ab2489e3832ddbbb894a2bc04b2bfb241590af1e1dfe490f1b5ee2d255455"
+          "targetFingerprint": "0daaf00972dd54e625689f5606cca8ec157c1ed7a25b3574a721c4555d275a70"
         },
         {
           "kind": "generic-callable-kernel",
@@ -11926,6 +12091,7 @@
             "kernel"
           ],
           "export": "SlicesCompactKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 1,
@@ -11942,6 +12108,13 @@
             "kernel"
           ],
           "export": "SlicesCompactFuncKernel",
+          "effect": "async",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "awaitable"
+            }
+          ],
           "genericTypeArguments": [
             {
               "typeParameter": 1,
@@ -11949,7 +12122,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "46e558c78887d96a72672b74ce2ca822f3772242d06a1b9fb7dd75230bc13d18"
+          "targetFingerprint": "eb71e34718a0fc32007ee0f136a15c79596b2ebb6a95ff5922690d74efba425a"
         },
         {
           "kind": "generic-callable-kernel",
@@ -11958,6 +12131,7 @@
             "kernel"
           ],
           "export": "SlicesCompareKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -11982,6 +12156,13 @@
             "kernel"
           ],
           "export": "SlicesCompareFuncKernel",
+          "effect": "async",
+          "callableParameters": [
+            {
+              "parameter": 2,
+              "effect": "awaitable"
+            }
+          ],
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12018,6 +12199,7 @@
             "kernel"
           ],
           "export": "SlicesConcatKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 1,
@@ -12034,6 +12216,7 @@
             "kernel"
           ],
           "export": "SlicesContainsKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12058,6 +12241,13 @@
             "kernel"
           ],
           "export": "SlicesContainsFuncKernel",
+          "effect": "async",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "awaitable"
+            }
+          ],
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12073,7 +12263,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "51471a875b878f57363136e6945ff722c2e8ef630c7cd5e1ab2a577c09820d13"
+          "targetFingerprint": "370102fc8a16488d9d39fe399edbc4eda2d71e9d7d20324a15986ca83fad71d3"
         },
         {
           "kind": "generic-callable-kernel",
@@ -12082,6 +12272,7 @@
             "kernel"
           ],
           "export": "SlicesDeleteKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 1,
@@ -12098,6 +12289,13 @@
             "kernel"
           ],
           "export": "SlicesDeleteFuncKernel",
+          "effect": "async",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "awaitable"
+            }
+          ],
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12113,7 +12311,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "d1cf42ce760ad01a3490f98525820313ab642ed617fc8dca35ac28841cc7b697"
+          "targetFingerprint": "54a2f13ec1399a5de61f712c0c5be5b32611ebf798d86ee8a0e642a8fae57497"
         },
         {
           "kind": "generic-callable-kernel",
@@ -12122,6 +12320,7 @@
             "kernel"
           ],
           "export": "SlicesEqualKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12146,6 +12345,13 @@
             "kernel"
           ],
           "export": "SlicesEqualFuncKernel",
+          "effect": "async",
+          "callableParameters": [
+            {
+              "parameter": 2,
+              "effect": "awaitable"
+            }
+          ],
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12182,6 +12388,7 @@
             "kernel"
           ],
           "export": "SlicesGrowKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12206,6 +12413,7 @@
             "kernel"
           ],
           "export": "SlicesIndexKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12230,6 +12438,13 @@
             "kernel"
           ],
           "export": "SlicesIndexFuncKernel",
+          "effect": "async",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "awaitable"
+            }
+          ],
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12245,7 +12460,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/slices/read.ts",
-          "targetFingerprint": "3b400bda68e7393e36c3a42df3fb4d9d953f8ac2049551a700d4e46ac226a6f9"
+          "targetFingerprint": "c42e66baad8acde8631c91297d5bc9b2a898ad1ed1989cfe4604d7e265d82ef5"
         },
         {
           "kind": "generic-callable-kernel",
@@ -12254,6 +12469,7 @@
             "kernel"
           ],
           "export": "SlicesInsertKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 1,
@@ -12270,6 +12486,7 @@
             "kernel"
           ],
           "export": "SlicesRepeatKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 1,
@@ -12286,6 +12503,7 @@
             "kernel"
           ],
           "export": "SlicesReplaceKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 1,
@@ -12302,6 +12520,7 @@
             "kernel"
           ],
           "export": "SlicesReverseKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 1,
@@ -12318,6 +12537,7 @@
             "kernel"
           ],
           "export": "SlicesSortKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12342,6 +12562,13 @@
             "kernel"
           ],
           "export": "SlicesSortFuncKernel",
+          "effect": "async",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "awaitable"
+            }
+          ],
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12357,7 +12584,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/slices/sort.ts",
-          "targetFingerprint": "56e4484e04dfe976440429672302f26625e99a39831a3a962c733c1ee71f1bf3"
+          "targetFingerprint": "a4344b441d83dd334ca2ab15fe4f94fd26fc595a995c9ca9d8c3a2f365c040ef"
         },
         {
           "kind": "generic-callable-kernel",
@@ -12366,6 +12593,13 @@
             "kernel"
           ],
           "export": "SlicesSortStableFuncKernel",
+          "effect": "async",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "awaitable"
+            }
+          ],
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12381,7 +12615,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/slices/sort.ts",
-          "targetFingerprint": "672d68dd29268761c8a592f14b4c62fcba8580d030ba4debd3bb1ee9ceb28e12"
+          "targetFingerprint": "233de7468f9aa4e4b3285bbac0fce4695abb8974e9e6571d07d66211ecef39dc"
         },
         {
           "kind": "generic-callable-kernel",
@@ -12390,6 +12624,7 @@
             "kernel"
           ],
           "export": "SlicesSortedKernel",
+          "effect": "async",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12401,7 +12636,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "1aeaea1812e2724700d5838ba997429d8efa156ff50f2ffec1ae13af39e8c934"
+          "targetFingerprint": "9c3e5832d917702edb35f862843b1cf5657a53f8633d7346b5a91b5c44096fbc"
         },
         {
           "kind": "generic-callable-kernel",
@@ -12410,6 +12645,13 @@
             "kernel"
           ],
           "export": "SlicesSortedFuncKernel",
+          "effect": "async",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "awaitable"
+            }
+          ],
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -12421,7 +12663,7 @@
             }
           ],
           "implementationOwner": "src/internal/portable/slices/sequence.ts",
-          "targetFingerprint": "b39e45c7e09a848613cce7af7ef9ee54cdcb23c7da9af712e213e3c9d46ad144"
+          "targetFingerprint": "40c0aea464e4e426fc850773bebaf26a33a7a9088556b821d8b6df736e8f97c9"
         },
         {
           "kind": "generic-callable-kernel",
@@ -12430,6 +12672,7 @@
             "kernel"
           ],
           "export": "SlicesValuesKernel",
+          "effect": "sync",
           "genericTypeArguments": [
             {
               "typeParameter": 0,
@@ -13257,6 +13500,21 @@
       "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
       "sourcePath": "src/internal/facets/named-sync.ts",
       "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "sync|kind=2|receiver=|name=Cond",
+          "capabilities": [
+            "copy",
+            "storage",
+            "zero"
+          ],
+          "export": "SyncCondOperations",
+          "storageExport": "SyncCondStorage",
+          "implementationOwner": "src/internal/facets/named-sync.ts",
+          "storageImplementationOwner": "src/internal/portable/sync/cond.ts",
+          "targetFingerprint": "929c90dcd8bb24175ff769bd34b0110c7b4683985951c4b573790734855f44de",
+          "storageTargetFingerprint": "1d87b5bea913cea3d59d351e761d7ee718efcd36ee881a95f518bc6de847ae0c"
+        },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=Map",
@@ -14101,7 +14359,7 @@
           ],
           "effect": "async",
           "implementationOwner": "src/internal/facets/provider-compress-gzip.ts",
-          "targetFingerprint": "3a24c8ddbb3cfb56cbaa71754e0c8eeffab65f042f744737e93b52183c75b01a"
+          "targetFingerprint": "d9ec4bf0ca1c35fdc2c25e958b5ec325a4821e0de8f3b5e0930f2225639196cc"
         }
       ],
       "statefulProfiles": [
@@ -14511,7 +14769,7 @@
           ],
           "effect": "async",
           "implementationOwner": "src/internal/facets/provider-context.ts",
-          "targetFingerprint": "630d20783fa3cf8a6a50af4136682b112007d1e65e875678b20401780ec353a0"
+          "targetFingerprint": "1ea02e6c8d428883f314c3e05f32a587f739fda5771ee64cb69d4059ea0f4f08"
         },
         {
           "sourceIdentity": "context|kind=4|receiver=|name=WithCancelCause",
@@ -14608,7 +14866,7 @@
           ],
           "effect": "async",
           "implementationOwner": "src/internal/facets/provider-context.ts",
-          "targetFingerprint": "7191a21627c283f28f60878e06b97794d5844dee4912d22f2e87aa70fd35b43d"
+          "targetFingerprint": "b0b8b16c3c633202cf6da0f9e36ae5ddd97d425f5db2dc52510c1b285c815221"
         },
         {
           "sourceIdentity": "context|kind=4|receiver=|name=WithTimeout",
@@ -14705,7 +14963,7 @@
           ],
           "effect": "async",
           "implementationOwner": "src/internal/facets/provider-context.ts",
-          "targetFingerprint": "db4a23deed2a8969b5100097ebbf2616927f95055cf72e057da6765c8dc65149"
+          "targetFingerprint": "73aa956378bd8d9aa7b526e7118dac95492b8763a5bb9566f8fa1f871492af14"
         },
         {
           "sourceIdentity": "context|kind=4|receiver=|name=WithValue",
@@ -14798,7 +15056,7 @@
           ],
           "effect": "sync",
           "implementationOwner": "src/internal/facets/provider-context.ts",
-          "targetFingerprint": "ad4d041b6bc740afdb0aced5c2aa587e02be8d70a83e8897d80a4c547a66d712"
+          "targetFingerprint": "caa7413b231dc98eb68a28584a5c8529d79cdf3781cd0b1a018298b49a0ca3f6"
         }
       ],
       "facets": []
@@ -14901,7 +15159,7 @@
           ],
           "effect": "sync",
           "implementationOwner": "src/internal/facets/provider-encoding-base64.ts",
-          "targetFingerprint": "21505a3a34db00111d927ba65fe84a9cd73a99c87b7e0c1e513eb2f5c2e4333f"
+          "targetFingerprint": "fa823f9200e09294c33259c798bf69469364c423150b3c3a5aca84bc1652123c"
         }
       ],
       "facets": []
@@ -15048,7 +15306,7 @@
           ],
           "effect": "sync",
           "implementationOwner": "src/internal/facets/provider-encoding-binary.ts",
-          "targetFingerprint": "e04c232a68259e8e8b1932ad3a65234405c90f934c0b2dcb383a09538446ab92"
+          "targetFingerprint": "b55e52d8161367116badee25dc3242f5afca054cc3948ec756fc35d91b1b589c"
         },
         {
           "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
@@ -15188,7 +15446,7 @@
           ],
           "effect": "sync",
           "implementationOwner": "src/internal/facets/provider-encoding-binary.ts",
-          "targetFingerprint": "56db84473e4bb5fae1dd0140ce3f516477adafb1c125f9fbf450736897f8fa6a"
+          "targetFingerprint": "b0196f7b20bc8010a9e2d595ed48098db1e4e1cf8d829623393eb698ecfb352d"
         }
       ],
       "facets": []
@@ -15825,7 +16083,7 @@
       "callableProfiles": [
         {
           "sourceIdentity": "io/fs|kind=4|receiver=|name=FileInfoToDirEntry",
-          "profileKey": "92ae88a15318f42431dc17d90a32f1218e2a1546ed60c689ded03744c8d54b7e",
+          "profileKey": "b0873328eae706ceb77dccfcfd35f3965bb226a0a12c07d6418920a12ccfa2f9",
           "export": "IoFsFileInfoToDirEntryCanonical",
           "canonicalParameters": [
             0
@@ -15837,6 +16095,26 @@
             "io/fs|kind=2|receiver=|name=DirEntry"
           ],
           "interfaces": [
+            {
+              "sourceIdentity": "go:universe|error",
+              "export": "CanonicalError",
+              "providerInterface": {
+                "mode": "bridge",
+                "methods": [
+                  {
+                    "sourceIdentity": "go:universe|error|method=Error",
+                    "kind": "callable",
+                    "member": "Error",
+                    "effect": "awaitable",
+                    "sourceSignature": "func() string",
+                    "sourceLocation": "builtin",
+                    "implementationOwner": "src/internal/facets/provider-io-contract.ts",
+                    "targetFingerprint": "2d41664fe788a96810bef7aedcc66f33314fa39e6419f8d734ca6503fdfb565e"
+                  }
+                ]
+              },
+              "targetFingerprint": "8f34dc8ec0f700e9b6b3f528e01d41a41cf0546b571f4a335fdcbf45cdcd95f6"
+            },
             {
               "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
               "export": "CanonicalDirEntry",
@@ -15960,7 +16238,7 @@
           ],
           "effect": "sync",
           "implementationOwner": "src/internal/facets/provider-io-fs.ts",
-          "targetFingerprint": "d881ac55198ba53ec02a8dcfda851ffde9b8757329ec0b5273c5a71ff04e7955"
+          "targetFingerprint": "e1eed4f45989e52aa4427275df54cf81ba9a720897ddec0b894938c8ee006655"
         },
         {
           "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
@@ -17008,7 +17286,7 @@
           ],
           "effect": "async",
           "implementationOwner": "src/internal/facets/provider-io-fs.ts",
-          "targetFingerprint": "b9f3bda747c6c3b3fb91256bb114ebc1929fda293854222cf470deac2bd78dfe"
+          "targetFingerprint": "714787ab8b96bb36e688d1eeb64bcd06c4ee259929061e1d7ba98ebc01b40807"
         }
       ],
       "facets": []
@@ -17179,7 +17457,7 @@
           ],
           "effect": "sync",
           "implementationOwner": "src/internal/facets/provider-os-error.ts",
-          "targetFingerprint": "a453f0264d608209a7a183851e9dead34e9ff13c67cf7091a4fa886cc7dc74ee"
+          "targetFingerprint": "da120f9767aea8816a4906a35843d3cf4e6c5487ab02860af9e24bc8b82c505f"
         },
         {
           "sourceIdentity": "os|kind=4|receiver=|name=IsNotExist",
@@ -17292,7 +17570,7 @@
           ],
           "effect": "async",
           "implementationOwner": "src/internal/facets/provider-os-error.ts",
-          "targetFingerprint": "436ef15fe842deab637c62aacfe3d780ee097b2e81d613130a330e50cb6d6166"
+          "targetFingerprint": "8131135bc645707b7d7b5dce040463f3c3ba3bb14e92cd16f52664aeb5aea34f"
         }
       ],
       "facets": []
@@ -17426,7 +17704,7 @@
           ],
           "effect": "async",
           "implementationOwner": "src/internal/facets/provider-os-signal.ts",
-          "targetFingerprint": "8d889ef36c8ad051f77f07311a353d57ee23fd74030cb042e4b50487c93a85ef"
+          "targetFingerprint": "12cfce3fbb20ff187772148cd1d13cb7750a0b8226cc0405b5262fe8f51d1e29"
         },
         {
           "sourceIdentity": "os|kind=4|receiver=*os.Process|name=Signal",
@@ -17586,7 +17864,7 @@
           ],
           "effect": "async",
           "implementationOwner": "src/internal/facets/provider-runtime-pprof.ts",
-          "targetFingerprint": "a94701d038ee34776d8daf79f7ca0efcdbf4ec5d85bfa7cfb20173e2ed927ac9"
+          "targetFingerprint": "79814a97a3ac52c6c3bd796057656ddad68b9b462bf377c3faec8e31f75497b5"
         },
         {
           "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
@@ -17645,7 +17923,7 @@
           ],
           "effect": "sync",
           "implementationOwner": "src/internal/facets/provider-runtime-pprof.ts",
-          "targetFingerprint": "b22077755bbc424c0c6277ffa3a552f49b37774c3a4e75d3c1e5c0441f62777a"
+          "targetFingerprint": "4c4f8501694d26f9cd33101fbe27b128736ec15e5428af4f507590323b0de44e"
         }
       ],
       "facets": []
@@ -18478,5 +18756,5 @@
       ]
     }
   ],
-  "manifestDigest": "9e7c40956e325de18d68d268d95e94241e0a51f97d82ad180534d2929de17cd3"
+  "manifestDigest": "50f21f9328033fdc1edda10783a6fcc9db0f4a63857476b993e63f8a9456e11e"
 }

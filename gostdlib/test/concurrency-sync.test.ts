@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { GoPanic } from "@gotots/runtime/panic.js";
+import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 import {
   ProviderError,
   isGoError,
 } from "../src/internal/runtime/error.js";
 import {
+  Cond,
+  type Locker,
   Map as SyncMap,
   Mutex,
+  NewCond,
   Once,
   OnceFunc,
   OnceValue,
@@ -15,6 +19,24 @@ import {
   RWMutex,
   WaitGroup,
 } from "../src/sync.js";
+
+const testLockerType = Object.freeze({ comparable: true });
+
+class TestLocker extends ProviderInterfaceValue implements Locker {
+  readonly #mutex = new Mutex();
+
+  constructor() {
+    super(testLockerType);
+  }
+
+  Lock(): Promise<void> {
+    return Mutex.Lock(this.#mutex);
+  }
+
+  Unlock(): void {
+    Mutex.Unlock(this.#mutex);
+  }
+}
 
 test("Mutex serializes waiters and rejects an unmatched unlock", async () => {
   const mutex = new Mutex();
@@ -32,6 +54,40 @@ test("Mutex serializes waiters and rejects an unmatched unlock", async () => {
 
   assert.deepEqual(events, ["owner", "waiter"]);
   assert.throws(() => Mutex.Unlock(mutex), panicWith(/unlocked mutex/u));
+});
+
+test("Cond Wait releases and reacquires its Locker before returning", async () => {
+  const locker = new TestLocker();
+  const condition = NewCond(locker);
+
+  await locker.Lock();
+  const waiting = Cond.Wait(condition);
+  await locker.Lock();
+  Cond.Signal(condition);
+  locker.Unlock();
+  await waiting;
+  locker.Unlock();
+});
+
+test("Cond Broadcast wakes every registered waiter", async () => {
+  const locker = new TestLocker();
+  const condition = NewCond(locker);
+  let resumed = 0;
+  const waitOnce = async (): Promise<void> => {
+    await Cond.Wait(condition);
+    resumed += 1;
+    locker.Unlock();
+  };
+
+  await locker.Lock();
+  const first = waitOnce();
+  await locker.Lock();
+  const second = waitOnce();
+  await locker.Lock();
+  Cond.Broadcast(condition);
+  locker.Unlock();
+  await Promise.all([first, second]);
+  assert.equal(resumed, 2);
 });
 
 test("RWMutex allows readers together and gives a queued writer exclusivity", async () => {
@@ -72,13 +128,26 @@ test("Once, OnceFunc, and OnceValue evaluate exactly once", async () => {
   });
   await Promise.all([onceFunction(), onceFunction()]);
 
-  const onceValue = OnceValue(() => {
+  const onceValue = OnceValue(async () => {
     count += 100;
+    await Promise.resolve();
     return count;
   });
-  assert.equal(onceValue(), 111);
-  assert.equal(onceValue(), 111);
+  assert.deepEqual(await Promise.all([onceValue(), onceValue()]), [111, 111]);
   assert.equal(count, 111);
+});
+
+test("OnceValue replays the first panic", async () => {
+  let count = 0;
+  const onceValue = OnceValue<number>(() => {
+    count += 1;
+    GoPanic.raise(new ProviderError("once failure"));
+  });
+
+  const first = await onceValue().catch((failure: object): object => failure);
+  const second = await onceValue().catch((failure: object): object => failure);
+  assert.equal(first, second);
+  assert.equal(count, 1);
 });
 
 test("WaitGroup waits for Add, Done, and Go work", async () => {

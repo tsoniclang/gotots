@@ -69,6 +69,11 @@ func Generate(config Config) ([]byte, error) {
 		client.Close()
 		return nil, err
 	}
+	supportMarkers, err := loadProviderSupportMarkers(resolved, project)
+	if err != nil {
+		client.Close()
+		return nil, err
+	}
 	modules := make([]gostdlib.ModuleDocument, len(ordered))
 	for index, seed := range ordered {
 		module, buildErr := buildModule(
@@ -124,6 +129,7 @@ func Generate(config Config) ([]byte, error) {
 		modules,
 		seeds.genericOperations,
 		effectMarker,
+		supportMarkers,
 		selectedToolchain,
 	)
 	if err != nil {

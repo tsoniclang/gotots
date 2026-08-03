@@ -54,12 +54,16 @@ func Build(
 	factory tsgo.Factory,
 	module api.RuntimeModule,
 	symbols []api.RuntimeSymbol,
+	concurrency api.ConcurrencySemantics,
 ) ([]Definition, error) {
 	if module == api.RuntimeModuleInvalid {
 		return nil, &AssemblyError{Reason: "runtime module is invalid"}
 	}
 	if len(symbols) == 0 {
 		return nil, &AssemblyError{Reason: "runtime symbol set is empty"}
+	}
+	if !concurrency.Valid() {
+		return nil, &AssemblyError{Reason: "runtime concurrency profile is invalid"}
 	}
 	if module == api.RuntimeModuleScalar {
 		if len(symbols) != 1 || symbols[0] != api.RuntimeAwaitable {
@@ -444,6 +448,7 @@ func Build(
 				factory,
 				symbol,
 				contract.ExportedName(),
+				concurrency,
 			)
 			if err != nil {
 				return nil, err

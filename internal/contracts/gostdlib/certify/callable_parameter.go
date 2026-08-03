@@ -30,6 +30,27 @@ func exportCallableParameters(
 	)
 }
 
+func genericKernelCallableParameters(
+	evidence goObject,
+	target tsgo.ProjectExport,
+	capabilityParameters int,
+	project *tsgo.ProjectInspection,
+	effectMarker tsgo.ProjectExport,
+) ([]gostdlib.ProviderCallableParameterDocument, error) {
+	return callableParameterDocuments(
+		evidence,
+		gostdlib.AccessExport,
+		func(parameter int) (gostdlib.EffectKind, error) {
+			return parameterCallableEffect(
+				project,
+				target,
+				capabilityParameters+parameter,
+				effectMarker,
+			)
+		},
+	)
+}
+
 func memberCallableParameters(
 	evidence goObject,
 	target tsgo.ProjectMember,

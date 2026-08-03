@@ -36,6 +36,7 @@ import {
   DecodeRuneInString,
   EncodeRune as EncodeUTF8Rune,
   FullRune,
+  FullRuneInString,
   RuneError,
   RuneCount,
   RuneSelf,
@@ -94,6 +95,11 @@ test("unicode utf8 byte operations preserve Go widths and append behavior", () =
   assert.deepEqual(DecodeUTF8Rune(encoded), [0x00e9, 2]);
   assert.equal(FullRune(encoded), true);
   assert.equal(FullRune(byteSlice(String.fromCharCode(0xe2, 0x82))), false);
+  assert.equal(FullRuneInString(goText("é")), true);
+  assert.equal(FullRuneInString(String.fromCharCode(0xe2, 0x82)), false);
+  assert.equal(FullRuneInString(String.fromCharCode(0xe0, 0x80)), true);
+  assert.equal(FullRuneInString(String.fromCharCode(0xf0, 0x90, 0x80)), false);
+  assert.equal(FullRuneInString(String.fromCharCode(0xf0, 0x80)), true);
   assert.equal(RuneCount(byteSlice(String.fromCharCode(0xff, 0x41))), 2);
   assert.equal(RuneStart(0x80), false);
   assert.equal(RuneStart(0x41), true);

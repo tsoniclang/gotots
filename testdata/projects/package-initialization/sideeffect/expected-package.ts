@@ -5,10 +5,14 @@ import { $state } from "./state.js";
 export function $initialize(): void {
     $state.first = 0;
     $state.second = 0;
-    Mark__from_sink(3);
-    const __gotots_results_0 = Pair__from_sink();
-    $state.first = __gotots_results_0[0];
-    $state.second = __gotots_results_0[1];
+    {
+        Mark__from_sink(3);
+    }
+    {
+        const __gotots_results_0 = Pair__from_sink();
+        $state.first = __gotots_results_0[0];
+        $state.second = __gotots_results_0[1];
+    }
     init();
     init__shadow_1();
 }

@@ -1075,6 +1075,10 @@
       ],
       "interfaces": [
         {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
           "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
           "export": "CanonicalDirEntry"
         },
@@ -1714,6 +1718,19 @@
         "storage"
       ],
       "storageExport": "UnicodeRangeTableStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=Cond",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncCondOperations",
+      "capabilities": [
+        "copy",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncCondStorage"
     },
     {
       "kind": "named-struct-operations",

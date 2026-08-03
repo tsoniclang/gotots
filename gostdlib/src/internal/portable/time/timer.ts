@@ -137,6 +137,15 @@ export function NewTimer(d: Duration): Timer {
   return new Timer(d);
 }
 
+export function Sleep(d: Duration): Promise<void> {
+  if (d.Nanoseconds() <= 0) {
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    schedule(delay(d), resolve);
+  });
+}
+
 function requireTimer(receiver: Timer | undefined): Timer {
   if (receiver === undefined) {
     GoPanic.raiseRuntime("Timer method called with nil receiver");

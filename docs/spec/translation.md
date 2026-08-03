@@ -338,22 +338,38 @@ func Add[T ~int | ~string](left, right T) T {
 }
 ```
 
-TypeScript cannot express one exact `+` over open `T` without a cast or
-operation parameter. For reached `Add[int]` and `Add[string]`, the owner may
-emit two private exact implementations reconstructed from the same AST:
+TypeScript cannot express one exact `+` over open `T` without a cast. For
+reached `Add[int]` and `Add[string]`, the owner may emit one internal typed
+kernel and two source-shaped facades reconstructed from the same AST:
 
 ```ts
+function Add$kernel<T>(
+  add: (left: T, right: T) => T,
+  left: T,
+  right: T,
+): T {
+  return add(left, right);
+}
+
 function Add$int(left: int, right: int): int {
-  return left + right;
+  return Add$kernel((a, b) => a + b, left, right);
 }
 
 function Add$string(left: gostring, right: gostring): gostring {
-  return left + right;
+  return Add$kernel((a, b) => a + b, left, right);
 }
 ```
 
-Calls select these by exact `types.Info.Instances` evidence. Neither function
-is a second public generic ABI. An unsupported open export fails explicitly.
+Calls select the facades by exact `types.Info.Instances` evidence. The kernel
+callable is individual, typed, internal, and selected statically; it is not a
+public source parameter or an operation object. An unsupported open export
+fails explicitly.
+
+The same rule covers representation-disjoint builtin forms. For
+`B ~[]byte | ~string`, `append(dst, src...)` requests exactly one internal
+append-spread callable; concrete facades bind either the canonical slice
+runtime operation or the canonical string-spread operation. The emitted source
+surface still has exactly `dst, src`.
 
 Generic named types keep only source type parameters. Storage/copy/callable
 profiles never add target-only public type parameters.

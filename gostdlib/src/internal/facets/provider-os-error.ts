@@ -13,6 +13,7 @@ import {
   type ProviderErrorUnwrapManyDirect,
 } from "./provider-error.js";
 import type { CanonicalError } from "./provider-io-contract.js";
+import type { InterfaceGuard } from "./provider-support.js";
 
 export type {
   ProviderErrorUnwrapDirect,
@@ -22,15 +23,11 @@ export type {
 } from "./provider-error.js";
 export type { CanonicalError } from "./provider-io-contract.js";
 
-type ErrorGuard<Value extends GoInterfaceValue> = (
-  value: GoInterfaceValue | undefined,
-) => value is Value;
-
 export function OsIsNotExistDirect(
   failure: ProviderErrorInterface | undefined,
   target: ProviderErrorInterface | undefined,
-  isUnwrap: ErrorGuard<ProviderErrorUnwrapDirect>,
-  isUnwrapMany: ErrorGuard<ProviderErrorUnwrapManyDirect>,
+  isUnwrap: InterfaceGuard<ProviderErrorUnwrapDirect>,
+  isUnwrapMany: InterfaceGuard<ProviderErrorUnwrapManyDirect>,
 ): bool {
   return ErrorsIsDirect(
     failure,
@@ -44,8 +41,8 @@ export function OsIsNotExistDirect(
 export function OsIsNotExistCanonical(
   failure: CanonicalError | undefined,
   target: CanonicalError | undefined,
-  isUnwrap: ErrorGuard<ProviderErrorUnwrap>,
-  isUnwrapMany: ErrorGuard<ProviderErrorUnwrapMany>,
+  isUnwrap: InterfaceGuard<ProviderErrorUnwrap>,
+  isUnwrapMany: InterfaceGuard<ProviderErrorUnwrapMany>,
 ): Promise<bool> {
   return ErrorsIsCanonical(
     failure,

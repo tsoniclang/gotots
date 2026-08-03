@@ -14,6 +14,7 @@ func TestArrayRuntimeAssemblyExactJoinsRequestedDefinition(t *testing.T) {
 		factory,
 		api.RuntimeModuleArray,
 		[]api.RuntimeSymbol{api.RuntimeArray},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -27,11 +28,47 @@ func TestArrayRuntimeAssemblyExactJoinsRequestedDefinition(t *testing.T) {
 	}
 }
 
+func TestErrorRuntimeContractFollowsConcurrencyProfile(t *testing.T) {
+	for _, testCase := range []struct {
+		name        string
+		concurrency api.ConcurrencySemantics
+		awaitable   bool
+	}{
+		{"disabled", api.ConcurrencySemanticsDisabled, false},
+		{"cooperative", api.ConcurrencySemanticsCooperative, true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			definitions, err := Build(
+				tsgo.NewFactory(),
+				api.RuntimeModuleInterfaceValue,
+				[]api.RuntimeSymbol{
+					api.RuntimeInterfaceValue,
+					api.RuntimeBuiltinErrorType,
+				},
+				testCase.concurrency,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			contract := definitions[1].Statement().(tsgo.InterfaceDeclaration)
+			method := contract.Members()[0].(tsgo.MethodSignatureDeclaration)
+			reference, isReference := method.Type().(tsgo.TypeReferenceNode)
+			if isReference != testCase.awaitable {
+				t.Fatalf("Error result = %T, awaitable=%t", method.Type(), testCase.awaitable)
+			}
+			if isReference && reference.TypeName().(tsgo.Identifier).Text() != "Awaitable" {
+				t.Fatalf("cooperative Error result = %#v", reference)
+			}
+		})
+	}
+}
+
 func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
 	base, err := Build(
 		tsgo.NewFactory(),
 		api.RuntimeModulePointer,
 		[]api.RuntimeSymbol{api.RuntimePointer},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -51,6 +88,7 @@ func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
 			api.RuntimePointer,
 			api.RuntimePointerHash,
 		},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -73,6 +111,7 @@ func TestUnsafePointerRuntimeIsNominalAndTypedPlaceholder(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModuleUnsafePointer,
 		[]api.RuntimeSymbol{api.RuntimeUnsafePointer},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -101,6 +140,7 @@ func TestEmptyStructRuntimeHasOneExactNominalOwner(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModuleStruct,
 		[]api.RuntimeSymbol{api.RuntimeEmptyStruct},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -129,6 +169,7 @@ func TestUnsafeRuntimeExactJoinsFourIntrinsicDefinitions(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModuleUnsafe,
 		symbols,
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -158,6 +199,7 @@ func TestAggregateArrayRuntimeAssemblyExactJoinsDemandedOperations(t *testing.T)
 		factory,
 		api.RuntimeModuleArray,
 		symbols,
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -202,6 +244,7 @@ func TestArrayRuntimeAssemblyRejectsMissingDuplicateAndWrongDefinitions(
 		factory,
 		api.RuntimeModuleArray,
 		nil,
+		api.ConcurrencySemanticsDisabled,
 	); err == nil {
 		t.Fatal("missing RuntimeArray definition passed")
 	}
@@ -209,6 +252,7 @@ func TestArrayRuntimeAssemblyRejectsMissingDuplicateAndWrongDefinitions(
 		factory,
 		api.RuntimeModuleArray,
 		[]api.RuntimeSymbol{api.RuntimeArray, api.RuntimeArray},
+		api.ConcurrencySemanticsDisabled,
 	); err == nil {
 		t.Fatal("duplicate RuntimeArray definition passed")
 	}
@@ -216,6 +260,7 @@ func TestArrayRuntimeAssemblyRejectsMissingDuplicateAndWrongDefinitions(
 		factory,
 		api.RuntimeModuleArray,
 		[]api.RuntimeSymbol{api.RuntimePointer},
+		api.ConcurrencySemanticsDisabled,
 	); err == nil {
 		t.Fatal("wrong-module runtime symbol passed array assembly")
 	}
@@ -226,6 +271,7 @@ func TestArrayRuntimeAssemblyRejectsMissingDuplicateAndWrongDefinitions(
 			api.RuntimeArrayAllocate,
 			api.RuntimeArray,
 		},
+		api.ConcurrencySemanticsDisabled,
 	); err == nil {
 		t.Fatal("aggregate operation preceding RuntimeArray passed assembly")
 	}
@@ -245,6 +291,7 @@ func TestSliceAggregateDefinitionsExactJoinRequestedSymbols(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModuleSlice,
 		symbols,
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -273,6 +320,7 @@ func TestSliceAggregateDefinitionsRequireRuntimeSliceFirst(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModuleSlice,
 		[]api.RuntimeSymbol{api.RuntimeSliceStorage},
+		api.ConcurrencySemanticsDisabled,
 	); err == nil {
 		t.Fatal("slice aggregate helper assembled without RuntimeSlice")
 	}
@@ -283,6 +331,7 @@ func TestMapRuntimeRejectsDuplicateOwners(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModuleMap,
 		[]api.RuntimeSymbol{api.RuntimeMap, api.RuntimeMap},
+		api.ConcurrencySemanticsDisabled,
 	); err == nil {
 		t.Fatal("map runtime accepted a duplicate owner")
 	}
@@ -293,6 +342,7 @@ func TestMapRuntimeRejectsDuplicateOwners(t *testing.T) {
 			api.RuntimeMap,
 			api.RuntimeMapValue,
 		},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -309,6 +359,7 @@ func TestPanicRuntimeCreationStaysOnTheCanonicalCarrier(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModulePanic,
 		[]api.RuntimeSymbol{api.RuntimePanic},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -346,6 +397,7 @@ func TestSchedulerRoutesOnlyThroughItsSemanticOwner(t *testing.T) {
 		factory,
 		api.RuntimeModuleChannel,
 		[]api.RuntimeSymbol{api.RuntimeScheduler},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -9,6 +9,7 @@ import {
 } from "../portable/errors/tree.js";
 import { sliceValues } from "../runtime/slice.js";
 import type { CanonicalError } from "./provider-io-contract.js";
+import type { InterfaceGuard } from "./provider-support.js";
 
 export type { CanonicalError } from "./provider-io-contract.js";
 
@@ -49,10 +50,6 @@ export interface ProviderErrorUnwrapMany extends GoInterfaceValue {
     recovery?: GoRecovery,
   ): Awaitable<RuntimeSlice<CanonicalError | undefined>>;
 }
-
-type InterfaceGuard<Value extends GoInterfaceValue> = (
-  value: GoInterfaceValue | undefined,
-) => value is Value;
 
 export function ErrorsIsDirect(
   failure: ProviderErrorInterface | undefined,

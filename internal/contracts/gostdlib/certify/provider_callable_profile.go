@@ -21,6 +21,7 @@ func buildProviderCallableProfile(
 	targets map[string]tsgo.ProjectExport,
 	project *tsgo.ProjectInspection,
 	effectMarker tsgo.ProjectExport,
+	supportMarkers providerSupportMarkers,
 ) (providerCallableProfileBuild, error) {
 	evidence, ok := source.objects[seed.SourceIdentity]
 	if !ok {
@@ -247,6 +248,21 @@ func buildProviderCallableProfile(
 			return providerCallableProfileBuild{}, err
 		}
 		guardInterfaces = append(guardInterfaces, identity)
+	}
+	baseParameters := signature.Params().Len() + len(seed.CanonicalValues)
+	if seed.Receiver {
+		baseParameters++
+	}
+	if err := verifyProviderSupportParameters(
+		project,
+		profileTarget,
+		baseParameters,
+		len(guardInterfaces),
+		len(seed.ContractInterfaces),
+		len(seed.FromProviderInterfaces),
+		supportMarkers,
+	); err != nil {
+		return providerCallableProfileBuild{}, err
 	}
 	profileKey, err := gostdlib.BuildImplementedResultProfileKey(
 		keyInterfaces,

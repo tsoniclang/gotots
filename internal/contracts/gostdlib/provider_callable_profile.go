@@ -29,7 +29,7 @@ type ProviderCallableProfileDocument struct {
 	FromProviderInterfaces      []string                                   `json:"fromProviderInterfaces,omitempty"`
 	ImplementedResultInterfaces []string                                   `json:"implementedResultInterfaces,omitempty"`
 	Interfaces                  []ProviderCallableProfileInterfaceDocument `json:"interfaces,omitempty"`
-	CallableParameters          []ProviderCallableParameterDocument         `json:"callableParameters,omitempty"`
+	CallableParameters          []ProviderCallableParameterDocument        `json:"callableParameters,omitempty"`
 	Effect                      EffectKind                                 `json:"effect"`
 	ImplementationOwner         string                                     `json:"implementationOwner"`
 	TargetFingerprint           string                                     `json:"targetFingerprint"`

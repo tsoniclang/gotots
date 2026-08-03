@@ -4,6 +4,7 @@ export { Abs, EvalSymlinks } from "../internal/node/filepath/filesystem.js";
 export {
   Clean,
   Dir,
+  Ext,
   FromSlash,
   IsAbs,
   Join,

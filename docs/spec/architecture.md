@@ -380,18 +380,30 @@ The source declaration never receives operation dictionaries/functions for
 copy, zero, arithmetic, equality, conversion, methods, channels, or iteration.
 
 When an operation cannot be expressed exactly over open `T`, the declaration
-owner emits one private concretization for each exact reached
-`go/types.Instance`. It re-emits the same Go AST under the checker-produced
-substitution and calls the existing concrete semantic owner directly. Its
-value parameters are the source parameters after substitution. It is keyed by
-Go declaration identity plus exact type arguments, not source position or
-target spelling.
+owner emits one internal kernel and one source-shaped facade for each exact
+reached `go/types.Instance`. The kernel may receive the smallest statically
+typed callable for each indivisible semantic operation used by the body. Each
+facade constructs those callables from the existing concrete semantic owners
+and retains only the source parameters after substitution. These callables are
+internal artifact wiring: they never enter a source-facing signature, a
+first-class operation bag, or runtime selection. Kernel, facade, and operation
+identities derive from Go declaration identity plus exact type arguments, not
+source position or target spelling.
 
-Direct generic bodies are emitted once. Concretizations grow only with
-distinct reached instances that require them. Recursive requests exact-join;
-an unbounded chain, unsupported open exported case, or representation
-disagreement fails explicitly. No erased payload, operation bag, hidden source
-parameter, runtime type switch, or alternate semantic path exists.
+For example, Go accepts `append(dst, src...)` when `src` has type parameter
+`B ~[]byte | ~string`. TypeScript has no one static append expression over
+both target representations. The function owner requests one internal
+`append-spread` callable. Its `[]byte` facade binds the canonical slice-spread
+operation; its `string` facade binds the canonical string-spread operation.
+Neither facade adds a source argument, performs a runtime type test, or
+reimplements slice behavior.
+
+Direct generic bodies are emitted once. Internal kernels and facades grow only
+with distinct reached instances that require them. Recursive requests
+exact-join; an unbounded chain, unsupported open exported case, or
+representation disagreement fails explicitly. No erased payload, broad
+operation dictionary, hidden source parameter, runtime type switch, or
+alternate semantic path exists.
 
 Generic named types retain exactly their declared type parameters. Closed
 representation operations may be private specialized artifacts; they do not
@@ -508,6 +520,12 @@ callbacks from named callable values, describes interface methods, and resolves
 typed provider protocols. No consumer repeats those decisions or moves them
 into serialized documents.
 
+The provider source is independently built against a generated direct-profile
+runtime contract. A linked product owns its selected generated runtime package;
+cooperative products consume the provider declarations through certified
+cooperative facades rather than changing the provider's direct implementation
+ABI. Both runtime profiles are generated from the same runtime contract owner.
+
 Generated source never calls a provider kernel with extra source arguments.
 When canonical generated values require conversion, guards, runtime tokens,
 copy/zero operations, or a specialized generic implementation, the compiler
@@ -573,6 +591,14 @@ at every parameter. If a recursively nested callable shape has no typed path
 representation in the current contract schema, certification rejects the
 provider surface explicitly rather than flattening it into its outer effect.
 
+Private provider facades have one certified support suffix after their source
+parameters, receiver, and canonical value parameters. Its order is fixed:
+interface guards, interface contracts, then provider-to-generated bridges.
+Every support parameter has one named provider-owned marker type, and contract
+generation exact-joins both the total arity and each ordered marker identity.
+These are statically imported facade dependencies; they never form a policy
+object or appear at a translated source call site.
+
 For example, cooperative `sort.Sort(data sort.Interface)` requires one private
 facade whose `Len`, `Less`, and `Swap` inputs use the canonical `Awaitable` method
 ABI. Cooperative `sort.Search(n, predicate func(int) bool)` requires one private
@@ -603,6 +629,11 @@ Representation-dependent provider generics use direct exact TypeScript when
 possible. Otherwise a reached exact instance selects a private generated
 facade/concretization or private provider kernel. Public/provider and generated
 source callables retain source arity.
+
+When a private generic kernel transports callbacks, its outer effect and each
+callback parameter effect are exact-joined to the public provider binding.
+The kernel cannot silently narrow an `Awaitable` callback to synchronous,
+duplicate a cooperative implementation, or introduce another public profile.
 
 Compile-only mode emits exact typed throwing placeholders and canonical
 obligations. Linked mode uses certified provider facades. These are explicit

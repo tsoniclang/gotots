@@ -15,6 +15,7 @@ export {
   AfterFunc,
   NewTicker,
   NewTimer,
+  Sleep,
   Ticker,
   Timer,
 } from "./internal/portable/time/timer.js";

@@ -34,6 +34,7 @@ func TestComplexRuntimeOwnsOneDefinitionPerClosedSymbol(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModuleComplex,
 		symbols,
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -67,6 +68,7 @@ func TestComplexRuntimeRejectsDuplicateAndForeignSymbols(t *testing.T) {
 			tsgo.NewFactory(),
 			api.RuntimeModuleComplex,
 			symbols,
+			api.ConcurrencySemanticsDisabled,
 		)
 		if err == nil {
 			t.Fatalf("complex symbols %v were accepted", symbols)
@@ -105,6 +107,7 @@ func TestComplexRuntimePrintsNominalConstantSizeOperations(t *testing.T) {
 		factory,
 		api.RuntimeModuleComplex,
 		symbols,
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)

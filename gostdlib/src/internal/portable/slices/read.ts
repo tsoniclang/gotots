@@ -1,5 +1,5 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { bool, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool, int64 } from "@gotots/runtime/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import {
@@ -13,9 +13,9 @@ import {
   readElement,
 } from "./capabilities.js";
 
-type Predicate<T> = ((value: T) => bool) | undefined;
-type Equality<L, R> = ((left: L, right: R) => bool) | undefined;
-type Comparison<L, R> = ((left: L, right: R) => int64) | undefined;
+type Predicate<T> = ((value: T) => Awaitable<bool>) | undefined;
+type Equality<L, R> = ((left: L, right: R) => Awaitable<bool>) | undefined;
+type Comparison<L, R> = ((left: L, right: R) => Awaitable<int64>) | undefined;
 
 export function BinarySearch<S, E, EStorage>(
   less: BinaryLess<E>,
@@ -50,21 +50,21 @@ export function BinarySearch<S, E, EStorage>(
   ];
 }
 
-export function BinarySearchFunc<S, E, EStorage, Target>(
+export async function BinarySearchFunc<S, E, EStorage, Target>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   copyElement: CopyValue<E>,
   fromStorage: FromContainerStorage<E, EStorage>,
   source: S,
   target: Target,
   compare: Comparison<E, Target>,
-): [int64, bool] {
+): Promise<[int64, bool]> {
   const values = toSlice(source);
   let low = 0;
   let high = values.length;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
     if (
-      callComparison(
+      await callComparison(
         compare,
         readElement(values, middle, copyElement, fromStorage),
         target,
@@ -78,7 +78,7 @@ export function BinarySearchFunc<S, E, EStorage, Target>(
   return [
     low,
     low < values.length
-      && callComparison(
+      && await callComparison(
         compare,
         readElement(values, low, copyElement, fromStorage),
         target,
@@ -112,7 +112,7 @@ export function Compare<S, E, EStorage>(
   return compareLengths(leftValues.length, rightValues.length);
 }
 
-export function CompareFunc<S1, S2, E1, E1Storage, E2, E2Storage>(
+export async function CompareFunc<S1, S2, E1, E1Storage, E2, E2Storage>(
   leftSlice: Convert<S1, RuntimeSlice<E1Storage>>,
   rightSlice: Convert<S2, RuntimeSlice<E2Storage>>,
   copyLeft: CopyValue<E1>,
@@ -122,12 +122,12 @@ export function CompareFunc<S1, S2, E1, E1Storage, E2, E2Storage>(
   left: S1,
   right: S2,
   compare: Comparison<E1, E2>,
-): int64 {
+): Promise<int64> {
   const leftValues = leftSlice(left);
   const rightValues = rightSlice(right);
   const count = Math.min(leftValues.length, rightValues.length);
   for (let index = 0; index < count; index += 1) {
-    const result = callComparison(
+    const result = await callComparison(
       compare,
       readElement(leftValues, index, copyLeft, fromLeftStorage),
       readElement(rightValues, index, copyRight, fromRightStorage),
@@ -156,14 +156,14 @@ export function Contains<S, E, EStorage>(
   ) >= 0;
 }
 
-export function ContainsFunc<S, E, EStorage>(
+export async function ContainsFunc<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   copyElement: CopyValue<E>,
   fromStorage: FromContainerStorage<E, EStorage>,
   source: S,
   predicate: Predicate<E>,
-): bool {
-  return indexFuncBy(
+): Promise<bool> {
+  return await indexFuncBy(
     toSlice(source),
     copyElement,
     fromStorage,
@@ -197,7 +197,7 @@ export function Equal<S, E, EStorage>(
   return true;
 }
 
-export function EqualFunc<S1, S2, E1, E1Storage, E2, E2Storage>(
+export async function EqualFunc<S1, S2, E1, E1Storage, E2, E2Storage>(
   leftSlice: Convert<S1, RuntimeSlice<E1Storage>>,
   rightSlice: Convert<S2, RuntimeSlice<E2Storage>>,
   copyLeft: CopyValue<E1>,
@@ -207,7 +207,7 @@ export function EqualFunc<S1, S2, E1, E1Storage, E2, E2Storage>(
   left: S1,
   right: S2,
   equal: Equality<E1, E2>,
-): bool {
+): Promise<bool> {
   const leftValues = leftSlice(left);
   const rightValues = rightSlice(right);
   if (leftValues.length !== rightValues.length) {
@@ -215,7 +215,7 @@ export function EqualFunc<S1, S2, E1, E1Storage, E2, E2Storage>(
   }
   for (let index = 0; index < leftValues.length; index += 1) {
     if (
-      !callEquality(
+      !await callEquality(
         equal,
         readElement(leftValues, index, copyLeft, fromLeftStorage),
         readElement(rightValues, index, copyRight, fromRightStorage),
@@ -244,13 +244,13 @@ export function Index<S, E, EStorage>(
   );
 }
 
-export function IndexFunc<S, E, EStorage>(
+export async function IndexFunc<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   copyElement: CopyValue<E>,
   fromStorage: FromContainerStorage<E, EStorage>,
   source: S,
   predicate: Predicate<E>,
-): int64 {
+): Promise<int64> {
   return indexFuncBy(
     toSlice(source),
     copyElement,
@@ -274,15 +274,15 @@ function indexBy<E, EStorage>(
   return -1;
 }
 
-function indexFuncBy<E, EStorage>(
+async function indexFuncBy<E, EStorage>(
   source: RuntimeSlice<EStorage>,
   copyElement: CopyValue<E>,
   fromStorage: FromContainerStorage<E, EStorage>,
   predicate: Predicate<E>,
-): int64 {
+): Promise<int64> {
   for (let index = 0; index < source.length; index += 1) {
     if (
-      callPredicate(
+      await callPredicate(
         predicate,
         readElement(source, index, copyElement, fromStorage),
       )
@@ -293,31 +293,34 @@ function indexFuncBy<E, EStorage>(
   return -1;
 }
 
-export function callPredicate<T>(predicate: Predicate<T>, value: T): bool {
+export async function callPredicate<T>(
+  predicate: Predicate<T>,
+  value: T,
+): Promise<bool> {
   if (predicate === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
-  return predicate(value);
+  return await predicate(value);
 }
 
-export function callEquality<L, R>(
+export async function callEquality<L, R>(
   equal: Equality<L, R>,
   left: L,
   right: R,
-): bool {
+): Promise<bool> {
   if (equal === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
-  return equal(left, right);
+  return await equal(left, right);
 }
 
-export function callComparison<L, R>(
+export async function callComparison<L, R>(
   compare: Comparison<L, R>,
   left: L,
   right: R,
-): int64 {
+): Promise<int64> {
   if (compare === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
-  return compare(left, right);
+  return await compare(left, right);
 }

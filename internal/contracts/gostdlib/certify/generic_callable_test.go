@@ -3,6 +3,7 @@ package certify
 import (
 	"go/token"
 	"go/types"
+	"slices"
 	"strings"
 	"testing"
 
@@ -55,5 +56,44 @@ func TestGenericKernelValueArityJoinsCapabilitiesAndGoParameters(t *testing.T) {
 		"kernel has 4 value parameters, capability and source contract requires 3",
 	) {
 		t.Fatalf("hidden kernel-parameter mutation error = %v", err)
+	}
+}
+
+func TestGenericKernelCallableContractJoinsPublicBinding(t *testing.T) {
+	identity := "slices|kind=4|receiver=|name=EqualFunc"
+	parameters := []gostdlib.ProviderCallableParameterDocument{{
+		Parameter: 2,
+		Effect:    gostdlib.EffectAwaitable,
+	}}
+	binding := gostdlib.BindingDocument{
+		Kind:               gostdlib.BindingFunction,
+		Effect:             gostdlib.EffectAsynchronous,
+		CallableParameters: parameters,
+	}
+	if err := verifyGenericKernelCallableContract(
+		identity,
+		binding,
+		gostdlib.EffectAsynchronous,
+		parameters,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyGenericKernelCallableContract(
+		identity,
+		binding,
+		gostdlib.EffectSynchronous,
+		parameters,
+	); err == nil || !strings.Contains(err.Error(), "kernel effect") {
+		t.Fatalf("effect mutation error = %v", err)
+	}
+	mutated := slices.Clone(parameters)
+	mutated[0].Effect = gostdlib.EffectSynchronous
+	if err := verifyGenericKernelCallableContract(
+		identity,
+		binding,
+		gostdlib.EffectAsynchronous,
+		mutated,
+	); err == nil || !strings.Contains(err.Error(), "callable parameters") {
+		t.Fatalf("callback mutation error = %v", err)
 	}
 }

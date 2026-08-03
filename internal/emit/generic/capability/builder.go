@@ -376,6 +376,30 @@ func emitValue(
 			)
 		}
 		return target, nil
+	case api.GenericOperationAppendSpread:
+		if len(arguments) != 2 ||
+			signature.Params().Len() != 2 {
+			return api.ExpressionEmission{}, shapeError(context, operation)
+		}
+		target, handled, err := builtinoperation.ApplyAppendSpread(
+			context,
+			nil,
+			signature.Results().At(0).Type(),
+			signature.Params().At(0).Type(),
+			signature.Params().At(1).Type(),
+			api.DirectExpression(arguments[0]),
+			api.DirectExpression(arguments[1]),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !handled {
+			return api.ExpressionEmission{}, invariant(
+				context,
+				"generic append-spread capability has no concrete operation",
+			)
+		}
+		return target, nil
 	case api.GenericOperationConstraintMethod:
 		return emitConstraintMethod(
 			context,

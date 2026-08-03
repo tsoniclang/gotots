@@ -17,6 +17,7 @@ import {
   type CanonicalReader,
   type CanonicalWriter,
 } from "./provider-io-contract.js";
+import type { InterfaceContract } from "./provider-support.js";
 
 export type {
   CanonicalError,
@@ -50,7 +51,7 @@ export function EncodingBinaryReadCanonical(
   _reader: CanonicalReader<CanonicalError> | undefined,
   _order: CanonicalByteOrder | undefined,
   _data: GoInterfaceValue | undefined,
-  errorContract: readonly object[],
+  errorContract: InterfaceContract,
 ): CanonicalError | undefined {
   return new CanonicalBoundaryError(
     unsupportedReflectionMessage("Read"),
@@ -62,7 +63,7 @@ export function EncodingBinaryWriteCanonical(
   _writer: CanonicalWriter<CanonicalError> | undefined,
   _order: CanonicalByteOrder | undefined,
   _data: GoInterfaceValue | undefined,
-  errorContract: readonly object[],
+  errorContract: InterfaceContract,
 ): CanonicalError | undefined {
   return new CanonicalBoundaryError(
     unsupportedReflectionMessage("Write"),

@@ -17,6 +17,7 @@ func TestRuntimeAssemblyExactJoinsFrozenSliceSymbol(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModuleSlice,
 		[]api.RuntimeSymbol{api.RuntimeSlice},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -31,6 +32,7 @@ func TestRuntimeAssemblyExactJoinsFrozenSliceSymbol(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModuleSlice,
 		[]api.RuntimeSymbol{api.RuntimeSlice, api.RuntimeSlice},
+		api.ConcurrencySemanticsDisabled,
 	); err == nil {
 		t.Fatal("runtime slice assembly accepted a non-exact symbol multiset")
 	}

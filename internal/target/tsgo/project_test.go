@@ -70,6 +70,11 @@ export function Invoke(
   return Promise.resolve();
 }
 
+export interface SupportContract extends ReadonlyArray<object> {}
+export function ConsumeSupport(contract: SupportContract): void {
+  void contract;
+}
+
 export class Effects {
   static Async(): Promise<void> {
     return Promise.resolve();
@@ -93,6 +98,8 @@ void Hidden;
   Invoke,
   MemberAccess,
   Shape,
+  SupportContract,
+  ConsumeSupport,
   SyncCallable,
   Value,
 } from "./implementation.js";
@@ -177,7 +184,7 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			) {
 				t.Fatalf("Shape members = %#v", selected)
 			}
-		case "AsyncCallable", "AwaitableCallable", "AwaitableUnionCallable", "Effects", "GenericAsyncCallable", "InvalidEffectCallable", "Invoke", "SyncCallable":
+		case "AsyncCallable", "AwaitableCallable", "AwaitableUnionCallable", "ConsumeSupport", "Effects", "GenericAsyncCallable", "InvalidEffectCallable", "Invoke", "SupportContract", "SyncCallable":
 			continue
 		}
 		if !slices.Equal(
@@ -198,12 +205,14 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			"AwaitableCallable",
 			"AwaitableUnionCallable",
 			"Box",
+			"ConsumeSupport",
 			"Effects",
 			"GenericAsyncCallable",
 			"InvalidEffectCallable",
 			"Invoke",
 			"MemberAccess",
 			"Shape",
+			"SupportContract",
 			"SyncCallable",
 			"Value",
 			"count",
@@ -264,6 +273,12 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			cooperativeParameterEffect,
 			err,
 		)
+	}
+	consumeSupport := projectExportByName(t, exports, "ConsumeSupport")
+	supportContract := projectExportByName(t, exports, "SupportContract")
+	supportIdentity, err := project.CallableParameterTypeIdentity(consumeSupport, 0)
+	if err != nil || !supportIdentity.Matches(supportContract) {
+		t.Fatalf("support parameter identity = %#v, %v", supportIdentity, err)
 	}
 	async := projectExportByName(t, exports, "AsyncCallable")
 	awaitable := projectExportByName(t, exports, "AwaitableCallable")
@@ -349,10 +364,8 @@ func TestDeclarationPathRejectsMalformedHandles(t *testing.T) {
 }
 
 func TestProjectFingerprintCanonicalizesComputedUniqueSymbolKeys(t *testing.T) {
-	fingerprint := func(prefix string) (string, string) {
-		t.Helper()
-		directory := t.TempDir()
-		writeProjectFile(t, filepath.Join(directory, "tsconfig.json"), `{
+	directory := t.TempDir()
+	writeProjectFile(t, filepath.Join(directory, "tsconfig.json"), `{
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
@@ -362,63 +375,57 @@ func TestProjectFingerprintCanonicalizesComputedUniqueSymbolKeys(t *testing.T) {
   "include": ["*.ts"]
 }
 `)
-		implementation := filepath.Join(directory, "implementation.ts")
-		writeProjectFile(t, implementation, prefix+`
+	implementation := filepath.Join(directory, "implementation.ts")
+	writeProjectFile(t, implementation, `
 export const ProfileNameKey: unique symbol = Symbol("profile-name");
 export class Profile {
   readonly [ProfileNameKey]: string = "profile";
 }
 `)
-		client, err := StartClient(repositoryRoot(), directory)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			if err := client.Close(); err != nil {
-				t.Errorf("close client: %v", err)
-			}
-		})
-		project, err := client.OpenProject(filepath.Join(directory, "tsconfig.json"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		exports, err := project.Exports(implementation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if prefix != "" {
-			earlier := projectExportByName(t, exports, "Earlier")
-			if len(earlier.TypeMembers()) != 1 {
-				t.Fatal("allocation-order control member is absent")
-			}
-		}
-		profile := projectExportByName(t, exports, "Profile")
-		members := profile.TypeMembers()
-		if len(members) != 1 {
-			t.Fatalf("Profile members = %#v", members)
-		}
-		return profile.Fingerprint(), members[0].Name()
+	client, err := StartClient(repositoryRoot(), directory)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	baselineFingerprint, baselineDisplay := fingerprint("")
-	shiftedFingerprint, shiftedDisplay := fingerprint(
-		`export const EarlierKey: unique symbol = Symbol("earlier");
-export class Earlier {
-  readonly [EarlierKey]: string = "earlier";
-}
-`,
+	t.Cleanup(func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close client: %v", err)
+		}
+	})
+	project, err := client.OpenProject(filepath.Join(directory, "tsconfig.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exports, err := project.Exports(implementation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile := projectExportByName(t, exports, "Profile")
+	members := profile.TypeMembers()
+	if len(members) != 1 {
+		t.Fatalf("Profile members = %#v", members)
+	}
+	baseline := members[0]
+	mutated, err := project.projectMember(
+		implementation,
+		"computed-key display mutation",
+		symbolResponse{
+			ID:           baseline.symbolID,
+			Name:         baseline.name + "@allocation-shift",
+			Flags:        baseline.flags,
+			Declarations: baseline.handles,
+		},
 	)
-	if baselineDisplay == shiftedDisplay {
-		t.Fatalf(
-			"unique-symbol allocation-order control did not change display spelling %q",
-			baselineDisplay,
-		)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if baselineFingerprint != shiftedFingerprint {
+	if baseline.Name() == mutated.Name() {
+		t.Fatal("display-spelling mutation did not change the member name")
+	}
+	if baseline.Fingerprint() != mutated.Fingerprint() {
 		t.Fatalf(
 			"computed unique-symbol fingerprint drifted: %s != %s",
-			baselineFingerprint,
-			shiftedFingerprint,
+			baseline.Fingerprint(),
+			mutated.Fingerprint(),
 		)
 	}
 }

@@ -12,6 +12,7 @@ import { Duration } from "../portable/time/duration.js";
 import { After } from "../portable/time/timer.js";
 import { Now, Time } from "../portable/time/time.js";
 import { goInterfaceEqual } from "../runtime/interface.js";
+import type { InterfaceContract } from "./provider-support.js";
 
 export type { CanonicalError } from "./provider-io-contract.js";
 
@@ -210,7 +211,7 @@ export function ContextWithValueCanonical<
   parent: Parent | undefined,
   key: GoInterfaceValue | undefined,
   value: GoInterfaceValue | undefined,
-  contextContract: readonly object[],
+  contextContract: InterfaceContract,
 ): CanonicalContext<Failure> {
   if (parent === undefined) {
     GoPanic.raiseRuntime("cannot create context from nil parent");
@@ -227,7 +228,7 @@ export async function ContextWithCancelCanonical<
 >(
   parent: Parent | undefined,
   canceled: Failure | undefined,
-  contextContract: readonly object[],
+  contextContract: InterfaceContract,
 ): Promise<[
   CanonicalContext<Failure>,
   (_recovery?: GoRecovery) => Awaitable<void>,
@@ -250,7 +251,7 @@ export async function ContextWithCancelCauseCanonical<
 >(
   parent: Parent | undefined,
   canceled: Failure | undefined,
-  contextContract: readonly object[],
+  contextContract: InterfaceContract,
 ): Promise<[
   CanonicalContext<Failure>,
   (cause: Failure | undefined, _recovery?: GoRecovery) => Awaitable<void>,
@@ -276,7 +277,7 @@ export async function ContextWithTimeoutCanonical<
   timeout: Duration,
   canceled: Failure | undefined,
   deadlineExceeded: Failure | undefined,
-  contextContract: readonly object[],
+  contextContract: InterfaceContract,
 ): Promise<[
   CanonicalContext<Failure>,
   (_recovery?: GoRecovery) => Awaitable<void>,

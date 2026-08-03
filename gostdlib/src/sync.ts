@@ -1,3 +1,4 @@
+export { Cond, type Locker, NewCond } from "./internal/portable/sync/cond.js";
 export { Map } from "./internal/portable/sync/map.js";
 export { Mutex, RWMutex } from "./internal/portable/sync/mutex.js";
 export {

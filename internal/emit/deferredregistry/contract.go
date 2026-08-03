@@ -139,24 +139,16 @@ func observedCallableTypes(
 	if err != nil {
 		return callableContract{}, err
 	}
-	facet, err := context.CallableABIFacet(abi)
-	if err != nil {
-		return callableContract{}, err
-	}
-	observation, err := context.ObserveCooperativeCallable(facet)
-	if err != nil {
-		return callableContract{}, err
-	}
 	contract, err := callableTypes(
 		context,
 		children,
 		signature,
-		observation.Cooperative(),
+		context.ConcurrencySemantics() ==
+			api.ConcurrencySemanticsCooperative,
 	)
 	contract.requests = api.CombineRequests(
 		contract.requests,
 		abi.Requests(),
-		observation.Requests(),
 	)
 	return contract, err
 }

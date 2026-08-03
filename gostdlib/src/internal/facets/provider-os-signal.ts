@@ -15,6 +15,7 @@ import {
   type CanonicalContext,
 } from "./provider-context.js";
 import type { CanonicalError } from "./provider-io-contract.js";
+import type { InterfaceContract } from "./provider-support.js";
 
 export type { CanonicalContext } from "./provider-context.js";
 export type { CanonicalError } from "./provider-io-contract.js";
@@ -31,7 +32,7 @@ export async function OsSignalNotifyContextCanonical<
   parent: Parent | undefined,
   signals: RuntimeSlice<CanonicalSignal | undefined>,
   canceled: Failure | undefined,
-  contextContract: readonly object[],
+  contextContract: InterfaceContract,
 ): Promise<[
   CanonicalContext<Failure>,
   NonNullable<CancelFunc>,

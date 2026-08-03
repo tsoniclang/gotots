@@ -114,6 +114,128 @@ func verifyInterfaceParameterProfileCoverage(
 	)
 }
 
+func verifyProviderProfileInterfaceClosure(
+	source goSurface,
+	modules []gostdlib.ModuleDocument,
+	facetModules []gostdlib.FacetModuleDocument,
+) error {
+	providers, err := ordinaryProviderInterfaces(modules, facetModules)
+	if err != nil {
+		return err
+	}
+	identities := sourceTypeIdentities(source)
+	interfaces := sourceProviderInterfaceTypes(source, providers)
+	var differences []string
+	for _, module := range facetModules {
+		for _, profile := range module.CallableProfiles {
+			selected := make(map[string]gostdlib.ProviderInterfaceDocument)
+			queue := make([]string, 0, len(profile.Interfaces))
+			for _, candidate := range profile.Interfaces {
+				selected[candidate.SourceIdentity] = candidate.ProviderInterface
+				if candidate.Protocol == nil {
+					queue = append(queue, candidate.SourceIdentity)
+				}
+			}
+			visited := make(map[string]struct{})
+			for len(queue) != 0 {
+				identity := queue[0]
+				queue = queue[1:]
+				if _, seen := visited[identity]; seen {
+					continue
+				}
+				visited[identity] = struct{}{}
+				contract := interfaces[identity]
+				if contract == nil {
+					continue
+				}
+				children := make(map[string]struct{})
+				for index := range contract.NumMethods() {
+					collectBoundProviderInterfaces(
+						contract.Method(index).Type(),
+						identities,
+						providers,
+						make(map[types.Type]struct{}),
+						children,
+					)
+				}
+				ordered := sortedIdentityKeys(children)
+				for _, child := range ordered {
+					if child == identity {
+						continue
+					}
+					queue = append(queue, child)
+					ordinary := providers[child]
+					required, requiredErr := providerInterfaceNeedsCooperative(
+						child,
+						ordinary,
+					)
+					if requiredErr != nil {
+						return requiredErr
+					}
+					cooperative, ok := selected[child]
+					if required && (!ok || !providerInterfaceIsCooperative(
+						ordinary,
+						cooperative,
+					)) {
+						differences = append(differences, fmt.Sprintf(
+							"%s interface %s transitively requires cooperative %s",
+							profile.SourceIdentity,
+							identity,
+							child,
+						))
+					}
+				}
+			}
+		}
+	}
+	if len(differences) == 0 {
+		return nil
+	}
+	sort.Strings(differences)
+	return certifyError(
+		"verify provider profile interface closure",
+		"provider surface",
+		strings.Join(differences, "; "),
+	)
+}
+
+func sourceProviderInterfaceTypes(
+	source goSurface,
+	providers map[string]gostdlib.ProviderInterfaceDocument,
+) map[string]*types.Interface {
+	result := make(map[string]*types.Interface, len(providers))
+	for identity := range providers {
+		var sourceType types.Type
+		if identity == gostdlib.LanguageErrorInterfaceIdentity {
+			sourceType = types.Universe.Lookup("error").Type()
+		} else if evidence, ok := source.objects[identity]; ok &&
+			evidence.object != nil {
+			sourceType = evidence.object.Type()
+		}
+		if sourceType == nil {
+			continue
+		}
+		named, ok := types.Unalias(sourceType).(*types.Named)
+		if !ok {
+			continue
+		}
+		contract, ok := named.Underlying().(*types.Interface)
+		if ok {
+			result[identity] = contract.Complete()
+		}
+	}
+	return result
+}
+
+func sortedIdentityKeys(source map[string]struct{}) []string {
+	result := make([]string, 0, len(source))
+	for identity := range source {
+		result = append(result, identity)
+	}
+	sort.Strings(result)
+	return result
+}
+
 func ordinaryProviderInterfaces(
 	modules []gostdlib.ModuleDocument,
 	facetModules []gostdlib.FacetModuleDocument,

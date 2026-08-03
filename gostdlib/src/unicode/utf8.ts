@@ -38,15 +38,21 @@ export function EncodeRune(target: RuntimeSlice<uint8>, rune: int32): int64 {
 }
 
 export function FullRune(source: RuntimeSlice<uint8>): boolean {
-  if (source.length === 0) {
-    return false;
-  }
-  const first = source.get(0);
-  if (first < RuneSelf || first < 0xc2 || first > 0xf4) {
-    return true;
-  }
-  const width = first < 0xe0 ? 2 : first < 0xf0 ? 3 : 4;
-  return source.length >= width;
+  return fullRunePrefix(
+    source.length,
+    source.length > 0 ? source.get(0) : 0,
+    source.length > 1 ? source.get(1) : 0,
+    source.length > 2 ? source.get(2) : 0,
+  );
+}
+
+export function FullRuneInString(source: gostring): boolean {
+  return fullRunePrefix(
+    source.length,
+    source.length > 0 ? source.charCodeAt(0) : 0,
+    source.length > 1 ? source.charCodeAt(1) : 0,
+    source.length > 2 ? source.charCodeAt(2) : 0,
+  );
 }
 
 export function RuneCount(source: RuntimeSlice<uint8>): int64 {
@@ -80,6 +86,33 @@ function byteString(source: RuntimeSlice<uint8>): gostring {
     value += String.fromCharCode(source.get(index));
   }
   return value;
+}
+
+function fullRunePrefix(
+  length: number,
+  first: number,
+  second: number,
+  third: number,
+): boolean {
+  if (length === 0) {
+    return false;
+  }
+  if (first < 0xc2 || first > 0xf4) {
+    return true;
+  }
+  const width = first < 0xe0 ? 2 : first < 0xf0 ? 3 : 4;
+  if (length >= width) {
+    return true;
+  }
+  if (length > 1 && !validSecondByte(first, second)) {
+    return true;
+  }
+  return length > 2 && (third < 0x80 || third > 0xbf);
+}
+
+function validSecondByte(first: number, second: number): boolean {
+  return second >= (first === 0xe0 ? 0xa0 : first === 0xf0 ? 0x90 : 0x80)
+    && second <= (first === 0xed ? 0x9f : first === 0xf4 ? 0x8f : 0xbf);
 }
 
 function encodedBytes(rune: int32): uint8[] {

@@ -135,18 +135,15 @@ func validateProviderCallableProfile(
 		0,
 		len(profile.CallableParameters),
 	)
-	previousParameter := -1
+	if err := validateCallableParameters(
+		profile.CallableParameters,
+		field+".callableParameters",
+		false,
+	); err != nil {
+		return err
+	}
 	for index, selected := range profile.CallableParameters {
 		callableField := fmt.Sprintf("%s.callableParameters[%d]", field, index)
-		if selected.Parameter < 0 || selected.Parameter <= previousParameter {
-			return manifestError(
-				field+".callableParameters",
-				"parameters are negative, duplicated, or not strictly ordered",
-			)
-		}
-		if selected.Effect != EffectSynchronous && selected.Effect != EffectAwaitable {
-			return manifestError(callableField+".effect", "value is invalid")
-		}
 		if _, found := slices.BinarySearch(
 			profile.CanonicalParameters,
 			selected.Parameter,
@@ -156,7 +153,6 @@ func validateProviderCallableProfile(
 				"value is not a canonical parameter root",
 			)
 		}
-		previousParameter = selected.Parameter
 		keyCallables = append(keyCallables, ProviderCallableProfileKeyCallable{
 			Parameter: selected.Parameter,
 			Effect:    selected.Effect,

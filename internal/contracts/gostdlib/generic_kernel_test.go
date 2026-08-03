@@ -25,6 +25,7 @@ func TestGenericCallableKernelRoundTripIsCanonicalAndImmutable(t *testing.T) {
 		kernel.ModuleSpecifier() !=
 			"@gotots/gostdlib/internal/facets/generic-slices.js" ||
 		kernel.Export() != "SlicesEqualKernel" ||
+		kernel.Effect() != gostdlib.EffectSynchronous ||
 		!slices.Equal(
 			kernel.Capabilities(),
 			[]gostdlib.FacetCapability{gostdlib.FacetCapabilityKernel},
@@ -120,6 +121,7 @@ func genericKernelDocument() gostdlib.Document {
 				gostdlib.FacetCapabilityKernel,
 			},
 			Export: "SlicesEqualKernel",
+			Effect: gostdlib.EffectSynchronous,
 			GenericTypeArguments: []gostdlib.GenericTypeArgumentDocument{{
 				TypeParameter: 1,
 				Facet:         gostdlib.GenericTypeArgumentLogical,

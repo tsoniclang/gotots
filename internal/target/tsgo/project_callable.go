@@ -271,6 +271,41 @@ func (p *ProjectInspection) CallableParameterEffect(
 	}, asyncMarker)
 }
 
+func (p *ProjectInspection) CallableParameterTypeIdentity(
+	target projectCallable,
+	parameter int,
+) (ProjectTypeIdentity, error) {
+	if p == nil || target == nil {
+		return ProjectTypeIdentity{}, &ProjectInspectionError{
+			Operation: "callable parameter type identity",
+			Reason:    "target is absent",
+		}
+	}
+	signature, err := p.singleCallSignature(target, target.callableSubject())
+	if err != nil {
+		return ProjectTypeIdentity{}, err
+	}
+	if parameter < 0 || parameter >= len(signature.Parameters) {
+		return ProjectTypeIdentity{}, &ProjectInspectionError{
+			Operation: "callable parameter type identity",
+			Reason: fmt.Sprintf(
+				"%s parameter %d is outside %d parameters",
+				target.callableSubject(),
+				parameter,
+				len(signature.Parameters),
+			),
+		}
+	}
+	parameterType, err := p.projectSymbolType(
+		signature.Parameters[parameter],
+		"callable parameter type identity",
+	)
+	if err != nil {
+		return ProjectTypeIdentity{}, err
+	}
+	return p.projectTypeIdentity(parameterType.ID)
+}
+
 func (p *ProjectInspection) projectSymbolType(
 	symbol uint64,
 	operation string,

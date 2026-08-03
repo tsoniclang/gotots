@@ -29,7 +29,8 @@ func validateFacet(facet FacetDocument, field string) error {
 	switch facet.Kind {
 	case FacetNamedStructOperations:
 		if len(facet.Capabilities) == 0 ||
-			facet.Effect != EffectInvalid || len(facet.GenericTypeArguments) != 0 {
+			facet.Effect != EffectInvalid || len(facet.CallableParameters) != 0 ||
+			len(facet.GenericTypeArguments) != 0 {
 			return manifestError(field, "named-struct facet shape is invalid")
 		}
 		storage := false
@@ -59,6 +60,7 @@ func validateFacet(facet FacetDocument, field string) error {
 			facet.Capabilities[0] != FacetCapabilityProject ||
 			facet.Capabilities[1] != FacetCapabilityWrap ||
 			facet.Effect != EffectInvalid ||
+			len(facet.CallableParameters) != 0 ||
 			len(facet.GenericTypeArguments) != 0 ||
 			facet.StorageExport != "" || facet.RepresentationExport != "" ||
 			facet.StorageImplementationOwner != "" ||
@@ -69,6 +71,7 @@ func validateFacet(facet FacetDocument, field string) error {
 		if len(facet.Capabilities) != 1 ||
 			facet.Capabilities[0] != FacetCapabilityRecovery ||
 			!facet.Effect.Valid() ||
+			len(facet.CallableParameters) != 0 ||
 			len(facet.GenericTypeArguments) != 0 ||
 			facet.StorageExport != "" ||
 			facet.RepresentationExport != "" ||
@@ -79,7 +82,7 @@ func validateFacet(facet FacetDocument, field string) error {
 	case FacetGenericCallableKernel:
 		if len(facet.Capabilities) != 1 ||
 			facet.Capabilities[0] != FacetCapabilityKernel ||
-			facet.Effect != EffectInvalid ||
+			!facet.Effect.Valid() ||
 			len(facet.GenericTypeArguments) == 0 ||
 			facet.StorageExport != "" || facet.RepresentationExport != "" ||
 			facet.StorageImplementationOwner != "" ||
@@ -89,6 +92,13 @@ func validateFacet(facet FacetDocument, field string) error {
 		if err := validateGenericTypeArguments(
 			facet.GenericTypeArguments,
 			field+".genericTypeArguments",
+		); err != nil {
+			return err
+		}
+		if err := validateCallableParameters(
+			facet.CallableParameters,
+			field+".callableParameters",
+			true,
 		); err != nil {
 			return err
 		}

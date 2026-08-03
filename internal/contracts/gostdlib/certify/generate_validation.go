@@ -86,7 +86,14 @@ func verifyProviderBoundaryCoverage(
 	); err != nil {
 		return err
 	}
-	return verifyInterfaceParameterProfileCoverage(source, modules, facets)
+	if err := verifyInterfaceParameterProfileCoverage(
+		source,
+		modules,
+		facets,
+	); err != nil {
+		return err
+	}
+	return verifyProviderProfileInterfaceClosure(source, modules, facets)
 }
 
 func compareCanonical(left []byte, right []byte) error {

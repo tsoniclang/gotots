@@ -10,6 +10,7 @@ import {
 } from "../portable/encoding/base64.js";
 import { ProviderInterfaceValue } from "../portable/io/value.js";
 import type { CanonicalWriter } from "./provider-io-contract.js";
+import type { InterfaceContract } from "./provider-support.js";
 
 export type {
   CanonicalError,
@@ -68,7 +69,7 @@ export function Base64NewEncoderCanonical<
 >(
   encoding: Encoding | undefined,
   target: Target | undefined,
-  writeCloserContract: readonly object[],
+  writeCloserContract: InterfaceContract,
 ): CanonicalWriteCloser<Failure> {
   return new CanonicalBase64Encoder(
     encoding,

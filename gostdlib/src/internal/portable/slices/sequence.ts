@@ -1,5 +1,5 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { bool, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool, int64 } from "@gotots/runtime/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import { Seq } from "../iter/sequence.js";
@@ -16,10 +16,11 @@ import {
   type Zero,
 } from "./capabilities.js";
 import { callComparison } from "./read.js";
+import { sortValues } from "./sort.js";
 
-type Comparison<T> = ((left: T, right: T) => int64) | undefined;
+type Comparison<T> = ((left: T, right: T) => Awaitable<int64>) | undefined;
 
-export function AppendSeq<S, E, EStorage>(
+export async function AppendSeq<S, E, EStorage>(
   toSlice: Convert<S, RuntimeSlice<EStorage>>,
   fromSlice: Convert<RuntimeSlice<EStorage>, S>,
   copyElement: CopyValue<E>,
@@ -28,9 +29,9 @@ export function AppendSeq<S, E, EStorage>(
   zeroElement: Zero<E>,
   source: S,
   sequence: Seq<E>,
-): S {
+): Promise<S> {
   const appended: E[] = [];
-  runSequence(sequence, (value): bool => {
+  await runSequence(sequence, (value): bool => {
     appended.push(copyElement(value));
     return true;
   });
@@ -79,13 +80,13 @@ export function AppendSeq<S, E, EStorage>(
   return fromSlice(result);
 }
 
-export function Collect<E, EStorage>(
+export async function Collect<E, EStorage>(
   copyElement: CopyValue<E>,
   toStorage: ToContainerStorage<E, EStorage>,
   sequence: Seq<E>,
-): RuntimeSlice<EStorage> {
+): Promise<RuntimeSlice<EStorage>> {
   const values: EStorage[] = [];
-  runSequence(sequence, (value): bool => {
+  await runSequence(sequence, (value): bool => {
     values.push(toStorage(copyElement(value)));
     return true;
   });
@@ -94,15 +95,15 @@ export function Collect<E, EStorage>(
     : RuntimeSlice.literal(values);
 }
 
-export function Sorted<E, EStorage>(
+export async function Sorted<E, EStorage>(
   less: BinaryLess<E>,
   copyElement: CopyValue<E>,
   equal: EqualValue<E>,
   fromStorage: FromContainerStorage<E, EStorage>,
   toStorage: ToContainerStorage<E, EStorage>,
   sequence: Seq<E>,
-): RuntimeSlice<EStorage> {
-  const result = Collect(copyElement, toStorage, sequence);
+): Promise<RuntimeSlice<EStorage>> {
+  const result = await Collect(copyElement, toStorage, sequence);
   const values = logicalValues(result, copyElement, fromStorage);
   values.sort(
     (left, right): number => orderedCompare(less, equal, left, right),
@@ -112,16 +113,18 @@ export function Sorted<E, EStorage>(
   );
 }
 
-export function SortedFunc<E, EStorage>(
+export async function SortedFunc<E, EStorage>(
   copyElement: CopyValue<E>,
   fromStorage: FromContainerStorage<E, EStorage>,
   toStorage: ToContainerStorage<E, EStorage>,
   sequence: Seq<E>,
   compare: Comparison<E>,
-): RuntimeSlice<EStorage> {
-  const result = Collect(copyElement, toStorage, sequence);
-  const values = logicalValues(result, copyElement, fromStorage);
-  values.sort((left, right): number => callComparison(compare, left, right));
+): Promise<RuntimeSlice<EStorage>> {
+  const result = await Collect(copyElement, toStorage, sequence);
+  const values = await sortValues(
+    logicalValues(result, copyElement, fromStorage),
+    compare,
+  );
   return RuntimeSlice.literal(
     values.map((value): EStorage => toStorage(copyElement(value))),
   );
@@ -134,12 +137,14 @@ export function Values<S, E, EStorage>(
   source: S,
 ): Seq<E> {
   const values = toSlice(source);
-  return new Seq<E>((yieldValue): void => {
+  return new Seq<E>(async (yieldValue): Promise<void> => {
     if (yieldValue === undefined) {
       GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
     }
     for (let index = 0; index < values.length; index += 1) {
-      if (!yieldValue(readElement(values, index, copyElement, fromStorage))) {
+      if (!await yieldValue(
+        readElement(values, index, copyElement, fromStorage),
+      )) {
         return;
       }
     }
@@ -158,12 +163,12 @@ function logicalValues<E, EStorage>(
   return values;
 }
 
-function runSequence<T>(
+async function runSequence<T>(
   sequence: Seq<T>,
-  yieldValue: (value: T) => bool,
-): void {
+  yieldValue: (value: T) => Awaitable<bool>,
+): Promise<void> {
   if (sequence.value === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
-  sequence.value(yieldValue);
+  await sequence.value(yieldValue);
 }

@@ -29,7 +29,7 @@ export {
   LastIndexByte,
   LastIndexFunc,
 } from "./internal/portable/strings/search.js";
-export { Join, Split } from "./internal/portable/strings/split.js";
+export { Join, Split, SplitN } from "./internal/portable/strings/split.js";
 export {
   Map,
   Repeat,

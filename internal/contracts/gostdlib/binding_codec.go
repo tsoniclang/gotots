@@ -1,7 +1,5 @@
 package gostdlib
 
-import "fmt"
-
 func validateBinding(binding BindingDocument, field string) error {
 	requiresEffect := binding.Kind == BindingFunction
 	switch {
@@ -73,23 +71,12 @@ func validateBinding(binding BindingDocument, field string) error {
 			"parameters do not belong to a callable",
 		)
 	}
-	previousCallable := -1
-	for index, selected := range binding.CallableParameters {
-		if selected.Parameter < 0 || selected.Parameter <= previousCallable {
-			return manifestError(
-				field+".callableParameters",
-				"parameters are negative, duplicated, or not strictly ordered",
-			)
-		}
-		if selected.Effect != EffectSynchronous &&
-			selected.Effect != EffectAsynchronous &&
-			selected.Effect != EffectAwaitable {
-			return manifestError(
-				fmt.Sprintf("%s.callableParameters[%d].effect", field, index),
-				"value is invalid",
-			)
-		}
-		previousCallable = selected.Parameter
+	if err := validateCallableParameters(
+		binding.CallableParameters,
+		field+".callableParameters",
+		true,
+	); err != nil {
+		return err
 	}
 	if binding.ProviderInterface != nil {
 		if err := validateProviderInterface(

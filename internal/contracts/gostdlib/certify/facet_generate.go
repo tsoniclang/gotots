@@ -20,6 +20,7 @@ func buildFacetModules(
 	modules []gostdlib.ModuleDocument,
 	genericOperations map[string][]gostdlib.GenericOperationDocument,
 	effectMarker tsgo.ProjectExport,
+	supportMarkers providerSupportMarkers,
 	selectedToolchain toolchain,
 ) ([]gostdlib.FacetModuleDocument, error) {
 	interfaceTargets, err := providerInterfaceTargets(
@@ -295,6 +296,7 @@ func buildFacetModules(
 				byName,
 				project,
 				effectMarker,
+				supportMarkers,
 			)
 			if err != nil {
 				return nil, err
@@ -314,6 +316,8 @@ func buildFacetModules(
 				byName,
 				representations,
 				genericOperations,
+				bindingDocuments,
+				effectMarker,
 			)
 			if err != nil {
 				return nil, err

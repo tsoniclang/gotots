@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -29,17 +30,28 @@ func emitAppendSpread(
 			source,
 		)
 	}
-	_, elementType, resultOK := scalarSlice(context, result)
 	receiverType := context.TypesInfo().TypeOf(source.Args[0])
 	spreadType := context.TypesInfo().TypeOf(source.Args[1])
-	_, spreadElementType, spreadOK := scalarSlice(context, spreadType)
-	stringSpread := appendStringSpread(elementType, spreadType)
-	sliceSpread := spreadOK &&
-		types.Identical(elementType, spreadElementType) &&
-		types.AssignableTo(spreadType, types.NewSlice(elementType))
-	if !resultOK ||
-		!types.Identical(receiverType, result) ||
-		(!sliceSpread && !stringSpread) {
+	_, _, stringSpread, concrete := appendSpreadTypes(
+		context,
+		result,
+		receiverType,
+		spreadType,
+	)
+	if !concrete &&
+		(api.ContainsGenericTypeParameter(result) ||
+			api.ContainsGenericTypeParameter(receiverType) ||
+			api.ContainsGenericTypeParameter(spreadType)) {
+		return emitGenericAppendSpread(
+			context,
+			children,
+			source,
+			result,
+			receiverType,
+			spreadType,
+		)
+	}
+	if !concrete {
 		return api.ExpressionEmission{}, api.Unsupported(
 			context,
 			api.CategoryExpression,
@@ -59,13 +71,9 @@ func emitAppendSpread(
 		}
 	}
 	receiver, err := children.Expression(
-		context.WithRole(api.RoleSliceReceiver).WithExpectedType(result),
+		context.WithRole(api.RoleSliceReceiver).WithExpectedType(receiverType),
 		source.Args[0],
 	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	receiver, err = projectDefinedSlice(context, result, receiver)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -76,23 +84,104 @@ func emitAppendSpread(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	target, handled, err := ApplyAppendSpread(
+		context,
+		source,
+		result,
+		receiverType,
+		spreadType,
+		receiver,
+		spread,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if !handled {
+		return api.ExpressionEmission{}, api.Unsupported(
+			context,
+			api.CategoryExpression,
+			source,
+		)
+	}
+	return target, nil
+}
+
+func emitGenericAppendSpread(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	resultType types.Type,
+	receiverType types.Type,
+	spreadType types.Type,
+) (api.ExpressionEmission, error) {
+	if resultType == nil || receiverType == nil || spreadType == nil {
+		return api.ExpressionEmission{}, api.Unsupported(
+			context,
+			api.CategoryExpression,
+			source,
+		)
+	}
+	receiver, err := children.Expression(
+		context.WithRole(api.RoleSliceReceiver).WithExpectedType(receiverType),
+		source.Args[0],
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	spread, err := children.Expression(
+		context.WithRole(api.RoleCallArgument).WithExpectedType(spreadType),
+		source.Args[1],
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return genericoperation.Call(
+		context,
+		source,
+		api.GenericOperationAppendSpread,
+		[]types.Type{receiverType, spreadType},
+		[]types.Type{resultType},
+		[]api.ExpressionEmission{receiver, spread},
+	)
+}
+
+func ApplyAppendSpread(
+	context api.Context,
+	source ast.Node,
+	resultType types.Type,
+	receiverType types.Type,
+	spreadType types.Type,
+	receiver api.ExpressionEmission,
+	spread api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	elementType, sliceSpread, stringSpread, ok := appendSpreadTypes(
+		context,
+		resultType,
+		receiverType,
+		spreadType,
+	)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
+	}
+	var err error
+	receiver, err = projectDefinedSlice(context, resultType, receiver)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	if sliceSpread {
 		spread, err = projectDefinedSlice(context, spreadType, spread)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
 	} else {
 		spread, err = projectDefinedString(context, spreadType, spread)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
+	}
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
 	operands, before, requests, err := arrangeValues(
 		context,
 		[]api.ExpressionEmission{receiver, spread},
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, err
+		return api.ExpressionEmission{}, true, err
 	}
 	targetElement, err := context.ContainerStorage().ContainerStorageType(
 		context.WithRole(api.RoleSliceElementType),
@@ -100,7 +189,7 @@ func emitAppendSpread(
 		elementType,
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, err
+		return api.ExpressionEmission{}, true, err
 	}
 	requests = api.CombineRequests(requests, targetElement.Requests())
 	if stringSpread {
@@ -114,9 +203,10 @@ func emitAppendSpread(
 			requests,
 		)
 		if err != nil {
-			return api.ExpressionEmission{}, err
+			return api.ExpressionEmission{}, true, err
 		}
-		return wrapDefinedSlice(context, result, emission)
+		wrapped, err := wrapDefinedSlice(context, resultType, emission)
+		return wrapped, true, err
 	}
 	var target tsgo.Expression
 	if context.Values().RequiresStructuralCopy(context, elementType) {
@@ -130,9 +220,10 @@ func emitAppendSpread(
 			requests,
 		)
 		if err != nil {
-			return api.ExpressionEmission{}, err
+			return api.ExpressionEmission{}, true, err
 		}
-		return wrapDefinedSlice(context, result, emission)
+		wrapped, err := wrapDefinedSlice(context, resultType, emission)
+		return wrapped, true, err
 	} else {
 		zero, err := context.Values().Zero(
 			context.WithRole(api.RoleSliceElement),
@@ -140,7 +231,7 @@ func emitAppendSpread(
 			elementType,
 		)
 		if err != nil {
-			return api.ExpressionEmission{}, err
+			return api.ExpressionEmission{}, true, err
 		}
 		zero, err = context.ContainerStorage().ToContainerStorage(
 			context.WithRole(api.RoleSliceElement),
@@ -149,14 +240,14 @@ func emitAppendSpread(
 			zero,
 		)
 		if err != nil {
-			return api.ExpressionEmission{}, err
+			return api.ExpressionEmission{}, true, err
 		}
 		runtime, err := context.Names().Runtime(
 			api.RuntimeSliceAppendSlice,
 			api.ImportPhaseValue,
 		)
 		if err != nil {
-			return api.ExpressionEmission{}, err
+			return api.ExpressionEmission{}, true, err
 		}
 		before = append(before, zero.Before()...)
 		target = context.Factory().CallExpression(
@@ -178,13 +269,34 @@ func emitAppendSpread(
 	}
 	emission, err := api.NewExpressionEmission(before, target, requests)
 	if err != nil {
-		return api.ExpressionEmission{}, err
+		return api.ExpressionEmission{}, true, err
 	}
-	return wrapDefinedSlice(
+	wrapped, err := wrapDefinedSlice(
 		context,
-		result,
+		resultType,
 		emission,
 	)
+	return wrapped, true, err
+}
+
+func appendSpreadTypes(
+	context api.Context,
+	resultType types.Type,
+	receiverType types.Type,
+	spreadType types.Type,
+) (types.Type, bool, bool, bool) {
+	_, elementType, resultOK := scalarSlice(context, resultType)
+	_, spreadElementType, spreadOK := scalarSlice(context, spreadType)
+	stringSpread := resultOK && appendStringSpread(elementType, spreadType)
+	sliceSpread := resultOK && spreadOK &&
+		types.Identical(elementType, spreadElementType) &&
+		types.AssignableTo(spreadType, types.NewSlice(elementType))
+	return elementType,
+		sliceSpread,
+		stringSpread,
+		resultOK &&
+			types.Identical(receiverType, resultType) &&
+			(sliceSpread || stringSpread)
 }
 
 func appendStringSpread(elementType, spreadType types.Type) bool {

@@ -391,6 +391,7 @@ func materializeRuntime(t *testing.T, directory string) (string, string) {
 			api.RuntimeErrorMethodToken,
 			api.RuntimeRuntimeErrorToken,
 		},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -402,6 +403,7 @@ func materializeRuntime(t *testing.T, directory string) (string, string) {
 			api.RuntimePanicValue,
 			api.RuntimePanic,
 		},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -410,6 +412,7 @@ func materializeRuntime(t *testing.T, directory string) (string, string) {
 		factory,
 		api.RuntimeModuleDenseIndex,
 		[]api.RuntimeSymbol{api.RuntimeDenseIndex},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -427,6 +430,7 @@ func materializeRuntime(t *testing.T, directory string) (string, string) {
 			api.RuntimeSelect,
 			api.RuntimeScheduler,
 		},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)

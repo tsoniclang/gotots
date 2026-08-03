@@ -9,6 +9,7 @@ import {
   Abs,
   Clean,
   Dir,
+  Ext,
   EvalSymlinks,
   FromSlash,
   IsAbs,
@@ -26,6 +27,10 @@ test("filepath exposes the selected Unix lexical contract", () => {
   assert.equal(Separator, 0x2f);
   assert.equal(Clean("//a/./b/../c/"), "/a/c");
   assert.equal(Dir("/a/b.txt"), "/a");
+  assert.equal(Ext("/a/b.txt"), ".txt");
+  assert.equal(Ext("/a/.profile"), ".profile");
+  assert.equal(Ext("/a/name."), ".");
+  assert.equal(Ext("/a.b/name"), "");
   assert.equal(FromSlash("a/b"), "a/b");
   assert.equal(IsAbs("/a"), true);
   assert.equal(IsAbs("a"), false);
