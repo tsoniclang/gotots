@@ -19,7 +19,7 @@ import {
 } from "../../io/fs.js";
 import type { Time } from "../../time.js";
 import { Join as JoinPath } from "../../path.js";
-import type { CanonicalErrorAsync } from "./provider-io-contract.js";
+import type { CanonicalError } from "./provider-io-contract.js";
 import {
   byteSlice,
   sliceValues,
@@ -79,85 +79,85 @@ interface FromProviderBridge<
   $from(value: Provider | undefined): Canonical | undefined;
 }
 
-export interface CanonicalFileAsyncError extends GoInterfaceValue {
-  Close(recovery?: GoRecovery): Awaitable<CanonicalErrorAsync | undefined>;
+export interface CanonicalFile extends GoInterfaceValue {
+  Close(recovery?: GoRecovery): Awaitable<CanonicalError | undefined>;
   Read(
     buffer: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Awaitable<[int64, CanonicalErrorAsync | undefined]>;
+  ): Awaitable<[int64, CanonicalError | undefined]>;
   Stat(
     recovery?: GoRecovery,
-  ): Awaitable<[CanonicalFileInfo | undefined, CanonicalErrorAsync | undefined]>;
+  ): Awaitable<[CanonicalFileInfo | undefined, CanonicalError | undefined]>;
 }
 
-export interface CanonicalFSAsyncError extends GoInterfaceValue {
+export interface CanonicalFS extends GoInterfaceValue {
   Open(
     name: gostring,
     recovery?: GoRecovery,
   ): Awaitable<[
-    CanonicalFileAsyncError | undefined,
-    CanonicalErrorAsync | undefined,
+    CanonicalFile | undefined,
+    CanonicalError | undefined,
   ]>;
 }
 
-export interface CanonicalReadFileFSAsyncError extends CanonicalFSAsyncError {
+export interface CanonicalReadFileFS extends CanonicalFS {
   ReadFile(
     name: gostring,
     recovery?: GoRecovery,
-  ): Awaitable<[RuntimeSlice<uint8>, CanonicalErrorAsync | undefined]>;
+  ): Awaitable<[RuntimeSlice<uint8>, CanonicalError | undefined]>;
 }
 
-export interface CanonicalDirEntryAsyncError extends GoInterfaceValue {
+export interface CanonicalDirEntry extends GoInterfaceValue {
   Info(
     recovery?: GoRecovery,
-  ): Awaitable<[CanonicalFileInfo | undefined, CanonicalErrorAsync | undefined]>;
+  ): Awaitable<[CanonicalFileInfo | undefined, CanonicalError | undefined]>;
   IsDir(recovery?: GoRecovery): Awaitable<boolean>;
   Name(recovery?: GoRecovery): Awaitable<gostring>;
   Type(recovery?: GoRecovery): Awaitable<FileMode>;
 }
 
-export interface CanonicalReadDirFSAsyncError extends CanonicalFSAsyncError {
+export interface CanonicalReadDirFS extends CanonicalFS {
   ReadDir(
     name: gostring,
     recovery?: GoRecovery,
   ): Awaitable<[
-    RuntimeSlice<CanonicalDirEntryAsyncError | undefined>,
-    CanonicalErrorAsync | undefined,
+    RuntimeSlice<CanonicalDirEntry | undefined>,
+    CanonicalError | undefined,
   ]>;
 }
 
-export interface CanonicalReadDirFileAsyncError extends CanonicalFileAsyncError {
+export interface CanonicalReadDirFile extends CanonicalFile {
   ReadDir(
     count: int64,
     recovery?: GoRecovery,
   ): Awaitable<[
-    RuntimeSlice<CanonicalDirEntryAsyncError | undefined>,
-    CanonicalErrorAsync | undefined,
+    RuntimeSlice<CanonicalDirEntry | undefined>,
+    CanonicalError | undefined,
   ]>;
 }
 
-type CanonicalWalkDirFuncAsyncError = ((
+type CanonicalWalkDirFunc = ((
   path: gostring,
-  entry: CanonicalDirEntryAsyncError | undefined,
-  failure: CanonicalErrorAsync | undefined,
+  entry: CanonicalDirEntry | undefined,
+  failure: CanonicalError | undefined,
   recovery?: GoRecovery,
-) => Awaitable<CanonicalErrorAsync | undefined>) | undefined;
+) => Awaitable<CanonicalError | undefined>) | undefined;
 
-export type { CanonicalErrorAsync } from "./provider-io-contract.js";
+export type { CanonicalError } from "./provider-io-contract.js";
 
-export interface CanonicalStatFSAsyncError extends CanonicalFSAsyncError {
+export interface CanonicalStatFS extends CanonicalFS {
   Stat(
     name: gostring,
     recovery?: GoRecovery,
-  ): Awaitable<[CanonicalFileInfo | undefined, CanonicalErrorAsync | undefined]>;
+  ): Awaitable<[CanonicalFileInfo | undefined, CanonicalError | undefined]>;
 }
 
-export async function IoFsReadFileCanonicalAsyncError(
-  fileSystem: CanonicalFSAsyncError | undefined,
+export async function IoFsReadFileCanonical(
+  fileSystem: CanonicalFS | undefined,
   name: gostring,
-  eof: CanonicalErrorAsync | undefined,
-  isReadFileFS: InterfaceGuard<CanonicalReadFileFSAsyncError>,
-): Promise<[RuntimeSlice<uint8>, CanonicalErrorAsync | undefined]> {
+  eof: CanonicalError | undefined,
+  isReadFileFS: InterfaceGuard<CanonicalReadFileFS>,
+): Promise<[RuntimeSlice<uint8>, CanonicalError | undefined]> {
   if (fileSystem === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
@@ -188,11 +188,11 @@ export async function IoFsReadFileCanonicalAsyncError(
   }
 }
 
-export async function IoFsStatCanonicalAsyncError(
-  fileSystem: CanonicalFSAsyncError | undefined,
+export async function IoFsStatCanonical(
+  fileSystem: CanonicalFS | undefined,
   name: gostring,
-  isStatFS: InterfaceGuard<CanonicalStatFSAsyncError>,
-): Promise<[CanonicalFileInfo | undefined, CanonicalErrorAsync | undefined]> {
+  isStatFS: InterfaceGuard<CanonicalStatFS>,
+): Promise<[CanonicalFileInfo | undefined, CanonicalError | undefined]> {
   if (fileSystem === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
@@ -210,15 +210,15 @@ export async function IoFsStatCanonicalAsyncError(
   }
 }
 
-export async function IoFsReadDirCanonicalAsyncError(
-  fileSystem: CanonicalFSAsyncError | undefined,
+export async function IoFsReadDirCanonical(
+  fileSystem: CanonicalFS | undefined,
   name: gostring,
-  isReadDirFS: InterfaceGuard<CanonicalReadDirFSAsyncError>,
-  isReadDirFile: InterfaceGuard<CanonicalReadDirFileAsyncError>,
-  errorBridge: FromProviderBridge<GoError, CanonicalErrorAsync>,
+  isReadDirFS: InterfaceGuard<CanonicalReadDirFS>,
+  isReadDirFile: InterfaceGuard<CanonicalReadDirFile>,
+  errorBridge: FromProviderBridge<GoError, CanonicalError>,
 ): Promise<[
-  RuntimeSlice<CanonicalDirEntryAsyncError | undefined>,
-  CanonicalErrorAsync | undefined,
+  RuntimeSlice<CanonicalDirEntry | undefined>,
+  CanonicalError | undefined,
 ]> {
   if (fileSystem === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
@@ -228,12 +228,12 @@ export async function IoFsReadDirCanonicalAsyncError(
   }
   const [file, openFailure] = await fileSystem.Open(name);
   if (openFailure !== undefined || file === undefined) {
-    return [RuntimeSlice.nil<CanonicalDirEntryAsyncError | undefined>(), openFailure];
+    return [RuntimeSlice.nil<CanonicalDirEntry | undefined>(), openFailure];
   }
   try {
     if (!isReadDirFile(file)) {
       return [
-        RuntimeSlice.nil<CanonicalDirEntryAsyncError | undefined>(),
+        RuntimeSlice.nil<CanonicalDirEntry | undefined>(),
         requireBridgedValue(
           errorBridge.$from(
             new PathError("readdir", name, New("not implemented")),
@@ -250,34 +250,34 @@ export async function IoFsReadDirCanonicalAsyncError(
   }
 }
 
-export async function IoFsWalkDirCanonicalAsyncError(
-  fileSystem: CanonicalFSAsyncError | undefined,
+export async function IoFsWalkDirCanonical(
+  fileSystem: CanonicalFS | undefined,
   root: gostring,
-  visit: CanonicalWalkDirFuncAsyncError,
-  skipAll: CanonicalErrorAsync | undefined,
-  skipDir: CanonicalErrorAsync | undefined,
-  isReadDirFS: InterfaceGuard<CanonicalReadDirFSAsyncError>,
-  isReadDirFile: InterfaceGuard<CanonicalReadDirFileAsyncError>,
-  isStatFS: InterfaceGuard<CanonicalStatFSAsyncError>,
-  errorBridge: FromProviderBridge<GoError, CanonicalErrorAsync>,
+  visit: CanonicalWalkDirFunc,
+  skipAll: CanonicalError | undefined,
+  skipDir: CanonicalError | undefined,
+  isReadDirFS: InterfaceGuard<CanonicalReadDirFS>,
+  isReadDirFile: InterfaceGuard<CanonicalReadDirFile>,
+  isStatFS: InterfaceGuard<CanonicalStatFS>,
+  errorBridge: FromProviderBridge<GoError, CanonicalError>,
   dirEntryContract: readonly object[],
-): Promise<CanonicalErrorAsync | undefined> {
-  const [information, statFailure] = await IoFsStatCanonicalAsyncError(
+): Promise<CanonicalError | undefined> {
+  const [information, statFailure] = await IoFsStatCanonical(
     fileSystem,
     root,
     isStatFS,
   );
-  let failure: CanonicalErrorAsync | undefined;
+  let failure: CanonicalError | undefined;
   if (statFailure !== undefined) {
-    failure = await invokeWalkDirAsyncError(visit, root, undefined, statFailure);
+    failure = await invokeWalkDir(visit, root, undefined, statFailure);
   } else {
     const entry = information === undefined
       ? undefined
-      : new CanonicalInfoDirEntry<CanonicalErrorAsync>(
+      : new CanonicalInfoDirEntry<CanonicalError>(
         information,
         dirEntryContract,
       );
-    failure = await walkAsyncError(
+    failure = await walk(
       fileSystem,
       root,
       entry,
@@ -293,17 +293,17 @@ export async function IoFsWalkDirCanonicalAsyncError(
     : failure;
 }
 
-async function walkAsyncError(
-  fileSystem: CanonicalFSAsyncError | undefined,
+async function walk(
+  fileSystem: CanonicalFS | undefined,
   path: gostring,
-  entry: CanonicalDirEntryAsyncError | undefined,
-  visit: CanonicalWalkDirFuncAsyncError,
-  skipDir: CanonicalErrorAsync | undefined,
-  isReadDirFS: InterfaceGuard<CanonicalReadDirFSAsyncError>,
-  isReadDirFile: InterfaceGuard<CanonicalReadDirFileAsyncError>,
-  errorBridge: FromProviderBridge<GoError, CanonicalErrorAsync>,
-): Promise<CanonicalErrorAsync | undefined> {
-  let failure = await invokeWalkDirAsyncError(visit, path, entry, undefined);
+  entry: CanonicalDirEntry | undefined,
+  visit: CanonicalWalkDirFunc,
+  skipDir: CanonicalError | undefined,
+  isReadDirFS: InterfaceGuard<CanonicalReadDirFS>,
+  isReadDirFile: InterfaceGuard<CanonicalReadDirFile>,
+  errorBridge: FromProviderBridge<GoError, CanonicalError>,
+): Promise<CanonicalError | undefined> {
+  let failure = await invokeWalkDir(visit, path, entry, undefined);
   if (entry === undefined) {
     if (failure !== undefined) {
       return failure;
@@ -317,7 +317,7 @@ async function walkAsyncError(
     }
     return failure;
   }
-  const [entries, readFailure] = await IoFsReadDirCanonicalAsyncError(
+  const [entries, readFailure] = await IoFsReadDirCanonical(
     fileSystem,
     path,
     isReadDirFS,
@@ -325,7 +325,7 @@ async function walkAsyncError(
     errorBridge,
   );
   if (readFailure !== undefined) {
-    failure = await invokeWalkDirAsyncError(visit, path, entry, readFailure);
+    failure = await invokeWalkDir(visit, path, entry, readFailure);
     if (failure !== undefined) {
       return goInterfaceEqual(failure, skipDir) && isDirectory
         ? undefined
@@ -336,7 +336,7 @@ async function walkAsyncError(
     if (child === undefined) {
       return GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
     }
-    const childFailure = await walkAsyncError(
+    const childFailure = await walk(
       fileSystem,
       JoinPath(RuntimeSlice.literal([path, await child.Name()])),
       child,
@@ -356,12 +356,12 @@ async function walkAsyncError(
   return undefined;
 }
 
-async function invokeWalkDirAsyncError(
-  visit: CanonicalWalkDirFuncAsyncError,
+async function invokeWalkDir(
+  visit: CanonicalWalkDirFunc,
   path: gostring,
-  entry: CanonicalDirEntryAsyncError | undefined,
-  failure: CanonicalErrorAsync | undefined,
-): Promise<CanonicalErrorAsync | undefined> {
+  entry: CanonicalDirEntry | undefined,
+  failure: CanonicalError | undefined,
+): Promise<CanonicalError | undefined> {
   if (visit === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
@@ -379,8 +379,8 @@ function requireBridgedValue<Value extends GoInterfaceValue>(
 }
 
 async function sortDirectoryEntries(
-  entries: (CanonicalDirEntryAsyncError | undefined)[],
-): Promise<(CanonicalDirEntryAsyncError | undefined)[]> {
+  entries: (CanonicalDirEntry | undefined)[],
+): Promise<(CanonicalDirEntry | undefined)[]> {
   const named = await Promise.all(entries.map(async (entry) => ({
     entry,
     name: entry === undefined ? "" : await entry.Name(),

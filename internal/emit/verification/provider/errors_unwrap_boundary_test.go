@@ -148,12 +148,13 @@ func main() {
 	}
 	if !strings.Contains(
 		artifacts.printed,
-		"ErrorsUnwrapCanonicalAsyncErrorAsync",
+		"ErrorsUnwrapCanonical",
 	) {
-		t.Fatalf("errors.Unwrap output lacks exact async profile:\n%s", artifacts.printed)
+		t.Fatalf("errors.Unwrap output lacks canonical boundary:\n%s", artifacts.printed)
 	}
 	for _, rejected := range []string{
 		"ErrorsUnwrapCanonicalSync",
+		"ErrorsUnwrapCanonicalAsync",
 		"ErrorsUnwrapCanonicalAsyncErrorSync",
 	} {
 		if strings.Contains(artifacts.printed, rejected) {

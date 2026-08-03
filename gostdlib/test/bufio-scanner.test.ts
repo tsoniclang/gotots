@@ -20,9 +20,9 @@ import {
 } from "../src/bufio.js";
 import { New } from "../src/errors.js";
 import {
-  CanonicalScannerAsync,
-  NewScannerCanonicalAsync,
-  type CanonicalReaderSourceAsync,
+  CanonicalBufioScanner,
+  NewScannerCanonical,
+  type CanonicalReader,
 } from "../src/internal/facets/provider-bufio-scanner.js";
 import { ProviderInterfaceValue } from "../src/internal/portable/io/value.js";
 import { state as ioState, type Reader } from "../src/io.js";
@@ -57,7 +57,7 @@ class ChunkReader extends ProviderInterfaceValue implements Reader {
   }
 }
 
-class AsyncChunkReader extends ProviderInterfaceValue implements CanonicalReaderSourceAsync<GoError> {
+class AsyncChunkReader extends ProviderInterfaceValue implements CanonicalReader<GoError> {
   readonly #source: ChunkReader;
 
   constructor(source: string, chunkSize: number) {
@@ -107,8 +107,8 @@ test("bufio Scanner reports non-EOF and bounded-token failures", (): void => {
   assert.equal(Scanner.Err(oversized), bufioState.ErrTooLong);
 });
 
-test("bufio Scanner canonical profile awaits an asynchronous reader", async (): Promise<void> => {
-  const scanner = NewScannerCanonicalAsync(
+test("bufio Scanner canonical boundary awaits an asynchronous reader", async (): Promise<void> => {
+  const scanner = NewScannerCanonical(
     new AsyncChunkReader("one\ntwo", 2),
     bufioState.ErrBadReadCount,
     bufioState.ErrTooLong,
@@ -116,11 +116,11 @@ test("bufio Scanner canonical profile awaits an asynchronous reader", async (): 
     ioState.ErrNoProgress,
   );
   const tokens: string[] = [];
-  while (await CanonicalScannerAsync.Scan(scanner)) {
-    tokens.push(CanonicalScannerAsync.Text(scanner));
+  while (await CanonicalBufioScanner.Scan(scanner)) {
+    tokens.push(CanonicalBufioScanner.Text(scanner));
   }
   assert.deepEqual(tokens, ["one", "two"]);
-  assert.equal(CanonicalScannerAsync.Err(scanner), undefined);
+  assert.equal(CanonicalBufioScanner.Err(scanner), undefined);
 });
 
 function scannerProviderResult(): string {

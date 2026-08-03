@@ -10,21 +10,18 @@ import type {
 
 import { ProviderInterfaceValue } from "../portable/io/value.js";
 
-export interface CanonicalErrorSync extends GoInterfaceValue {
-  Error(recovery?: GoRecovery): gostring;
-}
-
-export interface CanonicalErrorAsync extends GoInterfaceValue {
+export interface CanonicalError extends GoInterfaceValue {
   Error(recovery?: GoRecovery): Awaitable<gostring>;
 }
 
 const canonicalBoundaryErrorType = Object.freeze({ comparable: true });
 
-abstract class CanonicalBoundaryError extends ProviderInterfaceValue {
+export class CanonicalBoundaryError extends ProviderInterfaceValue
+  implements CanonicalError {
   override readonly $go$methods: ReadonlySet<object>;
 
   constructor(
-    protected readonly message: string,
+    private readonly message: string,
     contract: readonly object[],
   ) {
     super(canonicalBoundaryErrorType);
@@ -38,52 +35,22 @@ abstract class CanonicalBoundaryError extends ProviderInterfaceValue {
   ): string {
     return verb === "q" ? JSON.stringify(this.message) : this.message;
   }
-}
 
-export class CanonicalBoundaryErrorSync extends CanonicalBoundaryError
-  implements CanonicalErrorSync {
-  Error(): string {
+  Error(): gostring {
     return this.message;
   }
 }
 
-export class CanonicalBoundaryErrorAsync extends CanonicalBoundaryError
-  implements CanonicalErrorAsync {
-  async Error(): Promise<string> {
-    return this.message;
-  }
-}
-
-export interface CanonicalReaderSourceSync<
-  Failure extends GoInterfaceValue,
-> extends GoInterfaceValue {
-  Read(
-    destination: RuntimeSlice<uint8>,
-    recovery?: GoRecovery,
-  ): [int64, Failure | undefined];
-}
-
-export interface CanonicalReaderSourceAsync<
-  Failure extends GoInterfaceValue,
-> extends GoInterfaceValue {
+export interface CanonicalReader<Failure extends GoInterfaceValue>
+  extends GoInterfaceValue {
   Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
   ): Awaitable<[int64, Failure | undefined]>;
 }
 
-export interface CanonicalWriterTargetSync<
-  Failure extends GoInterfaceValue,
-> extends GoInterfaceValue {
-  Write(
-    source: RuntimeSlice<uint8>,
-    recovery?: GoRecovery,
-  ): [int64, Failure | undefined];
-}
-
-export interface CanonicalWriterTargetAsync<
-  Failure extends GoInterfaceValue,
-> extends GoInterfaceValue {
+export interface CanonicalWriter<Failure extends GoInterfaceValue>
+  extends GoInterfaceValue {
   Write(
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,

@@ -120,9 +120,9 @@ Install the explicit race-free `cooperative` profile:
 - one canonical `Awaitable` ABI per indirect signature and interface method;
 - package/program asynchronous initialization where demanded.
 
-Exit: no callable-profile variants, hidden effect type parameters, result
-shape tests, or all-function async conversion; full channel/scheduler
-differentials, deadlock/panic tests, and cost gates pass.
+Exit: no per-method or combinatorial callable-profile variants, hidden effect
+type parameters, result shape tests, or all-function async conversion; full
+channel/scheduler differentials, deadlock/panic tests, and cost gates pass.
 
 ## 7. Language Closure
 
@@ -153,7 +153,10 @@ Install:
 Public provider APIs and generated facades preserve source arity. Generic,
 interface, cooperative, and recovery support remains statically linked in
 private facade/kernel artifacts. No runtime policy object, capability
-argument, profile variant, or ambient fallback survives.
+argument, per-method profile variant, or ambient fallback survives. Required
+semantic protocols may retain at most one uniform direct certificate and one
+uniform cooperative certificate for a Go identity; ordinary direct bindings
+are not duplicated.
 
 Exit: provider package independently strict-typechecks and executes; exact
 contract/facade joins pass; a linked representative product uses one runtime

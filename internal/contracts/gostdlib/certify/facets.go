@@ -188,14 +188,15 @@ func validateProviderStatefulProfileSeeds(
 		return providerStatefulProfileSeedKey(result[left]) <
 			providerStatefulProfileSeedKey(result[right])
 	})
-	previous := ""
+	previousKey := ""
 	for index := range result {
 		seed := &result[index]
 		seed.Interfaces = slices.Clone(seed.Interfaces)
 		seed.TypeArguments = slices.Clone(seed.TypeArguments)
 		seed.Operations = slices.Clone(seed.Operations)
 		key := providerStatefulProfileSeedKey(*seed)
-		if key == "" || key == previous || seed.SourceIdentity == "" ||
+		if key == "" || key == previousKey ||
+			seed.SourceIdentity == "" ||
 			seed.Specifier == "" || seed.SourcePath == "" || seed.Export == "" ||
 			len(seed.Interfaces) == 0 || len(seed.TypeArguments) == 0 {
 			return nil, certifyError(
@@ -204,7 +205,7 @@ func validateProviderStatefulProfileSeeds(
 				"profile identity or shape is incomplete or duplicated",
 			)
 		}
-		previous = key
+		previousKey = key
 		if subpath, ok := providerSubpath(seed.Specifier); !ok ||
 			!strings.HasPrefix(subpath, "./internal/facets/") ||
 			!strings.HasPrefix(seed.SourcePath, "src/internal/facets/") ||
@@ -358,11 +359,12 @@ func validateProviderCallableProfileSeeds(
 		return providerCallableProfileSeedKey(result[left]) <
 			providerCallableProfileSeedKey(result[right])
 	})
-	previous := ""
+	previousKey := ""
 	for index := range result {
 		seed := &result[index]
 		key := providerCallableProfileSeedKey(*seed)
-		if key == "" || key == previous || seed.SourceIdentity == "" ||
+		if key == "" || key == previousKey ||
+			seed.SourceIdentity == "" ||
 			seed.Specifier == "" || seed.SourcePath == "" || seed.Export == "" ||
 			len(seed.CanonicalParameters) == 0 ||
 			len(seed.Interfaces)+len(seed.Protocols) == 0 {
@@ -379,7 +381,7 @@ func validateProviderCallableProfileSeeds(
 				"required selection and semantic protocols disagree",
 			)
 		}
-		previous = key
+		previousKey = key
 		if subpath, ok := providerSubpath(seed.Specifier); !ok ||
 			!strings.HasPrefix(subpath, "./internal/facets/") ||
 			!strings.HasPrefix(seed.SourcePath, "src/internal/facets/") ||

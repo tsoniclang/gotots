@@ -72,13 +72,12 @@ func Decode(mutex *sync.Mutex) error {
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
-	selected := "EncodingBinaryReadCanonicalOrderAsyncReaderAsyncError"
+	selected := "EncodingBinaryReadCanonical"
 	if !strings.Contains(artifacts.printed, selected) {
 		t.Fatalf("binary profile output lacks %q:\n%s", selected, artifacts.printed)
 	}
 	for _, rejected := range []string{
-		"EncodingBinaryReadCanonical(",
-		"EncodingBinaryReadCanonicalAsyncReaderAsyncError",
+		"EncodingBinaryReadCanonicalOrder",
 		"EncodingBinaryReadCanonicalSyncReaderSyncError",
 		"EncodingBinaryReadCanonicalAsyncReaderSyncError",
 		"EncodingBinaryReadCanonicalSyncReaderAsyncError",
@@ -186,8 +185,8 @@ func Encode(mutex *sync.Mutex) error {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 	for _, selected := range []string{
-		"EncodingBinaryReadCanonicalOrderAsyncReaderAsyncError",
-		"EncodingBinaryWriteCanonicalOrderAsyncWriterAsyncError",
+		"EncodingBinaryReadCanonical",
+		"EncodingBinaryWriteCanonical",
 	} {
 		if !strings.Contains(artifacts.printed, selected) {
 			t.Fatalf("combined binary profile output lacks %q:\n%s", selected, artifacts.printed)

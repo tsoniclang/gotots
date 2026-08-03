@@ -170,8 +170,8 @@ func main() {
 		)
 	}
 	for _, required := range []string{
-		"GzipNewReaderCanonicalReadAsync",
-		"CanonicalGzipReaderReadAsync",
+		"GzipNewReaderCanonical",
+		"CanonicalGzipReader",
 		".Header.Name",
 		".Header.Comment",
 	} {

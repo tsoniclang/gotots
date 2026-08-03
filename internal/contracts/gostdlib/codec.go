@@ -229,8 +229,8 @@ func validateDocument(document Document, sealed bool) error {
 	}
 	previousFacetModule := ""
 	facetLookups := make(map[facetLookup]struct{})
-	callableProfileLookups := make(map[providerCallableProfileLookup]struct{})
-	statefulProfileLookups := make(map[providerStatefulProfileLookup]struct{})
+	callableProfileLookups := make(map[string]struct{})
+	statefulProfileLookups := make(map[string]struct{})
 	providerInterfaceLookups := make(map[string]struct{})
 	for index, module := range document.FacetModules {
 		field := fmt.Sprintf("facetModules[%d]", index)

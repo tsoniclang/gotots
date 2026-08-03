@@ -176,7 +176,7 @@ func main() {
 		)
 	}
 	for _, required := range []string{
-		"CanonicalReaderAsync",
+		"CanonicalBufioReader",
 		"await",
 		"ReadBytes",
 	} {
@@ -184,8 +184,9 @@ func main() {
 			t.Fatalf("stateful profile output lacks %q:\n%s", required, artifacts.printed)
 		}
 	}
-	if strings.Contains(artifacts.printed, "CanonicalReaderSync") {
-		t.Fatalf("cooperative profile retained a synchronous reader permutation:\n%s", artifacts.printed)
+	if strings.Contains(artifacts.printed, "CanonicalReaderSync") ||
+		strings.Contains(artifacts.printed, "CanonicalReaderAsync") {
+		t.Fatalf("cooperative profile retained a reader permutation:\n%s", artifacts.printed)
 	}
 	if strings.Contains(artifacts.printed, "BufioReaderRead") {
 		t.Fatal("stateful reader adapter retained the ordinary recovery target")
@@ -346,10 +347,10 @@ func RootFactory() func(string) fs.FS { return os.DirFS }
 			artifacts.printed,
 		)
 	}
-	if !strings.Contains(artifacts.printed, "IoFsReadFileCanonicalAsyncError") {
-		t.Fatalf("async-error fs.ReadFile profile is absent:\n%s", artifacts.printed)
+	if !strings.Contains(artifacts.printed, "IoFsReadFileCanonical") {
+		t.Fatalf("canonical fs.ReadFile boundary is absent:\n%s", artifacts.printed)
 	}
-	if !strings.Contains(artifacts.printed, "IoFsStatCanonicalAsyncError") {
-		t.Fatalf("async-error fs.Stat profile is absent:\n%s", artifacts.printed)
+	if !strings.Contains(artifacts.printed, "IoFsStatCanonical") {
+		t.Fatalf("canonical fs.Stat boundary is absent:\n%s", artifacts.printed)
 	}
 }

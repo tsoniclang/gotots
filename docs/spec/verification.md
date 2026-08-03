@@ -342,8 +342,14 @@ Callable shape proof requires:
   `Awaitable` ABI;
 - all generated interface methods use the equivalent canonical ABI;
 - indirect calls unconditionally await;
-- no profile variants, hidden effect type parameters, result runtime tests, or
-  transport/dataflow graph.
+- no per-method/combinatorial profile variants, hidden effect type parameters,
+  result runtime tests, or transport/dataflow graph.
+
+Provider contract validation separately proves that every boundary certificate
+is uniform: all transported methods are synchronous for direct mode or all are
+`Awaitable` for cooperative mode. A Go identity admits at most one certificate
+per mode. Mutations adding a second certificate in either mode or mixing the
+two effects inside one certificate fail before emission.
 
 Mutations split direct/select queues, use historical queue storage, omit
 cancellation, bias source order, treat nil as ready, settle before pending

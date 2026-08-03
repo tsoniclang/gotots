@@ -125,11 +125,12 @@ func main() { fmt.Println(profile.Consume()) }
 			targetOutput,
 		)
 	}
-	if !strings.Contains(artifacts.printed, "CanonicalReaderAsync") {
+	if !strings.Contains(artifacts.printed, "CanonicalBufioReader") {
 		t.Fatalf("canonical cooperative provider state is absent:\n%s", artifacts.printed)
 	}
 	for _, forbidden := range []string{
 		"CanonicalReaderSync",
+		"CanonicalReaderAsync",
 		"bufio__from_gostdlib.NewReader(",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {

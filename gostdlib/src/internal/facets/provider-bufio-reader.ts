@@ -5,18 +5,11 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { int64, uint8 } from "@gotots/runtime/scalars.js";
 
 import { byteSlice, writeBytes } from "../runtime/slice.js";
-import type {
-  CanonicalErrorAsync,
-  CanonicalErrorSync,
-  CanonicalReaderSourceAsync,
-  CanonicalReaderSourceSync,
-} from "./provider-io-contract.js";
+import type { CanonicalReader } from "./provider-io-contract.js";
 
 export type {
-  CanonicalErrorAsync,
-  CanonicalErrorSync,
-  CanonicalReaderSourceAsync,
-  CanonicalReaderSourceSync,
+  CanonicalError,
+  CanonicalReader,
 } from "./provider-io-contract.js";
 
 const defaultBufferSize = 4096;
@@ -68,9 +61,9 @@ class ReaderBuffer<Failure> {
   }
 }
 
-export class CanonicalReaderSync<
+export class CanonicalBufioReader<
   Failure extends GoInterfaceValue,
-  Source extends CanonicalReaderSourceSync<Failure>,
+  Source extends CanonicalReader<Failure>,
 > {
   readonly #state = new ReaderBuffer<Failure>();
   readonly #source: Source | undefined;
@@ -86,142 +79,34 @@ export class CanonicalReaderSync<
 
   static Read<
     Failure extends GoInterfaceValue,
-    Source extends CanonicalReaderSourceSync<Failure>,
+    Source extends CanonicalReader<Failure>,
   >(
-    receiver: CanonicalReaderSync<Failure, Source> | undefined,
-    destination: RuntimeSlice<uint8>,
-    recovery?: GoRecovery,
-  ): [int64, Failure | undefined] {
-    return requireReaderSync(receiver).Read(destination, recovery);
-  }
-
-  static ReadByte<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReaderSourceSync<Failure>,
-  >(
-    receiver: CanonicalReaderSync<Failure, Source> | undefined,
-    recovery?: GoRecovery,
-  ): [uint8, Failure | undefined] {
-    return requireReaderSync(receiver).ReadByte(recovery);
-  }
-
-  static ReadBytes<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReaderSourceSync<Failure>,
-  >(
-    receiver: CanonicalReaderSync<Failure, Source> | undefined,
-    delimiter: uint8,
-    recovery?: GoRecovery,
-  ): [RuntimeSlice<uint8>, Failure | undefined] {
-    return requireReaderSync(receiver).ReadBytes(delimiter, recovery);
-  }
-
-  Read(
-    destination: RuntimeSlice<uint8>,
-    recovery?: GoRecovery,
-  ): [int64, Failure | undefined] {
-    if (destination.length === 0) {
-      return [0, undefined];
-    }
-    this.#fill(recovery);
-    return this.#state.read(destination);
-  }
-
-  ReadByte(recovery?: GoRecovery): [uint8, Failure | undefined] {
-    this.#fill(recovery);
-    return this.#state.readByte();
-  }
-
-  ReadBytes(
-    delimiter: uint8,
-    recovery?: GoRecovery,
-  ): [RuntimeSlice<uint8>, Failure | undefined] {
-    const values: number[] = [];
-    for (;;) {
-      const [value, failure] = this.ReadByte(recovery);
-      if (failure !== undefined) {
-        return [byteSlice(values), failure];
-      }
-      values.push(value);
-      if (value === delimiter) {
-        return [byteSlice(values), undefined];
-      }
-    }
-  }
-
-  #fill(recovery?: GoRecovery): void {
-    if (!this.#state.shouldFill()) {
-      return;
-    }
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      const target = readBuffer();
-      const source = requireSource(this.#source);
-      const [count, failure] = source.Read(target, recovery);
-      this.#state.accept(target, count, failure);
-      if (count > 0 || failure !== undefined) {
-        return;
-      }
-    }
-    this.#state.setFailure(this.#noProgress);
-  }
-}
-
-export function NewReaderCanonicalSync<
-  Failure extends GoInterfaceValue,
-  Source extends CanonicalReaderSourceSync<Failure>,
->(
-  source: Source | undefined,
-  noProgress: Failure | undefined,
-): CanonicalReaderSync<Failure, Source> {
-  return new CanonicalReaderSync(source, requireNoProgress(noProgress));
-}
-
-export class CanonicalReaderAsync<
-  Failure extends GoInterfaceValue,
-  Source extends CanonicalReaderSourceAsync<Failure>,
-> {
-  readonly #state = new ReaderBuffer<Failure>();
-  readonly #source: Source | undefined;
-  readonly #noProgress: Failure;
-
-  constructor(
-    source: Source | undefined,
-    noProgress: Failure,
-  ) {
-    this.#source = source;
-    this.#noProgress = noProgress;
-  }
-
-  static Read<
-    Failure extends GoInterfaceValue,
-    Source extends CanonicalReaderSourceAsync<Failure>,
-  >(
-    receiver: CanonicalReaderAsync<Failure, Source> | undefined,
+    receiver: CanonicalBufioReader<Failure, Source> | undefined,
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
   ): Promise<[int64, Failure | undefined]> {
-    return requireReaderAsync(receiver).Read(destination, recovery);
+    return requireReader(receiver).Read(destination, recovery);
   }
 
   static ReadByte<
     Failure extends GoInterfaceValue,
-    Source extends CanonicalReaderSourceAsync<Failure>,
+    Source extends CanonicalReader<Failure>,
   >(
-    receiver: CanonicalReaderAsync<Failure, Source> | undefined,
+    receiver: CanonicalBufioReader<Failure, Source> | undefined,
     recovery?: GoRecovery,
   ): Promise<[uint8, Failure | undefined]> {
-    return requireReaderAsync(receiver).ReadByte(recovery);
+    return requireReader(receiver).ReadByte(recovery);
   }
 
   static ReadBytes<
     Failure extends GoInterfaceValue,
-    Source extends CanonicalReaderSourceAsync<Failure>,
+    Source extends CanonicalReader<Failure>,
   >(
-    receiver: CanonicalReaderAsync<Failure, Source> | undefined,
+    receiver: CanonicalBufioReader<Failure, Source> | undefined,
     delimiter: uint8,
     recovery?: GoRecovery,
   ): Promise<[RuntimeSlice<uint8>, Failure | undefined]> {
-    return requireReaderAsync(receiver).ReadBytes(delimiter, recovery);
+    return requireReader(receiver).ReadBytes(delimiter, recovery);
   }
 
   async Read(
@@ -276,14 +161,14 @@ export class CanonicalReaderAsync<
   }
 }
 
-export function NewReaderCanonicalAsync<
+export function NewReaderCanonical<
   Failure extends GoInterfaceValue,
-  Source extends CanonicalReaderSourceAsync<Failure>,
+  Source extends CanonicalReader<Failure>,
 >(
   source: Source | undefined,
   noProgress: Failure | undefined,
-): CanonicalReaderAsync<Failure, Source> {
-  return new CanonicalReaderAsync(source, requireNoProgress(noProgress));
+): CanonicalBufioReader<Failure, Source> {
+  return new CanonicalBufioReader(source, requireNoProgress(noProgress));
 }
 
 function readBuffer(): RuntimeSlice<uint8> {
@@ -304,24 +189,12 @@ function requireNoProgress<Failure>(failure: Failure | undefined): Failure {
   return failure;
 }
 
-function requireReaderSync<
+function requireReader<
   Failure extends GoInterfaceValue,
-  Source extends CanonicalReaderSourceSync<Failure>,
+  Source extends CanonicalReader<Failure>,
 >(
-  receiver: CanonicalReaderSync<Failure, Source> | undefined,
-): CanonicalReaderSync<Failure, Source> {
-  if (receiver === undefined) {
-    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
-  }
-  return receiver;
-}
-
-function requireReaderAsync<
-  Failure extends GoInterfaceValue,
-  Source extends CanonicalReaderSourceAsync<Failure>,
->(
-  receiver: CanonicalReaderAsync<Failure, Source> | undefined,
-): CanonicalReaderAsync<Failure, Source> {
+  receiver: CanonicalBufioReader<Failure, Source> | undefined,
+): CanonicalBufioReader<Failure, Source> {
   if (receiver === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }

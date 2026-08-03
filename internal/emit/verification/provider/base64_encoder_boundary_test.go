@@ -158,14 +158,16 @@ func main() {
 	}
 	if !strings.Contains(
 		artifacts.printed,
-		"Base64NewEncoderCanonicalAsync<",
+		"Base64NewEncoderCanonical<",
 	) {
-		t.Fatalf("base64 output lacks async profile:\n%s", artifacts.printed)
+		t.Fatalf("base64 output lacks canonical boundary:\n%s", artifacts.printed)
 	}
-	if strings.Contains(
-		artifacts.printed,
+	for _, obsolete := range []string{
 		"Base64NewEncoderCanonicalSync",
-	) {
-		t.Fatalf("base64 output selected sync profile:\n%s", artifacts.printed)
+		"Base64NewEncoderCanonicalAsync",
+	} {
+		if strings.Contains(artifacts.printed, obsolete) {
+			t.Fatalf("base64 output retained profile variant %q:\n%s", obsolete, artifacts.printed)
+		}
 	}
 }

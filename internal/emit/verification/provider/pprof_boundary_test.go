@@ -142,8 +142,8 @@ func main() {
 		)
 	}
 	for _, required := range []string{
-		"PprofStartCPUProfileCanonicalAsyncWriterAsyncError",
-		"PprofProfileWriteToCanonicalAsyncWriterAsyncError",
+		"PprofStartCPUProfileCanonical",
+		"PprofProfileWriteToCanonical",
 		"await pprof__from_gostdlib.StopCPUProfile()",
 	} {
 		if !strings.Contains(artifacts.printed, required) {

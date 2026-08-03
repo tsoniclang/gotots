@@ -10,8 +10,8 @@ func validateFacetModule(
 	module FacetModuleDocument,
 	field string,
 	lookups map[facetLookup]struct{},
-	callableProfileLookups map[providerCallableProfileLookup]struct{},
-	statefulProfileLookups map[providerStatefulProfileLookup]struct{},
+	callableProfileLookups map[string]struct{},
+	statefulProfileLookups map[string]struct{},
 	providerInterfaceLookups map[string]struct{},
 ) error {
 	if !strings.HasPrefix(
@@ -118,14 +118,21 @@ func validateFacetModule(
 			)
 		}
 		previousProfile = key
-		lookup := providerCallableProfileLookup{
-			sourceIdentity: profile.SourceIdentity,
-			profileKey:     profile.ProfileKey,
+		boundaryEffect, err := providerProfileBoundaryEffect(
+			profile.Interfaces,
+			profileField+".interfaces",
+		)
+		if err != nil {
+			return err
 		}
-		if _, duplicate := callableProfileLookups[lookup]; duplicate {
-			return manifestError(profileField, "profile identity is duplicated")
+		if err := recordProviderBoundaryProfile(
+			callableProfileLookups,
+			profile.SourceIdentity,
+			boundaryEffect,
+			profileField,
+		); err != nil {
+			return err
 		}
-		callableProfileLookups[lookup] = struct{}{}
 		if err := recordProviderCallableProfileTarget(
 			profile,
 			profileField,
@@ -157,14 +164,21 @@ func validateFacetModule(
 			)
 		}
 		previousStatefulProfile = key
-		lookup := providerStatefulProfileLookup{
-			sourceIdentity: profile.SourceIdentity,
-			profileKey:     profile.ProfileKey,
+		boundaryEffect, err := providerProfileBoundaryEffect(
+			profile.Interfaces,
+			profileField+".interfaces",
+		)
+		if err != nil {
+			return err
 		}
-		if _, duplicate := statefulProfileLookups[lookup]; duplicate {
-			return manifestError(profileField, "profile identity is duplicated")
+		if err := recordProviderBoundaryProfile(
+			statefulProfileLookups,
+			profile.SourceIdentity,
+			boundaryEffect,
+			profileField,
+		); err != nil {
+			return err
 		}
-		statefulProfileLookups[lookup] = struct{}{}
 		if err := recordProviderStatefulProfileTarget(
 			profile,
 			profileField,
@@ -228,6 +242,23 @@ func validateFacetModule(
 			)
 		}
 	}
+	return nil
+}
+
+func recordProviderBoundaryProfile(
+	lookups map[string]struct{},
+	sourceIdentity string,
+	effect EffectKind,
+	field string,
+) error {
+	key := sourceIdentity + "\x00" + string(effect)
+	if _, duplicate := lookups[key]; duplicate {
+		return manifestError(
+			field,
+			"source identity has multiple profiles for one boundary effect",
+		)
+	}
+	lookups[key] = struct{}{}
 	return nil
 }
 

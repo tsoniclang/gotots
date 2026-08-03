@@ -13,10 +13,7 @@ import type {
 } from "./io.js";
 import { state as ioState } from "./io.js";
 import { ProviderError } from "./internal/runtime/error.js";
-import {
-  CanonicalScannerSync,
-  NewScannerCanonicalSync,
-} from "./internal/facets/provider-bufio-scanner.js";
+import { ProviderScanner } from "./internal/portable/io/scanner.js";
 
 class BufferedReader {
   constructor(
@@ -72,10 +69,10 @@ function requireReader(receiver: Reader | undefined): Reader {
 }
 
 export class Scanner {
-  readonly #implementation: CanonicalScannerSync<GoError, IoReader>;
+  readonly #implementation: ProviderScanner<GoError, IoReader>;
 
   constructor(source: IoReader | undefined) {
-    this.#implementation = NewScannerCanonicalSync(
+    this.#implementation = new ProviderScanner(
       source,
       state.ErrBadReadCount,
       state.ErrTooLong,
@@ -85,15 +82,15 @@ export class Scanner {
   }
 
   static Err(receiver: Scanner | undefined): GoError | undefined {
-    return CanonicalScannerSync.Err(requireScanner(receiver).#implementation);
+    return requireScanner(receiver).#implementation.Err();
   }
 
   static Scan(receiver: Scanner | undefined): bool {
-    return CanonicalScannerSync.Scan(requireScanner(receiver).#implementation);
+    return requireScanner(receiver).#implementation.Scan();
   }
 
   static Text(receiver: Scanner | undefined): gostring {
-    return CanonicalScannerSync.Text(requireScanner(receiver).#implementation);
+    return requireScanner(receiver).#implementation.Text();
   }
 }
 

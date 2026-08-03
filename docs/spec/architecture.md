@@ -280,8 +280,9 @@ gain a hidden payload/effect type parameter. Method values and method
 expressions create typed wrappers with the exact receiver-free Go signature;
 they never use `.call`, `.apply`, or `.bind`.
 
-This single ABI replaces callable-profile matrices, public cooperative
-variants, effect-dependent named-type arity, and runtime Promise detection.
+Within cooperative compilation, this single ABI replaces callable-profile
+matrices, public cooperative variants, effect-dependent named-type arity, and
+runtime Promise detection.
 
 ## Values And Representations
 
@@ -529,6 +530,16 @@ not a source type argument, default, constraint, or alternate public alias.
 When provider parameter or result representations differ from generated ones,
 the static provider facade owns one typed adapter at the crossing; ordinary
 generated declarations and values never inherit the provider ABI.
+
+Provider boundary certificates are mode-bounded, not method-profile matrices.
+An ordinary direct call uses the source-synchronous ABI. A required semantic
+protocol such as `errors.Is` may therefore have one direct certificate whose
+transported methods are all synchronous. Cooperative compilation may have one
+certificate for the same Go identity whose transported methods all use the
+canonical `Awaitable` ABI. No source identity may have more than one certificate
+for either boundary effect, and no certificate may mix synchronous and
+`Awaitable` transported methods. Ordinary direct provider calls that need no
+semantic protocol use their regular binding and require no duplicate profile.
 
 For example, Go `io/fs.WalkDirFunc` remains one non-generic generated callable
 type whose result is `Awaitable<error>`. The provider may implement its private

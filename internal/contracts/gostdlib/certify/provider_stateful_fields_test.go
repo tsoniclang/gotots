@@ -40,7 +40,7 @@ func TestStatefulProfileTargetFieldsExactJoin(t *testing.T) {
 	}
 	var target tsgo.ProjectExport
 	for _, selected := range exports {
-		if selected.Name() == "CanonicalGzipReaderReadAsync" {
+		if selected.Name() == "CanonicalGzipReader" {
 			target = selected
 			break
 		}

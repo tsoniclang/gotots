@@ -9,37 +9,24 @@ import { decodeGzip } from "../node/compress/gzip/decode.js";
 import {
   GzipSourceState,
   runGzipSourceAsync,
-  runGzipSourceSync,
 } from "../portable/compress/gzip/header.js";
 import { bytes, writeBytes } from "../runtime/slice.js";
 import { goInterfaceEqual } from "../runtime/interface.js";
 import { Time, UnixMilli } from "../../time.js";
 import {
-  CanonicalBoundaryErrorAsync,
+  CanonicalBoundaryError,
 } from "./provider-io-contract.js";
 import type {
-  CanonicalErrorAsync,
-  CanonicalReaderSourceAsync,
-  CanonicalReaderSourceSync,
+  CanonicalError,
+  CanonicalReader,
 } from "./provider-io-contract.js";
 
 export type {
-  CanonicalErrorAsync,
-  CanonicalReaderSourceAsync,
-  CanonicalReaderSourceSync,
+  CanonicalError,
+  CanonicalReader,
 } from "./provider-io-contract.js";
 
-export interface CanonicalFlateReaderSync<
-  Failure extends GoInterfaceValue,
-> extends GoInterfaceValue {
-  Read(
-    destination: RuntimeSlice<uint8>,
-    recovery?: GoRecovery,
-  ): [int64, Failure | undefined];
-  ReadByte(recovery?: GoRecovery): [uint8, Failure | undefined];
-}
-
-export interface CanonicalFlateReaderReadAsync<
+export interface CanonicalFlateReader<
   Failure extends GoInterfaceValue,
 > extends GoInterfaceValue {
   Read(
@@ -49,7 +36,7 @@ export interface CanonicalFlateReaderReadAsync<
   ReadByte(recovery?: GoRecovery): Awaitable<[uint8, Failure | undefined]>;
 }
 
-export interface CanonicalReadCloserReadAsync<
+export interface CanonicalReadCloser<
   Failure extends GoInterfaceValue,
 > extends GoInterfaceValue {
   Read(
@@ -59,28 +46,18 @@ export interface CanonicalReadCloserReadAsync<
   Close(recovery?: GoRecovery): Awaitable<Failure | undefined>;
 }
 
-export interface CanonicalReadCloserCloseAsync<
-  Failure extends GoInterfaceValue,
-> extends GoInterfaceValue {
-  Read(
-    destination: RuntimeSlice<uint8>,
-    recovery?: GoRecovery,
-  ): Awaitable<[int64, Failure | undefined]>;
-  Close(recovery?: GoRecovery): Awaitable<Failure | undefined>;
-}
-
-class CanonicalGzipPayload<Failure extends CanonicalErrorAsync> {
+class CanonicalGzipPayload<Failure extends CanonicalError> {
   private decoded: Uint8Array | undefined;
   private offset = 0;
-  private terminalFailure: CanonicalErrorAsync | undefined;
+  private terminalFailure: CanonicalError | undefined;
   private closed = false;
 
   constructor(
     private readonly eof: Failure,
-    private readonly invalidError: (message: string) => CanonicalErrorAsync,
+    private readonly invalidError: (message: string) => CanonicalError,
   ) {}
 
-  Close(): CanonicalErrorAsync | undefined {
+  Close(): CanonicalError | undefined {
     this.closed = true;
     return undefined;
   }
@@ -94,7 +71,7 @@ class CanonicalGzipPayload<Failure extends CanonicalErrorAsync> {
 
   Load(
     encoded: RuntimeSlice<uint8>,
-    sourceFailure: CanonicalErrorAsync | undefined,
+    sourceFailure: CanonicalError | undefined,
   ): void {
     if (sourceFailure !== undefined && !goInterfaceEqual(sourceFailure, this.eof)) {
       this.terminalFailure = sourceFailure;
@@ -109,7 +86,7 @@ class CanonicalGzipPayload<Failure extends CanonicalErrorAsync> {
 
   Read(
     destination: RuntimeSlice<uint8>,
-  ): [int64, CanonicalErrorAsync | undefined] {
+  ): [int64, CanonicalError | undefined] {
     if (this.closed) {
       return [0, this.invalidError("gzip: reader is closed")];
     }
@@ -134,26 +111,26 @@ class CanonicalGzipPayload<Failure extends CanonicalErrorAsync> {
   }
 }
 
-class CanonicalGzipReaderAsyncState<Failure extends CanonicalErrorAsync> {
+class CanonicalGzipReaderState<Failure extends CanonicalError> {
   private readonly payload: CanonicalGzipPayload<Failure>;
 
   constructor(
-    private readonly sourceState: GzipSourceState<CanonicalErrorAsync>,
-    private readonly source: CanonicalReaderSourceAsync<Failure>,
+    private readonly sourceState: GzipSourceState<CanonicalError>,
+    private readonly source: CanonicalReader<Failure>,
     eof: Failure,
-    invalidError: (message: string) => CanonicalErrorAsync,
+    invalidError: (message: string) => CanonicalError,
   ) {
     this.payload = new CanonicalGzipPayload(eof, invalidError);
   }
 
-  Close(): CanonicalErrorAsync | undefined {
+  Close(): CanonicalError | undefined {
     return this.payload.Close();
   }
 
   async Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, CanonicalErrorAsync | undefined]> {
+  ): Promise<[int64, CanonicalError | undefined]> {
     if (this.payload.NeedsLoad(destination)) {
       const [encoded, sourceFailure] = await runGzipSourceAsync(
         this.sourceState.beginDrain(),
@@ -165,40 +142,9 @@ class CanonicalGzipReaderAsyncState<Failure extends CanonicalErrorAsync> {
   }
 }
 
-class CanonicalGzipReaderSyncState<Failure extends CanonicalErrorAsync> {
-  private readonly payload: CanonicalGzipPayload<Failure>;
-
-  constructor(
-    private readonly sourceState: GzipSourceState<CanonicalErrorAsync>,
-    private readonly source: CanonicalReaderSourceSync<Failure>,
-    eof: Failure,
-    invalidError: (message: string) => CanonicalErrorAsync,
-  ) {
-    this.payload = new CanonicalGzipPayload(eof, invalidError);
-  }
-
-  Close(): CanonicalErrorAsync | undefined {
-    return this.payload.Close();
-  }
-
-  Read(
-    destination: RuntimeSlice<uint8>,
-    recovery?: GoRecovery,
-  ): [int64, CanonicalErrorAsync | undefined] {
-    if (this.payload.NeedsLoad(destination)) {
-      const [encoded, sourceFailure] = runGzipSourceSync(
-        this.sourceState.beginDrain(),
-        (target) => this.source.Read(target, recovery),
-      );
-      this.payload.Load(encoded, sourceFailure);
-    }
-    return this.payload.Read(destination);
-  }
-}
-
-export class CanonicalGzipReaderReadAsync<
+export class CanonicalGzipReader<
   FlateReader extends GoInterfaceValue,
-  Failure extends CanonicalErrorAsync,
+  Failure extends CanonicalError,
   ReadCloser extends GoInterfaceValue,
 > {
   declare private readonly flateReaderContract: FlateReader;
@@ -206,126 +152,70 @@ export class CanonicalGzipReaderReadAsync<
 
   constructor(
     public Header: Header,
-    private readonly state: CanonicalGzipReaderAsyncState<Failure>,
+    private readonly state: CanonicalGzipReaderState<Failure>,
   ) {}
 
   static Close<
     FlateReader extends GoInterfaceValue,
-    Failure extends CanonicalErrorAsync,
+    Failure extends CanonicalError,
     ReadCloser extends GoInterfaceValue,
   >(
-    receiver: CanonicalGzipReaderReadAsync<
+    receiver: CanonicalGzipReader<
       FlateReader,
       Failure,
       ReadCloser
     > | undefined,
     recovery?: GoRecovery,
-  ): CanonicalErrorAsync | undefined {
+  ): CanonicalError | undefined {
     return requireValue(receiver, "gzip.Reader").Close(recovery);
   }
 
   static Read<
     FlateReader extends GoInterfaceValue,
-    Failure extends CanonicalErrorAsync,
+    Failure extends CanonicalError,
     ReadCloser extends GoInterfaceValue,
   >(
-    receiver: CanonicalGzipReaderReadAsync<
+    receiver: CanonicalGzipReader<
       FlateReader,
       Failure,
       ReadCloser
     > | undefined,
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, CanonicalErrorAsync | undefined]> {
+  ): Promise<[int64, CanonicalError | undefined]> {
     return requireValue(receiver, "gzip.Reader").Read(destination, recovery);
   }
 
-  Close(_recovery?: GoRecovery): CanonicalErrorAsync | undefined {
+  Close(_recovery?: GoRecovery): CanonicalError | undefined {
     return this.state.Close();
   }
 
   async Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, CanonicalErrorAsync | undefined]> {
+  ): Promise<[int64, CanonicalError | undefined]> {
     return this.state.Read(destination, recovery);
   }
 }
 
-export class CanonicalGzipReaderCloseAsync<
-  FlateReader extends GoInterfaceValue,
-  Failure extends CanonicalErrorAsync,
-  ReadCloser extends GoInterfaceValue,
-> {
-  declare private readonly flateReaderContract: FlateReader;
-  declare private readonly readCloserContract: ReadCloser;
-
-  constructor(
-    public Header: Header,
-    private readonly state: CanonicalGzipReaderSyncState<Failure>,
-  ) {}
-
-  static Close<
-    FlateReader extends GoInterfaceValue,
-    Failure extends CanonicalErrorAsync,
-    ReadCloser extends GoInterfaceValue,
-  >(
-    receiver: CanonicalGzipReaderCloseAsync<
-      FlateReader,
-      Failure,
-      ReadCloser
-    > | undefined,
-    recovery?: GoRecovery,
-  ): Promise<CanonicalErrorAsync | undefined> {
-    return requireValue(receiver, "gzip.Reader").Close(recovery);
-  }
-
-  static Read<
-    FlateReader extends GoInterfaceValue,
-    Failure extends CanonicalErrorAsync,
-    ReadCloser extends GoInterfaceValue,
-  >(
-    receiver: CanonicalGzipReaderCloseAsync<
-      FlateReader,
-      Failure,
-      ReadCloser
-    > | undefined,
-    destination: RuntimeSlice<uint8>,
-    recovery?: GoRecovery,
-  ): [int64, CanonicalErrorAsync | undefined] {
-    return requireValue(receiver, "gzip.Reader").Read(destination, recovery);
-  }
-
-  async Close(_recovery?: GoRecovery): Promise<CanonicalErrorAsync | undefined> {
-    return this.state.Close();
-  }
-
-  Read(
-    destination: RuntimeSlice<uint8>,
-    recovery?: GoRecovery,
-  ): [int64, CanonicalErrorAsync | undefined] {
-    return this.state.Read(destination, recovery);
-  }
-}
-
-async function initializeGzipReaderAsync<Failure extends CanonicalErrorAsync>(
-  source: CanonicalReaderSourceAsync<Failure> | undefined,
+async function initializeGzipReader<Failure extends CanonicalError>(
+  source: CanonicalReader<Failure> | undefined,
   eof: Failure | undefined,
   unexpectedEOF: Failure | undefined,
   noProgress: Failure | undefined,
   errorContract: readonly object[],
 ): Promise<[
   Header | undefined,
-  CanonicalGzipReaderAsyncState<Failure> | undefined,
-  CanonicalErrorAsync | undefined,
+  CanonicalGzipReaderState<Failure> | undefined,
+  CanonicalError | undefined,
 ]> {
-  const invalidError = (message: string): CanonicalErrorAsync =>
-    new CanonicalBoundaryErrorAsync(message, errorContract);
+  const invalidError = (message: string): CanonicalError =>
+    new CanonicalBoundaryError(message, errorContract);
   if (source === undefined) {
     return [undefined, undefined, invalidError("gzip: nil Reader")];
   }
   const canonicalEOF = requireValue(eof, "io.EOF");
-  const sourceState = new GzipSourceState<CanonicalErrorAsync>(
+  const sourceState = new GzipSourceState<CanonicalError>(
     canonicalEOF,
     requireValue(unexpectedEOF, "io.ErrUnexpectedEOF"),
     requireValue(noProgress, "io.ErrNoProgress"),
@@ -351,7 +241,7 @@ async function initializeGzipReaderAsync<Failure extends CanonicalErrorAsync>(
       header.name,
       header.operatingSystem,
     ),
-    new CanonicalGzipReaderAsyncState(
+    new CanonicalGzipReaderState(
       sourceState,
       source,
       canonicalEOF,
@@ -361,74 +251,21 @@ async function initializeGzipReaderAsync<Failure extends CanonicalErrorAsync>(
   ];
 }
 
-function initializeGzipReaderSync<Failure extends CanonicalErrorAsync>(
-  source: CanonicalReaderSourceSync<Failure> | undefined,
-  eof: Failure | undefined,
-  unexpectedEOF: Failure | undefined,
-  noProgress: Failure | undefined,
-  errorContract: readonly object[],
-): [
-  Header | undefined,
-  CanonicalGzipReaderSyncState<Failure> | undefined,
-  CanonicalErrorAsync | undefined,
-] {
-  const invalidError = (message: string): CanonicalErrorAsync =>
-    new CanonicalBoundaryErrorAsync(message, errorContract);
-  if (source === undefined) {
-    return [undefined, undefined, invalidError("gzip: nil Reader")];
-  }
-  const canonicalEOF = requireValue(eof, "io.EOF");
-  const sourceState = new GzipSourceState<CanonicalErrorAsync>(
-    canonicalEOF,
-    requireValue(unexpectedEOF, "io.ErrUnexpectedEOF"),
-    requireValue(noProgress, "io.ErrNoProgress"),
-    () => invalidError("gzip: invalid header"),
-  );
-  const [header, failure] = runGzipSourceSync(
-    sourceState.beginHeader(),
-    (destination) => source.Read(destination),
-  );
-  if (failure !== undefined) {
-    return [undefined, undefined, failure];
-  }
-  if (header === undefined) {
-    return [undefined, undefined, invalidError("gzip: invalid header")];
-  }
-  return [
-    new Header(
-      header.comment,
-      header.extra,
-      header.modificationTimeSeconds === 0
-        ? new Time()
-        : UnixMilli(header.modificationTimeSeconds * 1000),
-      header.name,
-      header.operatingSystem,
-    ),
-    new CanonicalGzipReaderSyncState(
-      sourceState,
-      source,
-      canonicalEOF,
-      invalidError,
-    ),
-    undefined,
-  ];
-}
-
-export async function GzipNewReaderCanonicalReadAsync<
+export async function GzipNewReaderCanonical<
   FlateReader extends GoInterfaceValue,
-  Failure extends CanonicalErrorAsync,
+  Failure extends CanonicalError,
   ReadCloser extends GoInterfaceValue,
 >(
-  source: CanonicalReaderSourceAsync<Failure> | undefined,
+  source: CanonicalReader<Failure> | undefined,
   eof: Failure | undefined,
   unexpectedEOF: Failure | undefined,
   noProgress: Failure | undefined,
   errorContract: readonly object[],
 ): Promise<[
-  CanonicalGzipReaderReadAsync<FlateReader, Failure, ReadCloser> | undefined,
-  CanonicalErrorAsync | undefined,
+  CanonicalGzipReader<FlateReader, Failure, ReadCloser> | undefined,
+  CanonicalError | undefined,
 ]> {
-  const [header, state, failure] = await initializeGzipReaderAsync(
+  const [header, state, failure] = await initializeGzipReader(
     source,
     eof,
     unexpectedEOF,
@@ -439,40 +276,7 @@ export async function GzipNewReaderCanonicalReadAsync<
     return [undefined, failure];
   }
   return [
-    new CanonicalGzipReaderReadAsync<FlateReader, Failure, ReadCloser>(
-      header,
-      state,
-    ),
-    undefined,
-  ];
-}
-
-export async function GzipNewReaderCanonicalCloseAsync<
-  FlateReader extends GoInterfaceValue,
-  Failure extends CanonicalErrorAsync,
-  ReadCloser extends GoInterfaceValue,
->(
-  source: CanonicalReaderSourceSync<Failure> | undefined,
-  eof: Failure | undefined,
-  unexpectedEOF: Failure | undefined,
-  noProgress: Failure | undefined,
-  errorContract: readonly object[],
-): Promise<[
-  CanonicalGzipReaderCloseAsync<FlateReader, Failure, ReadCloser> | undefined,
-  CanonicalErrorAsync | undefined,
-]> {
-  const [header, state, failure] = initializeGzipReaderSync(
-    source,
-    eof,
-    unexpectedEOF,
-    noProgress,
-    errorContract,
-  );
-  if (header === undefined || state === undefined) {
-    return [undefined, failure];
-  }
-  return [
-    new CanonicalGzipReaderCloseAsync<FlateReader, Failure, ReadCloser>(
+    new CanonicalGzipReader<FlateReader, Failure, ReadCloser>(
       header,
       state,
     ),

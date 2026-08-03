@@ -139,14 +139,16 @@ func main() {
 	}
 	if !strings.Contains(
 		artifacts.printed,
-		"OsSignalNotifyContextCanonicalContextSignal<",
+		"OsSignalNotifyContextCanonical<",
 	) {
 		t.Fatalf("NotifyContext output lacks canonical cooperative profile:\n%s", artifacts.printed)
 	}
-	if strings.Contains(
-		artifacts.printed,
+	for _, obsolete := range []string{
 		"OsSignalNotifyContextCanonicalContext<",
-	) {
-		t.Fatalf("NotifyContext output retained a partial context profile:\n%s", artifacts.printed)
+		"OsSignalNotifyContextCanonicalContextSignal<",
+	} {
+		if strings.Contains(artifacts.printed, obsolete) {
+			t.Fatalf("NotifyContext output retained profile variant %q:\n%s", obsolete, artifacts.printed)
+		}
 	}
 }

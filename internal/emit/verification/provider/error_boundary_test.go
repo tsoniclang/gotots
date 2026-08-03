@@ -134,13 +134,16 @@ func main() {
 		)
 	}
 	for _, required := range []string{
-		"ErrorsIsCanonical",
+		"ErrorsIsDirect",
 		"readonly comparable: boolean",
 		"$is",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("errors.Is output lacks %q:\n%s", required, artifacts.printed)
 		}
+	}
+	if strings.Contains(artifacts.printed, "ErrorsIsCanonical(") {
+		t.Fatalf("direct errors.Is output selected cooperative boundary:\n%s", artifacts.printed)
 	}
 }
 
@@ -250,7 +253,7 @@ func main() { fmt.Println(protocol.Result()) }
 		)
 	}
 	for _, required := range []string{
-		"ErrorsIsCanonicalAsyncErrorAsyncAll",
+		"ErrorsIsCanonical",
 		"async Is(",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
@@ -368,7 +371,7 @@ func main() { fmt.Println(comparison.Result()) }
 		)
 	}
 	for _, required := range []string{
-		"ErrorsIsCanonicalAsyncErrorAsyncAll",
+		"ErrorsIsCanonical",
 		"async Error(",
 	} {
 		if !strings.Contains(artifacts.printed, required) {

@@ -155,10 +155,11 @@ func main() {
 			targetOutput,
 		)
 	}
-	if !strings.Contains(artifacts.printed, "IoReadFullCanonicalAsync") {
-		t.Fatalf("io.ReadFull output lacks async profile:\n%s", artifacts.printed)
+	if !strings.Contains(artifacts.printed, "IoReadFullCanonical") {
+		t.Fatalf("io.ReadFull output lacks canonical boundary:\n%s", artifacts.printed)
 	}
-	if strings.Contains(artifacts.printed, "IoReadFullCanonicalSync") {
-		t.Fatalf("io.ReadFull output selected sync profile:\n%s", artifacts.printed)
+	if strings.Contains(artifacts.printed, "IoReadFullCanonicalSync") ||
+		strings.Contains(artifacts.printed, "IoReadFullCanonicalAsync") {
+		t.Fatalf("io.ReadFull output retained a profile variant:\n%s", artifacts.printed)
 	}
 }

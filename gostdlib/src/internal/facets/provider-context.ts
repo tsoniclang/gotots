@@ -7,18 +7,15 @@ import type { Awaitable, bool } from "@gotots/runtime/scalars.js";
 import { GoEmptyStruct } from "@gotots/runtime/struct.js";
 
 import { ProviderChannel } from "../portable/concurrency/channel.js";
-import { propagateCancel } from "../portable/context/propagation.js";
+import { propagateCancelAwaitable } from "../portable/context/propagation.js";
 import { Duration } from "../portable/time/duration.js";
 import { After } from "../portable/time/timer.js";
 import { Now, Time } from "../portable/time/time.js";
 import { goInterfaceEqual } from "../runtime/interface.js";
 
-export type {
-  CanonicalErrorAsync,
-  CanonicalErrorSync,
-} from "./provider-io-contract.js";
+export type { CanonicalError } from "./provider-io-contract.js";
 
-export interface CanonicalContextSync<Failure extends GoInterfaceValue>
+export interface CanonicalContext<Failure extends GoInterfaceValue>
   extends GoInterfaceValue {
   Deadline(recovery?: GoRecovery): Awaitable<[Time, bool]>;
   Done(
@@ -32,7 +29,7 @@ export interface CanonicalContextSync<Failure extends GoInterfaceValue>
 }
 
 abstract class ContextValue<Failure extends GoInterfaceValue>
-	implements CanonicalContextSync<Failure> {
+	implements CanonicalContext<Failure> {
 	static readonly comparable = true;
   readonly $go$methods: ReadonlySet<object>;
   readonly $go$formatString = false;
@@ -74,7 +71,7 @@ abstract class ContextValue<Failure extends GoInterfaceValue>
 
 class ValueContext<
   Failure extends GoInterfaceValue,
-  Parent extends CanonicalContextSync<Failure>,
+  Parent extends CanonicalContext<Failure>,
 > extends ContextValue<Failure> {
   readonly $go$type = ValueContext;
   readonly #parent: Parent;
@@ -131,7 +128,7 @@ class ValueContext<
 
 class CancelContext<
   Failure extends GoInterfaceValue,
-  Parent extends CanonicalContextSync<Failure>,
+  Parent extends CanonicalContext<Failure>,
 > extends ContextValue<Failure> {
   readonly #done = new ProviderChannel<GoEmptyStruct>(
     () => GoEmptyStruct.$zero(),
@@ -150,7 +147,7 @@ class CancelContext<
   }
 
   async Initialize(): Promise<this> {
-    propagateCancel(
+    await propagateCancelAwaitable(
       await this.parent.Done(),
       this.#done,
       () => this.parent.Err(),
@@ -206,15 +203,15 @@ class CancelContext<
   }
 }
 
-export function ContextWithValueCanonicalSync<
+export function ContextWithValueCanonical<
   Failure extends GoInterfaceValue,
-  Parent extends CanonicalContextSync<Failure>,
+  Parent extends CanonicalContext<Failure>,
 >(
   parent: Parent | undefined,
   key: GoInterfaceValue | undefined,
   value: GoInterfaceValue | undefined,
   contextContract: readonly object[],
-): CanonicalContextSync<Failure> {
+): CanonicalContext<Failure> {
   if (parent === undefined) {
     GoPanic.raiseRuntime("cannot create context from nil parent");
   }
@@ -224,15 +221,15 @@ export function ContextWithValueCanonicalSync<
   return new ValueContext(parent, key, value, contextContract);
 }
 
-export async function ContextWithCancelCanonicalSync<
+export async function ContextWithCancelCanonical<
   Failure extends GoInterfaceValue,
-  Parent extends CanonicalContextSync<Failure>,
+  Parent extends CanonicalContext<Failure>,
 >(
   parent: Parent | undefined,
   canceled: Failure | undefined,
   contextContract: readonly object[],
 ): Promise<[
-  CanonicalContextSync<Failure>,
+  CanonicalContext<Failure>,
   (_recovery?: GoRecovery) => Awaitable<void>,
 ]> {
   const requiredCanceled = requireFailure(canceled);
@@ -247,15 +244,15 @@ export async function ContextWithCancelCanonicalSync<
   ];
 }
 
-export async function ContextWithCancelCauseCanonicalSync<
+export async function ContextWithCancelCauseCanonical<
   Failure extends GoInterfaceValue,
-  Parent extends CanonicalContextSync<Failure>,
+  Parent extends CanonicalContext<Failure>,
 >(
   parent: Parent | undefined,
   canceled: Failure | undefined,
   contextContract: readonly object[],
 ): Promise<[
-  CanonicalContextSync<Failure>,
+  CanonicalContext<Failure>,
   (cause: Failure | undefined, _recovery?: GoRecovery) => Awaitable<void>,
 ]> {
   const requiredCanceled = requireFailure(canceled);
@@ -271,9 +268,9 @@ export async function ContextWithCancelCauseCanonicalSync<
   ];
 }
 
-export async function ContextWithTimeoutCanonicalSync<
+export async function ContextWithTimeoutCanonical<
   Failure extends GoInterfaceValue,
-  Parent extends CanonicalContextSync<Failure>,
+  Parent extends CanonicalContext<Failure>,
 >(
   parent: Parent | undefined,
   timeout: Duration,
@@ -281,7 +278,7 @@ export async function ContextWithTimeoutCanonicalSync<
   deadlineExceeded: Failure | undefined,
   contextContract: readonly object[],
 ): Promise<[
-  CanonicalContextSync<Failure>,
+  CanonicalContext<Failure>,
   (_recovery?: GoRecovery) => Awaitable<void>,
 ]> {
   const actualParent = requireParent(parent);
@@ -305,9 +302,9 @@ export async function ContextWithTimeoutCanonicalSync<
   ];
 }
 
-export async function ContextAfterFuncCanonicalSync<
+export async function ContextAfterFuncCanonical<
   Failure extends GoInterfaceValue,
-  Parent extends CanonicalContextSync<Failure>,
+  Parent extends CanonicalContext<Failure>,
 >(
   parent: Parent | undefined,
   callback: (() => Awaitable<void>) | undefined,
@@ -335,16 +332,16 @@ export async function ContextAfterFuncCanonicalSync<
   };
 }
 
-export async function ContextCauseCanonicalSync<
+export async function ContextCauseCanonical<
   Failure extends GoInterfaceValue,
-  Parent extends CanonicalContextSync<Failure>,
+  Parent extends CanonicalContext<Failure>,
 >(parent: Parent | undefined): Promise<Failure | undefined> {
   return await contextCause(requireParent(parent));
 }
 
 function requireParent<
   Failure extends GoInterfaceValue,
-  Parent extends CanonicalContextSync<Failure>,
+  Parent extends CanonicalContext<Failure>,
 >(parent: Parent | undefined): Parent {
   if (parent === undefined) {
     GoPanic.raiseRuntime("cannot create context from nil parent");
@@ -362,7 +359,7 @@ function requireFailure<Failure extends GoInterfaceValue>(
 }
 
 async function contextCause<Failure extends GoInterfaceValue>(
-  source: CanonicalContextSync<Failure>,
+  source: CanonicalContext<Failure>,
 ): Promise<Failure | undefined> {
   return await (source instanceof ContextValue ? source.Cause() : source.Err());
 }

@@ -130,6 +130,12 @@ func validateProviderCallableProfile(
 			Methods:        methods,
 		})
 	}
+	if _, err := providerProfileBoundaryEffect(
+		profile.Interfaces,
+		field+".interfaces",
+	); err != nil {
+		return err
+	}
 	seenTypeArguments := make(map[string]struct{}, len(profile.CanonicalTypeArguments))
 	for index, identity := range profile.CanonicalTypeArguments {
 		if _, ok := interfaceIdentities[identity]; !ok {
@@ -228,6 +234,46 @@ func validateProviderCallableProfile(
 		}
 	}
 	return nil
+}
+
+func providerProfileBoundaryEffect(
+	interfaces []ProviderCallableProfileInterfaceDocument,
+	field string,
+) (EffectKind, error) {
+	effect := EffectInvalid
+	for interfaceIndex, selected := range interfaces {
+		for methodIndex, method := range selected.ProviderInterface.Methods {
+			methodField := fmt.Sprintf(
+				"%s[%d].providerInterface.methods[%d].effect",
+				field,
+				interfaceIndex,
+				methodIndex,
+			)
+			if method.Effect != EffectSynchronous && method.Effect != EffectAwaitable {
+				return EffectInvalid, manifestError(
+					methodField,
+					"transported method is neither direct nor awaitable",
+				)
+			}
+			if effect == EffectInvalid {
+				effect = method.Effect
+				continue
+			}
+			if method.Effect != effect {
+				return EffectInvalid, manifestError(
+					field,
+					"profile mixes direct and cooperative transported methods",
+				)
+			}
+		}
+	}
+	if effect == EffectInvalid {
+		return EffectInvalid, manifestError(
+			field,
+			"profile has no transported method effect",
+		)
+	}
+	return effect, nil
 }
 
 func sameProviderCallableProfileInterface(

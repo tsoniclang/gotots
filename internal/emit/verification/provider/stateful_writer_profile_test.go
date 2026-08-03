@@ -183,7 +183,7 @@ func main() {
 		)
 	}
 	for _, required := range []string{
-		"CanonicalWriter",
+		"CanonicalBufioWriter",
 		"await $goProviderState",
 		"WriteByte",
 		".Flush(",

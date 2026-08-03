@@ -180,6 +180,64 @@ func TestImplementedResultRequiresContractOwner(t *testing.T) {
 	}
 }
 
+func TestProviderProfileSeedsAllowBoundaryModesButRejectDuplicateTargets(t *testing.T) {
+	callable := providerCallableProfileSeed{
+		SourceIdentity:      "example.com/source|kind=4|receiver=|name=Read",
+		Specifier:           "@gotots/gostdlib/internal/facets/provider-read.js",
+		SourcePath:          "src/internal/facets/provider-read.ts",
+		Export:              "ReadCanonical",
+		CanonicalParameters: []int{0},
+		Interfaces: []providerCallableProfileInterfaceSeed{{
+			SourceIdentity: "example.com/source|kind=2|receiver=|name=Reader",
+			Export:         "CanonicalReader",
+		}},
+	}
+	duplicateCallable := callable
+	duplicateCallable.Export = "ReadCanonicalVariant"
+	duplicateCallable.Interfaces = []providerCallableProfileInterfaceSeed{{
+		SourceIdentity: "example.com/source|kind=2|receiver=|name=Reader",
+		Export:         "CanonicalReaderVariant",
+	}}
+	if _, err := validateProviderCallableProfileSeeds(
+		[]providerCallableProfileSeed{callable, duplicateCallable},
+		nil,
+	); err != nil {
+		t.Fatalf("two callable boundary targets: %v", err)
+	}
+	if _, err := validateProviderCallableProfileSeeds(
+		[]providerCallableProfileSeed{callable, callable},
+		nil,
+	); err == nil || !strings.Contains(err.Error(), "duplicated") {
+		t.Fatalf("duplicate callable target error = %v", err)
+	}
+
+	stateful := providerStatefulProfileSeed{
+		SourceIdentity: "example.com/source|kind=2|receiver=|name=State",
+		Specifier:      "@gotots/gostdlib/internal/facets/provider-state.js",
+		SourcePath:     "src/internal/facets/provider-state.ts",
+		Export:         "CanonicalState",
+		Interfaces: []providerCallableProfileInterfaceSeed{{
+			SourceIdentity: "example.com/source|kind=2|receiver=|name=Reader",
+			Export:         "CanonicalReader",
+		}},
+		TypeArguments: []string{
+			"example.com/source|kind=2|receiver=|name=Reader",
+		},
+	}
+	duplicateStateful := stateful
+	duplicateStateful.Export = "CanonicalStateVariant"
+	if _, err := validateProviderStatefulProfileSeeds(
+		[]providerStatefulProfileSeed{stateful, duplicateStateful},
+	); err != nil {
+		t.Fatalf("two stateful boundary targets: %v", err)
+	}
+	if _, err := validateProviderStatefulProfileSeeds(
+		[]providerStatefulProfileSeed{stateful, stateful},
+	); err == nil || !strings.Contains(err.Error(), "duplicated") {
+		t.Fatalf("duplicate stateful target error = %v", err)
+	}
+}
+
 func TestGenericCallableKernelRejectsProviderArityDrift(t *testing.T) {
 	repository, err := filepath.Abs("../../../..")
 	if err != nil {

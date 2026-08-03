@@ -68,6 +68,12 @@ func validateProviderStatefulProfile(
 			Methods:        methods,
 		})
 	}
+	if _, err := providerProfileBoundaryEffect(
+		profile.Interfaces,
+		field+".interfaces",
+	); err != nil {
+		return err
+	}
 	seenTypeArguments := make(map[string]struct{}, len(profile.TypeArguments))
 	for index, identity := range profile.TypeArguments {
 		if _, ok := interfaceIdentities[identity]; !ok {

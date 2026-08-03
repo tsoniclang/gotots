@@ -4,9 +4,9 @@ import type { gostring } from "@gotots/runtime/scalars.js";
 import type { uint32 } from "@gotots/runtime/scalars.js";
 
 import { FileMode, PathError } from "../../io/fs.js";
-import type { CanonicalErrorAsync } from "./provider-io-contract.js";
+import type { CanonicalError } from "./provider-io-contract.js";
 
-export type { CanonicalErrorAsync } from "./provider-io-contract.js";
+export type { CanonicalError } from "./provider-io-contract.js";
 
 export class IoFsFileModeValueOperations {
   static $project(source: FileMode): uint32 {
@@ -22,14 +22,14 @@ export type IoFsPathErrorStorage = PathError;
 
 export const IoFsPathErrorOperations = PathError;
 
-export class CanonicalPathError<Failure extends CanonicalErrorAsync> {
+export class CanonicalPathError<Failure extends CanonicalError> {
   constructor(
     public Op: gostring,
     public Path: gostring,
     public Err: Failure | undefined,
   ) {}
 
-  static $make<Failure extends CanonicalErrorAsync>(
+  static $make<Failure extends CanonicalError>(
     operation: gostring,
     path: gostring,
     failure: Failure | undefined,
@@ -37,19 +37,19 @@ export class CanonicalPathError<Failure extends CanonicalErrorAsync> {
     return new CanonicalPathError(operation, path, failure);
   }
 
-  static $storageOf<Failure extends CanonicalErrorAsync>(
+  static $storageOf<Failure extends CanonicalError>(
     source: CanonicalPathError<Failure>,
   ): CanonicalPathError<Failure> {
     return source;
   }
 
-  static $fromStorage<Failure extends CanonicalErrorAsync>(
+  static $fromStorage<Failure extends CanonicalError>(
     source: CanonicalPathError<Failure>,
   ): CanonicalPathError<Failure> {
     return source;
   }
 
-  static async Error<Failure extends CanonicalErrorAsync>(
+  static async Error<Failure extends CanonicalError>(
     receiver: CanonicalPathError<Failure> | undefined,
     _recovery?: GoRecovery,
   ): Promise<gostring> {
@@ -59,7 +59,7 @@ export class CanonicalPathError<Failure extends CanonicalErrorAsync> {
     return await receiver.Error();
   }
 
-  static Unwrap<Failure extends CanonicalErrorAsync>(
+  static Unwrap<Failure extends CanonicalError>(
     receiver: CanonicalPathError<Failure> | undefined,
   ): Failure | undefined {
     if (receiver === undefined) {
