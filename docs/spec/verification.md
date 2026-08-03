@@ -250,6 +250,36 @@ one `Awaitable` interface declaration. Indirect calls are awaited without
 thenable tests. A mutation creating method-profile variants or widening
 source type arity fails.
 
+## Reflection Proof
+
+The focused matrix covers basic, defined, pointer, array, slice, map, struct,
+interface, function, and recursive types. It compares Go and generated strict
+ESM for:
+
+- `TypeFor`, `TypeOf`, descriptor equality, kind/name/package/string identity;
+- element/key/length, size/alignment/bits, comparability, and implementation;
+- field count/index/name/tag/embedding/export and recursive field types;
+- `ValueOf`, nil/invalid/addressable/settable state, pointer `Elem`, fields,
+  indexes, maps, scalar projections, mutation, zero, and interface recovery;
+- reflective map/slice/pointer construction and iterator behavior;
+- open generic `TypeFor[T]` through exact private capability or
+  concretization, with unchanged source value arity.
+
+An independent descriptor extractor walks the selected `go/types` graph and
+exact-joins canonical type identity, kind, relations, fields, tags, methods,
+and architecture sizes against generated descriptor records. Runtime tests
+assert `TypeOf(boxed T) == TypeFor[T]` and that reflective mutation changes the
+same Go storage observed by ordinary generated code.
+
+Required mutations omit or duplicate a descriptor, key it by display spelling,
+change kind/field order/tag/method token, eagerly inline a recursive descriptor,
+disconnect an interface adapter from its descriptor, recover a payload through
+`any`/`unknown`, or add a hidden value parameter to `TypeFor`. Each fails at the
+descriptor join, staticness wall, source-shape gate, strict typecheck, or
+differential test. Scaling holds call sites constant and bounds descriptor
+bytes/AST nodes by canonical types plus fields/methods, with no type-pair or
+call-site cross-product.
+
 ## Generic Proof
 
 Fixtures cover:

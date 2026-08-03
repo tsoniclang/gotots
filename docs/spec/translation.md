@@ -350,6 +350,57 @@ Assertions, comma-ok, type switches, equality, comparability, and map keys use
 typed runtime metadata. No constructor-name test, reflection, spelling table,
 `any`, or `unknown`.
 
+### Reflection
+
+Reflection calls are selected by exact `go/types` object identity, never by the
+spelling `reflect` or `TypeFor`. For example:
+
+```go
+type Entry struct { Name string `json:"name"` }
+
+func Describe() (reflect.Kind, string) {
+    typ := reflect.TypeFor[Entry]()
+    return typ.Kind(), typ.Field(0).Tag.Get("json")
+}
+```
+
+The call emits a reference to one canonical generated descriptor:
+
+```ts
+const typ: reflect.Type = $goReflectType_Entry;
+return [typ.Kind(), typ.Field(0).Tag.Get("json")];
+```
+
+The descriptor is generated from the selected `go/types.Named` and
+`go/types.Struct`; it is not assembled from target class names or target object
+properties. Its `Entry` field record points lazily to the canonical string
+descriptor and records the exact tag, package identity, offset, index, and
+embedded/exported facts.
+
+Dynamic observation uses the same identity:
+
+```go
+var value any = Entry{Name: "readme"}
+same := reflect.TypeOf(value) == reflect.TypeFor[Entry]()
+```
+
+The interface adapter carries the exact typed `Entry` payload and its canonical
+descriptor. `TypeOf` returns that descriptor and `ValueOf` creates a typed
+reflective value view whose field/index/element operations delegate to
+generated typed accessors. No host object inspection occurs.
+
+For an open generic body:
+
+```go
+func KindOf[T any]() reflect.Kind { return reflect.TypeFor[T]().Kind() }
+```
+
+TypeScript generic erasure cannot implement `TypeFor<T>`. The body therefore
+uses one private runtime-type operation supplied by the existing exact generic
+owner or finite concretization. The source-facing callable still has zero value
+parameters. A public hidden descriptor parameter, provider policy object, or
+runtime type-name lookup is invalid.
+
 ## Generics
 
 ### Direct Generic Form

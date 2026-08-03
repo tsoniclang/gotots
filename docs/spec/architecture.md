@@ -361,6 +361,40 @@ Under the cooperative profile, interface method results use the canonical
 `Awaitable` callable rule. A synchronous concrete method and an asynchronous
 one satisfy the same generated method contract without profile variants.
 
+### Go Reflection Metadata
+
+Go reflection is a language/runtime observation over the selected Go type
+graph; it is not JavaScript reflection. The compiler owns one canonical,
+identity-keyed runtime type descriptor for every reached reflection-visible Go
+type. The descriptor is derived directly from `go/types` and contains only the
+facts required by the Go `reflect` contract: kind, defined identity, package,
+display form, size/alignment, element/key/length relations, fields/tags, method
+tokens, and typed value operations. Recursive relations are lazy references to
+canonical descriptors, never copied nested descriptions.
+
+The same concrete Go type identity owns interface dynamic identity and
+reflection identity. `reflect.TypeFor[T]()` selects its canonical descriptor
+statically from exact type-argument evidence and retains zero source value
+parameters. `reflect.TypeOf` and `reflect.ValueOf` consume the descriptor and
+typed payload already carried by the canonical interface adapter. A generic
+body whose type argument is still open requests one private typed runtime-type
+operation through the existing generic concretization/capability owner; it does
+not attempt to recover an erased TypeScript type argument.
+
+Portable `reflect.Type` and `reflect.Value` behavior belongs to the `reflect`
+provider implementation over those descriptors. Generated per-type adapters
+own typed access to represented values, fields, elements, maps, pointers, and
+setters. The provider never receives or recovers an erased payload. Runtime
+constructor names, object-key enumeration, property spelling, source-name
+tables, `any`, `unknown`, unchecked casts, and product/package-specific
+descriptor overrides are forbidden.
+
+Descriptor definitions are emitted once and use-site references are O(1).
+Metadata growth is linear in reached canonical types plus their actual
+fields/methods; it may not grow by type-pair, call-site, implementer, or package
+cross-product. An unsupported reflection operation fails at its closed
+operation owner rather than falling back to host reflection.
+
 ## Generics
 
 Go type parameters remain TypeScript type parameters when the body is directly

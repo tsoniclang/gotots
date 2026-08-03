@@ -73,11 +73,16 @@ Install:
 - method values/expressions;
 - exact promotion and conditional native inheritance;
 - canonical interface metadata and one reached adapter;
-- O(1) interface dispatch, assertions, type switches, equality, and map keys.
+- O(1) interface dispatch, assertions, type switches, equality, and map keys;
+- canonical runtime type descriptors and typed reflection value views;
+- `TypeFor`, `TypeOf`, `ValueOf`, and reached `reflect.Type`/`Value` operation
+  families without host reflection or erased payloads.
 
 Exit: nil/copy/promotion/dynamic-value differentials pass, ordinary concrete
 calls remain statically selected, and implementer-count scaling leaves call
-sites constant.
+sites constant. Reflection descriptors exact-join the selected `go/types`
+facts, dynamic and static type observations share one identity, and descriptor
+size is linear in reached type structure.
 
 ## 4. Generics And Iterator Functions
 
