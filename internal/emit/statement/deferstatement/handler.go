@@ -18,13 +18,13 @@ func Emit(
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	control, selected := context.DeferControl()
+	request, err := context.CallableControlRequest(
+		api.CallableControlDefer,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
 	if !selected {
-		request, err := context.CallableControlRequest(
-			api.CallableControlDefer,
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
 		return api.NewStatementEmission(nil, []api.RootRequest{request})
 	}
 	deferred, err := callexpression.EmitDeferred(
@@ -53,5 +53,8 @@ func Emit(
 			),
 		),
 	)
-	return api.NewStatementEmission(statements, deferred.Requests())
+	return api.NewStatementEmission(
+		statements,
+		api.CombineRequests(deferred.Requests(), []api.RootRequest{request}),
+	)
 }

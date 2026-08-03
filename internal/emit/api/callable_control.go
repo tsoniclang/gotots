@@ -481,9 +481,6 @@ func (c Context) IteratorReturnControlRequests() (
 	}
 	requests := make([]RootRequest, 0, len(c.iteratorRangeControls))
 	for _, control := range c.iteratorRangeControls {
-		if control.Returning() {
-			continue
-		}
 		request, err := NewIteratorReturnControlRequest(
 			c.artifactOwner,
 			c.callableEnclosing,
@@ -494,12 +491,6 @@ func (c Context) IteratorReturnControlRequests() (
 			return nil, err
 		}
 		requests = append(requests, request)
-	}
-	if len(requests) == 0 {
-		return nil, &InvariantError{
-			Role:   c.role,
-			Reason: "iterator-return request has no unselected boundary",
-		}
 	}
 	return requests, nil
 }

@@ -10,6 +10,11 @@ func ApplyFirst[T any](value T, predicates []func(T) bool) bool {
 	return predicates[0](value)
 }
 
+func Resolve[T any](callback func() T) T {
+	value := callback()
+	return value
+}
+
 type Box[T any] struct {
 	Value T
 }
@@ -100,6 +105,18 @@ func CooperativeApply() bool {
 	return Apply(int32(2), func(value int32) bool {
 		return value+<-values == 42
 	})
+}
+
+func CooperativeLexicalResult() int32 {
+	type result struct {
+		value int32
+	}
+	values := make(chan int32, 1)
+	values <- 42
+	resolved := Resolve(func() result {
+		return result{value: <-values}
+	})
+	return resolved.value
 }
 
 func SynchronousApply() bool {

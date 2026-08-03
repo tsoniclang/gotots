@@ -379,7 +379,7 @@ func TestDeclarationRequirementSchedulerReplacesConsumerRevision(
 	}
 }
 
-func TestDeclarationRequirementSchedulerRetainsSelfDemand(
+func TestDeclarationRequirementSchedulerReplacesSelfDemand(
 	t *testing.T,
 ) {
 	sourcePackage := types.NewPackage("example.com/self-demand", "selfdemand")
@@ -402,9 +402,13 @@ func TestDeclarationRequirementSchedulerRetainsSelfDemand(
 		t.Fatal("self demand was not scheduled")
 	}
 	scheduler.replace(requirement.Owner(), nil)
-	if scheduler.hasPending() ||
-		!scheduler.wasApplied(requirement) {
-		t.Fatal("satisfied self demand was treated as a stale foreign request")
+	if !scheduler.finalizeRemovals() {
+		t.Fatal("stale self demand was retained after exact replacement")
+	}
+	owner, requirements, removed, ok := scheduler.nextBatch()
+	if !ok || !removed || owner != requirement.Owner() ||
+		len(requirements) != 0 || scheduler.wasApplied(requirement) {
+		t.Fatal("stale self demand survived its replacement revision")
 	}
 }
 

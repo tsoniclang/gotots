@@ -21,13 +21,13 @@ func Emit(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	request, err := context.CallableControlRequest(
+		api.CallableControlRecovery,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	if !context.CallableControl().Recovery() {
-		request, err := context.CallableControlRequest(
-			api.CallableControlRecovery,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
 		return api.DirectExpression(
 			context.Factory().VoidExpression(
 				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
@@ -39,6 +39,7 @@ func Emit(
 	if !available {
 		return api.DirectExpression(
 			context.Factory().Identifier("undefined"),
+			request,
 		), true, nil
 	}
 	return api.DirectExpression(
@@ -70,5 +71,6 @@ func Emit(
 				tsgo.NodeFlagsNone,
 			),
 		),
+		request,
 	), true, nil
 }

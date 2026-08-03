@@ -85,7 +85,17 @@ func identifier(
 		context,
 		variable,
 	); selected {
-		return api.DirectExpression(context.Factory().Identifier(name)), nil
+		requirement, err := context.AddressableStorage().Requirement(
+			context,
+			variable,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().Identifier(name),
+			requirement,
+		), nil
 	}
 	var receiverRequest []api.RootRequest
 	if receiver, ok := context.ValueReceiver(variable); ok {

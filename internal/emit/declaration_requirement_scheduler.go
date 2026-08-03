@@ -253,11 +253,6 @@ func (s *declarationRequirementScheduler) replace(
 	}
 	current := s.byConsumer[consumer]
 	for requirement := range current {
-		if requirement.Owner() == consumer {
-			next[requirement] = struct{}{}
-		}
-	}
-	for requirement := range current {
 		if _, retained := next[requirement]; retained {
 			continue
 		}

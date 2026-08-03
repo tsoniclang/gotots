@@ -16,18 +16,25 @@ func Emit(
 	source *ast.ReturnStmt,
 ) (api.StatementEmission, error) {
 	if control, selected := context.IteratorRangeControl(); selected {
+		requests, err := context.IteratorReturnControlRequests()
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 		if !control.Returning() {
-			requests, err := context.IteratorReturnControlRequests()
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
 			return api.NewStatementEmission(nil, requests)
 		}
-		return emitIteratorReturn(
+		result, err := emitIteratorReturn(
 			context,
 			children,
 			source,
 			control,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		return api.NewStatementEmission(
+			result.Statements(),
+			api.CombineRequests(result.Requests(), requests),
 		)
 	}
 	if control, selected := context.ReturnControl(); selected {

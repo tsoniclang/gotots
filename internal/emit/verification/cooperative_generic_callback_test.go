@@ -377,6 +377,30 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 			)
 		}
 	}
+	lexicalResult := waveNineFunctionText(
+		t,
+		artifacts.printed,
+		"CooperativeLexicalResult",
+	)
+	if count := strings.Count(
+		lexicalResult,
+		"function Resolve$concrete_",
+	); count != 1 {
+		t.Fatalf(
+			"cooperative lexical-result concretizations = %d, want 1:\n%s",
+			count,
+			lexicalResult,
+		)
+	}
+	if !strings.Contains(
+		lexicalResult,
+		"return Resolve$cooperative_",
+	) {
+		t.Fatalf(
+			"cooperative lexical-result wrapper selects the wrong kernel:\n%s",
+			lexicalResult,
+		)
+	}
 	if count := strings.Count(
 		artifacts.printed,
 		"export async function $initialize(): Promise<void>",
@@ -413,6 +437,7 @@ func TestGenericCallableProfilesDoNotWidenOtherInstantiations(
 	writeProgramFile(t, runner, `import "./program.js";
 import {
     CooperativeApply,
+	CooperativeLexicalResult,
     SynchronousApply,
     CooperativeFunctionValue,
     SynchronousFunctionValue,
@@ -448,6 +473,7 @@ import { GoScheduler } from "./runtime/channel.js";
 await GoScheduler.run(async () => {
     console.log([
         await CooperativeApply(),
+		await CooperativeLexicalResult(),
         await SynchronousApply(),
         await CooperativeFunctionValue(),
         SynchronousFunctionValue(),
@@ -514,6 +540,7 @@ import (
 func main() {
 	fmt.Println(
 		values.CooperativeApply(),
+		values.CooperativeLexicalResult(),
 		values.SynchronousApply(),
 		values.CooperativeFunctionValue(),
 		values.SynchronousFunctionValue(),
