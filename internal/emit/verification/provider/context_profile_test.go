@@ -2,11 +2,9 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -65,7 +63,12 @@ func Run(key string, value string) (string, bool, string) {
 	options := emit.DefaultOptions()
 	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
-	emission, err := emit.CompileWithOptions(
+	// The provider-internal context value-formatting branch is a certified
+	// placeholder reached from every context constructor chain; the
+	// used-provider closure must fail this compilation before any target
+	// file is sealed. The runtime differential returns when the context
+	// formatting family is implemented.
+	_, err = emit.CompileWithOptions(
 		program,
 		[]emit.Root{mustProviderRoot(
 			t,
@@ -73,86 +76,11 @@ func Run(key string, value string) (string, bool, string) {
 		)},
 		options,
 	)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("used context formatting placeholder passed the closure gate")
 	}
-	workingDirectory := t.TempDir()
-	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	assemblyPath := ""
-	for _, file := range emission.Files() {
-		if file.Kind() == emit.TargetFilePackageAssembly &&
-			file.PackageName() == "contextprofile" {
-			assemblyPath = file.OutputPath()
-			break
-		}
-	}
-	if assemblyPath == "" {
-		t.Fatal("context profile package assembly is absent")
-	}
-	if !strings.Contains(artifacts.printed, "export class RuntimeSlice") {
-		t.Fatalf("context provider runtime closure lacks RuntimeSlice:\n%s", artifacts.printed)
-	}
-	targetOutput := executeProviderTypeScript(
-		t,
-		workingDirectory,
-		artifacts.paths,
-		assemblyPath,
-		[]string{"Run"},
-		`const [value, identities, failure] = await Run("request", "alpha");
-console.log(JSON.stringify(value) + " " + identities + " " + JSON.stringify(failure));
-`,
-	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	profile "example.com/contextprofile"
-)
-
-func main() {
-	value, identities, failure := profile.Run("request", "alpha")
-	fmt.Printf("%q %t %q\n", value, identities, failure)
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go context comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"context provider differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
-	for _, required := range []string{
-		"ContextWithValueCanonical",
-		"$from(provider_context.ContextWithValueCanonical",
-		"context__from_gostdlib.Background",
-		"context__from_gostdlib.TODO",
-		"$contract);",
-	} {
-		if !strings.Contains(artifacts.printed, required) {
-			t.Fatalf("context provider output lacks %q:\n%s", required, artifacts.printed)
-		}
-	}
-	for _, forbidden := range []string{
-		" as any",
-		" as unknown",
-		".apply(",
-		".call(",
-	} {
-		if strings.Contains(artifacts.printed, forbidden) {
-			t.Fatalf("context provider output contains %q:\n%s", forbidden, artifacts.printed)
-		}
+	if !strings.Contains(err.Error(), "used provider placeholders") ||
+		!strings.Contains(err.Error(), "ContextValue") {
+		t.Fatalf("closure diagnostic = %v", err)
 	}
 }

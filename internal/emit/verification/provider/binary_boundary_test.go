@@ -61,30 +61,24 @@ func Decode(mutex *sync.Mutex) error {
 	options := emit.DefaultOptions()
 	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
-	emission, err := emit.CompileWithOptions(
+	// encoding/binary.Read is a certified placeholder until the reflection
+	// family lands; the used-provider closure must fail this compilation
+	// before any target file is sealed. The profile-ABI artifact
+	// assertions return with the implemented family.
+	_, err = emit.CompileWithOptions(
 		program,
 		[]emit.Root{mustProviderRoot(t, scope.Lookup("Decode"))},
 		options,
 	)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("used encoding/binary.Read placeholder passed the closure gate")
 	}
-	workingDirectory := t.TempDir()
-	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
-	selected := "EncodingBinaryReadCanonical"
-	if !strings.Contains(artifacts.printed, selected) {
-		t.Fatalf("binary profile output lacks %q:\n%s", selected, artifacts.printed)
-	}
-	for _, rejected := range []string{
-		"EncodingBinaryReadCanonicalOrder",
-		"EncodingBinaryReadCanonicalSyncReaderSyncError",
-		"EncodingBinaryReadCanonicalAsyncReaderSyncError",
-		"EncodingBinaryReadCanonicalSyncReaderAsyncError",
-	} {
-		if strings.Contains(artifacts.printed, rejected) {
-			t.Fatalf("binary profile output selected %q:\n%s", rejected, artifacts.printed)
-		}
+	if !strings.Contains(err.Error(), "used provider placeholders") ||
+		!strings.Contains(
+			err.Error(),
+			"encoding/binary|kind=4|receiver=|name=Read",
+		) {
+		t.Fatalf("closure diagnostic = %v", err)
 	}
 }
 
@@ -170,7 +164,10 @@ func Encode(mutex *sync.Mutex) error {
 	options := emit.DefaultOptions()
 	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
-	emission, err := emit.CompileWithOptions(
+	// Both selected placeholders must be named by one typed closure
+	// diagnostic with identity-keyed lists; the behavior assertions return
+	// with the implemented family.
+	_, err = emit.CompileWithOptions(
 		program,
 		[]emit.Root{
 			mustProviderRoot(t, scope.Lookup("Decode")),
@@ -178,18 +175,15 @@ func Encode(mutex *sync.Mutex) error {
 		},
 		options,
 	)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("used encoding/binary placeholders passed the closure gate")
 	}
-	workingDirectory := t.TempDir()
-	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
-	for _, selected := range []string{
-		"EncodingBinaryReadCanonical",
-		"EncodingBinaryWriteCanonical",
+	for _, expected := range []string{
+		"encoding/binary|kind=4|receiver=|name=Read",
+		"encoding/binary|kind=4|receiver=|name=Write",
 	} {
-		if !strings.Contains(artifacts.printed, selected) {
-			t.Fatalf("combined binary profile output lacks %q:\n%s", selected, artifacts.printed)
+		if !strings.Contains(err.Error(), expected) {
+			t.Fatalf("closure diagnostic lacks %q: %v", expected, err)
 		}
 	}
 }

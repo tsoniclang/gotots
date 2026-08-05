@@ -24,6 +24,7 @@ func buildFacetModules(
 	supportMarkers providerSupportMarkers,
 	selectedToolchain toolchain,
 	scalarAliases map[string]string,
+	behaviorEvidence *implementationEvidence,
 ) ([]gostdlib.FacetModuleDocument, error) {
 	interfaceTargets, err := providerInterfaceTargets(
 		config,
@@ -278,12 +279,14 @@ func buildFacetModules(
 				)
 			}
 			representation, err := buildProviderRepresentation(
+				config,
 				source,
 				seed,
 				target,
 				interfaceTargets,
 				project,
 				effectMarker,
+				behaviorEvidence,
 			)
 			if err != nil {
 				return nil, err
@@ -320,6 +323,25 @@ func buildFacetModules(
 			if err != nil {
 				return nil, err
 			}
+			statefulTarget, ok := byName[built.profile.Export]
+			if !ok {
+				return nil, certifyError(
+					"build provider stateful profiles",
+					built.profile.Export,
+					"profile export is absent",
+				)
+			}
+			built.profile.ImplementationSites, err = facetImplementationSites(
+				config,
+				project,
+				"stateful profile "+built.profile.SourceIdentity,
+				built.profile.Export,
+				statefulTarget.DeclarationNodeHandles(),
+				behaviorEvidence,
+			)
+			if err != nil {
+				return nil, err
+			}
 			statefulProfileDocuments = append(
 				statefulProfileDocuments,
 				built.profile,
@@ -338,6 +360,25 @@ func buildFacetModules(
 				project,
 				effectMarker,
 				supportMarkers,
+			)
+			if err != nil {
+				return nil, err
+			}
+			profileTarget, ok := byName[built.profile.Export]
+			if !ok {
+				return nil, certifyError(
+					"build provider callable profiles",
+					built.profile.Export,
+					"profile export is absent",
+				)
+			}
+			built.profile.ImplementationSites, err = facetImplementationSites(
+				config,
+				project,
+				"callable profile "+built.profile.SourceIdentity,
+				built.profile.Export,
+				profileTarget.DeclarationNodeHandles(),
+				behaviorEvidence,
 			)
 			if err != nil {
 				return nil, err
@@ -390,6 +431,25 @@ func buildFacetModules(
 				if name != "" {
 					owned[name] = struct{}{}
 				}
+			}
+			facetTarget, ok := byName[facet.Export]
+			if !ok {
+				return nil, certifyError(
+					"build facet",
+					facet.Export,
+					"facet export is absent",
+				)
+			}
+			facet.ImplementationSites, err = facetImplementationSites(
+				config,
+				project,
+				"facet "+facet.SourceIdentity+"/"+string(facet.Kind),
+				facet.Export,
+				facetTarget.DeclarationNodeHandles(),
+				behaviorEvidence,
+			)
+			if err != nil {
+				return nil, err
 			}
 			facets = append(facets, facet)
 		}

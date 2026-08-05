@@ -13,8 +13,11 @@ import (
 )
 
 func buildStateBindings(
+	config resolvedConfig,
+	project *tsgo.ProjectInspection,
 	source *goPackageSurface,
 	target tsgo.ProjectExport,
+	behaviorEvidence *implementationEvidence,
 ) ([]gostdlib.BindingDocument, error) {
 	var result []gostdlib.BindingDocument
 	for _, member := range target.ValueMembers() {
@@ -47,6 +50,20 @@ func buildStateBindings(
 		if err != nil {
 			return nil, err
 		}
+		sites, behavior, behaviorErr := certifyBindingBehavior(
+			config,
+			project,
+			binding.Identity,
+			member.Name(),
+			member.DeclarationNodeHandles(),
+			behaviorEvidence,
+		)
+		if behaviorErr != nil {
+			return nil, behaviorErr
+		}
+		binding.ImplementationSites = sites
+		binding.Dependencies = behavior.dependencies
+		binding.Disposition = behavior.disposition
 		result = append(result, binding)
 	}
 	if len(result) == 0 {

@@ -2,11 +2,9 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -71,7 +69,12 @@ var _ context.Context = (*fixedContext)(nil)
 	options := emit.DefaultOptions()
 	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
-	emission, err := emit.CompileWithOptions(
+	// signal.NotifyContext reaches the certified context value-formatting
+	// placeholder through its context construction chain; the used-provider
+	// closure must fail this compilation before any target file is sealed.
+	// The runtime differential returns when the context formatting family
+	// is implemented.
+	_, err = emit.CompileWithOptions(
 		program,
 		[]emit.Root{mustProviderRoot(
 			t,
@@ -79,76 +82,11 @@ var _ context.Context = (*fixedContext)(nil)
 		)},
 		options,
 	)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("used context formatting placeholder passed the closure gate")
 	}
-	workingDirectory := t.TempDir()
-	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	assemblyPath := ""
-	for _, file := range emission.Files() {
-		if file.Kind() == emit.TargetFilePackageAssembly &&
-			file.PackageName() == "signalcontext" {
-			assemblyPath = file.OutputPath()
-			break
-		}
-	}
-	if assemblyPath == "" {
-		t.Fatal("signal context fixture package assembly is absent")
-	}
-	targetOutput := executeProviderTypeScript(
-		t,
-		workingDirectory,
-		artifacts.paths,
-		assemblyPath,
-		[]string{"Result"},
-		`const [present, parent, child] = await Result();
-console.log(present + " " + JSON.stringify(parent) + " " + JSON.stringify(child));
-`,
-	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	fixture "example.com/signalcontext"
-)
-
-func main() {
-	present, parent, child := fixture.Result()
-	fmt.Printf("%t %q %q\n", present, parent, child)
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go signal.NotifyContext comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"signal.NotifyContext differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
-	if !strings.Contains(
-		artifacts.printed,
-		"OsSignalNotifyContextCanonical<",
-	) {
-		t.Fatalf("NotifyContext output lacks canonical cooperative profile:\n%s", artifacts.printed)
-	}
-	for _, obsolete := range []string{
-		"OsSignalNotifyContextCanonicalContext<",
-		"OsSignalNotifyContextCanonicalContextSignal<",
-	} {
-		if strings.Contains(artifacts.printed, obsolete) {
-			t.Fatalf("NotifyContext output retained profile variant %q:\n%s", obsolete, artifacts.printed)
-		}
+	if !strings.Contains(err.Error(), "used provider placeholders") ||
+		!strings.Contains(err.Error(), "ContextValue") {
+		t.Fatalf("closure diagnostic = %v", err)
 	}
 }

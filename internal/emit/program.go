@@ -196,15 +196,18 @@ func CompileWithOptions(
 		}
 		break
 	}
+	obligations, err := session.environmentObligations()
+	if err != nil {
+		return ProgramEmission{}, err
+	}
+	if err := session.verifyProviderClosure(obligations); err != nil {
+		return ProgramEmission{}, err
+	}
 	files, err := session.targetFiles()
 	if err != nil {
 		return ProgramEmission{}, err
 	}
 	if err := session.verifyRootObligations(orderedRoots, files); err != nil {
-		return ProgramEmission{}, err
-	}
-	obligations, err := session.environmentObligations()
-	if err != nil {
 		return ProgramEmission{}, err
 	}
 	profile, err := session.environmentProfile(options)

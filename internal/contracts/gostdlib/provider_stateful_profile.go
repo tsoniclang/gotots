@@ -21,6 +21,7 @@ type ProviderStatefulProfileDocument struct {
 	Methods             []ProviderStatefulProfileMethodDocument    `json:"methods"`
 	ImplementationOwner string                                     `json:"implementationOwner"`
 	TargetFingerprint   string                                     `json:"targetFingerprint"`
+	ImplementationSites []string                                   `json:"implementationSites,omitempty"`
 }
 
 type ProviderStructFieldDocument struct {
@@ -249,6 +250,12 @@ func (p ProviderStatefulProfile) ImplementationOwner() string {
 	return p.profile.ImplementationOwner
 }
 
+// ImplementationSites reference the certified implementation documents of
+// this profile representation's checked behavior.
+func (p ProviderStatefulProfile) ImplementationSites() []string {
+	return append([]string(nil), p.profile.ImplementationSites...)
+}
+
 func (p ProviderStatefulProfile) TargetFingerprint() string {
 	return p.profile.TargetFingerprint
 }
@@ -268,5 +275,6 @@ func cloneProviderStatefulProfile(
 	result.Operations = slices.Clone(source.Operations)
 	result.Fields = slices.Clone(source.Fields)
 	result.Methods = slices.Clone(source.Methods)
+	result.ImplementationSites = slices.Clone(source.ImplementationSites)
 	return result
 }

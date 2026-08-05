@@ -203,11 +203,10 @@ func TestProviderCallableProfilesPreserveCanonicalInterfaceABI(t *testing.T) {
 	writeProgramFile(t, filepath.Join(project, "source.go"), `package providerprofile
 
 import (
-	"context"
 	"encoding/binary"
+	"io"
 	"io/fs"
 	"os"
-	"os/signal"
 	"strings"
 	"sync"
 )
@@ -276,10 +275,6 @@ func NewFileSystem(mutex *sync.Mutex) fs.FS {
 	return &blockingFS{mutex: mutex}
 }
 
-func Notify(parent context.Context, value os.Signal) (context.Context, context.CancelFunc) {
-	return signal.NotifyContext(parent, value, os.Interrupt)
-}
-
 func NewSignal(mutex *sync.Mutex) os.Signal {
 	return blockingSignal{mutex: mutex}
 }
@@ -288,9 +283,12 @@ func Kill(process *os.Process, value os.Signal) error {
 	return process.Signal(value)
 }
 
-func Decode(order binary.ByteOrder) error {
-	var value uint16
-	return binary.Read(strings.NewReader("\x00\x01"), order, &value)
+// Decode crosses a provider strings.Reader through the canonical io.Reader
+// boundary; encoding/binary.Read itself remains a certified placeholder
+// proven by its own closure-gate test until the reflection family lands.
+func Decode() (int, error) {
+	buffer := make([]byte, 2)
+	return io.ReadFull(strings.NewReader("\x00\x01"), buffer)
 }
 
 func NewOrder(mutex *sync.Mutex) binary.ByteOrder {
@@ -321,7 +319,6 @@ func Visit(fileSystem fs.FS, callback fs.WalkDirFunc) error {
 			mustProviderRoot(t, scope.Lookup("Read")),
 			mustProviderRoot(t, scope.Lookup("Metadata")),
 			mustProviderRoot(t, scope.Lookup("NewFileSystem")),
-			mustProviderRoot(t, scope.Lookup("Notify")),
 			mustProviderRoot(t, scope.Lookup("NewSignal")),
 			mustProviderRoot(t, scope.Lookup("Kill")),
 			mustProviderRoot(t, scope.Lookup("Decode")),

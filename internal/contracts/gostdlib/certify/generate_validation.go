@@ -163,13 +163,40 @@ func deriveImplementationBehavior(
 	subject string,
 	handles []string,
 ) (implementationBehavior, error) {
+	return deriveBehavior(config, project, subject, handles, false)
+}
+
+// deriveConstructionBehavior derives only the construction behavior of one
+// public class declaration; member behavior joins per method binding.
+func deriveConstructionBehavior(
+	config resolvedConfig,
+	project *tsgo.ProjectInspection,
+	subject string,
+	handles []string,
+) (implementationBehavior, error) {
+	return deriveBehavior(config, project, subject, handles, true)
+}
+
+func deriveBehavior(
+	config resolvedConfig,
+	project *tsgo.ProjectInspection,
+	subject string,
+	handles []string,
+	constructionOnly bool,
+) (implementationBehavior, error) {
 	behavior := implementationBehavior{
 		disposition: gostdlib.DispositionImplemented,
 		discovered:  make(map[string]string),
 	}
 	edges := make(map[string]struct{})
 	for _, handle := range handles {
-		references, err := project.ImplementationBodyReferences(handle)
+		var references []tsgo.BodyValueReference
+		var err error
+		if constructionOnly {
+			references, err = project.ConstructionBodyReferences(handle)
+		} else {
+			references, err = project.ImplementationBodyReferences(handle)
+		}
 		if err != nil {
 			return implementationBehavior{}, err
 		}
@@ -354,15 +381,45 @@ func certifyBindingBehavior(
 	handles []string,
 	evidence *implementationEvidence,
 ) ([]string, implementationBehavior, error) {
+	return certifyBehavior(
+		config, project, subject, name, handles, evidence, false,
+	)
+}
+
+// certifyConstructionBehavior certifies one public class export's
+// construction behavior; member behavior joins per method binding.
+func certifyConstructionBehavior(
+	config resolvedConfig,
+	project *tsgo.ProjectInspection,
+	subject string,
+	name string,
+	handles []string,
+	evidence *implementationEvidence,
+) ([]string, implementationBehavior, error) {
+	return certifyBehavior(
+		config, project, subject, name, handles, evidence, true,
+	)
+}
+
+func certifyBehavior(
+	config resolvedConfig,
+	project *tsgo.ProjectInspection,
+	subject string,
+	name string,
+	handles []string,
+	evidence *implementationEvidence,
+	constructionOnly bool,
+) ([]string, implementationBehavior, error) {
 	resolved, err := project.ResolveDeclarationHandles(handles)
 	if err != nil {
 		return nil, implementationBehavior{}, err
 	}
-	behavior, err := deriveImplementationBehavior(
+	behavior, err := deriveBehavior(
 		config,
 		project,
 		subject,
 		resolved,
+		constructionOnly,
 	)
 	if err != nil {
 		return nil, implementationBehavior{}, err
@@ -467,4 +524,46 @@ func verifyGenericOperationBindings(
 		}
 	}
 	return nil
+}
+
+// facetImplementationSites records one facet-module export's checked
+// implementation sites and seeds the private closure so its behavior is
+// certified as implementation documents with one disposition owner.
+func facetImplementationSites(
+	config resolvedConfig,
+	project *tsgo.ProjectInspection,
+	subject string,
+	name string,
+	handles []string,
+	evidence *implementationEvidence,
+) ([]string, error) {
+	resolved, err := project.ResolveDeclarationHandles(handles)
+	if err != nil {
+		return nil, err
+	}
+	sites := make([]string, 0, len(resolved))
+	for _, handle := range resolved {
+		index, _, sourcePath, parseErr := tsgo.ParseNodeHandle(handle)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		relative := providerSourceRelativePath(config, sourcePath)
+		if relative == "" {
+			return nil, certifyError(
+				"certify implementation",
+				subject,
+				"implementation site is outside the provider sources",
+			)
+		}
+		site := gostdlib.ImplementationSiteIdentity(relative, name, index)
+		sites = append(sites, site)
+		if _, isPublic := evidence.public[site]; isPublic {
+			continue
+		}
+		if _, queued := evidence.worklist[site]; !queued {
+			evidence.worklist[site] = handle
+		}
+	}
+	sort.Strings(sites)
+	return sites, nil
 }

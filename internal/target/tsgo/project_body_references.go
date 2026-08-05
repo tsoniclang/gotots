@@ -49,6 +49,22 @@ type getSymbolsAtLocationsParams struct {
 func (p *ProjectInspection) ImplementationBodyReferences(
 	declarationHandle string,
 ) ([]BodyValueReference, error) {
+	return p.declarationBodyReferences(declarationHandle, false)
+}
+
+// ConstructionBodyReferences enumerates only the construction behavior of
+// one checked class declaration: its constructor and property-initializer
+// subtrees. Method bodies are selected per member by their own evidence.
+func (p *ProjectInspection) ConstructionBodyReferences(
+	declarationHandle string,
+) ([]BodyValueReference, error) {
+	return p.declarationBodyReferences(declarationHandle, true)
+}
+
+func (p *ProjectInspection) declarationBodyReferences(
+	declarationHandle string,
+	constructionOnly bool,
+) ([]BodyValueReference, error) {
 	rootIndex, _, sourcePath, err := parseProjectNodeHandle(declarationHandle)
 	if err != nil {
 		return nil, err
@@ -69,6 +85,10 @@ func (p *ProjectInspection) ImplementationBodyReferences(
 			continue
 		}
 		if !source.underAncestor(index, rootIndex) {
+			continue
+		}
+		if constructionOnly &&
+			!source.constructionPosition(index, rootIndex) {
 			continue
 		}
 		identifiers = append(identifiers, index)
@@ -432,6 +452,31 @@ func (p *ProjectInspection) resolveLocalAlias(
 		return cloneStrings(symbol.Declarations), nil
 	}
 	return nil, nil
+}
+
+// constructionPosition reports whether one node inside a class subtree
+// belongs to construction behavior: a constructor body, a property
+// initializer, or a heritage clause.
+func (s projectSourceEvidence) constructionPosition(
+	index uint32,
+	root uint32,
+) bool {
+	for current := s.nodes[index].parent; current != 0; current = s.nodes[current].parent {
+		switch SyntaxKind(s.nodes[current].kind) {
+		case SyntaxKindConstructor,
+			SyntaxKindPropertyDeclaration,
+			SyntaxKindHeritageClause:
+			return true
+		case SyntaxKindMethodDeclaration,
+			SyntaxKindGetAccessor,
+			SyntaxKindSetAccessor:
+			return false
+		}
+		if current == root {
+			return false
+		}
+	}
+	return false
 }
 
 func (s projectSourceEvidence) firstChildOfKind(

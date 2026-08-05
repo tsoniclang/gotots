@@ -208,6 +208,23 @@ func (m Manifest) ProviderDigest() string {
 	return m.document.ProviderDigest
 }
 
+// Implementations lists the certified private implementation documents:
+// every provider-internal body reached from a certified public or facet
+// body, with its closed disposition and conservative dependency edges.
+func (m Manifest) Implementations() []ImplementationDocument {
+	result := make(
+		[]ImplementationDocument,
+		len(m.document.Implementations),
+	)
+	for index, implementation := range m.document.Implementations {
+		implementation.Dependencies = slices.Clone(
+			implementation.Dependencies,
+		)
+		result[index] = implementation
+	}
+	return result
+}
+
 func (m Manifest) Modules() []Module {
 	result := make([]Module, len(m.document.Modules))
 	for index, module := range m.document.Modules {
@@ -470,6 +487,13 @@ func (b Binding) Disposition() ImplementationDisposition {
 // returned slice is an immutable copy.
 func (b Binding) ImplementationDependencies() []string {
 	return append([]string(nil), b.binding.Dependencies...)
+}
+
+// ImplementationSites are the checked implementation-site identities of
+// this binding's certified behavior. The returned slice is an immutable
+// copy.
+func (b Binding) ImplementationSites() []string {
+	return append([]string(nil), b.binding.ImplementationSites...)
 }
 
 func (b Binding) GoImportPath() string {

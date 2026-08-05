@@ -8,6 +8,7 @@ import (
 	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
@@ -124,6 +125,13 @@ func (s *programSession) RequireUse(
 				Reason: "environment declaration has no indexed binding",
 			}
 		}
+		if constant, isConstant := object.(*types.Const); isConstant &&
+			constantbinding.IsUntyped(constant.Type()) {
+			// An untyped constant has no runtime representation; its
+			// projections are generated exactly from checker values and
+			// never demand a provider body.
+			route = environmentidentity.RouteGeneratedFacet
+		}
 		if !route.Valid() {
 			// A selected constant's value is projected exactly from checker
 			// evidence; it never demands a provider body, so a missing
@@ -202,6 +210,32 @@ func (s *programSession) ObserveImplementation(
 	}
 	record.joinDemand(demand)
 	return nil
+}
+
+// verifyProviderClosure joins the provider-routed settled environment
+// evidence to the certified provider implementation closure and fails
+// closed before target files are sealed.
+func (s *programSession) verifyProviderClosure(
+	obligations []EnvironmentObligation,
+) error {
+	if s.standardLibrary == nil {
+		return nil
+	}
+	roots := make([]environmentcontract.ClosureRoot, 0, len(obligations))
+	for _, obligation := range obligations {
+		if obligation.Route() != environmentidentity.RouteProvider {
+			continue
+		}
+		roots = append(roots, environmentcontract.ClosureRoot{
+			Identity:   obligation.Identity(),
+			Demands:    obligation.Demands(),
+			Selections: obligation.ProviderSelections(),
+		})
+	}
+	return environmentcontract.VerifyProviderClosure(
+		roots,
+		s.standardLibrary,
+	)
 }
 
 // environmentProfile derives the complete exact identity of the settled

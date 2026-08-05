@@ -120,6 +120,22 @@ func (c *Certificate) Binding(identity string) (gostdlib.Binding, bool) {
 	return c.manifest.Binding(identity)
 }
 
+// FacetModules lists the certified facet modules.
+func (c *Certificate) FacetModules() []gostdlib.FacetModule {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.FacetModules()
+}
+
+// Implementations lists the certified private implementation documents.
+func (c *Certificate) Implementations() []gostdlib.ImplementationDocument {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.Implementations()
+}
+
 func (c *Certificate) Modules() []gostdlib.Module {
 	if !c.Valid() {
 		return nil

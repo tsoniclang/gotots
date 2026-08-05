@@ -234,13 +234,35 @@ func providerInterfaceTargets(
 	return result, nil
 }
 
+// sameRepresentationMethodCore compares the comparable identity core of
+// two representation method documents, ignoring derived behavior slices.
+func sameRepresentationMethodCore(
+	left gostdlib.ProviderRepresentationMethodDocument,
+	right gostdlib.ProviderRepresentationMethodDocument,
+) bool {
+	left.Dependencies = nil
+	left.ImplementationSites = nil
+	right.Dependencies = nil
+	right.ImplementationSites = nil
+	return left.SourceIdentity == right.SourceIdentity &&
+		left.Member == right.Member &&
+		left.Effect == right.Effect &&
+		left.SourceSignature == right.SourceSignature &&
+		left.SourceLocation == right.SourceLocation &&
+		left.ImplementationOwner == right.ImplementationOwner &&
+		left.TargetFingerprint == right.TargetFingerprint &&
+		left.Disposition == right.Disposition
+}
+
 func buildProviderRepresentation(
+	config resolvedConfig,
 	source goSurface,
 	seed providerRepresentationSeed,
 	target tsgo.ProjectExport,
 	interfaceTargets map[string]tsgo.ProjectExport,
 	project *tsgo.ProjectInspection,
 	effectMarker tsgo.ProjectExport,
+	behaviorEvidence *implementationEvidence,
 ) (gostdlib.ProviderRepresentationDocument, error) {
 	implementationOwner, err := singleImplementationOwner(
 		seed.Export,
@@ -388,7 +410,22 @@ func buildProviderRepresentation(
 				ImplementationOwner: owner,
 				TargetFingerprint:   targetMember.Fingerprint(),
 			}
-			if existing, duplicate := methodsByIdentity[contract.Identity()]; duplicate && existing != document {
+			sites, behavior, behaviorErr := certifyBindingBehavior(
+				config,
+				project,
+				contract.Identity(),
+				method.Name(),
+				targetMember.DeclarationNodeHandles(),
+				behaviorEvidence,
+			)
+			if behaviorErr != nil {
+				return gostdlib.ProviderRepresentationDocument{}, behaviorErr
+			}
+			document.ImplementationSites = sites
+			document.Dependencies = behavior.dependencies
+			document.Disposition = behavior.disposition
+			if existing, duplicate := methodsByIdentity[contract.Identity()]; duplicate &&
+				!sameRepresentationMethodCore(existing, document) {
 				return gostdlib.ProviderRepresentationDocument{}, certifyError(
 					"build representation",
 					contract.Identity(),

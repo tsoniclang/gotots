@@ -158,6 +158,7 @@ func Generate(config Config) ([]byte, error) {
 		supportMarkers,
 		selectedToolchain,
 		scalarAliases,
+		behaviorEvidence,
 	)
 	if err != nil {
 		client.Close()
@@ -244,7 +245,13 @@ func buildModule(
 			)
 		}
 		if target.Name() == "state" {
-			stateBindings, err := buildStateBindings(sourcePackage, target)
+			stateBindings, err := buildStateBindings(
+				config,
+				project,
+				sourcePackage,
+				target,
+				behaviorEvidence,
+			)
 			if err != nil {
 				return gostdlib.ModuleDocument{}, err
 			}
@@ -277,8 +284,7 @@ func buildModule(
 		}
 		binding.GenericOperations = genericOperations[binding.Identity]
 		if binding.Kind == gostdlib.BindingFunction ||
-			binding.Kind == gostdlib.BindingVariable ||
-			binding.Kind == gostdlib.BindingType {
+			binding.Kind == gostdlib.BindingVariable {
 			sites, behavior, behaviorErr := certifyBindingBehavior(
 				config,
 				project,
@@ -292,11 +298,25 @@ func buildModule(
 			}
 			binding.ImplementationSites = sites
 			binding.Dependencies = behavior.dependencies
-			// A type export aggregates every member body; per-method
-			// dispositions belong to the member bindings.
-			if binding.Kind != gostdlib.BindingType {
-				binding.Disposition = behavior.disposition
+			binding.Disposition = behavior.disposition
+		}
+		if binding.Kind == gostdlib.BindingType {
+			// A public class edge carries construction behavior only;
+			// member behavior joins per method binding.
+			sites, behavior, behaviorErr := certifyConstructionBehavior(
+				config,
+				project,
+				binding.Identity,
+				target.Name(),
+				target.DeclarationNodeHandles(),
+				behaviorEvidence,
+			)
+			if behaviorErr != nil {
+				return gostdlib.ModuleDocument{}, behaviorErr
 			}
+			binding.ImplementationSites = sites
+			binding.Dependencies = behavior.dependencies
+			binding.Disposition = behavior.disposition
 		}
 		if binding.Kind == gostdlib.BindingFunction {
 			if err := verifyExportSourceCallableShape(

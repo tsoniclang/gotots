@@ -29,6 +29,7 @@ type ProviderCallableProfileDocument struct {
 	ContractInterfaces          []string                                        `json:"contractInterfaces,omitempty"`
 	FromProviderInterfaces      []string                                        `json:"fromProviderInterfaces,omitempty"`
 	ImplementedResultInterfaces []string                                        `json:"implementedResultInterfaces,omitempty"`
+	ImplementationSites         []string                                        `json:"implementationSites,omitempty"`
 	Interfaces                  []ProviderCallableProfileInterfaceDocument      `json:"interfaces,omitempty"`
 	CallableParameters          []ProviderCallableParameterDocument             `json:"callableParameters,omitempty"`
 	Effect                      EffectKind                                      `json:"effect"`
@@ -181,6 +182,12 @@ func (p ProviderCallableProfile) Effect() EffectKind {
 
 func (p ProviderCallableProfile) ImplementationOwner() string {
 	return p.profile.ImplementationOwner
+}
+
+// ImplementationSites reference the certified implementation documents of
+// this profile facade's checked behavior.
+func (p ProviderCallableProfile) ImplementationSites() []string {
+	return append([]string(nil), p.profile.ImplementationSites...)
 }
 
 func (p ProviderCallableProfile) TargetFingerprint() string {
@@ -388,6 +395,7 @@ func cloneProviderCallableProfile(
 		result.Interfaces[index] = cloneProviderCallableProfileInterface(selected)
 	}
 	result.CallableParameters = slices.Clone(source.CallableParameters)
+	result.ImplementationSites = slices.Clone(source.ImplementationSites)
 	return result
 }
 

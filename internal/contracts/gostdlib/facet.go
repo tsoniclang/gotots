@@ -105,13 +105,16 @@ type ProviderRepresentationDocument struct {
 }
 
 type ProviderRepresentationMethodDocument struct {
-	SourceIdentity      string     `json:"sourceIdentity"`
-	Member              string     `json:"member"`
-	Effect              EffectKind `json:"effect"`
-	SourceSignature     string     `json:"sourceSignature"`
-	SourceLocation      string     `json:"sourceLocation"`
-	ImplementationOwner string     `json:"implementationOwner"`
-	TargetFingerprint   string     `json:"targetFingerprint"`
+	SourceIdentity      string                    `json:"sourceIdentity"`
+	Member              string                    `json:"member"`
+	Effect              EffectKind                `json:"effect"`
+	SourceSignature     string                    `json:"sourceSignature"`
+	SourceLocation      string                    `json:"sourceLocation"`
+	ImplementationOwner string                    `json:"implementationOwner"`
+	TargetFingerprint   string                    `json:"targetFingerprint"`
+	Disposition         ImplementationDisposition `json:"disposition,omitempty"`
+	Dependencies        []string                  `json:"dependencies,omitempty"`
+	ImplementationSites []string                  `json:"implementationSites,omitempty"`
 }
 
 type FacetDocument struct {
@@ -128,6 +131,7 @@ type FacetDocument struct {
 	StorageImplementationOwner string                              `json:"storageImplementationOwner,omitempty"`
 	TargetFingerprint          string                              `json:"targetFingerprint"`
 	StorageTargetFingerprint   string                              `json:"storageTargetFingerprint,omitempty"`
+	ImplementationSites        []string                            `json:"implementationSites,omitempty"`
 }
 
 type facetLookup struct {
@@ -285,6 +289,12 @@ func (f Facet) StorageImplementationOwner() string {
 	return f.facet.StorageImplementationOwner
 }
 
+// ImplementationSites reference the certified implementation documents of
+// this facet export's checked behavior.
+func (f Facet) ImplementationSites() []string {
+	return append([]string(nil), f.facet.ImplementationSites...)
+}
+
 func (f Facet) TargetFingerprint() string {
 	return f.facet.TargetFingerprint
 }
@@ -336,6 +346,9 @@ func cloneFacetModule(source FacetModuleDocument) FacetModuleDocument {
 		)
 		result.Facets[index].GenericTypeArguments = slices.Clone(
 			facet.GenericTypeArguments,
+		)
+		result.Facets[index].ImplementationSites = slices.Clone(
+			facet.ImplementationSites,
 		)
 	}
 	return result
@@ -390,6 +403,22 @@ func (r ProviderRepresentation) Method(
 	}, true
 }
 
+// Methods lists this representation's certified method documents.
+func (r ProviderRepresentation) Methods() []ProviderRepresentationMethodDocument {
+	result := make(
+		[]ProviderRepresentationMethodDocument,
+		len(r.representation.Methods),
+	)
+	for index, method := range r.representation.Methods {
+		method.Dependencies = slices.Clone(method.Dependencies)
+		method.ImplementationSites = slices.Clone(
+			method.ImplementationSites,
+		)
+		result[index] = method
+	}
+	return result
+}
+
 func (r ProviderRepresentation) ImplementationOwner() string {
 	return r.representation.ImplementationOwner
 }
@@ -436,6 +465,16 @@ func cloneProviderRepresentation(
 	result := source
 	result.SourceTypes = slices.Clone(source.SourceTypes)
 	result.SourceInterfaces = slices.Clone(source.SourceInterfaces)
-	result.Methods = slices.Clone(source.Methods)
+	result.Methods = make(
+		[]ProviderRepresentationMethodDocument,
+		len(source.Methods),
+	)
+	for index, method := range source.Methods {
+		method.Dependencies = slices.Clone(method.Dependencies)
+		method.ImplementationSites = slices.Clone(
+			method.ImplementationSites,
+		)
+		result.Methods[index] = method
+	}
 	return result
 }

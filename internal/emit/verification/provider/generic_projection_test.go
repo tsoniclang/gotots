@@ -21,7 +21,6 @@ func TestProviderGenericCallsUseCertifiedTargetProjection(t *testing.T) {
 
 import (
 	"cmp"
-	"context"
 	"errors"
 	"maps"
 	"slices"
@@ -80,11 +79,12 @@ func DeferredCompare() {
 	defer cmp.Compare("left", "right")
 }
 
-func PrintValues(source []string) {
-	_, cancel := context.WithCancel(context.Background())
+func PrintValues(source []string) int {
+	total := 0
 	for range slices.Values(source) {
-		cancel()
+		total++
 	}
+	return total
 }
 
 func GenericAddress[T any](first, second T) T {
