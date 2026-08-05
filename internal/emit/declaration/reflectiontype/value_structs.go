@@ -244,3 +244,81 @@ func structValueProperties(
 		expressionProperty(factory, "field", field),
 	}, nil
 }
+
+// pointerSliceValueProperties adds the elem callback of one pointer to a
+// slice: the pointee is a runtime pointer storage cell, so the location
+// reads and replaces the slice header through the cell's value member and
+// header mutations stay visible to the original variable.
+func pointerSliceValueProperties(
+	context api.Context,
+	names api.ReflectionNames,
+	reflectionType *types.TypeName,
+	pointee types.Type,
+	scaffold *locationScaffold,
+) ([]tsgo.ObjectLiteralElementLike, error) {
+	factory := scaffold.factory
+	sliceAdapter, err := context.Names().InterfaceAdapter(pointee, nil)
+	if err != nil {
+		return nil, err
+	}
+	descriptor, err := names.ReflectionValueType(pointee, reflectionType)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, sliceAdapter.Requests()...)
+	scaffold.requests = append(scaffold.requests, descriptor.Requests()...)
+	cellValue := memberAccess(factory, "instance", "value")
+	location := locationLiteral(scaffold, locationCallbacks{
+		descriptor: descriptor,
+		settable:   true,
+		get: factory.NewExpression(
+			sliceAdapter.Expression(factory),
+			nil,
+			[]tsgo.Expression{cellValue},
+		),
+		set: factory.Block([]tsgo.Statement{
+			factory.ExpressionStatement(factory.BinaryExpression(
+				nil,
+				cellValue,
+				nil,
+				factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
+				guardedForeignPayload(
+					scaffold,
+					sliceAdapter,
+					"Value.Set",
+				),
+			)),
+		}, true),
+	})
+	body := factory.Block([]tsgo.Statement{
+		foreignBoxGuardStatement(scaffold, "Value.Elem"),
+		constStatement(factory, "instance", boxPayload(factory)),
+		factory.IfStatement(
+			factory.BinaryExpression(
+				nil,
+				factory.Identifier("instance"),
+				nil,
+				factory.BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+				),
+				factory.Identifier("undefined"),
+			),
+			factory.Block([]tsgo.Statement{
+				factory.ReturnStatement(factory.Identifier("undefined")),
+			}, true),
+			nil,
+		),
+		factory.ReturnStatement(location),
+	}, true)
+	elem := factory.ArrowFunction(
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{boxParameter(scaffold)},
+		nil,
+		factory.EqualsGreaterThanToken(),
+		body,
+	)
+	return []tsgo.ObjectLiteralElementLike{
+		expressionProperty(factory, "elem", elem),
+	}, nil
+}

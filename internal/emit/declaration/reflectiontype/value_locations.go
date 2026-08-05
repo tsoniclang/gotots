@@ -36,17 +36,26 @@ func extendedValueProperties(
 	case *types.Basic:
 		return basicValueProperties(context, scaffold, selected)
 	case *types.Pointer:
-		if _, structPointee := types.Unalias(selected.Elem()).
-			Underlying().(*types.Struct); !structPointee {
+		switch types.Unalias(selected.Elem()).Underlying().(type) {
+		case *types.Struct:
+			return pointerValueProperties(
+				context,
+				names,
+				reflectionType,
+				selected.Elem(),
+				scaffold,
+			)
+		case *types.Slice:
+			return pointerSliceValueProperties(
+				context,
+				names,
+				reflectionType,
+				selected.Elem(),
+				scaffold,
+			)
+		default:
 			return nil, nil
 		}
-		return pointerValueProperties(
-			context,
-			names,
-			reflectionType,
-			selected.Elem(),
-			scaffold,
-		)
 	case *types.Struct:
 		return structValueProperties(
 			context,

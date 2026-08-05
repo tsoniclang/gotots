@@ -74,10 +74,20 @@ export const UnsafePointer = new Kind(26n);
 
 export abstract class Value {
   protected constructor(
-    protected readonly source?: GoInterfaceValue,
+    private readonly stored?: GoInterfaceValue,
     private readonly location?: RuntimeValueLocation,
     private readonly addressable: bool = false,
   ) {}
+
+  // source reads live through the location so mutations that replace the
+  // represented value (Set, SetLen, Grow, SetBytes) stay visible to every
+  // subsequent read of the same Value, exactly like Go's pointer-backed
+  // addressable values.
+  protected get source(): GoInterfaceValue | undefined {
+    return this.location === undefined
+      ? this.stored
+      : this.location.get();
+  }
 
   private static located(location: RuntimeValueLocation): Value {
     return new LocatedValue(location.get(), location, true);
@@ -140,7 +150,23 @@ export abstract class Value {
     }
     return operation(this.source);
   }
-  Bytes(): RuntimeSlice<uint8> { return providerPlaceholder("reflect.Value.Bytes requires generated reflection metadata"); }
+  Bytes(): RuntimeSlice<uint8> {
+    const operations = this.operations();
+    const box = this.source;
+    if (operations === undefined || box === undefined) {
+      return this.operationPanic("Bytes");
+    }
+    const bytes = operations.bytes;
+    if (bytes === undefined) {
+      if (operations.len !== undefined) {
+        return GoPanic.raise(
+          new ProviderError("reflect.Value.Bytes of non-byte slice"),
+        );
+      }
+      return this.operationPanic("Bytes");
+    }
+    return bytes(box);
+  }
   CanInt(): bool { return providerPlaceholder("reflect.Value.CanInt requires generated reflection metadata"); }
   CanSet(): bool {
     return this.addressable &&
@@ -191,7 +217,20 @@ export abstract class Value {
     }
     return operation(this.source);
   }
-  Grow(_capacity: int): void { return providerPlaceholder("reflect.Value.Grow requires generated reflection metadata"); }
+  Grow(count: int): void {
+    const target = this.settableLocation("Grow");
+    const grown = this.operations()?.grown;
+    const box = this.source;
+    if (grown === undefined || box === undefined) {
+      return this.operationPanic("Grow");
+    }
+    if (count < 0n) {
+      return GoPanic.raise(
+        new ProviderError("reflect.Value.Grow: negative len"),
+      );
+    }
+    target.set(grown(box, count));
+  }
   Index(index: int): Value {
     const operation = this.operations()?.index;
     if (operation === undefined || this.source === undefined) {
@@ -282,12 +321,52 @@ export abstract class Value {
     return this.location;
   }
   SetBool(_value: bool): void { return providerPlaceholder("reflect.Value.SetBool requires generated reflection metadata"); }
-  SetBytes(_value: RuntimeSlice<uint8>): void { return providerPlaceholder("reflect.Value.SetBytes requires generated reflection metadata"); }
+  SetBytes(value: RuntimeSlice<uint8>): void {
+    const target = this.settableLocation("SetBytes");
+    const operations = this.operations();
+    const box = this.source;
+    if (operations === undefined || box === undefined) {
+      return this.operationPanic("SetBytes");
+    }
+    const boxBytes = operations.boxBytes;
+    if (boxBytes === undefined) {
+      if (operations.len !== undefined) {
+        return GoPanic.raise(
+          new ProviderError(
+            "reflect.Value.SetBytes of non-byte slice",
+          ),
+        );
+      }
+      return this.operationPanic("SetBytes");
+    }
+    target.set(boxBytes(value));
+  }
   SetFloat(_value: float64): void { return providerPlaceholder("reflect.Value.SetFloat requires generated reflection metadata"); }
   SetInt(_value: int64): void { return providerPlaceholder("reflect.Value.SetInt requires generated reflection metadata"); }
   SetIterKey(_iterator: MapIter | undefined): void { return providerPlaceholder("reflect.Value.SetIterKey requires generated reflection metadata"); }
   SetIterValue(_iterator: MapIter | undefined): void { return providerPlaceholder("reflect.Value.SetIterValue requires generated reflection metadata"); }
-  SetLen(_length: int): void { return providerPlaceholder("reflect.Value.SetLen requires generated reflection metadata"); }
+  SetLen(length: int): void {
+    const target = this.settableLocation("SetLen");
+    const operations = this.operations();
+    const resliced = operations?.resliced;
+    const capacity = operations?.cap;
+    const box = this.source;
+    if (
+      resliced === undefined ||
+      capacity === undefined ||
+      box === undefined
+    ) {
+      return this.operationPanic("SetLen");
+    }
+    if (length < 0n || length > capacity(box)) {
+      return GoPanic.raise(
+        new ProviderError(
+          "reflect: slice length out of range in SetLen",
+        ),
+      );
+    }
+    target.set(resliced(box, length));
+  }
   SetMapIndex(_key: Value, _element: Value): void { return providerPlaceholder("reflect.Value.SetMapIndex requires generated reflection metadata"); }
   SetString(value: gostring): void {
     const target = this.settableLocation("SetString");

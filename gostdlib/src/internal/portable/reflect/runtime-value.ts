@@ -1,9 +1,11 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
+import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
   float64,
   gostring,
   int64,
+  uint8,
   uint64,
 } from "@gotots/gostdlib/internal/scalars.js";
 
@@ -57,6 +59,16 @@ export interface RuntimeValueOperations {
     length: int64,
     capacity: int64,
   ) => GoInterfaceValue;
+  readonly resliced?: (
+    box: GoInterfaceValue,
+    length: int64,
+  ) => GoInterfaceValue;
+  readonly grown?: (
+    box: GoInterfaceValue,
+    count: int64,
+  ) => GoInterfaceValue;
+  readonly bytes?: (box: GoInterfaceValue) => RuntimeSlice<uint8>;
+  readonly boxBytes?: (value: RuntimeSlice<uint8>) => GoInterfaceValue;
 }
 
 const operationsByType = new Map<Type, RuntimeValueOperations>();

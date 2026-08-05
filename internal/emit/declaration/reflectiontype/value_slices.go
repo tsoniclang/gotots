@@ -4,6 +4,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -293,6 +294,227 @@ func sliceValueProperties(
 			)),
 		),
 	))
+	resliced := factory.ArrowFunction(
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{
+			boxParameter(scaffold),
+			factory.ParameterDeclaration(
+				nil,
+				nil,
+				factory.Identifier("length"),
+				nil,
+				factory.TypeReferenceNode(
+					indexType.EntityName(factory),
+					nil,
+				),
+				nil,
+			),
+		},
+		nil,
+		factory.EqualsGreaterThanToken(),
+		factory.ParenthesizedExpression(guardedProjection(
+			scaffold,
+			"Value.SetLen",
+			factory.NewExpression(
+				scaffold.adapter.Expression(factory),
+				nil,
+				[]tsgo.Expression{factory.CallExpression(
+					factory.PropertyAccessExpression(
+						boxPayload(factory),
+						nil,
+						factory.Identifier("slice"),
+						tsgo.NodeFlagsNone,
+					),
+					nil,
+					nil,
+					[]tsgo.Expression{
+						factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+						factory.Identifier("length"),
+						factory.NullLiteral(),
+					},
+					tsgo.NodeFlagsNone,
+				)},
+			),
+		)),
+	)
+	properties = append(
+		properties,
+		expressionProperty(factory, "resliced", resliced),
+	)
+	elementAlias, aliasOK := basictype.PrimitiveAlias(
+		context.TypesSizes(),
+		elementBasic,
+	)
+	if !aliasOK {
+		return nil, &api.GeneratedArtifactShapeError{
+			Artifact: sliceType.String(),
+			Reason:   "reflection value slice element has no primitive alias",
+		}
+	}
+	elementProduct, err := context.Names().Primitive(elementAlias)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, elementProduct.Requests()...)
+	filler := factory.CallExpression(
+		factory.PropertyAccessExpression(
+			factory.NewExpression(
+				factory.PropertyAccessExpression(
+					factory.Identifier("globalThis"),
+					nil,
+					factory.Identifier("Array"),
+					tsgo.NodeFlagsNone,
+				),
+				[]tsgo.TypeNode{factory.TypeReferenceNode(
+					elementProduct.EntityName(factory),
+					nil,
+				)},
+				[]tsgo.Expression{factory.CallExpression(
+					factory.PropertyAccessExpression(
+						factory.Identifier("globalThis"),
+						nil,
+						factory.Identifier("Number"),
+						tsgo.NodeFlagsNone,
+					),
+					nil,
+					nil,
+					[]tsgo.Expression{factory.Identifier("count")},
+					tsgo.NodeFlagsNone,
+				)},
+			),
+			nil,
+			factory.Identifier("fill"),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		[]tsgo.Expression{elementZero},
+		tsgo.NodeFlagsNone,
+	)
+	grownSlice := factory.CallExpression(
+		factory.PropertyAccessExpression(
+			factory.CallExpression(
+				factory.PropertyAccessExpression(
+					boxPayload(factory),
+					nil,
+					factory.Identifier("append"),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{elementZero, filler},
+				tsgo.NodeFlagsNone,
+			),
+			nil,
+			factory.Identifier("slice"),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		[]tsgo.Expression{
+			factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+			factory.PropertyAccessExpression(
+				boxPayload(factory),
+				nil,
+				factory.Identifier("length"),
+				tsgo.NodeFlagsNone,
+			),
+			factory.NullLiteral(),
+		},
+		tsgo.NodeFlagsNone,
+	)
+	grown := factory.ArrowFunction(
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{
+			boxParameter(scaffold),
+			factory.ParameterDeclaration(
+				nil,
+				nil,
+				factory.Identifier("count"),
+				nil,
+				factory.TypeReferenceNode(
+					indexType.EntityName(factory),
+					nil,
+				),
+				nil,
+			),
+		},
+		nil,
+		factory.EqualsGreaterThanToken(),
+		factory.ParenthesizedExpression(guardedProjection(
+			scaffold,
+			"Value.Grow",
+			factory.NewExpression(
+				scaffold.adapter.Expression(factory),
+				nil,
+				[]tsgo.Expression{grownSlice},
+			),
+		)),
+	)
+	properties = append(
+		properties,
+		expressionProperty(factory, "grown", grown),
+	)
+	if elementBasic.Kind() == types.Uint8 {
+		providerByte, byteErr := context.Names().ProviderPrimitive(
+			api.PrimitiveUint8,
+		)
+		if byteErr != nil {
+			return nil, byteErr
+		}
+		scaffold.requests = append(
+			scaffold.requests,
+			providerByte.Requests()...,
+		)
+		byteSliceType := factory.TypeReferenceNode(
+			runtimeSlice.EntityName(factory),
+			[]tsgo.TypeNode{factory.TypeReferenceNode(
+				providerByte.EntityName(factory),
+				nil,
+			)},
+		)
+		bytes := factory.ArrowFunction(
+			nil,
+			nil,
+			[]tsgo.ParameterDeclaration{boxParameter(scaffold)},
+			byteSliceType,
+			factory.EqualsGreaterThanToken(),
+			factory.ParenthesizedExpression(guardedProjection(
+				scaffold,
+				"Value.Bytes",
+				boxPayload(factory),
+			)),
+		)
+		boxBytes := factory.ArrowFunction(
+			nil,
+			nil,
+			[]tsgo.ParameterDeclaration{factory.ParameterDeclaration(
+				nil,
+				nil,
+				factory.Identifier("value"),
+				nil,
+				byteSliceType,
+				nil,
+			)},
+			factory.TypeReferenceNode(
+				scaffold.boxType.EntityName(factory),
+				nil,
+			),
+			factory.EqualsGreaterThanToken(),
+			factory.NewExpression(
+				scaffold.adapter.Expression(factory),
+				nil,
+				[]tsgo.Expression{factory.Identifier("value")},
+			),
+		)
+		properties = append(
+			properties,
+			expressionProperty(factory, "bytes", bytes),
+			expressionProperty(factory, "boxBytes", boxBytes),
+		)
+	}
 	return properties, nil
 }
 
