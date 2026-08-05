@@ -298,3 +298,124 @@ func (b builder) indexMethod() tsgo.MethodDeclaration {
 		),
 	)
 }
+
+func (b builder) projectMethod() tsgo.MethodDeclaration {
+	typeFL := b.typeReference("FL")
+	typeFS := b.typeReference("FS")
+	typeTL := b.typeReference("TL")
+	typeTS := b.typeReference("TS")
+	pointer := b.id("pointer")
+	read := b.factory.CallExpression(
+		b.id("fromSource"),
+		nil,
+		nil,
+		[]tsgo.Expression{b.property(pointer, CellValueName)},
+		tsgo.NodeFlagsNone,
+	)
+	write := b.factory.BinaryExpression(
+		nil,
+		b.property(pointer, CellValueName),
+		nil,
+		b.factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
+		b.factory.CallExpression(
+			b.id("toSource"),
+			nil,
+			nil,
+			[]tsgo.Expression{b.id("next")},
+			tsgo.NodeFlagsNone,
+		),
+	)
+	converter := func(
+		name string,
+		from tsgo.TypeNode,
+		to tsgo.TypeNode,
+	) tsgo.ParameterDeclaration {
+		return b.parameter(
+			name,
+			b.factory.FunctionTypeNode(
+				nil,
+				[]tsgo.ParameterDeclaration{b.parameter("value", from)},
+				to,
+			),
+		)
+	}
+	return b.method(
+		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
+		ProjectName,
+		[]tsgo.TypeParameterDeclaration{
+			b.typeParameter("FL", nil),
+			b.typeParameter("FS", nil),
+			b.typeParameter("TL", nil),
+			b.typeParameter("TS", nil),
+		},
+		[]tsgo.ParameterDeclaration{
+			b.parameter("pointer", b.pointerType(typeFL, typeFS)),
+			converter("fromSource", typeFS, typeTS),
+			converter("toSource", typeTS, typeFS),
+		},
+		b.pointerType(typeTL, typeTS),
+		b.factory.ReturnStatement(b.newPointerWithWrite(
+			typeTL,
+			typeTS,
+			b.property(pointer, AddressName),
+			read,
+			write,
+		)),
+	)
+}
+
+func Project(
+	factory tsgo.Factory,
+	functionName string,
+	pointerName string,
+) tsgo.FunctionDeclaration {
+	b := builder{factory: factory, className: pointerName}
+	typeFL := b.typeReference("FL")
+	typeFS := b.typeReference("FS")
+	typeTL := b.typeReference("TL")
+	typeTS := b.typeReference("TS")
+	converter := func(
+		name string,
+		from tsgo.TypeNode,
+		to tsgo.TypeNode,
+	) tsgo.ParameterDeclaration {
+		return b.parameter(
+			name,
+			factory.FunctionTypeNode(
+				nil,
+				[]tsgo.ParameterDeclaration{b.parameter("value", from)},
+				to,
+			),
+		)
+	}
+	return factory.FunctionDeclaration(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		nil,
+		factory.Identifier(functionName),
+		[]tsgo.TypeParameterDeclaration{
+			b.typeParameter("FL", nil),
+			b.typeParameter("FS", nil),
+			b.typeParameter("TL", nil),
+			b.typeParameter("TS", nil),
+		},
+		[]tsgo.ParameterDeclaration{
+			b.parameter("pointer", b.pointerType(typeFL, typeFS)),
+			converter("fromSource", typeFS, typeTS),
+			converter("toSource", typeTS, typeFS),
+		},
+		b.pointerType(typeTL, typeTS),
+		factory.Block([]tsgo.Statement{factory.ReturnStatement(
+			factory.CallExpression(
+				b.property(factory.Identifier(pointerName), ProjectName),
+				nil,
+				[]tsgo.TypeNode{typeFL, typeFS, typeTL, typeTS},
+				[]tsgo.Expression{
+					factory.Identifier("pointer"),
+					factory.Identifier("fromSource"),
+					factory.Identifier("toSource"),
+				},
+				tsgo.NodeFlagsNone,
+			),
+		)}, true),
+	)
+}

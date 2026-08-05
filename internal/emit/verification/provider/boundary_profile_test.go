@@ -298,6 +298,10 @@ func NewOrder(mutex *sync.Mutex) binary.ByteOrder {
 }
 
 func RootFactory() func(string) fs.FS { return os.DirFS }
+
+func Visit(fileSystem fs.FS, callback fs.WalkDirFunc) error {
+	return fs.WalkDir(fileSystem, ".", callback)
+}
 `)
 	program, err := load.Load(context.Background(), load.Request{
 		Directory:    project,
@@ -323,6 +327,7 @@ func RootFactory() func(string) fs.FS { return os.DirFS }
 			mustProviderRoot(t, scope.Lookup("Decode")),
 			mustProviderRoot(t, scope.Lookup("NewOrder")),
 			mustProviderRoot(t, scope.Lookup("RootFactory")),
+			mustProviderRoot(t, scope.Lookup("Visit")),
 		},
 		options,
 	)
@@ -352,6 +357,17 @@ func RootFactory() func(string) fs.FS { return os.DirFS }
 	}
 	if !strings.Contains(artifacts.printed, "IoFsStatCanonical") {
 		t.Fatalf("canonical fs.Stat boundary is absent:\n%s", artifacts.printed)
+	}
+	if !strings.Contains(artifacts.printed, "IoFsWalkDirCanonical") ||
+		strings.Contains(artifacts.printed, "fs__from_gostdlib.WalkDirFunc") {
+		t.Fatalf("canonical fs.WalkDir callable boundary is absent:\n%s", artifacts.printed)
+	}
+	if !strings.Contains(artifacts.printed, "new RuntimeSliceProjection<") ||
+		!strings.Contains(artifacts.printed, "this.$go$value.ReadDir(") {
+		t.Fatalf(
+			"recursive fs.DirEntry slice boundary is not projected at the provider bridge:\n%s",
+			artifacts.printed,
+		)
 	}
 }
 

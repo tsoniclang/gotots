@@ -99,6 +99,14 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimePointer,
 			RuntimePanic,
 		), nil
+	case RuntimePointerProjection:
+		return runtimeContract(
+			RuntimeModulePointer,
+			"runtime/pointer.ts",
+			"goPointerProject",
+			false,
+			RuntimePointer,
+		), nil
 	case RuntimeArray:
 		return runtimeContract(
 			RuntimeModuleArray,
@@ -227,6 +235,15 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goSliceAllocate",
 			false,
 			RuntimeSlice,
+		), nil
+	case RuntimeSliceProjection:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"RuntimeSliceProjection",
+			true,
+			RuntimeSlice,
+			RuntimePointerProjection,
 		), nil
 	case RuntimeSliceArrayPointer:
 		return runtimeContract(

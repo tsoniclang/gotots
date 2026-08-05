@@ -23,6 +23,7 @@ const (
 	RuntimePointerHash             = runtimecontract.RuntimePointerHash
 	RuntimePointerRegion           = runtimecontract.RuntimePointerRegion
 	RuntimePointerUnsafeMemory     = runtimecontract.RuntimePointerUnsafeMemory
+	RuntimePointerProjection       = runtimecontract.RuntimePointerProjection
 	RuntimeArray                   = runtimecontract.RuntimeArray
 	RuntimeArrayAllocate           = runtimecontract.RuntimeArrayAllocate
 	RuntimeArrayView               = runtimecontract.RuntimeArrayView
@@ -39,6 +40,7 @@ const (
 	RuntimeSlice                   = runtimecontract.RuntimeSlice
 	RuntimeSliceAddress            = runtimecontract.RuntimeSliceAddress
 	RuntimeSliceStorage            = runtimecontract.RuntimeSliceStorage
+	RuntimeSliceProjection         = runtimecontract.RuntimeSliceProjection
 	RuntimeSliceArrayPointer       = runtimecontract.RuntimeSliceArrayPointer
 	RuntimeArraySlice              = runtimecontract.RuntimeArraySlice
 	RuntimeSliceAppendSlice        = runtimecontract.RuntimeSliceAppendSlice

@@ -44,6 +44,18 @@ func fromProviderValueSelected(
 	if err != nil || scalar {
 		return converted, changed, err
 	}
+	converted, slice, changed, err := fromProviderSlice(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		profile,
+		sourceType,
+		value,
+	)
+	if err != nil || slice {
+		return converted, changed, err
+	}
 	selected, ok := types.Unalias(sourceType).(*types.Named)
 	if ok && selected.Obj() != nil {
 		_, profileOwned, profileErr :=
@@ -149,6 +161,18 @@ func toProviderValueSelected(
 		value,
 	)
 	if err != nil || scalar {
+		return converted, changed, err
+	}
+	converted, slice, changed, err := toProviderSlice(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		profile,
+		sourceType,
+		value,
+	)
+	if err != nil || slice {
 		return converted, changed, err
 	}
 	selected, ok := types.Unalias(sourceType).(*types.Named)

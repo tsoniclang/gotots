@@ -477,6 +477,17 @@ methods, interfaces in both directions, callbacks, nested containers,
 provider-created values, constants, package state, generic operations,
 cooperative calls, and deferred recovery.
 
+Nested-container proof mutates a provider slice and its generated projection in
+both directions, then reslices, appends with and without reallocation, and uses
+`copy`. The observed backing aliases, nil state, length, and capacity must match
+Go. Artifact inspection proves equal-representation slices remain direct and a
+differing element emits one `RuntimeSliceProjection<F,T>` with reciprocal typed
+element conversions. Replacing the projection with an eager copy, omitting the
+reverse conversion, or projecting an equal carrier must fail.
+Projected contiguous-region proof verifies that nil stays nil and a non-nil
+request reaches the projection's explicit typed unsupported boundary rather
+than inheriting the direct slice's raw-backing implementation.
+
 For each generated static facade, proof records:
 
 - selected Go callable identity/signature;

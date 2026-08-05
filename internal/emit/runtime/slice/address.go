@@ -1,25 +1,30 @@
 package slice
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 func (b builder) addressMethod() tsgo.MethodDeclaration {
-	tuple := b.factory.TypeOperatorNode(
-		tsgo.TypeOperatorNodeOperatorKindReadonlyKeyword,
-		b.factory.TupleTypeNode(
-			[]tsgo.TypeNode{
-				b.factory.ArrayTypeNode(b.typeT()),
-				b.numberType(),
-			},
-		),
+	typeL := b.factory.TypeReferenceNode(b.id("L"), nil)
+	pointerType := b.factory.TypeReferenceNode(
+		b.id(b.pointerName),
+		[]tsgo.TypeNode{typeL, b.typeT()},
 	)
 	return b.method(
 		nil,
 		MemberName(MemberAddress),
-		nil,
+		[]tsgo.TypeParameterDeclaration{b.factory.TypeParameterDeclaration(
+			nil,
+			b.id("L"),
+			nil,
+			nil,
+			nil,
+		)},
 		[]tsgo.ParameterDeclaration{
 			b.parameter("index", b.integerInputType()),
 		},
-		tuple,
+		pointerType,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"numericIndex",
@@ -43,8 +48,11 @@ func (b builder) addressMethod() tsgo.MethodDeclaration {
 			b.throwBounds(),
 			nil,
 		),
-		b.returnStatement(
-			b.factory.ArrayLiteralExpression(
+		b.returnStatement(b.factory.CallExpression(
+			b.property(b.id(b.pointerName), "element"),
+			nil,
+			[]tsgo.TypeNode{typeL, b.typeT()},
+			[]tsgo.Expression{b.factory.ArrayLiteralExpression(
 				[]tsgo.Expression{
 					b.id("backing"),
 					b.add(
@@ -53,8 +61,111 @@ func (b builder) addressMethod() tsgo.MethodDeclaration {
 					),
 				},
 				false,
+			)},
+			tsgo.NodeFlagsNone,
+		)),
+	)
+}
+
+func (b projectionBuilder) addressMethod() tsgo.MethodDeclaration {
+	typeL := b.typeReference("L")
+	sourcePointer := b.factory.CallExpression(
+		b.property(b.source(), MemberName(MemberAddress)),
+		nil,
+		[]tsgo.TypeNode{typeL},
+		[]tsgo.Expression{b.id("index")},
+		tsgo.NodeFlagsNone,
+	)
+	projected := b.factory.CallExpression(
+		b.id(b.pointerProject),
+		nil,
+		[]tsgo.TypeNode{
+			typeL,
+			b.typeReference("F"),
+			typeL,
+			b.typeReference("T"),
+		},
+		[]tsgo.Expression{
+			sourcePointer,
+			b.thisProperty("fromSource"),
+			b.thisProperty("toSource"),
+		},
+		tsgo.NodeFlagsNone,
+	)
+	return b.factory.MethodDeclaration(
+		[]tsgo.ModifierLike{b.factory.OverrideKeyword()},
+		nil,
+		b.id(MemberName(MemberAddress)),
+		nil,
+		[]tsgo.TypeParameterDeclaration{b.typeParameter("L")},
+		[]tsgo.ParameterDeclaration{
+			b.parameter(nil, "index", b.integerInputType()),
+		},
+		b.pointerType(typeL, b.typeReference("T")),
+		b.factory.Block([]tsgo.Statement{b.returnStatement(projected)}, true),
+	)
+}
+
+func (b projectionBuilder) arrayLocationMethod() tsgo.MethodDeclaration {
+	typeN := b.typeReference("N")
+	sourceLocation := b.factory.CallExpression(
+		b.property(b.source(), MemberName(MemberArrayLocation)),
+		nil,
+		[]tsgo.TypeNode{typeN},
+		[]tsgo.Expression{b.id("length")},
+		tsgo.NodeFlagsNone,
+	)
+	return b.factory.MethodDeclaration(
+		[]tsgo.ModifierLike{b.factory.OverrideKeyword()},
+		nil,
+		b.id(MemberName(MemberArrayLocation)),
+		nil,
+		[]tsgo.TypeParameterDeclaration{b.factory.TypeParameterDeclaration(
+			nil,
+			b.id("N"),
+			b.numberType(),
+			nil,
+			nil,
+		)},
+		[]tsgo.ParameterDeclaration{
+			b.parameter(nil, "length", typeN),
+		},
+		b.factory.UnionTypeNode([]tsgo.TypeNode{
+			b.factory.TypeOperatorNode(
+				tsgo.TypeOperatorNodeOperatorKindReadonlyKeyword,
+				b.factory.TupleTypeNode([]tsgo.TypeNode{
+					b.factory.ArrayTypeNode(b.typeReference("T")),
+					b.numberType(),
+				}),
 			),
-		),
+			b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword),
+		}),
+		b.factory.Block([]tsgo.Statement{
+			b.variable(tsgo.NodeFlagsConst, "sourceLocation", sourceLocation),
+			b.factory.IfStatement(
+				b.factory.BinaryExpression(
+					nil,
+					b.id("sourceLocation"),
+					nil,
+					b.factory.BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					),
+					b.factory.VoidExpression(b.number("0")),
+				),
+				b.factory.Block([]tsgo.Statement{
+					b.returnStatement(b.factory.VoidExpression(b.number("0"))),
+				}, true),
+				nil,
+			),
+			b.returnStatement(panicruntime.Call(
+				b.factory,
+				b.panicName,
+				b.factory.StringLiteral(
+					"projected slice has no contiguous target representation",
+					tsgo.TokenFlagsNone,
+				),
+			)),
+		}, true),
 	)
 }
 
@@ -87,7 +198,7 @@ func BuildAddress(
 			),
 		},
 	)
-	location := factory.CallExpression(
+	result := factory.CallExpression(
 		factory.PropertyAccessExpression(
 			factory.Identifier("value"),
 			nil,
@@ -95,20 +206,8 @@ func BuildAddress(
 			tsgo.NodeFlagsNone,
 		),
 		nil,
-		nil,
+		[]tsgo.TypeNode{typeReference(factory, "L")},
 		[]tsgo.Expression{factory.Identifier("index")},
-		tsgo.NodeFlagsNone,
-	)
-	result := factory.CallExpression(
-		factory.PropertyAccessExpression(
-			factory.Identifier(pointerName),
-			nil,
-			factory.Identifier("element"),
-			tsgo.NodeFlagsNone,
-		),
-		nil,
-		[]tsgo.TypeNode{typeReference(factory, "L"), typeReference(factory, "S")},
-		[]tsgo.Expression{location},
 		tsgo.NodeFlagsNone,
 	)
 	return factory.FunctionDeclaration(

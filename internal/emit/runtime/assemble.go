@@ -13,7 +13,6 @@ import (
 	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
 	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	storagefacetruntime "github.com/tsoniclang/gotots/internal/emit/runtime/storagefacet"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
 	unsafecodecruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafecodec"
@@ -183,100 +182,7 @@ func Build(
 		return []Definition{definition}, nil
 	}
 	if module == api.RuntimeModulePointer {
-		if len(symbols) == 0 || symbols[0] != api.RuntimePointer {
-			return nil, &AssemblyError{
-				Module: module,
-				Reason: "pointer runtime requires exactly RuntimePointer",
-			}
-		}
-		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
-		for _, symbol := range symbols {
-			if _, duplicate := seen[symbol]; duplicate {
-				return nil, &AssemblyError{
-					Module: module,
-					Symbol: symbol,
-					Reason: "pointer runtime symbol is duplicated",
-				}
-			}
-			seen[symbol] = struct{}{}
-			if symbol != api.RuntimePointer &&
-				symbol != api.RuntimePointerHash &&
-				symbol != api.RuntimePointerRegion &&
-				symbol != api.RuntimePointerUnsafeMemory {
-				return nil, &api.RuntimeSymbolError{Symbol: symbol}
-			}
-		}
-		contract, err := api.RuntimeContract(api.RuntimePointer)
-		if err != nil {
-			return nil, err
-		}
-		panicContract, err := api.RuntimeContract(api.RuntimePanic)
-		if err != nil {
-			return nil, err
-		}
-		denseIndexContract, err := api.RuntimeContract(api.RuntimeDenseIndex)
-		if err != nil {
-			return nil, err
-		}
-		definition, err := NewDefinition(
-			api.RuntimePointer,
-			pointerruntime.BuildWithCapabilities(
-				factory,
-				contract.ExportedName(),
-				panicContract.ExportedName(),
-				denseIndexContract.ExportedName(),
-				pointerruntime.Capabilities{
-					Region: slices.Contains(symbols, api.RuntimePointerRegion) ||
-						slices.Contains(symbols, api.RuntimePointerUnsafeMemory),
-					UnsafeMemory: slices.Contains(
-						symbols,
-						api.RuntimePointerUnsafeMemory,
-					),
-				},
-			),
-		)
-		if err != nil {
-			return nil, err
-		}
-		definitions := []Definition{definition}
-		for _, symbol := range symbols[1:] {
-			selected, err := api.RuntimeContract(symbol)
-			if err != nil {
-				return nil, err
-			}
-			var statement tsgo.Statement
-			switch symbol {
-			case api.RuntimePointerHash:
-				mapHashContract, err := api.RuntimeContract(api.RuntimeMapHash)
-				if err != nil {
-					return nil, err
-				}
-				statement = pointerruntime.Hash(
-					factory,
-					selected.ExportedName(),
-					contract.ExportedName(),
-					mapHashContract.ExportedName(),
-				)
-			case api.RuntimePointerRegion:
-				statement = pointerruntime.Region(
-					factory,
-					selected.ExportedName(),
-					contract.ExportedName(),
-				)
-			case api.RuntimePointerUnsafeMemory:
-				statement = pointerruntime.UnsafeMemory(
-					factory,
-					selected.ExportedName(),
-					contract.ExportedName(),
-				)
-			}
-			definition, err := NewDefinition(symbol, statement)
-			if err != nil {
-				return nil, err
-			}
-			definitions = append(definitions, definition)
-		}
-		return definitions, nil
+		return buildPointer(factory, symbols)
 	}
 	if module == api.RuntimeModuleArray {
 		if symbols[0] != api.RuntimeArray {

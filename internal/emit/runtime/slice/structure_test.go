@@ -98,6 +98,10 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 	if _, ok := backing.Types()[0].(tsgo.ArrayTypeNode); !ok {
 		t.Fatalf("runtime slice internal backing = %T, want typed array", backing.Types()[0])
 	}
+	if len(constructor.Modifiers()) != 1 ||
+		constructor.Modifiers()[0].Kind() != tsgo.SyntaxKindProtectedKeyword {
+		t.Fatal("runtime slice constructor does not admit only typed runtime subclasses")
+	}
 	var methods []string
 	for _, member := range members[1:] {
 		method, ok := member.(tsgo.MethodDeclaration)
@@ -119,6 +123,31 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 	}
 	if !slices.Equal(methods, want) {
 		t.Fatalf("runtime slice methods = %v, want %v", methods, want)
+	}
+}
+
+func TestRuntimeSliceProjectionIsOneDemandedTypedSubclass(t *testing.T) {
+	definitions, err := runtimeemission.Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleSlice,
+		[]api.RuntimeSymbol{
+			api.RuntimeSlice,
+			api.RuntimeSliceProjection,
+		},
+		api.ConcurrencySemanticsDisabled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 2 ||
+		definitions[1].Symbol() != api.RuntimeSliceProjection {
+		t.Fatalf("projected slice definitions = %#v", definitions)
+	}
+	projection, ok := definitions[1].Statement().(tsgo.ClassDeclaration)
+	if !ok || projection.Name().Text() != "RuntimeSliceProjection" ||
+		len(projection.TypeParameters()) != 2 ||
+		len(projection.HeritageClauses()) != 1 {
+		t.Fatalf("projected slice declaration = %#v", projection)
 	}
 }
 

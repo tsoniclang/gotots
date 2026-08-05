@@ -81,6 +81,26 @@ func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
 		t.Fatalf("base pointer owner = %T with unexpected members", base[0].Statement())
 	}
 
+	withProjection, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModulePointer,
+		[]api.RuntimeSymbol{
+			api.RuntimePointer,
+			api.RuntimePointerProjection,
+		},
+		api.ConcurrencySemanticsDisabled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectedClass, ok := withProjection[0].Statement().(tsgo.ClassDeclaration)
+	if len(withProjection) != 2 ||
+		!ok ||
+		len(projectedClass.Members()) != 19 ||
+		withProjection[1].Symbol() != api.RuntimePointerProjection {
+		t.Fatalf("pointer projection definitions = %#v", withProjection)
+	}
+
 	withHash, err := Build(
 		tsgo.NewFactory(),
 		api.RuntimeModulePointer,

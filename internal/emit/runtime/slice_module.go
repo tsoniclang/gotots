@@ -37,6 +37,7 @@ func buildSlice(
 			capabilities.ArrayView = true
 		case api.RuntimeSliceStorage:
 			capabilities.Storage = true
+		case api.RuntimeSliceProjection:
 		case api.RuntimeSliceAppendSlice:
 			capabilities.AppendSlice = true
 		case api.RuntimeSliceClear:
@@ -59,6 +60,22 @@ func buildSlice(
 	if err != nil {
 		return nil, err
 	}
+	pointerName := ""
+	pointerProjectName := ""
+	if capabilities.Address {
+		pointerContract, pointerErr := api.RuntimeContract(api.RuntimePointer)
+		if pointerErr != nil {
+			return nil, pointerErr
+		}
+		pointerName = pointerContract.ExportedName()
+		pointerProjectContract, pointerProjectErr := api.RuntimeContract(
+			api.RuntimePointerProjection,
+		)
+		if pointerProjectErr != nil {
+			return nil, pointerProjectErr
+		}
+		pointerProjectName = pointerProjectContract.ExportedName()
+	}
 	class, err := NewDefinition(
 		api.RuntimeSlice,
 		runtimeslice.BuildWithCapabilities(
@@ -66,6 +83,7 @@ func buildSlice(
 			sliceContract.ExportedName(),
 			panicContract.ExportedName(),
 			denseIndexContract.ExportedName(),
+			pointerName,
 			capabilities,
 		),
 	)
@@ -74,6 +92,29 @@ func buildSlice(
 	}
 	definitions := []Definition{class}
 	for _, symbol := range symbols[1:] {
+		if symbol == api.RuntimeSliceProjection {
+			projectionContract, err := api.RuntimeContract(symbol)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(
+				symbol,
+				runtimeslice.BuildProjection(
+					factory,
+					projectionContract.ExportedName(),
+					sliceContract.ExportedName(),
+					panicContract.ExportedName(),
+					pointerName,
+					pointerProjectName,
+					capabilities,
+				),
+			)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+			continue
+		}
 		statement, err := buildSliceOperation(
 			factory,
 			symbol,

@@ -9,6 +9,7 @@ const (
 	DereferenceName  = "dereference"
 	DirectName       = "direct"
 	EqualName        = "equal"
+	ProjectName      = "project"
 	ViewName         = "view"
 	FieldName        = "field"
 	ObjectFieldName  = "objectField"
@@ -26,6 +27,7 @@ const (
 type Capabilities struct {
 	Region       bool
 	UnsafeMemory bool
+	Projection   bool
 }
 
 type builder struct {
@@ -84,6 +86,9 @@ func BuildWithCapabilities(
 		target.viewMethod(),
 		target.valueGetter(),
 		target.valueSetter(),
+	}
+	if capabilities.Projection {
+		members = append(members, target.projectMethod())
 	}
 	if capabilities.Region {
 		members = append(members, target.regionMethod())

@@ -42,6 +42,16 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 	if len(members) != 18 {
 		t.Fatalf("pointer class members = %d, want 18", len(members))
 	}
+	for _, member := range members {
+		method, ok := member.(tsgo.MethodDeclaration)
+		if !ok {
+			continue
+		}
+		name, ok := method.Name().(tsgo.Identifier)
+		if ok && name.Text() == pointer.ProjectName {
+			t.Fatal("ordinary pointer runtime carries the projection facet")
+		}
+	}
 	constructor, ok := members[3].(tsgo.ConstructorDeclaration)
 	if !ok {
 		t.Fatalf("pointer member = %T, want constructor", members[3])
@@ -151,11 +161,12 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		}
 	})
 	printed, err := client.PrintNode(
-		pointer.Build(
+		pointer.BuildWithCapabilities(
 			factory,
 			pointerClassName(t),
 			panicClassName(t),
 			denseIndexClassName(t),
+			pointer.Capabilities{Projection: true},
 		),
 		tsgo.PrintOptions{},
 	)
@@ -172,6 +183,9 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		"static element<L, S>",
 		"static index<L, S, PL, O extends",
 		"static arrayRegion<L, T, S extends",
+		"static project<FL, FS, TL, TS>",
+		"fromSource(pointer.value)",
+		"pointer.value = toSource(next)",
 		"const numericIndex = globalThis.Number(index);",
 		"static equal<LL, LS, RL, RS>",
 		"static dereference<L, S>",

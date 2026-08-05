@@ -226,6 +226,35 @@ func (b builder) copyMethod() tsgo.MethodDeclaration {
 			),
 		),
 	)
+	directCopy := b.factory.Block([]tsgo.Statement{
+		b.factory.IfStatement(
+			sameBacking,
+			b.factory.ExpressionStatement(copyWithin),
+			distinctCopy,
+		),
+		b.returnStatement(b.id("count")),
+	}, true)
+	values := b.factory.NewExpression(
+		b.id("Array"),
+		[]tsgo.TypeNode{b.typeT()},
+		[]tsgo.Expression{b.id("count")},
+	)
+	captureProjected := b.loop(
+		b.id("count"),
+		b.factory.ExpressionStatement(b.assign(
+			b.index(b.id("values"), b.id("index")),
+			b.call(b.id("source"), MemberName(MemberGet), b.id("index")),
+		)),
+	)
+	writeProjected := b.loop(
+		b.id("count"),
+		b.factory.ExpressionStatement(b.call(
+			b.id("target"),
+			MemberName(MemberSet),
+			b.id("index"),
+			b.indexedValue(b.id("values"), b.id("index")),
+		)),
+	)
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		MemberName(MemberCopy),
@@ -259,24 +288,22 @@ func (b builder) copyMethod() tsgo.MethodDeclaration {
 			b.binary(
 				b.binary(
 					b.id("targetBacking"),
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					tsgo.BinaryOperatorExclamationEqualsEqualsToken,
 					b.factory.NullLiteral(),
 				),
-				tsgo.BinaryOperatorBarBarToken,
+				tsgo.BinaryOperatorAmpersandAmpersandToken,
 				b.binary(
 					b.id("sourceBacking"),
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					tsgo.BinaryOperatorExclamationEqualsEqualsToken,
 					b.factory.NullLiteral(),
 				),
 			),
-			b.throwBounds(),
+			directCopy,
 			nil,
 		),
-		b.factory.IfStatement(
-			sameBacking,
-			b.factory.ExpressionStatement(copyWithin),
-			distinctCopy,
-		),
+		b.variable(tsgo.NodeFlagsConst, "values", values),
+		captureProjected,
+		writeProjected,
 		b.returnStatement(b.id("count")),
 	)
 }

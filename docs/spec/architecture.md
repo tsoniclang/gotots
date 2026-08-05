@@ -665,6 +665,23 @@ Nested callbacks, tuples, containers, fields, and results follow the same
 type-directed boundary rule. Missing or ambiguous conversion fails
 certification; TypeScript assignability alone is not semantic evidence.
 
+When a slice element has different provider and generated representations, the
+boundary emits one typed, bidirectional slice projection. Reads convert from
+provider storage, writes convert back to provider storage, and nil, length,
+capacity, reslicing, append, copy, and ordinary pointer identity continue to
+refer to the source backing store. An eager element copy is forbidden because
+it loses observable Go aliasing. Ordinary equal-representation slices remain
+the existing `RuntimeSlice<T>` with no projection, branch, or per-element cost.
+The companion pointer-storage projection is a demanded runtime facet; ordinary
+pointer runtimes do not carry it.
+The projection is a runtime demand, not a provider-symbol exception. It owns
+its contiguous-region operation explicitly: nil remains nil, while a non-nil
+projected region raises the typed unsupported boundary until an exact projected
+region exists. It may not inherit the direct slice's null backing, materialize
+a detached array, or recover through a cast. A product claiming that operation
+as supported must replace the explicit boundary with an exact projected-region
+model and differential proof.
+
 The provider's scalar ABI is a separate certified fact from the product's
 selected integer profile. For a selected provider build, the runtime contract
 records one provider integer representation and one native integer width. The

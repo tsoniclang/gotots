@@ -15,6 +15,7 @@ const (
 	RuntimePointerHash             RuntimeSymbol = 101
 	RuntimePointerRegion           RuntimeSymbol = 102
 	RuntimePointerUnsafeMemory     RuntimeSymbol = 103
+	RuntimePointerProjection       RuntimeSymbol = 104
 	RuntimeArray                   RuntimeSymbol = 200
 	RuntimeArrayAllocate           RuntimeSymbol = 201
 	RuntimeArrayView               RuntimeSymbol = 202
@@ -31,6 +32,7 @@ const (
 	RuntimeSlice                   RuntimeSymbol = 300
 	RuntimeSliceAddress            RuntimeSymbol = 301
 	RuntimeSliceStorage            RuntimeSymbol = 302
+	RuntimeSliceProjection         RuntimeSymbol = 303
 	RuntimeSliceArrayPointer       RuntimeSymbol = 304
 	RuntimeArraySlice              RuntimeSymbol = 305
 	RuntimeSliceAppendSlice        RuntimeSymbol = 307
