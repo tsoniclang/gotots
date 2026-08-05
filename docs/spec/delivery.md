@@ -151,6 +151,11 @@ Install:
 - deterministic generated package/runtime/environment filesystem;
 - selected-`GOROOT` contracts;
 - exact typed placeholders and obligation ledgers;
+- settled environment use-demand and implementation-route evidence on the root
+  obligation projection;
+- provider implementation dispositions with certified private
+  dependency/capability closure;
+- the exact used-provider closure gate;
 - standalone strict-ESM `@gotots/gostdlib`;
 - standalone strict-ESM `@gotots/externals` modules for selected true-native
   boundaries;
@@ -185,7 +190,11 @@ incompatible base or target callable profile.
 
 Exit: provider package independently strict-typechecks and executes; exact
 contract/facade joins pass; a linked representative product uses one runtime
-identity and has zero reachable placeholders.
+identity and has zero reachable placeholders, zero used provider placeholders,
+and zero unresolved used profile boundaries under the exact settled closure. A
+satisfied generated obligation or certified binding is not implementation
+proof; publication scope is the selected closure, not the entire standard
+library.
 
 Delivery generates and strict-typechecks the complete product runtime under
 both integer profiles. The provider build is independent of that product

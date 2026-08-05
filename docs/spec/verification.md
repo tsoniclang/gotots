@@ -645,6 +645,44 @@ execute a `declare`-only ESM binding, read an optional provider artifact
 without proving it exists, or keep ambient fallback after a failed provider
 lookup.
 
+## Settled Environment And Provider-Closure Proof
+
+Settled environment evidence is proved structurally and by exact join:
+
+- every provider reference/facet route and every intrinsic or generated-facet
+  handler invokes the non-optional root environment observation with its
+  canonical object, sole route, and closed demand before returning a target;
+- the settled environment builders' canonical object/demand set exact-joins
+  the final immutable projection, and the provider-routed subset exact-joins
+  the provider closure roots;
+- the product header binds the selected Go toolchain, schema, provider, and
+  build digests;
+- type-only references do not become executable use; function and method
+  values do.
+
+Required environment-evidence mutations: remove root observation from one
+provider target route; classify a callable use as type-only; omit the behavior
+demand from a method-value route; change canonical identity while keeping
+display spelling; fail to upgrade an earlier type-only demand at a later
+callable use; drop one generated facade/capability use; alter a provider or
+profile digest; record all catalog bindings as used; select both intrinsic and
+provider implementations for one declaration; return a provider target while
+the environment observer is absent. Each must fail at its owning gate.
+
+Required provider-certificate mutations: mark a canonical placeholder as
+implemented; move a placeholder call behind a private helper; omit a private
+dependency edge; redirect an edge to a same-name symbol in another module; add
+an unresolved dynamic call; reuse a certificate under another build profile;
+duplicate an implementation owner; retain an old manifest reader beside the
+replacement schema.
+
+Required closure mutations: omit a used root; include an unused provider
+export; stop before transitive dependencies; accept a used placeholder; accept
+a used profile boundary from runtime argument assumptions; let a dependency
+cycle loop or silently truncate; replace the canonical identity join with a
+package/name join. Closure construction is measured linear in nodes plus
+edges, with both one-sided residual lists reported on every mismatch.
+
 ## Artifact And Cost Review
 
 Every material checkpoint reports absolute values and parent deltas for:

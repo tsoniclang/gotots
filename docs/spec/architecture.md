@@ -42,6 +42,9 @@ rerun the checker.
 | provider boundary meaning of selected Go types | `internal/contracts/gostdlib/sourcecontract` |
 | immutable provider certificate documents | `internal/contracts/gostdlib` |
 | provider implementation | certified `@gotots/gostdlib` export |
+| selected environment object, closed use demand, and sole implementation route | root environment scheduler and settled environment builders |
+| final settled environment-use evidence | the root's immutable post-fixed-point obligation projection |
+| provider implementation disposition and private dependency closure | provider certification over the strict checked provider project |
 | provider/generated conversion | generated static facade for the selected Go callable or type |
 | target AST shape and ordering | pinned TS-Go schema and generated protocol bindings |
 
@@ -869,6 +872,67 @@ Compile-only mode emits exact typed throwing placeholders and canonical
 obligations. Linked mode uses certified provider facades. These are explicit
 profiles, never fallback paths in one compilation. Publication requires every
 reachable obligation to be implemented.
+
+### Selected Environment Use And Provider Closure
+
+A certificate proves linkage, not behavior. A certified provider binding whose
+selected implementation still raises a typed unsupported boundary satisfies no
+publication requirement. Reachable-obligation acceptance therefore extends to
+provider-internal behavior: a satisfied generated obligation or a linked
+certified binding is never, by itself, proof that the selected provider body
+is implemented.
+
+Every environment target selection—provider reference or facet, compiler
+intrinsic, generated runtime facet, or explicit boundary—synchronously
+observes its canonical `go/types` object at the root environment owner with
+one closed monotonic use demand and exactly one implementation route before
+the target is returned. A selection route that can produce an environment
+target without that observation is invalid. Closed use demands are: type
+contract, value, callable behavior, state, initializer, interface capability,
+callback capability, and generated runtime facet. Repeated references
+deduplicate the canonical definition while monotonically joining demand.
+
+After the compilation fixed point, the root's immutable environment-obligation
+projection carries, for every settled environment declaration: canonical
+declaration identity, joined demand, sole implementation route, final
+requirements and facets, and the exact toolchain, schema, provider, and build
+digests. The projection is deterministic proof evidence. It is not a usage
+ledger, side table, or second source model, and it is never read to drive
+emission.
+
+Provider certification assigns every behavior-bearing binding and private
+provider facet exactly one mechanically derived implementation disposition:
+
+- `implemented` — exact behavior is supplied and certified;
+- `profile-boundary` — one named selected profile intentionally excludes the
+  behavior;
+- `placeholder` — a typed throwing boundary that is never publishable when
+  used.
+
+Dispositions and private dependencies come only from the strict checked
+provider project: every value-level reference in a checked implementation body
+is conservatively retained as a dependency and resolved to its exact symbol;
+type-only references create no behavior edge; interface, callback, and host
+operations terminate at certified capability or host boundaries; an unresolved
+dynamic call or ambiguous symbol fails certification. Canonical placeholder
+identity derives from checked caller/symbol evidence, never a free-form
+string argument.
+
+The used-provider closure is computed from the provider-routed settled roots
+through certified implementation dependencies and capabilities under one exact
+build and provider profile. Every join is by canonical identity and reports
+both one-sided residual lists on mismatch. Compiler-intrinsic and
+generated-runtime-facet rows join their existing artifact owners and must not
+also demand a provider body; a dormant provider catalog entry for such an
+identity stays outside the closure. Unused catalog entries remain outside the
+closure; extra closure rows are invalid. Closure construction is linear in
+nodes plus edges.
+
+Product sealing fails on any used `placeholder` and on any used
+`profile-boundary` whose exclusion the selected product profile cannot prove
+statically; runtime non-execution and argument-value guessing are not proof.
+The publication scope is the exact settled closure, not the entire standard
+library.
 
 ## Package, Runtime, And Target Output
 

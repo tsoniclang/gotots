@@ -703,6 +703,20 @@ const failure = await io_fs.WalkDir(fileSystem, ".", visit);
 The generated `io_fs.WalkDir` facade may statically import provider bridges
 or a private provider kernel, but no call site supplies a policy object.
 
+Every standard-library or toolchain reference selects exactly one
+implementation route—provider binding, compiler intrinsic, generated runtime
+facet, or explicit boundary—and records its canonical object and closed use
+demand at the root environment owner before its target reference is produced.
+A type-only reference demands the type and representation contract; it makes
+no unrelated package function executable. Calling a function or method, taking
+a function or method value, reading or writing provider state, package
+initialization, a demanded interface or callback capability, a certified
+private provider dependency, and a demanded generated runtime facet are
+executable demand. A compiler-intrinsic or generated-runtime-facet
+implementation—for example `reflect.TypeFor` and `reflect.TypeOf`—is that
+declaration's sole route; the dormant provider catalog entry with the same Go
+identity is not selected and must not acquire a duplicate provider demand.
+
 Selected bodyless or true-external declarations emit exact typed throwing
 placeholders and one canonical obligation file grouped by semantic owner.
 Their filesystem shape is deterministic:
@@ -716,7 +730,11 @@ generated/
 ```
 
 Provider linkage replaces the placeholder owner atomically; it does not add a
-fallback. Publication fails if a reachable obligation remains.
+fallback. A certified binding is linkage evidence only: publication also
+requires the exact used-provider closure, in which every used provider
+behavior joins one certified `implemented` body and any used placeholder or
+unproved profile boundary fails before target files are sealed. Publication
+fails if a reachable obligation remains.
 
 An external-function obligation binds the canonical Go declaration identity,
 stable `go/types` signature, owning module path and version, selected Go build
