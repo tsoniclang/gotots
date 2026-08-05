@@ -15,6 +15,7 @@ import { propagateCancel } from "./propagation.js";
 import { After } from "../time/timer.js";
 import { Duration } from "../time/duration.js";
 import { Now, Time } from "../time/time.js";
+import { providerPlaceholder } from "../../runtime/placeholder.js";
 
 const contextMethodToken = {};
 const canceled = new ProviderError("context canceled");
@@ -55,7 +56,7 @@ abstract class ContextValue extends InterfaceValue implements Context {
     if (verb === "T") {
       return "context.Context";
     }
-    return GoPanic.raiseRuntime("context value formatting is unsupported");
+    return providerPlaceholder("context value formatting is unsupported");
   }
 }
 

@@ -21,7 +21,7 @@ import {
   getStructTag,
   lookupStructTag,
 } from "./internal/portable/reflect/struct-tag.js";
-import { ProviderError } from "./internal/runtime/error.js";
+import { providerPlaceholder } from "./internal/runtime/placeholder.js";
 import type { Seq } from "./iter.js";
 
 export class ChanDir {
@@ -68,62 +68,62 @@ export const UnsafePointer = new Kind(26n);
 export abstract class Value {
   protected constructor(protected readonly source?: GoInterfaceValue) {}
 
-  Addr(): Value { return unsupportedReflect("Value.Addr"); }
-  Bool(): bool { return unsupportedReflect("Value.Bool"); }
-  Bytes(): RuntimeSlice<uint8> { return unsupportedReflect("Value.Bytes"); }
-  CanInt(): bool { return unsupportedReflect("Value.CanInt"); }
-  CanSet(): bool { return unsupportedReflect("Value.CanSet"); }
-  Cap(): int { return unsupportedReflect("Value.Cap"); }
-  Convert(_target: Type | undefined): Value { return unsupportedReflect("Value.Convert"); }
-  Elem(): Value { return unsupportedReflect("Value.Elem"); }
-  Field(_index: int): Value { return unsupportedReflect("Value.Field"); }
-  Float(): float64 { return unsupportedReflect("Value.Float"); }
-  Grow(_capacity: int): void { return unsupportedReflect("Value.Grow"); }
-  Index(_index: int): Value { return unsupportedReflect("Value.Index"); }
-  Int(): int64 { return unsupportedReflect("Value.Int"); }
+  Addr(): Value { return providerPlaceholder("reflect.Value.Addr requires generated reflection metadata"); }
+  Bool(): bool { return providerPlaceholder("reflect.Value.Bool requires generated reflection metadata"); }
+  Bytes(): RuntimeSlice<uint8> { return providerPlaceholder("reflect.Value.Bytes requires generated reflection metadata"); }
+  CanInt(): bool { return providerPlaceholder("reflect.Value.CanInt requires generated reflection metadata"); }
+  CanSet(): bool { return providerPlaceholder("reflect.Value.CanSet requires generated reflection metadata"); }
+  Cap(): int { return providerPlaceholder("reflect.Value.Cap requires generated reflection metadata"); }
+  Convert(_target: Type | undefined): Value { return providerPlaceholder("reflect.Value.Convert requires generated reflection metadata"); }
+  Elem(): Value { return providerPlaceholder("reflect.Value.Elem requires generated reflection metadata"); }
+  Field(_index: int): Value { return providerPlaceholder("reflect.Value.Field requires generated reflection metadata"); }
+  Float(): float64 { return providerPlaceholder("reflect.Value.Float requires generated reflection metadata"); }
+  Grow(_capacity: int): void { return providerPlaceholder("reflect.Value.Grow requires generated reflection metadata"); }
+  Index(_index: int): Value { return providerPlaceholder("reflect.Value.Index requires generated reflection metadata"); }
+  Int(): int64 { return providerPlaceholder("reflect.Value.Int requires generated reflection metadata"); }
 
   Interface(): GoInterfaceValue | undefined {
     if (this.source === undefined) {
-      return unsupportedReflect("Value.Interface on an invalid value");
+      return providerPlaceholder("reflect.Value.Interface on an invalid value requires generated reflection metadata");
     }
     return this.source;
   }
 
-  IsNil(): bool { return unsupportedReflect("Value.IsNil"); }
+  IsNil(): bool { return providerPlaceholder("reflect.Value.IsNil requires generated reflection metadata"); }
   IsValid(): bool { return this.source !== undefined; }
-  IsZero(): bool { return unsupportedReflect("Value.IsZero"); }
+  IsZero(): bool { return providerPlaceholder("reflect.Value.IsZero requires generated reflection metadata"); }
 
   Kind(): Kind {
-    return this.source === undefined ? Invalid : unsupportedReflect("Value.Kind");
+    return this.source === undefined ? Invalid : providerPlaceholder("reflect.Value.Kind requires generated reflection metadata");
   }
 
-  Len(): int { return unsupportedReflect("Value.Len"); }
-  MapIndex(_key: Value): Value { return unsupportedReflect("Value.MapIndex"); }
-  MapRange(): MapIter | undefined { return unsupportedReflect("Value.MapRange"); }
-  NumField(): int { return unsupportedReflect("Value.NumField"); }
-  Set(_value: Value): void { return unsupportedReflect("Value.Set"); }
-  SetBool(_value: bool): void { return unsupportedReflect("Value.SetBool"); }
-  SetBytes(_value: RuntimeSlice<uint8>): void { return unsupportedReflect("Value.SetBytes"); }
-  SetFloat(_value: float64): void { return unsupportedReflect("Value.SetFloat"); }
-  SetInt(_value: int64): void { return unsupportedReflect("Value.SetInt"); }
-  SetIterKey(_iterator: MapIter | undefined): void { return unsupportedReflect("Value.SetIterKey"); }
-  SetIterValue(_iterator: MapIter | undefined): void { return unsupportedReflect("Value.SetIterValue"); }
-  SetLen(_length: int): void { return unsupportedReflect("Value.SetLen"); }
-  SetMapIndex(_key: Value, _element: Value): void { return unsupportedReflect("Value.SetMapIndex"); }
-  SetString(_value: gostring): void { return unsupportedReflect("Value.SetString"); }
-  SetUint(_value: uint64): void { return unsupportedReflect("Value.SetUint"); }
-  SetZero(): void { return unsupportedReflect("Value.SetZero"); }
+  Len(): int { return providerPlaceholder("reflect.Value.Len requires generated reflection metadata"); }
+  MapIndex(_key: Value): Value { return providerPlaceholder("reflect.Value.MapIndex requires generated reflection metadata"); }
+  MapRange(): MapIter | undefined { return providerPlaceholder("reflect.Value.MapRange requires generated reflection metadata"); }
+  NumField(): int { return providerPlaceholder("reflect.Value.NumField requires generated reflection metadata"); }
+  Set(_value: Value): void { return providerPlaceholder("reflect.Value.Set requires generated reflection metadata"); }
+  SetBool(_value: bool): void { return providerPlaceholder("reflect.Value.SetBool requires generated reflection metadata"); }
+  SetBytes(_value: RuntimeSlice<uint8>): void { return providerPlaceholder("reflect.Value.SetBytes requires generated reflection metadata"); }
+  SetFloat(_value: float64): void { return providerPlaceholder("reflect.Value.SetFloat requires generated reflection metadata"); }
+  SetInt(_value: int64): void { return providerPlaceholder("reflect.Value.SetInt requires generated reflection metadata"); }
+  SetIterKey(_iterator: MapIter | undefined): void { return providerPlaceholder("reflect.Value.SetIterKey requires generated reflection metadata"); }
+  SetIterValue(_iterator: MapIter | undefined): void { return providerPlaceholder("reflect.Value.SetIterValue requires generated reflection metadata"); }
+  SetLen(_length: int): void { return providerPlaceholder("reflect.Value.SetLen requires generated reflection metadata"); }
+  SetMapIndex(_key: Value, _element: Value): void { return providerPlaceholder("reflect.Value.SetMapIndex requires generated reflection metadata"); }
+  SetString(_value: gostring): void { return providerPlaceholder("reflect.Value.SetString requires generated reflection metadata"); }
+  SetUint(_value: uint64): void { return providerPlaceholder("reflect.Value.SetUint requires generated reflection metadata"); }
+  SetZero(): void { return providerPlaceholder("reflect.Value.SetZero requires generated reflection metadata"); }
 
   String(): gostring {
     return this.source === undefined
       ? "<invalid Value>"
-      : unsupportedReflect("Value.String");
+      : providerPlaceholder("reflect.Value.String requires generated reflection metadata");
   }
 
-  Type(): Type | undefined { return unsupportedReflect("Value.Type"); }
-  Uint(): uint64 { return unsupportedReflect("Value.Uint"); }
+  Type(): Type | undefined { return providerPlaceholder("reflect.Value.Type requires generated reflection metadata"); }
+  Uint(): uint64 { return providerPlaceholder("reflect.Value.Uint requires generated reflection metadata"); }
   UnsafePointer(): GoUnsafePointer | undefined {
-    return unsupportedReflect("Value.UnsafePointer");
+    return providerPlaceholder("reflect.Value.UnsafePointer requires generated reflection metadata");
   }
 }
 
@@ -143,13 +143,13 @@ export type MapIter = MapIterator;
 
 export const MapIter = Object.freeze({
   Key(_receiver: MapIter | undefined): Value {
-    return unsupportedReflect("MapIter.Key");
+    return providerPlaceholder("reflect.MapIter.Key requires generated reflection metadata");
   },
   Next(_receiver: MapIter | undefined): bool {
-    return unsupportedReflect("MapIter.Next");
+    return providerPlaceholder("reflect.MapIter.Next requires generated reflection metadata");
   },
   Value(_receiver: MapIter | undefined): Value {
-    return unsupportedReflect("MapIter.Value");
+    return providerPlaceholder("reflect.MapIter.Value requires generated reflection metadata");
   },
 });
 
@@ -264,22 +264,22 @@ export interface Type extends GoInterfaceValue {
 }
 
 export function Append(_slice: Value, _values: RuntimeSlice<Value>): Value {
-  return unsupportedReflect("Append");
+  return providerPlaceholder("reflect.Append requires generated reflection metadata");
 }
 
 export function DeepEqual(
   _left: GoInterfaceValue | undefined,
   _right: GoInterfaceValue | undefined,
 ): bool {
-  return unsupportedReflect("DeepEqual");
+  return providerPlaceholder("reflect.DeepEqual requires generated reflection metadata");
 }
 
 export function Indirect(_value: Value): Value {
-  return unsupportedReflect("Indirect");
+  return providerPlaceholder("reflect.Indirect requires generated reflection metadata");
 }
 
 export function MakeMap(_type: Type | undefined): Value {
-  return unsupportedReflect("MakeMap");
+  return providerPlaceholder("reflect.MakeMap requires generated reflection metadata");
 }
 
 export function MakeSlice(
@@ -287,42 +287,42 @@ export function MakeSlice(
   _length: int,
   _capacity: int,
 ): Value {
-  return unsupportedReflect("MakeSlice");
+  return providerPlaceholder("reflect.MakeSlice requires generated reflection metadata");
 }
 
 export function MapOf(
   _key: Type | undefined,
   _element: Type | undefined,
 ): Type | undefined {
-  return unsupportedReflect("MapOf");
+  return providerPlaceholder("reflect.MapOf requires generated reflection metadata");
 }
 
 export function New(_type: Type | undefined): Value {
-  return unsupportedReflect("New");
+  return providerPlaceholder("reflect.New requires generated reflection metadata");
 }
 
 export function PointerTo(_type: Type | undefined): Type | undefined {
-  return unsupportedReflect("PointerTo");
+  return providerPlaceholder("reflect.PointerTo requires generated reflection metadata");
 }
 
 export function SliceOf(_type: Type | undefined): Type | undefined {
-  return unsupportedReflect("SliceOf");
+  return providerPlaceholder("reflect.SliceOf requires generated reflection metadata");
 }
 
 export function TypeAssert<T>(_value: Value): [T, bool] {
-  return unsupportedReflect("TypeAssert");
+  return providerPlaceholder("reflect.TypeAssert requires generated reflection metadata");
 }
 
 export function TypeFor<T>(): Type | undefined {
-  return unsupportedReflect("TypeFor");
+  return providerPlaceholder("reflect.TypeFor requires generated reflection metadata");
 }
 
 export function TypeOf(_value: GoInterfaceValue | undefined): Type | undefined {
-  return unsupportedReflect("TypeOf");
+  return providerPlaceholder("reflect.TypeOf requires generated reflection metadata");
 }
 
 export function Zero(_type: Type | undefined): Value {
-  return unsupportedReflect("Zero");
+  return providerPlaceholder("reflect.Zero requires generated reflection metadata");
 }
 
 const kindNames: readonly string[] = [
@@ -332,10 +332,3 @@ const kindNames: readonly string[] = [
   "ptr", "slice", "string", "struct", "unsafe.Pointer",
 ];
 
-function unsupportedReflect(operation: string): never {
-  return GoPanic.raise(
-    new ProviderError(
-      `reflect.${operation} requires generated reflection metadata`,
-    ),
-  );
-}

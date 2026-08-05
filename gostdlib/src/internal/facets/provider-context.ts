@@ -13,6 +13,7 @@ import { After } from "../portable/time/timer.js";
 import { Now, Time } from "../portable/time/time.js";
 import { goInterfaceEqual } from "../runtime/interface.js";
 import type { InterfaceContract } from "./provider-support.js";
+import { providerPlaceholder } from "../runtime/placeholder.js";
 
 export type { CanonicalError } from "./provider-io-contract.js";
 
@@ -66,7 +67,7 @@ abstract class ContextValue<Failure extends GoInterfaceValue>
     if (verb === "T") {
       return "context.Context";
     }
-    return GoPanic.raiseRuntime("context value formatting is unsupported");
+    return providerPlaceholder("context value formatting is unsupported");
   }
 }
 

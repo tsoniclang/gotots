@@ -39,6 +39,12 @@ func (m ProjectMember) TypeString() string {
 	return m.typeString
 }
 
+// DeclarationNodeHandles are the member symbol's checked declaration node
+// handles, suitable for implementation-body reference enumeration.
+func (m ProjectMember) DeclarationNodeHandles() []string {
+	return cloneStrings(m.handles)
+}
+
 func (m ProjectMember) Declarations() []string {
 	return cloneStrings(m.declarations)
 }

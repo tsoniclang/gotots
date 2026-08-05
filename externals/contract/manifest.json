@@ -12,7 +12,7 @@
   ],
   "integerRepresentation": "number",
   "concurrencySemantics": "cooperative",
-  "standardLibraryDigest": "62bd1728735b5e66e650a7a3576d5e3d91d0eb75774517d80b7277b62539ecf2",
+  "standardLibraryDigest": "abc326d3790702ff2dbe2e28af135b6bd483016403f4056ae791247ef5ddde23",
   "providerDigest": "1001b9804b0d9cdfe92cc5e93379fc198f392086d68e489dc11a50e5e6cd1b46",
   "bindings": [
     {
@@ -118,5 +118,5 @@
       "targetFingerprint": "93b6b22e7d27ea6c5847152232d782dc882bed713f21361e6497ae3f2272d6f6"
     }
   ],
-  "manifestDigest": "7938c4da8c29540740e6369d0515cb6ac055c313cf6422e835901d0260edbf91"
+  "manifestDigest": "72dd7c498dd7bb87f7bdd60fa71dfb8e07499fec9832d82e6a6127bd9ddaa00a"
 }

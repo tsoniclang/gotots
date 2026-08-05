@@ -10,7 +10,7 @@ import type {
   uint8,
 } from "@gotots/gostdlib/internal/scalars.js";
 
-import { unsupportedReflectionMessage } from "../portable/encoding/binary/reflection.js";
+import { providerPlaceholderMessage } from "../runtime/placeholder.js";
 import {
   CanonicalBoundaryError,
   type CanonicalError,
@@ -54,7 +54,9 @@ export function EncodingBinaryReadCanonical(
   errorContract: InterfaceContract,
 ): CanonicalError | undefined {
   return new CanonicalBoundaryError(
-    unsupportedReflectionMessage("Read"),
+    providerPlaceholderMessage(
+      "encoding/binary.Read requires generated reflection metadata",
+    ),
     errorContract,
   );
 }
@@ -66,7 +68,9 @@ export function EncodingBinaryWriteCanonical(
   errorContract: InterfaceContract,
 ): CanonicalError | undefined {
   return new CanonicalBoundaryError(
-    unsupportedReflectionMessage("Write"),
+    providerPlaceholderMessage(
+      "encoding/binary.Write requires generated reflection metadata",
+    ),
     errorContract,
   );
 }

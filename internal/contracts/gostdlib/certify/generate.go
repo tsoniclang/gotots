@@ -93,6 +93,7 @@ func Generate(config Config) ([]byte, error) {
 		return nil, err
 	}
 	modules := make([]gostdlib.ModuleDocument, len(ordered))
+	behaviorEvidence := newImplementationEvidence()
 	var scalarErrors []error
 	for index, seed := range ordered {
 		module, buildErr := buildModule(
@@ -105,6 +106,7 @@ func Generate(config Config) ([]byte, error) {
 			effectMarker,
 			scalarAliases,
 			&scalarErrors,
+			behaviorEvidence,
 		)
 		if buildErr != nil {
 			client.Close()
@@ -169,6 +171,16 @@ func Generate(config Config) ([]byte, error) {
 		client.Close()
 		return nil, err
 	}
+	implementations, err := certifyPrivateImplementations(
+		resolved,
+		project,
+		behaviorEvidence.public,
+		behaviorEvidence.worklist,
+	)
+	if err != nil {
+		client.Close()
+		return nil, err
+	}
 	if err := client.Close(); err != nil {
 		return nil, err
 	}
@@ -192,6 +204,7 @@ func Generate(config Config) ([]byte, error) {
 		ProviderDigest:   integrity,
 		Modules:          modules,
 		FacetModules:     facetModules,
+		Implementations:  implementations,
 	})
 }
 
@@ -205,6 +218,7 @@ func buildModule(
 	effectMarker tsgo.ProjectExport,
 	scalarAliases map[string]string,
 	scalarErrors *[]error,
+	behaviorEvidence *implementationEvidence,
 ) (gostdlib.ModuleDocument, error) {
 	sourcePackage := source.packages[seed.GoImportPath]
 	if sourcePackage == nil {
@@ -262,6 +276,28 @@ func buildModule(
 			return gostdlib.ModuleDocument{}, err
 		}
 		binding.GenericOperations = genericOperations[binding.Identity]
+		if binding.Kind == gostdlib.BindingFunction ||
+			binding.Kind == gostdlib.BindingVariable ||
+			binding.Kind == gostdlib.BindingType {
+			sites, behavior, behaviorErr := certifyBindingBehavior(
+				config,
+				project,
+				binding.Identity,
+				target.Name(),
+				target.DeclarationNodeHandles(),
+				behaviorEvidence,
+			)
+			if behaviorErr != nil {
+				return gostdlib.ModuleDocument{}, behaviorErr
+			}
+			binding.ImplementationSites = sites
+			binding.Dependencies = behavior.dependencies
+			// A type export aggregates every member body; per-method
+			// dispositions belong to the member bindings.
+			if binding.Kind != gostdlib.BindingType {
+				binding.Disposition = behavior.disposition
+			}
+		}
 		if binding.Kind == gostdlib.BindingFunction {
 			if err := verifyExportSourceCallableShape(
 				project,
@@ -348,12 +384,14 @@ func buildModule(
 		}
 		bindings[len(bindings)-1] = binding
 		methodBindings, err := buildMethodBindings(
+			config,
 			project,
 			target,
 			sourcePackage.methodsByType[target.Name()],
 			effectMarker,
 			scalarAliases,
 			scalarErrors,
+			behaviorEvidence,
 		)
 		if err != nil {
 			return gostdlib.ModuleDocument{}, err
@@ -374,76 +412,6 @@ func buildModule(
 		SourcePath:   seed.SourcePath,
 		Bindings:     bindings,
 	}, nil
-}
-
-func verifyGenericOperationBindings(
-	source goSurface,
-	modules []gostdlib.ModuleDocument,
-	configured map[string][]gostdlib.GenericOperationDocument,
-) error {
-	bound := make(map[string]struct{}, len(configured))
-	for _, module := range modules {
-		for _, binding := range module.Bindings {
-			if len(binding.GenericOperations) != 0 {
-				bound[binding.Identity] = struct{}{}
-			}
-		}
-	}
-	for identity, operations := range configured {
-		evidence, ok := source.objects[identity]
-		if !ok {
-			return certifyError(
-				"configure generic operations",
-				identity,
-				"selected-GOROOT declaration is absent",
-			)
-		}
-		function, ok := evidence.object.(*types.Func)
-		if !ok {
-			return certifyError(
-				"configure generic operations",
-				identity,
-				"operation-set owner is not a function",
-			)
-		}
-		signature, _ := function.Type().(*types.Signature)
-		typeParameterCount := 0
-		callableParameterCount := 0
-		if signature != nil {
-			typeParameterCount = signature.RecvTypeParams().Len() +
-				signature.TypeParams().Len()
-			callableParameterCount = signature.Params().Len()
-		}
-		for _, operation := range operations {
-			for _, reference := range append(
-				append(
-					[]gostdlib.ContractTypeDocument(nil),
-					operation.Parameters...,
-				),
-				operation.Results...,
-			) {
-				if err := verifyContractTypeParameters(
-					reference,
-					typeParameterCount,
-					callableParameterCount,
-				); err != nil {
-					return certifyError(
-						"configure generic operations",
-						identity,
-						err.Error(),
-					)
-				}
-			}
-		}
-		if _, ok := bound[identity]; !ok {
-			return certifyError(
-				"configure generic operations",
-				identity,
-				"provider export is absent",
-			)
-		}
-	}
-	return nil
 }
 
 func verifyContractTypeParameters(
@@ -488,12 +456,14 @@ func verifyContractTypeParameters(
 }
 
 func buildMethodBindings(
+	config resolvedConfig,
 	project *tsgo.ProjectInspection,
 	target tsgo.ProjectExport,
 	methods []goObject,
 	effectMarker tsgo.ProjectExport,
 	scalarAliases map[string]string,
 	scalarErrors *[]error,
+	behaviorEvidence *implementationEvidence,
 ) ([]gostdlib.BindingDocument, error) {
 	var result []gostdlib.BindingDocument
 	for _, method := range methods {
@@ -530,6 +500,20 @@ func buildMethodBindings(
 		if err != nil {
 			return nil, err
 		}
+		sites, behavior, behaviorErr := certifyBindingBehavior(
+			config,
+			project,
+			binding.Identity,
+			name,
+			selected.DeclarationNodeHandles(),
+			behaviorEvidence,
+		)
+		if behaviorErr != nil {
+			return nil, behaviorErr
+		}
+		binding.ImplementationSites = sites
+		binding.Dependencies = behavior.dependencies
+		binding.Disposition = behavior.disposition
 		if err := verifyMethodSourceCallableShape(
 			project,
 			method,

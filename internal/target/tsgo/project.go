@@ -69,6 +69,12 @@ func (e ProjectExport) TypeParameterCount() int {
 	return e.typeParameters
 }
 
+// DeclarationNodeHandles are the export symbol's checked declaration node
+// handles, suitable for implementation-body reference enumeration.
+func (e ProjectExport) DeclarationNodeHandles() []string {
+	return cloneStrings(e.exportHandles)
+}
+
 func (e ProjectExport) Declarations() []string {
 	return slices.Clone(e.declarations)
 }

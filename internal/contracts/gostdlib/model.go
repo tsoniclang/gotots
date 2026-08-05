@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	SchemaVersion = 27
+	SchemaVersion = 28
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -91,22 +91,23 @@ type GenericTypeArgumentDocument struct {
 }
 
 type Document struct {
-	SchemaVersion    int                   `json:"schemaVersion"`
-	PackageName      string                `json:"packageName"`
-	PackageVersion   string                `json:"packageVersion"`
-	Backend          string                `json:"backend"`
-	GoVersion        string                `json:"goVersion"`
-	MinimumGoVersion string                `json:"minimumGoVersion"`
-	MaximumGoVersion string                `json:"maximumGoVersion"`
-	GOOS             string                `json:"goos"`
-	GOARCH           string                `json:"goarch"`
-	CGOEnabled       bool                  `json:"cgoEnabled"`
-	BuildTags        []string              `json:"buildTags"`
-	RuntimeDigest    string                `json:"runtimeDigest"`
-	ProviderDigest   string                `json:"providerDigest"`
-	Modules          []ModuleDocument      `json:"modules"`
-	FacetModules     []FacetModuleDocument `json:"facetModules,omitempty"`
-	ManifestDigest   string                `json:"manifestDigest,omitempty"`
+	SchemaVersion    int                      `json:"schemaVersion"`
+	PackageName      string                   `json:"packageName"`
+	PackageVersion   string                   `json:"packageVersion"`
+	Backend          string                   `json:"backend"`
+	GoVersion        string                   `json:"goVersion"`
+	MinimumGoVersion string                   `json:"minimumGoVersion"`
+	MaximumGoVersion string                   `json:"maximumGoVersion"`
+	GOOS             string                   `json:"goos"`
+	GOARCH           string                   `json:"goarch"`
+	CGOEnabled       bool                     `json:"cgoEnabled"`
+	BuildTags        []string                 `json:"buildTags"`
+	RuntimeDigest    string                   `json:"runtimeDigest"`
+	ProviderDigest   string                   `json:"providerDigest"`
+	Modules          []ModuleDocument         `json:"modules"`
+	FacetModules     []FacetModuleDocument    `json:"facetModules,omitempty"`
+	Implementations  []ImplementationDocument `json:"implementations,omitempty"`
+	ManifestDigest   string                   `json:"manifestDigest,omitempty"`
 }
 
 type ModuleDocument struct {
@@ -135,6 +136,9 @@ type BindingDocument struct {
 	SourceLocation       string                              `json:"sourceLocation"`
 	ImplementationOwner  string                              `json:"implementationOwner"`
 	TargetFingerprint    string                              `json:"targetFingerprint"`
+	Disposition          ImplementationDisposition           `json:"disposition,omitempty"`
+	Dependencies         []string                            `json:"dependencies,omitempty"`
+	ImplementationSites  []string                            `json:"implementationSites,omitempty"`
 }
 
 type Manifest struct {
@@ -455,6 +459,19 @@ func (b Binding) TargetFingerprint() string {
 	return b.binding.TargetFingerprint
 }
 
+// Disposition is the mechanically certified implementation status of this
+// binding's behavior, derived from the strict checked provider project.
+func (b Binding) Disposition() ImplementationDisposition {
+	return b.binding.Disposition
+}
+
+// ImplementationDependencies lists the certified private value-level
+// dependency identities of this binding's checked implementation body. The
+// returned slice is an immutable copy.
+func (b Binding) ImplementationDependencies() []string {
+	return append([]string(nil), b.binding.Dependencies...)
+}
+
 func (b Binding) GoImportPath() string {
 	return b.module.GoImportPath
 }
@@ -473,6 +490,16 @@ func cloneDocument(source Document) Document {
 	result.FacetModules = make([]FacetModuleDocument, len(source.FacetModules))
 	for index, module := range source.FacetModules {
 		result.FacetModules[index] = cloneFacetModule(module)
+	}
+	result.Implementations = make(
+		[]ImplementationDocument,
+		len(source.Implementations),
+	)
+	for index, implementation := range source.Implementations {
+		implementation.Dependencies = slices.Clone(
+			implementation.Dependencies,
+		)
+		result.Implementations[index] = implementation
 	}
 	return result
 }
