@@ -73,14 +73,14 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 		)
 	}
 
-	mapIndex, ok := byIdentity["reflect|kind=4|receiver=reflect.Value|name=MapIndex"]
+	convert, ok := byIdentity["reflect|kind=4|receiver=reflect.Value|name=Convert"]
 	if !ok {
-		t.Fatal("reflect.Value.MapIndex has no certified binding")
+		t.Fatal("reflect.Value.Convert has no certified binding")
 	}
-	if mapIndex.Disposition() != gostdlib.DispositionPlaceholder {
+	if convert.Disposition() != gostdlib.DispositionPlaceholder {
 		t.Fatalf(
-			"reflect.Value.MapIndex disposition = %v, want placeholder",
-			mapIndex.Disposition(),
+			"reflect.Value.Convert disposition = %v, want placeholder",
+			convert.Disposition(),
 		)
 	}
 
@@ -114,9 +114,9 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 	// implemented bodies retain their conservative private value-level
 	// dependencies resolved to exact symbols.
 	foundCanonical := false
-	for _, dependency := range mapIndex.ImplementationDependencies() {
+	for _, dependency := range convert.ImplementationDependencies() {
 		if dependency == "" {
-			t.Fatal("reflect.Value.MapIndex recorded an anonymous dependency")
+			t.Fatal("reflect.Value.Convert recorded an anonymous dependency")
 		}
 		if gostdlib.CanonicalPlaceholderDependency(dependency) {
 			foundCanonical = true
@@ -124,8 +124,8 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 	}
 	if !foundCanonical {
 		t.Fatalf(
-			"reflect.Value.MapIndex placeholder does not depend on the canonical placeholder symbol: %v",
-			mapIndex.ImplementationDependencies(),
+			"reflect.Value.Convert placeholder does not depend on the canonical placeholder symbol: %v",
+			convert.ImplementationDependencies(),
 		)
 	}
 	for _, dependency := range elem.ImplementationDependencies() {

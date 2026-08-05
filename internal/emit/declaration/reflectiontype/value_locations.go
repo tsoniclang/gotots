@@ -45,8 +45,8 @@ func extendedValueProperties(
 				selected.Elem(),
 				scaffold,
 			)
-		case *types.Slice:
-			return pointerSliceValueProperties(
+		case *types.Slice, *types.Basic, *types.Map:
+			return pointerCellValueProperties(
 				context,
 				names,
 				reflectionType,
@@ -66,6 +66,14 @@ func extendedValueProperties(
 		)
 	case *types.Slice:
 		return sliceValueProperties(
+			context,
+			names,
+			reflectionType,
+			selected,
+			scaffold,
+		)
+	case *types.Map:
+		return mapValueProperties(
 			context,
 			names,
 			reflectionType,
@@ -190,11 +198,22 @@ func guardedForeignPayload(
 	adapter api.NameReference,
 	operation string,
 ) tsgo.Expression {
+	return guardedForeignOperand(scaffold, adapter, "value", operation)
+}
+
+// guardedForeignOperand projects the payload of one named box operand
+// through the exact adapter guard of its expected type.
+func guardedForeignOperand(
+	scaffold *locationScaffold,
+	adapter api.NameReference,
+	operand string,
+	operation string,
+) tsgo.Expression {
 	factory := scaffold.factory
 	return factory.ConditionalExpression(
-		adapterGuard(factory, adapter, "value"),
+		adapterGuard(factory, adapter, operand),
 		factory.QuestionToken(),
-		memberAccess(factory, "value", "$go$value"),
+		memberAccess(factory, operand, "$go$value"),
 		factory.ColonToken(),
 		runtimePanic(
 			scaffold,

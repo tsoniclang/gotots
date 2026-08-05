@@ -14,6 +14,8 @@ const reflectTypeForIdentity = "reflect|kind=4|receiver=|name=TypeFor"
 const reflectValueOfIdentity = "reflect|kind=4|receiver=|name=ValueOf"
 const reflectTypeOfIdentity = "reflect|kind=4|receiver=|name=TypeOf"
 const reflectMakeSliceIdentity = "reflect|kind=4|receiver=|name=MakeSlice"
+const reflectMakeMapIdentity = "reflect|kind=4|receiver=|name=MakeMap"
+const reflectMapOfIdentity = "reflect|kind=4|receiver=|name=MapOf"
 
 func emitReflectionTypeOf(
 	context api.Context,
@@ -324,13 +326,14 @@ func emitReflectionValueOf(
 	return emission, true, err
 }
 
-// emitReflectionMakeSlice intercepts reflect.MakeSlice to demand the
-// generated value facet of the constructed slice type whenever the Type
-// argument carries static composition evidence (a direct reflect.TypeOf
-// or reflect.TypeFor descriptor), then delegates the call to the ordinary
-// certified provider-profile emission. A dynamically flowing descriptor
-// keeps the certified provider boundary and fails loudly at the typed
-// provider check when its facet is absent.
+// emitReflectionMakeSlice intercepts reflect.MakeSlice and
+// reflect.MakeMap to demand the generated value facet of the constructed
+// type whenever the Type argument carries static composition evidence (a
+// direct reflect.TypeOf, reflect.TypeFor, or reflect.MapOf descriptor),
+// then delegates the call to the ordinary certified provider-profile
+// emission. A dynamically flowing descriptor keeps the certified provider
+// boundary and fails loudly at the typed provider check when its facet is
+// absent.
 func emitReflectionMakeSlice(
 	context api.Context,
 	children api.ChildEmitter,
@@ -346,7 +349,13 @@ func emitReflectionMakeSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	if contract.Identity() != reflectMakeSliceIdentity {
+	var arity int
+	switch contract.Identity() {
+	case reflectMakeSliceIdentity:
+		arity = 3
+	case reflectMakeMapIdentity:
+		arity = 1
+	default:
 		return api.ExpressionEmission{}, false, nil
 	}
 	if detached {
@@ -355,8 +364,8 @@ func emitReflectionMakeSlice(
 	}
 	signature, ok := owner.Type().(*types.Signature)
 	if !ok || signature.Results() == nil || signature.Results().Len() != 1 ||
-		signature.Params() == nil || signature.Params().Len() != 3 ||
-		len(source.Args) != 3 {
+		signature.Params() == nil || signature.Params().Len() != arity ||
+		len(source.Args) != arity {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -430,12 +439,33 @@ func reflectionCompositionType(
 		call.Fun,
 	); ownerOK {
 		contract, err := environmentcontract.Describe(owner)
-		if err == nil && contract.Identity() == reflectTypeOfIdentity &&
-			len(call.Args) == 1 {
+		if err != nil {
+			return nil, false
+		}
+		switch contract.Identity() {
+		case reflectTypeOfIdentity:
+			if len(call.Args) != 1 {
+				return nil, false
+			}
 			argumentType := context.TypesInfo().TypeOf(call.Args[0])
 			if argumentType != nil &&
 				!api.ContainsGenericTypeParameter(argumentType) {
 				return argumentType, true
+			}
+		case reflectMapOfIdentity:
+			if len(call.Args) != 2 {
+				return nil, false
+			}
+			keyType, keyOK := reflectionCompositionType(
+				context,
+				call.Args[0],
+			)
+			elementType, elementOK := reflectionCompositionType(
+				context,
+				call.Args[1],
+			)
+			if keyOK && elementOK {
+				return types.NewMap(keyType, elementType), true
 			}
 		}
 		return nil, false
@@ -452,4 +482,108 @@ func reflectionCompositionType(
 		}
 	}
 	return nil, false
+}
+
+// emitReflectionMapOf intercepts reflect.MapOf when both Type arguments
+// are effect-free descriptor compositions: the call collapses to the
+// canonical map descriptor reference on the generated-facet route, so no
+// provider binding participates. Argument expressions with observable
+// evaluation keep the ordinary provider boundary.
+func emitReflectionMapOf(
+	context api.Context,
+	source *ast.CallExpr,
+	discarded bool,
+	detached bool,
+) (api.ExpressionEmission, bool, error) {
+	owner, ok := calleeObject(context.TypesInfo(), source.Fun)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
+	}
+	contract, err := environmentcontract.Describe(owner)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if contract.Identity() != reflectMapOfIdentity {
+		return api.ExpressionEmission{}, false, nil
+	}
+	if discarded || detached || len(source.Args) != 2 {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if !effectFreeCompositionOperand(source.Args[0]) ||
+		!effectFreeCompositionOperand(source.Args[1]) {
+		return api.ExpressionEmission{}, false, nil
+	}
+	keyType, keyOK := reflectionCompositionType(context, source.Args[0])
+	elementType, elementOK := reflectionCompositionType(
+		context,
+		source.Args[1],
+	)
+	if !keyOK || !elementOK {
+		return api.ExpressionEmission{}, false, nil
+	}
+	signature, ok := owner.Type().(*types.Signature)
+	if !ok || signature.Results() == nil || signature.Results().Len() != 1 {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	reflectionType, ok := types.Unalias(
+		signature.Results().At(0).Type(),
+	).(*types.Named)
+	if !ok || reflectionType.Obj() == nil {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	names, ok := context.Names().(api.ReflectionNames)
+	if !ok {
+		return api.ExpressionEmission{}, true, &api.ContextError{
+			Reason: "reflection names are unavailable",
+		}
+	}
+	observer, ok := context.Names().(environmentcontract.ImplementationObserver)
+	if !ok {
+		return api.ExpressionEmission{}, true, &api.ContextError{
+			Reason: "environment implementation observer is unavailable",
+		}
+	}
+	if err := observer.ObserveEnvironmentImplementation(
+		owner,
+		environmentcontract.UseDemandCallable,
+		environmentcontract.RouteGeneratedFacet,
+	); err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	reference, err := names.ReflectionType(
+		types.NewMap(keyType, elementType),
+		reflectionType.Obj(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	return api.DirectExpression(
+		reference.Expression(context.Factory()),
+		reference.Requests()...,
+	), true, nil
+}
+
+// effectFreeCompositionOperand admits descriptor compositions whose
+// evaluation is observably pure: TypeFor takes no arguments, and TypeOf
+// or nested MapOf operands must bottom out in identifiers and literals.
+func effectFreeCompositionOperand(expression ast.Expr) bool {
+	call, ok := ast.Unparen(expression).(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	for _, argument := range call.Args {
+		switch operand := ast.Unparen(argument).(type) {
+		case *ast.Ident, *ast.BasicLit:
+		case *ast.CallExpr:
+			if !effectFreeCompositionOperand(operand) {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
 }

@@ -245,11 +245,12 @@ func structValueProperties(
 	}, nil
 }
 
-// pointerSliceValueProperties adds the elem callback of one pointer to a
-// slice: the pointee is a runtime pointer storage cell, so the location
-// reads and replaces the slice header through the cell's value member and
-// header mutations stay visible to the original variable.
-func pointerSliceValueProperties(
+// pointerCellValueProperties adds the elem callback of one pointer whose
+// pointee is represented through a runtime pointer storage cell (slices,
+// basic scalars, and maps): the location reads and replaces the pointee
+// through the cell's value member, so mutations stay visible to the
+// original variable.
+func pointerCellValueProperties(
 	context api.Context,
 	names api.ReflectionNames,
 	reflectionType *types.TypeName,

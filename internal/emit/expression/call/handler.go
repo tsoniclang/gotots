@@ -46,6 +46,14 @@ func emit(
 	); handled {
 		return target, err
 	}
+	if target, handled, err := emitReflectionMapOf(
+		context,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
 	if target, handled, err := emitReflectionMakeSlice(
 		context,
 		children,

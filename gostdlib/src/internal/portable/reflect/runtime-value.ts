@@ -69,6 +69,19 @@ export interface RuntimeValueOperations {
   ) => GoInterfaceValue;
   readonly bytes?: (box: GoInterfaceValue) => RuntimeSlice<uint8>;
   readonly boxBytes?: (value: RuntimeSlice<uint8>) => GoInterfaceValue;
+  readonly mapIndex?: (
+    box: GoInterfaceValue,
+    key: GoInterfaceValue,
+  ) => GoInterfaceValue | undefined;
+  readonly mapStore?: (
+    box: GoInterfaceValue,
+    key: GoInterfaceValue,
+    value: GoInterfaceValue | undefined,
+  ) => void;
+  readonly mapKeys?: (
+    box: GoInterfaceValue,
+  ) => readonly GoInterfaceValue[];
+  readonly makeMap?: () => GoInterfaceValue;
 }
 
 const operationsByType = new Map<Type, RuntimeValueOperations>();

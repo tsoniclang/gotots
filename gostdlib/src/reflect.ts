@@ -158,7 +158,8 @@ export abstract class Value {
     }
     const bytes = operations.bytes;
     if (bytes === undefined) {
-      if (operations.len !== undefined) {
+      const type = this.resolvedType();
+      if (type !== undefined && type.Kind().value === Slice.value) {
         return GoPanic.raise(
           new ProviderError("reflect.Value.Bytes of non-byte slice"),
         );
@@ -287,8 +288,29 @@ export abstract class Value {
     }
     return operation(this.source);
   }
-  MapIndex(_key: Value): Value { return providerPlaceholder("reflect.Value.MapIndex requires generated reflection metadata"); }
-  MapRange(): MapIter | undefined { return providerPlaceholder("reflect.Value.MapRange requires generated reflection metadata"); }
+  MapIndex(key: Value): Value {
+    const operation = this.operations()?.mapIndex;
+    const box = this.source;
+    const keyBox = key.source;
+    if (
+      operation === undefined ||
+      box === undefined ||
+      keyBox === undefined
+    ) {
+      return this.operationPanic("MapIndex");
+    }
+    return new InterfaceValue(operation(box, keyBox));
+  }
+  MapRange(): MapIter | undefined {
+    const operations = this.operations();
+    const keys = operations?.mapKeys;
+    const lookup = operations?.mapIndex;
+    const box = this.source;
+    if (keys === undefined || lookup === undefined || box === undefined) {
+      return this.operationPanic("MapRange");
+    }
+    return new MapIterator(keys(box), (key) => lookup(box, key));
+  }
   NumField(): int {
     const count = this.operations()?.numField;
     if (count === undefined || this.source === undefined) {
@@ -330,7 +352,8 @@ export abstract class Value {
     }
     const boxBytes = operations.boxBytes;
     if (boxBytes === undefined) {
-      if (operations.len !== undefined) {
+      const type = this.resolvedType();
+      if (type !== undefined && type.Kind().value === Slice.value) {
         return GoPanic.raise(
           new ProviderError(
             "reflect.Value.SetBytes of non-byte slice",
@@ -343,8 +366,24 @@ export abstract class Value {
   }
   SetFloat(_value: float64): void { return providerPlaceholder("reflect.Value.SetFloat requires generated reflection metadata"); }
   SetInt(_value: int64): void { return providerPlaceholder("reflect.Value.SetInt requires generated reflection metadata"); }
-  SetIterKey(_iterator: MapIter | undefined): void { return providerPlaceholder("reflect.Value.SetIterKey requires generated reflection metadata"); }
-  SetIterValue(_iterator: MapIter | undefined): void { return providerPlaceholder("reflect.Value.SetIterValue requires generated reflection metadata"); }
+  SetIterKey(iterator: MapIter | undefined): void {
+    const target = this.settableLocation("SetIterKey");
+    const state = mapIteratorState(iterator, "SetIterKey");
+    target.set(state.currentKey());
+  }
+  SetIterValue(iterator: MapIter | undefined): void {
+    const target = this.settableLocation("SetIterValue");
+    const state = mapIteratorState(iterator, "SetIterValue");
+    const value = state.currentValue();
+    if (value === undefined) {
+      return GoPanic.raise(
+        new ProviderError(
+          "reflect: map entry deleted during iteration",
+        ),
+      );
+    }
+    target.set(value);
+  }
   SetLen(length: int): void {
     const target = this.settableLocation("SetLen");
     const operations = this.operations();
@@ -367,7 +406,19 @@ export abstract class Value {
     }
     target.set(resliced(box, length));
   }
-  SetMapIndex(_key: Value, _element: Value): void { return providerPlaceholder("reflect.Value.SetMapIndex requires generated reflection metadata"); }
+  SetMapIndex(key: Value, element: Value): void {
+    const operation = this.operations()?.mapStore;
+    const box = this.source;
+    const keyBox = key.source;
+    if (
+      operation === undefined ||
+      box === undefined ||
+      keyBox === undefined
+    ) {
+      return this.operationPanic("SetMapIndex");
+    }
+    operation(box, keyBox, element.source);
+  }
   SetString(value: gostring): void {
     const target = this.settableLocation("SetString");
     const box = this.operations()?.boxString;
@@ -441,19 +492,93 @@ export function ValueOf(value: GoInterfaceValue | undefined): Value {
   return new InterfaceValue(value);
 }
 
-class MapIterator {}
+class MapIterator {
+  position = -1;
+
+  constructor(
+    readonly keys: readonly GoInterfaceValue[],
+    readonly valueAt: (key: GoInterfaceValue) => GoInterfaceValue | undefined,
+  ) {}
+
+  currentKey(): GoInterfaceValue {
+    const key = this.keys[this.position];
+    if (key === undefined) {
+      return GoPanic.raise(
+        new ProviderError("reflect: map iterator has no current entry"),
+      );
+    }
+    return key;
+  }
+
+  currentValue(): GoInterfaceValue | undefined {
+    return this.valueAt(this.currentKey());
+  }
+}
+
+// mapIteratorState validates one positioned live iterator with the exact
+// Go panic messages for premature and exhausted access.
+function mapIteratorState(
+  receiver: MapIterator | undefined,
+  operation: string,
+): MapIterator {
+  if (receiver === undefined) {
+    return GoPanic.raiseRuntime(
+      "invalid memory address or nil pointer dereference",
+    );
+  }
+  if (receiver.position < 0) {
+    return GoPanic.raise(
+      new ProviderError(`MapIter.${operation} called before Next`),
+    );
+  }
+  if (receiver.position >= receiver.keys.length) {
+    return GoPanic.raise(
+      new ProviderError(
+        `MapIter.${operation} called on exhausted iterator`,
+      ),
+    );
+  }
+  return receiver;
+}
 
 export type MapIter = MapIterator;
 
 export const MapIter = Object.freeze({
-  Key(_receiver: MapIter | undefined): Value {
-    return providerPlaceholder("reflect.MapIter.Key requires generated reflection metadata");
+  Key(receiver: MapIter | undefined): Value {
+    return new InterfaceValue(
+      mapIteratorState(receiver, "Key").currentKey(),
+    );
   },
-  Next(_receiver: MapIter | undefined): bool {
-    return providerPlaceholder("reflect.MapIter.Next requires generated reflection metadata");
+  Next(receiver: MapIter | undefined): bool {
+    if (receiver === undefined) {
+      return GoPanic.raiseRuntime(
+        "invalid memory address or nil pointer dereference",
+      );
+    }
+    if (receiver.position >= receiver.keys.length) {
+      return GoPanic.raise(
+        new ProviderError("MapIter.Next called on exhausted iterator"),
+      );
+    }
+    receiver.position++;
+    while (
+      receiver.position < receiver.keys.length &&
+      receiver.currentValue() === undefined
+    ) {
+      receiver.position++;
+    }
+    return receiver.position < receiver.keys.length;
   },
-  Value(_receiver: MapIter | undefined): Value {
-    return providerPlaceholder("reflect.MapIter.Value requires generated reflection metadata");
+  Value(receiver: MapIter | undefined): Value {
+    const value = mapIteratorState(receiver, "Value").currentValue();
+    if (value === undefined) {
+      return GoPanic.raise(
+        new ProviderError(
+          "reflect: map entry deleted during iteration",
+        ),
+      );
+    }
+    return new InterfaceValue(value);
   },
 });
 
@@ -582,8 +707,21 @@ export function Indirect(_value: Value): Value {
   return providerPlaceholder("reflect.Indirect requires generated reflection metadata");
 }
 
-export function MakeMap(_type: Type | undefined): Value {
-  return providerPlaceholder("reflect.MakeMap requires generated reflection metadata");
+export function MakeMap(type: Type | undefined): Value {
+  if (type === undefined || type.Kind().value !== Map.value) {
+    return GoPanic.raise(
+      new ProviderError("reflect: MakeMap of non-map type"),
+    );
+  }
+  const operation = runtimeValueOperations(type)?.makeMap;
+  if (operation === undefined) {
+    return GoPanic.raise(
+      new ProviderError(
+        `reflect: MakeMap requires a generated value facet for ${type.String()}`,
+      ),
+    );
+  }
+  return new InterfaceValue(operation());
 }
 
 export function MakeSlice(
@@ -629,10 +767,14 @@ export function MakeSlice(
 }
 
 export function MapOf(
-  _key: Type | undefined,
-  _element: Type | undefined,
+  key: Type | undefined,
+  element: Type | undefined,
 ): Type | undefined {
-  return providerPlaceholder("reflect.MapOf requires generated reflection metadata");
+  return GoPanic.raise(
+    new ProviderError(
+      `reflect: MapOf requires a generated descriptor for map[${key === undefined ? "?" : key.String()}]${element === undefined ? "?" : element.String()}`,
+    ),
+  );
 }
 
 export function New(_type: Type | undefined): Value {
