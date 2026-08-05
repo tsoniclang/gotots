@@ -497,8 +497,10 @@ normalization, or restore a product-scalar import in provider source; each
 fails at the runtime contract, strict typecheck, artifact gate, or execution
 differential.
 
-The provider is independently strict-typechecked against its certified scalar
-module. Exact 64-bit algorithms (binary encoding, parsing, bit operations,
+Provider-certificate generation invokes the pinned TS-Go compiler and rejects
+every diagnostic before sealing provider evidence. The provider is therefore
+independently strict-typechecked against its certified scalar module. Exact
+64-bit algorithms (binary encoding, parsing, bit operations,
 hash folding, and counters) execute against Go. Node/host boundaries have
 focused range tests; unchecked `bigint`-to-`number` narrowing is forbidden by
 source-shape and mutation gates.

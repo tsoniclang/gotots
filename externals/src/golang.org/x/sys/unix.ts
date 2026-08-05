@@ -1,6 +1,6 @@
 import { Errno } from "@gotots/gostdlib/syscall.js";
 
-const ENOSYS = 38;
+const ENOSYS = 38n;
 
 export function Syscall(
   _trap: number,

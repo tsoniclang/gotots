@@ -16,6 +16,9 @@ func Generate(config Config) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := verifyProviderTypecheck(resolved); err != nil {
+		return nil, err
+	}
 	seeds, err := readSeeds(resolved.bindingMapPath)
 	if err != nil {
 		return nil, err

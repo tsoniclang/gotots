@@ -1,6 +1,7 @@
 package certify
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,23 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/externals"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func verifyProviderTypecheck(config resolvedConfig) error {
+	err := tsgo.Compile(
+		context.Background(),
+		config.repositoryRoot,
+		config.providerRoot,
+		[]string{"--noEmit", "-p", config.tsConfigPath},
+	)
+	if err != nil {
+		return certifyError(
+			"typecheck provider",
+			config.tsConfigPath,
+			err.Error(),
+		)
+	}
+	return nil
+}
 
 type packageDocument struct {
 	Name    string                     `json:"name"`

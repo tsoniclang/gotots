@@ -11,6 +11,6 @@ test("unsupported Node syscalls return ENOSYS", (): void => {
   ]) {
     assert.equal(result[0], 0);
     assert.equal(result[1], 0);
-    assert.equal(result[2].value, 38);
+    assert.equal(result[2].value, 38n);
   }
 });
