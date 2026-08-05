@@ -24,6 +24,7 @@ func fromProviderSlice(
 	profile []gostdlib.ProviderCallableProfileInterface,
 	sourceType types.Type,
 	value api.ExpressionEmission,
+	leafPolicy providerBoundaryLeafPolicy,
 ) (api.ExpressionEmission, bool, bool, error) {
 	return projectProviderSlice(
 		context,
@@ -34,6 +35,7 @@ func fromProviderSlice(
 		sourceType,
 		value,
 		sliceBoundaryFromProvider,
+		leafPolicy,
 	)
 }
 
@@ -45,6 +47,7 @@ func toProviderSlice(
 	profile []gostdlib.ProviderCallableProfileInterface,
 	sourceType types.Type,
 	value api.ExpressionEmission,
+	leafPolicy providerBoundaryLeafPolicy,
 ) (api.ExpressionEmission, bool, bool, error) {
 	return projectProviderSlice(
 		context,
@@ -55,6 +58,7 @@ func toProviderSlice(
 		sourceType,
 		value,
 		sliceBoundaryToProvider,
+		leafPolicy,
 	)
 }
 
@@ -67,6 +71,7 @@ func projectProviderSlice(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 	direction sliceBoundaryDirection,
+	leafPolicy providerBoundaryLeafPolicy,
 ) (api.ExpressionEmission, bool, bool, error) {
 	slice, ok := types.Unalias(sourceType).(*types.Slice)
 	if !ok {
@@ -110,6 +115,7 @@ func projectProviderSlice(
 		element,
 		"$providerElement",
 		sliceBoundaryFromProvider,
+		leafPolicy,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, false, err
@@ -124,6 +130,7 @@ func projectProviderSlice(
 		element,
 		"$productElement",
 		sliceBoundaryToProvider,
+		leafPolicy,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, false, err
@@ -213,6 +220,7 @@ func providerSliceElementConversion(
 	element types.Type,
 	parameter string,
 	direction sliceBoundaryDirection,
+	leafPolicy providerBoundaryLeafPolicy,
 ) (api.ExpressionEmission, bool, error) {
 	value := api.DirectExpression(context.Factory().Identifier(parameter))
 	var err error
@@ -227,7 +235,7 @@ func providerSliceElementConversion(
 			return api.ExpressionEmission{}, false, err
 		}
 		var changed bool
-		value, changed, err = fromProviderValueSelected(
+		value, changed, err = fromProviderValueWithPolicy(
 			context,
 			children,
 			owner,
@@ -235,6 +243,7 @@ func providerSliceElementConversion(
 			profile,
 			element,
 			value,
+			leafPolicy,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, false, err
@@ -257,7 +266,7 @@ func providerSliceElementConversion(
 		return api.ExpressionEmission{}, false, err
 	}
 	var changed bool
-	value, changed, err = toProviderValueSelected(
+	value, changed, err = toProviderValueWithPolicy(
 		context,
 		children,
 		owner,
@@ -265,6 +274,7 @@ func providerSliceElementConversion(
 		profile,
 		element,
 		value,
+		leafPolicy,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, false, err

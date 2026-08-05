@@ -78,6 +78,24 @@ func ReadProvider(root string) (string, error) {
 	value, failure := fs.ReadFile(os.DirFS(root), "raw.txt")
 	return string(value), failure
 }
+
+func ReadProviderDir(root string) (string, int64, error) {
+	entries, failure := fs.ReadDir(os.DirFS(root), ".")
+	if failure != nil {
+		return "", 0, failure
+	}
+	for _, entry := range entries {
+		if entry.Name() != "raw.txt" {
+			continue
+		}
+		info, failure := entry.Info()
+		if failure != nil {
+			return "", 0, failure
+		}
+		return entry.Name(), info.Size(), nil
+	}
+	return "", 0, fs.ErrNotExist
+}
 `)
 	program, err := load.Load(context.Background(), load.Request{
 		Directory:    project,
@@ -96,6 +114,7 @@ func ReadProvider(root string) (string, error) {
 		[]emit.Root{
 			mustProviderRoot(t, scope.Lookup("ReadGenerated")),
 			mustProviderRoot(t, scope.Lookup("ReadProvider")),
+			mustProviderRoot(t, scope.Lookup("ReadProviderDir")),
 		},
 		options,
 	)
@@ -120,11 +139,13 @@ func ReadProvider(root string) (string, error) {
 		workingDirectory,
 		artifacts.paths,
 		assemblyPath,
-		[]string{"ReadGenerated", "ReadProvider"},
+		[]string{"ReadGenerated", "ReadProvider", "ReadProviderDir"},
 		`const [fallback, fast, generatedFailure] = await ReadGenerated();
 console.log(fallback + "|" + fast + "|" + (generatedFailure === undefined));
 const [raw, rawFailure] = await ReadProvider(`+strconv.Quote(project)+`);
 console.log(raw + "|" + (rawFailure === undefined));
+const [name, size, dirFailure] = await ReadProviderDir(`+strconv.Quote(project)+`);
+console.log(name + "|" + size + "|" + (dirFailure === undefined));
 `,
 	)
 	runnerDirectory := filepath.Join(project, "cmd", "compare")
@@ -141,6 +162,8 @@ func main() {
 	fmt.Printf("%s|%s|%t\n", fallback, fast, generatedFailure == nil)
 	raw, rawFailure := capability.ReadProvider(`+strconv.Quote(project)+`)
 	fmt.Printf("%s|%t\n", raw, rawFailure == nil)
+	name, size, dirFailure := capability.ReadProviderDir(`+strconv.Quote(project)+`)
+	fmt.Printf("%s|%d|%t\n", name, size, dirFailure == nil)
 }
 `)
 	sourceContext, sourceCancel := context.WithTimeout(
@@ -163,6 +186,8 @@ func main() {
 	}
 	for _, required := range []string{
 		"IoFsReadFileCanonical",
+		"IoFsReadDirCanonical",
+		"RuntimeSliceProjection",
 		"$Capability$",
 		"$raw",
 		"instanceof",

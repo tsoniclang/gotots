@@ -457,12 +457,21 @@ func TestProviderGenericCallableAndTupleBoundary(t *testing.T) {
 	writeProgramFile(t, filepath.Join(project, "source.go"), `package genericproviderboundary
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 )
 
 func Search(values []string, target string) (int, bool) {
 	return slices.BinarySearchFunc(values, target, strings.Compare)
+}
+
+func FirstInt() int {
+	return cmp.Or(0, 7, 9)
+}
+
+func FirstInt64() int64 {
+	return cmp.Or(int64(0), int64(11), int64(13))
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
@@ -478,10 +487,20 @@ func Search(values []string, target string) (int, bool) {
 	options.StandardLibrary = linkedProviderCertificate(t)
 	emission, err := emit.CompileWithOptions(
 		program,
-		[]emit.Root{mustProviderRoot(
-			t,
-			program.Roots()[0].Types().Scope().Lookup("Search"),
-		)},
+		[]emit.Root{
+			mustProviderRoot(
+				t,
+				program.Roots()[0].Types().Scope().Lookup("Search"),
+			),
+			mustProviderRoot(
+				t,
+				program.Roots()[0].Types().Scope().Lookup("FirstInt"),
+			),
+			mustProviderRoot(
+				t,
+				program.Roots()[0].Types().Scope().Lookup("FirstInt64"),
+			),
+		},
 		options,
 	)
 	if err != nil {
@@ -489,10 +508,41 @@ func Search(values []string, target string) (int, bool) {
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
-	for _, required := range []string{"satisfies", "Number(", "BigInt.asIntN"} {
+	assemblyPath := ""
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFilePackageAssembly &&
+			file.PackageName() == "genericproviderboundary" {
+			assemblyPath = file.OutputPath()
+			break
+		}
+	}
+	if assemblyPath == "" {
+		t.Fatal("generic-provider package assembly is absent")
+	}
+	targetOutput := executeProviderTypeScript(
+		t,
+		workingDirectory,
+		artifacts.paths,
+		assemblyPath,
+		[]string{"FirstInt", "FirstInt64"},
+		`console.log((await FirstInt()) + "|" + (await FirstInt64()));
+`,
+	)
+	if targetOutput != "7|11\n" {
+		t.Fatalf("generic provider output = %q, want %q", targetOutput, "7|11\n")
+	}
+	for _, required := range []string{
+		"satisfies",
+		"Number(",
+		"BigInt.asIntN",
+		"CmpOrKernel<int, int>(",
+		"CmpOrKernel<int64, int64>(",
+	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("generic provider boundary lacks %q:\n%s", required, artifacts.printed)
 		}
+	}
+	if strings.Contains(artifacts.printed, "$providerStorage") {
+		t.Fatalf("generic provider boundary projected caller-owned storage:\n%s", artifacts.printed)
 	}
 }

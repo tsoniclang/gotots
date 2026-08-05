@@ -8,6 +8,14 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+type providerBoundaryLeafPolicy uint8
+
+const (
+	providerBoundaryLeafInvalid providerBoundaryLeafPolicy = iota
+	providerBoundaryLeafAll
+	providerBoundaryLeafProfileOnly
+)
+
 func FromProviderValue(
 	context api.Context,
 	children api.ChildEmitter,
@@ -36,6 +44,35 @@ func fromProviderValueSelected(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
+	return fromProviderValueWithPolicy(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		profile,
+		sourceType,
+		value,
+		providerBoundaryLeafAll,
+	)
+}
+
+func fromProviderValueWithPolicy(
+	context api.Context,
+	children api.ChildEmitter,
+	owner *types.Named,
+	ownerBridge string,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+	leafPolicy providerBoundaryLeafPolicy,
+) (api.ExpressionEmission, bool, error) {
+	if leafPolicy != providerBoundaryLeafAll &&
+		leafPolicy != providerBoundaryLeafProfileOnly {
+		return api.ExpressionEmission{}, false, boundaryInvariant(
+			context,
+			"provider boundary leaf policy is invalid",
+		)
+	}
 	converted, scalar, changed, err := fromProviderScalar(
 		context,
 		sourceType,
@@ -52,6 +89,7 @@ func fromProviderValueSelected(
 		profile,
 		sourceType,
 		value,
+		leafPolicy,
 	)
 	if err != nil || slice {
 		return converted, changed, err
@@ -83,7 +121,8 @@ func fromProviderValueSelected(
 				reference.Requests(),
 			)
 		}
-		if owner != nil && types.Identical(selected, owner) {
+		if leafPolicy == providerBoundaryLeafAll &&
+			owner != nil && types.Identical(selected, owner) {
 			if ownerBridge == "" {
 				return api.ExpressionEmission{}, false, &api.InvariantError{
 					Role:   context.Role(),
@@ -98,18 +137,20 @@ func fromProviderValueSelected(
 				nil,
 			)
 		}
-		reference, provider, err := context.Names().ProviderInterfaceBridge(selected)
-		if err != nil {
-			return api.ExpressionEmission{}, false, err
-		}
-		if provider {
-			return bridgeEmission(
-				context,
-				value,
-				reference.Name(),
-				api.ProviderBridgeFromMember,
-				reference.Requests(),
-			)
+		if leafPolicy == providerBoundaryLeafAll {
+			reference, provider, err := context.Names().ProviderInterfaceBridge(selected)
+			if err != nil {
+				return api.ExpressionEmission{}, false, err
+			}
+			if provider {
+				return bridgeEmission(
+					context,
+					value,
+					reference.Name(),
+					api.ProviderBridgeFromMember,
+					reference.Requests(),
+				)
+			}
 		}
 	}
 	if signature, callableType, model := callableType(sourceType); callableType {
@@ -155,6 +196,35 @@ func toProviderValueSelected(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
+	return toProviderValueWithPolicy(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		profile,
+		sourceType,
+		value,
+		providerBoundaryLeafAll,
+	)
+}
+
+func toProviderValueWithPolicy(
+	context api.Context,
+	children api.ChildEmitter,
+	owner *types.Named,
+	ownerBridge string,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+	leafPolicy providerBoundaryLeafPolicy,
+) (api.ExpressionEmission, bool, error) {
+	if leafPolicy != providerBoundaryLeafAll &&
+		leafPolicy != providerBoundaryLeafProfileOnly {
+		return api.ExpressionEmission{}, false, boundaryInvariant(
+			context,
+			"provider boundary leaf policy is invalid",
+		)
+	}
 	converted, scalar, changed, err := toProviderScalar(
 		context,
 		sourceType,
@@ -171,6 +241,7 @@ func toProviderValueSelected(
 		profile,
 		sourceType,
 		value,
+		leafPolicy,
 	)
 	if err != nil || slice {
 		return converted, changed, err
@@ -202,7 +273,8 @@ func toProviderValueSelected(
 				reference.Requests(),
 			)
 		}
-		if owner != nil && types.Identical(selected, owner) {
+		if leafPolicy == providerBoundaryLeafAll &&
+			owner != nil && types.Identical(selected, owner) {
 			if ownerBridge == "" {
 				return api.ExpressionEmission{}, false, &api.InvariantError{
 					Role:   context.Role(),
@@ -217,18 +289,20 @@ func toProviderValueSelected(
 				nil,
 			)
 		}
-		reference, provider, err := context.Names().ProviderInterfaceBridge(selected)
-		if err != nil {
-			return api.ExpressionEmission{}, false, err
-		}
-		if provider {
-			return bridgeEmission(
-				context,
-				value,
-				reference.Name(),
-				api.ProviderBridgeToMember,
-				reference.Requests(),
-			)
+		if leafPolicy == providerBoundaryLeafAll {
+			reference, provider, err := context.Names().ProviderInterfaceBridge(selected)
+			if err != nil {
+				return api.ExpressionEmission{}, false, err
+			}
+			if provider {
+				return bridgeEmission(
+					context,
+					value,
+					reference.Name(),
+					api.ProviderBridgeToMember,
+					reference.Requests(),
+				)
+			}
 		}
 	}
 	if signature, callableType, model := callableType(sourceType); callableType {

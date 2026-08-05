@@ -564,6 +564,21 @@ Mutations change either side between synchronous and `Awaitable`, restore a
 separate cooperative kernel, or expose a capability as a public source
 parameter; each fails before emission.
 
+Generic-boundary differentials include concrete and open instances. A
+`cmp.Or[int]` fixture proves that generic-owned `[]T` remains
+`RuntimeSlice<int>` and selects `CmpOrKernel<int, int>`; a mutation that applies
+the provider bigint slice projection must fail strict typechecking. A callback
+fixture proves callable shells are still recursively adapted when their
+parameters mention `T` and their concrete leaves require provider conversion.
+
+Canonical-boundary differentials include a container of profile-owned
+interfaces and an already-canonical interface leaf. `fs.ReadDir` must project
+each `DirEntry` in its result slice, including nested `FileInfo.Size` scalar
+behavior. `errors.Is` must retain generated custom `Is`, single `Unwrap`, and
+multi-`Unwrap` behavior. Mutations either skip the nested element projection or
+route canonical `error` through the ordinary provider bridge; each fails its
+Go-versus-TypeScript differential.
+
 An allocation-order mutation inserts an unrelated computed `unique symbol`
 member and must leave every unaffected provider fingerprint byte-identical
 even when TS-Go's diagnostic/display spelling changes.

@@ -8,8 +8,8 @@ import { ProviderInterfaceValue } from "./value.js";
 const directoryFileType = Object.freeze({ comparable: true });
 
 export abstract class DirectoryFile extends ProviderInterfaceValue implements File {
-  protected constructor() {
-    super(directoryFileType);
+  protected constructor(type: { readonly comparable: boolean } = directoryFileType) {
+    super(type);
   }
 
   abstract Close(): GoError | undefined;
@@ -18,7 +18,7 @@ export abstract class DirectoryFile extends ProviderInterfaceValue implements Fi
 
   abstract Stat(): [FileInfo | undefined, GoError | undefined];
 
-  abstract ReadDir(count: number): [
+  abstract ReadDir(count: int): [
     RuntimeSlice<DirEntry | undefined>,
     GoError | undefined,
   ];

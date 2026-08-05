@@ -241,9 +241,6 @@ func fromProviderGenericValue(
 	concreteType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
-	if genericOpaque(contractType) {
-		return value, false, nil
-	}
 	contract, concrete, model, callablePair := genericCallablePair(
 		contractType,
 		concreteType,
@@ -257,6 +254,9 @@ func fromProviderGenericValue(
 			model,
 			value,
 		)
+	}
+	if genericOpaque(contractType) {
+		return value, false, nil
 	}
 	return fromProviderValueSelected(
 		context,
@@ -276,9 +276,6 @@ func toProviderGenericValue(
 	concreteType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
-	if genericOpaque(contractType) {
-		return value, false, nil
-	}
 	contract, concrete, model, callablePair := genericCallablePair(
 		contractType,
 		concreteType,
@@ -293,6 +290,9 @@ func toProviderGenericValue(
 			value,
 		)
 	}
+	if genericOpaque(contractType) {
+		return value, false, nil
+	}
 	return toProviderValueSelected(
 		context,
 		children,
@@ -305,8 +305,7 @@ func toProviderGenericValue(
 }
 
 func genericOpaque(source types.Type) bool {
-	_, ok := types.Unalias(source).(*types.TypeParam)
-	return ok
+	return api.ContainsGenericTypeParameter(source)
 }
 
 func genericCallablePair(

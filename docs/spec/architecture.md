@@ -844,6 +844,22 @@ possible. Otherwise a reached exact instance selects a private generated
 facade/concretization or private provider kernel. Public/provider and generated
 source callables retain source arity.
 
+A private generic kernel is parameterized over the generated caller's certified
+logical, storage, container-storage, and pointer facets. Those facets remain
+caller-owned; they are not silently replaced with the provider's scalar
+profile. A non-callable contract shape containing a Go type parameter is
+therefore transported opaquely to the kernel, while a callable shell is adapted
+recursively so its concrete non-generic parameter and result leaves still cross
+the provider boundary. Only concrete source leaves outside a generic-owned
+shape use ordinary provider scalar projection.
+
+A canonical provider parameter or result recursively projects containers and
+profile-owned interface/callable leaves. A canonical leaf already expressed in
+the generated ABI remains unchanged rather than being reboxed through an
+ordinary provider-interface bridge. Thus `[]fs.DirEntry` projects every entry
+through the selected `DirEntry` profile bridge, while canonical `error` values
+accepted by `errors.Is` preserve generated `Is` and `Unwrap` method sets.
+
 When a private generic kernel transports callbacks, its outer effect and each
 callback parameter effect are exact-joined to the public provider binding.
 The kernel cannot silently narrow an `Awaitable` callback to synchronous,

@@ -268,6 +268,22 @@ same facade crossing is an identity. Provider results take the inverse path.
 These conversions occur only at the certified provider boundary and are never
 passed as callable parameters.
 
+Generic provider kernels retain the generated caller's representation facets.
+For example, `cmp.Or(0, 7, 9)` passes its generated `RuntimeSlice<int>` to
+`CmpOrKernel<int, int>`; the `[]T` contract is generic-owned and is not rebuilt
+as a provider `RuntimeSlice<bigint>`. In contrast, a concrete non-generic `int`
+parameter such as the count in `slices.Grow(values, count)` is converted to the
+provider's `int64` carrier at the private boundary. Callable parameters are
+adapted recursively rather than treated as opaque merely because they mention
+a type parameter.
+
+Canonical container results are also recursive. For example, provider
+`fs.ReadDir` returns a provider slice of provider `DirEntry` contracts; generated
+code receives a `RuntimeSliceProjection` whose element functions are the
+certified `DirEntry` profile bridges. A canonical `error` parameter, however,
+already has the generated interface ABI and is passed unchanged so generated
+`Is(error)` and `Unwrap()` implementations remain observable.
+
 ### Defined Types And Aliases
 
 Aliases reference the selected target representation directly. A defined type

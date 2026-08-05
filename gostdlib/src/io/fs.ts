@@ -228,7 +228,7 @@ export function ReadDir(
       new PathError("readdir", name, state.ErrInvalid),
     ];
   }
-  const [entries, readFailure] = file.ReadDir(-1);
+  const [entries, readFailure] = file.ReadDir(-1n);
   const closeFailure = file.Close();
   const values = sliceValues(entries);
   values.sort((left, right): number => {

@@ -32,6 +32,7 @@ import {
   hostInteger,
   integerFromHost,
 } from "../../host-integer.js";
+import { state as ioState } from "../../../io.js";
 import type {
   DirEntry,
   FS,
@@ -40,7 +41,9 @@ import type {
 } from "../../../io/fs.js";
 import { FileMode } from "../../../io/fs.js";
 import { Time, UnixMilli } from "../../../time.js";
+import { DirectoryFile } from "../../portable/io/filesystem.js";
 import { ProviderInterfaceValue } from "../../portable/io/value.js";
+import { sliceValues } from "../../runtime/slice.js";
 import {
   attachFileDescriptor,
   closeFile,
@@ -251,7 +254,9 @@ class NodeDirectoryFS extends ProviderInterfaceValue implements FS {
 
 const fileSystemFileType = Object.freeze({ comparable: true });
 
-class NodeFileSystemFile extends ProviderInterfaceValue implements FsFile {
+class NodeFileSystemFile extends DirectoryFile implements FsFile {
+  private directoryOffset = 0;
+
   constructor(
     private readonly file: object,
     private readonly path: string,
@@ -271,6 +276,28 @@ class NodeFileSystemFile extends ProviderInterfaceValue implements FsFile {
 
   Stat(): [FileInfo | undefined, GoError | undefined] {
     return stat(this.path);
+  }
+
+  ReadDir(count: int): [
+    RuntimeSlice<DirEntry | undefined>,
+    GoError | undefined,
+  ] {
+    const [entries, failure] = readDirectory(this.path);
+    if (failure !== undefined) {
+      return [RuntimeSlice.nil<DirEntry | undefined>(), failure];
+    }
+    const values = sliceValues(entries);
+    const start = this.directoryOffset;
+    if (count <= 0n) {
+      this.directoryOffset = values.length;
+      return [RuntimeSlice.literal(values.slice(start)), undefined];
+    }
+    if (start >= values.length) {
+      return [RuntimeSlice.literal<DirEntry | undefined>([]), ioState.EOF];
+    }
+    const end = Math.min(values.length, start + hostInteger(count));
+    this.directoryOffset = end;
+    return [RuntimeSlice.literal(values.slice(start, end)), undefined];
   }
 }
 

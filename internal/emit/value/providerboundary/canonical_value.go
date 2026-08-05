@@ -79,47 +79,16 @@ func fromProviderCanonicalValue(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
-	selected, ok := types.Unalias(sourceType).(*types.Named)
-	if ok && selected.Obj() != nil {
-		_, profileOwned, err :=
-			providerProfileInterfaceCertificate(selected, profile)
-		if err != nil {
-			return api.ExpressionEmission{}, false, err
-		}
-		if profileOwned {
-			reference, found, err :=
-				context.Names().ProviderProfileInterfaceBridge(selected, profile)
-			if err != nil {
-				return api.ExpressionEmission{}, false, err
-			}
-			if !found {
-				return api.ExpressionEmission{}, false, boundaryInvariant(
-					context,
-					"canonical provider profile-interface bridge is absent",
-				)
-			}
-			return bridgeEmission(
-				context,
-				value,
-				reference.Bridge().Name(),
-				api.ProviderBridgeFromMember,
-				reference.Requests(),
-			)
-		}
-	}
-	if signature, callableType, model := callableType(sourceType); callableType {
-		return fromProviderCallableSelected(
-			context,
-			children,
-			nil,
-			"",
-			profile,
-			signature,
-			model,
-			value,
-		)
-	}
-	return value, false, nil
+	return fromProviderValueWithPolicy(
+		context,
+		children,
+		nil,
+		"",
+		profile,
+		sourceType,
+		value,
+		providerBoundaryLeafProfileOnly,
+	)
 }
 
 func toProviderCanonicalValue(
@@ -129,45 +98,14 @@ func toProviderCanonicalValue(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
-	selected, ok := types.Unalias(sourceType).(*types.Named)
-	if ok && selected.Obj() != nil {
-		_, profileOwned, err :=
-			providerProfileInterfaceCertificate(selected, profile)
-		if err != nil {
-			return api.ExpressionEmission{}, false, err
-		}
-		if profileOwned {
-			reference, found, err :=
-				context.Names().ProviderProfileInterfaceBridge(selected, profile)
-			if err != nil {
-				return api.ExpressionEmission{}, false, err
-			}
-			if !found {
-				return api.ExpressionEmission{}, false, boundaryInvariant(
-					context,
-					"canonical provider profile-interface bridge is absent",
-				)
-			}
-			return bridgeEmission(
-				context,
-				value,
-				reference.Bridge().Name(),
-				api.ProviderBridgeToMember,
-				reference.Requests(),
-			)
-		}
-	}
-	if signature, callableType, model := callableType(sourceType); callableType {
-		return toProviderCallableSelected(
-			context,
-			children,
-			nil,
-			"",
-			profile,
-			signature,
-			model,
-			value,
-		)
-	}
-	return value, false, nil
+	return toProviderValueWithPolicy(
+		context,
+		children,
+		nil,
+		"",
+		profile,
+		sourceType,
+		value,
+		providerBoundaryLeafProfileOnly,
+	)
 }

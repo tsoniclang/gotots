@@ -1,7 +1,7 @@
 import { GoDenseIndex } from "./dense-index.js";
 import { GoPanic } from "./panic.js";
 export class RuntimeSlice<T> {
-    private constructor(private readonly backing: T[] | null, private readonly offset: number, readonly length: number, readonly capacity: number) {
+    protected constructor(private readonly backing: T[] | null, private readonly offset: number, readonly length: number, readonly capacity: number) {
     }
     static nil<T>(): RuntimeSlice<T> {
         return new RuntimeSlice<T>(null, 0, 0, 0);
@@ -77,14 +77,22 @@ export class RuntimeSlice<T> {
         const sourceBacking = source.backing;
         if (count === 0)
             return 0;
-        if (targetBacking === null || sourceBacking === null)
-            GoPanic.raiseRuntime("slice bounds out of range");
-        if (targetBacking === sourceBacking)
-            targetBacking.copyWithin(target.offset, source.offset, source.offset + count);
-        else
-            for (let index = 0; index < count; index++) {
-                targetBacking[target.offset + index] = GoDenseIndex.get(sourceBacking, source.offset + index);
-            }
+        if (targetBacking !== null && sourceBacking !== null) {
+            if (targetBacking === sourceBacking)
+                targetBacking.copyWithin(target.offset, source.offset, source.offset + count);
+            else
+                for (let index = 0; index < count; index++) {
+                    targetBacking[target.offset + index] = GoDenseIndex.get(sourceBacking, source.offset + index);
+                }
+            return count;
+        }
+        const values = new Array<T>(count);
+        for (let index = 0; index < count; index++) {
+            values[index] = source.get(index);
+        }
+        for (let index = 0; index < count; index++) {
+            target.set(index, GoDenseIndex.get(values, index));
+        }
         return count;
     }
 }

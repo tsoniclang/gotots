@@ -28,6 +28,7 @@ import {
 } from "../runtime/slice.js";
 import { goInterfaceEqual } from "../runtime/interface.js";
 import { ProviderInterfaceValue } from "../portable/io/value.js";
+import { DirectoryFile } from "../portable/io/filesystem.js";
 import type {
   FromProviderBridge,
   InterfaceContract,
@@ -240,7 +241,9 @@ export async function IoFsReadDirCanonical(
     return [RuntimeSlice.nil<CanonicalDirEntry | undefined>(), openFailure];
   }
   try {
-    const readDirFile = asReadDirFile(file);
+    const readDirFile = file instanceof DirectoryFile
+      ? file
+      : asReadDirFile(file);
     if (readDirFile === undefined) {
       return [
         RuntimeSlice.nil<CanonicalDirEntry | undefined>(),
