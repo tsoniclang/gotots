@@ -84,6 +84,7 @@ func sliceValueProperties(
 	scaffold.requests = append(scaffold.requests, descriptor.Requests()...)
 	scaffold.requests = append(scaffold.requests, runtimeSlice.Requests()...)
 	properties := []tsgo.ObjectLiteralElementLike{
+		runtimeNilCallback(scaffold),
 		expressionProperty(factory, "len", sliceExtentCallback(
 			scaffold,
 			"length",
@@ -594,4 +595,35 @@ func sliceExtentCallback(
 			projected,
 		)),
 	)
+}
+
+// runtimeNilCallback projects the represented container's own nil
+// evidence: runtime slices and maps both carry an exact isNil method.
+func runtimeNilCallback(
+	scaffold *locationScaffold,
+) tsgo.ObjectLiteralElementLike {
+	factory := scaffold.factory
+	return expressionProperty(factory, "isNil", factory.ArrowFunction(
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{boxParameter(scaffold)},
+		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
+		factory.EqualsGreaterThanToken(),
+		factory.ParenthesizedExpression(guardedProjection(
+			scaffold,
+			"Value.IsNil",
+			factory.CallExpression(
+				factory.PropertyAccessExpression(
+					boxPayload(factory),
+					nil,
+					factory.Identifier("isNil"),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				nil,
+				tsgo.NodeFlagsNone,
+			),
+		)),
+	))
 }

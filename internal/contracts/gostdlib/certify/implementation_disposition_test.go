@@ -73,14 +73,14 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 		)
 	}
 
-	deepEqual, ok := byIdentity["reflect|kind=4|receiver=|name=DeepEqual"]
+	binaryRead, ok := byIdentity["encoding/binary|kind=4|receiver=|name=Read"]
 	if !ok {
-		t.Fatal("reflect.DeepEqual has no certified binding")
+		t.Fatal("binary.Read has no certified binding")
 	}
-	if deepEqual.Disposition() != gostdlib.DispositionPlaceholder {
+	if binaryRead.Disposition() != gostdlib.DispositionPlaceholder {
 		t.Fatalf(
-			"reflect.DeepEqual disposition = %v, want placeholder",
-			deepEqual.Disposition(),
+			"binary.Read disposition = %v, want placeholder",
+			binaryRead.Disposition(),
 		)
 	}
 
@@ -114,9 +114,9 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 	// implemented bodies retain their conservative private value-level
 	// dependencies resolved to exact symbols.
 	foundCanonical := false
-	for _, dependency := range deepEqual.ImplementationDependencies() {
+	for _, dependency := range binaryRead.ImplementationDependencies() {
 		if dependency == "" {
-			t.Fatal("reflect.DeepEqual recorded an anonymous dependency")
+			t.Fatal("binary.Read recorded an anonymous dependency")
 		}
 		if gostdlib.CanonicalPlaceholderDependency(dependency) {
 			foundCanonical = true
@@ -124,8 +124,8 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 	}
 	if !foundCanonical {
 		t.Fatalf(
-			"reflect.DeepEqual placeholder does not depend on the canonical placeholder symbol: %v",
-			deepEqual.ImplementationDependencies(),
+			"binary.Read placeholder does not depend on the canonical placeholder symbol: %v",
+			binaryRead.ImplementationDependencies(),
 		)
 	}
 	for _, dependency := range elem.ImplementationDependencies() {

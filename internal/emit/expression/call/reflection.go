@@ -20,6 +20,7 @@ const reflectPointerToIdentity = "reflect|kind=4|receiver=|name=PointerTo"
 const reflectSliceOfIdentity = "reflect|kind=4|receiver=|name=SliceOf"
 const reflectNewIdentity = "reflect|kind=4|receiver=|name=New"
 const reflectZeroIdentity = "reflect|kind=4|receiver=|name=Zero"
+const reflectDeepEqualIdentity = "reflect|kind=4|receiver=|name=DeepEqual"
 
 func emitReflectionTypeOf(
 	context api.Context,

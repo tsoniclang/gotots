@@ -130,11 +130,16 @@ func structValueProperties(
 	context api.Context,
 	names api.ReflectionNames,
 	reflectionType *types.TypeName,
+	sourceType types.Type,
 	structType *types.Struct,
 	scaffold *locationScaffold,
 ) ([]tsgo.ObjectLiteralElementLike, error) {
 	factory := scaffold.factory
 	if _, err := supportedValueStruct(structType); err != nil {
+		return nil, err
+	}
+	cloned, err := structClonedProperty(context, sourceType, scaffold)
+	if err != nil {
 		return nil, err
 	}
 	provider, ok := context.ProviderScalarABI()
@@ -265,7 +270,72 @@ func structValueProperties(
 	return []tsgo.ObjectLiteralElementLike{
 		numField,
 		expressionProperty(factory, "field", field),
+		cloned,
 	}, nil
+}
+
+// structClonedProperty binds the canonical class copy operation so
+// Interface projections of located struct values return an exact copy,
+// never an aliasing view. Structs without a named copy owner fail closed.
+func structClonedProperty(
+	context api.Context,
+	sourceType types.Type,
+	scaffold *locationScaffold,
+) (tsgo.ObjectLiteralElementLike, error) {
+	factory := scaffold.factory
+	named, ok := types.Unalias(sourceType).(*types.Named)
+	if !ok || named.Obj() == nil || named.TypeParams().Len() != 0 {
+		return nil, &api.GeneratedArtifactShapeError{
+			Artifact: sourceType.String(),
+			Reason: "reflection value struct " + sourceType.String() +
+				" has no canonical copy owner",
+		}
+	}
+	copyReference, err := context.Names().NamedStructOperation(
+		named.Origin().Obj(),
+		api.NamedStructOperationCopy,
+	)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, copyReference.Requests()...)
+	memberName, err := api.NamedStructOperationMemberName(
+		api.NamedStructOperationCopy,
+	)
+	if err != nil {
+		return nil, err
+	}
+	clone := factory.CallExpression(
+		factory.PropertyAccessExpression(
+			copyReference.Expression(factory),
+			nil,
+			factory.Identifier(memberName),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		[]tsgo.Expression{boxPayload(factory)},
+		tsgo.NodeFlagsNone,
+	)
+	return expressionProperty(factory, "cloned", factory.ArrowFunction(
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{boxParameter(scaffold)},
+		factory.TypeReferenceNode(
+			scaffold.boxType.EntityName(factory),
+			nil,
+		),
+		factory.EqualsGreaterThanToken(),
+		factory.ParenthesizedExpression(guardedProjection(
+			scaffold,
+			"Value.Interface",
+			factory.NewExpression(
+				scaffold.adapter.Expression(factory),
+				nil,
+				[]tsgo.Expression{clone},
+			),
+		)),
+	)), nil
 }
 
 // pointerCellValueProperties adds the elem callback of one pointer whose

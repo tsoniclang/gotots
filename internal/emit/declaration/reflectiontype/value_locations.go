@@ -61,6 +61,7 @@ func extendedValueProperties(
 			context,
 			names,
 			reflectionType,
+			sourceType,
 			selected,
 			scaffold,
 		)

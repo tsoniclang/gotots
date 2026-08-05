@@ -72,6 +72,15 @@ func emit(
 	); handled {
 		return target, err
 	}
+	if target, handled, err := emitReflectionDeepEqual(
+		context,
+		children,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
 	if target, handled, err := emitReflectionTypeAssert(
 		context,
 		children,

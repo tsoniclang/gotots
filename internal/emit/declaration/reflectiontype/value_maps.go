@@ -406,6 +406,7 @@ func mapValueProperties(
 		)),
 	)
 	return []tsgo.ObjectLiteralElementLike{
+		runtimeNilCallback(scaffold),
 		expressionProperty(factory, "zero", zero),
 		expressionProperty(factory, "len", length),
 		expressionProperty(factory, "mapIndex", mapIndex),

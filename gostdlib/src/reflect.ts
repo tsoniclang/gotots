@@ -345,10 +345,16 @@ export abstract class Value {
   }
 
   Interface(): GoInterfaceValue | undefined {
-    if (this.source === undefined) {
-      return providerPlaceholder("reflect.Value.Interface on an invalid value requires generated reflection metadata");
+    const box = this.source;
+    if (box === undefined) {
+      return GoPanic.raise(
+        new ProviderError(
+          "reflect: call of reflect.Value.Interface on zero Value",
+        ),
+      );
     }
-    return this.source;
+    const cloned = this.operations()?.cloned;
+    return cloned === undefined ? box : cloned(box);
   }
 
   IsNil(): bool {
@@ -594,7 +600,11 @@ export abstract class Value {
     return operation(this.source);
   }
   UnsafePointer(): GoUnsafePointer | undefined {
-    return providerPlaceholder("reflect.Value.UnsafePointer requires generated reflection metadata");
+    const operation = this.operations()?.unsafePointer;
+    if (operation === undefined || this.source === undefined) {
+      return this.operationPanic("UnsafePointer");
+    }
+    return operation(this.source);
   }
 }
 
@@ -848,14 +858,159 @@ export function Append(slice: Value, values: RuntimeSlice<Value>): Value {
 }
 
 export function DeepEqual(
-  _left: GoInterfaceValue | undefined,
-  _right: GoInterfaceValue | undefined,
+  left: GoInterfaceValue | undefined,
+  right: GoInterfaceValue | undefined,
 ): bool {
-  return providerPlaceholder("reflect.DeepEqual requires generated reflection metadata");
+  if (left === undefined || right === undefined) {
+    return left === right;
+  }
+  return deepValueEqual(left, right, new globalThis.Map());
 }
 
-export function Indirect(_value: Value): Value {
-  return providerPlaceholder("reflect.Indirect requires generated reflection metadata");
+function deepValueEqual(
+  left: GoInterfaceValue,
+  right: GoInterfaceValue,
+  visited: Map<GoInterfaceValue, Set<GoInterfaceValue>>,
+): bool {
+  const leftType = resolveRuntimeType(left);
+  const rightType = resolveRuntimeType(right);
+  if (leftType === undefined || rightType === undefined) {
+    return GoPanic.raise(
+      new ProviderError(
+        "reflect: DeepEqual requires generated reflection metadata for both operands",
+      ),
+    );
+  }
+  if (leftType !== rightType) {
+    return false;
+  }
+  const seen = visited.get(left);
+  if (seen !== undefined && seen.has(right)) {
+    return true;
+  }
+  const pairs = seen ?? new globalThis.Set<GoInterfaceValue>();
+  pairs.add(right);
+  visited.set(left, pairs);
+  const leftValue = new InterfaceValue(left);
+  const rightValue = new InterfaceValue(right);
+  const kind = leftType.Kind().value;
+  const operations = runtimeValueOperations(leftType);
+  if (operations === undefined) {
+    return GoPanic.raise(
+      new ProviderError(
+        `reflect: DeepEqual requires a generated value facet for ${leftType.String()}`,
+      ),
+    );
+  }
+  if (operations.int !== undefined) {
+    return operations.int(left) === operations.int(right);
+  }
+  if (operations.uint !== undefined) {
+    return operations.uint(left) === operations.uint(right);
+  }
+  if (operations.float !== undefined) {
+    return operations.float(left) === operations.float(right);
+  }
+  if (operations.bool !== undefined) {
+    return operations.bool(left) === operations.bool(right);
+  }
+  if (operations.string !== undefined) {
+    return operations.string(left) === operations.string(right);
+  }
+  if (kind === Pointer.value) {
+    if (leftValue.IsNil() && rightValue.IsNil()) {
+      return true;
+    }
+    if (leftValue.IsNil() || rightValue.IsNil()) {
+      return false;
+    }
+    const leftElem = leftValue.Elem().Interface();
+    const rightElem = rightValue.Elem().Interface();
+    if (leftElem === undefined || rightElem === undefined) {
+      return leftElem === rightElem;
+    }
+    return deepValueEqual(leftElem, rightElem, visited);
+  }
+  if (kind === Struct.value) {
+    const count = leftValue.NumField();
+    for (let index = 0n; index < count; index++) {
+      const leftField = leftValue.Field(index).Interface();
+      const rightField = rightValue.Field(index).Interface();
+      if (leftField === undefined || rightField === undefined) {
+        if (leftField !== rightField) {
+          return false;
+        }
+        continue;
+      }
+      if (!deepValueEqual(leftField, rightField, visited)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (kind === Slice.value) {
+    if (leftValue.IsNil() !== rightValue.IsNil()) {
+      return false;
+    }
+    const length = leftValue.Len();
+    if (length !== rightValue.Len()) {
+      return false;
+    }
+    for (let index = 0n; index < length; index++) {
+      const leftElement = leftValue.Index(index).Interface();
+      const rightElement = rightValue.Index(index).Interface();
+      if (leftElement === undefined || rightElement === undefined) {
+        if (leftElement !== rightElement) {
+          return false;
+        }
+        continue;
+      }
+      if (!deepValueEqual(leftElement, rightElement, visited)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (kind === Map.value) {
+    if (leftValue.IsNil() !== rightValue.IsNil()) {
+      return false;
+    }
+    if (leftValue.Len() !== rightValue.Len()) {
+      return false;
+    }
+    const iterator = leftValue.MapRange();
+    while (MapIter.Next(iterator)) {
+      const key = MapIter.Key(iterator);
+      const leftElement = MapIter.Value(iterator).Interface();
+      const rightEntry = rightValue.MapIndex(key);
+      if (!rightEntry.IsValid()) {
+        return false;
+      }
+      const rightElement = rightEntry.Interface();
+      if (leftElement === undefined || rightElement === undefined) {
+        if (leftElement !== rightElement) {
+          return false;
+        }
+        continue;
+      }
+      if (!deepValueEqual(leftElement, rightElement, visited)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return GoPanic.raise(
+    new ProviderError(
+      `reflect: DeepEqual is not supported for kind ${leftType.Kind().String()}`,
+    ),
+  );
+}
+
+export function Indirect(value: Value): Value {
+  if (value.Kind().value !== Pointer.value) {
+    return value;
+  }
+  return value.Elem();
 }
 
 export function MakeMap(type: Type | undefined): Value {

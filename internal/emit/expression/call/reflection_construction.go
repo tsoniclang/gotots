@@ -333,3 +333,105 @@ func effectFreeCompositionOperand(expression ast.Expr) bool {
 	}
 	return true
 }
+
+// emitReflectionDeepEqual intercepts reflect.DeepEqual to demand the
+// generated value facets of both operand types — the deep walk resolves
+// descriptors and callbacks for every reachable child type through the
+// generation-side demand closure — then emits the ordinary provider call.
+func emitReflectionDeepEqual(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	discarded bool,
+	detached bool,
+) (api.ExpressionEmission, bool, error) {
+	owner, ok := calleeObject(context.TypesInfo(), source.Fun)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
+	}
+	contract, err := environmentcontract.Describe(owner)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if contract.Identity() != reflectDeepEqualIdentity {
+		return api.ExpressionEmission{}, false, nil
+	}
+	if detached {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	signature, ok := owner.Type().(*types.Signature)
+	if !ok || signature.Results() == nil || signature.Results().Len() != 1 ||
+		signature.Params() == nil || signature.Params().Len() != 2 ||
+		len(source.Args) != 2 {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if err := validateResults(context, source, signature, discarded); err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	reflectTypeObject, typeOK := owner.Pkg().
+		Scope().
+		Lookup("Type").(*types.TypeName)
+	if !typeOK {
+		return api.ExpressionEmission{}, true, &api.ContextError{
+			Reason: "reflect package has no Type declaration",
+		}
+	}
+	names, namesOK := context.Names().(api.ReflectionNames)
+	if !namesOK {
+		return api.ExpressionEmission{}, true, &api.ContextError{
+			Reason: "reflection names are unavailable",
+		}
+	}
+	var demand []api.RootRequest
+	for _, argument := range source.Args {
+		argumentType := context.TypesInfo().TypeOf(argument)
+		if argumentType == nil {
+			return api.ExpressionEmission{}, true,
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		if basic, basicOK := types.Unalias(argumentType).(*types.Basic); basicOK &&
+			basic.Kind() == types.UntypedNil {
+			continue
+		}
+		if api.ContainsGenericTypeParameter(argumentType) {
+			return api.ExpressionEmission{}, true,
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		metadata, metadataErr := names.ReflectionValueOf(
+			argumentType,
+			reflectTypeObject,
+		)
+		if metadataErr != nil {
+			return api.ExpressionEmission{}, true, metadataErr
+		}
+		demand = api.CombineRequests(demand, metadata.Requests())
+	}
+	callee, err := context.Names().Reference(owner)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	arguments, before, argumentRequests, err := emitArguments(
+		context,
+		children,
+		source,
+		signature,
+		false,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	emission, err := api.NewExpressionEmission(
+		before,
+		context.Factory().CallExpression(
+			callee.Expression(context.Factory()),
+			nil,
+			nil,
+			arguments,
+			tsgo.NodeFlagsNone,
+		),
+		api.CombineRequests(callee.Requests(), argumentRequests, demand),
+	)
+	return emission, true, err
+}

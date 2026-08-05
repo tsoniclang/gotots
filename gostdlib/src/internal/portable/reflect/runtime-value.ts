@@ -1,4 +1,5 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
+import type { GoUnsafePointer } from "@gotots/runtime/unsafe-pointer.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
@@ -88,6 +89,10 @@ export interface RuntimeValueOperations {
   readonly boxFloat?: (value: float64) => GoInterfaceValue;
   readonly boxBool?: (value: bool) => GoInterfaceValue;
   readonly newPointer?: () => GoInterfaceValue;
+  readonly cloned?: (box: GoInterfaceValue) => GoInterfaceValue;
+  readonly unsafePointer?: (
+    box: GoInterfaceValue,
+  ) => GoUnsafePointer | undefined;
 }
 
 const pointerDescriptors: Array<[Type, () => Type]> = [];
