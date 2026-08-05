@@ -1,4 +1,5 @@
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
+import { GoMapHash } from "@gotots/runtime/map.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
 import { hostInteger } from "../../host-integer.js";
@@ -15,16 +16,22 @@ function delay(d: Duration): number {
   return hostInteger(d.Nanoseconds()) / 1_000_000;
 }
 
+let assignTimerRepresentation: (target: Timer, source: Timer) => void;
+let copyTimerRepresentation: (source: Timer) => Timer;
+let equalTimerRepresentation: (left: Timer, right: Timer) => bool;
+let hashTimerRepresentation: (source: Timer) => number;
+
 export class Timer {
-  readonly C: GoReceiveChannel<Time> | undefined;
+  C: GoReceiveChannel<Time> | undefined;
   readonly #channel: ProviderChannel<Time> | undefined;
   #handle: ClockHandle | undefined;
   #active = false;
+  #initialized = false;
   readonly #action: (() => Awaitable<void>) | undefined;
 
   constructor(duration?: Duration, action?: () => Awaitable<void>) {
     this.#action = action;
-    if (action === undefined) {
+    if (duration !== undefined && action === undefined) {
       this.#channel = new ProviderChannel<Time>(
         () => new Time(),
         (value) => value,
@@ -33,16 +40,47 @@ export class Timer {
       this.C = this.#channel;
     }
     if (duration !== undefined) {
+      this.#initialized = true;
       this.#start(duration);
     }
   }
 
+  static {
+    assignTimerRepresentation = (target: Timer, source: Timer): void => {
+      target.C = source.C;
+      target.#initialized = source.#initialized;
+    };
+    copyTimerRepresentation = (source: Timer): Timer => {
+      const result = new Timer();
+      assignTimerRepresentation(result, source);
+      return result;
+    };
+    equalTimerRepresentation = (left: Timer, right: Timer): bool =>
+      left.C === right.C && left.#initialized === right.#initialized;
+    hashTimerRepresentation = (source: Timer): number => {
+      const channelHash = source.C === undefined
+        ? 0
+        : GoMapHash.object(source.C);
+      return GoMapHash.mix(
+        channelHash,
+        GoMapHash.boolean(source.#initialized),
+      );
+    };
+  }
+
   static Stop(receiver: Timer | undefined): bool {
-    return requireTimer(receiver).#stop();
+    const timer = requireTimer(receiver);
+    if (!timer.#initialized) {
+      GoPanic.raiseRuntime("time: Stop called on uninitialized Timer");
+    }
+    return timer.#stop();
   }
 
   static Reset(receiver: Timer | undefined, d: Duration): bool {
     const timer = requireTimer(receiver);
+    if (!timer.#initialized) {
+      GoPanic.raiseRuntime("time: Reset called on uninitialized Timer");
+    }
     const active = timer.#stop();
     timer.#channel?.discard();
     timer.#start(d);
@@ -71,6 +109,22 @@ export class Timer {
     this.#active = false;
     return true;
   }
+}
+
+export function timerRepresentationAssign(target: Timer, source: Timer): void {
+  assignTimerRepresentation(target, source);
+}
+
+export function timerRepresentationCopy(source: Timer): Timer {
+  return copyTimerRepresentation(source);
+}
+
+export function timerRepresentationEqual(left: Timer, right: Timer): bool {
+  return equalTimerRepresentation(left, right);
+}
+
+export function timerRepresentationHash(source: Timer): number {
+  return hashTimerRepresentation(source);
 }
 
 export class Ticker {

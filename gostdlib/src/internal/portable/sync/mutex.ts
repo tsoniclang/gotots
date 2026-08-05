@@ -18,6 +18,14 @@ export class Mutex {
     return result;
   }
 
+  static $assign(target: Mutex, source: Mutex): void {
+    const locked = source.#locked;
+    const waiters = [...source.#waiters];
+    target.#locked = locked;
+    target.#waiters.length = 0;
+    target.#waiters.push(...waiters);
+  }
+
   static $equal(left: Mutex, right: Mutex): boolean {
     return left.#locked === right.#locked &&
       left.#waiters.length === right.#waiters.length;

@@ -43,7 +43,11 @@ import {
   SyncRWMutexOperations,
   SyncWaitGroupOperations,
 } from "../src/internal/facets/named-sync.js";
-import { TimeOperations } from "../src/internal/facets/named-time.js";
+import {
+  TimeOperations,
+  TimeParseErrorOperations,
+  TimeTimerOperations,
+} from "../src/internal/facets/named-time.js";
 import {
   UnicodeRange16Operations,
 } from "../src/internal/facets/named-unicode.js";
@@ -68,7 +72,13 @@ import {
   StructTag,
   Value as ReflectValue,
 } from "../src/reflect.js";
-import { ParseError, Time } from "../src/time.js";
+import {
+  Duration,
+  NewTimer,
+  ParseError,
+  Time,
+  Timer,
+} from "../src/time.js";
 import {
   Accuracy,
   Float as BigFloat,
@@ -270,6 +280,83 @@ test("named-struct facets expose only selected static operations", (): void => {
   const poolCopy = SyncPoolOperations.$copy(copiedPoolSource);
   assert.notEqual(poolCopy, copiedPoolSource);
   assert.equal(poolCopy.New, poolNew);
+});
+
+test("provider assignment facets preserve selected Go representations", async (): Promise<void> => {
+  const parseSource = new ParseError(
+    "layout",
+    "value",
+    "layout-elem",
+    "value-elem",
+    "message",
+  );
+  const parseTarget = new ParseError("", "", "", "", "");
+  TimeParseErrorOperations.$assign(parseTarget, parseSource);
+  assert.deepEqual(
+    [
+      parseTarget.Layout,
+      parseTarget.Value,
+      parseTarget.LayoutElem,
+      parseTarget.ValueElem,
+      parseTarget.Message,
+    ],
+    ["layout", "value", "layout-elem", "value-elem", "message"],
+  );
+
+  const mutexSource = new Mutex();
+  const mutexTarget = new Mutex();
+  SyncMutexOperations.$assign(mutexTarget, mutexSource);
+  await Mutex.Lock(mutexTarget);
+  Mutex.Unlock(mutexTarget);
+
+  const builderSource = new StringBuilder();
+  StringBuilder.WriteString(builderSource, "source");
+  const builderTarget = new StringBuilder();
+  StringsBuilderOperations.$assign(builderTarget, builderSource);
+  assert.equal(StringBuilder.String(builderTarget), "source");
+  assert.throws(
+    () => StringBuilder.WriteString(builderTarget, "-copy"),
+    (failure: unknown): boolean => failure instanceof GoPanic &&
+      failure.value.$go$format("v", "", undefined) ===
+        "strings: illegal use of non-zero Builder copied by value",
+  );
+  const builderCopy = StringsBuilderOperations.$copy(builderSource);
+  assert.equal(StringBuilder.String(builderCopy), "source");
+  assert.throws(
+    () => StringBuilder.WriteString(builderCopy, "-copy"),
+    (failure: unknown): boolean => failure instanceof GoPanic &&
+      failure.value.$go$format("v", "", undefined) ===
+        "strings: illegal use of non-zero Builder copied by value",
+  );
+  StringsBuilderOperations.$assign(builderSource, builderSource);
+  StringBuilder.WriteString(builderSource, "-self");
+  assert.equal(StringBuilder.String(builderSource), "source-self");
+  const zeroBuilder = new StringBuilder();
+  const assignedZeroBuilder = new StringBuilder();
+  StringsBuilderOperations.$assign(assignedZeroBuilder, zeroBuilder);
+  StringBuilder.WriteString(assignedZeroBuilder, "zero");
+  assert.equal(StringBuilder.String(assignedZeroBuilder), "zero");
+
+  const duration = new Duration(3_600_000_000_000n);
+  const timerSource = NewTimer(duration);
+  const timerTarget = NewTimer(duration);
+  assert.equal(Timer.Stop(timerTarget), true);
+  TimeTimerOperations.$assign(timerTarget, timerSource);
+  assert.equal(timerTarget.C, timerSource.C);
+  assert.equal(Timer.Stop(timerTarget), false);
+  const timerCopy = TimeTimerOperations.$copy(timerSource);
+  assert.equal(timerCopy.C, timerSource.C);
+  assert.equal(TimeTimerOperations.$equal(timerCopy, timerSource), true);
+  assert.equal(
+    TimeTimerOperations.$hash(timerCopy),
+    TimeTimerOperations.$hash(timerSource),
+  );
+  assert.equal(Timer.Stop(timerCopy), false);
+  const activeTimerTarget = NewTimer(duration);
+  TimeTimerOperations.$assign(activeTimerTarget, timerSource);
+  assert.equal(activeTimerTarget.C, timerSource.C);
+  assert.equal(Timer.Stop(activeTimerTarget), true);
+  assert.equal(Timer.Stop(timerSource), true);
 });
 
 test("sync value facets preserve comparable state", async (): Promise<void> => {

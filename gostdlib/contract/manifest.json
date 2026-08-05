@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "67ea43638501e69def92784a715bd71b5592f07ff9eb981fdb2cf26b3cba27d6",
-  "providerDigest": "0498d4b29284a93ecd17d993895464b4db0bd5f8c7cd9fbc99e445c4aef5bff2",
+  "providerDigest": "0c41ad067a618a9eaafbeda72b26a44ec13f805c6ca25364e2786413f0babab3",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -1384,7 +1384,7 @@
             "src/internal/portable/time/time.ts#Before@748",
             "src/internal/portable/time/time.ts#Now@2500",
             "src/internal/portable/time/time.ts#Sub@811",
-            "src/internal/portable/time/timer.ts#After@630"
+            "src/internal/portable/time/timer.ts#After@980"
           ],
           "implementationSites": [
             "src/internal/portable/context/context.ts#WithTimeout@1177"
@@ -12971,7 +12971,7 @@
           "targetFingerprint": "e0abc315bbe670641da809edd7e6db8a905461456e18e22beae55605ff8aea37",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/strings/builder.ts#Builder@60"
+            "src/internal/portable/strings/builder.ts#Builder@89"
           ]
         },
         {
@@ -13018,10 +13018,10 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/host-integer.ts#hostInteger@27",
-            "src/internal/portable/strings/builder.ts#requireBuilder@438"
+            "src/internal/portable/strings/builder.ts#requireBuilder@715"
           ],
           "implementationSites": [
-            "src/internal/portable/strings/builder.ts#Grow@80"
+            "src/internal/portable/strings/builder.ts#Grow@217"
           ]
         },
         {
@@ -13038,10 +13038,10 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/host-integer.ts#integerFromHost@69",
-            "src/internal/portable/strings/builder.ts#requireBuilder@438"
+            "src/internal/portable/strings/builder.ts#requireBuilder@715"
           ],
           "implementationSites": [
-            "src/internal/portable/strings/builder.ts#Len@130"
+            "src/internal/portable/strings/builder.ts#Len@273"
           ]
         },
         {
@@ -13057,10 +13057,10 @@
           "targetFingerprint": "35f2f36657c5da8699920e466faa38beaa999d45ae45e81f69da2bd91682c423",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/strings/builder.ts#requireBuilder@438"
+            "src/internal/portable/strings/builder.ts#requireBuilder@715"
           ],
           "implementationSites": [
-            "src/internal/portable/strings/builder.ts#Reset@158"
+            "src/internal/portable/strings/builder.ts#Reset@301"
           ]
         },
         {
@@ -13076,10 +13076,10 @@
           "targetFingerprint": "7ab25067a52a45ffd41afa90fb8cf2c027b6803ba400aaa95a1b10724d5e27fc",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/strings/builder.ts#requireBuilder@438"
+            "src/internal/portable/strings/builder.ts#requireBuilder@715"
           ],
           "implementationSites": [
-            "src/internal/portable/strings/builder.ts#String@183"
+            "src/internal/portable/strings/builder.ts#String@339"
           ]
         },
         {
@@ -13096,11 +13096,11 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/host-integer.ts#integerFromHost@69",
-            "src/internal/portable/strings/builder.ts#requireBuilder@438",
+            "src/internal/portable/strings/builder.ts#requireBuilder@715",
             "src/internal/runtime/slice.ts#sliceValues@19"
           ],
           "implementationSites": [
-            "src/internal/portable/strings/builder.ts#Write@206"
+            "src/internal/portable/strings/builder.ts#Write@362"
           ]
         },
         {
@@ -13116,10 +13116,10 @@
           "targetFingerprint": "7d9b50d4b94a24fd14c48ba91d8979105a798dfdcaaac6467c29b59dd663b361",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/strings/builder.ts#requireBuilder@438"
+            "src/internal/portable/strings/builder.ts#requireBuilder@715"
           ],
           "implementationSites": [
-            "src/internal/portable/strings/builder.ts#WriteByte@295"
+            "src/internal/portable/strings/builder.ts#WriteByte@457"
           ]
         },
         {
@@ -13136,11 +13136,11 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/host-integer.ts#integerFromHost@69",
-            "src/internal/portable/strings/builder.ts#requireBuilder@438",
+            "src/internal/portable/strings/builder.ts#requireBuilder@715",
             "src/internal/portable/utf8/codec.ts#encodeRune@566"
           ],
           "implementationSites": [
-            "src/internal/portable/strings/builder.ts#WriteRune@335"
+            "src/internal/portable/strings/builder.ts#WriteRune@509"
           ]
         },
         {
@@ -13157,10 +13157,10 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/host-integer.ts#integerFromHost@69",
-            "src/internal/portable/strings/builder.ts#requireBuilder@438"
+            "src/internal/portable/strings/builder.ts#requireBuilder@715"
           ],
           "implementationSites": [
-            "src/internal/portable/strings/builder.ts#WriteString@391"
+            "src/internal/portable/strings/builder.ts#WriteString@577"
           ]
         },
         {
@@ -14115,7 +14115,7 @@
           "sourceSignature": "defined=sync.Mutex|underlying=struct{_ sync.noCopy; mu internal/sync.Mutex}",
           "sourceLocation": "sync/mutex.go:30:6",
           "implementationOwner": "src/internal/portable/sync/mutex.ts",
-          "targetFingerprint": "63fb3e910e59d6c19c7789ff3fbf4f50d38f0ac3681e2c05f6384c553f519753",
+          "targetFingerprint": "09936e72e23074739aa494480656d811222663b20d57dd72c68c398c5b8dae8c",
           "disposition": "implemented",
           "implementationSites": [
             "src/internal/portable/sync/mutex.ts#Mutex@43"
@@ -14174,7 +14174,7 @@
           "targetFingerprint": "9cd3b15e3c919029875ccc9715eaf0c381482f9f22b289de8318691dfa2ccd8e",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#RWMutex@361"
+            "src/internal/portable/sync/mutex.ts#RWMutex@422"
           ]
         },
         {
@@ -14391,7 +14391,7 @@
             "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#Lock@190"
+            "src/internal/portable/sync/mutex.ts#Lock@251"
           ]
         },
         {
@@ -14410,7 +14410,7 @@
             "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#Unlock@256"
+            "src/internal/portable/sync/mutex.ts#Unlock@317"
           ]
         },
         {
@@ -14486,7 +14486,7 @@
             "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#Lock@591"
+            "src/internal/portable/sync/mutex.ts#Lock@652"
           ]
         },
         {
@@ -14505,7 +14505,7 @@
             "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#RLock@729"
+            "src/internal/portable/sync/mutex.ts#RLock@790"
           ]
         },
         {
@@ -14524,7 +14524,7 @@
             "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#RUnlock@832"
+            "src/internal/portable/sync/mutex.ts#RUnlock@893"
           ]
         },
         {
@@ -14543,7 +14543,7 @@
             "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#Unlock@675"
+            "src/internal/portable/sync/mutex.ts#Unlock@736"
           ]
         },
         {
@@ -15908,7 +15908,7 @@
             "src/internal/portable/time/time.ts#Time@155"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Ticker@429"
+            "src/internal/portable/time/timer.ts#Ticker@779"
           ]
         },
         {
@@ -15953,7 +15953,7 @@
             "src/internal/portable/time/time.ts#Time@155"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Timer@89"
+            "src/internal/portable/time/timer.ts#Timer@154"
           ]
         },
         {
@@ -15991,7 +15991,7 @@
             "src/internal/node/time/clock.ts#cancelSchedule@69"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Stop@514"
+            "src/internal/portable/time/timer.ts#Stop@864"
           ]
         },
         {
@@ -16008,10 +16008,10 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/concurrency/channel.ts#discard@397",
-            "src/internal/portable/time/timer.ts#requireTimer@815"
+            "src/internal/portable/time/timer.ts#requireTimer@1165"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Reset@247"
+            "src/internal/portable/time/timer.ts#Reset@503"
           ]
         },
         {
@@ -16027,10 +16027,10 @@
           "targetFingerprint": "0d238d27060fbf73b4304acb28a4cb551f28e24e8ef2241e416e10bb110473ec",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/time/timer.ts#requireTimer@815"
+            "src/internal/portable/time/timer.ts#requireTimer@1165"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Stop@222"
+            "src/internal/portable/time/timer.ts#Stop@458"
           ]
         },
         {
@@ -16462,11 +16462,11 @@
           "targetFingerprint": "c710c278e1c77eaa108adde6d6fa325be40d84cb4b062a08bef638cfb559c36e",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/time/timer.ts#C@94",
-            "src/internal/portable/time/timer.ts#Timer@89"
+            "src/internal/portable/time/timer.ts#C@159",
+            "src/internal/portable/time/timer.ts#Timer@154"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#After@630"
+            "src/internal/portable/time/timer.ts#After@980"
           ]
         },
         {
@@ -16487,10 +16487,10 @@
           "targetFingerprint": "a5735b1e6967f433c6cd3e37409f73bce80a43a864c90fa036d49f2bca3918d6",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/time/timer.ts#Timer@89"
+            "src/internal/portable/time/timer.ts#Timer@154"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#AfterFunc@673"
+            "src/internal/portable/time/timer.ts#AfterFunc@1023"
           ]
         },
         {
@@ -16505,10 +16505,10 @@
           "targetFingerprint": "8aff7792a2fdfb767e7eba9f746903558e6fad3916c1543059e4016321c0868e",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/time/timer.ts#Ticker@429"
+            "src/internal/portable/time/timer.ts#Ticker@779"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#NewTicker@725"
+            "src/internal/portable/time/timer.ts#NewTicker@1075"
           ]
         },
         {
@@ -16523,10 +16523,10 @@
           "targetFingerprint": "121d1a7dfeb7405c0560946bd25804baf0a5a6ec07f667125608de2eb0be1c2f",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/time/timer.ts#Timer@89"
+            "src/internal/portable/time/timer.ts#Timer@154"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#NewTimer@743"
+            "src/internal/portable/time/timer.ts#NewTimer@1093"
           ]
         },
         {
@@ -16632,10 +16632,10 @@
           "dependencies": [
             "src/internal/node/time/clock.ts#schedule@40",
             "src/internal/portable/time/duration.ts#Nanoseconds@64",
-            "src/internal/portable/time/timer.ts#delay@67"
+            "src/internal/portable/time/timer.ts#delay@74"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Sleep@761"
+            "src/internal/portable/time/timer.ts#Sleep@1111"
           ]
         },
         {
@@ -19498,6 +19498,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "strings|kind=2|receiver=|name=Builder",
           "capabilities": [
+            "assign",
             "copy",
             "storage",
             "zero"
@@ -19506,10 +19507,10 @@
           "storageExport": "StringsBuilderStorage",
           "implementationOwner": "src/internal/facets/named-strings.ts",
           "storageImplementationOwner": "src/internal/portable/strings/builder.ts",
-          "targetFingerprint": "c0d14aec4bdb8231bd5d3d0f256d784e4538e8cd9d69104ecf1be5616a676471",
+          "targetFingerprint": "4332531aea8487bc07baad2ce7318cf5ddfbf29bab5cc0ed128c9698d9015bfa",
           "storageTargetFingerprint": "81d80387430ddb838a6dd41165cf820f29ac0b25865329e1ab28c1ed6d339de6",
           "implementationSites": [
-            "src/internal/facets/named-strings.ts#StringsBuilderOperations@16"
+            "src/internal/facets/named-strings.ts#StringsBuilderOperations@25"
           ]
         }
       ]
@@ -19666,6 +19667,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "sync|kind=2|receiver=|name=Mutex",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -19676,7 +19678,7 @@
           "storageExport": "SyncMutexStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/mutex.ts",
-          "targetFingerprint": "75f55973f4df367d4d244efbee5c5edb69ec8d1577f48734ae27e8fc9fa9936f",
+          "targetFingerprint": "c76b202bd2f46eda0374bc15bc95046162f1d0e30e861a084e148df4aa885d21",
           "storageTargetFingerprint": "cd7aabb3a224893419d76942ddf095072b8e4180feb06c0981bc32519132d60c",
           "implementationSites": [
             "src/internal/facets/named-sync.ts#SyncMutexOperations@216"
@@ -19699,7 +19701,7 @@
           "targetFingerprint": "eb9df8b594b396721c6cf2b4fc2efbdfd6f7e7d91b8fee062a633d418dd86dbd",
           "storageTargetFingerprint": "85618d431bdbebbe1261382e1fb4bcdd75f54ded2a30e549544b5d91f558fdea",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncOnceOperations@333"
+            "src/internal/facets/named-sync.ts#SyncOnceOperations@357"
           ]
         },
         {
@@ -19717,7 +19719,7 @@
           "targetFingerprint": "a91f0d41ff7a7207e9a0ffb7732f160a0572cb98af7879e585f7b3ec8e949087",
           "storageTargetFingerprint": "cef67a67c61a5b0386d321d4551396860636a13f2294cc1a5957b26165373932",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncPoolOperations@450"
+            "src/internal/facets/named-sync.ts#SyncPoolOperations@474"
           ]
         },
         {
@@ -19737,7 +19739,7 @@
           "targetFingerprint": "6f1e3c681e3007cd61eac7c15c609e7ca9b81a22993baa35433802b13b92600d",
           "storageTargetFingerprint": "b3f4db5108c807b70b959f252597a0719661f3a3e0a3776486d94abd88aaeb08",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncRWMutexOperations@524"
+            "src/internal/facets/named-sync.ts#SyncRWMutexOperations@548"
           ]
         },
         {
@@ -19757,7 +19759,7 @@
           "targetFingerprint": "89380bac80d6f2342807c1b54f33cef0789eeadad16314061bf3dc84922f4325",
           "storageTargetFingerprint": "82b60b062fb280c49bf3f9c78c6d1aa801a308e81a7a4a88b860f9ed0cf1b5bd",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@641"
+            "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@665"
           ]
         }
       ]
@@ -19811,13 +19813,14 @@
           "implementationOwner": "src/internal/facets/named-time.ts",
           "targetFingerprint": "e9bf903bb20c910166b214d911daeca0d3b242eb04a796d726f75814a2bfb4fd",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeDurationValueOperations@47"
+            "src/internal/facets/named-time.ts#TimeDurationValueOperations@60"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "time|kind=2|receiver=|name=ParseError",
           "capabilities": [
+            "assign",
             "copy",
             "equal",
             "hash",
@@ -19828,10 +19831,10 @@
           "storageExport": "TimeParseErrorStorage",
           "implementationOwner": "src/internal/facets/named-time.ts",
           "storageImplementationOwner": "src/internal/portable/time/parse-error.ts",
-          "targetFingerprint": "7dd11ab10743fd57c0150d6f026ffe4e5639ef0eb7aaeddd51e8a1eb8c8e7fea",
+          "targetFingerprint": "0cfcd699144d44ff4629aaf587abd00cf62d242cb62d97be0f73897501592577",
           "storageTargetFingerprint": "0073fa4b3eb74a306e23ebb7ab0bdb7521fd7cca4bf809a74d9bf84b9936b3fb",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeParseErrorOperations@228"
+            "src/internal/facets/named-time.ts#TimeParseErrorOperations@241"
           ]
         },
         {
@@ -19847,7 +19850,7 @@
           "targetFingerprint": "2a47d53a0009db9f8f33495b6b0dec62ffeff09b8d32e3ea02d7c4f02e13732c",
           "storageTargetFingerprint": "ff82ffc641b89e7eb9413ff94611f8168916664a889bd2c1e13d2cade827fb49",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeTickerOperations@515"
+            "src/internal/facets/named-time.ts#TimeTickerOperations@589"
           ]
         },
         {
@@ -19868,23 +19871,27 @@
           "targetFingerprint": "1687252c7f0649c1fca7c0127fcb38be63562720dc20e8c83d909f2fdba37641",
           "storageTargetFingerprint": "d833aa31132cb50292bfbd8502c4dc9ebef10a01f63407c9fa81a77cbb43da94",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeOperations@95"
+            "src/internal/facets/named-time.ts#TimeOperations@108"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "time|kind=2|receiver=|name=Timer",
           "capabilities": [
+            "assign",
+            "copy",
+            "equal",
+            "hash",
             "storage"
           ],
           "export": "TimeTimerOperations",
           "storageExport": "TimeTimerStorage",
           "implementationOwner": "src/internal/facets/named-time.ts",
           "storageImplementationOwner": "src/internal/portable/time/timer.ts",
-          "targetFingerprint": "59aa0fe619dbf53d94f8c35a3a9a1e2153953240a5b48bfc84c8746454496d94",
+          "targetFingerprint": "87a2932998d32e79fb0d30b66232e27803800558d43e17ec46f0dd5216db4f60",
           "storageTargetFingerprint": "cc81f3a16b51b1c1e42c31a3703fff179dddee41376be109e64f8df3ad372470",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeTimerOperations@556"
+            "src/internal/facets/named-time.ts#TimeTimerOperations@630"
           ]
         }
       ]
@@ -26213,9 +26220,11 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-strings.ts#StringsBuilderOperations@16",
+      "identity": "src/internal/facets/named-strings.ts#StringsBuilderOperations@25",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/strings/builder.ts#builderRepresentationAssign@675",
+        "src/internal/portable/strings/builder.ts#builderRepresentationCopy@697",
         "src/strings.ts#Builder@27"
       ]
     },
@@ -26280,14 +26289,15 @@
       "identity": "src/internal/facets/named-sync.ts#SyncMutexOperations@216",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/mutex.ts#$assign@104",
         "src/internal/portable/sync/mutex.ts#$copy@60",
-        "src/internal/portable/sync/mutex.ts#$equal@104",
-        "src/internal/portable/sync/mutex.ts#$hash@143",
+        "src/internal/portable/sync/mutex.ts#$equal@165",
+        "src/internal/portable/sync/mutex.ts#$hash@204",
         "src/sync.ts#Mutex@22"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncOnceOperations@333",
+      "identity": "src/internal/facets/named-sync.ts#SyncOnceOperations@357",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/sync/once.ts#$copy@51",
@@ -26297,7 +26307,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncPoolOperations@450",
+      "identity": "src/internal/facets/named-sync.ts#SyncPoolOperations@474",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/sync/pool.ts#New@38",
@@ -26305,17 +26315,17 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncRWMutexOperations@524",
+      "identity": "src/internal/facets/named-sync.ts#SyncRWMutexOperations@548",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/mutex.ts#$copy@381",
-        "src/internal/portable/sync/mutex.ts#$equal@434",
-        "src/internal/portable/sync/mutex.ts#$hash@515",
+        "src/internal/portable/sync/mutex.ts#$copy@442",
+        "src/internal/portable/sync/mutex.ts#$equal@495",
+        "src/internal/portable/sync/mutex.ts#$hash@576",
         "src/sync.ts#RWMutex@24"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@641",
+      "identity": "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@665",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/sync/wait-group.ts#$copy@48",
@@ -26341,7 +26351,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-time.ts#TimeDurationValueOperations@47",
+      "identity": "src/internal/facets/named-time.ts#TimeDurationValueOperations@60",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/time/duration.ts#Nanoseconds@64",
@@ -26349,7 +26359,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-time.ts#TimeOperations@95",
+      "identity": "src/internal/facets/named-time.ts#TimeOperations@108",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/time/time.ts#timeRepresentationAssign@2443",
@@ -26360,7 +26370,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-time.ts#TimeParseErrorOperations@228",
+      "identity": "src/internal/facets/named-time.ts#TimeParseErrorOperations@241",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/time/parse-error.ts#Layout@88",
@@ -26372,12 +26382,18 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-time.ts#TimeTickerOperations@515",
+      "identity": "src/internal/facets/named-time.ts#TimeTickerOperations@589",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/named-time.ts#TimeTimerOperations@556",
-      "disposition": "implemented"
+      "identity": "src/internal/facets/named-time.ts#TimeTimerOperations@630",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/time/timer.ts#timerRepresentationAssign@699",
+        "src/internal/portable/time/timer.ts#timerRepresentationCopy@721",
+        "src/internal/portable/time/timer.ts#timerRepresentationEqual@739",
+        "src/internal/portable/time/timer.ts#timerRepresentationHash@762"
+      ]
     },
     {
       "identity": "src/internal/facets/named-unicode.ts#UnicodeRange16Operations@38",
@@ -26849,7 +26865,7 @@
         "src/internal/portable/time/time.ts#Before@748",
         "src/internal/portable/time/time.ts#Now@2500",
         "src/internal/portable/time/time.ts#Sub@811",
-        "src/internal/portable/time/timer.ts#After@630"
+        "src/internal/portable/time/timer.ts#After@980"
       ]
     },
     {
@@ -27491,7 +27507,7 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/facets/recovery-io.ts#StringsBuilder@79",
-        "src/internal/portable/strings/builder.ts#Write@206"
+        "src/internal/portable/strings/builder.ts#Write@362"
       ]
     },
     {
@@ -27522,7 +27538,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncMutexUnlock@44",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/mutex.ts#Unlock@256",
+        "src/internal/portable/sync/mutex.ts#Unlock@317",
         "src/sync.ts#Mutex@22"
       ]
     },
@@ -27538,7 +27554,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncRWMutexRUnlock@106",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/mutex.ts#RUnlock@832",
+        "src/internal/portable/sync/mutex.ts#RUnlock@893",
         "src/sync.ts#RWMutex@24"
       ]
     },
@@ -27546,7 +27562,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncRWMutexUnlock@133",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/mutex.ts#Unlock@675",
+        "src/internal/portable/sync/mutex.ts#Unlock@736",
         "src/sync.ts#RWMutex@24"
       ]
     },
@@ -27612,7 +27628,7 @@
       "identity": "src/internal/facets/recovery-value.ts#TimeTickerStop@217",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/time/timer.ts#Stop@514",
+        "src/internal/portable/time/timer.ts#Stop@864",
         "src/time.ts#Ticker@56"
       ]
     },
@@ -31295,7 +31311,29 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/strings/builder.ts#requireBuilder@438",
+      "identity": "src/internal/portable/strings/builder.ts#assignBuilderRepresentation@63",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/strings/builder.ts#builderRepresentationAssign@675",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/strings/builder.ts#assignBuilderRepresentation@63"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/strings/builder.ts#builderRepresentationCopy@697",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/strings/builder.ts#copyBuilderRepresentation@79"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/strings/builder.ts#copyBuilderRepresentation@79",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/strings/builder.ts#requireBuilder@715",
       "disposition": "implemented"
     },
     {
@@ -31517,10 +31555,14 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/mutex.ts#$copy@381",
+      "identity": "src/internal/portable/sync/mutex.ts#$assign@104",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/mutex.ts#$copy@442",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/mutex.ts#RWMutex@361"
+        "src/internal/portable/sync/mutex.ts#RWMutex@422"
       ]
     },
     {
@@ -31531,19 +31573,19 @@
       ]
     },
     {
-      "identity": "src/internal/portable/sync/mutex.ts#$equal@104",
+      "identity": "src/internal/portable/sync/mutex.ts#$equal@165",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/mutex.ts#$equal@434",
+      "identity": "src/internal/portable/sync/mutex.ts#$equal@495",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/mutex.ts#$hash@143",
+      "identity": "src/internal/portable/sync/mutex.ts#$hash@204",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/mutex.ts#$hash@515",
+      "identity": "src/internal/portable/sync/mutex.ts#$hash@576",
       "disposition": "implemented"
     },
     {
@@ -32034,11 +32076,19 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/time/timer.ts#C@94",
+      "identity": "src/internal/portable/time/timer.ts#C@159",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/time/timer.ts#delay@67",
+      "identity": "src/internal/portable/time/timer.ts#assignTimerRepresentation@99",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#copyTimerRepresentation@115",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#delay@74",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
@@ -32046,8 +32096,44 @@
       ]
     },
     {
-      "identity": "src/internal/portable/time/timer.ts#requireTimer@815",
+      "identity": "src/internal/portable/time/timer.ts#equalTimerRepresentation@128",
       "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#hashTimerRepresentation@145",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#requireTimer@1165",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#timerRepresentationAssign@699",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/time/timer.ts#assignTimerRepresentation@99"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#timerRepresentationCopy@721",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/time/timer.ts#copyTimerRepresentation@115"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#timerRepresentationEqual@739",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/time/timer.ts#equalTimerRepresentation@128"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#timerRepresentationHash@762",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/time/timer.ts#hashTimerRepresentation@145"
+      ]
     },
     {
       "identity": "src/internal/portable/unicode/case.ts#convertCase@501",
@@ -33494,5 +33580,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "c9e843bc403c4f351bb5b88815e81fbcc292049236e697102d26ce8e9ccfc55c"
+  "manifestDigest": "d6e45aa788c22f85dbbd2d192369d7885e4cd105344cb9346e3b00a42e9c5b5f"
 }

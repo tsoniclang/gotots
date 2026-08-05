@@ -9,6 +9,12 @@ import {
   Timer,
 } from "../../time.js";
 import {
+  timerRepresentationAssign,
+  timerRepresentationCopy,
+  timerRepresentationEqual,
+  timerRepresentationHash,
+} from "../portable/time/timer.js";
+import {
   timeRepresentationAssign,
   timeRepresentationCopy,
   timeRepresentationEqual,
@@ -86,6 +92,14 @@ export class TimeParseErrorOperations {
     );
   }
 
+  static $assign(target: ParseError, source: ParseError): void {
+    target.Layout = source.Layout;
+    target.Value = source.Value;
+    target.LayoutElem = source.LayoutElem;
+    target.ValueElem = source.ValueElem;
+    target.Message = source.Message;
+  }
+
   static $hash(source: ParseError): number {
     let hash = 2166136261;
     hash = GoMapHash.mix(hash, GoMapHash.string(source.Layout));
@@ -130,6 +144,22 @@ export class TimeTickerOperations {
 export type TimeTimerStorage = Timer;
 
 export class TimeTimerOperations {
+  static $assign(target: Timer, source: Timer): void {
+    timerRepresentationAssign(target, source);
+  }
+
+  static $copy(source: Timer): Timer {
+    return timerRepresentationCopy(source);
+  }
+
+  static $equal(left: Timer, right: Timer): boolean {
+    return timerRepresentationEqual(left, right);
+  }
+
+  static $hash(source: Timer): number {
+    return timerRepresentationHash(source);
+  }
+
   static $storageOf(source: Timer): TimeTimerStorage {
     return source;
   }

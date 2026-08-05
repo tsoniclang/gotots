@@ -59,6 +59,10 @@ export class SyncMutexOperations {
     return Mutex.$copy(source);
   }
 
+  static $assign(target: Mutex, source: Mutex): void {
+    Mutex.$assign(target, source);
+  }
+
   static $equal(left: Mutex, right: Mutex): boolean {
     return Mutex.$equal(left, right);
   }

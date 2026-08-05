@@ -1868,6 +1868,7 @@
       "sourcePath": "src/internal/facets/named-time.ts",
       "export": "TimeParseErrorOperations",
       "capabilities": [
+        "assign",
         "copy",
         "equal",
         "hash",
@@ -1883,6 +1884,10 @@
       "sourcePath": "src/internal/facets/named-time.ts",
       "export": "TimeTimerOperations",
       "capabilities": [
+        "assign",
+        "copy",
+        "equal",
+        "hash",
         "storage"
       ],
       "storageExport": "TimeTimerStorage"
@@ -1954,6 +1959,7 @@
       "sourcePath": "src/internal/facets/named-sync.ts",
       "export": "SyncMutexOperations",
       "capabilities": [
+        "assign",
         "copy",
         "equal",
         "hash",
@@ -2102,6 +2108,7 @@
       "sourcePath": "src/internal/facets/named-strings.ts",
       "export": "StringsBuilderOperations",
       "capabilities": [
+        "assign",
         "copy",
         "storage",
         "zero"
