@@ -391,7 +391,15 @@ export abstract class Value {
 
   Kind(): Kind {
     const type = this.resolvedType();
-    return type === undefined ? Invalid : type.Kind();
+    if (type === undefined) {
+      if (this.source === undefined) {
+        return Invalid;
+      }
+      return GoPanic.raiseRuntime(
+        "reflect: value type has no registered canonical descriptor",
+      );
+    }
+    return type.Kind();
   }
 
   Len(): int {
@@ -1190,4 +1198,3 @@ const kindNames: readonly string[] = [
   "complex64", "complex128", "array", "chan", "func", "interface", "map",
   "ptr", "slice", "string", "struct", "unsafe.Pointer",
 ];
-

@@ -74,14 +74,14 @@ test("reflect.ValueOf retains a typed interface descriptor", () => {
   assert.equal(invalid.String(), "<invalid Value>");
 });
 
-test("unimplemented reflect operations fail explicitly", () => {
+test("reflect rejects nonzero values without canonical type metadata", () => {
   assert.throws(
     () => ValueOf(new ProviderError("failure")).Kind(),
     (failure): boolean => {
       assert.ok(failure instanceof GoPanic);
       assert.match(
         failure.value.$go$format("v", "", undefined),
-        /reflect\.Value\.Kind requires generated reflection metadata/,
+        /value type has no registered canonical descriptor/,
       );
       return true;
     },

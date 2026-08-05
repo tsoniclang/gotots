@@ -10,6 +10,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { GoPanic } from "@gotots/runtime/panic.js";
 import type { uint8 } from "@gotots/runtime/scalars.js";
 
 import * as binary from "../src/encoding/binary.js";
@@ -52,15 +53,20 @@ test("AppendUint32 remains an unexported-receiver operation", (): void => {
   );
 });
 
-test("reflection-backed structured I/O fails through a typed provider boundary", (): void => {
-  assert.match(
-    binary.Read(undefined, undefined, undefined)?.Error() ?? "",
-    /requires generated reflection metadata/u,
-  );
-  assert.match(
-    binary.Write(undefined, undefined, undefined)?.Error() ?? "",
-    /requires generated reflection metadata/u,
-  );
+test("structured I/O preserves Go nil-interface panics", (): void => {
+  for (const operation of [binary.Read, binary.Write]) {
+    assert.throws(
+      () => operation(undefined, undefined, undefined),
+      (failure: unknown): boolean => {
+        assert.ok(failure instanceof GoPanic);
+        assert.equal(
+          failure.value.$go$format("v", "", undefined),
+          "invalid memory address or nil pointer dereference",
+        );
+        return true;
+      },
+    );
+  }
 });
 
 test("internal AppendUint32 agrees with Go receiver methods", (): void => {

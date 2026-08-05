@@ -24,6 +24,7 @@ type ClosureRoot struct {
 type ClosureError struct {
 	MissingBindings        []string
 	MissingImplementations []string
+	UsedProfileBoundaries  []string
 	UsedPlaceholders       []string
 }
 
@@ -41,6 +42,13 @@ func (e *ClosureError) Error() string {
 			sections,
 			"certified edges without implementation documents: "+
 				strings.Join(e.MissingImplementations, ", "),
+		)
+	}
+	if len(e.UsedProfileBoundaries) != 0 {
+		sections = append(
+			sections,
+			"used provider profile boundaries: "+
+				strings.Join(e.UsedProfileBoundaries, ", "),
 		)
 	}
 	if len(e.UsedPlaceholders) != 0 {
@@ -130,12 +138,11 @@ func VerifyProviderClosure(
 		if !ok {
 			if method, covered := representationMethods[root.Identity]; covered {
 				if executable {
-					if method.Disposition == gostdlib.DispositionPlaceholder {
-						failure.UsedPlaceholders = append(
-							failure.UsedPlaceholders,
-							root.Identity,
-						)
-					}
+					recordUsedDisposition(
+						root.Identity,
+						method.Disposition,
+						failure,
+					)
 					expandClosureEdges(
 						root.Identity,
 						method.Dependencies,
@@ -158,12 +165,11 @@ func VerifyProviderClosure(
 			continue
 		}
 		if executable && binding.Disposition().Valid() {
-			if binding.Disposition() == gostdlib.DispositionPlaceholder {
-				failure.UsedPlaceholders = append(
-					failure.UsedPlaceholders,
-					root.Identity,
-				)
-			}
+			recordUsedDisposition(
+				root.Identity,
+				binding.Disposition(),
+				failure,
+			)
 			expandClosureEdges(
 				root.Identity,
 				binding.ImplementationDependencies(),
@@ -198,14 +204,19 @@ func VerifyProviderClosure(
 	}
 	sort.Strings(failure.MissingBindings)
 	sort.Strings(failure.MissingImplementations)
+	sort.Strings(failure.UsedProfileBoundaries)
 	sort.Strings(failure.UsedPlaceholders)
 	failure.MissingBindings = slices.Compact(failure.MissingBindings)
 	failure.MissingImplementations = slices.Compact(
 		failure.MissingImplementations,
 	)
+	failure.UsedProfileBoundaries = slices.Compact(
+		failure.UsedProfileBoundaries,
+	)
 	failure.UsedPlaceholders = slices.Compact(failure.UsedPlaceholders)
 	if len(failure.MissingBindings) != 0 ||
 		len(failure.MissingImplementations) != 0 ||
+		len(failure.UsedProfileBoundaries) != 0 ||
 		len(failure.UsedPlaceholders) != 0 {
 		return failure
 	}
@@ -263,12 +274,11 @@ func expandClosureSite(
 		)
 		return
 	}
-	if implementation.Disposition == gostdlib.DispositionPlaceholder {
-		failure.UsedPlaceholders = append(
-			failure.UsedPlaceholders,
-			root+" -> "+site,
-		)
-	}
+	recordUsedDisposition(
+		root+" -> "+site,
+		implementation.Disposition,
+		failure,
+	)
 	expandClosureEdges(
 		root,
 		implementation.Dependencies,
@@ -304,12 +314,33 @@ func expandClosureEdges(
 			)
 			continue
 		}
-		if implementation.Disposition == gostdlib.DispositionPlaceholder {
-			failure.UsedPlaceholders = append(
-				failure.UsedPlaceholders,
-				root+" -> "+edge,
-			)
-		}
+		recordUsedDisposition(
+			root+" -> "+edge,
+			implementation.Disposition,
+			failure,
+		)
 		pending = append(pending, implementation.Dependencies...)
+	}
+}
+
+// recordUsedDisposition records behavior that cannot enter an executable
+// selected-provider closure. A profile boundary is valid provider evidence,
+// but reaching it proves that the selected product did not exclude it.
+func recordUsedDisposition(
+	identity string,
+	disposition gostdlib.ImplementationDisposition,
+	failure *ClosureError,
+) {
+	switch disposition {
+	case gostdlib.DispositionProfileBoundary:
+		failure.UsedProfileBoundaries = append(
+			failure.UsedProfileBoundaries,
+			identity,
+		)
+	case gostdlib.DispositionPlaceholder:
+		failure.UsedPlaceholders = append(
+			failure.UsedPlaceholders,
+			identity,
+		)
 	}
 }
