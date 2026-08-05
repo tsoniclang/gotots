@@ -122,12 +122,12 @@ func (owner Owner) Hash(
 	sourceType types.Type,
 	value tsgo.Expression,
 ) (api.ExpressionEmission, error) {
-	if parameter, ok := api.GenericTypeParameter(sourceType); ok {
+	if api.ContainsGenericTypeParameter(sourceType) {
 		return genericoperation.Call(
 			context,
 			source,
 			api.GenericOperationHash,
-			[]types.Type{parameter},
+			[]types.Type{sourceType},
 			[]types.Type{types.Typ[types.Uint32]},
 			[]api.ExpressionEmission{api.DirectExpression(value)},
 		)
