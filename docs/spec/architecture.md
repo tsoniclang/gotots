@@ -665,6 +665,28 @@ Nested callbacks, tuples, containers, fields, and results follow the same
 type-directed boundary rule. Missing or ambiguous conversion fails
 certification; TypeScript assignability alone is not semantic evidence.
 
+A direct provider-owned Go struct remains one object identity across the
+boundary, but each exported field is independently certified against its
+selected Go field identity and type. A field whose provider and product
+representations differ is projected at every semantic operation: reads convert
+provider to product, writes convert product to provider, and field addresses
+use one bidirectional pointer projection that retains the original Go address.
+Construction converts each supplied field to the provider representation;
+zero and copy use the struct's certified provider operations. Equal-
+representation fields stay direct and acquire no adapter. The compiler may not
+create a shadow struct, duplicate field state, infer a field from spelling, or
+let the provider carrier leak into generated source semantics.
+
+For example, under the product `number` profile and the provider `bigint`
+profile, Go `runtime.MemStats.Alloc uint64` is observed as a generated `number`
+but stored in the provider object as `bigint`. Reading performs the checked
+provider-to-product conversion, assigning performs the reciprocal conversion,
+and `&stats.Alloc` projects those same conversions over the provider field's
+pointer. Conversely, `runtime/metrics.Description.Name string` remains a
+direct string field. `unicode.RangeTable{LatinOffset: 5}` converts only the
+`int` constructor argument; its equal-representation slice fields remain
+direct.
+
 When a slice element has different provider and generated representations, the
 boundary emits one typed, bidirectional slice projection. Reads convert from
 provider storage, writes convert back to provider storage, and nil, length,

@@ -5,12 +5,15 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func arrange(
 	context api.Context,
+	children api.ChildEmitter,
 	source *ast.CompositeLit,
+	named *types.Named,
 	structType *types.Struct,
 	elements []element,
 	canonicalStorage bool,
@@ -53,6 +56,19 @@ func arrange(
 		)
 		if err != nil {
 			return nil, nil, nil, err
+		}
+		if named != nil {
+			zero, _, err = providerboundary.ToProviderStructField(
+				context.WithRole(api.RoleStructZeroField),
+				children,
+				source,
+				named,
+				structType.Field(fieldIndex),
+				zero,
+			)
+			if err != nil {
+				return nil, nil, nil, err
+			}
 		}
 		if canonicalStorage {
 			zero, err = context.Values().ToStorage(

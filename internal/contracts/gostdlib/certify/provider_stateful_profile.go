@@ -128,6 +128,7 @@ func buildProviderStatefulProfile(
 	facets []facetSeed,
 	project *tsgo.ProjectInspection,
 	effectMarker tsgo.ProjectExport,
+	scalarAliases map[string]string,
 ) (providerStatefulProfileBuild, error) {
 	evidence, ok := source.objects[seed.SourceIdentity]
 	if !ok {
@@ -242,12 +243,14 @@ func buildProviderStatefulProfile(
 	if err != nil {
 		return providerStatefulProfileBuild{}, err
 	}
-	fields, err := buildStatefulProfileFields(
+	fields, err := buildProviderStructFields(
 		selectedToolchain,
 		source,
 		typeName,
 		named,
 		target,
+		project,
+		scalarAliases,
 	)
 	if err != nil {
 		return providerStatefulProfileBuild{}, err

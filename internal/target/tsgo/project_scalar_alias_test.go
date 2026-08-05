@@ -129,6 +129,71 @@ export function Wrong(value: int): int { return value; }
 	}
 }
 
+func TestMemberScalarAliasesTraverseContainerAndLocalContractTypes(t *testing.T) {
+	directory := t.TempDir()
+	writeProjectFile(t, filepath.Join(directory, "tsconfig.json"), `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true
+  },
+  "include": ["*.ts"]
+}
+`)
+	scalarPath := filepath.Join(directory, "scalars.ts")
+	writeProjectFile(t, scalarPath, `
+export type int64 = bigint;
+export type uint32 = number;
+export type uint64 = bigint;
+`)
+	sourcePath := filepath.Join(directory, "source.ts")
+	writeProjectFile(t, sourcePath, `
+import type { int64, uint32, uint64 } from "./scalars.js";
+
+type Entry = {
+  Size: uint32;
+  Count: uint64;
+};
+
+type Pair = readonly [int64, Entry];
+
+export class Fields {
+  Direct!: uint64;
+  Nested!: readonly [uint32, Entry];
+  Aliased!: Pair;
+}
+`)
+	project := openScalarAliasTestProject(t, directory)
+	exports, err := project.Exports(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields := projectExportByName(t, exports, "Fields")
+	aliases := map[string]string{
+		"int64":  scalarPath,
+		"uint32": scalarPath,
+		"uint64": scalarPath,
+	}
+	for name, expected := range map[string][]string{
+		"Direct":  {"uint64"},
+		"Nested":  {"uint32", "uint32", "uint64"},
+		"Aliased": {"int64", "uint32", "uint64"},
+	} {
+		member, ok := fields.TypeMember(name)
+		if !ok {
+			t.Fatalf("member %s is absent", name)
+		}
+		actual, err := project.MemberScalarAliases(member, aliases)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(actual, expected) {
+			t.Fatalf("%s scalar aliases = %v, want %v", name, actual, expected)
+		}
+	}
+}
+
 func openScalarAliasTestProject(
 	t *testing.T,
 	directory string,

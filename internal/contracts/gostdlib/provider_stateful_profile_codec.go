@@ -119,34 +119,11 @@ func validateProviderStatefulProfile(
 			)
 		}
 	}
-	for index, selected := range profile.Fields {
-		selectedField := fmt.Sprintf("%s.fields[%d]", field, index)
-		switch {
-		case selected.Member == "":
-			return manifestError(selectedField+".member", "value is empty")
-		case selected.Ordinal < 0:
-			return manifestError(selectedField+".ordinal", "value is negative")
-		case selected.SourceSignature == "":
-			return manifestError(selectedField+".sourceSignature", "value is empty")
-		case selected.SourceLocation == "":
-			return manifestError(selectedField+".sourceLocation", "value is empty")
-		case !sourcePath(selected.ImplementationOwner):
-			return manifestError(
-				selectedField+".implementationOwner",
-				"value is not a provider source path",
-			)
-		case !validDigest(selected.TargetFingerprint):
-			return manifestError(
-				selectedField+".targetFingerprint",
-				"value is not a sha256 digest",
-			)
-		}
-		if index != 0 && selected.Member <= profile.Fields[index-1].Member {
-			return manifestError(
-				field+".fields",
-				"fields are not strictly ordered",
-			)
-		}
+	if err := validateProviderStructFields(
+		profile.Fields,
+		field+".fields",
+	); err != nil {
+		return err
 	}
 	for index, method := range profile.Methods {
 		methodField := fmt.Sprintf("%s.methods[%d]", field, index)

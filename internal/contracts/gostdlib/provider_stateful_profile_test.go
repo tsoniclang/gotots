@@ -84,7 +84,7 @@ func TestStatefulProfilePreservesCertifiedTypeArgumentOrder(t *testing.T) {
 			Export:         "CanonicalState",
 			Interfaces:     interfaces,
 			TypeArguments:  []string{secondIdentity, firstIdentity},
-			Fields: []gostdlib.ProviderStatefulProfileFieldDocument{{
+			Fields: []gostdlib.ProviderStructFieldDocument{{
 				Member:              "Value",
 				Ordinal:             1,
 				SourceSignature:     "int",
@@ -136,8 +136,95 @@ func TestStatefulProfilePreservesCertifiedTypeArgumentOrder(t *testing.T) {
 		t.Fatalf("stateful field = %#v", field)
 	}
 	fields := profile.Fields()
-	fields[0] = gostdlib.ProviderStatefulProfileField{}
+	fields[0] = gostdlib.ProviderStructField{}
 	if _, ok := profile.Field("Value"); !ok {
 		t.Fatal("stateful profile exposed mutable field storage")
+	}
+}
+
+func TestDirectStructBindingOwnsImmutableFieldEvidence(t *testing.T) {
+	document := validDocument()
+	document.Modules[0].Bindings = []gostdlib.BindingDocument{{
+		Identity:       "runtime|kind=2|receiver=|name=MemStats",
+		Kind:           gostdlib.BindingType,
+		Access:         gostdlib.AccessExport,
+		Representation: gostdlib.RepresentationDirect,
+		Export:         "MemStats",
+		StructFields: []gostdlib.ProviderStructFieldDocument{
+			{
+				Member:              "Alloc",
+				Ordinal:             0,
+				SourceSignature:     "uint64",
+				SourceLocation:      "runtime/mstats.go:52:2",
+				ImplementationOwner: "src/internal/portable/runtime/mem-stats.ts",
+				TargetFingerprint:   digest('d'),
+			},
+			{
+				Member:              "Sys",
+				Ordinal:             2,
+				SourceSignature:     "uint64",
+				SourceLocation:      "runtime/mstats.go:64:2",
+				ImplementationOwner: "src/internal/portable/runtime/mem-stats.ts",
+				TargetFingerprint:   digest('e'),
+			},
+		},
+		SourceSignature:     "defined=runtime.MemStats|underlying=struct{...}",
+		SourceLocation:      "runtime/mstats.go:48:1",
+		ImplementationOwner: "src/internal/portable/runtime/mem-stats.ts",
+		TargetFingerprint:   digest('f'),
+	}}
+	payload, err := gostdlib.Seal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := gostdlib.Parse(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, ok := manifest.Binding("runtime|kind=2|receiver=|name=MemStats")
+	if !ok {
+		t.Fatal("direct struct binding is absent")
+	}
+	field, ok := binding.StructField("Alloc")
+	if !ok || field.Member() != "Alloc" || field.Ordinal() != 0 ||
+		field.SourceSignature() != "uint64" ||
+		field.SourceLocation() != "runtime/mstats.go:52:2" ||
+		field.ImplementationOwner() !=
+			"src/internal/portable/runtime/mem-stats.ts" ||
+		field.TargetFingerprint() != digest('d') {
+		t.Fatalf("direct struct field = %#v", field)
+	}
+	fields := binding.StructFields()
+	fields[0] = gostdlib.ProviderStructField{}
+	if _, ok := binding.StructField("Alloc"); !ok {
+		t.Fatal("direct struct binding exposed mutable field storage")
+	}
+
+	unsorted := document
+	unsorted.Modules = append([]gostdlib.ModuleDocument(nil), document.Modules...)
+	unsorted.Modules[0].Bindings = append(
+		[]gostdlib.BindingDocument(nil),
+		document.Modules[0].Bindings...,
+	)
+	unsorted.Modules[0].Bindings[0].StructFields = []gostdlib.ProviderStructFieldDocument{
+		document.Modules[0].Bindings[0].StructFields[1],
+		document.Modules[0].Bindings[0].StructFields[0],
+	}
+	if _, err := gostdlib.Seal(unsorted); err == nil {
+		t.Fatal("manifest accepted reordered direct struct-field evidence")
+	}
+
+	wrongOwner := document
+	wrongOwner.Modules = append([]gostdlib.ModuleDocument(nil), document.Modules...)
+	wrongOwner.Modules[0].Bindings = append(
+		[]gostdlib.BindingDocument(nil),
+		document.Modules[0].Bindings...,
+	)
+	wrongOwner.Modules[0].Bindings[0].Kind = gostdlib.BindingFunction
+	wrongOwner.Modules[0].Bindings[0].Effect = gostdlib.EffectSynchronous
+	wrongOwner.Modules[0].Bindings[0].Representation =
+		gostdlib.RepresentationInvalid
+	if _, err := gostdlib.Seal(wrongOwner); err == nil {
+		t.Fatal("manifest attached struct-field evidence to a function")
 	}
 }

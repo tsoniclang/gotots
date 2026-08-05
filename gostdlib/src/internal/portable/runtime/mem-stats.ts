@@ -47,14 +47,14 @@ export class MemStats {
   NextGC: uint64 = 0n;
   LastGC: uint64 = 0n;
   PauseTotalNs: uint64 = 0n;
-  PauseNs = GoArray.zero<uint64, 256>(256, 0n);
-  PauseEnd = GoArray.zero<uint64, 256>(256, 0n);
+  PauseNs: GoArray<uint64, 256> = GoArray.zero<uint64, 256>(256, 0n);
+  PauseEnd: GoArray<uint64, 256> = GoArray.zero<uint64, 256>(256, 0n);
   NumGC: uint32 = 0;
   NumForcedGC: uint32 = 0;
   GCCPUFraction: float64 = 0;
   EnableGC: bool = false;
   DebugGC: bool = false;
-  BySize = zeroBySize();
+  BySize: GoArray<MemStatsBySize, 61> = zeroBySize();
 }
 
 export function populateMemStats(target: MemStats, source: MemorySnapshot): void {

@@ -13,6 +13,42 @@ import (
 	"sort"
 )
 
+func selectMethodOwner(
+	method goObject,
+	static tsgo.ProjectMember,
+	staticOK bool,
+	instance tsgo.ProjectMember,
+	instanceOK bool,
+) (tsgo.ProjectMember, gostdlib.AccessKind, error) {
+	signature, ok := method.object.Type().(*types.Signature)
+	if !ok || signature.Recv() == nil {
+		return tsgo.ProjectMember{}, gostdlib.AccessInvalid, certifyError(
+			"build methods",
+			method.contract.Identity(),
+			"Go method receiver evidence is absent",
+		)
+	}
+	_, pointerReceiver := signature.Recv().Type().(*types.Pointer)
+	if pointerReceiver {
+		if !staticOK {
+			return tsgo.ProjectMember{}, gostdlib.AccessInvalid, certifyError(
+				"build methods",
+				method.contract.Identity(),
+				"pointer receiver has no static operation",
+			)
+		}
+		return static, gostdlib.AccessStaticMethod, nil
+	}
+	if !instanceOK {
+		return tsgo.ProjectMember{}, gostdlib.AccessInvalid, certifyError(
+			"build methods",
+			method.contract.Identity(),
+			"value receiver has no instance operation",
+		)
+	}
+	return instance, gostdlib.AccessInstanceMethod, nil
+}
+
 func readRuntimeContract(
 	sourcePath string,
 ) (runtimecontract.Requirements, string, error) {
@@ -192,13 +228,15 @@ func buildStatefulProfileOperations(
 	return slices.Clone(expected), nil
 }
 
-func buildStatefulProfileFields(
+func buildProviderStructFields(
 	selectedToolchain toolchain,
 	source goSurface,
 	typeName *types.TypeName,
 	named *types.Named,
 	target tsgo.ProjectExport,
-) ([]gostdlib.ProviderStatefulProfileFieldDocument, error) {
+	project *tsgo.ProjectInspection,
+	scalarAliases map[string]string,
+) ([]gostdlib.ProviderStructFieldDocument, error) {
 	structure, ok := named.Underlying().(*types.Struct)
 	if !ok {
 		return nil, nil
@@ -207,12 +245,12 @@ func buildStatefulProfileFields(
 	if selectedPackage == nil || selectedPackage.selected == nil ||
 		selectedPackage.selected.Fset == nil {
 		return nil, certifyError(
-			"build provider stateful profile",
+			"build provider struct fields",
 			typeName.Name(),
 			"source package field evidence is absent",
 		)
 	}
-	result := make([]gostdlib.ProviderStatefulProfileFieldDocument, 0)
+	result := make([]gostdlib.ProviderStructFieldDocument, 0)
 	for ordinal := range structure.NumFields() {
 		field := structure.Field(ordinal)
 		if field == nil || !field.Exported() {
@@ -221,10 +259,19 @@ func buildStatefulProfileFields(
 		member, found := target.TypeMember(field.Name())
 		if !found || !member.Visible() {
 			return nil, certifyError(
-				"build provider stateful profile",
+				"build provider struct fields",
 				typeName.Name()+"."+field.Name(),
 				"exported source field has no public target member",
 			)
+		}
+		if err := verifyProviderStructFieldScalars(
+			project,
+			typeName,
+			field,
+			member,
+			scalarAliases,
+		); err != nil {
+			return nil, err
 		}
 		location, selected, err := selectedGoSourceLocation(
 			selectedToolchain.root,
@@ -233,14 +280,14 @@ func buildStatefulProfileFields(
 		)
 		if err != nil {
 			return nil, certifyError(
-				"build provider stateful profile",
+				"build provider struct fields",
 				typeName.Name()+"."+field.Name(),
 				err.Error(),
 			)
 		}
 		if !selected {
 			return nil, certifyError(
-				"build provider stateful profile",
+				"build provider struct fields",
 				typeName.Name()+"."+field.Name(),
 				"exported source field is outside the selected GOROOT",
 			)
@@ -252,7 +299,7 @@ func buildStatefulProfileFields(
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, gostdlib.ProviderStatefulProfileFieldDocument{
+		result = append(result, gostdlib.ProviderStructFieldDocument{
 			Member:              field.Name(),
 			Ordinal:             ordinal,
 			Embedded:            field.Embedded(),
@@ -270,7 +317,7 @@ func buildStatefulProfileFields(
 
 func verifyStatefulProfileTargetMembers(
 	target tsgo.ProjectExport,
-	fields []gostdlib.ProviderStatefulProfileFieldDocument,
+	fields []gostdlib.ProviderStructFieldDocument,
 	methods []gostdlib.ProviderStatefulProfileMethodDocument,
 	operations []gostdlib.FacetCapability,
 ) error {

@@ -128,6 +128,11 @@ type Names interface {
 	NamedStructConstructor(*types.TypeName) (NameReference, error)
 	NamedStructOperation(*types.TypeName, NamedStructOperation) (NameReference, error)
 	NamedStructStorage(*types.TypeName) (NameReference, error)
+	ProviderStructField(*types.TypeName, *types.Var) (
+		gostdlib.ProviderStructField,
+		bool,
+		error,
+	)
 	DefinedValueRepresentation(*types.TypeName) (DefinedValueRepresentation, error)
 	AnonymousStruct(
 		*types.Struct,

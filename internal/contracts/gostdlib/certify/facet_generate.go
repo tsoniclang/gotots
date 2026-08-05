@@ -23,6 +23,7 @@ func buildFacetModules(
 	effectMarker tsgo.ProjectExport,
 	supportMarkers providerSupportMarkers,
 	selectedToolchain toolchain,
+	scalarAliases map[string]string,
 ) ([]gostdlib.FacetModuleDocument, error) {
 	interfaceTargets, err := providerInterfaceTargets(
 		config,
@@ -314,6 +315,7 @@ func buildFacetModules(
 				selected,
 				project,
 				effectMarker,
+				scalarAliases,
 			)
 			if err != nil {
 				return nil, err

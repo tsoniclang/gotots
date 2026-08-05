@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 26,
+  "schemaVersion": 27,
   "packageName": "@gotots/gostdlib",
   "packageVersion": "0.0.0",
   "backend": "node",
@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "67ea43638501e69def92784a715bd71b5592f07ff9eb981fdb2cf26b3cba27d6",
-  "providerDigest": "f835c22d12456082e3cd56b5d8cbe63302b7fdf7ce925fa25674758cf31f43f0",
+  "providerDigest": "1be30cda5a209045a240a4db12429b399d2b6a150445d8a6d9ead233dbc8a93e",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -658,6 +658,53 @@
           "access": "export",
           "representation": "direct",
           "export": "Header",
+          "structFields": [
+            {
+              "member": "Comment",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "compress/gzip/gunzip.go:53:2",
+              "implementationOwner": "src/compress/gzip.ts",
+              "targetFingerprint": "b064a58d8e6c6bb7eebe51d1e69da39359233989f0f9e01627de026070a27587"
+            },
+            {
+              "member": "Extra",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "[]byte",
+              "sourceLocation": "compress/gzip/gunzip.go:54:2",
+              "implementationOwner": "src/compress/gzip.ts",
+              "targetFingerprint": "c5457bf76820eb90089a90bfaf5851501e168159401bce3bce4fd8212e2f15b1"
+            },
+            {
+              "member": "ModTime",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "time.Time",
+              "sourceLocation": "compress/gzip/gunzip.go:55:2",
+              "implementationOwner": "src/compress/gzip.ts",
+              "targetFingerprint": "befce8bbb7806fcfe9069782ac5de3bab631c7974edfe486ebf0286b7c444a3c"
+            },
+            {
+              "member": "Name",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "compress/gzip/gunzip.go:56:2",
+              "implementationOwner": "src/compress/gzip.ts",
+              "targetFingerprint": "7dfa69c623db06dad1bce683ae539c52134f7fc56bdddb0af7f319f5a4cc4358"
+            },
+            {
+              "member": "OS",
+              "ordinal": 4,
+              "embedded": false,
+              "sourceSignature": "byte",
+              "sourceLocation": "compress/gzip/gunzip.go:57:2",
+              "implementationOwner": "src/compress/gzip.ts",
+              "targetFingerprint": "7dffc96b44b9f66943cc8028f312bfb00e94e9dffc2756cfa824812c6e685f4f"
+            }
+          ],
           "sourceSignature": "defined=compress/gzip.Header|underlying=struct{Comment string; Extra []byte; ModTime time.Time; Name string; OS byte}",
           "sourceLocation": "compress/gzip/gunzip.go:52:6",
           "implementationOwner": "src/compress/gzip.ts",
@@ -669,6 +716,17 @@
           "access": "export",
           "representation": "direct",
           "export": "Reader",
+          "structFields": [
+            {
+              "member": "Header",
+              "ordinal": 0,
+              "embedded": true,
+              "sourceSignature": "compress/gzip.Header",
+              "sourceLocation": "compress/gzip/gunzip.go:75:2",
+              "implementationOwner": "src/compress/gzip.ts",
+              "targetFingerprint": "813cddbf8b9fd39e2bcf5b3c9580dc971b3c0148bcb35d8a5b087ffc0cfacd00"
+            }
+          ],
           "sourceSignature": "defined=compress/gzip.Reader|underlying=struct{compress/gzip.Header; r compress/flate.Reader; decompressor io.ReadCloser; digest uint32; size uint32; buf [512]byte; err error; multistream bool}",
           "sourceLocation": "compress/gzip/gunzip.go:74:6",
           "implementationOwner": "src/compress/gzip.ts",
@@ -1527,6 +1585,17 @@
           "access": "export",
           "representation": "direct",
           "export": "FlagSet",
+          "structFields": [
+            {
+              "member": "Usage",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "func()",
+              "sourceLocation": "flag/flag.go:395:2",
+              "implementationOwner": "src/flag.ts",
+              "targetFingerprint": "6a0bc48ad2a891b8edb09a1df4851deb5cafe3e76dd8c697c157e0c9c643b16a"
+            }
+          ],
           "sourceSignature": "defined=flag.FlagSet|underlying=struct{Usage func(); name string; parsed bool; actual map[string]*flag.Flag; formal map[string]*flag.Flag; args []string; errorHandling flag.ErrorHandling; output io.Writer; undef map[string]string}",
           "sourceLocation": "flag/flag.go:389:6",
           "implementationOwner": "src/flag.ts",
@@ -1739,6 +1808,107 @@
           "access": "export",
           "representation": "direct",
           "export": "Type",
+          "structFields": [
+            {
+              "member": "Align_",
+              "ordinal": 4,
+              "embedded": false,
+              "sourceSignature": "uint8",
+              "sourceLocation": "internal/abi/type.go:25:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "73a769effc89893ea33809ffad22a656e2dbec008b3e63e92c5b5dd4ac9a9446"
+            },
+            {
+              "member": "Equal",
+              "ordinal": 7,
+              "embedded": false,
+              "sourceSignature": "func(unsafe.Pointer, unsafe.Pointer) bool",
+              "sourceLocation": "internal/abi/type.go:30:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "b1d9a7645d907e40a61e55d3114cb3d7e81e7c1e1cc4a3ea9ff500408987d87b"
+            },
+            {
+              "member": "FieldAlign_",
+              "ordinal": 5,
+              "embedded": false,
+              "sourceSignature": "uint8",
+              "sourceLocation": "internal/abi/type.go:26:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "aed9d8528eb1564bc589ba4377f7581958311179ae30e7d14131cf1fb4a5ea6f"
+            },
+            {
+              "member": "GCData",
+              "ordinal": 8,
+              "embedded": false,
+              "sourceSignature": "*byte",
+              "sourceLocation": "internal/abi/type.go:42:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "70034005c0a40be49c58d561fc2db7a4ab1e44033e1f283de8bc452404562d2f"
+            },
+            {
+              "member": "Hash",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "uint32",
+              "sourceLocation": "internal/abi/type.go:23:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "a561f04cd46577f2eec571e2776c9773ecd04b90c56a95ae9bf2594ec4acb769"
+            },
+            {
+              "member": "Kind_",
+              "ordinal": 6,
+              "embedded": false,
+              "sourceSignature": "internal/abi.Kind",
+              "sourceLocation": "internal/abi/type.go:27:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "eb04b3c3cc19645d4b1272a04ad20b2c056f1e8ca93fd70877b9b68b251b2870"
+            },
+            {
+              "member": "PtrBytes",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "uintptr",
+              "sourceLocation": "internal/abi/type.go:22:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "cbd0647c1ea3cf62ff11e5f41d121ea1d008a895ea9954f2fc36f35520e2ebd9"
+            },
+            {
+              "member": "PtrToThis",
+              "ordinal": 10,
+              "embedded": false,
+              "sourceSignature": "internal/abi.TypeOff",
+              "sourceLocation": "internal/abi/type.go:44:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "3ef8d92b82d3956ff4edd9ac4049baddfeadbe026af33f0b457c8f1b28e256af"
+            },
+            {
+              "member": "Size_",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "uintptr",
+              "sourceLocation": "internal/abi/type.go:21:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "dc734917f871dadd95e485a9e57ace1b412e2d66bbe11d416c3be1ec66eb15df"
+            },
+            {
+              "member": "Str",
+              "ordinal": 9,
+              "embedded": false,
+              "sourceSignature": "internal/abi.NameOff",
+              "sourceLocation": "internal/abi/type.go:43:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "ea2470c471c217cf25473137984c1e3f5702dc0f03aa0c1c416ee2ecb187686b"
+            },
+            {
+              "member": "TFlag",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "internal/abi.TFlag",
+              "sourceLocation": "internal/abi/type.go:24:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "06e7b4392e0ffc16d296bc8d92ee75b3932a0052eae96d84c4b0f80fa89e3028"
+            }
+          ],
           "sourceSignature": "defined=internal/abi.Type|underlying=struct{Size_ uintptr; PtrBytes uintptr; Hash uint32; TFlag internal/abi.TFlag; Align_ uint8; FieldAlign_ uint8; Kind_ internal/abi.Kind; Equal func(unsafe.Pointer, unsafe.Pointer) bool; GCData *byte; Str internal/abi.NameOff; PtrToThis internal/abi.TypeOff}",
           "sourceLocation": "internal/abi/type.go:20:6",
           "implementationOwner": "src/internal/abi.ts",
@@ -1762,6 +1932,44 @@
           "access": "export",
           "representation": "direct",
           "export": "UncommonType",
+          "structFields": [
+            {
+              "member": "Mcount",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "uint16",
+              "sourceLocation": "internal/abi/type.go:231:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "d466d0bfee06caa03784c44edfecd509dee70ec20483e72d437fe90679d3e88c"
+            },
+            {
+              "member": "Moff",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "uint32",
+              "sourceLocation": "internal/abi/type.go:233:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "aaf523799d0291726999f68f3149fb4f8c9db432733ae1281c547123f8b0ab94"
+            },
+            {
+              "member": "PkgPath",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "internal/abi.NameOff",
+              "sourceLocation": "internal/abi/type.go:230:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "eb2f575ae1a9c49eeabf8b58863413748a5afb7503df61792eb6905a16f7151f"
+            },
+            {
+              "member": "Xcount",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "uint16",
+              "sourceLocation": "internal/abi/type.go:232:2",
+              "implementationOwner": "src/internal/abi.ts",
+              "targetFingerprint": "39f64b64bbc839aa9ae49fbc2b61ad6a37e6943155121e33a34ccf8a55a5a9b9"
+            }
+          ],
           "sourceSignature": "defined=internal/abi.UncommonType|underlying=struct{PkgPath internal/abi.NameOff; Mcount uint16; Xcount uint16; Moff uint32; _ uint32}",
           "sourceLocation": "internal/abi/type.go:229:6",
           "implementationOwner": "src/internal/abi.ts",
@@ -2371,6 +2579,35 @@
           "access": "export",
           "representation": "direct",
           "export": "PathError",
+          "structFields": [
+            {
+              "member": "Err",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "error",
+              "sourceLocation": "io/fs/fs.go:264:2",
+              "implementationOwner": "src/io/fs.ts",
+              "targetFingerprint": "9d82fe1108b49934c2a76ad21767e249cd1b687d84cf6af90998a2552ef17bfc"
+            },
+            {
+              "member": "Op",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "io/fs/fs.go:262:2",
+              "implementationOwner": "src/io/fs.ts",
+              "targetFingerprint": "0a8e452557d190823b8e8d7c44bee8b693edf3f7aaf5f5882a14fef45a86a247"
+            },
+            {
+              "member": "Path",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "io/fs/fs.go:263:2",
+              "implementationOwner": "src/io/fs.ts",
+              "targetFingerprint": "4cdf31d9f091928615d92c4b808a8d26bb37c9e11208e04427545a714a7f2299"
+            }
+          ],
           "sourceSignature": "defined=io/fs.PathError|underlying=struct{Op string; Path string; Err error}",
           "sourceLocation": "io/fs/fs.go:261:6",
           "implementationOwner": "src/io/fs.ts",
@@ -3989,6 +4226,107 @@
           "access": "export",
           "representation": "direct",
           "export": "URL",
+          "structFields": [
+            {
+              "member": "ForceQuery",
+              "ordinal": 9,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "net/url/url.go:301:2",
+              "implementationOwner": "src/net/url.ts",
+              "targetFingerprint": "22f8a6a5a1b693d7f5887ea2714b77609be6c52532f94aa39a671133cebc5441"
+            },
+            {
+              "member": "Fragment",
+              "ordinal": 5,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "net/url/url.go:281:2",
+              "implementationOwner": "src/net/url.ts",
+              "targetFingerprint": "2f67218ac449a94aff238bf21ef73892c51a7805bee549993766a7d8c9845605"
+            },
+            {
+              "member": "Host",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "net/url/url.go:279:2",
+              "implementationOwner": "src/net/url.ts",
+              "targetFingerprint": "c9632f6174255f28a8f81f963cc43057198189771d9f567452cba1f18d57fa7a"
+            },
+            {
+              "member": "OmitHost",
+              "ordinal": 10,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "net/url/url.go:305:2",
+              "implementationOwner": "src/net/url.ts",
+              "targetFingerprint": "e889357f51621b8906dd1a2d7d153074fb8968e65627894f02d5377359d0fd65"
+            },
+            {
+              "member": "Opaque",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "net/url/url.go:277:2",
+              "implementationOwner": "src/net/url.ts",
+              "targetFingerprint": "80ed5fdaf6bec6366e27ff566d97488db63a5f6d5e4e051d64b8f706eae991d1"
+            },
+            {
+              "member": "Path",
+              "ordinal": 4,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "net/url/url.go:280:2",
+              "implementationOwner": "src/net/url.ts",
+              "targetFingerprint": "fc048eee304df5fdfacc38b0d27788574df26711010f2de532e6d43b14936027"
+            },
+            {
+              "member": "RawFragment",
+              "ordinal": 8,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "net/url/url.go:297:2",
+              "implementationOwner": "src/net/url.ts",
+              "targetFingerprint": "d2237976a29e09c136bebf42d55b6cc8953c5696dd5bfa854fabc6d595733341"
+            },
+            {
+              "member": "RawPath",
+              "ordinal": 7,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "net/url/url.go:291:2",
+              "implementationOwner": "src/net/url.ts",
+              "targetFingerprint": "f9c9a8d33e9424e385406cfc817e89d2f85ead8f1459a04bf8de1d93a57b0dc4"
+            },
+            {
+              "member": "RawQuery",
+              "ordinal": 6,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "net/url/url.go:285:2",
+              "implementationOwner": "src/net/url.ts",
+              "targetFingerprint": "39841cb7cd443324b5986afd8f42c11b7f5d5e3ab0353cdaf2f7ceb3b833649d"
+            },
+            {
+              "member": "Scheme",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "net/url/url.go:276:2",
+              "implementationOwner": "src/net/url.ts",
+              "targetFingerprint": "be77cd1cd52fd7cdef20278bcd3812fe9c4c08e24413bf0d27fdb78a633bcbd0"
+            },
+            {
+              "member": "User",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "*net/url.Userinfo",
+              "sourceLocation": "net/url/url.go:278:2",
+              "implementationOwner": "src/net/url.ts",
+              "targetFingerprint": "aafab2eed9ad338b31ec1c7ab372431249b147672a6a0413b21cd0f1457dd752"
+            }
+          ],
           "sourceSignature": "defined=net/url.URL|underlying=struct{Scheme string; Opaque string; User *net/url.Userinfo; Host string; Path string; Fragment string; RawQuery string; RawPath string; RawFragment string; ForceQuery bool; OmitHost bool}",
           "sourceLocation": "net/url/url.go:275:6",
           "implementationOwner": "src/net/url.ts",
@@ -4117,6 +4455,17 @@
           "access": "export",
           "representation": "direct",
           "export": "Process",
+          "structFields": [
+            {
+              "member": "Pid",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "int",
+              "sourceLocation": "os/exec.go:44:2",
+              "implementationOwner": "src/os.ts",
+              "targetFingerprint": "fe67e2d56040dfa1c16d493bb8399e1fa0561228c4048439261ea75df87b0db1"
+            }
+          ],
           "sourceSignature": "defined=os.Process|underlying=struct{Pid int; state sync/atomic.Uint32; sigMu sync.RWMutex; handle *os.processHandle; cleanup runtime.Cleanup}",
           "sourceLocation": "os/exec.go:43:6",
           "implementationOwner": "src/os.ts",
@@ -4531,6 +4880,134 @@
           "access": "export",
           "representation": "direct",
           "export": "Cmd",
+          "structFields": [
+            {
+              "member": "Args",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "[]string",
+              "sourceLocation": "os/exec/exec.go:160:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "6aaaae0f22466aeff7fdb348545ef0dd3572ab94ecaa058825e8cc2cfdb75aa5"
+            },
+            {
+              "member": "Cancel",
+              "ordinal": 13,
+              "embedded": false,
+              "sourceSignature": "func() error",
+              "sourceLocation": "os/exec/exec.go:276:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "c0dda7abce1f9c4ab25f90a8d5b4b4d4084d4c69bca1c018b3d2dab38d751ea2"
+            },
+            {
+              "member": "Dir",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "os/exec/exec.go:191:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "4cdf8a5b77e654daef253c06ca11b399b268d080d05398e2a9cb60d76f32da5f"
+            },
+            {
+              "member": "Env",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "[]string",
+              "sourceLocation": "os/exec/exec.go:172:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "10b83fe97aa82738b24a28090e0d51fcdcc4a724c2f48ba473d3c190d4c33f56"
+            },
+            {
+              "member": "Err",
+              "ordinal": 12,
+              "embedded": false,
+              "sourceSignature": "error",
+              "sourceLocation": "os/exec/exec.go:249:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "54771456ac8e3f4eeb73af373caec894b6e19fc5418cf9509cdc7bfb499cc5f6"
+            },
+            {
+              "member": "ExtraFiles",
+              "ordinal": 7,
+              "embedded": false,
+              "sourceSignature": "[]*os.File",
+              "sourceLocation": "os/exec/exec.go:232:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "fed96f069d41d7ac4ad5d2cd00cddf36c6afdc1976c81ca6f9bc016e8f195398"
+            },
+            {
+              "member": "Path",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "os/exec/exec.go:154:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "fd5f8e13d56accec664a2a1078edf29d1ca9b52ae2ad29b7ecc25c8443762b9f"
+            },
+            {
+              "member": "Process",
+              "ordinal": 9,
+              "embedded": false,
+              "sourceSignature": "*os.Process",
+              "sourceLocation": "os/exec/exec.go:239:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "d5fa8fabf914993a5b338504ac3bfbf42437b0c96ca792660da1e7788ee15738"
+            },
+            {
+              "member": "ProcessState",
+              "ordinal": 10,
+              "embedded": false,
+              "sourceSignature": "*os.ProcessState",
+              "sourceLocation": "os/exec/exec.go:244:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "c7cd5d348cb55d4430e5992dbf409abb41d3e188263efa22ae7bf0b101382744"
+            },
+            {
+              "member": "Stderr",
+              "ordinal": 6,
+              "embedded": false,
+              "sourceSignature": "io.Writer",
+              "sourceLocation": "os/exec/exec.go:225:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "cd2b63444b085caa1a3f3f75105da969511723f814b4f5ae3d5495a66839a7e7"
+            },
+            {
+              "member": "Stdin",
+              "ordinal": 4,
+              "embedded": false,
+              "sourceSignature": "io.Reader",
+              "sourceLocation": "os/exec/exec.go:206:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "94a2653f6ce6ee5696c3ceec87abbd05150b037acca91ab0071717cd27e865a9"
+            },
+            {
+              "member": "Stdout",
+              "ordinal": 5,
+              "embedded": false,
+              "sourceSignature": "io.Writer",
+              "sourceLocation": "os/exec/exec.go:224:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "9cdee4fc4aa7ae5c451bd46ec152a47eb63bde794464c6f5208a5b83c7df196c"
+            },
+            {
+              "member": "SysProcAttr",
+              "ordinal": 8,
+              "embedded": false,
+              "sourceSignature": "*syscall.SysProcAttr",
+              "sourceLocation": "os/exec/exec.go:236:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "fbaee6aeaa5ef744da2fbe7b9745d6c909d65b7dfee60742f63cf12a580cc70e"
+            },
+            {
+              "member": "WaitDelay",
+              "ordinal": 14,
+              "embedded": false,
+              "sourceSignature": "time.Duration",
+              "sourceLocation": "os/exec/exec.go:303:2",
+              "implementationOwner": "src/os/exec.ts",
+              "targetFingerprint": "97e4ae5e9f9e1d06eaa56c27930ba105c5454090058e3a3dc21b4022cb9fe8ed"
+            }
+          ],
           "sourceSignature": "defined=os/exec.Cmd|underlying=struct{Path string; Args []string; Env []string; Dir string; Stdin io.Reader; Stdout io.Writer; Stderr io.Writer; ExtraFiles []*os.File; SysProcAttr *syscall.SysProcAttr; Process *os.Process; ProcessState *os.ProcessState; ctx context.Context; Err error; Cancel func() error; WaitDelay time.Duration; childIOFiles []io.Closer; parentIOPipes []io.Closer; goroutine []func() error; goroutineErr \u003c-chan error; ctxResult \u003c-chan os/exec.ctxResult; createdByStack []byte; lookPathErr error; cachedLookExtensions struct{in string; out string}; startCalled int32}",
           "sourceLocation": "os/exec/exec.go:148:6",
           "implementationOwner": "src/os/exec.ts",
@@ -5057,6 +5534,53 @@
           "access": "export",
           "representation": "direct",
           "export": "Method",
+          "structFields": [
+            {
+              "member": "Func",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "reflect.Value",
+              "sourceLocation": "reflect/type.go:482:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "77f1323b7cca08fea84ab070814e5b54628af5ae4a00dd58b44da76b6b1a3285"
+            },
+            {
+              "member": "Index",
+              "ordinal": 4,
+              "embedded": false,
+              "sourceSignature": "int",
+              "sourceLocation": "reflect/type.go:483:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "b34e65b1621d9968bde7b470c6cba98f059d90fe8a5eb3eb85fb2ecfb6670018"
+            },
+            {
+              "member": "Name",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "reflect/type.go:472:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "7b73265418b0572e3243b71dbd4b6bf874d5af16910a1fd5df789cfb26e80f1e"
+            },
+            {
+              "member": "PkgPath",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "reflect/type.go:479:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "37ac81b809905541a9bdfa42207ebb28a5c757a6dade98a989bf328543c1a29f"
+            },
+            {
+              "member": "Type",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "reflect.Type",
+              "sourceLocation": "reflect/type.go:481:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "261be7c1b05e6e01b5c6dad00b596ddf9bca50f0365bca3a552f98f2c9043195"
+            }
+          ],
           "sourceSignature": "defined=reflect.Method|underlying=struct{Name string; PkgPath string; Type reflect.Type; Func reflect.Value; Index int}",
           "sourceLocation": "reflect/type.go:470:6",
           "implementationOwner": "src/reflect.ts",
@@ -5068,6 +5592,71 @@
           "access": "export",
           "representation": "direct",
           "export": "StructField",
+          "structFields": [
+            {
+              "member": "Anonymous",
+              "ordinal": 6,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "reflect/type.go:1094:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "687bc50c5765566de9fc51c9e83366626fa5372089055d373c96d64b9dd42bb6"
+            },
+            {
+              "member": "Index",
+              "ordinal": 5,
+              "embedded": false,
+              "sourceSignature": "[]int",
+              "sourceLocation": "reflect/type.go:1093:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "991b19cc0578e8cebe6df116aefc8bbae53221bb829e561319e5f2efa3fbe3c4"
+            },
+            {
+              "member": "Name",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "reflect/type.go:1083:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "7b73265418b0572e3243b71dbd4b6bf874d5af16910a1fd5df789cfb26e80f1e"
+            },
+            {
+              "member": "Offset",
+              "ordinal": 4,
+              "embedded": false,
+              "sourceSignature": "uintptr",
+              "sourceLocation": "reflect/type.go:1092:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "deb7d92d67bb005dc70cb341d13d5b7181697233269b225a25f3595303eba1ff"
+            },
+            {
+              "member": "PkgPath",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "reflect/type.go:1088:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "37ac81b809905541a9bdfa42207ebb28a5c757a6dade98a989bf328543c1a29f"
+            },
+            {
+              "member": "Tag",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "reflect.StructTag",
+              "sourceLocation": "reflect/type.go:1091:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "88675f46b7496ee643b1e4d1648e759c7fd52f41479792e9caf35b007ecd7e38"
+            },
+            {
+              "member": "Type",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "reflect.Type",
+              "sourceLocation": "reflect/type.go:1090:2",
+              "implementationOwner": "src/reflect.ts",
+              "targetFingerprint": "261be7c1b05e6e01b5c6dad00b596ddf9bca50f0365bca3a552f98f2c9043195"
+            }
+          ],
           "sourceSignature": "defined=reflect.StructField|underlying=struct{Name string; PkgPath string; Type reflect.Type; Tag reflect.StructTag; Offset uintptr; Index []int; Anonymous bool}",
           "sourceLocation": "reflect/type.go:1081:6",
           "implementationOwner": "src/reflect.ts",
@@ -6402,10 +6991,300 @@
           "access": "export",
           "representation": "direct",
           "export": "MemStats",
+          "structFields": [
+            {
+              "member": "Alloc",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:61:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "15d41ab8381887d32233e4bd6320f0e34f98aa2fa3f8b83b33332957ec35e2bf"
+            },
+            {
+              "member": "BuckHashSys",
+              "ordinal": 18,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:238:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "ceda4b05d78d957c0940dbfdf01d927dc78379a2e5a932581513b667cbab9169"
+            },
+            {
+              "member": "BySize",
+              "ordinal": 31,
+              "embedded": false,
+              "sourceSignature": "[61]struct{Size uint32; Mallocs uint64; Frees uint64}",
+              "sourceLocation": "runtime/mstats.go:320:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "47ab792cf9c4f6acc5c94ed0cb630cad5b1f011abe56c5b353de94903d80abf7"
+            },
+            {
+              "member": "DebugGC",
+              "ordinal": 30,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "runtime/mstats.go:312:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "abeef822ce1cff6c05904f0c52db524bb4b472f9098d63847044ce47ac6755c7"
+            },
+            {
+              "member": "EnableGC",
+              "ordinal": 29,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "runtime/mstats.go:309:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "696acde4aea605433610c9e64853d950e26483f653c21531df38a992e75d102b"
+            },
+            {
+              "member": "Frees",
+              "ordinal": 5,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:91:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "86ce537d34a3cac35aa5d45df1e6de31cb968b8cb75cc67813ba7944811b4bc1"
+            },
+            {
+              "member": "GCCPUFraction",
+              "ordinal": 28,
+              "embedded": false,
+              "sourceSignature": "float64",
+              "sourceLocation": "runtime/mstats.go:305:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "84809cf2787e513997e4b7cbf9c1eb2799790c5ac835acf51d7d1a7575aacc94"
+            },
+            {
+              "member": "GCSys",
+              "ordinal": 19,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:241:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "c3b0b4005861a5bbcbad38d551c5a143aba6861e7a9ebc5cef7a8ca65cfe61e1"
+            },
+            {
+              "member": "HeapAlloc",
+              "ordinal": 6,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:125:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "8c27cba84145da4fbf8a1fba216c4b68a3d7c4cb620680e1039e5ecbaf0364cf"
+            },
+            {
+              "member": "HeapIdle",
+              "ordinal": 8,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:153:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "ccf25647a0b3a2852d8840d27ce017956e83cdcf8e2e9e7485500f976f7d0d12"
+            },
+            {
+              "member": "HeapInuse",
+              "ordinal": 9,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:166:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "5d17d9a30c3e2fe964542bae85c8d0d9d8f8e82cc8fb8e87874f2aec57a07393"
+            },
+            {
+              "member": "HeapObjects",
+              "ordinal": 11,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:179:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "458c9b1d17f461ddfd664fbeef45221ed9911a555dcec7ac9208ee3567c2aa0c"
+            },
+            {
+              "member": "HeapReleased",
+              "ordinal": 10,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:172:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "8b13647224423fa2c4fdc9b54c087f8dd55e1d8a3780fbd551f68c5d4aff2b0a"
+            },
+            {
+              "member": "HeapSys",
+              "ordinal": 7,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:138:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "7f2331d1eaea7ad50c4047a8193f0334ee309e86d8511b35077bcf543ed2878e"
+            },
+            {
+              "member": "LastGC",
+              "ordinal": 22,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:259:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "e508d9d8a02a05150ac66ea0c6f18064dd4e508776c1fa78e030e7f1f8d234ee"
+            },
+            {
+              "member": "Lookups",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:84:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "e4d9e5775b0a21c11fdddd2e201f1d0192d5d46a86ea83232fc176c1fe8c430b"
+            },
+            {
+              "member": "MCacheInuse",
+              "ordinal": 16,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:231:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "ab5cba02b8f8f573447e41707e97891377e397fa821e0dcdae843a3a59b551dc"
+            },
+            {
+              "member": "MCacheSys",
+              "ordinal": 17,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:235:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "0177eaf7b076279df51f01ff2efd0dd86301953b495f1279700ad596139a6e51"
+            },
+            {
+              "member": "MSpanInuse",
+              "ordinal": 14,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:224:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "af0fc07b156c5cd3088e3fb0446cc6f0a5b122ff514c27590a5a5b296db1ddff"
+            },
+            {
+              "member": "MSpanSys",
+              "ordinal": 15,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:228:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "9c3720a47f5065464342f3e0c3859432826e0f8464499326a02256fce4d006b3"
+            },
+            {
+              "member": "Mallocs",
+              "ordinal": 4,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:88:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "d8915ccbac48314fc46497b89bc977d18bc0782c49e34d35c6b6be36f7bdd398"
+            },
+            {
+              "member": "NextGC",
+              "ordinal": 21,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:255:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "4a251973821a761460ac5ddd82a9ccd5a63a632a4dfbfdf0a1a65e12b265008a"
+            },
+            {
+              "member": "NumForcedGC",
+              "ordinal": 27,
+              "embedded": false,
+              "sourceSignature": "uint32",
+              "sourceLocation": "runtime/mstats.go:290:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "41f46180eeabd0299303e06327b5f952e13835953d31d03250c01e321fa5d720"
+            },
+            {
+              "member": "NumGC",
+              "ordinal": 26,
+              "embedded": false,
+              "sourceSignature": "uint32",
+              "sourceLocation": "runtime/mstats.go:286:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "1d6141d584354d2f72265acc3773adc6af0737c119dee6f393cad68b91325bd0"
+            },
+            {
+              "member": "OtherSys",
+              "ordinal": 20,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:245:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "094a97a1c5b4f9d0da3721c1ea3c205f8a32e0b87d1b7c0a51a7d5fdb411521d"
+            },
+            {
+              "member": "PauseEnd",
+              "ordinal": 25,
+              "embedded": false,
+              "sourceSignature": "[256]uint64",
+              "sourceLocation": "runtime/mstats.go:283:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "5696815f2f9763733c8f73cceb402792ff2c5f133afbcdbc7cb8b8ffca714567"
+            },
+            {
+              "member": "PauseNs",
+              "ordinal": 24,
+              "embedded": false,
+              "sourceSignature": "[256]uint64",
+              "sourceLocation": "runtime/mstats.go:275:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "dc9fdf4d69397369ed9c5875e7d8a3227756de3411218b1c619e510ce01efdbf"
+            },
+            {
+              "member": "PauseTotalNs",
+              "ordinal": 23,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:266:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "8cd5471748b3b5c960d96f6ae2e94af9615aad7eeb30fcad8e65ac46d84835cd"
+            },
+            {
+              "member": "StackInuse",
+              "ordinal": 12,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:194:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "ea62188c53745619320cf30cefdfbe8a038e800c414cecf5b433792b03f98e30"
+            },
+            {
+              "member": "StackSys",
+              "ordinal": 13,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:210:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "1cc08455d3295df69347e7fbf4593e7f2f5ccb990003c72cb563cd16957df2c2"
+            },
+            {
+              "member": "Sys",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:78:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "f9f5aa55b220dec78e64f9216915e70b97dc75ad2a15b8c4e6a99ef137180244"
+            },
+            {
+              "member": "TotalAlloc",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "uint64",
+              "sourceLocation": "runtime/mstats.go:68:2",
+              "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
+              "targetFingerprint": "b479faf2d019ae4c63363ed7124ab609420e8d83c68a0ac455c295a60fdd24ce"
+            }
+          ],
           "sourceSignature": "defined=runtime.MemStats|underlying=struct{Alloc uint64; TotalAlloc uint64; Sys uint64; Lookups uint64; Mallocs uint64; Frees uint64; HeapAlloc uint64; HeapSys uint64; HeapIdle uint64; HeapInuse uint64; HeapReleased uint64; HeapObjects uint64; StackInuse uint64; StackSys uint64; MSpanInuse uint64; MSpanSys uint64; MCacheInuse uint64; MCacheSys uint64; BuckHashSys uint64; GCSys uint64; OtherSys uint64; NextGC uint64; LastGC uint64; PauseTotalNs uint64; PauseNs [256]uint64; PauseEnd [256]uint64; NumGC uint32; NumForcedGC uint32; GCCPUFraction float64; EnableGC bool; DebugGC bool; BySize [61]struct{Size uint32; Mallocs uint64; Frees uint64}}",
           "sourceLocation": "runtime/mstats.go:55:6",
           "implementationOwner": "src/internal/portable/runtime/mem-stats.ts",
-          "targetFingerprint": "81bfbe5e7e1b5f3462d93a1272c4054c517921941fcaa5748e553cb20c9ebbfc"
+          "targetFingerprint": "2977bf78d9df14dc1c1d05e9d0080ea90023ee8af7ac3ec5adb5c06c218ca955"
         },
         {
           "identity": "runtime|kind=4|receiver=|name=Caller",
@@ -6526,6 +7405,44 @@
           "access": "export",
           "representation": "direct",
           "export": "Description",
+          "structFields": [
+            {
+              "member": "Cumulative",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "runtime/metrics/description.go:50:2",
+              "implementationOwner": "src/internal/portable/runtime/metrics.ts",
+              "targetFingerprint": "46018ed8a8ddbb2309f1a70fc5bb72419c722b10be2e88e7d99152c8f7abe465"
+            },
+            {
+              "member": "Description",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "runtime/metrics/description.go:37:2",
+              "implementationOwner": "src/internal/portable/runtime/metrics.ts",
+              "targetFingerprint": "ee5730666ad1818d1be21e8b060752e16ec1113baca40b5df81a211b79bb6dca"
+            },
+            {
+              "member": "Kind",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "runtime/metrics.ValueKind",
+              "sourceLocation": "runtime/metrics/description.go:43:2",
+              "implementationOwner": "src/internal/portable/runtime/metrics.ts",
+              "targetFingerprint": "90c1e483e6ca2b5d6d5d1b0e731e396763e894b46ccdbeefae7b8187e4a0a240"
+            },
+            {
+              "member": "Name",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "runtime/metrics/description.go:34:2",
+              "implementationOwner": "src/internal/portable/runtime/metrics.ts",
+              "targetFingerprint": "9a2dbc813626e8b815918a3f50362386d3cd2fb1588577fbc900d0d646772569"
+            }
+          ],
           "sourceSignature": "defined=runtime/metrics.Description|underlying=struct{Name string; Description string; Kind runtime/metrics.ValueKind; Cumulative bool}",
           "sourceLocation": "runtime/metrics/description.go:10:6",
           "implementationOwner": "src/internal/portable/runtime/metrics.ts",
@@ -6537,6 +7454,26 @@
           "access": "export",
           "representation": "direct",
           "export": "Sample",
+          "structFields": [
+            {
+              "member": "Name",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "runtime/metrics/sample.go:18:2",
+              "implementationOwner": "src/internal/portable/runtime/metrics.ts",
+              "targetFingerprint": "6844c9d08692b2e737ba6fcc589235c236d18d26e396a98f3188955b21213171"
+            },
+            {
+              "member": "Value",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "runtime/metrics.Value",
+              "sourceLocation": "runtime/metrics/sample.go:21:2",
+              "implementationOwner": "src/internal/portable/runtime/metrics.ts",
+              "targetFingerprint": "0f7c5833b3282b0230db44a24498d85d0c68718a22cad7071371c41107762b2f"
+            }
+          ],
           "sourceSignature": "defined=runtime/metrics.Sample|underlying=struct{Name string; Value runtime/metrics.Value}",
           "sourceLocation": "runtime/metrics/sample.go:13:6",
           "implementationOwner": "src/internal/portable/runtime/metrics.ts",
@@ -9823,6 +10760,17 @@
           "access": "export",
           "representation": "direct",
           "export": "Cond",
+          "structFields": [
+            {
+              "member": "L",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "sync.Locker",
+              "sourceLocation": "sync/cond.go:41:2",
+              "implementationOwner": "src/internal/portable/sync/cond.ts",
+              "targetFingerprint": "6f86c177318bf99fd25ef4282a9ac3ff79239b396356c1dd3ab27847cc23f759"
+            }
+          ],
           "sourceSignature": "defined=sync.Cond|underlying=struct{noCopy sync.noCopy; L sync.Locker; notify sync.notifyList; checker sync.copyChecker}",
           "sourceLocation": "sync/cond.go:37:6",
           "implementationOwner": "src/internal/portable/sync/cond.ts",
@@ -9905,6 +10853,17 @@
           "access": "export",
           "representation": "direct",
           "export": "Pool",
+          "structFields": [
+            {
+              "member": "New",
+              "ordinal": 5,
+              "embedded": false,
+              "sourceSignature": "func() any",
+              "sourceLocation": "sync/pool.go:63:2",
+              "implementationOwner": "src/internal/portable/sync/pool.ts",
+              "targetFingerprint": "cd751ee71a360c28cc7e00ab5b21680b4791ab8e1b21fee403c889ffe8341dad"
+            }
+          ],
           "sourceSignature": "defined=sync.Pool|underlying=struct{noCopy sync.noCopy; local unsafe.Pointer; localSize uintptr; victim unsafe.Pointer; victimSize uintptr; New func() any}",
           "sourceLocation": "sync/pool.go:51:6",
           "implementationOwner": "src/internal/portable/sync/pool.ts",
@@ -10644,6 +11603,44 @@
           "access": "export",
           "representation": "direct",
           "export": "Credential",
+          "structFields": [
+            {
+              "member": "Gid",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "uint32",
+              "sourceLocation": "syscall/exec_unix.go:126:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "31227e3facb1d94df355cefe99d2806b9126b917f95a17d0f06138973de5d49b"
+            },
+            {
+              "member": "Groups",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "[]uint32",
+              "sourceLocation": "syscall/exec_unix.go:127:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "5a7320a0b68fb52657dd9adec289b1d8a1b3e03993595a2d185a89626bd140a0"
+            },
+            {
+              "member": "NoSetGroups",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "syscall/exec_unix.go:128:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "364bc578e88d1f14cbaa740f22a9ef95b423837eaec0ed1174b71146245cd746"
+            },
+            {
+              "member": "Uid",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "uint32",
+              "sourceLocation": "syscall/exec_unix.go:125:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "ca2d8d412ed23a085dc258ab968370c56badbdc3cff25d29a9d453840cd37868"
+            }
+          ],
           "sourceSignature": "defined=syscall.Credential|underlying=struct{Uid uint32; Gid uint32; Groups []uint32; NoSetGroups bool}",
           "sourceLocation": "syscall/exec_unix.go:124:6",
           "implementationOwner": "src/syscall.ts",
@@ -10679,6 +11676,188 @@
           "access": "export",
           "representation": "direct",
           "export": "SysProcAttr",
+          "structFields": [
+            {
+              "member": "AmbientCaps",
+              "ordinal": 16,
+              "embedded": false,
+              "sourceSignature": "[]uintptr",
+              "sourceLocation": "syscall/exec_linux.go:106:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "b40420cd443940dda24695e4c771253100ae9e71aedba78cab17112c348b8204"
+            },
+            {
+              "member": "CgroupFD",
+              "ordinal": 18,
+              "embedded": false,
+              "sourceSignature": "int",
+              "sourceLocation": "syscall/exec_linux.go:108:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "4efda406ecf3514b87f0b7f80e16f3c21bc206589cd445e973746c2fb42d1cf5"
+            },
+            {
+              "member": "Chroot",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "syscall/exec_linux.go:68:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "2205574a2b70a683f4991171dcdd7e06337b6fa7e886819b9f14b1b6921998fa"
+            },
+            {
+              "member": "Cloneflags",
+              "ordinal": 11,
+              "embedded": false,
+              "sourceSignature": "uintptr",
+              "sourceLocation": "syscall/exec_linux.go:97:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "5bc1c39490a7cf1f93ab2b6f504a3c6d0e8400b5d3266c4a7b0d86843aa42f0c"
+            },
+            {
+              "member": "Credential",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "*syscall.Credential",
+              "sourceLocation": "syscall/exec_linux.go:69:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "141c313222dace18bed4800f245bc20e357bfb969f7d214d0a3ae8269919f333"
+            },
+            {
+              "member": "Ctty",
+              "ordinal": 7,
+              "embedded": false,
+              "sourceSignature": "int",
+              "sourceLocation": "syscall/exec_linux.go:84:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "91431aee6a82984ee90fd41b427765bcb8dac2f069ef136156d38821e8e70105"
+            },
+            {
+              "member": "Foreground",
+              "ordinal": 8,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "syscall/exec_linux.go:90:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "6e40e3198167c543aa5d90332717033d602a19a14c17fbae26e966606b545c30"
+            },
+            {
+              "member": "GidMappings",
+              "ordinal": 14,
+              "embedded": false,
+              "sourceSignature": "[]syscall.SysProcIDMap",
+              "sourceLocation": "syscall/exec_linux.go:100:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "b7d4054c2593ceaad9fc222b1057d22d77af8ae9d333a2fb2daf1177ab98ef21"
+            },
+            {
+              "member": "GidMappingsEnableSetgroups",
+              "ordinal": 15,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "syscall/exec_linux.go:105:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "6587b5d667a36cd8114bd8687753540d41bbcf9fb2c5b9d35774702f8fe5ee99"
+            },
+            {
+              "member": "Noctty",
+              "ordinal": 6,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "syscall/exec_linux.go:83:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "fb1bdf4dbaefbc09147cfbac13c6a3131665accea7df912b73533f628a3277a9"
+            },
+            {
+              "member": "Pdeathsig",
+              "ordinal": 10,
+              "embedded": false,
+              "sourceSignature": "syscall.Signal",
+              "sourceLocation": "syscall/exec_linux.go:96:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "edf7a37b428ebaa52a59e31d4d78603f7718c7daf679cc564ab538a13dd5aba6"
+            },
+            {
+              "member": "Pgid",
+              "ordinal": 9,
+              "embedded": false,
+              "sourceSignature": "int",
+              "sourceLocation": "syscall/exec_linux.go:91:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "e89d33c5d1c84eaaf66a698a21b1a23d5af1343dc6e3f9376db7eba81b835a31"
+            },
+            {
+              "member": "PidFD",
+              "ordinal": 19,
+              "embedded": false,
+              "sourceSignature": "*int",
+              "sourceLocation": "syscall/exec_linux.go:112:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "9a1b5731728d28c84ed9cefbe4c096b31b94f13267401c9a78d00ddbf5a203ff"
+            },
+            {
+              "member": "Ptrace",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "syscall/exec_linux.go:73:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "c801ba6bcfdebe180f6e2d7b4068fbc991920dab304ee8ec3dba6c2fcf8a81b7"
+            },
+            {
+              "member": "Setctty",
+              "ordinal": 5,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "syscall/exec_linux.go:82:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "6500ce83377ea87183493a22ec2ff9b39fba258f27be6383a571d49c9be6e0f1"
+            },
+            {
+              "member": "Setpgid",
+              "ordinal": 4,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "syscall/exec_linux.go:77:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "1abd89831effcc8d739ffc2519f99fab7e42130ac8555da6840d3e4508e4755b"
+            },
+            {
+              "member": "Setsid",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "syscall/exec_linux.go:74:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "e4a0bb491e00ead45a7a44e49f9966527e02939ced88719501adb4f05181502d"
+            },
+            {
+              "member": "UidMappings",
+              "ordinal": 13,
+              "embedded": false,
+              "sourceSignature": "[]syscall.SysProcIDMap",
+              "sourceLocation": "syscall/exec_linux.go:99:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "b072b3748b70dca6641fb3d8225da6447691b85876df07c5a9d262c6d116a318"
+            },
+            {
+              "member": "Unshareflags",
+              "ordinal": 12,
+              "embedded": false,
+              "sourceSignature": "uintptr",
+              "sourceLocation": "syscall/exec_linux.go:98:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "5d0839162455983180724eb2aa44d7a6799c1daaa8691c8eb080aa0ea8827c08"
+            },
+            {
+              "member": "UseCgroupFD",
+              "ordinal": 17,
+              "embedded": false,
+              "sourceSignature": "bool",
+              "sourceLocation": "syscall/exec_linux.go:107:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "7d0354faf0e3be69d9ebb5a23bea1b543e64acb51762c1212fcac42dced19b32"
+            }
+          ],
           "sourceSignature": "defined=syscall.SysProcAttr|underlying=struct{Chroot string; Credential *syscall.Credential; Ptrace bool; Setsid bool; Setpgid bool; Setctty bool; Noctty bool; Ctty int; Foreground bool; Pgid int; Pdeathsig syscall.Signal; Cloneflags uintptr; Unshareflags uintptr; UidMappings []syscall.SysProcIDMap; GidMappings []syscall.SysProcIDMap; GidMappingsEnableSetgroups bool; AmbientCaps []uintptr; UseCgroupFD bool; CgroupFD int; PidFD *int}",
           "sourceLocation": "syscall/exec_linux.go:67:6",
           "implementationOwner": "src/syscall.ts",
@@ -10690,6 +11869,35 @@
           "access": "export",
           "representation": "direct",
           "export": "SysProcIDMap",
+          "structFields": [
+            {
+              "member": "ContainerID",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "int",
+              "sourceLocation": "syscall/exec_linux.go:62:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "77b88a50a8918174db2dd083ab82a1f7f7b4f282f9310270051e7c9674b93abb"
+            },
+            {
+              "member": "HostID",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "int",
+              "sourceLocation": "syscall/exec_linux.go:63:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "dbc8d0f72a73937efeb61d9803472de77aea7d439dc86f3d10218ce821e63387"
+            },
+            {
+              "member": "Size",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "int",
+              "sourceLocation": "syscall/exec_linux.go:64:2",
+              "implementationOwner": "src/syscall.ts",
+              "targetFingerprint": "20305d03da9c258a61a6d038e20152934161ef142fffcffd5ec4fcd729df3205"
+            }
+          ],
           "sourceSignature": "defined=syscall.SysProcIDMap|underlying=struct{ContainerID int; HostID int; Size int}",
           "sourceLocation": "syscall/exec_linux.go:61:6",
           "implementationOwner": "src/syscall.ts",
@@ -10876,6 +12084,53 @@
           "access": "export",
           "representation": "direct",
           "export": "ParseError",
+          "structFields": [
+            {
+              "member": "Layout",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "time/format.go:842:2",
+              "implementationOwner": "src/internal/portable/time/parse-error.ts",
+              "targetFingerprint": "66cebf1f61c173434a44487de06cb8f2cae8712c1590c075f069e0f0ce8cbae3"
+            },
+            {
+              "member": "LayoutElem",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "time/format.go:844:2",
+              "implementationOwner": "src/internal/portable/time/parse-error.ts",
+              "targetFingerprint": "2e5481b8fec9f6a5ddf437f700cc15040d10ccc8a29dea3b079edda5f1e848cf"
+            },
+            {
+              "member": "Message",
+              "ordinal": 4,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "time/format.go:846:2",
+              "implementationOwner": "src/internal/portable/time/parse-error.ts",
+              "targetFingerprint": "929759e13ddfa4538038ed18b579a8b94f358d351e36b68543aa65d144f1d3b1"
+            },
+            {
+              "member": "Value",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "time/format.go:843:2",
+              "implementationOwner": "src/internal/portable/time/parse-error.ts",
+              "targetFingerprint": "d3c9af2464f56843283ff09c8816b0e9c7ae19dba72cf6430440d5b34657d229"
+            },
+            {
+              "member": "ValueElem",
+              "ordinal": 3,
+              "embedded": false,
+              "sourceSignature": "string",
+              "sourceLocation": "time/format.go:845:2",
+              "implementationOwner": "src/internal/portable/time/parse-error.ts",
+              "targetFingerprint": "b100d017af9242b6747b373653a8af4b08f0c6345e6e65c0629156025bdf7ce4"
+            }
+          ],
           "sourceSignature": "defined=time.ParseError|underlying=struct{Layout string; Value string; LayoutElem string; ValueElem string; Message string}",
           "sourceLocation": "time/format.go:841:6",
           "implementationOwner": "src/internal/portable/time/parse-error.ts",
@@ -10887,6 +12142,17 @@
           "access": "export",
           "representation": "direct",
           "export": "Ticker",
+          "structFields": [
+            {
+              "member": "C",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "\u003c-chan time.Time",
+              "sourceLocation": "time/tick.go:17:2",
+              "implementationOwner": "src/internal/portable/time/timer.ts",
+              "targetFingerprint": "9b6f7033b952703ab43e1631002290f8232a8a893b8689f249121707b455d8d6"
+            }
+          ],
           "sourceSignature": "defined=time.Ticker|underlying=struct{C \u003c-chan time.Time; initTicker bool}",
           "sourceLocation": "time/tick.go:16:6",
           "implementationOwner": "src/internal/portable/time/timer.ts",
@@ -10909,6 +12175,17 @@
           "access": "export",
           "representation": "direct",
           "export": "Timer",
+          "structFields": [
+            {
+              "member": "C",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "\u003c-chan time.Time",
+              "sourceLocation": "time/sleep.go:90:2",
+              "implementationOwner": "src/internal/portable/time/timer.ts",
+              "targetFingerprint": "4ac2e7e7edf65da96d1d3aa5d699efcbe46205e49f88276daba6903e312dffea"
+            }
+          ],
           "sourceSignature": "defined=time.Timer|underlying=struct{C \u003c-chan time.Time; initTimer bool}",
           "sourceLocation": "time/sleep.go:89:6",
           "implementationOwner": "src/internal/portable/time/timer.ts",
@@ -11376,6 +12653,35 @@
           "access": "export",
           "representation": "direct",
           "export": "Range16",
+          "structFields": [
+            {
+              "member": "Hi",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "uint16",
+              "sourceLocation": "unicode/letter.go:31:2",
+              "implementationOwner": "src/internal/portable/unicode/ranges.ts",
+              "targetFingerprint": "d5eae2030cf6e6b8fcdbab3685dcc9430fca0dc6fc2f3bf9c9c309bc2f015992"
+            },
+            {
+              "member": "Lo",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "uint16",
+              "sourceLocation": "unicode/letter.go:30:2",
+              "implementationOwner": "src/internal/portable/unicode/ranges.ts",
+              "targetFingerprint": "82c60d5f87fafa66fd0638047dba340e71109228c4618484ff1be5b31be587a9"
+            },
+            {
+              "member": "Stride",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "uint16",
+              "sourceLocation": "unicode/letter.go:32:2",
+              "implementationOwner": "src/internal/portable/unicode/ranges.ts",
+              "targetFingerprint": "b7d96c02bc755537941f11a9b9178eba41ac726834de6c8456fa01e91b022623"
+            }
+          ],
           "sourceSignature": "defined=unicode.Range16|underlying=struct{Lo uint16; Hi uint16; Stride uint16}",
           "sourceLocation": "unicode/letter.go:29:6",
           "implementationOwner": "src/internal/portable/unicode/ranges.ts",
@@ -11387,6 +12693,35 @@
           "access": "export",
           "representation": "direct",
           "export": "Range32",
+          "structFields": [
+            {
+              "member": "Hi",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "uint32",
+              "sourceLocation": "unicode/letter.go:40:2",
+              "implementationOwner": "src/internal/portable/unicode/ranges.ts",
+              "targetFingerprint": "d5eae2030cf6e6b8fcdbab3685dcc9430fca0dc6fc2f3bf9c9c309bc2f015992"
+            },
+            {
+              "member": "Lo",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "uint32",
+              "sourceLocation": "unicode/letter.go:39:2",
+              "implementationOwner": "src/internal/portable/unicode/ranges.ts",
+              "targetFingerprint": "82c60d5f87fafa66fd0638047dba340e71109228c4618484ff1be5b31be587a9"
+            },
+            {
+              "member": "Stride",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "uint32",
+              "sourceLocation": "unicode/letter.go:41:2",
+              "implementationOwner": "src/internal/portable/unicode/ranges.ts",
+              "targetFingerprint": "b7d96c02bc755537941f11a9b9178eba41ac726834de6c8456fa01e91b022623"
+            }
+          ],
           "sourceSignature": "defined=unicode.Range32|underlying=struct{Lo uint32; Hi uint32; Stride uint32}",
           "sourceLocation": "unicode/letter.go:38:6",
           "implementationOwner": "src/internal/portable/unicode/ranges.ts",
@@ -11398,6 +12733,35 @@
           "access": "export",
           "representation": "direct",
           "export": "RangeTable",
+          "structFields": [
+            {
+              "member": "LatinOffset",
+              "ordinal": 2,
+              "embedded": false,
+              "sourceSignature": "int",
+              "sourceLocation": "unicode/letter.go:24:2",
+              "implementationOwner": "src/internal/portable/unicode/ranges.ts",
+              "targetFingerprint": "dc5b90537034d88bb64814fcd6088afb1d8c39b5087e3e25f278c29b686e26d0"
+            },
+            {
+              "member": "R16",
+              "ordinal": 0,
+              "embedded": false,
+              "sourceSignature": "[]unicode.Range16",
+              "sourceLocation": "unicode/letter.go:22:2",
+              "implementationOwner": "src/internal/portable/unicode/ranges.ts",
+              "targetFingerprint": "a0f11f98a7bc6e45e7bd7696bb00dfed3626d2330ca7c9c20e0f6e2b4cb2c7a9"
+            },
+            {
+              "member": "R32",
+              "ordinal": 1,
+              "embedded": false,
+              "sourceSignature": "[]unicode.Range32",
+              "sourceLocation": "unicode/letter.go:23:2",
+              "implementationOwner": "src/internal/portable/unicode/ranges.ts",
+              "targetFingerprint": "47bd2705adcdbdc82874ede99aa7198bc60fc7f34a078cb8b45e2b5f9b0b5dda"
+            }
+          ],
           "sourceSignature": "defined=unicode.RangeTable|underlying=struct{R16 []unicode.Range16; R32 []unicode.Range32; LatinOffset int}",
           "sourceLocation": "unicode/letter.go:21:6",
           "implementationOwner": "src/internal/portable/unicode/ranges.ts",
@@ -13499,6 +14863,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "runtime|kind=2|receiver=|name=MemStats",
           "capabilities": [
+            "copy",
             "storage",
             "zero"
           ],
@@ -13506,8 +14871,8 @@
           "storageExport": "RuntimeMemStatsStorage",
           "implementationOwner": "src/internal/facets/named-runtime.ts",
           "storageImplementationOwner": "src/internal/portable/runtime/mem-stats.ts",
-          "targetFingerprint": "ce5b23e68cecf8ef5ae46f5e32092049c164435dfd03a7a69564aa6be61b4283",
-          "storageTargetFingerprint": "d1f78e9be95c9f36cacd8eb18e2a8de70398d20fb074d56bfeb7ef1a99b3ce2a"
+          "targetFingerprint": "0ca12f60a806da839ddc6d0adab66bc5ff57b2d6ca8fd84d24809bc974ebdd6f",
+          "storageTargetFingerprint": "1fb2c2b4040ace0842c787041540bcfd85ca187524ee621949cbfe6db891c301"
         }
       ]
     },
@@ -19342,5 +20707,5 @@
       ]
     }
   ],
-  "manifestDigest": "ab3a527efb1bcc54144e67b8a38d941ac53ac17401cf9fdb8b5d775751db8e05"
+  "manifestDigest": "e478cc9c2a958f10adb17492bc7c8bd694d0f94822a04a55d4878c0a11a66007"
 }

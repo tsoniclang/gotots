@@ -331,6 +331,69 @@ console.log(kind + "|" + tag + "|" + fields);
 	}
 }
 
+func TestProviderStructFieldsProjectEveryValueOperation(t *testing.T) {
+	program := loadProviderRuntimeProgram(t)
+	root := mustProviderRoot(
+		t,
+		program.Roots()[0].Types().Scope().Lookup("ProviderStructFields"),
+	)
+	options := emit.DefaultOptions()
+	options.StandardLibrary = linkedProviderCertificate(t)
+	emission, err := emit.CompileWithOptions(program, []emit.Root{root}, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	rootSource := readProviderRuntimeRootSource(t, emission, workingDirectory)
+	for _, required := range []string{
+		"UnicodeRangeTableOperations.$make(",
+		"BigInt.asIntN(64, goNumberToBigInt(5))",
+		"BigInt.asUintN(64, goNumberToBigInt($productValue))",
+		"globalThis.Number(BigInt.asUintN(64,",
+		"goPointerProject<",
+	} {
+		if !strings.Contains(rootSource, required) &&
+			!strings.Contains(artifacts.printed, required) {
+			t.Fatalf("provider struct projection lacks %q:\n%s", required, artifacts.printed)
+		}
+	}
+	for _, forbidden := range []string{
+		"RuntimeSliceProjection<metrics__from_gostdlib.Description",
+		"RuntimeMetricsDescriptionOperations.$zero()",
+		"RuntimeSliceProjection<unicode__from_gostdlib.Range16",
+		"RuntimeSliceProjection<unicode__from_gostdlib.Range32",
+	} {
+		if strings.Contains(rootSource, forbidden) {
+			t.Fatalf("equal provider struct representation emitted %q:\n%s", forbidden, rootSource)
+		}
+	}
+	assemblyPath := ""
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFilePackageAssembly &&
+			file.PackageName() == "providerruntime" {
+			assemblyPath = file.OutputPath()
+			break
+		}
+	}
+	if assemblyPath == "" {
+		t.Fatal("provider runtime package assembly is absent")
+	}
+	targetOutput := executeProviderTypeScript(
+		t,
+		workingDirectory,
+		artifacts.paths,
+		assemblyPath,
+		[]string{"ProviderStructFields"},
+		`const [allocation, latinOffset, name] = ProviderStructFields();
+console.log(allocation + "|" + latinOffset + "|" + name);
+`,
+	)
+	if targetOutput != "9|5|changed\n" {
+		t.Fatalf("provider struct differential = %q", targetOutput)
+	}
+}
+
 func loadProviderRuntimeProgram(t *testing.T) *load.Program {
 	t.Helper()
 	project := t.TempDir()
@@ -341,7 +404,12 @@ func loadProviderRuntimeProgram(t *testing.T) *load.Program {
 	)
 	writeProgramFile(t, filepath.Join(project, "source.go"), `package providerruntime
 
-import "reflect"
+import (
+	"reflect"
+	"runtime"
+	"runtime/metrics"
+	"unicode"
+)
 
 type ReflectedEntry struct { Name string `+"`json:\"name\"`"+` }
 
@@ -369,6 +437,17 @@ func ReflectGenericString() string { return ReflectGeneric[string]() }
 
 func ReflectType(value any) reflect.Type { return reflect.TypeOf(value) }
 func Identity(value int) int { return value }
+
+func ProviderStructFields() (uint64, int, string) {
+	var stats runtime.MemStats
+	stats.Alloc = 7
+	allocation := &stats.Alloc
+	*allocation = 9
+	table := unicode.RangeTable{LatinOffset: 5}
+	descriptions := metrics.All()
+	descriptions[0].Name = "changed"
+	return stats.Alloc, table.LatinOffset, descriptions[0].Name
+}
 `)
 	program, err := load.Load(context.Background(), load.Request{
 		Directory:    project,

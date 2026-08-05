@@ -1807,6 +1807,7 @@
       "sourcePath": "src/internal/facets/named-runtime.ts",
       "export": "RuntimeMemStatsOperations",
       "capabilities": [
+        "copy",
         "storage",
         "zero"
       ],

@@ -7,9 +7,11 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
   gostring,
+  int,
   int64,
   uint32,
   uint64,
+  uintptr,
 } from "@gotots/gostdlib/internal/scalars.js";
 import { hostInteger } from "./internal/host-integer.js";
 import { errnoMessage } from "./internal/node/syscall/errno.js";
@@ -107,9 +109,9 @@ export class Credential {
 
 export class SysProcIDMap {
   constructor(
-    public ContainerID: int64 = 0n,
-    public HostID: int64 = 0n,
-    public Size: int64 = 0n,
+    public ContainerID: int = 0n,
+    public HostID: int = 0n,
+    public Size: int = 0n,
   ) {}
 }
 
@@ -122,18 +124,18 @@ export class SysProcAttr {
     public Setpgid: bool = false,
     public Setctty: bool = false,
     public Noctty: bool = false,
-    public Ctty: int64 = 0n,
+    public Ctty: int = 0n,
     public Foreground: bool = false,
-    public Pgid: int64 = 0n,
+    public Pgid: int = 0n,
     public Pdeathsig: Signal = new Signal(0n),
-    public Cloneflags: uint64 = 0n,
-    public Unshareflags: uint64 = 0n,
+    public Cloneflags: uintptr = 0n,
+    public Unshareflags: uintptr = 0n,
     public UidMappings: RuntimeSlice<SysProcIDMap> = RuntimeSlice.nil<SysProcIDMap>(),
     public GidMappings: RuntimeSlice<SysProcIDMap> = RuntimeSlice.nil<SysProcIDMap>(),
     public GidMappingsEnableSetgroups: bool = false,
-    public AmbientCaps: RuntimeSlice<uint64> = RuntimeSlice.nil<uint64>(),
+    public AmbientCaps: RuntimeSlice<uintptr> = RuntimeSlice.nil<uintptr>(),
     public UseCgroupFD: bool = false,
-    public CgroupFD: int64 = 0n,
-    public PidFD: GoPointer<int64, int64> | undefined = undefined,
+    public CgroupFD: int = 0n,
+    public PidFD: GoPointer<int, int> | undefined = undefined,
   ) {}
 }

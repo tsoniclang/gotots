@@ -401,6 +401,13 @@ func (unusedNames) NamedStructStorage(
 	panic("unused")
 }
 
+func (unusedNames) ProviderStructField(
+	*types.TypeName,
+	*types.Var,
+) (gostdlib.ProviderStructField, bool, error) {
+	return gostdlib.ProviderStructField{}, false, nil
+}
+
 func (unusedNames) AnonymousStructStorage(
 	*types.Struct,
 ) (api.NameReference, error) {

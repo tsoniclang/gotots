@@ -5,8 +5,8 @@ import type {
   int32,
   uint16,
   uint32,
-  uint64,
   uint8,
+  uintptr,
 } from "@gotots/gostdlib/internal/scalars.js";
 
 export class Kind {
@@ -33,8 +33,8 @@ type EqualFunction =
   | undefined;
 
 export class Type {
-  Size_: uint64;
-  PtrBytes: uint64;
+  Size_: uintptr;
+  PtrBytes: uintptr;
   Hash: uint32;
   TFlag: TFlag;
   Align_: uint8;
@@ -46,8 +46,8 @@ export class Type {
   PtrToThis: TypeOff;
 
   constructor(fields: {
-    Size_: uint64;
-    PtrBytes: uint64;
+    Size_: uintptr;
+    PtrBytes: uintptr;
     Hash: uint32;
     TFlag: TFlag;
     Align_: uint8;

@@ -9,6 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/expression/mapliteral"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
+	"github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -81,7 +82,9 @@ func Emit(
 	}
 	before, requests, values, err := arrange(
 		context,
+		children,
 		source,
+		named,
 		structType,
 		elements,
 		canonicalStorage,
@@ -472,6 +475,19 @@ func emitElements(
 		)
 		if err != nil {
 			return nil, err
+		}
+		if named != nil {
+			value, _, err = providerboundary.ToProviderStructField(
+				context.WithRole(api.RoleCompositeElement),
+				children,
+				valueSource,
+				named,
+				selectedField,
+				value,
+			)
+			if err != nil {
+				return nil, err
+			}
 		}
 		result = append(result, element{
 			fieldIndex:       fieldIndex,

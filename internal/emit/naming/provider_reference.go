@@ -149,7 +149,7 @@ func (n *File) providerFacetTargetReference(
 			return api.NameReference{}, true, err
 		}
 	}
-	reference, err := api.NewQualifiedNameReference(
+	reference, err := api.NewProviderQualifiedNameReference(
 		qualifier,
 		export,
 		request,

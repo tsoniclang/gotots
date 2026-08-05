@@ -11,6 +11,85 @@ type ProjectCallableScalarAliases struct {
 	Results    []string
 }
 
+func (p *ProjectInspection) MemberScalarAliases(
+	target ProjectMember,
+	aliases map[string]string,
+) ([]string, error) {
+	if p == nil || target.Name() == "" {
+		return nil, &ProjectInspectionError{
+			Operation: "member scalar aliases",
+			Reason:    "target is absent",
+		}
+	}
+	expectedPaths := make(map[string]string, len(aliases))
+	for alias, sourcePath := range aliases {
+		if alias == "" || sourcePath == "" {
+			return nil, &ProjectInspectionError{
+				Operation: "member scalar aliases",
+				Reason:    "scalar alias identity is incomplete",
+			}
+		}
+		absolute, err := filepath.Abs(sourcePath)
+		if err != nil {
+			return nil, err
+		}
+		expectedPaths[alias] = filepath.ToSlash(absolute)
+	}
+	handles := target.scalarDeclarationHandles()
+	if len(handles) == 0 {
+		return nil, &ProjectInspectionError{
+			Operation: "member scalar aliases",
+			Path:      target.Name(),
+			Reason:    "declaration is absent",
+		}
+	}
+	var result []string
+	for index, handle := range handles {
+		node, _, sourcePath, err := parseProjectNodeHandle(handle)
+		if err != nil {
+			return nil, err
+		}
+		source, err := p.projectSourceEvidence(sourcePath)
+		if err != nil {
+			return nil, err
+		}
+		typeNode, err := source.singleDirectTypeNode(node)
+		if err != nil {
+			return nil, projectNodeEvidenceError(
+				"member "+target.Name(),
+				err.Error(),
+			)
+		}
+		var selected []string
+		if typeNode != 0 {
+			selected, err = p.scalarAliasesInTypeNode(
+				sourcePath,
+				source,
+				typeNode,
+				expectedPaths,
+				make(map[uint64]error),
+				make(map[uint64]bool),
+				true,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if index == 0 {
+			result = selected
+			continue
+		}
+		if !slices.Equal(result, selected) {
+			return nil, &ProjectInspectionError{
+				Operation: "member scalar aliases",
+				Path:      target.Name(),
+				Reason:    "declarations disagree on scalar aliases",
+			}
+		}
+	}
+	return slices.Clone(result), nil
+}
+
 type projectDeclaredCallable interface {
 	projectCallable
 	scalarDeclarationHandles() []string
@@ -115,6 +194,8 @@ func (p *ProjectInspection) callableDeclarationScalarAliases(
 			typeNode,
 			expectedPaths,
 			verified,
+			make(map[uint64]bool),
+			false,
 		)
 		if err != nil {
 			return ProjectCallableScalarAliases{}, err
@@ -136,6 +217,8 @@ func (p *ProjectInspection) callableDeclarationScalarAliases(
 		returnNode,
 		expectedPaths,
 		verified,
+		make(map[uint64]bool),
+		false,
 	)
 	if err != nil {
 		return ProjectCallableScalarAliases{}, err
@@ -165,6 +248,8 @@ func (p *ProjectInspection) scalarAliasesInTypeNode(
 	root uint32,
 	expectedPaths map[string]string,
 	verified map[uint64]error,
+	expanding map[uint64]bool,
+	expandAliases bool,
 ) ([]string, error) {
 	var result []string
 	var visit func(uint32) error
@@ -192,6 +277,49 @@ func (p *ProjectInspection) scalarAliasesInTypeNode(
 					}
 					result = append(result, symbol.Name)
 					return nil
+				}
+				if expandAliases &&
+					!expanding[symbol.ID] &&
+					declarationsWithinProject(
+						symbol.Declarations,
+						filepath.Dir(p.config),
+					) {
+					expanding[symbol.ID] = true
+					defer delete(expanding, symbol.ID)
+					for _, declaration := range symbol.Declarations {
+						aliasNode, kind, aliasPath, err :=
+							parseProjectNodeHandle(declaration)
+						if err != nil {
+							return err
+						}
+						if kind != uint32(SyntaxKindTypeAliasDeclaration) {
+							continue
+						}
+						aliasSource, err := p.projectSourceEvidence(aliasPath)
+						if err != nil {
+							return err
+						}
+						aliasType, err := aliasSource.singleDirectTypeNode(aliasNode)
+						if err != nil {
+							return err
+						}
+						if aliasType != 0 {
+							aliases, err := p.scalarAliasesInTypeNode(
+								aliasPath,
+								aliasSource,
+								aliasType,
+								expectedPaths,
+								verified,
+								expanding,
+								expandAliases,
+							)
+							if err != nil {
+								return err
+							}
+							result = append(result, aliases...)
+						}
+						break
+					}
 				}
 			}
 		}

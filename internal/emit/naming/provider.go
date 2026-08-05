@@ -31,6 +31,87 @@ type standardLibraryProvider interface {
 	ProviderStatefulProfiles(string) []gostdlib.ProviderStatefulProfile
 }
 
+func (n *File) ProviderStructField(
+	typeName *types.TypeName,
+	field *types.Var,
+) (gostdlib.ProviderStructField, bool, error) {
+	if n == nil || n.owner == nil || typeName == nil || field == nil {
+		return gostdlib.ProviderStructField{}, false, &api.NameError{
+			Reason: "provider struct-field query is invalid",
+		}
+	}
+	binding, ok := n.owner.byObject[typeName]
+	if !ok && n.owner.registry != nil {
+		binding, ok = n.owner.registry.byObject[typeName]
+	}
+	if !ok || binding.kind != targetBindingProvider ||
+		binding.providerRepresentation {
+		return gostdlib.ProviderStructField{}, false, nil
+	}
+	provider := n.owner.registry.provider
+	if provider == nil || !provider.Valid() {
+		return gostdlib.ProviderStructField{}, true, &api.NameError{
+			Name:   typeName.Name(),
+			Reason: "standard-library provider certificate is invalid",
+		}
+	}
+	contract, err := environmentcontract.Describe(typeName)
+	if err != nil {
+		return gostdlib.ProviderStructField{}, true, err
+	}
+	selected, ok := provider.Binding(contract.Identity())
+	if !ok || selected.Kind() != gostdlib.BindingType ||
+		selected.Access() != gostdlib.AccessExport ||
+		selected.Representation() != gostdlib.RepresentationDirect {
+		return gostdlib.ProviderStructField{}, true, &api.NameError{
+			Name:   contract.Identity(),
+			Reason: "provider struct binding is absent or invalid",
+		}
+	}
+	named, ok := types.Unalias(typeName.Type()).(*types.Named)
+	if !ok || named.Obj() == nil {
+		return gostdlib.ProviderStructField{}, true, &api.NameError{
+			Name:   contract.Identity(),
+			Reason: "provider struct owner has no named source type",
+		}
+	}
+	structure, ok := named.Underlying().(*types.Struct)
+	if !ok {
+		return gostdlib.ProviderStructField{}, false, nil
+	}
+	ordinal := -1
+	for index := range structure.NumFields() {
+		if structure.Field(index) == field {
+			ordinal = index
+			break
+		}
+	}
+	if ordinal < 0 || !field.Exported() {
+		return gostdlib.ProviderStructField{}, true, &api.NameError{
+			Name:   contract.Identity(),
+			Reason: "provider field does not belong to its selected Go struct",
+		}
+	}
+	certified, ok := selected.StructField(field.Name())
+	if !ok {
+		return gostdlib.ProviderStructField{}, true, &api.NameError{
+			Name:   contract.Identity() + "." + field.Name(),
+			Reason: "provider struct-field certificate is absent",
+		}
+	}
+	if certified.Member() != field.Name() ||
+		certified.Ordinal() != ordinal ||
+		certified.Embedded() != field.Embedded() ||
+		certified.SourceSignature() !=
+			environmentcontract.StableTypeString(field.Type()) {
+		return gostdlib.ProviderStructField{}, true, &api.NameError{
+			Name:   contract.Identity() + "." + field.Name(),
+			Reason: "provider struct-field certificate diverged from selected Go evidence",
+		}
+	}
+	return certified, true, nil
+}
+
 func (r *Registry) ProviderInterface(
 	typeName *types.TypeName,
 ) (gostdlib.ProviderInterface, bool, error) {

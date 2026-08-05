@@ -253,6 +253,13 @@ func (aggregateNames) NamedStructStorage(
 	panic("unused")
 }
 
+func (aggregateNames) ProviderStructField(
+	*types.TypeName,
+	*types.Var,
+) (gostdlib.ProviderStructField, bool, error) {
+	return gostdlib.ProviderStructField{}, false, nil
+}
+
 func (aggregateNames) AnonymousStructStorage(
 	*types.Struct,
 ) (api.NameReference, error) {

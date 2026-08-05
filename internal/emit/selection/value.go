@@ -11,6 +11,7 @@ import (
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
+	"github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -124,6 +125,20 @@ func projectFieldValue(
 			return api.ExpressionEmission{}, nil, err
 		}
 		return current, field.Type(), nil
+	}
+	projected, providerOwned, err := providerboundary.ReadStructField(
+		context,
+		children,
+		source,
+		currentType,
+		field,
+		current,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
+	}
+	if providerOwned {
+		return projected, field.Type(), nil
 	}
 	name, err := context.Names().Member(field)
 	if err != nil {

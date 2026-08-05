@@ -17,13 +17,13 @@ type ProviderStatefulProfileDocument struct {
 	Interfaces          []ProviderCallableProfileInterfaceDocument `json:"interfaces"`
 	TypeArguments       []string                                   `json:"typeArguments"`
 	Operations          []FacetCapability                          `json:"operations,omitempty"`
-	Fields              []ProviderStatefulProfileFieldDocument     `json:"fields"`
+	Fields              []ProviderStructFieldDocument              `json:"fields"`
 	Methods             []ProviderStatefulProfileMethodDocument    `json:"methods"`
 	ImplementationOwner string                                     `json:"implementationOwner"`
 	TargetFingerprint   string                                     `json:"targetFingerprint"`
 }
 
-type ProviderStatefulProfileFieldDocument struct {
+type ProviderStructFieldDocument struct {
 	Member              string `json:"member"`
 	Ordinal             int    `json:"ordinal"`
 	Embedded            bool   `json:"embedded"`
@@ -137,59 +137,59 @@ func (p ProviderStatefulProfile) Methods() []ProviderStatefulProfileMethod {
 	return result
 }
 
-func (p ProviderStatefulProfile) Fields() []ProviderStatefulProfileField {
-	result := make([]ProviderStatefulProfileField, len(p.profile.Fields))
+func (p ProviderStatefulProfile) Fields() []ProviderStructField {
+	result := make([]ProviderStructField, len(p.profile.Fields))
 	for index, selected := range p.profile.Fields {
-		result[index] = ProviderStatefulProfileField{document: selected}
+		result[index] = ProviderStructField{document: selected}
 	}
 	return result
 }
 
 func (p ProviderStatefulProfile) Field(
 	member string,
-) (ProviderStatefulProfileField, bool) {
+) (ProviderStructField, bool) {
 	index, found := slices.BinarySearchFunc(
 		p.profile.Fields,
 		member,
-		func(field ProviderStatefulProfileFieldDocument, selected string) int {
+		func(field ProviderStructFieldDocument, selected string) int {
 			return strings.Compare(field.Member, selected)
 		},
 	)
 	if !found {
-		return ProviderStatefulProfileField{}, false
+		return ProviderStructField{}, false
 	}
-	return ProviderStatefulProfileField{document: p.profile.Fields[index]}, true
+	return ProviderStructField{document: p.profile.Fields[index]}, true
 }
 
-type ProviderStatefulProfileField struct {
-	document ProviderStatefulProfileFieldDocument
+type ProviderStructField struct {
+	document ProviderStructFieldDocument
 }
 
-func (f ProviderStatefulProfileField) Member() string {
+func (f ProviderStructField) Member() string {
 	return f.document.Member
 }
 
-func (f ProviderStatefulProfileField) Ordinal() int {
+func (f ProviderStructField) Ordinal() int {
 	return f.document.Ordinal
 }
 
-func (f ProviderStatefulProfileField) Embedded() bool {
+func (f ProviderStructField) Embedded() bool {
 	return f.document.Embedded
 }
 
-func (f ProviderStatefulProfileField) SourceSignature() string {
+func (f ProviderStructField) SourceSignature() string {
 	return f.document.SourceSignature
 }
 
-func (f ProviderStatefulProfileField) SourceLocation() string {
+func (f ProviderStructField) SourceLocation() string {
 	return f.document.SourceLocation
 }
 
-func (f ProviderStatefulProfileField) ImplementationOwner() string {
+func (f ProviderStructField) ImplementationOwner() string {
 	return f.document.ImplementationOwner
 }
 
-func (f ProviderStatefulProfileField) TargetFingerprint() string {
+func (f ProviderStructField) TargetFingerprint() string {
 	return f.document.TargetFingerprint
 }
 

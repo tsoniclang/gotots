@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	SchemaVersion = 26
+	SchemaVersion = 27
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -129,6 +129,7 @@ type BindingDocument struct {
 	GenericOperations    []GenericOperationDocument          `json:"genericOperations,omitempty"`
 	CallableParameters   []ProviderCallableParameterDocument `json:"callableParameters,omitempty"`
 	ProviderInterface    *ProviderInterfaceDocument          `json:"providerInterface,omitempty"`
+	StructFields         []ProviderStructFieldDocument       `json:"structFields,omitempty"`
 	SourceSignature      string                              `json:"sourceSignature"`
 	SourceValue          string                              `json:"sourceValue,omitempty"`
 	SourceLocation       string                              `json:"sourceLocation"`
@@ -412,6 +413,28 @@ func (b Binding) ProviderInterface() (ProviderInterface, bool) {
 	return newProviderInterface(*b.binding.ProviderInterface), true
 }
 
+func (b Binding) StructFields() []ProviderStructField {
+	result := make([]ProviderStructField, len(b.binding.StructFields))
+	for index, selected := range b.binding.StructFields {
+		result[index] = ProviderStructField{document: selected}
+	}
+	return result
+}
+
+func (b Binding) StructField(member string) (ProviderStructField, bool) {
+	index, found := slices.BinarySearchFunc(
+		b.binding.StructFields,
+		member,
+		func(field ProviderStructFieldDocument, selected string) int {
+			return strings.Compare(field.Member, selected)
+		},
+	)
+	if !found {
+		return ProviderStructField{}, false
+	}
+	return ProviderStructField{document: b.binding.StructFields[index]}, true
+}
+
 func (b Binding) SourceSignature() string {
 	return b.binding.SourceSignature
 }
@@ -465,6 +488,8 @@ func cloneModule(source ModuleDocument) ModuleDocument {
 			cloneGenericOperations(binding.GenericOperations)
 		result.Bindings[index].CallableParameters =
 			slices.Clone(binding.CallableParameters)
+		result.Bindings[index].StructFields =
+			slices.Clone(binding.StructFields)
 		if binding.ProviderInterface != nil {
 			cloned := cloneProviderInterface(*binding.ProviderInterface)
 			result.Bindings[index].ProviderInterface = &cloned

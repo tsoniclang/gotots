@@ -63,6 +63,13 @@ func (staticSpecializationNames) NamedStructStorage(
 	panic("unused")
 }
 
+func (staticSpecializationNames) ProviderStructField(
+	*types.TypeName,
+	*types.Var,
+) (gostdlib.ProviderStructField, bool, error) {
+	return gostdlib.ProviderStructField{}, false, nil
+}
+
 func (staticSpecializationNames) AnonymousStructStorage(
 	*types.Struct,
 ) (api.NameReference, error) {

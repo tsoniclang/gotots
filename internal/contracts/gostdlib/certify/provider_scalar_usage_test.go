@@ -82,6 +82,20 @@ func TestSourceScalarAliasesPreserveNestedGoIdentities(t *testing.T) {
 	}
 }
 
+func TestProviderStructFieldRejectsSameCarrierWrongScalarIdentity(t *testing.T) {
+	err := verifyProviderStructFieldScalarAliases(
+		"Type.Size_",
+		types.Typ[types.Uintptr],
+		[]string{"uint64"},
+	)
+	if err == nil || !strings.Contains(
+		err.Error(),
+		"target scalar aliases are [uint64], want [uintptr]",
+	) {
+		t.Fatalf("field scalar identity error = %v", err)
+	}
+}
+
 func slicesEqual(left []string, right []string) bool {
 	if len(left) != len(right) {
 		return false

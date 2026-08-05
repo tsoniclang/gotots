@@ -155,6 +155,7 @@ func Generate(config Config) ([]byte, error) {
 		effectMarker,
 		supportMarkers,
 		selectedToolchain,
+		scalarAliases,
 	)
 	if err != nil {
 		client.Close()
@@ -321,6 +322,26 @@ func buildModule(
 			target,
 			project,
 			effectMarker,
+		)
+		if err != nil {
+			return gostdlib.ModuleDocument{}, err
+		}
+		named, namedOK := types.Unalias(typeName.Type()).(*types.Named)
+		if !namedOK {
+			return gostdlib.ModuleDocument{}, certifyError(
+				"build module",
+				binding.Identity,
+				"defined provider type has no named source type",
+			)
+		}
+		binding.StructFields, err = buildProviderStructFields(
+			selectedToolchain,
+			source,
+			typeName,
+			named,
+			target,
+			project,
+			scalarAliases,
 		)
 		if err != nil {
 			return gostdlib.ModuleDocument{}, err
@@ -547,40 +568,4 @@ func buildMethodBindings(
 		result = append(result, binding)
 	}
 	return result, nil
-}
-
-func selectMethodOwner(
-	method goObject,
-	static tsgo.ProjectMember,
-	staticOK bool,
-	instance tsgo.ProjectMember,
-	instanceOK bool,
-) (tsgo.ProjectMember, gostdlib.AccessKind, error) {
-	signature, ok := method.object.Type().(*types.Signature)
-	if !ok || signature.Recv() == nil {
-		return tsgo.ProjectMember{}, gostdlib.AccessInvalid, certifyError(
-			"build methods",
-			method.contract.Identity(),
-			"Go method receiver evidence is absent",
-		)
-	}
-	_, pointerReceiver := signature.Recv().Type().(*types.Pointer)
-	if pointerReceiver {
-		if !staticOK {
-			return tsgo.ProjectMember{}, gostdlib.AccessInvalid, certifyError(
-				"build methods",
-				method.contract.Identity(),
-				"pointer receiver has no static operation",
-			)
-		}
-		return static, gostdlib.AccessStaticMethod, nil
-	}
-	if !instanceOK {
-		return tsgo.ProjectMember{}, gostdlib.AccessInvalid, certifyError(
-			"build methods",
-			method.contract.Identity(),
-			"value receiver has no instance operation",
-		)
-	}
-	return instance, gostdlib.AccessInstanceMethod, nil
 }

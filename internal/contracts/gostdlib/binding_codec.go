@@ -1,5 +1,7 @@
 package gostdlib
 
+import "fmt"
+
 func validateBinding(binding BindingDocument, field string) error {
 	requiresEffect := binding.Kind == BindingFunction
 	switch {
@@ -42,6 +44,13 @@ func validateBinding(binding BindingDocument, field string) error {
 		return manifestError(
 			field+".providerInterface",
 			"provider-interface evidence does not belong to a direct exported type",
+		)
+	case len(binding.StructFields) != 0 &&
+		(binding.Kind != BindingType || binding.Access != AccessExport ||
+			binding.Representation != RepresentationDirect):
+		return manifestError(
+			field+".structFields",
+			"struct-field evidence does not belong to a direct exported type",
 		)
 	case binding.SourceSignature == "":
 		return manifestError(field+".sourceSignature", "value is empty")
@@ -86,6 +95,12 @@ func validateBinding(binding BindingDocument, field string) error {
 			return err
 		}
 	}
+	if err := validateProviderStructFields(
+		binding.StructFields,
+		field+".structFields",
+	); err != nil {
+		return err
+	}
 	if err := validateGenericTypeArguments(
 		binding.GenericTypeArguments,
 		field+".genericTypeArguments",
@@ -119,6 +134,42 @@ func validateBinding(binding BindingDocument, field string) error {
 			return manifestError(
 				field+".access",
 				"method access does not own a function",
+			)
+		}
+	}
+	return nil
+}
+
+func validateProviderStructFields(
+	fields []ProviderStructFieldDocument,
+	field string,
+) error {
+	for index, selected := range fields {
+		selectedField := fmt.Sprintf("%s[%d]", field, index)
+		switch {
+		case selected.Member == "":
+			return manifestError(selectedField+".member", "value is empty")
+		case selected.Ordinal < 0:
+			return manifestError(selectedField+".ordinal", "value is negative")
+		case selected.SourceSignature == "":
+			return manifestError(selectedField+".sourceSignature", "value is empty")
+		case selected.SourceLocation == "":
+			return manifestError(selectedField+".sourceLocation", "value is empty")
+		case !sourcePath(selected.ImplementationOwner):
+			return manifestError(
+				selectedField+".implementationOwner",
+				"value is not a provider source path",
+			)
+		case !validDigest(selected.TargetFingerprint):
+			return manifestError(
+				selectedField+".targetFingerprint",
+				"value is not a sha256 digest",
+			)
+		}
+		if index != 0 && selected.Member <= fields[index-1].Member {
+			return manifestError(
+				field,
+				"fields are not strictly ordered",
 			)
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
+	"github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -113,6 +114,17 @@ func FieldStoreTarget(
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
+	}
+	target, providerOwned, err := providerboundary.StructFieldStoreTarget(
+		context.WithRole(api.RoleAssignmentTarget),
+		children,
+		source,
+		receiverType,
+		field,
+		receiver,
+	)
+	if err != nil || providerOwned {
+		return target, err
 	}
 	target, storageSelected, err := namedstructstorage.FieldTarget(
 		context.WithRole(api.RoleAssignmentTarget),
@@ -375,8 +387,23 @@ func projectFieldPointer(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	fieldRepresentation, err := pointertype.Observe(
+	providerField, providerOwned, err := providerboundary.StructField(
 		context,
+		parentType,
+		field,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	fieldContext := context
+	if providerOwned {
+		fieldContext, err = context.WithProviderScalarRepresentation()
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	fieldRepresentation, err := pointertype.Observe(
+		fieldContext,
 		types.NewPointer(field.Type()),
 		true,
 	)
@@ -384,15 +411,15 @@ func projectFieldPointer(
 		return api.ExpressionEmission{}, err
 	}
 	fieldType, err := children.RepresentedType(
-		context.WithRole(api.RoleFieldReceiver),
+		fieldContext.WithRole(api.RoleFieldReceiver),
 		source,
 		field.Type(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	fieldStorage, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
+	fieldStorage, err := fieldContext.Values().StorageType(
+		fieldContext.WithRole(api.RoleStorageType),
 		source,
 		field.Type(),
 	)
@@ -400,7 +427,7 @@ func projectFieldPointer(
 		return api.ExpressionEmission{}, err
 	}
 	parentLogical, err := children.RepresentedType(
-		context.WithRole(api.RoleFieldReceiver),
+		fieldContext.WithRole(api.RoleFieldReceiver),
 		source,
 		parentType,
 	)
@@ -410,22 +437,22 @@ func projectFieldPointer(
 	var parentStorage api.TypeEmission
 	var parentRepresentationRequests []api.RootRequest
 	if parentDirect {
-		parentStorage, err = context.Values().StorageType(
-			context.WithRole(api.RoleStorageType),
+		parentStorage, err = fieldContext.Values().StorageType(
+			fieldContext.WithRole(api.RoleStorageType),
 			source,
 			parentType,
 		)
 	} else {
 		parentRepresentation, representationErr := pointertype.Observe(
-			context,
+			fieldContext,
 			types.NewPointer(parentType),
 			true,
 		)
 		if representationErr != nil {
 			return api.ExpressionEmission{}, representationErr
 		}
-		parentStorage, err = context.ContainerStorage().PointerStorageType(
-			context.WithRole(api.RoleStorageType),
+		parentStorage, err = fieldContext.ContainerStorage().PointerStorageType(
+			fieldContext.WithRole(api.RoleStorageType),
 			source,
 			parentType,
 			parentRepresentation,
@@ -438,7 +465,7 @@ func projectFieldPointer(
 	name := ""
 	method := pointerruntime.FieldName
 	receiver := parent
-	if parentDirect {
+	if parentDirect && !providerOwned {
 		receiver, name, err = namedstructstorage.DemandFieldOwner(
 			context.WithRole(api.RoleStorageType),
 			parentType,
@@ -449,6 +476,11 @@ func projectFieldPointer(
 			return api.ExpressionEmission{}, err
 		}
 		method = pointerruntime.ObjectFieldName
+	} else if providerOwned {
+		name = providerField.Member()
+		if parentDirect {
+			method = pointerruntime.ObjectFieldName
+		}
 	} else {
 		name, err = context.Names().Member(field)
 		if err != nil {
@@ -476,7 +508,7 @@ func projectFieldPointer(
 			),
 		}
 	}
-	return api.NewExpressionEmission(
+	raw, err := api.NewExpressionEmission(
 		receiver.Before(),
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
@@ -503,5 +535,16 @@ func projectFieldPointer(
 			runtime.Requests(),
 			fieldRepresentation.Requests(),
 		),
+	)
+	if err != nil || !providerOwned {
+		return raw, err
+	}
+	return providerboundary.ProjectStructFieldPointer(
+		context,
+		fieldContext,
+		children,
+		source,
+		field.Type(),
+		raw,
 	)
 }

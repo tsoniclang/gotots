@@ -168,6 +168,55 @@ func verifyMethodSourceCallableScalars(
 	)
 }
 
+func verifyProviderStructFieldScalars(
+	project *tsgo.ProjectInspection,
+	typeName *types.TypeName,
+	field *types.Var,
+	target tsgo.ProjectMember,
+	aliases map[string]string,
+) error {
+	if project == nil || typeName == nil || field == nil {
+		return certifyError(
+			"verify provider struct-field scalars",
+			"",
+			"source or target field evidence is absent",
+		)
+	}
+	actual, err := project.MemberScalarAliases(target, aliases)
+	if err != nil {
+		return certifyError(
+			"verify provider struct-field scalars",
+			typeName.Name()+"."+field.Name(),
+			err.Error(),
+		)
+	}
+	return verifyProviderStructFieldScalarAliases(
+		typeName.Name()+"."+field.Name(),
+		field.Type(),
+		actual,
+	)
+}
+
+func verifyProviderStructFieldScalarAliases(
+	identity string,
+	source types.Type,
+	actual []string,
+) error {
+	expected := sourceScalarAliases(source)
+	if !slices.Equal(actual, expected) {
+		return certifyError(
+			"verify provider struct-field scalars",
+			identity,
+			fmt.Sprintf(
+				"target scalar aliases are %v, want %v",
+				actual,
+				expected,
+			),
+		)
+	}
+	return nil
+}
+
 func missingSourceScalarSignature(evidence goObject) error {
 	return certifyError(
 		"verify source callable scalars",

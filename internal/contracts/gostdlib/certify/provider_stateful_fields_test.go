@@ -48,7 +48,7 @@ func TestStatefulProfileTargetFieldsExactJoin(t *testing.T) {
 	if target.Name() == "" {
 		t.Fatal("canonical gzip stateful target is absent")
 	}
-	fields := []gostdlib.ProviderStatefulProfileFieldDocument{{Member: "Header"}}
+	fields := []gostdlib.ProviderStructFieldDocument{{Member: "Header"}}
 	methods := []gostdlib.ProviderStatefulProfileMethodDocument{
 		{Member: "Close"},
 		{Member: "Read"},
@@ -58,7 +58,7 @@ func TestStatefulProfileTargetFieldsExactJoin(t *testing.T) {
 	}
 	tests := []struct {
 		name   string
-		fields []gostdlib.ProviderStatefulProfileFieldDocument
+		fields []gostdlib.ProviderStructFieldDocument
 		want   string
 	}{
 		{
@@ -67,7 +67,7 @@ func TestStatefulProfileTargetFieldsExactJoin(t *testing.T) {
 		},
 		{
 			name: "extra",
-			fields: []gostdlib.ProviderStatefulProfileFieldDocument{
+			fields: []gostdlib.ProviderStructFieldDocument{
 				{Member: "Header"},
 				{Member: "Invented"},
 			},
@@ -75,7 +75,7 @@ func TestStatefulProfileTargetFieldsExactJoin(t *testing.T) {
 		},
 		{
 			name:   "renamed",
-			fields: []gostdlib.ProviderStatefulProfileFieldDocument{{Member: "Renamed"}},
+			fields: []gostdlib.ProviderStructFieldDocument{{Member: "Renamed"}},
 			want:   "unowned public instance member",
 		},
 	}
@@ -128,7 +128,7 @@ func TestStatefulProfileOperationsExactJoin(t *testing.T) {
 	if target.Name() == "" {
 		t.Fatal("canonical path-error target is absent")
 	}
-	fields := []gostdlib.ProviderStatefulProfileFieldDocument{
+	fields := []gostdlib.ProviderStructFieldDocument{
 		{Member: "Err"},
 		{Member: "Op"},
 		{Member: "Path"},
