@@ -80,11 +80,14 @@ has no universal runtime representation and is projected from its canonical
 `go/constant.Value` at each use's checker-selected contextual type.
 
 A package constant whose selected type needs a package-local runtime
-constructor is not eagerly constructed in a source-file ESM module. Its source
-artifact is one private, statically typed value thunk; generated Go uses invoke
-that thunk, and the package assembly invokes it once to expose the ordinary
-public `const`. This preserves the Go-facing API while preventing a legal Go
-same-package file cycle from becoming an ESM temporal-dead-zone failure.
+constructor is never eagerly constructed during ESM module evaluation. Its
+source artifact is one private, statically typed value thunk and generated Go
+uses invoke that thunk. The package assembly declares the ordinary public
+value without an initializer, then assigns it once at the start of the package
+`$initialize` function, before package variables and Go `init` functions. The
+program initializer runs packages in Go dependency order. This preserves the
+Go-facing value API while preventing a legal generated module cycle from
+becoming an ESM temporal-dead-zone failure.
 
 ```go
 // compact.go
@@ -102,16 +105,23 @@ export function Value$constant(): ID { return new ID(7); }
 // compact.ts
 export function Use(): uint16 { return Value$constant().Value(); }
 
-// package.ts: the handwritten-facing surface remains a value
-export const Value = Value$constant();
+// package.ts: no constructor executes during ESM evaluation
+export let Value: ReturnType<typeof Value$constant>;
+export function $initialize(): void {
+  Value = Value$constant();
+}
 ```
 
 Primitive package constants stay direct immutable bindings, and local
 constants stay at their lexical execution boundary. The compiler does not
 inline repeated large values merely to avoid a module cycle: constant payload
 size remains `O(value bytes + uses)`, not `O(value bytes * uses)`.
-Inlining all uses is rejected for that scaling reason; a deferred mutable
-binding is rejected because it would expose initialization state and mutation;
+Inlining all uses is rejected for that scaling reason; generated Go code never
+reads the delayed public binding, and consumers cannot assign an imported ESM
+binding. The only writer is the package initializer that already owns Go
+package-variable and `init` ordering. An untyped or dynamically recovered
+binding is rejected because it would expose initialization state without an
+exact contract;
 coalescing every Go file into one target module is rejected because it moves a
 local constant issue into unbounded package-module and typecheck size. The
 thunk is deleted if the defined-basic representation ceases to require runtime

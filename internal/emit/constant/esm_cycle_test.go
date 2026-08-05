@@ -46,13 +46,14 @@ const Value ID = 7
 	for _, expected := range []string{
 		"export function Value$constant(): ID",
 		"return Value$constant().Value()",
-		"export const Value = Value$constant()",
+		"export let Value: ReturnType<typeof Value$constant>",
+		"Value = Value$constant()",
 	} {
 		if !strings.Contains(printed, expected) {
 			t.Fatalf("constant-cycle artifact lacks %q:\n%s", expected, printed)
 		}
 	}
-	if strings.Contains(printed, "export const Value: ID = new ID(7)") {
+	if strings.Contains(printed, "export const Value") {
 		t.Fatalf("constant-cycle artifact retained eager construction:\n%s", printed)
 	}
 
@@ -69,7 +70,8 @@ const Value ID = 7
 		t.Fatal("constant-cycle package assembly is absent")
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Use, Value } from "`+packageModule+`";
+	writeFile(t, runnerPath, `import "./program.js";
+import { Use, Value } from "`+packageModule+`";
 
 console.log(String(Use()));
 console.log(String(Value.Value()));
@@ -147,7 +149,8 @@ func Read() uint16 { return defs.Number.Value() }
 		"export function Number$constant(): ID",
 		"Number$constant as Number$constant__from_defs",
 		"return Number$constant__from_defs().Value()",
-		"export const Number = Number$constant()",
+		"export let Number: ReturnType<typeof Number$constant>",
+		"Number = Number$constant()",
 	} {
 		if !strings.Contains(printed, expected) {
 			t.Fatalf("cross-package constant artifact lacks %q:\n%s", expected, printed)
@@ -168,7 +171,8 @@ func Read() uint16 { return defs.Number.Value() }
 		t.Fatal("constant-thunk API assembly is absent")
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Read } from "`+apiModule+`";
+	writeFile(t, runnerPath, `import "./program.js";
+import { Read } from "`+apiModule+`";
 
 console.log(String(Read()));
 `)

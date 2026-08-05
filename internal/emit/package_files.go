@@ -3,6 +3,7 @@ package emit
 import (
 	"go/ast"
 	"go/types"
+	"slices"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -235,7 +236,7 @@ func (s *programSession) packageAssemblyFile(
 	}
 	requirements.observe(placement)
 	statements := placement.Statements(s.factory)
-	var initialization []tsgo.Statement
+	initialization := slices.Clone(builder.constantInitialization)
 	for _, storage := range builder.storage {
 		initialization = append(
 			initialization,
@@ -321,7 +322,8 @@ func (s *programSession) packageAssemblyFile(
 }
 
 func (b *packageTargetBuilder) hasInitializationWork() bool {
-	return len(b.storage) != 0 ||
+	return len(b.constantInitialization) != 0 ||
+		len(b.storage) != 0 ||
 		len(b.initialization) != 0 ||
 		len(b.initFunctions) != 0
 }

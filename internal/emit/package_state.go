@@ -64,25 +64,26 @@ type packageInitFunction struct {
 }
 
 type packageTargetBuilder struct {
-	sourcePackage      *load.Package
-	assemblyOwner      api.ArtifactOwner
-	statePath          string
-	assemblyPath       string
-	emitter            *emitter
-	stateContext       api.Context
-	assemblyContext    api.Context
-	statePlacement     *targetplacement.Owner
-	assemblyPlacement  *targetplacement.Owner
-	exportPlacement    *targetplacement.Owner
-	storage            []packageStorage
-	storageByObject    map[*types.Var]int
-	initialization     []packageInitializationArtifact
-	initializerByOwner map[api.ArtifactOwner]int
-	initFunctions      []packageInitFunction
-	exportObjects      map[types.Object]struct{}
-	exportStatements   []tsgo.Statement
-	exportPublished    bool
-	exportRevisions    uint64
+	sourcePackage          *load.Package
+	assemblyOwner          api.ArtifactOwner
+	statePath              string
+	assemblyPath           string
+	emitter                *emitter
+	stateContext           api.Context
+	assemblyContext        api.Context
+	statePlacement         *targetplacement.Owner
+	assemblyPlacement      *targetplacement.Owner
+	exportPlacement        *targetplacement.Owner
+	storage                []packageStorage
+	storageByObject        map[*types.Var]int
+	initialization         []packageInitializationArtifact
+	initializerByOwner     map[api.ArtifactOwner]int
+	initFunctions          []packageInitFunction
+	exportObjects          map[types.Object]struct{}
+	exportStatements       []tsgo.Statement
+	constantInitialization []tsgo.Statement
+	exportPublished        bool
+	exportRevisions        uint64
 }
 
 func newPackageInitializationScheduler() *packageInitializationScheduler {

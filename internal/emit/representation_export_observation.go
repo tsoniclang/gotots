@@ -316,6 +316,7 @@ func (s *programSession) publishPackageExports(
 	dependencies := make([]api.ArtifactDependency, 0, len(objects)*2)
 	exportPlacement := targetplacement.New()
 	var constantExports []tsgo.Statement
+	var constantInitialization []tsgo.Statement
 	for _, object := range objects {
 		owner := api.MustSourceArtifactOwner(object)
 		names, ok := s.artifacts.ExportedBindings(owner)
@@ -368,9 +369,15 @@ func (s *programSession) publishPackageExports(
 			if err := exportPlacement.Apply([]api.RootRequest{request}); err != nil {
 				return err
 			}
-			constantExports = append(
-				constantExports,
-				deferredConstantPackageExport(s.factory, binding.Name, deferredName),
+			declaration, initialization := deferredConstantPackageExport(
+				s.factory,
+				binding.Name,
+				deferredName,
+			)
+			constantExports = append(constantExports, declaration)
+			constantInitialization = append(
+				constantInitialization,
+				initialization,
 			)
 		}
 		for _, name := range names {
@@ -406,9 +413,12 @@ func (s *programSession) publishPackageExports(
 		return err
 	}
 	exports = append(exports, constantExports...)
-	nodes := make([]tsgo.Node, len(exports))
-	for index, statement := range exports {
-		nodes[index] = statement
+	nodes := make([]tsgo.Node, 0, len(exports)+len(constantInitialization))
+	for _, statement := range exports {
+		nodes = append(nodes, statement)
+	}
+	for _, statement := range constantInitialization {
+		nodes = append(nodes, statement)
 	}
 	contract, err := artifactstate.ProjectFacet(
 		api.ArtifactFacetImplementation,
@@ -431,32 +441,8 @@ func (s *programSession) publishPackageExports(
 	builder.exportPublished = true
 	builder.exportPlacement = exportPlacement
 	builder.exportStatements = exports
+	builder.constantInitialization = constantInitialization
 	return nil
-}
-
-func deferredConstantPackageExport(
-	factory tsgo.Factory,
-	publicName string,
-	deferredName string,
-) tsgo.VariableStatement {
-	return factory.VariableStatement(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.VariableDeclarationList(
-			[]tsgo.VariableDeclaration{factory.VariableDeclaration(
-				factory.Identifier(publicName),
-				nil,
-				nil,
-				factory.CallExpression(
-					factory.Identifier(deferredName),
-					nil,
-					nil,
-					nil,
-					tsgo.NodeFlagsNone,
-				),
-			)},
-			tsgo.NodeFlagsConst,
-		),
-	)
 }
 
 func (s *programSession) packageReexports(
