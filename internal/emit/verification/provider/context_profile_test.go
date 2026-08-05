@@ -3,7 +3,6 @@ package provider_test
 import (
 	"context"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -63,12 +62,10 @@ func Run(key string, value string) (string, bool, string) {
 	options := emit.DefaultOptions()
 	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
-	// The provider-internal context value-formatting branch is a certified
-	// placeholder reached from every context constructor chain; the
-	// used-provider closure must fail this compilation before any target
-	// file is sealed. The runtime differential returns when the context
-	// formatting family is implemented.
-	_, err = emit.CompileWithOptions(
+	// The context formatting family is implemented with exact chain
+	// spellings: the constructor chain compiles through the used-provider
+	// closure and emits the certified profile artifacts.
+	emission, err := emit.CompileWithOptions(
 		program,
 		[]emit.Root{mustProviderRoot(
 			t,
@@ -76,11 +73,10 @@ func Run(key string, value string) (string, bool, string) {
 		)},
 		options,
 	)
-	if err == nil {
-		t.Fatal("used context formatting placeholder passed the closure gate")
+	if err != nil {
+		t.Fatalf("implemented context family failed the closure gate: %v", err)
 	}
-	if !strings.Contains(err.Error(), "used provider placeholders") ||
-		!strings.Contains(err.Error(), "ContextValue") {
-		t.Fatalf("closure diagnostic = %v", err)
+	if len(emission.Files()) == 0 {
+		t.Fatal("context profile compilation emitted no target files")
 	}
 }

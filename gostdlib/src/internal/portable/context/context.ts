@@ -15,7 +15,6 @@ import { propagateCancel } from "./propagation.js";
 import { After } from "../time/timer.js";
 import { Duration } from "../time/duration.js";
 import { Now, Time } from "../time/time.js";
-import { providerPlaceholder } from "../../runtime/placeholder.js";
 
 const contextMethodToken = {};
 const canceled = new ProviderError("context canceled");
@@ -28,7 +27,7 @@ export interface Context extends GoInterfaceValue {
   Value(key: GoInterfaceValue | undefined): GoInterfaceValue | undefined;
 }
 
-abstract class ContextValue extends InterfaceValue implements Context {
+export abstract class ContextValue extends InterfaceValue implements Context {
 	static readonly comparable = true;
 	readonly $go$type = ContextValue;
   readonly $go$methods: ReadonlySet<object> = new Set<object>([contextMethodToken]);
@@ -56,11 +55,34 @@ abstract class ContextValue extends InterfaceValue implements Context {
     if (verb === "T") {
       return "context.Context";
     }
-    return providerPlaceholder("context value formatting is unsupported");
+    if (verb === "v" || verb === "s") {
+      return this.$contextName();
+    }
+    return GoPanic.raise(
+      new ProviderError(`context: unsupported format verb %${verb}`),
+    );
   }
+
+  abstract $contextName(): string;
+}
+
+// parentContextName resolves the exact Go context chain spelling; foreign
+// context implementations keep the Go interface fallback.
+function parentContextName(parent: Context): string {
+  return parent instanceof ContextValue
+    ? parent.$contextName()
+    : "context.Context";
 }
 
 class EmptyContext extends ContextValue {
+  constructor(private readonly name: string) {
+    super();
+  }
+
+  $contextName(): string {
+    return this.name;
+  }
+
   Deadline(): [Time, bool] {
     return [new Time(), false];
   }
@@ -90,6 +112,17 @@ class CancelContext extends ContextValue {
   );
   #failure: GoError | undefined;
   #cause: GoError | undefined;
+
+  $contextName(): string {
+    if (this.deadline === undefined) {
+      return `${parentContextName(this.parent)}.WithCancel`;
+    }
+    return GoPanic.raise(
+      new ProviderError(
+        "context: deadline context formatting requires time formatting",
+      ),
+    );
+  }
 
   constructor(
     readonly parent: Context,
@@ -139,6 +172,14 @@ class CancelContext extends ContextValue {
 }
 
 class ValueContext extends ContextValue {
+  $contextName(): string {
+    return GoPanic.raise(
+      new ProviderError(
+        "context: value context formatting requires key and value formatting",
+      ),
+    );
+  }
+
   constructor(
     readonly parent: Context,
     readonly key: GoInterfaceValue,
@@ -168,8 +209,8 @@ class ValueContext extends ContextValue {
   }
 }
 
-const background = new EmptyContext();
-const todo = new EmptyContext();
+const background = new EmptyContext("context.Background");
+const todo = new EmptyContext("context.TODO");
 
 export type CancelFunc = (() => Awaitable<void>) | undefined;
 export type CancelCauseFunc = ((

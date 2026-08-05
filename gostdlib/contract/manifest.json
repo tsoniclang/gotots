@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "67ea43638501e69def92784a715bd71b5592f07ff9eb981fdb2cf26b3cba27d6",
-  "providerDigest": "f88ccc2aca0a78e605c2d8b1839754f819b2d1a881036499d1e9d4834413eb19",
+  "providerDigest": "ee8bde458364d8819fb66a166b1e42e2a141d24427542efddd94f5ffbade2d08",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -1129,7 +1129,7 @@
           "targetFingerprint": "4f2ce8ed92fa357c8ff778afe12dc07d85a2588808ae5a24b656c968262050e6",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/context/context.ts#CancelCauseFunc@880"
+            "src/internal/portable/context/context.ts#CancelCauseFunc@1012"
           ]
         },
         {
@@ -1145,7 +1145,7 @@
           "targetFingerprint": "8fc0fb416cf28ea65b3810a1b341ce54569c4c486f8c27a89fe320b192c18ff7",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/context/context.ts#CancelFunc@866"
+            "src/internal/portable/context/context.ts#CancelFunc@998"
           ]
         },
         {
@@ -1209,7 +1209,7 @@
           "targetFingerprint": "75332e327dbdb6e40db04eea4612bd9746b9f405edf5da5db0ca59cbf9e21aac",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/context/context.ts#Context@140"
+            "src/internal/portable/context/context.ts#Context@133"
           ]
         },
         {
@@ -1224,7 +1224,7 @@
           "targetFingerprint": "35e04746a1e3d226bcdada230b46d87831a2c0528634ffa055608b246335d892",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/context/context.ts#Canceled@1412"
+            "src/internal/portable/context/context.ts#Canceled@1544"
           ]
         },
         {
@@ -1239,7 +1239,7 @@
           "targetFingerprint": "1e8ad2602dcf865aac822933befb4e62d07d4563addb27f9e9c5b0cd9b4ca3fc",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/context/context.ts#DeadlineExceeded@1416"
+            "src/internal/portable/context/context.ts#DeadlineExceeded@1548"
           ]
         },
         {
@@ -1260,10 +1260,10 @@
           "targetFingerprint": "5b2efad99754ad2b9fcaab0dcb59a78329e091f8da765ffc069471ad8923eb99",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/context/context.ts#requireParent@1428"
+            "src/internal/portable/context/context.ts#requireParent@1560"
           ],
           "implementationSites": [
-            "src/internal/portable/context/context.ts#AfterFunc@1270"
+            "src/internal/portable/context/context.ts#AfterFunc@1402"
           ]
         },
         {
@@ -1278,10 +1278,10 @@
           "targetFingerprint": "e333f87e3b8336670838e2fbc90b3b5ca17f6a9f80740fd49d751535a92d0e54",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/context/context.ts#background@853"
+            "src/internal/portable/context/context.ts#background@983"
           ],
           "implementationSites": [
-            "src/internal/portable/context/context.ts#Background@901"
+            "src/internal/portable/context/context.ts#Background@1033"
           ]
         },
         {
@@ -1296,11 +1296,11 @@
           "targetFingerprint": "034dc111db76697023000497785f903d323cc1685ffe0515b1900664b22d7681",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/context/context.ts#contextCause@1458",
-            "src/internal/portable/context/context.ts#requireParent@1428"
+            "src/internal/portable/context/context.ts#contextCause@1590",
+            "src/internal/portable/context/context.ts#requireParent@1560"
           ],
           "implementationSites": [
-            "src/internal/portable/context/context.ts#Cause@1189"
+            "src/internal/portable/context/context.ts#Cause@1321"
           ]
         },
         {
@@ -1315,10 +1315,10 @@
           "targetFingerprint": "9700e3d3a61b6a22b89e9fb2235303e1b1c89969593a1604d5d44a688af8f4f2",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/context/context.ts#todo@861"
+            "src/internal/portable/context/context.ts#todo@992"
           ],
           "implementationSites": [
-            "src/internal/portable/context/context.ts#TODO@912"
+            "src/internal/portable/context/context.ts#TODO@1044"
           ]
         },
         {
@@ -1333,13 +1333,13 @@
           "targetFingerprint": "68791e43ea11d6e78572418aefa631fe745e63785d22eef11db2a9284231be5c",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/context/context.ts#CancelContext@434",
-            "src/internal/portable/context/context.ts#cancel@653",
-            "src/internal/portable/context/context.ts#canceled@125",
-            "src/internal/portable/context/context.ts#requireParent@1428"
+            "src/internal/portable/context/context.ts#CancelContext@511",
+            "src/internal/portable/context/context.ts#cancel@767",
+            "src/internal/portable/context/context.ts#canceled@118",
+            "src/internal/portable/context/context.ts#requireParent@1560"
           ],
           "implementationSites": [
-            "src/internal/portable/context/context.ts#WithCancel@923"
+            "src/internal/portable/context/context.ts#WithCancel@1055"
           ]
         },
         {
@@ -1354,13 +1354,13 @@
           "targetFingerprint": "70fc4fad3ae35bb9bad7e0206270cef2b1de3254ea6bba15e157644e926c78a5",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/context/context.ts#CancelContext@434",
-            "src/internal/portable/context/context.ts#cancel@653",
-            "src/internal/portable/context/context.ts#canceled@125",
-            "src/internal/portable/context/context.ts#requireParent@1428"
+            "src/internal/portable/context/context.ts#CancelContext@511",
+            "src/internal/portable/context/context.ts#cancel@767",
+            "src/internal/portable/context/context.ts#canceled@118",
+            "src/internal/portable/context/context.ts#requireParent@1560"
           ],
           "implementationSites": [
-            "src/internal/portable/context/context.ts#WithCancelCause@979"
+            "src/internal/portable/context/context.ts#WithCancelCause@1111"
           ]
         },
         {
@@ -1375,11 +1375,11 @@
           "targetFingerprint": "ba058b61958b64e2c456cdfebad994bd49b17074be50c2d0e839c2c2bd278f31",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/context/context.ts#CancelContext@434",
-            "src/internal/portable/context/context.ts#cancel@653",
-            "src/internal/portable/context/context.ts#canceled@125",
-            "src/internal/portable/context/context.ts#deadlineExceeded@134",
-            "src/internal/portable/context/context.ts#requireParent@1428",
+            "src/internal/portable/context/context.ts#CancelContext@511",
+            "src/internal/portable/context/context.ts#cancel@767",
+            "src/internal/portable/context/context.ts#canceled@118",
+            "src/internal/portable/context/context.ts#deadlineExceeded@127",
+            "src/internal/portable/context/context.ts#requireParent@1560",
             "src/internal/portable/time/time.ts#Add@488",
             "src/internal/portable/time/time.ts#Before@748",
             "src/internal/portable/time/time.ts#Now@2500",
@@ -1387,7 +1387,7 @@
             "src/internal/portable/time/timer.ts#After@630"
           ],
           "implementationSites": [
-            "src/internal/portable/context/context.ts#WithTimeout@1045"
+            "src/internal/portable/context/context.ts#WithTimeout@1177"
           ]
         },
         {
@@ -1402,11 +1402,11 @@
           "targetFingerprint": "3383744c2933e826ea3c05efba86caf2fc6b31e5d168af73ec8f7f3bc37dd3cf",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/context/context.ts#ValueContext@699",
-            "src/internal/portable/context/context.ts#requireParent@1428"
+            "src/internal/portable/context/context.ts#ValueContext@813",
+            "src/internal/portable/context/context.ts#requireParent@1560"
           ],
           "implementationSites": [
-            "src/internal/portable/context/context.ts#WithValue@1216"
+            "src/internal/portable/context/context.ts#WithValue@1348"
           ]
         }
       ]
@@ -19775,6 +19775,7 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "time|kind=2|receiver=|name=ParseError",
           "capabilities": [
+            "copy",
             "equal",
             "hash",
             "make",
@@ -19784,7 +19785,7 @@
           "storageExport": "TimeParseErrorStorage",
           "implementationOwner": "src/internal/facets/named-time.ts",
           "storageImplementationOwner": "src/internal/portable/time/parse-error.ts",
-          "targetFingerprint": "35819d5632a16c21cbfc004f0b582a8cf947b78018ea3165b12c91c77e609e88",
+          "targetFingerprint": "7dd11ab10743fd57c0150d6f026ffe4e5639ef0eb7aaeddd51e8a1eb8c8e7fea",
           "storageTargetFingerprint": "0073fa4b3eb74a306e23ebb7ab0bdb7521fd7cca4bf809a74d9bf84b9936b3fb",
           "implementationSites": [
             "src/internal/facets/named-time.ts#TimeParseErrorOperations@228"
@@ -19803,7 +19804,7 @@
           "targetFingerprint": "2a47d53a0009db9f8f33495b6b0dec62ffeff09b8d32e3ea02d7c4f02e13732c",
           "storageTargetFingerprint": "ff82ffc641b89e7eb9413ff94611f8168916664a889bd2c1e13d2cade827fb49",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeTickerOperations@483"
+            "src/internal/facets/named-time.ts#TimeTickerOperations@515"
           ]
         },
         {
@@ -19840,7 +19841,7 @@
           "targetFingerprint": "59aa0fe619dbf53d94f8c35a3a9a1e2153953240a5b48bfc84c8746454496d94",
           "storageTargetFingerprint": "cc81f3a16b51b1c1e42c31a3703fff179dddee41376be109e64f8df3ad372470",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeTimerOperations@524"
+            "src/internal/facets/named-time.ts#TimeTimerOperations@556"
           ]
         }
       ]
@@ -20728,7 +20729,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextAfterFuncCanonical@1636"
+            "src/internal/facets/provider-context.ts#ContextAfterFuncCanonical@1732"
           ],
           "interfaces": [
             {
@@ -20826,7 +20827,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextCauseCanonical@1794"
+            "src/internal/facets/provider-context.ts#ContextCauseCanonical@1890"
           ],
           "interfaces": [
             {
@@ -20933,7 +20934,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1178"
+            "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1274"
           ],
           "interfaces": [
             {
@@ -21041,7 +21042,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextWithCancelCauseCanonical@1290"
+            "src/internal/facets/provider-context.ts#ContextWithCancelCauseCanonical@1386"
           ],
           "interfaces": [
             {
@@ -21152,7 +21153,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextWithTimeoutCanonical@1419"
+            "src/internal/facets/provider-context.ts#ContextWithTimeoutCanonical@1515"
           ],
           "interfaces": [
             {
@@ -21253,7 +21254,7 @@
             "context|kind=2|receiver=|name=Context"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-context.ts#ContextWithValueCanonical@1093"
+            "src/internal/facets/provider-context.ts#ContextWithValueCanonical@1189"
           ],
           "interfaces": [
             {
@@ -26314,11 +26315,11 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-time.ts#TimeTickerOperations@483",
+      "identity": "src/internal/facets/named-time.ts#TimeTickerOperations@515",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/named-time.ts#TimeTimerOperations@524",
+      "identity": "src/internal/facets/named-time.ts#TimeTimerOperations@556",
       "disposition": "implemented"
     },
     {
@@ -26714,73 +26715,79 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#CancelContext@730",
-      "disposition": "implemented",
-      "dependencies": [
-        "src/internal/facets/provider-context.ts#ContextValue@208",
-        "src/internal/facets/provider-context.ts#contextCause@1915",
-        "src/internal/portable/concurrency/channel.ts#ProviderChannel@70",
-        "src/internal/portable/concurrency/channel.ts#close@350",
-        "src/internal/portable/context/propagation.ts#propagateCancelAwaitable@134"
-      ]
-    },
-    {
-      "identity": "src/internal/facets/provider-context.ts#Cause@334",
+      "identity": "src/internal/facets/provider-context.ts#$contextName@487",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextAfterFuncCanonical@1636",
+      "identity": "src/internal/facets/provider-context.ts#CancelContext@789",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#requireParent@1838"
+        "src/internal/facets/provider-context.ts#ContextValue@216",
+        "src/internal/facets/provider-context.ts#canonicalParentContextName@2058",
+        "src/internal/facets/provider-context.ts#contextCause@2011",
+        "src/internal/portable/concurrency/channel.ts#ProviderChannel@70",
+        "src/internal/portable/concurrency/channel.ts#close@350",
+        "src/internal/portable/context/propagation.ts#propagateCancelAwaitable@134",
+        "src/internal/runtime/error.ts#ProviderError@16"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextCauseCanonical@1794",
+      "identity": "src/internal/facets/provider-context.ts#Cause@342",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#ContextAfterFuncCanonical@1732",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#contextCause@1915",
-        "src/internal/facets/provider-context.ts#requireParent@1838"
+        "src/internal/facets/provider-context.ts#requireParent@1934"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextValue@208",
-      "disposition": "placeholder",
+      "identity": "src/internal/facets/provider-context.ts#ContextCauseCanonical@1890",
+      "disposition": "implemented",
       "dependencies": [
-        "src/internal/runtime/placeholder.ts#providerPlaceholder@24"
+        "src/internal/facets/provider-context.ts#contextCause@2011",
+        "src/internal/facets/provider-context.ts#requireParent@1934"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1178",
+      "identity": "src/internal/facets/provider-context.ts#ContextValue@216",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#CancelContext@730",
-        "src/internal/facets/provider-context.ts#Initialize@828",
-        "src/internal/facets/provider-context.ts#cancel@1019",
-        "src/internal/facets/provider-context.ts#requireFailure@1880",
-        "src/internal/facets/provider-context.ts#requireParent@1838"
+        "src/internal/runtime/error.ts#ProviderError@16"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextWithCancelCauseCanonical@1290",
+      "identity": "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1274",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#CancelContext@730",
-        "src/internal/facets/provider-context.ts#Initialize@828",
-        "src/internal/facets/provider-context.ts#cancel@1019",
-        "src/internal/facets/provider-context.ts#requireFailure@1880",
-        "src/internal/facets/provider-context.ts#requireParent@1838"
+        "src/internal/facets/provider-context.ts#CancelContext@789",
+        "src/internal/facets/provider-context.ts#Initialize@924",
+        "src/internal/facets/provider-context.ts#cancel@1115",
+        "src/internal/facets/provider-context.ts#requireFailure@1976",
+        "src/internal/facets/provider-context.ts#requireParent@1934"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextWithTimeoutCanonical@1419",
+      "identity": "src/internal/facets/provider-context.ts#ContextWithCancelCauseCanonical@1386",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#CancelContext@730",
-        "src/internal/facets/provider-context.ts#Initialize@828",
-        "src/internal/facets/provider-context.ts#cancel@1019",
-        "src/internal/facets/provider-context.ts#requireFailure@1880",
-        "src/internal/facets/provider-context.ts#requireParent@1838",
+        "src/internal/facets/provider-context.ts#CancelContext@789",
+        "src/internal/facets/provider-context.ts#Initialize@924",
+        "src/internal/facets/provider-context.ts#cancel@1115",
+        "src/internal/facets/provider-context.ts#requireFailure@1976",
+        "src/internal/facets/provider-context.ts#requireParent@1934"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#ContextWithTimeoutCanonical@1515",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-context.ts#CancelContext@789",
+        "src/internal/facets/provider-context.ts#Initialize@924",
+        "src/internal/facets/provider-context.ts#cancel@1115",
+        "src/internal/facets/provider-context.ts#requireFailure@1976",
+        "src/internal/facets/provider-context.ts#requireParent@1934",
         "src/internal/portable/time/time.ts#Add@488",
         "src/internal/portable/time/time.ts#Before@748",
         "src/internal/portable/time/time.ts#Now@2500",
@@ -26789,56 +26796,75 @@
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ContextWithValueCanonical@1093",
+      "identity": "src/internal/facets/provider-context.ts#ContextWithValueCanonical@1189",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#ValueContext@450"
+        "src/internal/facets/provider-context.ts#ValueContext@493"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#Initialize@828",
+      "identity": "src/internal/facets/provider-context.ts#Initialize@924",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#cancel@1019",
-        "src/internal/facets/provider-context.ts#contextCause@1915",
-        "src/internal/facets/provider-context.ts#parent@799",
+        "src/internal/facets/provider-context.ts#cancel@1115",
+        "src/internal/facets/provider-context.ts#contextCause@2011",
+        "src/internal/facets/provider-context.ts#parent@895",
         "src/internal/portable/context/propagation.ts#propagateCancelAwaitable@134"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#ValueContext@450",
+      "identity": "src/internal/facets/provider-context.ts#PortableContextValue@72",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#ContextValue@208",
-        "src/internal/facets/provider-context.ts#contextCause@1915",
+        "src/internal/facets/provider-context.ts#PortableContextValue@72",
+        "src/internal/portable/context/context.ts#ContextValue@186"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#ValueContext@493",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-context.ts#ContextValue@216",
+        "src/internal/facets/provider-context.ts#contextCause@2011",
+        "src/internal/runtime/error.ts#ProviderError@16",
         "src/internal/runtime/interface.ts#goInterfaceEqual@10"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#cancel@1019",
+      "identity": "src/internal/facets/provider-context.ts#cancel@1115",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/concurrency/channel.ts#close@350"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#contextCause@1915",
+      "identity": "src/internal/facets/provider-context.ts#canonicalParentContextName@2058",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#Cause@334",
-        "src/internal/facets/provider-context.ts#ContextValue@208"
+        "src/internal/facets/provider-context.ts#$contextName@487",
+        "src/internal/facets/provider-context.ts#ContextValue@216",
+        "src/internal/facets/provider-context.ts#PortableContextValue@72",
+        "src/internal/portable/context/context.ts#$contextName@399"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#parent@799",
+      "identity": "src/internal/facets/provider-context.ts#contextCause@2011",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-context.ts#Cause@342",
+        "src/internal/facets/provider-context.ts#ContextValue@216"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-context.ts#parent@895",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#requireFailure@1880",
+      "identity": "src/internal/facets/provider-context.ts#requireFailure@1976",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-context.ts#requireParent@1838",
+      "identity": "src/internal/facets/provider-context.ts#requireParent@1934",
       "disposition": "implemented"
     },
     {
@@ -27179,7 +27205,7 @@
       "identity": "src/internal/facets/provider-os-signal.ts#OsSignalNotifyContextCanonical@133",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1178",
+        "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1274",
         "src/internal/node/os/signal/notify.ts#selectedSignalsAsync@660",
         "src/internal/node/os/signal/notify.ts#startNotificationAsync@337"
       ]
@@ -28852,34 +28878,40 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/context/context.ts#CancelContext@434",
+      "identity": "src/internal/portable/context/context.ts#$contextName@399",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/context/context.ts#CancelContext@511",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/concurrency/channel.ts#ProviderChannel@70",
         "src/internal/portable/concurrency/channel.ts#close@350",
-        "src/internal/portable/context/context.ts#ContextValue@193",
-        "src/internal/portable/context/context.ts#contextCause@1458",
-        "src/internal/portable/context/propagation.ts#propagateCancel@31"
+        "src/internal/portable/context/context.ts#ContextValue@186",
+        "src/internal/portable/context/context.ts#contextCause@1590",
+        "src/internal/portable/context/context.ts#parentContextName@405",
+        "src/internal/portable/context/propagation.ts#propagateCancel@31",
+        "src/internal/runtime/error.ts#ProviderError@16"
       ]
     },
     {
-      "identity": "src/internal/portable/context/context.ts#Cause@273",
+      "identity": "src/internal/portable/context/context.ts#Cause@267",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/context/context.ts#ContextValue@193",
-      "disposition": "placeholder",
+      "identity": "src/internal/portable/context/context.ts#ContextValue@186",
+      "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/context/context.ts#InterfaceValue@23",
-        "src/internal/portable/context/context.ts#contextMethodToken@118",
-        "src/internal/runtime/placeholder.ts#providerPlaceholder@24"
+        "src/internal/portable/context/context.ts#contextMethodToken@111",
+        "src/internal/runtime/error.ts#ProviderError@16"
       ]
     },
     {
-      "identity": "src/internal/portable/context/context.ts#EmptyContext@376",
+      "identity": "src/internal/portable/context/context.ts#EmptyContext@429",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/context/context.ts#ContextValue@193",
+        "src/internal/portable/context/context.ts#ContextValue@186",
         "src/internal/portable/time/time.ts#Time@155"
       ]
     },
@@ -28891,63 +28923,72 @@
       ]
     },
     {
-      "identity": "src/internal/portable/context/context.ts#ValueContext@699",
+      "identity": "src/internal/portable/context/context.ts#ValueContext@813",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/context/context.ts#ContextValue@193",
-        "src/internal/portable/context/context.ts#contextCause@1458",
+        "src/internal/portable/context/context.ts#ContextValue@186",
+        "src/internal/portable/context/context.ts#contextCause@1590",
+        "src/internal/runtime/error.ts#ProviderError@16",
         "src/internal/runtime/interface.ts#goInterfaceEqual@10"
       ]
     },
     {
-      "identity": "src/internal/portable/context/context.ts#background@853",
+      "identity": "src/internal/portable/context/context.ts#background@983",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/context/context.ts#EmptyContext@376"
+        "src/internal/portable/context/context.ts#EmptyContext@429"
       ]
     },
     {
-      "identity": "src/internal/portable/context/context.ts#cancel@653",
+      "identity": "src/internal/portable/context/context.ts#cancel@767",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/concurrency/channel.ts#close@350"
       ]
     },
     {
-      "identity": "src/internal/portable/context/context.ts#canceled@125",
+      "identity": "src/internal/portable/context/context.ts#canceled@118",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16"
       ]
     },
     {
-      "identity": "src/internal/portable/context/context.ts#contextCause@1458",
+      "identity": "src/internal/portable/context/context.ts#contextCause@1590",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/context/context.ts#Cause@273",
-        "src/internal/portable/context/context.ts#ContextValue@193"
+        "src/internal/portable/context/context.ts#Cause@267",
+        "src/internal/portable/context/context.ts#ContextValue@186"
       ]
     },
     {
-      "identity": "src/internal/portable/context/context.ts#contextMethodToken@118",
+      "identity": "src/internal/portable/context/context.ts#contextMethodToken@111",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/context/context.ts#deadlineExceeded@134",
+      "identity": "src/internal/portable/context/context.ts#deadlineExceeded@127",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16"
       ]
     },
     {
-      "identity": "src/internal/portable/context/context.ts#requireParent@1428",
+      "identity": "src/internal/portable/context/context.ts#parentContextName@405",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/context/context.ts#$contextName@399",
+        "src/internal/portable/context/context.ts#ContextValue@186"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/context/context.ts#requireParent@1560",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/context/context.ts#todo@861",
+      "identity": "src/internal/portable/context/context.ts#todo@992",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/context/context.ts#EmptyContext@376"
+        "src/internal/portable/context/context.ts#EmptyContext@429"
       ]
     },
     {
@@ -33296,5 +33337,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "5312f2f3a31185dbadb3c7581ecd8f9c7ccdf6e62b8906bbf76a9177662ecb38"
+  "manifestDigest": "dc3a230890de4c4d0787c6b933e74a2b2ab1e79916462237c835c3d1215585c9"
 }

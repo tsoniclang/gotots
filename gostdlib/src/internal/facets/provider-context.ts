@@ -1,19 +1,20 @@
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoMapHash } from "@gotots/runtime/map.js";
+import { ProviderError } from "../runtime/error.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
 import { GoEmptyStruct } from "@gotots/runtime/struct.js";
 
 import { ProviderChannel } from "../portable/concurrency/channel.js";
+import { ContextValue as PortableContextValue } from "../portable/context/context.js";
 import { propagateCancelAwaitable } from "../portable/context/propagation.js";
 import { Duration } from "../portable/time/duration.js";
 import { After } from "../portable/time/timer.js";
 import { Now, Time } from "../portable/time/time.js";
 import { goInterfaceEqual } from "../runtime/interface.js";
 import type { InterfaceContract } from "./provider-support.js";
-import { providerPlaceholder } from "../runtime/placeholder.js";
 
 export type { CanonicalError } from "./provider-io-contract.js";
 
@@ -67,8 +68,15 @@ abstract class ContextValue<Failure extends GoInterfaceValue>
     if (verb === "T") {
       return "context.Context";
     }
-    return providerPlaceholder("context value formatting is unsupported");
+    if (verb === "v" || verb === "s") {
+      return this.$contextName();
+    }
+    return GoPanic.raise(
+      new ProviderError(`context: unsupported format verb %${verb}`),
+    );
   }
+
+  abstract $contextName(): string;
 }
 
 class ValueContext<
@@ -79,6 +87,14 @@ class ValueContext<
   readonly #parent: Parent;
   readonly #key: GoInterfaceValue;
   readonly #value: GoInterfaceValue | undefined;
+
+  $contextName(): string {
+    return GoPanic.raise(
+      new ProviderError(
+        "context: value context formatting requires key and value formatting",
+      ),
+    );
+  }
 
   constructor(
     parent: Parent,
@@ -139,6 +155,17 @@ class CancelContext<
   );
   #failure: Failure | undefined;
   #cause: Failure | undefined;
+
+  $contextName(): string {
+    if (this.deadline === undefined) {
+      return `${canonicalParentContextName(this.parent)}.WithCancel`;
+    }
+    return GoPanic.raise(
+      new ProviderError(
+        "context: deadline context formatting requires time formatting",
+      ),
+    );
+  }
 
   constructor(
     private readonly parent: Parent,
@@ -364,4 +391,17 @@ async function contextCause<Failure extends GoInterfaceValue>(
   source: CanonicalContext<Failure>,
 ): Promise<Failure | undefined> {
   return await (source instanceof ContextValue ? source.Cause() : source.Err());
+}
+
+// canonicalParentContextName resolves the exact Go context chain spelling
+// for canonical contexts; foreign implementations keep the interface
+// fallback.
+function canonicalParentContextName(parent: object): string {
+  if (parent instanceof ContextValue) {
+    return parent.$contextName();
+  }
+  if (parent instanceof PortableContextValue) {
+    return parent.$contextName();
+  }
+  return "context.Context";
 }

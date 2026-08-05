@@ -76,6 +76,16 @@ export class TimeParseErrorOperations {
     );
   }
 
+  static $copy(source: ParseError): ParseError {
+    return new ParseError(
+      source.Layout,
+      source.Value,
+      source.LayoutElem,
+      source.ValueElem,
+      source.Message,
+    );
+  }
+
   static $hash(source: ParseError): number {
     let hash = 2166136261;
     hash = GoMapHash.mix(hash, GoMapHash.string(source.Layout));
