@@ -13,6 +13,7 @@ import (
 const reflectTypeForIdentity = "reflect|kind=4|receiver=|name=TypeFor"
 const reflectValueOfIdentity = "reflect|kind=4|receiver=|name=ValueOf"
 const reflectTypeOfIdentity = "reflect|kind=4|receiver=|name=TypeOf"
+const reflectMakeSliceIdentity = "reflect|kind=4|receiver=|name=MakeSlice"
 
 func emitReflectionTypeOf(
 	context api.Context,
@@ -321,4 +322,134 @@ func emitReflectionValueOf(
 		requests,
 	)
 	return emission, true, err
+}
+
+// emitReflectionMakeSlice intercepts reflect.MakeSlice to demand the
+// generated value facet of the constructed slice type whenever the Type
+// argument carries static composition evidence (a direct reflect.TypeOf
+// or reflect.TypeFor descriptor), then delegates the call to the ordinary
+// certified provider-profile emission. A dynamically flowing descriptor
+// keeps the certified provider boundary and fails loudly at the typed
+// provider check when its facet is absent.
+func emitReflectionMakeSlice(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	discarded bool,
+	detached bool,
+) (api.ExpressionEmission, bool, error) {
+	owner, ok := calleeObject(context.TypesInfo(), source.Fun)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
+	}
+	contract, err := environmentcontract.Describe(owner)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if contract.Identity() != reflectMakeSliceIdentity {
+		return api.ExpressionEmission{}, false, nil
+	}
+	if detached {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	signature, ok := owner.Type().(*types.Signature)
+	if !ok || signature.Results() == nil || signature.Results().Len() != 1 ||
+		signature.Params() == nil || signature.Params().Len() != 3 ||
+		len(source.Args) != 3 {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if err := validateResults(context, source, signature, discarded); err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	var demand []api.RootRequest
+	if sliceType, evident := reflectionCompositionType(
+		context,
+		source.Args[0],
+	); evident {
+		reflectTypeObject, typeOK := owner.Pkg().
+			Scope().
+			Lookup("Type").(*types.TypeName)
+		if !typeOK {
+			return api.ExpressionEmission{}, true, &api.ContextError{
+				Reason: "reflect package has no Type declaration",
+			}
+		}
+		names, namesOK := context.Names().(api.ReflectionNames)
+		if !namesOK {
+			return api.ExpressionEmission{}, true, &api.ContextError{
+				Reason: "reflection names are unavailable",
+			}
+		}
+		metadata, metadataErr := names.ReflectionValueType(
+			sliceType,
+			reflectTypeObject,
+		)
+		if metadataErr != nil {
+			return api.ExpressionEmission{}, true, metadataErr
+		}
+		demand = metadata.Requests()
+	}
+	target, selected, _, err := emitProviderProfileFunction(
+		context,
+		children,
+		source,
+		owner,
+		signature,
+		discarded,
+		detached,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if !selected {
+		return api.ExpressionEmission{}, false, nil
+	}
+	merged, err := api.NewExpressionEmission(
+		target.Before(),
+		target.Value(),
+		api.CombineRequests(target.Requests(), demand),
+	)
+	return merged, true, err
+}
+
+// reflectionCompositionType recovers the exact Go type flowing through a
+// direct reflect.TypeOf or reflect.TypeFor composition. Any other Type
+// expression yields no static evidence.
+func reflectionCompositionType(
+	context api.Context,
+	expression ast.Expr,
+) (types.Type, bool) {
+	call, ok := ast.Unparen(expression).(*ast.CallExpr)
+	if !ok {
+		return nil, false
+	}
+	if owner, ownerOK := calleeObject(
+		context.TypesInfo(),
+		call.Fun,
+	); ownerOK {
+		contract, err := environmentcontract.Describe(owner)
+		if err == nil && contract.Identity() == reflectTypeOfIdentity &&
+			len(call.Args) == 1 {
+			argumentType := context.TypesInfo().TypeOf(call.Args[0])
+			if argumentType != nil &&
+				!api.ContainsGenericTypeParameter(argumentType) {
+				return argumentType, true
+			}
+		}
+		return nil, false
+	}
+	if owner, instance, instanceOK := genericFunctionInstance(
+		context,
+		call,
+	); instanceOK {
+		contract, err := environmentcontract.Describe(owner)
+		if err == nil && contract.Identity() == reflectTypeForIdentity &&
+			instance.TypeArgs.Len() == 1 &&
+			!instance.TypeArgs.ContainsGenericTypeParameter() {
+			return instance.TypeArgs.At(0), true
+		}
+	}
+	return nil, false
 }

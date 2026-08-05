@@ -43,6 +43,20 @@ export interface RuntimeValueOperations {
     box: GoInterfaceValue,
     index: int64,
   ) => RuntimeValueLocation;
+  readonly len?: (box: GoInterfaceValue) => int64;
+  readonly cap?: (box: GoInterfaceValue) => int64;
+  readonly index?: (
+    box: GoInterfaceValue,
+    index: int64,
+  ) => RuntimeValueLocation;
+  readonly append?: (
+    box: GoInterfaceValue,
+    values: readonly GoInterfaceValue[],
+  ) => GoInterfaceValue;
+  readonly makeSlice?: (
+    length: int64,
+    capacity: int64,
+  ) => GoInterfaceValue;
 }
 
 const operationsByType = new Map<Type, RuntimeValueOperations>();

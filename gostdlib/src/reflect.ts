@@ -83,6 +83,31 @@ export abstract class Value {
     return new LocatedValue(location.get(), location, true);
   }
 
+  static $append(target: Value, values: RuntimeSlice<Value>): Value {
+    const operation = target.operations()?.append;
+    if (operation === undefined || target.source === undefined) {
+      return GoPanic.raise(
+        new ProviderError(
+          `reflect: call of reflect.Append on ${target.kindText()} Value`,
+        ),
+      );
+    }
+    const boxes: GoInterfaceValue[] = [];
+    for (let index = 0; index < values.length; index++) {
+      const element = values.get(index);
+      const box = element.source;
+      if (box === undefined) {
+        return GoPanic.raise(
+          new ProviderError(
+            "reflect: call of reflect.Append on zero Value",
+          ),
+        );
+      }
+      boxes.push(box);
+    }
+    return new InterfaceValue(operation(target.source, boxes));
+  }
+
   private resolvedType(): Type | undefined {
     return this.source === undefined
       ? undefined
@@ -122,7 +147,13 @@ export abstract class Value {
       this.location !== undefined &&
       this.location.settable;
   }
-  Cap(): int { return providerPlaceholder("reflect.Value.Cap requires generated reflection metadata"); }
+  Cap(): int {
+    const operation = this.operations()?.cap;
+    if (operation === undefined || this.source === undefined) {
+      return this.operationPanic("Cap");
+    }
+    return operation(this.source);
+  }
   Convert(_target: Type | undefined): Value { return providerPlaceholder("reflect.Value.Convert requires generated reflection metadata"); }
   Elem(): Value {
     const operation = this.operations()?.elem;
@@ -161,7 +192,19 @@ export abstract class Value {
     return operation(this.source);
   }
   Grow(_capacity: int): void { return providerPlaceholder("reflect.Value.Grow requires generated reflection metadata"); }
-  Index(_index: int): Value { return providerPlaceholder("reflect.Value.Index requires generated reflection metadata"); }
+  Index(index: int): Value {
+    const operation = this.operations()?.index;
+    if (operation === undefined || this.source === undefined) {
+      return this.operationPanic("Index");
+    }
+    if (index < 0n || index >= this.Len()) {
+      return GoPanic.raise(
+        new ProviderError("reflect: slice index out of range"),
+      );
+    }
+    const location = operation(this.source, index);
+    return new LocatedValue(location.get(), location, true);
+  }
   Int(): int64 {
     const operation = this.operations()?.int;
     if (operation === undefined || this.source === undefined) {
@@ -198,7 +241,13 @@ export abstract class Value {
     return type === undefined ? Invalid : type.Kind();
   }
 
-  Len(): int { return providerPlaceholder("reflect.Value.Len requires generated reflection metadata"); }
+  Len(): int {
+    const operation = this.operations()?.len;
+    if (operation === undefined || this.source === undefined) {
+      return this.operationPanic("Len");
+    }
+    return operation(this.source);
+  }
   MapIndex(_key: Value): Value { return providerPlaceholder("reflect.Value.MapIndex requires generated reflection metadata"); }
   MapRange(): MapIter | undefined { return providerPlaceholder("reflect.Value.MapRange requires generated reflection metadata"); }
   NumField(): int {
@@ -439,8 +488,8 @@ export interface Type extends GoInterfaceValue {
   String(): gostring;
 }
 
-export function Append(_slice: Value, _values: RuntimeSlice<Value>): Value {
-  return providerPlaceholder("reflect.Append requires generated reflection metadata");
+export function Append(slice: Value, values: RuntimeSlice<Value>): Value {
+  return Value.$append(slice, values);
 }
 
 export function DeepEqual(
@@ -459,11 +508,45 @@ export function MakeMap(_type: Type | undefined): Value {
 }
 
 export function MakeSlice(
-  _type: Type | undefined,
-  _length: int,
-  _capacity: int,
+  type: Type | undefined,
+  length: int,
+  capacity: int,
 ): Value {
-  return providerPlaceholder("reflect.MakeSlice requires generated reflection metadata");
+  if (type === undefined || type.Kind().value !== Slice.value) {
+    return GoPanic.raise(
+      new ProviderError("reflect: MakeSlice of non-slice type"),
+    );
+  }
+  if (length < 0n) {
+    return GoPanic.raise(
+      new ProviderError(
+        "reflect: negative len argument in call to reflect.MakeSlice",
+      ),
+    );
+  }
+  if (capacity < 0n) {
+    return GoPanic.raise(
+      new ProviderError(
+        "reflect: negative cap argument in call to reflect.MakeSlice",
+      ),
+    );
+  }
+  if (length > capacity) {
+    return GoPanic.raise(
+      new ProviderError(
+        "reflect: len > cap in call to reflect.MakeSlice",
+      ),
+    );
+  }
+  const operation = runtimeValueOperations(type)?.makeSlice;
+  if (operation === undefined) {
+    return GoPanic.raise(
+      new ProviderError(
+        `reflect: MakeSlice requires a generated value facet for ${type.String()}`,
+      ),
+    );
+  }
+  return new InterfaceValue(operation(length, capacity));
 }
 
 export function MapOf(
