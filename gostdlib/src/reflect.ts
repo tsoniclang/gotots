@@ -26,6 +26,7 @@ import { providerPlaceholder } from "./internal/runtime/placeholder.js";
 import {
   resolveRuntimeType,
   runtimeValueOperations,
+  type RuntimeValueLocation,
   type RuntimeValueOperations,
 } from "./internal/portable/reflect/runtime-value.js";
 import type { Seq } from "./iter.js";
@@ -72,7 +73,15 @@ export const Struct = new Kind(25n);
 export const UnsafePointer = new Kind(26n);
 
 export abstract class Value {
-  protected constructor(protected readonly source?: GoInterfaceValue) {}
+  protected constructor(
+    protected readonly source?: GoInterfaceValue,
+    private readonly location?: RuntimeValueLocation,
+    private readonly addressable: bool = false,
+  ) {}
+
+  private static located(location: RuntimeValueLocation): Value {
+    return new LocatedValue(location.get(), location, true);
+  }
 
   private resolvedType(): Type | undefined {
     return this.source === undefined
@@ -108,11 +117,42 @@ export abstract class Value {
   }
   Bytes(): RuntimeSlice<uint8> { return providerPlaceholder("reflect.Value.Bytes requires generated reflection metadata"); }
   CanInt(): bool { return providerPlaceholder("reflect.Value.CanInt requires generated reflection metadata"); }
-  CanSet(): bool { return providerPlaceholder("reflect.Value.CanSet requires generated reflection metadata"); }
+  CanSet(): bool {
+    return this.addressable &&
+      this.location !== undefined &&
+      this.location.settable;
+  }
   Cap(): int { return providerPlaceholder("reflect.Value.Cap requires generated reflection metadata"); }
   Convert(_target: Type | undefined): Value { return providerPlaceholder("reflect.Value.Convert requires generated reflection metadata"); }
-  Elem(): Value { return providerPlaceholder("reflect.Value.Elem requires generated reflection metadata"); }
-  Field(_index: int): Value { return providerPlaceholder("reflect.Value.Field requires generated reflection metadata"); }
+  Elem(): Value {
+    const operation = this.operations()?.elem;
+    if (operation === undefined || this.source === undefined) {
+      return this.operationPanic("Elem");
+    }
+    const location = operation(this.source);
+    return location === undefined
+      ? new LocatedValue(undefined)
+      : Value.located(location);
+  }
+  Field(index: int): Value {
+    const operations = this.operations();
+    const field = operations?.field;
+    const count = operations?.numField;
+    if (
+      field === undefined ||
+      count === undefined ||
+      this.source === undefined
+    ) {
+      return this.operationPanic("Field");
+    }
+    if (index < 0n || index >= count) {
+      return GoPanic.raise(
+        new ProviderError("reflect: Field index out of range"),
+      );
+    }
+    const location = field(this.source, index);
+    return new LocatedValue(location.get(), location, this.addressable);
+  }
   Float(): float64 {
     const operation = this.operations()?.float;
     if (operation === undefined || this.source === undefined) {
@@ -145,7 +185,13 @@ export abstract class Value {
     return operation(this.source);
   }
   IsValid(): bool { return this.source !== undefined; }
-  IsZero(): bool { return providerPlaceholder("reflect.Value.IsZero requires generated reflection metadata"); }
+  IsZero(): bool {
+    const operation = this.operations()?.isZero;
+    if (operation === undefined || this.source === undefined) {
+      return this.operationPanic("IsZero");
+    }
+    return operation(this.source);
+  }
 
   Kind(): Kind {
     const type = this.resolvedType();
@@ -155,8 +201,37 @@ export abstract class Value {
   Len(): int { return providerPlaceholder("reflect.Value.Len requires generated reflection metadata"); }
   MapIndex(_key: Value): Value { return providerPlaceholder("reflect.Value.MapIndex requires generated reflection metadata"); }
   MapRange(): MapIter | undefined { return providerPlaceholder("reflect.Value.MapRange requires generated reflection metadata"); }
-  NumField(): int { return providerPlaceholder("reflect.Value.NumField requires generated reflection metadata"); }
-  Set(_value: Value): void { return providerPlaceholder("reflect.Value.Set requires generated reflection metadata"); }
+  NumField(): int {
+    const count = this.operations()?.numField;
+    if (count === undefined || this.source === undefined) {
+      return this.operationPanic("NumField");
+    }
+    return count;
+  }
+  Set(value: Value): void {
+    const target = this.settableLocation("Set");
+    const payload = value.source;
+    if (payload === undefined) {
+      return GoPanic.raise(
+        new ProviderError("reflect: Set using zero Value argument"),
+      );
+    }
+    target.set(payload);
+  }
+
+  private settableLocation(operation: string): RuntimeValueLocation {
+    if (this.location === undefined || this.source === undefined) {
+      return this.operationPanic(operation);
+    }
+    if (!this.addressable || !this.location.settable) {
+      return GoPanic.raise(
+        new ProviderError(
+          `reflect: reflect.Value.${operation} using unaddressable value`,
+        ),
+      );
+    }
+    return this.location;
+  }
   SetBool(_value: bool): void { return providerPlaceholder("reflect.Value.SetBool requires generated reflection metadata"); }
   SetBytes(_value: RuntimeSlice<uint8>): void { return providerPlaceholder("reflect.Value.SetBytes requires generated reflection metadata"); }
   SetFloat(_value: float64): void { return providerPlaceholder("reflect.Value.SetFloat requires generated reflection metadata"); }
@@ -165,7 +240,14 @@ export abstract class Value {
   SetIterValue(_iterator: MapIter | undefined): void { return providerPlaceholder("reflect.Value.SetIterValue requires generated reflection metadata"); }
   SetLen(_length: int): void { return providerPlaceholder("reflect.Value.SetLen requires generated reflection metadata"); }
   SetMapIndex(_key: Value, _element: Value): void { return providerPlaceholder("reflect.Value.SetMapIndex requires generated reflection metadata"); }
-  SetString(_value: gostring): void { return providerPlaceholder("reflect.Value.SetString requires generated reflection metadata"); }
+  SetString(value: gostring): void {
+    const target = this.settableLocation("SetString");
+    const box = this.operations()?.boxString;
+    if (box === undefined) {
+      return this.operationPanic("SetString");
+    }
+    target.set(box(value));
+  }
   SetUint(_value: uint64): void { return providerPlaceholder("reflect.Value.SetUint requires generated reflection metadata"); }
   SetZero(): void { return providerPlaceholder("reflect.Value.SetZero requires generated reflection metadata"); }
 
@@ -214,6 +296,16 @@ export abstract class Value {
 class InterfaceValue extends Value {
   constructor(source: GoInterfaceValue | undefined) {
     super(source);
+  }
+}
+
+class LocatedValue extends Value {
+  constructor(
+    source: GoInterfaceValue | undefined,
+    location?: RuntimeValueLocation,
+    addressable: bool = false,
+  ) {
+    super(source, location, addressable);
   }
 }
 

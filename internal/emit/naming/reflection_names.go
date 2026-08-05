@@ -166,7 +166,15 @@ func (n *File) ReflectionValueOf(
 		if typeErr != nil {
 			return api.NameReference{}, typeErr
 		}
-		requests = api.CombineRequests(requests, staticType.Requests())
+		facet, facetErr := registry.reflectionValueOperationsRequest(artifactKey)
+		if facetErr != nil {
+			return api.NameReference{}, facetErr
+		}
+		requests = api.CombineRequests(
+			requests,
+			staticType.Requests(),
+			[]api.RootRequest{facet},
+		)
 	}
 	modulePath, err := output.ModuleSpecifier(
 		n.targetPath,
@@ -188,6 +196,53 @@ func (n *File) ReflectionValueOf(
 func (n *File) ReflectionValueOperationsDemanded(artifactKey string) bool {
 	_, demanded := n.owner.registry.reflectionValueDemands[artifactKey]
 	return demanded
+}
+
+// ReflectionValueType returns the canonical descriptor reference for one
+// type while joining its value-operation facet demand, closing the value
+// metadata over navigable child types (fields and pointees). The distinct
+// value-operation requirement requeues a descriptor that was already
+// constructed before this demand arrived.
+func (n *File) ReflectionValueType(
+	sourceType types.Type,
+	reflectionType *types.TypeName,
+) (api.NameReference, error) {
+	artifactKey, err := typeidentity.BuildKey(
+		sourceType,
+		n.generatedNamedObjectIdentity,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	n.owner.registry.reflectionValueDemands[artifactKey] = struct{}{}
+	reference, err := n.ReflectionType(sourceType, reflectionType)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	facet, err := n.owner.registry.reflectionValueOperationsRequest(
+		artifactKey,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return reference.WithRequests(api.CombineRequests(
+		reference.Requests(),
+		[]api.RootRequest{facet},
+	)...)
+}
+
+// reflectionValueOperationsRequest builds the value-operation facet
+// requirement of one interned canonical descriptor.
+func (r *Registry) reflectionValueOperationsRequest(
+	artifactKey string,
+) (api.RootRequest, error) {
+	binding, ok := r.reflectionTypes[artifactKey]
+	if !ok || binding.owner == nil {
+		return api.RootRequest{}, &api.NameError{
+			Reason: "reflection value demand has no interned descriptor",
+		}
+	}
+	return api.NewReflectionValueOperationsRequest(binding.owner)
 }
 
 func (r *Registry) internReflectionType(

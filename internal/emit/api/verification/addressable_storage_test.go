@@ -153,7 +153,8 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementUnsafeCodec != 29 ||
 		DeclarationRequirementProviderInterfaceCapability != 30 ||
 		DeclarationRequirementProviderProfileInterfaceCapability != 31 ||
-		DeclarationRequirementKind(32).Valid() {
+		DeclarationRequirementReflectionValueOperations != 32 ||
+		DeclarationRequirementKind(33).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }

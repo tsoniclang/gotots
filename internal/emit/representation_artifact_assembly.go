@@ -226,6 +226,8 @@ func (s *programSession) buildRepresentationArtifactRevision(
 				requirements,
 			)
 		}
+	} else if artifact.Kind() == api.GeneratedArtifactReflectionType {
+		err = reflectionRepresentationRequirements(requirements, artifact)
 	} else {
 		err = exactRepresentationRequirement(requirements, artifact)
 	}
@@ -418,6 +420,50 @@ func buildRepresentationArtifact(
 			Reason: "representation artifact kind is invalid",
 		}
 	}
+}
+
+// reflectionRepresentationRequirements admits the closed facet set of one
+// canonical reflection descriptor: the definition requirement plus at most
+// one value-operation facet requirement, both bound to the same artifact.
+func reflectionRepresentationRequirements(
+	requirements []api.DeclarationRequirement,
+	artifact *api.GeneratedArtifact,
+) error {
+	if len(requirements) == 0 || len(requirements) > 2 {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: fmt.Sprintf(
+				"reflection artifact requires one definition and at most one value facet, received %d",
+				len(requirements),
+			),
+		}
+	}
+	seen := make(map[api.DeclarationRequirementKind]struct{}, 2)
+	for _, requirement := range requirements {
+		kind := requirement.Kind()
+		if kind != api.DeclarationRequirementReflectionType &&
+			kind != api.DeclarationRequirementReflectionValueOperations {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "reflection artifact received a foreign requirement kind",
+			}
+		}
+		if _, duplicate := seen[kind]; duplicate {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "reflection artifact received a duplicate facet requirement",
+			}
+		}
+		seen[kind] = struct{}{}
+		selected, ok := requirement.GeneratedArtifact()
+		if !ok || selected != artifact {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "representation artifact received a foreign requirement",
+			}
+		}
+	}
+	return nil
 }
 
 func exactRepresentationRequirement(

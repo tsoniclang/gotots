@@ -344,7 +344,7 @@ func (r *Registry) recordInterfaceReflectionDemand(
 		if err != nil {
 			return nil, err
 		}
-		requests = append(requests, selected)
+		requests = append(requests, selected...)
 	}
 	return requests, nil
 }
@@ -448,7 +448,7 @@ func (r *Registry) interfaceAdapterContractRequests(
 			if reflectionErr != nil {
 				return nil, reflectionErr
 			}
-			requests = append(requests, reflection)
+			requests = append(requests, reflection...)
 		}
 	}
 	return requests, nil
@@ -457,15 +457,15 @@ func (r *Registry) interfaceAdapterContractRequests(
 func (r *Registry) interfaceAdapterReflectionRequest(
 	binding interfaceAdapterBinding,
 	reflectionType *types.TypeName,
-) (api.RootRequest, error) {
+) ([]api.RootRequest, error) {
 	if binding.owner == nil || binding.key == "" || reflectionType == nil {
-		return api.RootRequest{}, &api.NameError{
+		return nil, &api.NameError{
 			Reason: "interface adapter reflection owner is invalid",
 		}
 	}
 	sourceType, ok := binding.owner.InterfaceAdapterType()
 	if !ok {
-		return api.RootRequest{}, &api.NameError{
+		return nil, &api.NameError{
 			Reason: "interface adapter reflection owner has no source type",
 		}
 	}
@@ -475,12 +475,22 @@ func (r *Registry) interfaceAdapterReflectionRequest(
 		reflectionType,
 	)
 	if err != nil {
-		return api.RootRequest{}, err
+		return nil, err
 	}
+	descriptor, err := api.NewReflectionTypeRequest(reflection.owner)
+	if err != nil {
+		return nil, err
+	}
+	requests := []api.RootRequest{descriptor}
 	if r.contractDemandsValueOperations(binding) {
 		r.reflectionValueDemands[binding.key] = struct{}{}
+		facet, facetErr := r.reflectionValueOperationsRequest(binding.key)
+		if facetErr != nil {
+			return nil, facetErr
+		}
+		requests = append(requests, facet)
 	}
-	return api.NewReflectionTypeRequest(reflection.owner)
+	return requests, nil
 }
 
 // contractDemandsValueOperations reports whether any observed reflection

@@ -41,7 +41,8 @@ func RequirementUseDemand(
 	case api.DeclarationRequirementInterfaceAdapter,
 		api.DeclarationRequirementInterfaceDynamicTypeToken,
 		api.DeclarationRequirementInterfaceMethodToken,
-		api.DeclarationRequirementReflectionType:
+		api.DeclarationRequirementReflectionType,
+		api.DeclarationRequirementReflectionValueOperations:
 		return environmentidentity.UseDemandRuntimeFacet
 	case api.DeclarationRequirementProviderInterfaceBridge,
 		api.DeclarationRequirementProviderInterfaceCapability,

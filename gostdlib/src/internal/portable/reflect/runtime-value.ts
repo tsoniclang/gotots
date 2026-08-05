@@ -9,6 +9,17 @@ import type {
 
 import type { Type } from "../../../reflect.js";
 
+// RuntimeValueLocation is one addressable typed view over original Go
+// storage: reads box the current value and writes reach the represented
+// storage through the generated accessors. Settability is generated
+// evidence (exported-field and addressability facts), never inferred.
+export interface RuntimeValueLocation {
+  readonly type: () => Type;
+  readonly settable: bool;
+  readonly get: () => GoInterfaceValue;
+  readonly set: (box: GoInterfaceValue) => void;
+}
+
 // RuntimeValueOperations are the generated per-type typed value callbacks
 // of one reflection-visible Go type. Every callback receives the canonical
 // interface box, performs its exact generated adapter guard, and projects
@@ -23,6 +34,15 @@ export interface RuntimeValueOperations {
   readonly string?: (box: GoInterfaceValue) => gostring;
   readonly isNil?: (box: GoInterfaceValue) => bool;
   readonly isZero?: (box: GoInterfaceValue) => bool;
+  readonly boxString?: (value: gostring) => GoInterfaceValue;
+  readonly elem?: (
+    box: GoInterfaceValue,
+  ) => RuntimeValueLocation | undefined;
+  readonly numField?: int64;
+  readonly field?: (
+    box: GoInterfaceValue,
+    index: int64,
+  ) => RuntimeValueLocation;
 }
 
 const operationsByType = new Map<Type, RuntimeValueOperations>();

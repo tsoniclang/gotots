@@ -161,6 +161,9 @@ type ReflectionNames interface {
 	// ReflectionValueOperationsDemanded reports whether the value-operation
 	// facet was demanded for one canonical reflection artifact.
 	ReflectionValueOperationsDemanded(string) bool
+	// ReflectionValueType returns the canonical descriptor reference for
+	// one type while joining its value-operation facet demand.
+	ReflectionValueType(types.Type, *types.TypeName) (NameReference, error)
 }
 
 type UnsafeCodecNames interface {

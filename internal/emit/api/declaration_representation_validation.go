@@ -256,7 +256,8 @@ func (r DeclarationRequirement) Valid() bool {
 		return r.validGeneratedDefinition(
 			GeneratedArtifactInterfaceDynamicTypeToken,
 		)
-	case DeclarationRequirementReflectionType:
+	case DeclarationRequirementReflectionType,
+		DeclarationRequirementReflectionValueOperations:
 		return r.validGeneratedDefinition(GeneratedArtifactReflectionType)
 	case DeclarationRequirementUnsafeCodec:
 		return r.validGeneratedDefinition(GeneratedArtifactUnsafeCodec)

@@ -25,12 +25,15 @@ type valueOperationCallback struct {
 // projects the represented payload; message strings never select behavior.
 func valueOperationsStatement(
 	context api.Context,
+	names api.ReflectionNames,
 	operations api.NameReference,
+	reflectionType *types.TypeName,
+	targetType api.NameReference,
 	sourceType types.Type,
 	descriptorName string,
 ) (tsgo.Statement, []api.RootRequest, bool, error) {
-	callbacks, ok, err := selectValueCallbacks(context, sourceType)
-	if err != nil || !ok {
+	callbacks, _, err := selectValueCallbacks(context, sourceType)
+	if err != nil {
 		return nil, nil, false, err
 	}
 	factory := context.Factory()
@@ -184,6 +187,28 @@ func valueOperationsStatement(
 			arrow,
 		))
 	}
+	scaffold := &locationScaffold{
+		factory:    factory,
+		adapter:    adapter,
+		boxType:    boxType,
+		panicRef:   panicReference,
+		targetType: targetType,
+	}
+	extended, err := extendedValueProperties(
+		context,
+		names,
+		reflectionType,
+		sourceType,
+		scaffold,
+	)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	properties = append(properties, extended...)
+	requests = append(requests, scaffold.requests...)
+	if len(properties) == 0 {
+		return nil, nil, false, nil
+	}
 	statement := factory.ExpressionStatement(factory.CallExpression(
 		factory.PropertyAccessExpression(
 			operations.Expression(factory),
@@ -209,7 +234,7 @@ func selectValueCallbacks(
 	context api.Context,
 	sourceType types.Type,
 ) ([]valueOperationCallback, bool, error) {
-	switch selected := types.Unalias(sourceType).(type) {
+	switch selected := types.Unalias(sourceType).Underlying().(type) {
 	case *types.Basic:
 		provider, ok := context.ProviderScalarABI()
 		if !ok {

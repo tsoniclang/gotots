@@ -339,6 +339,7 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementDeferredCallableRegistry,
 		DeclarationRequirementGenericConcretization,
 		DeclarationRequirementReflectionType,
+		DeclarationRequirementReflectionValueOperations,
 		DeclarationRequirementUnsafeCodec:
 		return r.generated, true
 	case DeclarationRequirementTypeRepresentation:

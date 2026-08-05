@@ -403,6 +403,7 @@ func artifactKinds(kind api.DeclarationRequirementKind) bool {
 		kind == api.DeclarationRequirementCallableABI ||
 		kind == api.DeclarationRequirementPointerRepresentation ||
 		kind == api.DeclarationRequirementReflectionType ||
+		kind == api.DeclarationRequirementReflectionValueOperations ||
 		kind == api.DeclarationRequirementUnsafeCodec
 }
 

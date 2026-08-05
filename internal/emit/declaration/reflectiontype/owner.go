@@ -92,7 +92,10 @@ func Build(
 		registration, registrationRequests, handled, valueErr :=
 			valueOperationsStatement(
 				context,
+				names,
 				operations,
+				reflectionType,
+				targetType,
 				sourceType,
 				artifact.TargetName(),
 			)

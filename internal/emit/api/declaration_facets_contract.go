@@ -124,6 +124,7 @@ const (
 	DeclarationRequirementUnsafeCodec                        DeclarationRequirementKind = 29
 	DeclarationRequirementProviderInterfaceCapability        DeclarationRequirementKind = 30
 	DeclarationRequirementProviderProfileInterfaceCapability DeclarationRequirementKind = 31
+	DeclarationRequirementReflectionValueOperations          DeclarationRequirementKind = 32
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -155,7 +156,8 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementReflectionType ||
 		k == DeclarationRequirementUnsafeCodec ||
 		k == DeclarationRequirementProviderInterfaceCapability ||
-		k == DeclarationRequirementProviderProfileInterfaceCapability
+		k == DeclarationRequirementProviderProfileInterfaceCapability ||
+		k == DeclarationRequirementReflectionValueOperations
 }
 
 type CallableControlFacet uint8

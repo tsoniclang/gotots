@@ -66,10 +66,21 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 	if !ok {
 		t.Fatal("reflect.Value.Elem has no certified binding")
 	}
-	if elem.Disposition() != gostdlib.DispositionPlaceholder {
+	if elem.Disposition() != gostdlib.DispositionImplemented {
 		t.Fatalf(
-			"reflect.Value.Elem disposition = %v, want placeholder",
+			"reflect.Value.Elem disposition = %v, want implemented",
 			elem.Disposition(),
+		)
+	}
+
+	mapIndex, ok := byIdentity["reflect|kind=4|receiver=reflect.Value|name=MapIndex"]
+	if !ok {
+		t.Fatal("reflect.Value.MapIndex has no certified binding")
+	}
+	if mapIndex.Disposition() != gostdlib.DispositionPlaceholder {
+		t.Fatalf(
+			"reflect.Value.MapIndex disposition = %v, want placeholder",
+			mapIndex.Disposition(),
 		)
 	}
 
@@ -103,9 +114,9 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 	// implemented bodies retain their conservative private value-level
 	// dependencies resolved to exact symbols.
 	foundCanonical := false
-	for _, dependency := range elem.ImplementationDependencies() {
+	for _, dependency := range mapIndex.ImplementationDependencies() {
 		if dependency == "" {
-			t.Fatal("reflect.Value.Elem recorded an anonymous dependency")
+			t.Fatal("reflect.Value.MapIndex recorded an anonymous dependency")
 		}
 		if gostdlib.CanonicalPlaceholderDependency(dependency) {
 			foundCanonical = true
@@ -113,9 +124,17 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 	}
 	if !foundCanonical {
 		t.Fatalf(
-			"reflect.Value.Elem placeholder does not depend on the canonical placeholder symbol: %v",
-			elem.ImplementationDependencies(),
+			"reflect.Value.MapIndex placeholder does not depend on the canonical placeholder symbol: %v",
+			mapIndex.ImplementationDependencies(),
 		)
+	}
+	for _, dependency := range elem.ImplementationDependencies() {
+		if gostdlib.CanonicalPlaceholderDependency(dependency) {
+			t.Fatalf(
+				"implemented reflect.Value.Elem depends on the canonical placeholder: %v",
+				elem.ImplementationDependencies(),
+			)
+		}
 	}
 	for _, dependency := range trimSpace.ImplementationDependencies() {
 		if gostdlib.CanonicalPlaceholderDependency(dependency) {
