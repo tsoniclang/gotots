@@ -23,7 +23,13 @@ func renderProtocol(model *schemaModel) ([]byte, error) {
 	generatedHeader(&buffer)
 	fmt.Fprintf(&buffer, "const pinnedToolModule = %q\n", model.manifest.Module)
 	fmt.Fprintf(&buffer, "const pinnedToolPackage = %q\n", model.manifest.ToolPackage)
-	fmt.Fprintf(&buffer, "const pinnedToolVersion = %q\n\n", model.manifest.ToolVersion)
+	fmt.Fprintf(&buffer, "const pinnedToolVersion = %q\n", model.manifest.ToolVersion)
+	fmt.Fprintf(&buffer, "const pinnedSchemaRevision = %q\n", model.manifest.Revision)
+	fmt.Fprintf(
+		&buffer,
+		"const pinnedSchemaContractDigest = %q\n\n",
+		model.manifest.contractDigest,
+	)
 	buffer.WriteString("const (\n")
 	scanner := bufio.NewScanner(file)
 	count := 0

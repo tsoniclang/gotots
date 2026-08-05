@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -50,6 +51,9 @@ type EnvironmentObligation struct {
 	targetName        string
 	targetFingerprint string
 	requirements      []string
+	demands           []environmentidentity.UseDemand
+	route             environmentidentity.ImplementationRoute
+	selections        []gostdlib.UseSelection
 }
 
 func (o EnvironmentObligation) Kind() EnvironmentObligationKind {
@@ -108,6 +112,24 @@ func (o EnvironmentObligation) Requirements() []string {
 	return slices.Clone(o.requirements)
 }
 
+// Demands is the joined closed use-demand set settled for this declaration.
+// The returned slice is an immutable copy.
+func (o EnvironmentObligation) Demands() []environmentidentity.UseDemand {
+	return slices.Clone(o.demands)
+}
+
+// Route is the settled sole implementation route for this declaration.
+func (o EnvironmentObligation) Route() environmentidentity.ImplementationRoute {
+	return o.route
+}
+
+// ProviderSelections lists the certified typed provider facet and profile
+// identities selected beyond the declaration's ordinary binding. The
+// returned slice is an immutable copy.
+func (o EnvironmentObligation) ProviderSelections() []gostdlib.UseSelection {
+	return slices.Clone(o.selections)
+}
+
 func (s *programSession) environmentObligations() (
 	[]EnvironmentObligation,
 	error,
@@ -125,6 +147,7 @@ func (s *programSession) environmentObligations() (
 			builders[right].sourcePackage.Path()
 	})
 	var obligations []EnvironmentObligation
+	settled := make(map[types.Object]struct{})
 	for _, builder := range builders {
 		for _, declaration := range builder.declarations {
 			var requirements []api.DeclarationRequirement
@@ -140,6 +163,11 @@ func (s *programSession) environmentObligations() (
 					return nil, err
 				}
 			}
+			use, err := s.settledEnvironmentUse(declaration.object)
+			if err != nil {
+				return nil, err
+			}
+			settled[declaration.object] = struct{}{}
 			obligation, err := buildEnvironmentObligation(
 				builder,
 				EnvironmentObligationDeclaration,
@@ -148,6 +176,7 @@ func (s *programSession) environmentObligations() (
 				declaration.contract,
 				requirements,
 				types.Invalid,
+				use,
 			)
 			if err != nil {
 				return nil, err
@@ -155,6 +184,11 @@ func (s *programSession) environmentObligations() (
 			obligations = append(obligations, obligation)
 		}
 		for variable, state := range builder.stateFields {
+			use, err := s.settledEnvironmentUse(variable)
+			if err != nil {
+				return nil, err
+			}
+			settled[variable] = struct{}{}
 			obligation, err := buildEnvironmentObligation(
 				builder,
 				EnvironmentObligationState,
@@ -163,6 +197,7 @@ func (s *programSession) environmentObligations() (
 				state.contract,
 				nil,
 				types.Invalid,
+				use,
 			)
 			if err != nil {
 				return nil, err
@@ -170,6 +205,11 @@ func (s *programSession) environmentObligations() (
 			obligations = append(obligations, obligation)
 		}
 		for _, projection := range builder.projections {
+			use, err := s.settledEnvironmentUse(projection.source)
+			if err != nil {
+				return nil, err
+			}
+			settled[projection.source] = struct{}{}
 			obligation, err := buildEnvironmentObligation(
 				builder,
 				EnvironmentObligationConstantProjection,
@@ -178,6 +218,7 @@ func (s *programSession) environmentObligations() (
 				projection.contract,
 				nil,
 				projection.projection,
+				use,
 			)
 			if err != nil {
 				return nil, err
@@ -185,6 +226,11 @@ func (s *programSession) environmentObligations() (
 			obligations = append(obligations, obligation)
 		}
 	}
+	implementationRows, err := s.implementationRouteObligations(settled)
+	if err != nil {
+		return nil, err
+	}
+	obligations = append(obligations, implementationRows...)
 	sort.Slice(obligations, func(left, right int) bool {
 		if obligations[left].identity != obligations[right].identity {
 			return obligations[left].identity < obligations[right].identity
@@ -197,6 +243,89 @@ func (s *programSession) environmentObligations() (
 	return obligations, nil
 }
 
+// settledEnvironmentUse resolves the canonical scheduling record of one
+// settled environment declaration and fails closed when a declaration
+// settled without any recorded use observation.
+func (s *programSession) settledEnvironmentUse(
+	object types.Object,
+) (*declarationRecord, error) {
+	record := s.scheduler.records[object]
+	if record == nil || record.route == environmentidentity.RouteInvalid {
+		name := ""
+		if object != nil {
+			name = object.Name()
+		}
+		return nil, &ScheduleError{
+			Object: name,
+			Reason: "settled environment declaration has no recorded use demand",
+		}
+	}
+	return record, nil
+}
+
+// implementationRouteObligations projects environment declarations whose
+// non-emitting scheduling records settled a compiler-owned implementation
+// route. Such declarations have no environment declaration artifact and
+// therefore no provider target facts.
+func (s *programSession) implementationRouteObligations(
+	settled map[types.Object]struct{},
+) ([]EnvironmentObligation, error) {
+	objects := make([]types.Object, 0, len(s.scheduler.records))
+	for object, record := range s.scheduler.records {
+		if record.route == environmentidentity.RouteInvalid {
+			continue
+		}
+		if _, done := settled[object]; done {
+			continue
+		}
+		objects = append(objects, object)
+	}
+	sort.Slice(objects, func(left, right int) bool {
+		return objects[left].Pos() < objects[right].Pos()
+	})
+	rows := make([]EnvironmentObligation, 0, len(objects))
+	for _, object := range objects {
+		record := s.scheduler.records[object]
+		if record.emitting || record.route.Selection() {
+			return nil, &ScheduleError{
+				Object: object.Name(),
+				Reason: "environment use selected a declaration route but never settled",
+			}
+		}
+		environmentPackage := s.source.EnvironmentForTypes(object.Pkg())
+		if environmentPackage == nil {
+			return nil, &ScheduleError{
+				Object: object.Name(),
+				Reason: "observed environment implementation lost its package",
+			}
+		}
+		description, err := environmentidentity.Describe(object)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, EnvironmentObligation{
+			kind:            EnvironmentObligationDeclaration,
+			objectKind:      description.Kind(),
+			packageKind:     environmentPackage.Kind(),
+			packagePath:     environmentPackage.Path(),
+			contractKey:     environmentContractKey(environmentPackage),
+			identity:        description.Identity(),
+			name:            object.Name(),
+			receiver:        description.Receiver(),
+			sourceSignature: description.Signature(),
+			sourceValue:     description.Value(),
+			sourceLocation: environmentSourceLocation(
+				environmentPackage,
+				object,
+			),
+			demands:    record.demandList(),
+			route:      record.route,
+			selections: slices.Clone(record.selections),
+		})
+	}
+	return rows, nil
+}
+
 func buildEnvironmentObligation(
 	builder *environmentContractBuilder,
 	kind EnvironmentObligationKind,
@@ -205,11 +334,13 @@ func buildEnvironmentObligation(
 	contract artifactstate.Contract,
 	requirements []api.DeclarationRequirement,
 	projection types.BasicKind,
+	use *declarationRecord,
 ) (EnvironmentObligation, error) {
 	if builder == nil ||
 		builder.sourcePackage == nil ||
 		object == nil ||
-		targetName == "" {
+		targetName == "" ||
+		use == nil {
 		return EnvironmentObligation{}, &ScheduleError{
 			Reason: "environment obligation identity is invalid",
 		}
@@ -260,6 +391,9 @@ func buildEnvironmentObligation(
 		targetName:        targetName,
 		targetFingerprint: fingerprint,
 		requirements:      requirementKeys,
+		demands:           use.demandList(),
+		route:             use.route,
+		selections:        slices.Clone(use.selections),
 	}, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"go/types"
 	"strconv"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
@@ -144,10 +145,16 @@ func (n *File) providerFacetTargetReference(
 	if err != nil {
 		return api.NameReference{}, true, err
 	}
-	if n.require != nil {
-		if err := n.require(object); err != nil {
-			return api.NameReference{}, true, err
-		}
+	selection, err := gostdlib.NewFacetUseSelection(kind, capability)
+	if err != nil {
+		return api.NameReference{}, true, err
+	}
+	if err := n.observer.RequireUse(
+		object,
+		environmentcontract.UseDemandCallable,
+		selection,
+	); err != nil {
+		return api.NameReference{}, true, err
 	}
 	reference, err := api.NewProviderQualifiedNameReference(
 		qualifier,
@@ -196,10 +203,16 @@ func (n *File) ProviderCallableProfile(
 	if err != nil {
 		return api.ProviderCallableProfileReference{}, true, err
 	}
-	if n.require != nil {
-		if err := n.require(owner); err != nil {
-			return api.ProviderCallableProfileReference{}, true, err
-		}
+	selection, err := gostdlib.NewCallableProfileUseSelection(profileKey)
+	if err != nil {
+		return api.ProviderCallableProfileReference{}, true, err
+	}
+	if err := n.observer.RequireUse(
+		owner,
+		environmentcontract.UseDemandCallable,
+		selection,
+	); err != nil {
+		return api.ProviderCallableProfileReference{}, true, err
 	}
 	reference, err := api.NewQualifiedNameReference(
 		qualifier,
@@ -504,10 +517,19 @@ func (n *File) ProviderStatefulProfileTarget(
 		module = profile.ModuleSpecifier()
 		export = profile.Export()
 	}
-	if n.require != nil {
-		if err := n.require(owner); err != nil {
+	demand := environmentcontract.UseDemandValue
+	if phase == api.ImportPhaseType {
+		demand = environmentcontract.UseDemandTypeContract
+	}
+	selection := gostdlib.NoUseSelection()
+	if profileKey != "" {
+		selection, err = gostdlib.NewStatefulProfileUseSelection(profileKey)
+		if err != nil {
 			return api.NameReference{}, err
 		}
+	}
+	if err := n.observer.RequireUse(owner, demand, selection); err != nil {
+		return api.NameReference{}, err
 	}
 	qualifier, request, err := n.providerImport(module, phase)
 	if err != nil {

@@ -43,6 +43,7 @@ const (
 type ProgramEmission struct {
 	files                       []TargetFile
 	environmentObligations      []EnvironmentObligation
+	environmentProfile          EnvironmentProfile
 	externalFunctionObligations []ExternalFunctionObligation
 	runtimePackage              RuntimePackage
 }
@@ -206,9 +207,14 @@ func CompileWithOptions(
 	if err != nil {
 		return ProgramEmission{}, err
 	}
+	profile, err := session.environmentProfile(options)
+	if err != nil {
+		return ProgramEmission{}, err
+	}
 	return ProgramEmission{
 		files:                       files,
 		environmentObligations:      obligations,
+		environmentProfile:          profile,
 		externalFunctionObligations: session.externalFunctionObligations(),
 		runtimePackage:              session.runtimePackage,
 	}, nil
@@ -371,7 +377,7 @@ func newProgramSession(
 			providerScalar,
 			options.EvaluationOrder,
 			options.ConcurrencySemantics,
-			session.require,
+			session,
 			session,
 			session,
 			session,

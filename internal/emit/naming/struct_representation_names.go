@@ -3,6 +3,7 @@ package naming
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
@@ -434,8 +435,11 @@ func (n *File) NamedStructStorage(
 			Reason: "struct storage owner has no emitted declaration",
 		}
 	}
-	if binding.scheduled() && n.require != nil {
-		if err := n.require(typeName); err != nil {
+	if binding.scheduled() {
+		if err := n.requireUse(
+			typeName,
+			environmentcontract.UseDemandTypeContract,
+		); err != nil {
 			return api.NameReference{}, err
 		}
 	}

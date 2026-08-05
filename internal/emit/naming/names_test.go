@@ -8,6 +8,8 @@ import (
 	"slices"
 	"testing"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -253,21 +255,35 @@ func TestCrossPackageReferenceRequiresItsExactObjectBeforeImporting(t *testing.T
 		t.Fatal(err)
 	}
 	required := errors.New("enqueue mutation sentinel")
-	names := NewOwner(
-		currentPackage.Scope(),
-		&types.Info{Defs: make(map[*ast.Ident]types.Object)},
-		registry,
-	).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(
+			currentPackage.Scope(),
+			&types.Info{Defs: make(map[*ast.Ident]types.Object)},
+			registry,
+		),
 		sourceFile,
 		currentPackage.Scope(),
 		tsgo.NewFactory(),
 		"modules/current/current.ts",
-		func(actual types.Object) error {
+		stubEnvironmentObserver{requireUse: func(
+			actual types.Object,
+			demand environmentcontract.UseDemand,
+			selection gostdlib.UseSelection,
+		) error {
 			if actual != object {
 				t.Fatalf("required object = %v, want imported Run", actual)
 			}
+			if demand != environmentcontract.UseDemandCallable ||
+				selection.Kind() != gostdlib.UseSelectionNone {
+				t.Fatalf(
+					"required demand/selection = %v/%v, want callable/none",
+					demand,
+					selection.Kind(),
+				)
+			}
 			return required
-		},
+		}},
 	)
 	if _, err := names.Reference(object); !errors.Is(err, required) {
 		t.Fatalf("reference error = %v, want enqueue sentinel", err)
@@ -442,7 +458,9 @@ func TestPrimitiveAliasImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing
 			{Name: "int32__from_gotots_support"}: reservedAlias,
 		},
 	})
-	names := owner.ForFile(
+	names := testFileNames(
+		t,
+		owner,
 		&ast.File{},
 		packageScope,
 		tsgo.NewFactory(),
@@ -498,7 +516,9 @@ func TestRuntimeImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing.T) {
 			{Name: "goStringIndex__from_gotots_runtime"}: reservedAlias,
 		},
 	})
-	names := owner.ForFile(
+	names := testFileNames(
+		t,
+		owner,
 		&ast.File{},
 		packageScope,
 		tsgo.NewFactory(),

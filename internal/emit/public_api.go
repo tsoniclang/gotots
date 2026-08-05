@@ -6,10 +6,13 @@ import (
 	"slices"
 	"sort"
 
+	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
 	externalcertify "github.com/tsoniclang/gotots/internal/contracts/externals/certify"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
+	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -228,10 +231,18 @@ func (s *programSession) requireRoot(root Root) error {
 				Reason: "constant projection root does not own an untyped constant",
 			}
 		}
-		return s.require(root.object)
+		return s.RequireUse(
+			root.object,
+			rootUseDemand(root.object),
+			gostdlib.NoUseSelection(),
+		)
 	}
 	if root.kind == RootFileCoverage || root.kind == RootExportedAPI {
-		return s.require(root.object)
+		return s.RequireUse(
+			root.object,
+			rootUseDemand(root.object),
+			gostdlib.NoUseSelection(),
+		)
 	}
 	if root.kind != RootConstantProjection {
 		return &ScheduleError{
@@ -453,52 +464,32 @@ func (e *OptionsError) Error() string {
 	return fmt.Sprintf("validate compilation option %q: %s", e.Field, e.Reason)
 }
 
-func (s *programSession) require(object types.Object) error {
-	if s.sealed {
-		objectName := ""
-		if object != nil {
-			objectName = object.Name()
-		}
-		return &ScheduleError{
-			Object: objectName,
-			Reason: "declaration requested after target files were sealed",
-		}
+// rootUseDemand classifies the closed use demand created by requesting one
+// emission root from the referenced object kind.
+func rootUseDemand(object types.Object) environmentidentity.UseDemand {
+	switch object.(type) {
+	case *types.Func:
+		return environmentidentity.UseDemandCallable
+	case *types.TypeName:
+		return environmentidentity.UseDemandTypeContract
+	default:
+		return environmentidentity.UseDemandValue
 	}
-	if object == nil {
-		return &ScheduleError{Reason: "referenced object is nil"}
-	}
-	if function, ok := object.(*types.Func); ok {
-		object = function.Origin()
-	}
-	sourcePackage := s.source.PackageForTypes(object.Pkg())
-	environmentPackage := s.source.EnvironmentForTypes(object.Pkg())
-	if _, ok := s.sites[object]; !ok && environmentPackage == nil {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "object has no supported source declaration",
-		}
-	}
-	if sourcePackage == nil && environmentPackage == nil {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "object package has no declaration owner",
-		}
-	}
-	if sourcePackage != nil {
-		if err := s.requirePackage(sourcePackage); err != nil {
-			return err
-		}
-	} else {
-		if _, err := s.requireEnvironmentPackage(environmentPackage); err != nil {
-			return err
-		}
-	}
-	s.scheduler.enqueue(object)
-	return nil
 }
 
 func (e ProgramEmission) Files() []TargetFile {
 	return slices.Clone(e.files)
+}
+
+// EnvironmentProfile is the complete exact identity of the settled
+// environment evidence: build, compilation, provider, and pinned-target
+// profiles, each content-addressed by a deterministic fingerprint.
+type EnvironmentProfile = environmentcontract.Profile
+
+// EnvironmentProfile binds the settled environment evidence to the exact
+// selected build, compilation, provider, and pinned-target profiles.
+func (e ProgramEmission) EnvironmentProfile() EnvironmentProfile {
+	return e.environmentProfile
 }
 
 func (e ProgramEmission) EnvironmentObligations() []EnvironmentObligation {

@@ -31,10 +31,11 @@ func (n *File) derivedSourceReference(
 			Reason: "derived source reference has no declaration",
 		}
 	}
-	if n.require != nil {
-		if err := n.require(object); err != nil {
-			return api.NameReference{}, err
-		}
+	if err := n.requireUse(
+		object,
+		environmentcontract.UseDemandRuntimeFacet,
+	); err != nil {
+		return api.NameReference{}, err
 	}
 	exportedName := binding.name + suffix
 	var requests []api.RootRequest
@@ -352,10 +353,11 @@ func (n *File) MethodTarget(
 				Reason: "provider method target is invalid",
 			}
 		}
-		if n.require != nil {
-			if err := n.require(method); err != nil {
-				return api.MethodTarget{}, err
-			}
+		if err := n.requireUse(
+			method,
+			environmentcontract.UseDemandCallable,
+		); err != nil {
+			return api.MethodTarget{}, err
 		}
 		receiver := api.MethodReceiverTypeName(method)
 		receiverBinding, receiverOK := n.owner.byObject[receiver]

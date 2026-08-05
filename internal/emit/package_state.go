@@ -6,6 +6,8 @@ import (
 	"slices"
 	"sort"
 
+	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
@@ -516,7 +518,11 @@ func (s *programSession) emitPackageInitFunctions(
 					Reason: "package init has no function identity",
 				}
 			}
-			if err := s.require(object); err != nil {
+			if err := s.RequireUse(
+				object,
+				environmentidentity.UseDemandInitializer,
+				gostdlib.NoUseSelection(),
+			); err != nil {
 				return err
 			}
 			binding, ok := s.registry.Target(object)

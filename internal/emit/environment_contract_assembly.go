@@ -5,6 +5,8 @@ import (
 	"go/types"
 	"sort"
 
+	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
@@ -56,6 +58,165 @@ type environmentContractBuilder struct {
 	declarations  map[types.Object]environmentDeclaration
 	stateFields   map[*types.Var]environmentStateField
 	projections   map[string]environmentConstantProjection
+}
+
+// RequireUse schedules the canonical declaration owner of one reference on
+// the root scheduling record and joins its closed use demand and typed
+// provider selection. The implementation route of an environment
+// declaration is derived from the canonical binding evidence; a selection
+// route cannot return a target without this observation.
+func (s *programSession) RequireUse(
+	object types.Object,
+	demand environmentidentity.UseDemand,
+	selection gostdlib.UseSelection,
+) error {
+	if s.sealed {
+		objectName := ""
+		if object != nil {
+			objectName = object.Name()
+		}
+		return &ScheduleError{
+			Object: objectName,
+			Reason: "declaration requested after target files were sealed",
+		}
+	}
+	if object == nil {
+		return &ScheduleError{Reason: "referenced object is nil"}
+	}
+	if !demand.Valid() {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "environment use demand is invalid",
+		}
+	}
+	if function, ok := object.(*types.Func); ok {
+		object = function.Origin()
+	}
+	sourcePackage := s.source.PackageForTypes(object.Pkg())
+	environmentPackage := s.source.EnvironmentForTypes(object.Pkg())
+	if _, ok := s.sites[object]; !ok && environmentPackage == nil {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "object has no supported source declaration",
+		}
+	}
+	if sourcePackage == nil && environmentPackage == nil {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "object package has no declaration owner",
+		}
+	}
+	if sourcePackage != nil {
+		if selection.Kind() != gostdlib.UseSelectionNone {
+			return &ScheduleError{
+				Object: object.Name(),
+				Reason: "provider selection was recorded for a source declaration",
+			}
+		}
+		if err := s.requirePackage(sourcePackage); err != nil {
+			return err
+		}
+	} else {
+		route, environmentOwned := s.registry.EnvironmentSelectionRoute(object)
+		if !environmentOwned {
+			return &ScheduleError{
+				Object: object.Name(),
+				Reason: "environment declaration has no indexed binding",
+			}
+		}
+		if !route.Valid() {
+			// A selected constant's value is projected exactly from checker
+			// evidence; it never demands a provider body, so a missing
+			// provider binding selects its generated projection.
+			if _, constant := object.(*types.Const); constant {
+				route = environmentidentity.RouteGeneratedFacet
+			} else {
+				return &ScheduleError{
+					Object: object.Name(),
+					Reason: "selected standard-library declaration has no provider binding",
+				}
+			}
+		}
+		record := s.scheduler.record(object)
+		if err := record.joinRoute(object, route); err != nil {
+			return err
+		}
+		record.joinDemand(demand)
+		record.joinSelection(selection)
+		if _, err := s.requireEnvironmentPackage(environmentPackage); err != nil {
+			return err
+		}
+	}
+	s.scheduler.enqueue(object)
+	return nil
+}
+
+// ObserveImplementation records a compiler-intrinsic or generated
+// runtime-facet implementation route on the root scheduling record without
+// scheduling an environment declaration artifact. Such declarations retain
+// their existing compiler artifact owners and must not also demand a
+// provider or boundary declaration.
+func (s *programSession) ObserveImplementation(
+	object types.Object,
+	demand environmentidentity.UseDemand,
+	route environmentidentity.ImplementationRoute,
+) error {
+	if s.sealed {
+		objectName := ""
+		if object != nil {
+			objectName = object.Name()
+		}
+		return &ScheduleError{
+			Object: objectName,
+			Reason: "environment implementation observed after target files were sealed",
+		}
+	}
+	if object == nil {
+		return &ScheduleError{Reason: "observed environment object is nil"}
+	}
+	if !demand.Valid() {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "environment use demand is invalid",
+		}
+	}
+	if route != environmentidentity.RouteIntrinsic &&
+		route != environmentidentity.RouteGeneratedFacet {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "observed implementation route is not intrinsic or generated",
+		}
+	}
+	if function, ok := object.(*types.Func); ok {
+		object = function.Origin()
+	}
+	if s.source.EnvironmentForTypes(object.Pkg()) == nil {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "observed implementation owner is not an environment declaration",
+		}
+	}
+	record := s.scheduler.record(object)
+	if err := record.joinRoute(object, route); err != nil {
+		return err
+	}
+	record.joinDemand(demand)
+	return nil
+}
+
+// environmentProfile derives the complete exact identity of the settled
+// environment evidence for this compilation.
+func (s *programSession) environmentProfile(
+	options Options,
+) (EnvironmentProfile, error) {
+	return environmentcontract.NewProfile(
+		s.source,
+		options.IntegerRepresentation,
+		options.EvaluationOrder,
+		options.ConcurrencySemantics,
+		options.StandardLibrary,
+		options.ExternalProvider,
+	)
 }
 
 func (s *programSession) emitEnvironmentObject(object types.Object) error {
@@ -163,7 +324,7 @@ func (s *programSession) requireEnvironmentPackage(
 		s.providerScalar,
 		s.evaluationOrder,
 		s.concurrency,
-		s.require,
+		s,
 		s,
 		s,
 		s,

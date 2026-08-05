@@ -83,13 +83,16 @@ func (e *emitter) targetContext(
 	sourceFile *ast.File,
 	targetPath string,
 ) (api.Context, error) {
-	names := e.names.ForFile(
+	names, err := e.names.ForFile(
 		sourceFile,
 		e.source.Types().Scope(),
 		e.factory,
 		targetPath,
-		e.require,
+		e.observer,
 	)
+	if err != nil {
+		return api.Context{}, err
+	}
 	return e.context(names)
 }
 
@@ -97,7 +100,7 @@ func (e *emitter) generatedContext(
 	targetPath string,
 	registry *emitnaming.Registry,
 ) (api.Context, error) {
-	names := emitnaming.NewOwner(
+	names, err := emitnaming.NewOwner(
 		nil,
 		nil,
 		registry,
@@ -106,8 +109,11 @@ func (e *emitter) generatedContext(
 		nil,
 		e.factory,
 		targetPath,
-		e.require,
+		e.observer,
 	)
+	if err != nil {
+		return api.Context{}, err
+	}
 	return e.context(names)
 }
 

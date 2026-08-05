@@ -1,6 +1,7 @@
 package naming
 
 import (
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
@@ -119,10 +120,11 @@ func (n *File) ConstantValue(
 		reference, err := n.Reference(selected)
 		return reference, false, err
 	}
-	if n.require != nil {
-		if err := n.require(selected); err != nil {
-			return api.NameReference{}, false, err
-		}
+	if err := n.requireUse(
+		selected,
+		environmentcontract.UseDemandValue,
+	); err != nil {
+		return api.NameReference{}, false, err
 	}
 	deferredName, err := constantbinding.DeferredBindingName(binding.name)
 	if err != nil {
@@ -212,8 +214,11 @@ func (n *File) ConstantProjection(
 	requests := []api.RootRequest{request}
 	projectionScheduled := binding.scheduled() ||
 		binding.kind == targetBindingMissingProvider
-	if projectionScheduled && n.require != nil {
-		if err := n.require(selected); err != nil {
+	if projectionScheduled {
+		if err := n.requireUse(
+			selected,
+			environmentcontract.UseDemandValue,
+		); err != nil {
 			return api.NameReference{}, err
 		}
 	}

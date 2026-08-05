@@ -3,18 +3,124 @@ package emit
 import (
 	"fmt"
 	"go/types"
+	"slices"
+	"strings"
 
+	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+// declarationRecord is the canonical root scheduling record for one
+// declaration. It owns the declaration lifecycle together with the joined
+// closed use demands, the sole implementation route, the typed provider
+// selections, and whether the settled route emits a declaration artifact.
+// There is no other use ledger.
+type declarationRecord struct {
+	queued     bool
+	emitted    bool
+	emitting   bool
+	demands    uint16
+	route      environmentidentity.ImplementationRoute
+	selections []gostdlib.UseSelection
+}
+
+var declarationDemandOrder = []environmentidentity.UseDemand{
+	environmentidentity.UseDemandTypeContract,
+	environmentidentity.UseDemandValue,
+	environmentidentity.UseDemandCallable,
+	environmentidentity.UseDemandState,
+	environmentidentity.UseDemandInitializer,
+	environmentidentity.UseDemandInterfaceCapability,
+	environmentidentity.UseDemandCallbackCapability,
+	environmentidentity.UseDemandRuntimeFacet,
+}
+
+func (r *declarationRecord) joinDemand(
+	demand environmentidentity.UseDemand,
+) {
+	r.demands |= 1 << uint16(demand)
+}
+
+func (r *declarationRecord) demandList() []environmentidentity.UseDemand {
+	result := make(
+		[]environmentidentity.UseDemand,
+		0,
+		len(declarationDemandOrder),
+	)
+	for _, demand := range declarationDemandOrder {
+		if r.demands&(1<<uint16(demand)) != 0 {
+			result = append(result, demand)
+		}
+	}
+	return result
+}
+
+func (r *declarationRecord) joinSelection(selection gostdlib.UseSelection) {
+	if selection.Kind() == gostdlib.UseSelectionNone {
+		return
+	}
+	if slices.Contains(r.selections, selection) {
+		return
+	}
+	r.selections = append(r.selections, selection)
+	slices.SortFunc(r.selections, compareUseSelections)
+}
+
+// compareUseSelections orders typed provider selections structurally so the
+// settled evidence is deterministic without flattening identity to strings.
+func compareUseSelections(left, right gostdlib.UseSelection) int {
+	if left.Kind() != right.Kind() {
+		if left.Kind() < right.Kind() {
+			return -1
+		}
+		return 1
+	}
+	leftKind, leftCapability, _ := left.Facet()
+	rightKind, rightCapability, _ := right.Facet()
+	if leftKind != rightKind {
+		return strings.Compare(string(leftKind), string(rightKind))
+	}
+	if leftCapability != rightCapability {
+		return strings.Compare(
+			string(leftCapability),
+			string(rightCapability),
+		)
+	}
+	leftKey, _ := left.ProfileKey()
+	rightKey, _ := right.ProfileKey()
+	return strings.Compare(leftKey, rightKey)
+}
+
+// joinRoute settles the sole implementation route: the first observation
+// sets it, repeated identical observations succeed, and a different route
+// fails immediately.
+func (r *declarationRecord) joinRoute(
+	object types.Object,
+	route environmentidentity.ImplementationRoute,
+) error {
+	if r.route == environmentidentity.RouteInvalid {
+		r.route = route
+		return nil
+	}
+	if r.route == route {
+		return nil
+	}
+	return &ScheduleError{
+		Object: object.Name(),
+		Reason: "environment declaration selected implementation route " +
+			route.String() + " but already settled " + r.route.String(),
+	}
+}
+
 type scheduler struct {
 	queue   []types.Object
-	pending map[types.Object]struct{}
-	emitted map[types.Object]struct{}
+	records map[types.Object]*declarationRecord
 }
 
 type ScheduleError struct {
@@ -31,19 +137,26 @@ func (e *ScheduleError) Error() string {
 
 func newScheduler() *scheduler {
 	return &scheduler{
-		pending: make(map[types.Object]struct{}),
-		emitted: make(map[types.Object]struct{}),
+		records: make(map[types.Object]*declarationRecord),
 	}
 }
 
+func (s *scheduler) record(object types.Object) *declarationRecord {
+	existing := s.records[object]
+	if existing == nil {
+		existing = &declarationRecord{}
+		s.records[object] = existing
+	}
+	return existing
+}
+
 func (s *scheduler) enqueue(object types.Object) {
-	if _, done := s.emitted[object]; done {
+	record := s.record(object)
+	record.emitting = true
+	if record.emitted || record.queued {
 		return
 	}
-	if _, queued := s.pending[object]; queued {
-		return
-	}
-	s.pending[object] = struct{}{}
+	record.queued = true
 	s.queue = append(s.queue, object)
 }
 
@@ -53,13 +166,22 @@ func (s *scheduler) next() (types.Object, bool) {
 	}
 	object := s.queue[0]
 	s.queue = s.queue[1:]
-	delete(s.pending, object)
-	s.emitted[object] = struct{}{}
+	record := s.records[object]
+	record.queued = false
+	record.emitted = true
 	return object, true
 }
 
 func (s *scheduler) hasPending() bool {
-	return len(s.queue) != 0 || len(s.pending) != 0
+	if len(s.queue) != 0 {
+		return true
+	}
+	for _, record := range s.records {
+		if record.queued {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *programSession) scheduleDeclarationRequirement(
@@ -99,7 +221,11 @@ func (s *programSession) prepareDeclarationRequirement(
 				Reason: "declaration requirement owner has no source declaration",
 			}
 		}
-		if err := s.require(sourceOwner); err != nil {
+		if err := s.RequireUse(
+			sourceOwner,
+			environmentcontract.RequirementUseDemand(requirement),
+			gostdlib.NoUseSelection(),
+		); err != nil {
 			return err
 		}
 	} else if sourceTypes, _, initializerOwned := owner.PackageInitializer(); initializerOwned {

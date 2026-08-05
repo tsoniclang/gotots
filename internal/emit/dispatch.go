@@ -82,7 +82,7 @@ type emitter struct {
 	providerScalar api.ScalarABI
 	order          api.EvaluationOrder
 	concurrency    api.ConcurrencySemantics
-	require        func(types.Object) error
+	observer       emitnaming.EnvironmentObserver
 	generic        api.GenericCallableResolver
 	cooperative    api.CooperativeCallableResolver
 	recovery       api.RecoveryCallableResolver
@@ -99,7 +99,7 @@ func newEmitter(
 	providerScalar api.ScalarABI,
 	order api.EvaluationOrder,
 	concurrency api.ConcurrencySemantics,
-	require func(types.Object) error,
+	observer emitnaming.EnvironmentObserver,
 	generic api.GenericCallableResolver,
 	cooperative api.CooperativeCallableResolver,
 	recovery api.RecoveryCallableResolver,
@@ -121,7 +121,7 @@ func newEmitter(
 		providerScalar: providerScalar,
 		order:          order,
 		concurrency:    concurrency,
-		require:        require,
+		observer:       observer,
 		generic:        generic,
 		cooperative:    cooperative,
 		recovery:       recovery,

@@ -5,9 +5,62 @@ import (
 	"go/types"
 	"sort"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
+
+// EnvironmentObserver is the non-optional root environment selection
+// observer consumed by every file name owner. Every target selection whose
+// object may be environment-owned must synchronously observe the canonical
+// object with one closed demand and typed provider selection before its
+// target is returned; a selection route that can produce an environment
+// target without this observation is invalid.
+type EnvironmentObserver interface {
+	RequireUse(
+		object types.Object,
+		demand environmentcontract.UseDemand,
+		selection gostdlib.UseSelection,
+	) error
+	ObserveImplementation(
+		object types.Object,
+		demand environmentcontract.UseDemand,
+		route environmentcontract.ImplementationRoute,
+	) error
+}
+
+// referenceDemand classifies the closed environment use demand of one
+// ordinary reference from the referenced object kind and import phase.
+func referenceDemand(
+	object types.Object,
+	phase api.ImportPhase,
+) environmentcontract.UseDemand {
+	if phase == api.ImportPhaseType {
+		return environmentcontract.UseDemandTypeContract
+	}
+	if _, ok := object.(*types.Func); ok {
+		return environmentcontract.UseDemandCallable
+	}
+	return environmentcontract.UseDemandValue
+}
+
+func (n *File) requireUse(
+	object types.Object,
+	demand environmentcontract.UseDemand,
+) error {
+	return n.observer.RequireUse(object, demand, gostdlib.NoUseSelection())
+}
+
+// ObserveEnvironmentImplementation forwards a compiler-intrinsic or
+// generated-runtime-facet implementation route to the non-optional root
+// environment observer.
+func (n *File) ObserveEnvironmentImplementation(
+	object types.Object,
+	demand environmentcontract.UseDemand,
+	route environmentcontract.ImplementationRoute,
+) error {
+	return n.observer.ObserveImplementation(object, demand, route)
+}
 
 type targetBinding struct {
 	name                         string
@@ -280,6 +333,34 @@ func (r *Registry) HasProviderCoverageOwner(object types.Object) bool {
 	binding, ok := r.byObject[object]
 	return ok && (binding.kind == targetBindingProvider ||
 		binding.kind == targetBindingMissingProvider)
+}
+
+// EnvironmentSelectionRoute reports the canonical implementation route
+// derived from one environment-owned declaration binding. The second result
+// is false when the object has no environment binding. A certified provider
+// binding selects the provider route; a contract-only binding selects the
+// explicit boundary route; a selected declaration whose provider binding is
+// missing reports an invalid route so the caller fails closed.
+func (r *Registry) EnvironmentSelectionRoute(
+	object types.Object,
+) (environmentcontract.ImplementationRoute, bool) {
+	if r == nil {
+		return environmentcontract.RouteInvalid, false
+	}
+	binding, ok := r.byObject[object]
+	if !ok {
+		return environmentcontract.RouteInvalid, false
+	}
+	switch binding.kind {
+	case targetBindingProvider:
+		return environmentcontract.RouteProvider, true
+	case targetBindingEnvironment:
+		return environmentcontract.RouteBoundary, true
+	case targetBindingMissingProvider:
+		return environmentcontract.RouteInvalid, true
+	default:
+		return environmentcontract.RouteInvalid, false
+	}
 }
 
 func (r *Registry) ImportQualifier(sourcePackage *types.Package) string {

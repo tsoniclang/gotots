@@ -1,9 +1,11 @@
 package emit
 
 import (
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
@@ -380,7 +382,14 @@ func (s *programSession) consumeArtifactRequests(
 					}
 				}
 				if sourceProvider {
-					if err := s.require(sourceObject); err != nil {
+					if err := s.RequireUse(
+						sourceObject,
+						environmentcontract.ArtifactFacetUseDemand(
+							dependency.Facet(),
+							sourceObject,
+						),
+						gostdlib.NoUseSelection(),
+					); err != nil {
 						return err
 					}
 				}

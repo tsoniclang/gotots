@@ -12,6 +12,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
@@ -75,7 +76,7 @@ func TestArtifactReconstructionReplaysTemporaryNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(trigger); err != nil {
+	if err := session.RequireUse(trigger, rootUseDemand(trigger), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -111,7 +112,7 @@ func TestTargetFilesRejectPendingArtifactReconstruction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(caller); err != nil {
+	if err := session.RequireUse(caller, rootUseDemand(caller), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -477,7 +478,7 @@ func TestAnonymousStructDemandsUseExistingArtifactFixedPoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := session.require(definition); err != nil {
+	if err := session.RequireUse(definition, rootUseDemand(definition), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -491,7 +492,7 @@ func TestAnonymousStructDemandsUseExistingArtifactFixedPoint(t *testing.T) {
 		t.Fatal("anonymous artifact fabricated a go/types source object")
 	}
 
-	if err := session.require(copyValue); err != nil {
+	if err := session.RequireUse(copyValue, rootUseDemand(copyValue), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -510,7 +511,7 @@ func TestAnonymousStructDemandsUseExistingArtifactFixedPoint(t *testing.T) {
 		t.Fatal("copy consumer did not reconstruct through the existing artifact graph")
 	}
 
-	if err := session.require(equal); err != nil {
+	if err := session.RequireUse(equal, rootUseDemand(equal), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)

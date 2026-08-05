@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
@@ -48,11 +49,11 @@ func use() int32 { return Transform(int32(2)) }
 		t.Fatal(err)
 	}
 	scope := program.Roots()[0].Types().Scope()
-	if err := session.require(scope.Lookup("Existing")); err != nil {
+	if err := session.RequireUse(scope.Lookup("Existing"), rootUseDemand(scope.Lookup("Existing")), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
-	if err := session.require(scope.Lookup("use")); err != nil {
+	if err := session.RequireUse(scope.Lookup("use"), rootUseDemand(scope.Lookup("use")), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)

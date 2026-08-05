@@ -258,13 +258,15 @@ func TestProviderNamespaceIdentityIsTheCertifiedModule(t *testing.T) {
 	}
 
 	owner := NewOwner(nil, nil, first)
-	names := owner.ForFile(
+	names := testFileNames(
+		t,
+		owner,
 		&ast.File{},
 		nil,
 		tsgo.NewFactory(),
 		"modules/application/source.ts",
 		nil,
-	).(*File)
+	)
 	firstLocal, firstRequest, err := names.providerImport(
 		recoveryModule,
 		api.ImportPhaseType,

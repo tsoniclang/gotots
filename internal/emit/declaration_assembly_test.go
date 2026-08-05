@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -29,7 +30,7 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := session.require(box); err != nil {
+	if err := session.RequireUse(box, rootUseDemand(box), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	object, ok := session.scheduler.next()
@@ -47,7 +48,7 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 	}
 	initialClass := boxDeclaration.statements[0]
 
-	if err := session.require(use); err != nil {
+	if err := session.RequireUse(use, rootUseDemand(use), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -134,7 +135,7 @@ func TestObservableChangesReconstructOnlySubscribedDeclarations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(caller); err != nil {
+	if err := session.RequireUse(caller, rootUseDemand(caller), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -253,7 +254,7 @@ func TestDeclarationAssembliesCannotSealWithPendingWork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(box); err != nil {
+	if err := session.RequireUse(box, rootUseDemand(box), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -346,7 +347,7 @@ func measureDeclarationAssembly(
 		t.Fatal(err)
 	}
 	for _, root := range roots {
-		if err := session.require(root.object); err != nil {
+		if err := session.RequireUse(root.object, rootUseDemand(root.object), gostdlib.NoUseSelection()); err != nil {
 			t.Fatal(err)
 		}
 	}

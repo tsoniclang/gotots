@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
@@ -399,13 +400,13 @@ func demandDerived(values []Derived) *Derived {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(writer); err != nil {
+	if err := session.RequireUse(writer, rootUseDemand(writer), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(box); err != nil {
+	if err := session.RequireUse(box, rootUseDemand(box), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(derived); err != nil {
+	if err := session.RequireUse(derived, rootUseDemand(derived), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -439,10 +440,10 @@ func demandDerived(values []Derived) *Derived {
 		builder.assemblyOwner,
 		api.ArtifactFacetImplementation,
 	)
-	if err := session.require(demandBox); err != nil {
+	if err := session.RequireUse(demandBox, rootUseDemand(demandBox), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(demandDerived); err != nil {
+	if err := session.RequireUse(demandDerived, rootUseDemand(demandDerived), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)

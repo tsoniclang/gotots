@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	"github.com/tsoniclang/gotots/internal/load"
 )
@@ -242,7 +243,7 @@ func emittedObjectCounts(
 		t.Fatal(err)
 	}
 	for _, root := range roots {
-		if err := session.require(root.object); err != nil {
+		if err := session.RequireUse(root.object, rootUseDemand(root.object), gostdlib.NoUseSelection()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -292,7 +293,10 @@ func emittedObjectCounts(
 			actual[object]++
 		}
 	}
-	for object := range session.scheduler.emitted {
+	for object, record := range session.scheduler.records {
+		if !record.emitted {
+			continue
+		}
 		if actual[object] != 1 {
 			t.Fatalf(
 				"scheduled object %s owns %d target declarations",

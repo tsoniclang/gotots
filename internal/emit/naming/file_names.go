@@ -18,7 +18,7 @@ type File struct {
 	packageScope    *types.Scope
 	factory         tsgo.Factory
 	targetPath      string
-	require         func(types.Object) error
+	observer        EnvironmentObserver
 	temporaries     map[api.TemporaryKind]uint64
 	importNames     map[string]struct{}
 	importAliases   map[types.Object]string
@@ -72,15 +72,20 @@ func (n *Owner) ForFile(
 	packageScope *types.Scope,
 	factory tsgo.Factory,
 	targetPath string,
-	require func(types.Object) error,
-) api.Names {
+	observer EnvironmentObserver,
+) (api.Names, error) {
+	if observer == nil {
+		return nil, &api.NameError{
+			Reason: "file name owner requires a non-optional environment observer",
+		}
+	}
 	return &File{
 		owner:           n,
 		sourceFile:      sourceFile,
 		packageScope:    packageScope,
 		factory:         factory,
 		targetPath:      targetPath,
-		require:         require,
+		observer:        observer,
 		temporaries:     make(map[api.TemporaryKind]uint64),
 		importNames:     make(map[string]struct{}),
 		importAliases:   make(map[types.Object]string),
@@ -89,7 +94,7 @@ func (n *Owner) ForFile(
 		primitives:      make(map[api.PrimitiveAlias]string),
 		runtime:         make(map[api.RuntimeSymbol]string),
 		providerImports: make(map[string]providerImport),
-	}
+	}, nil
 }
 
 func (n *File) Declare(object types.Object) (string, error) {
@@ -222,10 +227,8 @@ func (n *File) reference(
 				Reason: "provider member requires method-target selection",
 			}
 		}
-		if n.require != nil {
-			if err := n.require(object); err != nil {
-				return api.NameReference{}, err
-			}
+		if err := n.requireUse(object, referenceDemand(object, phase)); err != nil {
+			return api.NameReference{}, err
 		}
 		qualifier, request, err := n.providerImport(
 			binding.providerModule,
@@ -240,8 +243,8 @@ func (n *File) reference(
 			request,
 		)
 	}
-	if binding.scheduled() && n.require != nil {
-		if err := n.require(object); err != nil {
+	if binding.scheduled() {
+		if err := n.requireUse(object, referenceDemand(object, phase)); err != nil {
 			return api.NameReference{}, err
 		}
 	}
@@ -316,10 +319,11 @@ func (n *File) PackageVariable(
 				Reason: "provider variable has invalid package-state access",
 			}
 		}
-		if n.require != nil {
-			if err := n.require(variable); err != nil {
-				return api.PackageVariableReference{}, err
-			}
+		if err := n.requireUse(
+			variable,
+			environmentcontract.UseDemandState,
+		); err != nil {
+			return api.PackageVariableReference{}, err
 		}
 		qualifier, request, err := n.providerImport(
 			target.providerModule,
@@ -335,10 +339,8 @@ func (n *File) PackageVariable(
 			request,
 		)
 	}
-	if n.require != nil {
-		if err := n.require(variable); err != nil {
-			return api.PackageVariableReference{}, err
-		}
+	if err := n.requireUse(variable, environmentcontract.UseDemandState); err != nil {
+		return api.PackageVariableReference{}, err
 	}
 	targetPath := binding.statePath
 	stateName := "$state"

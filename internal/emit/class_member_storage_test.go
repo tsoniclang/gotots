@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -40,7 +41,7 @@ func TestClassMemberContributionReconstructsTheTypeOwnedClass(t *testing.T) {
 		t.Fatal("method contribution was not assigned to its class target file")
 	}
 
-	if err := session.require(record); err != nil {
+	if err := session.RequireUse(record, rootUseDemand(record), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	object, ok := session.scheduler.next()
@@ -315,7 +316,7 @@ func TestAddressableStorageReconstructsOnlyOwningBodiesIncludingInit(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(caller); err != nil {
+	if err := session.RequireUse(caller, rootUseDemand(caller), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -386,7 +387,7 @@ func TestAddressableStorageRejectsForeignAndForgedSameSpellingVariables(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(addressed); err != nil {
+	if err := session.RequireUse(addressed, rootUseDemand(addressed), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -423,7 +424,7 @@ func TestAddressableStorageRejectsForeignAndForgedSameSpellingVariables(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(addressed); err != nil {
+	if err := session.RequireUse(addressed, rootUseDemand(addressed), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)

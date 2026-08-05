@@ -3,6 +3,7 @@ package naming
 import (
 	"go/types"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
@@ -143,10 +144,19 @@ func (n *File) providerGenericKernelReference(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	if n.require != nil {
-		if err := n.require(owner); err != nil {
-			return api.NameReference{}, err
-		}
+	selection, err := gostdlib.NewFacetUseSelection(
+		selected.Kind(),
+		gostdlib.FacetCapabilityKernel,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	if err := n.observer.RequireUse(
+		owner,
+		environmentcontract.UseDemandCallable,
+		selection,
+	); err != nil {
+		return api.NameReference{}, err
 	}
 	return api.NewProviderQualifiedNameReference(
 		qualifier,

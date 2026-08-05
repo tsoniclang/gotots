@@ -57,17 +57,19 @@ func TestArtifactReferencesRecordExactConsumedFacet(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	names := NewOwner(
-		sourcePackage.Scope(),
-		&types.Info{Defs: make(map[*ast.Ident]types.Object)},
-		registry,
-	).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(
+			sourcePackage.Scope(),
+			&types.Info{Defs: make(map[*ast.Ident]types.Object)},
+			registry,
+		),
 		sourceFile,
 		sourcePackage.Scope(),
 		tsgo.NewFactory(),
 		"modules/current/source.ts",
 		nil,
-	).(*File)
+	)
 	consumer := types.NewFunc(
 		token.Pos(10),
 		sourcePackage,
@@ -184,7 +186,9 @@ func TestGeneratedArtifactSourceReferencesUseDefiningModulesAndAliases(
 			t.Fatal(err)
 		}
 	}
-	names := NewOwner(nil, nil, registry).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(nil, nil, registry),
 		nil,
 		nil,
 		tsgo.NewFactory(),
@@ -275,17 +279,15 @@ func Parameter(value func(chan int32) int32) {}
 		t.Fatal(err)
 	}
 	registry := NewRegistry()
-	names := NewOwner(
-		sourcePackage.Scope(),
-		info,
-		registry,
-	).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(sourcePackage.Scope(), info, registry),
 		source,
 		sourcePackage.Scope(),
 		tsgo.NewFactory(),
 		"modules/callableabi/source.ts",
 		nil,
-	).(*File)
+	)
 
 	signatures := []*types.Signature{
 		callableSignature(t, sourcePackage.Scope().Lookup("Package").Type()),
@@ -394,17 +396,15 @@ type IntValue interface {
 		t.Fatal(err)
 	}
 	registry := NewRegistry()
-	names := NewOwner(
-		sourcePackage.Scope(),
-		info,
-		registry,
-	).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(sourcePackage.Scope(), info, registry),
 		source,
 		sourcePackage.Scope(),
 		tsgo.NewFactory(),
 		"modules/interfacecallable/source.ts",
 		nil,
-	).(*File)
+	)
 	interfaceMethod := func(typeName string) *types.Func {
 		t.Helper()
 		named := sourcePackage.Scope().Lookup(typeName).Type().(*types.Named)

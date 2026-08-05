@@ -57,6 +57,19 @@ func emitReflectionTypeOf(
 			Reason: "reflection names are unavailable",
 		}
 	}
+	observer, ok := context.Names().(environmentcontract.ImplementationObserver)
+	if !ok {
+		return api.ExpressionEmission{}, true, &api.ContextError{
+			Reason: "environment implementation observer is unavailable",
+		}
+	}
+	if err := observer.ObserveEnvironmentImplementation(
+		owner,
+		environmentcontract.UseDemandCallable,
+		environmentcontract.RouteGeneratedFacet,
+	); err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	if signature.Params() == nil || signature.Params().Len() != 1 {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -157,7 +170,20 @@ func emitReflectionTypeFor(
 			Reason: "reflection names are unavailable",
 		}
 	}
+	observer, ok := context.Names().(environmentcontract.ImplementationObserver)
+	if !ok {
+		return api.ExpressionEmission{}, true, &api.ContextError{
+			Reason: "environment implementation observer is unavailable",
+		}
+	}
 	if instance.TypeArgs.ContainsGenericTypeParameter() {
+		if err := observer.ObserveEnvironmentImplementation(
+			owner,
+			environmentcontract.UseDemandCallable,
+			environmentcontract.RouteGeneratedFacet,
+		); err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
 		witnessType := types.NewPointer(instance.TypeArgs.At(0))
 		witness, err := context.Values().Zero(context, source, witnessType)
 		if err != nil {
@@ -172,6 +198,13 @@ func emitReflectionTypeFor(
 			[]api.ExpressionEmission{witness},
 		)
 		return emission, true, err
+	}
+	if err := observer.ObserveEnvironmentImplementation(
+		owner,
+		environmentcontract.UseDemandCallable,
+		environmentcontract.RouteGeneratedFacet,
+	); err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
 	reference, err := names.ReflectionType(
 		instance.TypeArgs.At(0),
