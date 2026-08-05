@@ -382,11 +382,26 @@ export abstract class Value {
   }
   IsValid(): bool { return this.source !== undefined; }
   IsZero(): bool {
-    const operation = this.operations()?.isZero;
-    if (operation === undefined || this.source === undefined) {
+    const operations = this.operations();
+    const box = this.source;
+    if (box === undefined) {
       return this.operationPanic("IsZero");
     }
-    return operation(this.source);
+    if (operations?.isZero !== undefined) {
+      return operations.isZero(box);
+    }
+    if (operations?.isNil !== undefined) {
+      return operations.isNil(box);
+    }
+    if (operations?.numField !== undefined && operations.field !== undefined) {
+      for (let index: int = 0n; index < operations.numField; index++) {
+        if (!this.Field(index).IsZero()) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return this.operationPanic("IsZero");
   }
 
   Kind(): Kind {

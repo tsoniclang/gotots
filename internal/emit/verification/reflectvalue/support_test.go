@@ -342,10 +342,34 @@ func runReflectDifferential(
 	goRunner string,
 ) {
 	t.Helper()
+	runReflectDifferentialInspect(
+		t,
+		source,
+		rootName,
+		packageName,
+		typescriptRunner,
+		goRunner,
+		nil,
+	)
+}
+
+func runReflectDifferentialInspect(
+	t *testing.T,
+	source string,
+	rootName string,
+	packageName string,
+	typescriptRunner string,
+	goRunner string,
+	inspect func(renderedArtifacts),
+) {
+	t.Helper()
 	project := t.TempDir()
 	emission := compileReflectFixture(t, project, source, []string{rootName})
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	if inspect != nil {
+		inspect(artifacts)
+	}
 	assemblyPath := ""
 	for _, file := range emission.Files() {
 		if file.Kind() == emit.TargetFilePackageAssembly &&

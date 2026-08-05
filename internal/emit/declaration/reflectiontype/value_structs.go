@@ -31,12 +31,9 @@ func pointerValueProperties(
 	scaffold.requests = append(scaffold.requests, observation.Requests()...)
 	directClass := observation.Representation() ==
 		api.PointerRepresentationDirectClass
-	structType, structOK := types.Unalias(pointee).
-		Underlying().(*types.Struct)
-	if !directClass || !structOK || !locationModelStruct(structType) {
-		// The pointee is outside the location model: the pointer keeps
-		// its exact nil and zero evidence while elem stays a loud typed
-		// boundary through operation absence.
+	named, namedOK := types.Unalias(pointee).(*types.Named)
+	_, structOK := types.Unalias(pointee).Underlying().(*types.Struct)
+	if !directClass || !namedOK || named.Obj() == nil || !structOK {
 		return []tsgo.ObjectLiteralElementLike{
 			pointerZeroProperty(scaffold),
 		}, nil
@@ -51,27 +48,57 @@ func pointerValueProperties(
 	}
 	scaffold.requests = append(scaffold.requests, elemAdapter.Requests()...)
 	scaffold.requests = append(scaffold.requests, descriptor.Requests()...)
-	assignments := make([]tsgo.Statement, 0, structType.NumFields()+1)
-	assignments = append(assignments, constStatement(
-		factory,
-		"replacement",
-		guardedForeignPayload(scaffold, elemAdapter, "Value.Set"),
-	))
-	for index := range structType.NumFields() {
-		member, memberErr := context.Names().Member(structType.Field(index))
-		if memberErr != nil {
-			return nil, memberErr
-		}
-		assignments = append(assignments, factory.ExpressionStatement(
-			factory.BinaryExpression(
-				nil,
-				memberAccess(factory, "instance", member),
-				nil,
-				factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
-				memberAccess(factory, "replacement", member),
-			),
-		))
+	copied, err := context.Values().Transfer(
+		context.WithRole(api.RoleStructCopyField),
+		nil,
+		pointee,
+		pointee,
+		api.ValueTransferCopy,
+		api.DirectExpression(guardedForeignPayload(
+			scaffold,
+			elemAdapter,
+			"Value.Set",
+		)),
+	)
+	if err != nil {
+		return nil, err
 	}
+	assignReference, err := context.Names().NamedStructOperation(
+		named.Origin().Obj(),
+		api.NamedStructOperationAssign,
+	)
+	if err != nil {
+		return nil, err
+	}
+	assignMember, err := api.NamedStructOperationMemberName(
+		api.NamedStructOperationAssign,
+	)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, copied.Requests()...)
+	scaffold.requests = append(
+		scaffold.requests,
+		assignReference.Requests()...,
+	)
+	assignments := append([]tsgo.Statement(nil), copied.Before()...)
+	assignments = append(assignments, factory.ExpressionStatement(
+		factory.CallExpression(
+			factory.PropertyAccessExpression(
+				assignReference.Expression(factory),
+				nil,
+				factory.Identifier(assignMember),
+				tsgo.NodeFlagsNone,
+			),
+			nil,
+			nil,
+			[]tsgo.Expression{
+				factory.Identifier("instance"),
+				copied.Value(),
+			},
+			tsgo.NodeFlagsNone,
+		),
+	))
 	location := locationLiteral(scaffold, locationCallbacks{
 		descriptor: descriptor,
 		settable:   true,
@@ -167,11 +194,9 @@ func structValueProperties(
 		}
 		providerRepresented = providerRepresented || owned
 	}
-	fullySupported := !providerRepresented &&
-		locationModelStruct(structType)
 	var cloned tsgo.ObjectLiteralElementLike
-	if fullySupported {
-		if _, isNamed := types.Unalias(sourceType).(*types.Named); isNamed {
+	if !providerRepresented {
+		if named, isNamed := types.Unalias(sourceType).(*types.Named); isNamed && named.Obj() != nil && named.TypeParams().Len() == 0 {
 			var clonedErr error
 			cloned, clonedErr = structClonedProperty(
 				context,
@@ -208,7 +233,7 @@ func structValueProperties(
 	cases := make([]tsgo.CaseOrDefaultClause, 0, structType.NumFields()+1)
 	for index := range structType.NumFields() {
 		field := structType.Field(index)
-		if providerRepresented || !locationModelField(field.Type()) {
+		if providerRepresented {
 			caseLiteral, caseErr := api.IntegerLiteral(
 				factory,
 				provider,
@@ -255,16 +280,64 @@ func structValueProperties(
 			scaffold.requests,
 			descriptor.Requests()...,
 		)
-		fieldAccess := memberAccess(factory, "instance", member)
-		location := locationLiteral(scaffold, locationCallbacks{
-			descriptor: descriptor,
-			settable:   field.Exported(),
-			get: factory.NewExpression(
-				fieldAdapter.Expression(factory),
+		fieldAccess := tsgo.Expression(memberAccess(
+			factory,
+			"instance",
+			member,
+		))
+		fieldValue := fieldAccess
+		settable := field.Exported()
+		var setStatements []tsgo.Statement
+		if field.Name() == "_" {
+			zero, zeroErr := context.Values().Zero(
+				context.WithRole(api.RoleStructZeroField),
 				nil,
-				[]tsgo.Expression{fieldAccess},
-			),
-			set: factory.Block([]tsgo.Statement{
+				field.Type(),
+			)
+			if zeroErr != nil {
+				return nil, zeroErr
+			}
+			if len(zero.Before()) != 0 {
+				return nil, &api.GeneratedArtifactShapeError{
+					Artifact: field.Type().String(),
+					Reason:   "blank reflection field zero is not expression-only",
+				}
+			}
+			scaffold.requests = append(
+				scaffold.requests,
+				zero.Requests()...,
+			)
+			fieldValue = zero.Value()
+			settable = false
+			setStatements = []tsgo.Statement{factory.ExpressionStatement(
+				runtimePanic(
+					scaffold,
+					"reflect: Value.Set using unaddressable value",
+				),
+			)}
+		} else {
+			copied, copyErr := context.Values().Transfer(
+				context.WithRole(api.RoleStructCopyField),
+				nil,
+				field.Type(),
+				field.Type(),
+				api.ValueTransferCopy,
+				api.DirectExpression(guardedForeignPayload(
+					scaffold,
+					fieldAdapter,
+					"Value.Set",
+				)),
+			)
+			if copyErr != nil {
+				return nil, copyErr
+			}
+			scaffold.requests = append(
+				scaffold.requests,
+				copied.Requests()...,
+			)
+			setStatements = append(setStatements, copied.Before()...)
+			setStatements = append(
+				setStatements,
 				factory.ExpressionStatement(factory.BinaryExpression(
 					nil,
 					fieldAccess,
@@ -272,13 +345,19 @@ func structValueProperties(
 					factory.BinaryOperatorToken(
 						tsgo.BinaryOperatorEqualsToken,
 					),
-					guardedForeignPayload(
-						scaffold,
-						fieldAdapter,
-						"Value.Set",
-					),
+					copied.Value(),
 				)),
-			}, true),
+			)
+		}
+		location := locationLiteral(scaffold, locationCallbacks{
+			descriptor: descriptor,
+			settable:   settable,
+			get: factory.NewExpression(
+				fieldAdapter.Expression(factory),
+				nil,
+				[]tsgo.Expression{fieldValue},
+			),
+			set: factory.Block(setStatements, true),
 		})
 		caseLiteral, caseErr := api.IntegerLiteral(
 			factory,
@@ -337,27 +416,6 @@ func structValueProperties(
 		properties = append(properties, cloned)
 	}
 	return properties, nil
-}
-
-// locationModelField reports whether one struct field participates in the
-// generated location model. Unsupported field kinds keep exact loud typed
-// boundaries at their Field cases rather than blocking the whole type.
-func locationModelField(fieldType types.Type) bool {
-	basic, ok := types.Unalias(fieldType).(*types.Basic)
-	return ok && basic.Info()&(types.IsBoolean|types.IsString|
-		types.IsInteger|types.IsFloat) != 0
-}
-
-// locationModelStruct reports whether every field of one struct is inside
-// the location model, which gates whole-value operations such as the
-// interface clone.
-func locationModelStruct(structType *types.Struct) bool {
-	for index := range structType.NumFields() {
-		if !locationModelField(structType.Field(index).Type()) {
-			return false
-		}
-	}
-	return true
 }
 
 // structClonedProperty binds the canonical class copy operation so
@@ -422,170 +480,4 @@ func structClonedProperty(
 			),
 		)),
 	)), nil
-}
-
-// pointerCellValueProperties adds the elem callback of one pointer whose
-// pointee is represented through a runtime pointer storage cell (slices,
-// basic scalars, and maps): the location reads and replaces the pointee
-// through the cell's value member, so mutations stay visible to the
-// original variable.
-func pointerCellValueProperties(
-	context api.Context,
-	names api.ReflectionNames,
-	reflectionType *types.TypeName,
-	pointee types.Type,
-	scaffold *locationScaffold,
-) ([]tsgo.ObjectLiteralElementLike, error) {
-	factory := scaffold.factory
-	sliceAdapter, err := context.Names().InterfaceAdapter(pointee, nil)
-	if err != nil {
-		return nil, err
-	}
-	descriptor, err := names.ReflectionValueType(pointee, reflectionType)
-	if err != nil {
-		return nil, err
-	}
-	scaffold.requests = append(scaffold.requests, sliceAdapter.Requests()...)
-	scaffold.requests = append(scaffold.requests, descriptor.Requests()...)
-	cellValue := memberAccess(factory, "instance", "value")
-	// Scalar pointer cells hold the raw carrier storage: reads wrap the
-	// raw value into the pointee's branded representation for boxing, and
-	// writes project the boxed payload back to raw storage. Container
-	// cells hold the represented value directly.
-	cellRead := cellValue
-	cellWrite := guardedForeignPayload(
-		scaffold,
-		sliceAdapter,
-		"Value.Set",
-	)
-	if _, basicPointee := types.Unalias(pointee).
-		Underlying().(*types.Basic); basicPointee {
-		wrapped, readRequests, readErr := constructedScalarValue(
-			context,
-			pointee,
-			cellValue,
-		)
-		if readErr != nil {
-			return nil, readErr
-		}
-		scaffold.requests = append(scaffold.requests, readRequests...)
-		cellRead = wrapped
-		projected, writeRequests, writeErr := projectedScalarPayload(
-			context,
-			pointee,
-			cellWrite,
-		)
-		if writeErr != nil {
-			return nil, writeErr
-		}
-		scaffold.requests = append(scaffold.requests, writeRequests...)
-		cellWrite = projected
-	}
-	location := locationLiteral(scaffold, locationCallbacks{
-		descriptor: descriptor,
-		settable:   true,
-		get: factory.NewExpression(
-			sliceAdapter.Expression(factory),
-			nil,
-			[]tsgo.Expression{cellRead},
-		),
-		set: factory.Block([]tsgo.Statement{
-			factory.ExpressionStatement(factory.BinaryExpression(
-				nil,
-				cellValue,
-				nil,
-				factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
-				cellWrite,
-			)),
-		}, true),
-	})
-	body := factory.Block([]tsgo.Statement{
-		foreignBoxGuardStatement(scaffold, "Value.Elem"),
-		constStatement(factory, "instance", boxPayload(factory)),
-		factory.IfStatement(
-			factory.BinaryExpression(
-				nil,
-				factory.Identifier("instance"),
-				nil,
-				factory.BinaryOperatorToken(
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-				),
-				factory.Identifier("undefined"),
-			),
-			factory.Block([]tsgo.Statement{
-				factory.ReturnStatement(factory.Identifier("undefined")),
-			}, true),
-			nil,
-		),
-		factory.ReturnStatement(location),
-	}, true)
-	elem := factory.ArrowFunction(
-		nil,
-		nil,
-		[]tsgo.ParameterDeclaration{boxParameter(scaffold)},
-		nil,
-		factory.EqualsGreaterThanToken(),
-		body,
-	)
-	properties := []tsgo.ObjectLiteralElementLike{
-		expressionProperty(factory, "elem", elem),
-		pointerZeroProperty(scaffold),
-	}
-	if pointeeBasic, basicOK := types.Unalias(pointee).
-		Underlying().(*types.Basic); basicOK {
-		pointeeZero, zeroErr := scalarZeroExpression(
-			context,
-			factory,
-			pointeeBasic,
-		)
-		if zeroErr != nil {
-			return nil, zeroErr
-		}
-		if pointeeZero != nil {
-			runtimePointer, pointerErr := context.Names().Runtime(
-				api.RuntimePointer,
-				api.ImportPhaseValue,
-			)
-			if pointerErr != nil {
-				return nil, pointerErr
-			}
-			scaffold.requests = append(
-				scaffold.requests,
-				runtimePointer.Requests()...,
-			)
-			properties = append(properties, expressionProperty(
-				factory,
-				"newPointer",
-				factory.ArrowFunction(
-					nil,
-					nil,
-					nil,
-					factory.TypeReferenceNode(
-						scaffold.boxType.EntityName(factory),
-						nil,
-					),
-					factory.EqualsGreaterThanToken(),
-					factory.ParenthesizedExpression(
-						factory.NewExpression(
-							scaffold.adapter.Expression(factory),
-							nil,
-							[]tsgo.Expression{factory.CallExpression(
-								factory.PropertyAccessExpression(
-									runtimePointer.Expression(factory),
-									nil,
-									factory.Identifier("cell"),
-									tsgo.NodeFlagsNone,
-								),
-								nil,
-								nil,
-								[]tsgo.Expression{pointeeZero},
-								tsgo.NodeFlagsNone,
-							)},
-						),
-					),
-				),
-			))
-		}
-	}
-	return properties, nil
 }
