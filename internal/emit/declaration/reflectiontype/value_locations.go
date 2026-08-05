@@ -110,6 +110,7 @@ type locationCallbacks struct {
 	descriptor api.NameReference
 	settable   bool
 	get        tsgo.Expression
+	getBlock   tsgo.Block
 	set        tsgo.Block
 }
 
@@ -118,6 +119,12 @@ func locationLiteral(
 	callbacks locationCallbacks,
 ) tsgo.ObjectLiteralExpression {
 	factory := scaffold.factory
+	var get tsgo.ConciseBody
+	if callbacks.getBlock != nil {
+		get = callbacks.getBlock
+	} else {
+		get = factory.ParenthesizedExpression(callbacks.get)
+	}
 	return factory.ObjectLiteralExpression(
 		[]tsgo.ObjectLiteralElementLike{
 			expressionProperty(factory, "type", arrow(
@@ -132,7 +139,7 @@ func locationLiteral(
 				nil,
 				optionalInterfaceBoxType(factory, scaffold.boxType),
 				factory.EqualsGreaterThanToken(),
-				factory.ParenthesizedExpression(callbacks.get),
+				get,
 			)),
 			expressionProperty(factory, "set", factory.ArrowFunction(
 				nil,

@@ -29,6 +29,11 @@ type Record struct {
 	Value Named
 }
 
+type GenericRecord[T any] struct {
+	Value Named
+	Marker T
+}
+
 type Source struct {
 	Value Label
 }
@@ -73,7 +78,16 @@ func InterfaceFieldFacts() string {
 		field.IsNil(),
 		field.IsZero(),
 	)
-	return before + " | " + after + " | " + final
+
+	generic := &GenericRecord[int]{}
+	genericField := reflect.ValueOf(generic).Elem().Field(0)
+	genericField.Set(reflect.ValueOf(source).Elem().Field(0))
+	genericResult := fmt.Sprintf(
+		"%t %s",
+		genericField.CanSet(),
+		generic.Value.Name(),
+	)
+	return before + " | " + after + " | " + final + " | " + genericResult
 }
 `
 	typescriptRunner := `const facts = await InterfaceFieldFacts();
@@ -103,6 +117,7 @@ func main() {
 				"value === undefined",
 				"reflect: Value.Set received a value outside the interface contract",
 				"zero: (): GoInterfaceValue | undefined => undefined",
+				".$storageOf(instance).Value",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					t.Fatalf("interface-field reflection artifact lacks %q", required)

@@ -261,56 +261,33 @@ func structValueProperties(
 		if descriptorErr != nil {
 			return nil, descriptorErr
 		}
-		member, memberErr := context.Names().Member(field)
-		if memberErr != nil {
-			return nil, memberErr
-		}
 		scaffold.requests = append(
 			scaffold.requests,
 			descriptor.Requests()...,
 		)
-		fieldAccess := tsgo.Expression(memberAccess(
-			factory,
-			"instance",
-			member,
-		))
 		settable := field.Exported()
 		var boxedField tsgo.Expression
+		var boxedFieldBlock tsgo.Block
 		var setBlock tsgo.Block
-		if _, isInterface := types.Unalias(field.Type()).Underlying().(*types.Interface); isInterface {
-			var interfaceRequests []api.RootRequest
-			boxedField, setBlock, interfaceRequests, descriptorErr =
-				interfaceFieldCallbacks(
-					context,
-					field,
-					fieldAccess,
+		if field.Name() == "_" {
+			settable = false
+			setBlock = factory.Block(
+				[]tsgo.Statement{factory.ExpressionStatement(runtimePanic(
 					scaffold,
+					"reflect: Value.Set using unaddressable value",
+				))},
+				true,
+			)
+			if _, isInterface := types.Unalias(field.Type()).Underlying().(*types.Interface); isInterface {
+				boxedField = factory.Identifier("undefined")
+			} else {
+				fieldAdapter, adapterErr := context.Names().InterfaceAdapter(
+					field.Type(),
+					nil,
 				)
-			if descriptorErr != nil {
-				return nil, descriptorErr
-			}
-			scaffold.requests = append(
-				scaffold.requests,
-				interfaceRequests...,
-			)
-			if field.Name() == "_" {
-				settable = false
-			}
-		} else {
-			fieldAdapter, adapterErr := context.Names().InterfaceAdapter(
-				field.Type(),
-				nil,
-			)
-			if adapterErr != nil {
-				return nil, adapterErr
-			}
-			scaffold.requests = append(
-				scaffold.requests,
-				fieldAdapter.Requests()...,
-			)
-			fieldValue := fieldAccess
-			var setStatements []tsgo.Statement
-			if field.Name() == "_" {
+				if adapterErr != nil {
+					return nil, adapterErr
+				}
 				zero, zeroErr := context.Values().Zero(
 					context.WithRole(api.RoleStructZeroField),
 					nil,
@@ -319,69 +296,55 @@ func structValueProperties(
 				if zeroErr != nil {
 					return nil, zeroErr
 				}
-				if len(zero.Before()) != 0 {
-					return nil, &api.GeneratedArtifactShapeError{
-						Artifact: field.Type().String(),
-						Reason:   "blank reflection field zero is not expression-only",
-					}
-				}
+				scaffold.requests = append(
+					scaffold.requests,
+					fieldAdapter.Requests()...,
+				)
 				scaffold.requests = append(
 					scaffold.requests,
 					zero.Requests()...,
 				)
-				fieldValue = zero.Value()
-				settable = false
-				setStatements = []tsgo.Statement{factory.ExpressionStatement(
-					runtimePanic(
-						scaffold,
-						"reflect: Value.Set using unaddressable value",
-					),
-				)}
-			} else {
-				copied, copyErr := context.Values().Transfer(
-					context.WithRole(api.RoleStructCopyField),
+				boxedZero := factory.NewExpression(
+					fieldAdapter.Expression(factory),
 					nil,
-					field.Type(),
-					field.Type(),
-					api.ValueTransferCopy,
-					api.DirectExpression(guardedForeignPayload(
-						scaffold,
-						fieldAdapter,
-						"Value.Set",
-					)),
+					[]tsgo.Expression{zero.Value()},
 				)
-				if copyErr != nil {
-					return nil, copyErr
+				if len(zero.Before()) == 0 {
+					boxedField = boxedZero
+				} else {
+					statements := append(
+						[]tsgo.Statement(nil),
+						zero.Before()...,
+					)
+					statements = append(
+						statements,
+						factory.ReturnStatement(boxedZero),
+					)
+					boxedFieldBlock = factory.Block(statements, true)
 				}
-				scaffold.requests = append(
-					scaffold.requests,
-					copied.Requests()...,
-				)
-				setStatements = append(setStatements, copied.Before()...)
-				setStatements = append(
-					setStatements,
-					factory.ExpressionStatement(factory.BinaryExpression(
-						nil,
-						fieldAccess,
-						nil,
-						factory.BinaryOperatorToken(
-							tsgo.BinaryOperatorEqualsToken,
-						),
-						copied.Value(),
-					)),
-				)
 			}
-			boxedField = factory.NewExpression(
-				fieldAdapter.Expression(factory),
-				nil,
-				[]tsgo.Expression{fieldValue},
+		} else {
+			var fieldRequests []api.RootRequest
+			boxedField, boxedFieldBlock, setBlock, fieldRequests, descriptorErr =
+				nonBlankStructFieldCallbacks(
+					context,
+					sourceType,
+					field,
+					scaffold,
+				)
+			if descriptorErr != nil {
+				return nil, descriptorErr
+			}
+			scaffold.requests = append(
+				scaffold.requests,
+				fieldRequests...,
 			)
-			setBlock = factory.Block(setStatements, true)
 		}
 		location := locationLiteral(scaffold, locationCallbacks{
 			descriptor: descriptor,
 			settable:   settable,
 			get:        boxedField,
+			getBlock:   boxedFieldBlock,
 			set:        setBlock,
 		})
 		caseLiteral, caseErr := api.IntegerLiteral(

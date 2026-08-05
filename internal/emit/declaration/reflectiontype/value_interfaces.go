@@ -60,18 +60,35 @@ func interfaceFieldCallbacks(
 	error,
 ) {
 	factory := scaffold.factory
-	if field.Name() == "_" {
-		return factory.Identifier("undefined"), factory.Block(
-			[]tsgo.Statement{factory.ExpressionStatement(runtimePanic(
-				scaffold,
-				"reflect: Value.Set using unaddressable value",
-			))},
-			true,
-		), nil, nil
-	}
-	contract, err := context.Names().InterfaceContract(field.Type())
+	assigned, requests, err := admittedInterfaceFieldValue(
+		context,
+		field,
+		scaffold,
+	)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	set := factory.Block([]tsgo.Statement{factory.ExpressionStatement(
+		factory.BinaryExpression(
+			nil,
+			fieldAccess,
+			nil,
+			factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
+			assigned,
+		),
+	)}, true)
+	return fieldAccess, set, requests, nil
+}
+
+func admittedInterfaceFieldValue(
+	context api.Context,
+	field *types.Var,
+	scaffold *locationScaffold,
+) (tsgo.Expression, []api.RootRequest, error) {
+	factory := scaffold.factory
+	contract, err := context.Names().InterfaceContract(field.Type())
+	if err != nil {
+		return nil, nil, err
 	}
 	value := factory.Identifier("value")
 	nilValue := factory.BinaryExpression(
@@ -107,14 +124,5 @@ func interfaceFieldCallbacks(
 			"reflect: Value.Set received a value outside the interface contract",
 		),
 	)
-	set := factory.Block([]tsgo.Statement{factory.ExpressionStatement(
-		factory.BinaryExpression(
-			nil,
-			fieldAccess,
-			nil,
-			factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
-			assigned,
-		),
-	)}, true)
-	return fieldAccess, set, contract.Requests(), nil
+	return assigned, contract.Requests(), nil
 }
