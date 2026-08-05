@@ -354,3 +354,79 @@ func RootFactory() func(string) fs.FS { return os.DirFS }
 		t.Fatalf("canonical fs.Stat boundary is absent:\n%s", artifacts.printed)
 	}
 }
+
+func TestProviderCallableProfileWithoutInterfaceContract(t *testing.T) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/callableprofile\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package callableprofile
+
+import (
+	"strings"
+	"sync"
+)
+
+func Transform(input string) string {
+	var mutex sync.Mutex
+	return strings.Map(func(value rune) rune {
+		mutex.Lock()
+		mutex.Unlock()
+		return value + 1
+	}, input)
+}
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := emit.DefaultOptions()
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
+	options.StandardLibrary = linkedProviderCertificate(t)
+	emission, err := emit.CompileWithOptions(
+		program,
+		[]emit.Root{mustProviderRoot(
+			t,
+			program.Roots()[0].Types().Scope().Lookup("Transform"),
+		)},
+		options,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	assemblyPath := ""
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFilePackageAssembly &&
+			file.PackageName() == "callableprofile" {
+			assemblyPath = file.OutputPath()
+			break
+		}
+	}
+	if assemblyPath == "" {
+		t.Fatal("callable-profile package assembly is absent")
+	}
+	targetOutput := executeProviderTypeScript(
+		t,
+		workingDirectory,
+		artifacts.paths,
+		assemblyPath,
+		[]string{"Transform"},
+		`console.log(JSON.stringify(await Transform("ab")));
+`,
+	)
+	if targetOutput != "\"bc\"\n" {
+		t.Fatalf("callable-profile output = %q, want %q", targetOutput, "\"bc\"\n")
+	}
+	if !strings.Contains(artifacts.printed, "StringsMapCanonical") ||
+		!strings.Contains(artifacts.printed, "await") {
+		t.Fatalf("callable-only provider profile was not selected:\n%s", artifacts.printed)
+	}
+}

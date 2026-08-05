@@ -174,9 +174,13 @@ func emitProviderProfileInvocation(
 ) (api.ExpressionEmission, error) {
 	reference := selection.Reference()
 	profile := reference.Profile().Interfaces()
-	profileContext, err := context.WithProviderProfile(profile)
-	if err != nil {
-		return api.ExpressionEmission{}, err
+	profileContext := context
+	if len(profile) != 0 {
+		var err error
+		profileContext, err = context.WithProviderProfile(profile)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	typeArguments := make([]tsgo.TypeNode, 0, len(reference.CanonicalTypeArguments()))
 	for _, sourceType := range reference.CanonicalTypeArguments() {
