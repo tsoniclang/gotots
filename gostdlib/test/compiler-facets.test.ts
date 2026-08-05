@@ -173,7 +173,13 @@ test("named-struct facets expose only selected static operations", (): void => {
   const atomicBool = SyncAtomicBoolOperations.$zero();
   const atomicBoolCopy = SyncAtomicBoolOperations.$copy(atomicBool);
   assert.notEqual(atomicBoolCopy, atomicBool);
+  assert.equal(SyncAtomicBoolOperations.$equal(atomicBool, atomicBoolCopy), true);
+  assert.equal(
+    SyncAtomicBoolOperations.$hash(atomicBool),
+    SyncAtomicBoolOperations.$hash(atomicBoolCopy),
+  );
   AtomicBool.Store(atomicBool, true);
+  assert.equal(SyncAtomicBoolOperations.$equal(atomicBool, atomicBoolCopy), false);
   assert.equal(AtomicBool.Load(atomicBoolCopy), false);
   assert.equal(SyncAtomicBoolOperations.$fromStorage(
     SyncAtomicBoolOperations.$storageOf(atomicBool),
@@ -186,9 +192,22 @@ test("named-struct facets expose only selected static operations", (): void => {
   const atomicInt64Copy = SyncAtomicInt64Operations.$copy(atomicInt64);
   const atomicUint32Copy = SyncAtomicUint32Operations.$copy(atomicUint32);
   const atomicUint64Copy = SyncAtomicUint64Operations.$copy(atomicUint64);
+  assert.equal(SyncAtomicInt32Operations.$equal(atomicInt32, atomicInt32Copy), true);
+  assert.equal(SyncAtomicInt64Operations.$equal(atomicInt64, atomicInt64Copy), true);
+  assert.equal(SyncAtomicUint32Operations.$equal(atomicUint32, atomicUint32Copy), true);
+  assert.equal(SyncAtomicUint64Operations.$equal(atomicUint64, atomicUint64Copy), true);
+  assert.equal(SyncAtomicInt32Operations.$hash(atomicInt32), SyncAtomicInt32Operations.$hash(atomicInt32Copy));
+  assert.equal(SyncAtomicInt64Operations.$hash(atomicInt64), SyncAtomicInt64Operations.$hash(atomicInt64Copy));
+  assert.equal(SyncAtomicUint32Operations.$hash(atomicUint32), SyncAtomicUint32Operations.$hash(atomicUint32Copy));
+  assert.equal(SyncAtomicUint64Operations.$hash(atomicUint64), SyncAtomicUint64Operations.$hash(atomicUint64Copy));
   AtomicInt32.Store(atomicInt32, 1);
   AtomicInt64.Store(atomicInt64, 1n);
   AtomicUint32.Store(atomicUint32, 1);
+  AtomicUint64.Add(atomicUint64, 1n);
+  assert.equal(SyncAtomicInt32Operations.$equal(atomicInt32, atomicInt32Copy), false);
+  assert.equal(SyncAtomicInt64Operations.$equal(atomicInt64, atomicInt64Copy), false);
+  assert.equal(SyncAtomicUint32Operations.$equal(atomicUint32, atomicUint32Copy), false);
+  assert.equal(SyncAtomicUint64Operations.$equal(atomicUint64, atomicUint64Copy), false);
   assert.equal(AtomicInt32.Load(atomicInt32Copy), 0);
   assert.equal(AtomicInt64.Load(atomicInt64Copy), 0n);
   assert.equal(AtomicUint32.Load(atomicUint32Copy), 0);

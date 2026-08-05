@@ -2,9 +2,11 @@ package provider_test
 
 import (
 	"context"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -227,6 +229,126 @@ func SequenceTotal(sequence iter.Seq[int]) int {
 			"provider iterator projection count = %d, want one:\n%s",
 			count,
 			printed,
+		)
+	}
+}
+
+func TestAtomicComparableFacetsMatchGo(t *testing.T) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/atomiccomparable\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package atomiccomparable
+
+import (
+	"fmt"
+	"sync/atomic"
+)
+
+func Facts() string {
+	var zero atomic.Uint64
+	var same atomic.Uint64
+	var one atomic.Uint64
+	one.Add(1)
+	values := map[atomic.Uint64]string{
+		zero: "zero",
+		one:  "one",
+	}
+	return fmt.Sprintf(
+		"%t %t %s %s",
+		zero == same,
+		zero == one,
+		values[same],
+		values[one],
+	)
+}
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := emit.DefaultOptions()
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
+	options.StandardLibrary = linkedProviderCertificate(t)
+	emission, err := emit.CompileWithOptions(
+		program,
+		[]emit.Root{mustProviderRoot(
+			t,
+			program.Roots()[0].Types().Scope().Lookup("Facts"),
+		)},
+		options,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	for _, required := range []string{
+		"SyncAtomicUint64Operations.$equal",
+		"SyncAtomicUint64Operations.$hash",
+	} {
+		if !strings.Contains(artifacts.printed, required) {
+			t.Fatalf(
+				"atomic comparable artifact lacks %q:\n%s",
+				required,
+				artifacts.printed,
+			)
+		}
+	}
+	assemblyPath := ""
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFilePackageAssembly &&
+			file.PackageName() == "atomiccomparable" {
+			assemblyPath = file.OutputPath()
+			break
+		}
+	}
+	if assemblyPath == "" {
+		t.Fatal("atomic comparable package assembly is absent")
+	}
+	targetOutput := executeProviderTypeScript(
+		t,
+		workingDirectory,
+		artifacts.paths,
+		assemblyPath,
+		[]string{"Facts"},
+		"console.log(await Facts());\n",
+	)
+	runnerDirectory := filepath.Join(project, "cmd", "compare")
+	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+
+import (
+	"fmt"
+
+	fixture "example.com/atomiccomparable"
+)
+
+func main() {
+	fmt.Println(fixture.Facts())
+}
+`)
+	sourceContext, sourceCancel := context.WithTimeout(
+		context.Background(),
+		2*time.Minute,
+	)
+	defer sourceCancel()
+	command := exec.CommandContext(sourceContext, "go", "run", ".")
+	command.Dir = runnerDirectory
+	sourceOutput, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("execute Go atomic comparison: %v\n%s", err, sourceOutput)
+	}
+	if targetOutput != string(sourceOutput) {
+		t.Fatalf(
+			"atomic comparable differential:\nGo:\n%s\nTypeScript:\n%s",
+			sourceOutput,
+			targetOutput,
 		)
 	}
 }

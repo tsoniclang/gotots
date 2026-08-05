@@ -2018,6 +2018,8 @@
       "export": "SyncAtomicBoolOperations",
       "capabilities": [
 		"copy",
+		"equal",
+		"hash",
         "storage",
         "zero"
       ],
@@ -2031,6 +2033,8 @@
       "export": "SyncAtomicInt32Operations",
       "capabilities": [
 		"copy",
+		"equal",
+		"hash",
         "storage",
         "zero"
       ],
@@ -2044,6 +2048,8 @@
       "export": "SyncAtomicInt64Operations",
       "capabilities": [
 		"copy",
+		"equal",
+		"hash",
         "storage",
         "zero"
       ],
@@ -2057,6 +2063,8 @@
       "export": "SyncAtomicUint32Operations",
       "capabilities": [
 		"copy",
+		"equal",
+		"hash",
         "storage",
         "zero"
       ],
@@ -2070,6 +2078,8 @@
       "export": "SyncAtomicUint64Operations",
       "capabilities": [
 		"copy",
+		"equal",
+		"hash",
         "storage",
         "zero"
       ],
