@@ -1,6 +1,7 @@
 package providerboundary
 
 import (
+	"go/ast"
 	"go/types"
 	"strconv"
 
@@ -11,6 +12,33 @@ import (
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func FromProviderSourceCallable(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Expr,
+	function *types.Func,
+	target api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	converted, changed, err := FromProviderValue(
+		context,
+		children,
+		nil,
+		"",
+		function.Type(),
+		target,
+	)
+	if err != nil || changed {
+		return converted, err
+	}
+	return cooperativecall.AdaptSourceValue(
+		context,
+		children,
+		source,
+		function,
+		target,
+	)
+}
 
 func callableType(
 	sourceType types.Type,

@@ -100,25 +100,22 @@ func Emit(
 		reference.Requests()...,
 	)
 	if function, ok := object.(*types.Func); ok {
-		target, err = cooperativecall.AdaptSourceValue(
+		if reference.ProviderBoundary() {
+			return providerboundary.FromProviderSourceCallable(
+				context,
+				children,
+				source,
+				function,
+				target,
+			)
+		}
+		return cooperativecall.AdaptSourceValue(
 			context,
 			children,
 			source,
 			function,
 			target,
 		)
-		if err != nil || !reference.ProviderBoundary() {
-			return target, err
-		}
-		target, _, err = providerboundary.FromProviderValue(
-			context,
-			children,
-			nil,
-			"",
-			function.Type(),
-			target,
-		)
-		return target, err
 	}
 	return target, nil
 }

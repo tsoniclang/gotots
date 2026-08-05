@@ -430,3 +430,53 @@ func Transform(input string) string {
 		t.Fatalf("callable-only provider profile was not selected:\n%s", artifacts.printed)
 	}
 }
+
+func TestProviderGenericCallableAndTupleBoundary(t *testing.T) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/genericproviderboundary\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package genericproviderboundary
+
+import (
+	"slices"
+	"strings"
+)
+
+func Search(values []string, target string) (int, bool) {
+	return slices.BinarySearchFunc(values, target, strings.Compare)
+}
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := emit.DefaultOptions()
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
+	options.StandardLibrary = linkedProviderCertificate(t)
+	emission, err := emit.CompileWithOptions(
+		program,
+		[]emit.Root{mustProviderRoot(
+			t,
+			program.Roots()[0].Types().Scope().Lookup("Search"),
+		)},
+		options,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+	for _, required := range []string{"satisfies", "Number(", "BigInt.asIntN"} {
+		if !strings.Contains(artifacts.printed, required) {
+			t.Fatalf("generic provider boundary lacks %q:\n%s", required, artifacts.printed)
+		}
+	}
+}

@@ -83,6 +83,7 @@ func FromProviderGenericResults(
 		concrete,
 		emission,
 		fromProviderGenericValue,
+		false,
 	)
 }
 
@@ -100,6 +101,7 @@ func toProviderGenericResults(
 		concrete,
 		emission,
 		toProviderGenericValue,
+		true,
 	)
 }
 
@@ -118,6 +120,7 @@ func convertGenericResults(
 	concrete *types.Tuple,
 	emission api.ExpressionEmission,
 	convert genericValueConverter,
+	providerTarget bool,
 ) (api.ExpressionEmission, error) {
 	target, _, err := convertGenericResultsSelected(
 		context,
@@ -126,6 +129,7 @@ func convertGenericResults(
 		concrete,
 		emission,
 		convert,
+		providerTarget,
 	)
 	return target, err
 }
@@ -137,6 +141,7 @@ func convertGenericResultsSelected(
 	concrete *types.Tuple,
 	emission api.ExpressionEmission,
 	convert genericValueConverter,
+	providerTarget bool,
 ) (api.ExpressionEmission, bool, error) {
 	if contract == nil && concrete == nil {
 		return emission, false, nil
@@ -203,10 +208,28 @@ func convertGenericResultsSelected(
 	if !changed {
 		return emission, false, nil
 	}
+	targetContext := context
+	if providerTarget {
+		targetContext, err = providerRepresentationContext(context, nil)
+		if err != nil {
+			return api.ExpressionEmission{}, false, err
+		}
+	}
+	targetType, err := children.RepresentedType(
+		targetContext.WithRole(api.RoleResultType),
+		nil,
+		concrete,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, false, err
+	}
 	target, err := api.NewExpressionEmission(
 		before,
-		context.Factory().ArrayLiteralExpression(elements, false),
-		api.CombineRequests(requests),
+		context.Factory().SatisfiesExpression(
+			context.Factory().ArrayLiteralExpression(elements, false),
+			targetType.Value(),
+		),
+		api.CombineRequests(requests, targetType.Requests()),
 	)
 	return target, true, err
 }
@@ -344,6 +367,7 @@ func fromProviderGenericCallable(
 		concrete.Results(),
 		call,
 		fromProviderGenericValue,
+		false,
 	)
 	changed := argumentsChanged || resultChanged
 	if err != nil || !changed {
