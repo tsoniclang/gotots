@@ -1,4 +1,8 @@
-import type { Awaitable, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int64 } from "@gotots/gostdlib/internal/scalars.js";
+import {
+  hostInteger,
+  integerFromHost,
+} from "../../host-integer.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import {
@@ -29,7 +33,7 @@ export function Sort<S, E, EStorage>(
   writeSorted(
     values,
     logicalValues(values, copyElement, fromStorage).sort(
-      (left, right): number => orderedCompare(less, equal, left, right),
+      (left, right): number => hostInteger(orderedCompare(less, equal, left, right)),
     ),
     copyElement,
     toStorage,
@@ -81,7 +85,12 @@ function logicalValues<E, EStorage>(
 ): E[] {
   const result: E[] = [];
   for (let index = 0; index < source.length; index += 1) {
-    result.push(readElement(source, index, copyElement, fromStorage));
+    result.push(readElement(
+      source,
+      integerFromHost(index),
+      copyElement,
+      fromStorage,
+    ));
   }
   return result;
 }
@@ -94,7 +103,13 @@ function writeSorted<E, EStorage>(
 ): void {
   let index = 0;
   for (const value of values) {
-    storeElement(target, index, value, copyElement, toStorage);
+    storeElement(
+      target,
+      integerFromHost(index),
+      value,
+      copyElement,
+      toStorage,
+    );
     index += 1;
   }
 }
@@ -115,7 +130,7 @@ export async function sortValues<E>(
   let leftStep = leftIterator.next();
   let rightStep = rightIterator.next();
   while (!leftStep.done && !rightStep.done) {
-    if (await callComparison(compare, leftStep.value, rightStep.value) <= 0) {
+    if (await callComparison(compare, leftStep.value, rightStep.value) <= 0n) {
       result.push(leftStep.value);
       leftStep = leftIterator.next();
     } else {

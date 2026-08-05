@@ -1,4 +1,4 @@
-import type { bool } from "@gotots/runtime/scalars.js";
+import type { bool } from "@gotots/gostdlib/internal/scalars.js";
 
 import { Errno } from "../../syscall.js";
 import { errnoMatchesSentinel } from "../portable/errors/sentinel.js";

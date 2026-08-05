@@ -5,6 +5,7 @@
   "type": "module",
   "gotots": {
     "integerRepresentation": "number",
+    "nativeIntegerBits": 64,
     "concurrencySemantics": "disabled"
   },
   "exports": {

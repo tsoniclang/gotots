@@ -1,4 +1,5 @@
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
+import { hostInteger } from "../../host-integer.js";
 
 import {
   decodeRuneAt,
@@ -59,10 +60,10 @@ export function translatePattern(expression: gostring): CompiledPattern {
 function assertValidPatternBytes(expression: gostring): void {
   for (let index = 0; index < expression.length; ) {
     const [rune, width] = decodeRuneAt(expression, index);
-    if (rune === 0xfffd && width === 1 && expression.charCodeAt(index) >= 0x80) {
+    if (rune === 0xfffd && width === 1n && expression.charCodeAt(index) >= 0x80) {
       throw new Error("invalid UTF-8");
     }
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
   }
 }
 

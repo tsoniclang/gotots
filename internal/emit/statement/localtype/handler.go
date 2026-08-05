@@ -519,17 +519,18 @@ func emitLexicalMapSpecialization(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-	mapModel, ok := maprepresentation.Source(context, mapType)
+	_, ok = maprepresentation.Source(context, mapType)
 	if !ok {
 		return api.DeclarationEmission{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "lexical map specialization has no representation model",
 		}
 	}
-	storageKeyType, err := children.RepresentedType(
-		context.WithRole(api.RoleStorageType),
+	storageKeyType, err := maprepresentation.EmitStorageKeyType(
+		context,
+		children,
 		source,
-		mapModel.StorageKey(),
+		mapType.Key(),
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, err

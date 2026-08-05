@@ -69,7 +69,7 @@ test("unicode properties and case mappings match selected Go tables", () => {
   const custom = new RangeTable(
     RuntimeSlice.literal([new Range16(10, 20, 2)]),
     RuntimeSlice.nil(),
-    0,
+    0n,
   );
   assert.equal(Is(custom, 16), true);
   assert.equal(Is(custom, 17), false);
@@ -83,16 +83,16 @@ test("unicode properties and case mappings match selected Go tables", () => {
 test("unicode utf8 decoders preserve Go invalid-sequence widths", () => {
   assert.equal(RuneError, 0xfffd);
   assert.equal(RuneSelf, 0x80);
-  assert.deepEqual(DecodeRuneInString(goText("é")), [0x00e9, 2]);
-  assert.deepEqual(DecodeRuneInString(String.fromCharCode(0xff, 0x41)), [0xfffd, 1]);
-  assert.deepEqual(DecodeLastRuneInString(goText("A𝄞")), [0x1d11e, 4]);
-  assert.deepEqual(DecodeLastRuneInString(""), [0xfffd, 0]);
+  assert.deepEqual(DecodeRuneInString(goText("é")), [0x00e9, 2n]);
+  assert.deepEqual(DecodeRuneInString(String.fromCharCode(0xff, 0x41)), [0xfffd, 1n]);
+  assert.deepEqual(DecodeLastRuneInString(goText("A𝄞")), [0x1d11e, 4n]);
+  assert.deepEqual(DecodeLastRuneInString(""), [0xfffd, 0n]);
 });
 
 test("unicode utf8 byte operations preserve Go widths and append behavior", () => {
   const encoded = byteSlice(goText("é"));
-  assert.equal(UTFMax, 4);
-  assert.deepEqual(DecodeUTF8Rune(encoded), [0x00e9, 2]);
+  assert.equal(UTFMax, 4n);
+  assert.deepEqual(DecodeUTF8Rune(encoded), [0x00e9, 2n]);
   assert.equal(FullRune(encoded), true);
   assert.equal(FullRune(byteSlice(String.fromCharCode(0xe2, 0x82))), false);
   assert.equal(FullRuneInString(goText("é")), true);
@@ -100,14 +100,14 @@ test("unicode utf8 byte operations preserve Go widths and append behavior", () =
   assert.equal(FullRuneInString(String.fromCharCode(0xe0, 0x80)), true);
   assert.equal(FullRuneInString(String.fromCharCode(0xf0, 0x90, 0x80)), false);
   assert.equal(FullRuneInString(String.fromCharCode(0xf0, 0x80)), true);
-  assert.equal(RuneCount(byteSlice(String.fromCharCode(0xff, 0x41))), 2);
+  assert.equal(RuneCount(byteSlice(String.fromCharCode(0xff, 0x41))), 2n);
   assert.equal(RuneStart(0x80), false);
   assert.equal(RuneStart(0x41), true);
   assert.equal(ValidString(goText("A🙂")), true);
   assert.equal(ValidString(String.fromCharCode(0xff)), false);
 
   const target = RuntimeSlice.make<number>(4, null, 0);
-  assert.equal(EncodeUTF8Rune(target, 0x1f642), 4);
+  assert.equal(EncodeUTF8Rune(target, 0x1f642), 4n);
   assert.deepEqual(sliceValues(target), [0xf0, 0x9f, 0x99, 0x82]);
   assert.deepEqual(
     sliceValues(AppendRune(RuntimeSlice.literal([0x41]), 0x00e9)),
@@ -120,7 +120,7 @@ test("unicode utf16 handles valid and malformed surrogate pairs", () => {
   assert.deepEqual(EncodeRune(0x1f642), [0xd83d, 0xde42]);
   assert.equal(DecodeRune(0xd83d, 0xde42), 0x1f642);
   assert.equal(DecodeRune(0xd83d, 0x41), 0xfffd);
-  assert.equal(RuneLen(0xd800), -1);
+  assert.equal(RuneLen(0xd800), -1n);
   assert.deepEqual(
     sliceValues(Decode(RuntimeSlice.literal([0x41, 0xd83d, 0xde42, 0xd800]))),
     [0x41, 0x1f642, 0xfffd],

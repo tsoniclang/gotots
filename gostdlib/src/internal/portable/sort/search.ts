@@ -1,24 +1,24 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { bool, int64 } from "@gotots/runtime/scalars.js";
+import type { bool, int } from "@gotots/gostdlib/internal/scalars.js";
 
 export function Search(
-  length: int64,
-  predicate: ((index: int64) => bool) | undefined,
-): int64 {
-  if (length < 0) {
+  length: int,
+  predicate: ((index: int) => bool) | undefined,
+): int {
+  if (length < 0n) {
     GoPanic.raiseRuntime("sort: negative length");
   }
   if (predicate === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
-  let low = 0;
+  let low = 0n;
   let high = length;
   while (low < high) {
-    const middle = low + Math.trunc((high - low) / 2);
+    const middle = low + (high - low) / 2n;
     if (predicate(middle)) {
       high = middle;
     } else {
-      low = middle + 1;
+      low = middle + 1n;
     }
   }
   return low;

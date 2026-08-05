@@ -26,7 +26,8 @@ func validateFacetModule(
 	}
 	if len(module.Facets) == 0 && len(module.CallableProfiles) == 0 &&
 		len(module.StatefulProfiles) == 0 &&
-		len(module.ProviderInterfaces) == 0 {
+		len(module.ProviderInterfaces) == 0 &&
+		len(module.ProviderInterfaceCapabilities) == 0 {
 		return manifestError(
 			field,
 			"facet, provider-interface, and callable-profile sets are empty",
@@ -94,7 +95,17 @@ func validateFacetModule(
 	profileInterfaceTargets := make(
 		map[string]ProviderCallableProfileInterfaceDocument,
 	)
+	providerInterfaceTargets := make(
+		map[string]ProviderInterfaceBindingDocument,
+		len(module.ProviderInterfaces),
+	)
+	for _, selected := range module.ProviderInterfaces {
+		profileInterfaceTargets[selected.Export] =
+			providerBindingProfileInterface(selected)
+		providerInterfaceTargets[selected.SourceIdentity+"\x00"+selected.Export] = selected
+	}
 	callableProfileTargets := make(map[string]ProviderCallableProfileDocument)
+	callableProfiles := make(map[string]ProviderCallableProfileDocument)
 	statefulProfileTargets := make(map[string]ProviderStatefulProfileDocument)
 	previousProfile := ""
 	for index, profile := range module.CallableProfiles {
@@ -118,6 +129,7 @@ func validateFacetModule(
 			)
 		}
 		previousProfile = key
+		callableProfiles[key] = profile
 		boundaryEffect, err := providerProfileBoundaryEffect(
 			profile.Interfaces,
 			profile.CallableParameters,
@@ -190,6 +202,15 @@ func validateFacetModule(
 			return err
 		}
 	}
+	if err := validateProviderInterfaceCapabilities(
+		module.ProviderInterfaceCapabilities,
+		field,
+		callableProfiles,
+		providerInterfaceTargets,
+		owners,
+	); err != nil {
+		return err
+	}
 	previous := ""
 	referencedRepresentations := make(map[string]struct{})
 	for index, facet := range module.Facets {
@@ -245,6 +266,17 @@ func validateFacetModule(
 		}
 	}
 	return nil
+}
+
+func providerBindingProfileInterface(
+	binding ProviderInterfaceBindingDocument,
+) ProviderCallableProfileInterfaceDocument {
+	return ProviderCallableProfileInterfaceDocument{
+		SourceIdentity:    binding.SourceIdentity,
+		Export:            binding.Export,
+		ProviderInterface: cloneProviderInterface(binding.ProviderInterface),
+		TargetFingerprint: binding.TargetFingerprint,
+	}
 }
 
 func recordProviderBoundaryProfile(
@@ -330,6 +362,7 @@ func sameProviderCallableProfileTarget(
 		slices.Equal(left.CanonicalResults, right.CanonicalResults) &&
 		slices.Equal(left.CanonicalValues, right.CanonicalValues) &&
 		slices.Equal(left.CanonicalTypeArguments, right.CanonicalTypeArguments) &&
+		slices.Equal(left.CapabilityViews, right.CapabilityViews) &&
 		slices.Equal(left.CallableParameters, right.CallableParameters) &&
 		slices.Equal(left.GuardInterfaces, right.GuardInterfaces) &&
 		slices.Equal(left.ContractInterfaces, right.ContractInterfaces) &&

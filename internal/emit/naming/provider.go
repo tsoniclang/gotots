@@ -15,6 +15,7 @@ type standardLibraryProvider interface {
 	Valid() bool
 	ToolchainKey() string
 	ProviderModules() []string
+	ProviderScalarModule() string
 	Binding(string) (gostdlib.Binding, bool)
 	Facet(
 		string,
@@ -23,6 +24,7 @@ type standardLibraryProvider interface {
 	) (gostdlib.Facet, bool)
 	ProviderRepresentation(string, string) (gostdlib.ProviderRepresentation, bool)
 	ProviderInterface(string) (gostdlib.ProviderInterfaceBinding, bool)
+	ProviderInterfaceCapabilities(string) []gostdlib.ProviderInterfaceCapability
 	ProviderCallableProfile(string, string) (gostdlib.ProviderCallableProfile, bool)
 	ProviderCallableProfiles(string) []gostdlib.ProviderCallableProfile
 	ProviderStatefulProfile(string, string) (gostdlib.ProviderStatefulProfile, bool)

@@ -1,4 +1,4 @@
-import type { float64, gostring, int64 } from "@gotots/runtime/scalars.js";
+import type { float64, gostring, int } from "@gotots/gostdlib/internal/scalars.js";
 
 import { NumberError, rangeError, syntaxError } from "./number-error.js";
 
@@ -7,7 +7,7 @@ const hexadecimalPattern = /^([+-]?)0[xX]_?((?:[0-9a-fA-F](?:_?[0-9a-fA-F])*)?)(
 
 export function ParseFloat(
   value: gostring,
-  bitSize: int64,
+  bitSize: int,
 ): [float64, NumberError | undefined] {
   const lower = value.toLowerCase();
   if (lower === "nan") {
@@ -24,7 +24,7 @@ export function ParseFloat(
   if (parsed === undefined) {
     return [0, syntaxError("ParseFloat", value)];
   }
-  const rounded = bitSize === 32 ? Math.fround(parsed) : parsed;
+  const rounded = bitSize === 32n ? Math.fround(parsed) : parsed;
   if (!Number.isFinite(rounded)) {
     return [rounded, rangeError("ParseFloat", value)];
   }

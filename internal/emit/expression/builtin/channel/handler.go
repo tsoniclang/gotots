@@ -8,6 +8,7 @@ import (
 	channeloperation "github.com/tsoniclang/gotots/internal/emit/concurrency/channel"
 	concurrencyprofile "github.com/tsoniclang/gotots/internal/emit/concurrency/profile"
 	runtimechannel "github.com/tsoniclang/gotots/internal/emit/runtime/channel"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -243,11 +244,7 @@ func emitMake(
 }
 
 func zeroCapacity(context api.Context) (api.ExpressionEmission, error) {
-	value, err := api.IntegerLiteral(
-		context.Factory(),
-		context.IntegerRepresentation(),
-		"0",
-	)
+	value, err := integervalue.Literal(context, types.Typ[types.Int], "0")
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -351,8 +348,7 @@ func emitMeasure(
 		member,
 		channel,
 	)
-	if err != nil ||
-		context.IntegerRepresentation() != api.IntegerRepresentationBigInt {
+	if err != nil || !integervalue.TypeUsesBigInt(context, resultType) {
 		return target, err
 	}
 	return api.NewExpressionEmission(

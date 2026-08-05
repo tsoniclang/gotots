@@ -160,6 +160,24 @@ func emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	if model, defined := definedtype.ResolveCallable(
+		context.TypesInfo().TypeOf(source.Fun),
+	); defined {
+		providerCarrier, carrierErr := model.ProviderCarrier(
+			context.WithRole(api.RoleCallCallee),
+		)
+		if carrierErr != nil {
+			return api.ExpressionEmission{}, carrierErr
+		}
+		providerBoundary = providerBoundary || providerCarrier
+		callee, err = model.Project(
+			context.WithRole(api.RoleCallCallee),
+			callee,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
 	guardNil := !static &&
 		!callable.StaticallyNonNil(context.TypesInfo(), source.Fun)
 	arguments, argumentBefore, argumentRequests, err := emitArguments(
@@ -190,17 +208,6 @@ func emit(
 			argumentRequests,
 			providerRequests,
 		)
-	}
-	if model, defined := definedtype.ResolveCallable(
-		context.TypesInfo().TypeOf(source.Fun),
-	); defined {
-		callee, err = model.Project(
-			context.WithRole(api.RoleCallCallee),
-			callee,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
 	}
 	targetCallee := callee.Value()
 	before := callee.Before()
@@ -329,10 +336,21 @@ func emit(
 			target,
 		)
 	}
-	return cooperativecall.ValueCall(
+	target, err = cooperativecall.ValueCall(
 		context,
 		source,
 		signature,
+		target,
+	)
+	if err != nil || discarded || !providerBoundary {
+		return target, err
+	}
+	return providerboundary.FromProviderResults(
+		context,
+		children,
+		nil,
+		"",
+		signature.Results(),
 		target,
 	)
 }

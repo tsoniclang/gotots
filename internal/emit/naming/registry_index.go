@@ -17,6 +17,7 @@ func (r *Registry) IndexCompilationTargets(
 	sourcePackages []*load.Package,
 	environmentPackages []*load.Package,
 	certificate *certify.Certificate,
+	externalModules []string,
 ) error {
 	if r == nil {
 		return &api.NameError{Reason: "declaration registry is nil"}
@@ -49,8 +50,14 @@ func (r *Registry) IndexCompilationTargets(
 		provider = certificate
 	}
 	r.provider = provider
+	providerModules := slices.Clone(externalModules)
 	if provider != nil {
-		if err := r.indexProviderImportNames(provider.ProviderModules()); err != nil {
+		providerModules = append(providerModules, provider.ProviderModules()...)
+	}
+	if len(providerModules) != 0 {
+		sort.Strings(providerModules)
+		providerModules = slices.Compact(providerModules)
+		if err := r.indexProviderImportNames(providerModules); err != nil {
 			return err
 		}
 	}
@@ -94,6 +101,11 @@ func (r *Registry) IndexCompilationTargets(
 			return err
 		}
 		packages = append(packages, typesPackage)
+	}
+	if provider != nil {
+		if err := r.indexProviderInterfaceCapabilities(); err != nil {
+			return err
+		}
 	}
 	return r.indexPackageQualifiers(packages)
 }

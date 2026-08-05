@@ -1,6 +1,7 @@
 package certify
 
 import (
+	"errors"
 	"fmt"
 	"go/types"
 	"path/filepath"
@@ -18,6 +19,12 @@ type moduleSeed struct {
 
 func Generate(config Config) ([]byte, error) {
 	resolved, err := resolveConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	runtimeRequirements, runtimeDigest, err := readRuntimeContract(
+		resolved.runtimeContractPath,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -39,11 +46,13 @@ func Generate(config Config) ([]byte, error) {
 	}
 	if err := verifyPackageModules(
 		providerPackage,
+		runtimeRequirements.ProviderScalarModule(),
 		ordered,
 		seeds.facets,
 		seeds.callableProfiles,
 		seeds.statefulProfiles,
 		seeds.providerInterfaces,
+		seeds.providerCapabilities,
 	); err != nil {
 		return nil, err
 	}
@@ -64,6 +73,15 @@ func Generate(config Config) ([]byte, error) {
 		client.Close()
 		return nil, err
 	}
+	if err := verifyProviderScalarContract(
+		resolved,
+		project,
+		runtimeRequirements,
+	); err != nil {
+		client.Close()
+		return nil, err
+	}
+	scalarAliases := providerScalarAliasPaths(resolved, runtimeRequirements)
 	effectMarker, err := loadCallableEffectMarker(resolved, project)
 	if err != nil {
 		client.Close()
@@ -75,6 +93,7 @@ func Generate(config Config) ([]byte, error) {
 		return nil, err
 	}
 	modules := make([]gostdlib.ModuleDocument, len(ordered))
+	var scalarErrors []error
 	for index, seed := range ordered {
 		module, buildErr := buildModule(
 			resolved,
@@ -85,12 +104,18 @@ func Generate(config Config) ([]byte, error) {
 			seeds.genericOperations,
 			seeds.definedValueIdentities,
 			effectMarker,
+			scalarAliases,
+			&scalarErrors,
 		)
 		if buildErr != nil {
 			client.Close()
 			return nil, buildErr
 		}
 		modules[index] = module
+	}
+	if len(scalarErrors) != 0 {
+		client.Close()
+		return nil, errors.Join(scalarErrors...)
 	}
 	if err := verifyGenericOperationBindings(
 		source,
@@ -126,6 +151,7 @@ func Generate(config Config) ([]byte, error) {
 		seeds.callableProfiles,
 		seeds.statefulProfiles,
 		seeds.providerInterfaces,
+		seeds.providerCapabilities,
 		modules,
 		seeds.genericOperations,
 		effectMarker,
@@ -145,10 +171,6 @@ func Generate(config Config) ([]byte, error) {
 		return nil, err
 	}
 	if err := client.Close(); err != nil {
-		return nil, err
-	}
-	_, runtimeDigest, err := readRuntimeContract(resolved.runtimeContractPath)
-	if err != nil {
 		return nil, err
 	}
 	integrity, err := providerDigest(resolved)
@@ -183,6 +205,8 @@ func buildModule(
 	genericOperations map[string][]gostdlib.GenericOperationDocument,
 	definedValueIdentities map[string]struct{},
 	effectMarker tsgo.ProjectExport,
+	scalarAliases map[string]string,
+	scalarErrors *[]error,
 ) (gostdlib.ModuleDocument, error) {
 	sourcePackage := source.packages[seed.GoImportPath]
 	if sourcePackage == nil {
@@ -248,6 +272,14 @@ func buildModule(
 			); err != nil {
 				return gostdlib.ModuleDocument{}, err
 			}
+			if err := verifyExportSourceCallableScalars(
+				project,
+				evidence,
+				target,
+				scalarAliases,
+			); err != nil {
+				*scalarErrors = append(*scalarErrors, err)
+			}
 			binding.GenericTypeArguments, err =
 				certifiedSourceGenericCallableProjection(
 					project,
@@ -302,6 +334,8 @@ func buildModule(
 			target,
 			sourcePackage.methodsByType[target.Name()],
 			effectMarker,
+			scalarAliases,
+			scalarErrors,
 		)
 		if err != nil {
 			return gostdlib.ModuleDocument{}, err
@@ -435,54 +469,13 @@ func verifyContractTypeParameters(
 	return nil
 }
 
-func buildStateBindings(
-	source *goPackageSurface,
-	target tsgo.ProjectExport,
-) ([]gostdlib.BindingDocument, error) {
-	var result []gostdlib.BindingDocument
-	for _, member := range target.ValueMembers() {
-		if !member.Visible() {
-			continue
-		}
-		evidence, ok := source.objectsByName[member.Name()]
-		if !ok {
-			return nil, certifyError(
-				"build state",
-				member.Name(),
-				"state member has no selected-GOROOT declaration",
-			)
-		}
-		if _, ok := evidence.object.(*types.Var); !ok {
-			return nil, certifyError(
-				"build state",
-				member.Name(),
-				"state member does not own a Go variable",
-			)
-		}
-		binding, err := bindingDocument(
-			evidence,
-			"state",
-			member.Name(),
-			gostdlib.AccessStateMember,
-			member.Fingerprint(),
-			member.ImplementationOwners(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, binding)
-	}
-	if len(result) == 0 {
-		return nil, certifyError("build state", target.Name(), "state has no members")
-	}
-	return result, nil
-}
-
 func buildMethodBindings(
 	project *tsgo.ProjectInspection,
 	target tsgo.ProjectExport,
 	methods []goObject,
 	effectMarker tsgo.ProjectExport,
+	scalarAliases map[string]string,
+	scalarErrors *[]error,
 ) ([]gostdlib.BindingDocument, error) {
 	var result []gostdlib.BindingDocument
 	for _, method := range methods {
@@ -526,6 +519,15 @@ func buildMethodBindings(
 			access,
 		); err != nil {
 			return nil, err
+		}
+		if err := verifyMethodSourceCallableScalars(
+			project,
+			method,
+			selected,
+			access,
+			scalarAliases,
+		); err != nil {
+			*scalarErrors = append(*scalarErrors, err)
 		}
 		binding.Effect, err = memberCallableEffect(
 			project,
@@ -584,16 +586,4 @@ func selectMethodOwner(
 		)
 	}
 	return instance, gostdlib.AccessInstanceMethod, nil
-}
-
-func addTargetOwner(
-	owners map[string]struct{},
-	binding gostdlib.BindingDocument,
-) error {
-	key := string(binding.Access) + "\x00" + binding.Export + "\x00" + binding.Member
-	if _, duplicate := owners[key]; duplicate {
-		return certifyError("build binding", key, "target owner is duplicated")
-	}
-	owners[key] = struct{}{}
-	return nil
 }

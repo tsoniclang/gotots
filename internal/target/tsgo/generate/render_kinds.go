@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -46,7 +47,47 @@ func renderKinds(model *schemaModel) ([]byte, error) {
 	if err := writeKeywordIdentifierPredicate(&buffer, model); err != nil {
 		return nil, err
 	}
+	if err := writeBaseKindPredicate(
+		&buffer,
+		model,
+		"TypeNode",
+		"TypeNodeBase",
+	); err != nil {
+		return nil, err
+	}
 	return buffer.Bytes(), nil
+}
+
+func writeBaseKindPredicate(
+	buffer *bytes.Buffer,
+	model *schemaModel,
+	name string,
+	base string,
+) error {
+	var kinds []string
+	for _, node := range model.nodes {
+		definition := model.raw.Nodes.Definitions[node.SchemaName]
+		if slices.Contains(model.allRawBases(definition.Extends), base) {
+			kinds = append(kinds, node.Kind)
+		}
+	}
+	slices.Sort(kinds)
+	kinds = slices.Compact(kinds)
+	if len(kinds) == 0 {
+		return fmt.Errorf("pinned AST base %s has no concrete kinds", base)
+	}
+	fmt.Fprintf(buffer, "func Is%sSyntaxKind(kind SyntaxKind) bool {\n", name)
+	buffer.WriteString("\tswitch kind {\n\tcase\n")
+	for index, kind := range kinds {
+		terminator := ","
+		if index == len(kinds)-1 {
+			terminator = ":"
+		}
+		fmt.Fprintf(buffer, "\t\tSyntaxKind%s%s\n", kind, terminator)
+	}
+	buffer.WriteString("\t\treturn true\n")
+	buffer.WriteString("\tdefault:\n\t\treturn false\n\t}\n}\n\n")
+	return nil
 }
 
 func writeEnumConstants(buffer *bytes.Buffer, typeName string, values []enumValue) {

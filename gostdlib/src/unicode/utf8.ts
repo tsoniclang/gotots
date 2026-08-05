@@ -1,5 +1,9 @@
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring, int32, int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { bool, gostring, int, int32, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import {
+  hostInteger,
+  integerFromHost,
+} from "../internal/host-integer.js";
 
 import {
   decodeLastRune,
@@ -11,33 +15,33 @@ import {
 
 export const RuneError: int32 = runeError;
 export const RuneSelf: int32 = runeSelf;
-export const UTFMax: int64 = 4;
+export const UTFMax: int = 4n;
 
 export function AppendRune(target: RuntimeSlice<uint8>, rune: int32): RuntimeSlice<uint8> {
   return target.append(0, encodedBytes(rune));
 }
 
-export function DecodeRune(source: RuntimeSlice<uint8>): [int32, int64] {
+export function DecodeRune(source: RuntimeSlice<uint8>): [int32, int] {
   return decodeRuneAt(byteString(source), 0);
 }
 
-export function DecodeRuneInString(value: gostring): [int32, int64] {
+export function DecodeRuneInString(value: gostring): [int32, int] {
   return decodeRuneAt(value, 0);
 }
 
-export function DecodeLastRuneInString(value: gostring): [int32, int64] {
+export function DecodeLastRuneInString(value: gostring): [int32, int] {
   return decodeLastRune(value);
 }
 
-export function EncodeRune(target: RuntimeSlice<uint8>, rune: int32): int64 {
+export function EncodeRune(target: RuntimeSlice<uint8>, rune: int32): int {
   const bytes = encodedBytes(rune);
   for (let index = 0; index < bytes.length; index += 1) {
     target.set(index, bytes[index]!);
   }
-  return bytes.length;
+  return integerFromHost(bytes.length);
 }
 
-export function FullRune(source: RuntimeSlice<uint8>): boolean {
+export function FullRune(source: RuntimeSlice<uint8>): bool {
   return fullRunePrefix(
     source.length,
     source.length > 0 ? source.get(0) : 0,
@@ -46,7 +50,7 @@ export function FullRune(source: RuntimeSlice<uint8>): boolean {
   );
 }
 
-export function FullRuneInString(source: gostring): boolean {
+export function FullRuneInString(source: gostring): bool {
   return fullRunePrefix(
     source.length,
     source.length > 0 ? source.charCodeAt(0) : 0,
@@ -55,27 +59,27 @@ export function FullRuneInString(source: gostring): boolean {
   );
 }
 
-export function RuneCount(source: RuntimeSlice<uint8>): int64 {
+export function RuneCount(source: RuntimeSlice<uint8>): int {
   const value = byteString(source);
   let count = 0;
   for (let index = 0; index < value.length; count += 1) {
     const [, width] = decodeRuneAt(value, index);
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
   }
-  return count;
+  return integerFromHost(count);
 }
 
-export function RuneStart(value: uint8): boolean {
+export function RuneStart(value: uint8): bool {
   return (value & 0xc0) !== 0x80;
 }
 
-export function ValidString(value: gostring): boolean {
+export function ValidString(value: gostring): bool {
   for (let index = 0; index < value.length; ) {
     const [rune, width] = decodeRuneAt(value, index);
-    if (rune === RuneError && width === 1) {
+    if (rune === RuneError && width === 1n) {
       return false;
     }
-    index += width;
+    index += hostInteger(width);
   }
   return true;
 }
@@ -93,7 +97,7 @@ function fullRunePrefix(
   first: number,
   second: number,
   third: number,
-): boolean {
+): bool {
   if (length === 0) {
     return false;
   }
@@ -110,7 +114,7 @@ function fullRunePrefix(
   return length > 2 && (third < 0x80 || third > 0xbf);
 }
 
-function validSecondByte(first: number, second: number): boolean {
+function validSecondByte(first: number, second: number): bool {
   return second >= (first === 0xe0 ? 0xa0 : first === 0xf0 ? 0x90 : 0x80)
     && second <= (first === 0xed ? 0x9f : first === 0xf4 ? 0x8f : 0xbf);
 }

@@ -1,5 +1,5 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderError } from "../../runtime/error.js";
 import { Duration } from "./duration.js";
@@ -44,7 +44,7 @@ type LeadingInteger = {
 
 type LeadingFraction = {
   readonly value: bigint;
-  readonly scale: number;
+  readonly scale: bigint;
   readonly next: number;
 };
 
@@ -61,7 +61,7 @@ export function ParseDuration(
     index += 1;
   }
   if (source.slice(index) === "0") {
-    return [new Duration(0), undefined];
+    return [new Duration(0n), undefined];
   }
   if (index === source.length) {
     return failure("invalid duration", original);
@@ -83,7 +83,7 @@ export function ParseDuration(
     const hasInteger = index !== integerStart;
 
     let fraction = 0n;
-    let scale = 1;
+    let scale = 1n;
     let hasFraction = false;
     if (source[index] === ".") {
       index += 1;
@@ -123,10 +123,7 @@ export function ParseDuration(
     }
     let value = integer.value * unit;
     if (fraction > 0n) {
-      const fractionalValue = Math.trunc(
-        Number(fraction) * (Number(unit) / scale),
-      );
-      value += BigInt(fractionalValue);
+      value += (fraction * unit) / scale;
       if (value > maximumMagnitude) {
         return failure("invalid duration", original);
       }
@@ -141,7 +138,7 @@ export function ParseDuration(
     return failure("invalid duration", original);
   }
   const signed = negative ? -total : total;
-  return [new Duration(Number(signed)), undefined];
+  return [new Duration(signed), undefined];
 }
 
 function leadingInteger(source: string, start: number): LeadingInteger {
@@ -159,7 +156,7 @@ function leadingInteger(source: string, start: number): LeadingInteger {
 
 function leadingFraction(source: string, start: number): LeadingFraction {
   let value = 0n;
-  let scale = 1;
+  let scale = 1n;
   let overflow = false;
   let index = start;
   while (index < source.length && isDigit(source[index])) {
@@ -169,7 +166,7 @@ function leadingFraction(source: string, start: number): LeadingFraction {
         overflow = true;
       } else {
         value = next;
-        scale *= 10;
+        scale *= 10n;
       }
     }
     index += 1;
@@ -196,5 +193,5 @@ function isDigit(value: string | undefined): boolean {
 }
 
 function failure(message: string, source: string): [Duration, GoError] {
-  return [new Duration(0), new ParseDurationError(message, source)];
+  return [new Duration(0n), new ParseDurationError(message, source)];
 }

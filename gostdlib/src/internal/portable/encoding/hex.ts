@@ -1,6 +1,6 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring, int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { QuoteRune } from "../strconv/quote.js";
 import { IsPrint } from "../unicode/properties.js";
@@ -9,8 +9,8 @@ import { ProviderError } from "../../runtime/error.js";
 const digits = "0123456789abcdef";
 const errLength = new ProviderError("encoding/hex: odd length hex string");
 
-export function EncodedLen(length: int64): int64 {
-  return length * 2;
+export function EncodedLen(length: int): int {
+  return length * 2n;
 }
 
 export function AppendEncode(

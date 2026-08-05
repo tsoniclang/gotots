@@ -82,10 +82,10 @@ const panics = (operation: () => void): boolean => {
 console.log(NumberValue(17n, 5n).toString());
 console.log(StringByte("abc").toString());
 console.log(StringWindow("abcd"));
-console.log(PointerValue(7n).toString());
-console.log(ArrayValue(3n).toString());
-console.log(SliceValue(4n).toString());
-console.log(MapValue(5n).toString());
+console.log(PointerValue(7).toString());
+console.log(ArrayValue(3).toString());
+console.log(SliceValue(4).toString());
+console.log(MapValue(5).toString());
 console.log(SliceStoreOrder().toString());
 console.log(MapStoreOrder().toString());
 console.log(panics(() => { PointerPanic(); }));

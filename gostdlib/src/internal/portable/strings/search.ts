@@ -2,10 +2,12 @@ import { GoPanic } from "@gotots/runtime/panic.js";
 import type {
   bool,
   gostring,
+  int,
   int32,
-  int64,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 import {
   decodeRuneAt,
@@ -23,7 +25,7 @@ export function ContainsFunc(
   text: gostring,
   predicate: ((rune: int32) => bool) | undefined,
 ): bool {
-  return IndexFunc(text, predicate) >= 0;
+  return IndexFunc(text, predicate) >= 0n;
 }
 
 export function HasPrefix(text: gostring, prefix: gostring): bool {
@@ -34,52 +36,52 @@ export function HasSuffix(text: gostring, suffix: gostring): bool {
   return text.endsWith(suffix);
 }
 
-export function Index(text: gostring, substring: gostring): int64 {
-  return text.indexOf(substring);
+export function Index(text: gostring, substring: gostring): int {
+  return integerFromHost(text.indexOf(substring));
 }
 
 export function Clone(text: gostring): gostring {
   return text;
 }
 
-export function Compare(left: gostring, right: gostring): int64 {
-  return left === right ? 0 : left < right ? -1 : 1;
+export function Compare(left: gostring, right: gostring): int {
+  return left === right ? 0n : left < right ? -1n : 1n;
 }
 
 export function ContainsAny(text: gostring, characters: gostring): bool {
-  return IndexAny(text, characters) >= 0;
+  return IndexAny(text, characters) >= 0n;
 }
 
 export function ContainsRune(text: gostring, rune: int32): bool {
-  return IndexRune(text, rune) >= 0;
+  return IndexRune(text, rune) >= 0n;
 }
 
-export function IndexRune(text: gostring, rune: int32): int64 {
+export function IndexRune(text: gostring, rune: int32): int {
   if (!validRune(rune)) {
-    return -1;
+    return -1n;
   }
   if (rune === 0xfffd) {
     for (let index = 0; index < text.length; ) {
       const [decoded, width] = decodeRuneAt(text, index);
       if (decoded === rune) {
-        return index;
+        return integerFromHost(index);
       }
-      index += Math.max(1, width);
+      index += Math.max(1, hostInteger(width));
     }
-    return -1;
+    return -1n;
   }
-  return text.indexOf(encodeRune(rune));
+  return integerFromHost(text.indexOf(encodeRune(rune)));
 }
 
-export function Count(text: gostring, substring: gostring): int64 {
+export function Count(text: gostring, substring: gostring): int {
   if (substring.length === 0) {
-    return runeCount(text) + 1;
+    return integerFromHost(runeCount(text) + 1);
   }
   let count = 0;
   for (let start = 0; ; ) {
     const index = text.indexOf(substring, start);
     if (index < 0) {
-      return count;
+      return integerFromHost(count);
     }
     count += 1;
     start = index + substring.length;
@@ -110,47 +112,47 @@ export function EqualFold(left: gostring, right: gostring): bool {
     if (!runesEqualFold(leftRune, rightRune)) {
       return false;
     }
-    leftIndex += Math.max(1, leftWidth);
-    rightIndex += Math.max(1, rightWidth);
+    leftIndex += Math.max(1, hostInteger(leftWidth));
+    rightIndex += Math.max(1, hostInteger(rightWidth));
   }
   return leftIndex === left.length && rightIndex === right.length;
 }
 
-export function IndexAny(text: gostring, characters: gostring): int64 {
+export function IndexAny(text: gostring, characters: gostring): int {
   const set = runeSet(characters);
   for (let index = 0; index < text.length; ) {
     const [rune, width] = decodeRuneAt(text, index);
     if (set.has(rune)) {
-      return index;
+      return integerFromHost(index);
     }
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
   }
-  return -1;
+  return -1n;
 }
 
-export function IndexByte(text: gostring, value: uint8): int64 {
-  return text.indexOf(String.fromCharCode(value));
+export function IndexByte(text: gostring, value: uint8): int {
+  return integerFromHost(text.indexOf(String.fromCharCode(value)));
 }
 
 export function IndexFunc(
   text: gostring,
   predicate: ((rune: int32) => bool) | undefined,
-): int64 {
+): int {
   return findByPredicate(text, predicate, true, false);
 }
 
-export function LastIndex(text: gostring, substring: gostring): int64 {
-  return text.lastIndexOf(substring);
+export function LastIndex(text: gostring, substring: gostring): int {
+  return integerFromHost(text.lastIndexOf(substring));
 }
 
-export function LastIndexByte(text: gostring, value: uint8): int64 {
-  return text.lastIndexOf(String.fromCharCode(value));
+export function LastIndexByte(text: gostring, value: uint8): int {
+  return integerFromHost(text.lastIndexOf(String.fromCharCode(value)));
 }
 
 export function LastIndexFunc(
   text: gostring,
   predicate: ((rune: int32) => bool) | undefined,
-): int64 {
+): int {
   return findByPredicate(text, predicate, true, true);
 }
 
@@ -159,7 +161,7 @@ export function findByPredicate(
   predicate: ((rune: int32) => bool) | undefined,
   expected: boolean,
   last: boolean,
-): int64 {
+): int {
   if (predicate === undefined && text.length > 0) {
     GoPanic.raiseRuntime("call of nil predicate function");
   }
@@ -169,12 +171,12 @@ export function findByPredicate(
     if (predicate?.(rune) === expected) {
       found = index;
       if (!last) {
-        return found;
+        return integerFromHost(found);
       }
     }
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
   }
-  return found;
+  return integerFromHost(found);
 }
 
 function runeSet(text: gostring): Set<int32> {
@@ -182,7 +184,7 @@ function runeSet(text: gostring): Set<int32> {
   for (let index = 0; index < text.length; ) {
     const [rune, width] = decodeRuneAt(text, index);
     result.add(rune);
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
   }
   return result;
 }

@@ -1,9 +1,13 @@
 package naming
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"go/types"
+	"strings"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/output"
 )
@@ -176,9 +180,112 @@ func (r *Registry) internProviderInterfaceBridge(
 	if err != nil {
 		return providerInterfaceBridgeBinding{}, err
 	}
-	binding := providerInterfaceBridgeBinding{owner: owner, name: name}
+	binding := providerInterfaceBridgeBinding{
+		owner: owner,
+		name:  name,
+		key:   artifactKey,
+	}
 	r.providerInterfaceBridges[artifactKey] = binding
 	return binding, nil
+}
+
+func (r *Registry) internProviderProfileInterfaceBridge(
+	sourceKey string,
+	sourceType *types.Named,
+	profile []gostdlib.ProviderCallableProfileInterface,
+) (providerInterfaceBridgeBinding, error) {
+	if r == nil || sourceType == nil || sourceType.Obj() == nil ||
+		sourceKey == "" || len(profile) == 0 {
+		return providerInterfaceBridgeBinding{}, &api.NameError{
+			Reason: "provider-profile bridge canonicalization input is invalid",
+		}
+	}
+	contract, ok := sourceType.Underlying().(*types.Interface)
+	if !ok || !contract.Complete().IsMethodSet() {
+		return providerInterfaceBridgeBinding{}, &api.NameError{
+			Name:   sourceType.Obj().Name(),
+			Reason: "provider-profile bridge source is not an interface",
+		}
+	}
+	selected, err := providerProfileBridgeClosure(sourceType, profile)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	var descriptor strings.Builder
+	descriptor.WriteString(sourceKey)
+	for _, current := range selected {
+		if !current.Valid() {
+			return providerInterfaceBridgeBinding{}, &api.NameError{
+				Reason: "provider-profile bridge certificate is invalid",
+			}
+		}
+		descriptor.WriteByte(0)
+		descriptor.WriteString(current.SourceIdentity())
+		descriptor.WriteByte(0)
+		descriptor.WriteString(current.TargetFingerprint())
+	}
+	digest := sha256.Sum256([]byte(descriptor.String()))
+	artifactKey := hex.EncodeToString(digest[:])
+	if existing, found := r.providerInterfaceBridges[artifactKey]; found {
+		existingType, boundProfile, valid := existing.owner.ProviderProfileInterfaceBridge()
+		if !valid || !types.Identical(existingType, sourceType) ||
+			!sameProviderProfileInterfaces(boundProfile, selected) {
+			return providerInterfaceBridgeBinding{}, &api.NameError{
+				Name:   existing.name,
+				Reason: "provider-profile bridge key joined inconsistent evidence",
+			}
+		}
+		return existing, nil
+	}
+	name, err := interfaceTargetName("$goProviderProfileBridge_", artifactKey)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	if err := reserveGeneratedName(
+		r.providerInterfaceBridgeNames,
+		name,
+		artifactKey,
+		"provider-profile bridge",
+	); err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	outputPath, err := output.ProviderInterfaceBridgePath(artifactKey)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	owner, err := api.NewCompilationProviderProfileBridgeArtifact(
+		sourceType,
+		selected,
+		artifactKey,
+		name,
+		outputPath,
+	)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	binding := providerInterfaceBridgeBinding{
+		owner: owner,
+		name:  name,
+		key:   artifactKey,
+	}
+	r.providerInterfaceBridges[artifactKey] = binding
+	return binding, nil
+}
+
+func sameProviderProfileInterfaces(
+	left []gostdlib.ProviderCallableProfileInterface,
+	right []gostdlib.ProviderCallableProfileInterface,
+) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index].SourceIdentity() != right[index].SourceIdentity() ||
+			left[index].TargetFingerprint() != right[index].TargetFingerprint() {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *Registry) internInterfaceMethodToken(

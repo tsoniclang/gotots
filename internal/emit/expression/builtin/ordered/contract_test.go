@@ -65,7 +65,7 @@ func TestOrderedBuiltinASTAndDemandDefinitionsAreExact(t *testing.T) {
 	assertRuntimeDefinitionCount(t, number, "runtime/string.ts", 2)
 	assertNoRuntimeFile(t, number, "runtime/integer.ts")
 	assertRuntimeDefinitionCount(t, bigint, "runtime/string.ts", 2)
-	assertRuntimeDefinitionCount(t, bigint, "runtime/integer.ts", 2)
+	assertRuntimeDefinitionCount(t, bigint, "runtime/integer.ts", 1)
 
 	workingDirectory := t.TempDir()
 	_, _, printed := printOrdered(t, workingDirectory, bigint)
@@ -73,7 +73,6 @@ func TestOrderedBuiltinASTAndDemandDefinitionsAreExact(t *testing.T) {
 		t.Fatalf("ordered artifact = %d bytes, want <= 8000", len(printed))
 	}
 	for _, required := range []string{
-		"goIntegerMax",
 		"goIntegerMin",
 		"goStringMax",
 		"goStringMin",

@@ -1,7 +1,7 @@
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoEmptyStruct } from "@gotots/runtime/struct.js";
-import type { Awaitable } from "@gotots/runtime/scalars.js";
+import type { Awaitable } from "@gotots/gostdlib/internal/scalars.js";
 
 export function propagateCancel<Failure>(
   parentDone: GoReceiveChannel<GoEmptyStruct> | undefined,

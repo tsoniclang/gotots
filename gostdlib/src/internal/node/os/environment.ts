@@ -1,7 +1,7 @@
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GoError } from "@gotots/runtime/interface-value.js";
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 import { nodeError } from "./error.js";
 
 export function executable(): [gostring, GoError | undefined] {
@@ -13,7 +13,7 @@ export function environment(name: gostring): gostring {
 }
 
 export function processArguments(): readonly gostring[] {
-  return process.argv;
+  return process.argv.slice(1);
 }
 
 export function workingDirectory(): [gostring, GoError | undefined] {

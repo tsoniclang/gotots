@@ -15,6 +15,7 @@ func Build(
 	children api.ChildEmitter,
 	name string,
 	source *types.Named,
+	capabilities []CapabilityContract,
 	modifiers []tsgo.ModifierLike,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	if name == "" || source == nil || source.Obj() == nil {
@@ -44,6 +45,21 @@ func Build(
 	if err != nil {
 		return nil, nil, err
 	}
+	selectedCapabilities, capabilityRequests, err := selectCapabilities(
+		context,
+		name,
+		source,
+		capabilities,
+		provider,
+		directProviderUse,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	conflicts, err := capabilityConflicts(selectedCapabilities)
+	if err != nil {
+		return nil, nil, err
+	}
 	runtimeBase, err := context.Names().Runtime(
 		api.RuntimeProviderInterfaceBridge,
 		api.ImportPhaseValue,
@@ -52,7 +68,7 @@ func Build(
 		return nil, nil, err
 	}
 	var panicReference api.NameReference
-	if !directProviderUse {
+	if !directProviderUse || len(selectedCapabilities) != 0 {
 		panicReference, err = context.Names().Runtime(
 			api.RuntimePanic,
 			api.ImportPhaseValue,
@@ -61,11 +77,28 @@ func Build(
 			return nil, nil, err
 		}
 	}
-	members := []tsgo.ClassElement{
+	members := make(
+		[]tsgo.ClassElement,
+		0,
+		len(selectedCapabilities)+contract.NumMethods()+3,
+	)
+	for _, capability := range selectedCapabilities {
+		members = append(
+			members,
+			capabilityFieldDeclaration(context.Factory(), capability),
+		)
+	}
+	members = append(members,
 		constructor(
 			context.Factory(),
-			providerType,
+			context.Factory().TypeReferenceNode(
+				providerType.EntityName(context.Factory()),
+				nil,
+			),
 			canonical.ContractName(),
+			selectedCapabilities,
+			conflicts,
+			panicReference.Name(),
 		),
 		fromMethod(
 			context.Factory(),
@@ -81,13 +114,14 @@ func Build(
 			panicReference.Name(),
 			directProviderUse,
 		),
-	}
+	)
 	requests := api.CombineRequests(
 		providerType.Requests(),
 		canonical.Requests(),
 		runtimeBase.Requests(),
 		panicReference.Requests(),
 		compatibilityRequests,
+		capabilityRequests,
 	)
 	seen := make(map[string]struct{}, contract.NumMethods())
 	for index := range contract.NumMethods() {
@@ -128,6 +162,18 @@ func Build(
 	if len(seen) != len(provider.Methods()) {
 		return nil, nil, shapeError(name, "provider certificate has foreign methods")
 	}
+	capabilityMembers, methodRequests, err := emitCapabilityMethods(
+		context,
+		children,
+		name,
+		source,
+		selectedCapabilities,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	members = append(members, capabilityMembers...)
+	requests = append(requests, methodRequests...)
 	declaration := context.Factory().ClassDeclaration(
 		modifiers,
 		context.Factory().Identifier(name),

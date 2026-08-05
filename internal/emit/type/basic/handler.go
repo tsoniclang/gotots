@@ -54,7 +54,13 @@ func EmitRepresented(
 	if !ok {
 		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 	}
-	reference, err := context.Names().Primitive(alias)
+	var reference api.NameReference
+	var err error
+	if context.ProviderScalarRepresentation() {
+		reference, err = context.Names().ProviderPrimitive(alias)
+	} else {
+		reference, err = context.Names().Primitive(alias)
+	}
 	if err != nil {
 		return api.TypeEmission{}, err
 	}

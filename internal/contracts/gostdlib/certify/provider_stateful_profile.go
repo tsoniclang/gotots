@@ -4,6 +4,7 @@ import (
 	"go/types"
 	"slices"
 	"sort"
+	"strings"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
@@ -12,6 +13,110 @@ import (
 
 type providerStatefulProfileBuild struct {
 	profile gostdlib.ProviderStatefulProfileDocument
+}
+
+func validateProviderStatefulProfileSeeds(
+	source []providerStatefulProfileSeed,
+) ([]providerStatefulProfileSeed, error) {
+	result := append([]providerStatefulProfileSeed(nil), source...)
+	sort.Slice(result, func(left, right int) bool {
+		return providerStatefulProfileSeedKey(result[left]) <
+			providerStatefulProfileSeedKey(result[right])
+	})
+	previousKey := ""
+	for index := range result {
+		seed := &result[index]
+		seed.Interfaces = slices.Clone(seed.Interfaces)
+		seed.TypeArguments = slices.Clone(seed.TypeArguments)
+		seed.Operations = slices.Clone(seed.Operations)
+		key := providerStatefulProfileSeedKey(*seed)
+		if key == "" || key == previousKey ||
+			seed.SourceIdentity == "" ||
+			seed.Specifier == "" || seed.SourcePath == "" || seed.Export == "" ||
+			len(seed.Interfaces) == 0 || len(seed.TypeArguments) == 0 {
+			return nil, certifyError(
+				"configure provider stateful profiles",
+				key,
+				"profile identity or shape is incomplete or duplicated",
+			)
+		}
+		previousKey = key
+		if subpath, ok := providerSubpath(seed.Specifier); !ok ||
+			!strings.HasPrefix(subpath, "./internal/facets/") ||
+			!strings.HasPrefix(seed.SourcePath, "src/internal/facets/") ||
+			!strings.HasSuffix(seed.SourcePath, ".ts") {
+			return nil, certifyError(
+				"configure provider stateful profiles",
+				key,
+				"profile module is invalid",
+			)
+		}
+		previousInterface := ""
+		interfaceIdentities := make(map[string]struct{}, len(seed.Interfaces))
+		seenExports := make(map[string]struct{}, len(seed.Interfaces))
+		for _, selected := range seed.Interfaces {
+			if selected.SourceIdentity == "" || selected.Export == "" ||
+				selected.SourceIdentity <= previousInterface {
+				return nil, certifyError(
+					"configure provider stateful profiles",
+					key,
+					"profile interfaces are empty, duplicated, or unordered",
+				)
+			}
+			previousInterface = selected.SourceIdentity
+			interfaceIdentities[selected.SourceIdentity] = struct{}{}
+			if _, duplicate := seenExports[selected.Export]; duplicate {
+				return nil, certifyError(
+					"configure provider stateful profiles",
+					key,
+					"profile interface export is duplicated",
+				)
+			}
+			seenExports[selected.Export] = struct{}{}
+		}
+		seenTypeArguments := make(map[string]struct{}, len(seed.TypeArguments))
+		for _, identity := range seed.TypeArguments {
+			if _, ok := interfaceIdentities[identity]; !ok {
+				return nil, certifyError(
+					"configure provider stateful profiles",
+					key,
+					"type argument has no retained-interface owner",
+				)
+			}
+			if _, duplicate := seenTypeArguments[identity]; duplicate {
+				return nil, certifyError(
+					"configure provider stateful profiles",
+					key,
+					"type argument is duplicated",
+				)
+			}
+			seenTypeArguments[identity] = struct{}{}
+		}
+		if len(seenTypeArguments) != len(interfaceIdentities) {
+			return nil, certifyError(
+				"configure provider stateful profiles",
+				key,
+				"type arguments do not exact-join retained interfaces",
+			)
+		}
+		for operationIndex, capability := range seed.Operations {
+			if !capability.NamedStructOperation() ||
+				capability == gostdlib.FacetCapabilityRepresentation ||
+				operationIndex != 0 && capability <= seed.Operations[operationIndex-1] {
+				return nil, certifyError(
+					"configure provider stateful profiles",
+					key,
+					"operations are invalid, duplicated, or unordered",
+				)
+			}
+		}
+	}
+	return result, nil
+}
+
+func providerStatefulProfileSeedKey(seed providerStatefulProfileSeed) string {
+	return seed.SourceIdentity + "\x00" + seed.Specifier + "\x00" + seed.Export +
+		providerProfileInterfaceSeedKey(seed.Interfaces)
 }
 
 func buildProviderStatefulProfile(

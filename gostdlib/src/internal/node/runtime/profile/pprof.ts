@@ -36,7 +36,7 @@ export function memoryProfile(
   const profile = new Proto();
   profile.message(1, valueType(1, 2));
   profile.message(1, valueType(3, 4));
-  profile.message(2, sample([memory.heapUsed, 0]));
+  profile.message(2, sample([memory.heapUsed, 0n]));
   writeStrings(profile, strings);
   profile.integer(9, BigInt(Date.now()) * nanosecondsPerMillisecond);
   profile.integer(14, 1);
@@ -71,7 +71,7 @@ function valueType(type: number, unit: number): Uint8Array {
   return value.finish();
 }
 
-function sample(values: readonly number[]): Uint8Array {
+function sample(values: readonly (number | bigint)[]): Uint8Array {
   const result = new Proto();
   result.packedIntegers(2, values);
   return result.finish();
@@ -101,10 +101,10 @@ class Proto {
     this.bytes(field, value);
   }
 
-  packedIntegers(field: number, values: readonly number[]): void {
+  packedIntegers(field: number, values: readonly (number | bigint)[]): void {
     const packed = new Proto();
     for (const value of values) {
-      packed.#varint(BigInt(Math.trunc(value)));
+      packed.#varint(typeof value === "bigint" ? value : BigInt(Math.trunc(value)));
     }
     this.bytes(field, packed.finish());
   }

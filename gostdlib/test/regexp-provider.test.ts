@@ -47,7 +47,7 @@ test("regexp replacement expands captures and invokes callbacks directly", () =>
 
 test("regexp Split and compile failures follow Go result shapes", () => {
   assert.deepEqual(
-    sliceValues(Regexp.Split(MustCompile("\\s+"), "a b  c", -1)),
+    sliceValues(Regexp.Split(MustCompile("\\s+"), "a b  c", -1n)),
     ["a", "b", "c"],
   );
   const [regexp, failure] = Compile("(?=x)");

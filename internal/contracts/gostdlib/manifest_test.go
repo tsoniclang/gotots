@@ -445,15 +445,17 @@ func TestManifestOwnsProviderInterfaceSurface(t *testing.T) {
 				Member:              "Read",
 				Effect:              gostdlib.EffectSynchronous,
 				SourceSignature:     "func([]byte) (int, error)|params=|results=",
+				ContractSignature:   "func([]byte) (int, error)",
 				SourceLocation:      "strings/reader.go:2:1",
 				ImplementationOwner: "src/strings.ts",
 				TargetFingerprint:   digest('e'),
 			},
 			{
-				SourceIdentity:  "strings|kind=4|receiver=strings.Reader|name=private",
-				Kind:            gostdlib.ProviderInterfaceMethodRuntimeOnly,
-				SourceSignature: "func()|params=|results=",
-				SourceLocation:  "strings/reader.go:1:1",
+				SourceIdentity:    "strings|kind=4|receiver=strings.Reader|name=private",
+				Kind:              gostdlib.ProviderInterfaceMethodRuntimeOnly,
+				SourceSignature:   "func()|params=|results=",
+				ContractSignature: "func()",
+				SourceLocation:    "strings/reader.go:1:1",
 			},
 		},
 	}
@@ -501,10 +503,11 @@ func TestManifestOwnsProviderInterfaceSurface(t *testing.T) {
 	binding.ProviderInterface = &gostdlib.ProviderInterfaceDocument{
 		Mode: gostdlib.ProviderInterfaceModeBridge,
 		Methods: []gostdlib.ProviderInterfaceMethodDocument{{
-			SourceIdentity:  "strings|kind=4|receiver=strings.Reader|name=private",
-			Kind:            gostdlib.ProviderInterfaceMethodRuntimeOnly,
-			SourceSignature: "func()|params=|results=",
-			SourceLocation:  "strings/reader.go:1:1",
+			SourceIdentity:    "strings|kind=4|receiver=strings.Reader|name=private",
+			Kind:              gostdlib.ProviderInterfaceMethodRuntimeOnly,
+			SourceSignature:   "func()|params=|results=",
+			ContractSignature: "func()",
+			SourceLocation:    "strings/reader.go:1:1",
 		}},
 	}
 	if _, err := gostdlib.Seal(document); err == nil {
@@ -528,6 +531,7 @@ func TestManifestOwnsLanguageProviderInterfaceBinding(t *testing.T) {
 					Member:              "Error",
 					Effect:              gostdlib.EffectSynchronous,
 					SourceSignature:     "func() string",
+					ContractSignature:   "func() string",
 					SourceLocation:      "builtin",
 					ImplementationOwner: "src/internal/facets/provider-error.ts",
 					TargetFingerprint:   digest('e'),
@@ -572,45 +576,4 @@ func TestManifestOwnsLanguageProviderInterfaceBinding(t *testing.T) {
 	if _, err := gostdlib.Seal(document); err == nil {
 		t.Fatal("duplicate language provider-interface owner passed")
 	}
-}
-
-func validDocument() gostdlib.Document {
-	return gostdlib.Document{
-		SchemaVersion:    gostdlib.SchemaVersion,
-		PackageName:      gostdlib.PackageName,
-		PackageVersion:   "0.0.0",
-		Backend:          "node",
-		GoVersion:        "go1.26.4",
-		MinimumGoVersion: "go1.26.4",
-		MaximumGoVersion: "go1.26.4",
-		GOOS:             "linux",
-		GOARCH:           "amd64",
-		BuildTags:        []string{},
-		RuntimeDigest:    digest('a'),
-		ProviderDigest:   digest('c'),
-		Modules: []gostdlib.ModuleDocument{{
-			GoImportPath: "strings",
-			Specifier:    "@gotots/gostdlib/strings.js",
-			SourcePath:   "src/strings.ts",
-			Bindings: []gostdlib.BindingDocument{{
-				Identity:            "strings|kind=4|receiver=|name=Contains",
-				Kind:                gostdlib.BindingFunction,
-				Access:              gostdlib.AccessExport,
-				Effect:              gostdlib.EffectSynchronous,
-				Export:              "Contains",
-				SourceSignature:     "func(s, substr string) bool|params=s,substr|results=",
-				SourceLocation:      "strings/strings.go:1:1",
-				ImplementationOwner: "src/strings.ts",
-				TargetFingerprint:   digest('b'),
-			}},
-		}},
-	}
-}
-
-func digest(character byte) string {
-	value := make([]byte, 64)
-	for index := range value {
-		value[index] = character
-	}
-	return string(value)
 }

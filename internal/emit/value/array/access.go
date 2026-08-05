@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -167,7 +168,7 @@ func (a RuntimeArray) Measure(
 		stored.Value(),
 		arraymember.Length,
 	))
-	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
+	if integervalue.TypeUsesBigInt(context, types.Typ[types.Int]) {
 		target = context.Factory().CallExpression(
 			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,

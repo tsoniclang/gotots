@@ -3,9 +3,10 @@ import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   gostring,
-  int64,
+  int,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
+import { integerFromHost } from "../internal/host-integer.js";
 
 import { decodeGzip } from "../internal/node/compress/gzip/decode.js";
 import { GzipSource } from "../internal/portable/compress/gzip/header.js";
@@ -40,12 +41,12 @@ class GzipReader {
     return undefined;
   }
 
-  Read(destination: RuntimeSlice<uint8>): [int64, GoError | undefined] {
+  Read(destination: RuntimeSlice<uint8>): [int, GoError | undefined] {
     if (this.closed) {
-      return [0, new ProviderError("gzip: reader is closed")];
+      return [0n, new ProviderError("gzip: reader is closed")];
     }
     if (destination.length === 0) {
-      return [0, undefined];
+      return [0n, undefined];
     }
     if (this.decoded === undefined && this.terminalFailure === undefined) {
       const [decoded, failure] = this.load();
@@ -53,15 +54,15 @@ class GzipReader {
       this.terminalFailure = failure;
     }
     if (this.terminalFailure !== undefined) {
-      return [0, this.terminalFailure];
+      return [0n, this.terminalFailure];
     }
     const decoded = this.decoded;
     if (decoded === undefined || this.offset >= decoded.length) {
-      return [0, ioState.EOF];
+      return [0n, ioState.EOF];
     }
     const count = writeBytes(destination, decoded.subarray(this.offset));
     this.offset += count;
-    return [count, undefined];
+    return [integerFromHost(count), undefined];
   }
 }
 
@@ -75,7 +76,7 @@ export const Reader = Object.freeze({
   Read(
     receiver: Reader | undefined,
     destination: RuntimeSlice<uint8>,
-  ): [int64, GoError | undefined] {
+  ): [int, GoError | undefined] {
     return requireReader(receiver).Read(destination);
   },
 });
@@ -108,7 +109,7 @@ export function NewReader(
         header.extra,
         header.modificationTimeSeconds === 0
           ? new Time()
-          : UnixMilli(header.modificationTimeSeconds * 1000),
+          : UnixMilli(integerFromHost(header.modificationTimeSeconds * 1000)),
         header.name,
         header.operatingSystem,
       ),

@@ -6,10 +6,11 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
   gostring,
-  int64,
-  uint64,
+  int,
+  uintptr,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
+import { integerFromHost } from "./internal/host-integer.js";
 import type {
   DirEntry,
   FS,
@@ -57,10 +58,10 @@ import { stringSlice } from "./internal/runtime/slice.js";
 import { SIGINT } from "./syscall.js";
 import { constants as nodeFileConstants } from "node:fs";
 
-export const O_APPEND: int64 = nodeFileConstants.O_APPEND;
-export const O_CREATE: int64 = nodeFileConstants.O_CREAT;
-export const O_TRUNC: int64 = nodeFileConstants.O_TRUNC;
-export const O_WRONLY: int64 = nodeFileConstants.O_WRONLY;
+export const O_APPEND: int = integerFromHost(nodeFileConstants.O_APPEND);
+export const O_CREATE: int = integerFromHost(nodeFileConstants.O_CREAT);
+export const O_TRUNC: int = integerFromHost(nodeFileConstants.O_TRUNC);
+export const O_WRONLY: int = integerFromHost(nodeFileConstants.O_WRONLY);
 
 export interface Signal extends GoInterfaceValue {
   Signal(): void;
@@ -72,34 +73,34 @@ export class File {
     return closeFile(receiver);
   }
 
-  static Fd(receiver: File | undefined): uint64 {
+  static Fd(receiver: File | undefined): uintptr {
     return fileDescriptor(receiver);
   }
 
   static Read(
     receiver: File | undefined,
     buffer: RuntimeSlice<uint8>,
-  ): [int64, GoError | undefined] {
+  ): [int, GoError | undefined] {
     return readFile(receiver, buffer);
   }
 
   static Write(
     receiver: File | undefined,
     buffer: RuntimeSlice<uint8>,
-  ): [int64, GoError | undefined] {
+  ): [int, GoError | undefined] {
     return writeFile(receiver, buffer);
   }
 
   static WriteString(
     receiver: File | undefined,
     text: gostring,
-  ): [int64, GoError | undefined] {
+  ): [int, GoError | undefined] {
     return writeFileString(receiver, text);
   }
 }
 
 export class Process {
-  constructor(public Pid: int64 = 0) {}
+  constructor(public Pid: int = 0n) {}
 
   static Signal(
     receiver: Process | undefined,
@@ -133,12 +134,12 @@ export function Executable(): [gostring, GoError | undefined] {
   return executable();
 }
 
-export function Exit(code: int64): void {
+export function Exit(code: int): void {
   exitProcess(code);
 }
 
 export function FindProcess(
-  pid: int64,
+  pid: int,
 ): [Process | undefined, GoError | undefined] {
   return [new Process(pid), undefined];
 }
@@ -147,7 +148,7 @@ export function Getenv(name: gostring): gostring {
   return environment(name);
 }
 
-export function Getpid(): int64 {
+export function Getpid(): int {
   return getProcessID();
 }
 
@@ -174,14 +175,14 @@ export function MkdirAll(
 
 export function OpenFile(
   name: gostring,
-  flags: int64,
+  flags: int,
   permissions: FileMode,
 ): [File | undefined, GoError | undefined] {
   return open(name, flags, permissions, newFile);
 }
 
 export function Open(name: gostring): [File | undefined, GoError | undefined] {
-  return OpenFile(name, 0, new FileMode(0));
+  return OpenFile(name, 0n, new FileMode(0));
 }
 
 export function Remove(name: gostring): GoError | undefined {

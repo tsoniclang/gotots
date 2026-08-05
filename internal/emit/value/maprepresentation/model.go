@@ -73,10 +73,6 @@ func (m Model) Element() types.Type {
 	return m.source.Elem()
 }
 
-func (m Model) StorageKey() types.Type {
-	return storageKeyType(m.source.Key())
-}
-
 func (m Model) Storage() Storage {
 	return m.storage
 }

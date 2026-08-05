@@ -27,6 +27,13 @@ func IndirectResult(
 		api.ConcurrencySemanticsCooperative {
 		return api.DirectType(result), nil
 	}
+	return AwaitableResult(context, result)
+}
+
+func AwaitableResult(
+	context api.Context,
+	result tsgo.TypeNode,
+) (api.TypeEmission, error) {
 	reference, err := context.Names().Runtime(
 		api.RuntimeAwaitable,
 		api.ImportPhaseType,

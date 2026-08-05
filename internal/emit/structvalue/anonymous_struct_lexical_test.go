@@ -271,15 +271,10 @@ func assertPackageInitializerLexicalPlacement(
 				continue
 			}
 			for _, candidate := range function.Body().(tsgo.Block).Statements() {
-				expression, ok := candidate.(tsgo.ExpressionStatement)
-				if !ok {
-					continue
-				}
-				if initializer := initializerFunctionExpression(
-					expression.Expression(),
-				); initializer != nil {
-					initializers = append(initializers, initializer)
-				}
+				initializers = append(
+					initializers,
+					initializerFunctionsInStatement(candidate)...,
+				)
 			}
 		}
 	}
@@ -306,6 +301,27 @@ func assertPackageInitializerLexicalPlacement(
 		t,
 		initializers[2].Body().(tsgo.Block),
 	)
+}
+
+func initializerFunctionsInStatement(
+	statement tsgo.Statement,
+) []tsgo.ArrowFunction {
+	switch statement := statement.(type) {
+	case tsgo.ExpressionStatement:
+		initializer := initializerFunctionExpression(statement.Expression())
+		if initializer == nil {
+			return nil
+		}
+		return []tsgo.ArrowFunction{initializer}
+	case tsgo.Block:
+		var result []tsgo.ArrowFunction
+		for _, child := range statement.Statements() {
+			result = append(result, initializerFunctionsInStatement(child)...)
+		}
+		return result
+	default:
+		return nil
+	}
 }
 
 func initializerFunctionExpression(

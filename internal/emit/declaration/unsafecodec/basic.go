@@ -5,6 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	complexruntime "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -79,31 +80,30 @@ func (b *builder) integerOperations(
 	readValue := tsgo.Expression(
 		b.memberCall(b.dataView(), get, readArguments...),
 	)
-	if wide && b.context.IntegerRepresentation() == api.IntegerRepresentationNumber {
+	carrier, represented := integervalue.DescribeUnderlying(
+		b.context.TypesSizes(),
+		sourceType,
+	)
+	if !represented {
+		return nil, nil, &api.GeneratedArtifactShapeError{
+			Reason: "unsafe-codec integer carrier is unavailable",
+		}
+	}
+	bigIntCarrier := integervalue.UsesBigInt(
+		b.context.IntegerRepresentation(),
+		carrier,
+	)
+	if wide && !bigIntCarrier {
 		readValue = b.call(
 			api.TargetIntrinsicNumber.Expression(b.factory),
-			nil,
-			readValue,
-		)
-	}
-	if !wide && b.context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
-		readValue = b.call(
-			api.TargetIntrinsicBigInt.Expression(b.factory),
 			nil,
 			readValue,
 		)
 	}
 	writeValue := tsgo.Expression(b.id("value"))
-	if wide && b.context.IntegerRepresentation() == api.IntegerRepresentationNumber {
+	if wide && !bigIntCarrier {
 		writeValue = b.call(
 			api.TargetIntrinsicBigInt.Expression(b.factory),
-			nil,
-			writeValue,
-		)
-	}
-	if !wide && b.context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
-		writeValue = b.call(
-			api.TargetIntrinsicNumber.Expression(b.factory),
 			nil,
 			writeValue,
 		)

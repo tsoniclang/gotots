@@ -104,7 +104,7 @@ func integerOperation(
 	target := operand.Value()
 	switch operator {
 	case token.ADD:
-		if context.IntegerRepresentation() == api.IntegerRepresentationNumber {
+		if !integervalue.UsesBigInt(context.IntegerRepresentation(), carrier) {
 			target = context.Factory().PrefixUnaryExpression(
 				tsgo.PrefixUnaryExpressionOperatorKindPlusToken,
 				target,
@@ -146,11 +146,7 @@ func normalizeComplement(
 		context.IntegerRepresentation(),
 		carrier,
 	):
-		zero, err := api.IntegerLiteral(
-			context.Factory(),
-			api.IntegerRepresentationNumber,
-			"0",
-		)
+		zero, err := integervalue.CarrierLiteral(context, carrier, "0")
 		if err != nil {
 			return nil, err
 		}
@@ -163,7 +159,7 @@ func normalizeComplement(
 			),
 			zero,
 		), nil
-	case context.IntegerRepresentation() == api.IntegerRepresentationNumber &&
+	case !integervalue.UsesBigInt(context.IntegerRepresentation(), carrier) &&
 		carrier.Width() > 32:
 		return target, nil
 	case !carrier.Signed():
@@ -174,11 +170,7 @@ func normalizeComplement(
 				Reason: "unsigned complement has no width mask",
 			}
 		}
-		maskLiteral, err := api.IntegerLiteral(
-			context.Factory(),
-			context.IntegerRepresentation(),
-			mask,
-		)
+		maskLiteral, err := integervalue.CarrierLiteral(context, carrier, mask)
 		if err != nil {
 			return nil, err
 		}

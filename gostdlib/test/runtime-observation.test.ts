@@ -6,7 +6,8 @@ import {
   type GoError,
 } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { int, uint8 } from "../src/internal/scalars.js";
+import { integerFromHost } from "../src/internal/host-integer.js";
 import {
   Caller,
   GC,
@@ -57,33 +58,33 @@ class BufferWriter extends GoInterfaceValue {
     return "buffer writer";
   }
 
-  Write(buffer: RuntimeSlice<uint8>): [int64, GoError | undefined] {
+  Write(buffer: RuntimeSlice<uint8>): [int, GoError | undefined] {
     for (let index = 0; index < buffer.length; index += 1) {
       this.bytes.push(buffer.get(index));
     }
-    return [buffer.length, undefined];
+    return [integerFromHost(buffer.length), undefined];
   }
 }
 
 test("runtime process observations are populated", () => {
   assert.notEqual(GOARCH, "");
   assert.notEqual(GOOS, "");
-  assert.equal(GOMAXPROCS(0), 1);
+  assert.equal(GOMAXPROCS(0n), 1n);
   GC();
 
   const stats = new MemStats();
   ReadMemStats(stats);
   assert.ok(stats.Sys >= stats.HeapAlloc);
 
-  const [, file, line, ok] = Caller(0);
+  const [, file, line, ok] = Caller(0n);
   assert.equal(ok, true);
   assert.match(file, /runtime-observation/u);
-  assert.ok(line > 0);
+  assert.ok(line > 0n);
 
   const stack = Stack();
   assert.ok(stack.length > 0);
-  const previous = SetMaxStack(2_000_000);
-  assert.ok(previous > 0);
+  const previous = SetMaxStack(2_000_000n);
+  assert.ok(previous > 0n);
 });
 
 test("runtime profiles write concrete provider observations", async () => {
@@ -99,7 +100,7 @@ test("runtime profiles write concrete provider observations", async () => {
 
   const heap = Lookup("heap");
   assert.ok(heap instanceof Profile);
-  assert.equal(Profile.WriteTo(heap, writer, 0), undefined);
+  assert.equal(Profile.WriteTo(heap, writer, 0n), undefined);
   assert.equal(Lookup("missing"), undefined);
 });
 
@@ -114,10 +115,10 @@ test("runtime metrics publish typed descriptions and selected values", () => {
   Read(samples);
 
   assert.equal(samples.get(0).Value.Kind().value, KindUint64.value);
-  assert.ok(samples.get(0).Value.Uint64() > 0);
+  assert.ok(samples.get(0).Value.Uint64() > 0n);
   assert.equal(samples.get(1).Value.Kind().value, KindFloat64.value);
   assert.ok(samples.get(1).Value.Float64() >= 0);
-  assert.equal(KindFloat64Histogram.value, 3);
+  assert.equal(KindFloat64Histogram.value, 3n);
 });
 
 test("Testing reports the active node test runner", () => {

@@ -1,4 +1,4 @@
-import type { Awaitable, bool } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
 type Yield<T> = (value: T) => Awaitable<bool>;
 type Yield2<K, V> = (key: K, value: V) => Awaitable<bool>;
 

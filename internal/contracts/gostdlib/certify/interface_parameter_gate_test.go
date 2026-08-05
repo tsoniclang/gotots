@@ -41,10 +41,11 @@ func TestInterfaceParameterProfilesExactJoinProviderBoundaries(t *testing.T) {
 	ordinary := gostdlib.ProviderInterfaceDocument{
 		Mode: gostdlib.ProviderInterfaceModeBridge,
 		Methods: []gostdlib.ProviderInterfaceMethodDocument{{
-			SourceIdentity:  "example.com/provider.Worker.Ready",
-			Kind:            gostdlib.ProviderInterfaceMethodCallable,
-			Effect:          gostdlib.EffectSynchronous,
-			SourceSignature: "func() bool",
+			SourceIdentity:    "example.com/provider.Worker.Ready",
+			Kind:              gostdlib.ProviderInterfaceMethodCallable,
+			Effect:            gostdlib.EffectSynchronous,
+			SourceSignature:   "func() bool",
+			ContractSignature: "func() bool",
 		}},
 	}
 	modules := []gostdlib.ModuleDocument{{Bindings: []gostdlib.BindingDocument{
@@ -209,10 +210,11 @@ func providerInterfaceForClosureTest(
 	return gostdlib.ProviderInterfaceDocument{
 		Mode: gostdlib.ProviderInterfaceModeBridge,
 		Methods: []gostdlib.ProviderInterfaceMethodDocument{{
-			SourceIdentity:  methodIdentity,
-			Kind:            gostdlib.ProviderInterfaceMethodCallable,
-			Effect:          effect,
-			SourceSignature: signature,
+			SourceIdentity:    methodIdentity,
+			Kind:              gostdlib.ProviderInterfaceMethodCallable,
+			Effect:            effect,
+			SourceSignature:   signature,
+			ContractSignature: signature,
 		}},
 	}
 }

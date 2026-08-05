@@ -3,7 +3,7 @@ import {
   type GoError,
 } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderInterfaceValue } from "../io/value.js";
 import { timeQuote } from "./quote.js";

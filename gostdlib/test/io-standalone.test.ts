@@ -3,7 +3,8 @@ import test from "node:test";
 
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { int, uint8 } from "../src/internal/scalars.js";
+import { integerFromHost } from "../src/internal/host-integer.js";
 
 import {
   NewReader,
@@ -41,9 +42,9 @@ class MemoryReader extends ProviderInterfaceValue implements Reader {
     super(memoryReaderType);
   }
 
-  Read(destination: RuntimeSlice<uint8>): [int64, GoError | undefined] {
+  Read(destination: RuntimeSlice<uint8>): [int, GoError | undefined] {
     if (this.offset >= this.source.length) {
-      return [0, state.EOF];
+      return [0n, state.EOF];
     }
     const count = Math.min(
       destination.length,
@@ -54,7 +55,10 @@ class MemoryReader extends ProviderInterfaceValue implements Reader {
       destination.set(index, this.source[this.offset + index] ?? 0);
     }
     this.offset += count;
-    return [count, this.offset === this.source.length ? state.EOF : undefined];
+    return [
+      integerFromHost(count),
+      this.offset === this.source.length ? state.EOF : undefined,
+    ];
   }
 }
 
@@ -65,9 +69,9 @@ class MemoryWriter extends ProviderInterfaceValue implements Writer {
     super(memoryWriterType);
   }
 
-  Write(source: RuntimeSlice<uint8>): [int64, GoError | undefined] {
+  Write(source: RuntimeSlice<uint8>): [int, GoError | undefined] {
     this.values.push(...sliceValues(source));
-    return [source.length, undefined];
+    return [integerFromHost(source.length), undefined];
   }
 }
 
@@ -76,8 +80,8 @@ class ShortWriter extends ProviderInterfaceValue implements Writer {
     super(memoryWriterType);
   }
 
-  Write(source: RuntimeSlice<uint8>): [int64, GoError | undefined] {
-    return [Math.max(0, source.length - 1), undefined];
+  Write(source: RuntimeSlice<uint8>): [int, GoError | undefined] {
+    return [integerFromHost(Math.max(0, source.length - 1)), undefined];
   }
 }
 
@@ -112,7 +116,7 @@ test("ReadFull handles exact EOF and reports unexpected EOF for short input", ()
     new MemoryReader(Uint8Array.of(1, 2, 3, 4)),
     exact,
   );
-  assert.equal(exactCount, 4);
+  assert.equal(exactCount, 4n);
   assert.equal(exactFailure, undefined);
   assert.deepEqual([...bytes(exact)], [1, 2, 3, 4]);
 
@@ -121,13 +125,13 @@ test("ReadFull handles exact EOF and reports unexpected EOF for short input", ()
     new MemoryReader(Uint8Array.of(1, 2, 3)),
     short,
   );
-  assert.equal(shortCount, 3);
+  assert.equal(shortCount, 3n);
   assert.equal(shortFailure, state.ErrUnexpectedEOF);
 });
 
 test("Discard accepts all bytes", () => {
   const source = byteSlice([1, 2, 3]);
-  assert.deepEqual(state.Discard.Write(source), [3, undefined]);
+  assert.deepEqual(state.Discard.Write(source), [3n, undefined]);
 });
 
 test("buffered reader preserves delimiter and EOF behavior", () => {
@@ -148,7 +152,7 @@ test("buffered writer delays writes until Flush", () => {
   const writer = NewWriter(target);
   assert.notEqual(writer, undefined);
 
-  assert.deepEqual(BufferedWriter.Write(writer, byteSlice([1, 2, 3])), [3, undefined]);
+  assert.deepEqual(BufferedWriter.Write(writer, byteSlice([1, 2, 3])), [3n, undefined]);
   assert.deepEqual(target.values, []);
   assert.equal(BufferedWriter.WriteByte(writer, 4), undefined);
   assert.equal(BufferedWriter.Flush(writer), undefined);
@@ -158,6 +162,6 @@ test("buffered writer delays writes until Flush", () => {
 test("buffered writer converts an unexplained partial write to short write", () => {
   const writer = NewWriter(new ShortWriter());
   assert.notEqual(writer, undefined);
-  assert.deepEqual(BufferedWriter.Write(writer, byteSlice([1, 2, 3])), [3, undefined]);
+  assert.deepEqual(BufferedWriter.Write(writer, byteSlice([1, 2, 3])), [3n, undefined]);
   assert.equal(BufferedWriter.Flush(writer)?.Error(), "short write");
 });

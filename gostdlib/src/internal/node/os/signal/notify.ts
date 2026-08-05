@@ -1,6 +1,6 @@
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable } from "@gotots/runtime/scalars.js";
+import type { Awaitable } from "@gotots/gostdlib/internal/scalars.js";
 import type { GoEmptyStruct } from "@gotots/runtime/struct.js";
 import { WithCancel } from "../../../../context.js";
 import type {

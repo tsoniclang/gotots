@@ -1,9 +1,11 @@
 package unsafecodec
 
 import (
+	"go/types"
 	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -163,16 +165,12 @@ func (b *builder) dataView() tsgo.NewExpression {
 }
 
 func (b *builder) integerZero() (tsgo.Expression, error) {
-	return api.IntegerLiteral(
-		b.factory,
-		b.context.IntegerRepresentation(),
-		"0",
-	)
+	return integervalue.Literal(b.context, types.Typ[types.Uintptr], "0")
 }
 
 func (b *builder) convertInteger(value tsgo.Expression) tsgo.Expression {
 	intrinsic := api.TargetIntrinsicNumber
-	if b.context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
+	if integervalue.TypeUsesBigInt(b.context, types.Typ[types.Uintptr]) {
 		intrinsic = api.TargetIntrinsicBigInt
 	}
 	return b.call(intrinsic.Expression(b.factory), nil, value)

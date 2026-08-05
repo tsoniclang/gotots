@@ -1,4 +1,4 @@
-import type { int32 } from "@gotots/runtime/scalars.js";
+import type { int32 } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   caseOrbit,

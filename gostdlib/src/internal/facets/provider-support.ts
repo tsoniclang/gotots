@@ -6,6 +6,13 @@ export interface InterfaceGuard<Value extends GoInterfaceValue> {
   (value: GoInterfaceValue | undefined): value is Value;
 }
 
+export interface InterfaceView<
+  Base extends GoInterfaceValue,
+  Target extends Base,
+> {
+  (value: Base | undefined): Target | undefined;
+}
+
 export interface InterfaceContract extends ReadonlyArray<object> {}
 
 export interface FromProviderBridge<

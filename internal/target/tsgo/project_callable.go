@@ -2,7 +2,11 @@ package tsgo
 
 import "fmt"
 
-const typeFlagUnionOrIntersection uint32 = 1<<27 | 1<<28
+const (
+	typeFlagUndefined           uint32 = 1 << 2
+	typeFlagUnion               uint32 = 1 << 27
+	typeFlagUnionOrIntersection uint32 = typeFlagUnion | 1<<28
+)
 
 type CallableEffect uint8
 
@@ -190,120 +194,90 @@ func sameTypeMembers(left []typeResponse, right []typeResponse) bool {
 	return true
 }
 
-func (p *ProjectInspection) CallableTypeParameterCount(
+func (p *ProjectInspection) CallableOptionalViewTypes(
 	target projectCallable,
-) (int, error) {
+) (ProjectTypeIdentity, ProjectTypeIdentity, error) {
 	if p == nil || target == nil {
-		return 0, &ProjectInspectionError{
-			Operation: "callable type parameters",
-			Reason:    "target is absent",
-		}
-	}
-	signature, err := p.singleCallSignature(
-		target,
-		target.callableSubject(),
-	)
-	if err != nil {
-		return 0, err
-	}
-	return len(signature.TypeParameters), nil
-}
-
-func (p *ProjectInspection) CallableParameterCount(
-	target projectCallable,
-) (int, error) {
-	if p == nil || target == nil {
-		return 0, &ProjectInspectionError{
-			Operation: "callable parameters",
-			Reason:    "target is absent",
-		}
-	}
-	signature, err := p.singleCallSignature(
-		target,
-		target.callableSubject(),
-	)
-	if err != nil {
-		return 0, err
-	}
-	return len(signature.Parameters), nil
-}
-
-func (p *ProjectInspection) CallableParameterEffect(
-	target projectCallable,
-	parameter int,
-	asyncMarker ProjectExport,
-) (CallableEffect, error) {
-	if p == nil || target == nil {
-		return CallableEffectInvalid, &ProjectInspectionError{
-			Operation: "callable parameter effect",
+		return ProjectTypeIdentity{}, ProjectTypeIdentity{}, &ProjectInspectionError{
+			Operation: "callable optional view types",
 			Reason:    "target is absent",
 		}
 	}
 	signature, err := p.singleCallSignature(target, target.callableSubject())
 	if err != nil {
-		return CallableEffectInvalid, err
+		return ProjectTypeIdentity{}, ProjectTypeIdentity{}, err
 	}
-	if parameter < 0 || parameter >= len(signature.Parameters) {
-		return CallableEffectInvalid, &ProjectInspectionError{
-			Operation: "callable parameter effect",
+	if len(signature.Parameters) != 1 {
+		return ProjectTypeIdentity{}, ProjectTypeIdentity{}, &ProjectInspectionError{
+			Operation: "callable optional view types",
 			Reason: fmt.Sprintf(
-				"%s parameter %d is outside %d parameters",
+				"%s has %d parameters, want one",
 				target.callableSubject(),
-				parameter,
 				len(signature.Parameters),
 			),
 		}
 	}
-	parameterType, err := p.projectSymbolType(
-		signature.Parameters[parameter],
-		"callable parameter effect",
+	parameter, err := p.projectSymbolType(
+		signature.Parameters[0],
+		"callable optional view types",
 	)
 	if err != nil {
-		return CallableEffectInvalid, err
+		return ProjectTypeIdentity{}, ProjectTypeIdentity{}, err
 	}
-	return p.CallableEffect(projectCallableType{
-		typeID: parameterType.ID,
-		subject: fmt.Sprintf(
-			"%s parameter %d",
-			target.callableSubject(),
-			parameter,
-		),
-	}, asyncMarker)
-}
-
-func (p *ProjectInspection) CallableParameterTypeIdentity(
-	target projectCallable,
-	parameter int,
-) (ProjectTypeIdentity, error) {
-	if p == nil || target == nil {
-		return ProjectTypeIdentity{}, &ProjectInspectionError{
-			Operation: "callable parameter type identity",
-			Reason:    "target is absent",
+	parameterIdentity, err := p.projectTypeIdentity(parameter.ID)
+	if err != nil {
+		return ProjectTypeIdentity{}, ProjectTypeIdentity{}, err
+	}
+	result, err := p.signatureReturn(signature.ID, target.callableSubject())
+	if err != nil {
+		return ProjectTypeIdentity{}, ProjectTypeIdentity{}, err
+	}
+	if result.Flags&typeFlagUnion == 0 {
+		return ProjectTypeIdentity{}, ProjectTypeIdentity{}, &ProjectInspectionError{
+			Operation: "callable optional view types",
+			Reason:    target.callableSubject() + " does not return T | undefined",
 		}
 	}
-	signature, err := p.singleCallSignature(target, target.callableSubject())
+	members, err := p.compositeTypes(result.ID)
 	if err != nil {
-		return ProjectTypeIdentity{}, err
+		return ProjectTypeIdentity{}, ProjectTypeIdentity{}, err
 	}
-	if parameter < 0 || parameter >= len(signature.Parameters) {
-		return ProjectTypeIdentity{}, &ProjectInspectionError{
-			Operation: "callable parameter type identity",
+	if len(members) != 2 {
+		return ProjectTypeIdentity{}, ProjectTypeIdentity{}, &ProjectInspectionError{
+			Operation: "callable optional view types",
 			Reason: fmt.Sprintf(
-				"%s parameter %d is outside %d parameters",
+				"%s return has %d alternatives, want T | undefined",
 				target.callableSubject(),
-				parameter,
-				len(signature.Parameters),
+				len(members),
 			),
 		}
 	}
-	parameterType, err := p.projectSymbolType(
-		signature.Parameters[parameter],
-		"callable parameter type identity",
-	)
-	if err != nil {
-		return ProjectTypeIdentity{}, err
+	var resultType uint32
+	undefined := 0
+	for _, member := range members {
+		if member.Flags == typeFlagUndefined {
+			undefined++
+			continue
+		}
+		if resultType != 0 {
+			return ProjectTypeIdentity{}, ProjectTypeIdentity{}, &ProjectInspectionError{
+				Operation: "callable optional view types",
+				Reason:    target.callableSubject() + " does not return exactly T | undefined",
+			}
+		}
+		resultType = member.ID
 	}
-	return p.projectTypeIdentity(parameterType.ID)
+	if undefined != 1 || resultType == 0 {
+		return ProjectTypeIdentity{}, ProjectTypeIdentity{}, &ProjectInspectionError{
+			Operation: "callable optional view types",
+			Reason:    target.callableSubject() + " does not return exactly T | undefined",
+		}
+	}
+	resultIdentity, err := p.projectTypeIdentity(resultType)
+	if err != nil {
+		return ProjectTypeIdentity{}, ProjectTypeIdentity{}, err
+	}
+	return parameterIdentity, resultIdentity, nil
 }
 
 func (p *ProjectInspection) projectSymbolType(

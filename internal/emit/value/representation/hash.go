@@ -15,6 +15,7 @@ import (
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -212,6 +213,10 @@ func (owner Owner) Hash(
 		), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		projected, err := defined.Project(
 			context.WithRole(api.RoleDefinedValue),
 			api.DirectExpression(value),
@@ -220,7 +225,7 @@ func (owner Owner) Hash(
 			return api.ExpressionEmission{}, err
 		}
 		result, err := (Owner{}).Hash(
-			context.WithRole(api.RoleDefinedValue),
+			operationContext.WithRole(api.RoleDefinedValue),
 			source,
 			defined.Underlying(),
 			projected.Value(),
@@ -496,13 +501,17 @@ func hashMember(
 	case basic.Info()&types.IsFloat != 0:
 		return mapruntime.HashNumberMember, true
 	case basic.Info()&types.IsInteger != 0:
-		if _, ok := basictype.PrimitiveAlias(
+		carrier, ok := integervalue.Describe(
 			context.TypesSizes(),
 			basic,
-		); !ok {
+		)
+		if !ok {
 			return "", false
 		}
-		if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
+		if integervalue.UsesBigInt(
+			context.IntegerRepresentation(),
+			carrier,
+		) {
 			return mapruntime.HashBigIntMember, true
 		}
 		return mapruntime.HashNumberMember, true

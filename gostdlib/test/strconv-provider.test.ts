@@ -24,51 +24,51 @@ import { Unwrap } from "../src/errors.js";
 import { sliceValues } from "../src/internal/runtime/slice.js";
 
 test("strconv integer parsing honors bases, prefixes, underscores, and bounds", () => {
-  assert.deepEqual(Atoi("-42"), [-42, undefined]);
-  assert.deepEqual(ParseInt("0x_7f", 0, 8), [127, undefined]);
-  assert.notEqual(ParseInt("_1", 0, 8)[1], undefined);
-  assert.deepEqual(ParseInt("0_7", 0, 8), [7, undefined]);
-  assert.deepEqual(ParseUint("1111", 2, 8), [15, undefined]);
-  assert.deepEqual(ParseInt("128", 10, 8)[0], 127);
-  assert.equal(ParseInt("128", 10, 8)[1]?.Unwrap(), state.ErrRange);
-  assert.notEqual(ParseUint("-1", 10, 64)[1], undefined);
+  assert.deepEqual(Atoi("-42"), [-42n, undefined]);
+  assert.deepEqual(ParseInt("0x_7f", 0n, 8n), [127n, undefined]);
+  assert.notEqual(ParseInt("_1", 0n, 8n)[1], undefined);
+  assert.deepEqual(ParseInt("0_7", 0n, 8n), [7n, undefined]);
+  assert.deepEqual(ParseUint("1111", 2n, 8n), [15n, undefined]);
+  assert.deepEqual(ParseInt("128", 10n, 8n)[0], 127n);
+  assert.equal(ParseInt("128", 10n, 8n)[1]?.Unwrap(), state.ErrRange);
+  assert.notEqual(ParseUint("-1", 10n, 64n)[1], undefined);
 });
 
 test("strconv formatting uses clean lower-case radix output", () => {
-  assert.equal(FormatInt(-255, 16), "-ff");
-  assert.equal(FormatUint(255, 16), "ff");
-  assert.equal(Itoa(1234), "1234");
-  assert.throws(() => FormatInt(1, 1));
+  assert.equal(FormatInt(-255n, 16n), "-ff");
+  assert.equal(FormatUint(255n, 16n), "ff");
+  assert.equal(Itoa(1234n), "1234");
+  assert.throws(() => FormatInt(1n, 1n));
 });
 
 test("strconv append formatting preserves the destination slice and Go forms", () => {
   const prefix = RuntimeSlice.literal([0x58]);
   assert.deepEqual(sliceValues(AppendBool(prefix, true)), [0x58, 0x74, 0x72, 0x75, 0x65]);
-  assert.deepEqual(ascii(AppendInt(prefix, -255, 16)), "X-ff");
-  assert.deepEqual(ascii(AppendUint(prefix, 255, 16)), "Xff");
-  assert.deepEqual(ascii(AppendFloat(prefix, 1.25, code("g"), -1, 64)), "X1.25");
-  assert.deepEqual(ascii(AppendFloat(prefix, 1.2, code("g"), -1, 32)), "X1.2");
-  assert.deepEqual(ascii(AppendFloat(prefix, 1e6, code("g"), -1, 64)), "X1e+06");
-  assert.deepEqual(ascii(AppendFloat(prefix, 1e-5, code("g"), -1, 64)), "X1e-05");
+  assert.deepEqual(ascii(AppendInt(prefix, -255n, 16n)), "X-ff");
+  assert.deepEqual(ascii(AppendUint(prefix, 255n, 16n)), "Xff");
+  assert.deepEqual(ascii(AppendFloat(prefix, 1.25, code("g"), -1n, 64n)), "X1.25");
+  assert.deepEqual(ascii(AppendFloat(prefix, 1.2, code("g"), -1n, 32n)), "X1.2");
+  assert.deepEqual(ascii(AppendFloat(prefix, 1e6, code("g"), -1n, 64n)), "X1e+06");
+  assert.deepEqual(ascii(AppendFloat(prefix, 1e-5, code("g"), -1n, 64n)), "X1e-05");
   assert.deepEqual(
-    ascii(AppendFloat(prefix, 3.1415926535, code("E"), -1, 32)),
+    ascii(AppendFloat(prefix, 3.1415926535, code("E"), -1n, 32n)),
     "X3.1415927E+00",
   );
-  assert.deepEqual(ascii(AppendFloat(prefix, 1.005, code("f"), 2, 64)), "X1.00");
-  assert.deepEqual(ascii(AppendFloat(prefix, 1.5, code("x"), -1, 64)), "X0x1.8p+00");
+  assert.deepEqual(ascii(AppendFloat(prefix, 1.005, code("f"), 2n, 64n)), "X1.00");
+  assert.deepEqual(ascii(AppendFloat(prefix, 1.5, code("x"), -1n, 64n)), "X0x1.8p+00");
 });
 
 test("strconv floating parsing covers decimal, hexadecimal, special, and range forms", () => {
-  assert.deepEqual(ParseFloat("1_2.5e1", 64), [125, undefined]);
-  assert.deepEqual(ParseFloat("0x1.8p+1", 64), [3, undefined]);
-  assert.deepEqual(ParseFloat("1.5", 0), [1.5, undefined]);
-  assert.equal(ParseFloat("NaN", 64)[1], undefined);
-  assert.equal(ParseFloat("1e999", 64)[0], Number.POSITIVE_INFINITY);
-  const overflow = ParseFloat("1e999", 64)[1];
+  assert.deepEqual(ParseFloat("1_2.5e1", 64n), [125, undefined]);
+  assert.deepEqual(ParseFloat("0x1.8p+1", 64n), [3, undefined]);
+  assert.deepEqual(ParseFloat("1.5", 0n), [1.5, undefined]);
+  assert.equal(ParseFloat("NaN", 64n)[1], undefined);
+  assert.equal(ParseFloat("1e999", 64n)[0], Number.POSITIVE_INFINITY);
+  const overflow = ParseFloat("1e999", 64n)[1];
   assert.equal(overflow?.Unwrap(), state.ErrRange);
   assert.equal(Unwrap(overflow), state.ErrRange);
   assert.equal(Unwrap(state.ErrRange), undefined);
-  assert.notEqual(ParseFloat("1.2.3", 64)[1], undefined);
+  assert.notEqual(ParseFloat("1.2.3", 64n)[1], undefined);
 });
 
 test("strconv quoting preserves Go byte strings and escape rules", () => {

@@ -7,7 +7,8 @@ import {
   type GoError,
 } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { uint8 } from "@gotots/runtime/scalars.js";
+import type { int, uint8 } from "../src/internal/scalars.js";
+import { integerFromHost } from "../src/internal/host-integer.js";
 
 import { Fprintln, Println, Sprintf } from "../src/fmt.js";
 import type { Writer } from "../src/io.js";
@@ -66,13 +67,13 @@ class CaptureWriter extends GoInterfaceValue implements Writer {
     return "capture-writer";
   }
 
-  Write(buffer: RuntimeSlice<uint8>): [number, GoError | undefined] {
+  Write(buffer: RuntimeSlice<uint8>): [int, GoError | undefined] {
     const bytes: number[] = [];
     for (let index = 0; index < buffer.length; index += 1) {
       bytes.push(buffer.get(index));
     }
     this.content += new TextDecoder().decode(Uint8Array.from(bytes));
-    return [buffer.length, undefined];
+    return [integerFromHost(buffer.length), undefined];
   }
 }
 
@@ -90,7 +91,7 @@ test("fmt Fprintln writes one Go line through io.Writer", () => {
     new FormattedValue("value", "value"),
     new FormattedValue("15", "f"),
   ]);
-  assert.deepEqual(Fprintln(writer, arguments_), [9, undefined]);
+  assert.deepEqual(Fprintln(writer, arguments_), [9n, undefined]);
   assert.equal(writer.content, "value 15\n");
 });
 
@@ -101,7 +102,7 @@ test("fmt Println writes through the selected standard output", (): void => {
     import { Println } from ${JSON.stringify(moduleURL)};
     import { RuntimeSlice } from "@gotots/runtime/slice.js";
     const result = Println(RuntimeSlice.literal([]));
-    process.stderr.write(JSON.stringify(result));
+    process.stderr.write(JSON.stringify([result[0].toString(), result[1]]));
   `;
   const result = spawnSync(
     process.execPath,
@@ -110,5 +111,5 @@ test("fmt Println writes through the selected standard output", (): void => {
   );
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, "\n");
-  assert.equal(result.stderr, "[1,null]");
+  assert.equal(result.stderr, '["1",null]');
 });

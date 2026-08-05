@@ -1,4 +1,4 @@
-import type { bool, gostring } from "@gotots/runtime/scalars.js";
+import type { bool, gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   decode,

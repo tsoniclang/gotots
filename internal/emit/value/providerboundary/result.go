@@ -1,11 +1,11 @@
 package providerboundary
 
 import (
-	"fmt"
 	"go/types"
 	"slices"
 	"strconv"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -29,92 +29,11 @@ func FromProviderResults(
 	return target, err
 }
 
-func ToProviderArguments(
-	context api.Context,
-	children api.ChildEmitter,
-	parameters *types.Tuple,
-	sourceArguments []tsgo.Expression,
-) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	return toProviderArgumentsSelected(
-		context,
-		children,
-		parameters,
-		nil,
-		sourceArguments,
-	)
-}
-
-func ToProviderProfileArguments(
-	context api.Context,
-	children api.ChildEmitter,
-	parameters *types.Tuple,
-	canonical []int,
-	sourceArguments []tsgo.Expression,
-) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	return toProviderArgumentsSelected(
-		context,
-		children,
-		parameters,
-		canonical,
-		sourceArguments,
-	)
-}
-
-func toProviderArgumentsSelected(
-	context api.Context,
-	children api.ChildEmitter,
-	parameters *types.Tuple,
-	canonical []int,
-	sourceArguments []tsgo.Expression,
-) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	if parameters == nil && len(sourceArguments) == 0 {
-		return nil, nil, nil, nil
-	}
-	if parameters == nil || parameters.Len() != len(sourceArguments) {
-		parameterCount := 0
-		if parameters != nil {
-			parameterCount = parameters.Len()
-		}
-		return nil, nil, nil, &api.InvariantError{
-			Role: context.Role(),
-			Reason: fmt.Sprintf(
-				"provider argument count does not match the source contract: %d parameters, %d arguments",
-				parameterCount,
-				len(sourceArguments),
-			),
-		}
-	}
-	arguments := make([]tsgo.Expression, 0, len(sourceArguments))
-	var before []tsgo.Statement
-	var requests []api.RootRequest
-	for index, sourceArgument := range sourceArguments {
-		converted := api.DirectExpression(sourceArgument)
-		var err error
-		if !slices.Contains(canonical, index) {
-			converted, _, err = ToProviderValue(
-				context,
-				children,
-				nil,
-				"",
-				parameters.At(index).Type(),
-				converted,
-			)
-		}
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		before = append(before, converted.Before()...)
-		arguments = append(arguments, converted.Value())
-		requests = append(requests, converted.Requests()...)
-	}
-	return arguments, before, api.CombineRequests(requests), nil
-}
-
 func FromProviderProfileResults(
 	context api.Context,
 	children api.ChildEmitter,
 	results *types.Tuple,
-	canonical []int,
+	profile gostdlib.ProviderCallableProfile,
 	emission api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	target, _, err := fromProviderResultsSelected(
@@ -122,8 +41,31 @@ func FromProviderProfileResults(
 		children,
 		nil,
 		"",
+		profile.CanonicalResults(),
+		profile.Interfaces(),
 		results,
-		canonical,
+		emission,
+	)
+	return target, err
+}
+
+func FromProviderProfileResultsForBridge(
+	context api.Context,
+	children api.ChildEmitter,
+	owner *types.Named,
+	ownerBridge string,
+	results *types.Tuple,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	emission api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	target, _, err := fromProviderResultsSelected(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		nil,
+		profile,
+		results,
 		emission,
 	)
 	return target, err
@@ -142,8 +84,9 @@ func fromProviderResults(
 		children,
 		owner,
 		ownerBridge,
-		results,
 		nil,
+		nil,
+		results,
 		emission,
 	)
 }
@@ -153,8 +96,9 @@ func fromProviderResultsSelected(
 	children api.ChildEmitter,
 	owner *types.Named,
 	ownerBridge string,
-	results *types.Tuple,
 	canonical []int,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	results *types.Tuple,
 	emission api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
 	if results == nil || results.Len() == 0 {
@@ -162,13 +106,20 @@ func fromProviderResultsSelected(
 	}
 	if results.Len() == 1 {
 		if slices.Contains(canonical, 0) {
-			return emission, false, nil
+			return fromProviderCanonicalValue(
+				context,
+				children,
+				profile,
+				results.At(0).Type(),
+				emission,
+			)
 		}
-		return FromProviderValue(
+		return fromProviderValueSelected(
 			context,
 			children,
 			owner,
 			ownerBridge,
+			profile,
 			results.At(0).Type(),
 			emission,
 		)
@@ -207,12 +158,21 @@ func fromProviderResultsSelected(
 		converted := api.DirectExpression(value)
 		convertedValue := false
 		var convertErr error
-		if !slices.Contains(canonical, index) {
-			converted, convertedValue, convertErr = FromProviderValue(
+		if slices.Contains(canonical, index) {
+			converted, convertedValue, convertErr = fromProviderCanonicalValue(
+				context,
+				children,
+				profile,
+				results.At(index).Type(),
+				converted,
+			)
+		} else {
+			converted, convertedValue, convertErr = fromProviderValueSelected(
 				context,
 				children,
 				owner,
 				ownerBridge,
+				profile,
 				results.At(index).Type(),
 				converted,
 			)
@@ -255,15 +215,76 @@ func toProviderResults(
 	results *types.Tuple,
 	emission api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
+	return toProviderResultsSelected(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		nil,
+		results,
+		emission,
+	)
+}
+
+func ToProviderProfileResults(
+	context api.Context,
+	children api.ChildEmitter,
+	results *types.Tuple,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	emission api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	target, _, err := toProviderResultsSelected(
+		context,
+		children,
+		nil,
+		"",
+		profile,
+		results,
+		emission,
+	)
+	return target, err
+}
+
+func ToProviderProfileResultsForBridge(
+	context api.Context,
+	children api.ChildEmitter,
+	owner *types.Named,
+	ownerBridge string,
+	results *types.Tuple,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	emission api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	target, _, err := toProviderResultsSelected(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		profile,
+		results,
+		emission,
+	)
+	return target, err
+}
+
+func toProviderResultsSelected(
+	context api.Context,
+	children api.ChildEmitter,
+	owner *types.Named,
+	ownerBridge string,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	results *types.Tuple,
+	emission api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
 	if results == nil || results.Len() == 0 {
 		return emission, false, nil
 	}
 	if results.Len() == 1 {
-		return ToProviderValue(
+		return toProviderValueSelected(
 			context,
 			children,
 			owner,
 			ownerBridge,
+			profile,
 			results.At(0).Type(),
 			emission,
 		)
@@ -299,11 +320,12 @@ func toProviderResults(
 			),
 			tsgo.NodeFlagsNone,
 		)
-		converted, convertedValue, convertErr := ToProviderValue(
+		converted, convertedValue, convertErr := toProviderValueSelected(
 			context,
 			children,
 			owner,
 			ownerBridge,
+			profile,
 			results.At(index).Type(),
 			api.DirectExpression(value),
 		)
@@ -334,8 +356,61 @@ func FromProviderValue(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
+	return fromProviderValueSelected(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		nil,
+		sourceType,
+		value,
+	)
+}
+
+func fromProviderValueSelected(
+	context api.Context,
+	children api.ChildEmitter,
+	owner *types.Named,
+	ownerBridge string,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	converted, scalar, changed, err := fromProviderScalar(
+		context,
+		sourceType,
+		value,
+	)
+	if err != nil || scalar {
+		return converted, changed, err
+	}
 	selected, ok := types.Unalias(sourceType).(*types.Named)
 	if ok && selected.Obj() != nil {
+		_, profileOwned, profileErr :=
+			providerProfileInterfaceCertificate(selected, profile)
+		if profileErr != nil {
+			return api.ExpressionEmission{}, false, profileErr
+		}
+		if profileOwned {
+			reference, found, referenceErr :=
+				context.Names().ProviderProfileInterfaceBridge(selected, profile)
+			if referenceErr != nil || !found {
+				if referenceErr != nil {
+					return api.ExpressionEmission{}, false, referenceErr
+				}
+				return api.ExpressionEmission{}, false, boundaryInvariant(
+					context,
+					"provider profile-interface bridge is absent",
+				)
+			}
+			return bridgeEmission(
+				context,
+				value,
+				reference.Bridge().Name(),
+				api.ProviderBridgeFromMember,
+				reference.Requests(),
+			)
+		}
 		if owner != nil && types.Identical(selected, owner) {
 			if ownerBridge == "" {
 				return api.ExpressionEmission{}, false, &api.InvariantError{
@@ -366,11 +441,12 @@ func FromProviderValue(
 		}
 	}
 	if signature, callableType, model := callableType(sourceType); callableType {
-		return fromProviderCallable(
+		return fromProviderCallableSelected(
 			context,
 			children,
 			owner,
 			ownerBridge,
+			profile,
 			signature,
 			model,
 			value,
@@ -387,8 +463,61 @@ func ToProviderValue(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
+	return toProviderValueSelected(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		nil,
+		sourceType,
+		value,
+	)
+}
+
+func toProviderValueSelected(
+	context api.Context,
+	children api.ChildEmitter,
+	owner *types.Named,
+	ownerBridge string,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	converted, scalar, changed, err := toProviderScalar(
+		context,
+		sourceType,
+		value,
+	)
+	if err != nil || scalar {
+		return converted, changed, err
+	}
 	selected, ok := types.Unalias(sourceType).(*types.Named)
 	if ok && selected.Obj() != nil {
+		_, profileOwned, profileErr :=
+			providerProfileInterfaceCertificate(selected, profile)
+		if profileErr != nil {
+			return api.ExpressionEmission{}, false, profileErr
+		}
+		if profileOwned {
+			reference, found, referenceErr :=
+				context.Names().ProviderProfileInterfaceBridge(selected, profile)
+			if referenceErr != nil || !found {
+				if referenceErr != nil {
+					return api.ExpressionEmission{}, false, referenceErr
+				}
+				return api.ExpressionEmission{}, false, boundaryInvariant(
+					context,
+					"provider profile-interface bridge is absent",
+				)
+			}
+			return bridgeEmission(
+				context,
+				value,
+				reference.Bridge().Name(),
+				api.ProviderBridgeToMember,
+				reference.Requests(),
+			)
+		}
 		if owner != nil && types.Identical(selected, owner) {
 			if ownerBridge == "" {
 				return api.ExpressionEmission{}, false, &api.InvariantError{
@@ -419,11 +548,12 @@ func ToProviderValue(
 		}
 	}
 	if signature, callableType, model := callableType(sourceType); callableType {
-		return toProviderCallable(
+		return toProviderCallableSelected(
 			context,
 			children,
 			owner,
 			ownerBridge,
+			profile,
 			signature,
 			model,
 			value,

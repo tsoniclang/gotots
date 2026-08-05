@@ -75,7 +75,7 @@ function providerResult(root: string): string {
   const [file, createError] = Create(path);
   assert.equal(createError, undefined);
   assert.ok(file !== undefined);
-  assert.deepEqual(File.WriteString(file, "hello"), [5, undefined]);
+  assert.deepEqual(File.WriteString(file, "hello"), [5n, undefined]);
   assert.equal(File.Close(file), undefined);
   const [information, statError] = Stat(path);
   assert.equal(statError, undefined);
@@ -83,7 +83,7 @@ function providerResult(root: string): string {
   assert.equal(openError, undefined);
   assert.ok(opened !== undefined);
   const contents = RuntimeSlice.make<number>(5, null, 0);
-  assert.deepEqual(File.Read(opened, contents), [5, undefined]);
+  assert.deepEqual(File.Read(opened, contents), [5n, undefined]);
   assert.equal(File.Close(opened), undefined);
 
   const command = Command("printf", RuntimeSlice.literal(["child"]));

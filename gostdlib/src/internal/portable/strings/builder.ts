@@ -5,10 +5,14 @@ import type {
 } from "@gotots/runtime/interface-value.js";
 import type {
   gostring,
+  int,
   int32,
-  int64,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
+import {
+  hostInteger,
+  integerFromHost,
+} from "../../host-integer.js";
 
 import { sliceValues } from "../../runtime/slice.js";
 import { encodeRune } from "../utf8/codec.js";
@@ -20,16 +24,17 @@ export class Builder {
     this.#value = "";
   }
 
-  static Grow(receiver: Builder | undefined, count: int64): void {
+  static Grow(receiver: Builder | undefined, count: int): void {
     const builder = requireBuilder(receiver);
-    if (!Number.isSafeInteger(count) || count < 0) {
+    if (count < 0n) {
       GoPanic.raiseRuntime("strings.Builder.Grow: negative count");
     }
+    hostInteger(count);
     void builder;
   }
 
-  static Len(receiver: Builder | undefined): int64 {
-    return requireBuilder(receiver).#value.length;
+  static Len(receiver: Builder | undefined): int {
+    return integerFromHost(requireBuilder(receiver).#value.length);
   }
 
   static Reset(receiver: Builder | undefined): void {
@@ -43,7 +48,7 @@ export class Builder {
   static Write(
     receiver: Builder | undefined,
     source: RuntimeSlice<uint8>,
-  ): [int64, GoError | undefined] {
+  ): [int, GoError | undefined] {
     const builder = requireBuilder(receiver);
     const bytes = sliceValues(source);
     let appended = "";
@@ -51,7 +56,7 @@ export class Builder {
       appended += String.fromCharCode(byte);
     }
     builder.#value += appended;
-    return [bytes.length, undefined];
+    return [integerFromHost(bytes.length), undefined];
   }
 
   static WriteByte(receiver: Builder | undefined, value: uint8): GoError | undefined {
@@ -62,18 +67,18 @@ export class Builder {
   static WriteRune(
     receiver: Builder | undefined,
     rune: int32,
-  ): [int64, GoError | undefined] {
+  ): [int, GoError | undefined] {
     const encoded = encodeRune(rune);
     requireBuilder(receiver).#value += encoded;
-    return [encoded.length, undefined];
+    return [integerFromHost(encoded.length), undefined];
   }
 
   static WriteString(
     receiver: Builder | undefined,
     text: gostring,
-  ): [int64, GoError | undefined] {
+  ): [int, GoError | undefined] {
     requireBuilder(receiver).#value += text;
-    return [text.length, undefined];
+    return [integerFromHost(text.length), undefined];
   }
 }
 

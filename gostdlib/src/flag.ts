@@ -6,7 +6,7 @@ import type {
   bool,
   gostring,
   int64,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
 import {
   booleanFlag,
   initializeFlagSet,
@@ -18,7 +18,7 @@ export class ErrorHandling {
   constructor(public readonly value: int64) {}
 }
 
-export const ContinueOnError = new ErrorHandling(0);
+export const ContinueOnError = new ErrorHandling(0n);
 
 export class FlagSet {
   Usage: (() => Awaitable<void>) | undefined = undefined;

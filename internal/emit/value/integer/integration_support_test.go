@@ -129,3 +129,7 @@ func repositoryRoot() string {
 		filepath.Join(filepath.Dir(file), "..", "..", "..", ".."),
 	)
 }
+
+func integerBoundaryDirectory() string {
+	return filepath.Join(repositoryRoot(), "testdata", "constructs", "value", "integer-boundaries")
+}

@@ -15,10 +15,9 @@ type StatefulProfileSelection struct {
 }
 
 type StatefulMethodBoundary struct {
-	method              gostdlib.ProviderStatefulProfileMethod
-	canonicalParameters []int
-	canonicalResults    []int
-	requests            []api.RootRequest
+	method     gostdlib.ProviderStatefulProfileMethod
+	interfaces []gostdlib.ProviderCallableProfileInterface
+	requests   []api.RootRequest
 }
 
 func ResolveStatefulProfile(
@@ -219,20 +218,9 @@ func ResolveStatefulMethodBoundary(
 	if err != nil {
 		return StatefulMethodBoundary{}, false, err
 	}
-	canonical := make(map[string]struct{}, len(selection.profile.Interfaces()))
-	for _, selectedInterface := range selection.profile.Interfaces() {
-		canonical[selectedInterface.SourceIdentity()] = struct{}{}
-	}
 	return StatefulMethodBoundary{
-		method: profileMethod,
-		canonicalParameters: rootsContainingIdentities(
-			boundary.parameterInterfaces,
-			canonical,
-		),
-		canonicalResults: rootsContainingIdentities(
-			boundary.resultInterfaces,
-			canonical,
-		),
+		method:     profileMethod,
+		interfaces: selection.profile.Interfaces(),
 		requests: api.CombineRequests(
 			selection.Requests(),
 			boundary.analyzer.requests,
@@ -256,12 +244,11 @@ func (s StatefulMethodBoundary) Method() gostdlib.ProviderStatefulProfileMethod 
 	return s.method
 }
 
-func (s StatefulMethodBoundary) CanonicalParameters() []int {
-	return append([]int(nil), s.canonicalParameters...)
-}
-
-func (s StatefulMethodBoundary) CanonicalResults() []int {
-	return append([]int(nil), s.canonicalResults...)
+func (s StatefulMethodBoundary) Interfaces() []gostdlib.ProviderCallableProfileInterface {
+	return append(
+		[]gostdlib.ProviderCallableProfileInterface(nil),
+		s.interfaces...,
+	)
 }
 
 func (s StatefulMethodBoundary) Requests() []api.RootRequest {

@@ -181,6 +181,108 @@ func (n *File) ProviderInterfaceBridge(
 		requirement,
 		api.ArtifactFacetConstructorSurface,
 	)
+	if err != nil {
+		return api.NameReference{}, true, err
+	}
+	base, baseKey, err := n.canonicalInterfaceContract(named)
+	if err != nil {
+		return api.NameReference{}, true, err
+	}
+	demands, err := n.owner.registry.providerInterfaceBridgeContractRequests(
+		binding,
+		baseKey,
+		base,
+	)
+	if err != nil {
+		return api.NameReference{}, true, err
+	}
+	reference, err = reference.WithRequests(
+		api.CombineRequests(reference.Requests(), demands)...,
+	)
+	return reference, true, err
+}
+
+func (n *File) ProviderProfileInterfaceBridge(
+	sourceType types.Type,
+	profile []gostdlib.ProviderCallableProfileInterface,
+) (api.ProviderProfileBridgeReference, bool, error) {
+	named, ok := types.Unalias(sourceType).(*types.Named)
+	if !ok || named.Obj() == nil || len(profile) == 0 {
+		return api.ProviderProfileBridgeReference{}, false, nil
+	}
+	contract, ok := named.Underlying().(*types.Interface)
+	if !ok || !contract.Complete().IsMethodSet() {
+		return api.ProviderProfileBridgeReference{}, false, nil
+	}
+	sourceKey, err := typeidentity.BuildKey(
+		named,
+		n.generatedNamedObjectIdentity,
+	)
+	if err != nil {
+		return api.ProviderProfileBridgeReference{}, true, err
+	}
+	binding, err := n.owner.registry.internProviderProfileInterfaceBridge(
+		sourceKey,
+		named,
+		profile,
+	)
+	if err != nil {
+		return api.ProviderProfileBridgeReference{}, true, err
+	}
+	requirement, err := api.NewProviderInterfaceBridgeRequest(binding.owner)
+	if err != nil {
+		return api.ProviderProfileBridgeReference{}, true, err
+	}
+	bridge, err := n.generatedReference(
+		binding.owner,
+		binding.name,
+		requirement,
+		api.ArtifactFacetConstructorSurface,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ProviderProfileBridgeReference{}, true, err
+	}
+	contractReference, err := n.generatedReference(
+		binding.owner,
+		binding.name+api.ProviderProfileContractSuffix,
+		requirement,
+		api.ArtifactFacetInstanceTypeSurface,
+		api.ImportPhaseType,
+	)
+	if err != nil {
+		return api.ProviderProfileBridgeReference{}, true, err
+	}
+	_, selectedProfile, profiled := binding.owner.ProviderProfileInterfaceBridge()
+	if !profiled || len(selectedProfile) == 0 {
+		return api.ProviderProfileBridgeReference{}, true, &api.NameError{
+			Name:   binding.name,
+			Reason: "provider-profile bridge artifact contract is absent",
+		}
+	}
+	base, baseKey, err := n.canonicalInterfaceContract(named)
+	if err != nil {
+		return api.ProviderProfileBridgeReference{}, true, err
+	}
+	demands, err := n.owner.registry.providerInterfaceBridgeContractRequests(
+		binding,
+		baseKey,
+		base,
+	)
+	if err != nil {
+		return api.ProviderProfileBridgeReference{}, true, err
+	}
+	bridge, err = bridge.WithRequests(
+		api.CombineRequests(bridge.Requests(), demands)...,
+	)
+	if err != nil {
+		return api.ProviderProfileBridgeReference{}, true, err
+	}
+	reference, err := api.NewProviderProfileBridgeReference(
+		bridge,
+		contractReference,
+		selectedProfile,
+	)
 	return reference, true, err
 }
 

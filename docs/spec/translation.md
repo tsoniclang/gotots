@@ -138,6 +138,21 @@ legal lexical scope. Every value begins with the exact Go zero unless an
 initializer supplies it. Package initializer order comes directly from
 `types.Info.InitOrder`; file order and target imports do not reconstruct it.
 
+A selected `//go:embed` declaration is a compiler-supplied package-storage
+initializer, not a source initializer and not a zero value. The loader-owned
+declaration-to-file join supplies its exact bytes. For example:
+
+```go
+//go:embed defaults.json
+var defaults string
+```
+
+initializes the emitted `defaults` storage from the selected file bytes before
+ordinary package initialization. String emission uses the canonical Go-string
+value owner so arbitrary bytes survive TypeScript printing and execution.
+Unsupported embed storage families fail at the declaration owner; they never
+silently retain zero.
+
 Assignments evaluate all right-hand values and required left-hand addresses in
 Go order before stores. Parallel assignment never observes an earlier store.
 The default `direct` evaluation profile avoids extra temporaries where
@@ -229,6 +244,29 @@ The default integer profile uses `number`; the explicit `bigint` profile
 uses `bigint` where required. No runtime marker compensates for missing
 semantics. Integer overflow not preserved by the default profile is a declared
 profile tradeoff, not silently described as exact.
+
+The alias name always follows the selected Go type, while the carrier follows
+the profile and selected native width:
+
+```text
+Go type                 number profile       bigint profile (64-bit build)
+int8..int32, uint8..32  number               number
+int64, uint64           number               bigint
+int, uint, uintptr      number               bigint
+```
+
+Thus `var index int` emits `let index: int`, never `let index: int64`; changing
+`GOARCH` changes the native alias carrier, not its identity. Conversions use
+the source and destination Go widths and signedness from `go/types`; alias
+spelling never selects behavior.
+
+At a gostdlib call, the source-facing signature remains unchanged. For example,
+under the `number` product profile a Go `uint64` argument remains `uint64`
+(`number`) in generated source and the private facade converts it to the
+provider's exact `uint64` (`bigint`). Under the `bigint` product profile the
+same facade crossing is an identity. Provider results take the inverse path.
+These conversions occur only at the certified provider boundary and are never
+passed as callable parameters.
 
 ### Defined Types And Aliases
 
@@ -349,6 +387,15 @@ forbidden.
 Assertions, comma-ok, type switches, equality, comparability, and map keys use
 typed runtime metadata. No constructor-name test, reflection, spelling table,
 `any`, or `unknown`.
+
+Provider-created dynamic values use the same contract. For example, a provider
+may return an `error` whose concrete provider class also implements
+`Unwrap() error`. A reached `errors.Is`, direct assertion, or type-switch case
+demands that optional interface from the canonical `error` bridge. The bridge
+uses its certified provider capability view, conditionally carries the exact
+`Unwrap` method token, and converts the delegated result back through the same
+`error` bridge. It does not assume that every provider error unwraps, test for
+an `Unwrap` property, or special-case `os.IsNotExist`.
 
 ### Reflection
 
@@ -513,6 +560,11 @@ would detach a captured Go receiver when passed as a callback.
 
 Blocks and clause bodies share one ordered statement-list owner. It preserves
 lexical scopes and parent-assigned break/continue targets.
+An entered loop replaces both inherited implicit targets. An entered non-loop
+breakable statement replaces only the break target and preserves the nearest
+enclosing loop's continue target. Thus a loop inside a lowered switch cannot
+break the switch, while a switch inside a labeled loop cannot turn its own
+unlabeled break into a loop break.
 
 - `if`, `switch`, and type switch preserve initializer scope and one-time
   evaluation;
@@ -649,6 +701,52 @@ generated/
 
 Provider linkage replaces the placeholder owner atomically; it does not add a
 fallback. Publication fails if a reachable obligation remains.
+
+An external-function obligation binds the canonical Go declaration identity,
+stable `go/types` signature, owning module path and version, selected Go build
+profile, selected target representation profile, and source position. The
+compiler accepts one verified external-provider certificate; it does not accept
+per-function package/name overrides. The certificate is regenerated from the
+pinned dependency modules and the strict TypeScript provider project, then
+byte-compared with the checked manifest before compilation may consume it.
+Linkage accepts exactly one of two static targets recorded by that certificate:
+
+1. a certified ESM module export, called with the original Go value parameters;
+2. a body-owning function in the same selected Go package with an identical
+   signature, used as the portable implementation of a selected native entry.
+
+For example:
+
+```go
+func Syscall(trap, a1, a2, a3 uintptr) (uintptr, uintptr, syscall.Errno)
+```
+
+linked to `@gotots/externals/golang.org/x/sys/unix.js` emits:
+
+```ts
+import * as unix from "@gotots/externals/golang.org/x/sys/unix.js";
+
+export function Syscall(trap: uint64, a1: uint64, a2: uint64, a3: uint64) {
+  return unix.Syscall(trap, a1, a2, a3);
+}
+```
+
+No provider argument appears in the source-facing signature. A portable-source
+binding emits the same direct wrapper call to the selected translated function.
+Missing, duplicate, stale-profile, stale-module-version, incompatible-signature,
+extra, or unconsumed bindings fail before target files are sealed. The initial
+linkage contract covers nonvariadic nongeneric package functions; every other
+bodyless callable remains an explicit obligation until its exact source ABI is
+specified rather than being widened heuristically.
+
+The certificate records the provider package/version/digest, its exact
+`@gotots/gostdlib` manifest dependency, integer and concurrency profiles, each
+source identity/signature/module version, and each target export fingerprint or
+portable-source identity/signature. Compiler code joins only those typed facts;
+it never selects a target from package spelling, function spelling, source-file
+name, or call-site heuristics. Unused entries in a certified provider catalog are
+not compilation overrides. A selected matching source declaration must consume
+exactly one entry or remain an explicit obligation.
 
 ## Failure
 

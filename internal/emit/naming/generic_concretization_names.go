@@ -148,7 +148,7 @@ func (n *File) providerGenericKernelReference(
 			return api.NameReference{}, err
 		}
 	}
-	return api.NewQualifiedNameReference(
+	return api.NewProviderQualifiedNameReference(
 		qualifier,
 		selected.Export(),
 		request,

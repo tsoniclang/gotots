@@ -6,6 +6,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	sliceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	unsafepointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafepointer"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -218,7 +219,7 @@ func (b *builder) stringOperations(
 		unsafeStringData.Expression(b.factory),
 		[]tsgo.TypeNode{byteStorage},
 		b.id("value"),
-		b.integerConverter(),
+		b.integerConverter(byteType),
 	)
 	unsafeValue = b.call(
 		b.property(
@@ -361,9 +362,9 @@ func (b *builder) sliceOperations(
 		b.writeArrow(storage, writes...), nil
 }
 
-func (b *builder) integerConverter() tsgo.Expression {
+func (b *builder) integerConverter(sourceType types.Type) tsgo.Expression {
 	intrinsic := api.TargetIntrinsicNumber
-	if b.context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
+	if integervalue.TypeUsesBigInt(b.context, sourceType) {
 		intrinsic = api.TargetIntrinsicBigInt
 	}
 	return intrinsic.Expression(b.factory)

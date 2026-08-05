@@ -2,7 +2,11 @@ import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import {
+  hostInteger,
+  integerFromHost,
+} from "../host-integer.js";
 
 import { byteSlice, writeBytes } from "../runtime/slice.js";
 import type { CanonicalReader } from "./provider-io-contract.js";
@@ -24,10 +28,11 @@ class ReaderBuffer<Failure> {
 
   accept(
     source: RuntimeSlice<uint8>,
-    count: int64,
+    count: int,
     failure: Failure | undefined,
   ): void {
-    for (let index = 0; index < count; index += 1) {
+    const hostCount = hostInteger(count);
+    for (let index = 0; index < hostCount; index += 1) {
       this.#values.push(source.get(index));
     }
     this.#pendingFailure = failure;
@@ -37,14 +42,14 @@ class ReaderBuffer<Failure> {
     this.#pendingFailure = failure;
   }
 
-  read(destination: RuntimeSlice<uint8>): [int64, Failure | undefined] {
+  read(destination: RuntimeSlice<uint8>): [int, Failure | undefined] {
     if (this.#values.length === 0) {
-      return [0, this.#takeFailure()];
+      return [0n, this.#takeFailure()];
     }
     const count = Math.min(destination.length, this.#values.length);
     writeBytes(destination, this.#values.slice(0, count));
     this.#values.splice(0, count);
-    return [count, undefined];
+    return [integerFromHost(count), undefined];
   }
 
   readByte(): [uint8, Failure | undefined] {
@@ -84,7 +89,7 @@ export class CanonicalBufioReader<
     receiver: CanonicalBufioReader<Failure, Source> | undefined,
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, Failure | undefined]> {
+  ): Promise<[int, Failure | undefined]> {
     return requireReader(receiver).Read(destination, recovery);
   }
 
@@ -112,9 +117,9 @@ export class CanonicalBufioReader<
   async Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, Failure | undefined]> {
+  ): Promise<[int, Failure | undefined]> {
     if (destination.length === 0) {
-      return [0, undefined];
+      return [0n, undefined];
     }
     await this.#fill(recovery);
     return this.#state.read(destination);
@@ -153,7 +158,7 @@ export class CanonicalBufioReader<
       const source = requireSource(this.#source);
       const [count, failure] = await source.Read(target, recovery);
       this.#state.accept(target, count, failure);
-      if (count > 0 || failure !== undefined) {
+      if (count > 0n || failure !== undefined) {
         return;
       }
     }

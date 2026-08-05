@@ -1,4 +1,4 @@
-import type { int64 } from "@gotots/runtime/scalars.js";
+import type { int } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   beginCpuProfile,
@@ -40,7 +40,7 @@ export function PprofStartCPUProfileCanonical(
 export async function PprofProfileWriteToCanonical(
   receiver: ProfileIdentity | undefined,
   writer: CanonicalWriter<CanonicalError> | undefined,
-  debug: int64,
+  debug: int,
   errorContract: InterfaceContract,
 ): Promise<CanonicalError | undefined> {
   void debug;
@@ -56,7 +56,7 @@ export async function PprofProfileWriteToCanonical(
 }
 
 function writeResult(
-  count: int64,
+  count: int,
   content: Uint8Array,
   failure: CanonicalError | undefined,
   errorContract: InterfaceContract,
@@ -64,7 +64,7 @@ function writeResult(
   if (failure !== undefined) {
     return failure;
   }
-  return count === content.length
+  return count === BigInt(content.length)
     ? undefined
     : new CanonicalBoundaryError("pprof: short write", errorContract);
 }

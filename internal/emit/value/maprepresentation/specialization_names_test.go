@@ -197,6 +197,21 @@ func (staticSpecializationNames) ProviderInterfaceBridge(
 	return api.NameReference{}, false, nil
 }
 
+func (staticSpecializationNames) ProviderProfileInterfaceBridge(
+	types.Type,
+	[]gostdlib.ProviderCallableProfileInterface,
+) (api.ProviderProfileBridgeReference, bool, error) {
+	return api.ProviderProfileBridgeReference{}, false, nil
+}
+
+func (staticSpecializationNames) ProviderInterfaceCapability(
+	types.Type,
+	types.Type,
+	string,
+) (api.ProviderInterfaceCapabilityReference, bool, error) {
+	return api.ProviderInterfaceCapabilityReference{}, false, nil
+}
+
 func (staticSpecializationNames) ProviderCallableProfile(
 	*types.Func,
 	string,
@@ -260,6 +275,12 @@ func (staticSpecializationNames) Primitive(
 	panic("unused")
 }
 
+func (staticSpecializationNames) ProviderPrimitive(
+	api.PrimitiveAlias,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) Runtime(
 	symbol api.RuntimeSymbol,
 	_ api.ImportPhase,
@@ -272,6 +293,13 @@ func (staticSpecializationNames) Runtime(
 	default:
 		panic("unexpected runtime symbol")
 	}
+}
+
+func (staticSpecializationNames) ExternalProviderFunction(
+	string,
+	string,
+) (api.NameReference, error) {
+	panic("unused")
 }
 
 func (staticSpecializationNames) Temporary(api.TemporaryKind) (string, error) {

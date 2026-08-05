@@ -1,5 +1,5 @@
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { uint8 } from "@gotots/runtime/scalars.js";
+import type { uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ParseError } from "./parse-error.js";
 

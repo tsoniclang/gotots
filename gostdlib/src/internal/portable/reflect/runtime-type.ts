@@ -10,7 +10,9 @@ import type {
   gostring,
   int64,
   uint64,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 import { Seq } from "../../../iter.js";
 import {
@@ -111,26 +113,26 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   }
 
   Bits(): int64 {
-    const bits = this.metadata.bits ?? 0;
-    if (bits === 0) {
+    const bits = this.metadata.bits ?? 0n;
+    if (bits === 0n) {
       return invalidTypeOperation(this.metadata.text, "Bits");
     }
     return bits;
   }
 
   CanSeq(): bool {
-    return [17, 18, 21, 22, 23, 24].includes(this.metadata.kind);
+    return [17n, 18n, 21n, 22n, 23n, 24n].includes(this.metadata.kind);
   }
 
   CanSeq2(): bool {
-    return [17, 21, 23, 24].includes(this.metadata.kind);
+    return [17n, 21n, 23n, 24n].includes(this.metadata.kind);
   }
 
   ChanDir(): ChanDir {
-    if (this.metadata.kind !== 18) {
+    if (this.metadata.kind !== 18n) {
       return invalidTypeOperation(this.metadata.text, "ChanDir");
     }
-    return new ChanDir(this.metadata.chanDir ?? 0);
+    return new ChanDir(this.metadata.chanDir ?? 0n);
   }
 
   Comparable(): bool { return this.metadata.comparable ?? true; }
@@ -145,11 +147,12 @@ export class RuntimeType extends GoInterfaceValue implements Type {
 
   Field(index: int64): StructField {
     const fields = this.structFields();
-    const selected = fields[Number(index)];
+    const ordinal = hostInteger(index);
+    const selected = fields[ordinal];
     if (selected === undefined) {
       return invalidTypeOperation(this.metadata.text, "Field");
     }
-    return materializeField(selected, Number(index));
+    return materializeField(selected, ordinal);
   }
 
   FieldAlign(): int64 { return this.metadata.align; }
@@ -220,17 +223,17 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     return this.metadata.key?.() ?? invalidTypeOperation(this.metadata.text, "Key");
   }
 
-  Kind(): Kind { return this.metadata.kind === 0 ? Invalid : new Kind(this.metadata.kind); }
+  Kind(): Kind { return this.metadata.kind === 0n ? Invalid : new Kind(this.metadata.kind); }
 
   Len(): int64 {
-    if (this.metadata.kind !== 17) {
+    if (this.metadata.kind !== 17n) {
       return invalidTypeOperation(this.metadata.text, "Len");
     }
-    return this.metadata.length ?? 0;
+    return this.metadata.length ?? 0n;
   }
 
   Method(index: int64): Method {
-    const method = this.runtimeMethods()[Number(index)];
+    const method = this.runtimeMethods()[hostInteger(index)];
     if (method === undefined) {
       return invalidTypeOperation(this.metadata.text, "Method");
     }
@@ -259,33 +262,31 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   }
 
   Name(): gostring { return this.metadata.name ?? ""; }
-  NumField(): int64 { return this.structFields().length; }
-  NumIn(): int64 { return this.inputs().length; }
-  NumMethod(): int64 { return this.runtimeMethods().length; }
-  NumOut(): int64 { return this.outputs().length; }
+  NumField(): int64 { return integerFromHost(this.structFields().length); }
+  NumIn(): int64 { return integerFromHost(this.inputs().length); }
+  NumMethod(): int64 { return integerFromHost(this.runtimeMethods().length); }
+  NumOut(): int64 { return integerFromHost(this.outputs().length); }
   Out(index: int64): Type | undefined { return sequenceAt(this.outputs(), index, "Out"); }
   Outs(): Seq<Type | undefined> { return typeSequence(this.outputs()); }
 
   OverflowComplex(value: GoComplex128): bool {
-    const limit = this.metadata.kind === 15 ? 3.4028234663852886e38 : Number.MAX_VALUE;
+    const limit = this.metadata.kind === 15n ? 3.4028234663852886e38 : Number.MAX_VALUE;
     return Math.abs(value.real) > limit || Math.abs(value.imag) > limit;
   }
 
   OverflowFloat(value: float64): bool {
-    return this.metadata.kind === 13 && Math.abs(value) > 3.4028234663852886e38;
+    return this.metadata.kind === 13n && Math.abs(value) > 3.4028234663852886e38;
   }
 
   OverflowInt(value: int64): bool {
-    const bits = Number(this.Bits());
-    const numeric = BigInt(value);
-    return numeric < -(1n << BigInt(bits - 1)) ||
-      numeric >= (1n << BigInt(bits - 1));
+    const bits = hostInteger(this.Bits());
+    return value < -(1n << BigInt(bits - 1)) ||
+      value >= (1n << BigInt(bits - 1));
   }
 
   OverflowUint(value: uint64): bool {
-    const bits = Number(this.Bits());
-    const numeric = BigInt(value);
-    return numeric < 0n || numeric >= (1n << BigInt(bits));
+    const bits = hostInteger(this.Bits());
+    return value < 0n || value >= (1n << BigInt(bits));
   }
 
   PkgPath(): gostring { return this.metadata.pkgPath ?? ""; }
@@ -298,7 +299,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     return this.metadata.methods?.() ?? [];
   }
   private structFields(): readonly RuntimeStructFieldMetadata[] {
-    if (this.metadata.kind !== 25) {
+    if (this.metadata.kind !== 25n) {
       return invalidTypeOperation(this.metadata.text, "Field");
     }
     return this.metadata.fields ?? [];
@@ -338,8 +339,8 @@ function materializeField(
     PkgPath: field.pkgPath ?? "",
     Type: field.type(),
     Tag: new StructTag(field.tag ?? ""),
-    Offset: field.offset ?? 0,
-    Index: RuntimeSlice.literal([...(field.index ?? [ordinal])]),
+    Offset: field.offset ?? 0n,
+    Index: RuntimeSlice.literal([...(field.index ?? [integerFromHost(ordinal)])]),
     Anonymous: field.anonymous ?? false,
   });
 }
@@ -366,14 +367,14 @@ function zeroStructField(): StructField {
     PkgPath: "",
     Type: undefined,
     Tag: new StructTag(""),
-    Offset: 0,
+    Offset: 0n,
     Index: RuntimeSlice.nil<int64>(),
     Anonymous: false,
   });
 }
 
 function zeroMethod(): Method {
-  return new Method({ Name: "", PkgPath: "", Type: undefined, Func: invalidRuntimeValue, Index: 0 });
+  return new Method({ Name: "", PkgPath: "", Type: undefined, Func: invalidRuntimeValue, Index: 0n });
 }
 
 function sequenceAt(
@@ -381,7 +382,7 @@ function sequenceAt(
   index: int64,
   operation: string,
 ): Type {
-  const selected = values[Number(index)];
+  const selected = values[hostInteger(index)];
   return selected ?? invalidTypeOperation("func", operation);
 }
 

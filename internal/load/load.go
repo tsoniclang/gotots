@@ -49,6 +49,7 @@ type Package struct {
 	typesPackage  *types.Package
 	typesInfo     *types.Info
 	typesSizes    types.Sizes
+	embeds        map[*types.Var]EmbedValue
 	program       *Program
 }
 
@@ -133,7 +134,9 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 			packages.NeedSyntax |
 			packages.NeedTypesInfo |
 			packages.NeedTypesSizes |
-			packages.NeedModule,
+			packages.NeedModule |
+			packages.NeedEmbedFiles |
+			packages.NeedEmbedPatterns,
 	}, request.Pattern)
 	if err != nil {
 		return nil, &Error{Pattern: request.Pattern, Reason: err.Error()}
@@ -339,6 +342,13 @@ func wrapPackage(
 		modulePath = selected.Module.Path
 		moduleVersion = selected.Module.Version
 	}
+	embeds, err := resolvePackageEmbeds(selected)
+	if err != nil {
+		return nil, &Error{
+			Pattern: pattern,
+			Reason:  selected.PkgPath + ": " + err.Error(),
+		}
+	}
 	return &Package{
 		path:          selected.PkgPath,
 		name:          selected.Name,
@@ -350,6 +360,7 @@ func wrapPackage(
 		typesPackage:  selected.Types,
 		typesInfo:     selected.TypesInfo,
 		typesSizes:    selected.TypesSizes,
+		embeds:        embeds,
 	}, nil
 }
 

@@ -1,4 +1,4 @@
-import type { int8 } from "@gotots/runtime/scalars.js";
+import type { int8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { Accuracy, Float, Int } from "../../math/big.js";
 

@@ -1,4 +1,4 @@
-import type { int32, uint8 } from "@gotots/runtime/scalars.js";
+import type { int32, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { Kind, NameOff, TFlag, TypeOff } from "../../internal/abi.js";
 

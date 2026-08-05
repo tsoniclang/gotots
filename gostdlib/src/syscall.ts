@@ -10,7 +10,8 @@ import type {
   int64,
   uint32,
   uint64,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
+import { hostInteger } from "./internal/host-integer.js";
 import { errnoMessage } from "./internal/node/syscall/errno.js";
 import { signalName } from "./internal/node/syscall/signal.js";
 import {
@@ -37,7 +38,7 @@ class SignalInterfaceValue extends GoInterfaceValue {
   }
 
   $go$hash(): number {
-    return this.value;
+    return Number(BigInt.asUintN(32, this.value));
   }
 
   $go$format(
@@ -48,7 +49,7 @@ class SignalInterfaceValue extends GoInterfaceValue {
     if (verb === "T") {
       return "syscall.Signal";
     }
-    const name = signalName(this.value);
+    const name = signalName(hostInteger(this.value));
     return verb === "q" ? JSON.stringify(name) : name;
   }
 }
@@ -57,7 +58,7 @@ export class Errno {
   constructor(public readonly value: uint64) {}
 
   Error(): gostring {
-    return errnoMessage(this.value);
+    return errnoMessage(hostInteger(this.value));
   }
 
   Is(target: GoError | undefined): bool {
@@ -65,12 +66,12 @@ export class Errno {
   }
 
   Temporary(): bool {
-    return this.value === 4 || this.value === 24 || this.value === 23
+    return this.value === 4n || this.value === 24n || this.value === 23n
       || this.Timeout();
   }
 
   Timeout(): bool {
-    return this.value === 11 || this.value === 110;
+    return this.value === 11n || this.value === 110n;
   }
 }
 
@@ -82,18 +83,18 @@ export class Signal extends SignalInterfaceValue {
   Signal(): void {}
 
   String(): gostring {
-    return signalName(this.value);
+    return signalName(hostInteger(this.value));
   }
 }
 
-export const EAGAIN = new Errno(11);
-export const EINTR = new Errno(4);
-export const EINVAL = new Errno(22);
-export const ENOENT = new Errno(2);
-export const ENOTDIR = new Errno(20);
-export const EPERM = new Errno(1);
-export const SIGINT = new Signal(2);
-export const SIGTERM = new Signal(15);
+export const EAGAIN = new Errno(11n);
+export const EINTR = new Errno(4n);
+export const EINVAL = new Errno(22n);
+export const ENOENT = new Errno(2n);
+export const ENOTDIR = new Errno(20n);
+export const EPERM = new Errno(1n);
+export const SIGINT = new Signal(2n);
+export const SIGTERM = new Signal(15n);
 
 export class Credential {
   constructor(
@@ -106,9 +107,9 @@ export class Credential {
 
 export class SysProcIDMap {
   constructor(
-    public ContainerID: int64 = 0,
-    public HostID: int64 = 0,
-    public Size: int64 = 0,
+    public ContainerID: int64 = 0n,
+    public HostID: int64 = 0n,
+    public Size: int64 = 0n,
   ) {}
 }
 
@@ -121,18 +122,18 @@ export class SysProcAttr {
     public Setpgid: bool = false,
     public Setctty: bool = false,
     public Noctty: bool = false,
-    public Ctty: int64 = 0,
+    public Ctty: int64 = 0n,
     public Foreground: bool = false,
-    public Pgid: int64 = 0,
-    public Pdeathsig: Signal = new Signal(0),
-    public Cloneflags: uint64 = 0,
-    public Unshareflags: uint64 = 0,
+    public Pgid: int64 = 0n,
+    public Pdeathsig: Signal = new Signal(0n),
+    public Cloneflags: uint64 = 0n,
+    public Unshareflags: uint64 = 0n,
     public UidMappings: RuntimeSlice<SysProcIDMap> = RuntimeSlice.nil<SysProcIDMap>(),
     public GidMappings: RuntimeSlice<SysProcIDMap> = RuntimeSlice.nil<SysProcIDMap>(),
     public GidMappingsEnableSetgroups: bool = false,
     public AmbientCaps: RuntimeSlice<uint64> = RuntimeSlice.nil<uint64>(),
     public UseCgroupFD: bool = false,
-    public CgroupFD: int64 = 0,
+    public CgroupFD: int64 = 0n,
     public PidFD: GoPointer<int64, int64> | undefined = undefined,
   ) {}
 }

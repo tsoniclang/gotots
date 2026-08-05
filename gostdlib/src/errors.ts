@@ -1,13 +1,15 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { bool, gostring } from "@gotots/runtime/scalars.js";
+import type { bool, gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
-  MessageWrappedErrors,
-  WrappedProviderError,
-} from "./internal/portable/errors/tree.js";
+  AsProviderErrorIsDirect,
+  AsProviderErrorUnwrapDirect,
+  AsProviderErrorUnwrapManyDirect,
+} from "./internal/facets/provider-error.js";
 import { unsupported } from "./internal/portable/errors/sentinel.js";
 import { ProviderError } from "./internal/runtime/error.js";
+import { sliceValues } from "./internal/runtime/slice.js";
 
 export const state: {
   ErrUnsupported: GoError;
@@ -20,9 +22,10 @@ export function New(text: gostring): GoError {
 }
 
 export function Unwrap(failure: GoError | undefined): GoError | undefined {
-  return failure instanceof WrappedProviderError
-    ? failure.Unwrap()
-    : undefined;
+  if (failure === undefined) {
+    return undefined;
+  }
+  return AsProviderErrorUnwrapDirect(failure)?.Unwrap();
 }
 
 export function Is(failure: GoError | undefined, target: GoError | undefined): bool {
@@ -32,11 +35,17 @@ export function Is(failure: GoError | undefined, target: GoError | undefined): b
   if (target.$go$type.comparable && failure.$go$equal(target)) {
     return true;
   }
-  if (failure instanceof WrappedProviderError) {
-    return Is(failure.Unwrap(), target);
+  const custom = AsProviderErrorIsDirect(failure);
+  if (custom !== undefined && custom.Is(target)) {
+    return true;
   }
-  if (failure instanceof MessageWrappedErrors) {
-    return failure.UnwrapAll().some((cause) => Is(cause, target));
+  const direct = AsProviderErrorUnwrapDirect(failure);
+  if (direct !== undefined) {
+    return Is(direct.Unwrap(), target);
+  }
+  const many = AsProviderErrorUnwrapManyDirect(failure);
+  if (many !== undefined) {
+    return sliceValues(many.Unwrap()).some((cause) => Is(cause, target));
   }
   return false;
 }

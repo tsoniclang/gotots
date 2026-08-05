@@ -33,7 +33,7 @@ type Package struct {
 	files       []PackageFile
 	manifest    []byte
 	fingerprint string
-	integer     api.IntegerRepresentation
+	scalar      api.ScalarABI
 	concurrency api.ConcurrencySemantics
 	valid       bool
 }
@@ -64,7 +64,11 @@ func (p Package) ManifestPath() string {
 }
 
 func (p Package) Profile() api.IntegerRepresentation {
-	return p.integer
+	return p.scalar.IntegerRepresentation()
+}
+
+func (p Package) NativeIntegerWidth() api.NativeIntegerWidth {
+	return p.scalar.NativeIntegerWidth()
 }
 
 func (p Package) Concurrency() api.ConcurrencySemantics {
@@ -85,14 +89,14 @@ func (p Package) Fingerprint() string {
 
 func AssemblePackage(
 	factory tsgo.Factory,
-	integer api.IntegerRepresentation,
+	scalar api.ScalarABI,
 	concurrency api.ConcurrencySemantics,
 	requested map[api.RuntimeSymbol]struct{},
 	aliases []api.PrimitiveAlias,
 ) (Package, error) {
-	if !integer.Valid() {
+	if !scalar.Valid() {
 		return Package{}, &AssemblyError{
-			Reason: "runtime package integer profile is invalid",
+			Reason: "runtime package scalar ABI is invalid",
 		}
 	}
 	if !concurrency.Valid() {
@@ -103,7 +107,7 @@ func AssemblePackage(
 	aliases = slices.Clone(aliases)
 	slices.Sort(aliases)
 	for index, alias := range aliases {
-		if _, _, err := api.PrimitiveAliasRepresentation(alias, integer); err != nil {
+		if _, _, err := api.PrimitiveAliasRepresentation(alias, scalar); err != nil {
 			return Package{}, err
 		}
 		if index != 0 && alias == aliases[index-1] {
@@ -169,7 +173,7 @@ func AssemblePackage(
 		delete(byModule, api.RuntimeModuleScalar)
 	}
 	for _, alias := range aliases {
-		name, keyword, err := api.PrimitiveAliasRepresentation(alias, integer)
+		name, keyword, err := api.PrimitiveAliasRepresentation(alias, scalar)
 		if err != nil {
 			return Package{}, err
 		}
@@ -227,7 +231,7 @@ func AssemblePackage(
 	sort.Slice(files, func(left, right int) bool {
 		return files[left].outputPath < files[right].outputPath
 	})
-	manifest, fingerprint, err := packageManifest(integer, concurrency, files)
+	manifest, fingerprint, err := packageManifest(scalar, concurrency, files)
 	if err != nil {
 		return Package{}, err
 	}
@@ -235,7 +239,7 @@ func AssemblePackage(
 		files:       files,
 		manifest:    manifest,
 		fingerprint: fingerprint,
-		integer:     integer,
+		scalar:      scalar,
 		concurrency: concurrency,
 		valid:       true,
 	}, nil
@@ -437,6 +441,7 @@ type packageExport struct {
 
 type packageMetadata struct {
 	IntegerRepresentation string `json:"integerRepresentation"`
+	NativeIntegerBits     uint8  `json:"nativeIntegerBits"`
 	ConcurrencySemantics  string `json:"concurrencySemantics"`
 }
 
@@ -450,7 +455,7 @@ type packageDocument struct {
 }
 
 func packageManifest(
-	integer api.IntegerRepresentation,
+	scalar api.ScalarABI,
 	concurrency api.ConcurrencySemantics,
 	files []PackageFile,
 ) ([]byte, string, error) {
@@ -489,7 +494,8 @@ func packageManifest(
 		Private: true,
 		Type:    "module",
 		GoToTS: packageMetadata{
-			IntegerRepresentation: integer.String(),
+			IntegerRepresentation: scalar.IntegerRepresentation().String(),
+			NativeIntegerBits:     uint8(scalar.NativeIntegerWidth()),
 			ConcurrencySemantics:  concurrency.String(),
 		},
 		Exports: exports,

@@ -4,7 +4,7 @@ import type {
   float64,
   uint32,
   uint64,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
 
 export interface MemStatsBySize {
   Size: uint32;
@@ -23,32 +23,32 @@ export interface MemorySnapshot {
 }
 
 export class MemStats {
-  Alloc: uint64 = 0;
-  TotalAlloc: uint64 = 0;
-  Sys: uint64 = 0;
-  Lookups: uint64 = 0;
-  Mallocs: uint64 = 0;
-  Frees: uint64 = 0;
-  HeapAlloc: uint64 = 0;
-  HeapSys: uint64 = 0;
-  HeapIdle: uint64 = 0;
-  HeapInuse: uint64 = 0;
-  HeapReleased: uint64 = 0;
-  HeapObjects: uint64 = 0;
-  StackInuse: uint64 = 0;
-  StackSys: uint64 = 0;
-  MSpanInuse: uint64 = 0;
-  MSpanSys: uint64 = 0;
-  MCacheInuse: uint64 = 0;
-  MCacheSys: uint64 = 0;
-  BuckHashSys: uint64 = 0;
-  GCSys: uint64 = 0;
-  OtherSys: uint64 = 0;
-  NextGC: uint64 = 0;
-  LastGC: uint64 = 0;
-  PauseTotalNs: uint64 = 0;
-  PauseNs = GoArray.zero<uint64, 256>(256, 0);
-  PauseEnd = GoArray.zero<uint64, 256>(256, 0);
+  Alloc: uint64 = 0n;
+  TotalAlloc: uint64 = 0n;
+  Sys: uint64 = 0n;
+  Lookups: uint64 = 0n;
+  Mallocs: uint64 = 0n;
+  Frees: uint64 = 0n;
+  HeapAlloc: uint64 = 0n;
+  HeapSys: uint64 = 0n;
+  HeapIdle: uint64 = 0n;
+  HeapInuse: uint64 = 0n;
+  HeapReleased: uint64 = 0n;
+  HeapObjects: uint64 = 0n;
+  StackInuse: uint64 = 0n;
+  StackSys: uint64 = 0n;
+  MSpanInuse: uint64 = 0n;
+  MSpanSys: uint64 = 0n;
+  MCacheInuse: uint64 = 0n;
+  MCacheSys: uint64 = 0n;
+  BuckHashSys: uint64 = 0n;
+  GCSys: uint64 = 0n;
+  OtherSys: uint64 = 0n;
+  NextGC: uint64 = 0n;
+  LastGC: uint64 = 0n;
+  PauseTotalNs: uint64 = 0n;
+  PauseNs = GoArray.zero<uint64, 256>(256, 0n);
+  PauseEnd = GoArray.zero<uint64, 256>(256, 0n);
   NumGC: uint32 = 0;
   NumForcedGC: uint32 = 0;
   GCCPUFraction: float64 = 0;
@@ -63,7 +63,9 @@ export function populateMemStats(target: MemStats, source: MemorySnapshot): void
   target.Sys = source.rss + source.external + source.arrayBuffers;
   target.HeapAlloc = source.heapUsed;
   target.HeapSys = source.heapTotal;
-  target.HeapIdle = Math.max(0, source.heapTotal - source.heapUsed);
+  target.HeapIdle = source.heapTotal > source.heapUsed
+    ? source.heapTotal - source.heapUsed
+    : 0n;
   target.HeapInuse = source.heapUsed;
   target.MSpanInuse = source.malloced;
   target.MSpanSys = source.malloced;
@@ -77,11 +79,11 @@ function zeroBySize(): GoArray<MemStatsBySize, 61> {
   const values: MemStatsBySize[] = [];
   for (let index = 0; index < 61; index += 1) {
     indexes.push(index);
-    values.push({ Size: 0, Mallocs: 0, Frees: 0 });
+    values.push({ Size: 0, Mallocs: 0n, Frees: 0n });
   }
   return GoArray.literal<MemStatsBySize, 61>(
     61,
-    { Size: 0, Mallocs: 0, Frees: 0 },
+    { Size: 0, Mallocs: 0n, Frees: 0n },
     indexes,
     values,
   );

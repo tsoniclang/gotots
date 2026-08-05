@@ -33,19 +33,20 @@ type ProjectInspection struct {
 }
 
 type ProjectExport struct {
-	name           string
-	flags          uint32
-	typeString     string
-	typeID         uint32
-	declaredTypeID uint32
-	typeSymbolID   uint64
-	typeParameters int
-	exportHandles  []string
-	handles        []string
-	declarations   []string
-	ownerKeys      []string
-	valueMembers   []ProjectMember
-	typeMembers    []ProjectMember
+	name               string
+	flags              uint32
+	typeString         string
+	declaredTypeString string
+	typeID             uint32
+	declaredTypeID     uint32
+	typeSymbolID       uint64
+	typeParameters     int
+	exportHandles      []string
+	handles            []string
+	declarations       []string
+	ownerKeys          []string
+	valueMembers       []ProjectMember
+	typeMembers        []ProjectMember
 }
 
 func (e ProjectExport) Name() string {
@@ -58,6 +59,10 @@ func (e ProjectExport) Flags() uint32 {
 
 func (e ProjectExport) TypeString() string {
 	return e.typeString
+}
+
+func (e ProjectExport) DeclaredTypeString() string {
+	return e.declaredTypeString
 }
 
 func (e ProjectExport) TypeParameterCount() int {
@@ -268,6 +273,21 @@ func (p *ProjectInspection) projectExport(
 	); err != nil {
 		return ProjectExport{}, err
 	}
+	var declaredTypeString string
+	if declaredType != nil && declaredType.ID != 0 {
+		if err := requestProjectJSON(
+			p.client,
+			"typeToString",
+			typeToStringParams{
+				Snapshot: p.snapshot,
+				Project:  p.project,
+				Type:     declaredType.ID,
+			},
+			&declaredTypeString,
+		); err != nil {
+			return ProjectExport{}, err
+		}
+	}
 	declaredDeclarations, found, err :=
 		p.projectTypeDeclarations(declaredType)
 	if err != nil {
@@ -340,19 +360,20 @@ func (p *ProjectInspection) projectExport(
 		}
 	}
 	return ProjectExport{
-		name:           symbol.Name,
-		flags:          symbol.Flags,
-		typeString:     typeString,
-		typeID:         targetType.ID,
-		declaredTypeID: typeResponseID(declaredType),
-		typeSymbolID:   preferredTypeSymbol(declaredType, targetType),
-		typeParameters: typeParameters,
-		exportHandles:  sortedStrings(symbol.Declarations),
-		handles:        sortedStrings(declarationHandles),
-		declarations:   declarations,
-		ownerKeys:      ownerKeys,
-		valueMembers:   valueMembers,
-		typeMembers:    typeMembers,
+		name:               symbol.Name,
+		flags:              symbol.Flags,
+		typeString:         typeString,
+		declaredTypeString: declaredTypeString,
+		typeID:             targetType.ID,
+		declaredTypeID:     typeResponseID(declaredType),
+		typeSymbolID:       preferredTypeSymbol(declaredType, targetType),
+		typeParameters:     typeParameters,
+		exportHandles:      sortedStrings(symbol.Declarations),
+		handles:            sortedStrings(declarationHandles),
+		declarations:       declarations,
+		ownerKeys:          ownerKeys,
+		valueMembers:       valueMembers,
+		typeMembers:        typeMembers,
 	}, nil
 }
 

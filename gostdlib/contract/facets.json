@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 16,
+  "schemaVersion": 20,
   "representations": [
     {
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
@@ -29,6 +29,74 @@
       "export": "ProviderErrorInterface"
     }
   ],
+  "providerInterfaceCapabilities": [
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "ProviderErrorInterface",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsDirect",
+      "targetExport": "ProviderErrorIsDirect",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorIsDirect"
+    },
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "ProviderErrorInterface",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsDirect",
+      "targetExport": "ProviderErrorUnwrapDirect",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorUnwrapDirect"
+    },
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "ProviderErrorInterface",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsDirect",
+      "targetExport": "ProviderErrorUnwrapManyDirect",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorUnwrapManyDirect"
+    },
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "CanonicalError",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsCanonical",
+      "targetExport": "ProviderErrorIs",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorIs"
+    },
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "CanonicalError",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsCanonical",
+      "targetExport": "ProviderErrorUnwrap",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorUnwrap"
+    },
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "CanonicalError",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsCanonical",
+      "targetExport": "ProviderErrorUnwrapMany",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorUnwrapMany"
+    }
+  ],
   "providerProtocols": [
     {
       "name": "error-is",
@@ -38,6 +106,22 @@
             "name": "Is",
             "parameters": [
               { "kind": "callable-parameter", "callableParameter": 1 }
+            ],
+            "results": [
+              { "kind": "bool" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "error-is-source",
+      "protocol": {
+        "methods": [
+          {
+            "name": "Is",
+            "parameters": [
+              { "kind": "callable-parameter", "callableParameter": 0 }
             ],
             "results": [
               { "kind": "bool" }
@@ -154,6 +238,12 @@
       "canonicalResults": [
         0
       ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        }
+      ],
       "protocols": [
         {
           "protocol": "error-unwrap",
@@ -200,7 +290,10 @@
         0
       ],
       "canonicalValues": [
-        "context|kind=3|receiver=|name=Canceled"
+        {
+          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
+          "targetParameter": "canceled"
+        }
       ],
       "canonicalTypeArguments": [
         "go:universe|error",
@@ -233,7 +326,10 @@
         1
       ],
       "canonicalValues": [
-        "context|kind=3|receiver=|name=Canceled"
+        {
+          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
+          "targetParameter": "canceled"
+        }
       ],
       "canonicalTypeArguments": [
         "go:universe|error",
@@ -265,8 +361,14 @@
         0
       ],
       "canonicalValues": [
-        "context|kind=3|receiver=|name=Canceled",
-        "context|kind=3|receiver=|name=DeadlineExceeded"
+        {
+          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
+          "targetParameter": "canceled"
+        },
+        {
+          "sourceIdentity": "context|kind=3|receiver=|name=DeadlineExceeded",
+          "targetParameter": "deadlineExceeded"
+        }
       ],
       "canonicalTypeArguments": [
         "go:universe|error",
@@ -505,7 +607,10 @@
         0
       ],
       "canonicalValues": [
-        "io|kind=3|receiver=|name=ErrNoProgress"
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
+          "targetParameter": "noProgress"
+        }
       ],
       "canonicalTypeArguments": [
         "go:universe|error",
@@ -534,10 +639,22 @@
         0
       ],
       "canonicalValues": [
-        "bufio|kind=3|receiver=|name=ErrBadReadCount",
-        "bufio|kind=3|receiver=|name=ErrTooLong",
-        "io|kind=3|receiver=|name=EOF",
-        "io|kind=3|receiver=|name=ErrNoProgress"
+        {
+          "sourceIdentity": "bufio|kind=3|receiver=|name=ErrBadReadCount",
+          "targetParameter": "badReadCount"
+        },
+        {
+          "sourceIdentity": "bufio|kind=3|receiver=|name=ErrTooLong",
+          "targetParameter": "tooLong"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
+          "targetParameter": "noProgress"
+        }
       ],
       "canonicalTypeArguments": [
         "go:universe|error",
@@ -566,7 +683,10 @@
         0
       ],
       "canonicalValues": [
-        "io|kind=3|receiver=|name=ErrShortWrite"
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrShortWrite",
+          "targetParameter": "shortWrite"
+        }
       ],
       "canonicalTypeArguments": [
         "go:universe|error",
@@ -596,9 +716,18 @@
         1
       ],
       "canonicalValues": [
-        "io|kind=3|receiver=|name=EOF",
-        "io|kind=3|receiver=|name=ErrNoProgress",
-        "io|kind=3|receiver=|name=ErrUnexpectedEOF"
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrUnexpectedEOF",
+          "targetParameter": "unexpectedEOF"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
+          "targetParameter": "noProgress"
+        }
       ],
       "canonicalTypeArguments": [
         "compress/flate|kind=2|receiver=|name=Reader",
@@ -637,9 +766,17 @@
         0
       ],
       "canonicalValues": [
-        "io/fs|kind=3|receiver=|name=ErrNotExist"
+        {
+          "sourceIdentity": "io/fs|kind=3|receiver=|name=ErrNotExist",
+          "targetParameter": "target"
+        }
       ],
       "protocols": [
+        {
+          "protocol": "error-is-source",
+          "export": "ProviderOsErrorIsDirect",
+          "valueParameter": 0
+        },
         {
           "protocol": "error-unwrap",
           "export": "ProviderErrorUnwrapDirect",
@@ -662,7 +799,10 @@
         0
       ],
       "canonicalValues": [
-        "io/fs|kind=3|receiver=|name=ErrNotExist"
+        {
+          "sourceIdentity": "io/fs|kind=3|receiver=|name=ErrNotExist",
+          "targetParameter": "target"
+        }
       ],
       "interfaces": [
         {
@@ -671,6 +811,11 @@
         }
       ],
       "protocols": [
+        {
+          "protocol": "error-is-source",
+          "export": "ProviderOsErrorIs",
+          "valueParameter": 0
+        },
         {
           "protocol": "error-unwrap",
           "export": "ProviderErrorUnwrap",
@@ -725,8 +870,14 @@
         1
       ],
       "canonicalValues": [
-        "io|kind=3|receiver=|name=EOF",
-        "io|kind=3|receiver=|name=ErrUnexpectedEOF"
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrUnexpectedEOF",
+          "targetParameter": "unexpectedEOF"
+        }
       ],
       "canonicalTypeArguments": [
         "go:universe|error",
@@ -785,9 +936,17 @@
         0,
         1
       ],
-      "guardInterfaces": [
-        "io/fs|kind=2|receiver=|name=ReadDirFS",
-        "io/fs|kind=2|receiver=|name=ReadDirFile"
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "targetParameter": "asReadDirFS"
+        },
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "targetParameter": "asReadDirFile"
+        }
       ],
       "fromProviderInterfaces": [
         "go:universe|error"
@@ -835,10 +994,17 @@
         1
       ],
       "canonicalValues": [
-        "io|kind=3|receiver=|name=EOF"
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        }
       ],
-      "guardInterfaces": [
-        "io/fs|kind=2|receiver=|name=ReadFileFS"
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
+          "targetParameter": "asReadFileFS"
+        }
       ],
       "interfaces": [
         {
@@ -875,8 +1041,12 @@
         0,
         1
       ],
-      "guardInterfaces": [
-        "io/fs|kind=2|receiver=|name=StatFS"
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "targetParameter": "asStatFS"
+        }
       ],
       "interfaces": [
         {
@@ -914,13 +1084,31 @@
         0
       ],
       "canonicalValues": [
-        "io/fs|kind=3|receiver=|name=SkipAll",
-        "io/fs|kind=3|receiver=|name=SkipDir"
+        {
+          "sourceIdentity": "io/fs|kind=3|receiver=|name=SkipAll",
+          "targetParameter": "skipAll"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=3|receiver=|name=SkipDir",
+          "targetParameter": "skipDir"
+        }
       ],
-      "guardInterfaces": [
-        "io/fs|kind=2|receiver=|name=ReadDirFS",
-        "io/fs|kind=2|receiver=|name=ReadDirFile",
-        "io/fs|kind=2|receiver=|name=StatFS"
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "targetParameter": "asReadDirFS"
+        },
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "targetParameter": "asReadDirFile"
+        },
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "targetParameter": "asStatFS"
+        }
       ],
       "contractInterfaces": [
         "io/fs|kind=2|receiver=|name=DirEntry"
@@ -976,7 +1164,10 @@
         0
       ],
       "canonicalValues": [
-        "context|kind=3|receiver=|name=Canceled"
+        {
+          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
+          "targetParameter": "canceled"
+        }
       ],
       "canonicalTypeArguments": [
         "go:universe|error",

@@ -3,10 +3,13 @@ import type {
   bool,
   float64,
   gostring,
+  int,
   int64,
   int8,
-  uint64,
-} from "@gotots/runtime/scalars.js";
+  uint,
+} from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger } from "../../host-integer.js";
 
 const accuracyBelow: int8 = -1;
 const accuracyExact: int8 = 0;
@@ -72,7 +75,7 @@ export class Int {
   static SetString(
     receiver: Int | undefined,
     text: gostring,
-    base: int64,
+    base: int,
   ): [Int | undefined, bool] {
     const target = requireInt(receiver);
     const parsed = parseInteger(text, base);
@@ -116,10 +119,10 @@ export class Float {
     return target;
   }
 
-  static SetPrec(receiver: Float | undefined, precision: uint64): Float | undefined {
+  static SetPrec(receiver: Float | undefined, precision: uint): Float | undefined {
     const target = requireFloat(receiver);
     const state = floatState(target);
-    const selected = Math.max(0, Math.min(Math.trunc(precision), 4_294_967_295));
+    const selected = Math.max(0, Math.min(hostInteger(precision), 4_294_967_295));
     state.precision = selected;
     if (selected === 0) {
       state.accuracy = state.value < 0n
@@ -136,7 +139,7 @@ export class Float {
 }
 
 export function NewInt(value: int64): Int | undefined {
-  return new Int(BigInt(Math.trunc(value)));
+  return new Int(value);
 }
 
 function requireInt(value: Int | undefined): Int {
@@ -244,8 +247,8 @@ function modularInverse(value: bigint, modulus: bigint): bigint | undefined {
   return ((oldCoefficient % modulus) + modulus) % modulus;
 }
 
-function parseInteger(text: gostring, requestedBase: int64): bigint | undefined {
-  if (requestedBase !== 0 && (requestedBase < 2 || requestedBase > 62)) {
+function parseInteger(text: gostring, requestedBase: int): bigint | undefined {
+  if (requestedBase !== 0n && (requestedBase < 2n || requestedBase > 62n)) {
     GoPanic.raiseRuntime("invalid number base");
   }
   if (text.length === 0 || text.trim() !== text) {
@@ -261,7 +264,7 @@ function parseInteger(text: gostring, requestedBase: int64): bigint | undefined 
     return undefined;
   }
 
-  let base = requestedBase;
+  let base = hostInteger(requestedBase);
   let prefix = false;
   if (base === 0) {
     base = 10;
@@ -291,7 +294,7 @@ function parseInteger(text: gostring, requestedBase: int64): bigint | undefined 
   for (; index < text.length; index += 1) {
     const character = text[index] ?? "";
     if (character === "_") {
-      if (requestedBase !== 0 || previousUnderscore || (!sawDigit && !prefix)) {
+      if (requestedBase !== 0n || previousUnderscore || (!sawDigit && !prefix)) {
         return undefined;
       }
       previousUnderscore = true;

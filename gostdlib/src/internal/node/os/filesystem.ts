@@ -25,8 +25,13 @@ import type {
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   gostring,
+  int,
   int64,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
+import {
+  hostInteger,
+  integerFromHost,
+} from "../../host-integer.js";
 import type {
   DirEntry,
   FS,
@@ -60,17 +65,17 @@ export function create<T extends object>(
   path: gostring,
   factory: FileFactory<T>,
 ): [T | undefined, GoError | undefined] {
-  return open(path, 0x242, new FileMode(0o666), factory);
+  return open(path, 0x242n, new FileMode(0o666), factory);
 }
 
 export function open<T extends object>(
   path: gostring,
-  flags: int64,
+  flags: int,
   permissions: FileMode,
   factory: FileFactory<T>,
 ): [T | undefined, GoError | undefined] {
   try {
-    const descriptor = openSync(path, flags, permissions.value);
+    const descriptor = openSync(path, hostInteger(flags), permissions.value);
     return [factory(descriptor, path), undefined];
   } catch {
     if (statSync(path, { throwIfNoEntry: false }) === undefined) {
@@ -135,8 +140,8 @@ export function changeTimes(
   try {
     utimesSync(
       path,
-      accessTime.UnixMilli() / 1000,
-      modificationTime.UnixMilli() / 1000,
+      hostInteger(accessTime.UnixMilli()) / 1000,
+      hostInteger(modificationTime.UnixMilli()) / 1000,
     );
     return undefined;
   } catch {
@@ -229,7 +234,7 @@ class NodeDirectoryFS extends ProviderInterfaceValue implements FS {
     }
     const [file, error] = open(
       path,
-      0,
+      0n,
       new FileMode(0),
       (descriptor: number, openedPath: string): object => {
         const value = {};
@@ -284,7 +289,7 @@ class NodeFileInfo extends ProviderInterfaceValue implements FileInfo {
   }
 
   ModTime(): Time {
-    return UnixMilli(this.information.mtimeMs);
+    return UnixMilli(integerFromHost(this.information.mtimeMs));
   }
 
   Mode(): FileMode {
@@ -302,7 +307,7 @@ class NodeFileInfo extends ProviderInterfaceValue implements FileInfo {
   }
 
   Size(): int64 {
-    return this.information.size;
+    return integerFromHost(this.information.size);
   }
 
   Sys(): GoInterfaceValue | undefined {
@@ -386,7 +391,10 @@ function resolveFileSystemPath(
   }
   const resolvedRoot = resolve(root);
   const path = resolve(resolvedRoot, name);
-  if (path !== resolvedRoot && !path.startsWith(`${resolvedRoot}${sep}`)) {
+  const descendantPrefix = resolvedRoot.endsWith(sep)
+    ? resolvedRoot
+    : `${resolvedRoot}${sep}`;
+  if (path !== resolvedRoot && !path.startsWith(descendantPrefix)) {
     return undefined;
   }
   return path;

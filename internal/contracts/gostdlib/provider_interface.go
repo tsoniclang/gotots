@@ -88,6 +88,7 @@ type ProviderInterfaceMethodDocument struct {
 	Member              string                      `json:"member,omitempty"`
 	Effect              EffectKind                  `json:"effect,omitempty"`
 	SourceSignature     string                      `json:"sourceSignature"`
+	ContractSignature   string                      `json:"contractSignature"`
 	SourceLocation      string                      `json:"sourceLocation"`
 	ImplementationOwner string                      `json:"implementationOwner,omitempty"`
 	TargetFingerprint   string                      `json:"targetFingerprint,omitempty"`
@@ -158,6 +159,10 @@ func (m ProviderInterfaceMethod) Effect() EffectKind {
 
 func (m ProviderInterfaceMethod) SourceSignature() string {
 	return m.document.SourceSignature
+}
+
+func (m ProviderInterfaceMethod) ContractSignature() string {
+	return m.document.ContractSignature
 }
 
 func (m ProviderInterfaceMethod) SourceLocation() string {

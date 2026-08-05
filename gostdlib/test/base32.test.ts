@@ -22,7 +22,7 @@ test("base32 appends standard and hexadecimal encodings", (): void => {
   const hexadecimal = requireEncoding(state.HexEncoding);
   const source = bytes("foobar");
 
-  assert.equal(Encoding.EncodedLen(standard, source.length), 16);
+  assert.equal(Encoding.EncodedLen(standard, BigInt(source.length)), 16n);
   assert.equal(text(Encoding.AppendEncode(standard, bytes("x"), source)), "xMZXW6YTBOI======");
   assert.equal(text(Encoding.AppendEncode(hexadecimal, bytes("x"), source)), "xCPNMUOJ1E8======");
 

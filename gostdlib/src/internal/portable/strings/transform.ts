@@ -1,5 +1,7 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { bool, gostring, int32, int64 } from "@gotots/runtime/scalars.js";
+import type { bool, gostring, int, int32 } from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger } from "../../host-integer.js";
 
 import { ToLower as lowerRune, ToUpper as upperRune } from "../unicode/case.js";
 import { IsSpace } from "../unicode/properties.js";
@@ -24,31 +26,32 @@ export function Map(
     if (mapped >= 0) {
       result += encodeRune(mapped);
     }
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
   }
   return result;
 }
 
-export function Repeat(text: gostring, count: int64): gostring {
-  if (!Number.isSafeInteger(count) || count < 0) {
+export function Repeat(text: gostring, count: int): gostring {
+  if (count < 0n) {
     GoPanic.raiseRuntime("strings: negative Repeat count");
   }
-  if (text.length !== 0 && count > Math.floor(0x1fffffff / text.length)) {
+  const hostCount = hostInteger(count);
+  if (text.length !== 0 && hostCount > Math.floor(0x1fffffff / text.length)) {
     GoPanic.raiseRuntime("strings: Repeat output length overflow");
   }
-  return text.repeat(count);
+  return text.repeat(hostCount);
 }
 
 export function Replace(
   text: gostring,
   oldText: gostring,
   newText: gostring,
-  count: int64,
+  count: int,
 ): gostring {
-  if (count === 0) {
+  if (count === 0n) {
     return text;
   }
-  const limit = count < 0 ? Number.POSITIVE_INFINITY : count;
+  const limit = count < 0n ? Number.POSITIVE_INFINITY : hostInteger(count);
   if (oldText.length === 0) {
     const boundaries = runeBoundaries(text);
     let result = "";
@@ -83,7 +86,7 @@ export function Replace(
 }
 
 export function ReplaceAll(text: gostring, oldText: gostring, newText: gostring): gostring {
-  return Replace(text, oldText, newText, -1);
+  return Replace(text, oldText, newText, -1n);
 }
 
 export function ToLower(text: gostring): gostring {
@@ -99,7 +102,7 @@ export function ToValidUTF8(text: gostring, replacement: gostring): gostring {
   let invalid = false;
   for (let index = 0; index < text.length; ) {
     const [rune, width] = decodeRuneAt(text, index);
-    if (rune === 0xfffd && width === 1 && text.charCodeAt(index) >= 0x80) {
+    if (rune === 0xfffd && width === 1n && text.charCodeAt(index) >= 0x80) {
       if (!invalid) {
         result += replacement;
         invalid = true;
@@ -108,8 +111,8 @@ export function ToValidUTF8(text: gostring, replacement: gostring): gostring {
       continue;
     }
     invalid = false;
-    result += text.slice(index, index + Math.max(1, width));
-    index += Math.max(1, width);
+    result += text.slice(index, index + Math.max(1, hostInteger(width)));
+    index += Math.max(1, hostInteger(width));
   }
   return result;
 }
@@ -139,7 +142,7 @@ export function TrimLeftFunc(
   predicate: ((rune: int32) => bool) | undefined,
 ): gostring {
   const index = findByPredicate(text, predicate, false, false);
-  return index < 0 ? "" : text.slice(index);
+  return index < 0n ? "" : text.slice(hostInteger(index));
 }
 
 export function TrimRightFunc(
@@ -147,11 +150,12 @@ export function TrimRightFunc(
   predicate: ((rune: int32) => bool) | undefined,
 ): gostring {
   const index = findByPredicate(text, predicate, false, true);
-  if (index < 0) {
+  if (index < 0n) {
     return "";
   }
-  const [, width] = decodeRuneAt(text, index);
-  return text.slice(0, index + Math.max(1, width));
+  const hostIndex = hostInteger(index);
+  const [, width] = decodeRuneAt(text, hostIndex);
+  return text.slice(0, hostIndex + Math.max(1, hostInteger(width)));
 }
 
 export function TrimSpace(text: gostring): gostring {
@@ -171,7 +175,7 @@ function cutsetPredicate(cutset: gostring): (rune: int32) => bool {
   for (let index = 0; index < cutset.length; ) {
     const [rune, width] = decodeRuneAt(cutset, index);
     runes.add(rune);
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
   }
   return (rune: int32): bool => runes.has(rune);
 }

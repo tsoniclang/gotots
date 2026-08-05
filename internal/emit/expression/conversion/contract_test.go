@@ -27,9 +27,9 @@ func TestConversionASTUsesDirectAndBoundaryShapes(t *testing.T) {
 			returnExpression(t, number, "Widen"),
 		)
 	}
-	if _, ok := returnExpression(t, bigint, "Widen").(tsgo.Identifier); !ok {
+	if _, ok := returnExpression(t, bigint, "Widen").(tsgo.CallExpression); !ok {
 		t.Fatalf(
-			"lossless BigInt widening = %T, want direct identifier",
+			"number-to-BigInt widening = %T, want static conversion call",
 			returnExpression(t, bigint, "Widen"),
 		)
 	}
@@ -43,16 +43,10 @@ func TestConversionASTUsesDirectAndBoundaryShapes(t *testing.T) {
 			returnExpression(t, number, "NarrowSigned"),
 		)
 	}
-	if _, ok := returnExpression(
+	assertBigIntToNumberNarrowingOrder(
 		t,
-		bigint,
-		"NarrowSigned",
-	).(tsgo.CallExpression); !ok {
-		t.Fatalf(
-			"BigInt narrowing = %T, want static width-normalizing call",
-			returnExpression(t, bigint, "NarrowSigned"),
-		)
-	}
+		returnExpression(t, bigint, "NarrowSigned"),
+	)
 	assertOneConversionRuntimeDefinition(t, number)
 	assertOneConversionRuntimeDefinition(t, bigint)
 
@@ -72,6 +66,43 @@ func TestConversionASTUsesDirectAndBoundaryShapes(t *testing.T) {
 	}
 	if strings.Count(numberText, "function goNumberToBigInt") != 1 {
 		t.Fatalf("number-to-BigInt definition count is not one:\n%s", numberText)
+	}
+}
+
+func assertBigIntToNumberNarrowingOrder(
+	t *testing.T,
+	expression tsgo.Expression,
+) {
+	t.Helper()
+	outer, ok := expression.(tsgo.CallExpression)
+	if !ok || len(outer.Arguments()) != 1 {
+		t.Fatalf("BigInt narrowing = %T, want one-argument Number call", expression)
+	}
+	number, ok := outer.Expression().(tsgo.PropertyAccessExpression)
+	if !ok {
+		t.Fatal("BigInt narrowing Number callee is not a property access")
+	}
+	numberReceiver, receiverOK := number.Expression().(tsgo.Identifier)
+	numberName, nameOK := number.Name().(tsgo.Identifier)
+	if !receiverOK || !nameOK ||
+		numberReceiver.Text() != api.TargetGlobalAnchorName ||
+		numberName.Text() != api.TargetIntrinsicNumber.String() {
+		t.Fatal("BigInt narrowing does not cross carriers through globalThis.Number")
+	}
+	normalize, ok := outer.Arguments()[0].(tsgo.CallExpression)
+	if !ok || len(normalize.Arguments()) != 2 {
+		t.Fatal("BigInt narrowing crosses carriers before exact width normalization")
+	}
+	member, ok := normalize.Expression().(tsgo.PropertyAccessExpression)
+	if !ok {
+		t.Fatal("BigInt width normalizer is not a property access")
+	}
+	memberReceiver, receiverOK := member.Expression().(tsgo.Identifier)
+	memberName, nameOK := member.Name().(tsgo.Identifier)
+	if !receiverOK || !nameOK ||
+		memberReceiver.Text() != "BigInt" ||
+		memberName.Text() != "asIntN" {
+		t.Fatal("BigInt narrowing does not normalize exact low bits before Number conversion")
 	}
 }
 

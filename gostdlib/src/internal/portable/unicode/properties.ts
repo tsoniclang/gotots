@@ -1,4 +1,4 @@
-import type { int32 } from "@gotots/runtime/scalars.js";
+import type { bool, int32 } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   lowerRanges16,
@@ -20,14 +20,14 @@ import {
   type RangeRecord,
 } from "./data.js";
 
-export function IsDigit(rune: int32): boolean {
+export function IsDigit(rune: int32): bool {
   if (rune <= 0xff) {
     return rune >= 0x30 && rune <= 0x39;
   }
   return inRecords(rune, digitRanges16) || inRecords(rune, digitRanges32);
 }
 
-export function IsLower(rune: int32): boolean {
+export function IsLower(rune: int32): bool {
   if (rune <= 0xff) {
     return (
       (rune >= 0x61 && rune <= 0x7a) ||
@@ -39,19 +39,19 @@ export function IsLower(rune: int32): boolean {
   return inRecords(rune, lowerRanges16) || inRecords(rune, lowerRanges32);
 }
 
-export function IsLetter(rune: int32): boolean {
+export function IsLetter(rune: int32): bool {
   return inRecords(rune, letterRanges16) || inRecords(rune, letterRanges32);
 }
 
-export function IsNumber(rune: int32): boolean {
+export function IsNumber(rune: int32): bool {
   return inRecords(rune, numberRanges16) || inRecords(rune, numberRanges32);
 }
 
-export function IsPrint(rune: int32): boolean {
+export function IsPrint(rune: int32): bool {
   return inRecords(rune, printRanges16) || inRecords(rune, printRanges32);
 }
 
-export function IsUpper(rune: int32): boolean {
+export function IsUpper(rune: int32): bool {
   if (rune <= 0xff) {
     return (
       (rune >= 0x41 && rune <= 0x5a) ||
@@ -62,7 +62,7 @@ export function IsUpper(rune: int32): boolean {
   return inRecords(rune, upperRanges16) || inRecords(rune, upperRanges32);
 }
 
-export function IsSpace(rune: int32): boolean {
+export function IsSpace(rune: int32): bool {
   if (rune <= 0xff) {
     return (
       rune === 0x09 ||

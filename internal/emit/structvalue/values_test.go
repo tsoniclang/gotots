@@ -44,9 +44,11 @@ func TestNamedStructValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
     PositionalComposite,
     PrimitiveZero,
     ReservedValue,
+    ReturnSnapshotResult,
     ZeroIsFresh,
 } from "`+module+`";
 
+console.log(ReturnSnapshotResult());
 console.log(ZeroIsFresh());
 console.log(CopyResult());
 console.log(AssignResult());
@@ -322,6 +324,7 @@ import (
 )
 
 func main() {
+	fmt.Println(values.ReturnSnapshotResult())
 	fmt.Println(values.ZeroIsFresh())
 	fmt.Println(values.CopyResult())
 	fmt.Println(values.AssignResult())

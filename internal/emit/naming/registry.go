@@ -94,6 +94,16 @@ type interfaceDynamicTypeTokenBinding struct {
 type providerInterfaceBridgeBinding struct {
 	owner *api.GeneratedArtifact
 	name  string
+	key   string
+}
+
+type providerInterfaceCapabilityBinding struct {
+	key         string
+	certificate gostdlib.ProviderInterfaceCapability
+	base        *types.Named
+	target      *types.Interface
+	targetKey   string
+	demandKey   string
 }
 
 type providerStatefulRepresentationBinding struct {
@@ -174,6 +184,9 @@ type Registry struct {
 	interfaceDynamicNames               map[string]string
 	providerInterfaceBridges            map[string]providerInterfaceBridgeBinding
 	providerInterfaceBridgeNames        map[string]string
+	providerInterfaceCapabilities       map[string]map[string]providerInterfaceCapabilityBinding
+	providerInterfaceCapabilityDemands  map[string]providerInterfaceCapabilityBinding
+	providerInterfaceBridgesByContract  map[string]map[string]struct{}
 	providerStatefulRepresentations     map[string]providerStatefulRepresentationBinding
 	providerStatefulRepresentationNames map[string]string
 	providerObjectByIdentity            map[string]types.Object
@@ -220,6 +233,9 @@ func NewRegistry() *Registry {
 		interfaceDynamicNames:               make(map[string]string),
 		providerInterfaceBridges:            make(map[string]providerInterfaceBridgeBinding),
 		providerInterfaceBridgeNames:        make(map[string]string),
+		providerInterfaceCapabilities:       make(map[string]map[string]providerInterfaceCapabilityBinding),
+		providerInterfaceCapabilityDemands:  make(map[string]providerInterfaceCapabilityBinding),
+		providerInterfaceBridgesByContract:  make(map[string]map[string]struct{}),
 		providerStatefulRepresentations:     make(map[string]providerStatefulRepresentationBinding),
 		providerStatefulRepresentationNames: make(map[string]string),
 		providerObjectByIdentity:            make(map[string]types.Object),

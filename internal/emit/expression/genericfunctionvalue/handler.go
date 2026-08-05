@@ -10,6 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -207,13 +208,6 @@ func Emit(
 		return api.ExpressionEmission{}, true, err
 	}
 	sourceArguments := target.SourceParameterReferences(context.Factory())
-	arguments := make(
-		[]tsgo.Expression,
-		0,
-		len(mechanicArgs)+len(sourceArguments),
-	)
-	arguments = append(arguments, mechanicArgs...)
-	arguments = append(arguments, sourceArguments...)
 	var modifiers []tsgo.ModifierLike
 	resultType := target.Result()
 	if abiCooperative {
@@ -225,19 +219,36 @@ func Emit(
 			resultType,
 		)
 	}
+	contract, ok := owner.Type().(*types.Signature)
+	if !ok {
+		return api.ExpressionEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic function-value owner has no signature",
+		}
+	}
+	ordinaryCall, err := kernelValueInvocation(
+		context,
+		children,
+		reference,
+		typeArguments,
+		mechanicArgs,
+		sourceArguments,
+		contract,
+		signature,
+		abiCooperative,
+		nil,
+		api.DeferredGenericRecoveryInvalid,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	ordinary := context.Factory().ArrowFunction(
 		modifiers,
 		nil,
 		target.Parameters(),
 		resultType,
 		context.Factory().EqualsGreaterThanToken(),
-		context.Factory().CallExpression(
-			reference.Expression(context.Factory()),
-			nil,
-			typeArguments,
-			arguments,
-			tsgo.NodeFlagsNone,
-		),
+		callableBody(context.Factory(), signature.Results(), ordinaryCall),
 	)
 	if !recoveryObservation.Recovery() {
 		return api.DirectExpression(
@@ -246,7 +257,7 @@ func Emit(
 				target.Requests(),
 				typeRequests,
 				mechanicReqs,
-				reference.Requests(),
+				ordinaryCall.Requests(),
 				contractRequests,
 				recoveryObservation.Requests(),
 			)...,
@@ -257,23 +268,33 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	deferredArguments := append(
-		[]tsgo.Expression{
-			context.Factory().Identifier(callable.RecoveryAuthorityName),
-		},
-		arguments...,
-	)
+	recoveryValue := context.Factory().Identifier(callable.RecoveryAuthorityName)
+	recoveryPlacement := api.DeferredGenericRecoveryFirst
 	if deferredTargetSelected {
-		deferredArguments, err = deferredTarget.CallArguments(
-			context.Factory().Identifier(callable.RecoveryAuthorityName),
-			arguments,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
+		recoveryPlacement = deferredTarget.RecoveryPlacement()
+	}
+	if deferredReference.ProviderBoundary() != reference.ProviderBoundary() {
+		return api.ExpressionEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic function-value variants disagree on provider ownership",
 		}
 	}
-	deferredCallee := deferredReference.Expression(context.Factory())
-	deferredRequests := deferredReference.Requests()
+	deferredCall, err := kernelValueInvocation(
+		context,
+		children,
+		deferredReference,
+		typeArguments,
+		mechanicArgs,
+		sourceArguments,
+		contract,
+		signature,
+		abiCooperative,
+		recoveryValue,
+		recoveryPlacement,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	deferred := context.Factory().ArrowFunction(
 		modifiers,
 		nil,
@@ -283,13 +304,7 @@ func Emit(
 		),
 		resultType,
 		context.Factory().EqualsGreaterThanToken(),
-		context.Factory().CallExpression(
-			deferredCallee,
-			nil,
-			typeArguments,
-			deferredArguments,
-			tsgo.NodeFlagsNone,
-		),
+		callableBody(context.Factory(), signature.Results(), deferredCall),
 	)
 	registry, err := deferredregistry.Reference(context, source, signature)
 	if err != nil {
@@ -314,12 +329,103 @@ func Emit(
 			target.Requests(),
 			typeRequests,
 			mechanicReqs,
-			reference.Requests(),
-			deferredRequests,
+			ordinaryCall.Requests(),
+			deferredCall.Requests(),
 			recoveryRequests,
 			registry.Requests(),
 			contractRequests,
 			recoveryObservation.Requests(),
 		)...,
 	), true, nil
+}
+
+func kernelValueInvocation(
+	context api.Context,
+	children api.ChildEmitter,
+	reference api.NameReference,
+	typeArguments []tsgo.TypeNode,
+	mechanics []tsgo.Expression,
+	sourceArguments []tsgo.Expression,
+	contract *types.Signature,
+	signature *types.Signature,
+	cooperative bool,
+	recovery tsgo.Expression,
+	recoveryPlacement api.DeferredGenericRecoveryPlacement,
+) (api.ExpressionEmission, error) {
+	arguments := sourceArguments
+	var before []tsgo.Statement
+	var requests []api.RootRequest
+	var err error
+	if reference.ProviderBoundary() {
+		arguments, before, requests, err =
+			providerboundary.ToProviderGenericArguments(
+				context,
+				children,
+				contract.Params(),
+				signature.Params(),
+				sourceArguments,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	arguments = append(append([]tsgo.Expression{}, mechanics...), arguments...)
+	if recoveryPlacement != api.DeferredGenericRecoveryInvalid {
+		deferred, err := api.NewDeferredGenericCallableReference(
+			reference,
+			recoveryPlacement,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		arguments, err = deferred.CallArguments(recovery, arguments)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	target, err := api.NewExpressionEmission(
+		before,
+		context.Factory().CallExpression(
+			reference.Expression(context.Factory()),
+			nil,
+			typeArguments,
+			arguments,
+			tsgo.NodeFlagsNone,
+		),
+		api.CombineRequests(reference.Requests(), requests),
+	)
+	if err != nil || !reference.ProviderBoundary() {
+		return target, err
+	}
+	if cooperative {
+		target, err = api.NewExpressionEmission(
+			target.Before(),
+			context.Factory().AwaitExpression(target.Value()),
+			target.Requests(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	return providerboundary.FromProviderGenericResults(
+		context,
+		children,
+		contract.Results(),
+		signature.Results(),
+		target,
+	)
+}
+
+func callableBody(
+	factory tsgo.Factory,
+	results *types.Tuple,
+	emission api.ExpressionEmission,
+) tsgo.ConciseBody {
+	statements := emission.Before()
+	if results == nil || results.Len() == 0 {
+		statements = append(statements, factory.ExpressionStatement(emission.Value()))
+	} else {
+		statements = append(statements, factory.ReturnStatement(emission.Value()))
+	}
+	return factory.Block(statements, true)
 }

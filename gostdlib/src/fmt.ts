@@ -4,7 +4,7 @@ import type {
 } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring, int64 } from "@gotots/runtime/scalars.js";
+import type { gostring, int } from "@gotots/gostdlib/internal/scalars.js";
 
 import type { Writer } from "./io.js";
 import { File, state as osState } from "./os.js";
@@ -34,7 +34,7 @@ export function Errorf(
 export function Fprint(
   writer: Writer | undefined,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
-): [int64, GoError | undefined] {
+): [int, GoError | undefined] {
   return write(writer, formatOperands(arguments_, false));
 }
 
@@ -42,20 +42,20 @@ export function Fprintf(
   writer: Writer | undefined,
   format: gostring,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
-): [int64, GoError | undefined] {
+): [int, GoError | undefined] {
   return write(writer, formatText(format, arguments_).text);
 }
 
 export function Fprintln(
   writer: Writer | undefined,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
-): [int64, GoError | undefined] {
+): [int, GoError | undefined] {
   return write(writer, formatOperands(arguments_, true));
 }
 
 export function Println(
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
-): [int64, GoError | undefined] {
+): [int, GoError | undefined] {
   const text = formatOperands(arguments_, true);
   return File.Write(osState.Stdout, byteSlice(new TextEncoder().encode(text)));
 }
@@ -76,7 +76,7 @@ export function Sprintf(
 function write(
   writer: Writer | undefined,
   text: string,
-): [int64, GoError | undefined] {
+): [int, GoError | undefined] {
   if (writer === undefined) {
     return GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }

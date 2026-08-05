@@ -26,8 +26,8 @@ test("byte orders round-trip selected integer widths", () => {
     assert.equal(order.Uint16(buffer), 0xabcd);
     order.PutUint32(buffer, 0x89ab_cdef);
     assert.equal(order.Uint32(buffer), 0x89ab_cdef);
-    order.PutUint64(buffer, 0x1f_ffff_ffff);
-    assert.equal(order.Uint64(buffer), 0x1f_ffff_ffff);
+    order.PutUint64(buffer, 0x1f_ffff_ffffn);
+    assert.equal(order.Uint64(buffer), 0x1f_ffff_ffffn);
   }
 });
 
@@ -43,7 +43,7 @@ test("AppendUint32 remains an unexported-receiver operation", (): void => {
     [0xaa, 1, 2],
   );
   assert.deepEqual(
-    sliceValues(binary.state.LittleEndian.AppendUint64(prefix, 0x0102_0304)),
+    sliceValues(binary.state.LittleEndian.AppendUint64(prefix, 0x0102_0304n)),
     [0xaa, 4, 3, 2, 1, 0, 0, 0, 0],
   );
   assert.deepEqual(

@@ -6,7 +6,7 @@ import type {
 import { GoInterfaceValue as InterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
 import { GoEmptyStruct } from "@gotots/runtime/struct.js";
 import { ProviderError } from "../../runtime/error.js";
 import { goInterfaceEqual } from "../../runtime/interface.js";

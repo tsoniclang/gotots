@@ -1,6 +1,6 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, gostring, uint8 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, gostring, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 import type { Reader, Writer } from "../io.js";
 import type { SysProcAttr } from "../syscall.js";
 import { Duration } from "../time.js";
@@ -29,7 +29,7 @@ export class Cmd {
   ProcessState: ProcessState | undefined = undefined;
   Err: GoError | undefined = undefined;
   Cancel: (() => Awaitable<GoError | undefined>) | undefined = undefined;
-  WaitDelay: Duration = new Duration(0);
+  WaitDelay: Duration = new Duration(0n);
 
   static Output(
     receiver: Cmd | undefined,

@@ -47,10 +47,10 @@ test("bytes search, clone, join, and trim preserve byte boundaries", () => {
   assert.deepEqual(sliceValues(clone), sliceValues(source));
   clone.set(0, 0x78);
   assert.equal(source.get(0), 0x61);
-  assert.equal(Compare(source, RuntimeSlice.literal([0x61, 0xc3, 0xa9, 0x63])), -1);
-  assert.equal(IndexAny(source, "Ã©"), 1);
-  assert.equal(IndexByte(source, 0x62), 3);
-  assert.equal(LastIndexByte(source, 0x61), 4);
+  assert.equal(Compare(source, RuntimeSlice.literal([0x61, 0xc3, 0xa9, 0x63])), -1n);
+  assert.equal(IndexAny(source, "Ã©"), 1n);
+  assert.equal(IndexByte(source, 0x62), 3n);
+  assert.equal(LastIndexByte(source, 0x61), 4n);
   assert.deepEqual(
     sliceValues(Join(RuntimeSlice.literal([
       RuntimeSlice.literal([1]),

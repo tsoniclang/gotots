@@ -1,56 +1,87 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "integerRepresentations": [
-    "number"
+    "number",
+    "bigint"
   ],
+  "providerIntegerRepresentation": "bigint",
+  "providerScalarModule": "./internal/scalars.js",
+  "nativeIntegerBits": 64,
   "primitiveAliases": [
     {
       "id": 1,
-      "export": "bool"
+      "export": "bool",
+      "providerCarrier": "boolean"
     },
     {
       "id": 2,
-      "export": "int8"
+      "export": "int8",
+      "providerCarrier": "number"
     },
     {
       "id": 3,
-      "export": "int16"
+      "export": "int16",
+      "providerCarrier": "number"
     },
     {
       "id": 4,
-      "export": "int32"
+      "export": "int32",
+      "providerCarrier": "number"
     },
     {
       "id": 5,
-      "export": "int64"
+      "export": "int64",
+      "providerCarrier": "bigint"
     },
     {
       "id": 6,
-      "export": "uint8"
+      "export": "uint8",
+      "providerCarrier": "number"
     },
     {
       "id": 7,
-      "export": "uint16"
+      "export": "uint16",
+      "providerCarrier": "number"
     },
     {
       "id": 8,
-      "export": "uint32"
+      "export": "uint32",
+      "providerCarrier": "number"
     },
     {
       "id": 9,
-      "export": "uint64"
+      "export": "uint64",
+      "providerCarrier": "bigint"
     },
     {
       "id": 10,
-      "export": "gostring"
+      "export": "gostring",
+      "providerCarrier": "string"
     },
     {
       "id": 11,
-      "export": "float32"
+      "export": "float32",
+      "providerCarrier": "number"
     },
     {
       "id": 12,
-      "export": "float64"
+      "export": "float64",
+      "providerCarrier": "number"
+    },
+    {
+      "id": 13,
+      "export": "int",
+      "providerCarrier": "bigint"
+    },
+    {
+      "id": 14,
+      "export": "uint",
+      "providerCarrier": "bigint"
+    },
+    {
+      "id": 15,
+      "export": "uintptr",
+      "providerCarrier": "bigint"
     }
   ],
   "runtimeSymbols": [

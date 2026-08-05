@@ -1,6 +1,6 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { runeBoundaries } from "../utf8/codec.js";
 

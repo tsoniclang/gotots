@@ -2,7 +2,8 @@ import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import { integerFromHost } from "../host-integer.js";
 
 import { Header } from "../../compress/gzip.js";
 import { decodeGzip } from "../node/compress/gzip/decode.js";
@@ -33,7 +34,7 @@ export interface CanonicalFlateReader<
   Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Awaitable<[int64, Failure | undefined]>;
+  ): Awaitable<[int, Failure | undefined]>;
   ReadByte(recovery?: GoRecovery): Awaitable<[uint8, Failure | undefined]>;
 }
 
@@ -43,7 +44,7 @@ export interface CanonicalReadCloser<
   Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Awaitable<[int64, Failure | undefined]>;
+  ): Awaitable<[int, Failure | undefined]>;
   Close(recovery?: GoRecovery): Awaitable<Failure | undefined>;
 }
 
@@ -87,28 +88,28 @@ class CanonicalGzipPayload<Failure extends CanonicalError> {
 
   Read(
     destination: RuntimeSlice<uint8>,
-  ): [int64, CanonicalError | undefined] {
+  ): [int, CanonicalError | undefined] {
     if (this.closed) {
-      return [0, this.invalidError("gzip: reader is closed")];
+      return [0n, this.invalidError("gzip: reader is closed")];
     }
     if (destination.length === 0) {
-      return [0, undefined];
+      return [0n, undefined];
     }
     if (this.terminalFailure !== undefined) {
-      return [0, this.terminalFailure];
+      return [0n, this.terminalFailure];
     }
     if (this.decoded === undefined) {
       GoPanic.raiseRuntime("gzip: buffered reader was not initialized");
     }
     if (this.offset >= this.decoded.length) {
-      return [0, this.eof];
+      return [0n, this.eof];
     }
     const count = writeBytes(
       destination,
       this.decoded.subarray(this.offset),
     );
     this.offset += count;
-    return [count, undefined];
+    return [integerFromHost(count), undefined];
   }
 }
 
@@ -131,7 +132,7 @@ class CanonicalGzipReaderState<Failure extends CanonicalError> {
   async Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, CanonicalError | undefined]> {
+  ): Promise<[int, CanonicalError | undefined]> {
     if (this.payload.NeedsLoad(destination)) {
       const [encoded, sourceFailure] = await runGzipSourceAsync(
         this.sourceState.beginDrain(),
@@ -183,7 +184,7 @@ export class CanonicalGzipReader<
     > | undefined,
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, CanonicalError | undefined]> {
+  ): Promise<[int, CanonicalError | undefined]> {
     return requireValue(receiver, "gzip.Reader").Read(destination, recovery);
   }
 
@@ -194,7 +195,7 @@ export class CanonicalGzipReader<
   async Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, CanonicalError | undefined]> {
+  ): Promise<[int, CanonicalError | undefined]> {
     return this.state.Read(destination, recovery);
   }
 }
@@ -238,7 +239,7 @@ async function initializeGzipReader<Failure extends CanonicalError>(
       header.extra,
       header.modificationTimeSeconds === 0
         ? new Time()
-        : UnixMilli(header.modificationTimeSeconds * 1000),
+        : UnixMilli(integerFromHost(header.modificationTimeSeconds * 1000)),
       header.name,
       header.operatingSystem,
     ),

@@ -1,8 +1,8 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64 } from "@gotots/runtime/scalars.js";
+import type { int } from "@gotots/gostdlib/internal/scalars.js";
 
-export function Compare<T>(left: T, right: T): int64 {
+export function Compare<T>(left: T, right: T): int {
   return specializationRequired("cmp.Compare");
 }
 

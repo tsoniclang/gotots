@@ -2,7 +2,11 @@ import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import {
+  hostInteger,
+  integerFromHost,
+} from "../host-integer.js";
 
 import { byteSlice } from "../runtime/slice.js";
 import type { CanonicalWriter } from "./provider-io-contract.js";
@@ -44,16 +48,17 @@ class WriterBuffer<Failure> {
   }
 
   finishFlush(
-    count: int64,
+    count: int,
     reportedFailure: Failure | undefined,
   ): Failure | undefined {
     const bufferedLength = this.#values.length;
-    const failure = count < bufferedLength && reportedFailure === undefined
+    const hostCount = hostInteger(count);
+    const failure = hostCount < bufferedLength && reportedFailure === undefined
       ? this.#shortWrite
       : reportedFailure;
     if (failure !== undefined) {
-      if (count > 0) {
-        this.#values.splice(0, Math.min(count, bufferedLength));
+      if (hostCount > 0) {
+        this.#values.splice(0, Math.min(hostCount, bufferedLength));
       }
       this.#pendingFailure = failure;
       return failure;
@@ -105,7 +110,7 @@ export class CanonicalBufioWriter<
     receiver: CanonicalBufioWriter<Failure, Target> | undefined,
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, Failure | undefined]> {
+  ): Promise<[int, Failure | undefined]> {
     return requireWriter(receiver).Write(source, recovery);
   }
 
@@ -134,20 +139,20 @@ export class CanonicalBufioWriter<
   async Write(
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, Failure | undefined]> {
+  ): Promise<[int, Failure | undefined]> {
     if (this.#state.failure !== undefined) {
-      return [0, this.#state.failure];
+      return [0n, this.#state.failure];
     }
     let accepted = 0;
     while (source.length - accepted > this.#state.available &&
       this.#state.failure === undefined) {
-      let count: int64;
+      let count: number;
       if (this.#state.length === 0) {
         const result = await requireTarget(this.#target).Write(
           source.slice(accepted, source.length, null),
           recovery,
         );
-        count = result[0];
+        count = hostInteger(result[0]);
         this.#state.acceptFailure(result[1]);
       } else {
         count = Math.min(this.#state.available, source.length - accepted);
@@ -157,11 +162,11 @@ export class CanonicalBufioWriter<
       accepted += count;
     }
     if (this.#state.failure !== undefined) {
-      return [accepted, this.#state.failure];
+      return [integerFromHost(accepted), this.#state.failure];
     }
     const count = source.length - accepted;
     this.#state.append(source, accepted, count);
-    return [accepted + count, undefined];
+    return [integerFromHost(accepted + count), undefined];
   }
 
   async WriteByte(

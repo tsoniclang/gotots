@@ -6,12 +6,14 @@ import (
 
 	runtimecontract "github.com/tsoniclang/gotots/internal/contracts/runtime"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type PackageRequirements struct {
-	profiles []api.IntegerRepresentation
-	symbols  map[api.RuntimeSymbol]struct{}
-	aliases  []api.PrimitiveAlias
+	profiles       []api.IntegerRepresentation
+	providerScalar api.ScalarABI
+	symbols        map[api.RuntimeSymbol]struct{}
+	aliases        []api.PrimitiveAlias
 }
 
 func (r PackageRequirements) AllowsProfile(
@@ -30,6 +32,10 @@ func (r PackageRequirements) RuntimeSymbols() map[api.RuntimeSymbol]struct{} {
 
 func (r PackageRequirements) PrimitiveAliases() []api.PrimitiveAlias {
 	return slices.Clone(r.aliases)
+}
+
+func (r PackageRequirements) ProviderScalarABI() api.ScalarABI {
+	return r.providerScalar
 }
 
 func ResolvePackageRequirements(
@@ -55,6 +61,24 @@ func ResolvePackageRequirements(
 		}
 		profiles = append(profiles, profile)
 	}
+	var providerProfile api.IntegerRepresentation
+	switch source.ProviderProfile() {
+	case runtimecontract.ProfileNumber:
+		providerProfile = api.IntegerRepresentationNumber
+	case runtimecontract.ProfileBigInt:
+		providerProfile = api.IntegerRepresentationBigInt
+	default:
+		return PackageRequirements{}, &AssemblyError{
+			Reason: "runtime package requirement has an invalid provider integer profile",
+		}
+	}
+	providerScalar, err := api.NewScalarABI(
+		providerProfile,
+		api.NativeIntegerWidth(source.NativeIntegerBits()),
+	)
+	if err != nil {
+		return PackageRequirements{}, err
+	}
 	aliases := make([]api.PrimitiveAlias, 0, len(source.PrimitiveAliases()))
 	for _, entry := range source.PrimitiveAliases() {
 		alias := api.PrimitiveAlias(entry.ID())
@@ -69,6 +93,22 @@ func ResolvePackageRequirements(
 					entry.ID(),
 					entry.Export(),
 					name,
+				),
+			}
+		}
+		_, keyword, err := api.PrimitiveAliasRepresentation(
+			alias,
+			providerScalar,
+		)
+		if err != nil {
+			return PackageRequirements{}, err
+		}
+		if !providerCarrierMatches(keyword, entry.ProviderCarrier()) {
+			return PackageRequirements{}, &AssemblyError{
+				Reason: fmt.Sprintf(
+					"primitive alias %d provider carrier is %q and does not match the certified scalar ABI",
+					entry.ID(),
+					entry.ProviderCarrier(),
 				),
 			}
 		}
@@ -94,8 +134,27 @@ func ResolvePackageRequirements(
 		symbols[symbol] = struct{}{}
 	}
 	return PackageRequirements{
-		profiles: profiles,
-		symbols:  symbols,
-		aliases:  aliases,
+		profiles:       profiles,
+		providerScalar: providerScalar,
+		symbols:        symbols,
+		aliases:        aliases,
 	}, nil
+}
+
+func providerCarrierMatches(
+	keyword tsgo.KeywordTypeSyntaxKind,
+	carrier runtimecontract.PrimitiveCarrier,
+) bool {
+	switch keyword {
+	case tsgo.KeywordTypeSyntaxKindBooleanKeyword:
+		return carrier == runtimecontract.PrimitiveCarrierBoolean
+	case tsgo.KeywordTypeSyntaxKindNumberKeyword:
+		return carrier == runtimecontract.PrimitiveCarrierNumber
+	case tsgo.KeywordTypeSyntaxKindBigIntKeyword:
+		return carrier == runtimecontract.PrimitiveCarrierBigInt
+	case tsgo.KeywordTypeSyntaxKindStringKeyword:
+		return carrier == runtimecontract.PrimitiveCarrierString
+	default:
+		return false
+	}
 }

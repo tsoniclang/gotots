@@ -22,9 +22,9 @@ export {
 
 import { Duration } from "./internal/portable/time/duration.js";
 
-export const Nanosecond = new Duration(1);
-export const Microsecond = new Duration(1_000);
-export const Millisecond = new Duration(1_000_000);
-export const Second = new Duration(1_000_000_000);
-export const Minute = new Duration(60_000_000_000);
-export const Hour = new Duration(3_600_000_000_000);
+export const Nanosecond = new Duration(1n);
+export const Microsecond = new Duration(1_000n);
+export const Millisecond = new Duration(1_000_000n);
+export const Second = new Duration(1_000_000_000n);
+export const Minute = new Duration(60_000_000_000n);
+export const Hour = new Duration(3_600_000_000_000n);

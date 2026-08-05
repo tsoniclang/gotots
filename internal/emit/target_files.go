@@ -1,16 +1,99 @@
 package emit
 
 import (
+	"fmt"
 	"slices"
 	"sort"
 
+	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	declarationorder "github.com/tsoniclang/gotots/internal/emit/declaration/order"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
+	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func programScalarABI(
+	source *load.Program,
+	integer api.IntegerRepresentation,
+) (api.ScalarABI, error) {
+	if source == nil {
+		return api.ScalarABI{}, &ScheduleError{Reason: "source program is nil"}
+	}
+	packages := append(source.Packages(), source.EnvironmentPackages()...)
+	var selected api.ScalarABI
+	for _, sourcePackage := range packages {
+		if sourcePackage == nil {
+			return api.ScalarABI{}, &ScheduleError{
+				Reason: "source package is nil while resolving scalar ABI",
+			}
+		}
+		current, err := api.NewScalarABIFromSizes(
+			integer,
+			sourcePackage.TypesSizes(),
+		)
+		if err != nil {
+			return api.ScalarABI{}, &ScheduleError{
+				Object: sourcePackage.Types().Path(),
+				Reason: "resolve scalar ABI: " + err.Error(),
+			}
+		}
+		if !selected.Valid() {
+			selected = current
+			continue
+		}
+		if current != selected {
+			return api.ScalarABI{}, &ScheduleError{
+				Object: sourcePackage.Types().Path(),
+				Reason: fmt.Sprintf(
+					"native integer width %d differs from compilation width %d",
+					current.NativeIntegerWidth(),
+					selected.NativeIntegerWidth(),
+				),
+			}
+		}
+	}
+	if !selected.Valid() {
+		return api.ScalarABI{}, &ScheduleError{
+			Reason: "source program has no scalar ABI evidence",
+		}
+	}
+	return selected, nil
+}
+
+func certifiedProviderScalarABI(
+	provider *gostdlibcertify.Certificate,
+	productWidth api.NativeIntegerWidth,
+) (api.ScalarABI, error) {
+	if provider == nil {
+		return api.ScalarABI{}, nil
+	}
+	contract, ok := provider.RuntimeRequirements()
+	if !ok {
+		return api.ScalarABI{}, &OptionsError{
+			Field:  "standard library provider",
+			Reason: "provider runtime contract is absent",
+		}
+	}
+	requirements, err := runtimeemission.ResolvePackageRequirements(contract)
+	if err != nil {
+		return api.ScalarABI{}, err
+	}
+	selected := requirements.ProviderScalarABI()
+	if selected.NativeIntegerWidth() != productWidth {
+		return api.ScalarABI{}, &OptionsError{
+			Field: "standard library provider",
+			Reason: fmt.Sprintf(
+				"provider native integer width %d differs from selected product width %d",
+				selected.NativeIntegerWidth(),
+				productWidth,
+			),
+		}
+	}
+	return selected, nil
+}
 
 func (s *programSession) targetFiles() ([]TargetFile, error) {
 	if s.sealed {
@@ -106,7 +189,7 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 	}
 	runtimePackage, err := runtimeemission.AssemblePackage(
 		s.factory,
-		s.integer,
+		s.scalar,
 		s.concurrency,
 		requirements.runtimeSymbols,
 		requirements.aliases(),
@@ -275,10 +358,17 @@ func (r *targetRequirements) addProviderRuntime(s *programSession) error {
 	if err != nil {
 		return err
 	}
-	if !requirements.AllowsProfile(s.integer) {
+	if !requirements.AllowsProfile(s.scalar.IntegerRepresentation()) {
 		return &OptionsError{
-			Field:  "integer representation",
-			Reason: "selected provider runtime does not admit " + s.integer.String(),
+			Field: "integer representation",
+			Reason: "selected provider runtime does not admit " +
+				s.scalar.IntegerRepresentation().String(),
+		}
+	}
+	if requirements.ProviderScalarABI() != s.providerScalar {
+		return &OptionsError{
+			Field:  "standard library provider",
+			Reason: "selected provider scalar ABI changed after session creation",
 		}
 	}
 	for _, alias := range requirements.PrimitiveAliases() {

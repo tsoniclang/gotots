@@ -26,24 +26,24 @@ type packageInitializationScheduler struct {
 }
 
 type packageStorage struct {
-	owner             api.ArtifactOwner
-	variable          *types.Var
-	source            ast.Node
-	field             tsgo.PropertyDeclaration
-	zeroStatements    []tsgo.Statement
-	statePlacement    *targetplacement.Owner
-	assemblyPlacement *targetplacement.Owner
-	reconstructions   uint64
+	owner                    api.ArtifactOwner
+	variable                 *types.Var
+	source                   ast.Node
+	field                    tsgo.PropertyDeclaration
+	initializationStatements []tsgo.Statement
+	statePlacement           *targetplacement.Owner
+	assemblyPlacement        *targetplacement.Owner
+	reconstructions          uint64
 }
 
 type packageStorageRevision struct {
-	field             tsgo.PropertyDeclaration
-	zeroStatements    []tsgo.Statement
-	statePlacement    *targetplacement.Owner
-	assemblyPlacement *targetplacement.Owner
-	dependencies      []api.ArtifactDependency
-	requirements      []api.DeclarationRequirement
-	contract          artifactstate.Contract
+	field                    tsgo.PropertyDeclaration
+	initializationStatements []tsgo.Statement
+	statePlacement           *targetplacement.Owner
+	assemblyPlacement        *targetplacement.Owner
+	dependencies             []api.ArtifactDependency
+	requirements             []api.DeclarationRequirement
+	contract                 artifactstate.Contract
 }
 
 type packageInitializationArtifact struct {
@@ -255,13 +255,13 @@ func (s *programSession) emitPackageStorage(
 	}
 	builder.storageByObject[variable] = len(builder.storage)
 	builder.storage = append(builder.storage, packageStorage{
-		owner:             owner,
-		variable:          variable,
-		source:            source,
-		field:             revision.field,
-		zeroStatements:    revision.zeroStatements,
-		statePlacement:    revision.statePlacement,
-		assemblyPlacement: revision.assemblyPlacement,
+		owner:                    owner,
+		variable:                 variable,
+		source:                   source,
+		field:                    revision.field,
+		initializationStatements: revision.initializationStatements,
+		statePlacement:           revision.statePlacement,
+		assemblyPlacement:        revision.assemblyPlacement,
 	})
 	return nil
 }
@@ -307,12 +307,17 @@ func (s *programSession) buildPackageStorageRevision(
 		return packageStorageRevision{}, err
 	}
 	defer finishAssembly()
+	var embedded *load.EmbedValue
+	if value, ok := site.Source.Embed(variable); ok {
+		embedded = &value
+	}
 	emission, err := packagevariable.EmitStorage(
 		builder.stateContext.WithArtifactOwner(owner),
 		builder.assemblyContext.WithArtifactOwner(owner),
 		builder.emitter,
 		source,
 		variable,
+		embedded,
 	)
 	if err != nil {
 		return packageStorageRevision{}, err
@@ -341,10 +346,10 @@ func (s *programSession) buildPackageStorageRevision(
 		return packageStorageRevision{}, err
 	}
 	return packageStorageRevision{
-		field:             emission.Field(),
-		zeroStatements:    emission.ZeroStatements(),
-		statePlacement:    statePlacement,
-		assemblyPlacement: assemblyPlacement,
+		field:                    emission.Field(),
+		initializationStatements: emission.InitializationStatements(),
+		statePlacement:           statePlacement,
+		assemblyPlacement:        assemblyPlacement,
 		dependencies: append(
 			stateDependencies,
 			assemblyDependencies...,
@@ -420,7 +425,7 @@ func (s *programSession) reconstructPackageStorage(
 	}
 	s.artifacts.DiscardDirty(owner)
 	storage.field = revision.field
-	storage.zeroStatements = revision.zeroStatements
+	storage.initializationStatements = revision.initializationStatements
 	storage.statePlacement = revision.statePlacement
 	storage.assemblyPlacement = revision.assemblyPlacement
 	storage.reconstructions++

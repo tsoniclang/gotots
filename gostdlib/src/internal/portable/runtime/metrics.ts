@@ -6,29 +6,38 @@ import type {
   gostring,
   int64,
   uint64,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
 import { readMetric } from "../../node/runtime/metrics.js";
 
 export class ValueKind {
   constructor(readonly value: int64) {}
 }
 
-export const KindUint64 = new ValueKind(1);
-export const KindFloat64 = new ValueKind(2);
-export const KindFloat64Histogram = new ValueKind(3);
-const kindBad = new ValueKind(0);
+export const KindUint64 = new ValueKind(1n);
+export const KindFloat64 = new ValueKind(2n);
+export const KindFloat64Histogram = new ValueKind(3n);
+const kindBad = new ValueKind(0n);
 
 export class Value {
   constructor(
     private readonly kind: ValueKind = kindBad,
-    private readonly numeric: number = 0,
+    private readonly floatValue: float64 = 0,
+    private readonly uintValue: uint64 = 0n,
   ) {}
+
+  static FromFloat64(value: float64): Value {
+    return new Value(KindFloat64, value, 0n);
+  }
+
+  static FromUint64(value: uint64): Value {
+    return new Value(KindUint64, 0, value);
+  }
 
   Float64(): float64 {
     if (this.kind.value !== KindFloat64.value) {
       GoPanic.raiseRuntime("called Float64 on non-float64 metric value");
     }
-    return this.numeric;
+    return this.floatValue;
   }
 
   Kind(): ValueKind {
@@ -39,7 +48,7 @@ export class Value {
     if (this.kind.value !== KindUint64.value) {
       GoPanic.raiseRuntime("called Uint64 on non-uint64 metric value");
     }
-    return this.numeric;
+    return this.uintValue;
   }
 }
 
@@ -100,10 +109,10 @@ export function Read(m: RuntimeSlice<Sample>): void {
     const reading = readMetric(sample.Name);
     switch (reading.kind) {
       case "uint64":
-        sample.Value = new Value(KindUint64, reading.value);
+        sample.Value = Value.FromUint64(reading.value);
         break;
       case "float64":
-        sample.Value = new Value(KindFloat64, reading.value);
+        sample.Value = Value.FromFloat64(reading.value);
         break;
       case "missing":
         sample.Value = new Value();

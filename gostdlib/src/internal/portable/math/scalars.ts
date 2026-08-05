@@ -2,21 +2,22 @@ import type {
   bool,
   float32,
   float64,
+  int,
   int32,
   int64,
   uint64,
   uint32,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
 
 const floatBuffer = new ArrayBuffer(8);
 const floatView = new DataView(floatBuffer);
 
 export const MaxFloat64: float64 = Number.MAX_VALUE;
-export const MaxInt: int64 = 9_223_372_036_854_775_807;
+export const MaxInt: int = 9_223_372_036_854_775_807n;
 export const MaxInt32: int32 = 2_147_483_647;
-export const MaxInt64: int64 = 9_223_372_036_854_775_807;
-export const MinInt: int64 = -9_223_372_036_854_775_808;
-export const MinInt64: int64 = -9_223_372_036_854_775_808;
+export const MaxInt64: int64 = 9_223_372_036_854_775_807n;
+export const MinInt: int = -9_223_372_036_854_775_808n;
+export const MinInt64: int64 = -9_223_372_036_854_775_808n;
 
 export function Abs(value: float64): float64 {
   return Math.abs(value);
@@ -33,7 +34,7 @@ export function Copysign(magnitude: float64, sign: float64): float64 {
 
 export function Float64bits(value: float64): uint64 {
   floatView.setFloat64(0, value, false);
-  return Number(floatView.getBigUint64(0, false));
+  return floatView.getBigUint64(0, false);
 }
 
 export function Float32bits(value: float32): uint32 {
@@ -47,7 +48,7 @@ export function Float32frombits(value: uint32): float32 {
 }
 
 export function Float64frombits(value: uint64): float64 {
-  floatView.setBigUint64(0, BigInt(Math.trunc(value)), false);
+  floatView.setBigUint64(0, value, false);
   return floatView.getFloat64(0, false);
 }
 
@@ -55,15 +56,15 @@ export function Floor(value: float64): float64 {
   return Math.floor(value);
 }
 
-export function Inf(sign: int64): float64 {
-  return sign >= 0 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+export function Inf(sign: int): float64 {
+  return sign >= 0n ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
 }
 
-export function IsInf(value: float64, sign: int64): bool {
-  if (sign > 0) {
+export function IsInf(value: float64, sign: int): bool {
+  if (sign > 0n) {
     return value === Number.POSITIVE_INFINITY;
   }
-  if (sign < 0) {
+  if (sign < 0n) {
     return value === Number.NEGATIVE_INFINITY;
   }
   return value === Number.POSITIVE_INFINITY || value === Number.NEGATIVE_INFINITY;

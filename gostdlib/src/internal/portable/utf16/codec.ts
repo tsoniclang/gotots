@@ -1,5 +1,5 @@
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int32, int64, uint16 } from "@gotots/runtime/scalars.js";
+import type { bool, int, int32, uint16 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { RuneError, validRune } from "../utf8/codec.js";
 
@@ -7,7 +7,7 @@ const surrogateMin = 0xd800;
 const surrogateMax = 0xdfff;
 const highSurrogateMax = 0xdbff;
 
-export function IsSurrogate(rune: int32): boolean {
+export function IsSurrogate(rune: int32): bool {
   return rune >= surrogateMin && rune <= surrogateMax;
 }
 
@@ -26,11 +26,11 @@ export function EncodeRune(rune: int32): [int32, int32] {
   return [surrogateMin + (adjusted >> 10), 0xdc00 + (adjusted & 0x3ff)];
 }
 
-export function RuneLen(rune: int32): int64 {
+export function RuneLen(rune: int32): int {
   if (!validRune(rune) || IsSurrogate(rune)) {
-    return -1;
+    return -1n;
   }
-  return rune < 0x10000 ? 1 : 2;
+  return rune < 0x10000 ? 1n : 2n;
 }
 
 export function Decode(source: RuntimeSlice<uint16>): RuntimeSlice<int32> {

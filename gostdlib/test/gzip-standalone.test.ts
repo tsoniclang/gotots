@@ -4,7 +4,8 @@ import { gzipSync } from "node:zlib";
 
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { int, uint8 } from "../src/internal/scalars.js";
+import { hostInteger, integerFromHost } from "../src/internal/host-integer.js";
 
 import {
   NewReader,
@@ -23,16 +24,19 @@ class MemoryReader extends ProviderInterfaceValue implements Reader {
     super(memoryReaderType);
   }
 
-  Read(destination: RuntimeSlice<uint8>): [int64, GoError | undefined] {
+  Read(destination: RuntimeSlice<uint8>): [int, GoError | undefined] {
     if (this.offset >= this.source.length) {
-      return [0, state.EOF];
+      return [0n, state.EOF];
     }
     const count = Math.min(destination.length, this.source.length - this.offset);
     for (let index = 0; index < count; index += 1) {
       destination.set(index, this.source[this.offset + index] ?? 0);
     }
     this.offset += count;
-    return [count, this.offset === this.source.length ? state.EOF : undefined];
+    return [
+      integerFromHost(count),
+      this.offset === this.source.length ? state.EOF : undefined,
+    ];
   }
 }
 
@@ -51,10 +55,10 @@ test("gzip reader decodes bytes and reports EOF", () => {
   const [count, readFailure] = GzipReader.Read(reader, decoded);
   assert.equal(readFailure, undefined);
   assert.equal(
-    new TextDecoder().decode(bytes(decoded.slice(0, count, null))),
+    new TextDecoder().decode(bytes(decoded.slice(0, hostInteger(count), null))),
     "hello gzip",
   );
-  assert.deepEqual(GzipReader.Read(reader, decoded), [0, state.EOF]);
+  assert.deepEqual(GzipReader.Read(reader, decoded), [0n, state.EOF]);
   assert.equal(GzipReader.Close(reader), undefined);
 });
 

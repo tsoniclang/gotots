@@ -244,8 +244,8 @@ func Arithmetic[T Integer](left, right T) T {
 	return (left-right)*right/right%left | left&right ^ left&^right
 }
 
-func AuditBigIntOperations() int32 {
-	return Arithmetic(int32(6), int32(3))
+func AuditBigIntOperations() int64 {
+	return Arithmetic(int64(6), int64(3))
 }
 
 func Ordered[T Integer](left, right T) bool {

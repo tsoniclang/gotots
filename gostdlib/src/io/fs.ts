@@ -9,10 +9,11 @@ import type {
   Awaitable,
   bool,
   gostring,
+  int,
   int64,
   uint32,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
 
 import { New } from "../errors.js";
 import {
@@ -67,7 +68,7 @@ export interface FS extends GoInterfaceValue {
 
 export interface File extends GoInterfaceValue {
   Close(): GoError | undefined;
-  Read(buffer: RuntimeSlice<uint8>): [int64, GoError | undefined];
+  Read(buffer: RuntimeSlice<uint8>): [int, GoError | undefined];
   Stat(): [FileInfo | undefined, GoError | undefined];
 }
 
@@ -264,7 +265,7 @@ export function ReadFile(
       }
       break;
     }
-    if (count === 0) {
+    if (count === 0n) {
       failure = New("multiple Read calls return no data or error");
       break;
     }

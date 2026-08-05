@@ -2,6 +2,7 @@ package certify
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	runtimecontract "github.com/tsoniclang/gotots/internal/contracts/runtime"
@@ -85,12 +86,21 @@ func (c *Certificate) ProviderModules() []string {
 	for _, module := range c.manifest.FacetModules() {
 		seen[module.Specifier()] = struct{}{}
 	}
+	seen[c.ProviderScalarModule()] = struct{}{}
 	modules := make([]string, 0, len(seen))
 	for module := range seen {
 		modules = append(modules, module)
 	}
 	sort.Strings(modules)
 	return modules
+}
+
+func (c *Certificate) ProviderScalarModule() string {
+	if !c.Valid() {
+		return ""
+	}
+	return strings.TrimSuffix(c.manifest.PackageName(), "/") +
+		strings.TrimPrefix(c.runtime.ProviderScalarModule(), ".")
 }
 
 func (c *Certificate) RuntimeRequirements() (
@@ -145,6 +155,15 @@ func (c *Certificate) ProviderInterface(
 		return gostdlib.ProviderInterfaceBinding{}, false
 	}
 	return c.manifest.ProviderInterface(sourceIdentity)
+}
+
+func (c *Certificate) ProviderInterfaceCapabilities(
+	baseSourceIdentity string,
+) []gostdlib.ProviderInterfaceCapability {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.ProviderInterfaceCapabilities(baseSourceIdentity)
 }
 
 func (c *Certificate) ProviderCallableProfile(

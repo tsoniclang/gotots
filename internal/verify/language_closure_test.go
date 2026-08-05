@@ -208,7 +208,7 @@ func TestWaveTenBodylessFunctionIsExactExternalObligation(t *testing.T) {
 	for _, required := range []string{
 		"export function Read",
 		"buffer: RuntimeSlice<uint8>",
-		"int64,",
+		"int,",
 		"$goInterface_",
 		"GoPanic.raiseRuntime(\"unresolved external Go function ",
 	} {

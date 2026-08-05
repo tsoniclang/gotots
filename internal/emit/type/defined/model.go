@@ -174,11 +174,44 @@ func (m Model) Channel() (*types.Chan, bool) {
 	return channel, ok && m.family == FamilyChannel
 }
 
+func (m Model) Representation(
+	context api.Context,
+) (api.DefinedValueRepresentation, error) {
+	representation, err := context.Names().DefinedValueRepresentation(m.typeName)
+	if err != nil {
+		return api.DefinedValueRepresentation{}, err
+	}
+	if !representation.Kind().Valid() {
+		return api.DefinedValueRepresentation{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "defined-value representation is invalid",
+		}
+	}
+	return representation, nil
+}
+
+func (m Model) ProviderCarrier(context api.Context) (bool, error) {
+	representation, err := m.Representation(context)
+	if err != nil {
+		return false, err
+	}
+	return representation.Kind() == api.DefinedValueRepresentationProviderIdentity ||
+		representation.Kind() == api.DefinedValueRepresentationProviderOperations, nil
+}
+
+func (m Model) OperationContext(context api.Context) (api.Context, error) {
+	provider, err := m.ProviderCarrier(context)
+	if err != nil || !provider {
+		return context, err
+	}
+	return context.WithProviderScalarRepresentation()
+}
+
 func (m Model) Project(
 	context api.Context,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	representation, err := context.Names().DefinedValueRepresentation(m.typeName)
+	representation, err := m.Representation(context)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -243,7 +276,7 @@ func (m Model) Wrap(
 	context api.Context,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	representation, err := context.Names().DefinedValueRepresentation(m.typeName)
+	representation, err := m.Representation(context)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

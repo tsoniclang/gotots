@@ -14,21 +14,21 @@ interface Cell {
 
 const copyCell = (value: Cell): Cell => ({ value: value.value });
 const zeroCell = (): Cell => ({ value: 0 });
-const sliceValue = <T>(value: RuntimeSlice<T>): RuntimeSlice<T> => value;
-const storageValue = <T>(value: T): T => value;
+const cellSlice = (value: RuntimeSlice<Cell>): RuntimeSlice<Cell> => value;
+const cellStorage = (value: Cell): Cell => value;
 
 test("slices.Grow preserves Go length, capacity, alias, copy, and zero semantics", () => {
   const source = RuntimeSlice.make<Cell>(1, 1, zeroCell());
   source.set(0, { value: 7 });
   const grown = Grow(
-    sliceValue,
-    sliceValue,
+    cellSlice,
+    cellSlice,
     copyCell,
-    storageValue,
-    storageValue,
+    cellStorage,
+    cellStorage,
     zeroCell,
     source,
-    3,
+    3n,
   );
   assert.equal(grown.length, 1);
   assert.ok(grown.capacity >= 4);
@@ -40,36 +40,36 @@ test("slices.Grow preserves Go length, capacity, alias, copy, and zero semantics
   assert.equal(exposed.get(2).value, 0);
 
   assert.equal(Grow(
-    sliceValue,
-    sliceValue,
+    cellSlice,
+    cellSlice,
     copyCell,
-    storageValue,
-    storageValue,
+    cellStorage,
+    cellStorage,
     zeroCell,
     grown,
-    0,
+    0n,
   ), grown);
   const nil = RuntimeSlice.nil<Cell>();
   assert.equal(Grow(
-    sliceValue,
-    sliceValue,
+    cellSlice,
+    cellSlice,
     copyCell,
-    storageValue,
-    storageValue,
+    cellStorage,
+    cellStorage,
     zeroCell,
     nil,
-    0,
+    0n,
   ), nil);
   assert.throws(
     () => Grow(
-      sliceValue,
-      sliceValue,
+      cellSlice,
+      cellSlice,
       copyCell,
-      storageValue,
-      storageValue,
+      cellStorage,
+      cellStorage,
       zeroCell,
       nil,
-      -1,
+      -1n,
     ),
     (failure: unknown): boolean => failure instanceof GoPanic
       && failure.value.$go$format("v", "", undefined) === "cannot be negative",

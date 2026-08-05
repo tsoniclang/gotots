@@ -24,6 +24,7 @@ func TestStatefulProfilePreservesCertifiedTypeArgumentOrder(t *testing.T) {
 			Member:              member,
 			Effect:              gostdlib.EffectSynchronous,
 			SourceSignature:     "func()",
+			ContractSignature:   "func()",
 			SourceLocation:      "source.go:1:1",
 			ImplementationOwner: "src/internal/facets/provider-state.ts",
 			TargetFingerprint:   digest(fingerprint),

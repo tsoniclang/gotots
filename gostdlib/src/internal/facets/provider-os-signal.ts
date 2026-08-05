@@ -1,7 +1,7 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, gostring } from "@gotots/runtime/scalars.js";
+import type { Awaitable, gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import type { CancelFunc } from "../../context.js";
 import type { Process } from "../../os.js";

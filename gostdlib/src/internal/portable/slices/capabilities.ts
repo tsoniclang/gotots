@@ -1,5 +1,7 @@
-import type { bool, int64 } from "@gotots/runtime/scalars.js";
+import type { bool, int64 } from "@gotots/gostdlib/internal/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+
+import { integerFromHost } from "../../host-integer.js";
 
 export type BinaryLess<T> = (left: T, right: T) => bool;
 export type Convert<Source, Target> = (value: Source) => Target;
@@ -39,7 +41,12 @@ export function storedValues<T, Storage>(
 ): Storage[] {
   const result: Storage[] = [];
   for (let index = 0; index < source.length; index += 1) {
-    result.push(toStorage(readElement(source, index, copy, fromStorage)));
+    result.push(toStorage(readElement(
+      source,
+      integerFromHost(index),
+      copy,
+      fromStorage,
+    )));
   }
   return result;
 }
@@ -53,26 +60,26 @@ export function orderedCompare<T>(
   const leftNaN = !equal(left, left);
   const rightNaN = !equal(right, right);
   if (leftNaN) {
-    return rightNaN ? 0 : -1;
+    return rightNaN ? 0n : -1n;
   }
   if (rightNaN) {
-    return 1;
+    return 1n;
   }
   if (less(left, right)) {
-    return -1;
+    return -1n;
   }
   if (less(right, left)) {
-    return 1;
+    return 1n;
   }
-  return 0;
+  return 0n;
 }
 
 export function compareLengths(left: number, right: number): int64 {
   if (left < right) {
-    return -1;
+    return -1n;
   }
   if (left > right) {
-    return 1;
+    return 1n;
   }
-  return 0;
+  return 0n;
 }

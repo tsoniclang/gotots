@@ -1,6 +1,6 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
-import type { bool } from "@gotots/runtime/scalars.js";
+import type { bool } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   Mutex,

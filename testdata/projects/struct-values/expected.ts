@@ -1,4 +1,5 @@
 import type { bool, int32 } from "../../../runtime/scalars.js";
+import { GoPointer } from "../../../runtime/pointer.js";
 export class Point {
     declare private readonly $goType: void;
     private constructor(public X: int32, public Visible: bool) {
@@ -35,7 +36,7 @@ export class Box {
     WithX(value: int32): Box {
         let box: Box = Box.$copy(this);
         box.Point.X = value;
-        return box;
+        return Box.$copy(box);
     }
 }
 export class Mirror {
@@ -79,6 +80,15 @@ export class Empty {
 export function NewBox(value: int32): Box {
     return Box.$make(Point.$make(value, true), value > 0);
 }
+export function Snapshot(value: Box | undefined): Point {
+    return Point.$copy(GoPointer.direct<Box>(value).Point);
+}
+export function ReturnSnapshotResult(): int32 {
+    let value$storage = NewBox(1);
+    let snapshot = Snapshot(value$storage);
+    value$storage.Point.X = 2;
+    return snapshot.X * 10 + Box.$copy(value$storage).Point.X;
+}
 export function ZeroIsFresh(): bool {
     let left = Box.$zero();
     let right = Box.$zero();
@@ -98,7 +108,7 @@ export function AssignIsolated(value: Box): int32 {
 }
 export function MutateParameter(value: Box): Box {
     value.Point.X = value.Point.X + 3;
-    return value;
+    return Box.$copy(value);
 }
 export function ParameterIsolated(value: Box): int32 {
     let changed = MutateParameter(Box.$copy(value));

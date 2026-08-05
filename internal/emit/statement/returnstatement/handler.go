@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
-	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -144,16 +143,12 @@ func emitSingle(
 		return api.StatementEmission{}, err
 	}
 	sourceType := context.TypesInfo().TypeOf(source.Results[0])
-	mode := api.ValueTransferRepresentation
-	if _, copied := arrayvalue.Resolve(context, resultType); copied {
-		mode = api.ValueTransferCopy
-	}
 	result, err = context.Values().Transfer(
 		context.WithRole(api.RoleReturnResult),
 		source.Results[0],
 		sourceType,
 		resultType,
-		mode,
+		api.ValueTransferCopy,
 		result,
 	)
 	if err != nil {

@@ -16,7 +16,7 @@ import (
 func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 	assembled, err := AssemblePackage(
 		tsgo.NewFactory(),
-		api.IntegerRepresentationNumber,
+		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsDisabled,
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeArray:         {},
@@ -82,7 +82,7 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 func TestDenseIndexDistinguishesNilValueFromAbsentStorage(t *testing.T) {
 	assembled, err := AssemblePackage(
 		tsgo.NewFactory(),
-		api.IntegerRepresentationNumber,
+		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsDisabled,
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeDenseIndex: {},

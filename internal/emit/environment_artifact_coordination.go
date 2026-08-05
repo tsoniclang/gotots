@@ -20,6 +20,25 @@ type environmentArtifact struct {
 	reconstructions uint64
 }
 
+func (s *programSession) validateProviderStatefulArtifact(
+	artifact *api.GeneratedArtifact,
+) error {
+	source, sourceOK := artifact.ProviderStatefulRepresentationType()
+	binding, found := s.registry.GeneratedArtifact(
+		api.GeneratedArtifactProviderStatefulRepresentation,
+		artifact.ArtifactKey(),
+	)
+	bound, boundOK := binding.ProviderStatefulRepresentationType()
+	if !sourceOK || !found || binding != artifact || !boundOK ||
+		!types.Identical(source, bound) {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "provider stateful-representation artifact has no exact canonical binding",
+		}
+	}
+	return nil
+}
+
 type environmentDeclaration struct {
 	object           types.Object
 	name             string

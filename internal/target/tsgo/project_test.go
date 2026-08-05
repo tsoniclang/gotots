@@ -52,6 +52,7 @@ export interface Shape {
 
 export type AsyncCallable = (() => Promise<void>) | undefined;
 export type SyncCallable = (() => number) | undefined;
+export type NumericAlias = number;
 export type AwaitableCallable = () => void | Promise<void>;
 export type AwaitableUnionCallable = () =>
   string | undefined | Promise<string | undefined>;
@@ -73,6 +74,26 @@ export function Invoke(
 export interface SupportContract extends ReadonlyArray<object> {}
 export function ConsumeSupport(contract: SupportContract): void {
   void contract;
+}
+
+export interface CapabilitySource {
+  Base(): string;
+}
+
+export interface CapabilityTarget extends CapabilitySource {
+  Extra(): number;
+}
+
+export function CapabilityView(
+  value: CapabilitySource,
+): CapabilityTarget | undefined {
+  return value.Base() === "target" ? value as CapabilityTarget : undefined;
+}
+
+export function RequiredCapabilityView(
+  value: CapabilitySource,
+): CapabilityTarget {
+  return value as CapabilityTarget;
 }
 
 export class Effects {
@@ -97,8 +118,13 @@ void Hidden;
   InvalidEffectCallable,
   Invoke,
   MemberAccess,
+  NumericAlias,
   Shape,
   SupportContract,
+  CapabilitySource,
+  CapabilityTarget,
+  CapabilityView,
+  RequiredCapabilityView,
   ConsumeSupport,
   SyncCallable,
   Value,
@@ -184,7 +210,7 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			) {
 				t.Fatalf("Shape members = %#v", selected)
 			}
-		case "AsyncCallable", "AwaitableCallable", "AwaitableUnionCallable", "ConsumeSupport", "Effects", "GenericAsyncCallable", "InvalidEffectCallable", "Invoke", "SupportContract", "SyncCallable":
+		case "AsyncCallable", "AwaitableCallable", "AwaitableUnionCallable", "CapabilitySource", "CapabilityTarget", "CapabilityView", "ConsumeSupport", "Effects", "GenericAsyncCallable", "InvalidEffectCallable", "Invoke", "NumericAlias", "RequiredCapabilityView", "SupportContract", "SyncCallable":
 			continue
 		}
 		if !slices.Equal(
@@ -198,6 +224,14 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			)
 		}
 	}
+	numeric := projectExportByName(t, exports, "NumericAlias")
+	if numeric.TypeString() != "any" || numeric.DeclaredTypeString() != "number" {
+		t.Fatalf(
+			"numeric alias types = %q/%q, want any/number",
+			numeric.TypeString(),
+			numeric.DeclaredTypeString(),
+		)
+	}
 	if !slices.Equal(
 		names,
 		[]string{
@@ -205,12 +239,17 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			"AwaitableCallable",
 			"AwaitableUnionCallable",
 			"Box",
+			"CapabilitySource",
+			"CapabilityTarget",
+			"CapabilityView",
 			"ConsumeSupport",
 			"Effects",
 			"GenericAsyncCallable",
 			"InvalidEffectCallable",
 			"Invoke",
 			"MemberAccess",
+			"NumericAlias",
+			"RequiredCapabilityView",
 			"Shape",
 			"SupportContract",
 			"SyncCallable",
@@ -279,6 +318,30 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 	supportIdentity, err := project.CallableParameterTypeIdentity(consumeSupport, 0)
 	if err != nil || !supportIdentity.Matches(supportContract) {
 		t.Fatalf("support parameter identity = %#v, %v", supportIdentity, err)
+	}
+	capabilitySource := projectExportByName(t, exports, "CapabilitySource")
+	capabilityTarget := projectExportByName(t, exports, "CapabilityTarget")
+	capabilityView := projectExportByName(t, exports, "CapabilityView")
+	capabilityParameter, capabilityResult, err :=
+		project.CallableOptionalViewTypes(capabilityView)
+	if err != nil || !capabilityParameter.Matches(capabilitySource) ||
+		!capabilityResult.Matches(capabilityTarget) {
+		t.Fatalf(
+			"capability view types = %#v, %#v, %v",
+			capabilityParameter,
+			capabilityResult,
+			err,
+		)
+	}
+	requiredCapabilityView := projectExportByName(
+		t,
+		exports,
+		"RequiredCapabilityView",
+	)
+	if _, _, err := project.CallableOptionalViewTypes(
+		requiredCapabilityView,
+	); err == nil {
+		t.Fatal("required capability result was accepted as optional")
 	}
 	async := projectExportByName(t, exports, "AsyncCallable")
 	awaitable := projectExportByName(t, exports, "AwaitableCallable")

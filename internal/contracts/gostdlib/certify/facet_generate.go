@@ -17,6 +17,7 @@ func buildFacetModules(
 	callableProfileSeeds []providerCallableProfileSeed,
 	statefulProfileSeeds []providerStatefulProfileSeed,
 	providerInterfaceSeeds []providerInterfaceSeed,
+	providerCapabilitySeeds []providerInterfaceCapabilitySeed,
 	modules []gostdlib.ModuleDocument,
 	genericOperations map[string][]gostdlib.GenericOperationDocument,
 	effectMarker tsgo.ProjectExport,
@@ -72,6 +73,15 @@ func buildFacetModules(
 			seed,
 		)
 	}
+	providerCapabilitiesBySpecifier := make(
+		map[string][]providerInterfaceCapabilitySeed,
+	)
+	for _, seed := range providerCapabilitySeeds {
+		providerCapabilitiesBySpecifier[seed.Specifier] = append(
+			providerCapabilitiesBySpecifier[seed.Specifier],
+			seed,
+		)
+	}
 	specifiers := make([]string, 0, len(bySpecifier))
 	for specifier := range bySpecifier {
 		specifiers = append(specifiers, specifier)
@@ -113,6 +123,23 @@ func buildFacetModules(
 			}
 		}
 	}
+	for specifier := range providerCapabilitiesBySpecifier {
+		if _, selected := bySpecifier[specifier]; selected {
+			continue
+		}
+		if _, selected := representationsBySpecifier[specifier]; selected {
+			continue
+		}
+		if _, selected := profilesBySpecifier[specifier]; selected {
+			continue
+		}
+		if _, selected := statefulProfilesBySpecifier[specifier]; selected {
+			continue
+		}
+		if _, selected := providerInterfacesBySpecifier[specifier]; !selected {
+			specifiers = append(specifiers, specifier)
+		}
+	}
 	sort.Strings(specifiers)
 	result := make([]gostdlib.FacetModuleDocument, 0, len(specifiers))
 	for _, specifier := range specifiers {
@@ -121,6 +148,7 @@ func buildFacetModules(
 		selectedProfiles := profilesBySpecifier[specifier]
 		selectedStatefulProfiles := statefulProfilesBySpecifier[specifier]
 		selectedProviderInterfaces := providerInterfacesBySpecifier[specifier]
+		selectedProviderCapabilities := providerCapabilitiesBySpecifier[specifier]
 		sourcePath := ""
 		if len(selected) != 0 {
 			sourcePath = selected[0].SourcePath
@@ -132,6 +160,8 @@ func buildFacetModules(
 			sourcePath = selectedStatefulProfiles[0].SourcePath
 		} else if len(selectedProviderInterfaces) != 0 {
 			sourcePath = selectedProviderInterfaces[0].SourcePath
+		} else if len(selectedProviderCapabilities) != 0 {
+			sourcePath = selectedProviderCapabilities[0].SourcePath
 		}
 		for _, seed := range selected {
 			if seed.SourcePath != sourcePath {
@@ -175,6 +205,15 @@ func buildFacetModules(
 					"build provider interfaces",
 					specifier,
 					"one provider-interface module has multiple source files",
+				)
+			}
+		}
+		for _, seed := range selectedProviderCapabilities {
+			if seed.SourcePath != sourcePath {
+				return nil, certifyError(
+					"build provider-interface capabilities",
+					specifier,
+					"one provider-capability module has multiple source files",
 				)
 			}
 		}
@@ -307,6 +346,29 @@ func buildFacetModules(
 				owned[selected.Export] = struct{}{}
 			}
 		}
+		providerCapabilityDocuments := make(
+			[]gostdlib.ProviderInterfaceCapabilityDocument,
+			0,
+			len(selectedProviderCapabilities),
+		)
+		for _, seed := range selectedProviderCapabilities {
+			capability, err := buildProviderInterfaceCapability(
+				seed,
+				profileDocuments,
+				providerInterfaceDocuments,
+				byName,
+				project,
+				effectMarker,
+			)
+			if err != nil {
+				return nil, err
+			}
+			providerCapabilityDocuments = append(
+				providerCapabilityDocuments,
+				capability,
+			)
+			owned[capability.ViewExport] = struct{}{}
+		}
 		facets := make([]gostdlib.FacetDocument, 0, len(selected))
 		for _, seed := range selected {
 			facet, err := buildFacet(
@@ -362,14 +424,24 @@ func buildFacetModules(
 				statefulProfileDocuments[right].ProfileKey
 			return leftKey < rightKey
 		})
+		sort.Slice(providerCapabilityDocuments, func(left, right int) bool {
+			leftKey := providerCapabilityDocuments[left].BaseSourceIdentity + "\x00" +
+				providerCapabilityDocuments[left].TargetSourceIdentity + "\x00" +
+				providerCapabilityDocuments[left].TargetExport
+			rightKey := providerCapabilityDocuments[right].BaseSourceIdentity + "\x00" +
+				providerCapabilityDocuments[right].TargetSourceIdentity + "\x00" +
+				providerCapabilityDocuments[right].TargetExport
+			return leftKey < rightKey
+		})
 		result = append(result, gostdlib.FacetModuleDocument{
-			Specifier:          specifier,
-			SourcePath:         sourcePath,
-			Representations:    representationDocuments,
-			ProviderInterfaces: providerInterfaceDocuments,
-			CallableProfiles:   profileDocuments,
-			StatefulProfiles:   statefulProfileDocuments,
-			Facets:             facets,
+			Specifier:                     specifier,
+			SourcePath:                    sourcePath,
+			Representations:               representationDocuments,
+			ProviderInterfaces:            providerInterfaceDocuments,
+			ProviderInterfaceCapabilities: providerCapabilityDocuments,
+			CallableProfiles:              profileDocuments,
+			StatefulProfiles:              statefulProfileDocuments,
+			Facets:                        facets,
 		})
 	}
 	return result, nil

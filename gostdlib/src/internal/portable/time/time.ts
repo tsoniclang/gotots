@@ -4,9 +4,11 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
   gostring,
+  int,
   int64,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
+import { hostInteger, integerFromHost } from "../../host-integer.js";
 import {
   monotonicMilliseconds,
   wallMilliseconds,
@@ -79,7 +81,7 @@ export class Time {
     if (this.epochMilliseconds === undefined) {
       return new Time();
     }
-    const deltaNanoseconds = d.Nanoseconds();
+    const deltaNanoseconds = hostInteger(d.Nanoseconds());
     const remainderTotal = this.nanosecondRemainder + deltaNanoseconds;
     const deltaMilliseconds = Math.floor(
       remainderTotal / nanosecondsPerMillisecond,
@@ -135,16 +137,16 @@ export class Time {
 
   Sub(u: Time): Duration {
     if (this.monotonic !== undefined && u.monotonic !== undefined) {
-      return new Duration(
+      return new Duration(integerFromHost(
         Math.trunc((this.monotonic - u.monotonic) * nanosecondsPerMillisecond),
-      );
+      ));
     }
-    return new Duration(Math.trunc((
+    return new Duration(integerFromHost(Math.trunc((
       (this.epochMilliseconds ?? zeroEpochMilliseconds)
         - (u.epochMilliseconds ?? zeroEpochMilliseconds)
     ) * nanosecondsPerMillisecond
       + this.nanosecondRemainder
-      - u.nanosecondRemainder));
+      - u.nanosecondRemainder)));
   }
 
   IsZero(): bool {
@@ -182,29 +184,30 @@ export class Time {
     return Time.#format(this, "2006-01-02 15:04:05.000000000 -0700 MST");
   }
 
-  Nanosecond(): number {
+  Nanosecond(): int {
     const millisecond = (
       (this.epochMilliseconds ?? zeroEpochMilliseconds) % 1_000 + 1_000
     ) % 1_000;
-    return millisecond * nanosecondsPerMillisecond
-      + this.nanosecondRemainder;
+    return integerFromHost(
+      millisecond * nanosecondsPerMillisecond + this.nanosecondRemainder,
+    );
   }
 
   Unix(): int64 {
-    return Math.floor(
+    return integerFromHost(Math.floor(
       (this.epochMilliseconds ?? zeroEpochMilliseconds) / 1_000,
-    );
+    ));
   }
 
   UnixMilli(): int64 {
-    return Math.trunc(this.epochMilliseconds ?? zeroEpochMilliseconds);
+    return integerFromHost(
+      Math.trunc(this.epochMilliseconds ?? zeroEpochMilliseconds),
+    );
   }
 
   UnixNano(): int64 {
-    return Math.trunc(
-      this.UnixMilli() * nanosecondsPerMillisecond
-        + this.nanosecondRemainder,
-    );
+    return this.UnixMilli() * 1_000_000n
+      + integerFromHost(this.nanosecondRemainder);
   }
 
   UnmarshalText(source: RuntimeSlice<uint8>): GoError | undefined {
@@ -388,23 +391,23 @@ export function Since(t: Time): Duration {
 export function Unix(sec: int64, nsec: int64): Time {
   let seconds = sec;
   let nanoseconds = nsec;
-  if (nanoseconds < 0 || nanoseconds >= 1_000_000_000) {
-    const secondAdjustment = Math.trunc(nanoseconds / 1_000_000_000);
+  if (nanoseconds < 0n || nanoseconds >= 1_000_000_000n) {
+    const secondAdjustment = nanoseconds / 1_000_000_000n;
     seconds += secondAdjustment;
-    nanoseconds -= secondAdjustment * 1_000_000_000;
-    if (nanoseconds < 0) {
-      nanoseconds += 1_000_000_000;
-      seconds -= 1;
+    nanoseconds -= secondAdjustment * 1_000_000_000n;
+    if (nanoseconds < 0n) {
+      nanoseconds += 1_000_000_000n;
+      seconds -= 1n;
     }
   }
-  const milliseconds = seconds * 1_000
-    + Math.floor(nanoseconds / nanosecondsPerMillisecond);
-  const remainder = nanoseconds % nanosecondsPerMillisecond;
-  return new Time(milliseconds, undefined, remainder);
+  const milliseconds = seconds * 1_000n
+    + nanoseconds / 1_000_000n;
+  const remainder = hostInteger(nanoseconds % 1_000_000n);
+  return new Time(hostInteger(milliseconds), undefined, remainder);
 }
 
 export function UnixMilli(msec: int64): Time {
-  return new Time(msec);
+  return new Time(hostInteger(msec));
 }
 
 export function Until(t: Time): Duration {

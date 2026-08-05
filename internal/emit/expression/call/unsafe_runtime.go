@@ -144,13 +144,7 @@ func unsafePointerTypeArguments(
 }
 
 func unsafeByteConverter(context api.Context) (tsgo.Expression, error) {
-	var name string
-	switch context.IntegerRepresentation() {
-	case api.IntegerRepresentationNumber:
-		name = "Number"
-	case api.IntegerRepresentationBigInt:
-		name = "BigInt"
-	default:
+	if !context.IntegerRepresentation().Valid() {
 		return nil, &api.IntegerRepresentationError{
 			Representation: context.IntegerRepresentation(),
 		}
@@ -158,7 +152,7 @@ func unsafeByteConverter(context api.Context) (tsgo.Expression, error) {
 	return context.Factory().PropertyAccessExpression(
 		context.Factory().Identifier(api.TargetGlobalAnchorName),
 		nil,
-		context.Factory().Identifier(name),
+		context.Factory().Identifier("Number"),
 		tsgo.NodeFlagsNone,
 	), nil
 }

@@ -6,11 +6,16 @@ import type {
   bool,
   float64,
   gostring,
+  int,
   int64,
+  uint,
   uint8,
   uint64,
-} from "@gotots/runtime/scalars.js";
+  uintptr,
+} from "@gotots/gostdlib/internal/scalars.js";
 import type { GoUnsafePointer } from "@gotots/runtime/unsafe-pointer.js";
+
+import { hostInteger } from "./internal/host-integer.js";
 
 import {
   getStructTag,
@@ -20,45 +25,45 @@ import { ProviderError } from "./internal/runtime/error.js";
 import type { Seq } from "./iter.js";
 
 export class ChanDir {
-  constructor(readonly value: int64) {}
+  constructor(readonly value: int) {}
 }
 
 export class Kind {
-  constructor(readonly value: uint64) {}
+  constructor(readonly value: uint) {}
 
   String(): gostring {
-    return kindNames[this.value] ?? `Kind(${this.value})`;
+    return kindNames[hostInteger(this.value)] ?? `Kind(${this.value})`;
   }
 }
 
-export const Invalid = new Kind(0);
-export const Bool = new Kind(1);
-export const Int = new Kind(2);
-export const Int8 = new Kind(3);
-export const Int16 = new Kind(4);
-export const Int32 = new Kind(5);
-export const Int64 = new Kind(6);
-export const Uint = new Kind(7);
-export const Uint8 = new Kind(8);
-export const Uint16 = new Kind(9);
-export const Uint32 = new Kind(10);
-export const Uint64 = new Kind(11);
-export const Uintptr = new Kind(12);
-export const Float32 = new Kind(13);
-export const Float64 = new Kind(14);
-export const Complex64 = new Kind(15);
-export const Complex128 = new Kind(16);
-export const Array = new Kind(17);
-export const Chan = new Kind(18);
-export const Func = new Kind(19);
-export const Interface = new Kind(20);
-export const Map = new Kind(21);
-export const Pointer = new Kind(22);
+export const Invalid = new Kind(0n);
+export const Bool = new Kind(1n);
+export const Int = new Kind(2n);
+export const Int8 = new Kind(3n);
+export const Int16 = new Kind(4n);
+export const Int32 = new Kind(5n);
+export const Int64 = new Kind(6n);
+export const Uint = new Kind(7n);
+export const Uint8 = new Kind(8n);
+export const Uint16 = new Kind(9n);
+export const Uint32 = new Kind(10n);
+export const Uint64 = new Kind(11n);
+export const Uintptr = new Kind(12n);
+export const Float32 = new Kind(13n);
+export const Float64 = new Kind(14n);
+export const Complex64 = new Kind(15n);
+export const Complex128 = new Kind(16n);
+export const Array = new Kind(17n);
+export const Chan = new Kind(18n);
+export const Func = new Kind(19n);
+export const Interface = new Kind(20n);
+export const Map = new Kind(21n);
+export const Pointer = new Kind(22n);
 export const Ptr = Pointer;
-export const Slice = new Kind(23);
-export const String = new Kind(24);
-export const Struct = new Kind(25);
-export const UnsafePointer = new Kind(26);
+export const Slice = new Kind(23n);
+export const String = new Kind(24n);
+export const Struct = new Kind(25n);
+export const UnsafePointer = new Kind(26n);
 
 export abstract class Value {
   protected constructor(protected readonly source?: GoInterfaceValue) {}
@@ -68,13 +73,13 @@ export abstract class Value {
   Bytes(): RuntimeSlice<uint8> { return unsupportedReflect("Value.Bytes"); }
   CanInt(): bool { return unsupportedReflect("Value.CanInt"); }
   CanSet(): bool { return unsupportedReflect("Value.CanSet"); }
-  Cap(): int64 { return unsupportedReflect("Value.Cap"); }
+  Cap(): int { return unsupportedReflect("Value.Cap"); }
   Convert(_target: Type | undefined): Value { return unsupportedReflect("Value.Convert"); }
   Elem(): Value { return unsupportedReflect("Value.Elem"); }
-  Field(_index: int64): Value { return unsupportedReflect("Value.Field"); }
+  Field(_index: int): Value { return unsupportedReflect("Value.Field"); }
   Float(): float64 { return unsupportedReflect("Value.Float"); }
-  Grow(_capacity: int64): void { return unsupportedReflect("Value.Grow"); }
-  Index(_index: int64): Value { return unsupportedReflect("Value.Index"); }
+  Grow(_capacity: int): void { return unsupportedReflect("Value.Grow"); }
+  Index(_index: int): Value { return unsupportedReflect("Value.Index"); }
   Int(): int64 { return unsupportedReflect("Value.Int"); }
 
   Interface(): GoInterfaceValue | undefined {
@@ -92,10 +97,10 @@ export abstract class Value {
     return this.source === undefined ? Invalid : unsupportedReflect("Value.Kind");
   }
 
-  Len(): int64 { return unsupportedReflect("Value.Len"); }
+  Len(): int { return unsupportedReflect("Value.Len"); }
   MapIndex(_key: Value): Value { return unsupportedReflect("Value.MapIndex"); }
   MapRange(): MapIter | undefined { return unsupportedReflect("Value.MapRange"); }
-  NumField(): int64 { return unsupportedReflect("Value.NumField"); }
+  NumField(): int { return unsupportedReflect("Value.NumField"); }
   Set(_value: Value): void { return unsupportedReflect("Value.Set"); }
   SetBool(_value: bool): void { return unsupportedReflect("Value.SetBool"); }
   SetBytes(_value: RuntimeSlice<uint8>): void { return unsupportedReflect("Value.SetBytes"); }
@@ -103,7 +108,7 @@ export abstract class Value {
   SetInt(_value: int64): void { return unsupportedReflect("Value.SetInt"); }
   SetIterKey(_iterator: MapIter | undefined): void { return unsupportedReflect("Value.SetIterKey"); }
   SetIterValue(_iterator: MapIter | undefined): void { return unsupportedReflect("Value.SetIterValue"); }
-  SetLen(_length: int64): void { return unsupportedReflect("Value.SetLen"); }
+  SetLen(_length: int): void { return unsupportedReflect("Value.SetLen"); }
   SetMapIndex(_key: Value, _element: Value): void { return unsupportedReflect("Value.SetMapIndex"); }
   SetString(_value: gostring): void { return unsupportedReflect("Value.SetString"); }
   SetUint(_value: uint64): void { return unsupportedReflect("Value.SetUint"); }
@@ -153,14 +158,14 @@ export class Method {
   PkgPath: gostring;
   Type: Type | undefined;
   Func: Value;
-  Index: int64;
+  Index: int;
 
   constructor(fields: {
     Name: gostring;
     PkgPath: gostring;
     Type: Type | undefined;
     Func: Value;
-    Index: int64;
+    Index: int;
   }) {
     this.Name = fields.Name;
     this.PkgPath = fields.PkgPath;
@@ -175,8 +180,8 @@ export class StructField {
   PkgPath: gostring;
   Type: Type | undefined;
   Tag: StructTag;
-  Offset: uint64;
-  Index: RuntimeSlice<int64>;
+  Offset: uintptr;
+  Index: RuntimeSlice<int>;
   Anonymous: bool;
 
   constructor(fields: {
@@ -184,8 +189,8 @@ export class StructField {
     PkgPath: gostring;
     Type: Type | undefined;
     Tag: StructTag;
-    Offset: uint64;
-    Index: RuntimeSlice<int64>;
+    Offset: uintptr;
+    Index: RuntimeSlice<int>;
     Anonymous: bool;
   }) {
     this.Name = fields.Name;
@@ -215,46 +220,46 @@ export class StructTag {
 }
 
 export interface Type extends GoInterfaceValue {
-  Align(): int64;
+  Align(): int;
   AssignableTo(u: Type | undefined): bool;
-  Bits(): int64;
+  Bits(): int;
   CanSeq(): bool;
   CanSeq2(): bool;
   ChanDir(): ChanDir;
   Comparable(): bool;
   ConvertibleTo(u: Type | undefined): bool;
   Elem(): Type | undefined;
-  Field(i: int64): StructField;
-  FieldAlign(): int64;
-  FieldByIndex(index: RuntimeSlice<int64>): StructField;
+  Field(i: int): StructField;
+  FieldAlign(): int;
+  FieldByIndex(index: RuntimeSlice<int>): StructField;
   FieldByName(name: gostring): [StructField, bool];
   FieldByNameFunc(
     match: ((name: gostring) => bool) | undefined,
   ): [StructField, bool];
   Fields(): Seq<StructField>;
   Implements(u: Type | undefined): bool;
-  In(i: int64): Type | undefined;
+  In(i: int): Type | undefined;
   Ins(): Seq<Type | undefined>;
   IsVariadic(): bool;
   Key(): Type | undefined;
   Kind(): Kind;
-  Len(): int64;
-  Method(argument0: int64): Method;
+  Len(): int;
+  Method(argument0: int): Method;
   MethodByName(argument0: gostring): [Method, bool];
   Methods(): Seq<Method>;
   Name(): gostring;
-  NumField(): int64;
-  NumIn(): int64;
-  NumMethod(): int64;
-  NumOut(): int64;
-  Out(i: int64): Type | undefined;
+  NumField(): int;
+  NumIn(): int;
+  NumMethod(): int;
+  NumOut(): int;
+  Out(i: int): Type | undefined;
   Outs(): Seq<Type | undefined>;
   OverflowComplex(x: GoComplex128): bool;
   OverflowFloat(x: float64): bool;
   OverflowInt(x: int64): bool;
   OverflowUint(x: uint64): bool;
   PkgPath(): gostring;
-  Size(): uint64;
+  Size(): uintptr;
   String(): gostring;
 }
 
@@ -279,8 +284,8 @@ export function MakeMap(_type: Type | undefined): Value {
 
 export function MakeSlice(
   _type: Type | undefined,
-  _length: int64,
-  _capacity: int64,
+  _length: int,
+  _capacity: int,
 ): Value {
   return unsupportedReflect("MakeSlice");
 }

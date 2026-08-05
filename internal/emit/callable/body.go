@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	statementsequence "github.com/tsoniclang/gotots/internal/emit/statement/sequence"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -69,9 +70,15 @@ func EmitBody(
 	}
 	statements := append(parameterPrologue, prologue...)
 	statements = append(statements, body.Value().Statements()...)
+	var guardRequests []api.RootRequest
 	if sourceSignature.Results().Len() != 0 &&
 		resultEndGuardRequired(statements) {
-		statements = append(statements, unreachableResultEnd(context))
+		guard, err := unreachableResultEnd(context)
+		if err != nil {
+			return api.BlockEmission{}, err
+		}
+		statements = append(statements, guard.Statements()...)
+		guardRequests = guard.Requests()
 	}
 	return api.DirectBlock(
 		context.Factory().Block(statements, true),
@@ -79,6 +86,7 @@ func EmitBody(
 			parameterRequests,
 			prologueRequests,
 			body.Requests(),
+			guardRequests,
 		)...,
 	), nil
 }
@@ -101,20 +109,26 @@ func isNativeSwitch(statement tsgo.Statement) bool {
 	}
 }
 
-func unreachableResultEnd(context api.Context) tsgo.ThrowStatement {
+func unreachableResultEnd(context api.Context) (api.StatementEmission, error) {
 	factory := context.Factory()
-	return factory.ThrowStatement(
-		factory.NewExpression(
-			api.TargetIntrinsicError.Expression(factory),
-			nil,
-			[]tsgo.Expression{
-				factory.StringLiteral(
-					"unreachable Go function end",
-					tsgo.TokenFlagsNone,
-				),
-			},
-		),
+	panicReference, err := context.Names().Runtime(
+		api.RuntimePanic,
+		api.ImportPhaseValue,
 	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	return api.DirectStatement(
+		factory.ExpressionStatement(panicruntime.Call(
+			factory,
+			panicReference.Name(),
+			factory.StringLiteral(
+				"unreachable Go function end",
+				tsgo.TokenFlagsNone,
+			),
+		)),
+		panicReference.Requests()...,
+	), nil
 }
 
 func namedResultPrologue(

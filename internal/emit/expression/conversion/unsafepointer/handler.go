@@ -9,6 +9,7 @@ import (
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -48,8 +49,15 @@ func Convert(
 		}
 	}
 	if sourceUnsafe && targetInteger {
+		operationContext := context
+		if targetModel, defined := definedtype.ResolveBasic(targetType); defined {
+			operationContext, err = targetModel.OperationContext(context)
+			if err != nil {
+				return api.ExpressionEmission{}, true, err
+			}
+		}
 		target, targetErr := integerBoundary(
-			context,
+			operationContext,
 			reference,
 			unsafepointerruntime.ToIntegerName,
 			value,
@@ -63,14 +71,19 @@ func Convert(
 		return target, true, targetErr
 	}
 	if targetUnsafe && sourceInteger {
+		operationContext := context
 		if sourceModel, defined := definedtype.Resolve(sourceType); defined {
+			operationContext, err = sourceModel.OperationContext(context)
+			if err != nil {
+				return api.ExpressionEmission{}, true, err
+			}
 			value, err = sourceModel.Project(context, value)
 			if err != nil {
 				return api.ExpressionEmission{}, true, err
 			}
 		}
 		target, targetErr := integerBoundary(
-			context,
+			operationContext,
 			reference,
 			unsafepointerruntime.FromIntegerName,
 			value,
@@ -257,11 +270,7 @@ func integerBoundary(
 	member string,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	zero, err := api.IntegerLiteral(
-		context.Factory(),
-		context.IntegerRepresentation(),
-		"0",
-	)
+	zero, err := integervalue.Literal(context, types.Typ[types.Uintptr], "0")
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

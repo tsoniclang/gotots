@@ -312,6 +312,40 @@ func storageKeyType(sourceType types.Type) types.Type {
 	return sourceType
 }
 
+func storageKeyOperationContext(
+	context api.Context,
+	sourceType types.Type,
+) (api.Context, error) {
+	model, defined := definedtype.ResolveBasic(sourceType)
+	if !defined {
+		return context, nil
+	}
+	return model.OperationContext(context)
+}
+
+func EmitStorageKeyType(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	sourceType types.Type,
+) (api.TypeEmission, error) {
+	if children == nil || sourceType == nil || !types.Comparable(sourceType) {
+		return api.TypeEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "map storage key type contract is invalid",
+		}
+	}
+	operationContext, err := storageKeyOperationContext(context, sourceType)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return children.RepresentedType(
+		operationContext.WithRole(api.RoleStorageType),
+		source,
+		storageKeyType(sourceType),
+	)
+}
+
 func directKey(
 	context api.Context,
 	sourceType types.Type,

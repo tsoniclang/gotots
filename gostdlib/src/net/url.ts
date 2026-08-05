@@ -1,5 +1,5 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
-import type { bool, gostring } from "@gotots/runtime/scalars.js";
+import type { bool, gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { escapePathSegment, escapeQuery } from "../internal/portable/url/escape.js";
 import {

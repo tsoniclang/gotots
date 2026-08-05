@@ -4,9 +4,9 @@ import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   Awaitable,
   gostring,
-  int64,
+  int,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderInterfaceValue } from "../portable/io/value.js";
 
@@ -46,7 +46,7 @@ export interface CanonicalReader<Failure extends GoInterfaceValue>
   Read(
     destination: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Awaitable<[int64, Failure | undefined]>;
+  ): Awaitable<[int, Failure | undefined]>;
 }
 
 export interface CanonicalWriter<Failure extends GoInterfaceValue>
@@ -54,5 +54,5 @@ export interface CanonicalWriter<Failure extends GoInterfaceValue>
   Write(
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Awaitable<[int64, Failure | undefined]>;
+  ): Awaitable<[int, Failure | undefined]>;
 }

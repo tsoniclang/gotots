@@ -46,6 +46,8 @@ func validateProviderInterface(
 			return manifestError(methodField+".kind", "value is invalid")
 		case method.SourceSignature == "":
 			return manifestError(methodField+".sourceSignature", "value is empty")
+		case method.ContractSignature == "":
+			return manifestError(methodField+".contractSignature", "value is empty")
 		case method.SourceLocation == "":
 			return manifestError(methodField+".sourceLocation", "value is empty")
 		}

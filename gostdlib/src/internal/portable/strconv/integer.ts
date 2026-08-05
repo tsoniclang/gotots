@@ -1,44 +1,47 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type {
   gostring,
+  int,
   int64,
   uint64,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger } from "../../host-integer.js";
 
 import { NumberError, rangeError, syntaxError } from "./number-error.js";
 
 const digits = "0123456789abcdefghijklmnopqrstuvwxyz";
 
-export function Atoi(value: gostring): [int64, NumberError | undefined] {
-  const [parsed, error] = ParseInt(value, 10, 0);
+export function Atoi(value: gostring): [int, NumberError | undefined] {
+  const [parsed, error] = ParseInt(value, 10n, 0n);
   return error === undefined
     ? [parsed, undefined]
     : [parsed, new NumberError("Atoi", value, error.Unwrap())];
 }
 
-export function FormatInt(value: int64, base: int64): gostring {
+export function FormatInt(value: int64, base: int): gostring {
   validateBase(base);
-  const integer = BigInt.asIntN(64, BigInt(Math.trunc(value)));
-  return integer.toString(base);
+  const integer = BigInt.asIntN(64, value);
+  return integer.toString(hostInteger(base));
 }
 
-export function FormatUint(value: uint64, base: int64): gostring {
+export function FormatUint(value: uint64, base: int): gostring {
   validateBase(base);
-  const integer = BigInt.asUintN(64, BigInt(Math.trunc(value)));
-  return integer.toString(base);
+  const integer = BigInt.asUintN(64, value);
+  return integer.toString(hostInteger(base));
 }
 
-export function Itoa(value: int64): gostring {
-  return FormatInt(value, 10);
+export function Itoa(value: int): gostring {
+  return FormatInt(value, 10n);
 }
 
 export function ParseInt(
   value: gostring,
-  base: int64,
-  bitSize: int64,
+  base: int,
+  bitSize: int,
 ): [int64, NumberError | undefined] {
   if (value.length === 0) {
-    return [0, syntaxError("ParseInt", value)];
+    return [0n, syntaxError("ParseInt", value)];
   }
   let sign = 1n;
   let digitsText = value;
@@ -47,47 +50,47 @@ export function ParseInt(
     digitsText = digitsText.slice(1);
   }
   if (digitsText.length === 0) {
-    return [0, syntaxError("ParseInt", value)];
+    return [0n, syntaxError("ParseInt", value)];
   }
 
   const parsed = parseMagnitude(digitsText, base);
   if (parsed.error !== undefined) {
-    return [0, syntaxError("ParseInt", value)];
+    return [0n, syntaxError("ParseInt", value)];
   }
   const bits = normalizedBits(bitSize);
   if (bits === undefined) {
-    return [0, syntaxError("ParseInt", value)];
+    return [0n, syntaxError("ParseInt", value)];
   }
   const maximum = (1n << BigInt(bits - 1)) - 1n;
   const minimumMagnitude = 1n << BigInt(bits - 1);
-  const magnitudeLimit = sign < 0 ? minimumMagnitude : maximum;
+  const magnitudeLimit = sign < 0n ? minimumMagnitude : maximum;
   if (parsed.value > magnitudeLimit) {
-    return [Number(sign < 0 ? -minimumMagnitude : maximum), rangeError("ParseInt", value)];
+    return [sign < 0n ? -minimumMagnitude : maximum, rangeError("ParseInt", value)];
   }
-  return [Number(sign * parsed.value), undefined];
+  return [sign * parsed.value, undefined];
 }
 
 export function ParseUint(
   value: gostring,
-  base: int64,
-  bitSize: int64,
+  base: int,
+  bitSize: int,
 ): [uint64, NumberError | undefined] {
   if (value.length === 0 || value[0] === "+" || value[0] === "-") {
-    return [0, syntaxError("ParseUint", value)];
+    return [0n, syntaxError("ParseUint", value)];
   }
   const parsed = parseMagnitude(value, base);
   if (parsed.error !== undefined) {
-    return [0, syntaxError("ParseUint", value)];
+    return [0n, syntaxError("ParseUint", value)];
   }
   const bits = normalizedBits(bitSize);
   if (bits === undefined) {
-    return [0, syntaxError("ParseUint", value)];
+    return [0n, syntaxError("ParseUint", value)];
   }
   const maximum = (1n << BigInt(bits)) - 1n;
   if (parsed.value > maximum) {
-    return [Number(maximum), rangeError("ParseUint", value)];
+    return [maximum, rangeError("ParseUint", value)];
   }
-  return [Number(parsed.value), undefined];
+  return [parsed.value, undefined];
 }
 
 type Magnitude = {
@@ -95,8 +98,8 @@ type Magnitude = {
   readonly error: boolean | undefined;
 };
 
-function parseMagnitude(text: gostring, requestedBase: int64): Magnitude {
-  let base = requestedBase;
+function parseMagnitude(text: gostring, requestedBase: int): Magnitude {
+  let base = hostInteger(requestedBase);
   let digitsText = text;
   let underscores = false;
   let prefixed = false;
@@ -156,19 +159,19 @@ function digitValue(character: string): number {
   return digits.indexOf(character.toLowerCase());
 }
 
-function normalizedBits(bitSize: int64): number | undefined {
-  if (!Number.isInteger(bitSize) || bitSize < 0 || bitSize > 64) {
+function normalizedBits(bitSize: int): number | undefined {
+  if (bitSize < 0n || bitSize > 64n) {
     return undefined;
   }
-  return bitSize === 0 ? 64 : bitSize;
+  return bitSize === 0n ? 64 : hostInteger(bitSize);
 }
 
-function validateBase(base: int64): void {
-  if (!validBase(base)) {
+function validateBase(base: int): void {
+  if (!validBase(hostInteger(base))) {
     GoPanic.raiseRuntime("strconv: illegal base");
   }
 }
 
-function validBase(base: int64): boolean {
+function validBase(base: number): boolean {
   return Number.isInteger(base) && base >= 2 && base <= 36;
 }

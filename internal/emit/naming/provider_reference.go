@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
-	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 )
 
 type providerImport struct {
@@ -46,6 +46,25 @@ func (n *File) providerImport(
 		return "", api.RootRequest{}, err
 	}
 	return selected.local, request, nil
+}
+
+func (n *File) ExternalProviderFunction(
+	module string,
+	export string,
+) (api.NameReference, error) {
+	if export == "" {
+		return api.NameReference{}, &api.NameError{
+			Reason: "external provider export is empty",
+		}
+	}
+	qualifier, request, err := n.providerImport(
+		module,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return api.NewQualifiedNameReference(qualifier, export, request)
 }
 
 func (n *File) providerFacetReference(
@@ -198,6 +217,10 @@ func (n *File) ProviderCallableProfile(
 	if err != nil {
 		return api.ProviderCallableProfileReference{}, true, err
 	}
+	capabilityViews, err := n.providerCallableProfileCapabilityViews(selected)
+	if err != nil {
+		return api.ProviderCallableProfileReference{}, true, err
+	}
 	reference, err = reference.WithRequests(
 		api.CombineRequests(reference.Requests(), guardRequests)...,
 	)
@@ -227,6 +250,7 @@ func (n *File) ProviderCallableProfile(
 	result, err := api.NewProviderCallableProfileReference(
 		reference,
 		selected,
+		capabilityViews,
 		guards,
 		contracts,
 		fromProvider,
@@ -234,6 +258,94 @@ func (n *File) ProviderCallableProfile(
 		typeArguments,
 	)
 	return result, true, err
+}
+
+func (n *File) providerCallableProfileCapabilityViews(
+	profile gostdlib.ProviderCallableProfile,
+) ([]api.NameReference, error) {
+	capabilities, err := n.providerCallableProfileCapabilityTypes(profile)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]api.NameReference, 0, len(capabilities))
+	for _, capability := range capabilities {
+		adapterDemands, err := n.InterfaceContractDemand(
+			capability.Base(),
+			capability.Target(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		baseKey, err := typeidentity.BuildKey(
+			capability.Base(),
+			n.generatedNamedObjectIdentity,
+		)
+		if err != nil {
+			return nil, err
+		}
+		binding, err := n.owner.registry.internProviderProfileInterfaceBridge(
+			baseKey,
+			capability.Base(),
+			profile.Interfaces(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		targetKey, err := typeidentity.BuildKey(
+			capability.Target(),
+			n.generatedNamedObjectIdentity,
+		)
+		if err != nil {
+			return nil, err
+		}
+		targetBinding, err := n.owner.registry.internProviderProfileInterfaceBridge(
+			targetKey,
+			capability.Target(),
+			profile.Interfaces(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := api.NewProviderInterfaceBridgeRequest(binding.owner)
+		if err != nil {
+			return nil, err
+		}
+		demand, err := api.NewProviderProfileInterfaceCapabilityRequest(
+			binding.owner,
+			targetBinding.owner,
+		)
+		if err != nil {
+			return nil, err
+		}
+		name, err := api.ProviderProfileCapabilityName(
+			binding.name,
+			targetBinding.key,
+		)
+		if err != nil {
+			return nil, err
+		}
+		reference, err := n.generatedValueReference(
+			binding.owner,
+			name,
+			definition,
+			api.ArtifactFacetExportSurface,
+		)
+		if err != nil {
+			return nil, err
+		}
+		reference, err = reference.WithRequests(
+			api.CombineRequests(
+				reference.Requests(),
+				adapterDemands,
+				[]api.RootRequest{demand},
+			)...,
+		)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, reference)
+	}
+	return result, nil
 }
 
 func (n *File) providerCallableProfileBridges(
@@ -406,158 +518,4 @@ func (n *File) ProviderStatefulProfileTarget(
 		export,
 		request,
 	)
-}
-
-func (n *File) providerCallableProfileValues(
-	profile gostdlib.ProviderCallableProfile,
-) ([]types.Object, error) {
-	identities := profile.CanonicalValues()
-	values := make([]types.Object, 0, len(identities))
-	for _, identity := range identities {
-		object := n.owner.registry.providerObjectByIdentity[identity]
-		variable, ok := object.(*types.Var)
-		if !ok || variable.IsField() || variable.Pkg() == nil ||
-			variable.Parent() != variable.Pkg().Scope() {
-			return nil, &api.NameError{
-				Name:   identity,
-				Reason: "provider callable-profile canonical value has no exact source variable",
-			}
-		}
-		values = append(values, variable)
-	}
-	return values, nil
-}
-
-func (n *File) ProviderCallableProfileCandidates(
-	owner *types.Func,
-) ([]api.ProviderCallableProfileCandidate, bool, error) {
-	if owner == nil {
-		return nil, false, &api.NameError{
-			Reason: "provider callable-profile owner is nil",
-		}
-	}
-	owner = owner.Origin()
-	contract, providerOwned, err := n.providerFacetOwner(owner)
-	if err != nil || !providerOwned {
-		return nil, providerOwned, err
-	}
-	profiles := n.owner.registry.provider.ProviderCallableProfiles(
-		contract.Identity(),
-	)
-	result := make([]api.ProviderCallableProfileCandidate, 0, len(profiles))
-	for _, profile := range profiles {
-		if !profile.Valid() || profile.SourceIdentity() != contract.Identity() {
-			return nil, true, &api.NameError{
-				Name:   contract.Identity(),
-				Reason: "provider callable-profile candidate is inconsistent",
-			}
-		}
-		guards, _, guardErr := n.providerCallableProfileGuards(
-			owner,
-			profile,
-			false,
-		)
-		if guardErr != nil {
-			return nil, true, guardErr
-		}
-		candidate, candidateErr := api.NewProviderCallableProfileCandidate(
-			profile,
-			guards,
-		)
-		if candidateErr != nil {
-			return nil, true, candidateErr
-		}
-		result = append(result, candidate)
-	}
-	return result, true, nil
-}
-
-func (n *File) ProviderCallableParameters(
-	owner *types.Func,
-) ([]gostdlib.ProviderCallableParameterDocument, bool, error) {
-	if owner == nil {
-		return nil, false, &api.NameError{
-			Reason: "provider callable owner is nil",
-		}
-	}
-	owner = owner.Origin()
-	contract, providerOwned, err := n.providerFacetOwner(owner)
-	if err != nil || !providerOwned {
-		return nil, providerOwned, err
-	}
-	binding, ok := n.owner.registry.provider.Binding(contract.Identity())
-	if !ok || binding.Kind() != gostdlib.BindingFunction {
-		return nil, true, &api.NameError{
-			Name:   contract.Identity(),
-			Reason: "provider callable binding evidence is absent",
-		}
-	}
-	return binding.CallableParameters(), true, nil
-}
-
-func (n *File) providerCallableProfileGuards(
-	owner *types.Func,
-	profile gostdlib.ProviderCallableProfile,
-	demand bool,
-) ([]types.Type, []api.RootRequest, error) {
-	if owner == nil {
-		return nil, nil, &api.NameError{
-			Reason: "provider callable-profile owner is nil",
-		}
-	}
-	signature, ok := owner.Origin().Type().(*types.Signature)
-	if !ok {
-		return nil, nil, &api.NameError{
-			Name:   owner.Name(),
-			Reason: "provider callable-profile owner has no signature",
-		}
-	}
-	guardIdentities := profile.GuardInterfaces()
-	guards := make([]types.Type, 0, len(guardIdentities))
-	var requests []api.RootRequest
-	for _, identity := range guardIdentities {
-		certificate, found := profile.Interface(identity)
-		if !found {
-			return nil, nil, &api.NameError{
-				Name:   identity,
-				Reason: "provider callable-profile guard certificate is absent",
-			}
-		}
-		protocol, synthetic := certificate.Protocol()
-		if synthetic {
-			selected, err := gostdlibsource.ResolveProviderProtocolInterface(
-				protocol,
-				signature,
-			)
-			if err != nil {
-				return nil, nil, err
-			}
-			valueParameter, ok := certificate.ProtocolValueParameter()
-			if !ok || valueParameter < 0 ||
-				valueParameter >= signature.Params().Len() {
-				return nil, nil, &api.NameError{
-					Name:   identity,
-					Reason: "provider protocol value parameter is invalid",
-				}
-			}
-			if demand {
-				selectedRequests, err := n.InterfaceContractDemand(
-					signature.Params().At(valueParameter).Type(),
-					selected,
-				)
-				if err != nil {
-					return nil, nil, err
-				}
-				requests = append(requests, selectedRequests...)
-			}
-			guards = append(guards, selected)
-			continue
-		}
-		selected, err := n.providerProfileInterfaceType(identity)
-		if err != nil {
-			return nil, nil, err
-		}
-		guards = append(guards, selected)
-	}
-	return guards, api.CombineRequests(requests), nil
 }

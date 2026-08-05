@@ -27,6 +27,7 @@ Install:
 - pinned TS-Go schema and generated typed protocol bindings;
 - real `printNode` encode/decode/print round trip;
 - explicit Go build profile and selected package graph;
+- exact loader-owned `//go:embed` declaration, pattern, file, and payload joins;
 - deterministic module/name/import/scope builders;
 - root placement and revisable artifact fixed point;
 - architecture walls.
@@ -151,9 +152,21 @@ Install:
 - selected-`GOROOT` contracts;
 - exact typed placeholders and obligation ledgers;
 - standalone strict-ESM `@gotots/gostdlib`;
+- standalone strict-ESM `@gotots/externals` modules for selected true-native
+  boundaries;
 - provider certificate and generated static facades;
+- one provider-owned, certified scalar ABI with selected native width;
 - true external/native/cgo boundaries;
 - reachable-obligation deletion gate.
+
+`@gotots/externals` owns a small, hand-maintainable public TypeScript surface,
+an exact module/export seed, and a generated canonical certificate. Its public
+subpaths mirror Go import paths (for example
+`@gotots/externals/golang.org/x/sys/unix.js`). The provider may depend on the
+exact certified `@gotots/gostdlib` package and GoToTS runtime, but generated Go
+callables never gain provider-policy parameters. Local product assembly links
+the package normally through ESM package resolution; publication is a separate
+later action.
 
 Public provider APIs and generated facades preserve source arity. Generic,
 interface, cooperative, and recovery support remains statically linked in
@@ -163,9 +176,23 @@ semantic protocols may retain at most one uniform direct certificate and one
 uniform cooperative certificate for a Go identity; ordinary direct bindings
 are not duplicated.
 
+Capability views used only inside the provider and views permitted in generated
+bridges are separately certified. Only the latter enter reverse interface
+demand. Delivery fails if a provider-internal view appears in generated output,
+if an exported view lacks a usage, if a direct bridge selects a canonical view,
+if a canonical bridge selects a direct view, or if either usage selects an
+incompatible base or target callable profile.
+
 Exit: provider package independently strict-typechecks and executes; exact
 contract/facade joins pass; a linked representative product uses one runtime
 identity and has zero reachable placeholders.
+
+Delivery generates and strict-typechecks the complete product runtime under
+both integer profiles. The provider build is independent of that product
+selection: provider source contains no import of `@gotots/runtime/scalars.js`,
+and its certificate pins the provider representation plus native width.
+Linked-product proof executes both equal-carrier and converting facades and
+rejects stale or mismatched provider scalar contracts before target sealing.
 
 ## 9. Product Proof
 

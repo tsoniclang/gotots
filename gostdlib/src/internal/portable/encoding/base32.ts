@@ -1,7 +1,7 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring, int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderError } from "../../runtime/error.js";
 import { byteSlice, sliceValues } from "../../runtime/slice.js";
@@ -45,9 +45,9 @@ export class Encoding {
     return destination.append(0, encoded);
   }
 
-  static EncodedLen(receiver: Encoding | undefined, length: int64): int64 {
+  static EncodedLen(receiver: Encoding | undefined, length: int): int {
     requireEncoding(receiver);
-    return Math.floor((length + 4) / 5) * 8;
+    return ((length + 4n) / 5n) * 8n;
   }
 
   #encodeBytes(source: readonly uint8[]): uint8[] {

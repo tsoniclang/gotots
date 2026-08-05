@@ -12,18 +12,19 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
-const facetMapSchemaVersion = 16
+const facetMapSchemaVersion = 20
 
 type facetMapDocument struct {
-	SchemaVersion            int                           `json:"schemaVersion"`
-	Representations          []providerRepresentationSeed  `json:"representations,omitempty"`
-	DefinedValueIdentities   []string                      `json:"definedValueIdentities,omitempty"`
-	Facets                   []facetSeed                   `json:"facets"`
-	ProviderCallableProfiles []providerCallableProfileSeed `json:"providerCallableProfiles,omitempty"`
-	ProviderProtocols        []providerProtocolSeed        `json:"providerProtocols,omitempty"`
-	ProviderStatefulProfiles []providerStatefulProfileSeed `json:"providerStatefulProfiles,omitempty"`
-	ProviderInterfaces       []providerInterfaceSeed       `json:"providerInterfaces,omitempty"`
-	GenericOperationSets     []genericOperationSetSeed     `json:"genericOperationSets"`
+	SchemaVersion                 int                               `json:"schemaVersion"`
+	Representations               []providerRepresentationSeed      `json:"representations,omitempty"`
+	DefinedValueIdentities        []string                          `json:"definedValueIdentities,omitempty"`
+	Facets                        []facetSeed                       `json:"facets"`
+	ProviderCallableProfiles      []providerCallableProfileSeed     `json:"providerCallableProfiles,omitempty"`
+	ProviderProtocols             []providerProtocolSeed            `json:"providerProtocols,omitempty"`
+	ProviderStatefulProfiles      []providerStatefulProfileSeed     `json:"providerStatefulProfiles,omitempty"`
+	ProviderInterfaces            []providerInterfaceSeed           `json:"providerInterfaces,omitempty"`
+	ProviderInterfaceCapabilities []providerInterfaceCapabilitySeed `json:"providerInterfaceCapabilities,omitempty"`
+	GenericOperationSets          []genericOperationSetSeed         `json:"genericOperationSets"`
 }
 
 type providerRepresentationSeed struct {
@@ -53,22 +54,22 @@ type facetSeed struct {
 }
 
 type providerCallableProfileSeed struct {
-	SourceIdentity              string                                 `json:"sourceIdentity"`
-	Specifier                   string                                 `json:"specifier"`
-	SourcePath                  string                                 `json:"sourcePath"`
-	Export                      string                                 `json:"export"`
-	Required                    bool                                   `json:"required,omitempty"`
-	Receiver                    bool                                   `json:"receiver,omitempty"`
-	CanonicalParameters         []int                                  `json:"canonicalParameters"`
-	CanonicalResults            []int                                  `json:"canonicalResults,omitempty"`
-	CanonicalValues             []string                               `json:"canonicalValues,omitempty"`
-	CanonicalTypeArguments      []string                               `json:"canonicalTypeArguments,omitempty"`
-	GuardInterfaces             []string                               `json:"guardInterfaces,omitempty"`
-	ContractInterfaces          []string                               `json:"contractInterfaces,omitempty"`
-	FromProviderInterfaces      []string                               `json:"fromProviderInterfaces,omitempty"`
-	ImplementedResultInterfaces []string                               `json:"implementedResultInterfaces,omitempty"`
-	Interfaces                  []providerCallableProfileInterfaceSeed `json:"interfaces"`
-	Protocols                   []providerCallableProtocolSeed         `json:"protocols,omitempty"`
+	SourceIdentity              string                                                   `json:"sourceIdentity"`
+	Specifier                   string                                                   `json:"specifier"`
+	SourcePath                  string                                                   `json:"sourcePath"`
+	Export                      string                                                   `json:"export"`
+	Required                    bool                                                     `json:"required,omitempty"`
+	Receiver                    bool                                                     `json:"receiver,omitempty"`
+	CanonicalParameters         []int                                                    `json:"canonicalParameters"`
+	CanonicalResults            []int                                                    `json:"canonicalResults,omitempty"`
+	CanonicalValues             []gostdlib.ProviderCallableProfileCanonicalValueDocument `json:"canonicalValues,omitempty"`
+	CanonicalTypeArguments      []string                                                 `json:"canonicalTypeArguments,omitempty"`
+	CapabilityViews             []gostdlib.ProviderCallableProfileCapabilityViewDocument `json:"capabilityViews,omitempty"`
+	ContractInterfaces          []string                                                 `json:"contractInterfaces,omitempty"`
+	FromProviderInterfaces      []string                                                 `json:"fromProviderInterfaces,omitempty"`
+	ImplementedResultInterfaces []string                                                 `json:"implementedResultInterfaces,omitempty"`
+	Interfaces                  []providerCallableProfileInterfaceSeed                   `json:"interfaces"`
+	Protocols                   []providerCallableProtocolSeed                           `json:"protocols,omitempty"`
 }
 
 type providerCallableProfileInterfaceSeed struct {
@@ -103,6 +104,7 @@ type facetSeedSet struct {
 	definedValueIdentities map[string]struct{}
 	genericOperations      map[string][]gostdlib.GenericOperationDocument
 	providerInterfaces     []providerInterfaceSeed
+	providerCapabilities   []providerInterfaceCapabilitySeed
 }
 
 func readFacetSeeds(sourcePath string) (facetSeedSet, error) {
@@ -155,6 +157,14 @@ func readFacetSeeds(sourcePath string) (facetSeedSet, error) {
 	if err != nil {
 		return facetSeedSet{}, err
 	}
+	providerCapabilities, err := validateProviderInterfaceCapabilitySeeds(
+		document.ProviderInterfaceCapabilities,
+		profiles,
+		providerInterfaces,
+	)
+	if err != nil {
+		return facetSeedSet{}, err
+	}
 	identities, err := validateDefinedValueIdentities(document.DefinedValueIdentities)
 	if err != nil {
 		return facetSeedSet{}, err
@@ -177,143 +187,8 @@ func readFacetSeeds(sourcePath string) (facetSeedSet, error) {
 		definedValueIdentities: identities,
 		genericOperations:      operations,
 		providerInterfaces:     providerInterfaces,
+		providerCapabilities:   providerCapabilities,
 	}, nil
-}
-
-func validateProviderStatefulProfileSeeds(
-	source []providerStatefulProfileSeed,
-) ([]providerStatefulProfileSeed, error) {
-	result := append([]providerStatefulProfileSeed(nil), source...)
-	sort.Slice(result, func(left, right int) bool {
-		return providerStatefulProfileSeedKey(result[left]) <
-			providerStatefulProfileSeedKey(result[right])
-	})
-	previousKey := ""
-	for index := range result {
-		seed := &result[index]
-		seed.Interfaces = slices.Clone(seed.Interfaces)
-		seed.TypeArguments = slices.Clone(seed.TypeArguments)
-		seed.Operations = slices.Clone(seed.Operations)
-		key := providerStatefulProfileSeedKey(*seed)
-		if key == "" || key == previousKey ||
-			seed.SourceIdentity == "" ||
-			seed.Specifier == "" || seed.SourcePath == "" || seed.Export == "" ||
-			len(seed.Interfaces) == 0 || len(seed.TypeArguments) == 0 {
-			return nil, certifyError(
-				"configure provider stateful profiles",
-				key,
-				"profile identity or shape is incomplete or duplicated",
-			)
-		}
-		previousKey = key
-		if subpath, ok := providerSubpath(seed.Specifier); !ok ||
-			!strings.HasPrefix(subpath, "./internal/facets/") ||
-			!strings.HasPrefix(seed.SourcePath, "src/internal/facets/") ||
-			!strings.HasSuffix(seed.SourcePath, ".ts") {
-			return nil, certifyError(
-				"configure provider stateful profiles",
-				key,
-				"profile module is invalid",
-			)
-		}
-		previousInterface := ""
-		interfaceIdentities := make(map[string]struct{}, len(seed.Interfaces))
-		seenExports := make(map[string]struct{}, len(seed.Interfaces))
-		for _, selected := range seed.Interfaces {
-			if selected.SourceIdentity == "" || selected.Export == "" ||
-				selected.SourceIdentity <= previousInterface {
-				return nil, certifyError(
-					"configure provider stateful profiles",
-					key,
-					"profile interfaces are empty, duplicated, or unordered",
-				)
-			}
-			previousInterface = selected.SourceIdentity
-			interfaceIdentities[selected.SourceIdentity] = struct{}{}
-			if _, duplicate := seenExports[selected.Export]; duplicate {
-				return nil, certifyError(
-					"configure provider stateful profiles",
-					key,
-					"profile interface export is duplicated",
-				)
-			}
-			seenExports[selected.Export] = struct{}{}
-		}
-		seenTypeArguments := make(map[string]struct{}, len(seed.TypeArguments))
-		for _, identity := range seed.TypeArguments {
-			if _, ok := interfaceIdentities[identity]; !ok {
-				return nil, certifyError(
-					"configure provider stateful profiles",
-					key,
-					"type argument has no retained-interface owner",
-				)
-			}
-			if _, duplicate := seenTypeArguments[identity]; duplicate {
-				return nil, certifyError(
-					"configure provider stateful profiles",
-					key,
-					"type argument is duplicated",
-				)
-			}
-			seenTypeArguments[identity] = struct{}{}
-		}
-		if len(seenTypeArguments) != len(interfaceIdentities) {
-			return nil, certifyError(
-				"configure provider stateful profiles",
-				key,
-				"type arguments do not exact-join retained interfaces",
-			)
-		}
-		for operationIndex, capability := range seed.Operations {
-			if !capability.NamedStructOperation() ||
-				capability == gostdlib.FacetCapabilityRepresentation ||
-				operationIndex != 0 && capability <= seed.Operations[operationIndex-1] {
-				return nil, certifyError(
-					"configure provider stateful profiles",
-					key,
-					"operations are invalid, duplicated, or unordered",
-				)
-			}
-		}
-	}
-	return result, nil
-}
-
-func providerStatefulProfileSeedKey(seed providerStatefulProfileSeed) string {
-	return seed.SourceIdentity + "\x00" + seed.Specifier + "\x00" + seed.Export +
-		providerProfileInterfaceSeedKey(seed.Interfaces)
-}
-
-func validateProviderInterfaceSeeds(
-	source []providerInterfaceSeed,
-) ([]providerInterfaceSeed, error) {
-	result := append([]providerInterfaceSeed(nil), source...)
-	sort.Slice(result, func(left, right int) bool {
-		return result[left].SourceIdentity < result[right].SourceIdentity
-	})
-	previous := ""
-	for _, seed := range result {
-		if seed.SourceIdentity == "" || seed.SourceIdentity <= previous ||
-			seed.Specifier == "" || seed.SourcePath == "" || seed.Export == "" {
-			return nil, certifyError(
-				"configure provider interfaces",
-				seed.SourceIdentity,
-				"provider-interface identity or target is incomplete or duplicated",
-			)
-		}
-		previous = seed.SourceIdentity
-		if subpath, ok := providerSubpath(seed.Specifier); !ok ||
-			!strings.HasPrefix(subpath, "./internal/facets/") ||
-			!strings.HasPrefix(seed.SourcePath, "src/internal/facets/") ||
-			!strings.HasSuffix(seed.SourcePath, ".ts") {
-			return nil, certifyError(
-				"configure provider interfaces",
-				seed.SourceIdentity,
-				"provider-interface module is invalid",
-			)
-		}
-	}
-	return result, nil
 }
 
 func validateProviderCallableProfileSeeds(
@@ -327,7 +202,7 @@ func validateProviderCallableProfileSeeds(
 		result[index].CanonicalResults = slices.Clone(selected.CanonicalResults)
 		result[index].CanonicalValues = slices.Clone(selected.CanonicalValues)
 		result[index].CanonicalTypeArguments = slices.Clone(selected.CanonicalTypeArguments)
-		result[index].GuardInterfaces = slices.Clone(selected.GuardInterfaces)
+		result[index].CapabilityViews = slices.Clone(selected.CapabilityViews)
 		result[index].ContractInterfaces = slices.Clone(selected.ContractInterfaces)
 		result[index].FromProviderInterfaces = slices.Clone(selected.FromProviderInterfaces)
 		result[index].ImplementedResultInterfaces = slices.Clone(
@@ -405,14 +280,53 @@ func validateProviderCallableProfileSeeds(
 				"canonical result roots are invalid",
 			)
 		}
-		for valueIndex, identity := range seed.CanonicalValues {
-			if identity == "" || valueIndex != 0 && identity <= seed.CanonicalValues[valueIndex-1] {
+		valueParameters := make(map[string]struct{}, len(seed.CanonicalValues))
+		for _, value := range seed.CanonicalValues {
+			if value.SourceIdentity == "" || value.TargetParameter == "" {
 				return nil, certifyError(
 					"configure provider callable profiles",
 					key,
-					"canonical value identities are empty, duplicated, or unordered",
+					"canonical value identity or target parameter is empty",
 				)
 			}
+			if _, duplicate := valueParameters[value.TargetParameter]; duplicate {
+				return nil, certifyError(
+					"configure provider callable profiles",
+					key,
+					"canonical value target parameter is duplicated",
+				)
+			}
+			valueParameters[value.TargetParameter] = struct{}{}
+		}
+		viewKeys := make(map[string]struct{}, len(seed.CapabilityViews))
+		viewParameters := make(map[string]struct{}, len(seed.CapabilityViews))
+		for _, view := range seed.CapabilityViews {
+			if view.BaseSourceIdentity == "" || view.TargetSourceIdentity == "" ||
+				view.TargetParameter == "" ||
+				view.BaseSourceIdentity == view.TargetSourceIdentity {
+				return nil, certifyError(
+					"configure provider callable profiles",
+					key,
+					"capability view is incomplete",
+				)
+			}
+			viewKey := view.BaseSourceIdentity + "\x00" + view.TargetSourceIdentity
+			if _, duplicate := viewKeys[viewKey]; duplicate {
+				return nil, certifyError(
+					"configure provider callable profiles",
+					key,
+					"capability view base/target pair is duplicated",
+				)
+			}
+			if _, duplicate := viewParameters[view.TargetParameter]; duplicate {
+				return nil, certifyError(
+					"configure provider callable profiles",
+					key,
+					"capability view target parameter is duplicated",
+				)
+			}
+			viewKeys[viewKey] = struct{}{}
+			viewParameters[view.TargetParameter] = struct{}{}
 		}
 		interfaceIdentities := make(
 			map[string]struct{},
@@ -515,23 +429,21 @@ func validateProviderCallableProfileSeeds(
 			}
 			seenTypeArguments[identity] = struct{}{}
 		}
-		seenGuards := make(map[string]struct{}, len(seed.GuardInterfaces))
-		for _, identity := range seed.GuardInterfaces {
-			if _, ok := interfaceIdentities[identity]; !ok {
+		for _, view := range seed.CapabilityViews {
+			if _, ok := interfaceIdentities[view.BaseSourceIdentity]; !ok {
 				return nil, certifyError(
 					"configure provider callable profiles",
 					key,
-					"guard has no profile-interface owner",
+					"capability-view base has no profile-interface owner",
 				)
 			}
-			if _, duplicate := seenGuards[identity]; duplicate {
+			if _, ok := interfaceIdentities[view.TargetSourceIdentity]; !ok {
 				return nil, certifyError(
 					"configure provider callable profiles",
 					key,
-					"guard interface is duplicated",
+					"capability-view target has no profile-interface owner",
 				)
 			}
-			seenGuards[identity] = struct{}{}
 		}
 		seenContracts := make(map[string]struct{}, len(seed.ContractInterfaces))
 		for _, identity := range seed.ContractInterfaces {

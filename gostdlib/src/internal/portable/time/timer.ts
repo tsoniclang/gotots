@@ -1,6 +1,7 @@
 import type { GoReceiveChannel } from "@gotots/runtime/channel.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
+import { hostInteger } from "../../host-integer.js";
 import {
   cancelSchedule,
   schedule,
@@ -11,7 +12,7 @@ import { Duration } from "./duration.js";
 import { Now, Time } from "./time.js";
 
 function delay(d: Duration): number {
-  return d.Nanoseconds() / 1_000_000;
+  return hostInteger(d.Nanoseconds()) / 1_000_000;
 }
 
 export class Timer {
@@ -83,7 +84,7 @@ export class Ticker {
   #stopped = false;
 
   constructor(private readonly duration: Duration) {
-    if (duration.Nanoseconds() <= 0) {
+    if (duration.Nanoseconds() <= 0n) {
       GoPanic.raiseRuntime("non-positive interval for NewTicker");
     }
     this.#schedule();
@@ -138,7 +139,7 @@ export function NewTimer(d: Duration): Timer {
 }
 
 export function Sleep(d: Duration): Promise<void> {
-  if (d.Nanoseconds() <= 0) {
+  if (d.Nanoseconds() <= 0n) {
     return Promise.resolve();
   }
   return new Promise<void>((resolve) => {

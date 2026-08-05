@@ -1,5 +1,7 @@
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { bool, gostring, int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { bool, gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 import { IsSpace } from "../unicode/properties.js";
 import { decodeRuneAt } from "../utf8/codec.js";
@@ -13,15 +15,15 @@ export function Clone(source: RuntimeSlice<uint8>): RuntimeSlice<uint8> {
   return target;
 }
 
-export function Compare(left: RuntimeSlice<uint8>, right: RuntimeSlice<uint8>): int64 {
+export function Compare(left: RuntimeSlice<uint8>, right: RuntimeSlice<uint8>): int {
   const count = Math.min(left.length, right.length);
   for (let index = 0; index < count; index += 1) {
     const compared = left.get(index) - right.get(index);
     if (compared !== 0) {
-      return compared < 0 ? -1 : 1;
+      return compared < 0 ? -1n : 1n;
     }
   }
-  return left.length === right.length ? 0 : left.length < right.length ? -1 : 1;
+  return left.length === right.length ? 0n : left.length < right.length ? -1n : 1n;
 }
 
 export function Cut(
@@ -50,26 +52,26 @@ export function Equal(left: RuntimeSlice<uint8>, right: RuntimeSlice<uint8>): bo
   return true;
 }
 
-export function IndexAny(source: RuntimeSlice<uint8>, characters: gostring): int64 {
+export function IndexAny(source: RuntimeSlice<uint8>, characters: gostring): int {
   const selected = runeSet(characters);
   const value = toByteString(source);
   for (let index = 0; index < value.length; ) {
     const [rune, width] = decodeRuneAt(value, index);
     if (selected.has(rune)) {
-      return index;
+      return integerFromHost(index);
     }
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
   }
-  return -1;
+  return -1n;
 }
 
-export function IndexByte(source: RuntimeSlice<uint8>, value: uint8): int64 {
+export function IndexByte(source: RuntimeSlice<uint8>, value: uint8): int {
   for (let index = 0; index < source.length; index += 1) {
     if (source.get(index) === value) {
-      return index;
+      return integerFromHost(index);
     }
   }
-  return -1;
+  return -1n;
 }
 
 export function Join(
@@ -89,13 +91,13 @@ export function Join(
   return result;
 }
 
-export function LastIndexByte(source: RuntimeSlice<uint8>, value: uint8): int64 {
+export function LastIndexByte(source: RuntimeSlice<uint8>, value: uint8): int {
   for (let index = source.length - 1; index >= 0; index -= 1) {
     if (source.get(index) === value) {
-      return index;
+      return integerFromHost(index);
     }
   }
-  return -1;
+  return -1n;
 }
 
 export function Trim(source: RuntimeSlice<uint8>, cutset: gostring): RuntimeSlice<uint8> {
@@ -118,14 +120,14 @@ export function TrimSpace(source: RuntimeSlice<uint8>): RuntimeSlice<uint8> {
     if (!IsSpace(rune)) {
       break;
     }
-    start += Math.max(1, width);
+    start += Math.max(1, hostInteger(width));
   }
 
   let end = start;
   let lastNonSpace = start;
   while (end < byteString.length) {
     const [rune, width] = decodeRuneAt(byteString, end);
-    end += Math.max(1, width);
+    end += Math.max(1, hostInteger(width));
     if (!IsSpace(rune)) {
       lastNonSpace = end;
     }
@@ -188,7 +190,7 @@ function trim(
       if (!selected.has(rune)) {
         break;
       }
-      start += Math.max(1, width);
+      start += Math.max(1, hostInteger(width));
     }
   }
   if (right) {
@@ -196,7 +198,7 @@ function trim(
     let lastRetained = start;
     while (index < end) {
       const [rune, width] = decodeRuneAt(value, index);
-      index += Math.max(1, width);
+      index += Math.max(1, hostInteger(width));
       if (!selected.has(rune)) {
         lastRetained = index;
       }
@@ -211,7 +213,7 @@ function runeSet(value: gostring): Set<number> {
   for (let index = 0; index < value.length; ) {
     const [rune, width] = decodeRuneAt(value, index);
     result.add(rune);
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
   }
   return result;
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -92,6 +93,7 @@ func EmitDeferred(
 	}
 	var callee api.ExpressionEmission
 	static := false
+	providerBoundary := false
 	if directLiteral {
 		callee, err = children.Expression(
 			context.
@@ -107,6 +109,7 @@ func EmitDeferred(
 				providerRecovery.Expression(context.Factory()),
 				providerRecovery.Requests()...,
 			)
+			providerBoundary = providerRecovery.ProviderBoundary()
 		} else if sourceRecovery {
 			deferredReference, referenceErr :=
 				context.Names().DeferredCallable(directOwner, "")
@@ -126,10 +129,11 @@ func EmitDeferred(
 				reference.Expression(context.Factory()),
 				reference.Requests()...,
 			)
+			providerBoundary = reference.ProviderBoundary()
 		}
 		static = true
 	} else {
-		callee, static, _, err = emitCallee(
+		callee, static, providerBoundary, err = emitCallee(
 			context,
 			children,
 			source.Fun,
@@ -141,6 +145,13 @@ func EmitDeferred(
 	}
 	sourceType := context.TypesInfo().TypeOf(source.Fun)
 	if model, defined := definedtype.ResolveCallable(sourceType); defined {
+		providerCarrier, carrierErr := model.ProviderCarrier(
+			context.WithRole(api.RoleCallCallee),
+		)
+		if carrierErr != nil {
+			return api.ExpressionEmission{}, carrierErr
+		}
+		providerBoundary = providerBoundary || providerCarrier
 		callee, err = model.Project(
 			context.WithRole(api.RoleCallCallee),
 			callee,
@@ -201,7 +212,8 @@ func EmitDeferred(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		if _, defined := definedtype.ResolveCallable(sourceType); defined {
+		if _, defined := definedtype.ResolveCallable(sourceType); defined &&
+			!providerBoundary {
 			targetType, err = callable.EmitType(
 				context.WithRole(api.RoleCallCallee),
 				children,
@@ -243,6 +255,25 @@ func EmitDeferred(
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if providerBoundary {
+		var providerBefore []tsgo.Statement
+		var providerRequests []api.RootRequest
+		arguments, providerBefore, providerRequests, err =
+			providerboundary.ToProviderArguments(
+				context,
+				children,
+				signature.Params(),
+				arguments,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		argumentBefore = append(argumentBefore, providerBefore...)
+		argumentRequests = api.CombineRequests(
+			argumentRequests,
+			providerRequests,
+		)
 	}
 	before = append(before, argumentBefore...)
 	literalRecovery := directLiteral &&

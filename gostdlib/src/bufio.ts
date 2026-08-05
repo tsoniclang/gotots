@@ -1,7 +1,7 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { bool, gostring, int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { bool, gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   BufferedReaderState,
@@ -19,14 +19,14 @@ class BufferedReader {
   constructor(
     private readonly readOperation: (
       destination: RuntimeSlice<uint8>,
-    ) => [int64, GoError | undefined],
+    ) => [int, GoError | undefined],
     private readonly readByteOperation: () => [uint8, GoError | undefined],
     private readonly readBytesOperation: (
       delimiter: uint8,
     ) => [RuntimeSlice<uint8>, GoError | undefined],
   ) {}
 
-  Read(destination: RuntimeSlice<uint8>): [int64, GoError | undefined] {
+  Read(destination: RuntimeSlice<uint8>): [int, GoError | undefined] {
     return this.readOperation(destination);
   }
 
@@ -45,7 +45,7 @@ export const Reader = Object.freeze({
   Read(
     receiver: Reader | undefined,
     destination: RuntimeSlice<uint8>,
-  ): [int64, GoError | undefined] {
+  ): [int, GoError | undefined] {
     return requireReader(receiver).Read(destination);
   },
 
@@ -116,7 +116,7 @@ class BufferedWriter {
     private readonly flushOperation: () => GoError | undefined,
     private readonly writeOperation: (
       source: RuntimeSlice<uint8>,
-    ) => [int64, GoError | undefined],
+    ) => [int, GoError | undefined],
     private readonly writeByteOperation: (value: uint8) => GoError | undefined,
   ) {}
 
@@ -124,7 +124,7 @@ class BufferedWriter {
     return this.flushOperation();
   }
 
-  Write(source: RuntimeSlice<uint8>): [int64, GoError | undefined] {
+  Write(source: RuntimeSlice<uint8>): [int, GoError | undefined] {
     return this.writeOperation(source);
   }
 
@@ -143,7 +143,7 @@ export const Writer = Object.freeze({
   Write(
     receiver: Writer | undefined,
     source: RuntimeSlice<uint8>,
-  ): [int64, GoError | undefined] {
+  ): [int, GoError | undefined] {
     return requireWriter(receiver).Write(source);
   },
 

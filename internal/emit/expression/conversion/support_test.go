@@ -197,7 +197,7 @@ func runConversionTypeScript(
 	workingDirectory string,
 	targetPaths []string,
 	sourceModule string,
-	suffix string,
+	wideSuffix string,
 ) string {
 	t.Helper()
 	runner := `import * as values from "` + sourceModule + `";
@@ -212,13 +212,13 @@ const panics = (action: () => void): boolean => {
         throw error;
     }
 };
-console.log(show(values.NarrowSigned(130` + suffix + `)));
-console.log(show(values.NarrowUnsigned(-1` + suffix + `)));
-console.log(show(values.Sign32(-1` + suffix + `)));
+console.log(show(values.NarrowSigned(130` + wideSuffix + `)));
+console.log(show(values.NarrowUnsigned(-1` + wideSuffix + `)));
+console.log(show(values.Sign32(-1)));
 console.log(show(values.Sign64EvaluatesOnce()));
-console.log(show(values.Widen(-8` + suffix + `)));
-console.log(show(values.IntegerToFloat64(9007199254740991` + suffix + `)));
-console.log(show(values.UnsignedToFloat32(16777217` + suffix + `)));
+console.log(show(values.Widen(-8)));
+console.log(show(values.IntegerToFloat64(9007199254740991` + wideSuffix + `)));
+console.log(show(values.UnsignedToFloat32(16777217` + wideSuffix + `)));
 console.log(show(values.FloatToInt8(130.9)));
 console.log(show(values.FloatToUint32(-1.9)));
 console.log(show(values.FloatToInt64(-123.9)));

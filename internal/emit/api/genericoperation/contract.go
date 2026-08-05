@@ -1,0 +1,533 @@
+package genericoperation
+
+import (
+	"fmt"
+	"go/token"
+	"go/types"
+	"slices"
+)
+
+type Error struct {
+	Reason string
+}
+
+func (e *Error) Error() string {
+	return "select generic operation: " + e.Reason
+}
+
+func GenericTypeParameter(sourceType types.Type) (*types.TypeParam, bool) {
+	if sourceType == nil {
+		return nil, false
+	}
+	parameter, ok := types.Unalias(sourceType).(*types.TypeParam)
+	return parameter, ok
+}
+
+type GenericOperation uint8
+
+const (
+	GenericOperationInvalid GenericOperation = iota
+	GenericOperationZero
+	GenericOperationCopy
+	GenericOperationEqual
+	GenericOperationHash
+	GenericOperationUnaryPlus
+	GenericOperationUnaryMinus
+	GenericOperationUnaryNot
+	GenericOperationUnaryXor
+	GenericOperationBinaryAdd
+	GenericOperationBinarySubtract
+	GenericOperationBinaryMultiply
+	GenericOperationBinaryDivide
+	GenericOperationBinaryRemainder
+	GenericOperationBinaryAnd
+	GenericOperationBinaryOr
+	GenericOperationBinaryXor
+	GenericOperationBinaryAndNot
+	GenericOperationBinaryShiftLeft
+	GenericOperationBinaryShiftRight
+	GenericOperationBinaryEqual
+	GenericOperationBinaryNotEqual
+	GenericOperationBinaryLess
+	GenericOperationBinaryLessEqual
+	GenericOperationBinaryGreater
+	GenericOperationBinaryGreaterEqual
+	GenericOperationLength
+	GenericOperationCapacity
+	GenericOperationConvert
+	GenericOperationIndex
+	GenericOperationConstraintMethod
+	GenericOperationMapConstruct
+	GenericOperationInterfaceAdapt
+	GenericOperationInterfaceAssert
+	GenericOperationInterfaceAssertOK
+	GenericOperationClear
+	GenericOperationNilEqual
+	GenericOperationToStorage
+	GenericOperationFromStorage
+	GenericOperationPointerCell
+	GenericOperationPointerLoad
+	GenericOperationPointerStore
+	GenericOperationToContainerStorage
+	GenericOperationFromContainerStorage
+	GenericOperationIndexAddress
+	GenericOperationSlice
+	GenericOperationSliceFull
+	GenericOperationDeferredCallableRegistry
+	GenericOperationAppendSpread
+	GenericOperationReflectionType
+)
+
+var genericOperationIdentifiers = [...]string{
+	GenericOperationInvalid:                  "",
+	GenericOperationZero:                     "zero",
+	GenericOperationCopy:                     "copy",
+	GenericOperationEqual:                    "equal",
+	GenericOperationHash:                     "hash",
+	GenericOperationUnaryPlus:                "unary_plus",
+	GenericOperationUnaryMinus:               "unary_minus",
+	GenericOperationUnaryNot:                 "unary_not",
+	GenericOperationUnaryXor:                 "unary_xor",
+	GenericOperationBinaryAdd:                "binary_add",
+	GenericOperationBinarySubtract:           "binary_subtract",
+	GenericOperationBinaryMultiply:           "binary_multiply",
+	GenericOperationBinaryDivide:             "binary_divide",
+	GenericOperationBinaryRemainder:          "binary_remainder",
+	GenericOperationBinaryAnd:                "binary_and",
+	GenericOperationBinaryOr:                 "binary_or",
+	GenericOperationBinaryXor:                "binary_xor",
+	GenericOperationBinaryAndNot:             "binary_and_not",
+	GenericOperationBinaryShiftLeft:          "binary_shift_left",
+	GenericOperationBinaryShiftRight:         "binary_shift_right",
+	GenericOperationBinaryEqual:              "binary_equal",
+	GenericOperationBinaryNotEqual:           "binary_not_equal",
+	GenericOperationBinaryLess:               "binary_less",
+	GenericOperationBinaryLessEqual:          "binary_less_equal",
+	GenericOperationBinaryGreater:            "binary_greater",
+	GenericOperationBinaryGreaterEqual:       "binary_greater_equal",
+	GenericOperationLength:                   "length",
+	GenericOperationCapacity:                 "capacity",
+	GenericOperationConvert:                  "convert",
+	GenericOperationIndex:                    "index",
+	GenericOperationConstraintMethod:         "constraint_method",
+	GenericOperationMapConstruct:             "map_construct",
+	GenericOperationInterfaceAdapt:           "interface_adapt",
+	GenericOperationInterfaceAssert:          "interface_assert",
+	GenericOperationInterfaceAssertOK:        "interface_assert_ok",
+	GenericOperationClear:                    "clear",
+	GenericOperationNilEqual:                 "nil_equal",
+	GenericOperationToStorage:                "to_storage",
+	GenericOperationFromStorage:              "from_storage",
+	GenericOperationPointerCell:              "pointer_cell",
+	GenericOperationPointerLoad:              "pointer_load",
+	GenericOperationPointerStore:             "pointer_store",
+	GenericOperationToContainerStorage:       "to_container_storage",
+	GenericOperationFromContainerStorage:     "from_container_storage",
+	GenericOperationIndexAddress:             "index_address",
+	GenericOperationSlice:                    "slice",
+	GenericOperationSliceFull:                "slice_full",
+	GenericOperationDeferredCallableRegistry: "deferred_callable_registry",
+	GenericOperationAppendSpread:             "append_spread",
+	GenericOperationReflectionType:           "reflection_type",
+}
+
+func (o GenericOperation) Valid() bool {
+	return o >= GenericOperationZero &&
+		o <= GenericOperationReflectionType
+}
+
+func (o GenericOperation) Identifier() string {
+	if !o.Valid() {
+		return ""
+	}
+	return genericOperationIdentifiers[o]
+}
+
+func (o GenericOperation) String() string {
+	switch o {
+	case GenericOperationZero:
+		return "zero"
+	case GenericOperationCopy:
+		return "copy"
+	case GenericOperationEqual:
+		return "equal"
+	case GenericOperationHash:
+		return "hash"
+	case GenericOperationUnaryPlus:
+		return "unary-plus"
+	case GenericOperationUnaryMinus:
+		return "unary-minus"
+	case GenericOperationUnaryNot:
+		return "unary-not"
+	case GenericOperationUnaryXor:
+		return "unary-xor"
+	case GenericOperationLength:
+		return "length"
+	case GenericOperationCapacity:
+		return "capacity"
+	case GenericOperationConvert:
+		return "convert"
+	case GenericOperationIndex:
+		return "index"
+	case GenericOperationConstraintMethod:
+		return "constraint-method"
+	case GenericOperationMapConstruct:
+		return "map-construct"
+	case GenericOperationInterfaceAdapt:
+		return "interface-adapt"
+	case GenericOperationInterfaceAssert:
+		return "interface-assert"
+	case GenericOperationInterfaceAssertOK:
+		return "interface-assert-ok"
+	case GenericOperationClear:
+		return "clear"
+	case GenericOperationNilEqual:
+		return "nil-equal"
+	case GenericOperationToStorage:
+		return "to-storage"
+	case GenericOperationFromStorage:
+		return "from-storage"
+	case GenericOperationPointerCell:
+		return "pointer-cell"
+	case GenericOperationPointerLoad:
+		return "pointer-load"
+	case GenericOperationPointerStore:
+		return "pointer-store"
+	case GenericOperationToContainerStorage:
+		return "to-container-storage"
+	case GenericOperationFromContainerStorage:
+		return "from-container-storage"
+	case GenericOperationIndexAddress:
+		return "index-address"
+	case GenericOperationSlice:
+		return "slice"
+	case GenericOperationSliceFull:
+		return "slice-full"
+	case GenericOperationDeferredCallableRegistry:
+		return "deferred-callable-registry"
+	case GenericOperationAppendSpread:
+		return "append-spread"
+	case GenericOperationReflectionType:
+		return "reflection-type"
+	default:
+		if source, ok := o.BinaryToken(); ok {
+			return "binary-" + source.String()
+		}
+		return fmt.Sprintf("generic-operation(%d)", o)
+	}
+}
+
+func UnaryGenericOperation(source token.Token) (GenericOperation, bool) {
+	switch source {
+	case token.ADD:
+		return GenericOperationUnaryPlus, true
+	case token.SUB:
+		return GenericOperationUnaryMinus, true
+	case token.NOT:
+		return GenericOperationUnaryNot, true
+	case token.XOR:
+		return GenericOperationUnaryXor, true
+	default:
+		return GenericOperationInvalid, false
+	}
+}
+
+func BinaryGenericOperation(source token.Token) (GenericOperation, bool) {
+	switch source {
+	case token.ADD:
+		return GenericOperationBinaryAdd, true
+	case token.SUB:
+		return GenericOperationBinarySubtract, true
+	case token.MUL:
+		return GenericOperationBinaryMultiply, true
+	case token.QUO:
+		return GenericOperationBinaryDivide, true
+	case token.REM:
+		return GenericOperationBinaryRemainder, true
+	case token.AND:
+		return GenericOperationBinaryAnd, true
+	case token.OR:
+		return GenericOperationBinaryOr, true
+	case token.XOR:
+		return GenericOperationBinaryXor, true
+	case token.AND_NOT:
+		return GenericOperationBinaryAndNot, true
+	case token.SHL:
+		return GenericOperationBinaryShiftLeft, true
+	case token.SHR:
+		return GenericOperationBinaryShiftRight, true
+	case token.EQL:
+		return GenericOperationBinaryEqual, true
+	case token.NEQ:
+		return GenericOperationBinaryNotEqual, true
+	case token.LSS:
+		return GenericOperationBinaryLess, true
+	case token.LEQ:
+		return GenericOperationBinaryLessEqual, true
+	case token.GTR:
+		return GenericOperationBinaryGreater, true
+	case token.GEQ:
+		return GenericOperationBinaryGreaterEqual, true
+	default:
+		return GenericOperationInvalid, false
+	}
+}
+
+func (o GenericOperation) BinaryToken() (token.Token, bool) {
+	for _, candidate := range []token.Token{
+		token.ADD,
+		token.SUB,
+		token.MUL,
+		token.QUO,
+		token.REM,
+		token.AND,
+		token.OR,
+		token.XOR,
+		token.AND_NOT,
+		token.SHL,
+		token.SHR,
+		token.EQL,
+		token.NEQ,
+		token.LSS,
+		token.LEQ,
+		token.GTR,
+		token.GEQ,
+	} {
+		if selected, _ := BinaryGenericOperation(candidate); selected == o {
+			return candidate, true
+		}
+	}
+	return token.ILLEGAL, false
+}
+
+type GenericOperationSelection struct {
+	operation GenericOperation
+	method    *types.Func
+}
+
+func SelectGenericOperation(
+	operation GenericOperation,
+) (GenericOperationSelection, error) {
+	if !operation.Valid() ||
+		operation == GenericOperationConstraintMethod {
+		return GenericOperationSelection{}, &Error{Reason: "generic operation selection is invalid"}
+	}
+	return GenericOperationSelection{operation: operation}, nil
+}
+
+func SelectGenericConstraintMethod(
+	method *types.Func,
+) (GenericOperationSelection, error) {
+	if method == nil {
+		return GenericOperationSelection{}, &Error{Reason: "generic constraint method is nil"}
+	}
+	method = method.Origin()
+	if _, ok := method.Type().(*types.Signature); !ok {
+		return GenericOperationSelection{}, &Error{Reason: "generic constraint method has no signature"}
+	}
+	return GenericOperationSelection{
+		operation: GenericOperationConstraintMethod,
+		method:    method,
+	}, nil
+}
+
+func (s GenericOperationSelection) Valid() bool {
+	return s.operation.Valid() &&
+		((s.operation == GenericOperationConstraintMethod) ==
+			(s.method != nil))
+}
+
+func (s GenericOperationSelection) Operation() GenericOperation {
+	if !s.Valid() {
+		return GenericOperationInvalid
+	}
+	return s.operation
+}
+
+func (s GenericOperationSelection) Method() (*types.Func, bool) {
+	return s.method,
+		s.Valid() &&
+			s.operation == GenericOperationConstraintMethod
+}
+
+func (s GenericOperationSelection) IdentityPrefix() (string, error) {
+	if !s.Valid() {
+		return "", &Error{Reason: "generic operation selection is invalid"}
+	}
+	if s.operation != GenericOperationConstraintMethod {
+		return s.operation.Identifier(), nil
+	}
+	identity := s.operation.Identifier() + "|"
+	if s.method.Exported() {
+		return identity + "exported|" + s.method.Name(), nil
+	}
+	if s.method.Pkg() == nil {
+		return "", &Error{Reason: "unexported generic constraint method has no package"}
+	}
+	return identity + s.method.Pkg().Path() + "|" + s.method.Name(), nil
+}
+
+type GenericRepresentationFacet uint8
+
+const (
+	GenericRepresentationInvalid          GenericRepresentationFacet = 0
+	GenericRepresentationStorage          GenericRepresentationFacet = 1
+	GenericRepresentationPointer          GenericRepresentationFacet = 2
+	GenericRepresentationContainerStorage GenericRepresentationFacet = 3
+)
+
+func (f GenericRepresentationFacet) Valid() bool {
+	return f == GenericRepresentationStorage ||
+		f == GenericRepresentationPointer ||
+		f == GenericRepresentationContainerStorage
+}
+
+func (f GenericRepresentationFacet) String() string {
+	switch f {
+	case GenericRepresentationStorage:
+		return "storage"
+	case GenericRepresentationPointer:
+		return "pointer"
+	case GenericRepresentationContainerStorage:
+		return "container-storage"
+	default:
+		return "invalid"
+	}
+}
+
+var representationFacetOrder = [...]GenericRepresentationFacet{
+	GenericRepresentationStorage,
+	GenericRepresentationContainerStorage,
+	GenericRepresentationPointer,
+}
+
+func GenericRepresentationFacetOrder() []GenericRepresentationFacet {
+	return slices.Clone(representationFacetOrder[:])
+}
+
+type GenericStorageDirection uint8
+
+const (
+	GenericStorageDirectionInvalid GenericStorageDirection = 0
+	GenericStorageDirectionTo      GenericStorageDirection = 1
+	GenericStorageDirectionFrom    GenericStorageDirection = 2
+)
+
+func (d GenericStorageDirection) Valid() bool {
+	return d == GenericStorageDirectionTo ||
+		d == GenericStorageDirectionFrom
+}
+
+func GenericPointerOperationElement(
+	selection GenericOperationSelection,
+	signature *types.Signature,
+) (types.Type, bool) {
+	if signature == nil {
+		return nil, false
+	}
+	operation := selection.Operation()
+	switch operation {
+	case GenericOperationPointerCell:
+		if signature.Params().Len() != 1 ||
+			signature.Results().Len() != 1 {
+			return nil, false
+		}
+		element := signature.Params().At(0).Type()
+		pointer, ok := types.Unalias(
+			signature.Results().At(0).Type(),
+		).(*types.Pointer)
+		return element, ok && types.Identical(pointer.Elem(), element)
+	case GenericOperationPointerLoad:
+		if signature.Params().Len() != 1 ||
+			signature.Results().Len() != 1 {
+			return nil, false
+		}
+		pointer, ok := types.Unalias(
+			signature.Params().At(0).Type(),
+		).(*types.Pointer)
+		result := signature.Results().At(0).Type()
+		return result, ok && types.Identical(pointer.Elem(), result)
+	case GenericOperationPointerStore:
+		if signature.Params().Len() != 2 ||
+			signature.Results().Len() != 0 {
+			return nil, false
+		}
+		pointer, ok := types.Unalias(
+			signature.Params().At(0).Type(),
+		).(*types.Pointer)
+		element := signature.Params().At(1).Type()
+		return element, ok && types.Identical(pointer.Elem(), element)
+	default:
+		return nil, false
+	}
+}
+
+func GenericStorageOperationType(
+	selection GenericOperationSelection,
+	signature *types.Signature,
+) (
+	types.Type,
+	GenericRepresentationFacet,
+	GenericStorageDirection,
+	bool,
+) {
+	var facet GenericRepresentationFacet
+	var direction GenericStorageDirection
+	switch selection.Operation() {
+	case GenericOperationToStorage:
+		facet = GenericRepresentationStorage
+		direction = GenericStorageDirectionTo
+	case GenericOperationFromStorage:
+		facet = GenericRepresentationStorage
+		direction = GenericStorageDirectionFrom
+	case GenericOperationToContainerStorage:
+		facet = GenericRepresentationContainerStorage
+		direction = GenericStorageDirectionTo
+	case GenericOperationFromContainerStorage:
+		facet = GenericRepresentationContainerStorage
+		direction = GenericStorageDirectionFrom
+	default:
+		return nil,
+			GenericRepresentationInvalid,
+			GenericStorageDirectionInvalid,
+			false
+	}
+	if signature == nil ||
+		signature.Params().Len() != 1 ||
+		signature.Results().Len() != 1 {
+		return nil,
+			GenericRepresentationInvalid,
+			GenericStorageDirectionInvalid,
+			false
+	}
+	parameter := signature.Params().At(0).Type()
+	result := signature.Results().At(0).Type()
+	if !types.Identical(parameter, result) {
+		return nil,
+			GenericRepresentationInvalid,
+			GenericStorageDirectionInvalid,
+			false
+	}
+	return parameter, facet, direction, true
+}
+
+func GenericIndexAddressOperation(
+	selection GenericOperationSelection,
+	signature *types.Signature,
+) (types.Type, types.Type, types.Type, bool) {
+	if selection.Operation() != GenericOperationIndexAddress ||
+		signature == nil ||
+		signature.Params().Len() != 2 ||
+		signature.Results().Len() != 1 {
+		return nil, nil, nil, false
+	}
+	receiver := signature.Params().At(0).Type()
+	index := signature.Params().At(1).Type()
+	pointer, ok := types.Unalias(
+		signature.Results().At(0).Type(),
+	).(*types.Pointer)
+	if !ok || pointer.Elem() == nil {
+		return nil, nil, nil, false
+	}
+	return receiver, index, pointer.Elem(), true
+}

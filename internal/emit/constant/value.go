@@ -30,8 +30,12 @@ func EmitValue(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if defined, ok := definedtype.ResolveBasic(targetType); ok {
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		underlying, err := EmitValue(
-			context,
+			operationContext,
 			source,
 			defined.Underlying(),
 			value,

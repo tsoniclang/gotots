@@ -10,6 +10,7 @@ import (
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -288,11 +289,7 @@ func emitGenericBound(
 	source ast.Expr,
 ) (genericBound, error) {
 	if source == nil {
-		zero, err := api.IntegerLiteral(
-			context.Factory(),
-			context.IntegerRepresentation(),
-			"0",
-		)
+		zero, err := integervalue.Literal(context, types.Typ[types.Int], "0")
 		return genericBound{
 			emission:   api.DirectExpression(zero),
 			sourceType: types.Typ[types.Int],
@@ -326,11 +323,7 @@ func bound(
 	value ast.Expr,
 ) (api.ExpressionEmission, error) {
 	if value == nil {
-		zero, err := api.IntegerLiteral(
-			context.Factory(),
-			context.IntegerRepresentation(),
-			"0",
-		)
+		zero, err := integervalue.Literal(context, types.Typ[types.Int], "0")
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}

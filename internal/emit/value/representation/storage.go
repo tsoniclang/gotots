@@ -63,8 +63,12 @@ func (owner Owner) StorageType(
 		)
 	}
 	if defined, ok := definedStorageModel(sourceType); ok {
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
 		return owner.StorageType(
-			context.WithRole(api.RoleDefinedUnderlyingType),
+			operationContext.WithRole(api.RoleDefinedUnderlyingType),
 			source,
 			defined.Underlying(),
 		)
@@ -151,12 +155,16 @@ func (owner Owner) ToStorage(
 		return model.ReadReceiver(context, source, value)
 	}
 	if defined, ok := definedStorageModel(sourceType); ok {
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		projected, err := defined.Project(context, value)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
 		return owner.ToStorage(
-			context.WithRole(api.RoleDefinedUnderlyingType),
+			operationContext.WithRole(api.RoleDefinedUnderlyingType),
 			source,
 			defined.Underlying(),
 			projected,
@@ -223,8 +231,12 @@ func (owner Owner) FromStorage(
 		return model.Wrap(context, value)
 	}
 	if defined, ok := definedStorageModel(sourceType); ok {
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		restored, err := owner.FromStorage(
-			context.WithRole(api.RoleDefinedUnderlyingType),
+			operationContext.WithRole(api.RoleDefinedUnderlyingType),
 			source,
 			defined.Underlying(),
 			value,

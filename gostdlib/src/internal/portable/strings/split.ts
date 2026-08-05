@@ -1,5 +1,7 @@
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring, int } from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger } from "../../host-integer.js";
 
 import { sliceValues } from "../../runtime/slice.js";
 import { runeBoundaries } from "../utf8/codec.js";
@@ -9,21 +11,22 @@ export function Join(values: RuntimeSlice<gostring>, separator: gostring): gostr
 }
 
 export function Split(text: gostring, separator: gostring): RuntimeSlice<gostring> {
-  return SplitN(text, separator, -1);
+  return SplitN(text, separator, -1n);
 }
 
 export function SplitN(
   text: gostring,
   separator: gostring,
-  count: number,
+  count: int,
 ): RuntimeSlice<gostring> {
-  if (count === 0) {
+  if (count === 0n) {
     return RuntimeSlice.nil<gostring>();
   }
   if (separator.length === 0) {
     const boundaries = runeBoundaries(text);
     const runeCount = boundaries.length - 1;
-    const partCount = count < 0 || count > runeCount ? runeCount : count;
+    const hostCount = hostInteger(count);
+    const partCount = count < 0n || hostCount > runeCount ? runeCount : hostCount;
     const parts: gostring[] = [];
     for (let index = 0; index < partCount; index += 1) {
       const start = boundaries[index];
@@ -34,12 +37,13 @@ export function SplitN(
     }
     return RuntimeSlice.literal(parts);
   }
-  if (count < 0) {
+  if (count < 0n) {
     return RuntimeSlice.literal(text.split(separator));
   }
   const parts: gostring[] = [];
   let remainder = text;
-  for (let index = 1; index < count; index += 1) {
+  const hostCount = hostInteger(count);
+  for (let index = 1; index < hostCount; index += 1) {
     const separatorIndex = remainder.indexOf(separator);
     if (separatorIndex < 0) {
       break;

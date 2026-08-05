@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { int64 } from "../src/internal/scalars.js";
+import {
+  hostInteger,
+  integerFromHost,
+} from "../src/internal/host-integer.js";
 
 import type { CancelCauseFunc } from "../src/context.js";
 import type { WalkDirFunc } from "../src/io/fs.js";
@@ -53,22 +58,25 @@ class CooperativeSortable extends ProviderInterfaceValue implements SortInterfac
     super(Object.freeze({ comparable: true }));
   }
 
-  async Len(): Promise<number> {
-    return this.values.length;
+  async Len(): Promise<int64> {
+    return integerFromHost(this.values.length);
   }
 
-  async Less(left: number, right: number): Promise<boolean> {
-    return (this.values[left] ?? 0) < (this.values[right] ?? 0);
+  async Less(left: int64, right: int64): Promise<boolean> {
+    return (this.values[hostInteger(left)] ?? 0)
+      < (this.values[hostInteger(right)] ?? 0);
   }
 
-  async Swap(left: number, right: number): Promise<void> {
-    const saved = this.values[left];
-    const replacement = this.values[right];
+  async Swap(left: int64, right: int64): Promise<void> {
+    const leftIndex = hostInteger(left);
+    const rightIndex = hostInteger(right);
+    const saved = this.values[leftIndex];
+    const replacement = this.values[rightIndex];
     if (saved === undefined || replacement === undefined) {
       throw new Error("sort index is outside the test value");
     }
-    this.values[left] = replacement;
-    this.values[right] = saved;
+    this.values[leftIndex] = replacement;
+    this.values[rightIndex] = saved;
   }
 }
 
@@ -93,8 +101,8 @@ class CooperativeFileInfo extends ProviderInterfaceValue implements CanonicalFil
     return "entry";
   }
 
-  async Size(): Promise<number> {
-    return 3;
+  async Size(): Promise<int64> {
+    return 3n;
   }
 
   async Sys(): Promise<undefined> {
@@ -104,8 +112,8 @@ class CooperativeFileInfo extends ProviderInterfaceValue implements CanonicalFil
 
 test("provider callable profiles transport cooperative callbacks", async () => {
   assert.equal(
-    await SortSearchCanonical(8, async (index): Promise<boolean> => index >= 5),
-    5,
+    await SortSearchCanonical(8n, async (index): Promise<boolean> => index >= 5n),
+    5n,
   );
   const sortable = new CooperativeSortable([3, 1, 2]);
   await SortCanonical(sortable);
@@ -113,8 +121,8 @@ test("provider callable profiles transport cooperative callbacks", async () => {
 
   const isLetterA = async (rune: number): Promise<boolean> => rune === 97;
   assert.equal(await StringsContainsFuncCanonical("ba", isLetterA), true);
-  assert.equal(await StringsIndexFuncCanonical("ba", isLetterA), 1);
-  assert.equal(await StringsLastIndexFuncCanonical("aba", isLetterA), 2);
+  assert.equal(await StringsIndexFuncCanonical("ba", isLetterA), 1n);
+  assert.equal(await StringsLastIndexFuncCanonical("aba", isLetterA), 2n);
   assert.equal(
     await StringsMapCanonical(async (rune) => rune === 97 ? 65 : rune, "ab"),
     "Ab",

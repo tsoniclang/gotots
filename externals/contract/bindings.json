@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "bindings": [
+    {
+      "sourcePackage": "github.com/zeebo/xxh3",
+      "sourceName": "accumAVX2",
+      "targetKind": "source",
+      "targetName": "accumScalar"
+    },
+    {
+      "sourcePackage": "github.com/zeebo/xxh3",
+      "sourceName": "accumAVX512",
+      "targetKind": "source",
+      "targetName": "accumScalar"
+    },
+    {
+      "sourcePackage": "github.com/zeebo/xxh3",
+      "sourceName": "accumBlockAVX2",
+      "targetKind": "source",
+      "targetName": "accumBlockScalar"
+    },
+    {
+      "sourcePackage": "github.com/zeebo/xxh3",
+      "sourceName": "accumBlockAVX512",
+      "targetKind": "source",
+      "targetName": "accumBlockScalar"
+    },
+    {
+      "sourcePackage": "github.com/zeebo/xxh3",
+      "sourceName": "accumBlockSSE",
+      "targetKind": "source",
+      "targetName": "accumBlockScalar"
+    },
+    {
+      "sourcePackage": "github.com/zeebo/xxh3",
+      "sourceName": "accumSSE",
+      "targetKind": "source",
+      "targetName": "accumScalar"
+    },
+    {
+      "sourcePackage": "golang.org/x/sys/unix",
+      "sourceName": "RawSyscall",
+      "targetKind": "module",
+      "moduleSpecifier": "@gotots/externals/golang.org/x/sys/unix.js",
+      "sourcePath": "src/golang.org/x/sys/unix.ts",
+      "export": "RawSyscall"
+    },
+    {
+      "sourcePackage": "golang.org/x/sys/unix",
+      "sourceName": "Syscall",
+      "targetKind": "module",
+      "moduleSpecifier": "@gotots/externals/golang.org/x/sys/unix.js",
+      "sourcePath": "src/golang.org/x/sys/unix.ts",
+      "export": "Syscall"
+    },
+    {
+      "sourcePackage": "golang.org/x/sys/unix",
+      "sourceName": "Syscall6",
+      "targetKind": "module",
+      "moduleSpecifier": "@gotots/externals/golang.org/x/sys/unix.js",
+      "sourcePath": "src/golang.org/x/sys/unix.ts",
+      "export": "Syscall6"
+    }
+  ]
+}

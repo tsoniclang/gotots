@@ -44,6 +44,14 @@ func emitDirect(
 	clauses []clauseEmission,
 	targetLabel string,
 ) (api.StatementEmission, error) {
+	operationContext := context
+	if tag.wrapped {
+		var err error
+		operationContext, err = tag.model.OperationContext(context)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+	}
 	targetClauses := make(
 		[]tsgo.CaseOrDefaultClause,
 		0,
@@ -72,7 +80,7 @@ func emitDirect(
 				)
 				if constant && facts.Value != nil {
 					direct, err := constantvalue.EmitValue(
-						context.
+						operationContext.
 							WithRole(api.RoleSwitchCaseExpression).
 							WithExpectedType(tag.model.Underlying()),
 						clause.source.List[index],
@@ -93,7 +101,7 @@ func emitDirect(
 							)
 					}
 					value = direct.Value()
-					requests = append(requests, direct.Requests()...)
+					expressionRequests = direct.Requests()
 				} else {
 					projected, err := tag.model.Project(
 						context.WithRole(api.RoleSwitchCaseExpression),

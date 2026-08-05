@@ -1,7 +1,7 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring, uint8 } from "@gotots/runtime/scalars.js";
+import type { gostring, int64, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   Compare,
@@ -17,7 +17,7 @@ export function CmpCompare<T>(
   left: T,
   right: T,
   _recovery?: GoRecovery,
-): number {
+): int64 {
   return Compare(less, equal, left, right);
 }
 

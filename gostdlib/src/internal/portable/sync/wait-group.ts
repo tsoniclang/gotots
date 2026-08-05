@@ -1,20 +1,20 @@
-import type { Awaitable, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int } from "@gotots/gostdlib/internal/scalars.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 
 export class WaitGroup {
-  #count = 0;
+  #count: int = 0n;
   readonly #waiters: Array<() => void> = [];
 
-  static Add(receiver: WaitGroup | undefined, delta: int64): void {
+  static Add(receiver: WaitGroup | undefined, delta: int): void {
     if (receiver === undefined) {
       GoPanic.raiseRuntime("WaitGroup.Add called with nil receiver");
     }
     const next = receiver.#count + delta;
-    if (next < 0) {
+    if (next < 0n) {
       GoPanic.raiseRuntime("sync: negative WaitGroup counter");
     }
     receiver.#count = next;
-    if (next === 0) {
+    if (next === 0n) {
       for (const resume of receiver.#waiters.splice(0)) {
         resume();
       }
@@ -22,14 +22,14 @@ export class WaitGroup {
   }
 
   static Done(receiver: WaitGroup | undefined): void {
-    WaitGroup.Add(receiver, -1);
+    WaitGroup.Add(receiver, -1n);
   }
 
   static Go(
     receiver: WaitGroup | undefined,
     f: (() => Awaitable<void>) | undefined,
   ): void {
-    WaitGroup.Add(receiver, 1);
+    WaitGroup.Add(receiver, 1n);
     void (async (): Promise<void> => {
       try {
         if (f === undefined) {
@@ -46,7 +46,7 @@ export class WaitGroup {
     if (receiver === undefined) {
       GoPanic.raiseRuntime("WaitGroup.Wait called with nil receiver");
     }
-    if (receiver.#count === 0) {
+    if (receiver.#count === 0n) {
       return Promise.resolve();
     }
     return new Promise<void>((resolve) => receiver.#waiters.push(resolve));

@@ -1,5 +1,5 @@
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { joinSlashPath } from "./clean.js";
 import { sliceValues } from "../../runtime/slice.js";

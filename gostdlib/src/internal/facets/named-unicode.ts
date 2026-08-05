@@ -1,5 +1,5 @@
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint16, uint32 } from "@gotots/runtime/scalars.js";
+import type { int64, uint16, uint32 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { Range16, Range32, RangeTable } from "../../unicode.js";
 

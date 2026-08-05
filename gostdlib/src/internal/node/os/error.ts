@@ -1,7 +1,7 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { Is } from "../../../errors.js";
 import { state as fsState } from "../../../io/fs.js";
-import { ENOTDIR } from "../../../syscall.js";
+import { ENOENT, ENOTDIR } from "../../../syscall.js";
 import { WrappedProviderError } from "../../portable/errors/tree.js";
 import { errnoError } from "../../portable/syscall/errno.js";
 
@@ -36,7 +36,7 @@ export class NodeProviderError extends WrappedProviderError {
       case "closed":
         return fsState.ErrClosed;
       case "not-exist":
-        return fsState.ErrNotExist;
+        return errnoError(ENOENT);
       case "not-directory":
         return errnoError(ENOTDIR);
       case "permission":

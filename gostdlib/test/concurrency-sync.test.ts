@@ -152,7 +152,7 @@ test("OnceValue replays the first panic", async () => {
 
 test("WaitGroup waits for Add, Done, and Go work", async () => {
   const group = new WaitGroup();
-  WaitGroup.Add(group, 1);
+  WaitGroup.Add(group, 1n);
   const manual = Promise.resolve().then(() => WaitGroup.Done(group));
   WaitGroup.Go(group, async () => {
     await Promise.resolve();

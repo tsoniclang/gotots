@@ -11,9 +11,9 @@ import (
 
 func TestOrderedBuiltinsExecuteDifferentially(t *testing.T) {
 	for _, testCase := range []struct {
-		name    string
-		options emit.Options
-		suffix  string
+		name       string
+		options    emit.Options
+		wideSuffix string
 	}{
 		{"number", emit.DefaultOptions(), ""},
 		{
@@ -50,7 +50,7 @@ func TestOrderedBuiltinsExecuteDifferentially(t *testing.T) {
 				workingDirectory,
 				paths,
 				sourceModule,
-				testCase.suffix,
+				testCase.wideSuffix,
 			)
 			if targetOutput != goOutput {
 				t.Fatalf(

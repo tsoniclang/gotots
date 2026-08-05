@@ -4,6 +4,7 @@ import (
 	"go/types"
 	"sort"
 
+	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
@@ -97,7 +98,205 @@ func (r *Registry) recordInterfaceContractDemand(
 		}
 		requests = append(requests, selected...)
 	}
+	bridges := r.providerInterfaceBridgesByContract[sourceKey]
+	bridgeKeys := make([]string, 0, len(bridges))
+	for bridgeKey := range bridges {
+		bridgeKeys = append(bridgeKeys, bridgeKey)
+	}
+	sort.Strings(bridgeKeys)
+	for _, bridgeKey := range bridgeKeys {
+		binding, ok := r.providerInterfaceBridges[bridgeKey]
+		if !ok || binding.owner == nil {
+			return nil, &api.NameError{
+				Reason: "interface contract reachability has no provider bridge owner",
+			}
+		}
+		selected, err := r.providerInterfaceBridgeContractRequests(
+			binding,
+			sourceKey,
+			source,
+		)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, selected...)
+	}
 	return requests, nil
+}
+
+func (r *Registry) providerInterfaceBridgeContractRequests(
+	binding providerInterfaceBridgeBinding,
+	directKey string,
+	direct *types.Interface,
+) ([]api.RootRequest, error) {
+	if r == nil || binding.owner == nil || binding.key == "" ||
+		directKey == "" || direct == nil {
+		return nil, &api.NameError{
+			Reason: "provider-interface bridge demand owner is invalid",
+		}
+	}
+	base, ok := binding.owner.ProviderInterfaceBridgeType()
+	if !ok {
+		return nil, &api.NameError{
+			Reason: "provider-interface bridge demand has no source type",
+		}
+	}
+	baseContract, ok := base.Underlying().(*types.Interface)
+	if !ok {
+		return nil, &api.NameError{
+			Reason: "provider-interface bridge demand source is not an interface",
+		}
+	}
+	baseContract = baseContract.Complete()
+	type pendingContract struct {
+		key      string
+		contract *types.Interface
+	}
+	pending := []pendingContract{{key: directKey, contract: direct}}
+	selected := make(map[string]*types.Interface)
+	visited := make(map[string]struct{})
+	for len(pending) != 0 {
+		next := pending[0]
+		pending = pending[1:]
+		if _, duplicate := visited[next.key]; duplicate {
+			continue
+		}
+		contract, err := r.internInterfaceContract(next.key, next.contract)
+		if err != nil {
+			return nil, err
+		}
+		next.contract = contract
+		visited[next.key] = struct{}{}
+		reached := r.providerInterfaceBridgesByContract[next.key]
+		if reached == nil {
+			reached = make(map[string]struct{})
+			r.providerInterfaceBridgesByContract[next.key] = reached
+		}
+		reached[binding.key] = struct{}{}
+		targets := r.interfaceContractDemands[next.key]
+		targetKeys := make([]string, 0, len(targets))
+		for targetKey := range targets {
+			targetKeys = append(targetKeys, targetKey)
+		}
+		sort.Strings(targetKeys)
+		for _, targetKey := range targetKeys {
+			demand := targets[targetKey]
+			if !types.Identical(demand.source, next.contract) {
+				return nil, &api.NameError{
+					Reason: "provider-interface demand source identity drifted",
+				}
+			}
+			target := demand.target
+			if types.Implements(baseContract, target) {
+				pending = append(pending, pendingContract{
+					key:      targetKey,
+					contract: target,
+				})
+				continue
+			}
+			capabilities, err := r.providerInterfaceBridgeCapabilities(
+				base,
+				target,
+			)
+			if err != nil {
+				return nil, err
+			}
+			if len(capabilities) == 0 {
+				continue
+			}
+			pending = append(pending, pendingContract{
+				key:      targetKey,
+				contract: target,
+			})
+			for _, capability := range capabilities {
+				if existing := selected[capability.demandKey]; existing != nil &&
+					!types.Identical(existing, capability.target) {
+					return nil, &api.NameError{
+						Reason: "provider-interface capability key joined non-identical contracts",
+					}
+				}
+				selected[capability.demandKey] = capability.target
+				pending = append(pending, pendingContract{
+					key:      capability.targetKey,
+					contract: capability.target,
+				})
+			}
+		}
+	}
+	keys := make([]string, 0, len(selected))
+	for key := range selected {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	requests := make([]api.RootRequest, 0, len(keys))
+	for _, key := range keys {
+		request, err := api.NewProviderInterfaceCapabilityRequest(
+			binding.owner,
+			selected[key],
+			key,
+		)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, request)
+	}
+	return requests, nil
+}
+
+func (r *Registry) providerInterfaceBridgeCapabilities(
+	base *types.Named,
+	target *types.Interface,
+) ([]providerInterfaceCapabilityBinding, error) {
+	baseContract, ok := base.Underlying().(*types.Interface)
+	if !ok {
+		return nil, &api.NameError{
+			Reason: "provider-interface capability base is invalid",
+		}
+	}
+	baseKey, err := canonicalProviderInterfaceContractKey(baseContract)
+	if err != nil {
+		return nil, err
+	}
+	byTarget := r.providerInterfaceCapabilities[baseKey]
+	keys := make([]string, 0, len(byTarget))
+	for key := range byTarget {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	selected := make([]providerInterfaceCapabilityBinding, 0, len(keys))
+	targetKey, err := canonicalProviderInterfaceContractKey(target)
+	if err != nil {
+		return nil, err
+	}
+	for _, key := range keys {
+		capability := byTarget[key]
+		if !types.Identical(capability.base, base) {
+			return nil, &api.NameError{
+				Reason: "provider-interface capability base identity drifted",
+			}
+		}
+		_, matches, matchErr := gostdlibsource.SelectProviderInterfaceMethods(
+			capability.certificate.TargetInterface(),
+			target,
+		)
+		if matchErr != nil {
+			return nil, matchErr
+		}
+		if matches {
+			capability.target = target
+			capability.targetKey = targetKey
+			capability.demandKey = capability.key + "\x00" + targetKey
+			if existing, ok := r.providerInterfaceCapabilityDemands[capability.demandKey]; ok && (!types.Identical(existing.base, capability.base) ||
+				!types.Identical(existing.target, capability.target)) {
+				return nil, &api.NameError{
+					Reason: "provider-interface capability demand identity drifted",
+				}
+			}
+			r.providerInterfaceCapabilityDemands[capability.demandKey] = capability
+			selected = append(selected, capability)
+		}
+	}
+	return selected, nil
 }
 
 func (r *Registry) recordInterfaceReflectionDemand(

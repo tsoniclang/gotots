@@ -1,5 +1,5 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ParseError } from "./parse-error.js";
 import { Time } from "./time.js";

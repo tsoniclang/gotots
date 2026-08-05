@@ -41,36 +41,47 @@ func Describe(sizes types.Sizes, sourceType types.Type) (Carrier, bool) {
 	case types.Uint64:
 		return newCarrier(api.PrimitiveUint64, 64, false), true
 	case types.Int:
-		return sizedCarrier(sizes, types.Typ[types.Int], true)
+		return nativeCarrier(sizes, api.PrimitiveInt, true)
 	case types.Uint:
-		return sizedCarrier(sizes, types.Typ[types.Uint], false)
+		return nativeCarrier(sizes, api.PrimitiveUint, false)
 	case types.Uintptr:
-		return sizedCarrier(sizes, types.Typ[types.Uintptr], false)
+		return nativeCarrier(sizes, api.PrimitiveUintptr, false)
 	default:
 		return Carrier{}, false
 	}
+}
+
+func DescribeUnderlying(
+	sizes types.Sizes,
+	sourceType types.Type,
+) (Carrier, bool) {
+	if carrier, ok := Describe(sizes, sourceType); ok {
+		return carrier, true
+	}
+	if sourceType == nil {
+		return Carrier{}, false
+	}
+	basic, ok := types.Unalias(sourceType).Underlying().(*types.Basic)
+	if !ok {
+		return Carrier{}, false
+	}
+	return Describe(sizes, basic)
 }
 
 func newCarrier(alias api.PrimitiveAlias, width uint8, signed bool) Carrier {
 	return Carrier{alias: alias, width: width, signed: signed}
 }
 
-func sizedCarrier(
+func nativeCarrier(
 	sizes types.Sizes,
-	sourceType types.Type,
+	alias api.PrimitiveAlias,
 	signed bool,
 ) (Carrier, bool) {
-	switch sizes.Sizeof(sourceType) {
+	switch sizes.Sizeof(types.Typ[types.Int]) {
 	case 4:
-		if signed {
-			return newCarrier(api.PrimitiveInt32, 32, true), true
-		}
-		return newCarrier(api.PrimitiveUint32, 32, false), true
+		return newCarrier(alias, 32, signed), true
 	case 8:
-		if signed {
-			return newCarrier(api.PrimitiveInt64, 64, true), true
-		}
-		return newCarrier(api.PrimitiveUint64, 64, false), true
+		return newCarrier(alias, 64, signed), true
 	default:
 		return Carrier{}, false
 	}
@@ -86,6 +97,40 @@ func (c Carrier) Width() uint8 {
 
 func (c Carrier) Signed() bool {
 	return c.signed
+}
+
+func CarrierRepresentation(
+	profile api.IntegerRepresentation,
+	carrier Carrier,
+) (api.IntegerCarrier, bool) {
+	width := api.NativeIntegerWidth64
+	if carrier.Alias() == api.PrimitiveInt ||
+		carrier.Alias() == api.PrimitiveUint ||
+		carrier.Alias() == api.PrimitiveUintptr {
+		width = api.NativeIntegerWidth(carrier.Width())
+	}
+	abi, err := api.NewScalarABI(profile, width)
+	if err != nil {
+		return api.IntegerCarrierInvalid, false
+	}
+	representation, err := api.IntegerCarrierRepresentation(
+		carrier.Alias(),
+		abi,
+	)
+	return representation, err == nil
+}
+
+func UsesBigInt(
+	profile api.IntegerRepresentation,
+	carrier Carrier,
+) bool {
+	representation, ok := CarrierRepresentation(profile, carrier)
+	return ok && representation == api.IntegerCarrierBigInt
+}
+
+func TypeUsesBigInt(context api.Context, sourceType types.Type) bool {
+	carrier, ok := Describe(context.TypesSizes(), sourceType)
+	return ok && UsesBigInt(context.IntegerRepresentation(), carrier)
 }
 
 func FormatConstant(
@@ -222,7 +267,8 @@ func RequiresUint32Normalization(
 	representation api.IntegerRepresentation,
 	carrier Carrier,
 ) bool {
-	return representation == api.IntegerRepresentationNumber &&
+	target, ok := CarrierRepresentation(representation, carrier)
+	return ok && target == api.IntegerCarrierNumber &&
 		!carrier.signed &&
 		carrier.width == 32
 }

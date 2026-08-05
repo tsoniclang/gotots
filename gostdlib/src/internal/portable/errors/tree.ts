@@ -2,6 +2,7 @@ import {
   GoErrorMethodToken,
   type GoError,
 } from "@gotots/runtime/interface-value.js";
+import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import { ProviderInterfaceValue } from "../io/value.js";
 
@@ -10,7 +11,7 @@ export abstract class WrappedProviderError extends ProviderInterfaceValue implem
     GoErrorMethodToken,
   ]);
 
-	protected constructor(typeIdentity: { readonly comparable: boolean }) {
+  protected constructor(typeIdentity: { readonly comparable: boolean }) {
     super(typeIdentity);
   }
 
@@ -64,8 +65,8 @@ export class MessageWrappedErrors extends ProviderInterfaceValue implements GoEr
     return this.message;
   }
 
-  UnwrapAll(): readonly GoError[] {
-    return this.causes.slice();
+  Unwrap(): RuntimeSlice<GoError | undefined> {
+    return RuntimeSlice.literal(this.causes.slice());
   }
 
   override $go$format(verb: string, _flags: string, _precision: number | undefined): string {

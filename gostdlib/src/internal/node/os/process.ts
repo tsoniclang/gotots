@@ -1,5 +1,9 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
-import type { Awaitable, gostring, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, gostring, int64 } from "@gotots/gostdlib/internal/scalars.js";
+import {
+  hostInteger,
+  integerFromHost,
+} from "../../host-integer.js";
 import { nodeError } from "./error.js";
 import { nodeSignal } from "./signal.js";
 
@@ -24,7 +28,7 @@ export function signalProcess(
     return nodeError("invalid", "signal");
   }
   try {
-    process.kill(receiver.Pid, selected);
+    process.kill(hostInteger(receiver.Pid), selected);
     return undefined;
   } catch {
     return nodeError("operation", "signal");
@@ -44,7 +48,7 @@ export async function signalProcessAsync(
     return nodeError("invalid", "signal");
   }
   try {
-    process.kill(receiver.Pid, selected);
+    process.kill(hostInteger(receiver.Pid), selected);
     return undefined;
   } catch {
     return nodeError("operation", "signal");
@@ -52,9 +56,9 @@ export async function signalProcessAsync(
 }
 
 export function getProcessID(): int64 {
-  return process.pid;
+  return integerFromHost(process.pid);
 }
 
 export function exitProcess(code: int64): never {
-  process.exit(code);
+  process.exit(hostInteger(code));
 }

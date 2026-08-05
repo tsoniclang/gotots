@@ -9,10 +9,13 @@ import (
 
 func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
 	contract, err := runtimecontract.Decode([]byte(`{
-	  "schemaVersion": 1,
-	  "integerRepresentations": ["number"],
+	  "schemaVersion": 2,
+	  "integerRepresentations": ["number", "bigint"],
+	  "providerIntegerRepresentation": "bigint",
+	  "providerScalarModule": "./internal/scalars.js",
+	  "nativeIntegerBits": 64,
 	  "primitiveAliases": [
-	    {"id": 4, "export": "int32"}
+	    {"id": 4, "export": "int32", "providerCarrier": "number"}
 	  ],
 	  "runtimeSymbols": [
 	    {"id": 300, "export": "RuntimeSlice"}
@@ -26,8 +29,13 @@ func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !requirements.AllowsProfile(api.IntegerRepresentationNumber) ||
-		requirements.AllowsProfile(api.IntegerRepresentationBigInt) {
+		!requirements.AllowsProfile(api.IntegerRepresentationBigInt) {
 		t.Fatal("runtime requirement profile admission is wrong")
+	}
+	provider := requirements.ProviderScalarABI()
+	if provider.IntegerRepresentation() != api.IntegerRepresentationBigInt ||
+		provider.NativeIntegerWidth() != api.NativeIntegerWidth64 {
+		t.Fatal("runtime requirement provider scalar ABI is wrong")
 	}
 	aliases := requirements.PrimitiveAliases()
 	if len(aliases) != 1 || aliases[0] != api.PrimitiveInt32 {
@@ -51,21 +59,30 @@ func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
 func TestPackageRequirementsRejectIdentityMutations(t *testing.T) {
 	for _, source := range []string{
 		`{
-		  "schemaVersion": 1,
-		  "integerRepresentations": ["number"],
-		  "primitiveAliases": [{"id": 4, "export": "uint32"}],
+		  "schemaVersion": 2,
+		  "integerRepresentations": ["number", "bigint"],
+		  "providerIntegerRepresentation": "bigint",
+		  "providerScalarModule": "./internal/scalars.js",
+		  "nativeIntegerBits": 64,
+		  "primitiveAliases": [{"id": 4, "export": "uint32", "providerCarrier": "number"}],
 		  "runtimeSymbols": [{"id": 300, "export": "RuntimeSlice"}]
 		}`,
 		`{
-		  "schemaVersion": 1,
-		  "integerRepresentations": ["number"],
-		  "primitiveAliases": [{"id": 4, "export": "int32"}],
+		  "schemaVersion": 2,
+		  "integerRepresentations": ["number", "bigint"],
+		  "providerIntegerRepresentation": "bigint",
+		  "providerScalarModule": "./internal/scalars.js",
+		  "nativeIntegerBits": 64,
+		  "primitiveAliases": [{"id": 4, "export": "int32", "providerCarrier": "number"}],
 		  "runtimeSymbols": [{"id": 300, "export": "GoSlice"}]
 		}`,
 		`{
-		  "schemaVersion": 1,
+		  "schemaVersion": 2,
 		  "integerRepresentations": ["number", "number"],
-		  "primitiveAliases": [{"id": 4, "export": "int32"}],
+		  "providerIntegerRepresentation": "number",
+		  "providerScalarModule": "./internal/scalars.js",
+		  "nativeIntegerBits": 64,
+		  "primitiveAliases": [{"id": 4, "export": "int32", "providerCarrier": "number"}],
 		  "runtimeSymbols": [{"id": 300, "export": "RuntimeSlice"}]
 		}`,
 	} {

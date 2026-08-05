@@ -56,9 +56,16 @@ func main() {
 	if !requirements.AllowsProfile(profile) {
 		fail("runtime requirement contract does not admit profile " + profile.String())
 	}
+	scalar, err := api.NewScalarABI(
+		profile,
+		requirements.ProviderScalarABI().NativeIntegerWidth(),
+	)
+	if err != nil {
+		fail(err.Error())
+	}
 	assembled, err := runtimeemission.AssemblePackage(
 		tsgo.NewFactory(),
-		profile,
+		scalar,
 		concurrency,
 		requirements.RuntimeSymbols(),
 		requirements.PrimitiveAliases(),

@@ -1,4 +1,4 @@
-import type { gostring, int64 } from "@gotots/runtime/scalars.js";
+import type { gostring, int64 } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   Description,

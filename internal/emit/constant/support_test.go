@@ -203,13 +203,8 @@ func executeConstantFamilyTS(
 ) string {
 	t.Helper()
 	artifacts := materializeConstantFamily(t, emission, workingDirectory)
-	// Under the bigint profile every integer carrier is bigint, so Case's int32
-	// argument is passed as a bigint literal; the large constant root is also
-	// only exercised there.
-	suffix := ""
 	huge := ""
 	if bigint {
-		suffix = "n"
 		huge = "console.log(String(values.HugeAsUint()));\n"
 	}
 	runner := `import * as values from "` + artifacts.module(t, "source.ts") + `";
@@ -222,8 +217,8 @@ console.log(row(values.Inherited()));
 console.log(row(values.MultipleTargets()));
 console.log(String(values.Argument()));
 console.log(String(values.Assignment()));
-console.log(String(values.Case(100` + suffix + `)));
-console.log(String(values.Case(5` + suffix + `)));
+console.log(String(values.Case(100)));
+console.log(String(values.Case(5)));
 console.log(String(values.Conversion()));
 console.log(String(values.Arithmetic()));
 console.log(String(values.Float32Expression()));

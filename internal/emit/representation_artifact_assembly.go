@@ -206,11 +206,26 @@ func (s *programSession) buildRepresentationArtifactRevision(
 	context := builder.context.WithArtifactOwner(owner)
 	requirements := s.requirements.appliedFor(owner)
 	var adapterContracts []*types.Interface
+	var providerCapabilities []providerinterfacebridge.CapabilityContract
+	var providerProfileCapabilities []providerinterfacebridge.ProfileCapabilityContract
 	if artifact.Kind() == api.GeneratedArtifactInterfaceAdapter {
 		adapterContracts, err = interfaceadapterdeclaration.Contracts(
 			artifact,
 			requirements,
 		)
+	} else if artifact.Kind() == api.GeneratedArtifactProviderInterfaceBridge {
+		if _, profile, profiled := artifact.ProviderProfileInterfaceBridge(); profiled && len(profile) != 0 {
+			providerCapabilities, providerProfileCapabilities, err =
+				providerinterfacebridge.ProfileRequirements(
+					artifact,
+					requirements,
+				)
+		} else {
+			providerCapabilities, err = providerinterfacebridge.Requirements(
+				artifact,
+				requirements,
+			)
+		}
 	} else {
 		err = exactRepresentationRequirement(requirements, artifact)
 	}
@@ -222,6 +237,8 @@ func (s *programSession) buildRepresentationArtifactRevision(
 		context,
 		artifact,
 		adapterContracts,
+		providerCapabilities,
+		providerProfileCapabilities,
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -253,6 +270,8 @@ func buildRepresentationArtifact(
 	context api.Context,
 	artifact *api.GeneratedArtifact,
 	adapterContracts []*types.Interface,
+	providerCapabilities []providerinterfacebridge.CapabilityContract,
+	providerProfileCapabilities []providerinterfacebridge.ProfileCapabilityContract,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	switch artifact.Kind() {
 	case api.GeneratedArtifactInterfaceMethodToken:
@@ -348,11 +367,39 @@ func buildRepresentationArtifact(
 				Reason: "provider-interface bridge source is invalid",
 			}
 		}
+		profileSource, profile, profiled := artifact.ProviderProfileInterfaceBridge()
+		if profiled {
+			if !types.Identical(source, profileSource) {
+				return nil, nil, &ScheduleError{
+					Object: artifact.TargetName(),
+					Reason: "provider profile-interface bridge received incompatible capabilities",
+				}
+			}
+			return providerinterfacebridge.BuildProfile(
+				context,
+				builder.emitter,
+				artifact.TargetName(),
+				source,
+				profile,
+				providerCapabilities,
+				providerProfileCapabilities,
+				[]tsgo.ModifierLike{
+					builder.context.Factory().ExportKeyword(),
+				},
+			)
+		}
+		if len(providerProfileCapabilities) != 0 {
+			return nil, nil, &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "ordinary provider interface bridge received profile capabilities",
+			}
+		}
 		return providerinterfacebridge.Build(
 			context,
 			builder.emitter,
 			artifact.TargetName(),
 			source,
+			providerCapabilities,
 			[]tsgo.ModifierLike{
 				builder.context.Factory().ExportKeyword(),
 			},

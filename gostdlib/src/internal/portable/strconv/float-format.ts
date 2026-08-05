@@ -4,7 +4,8 @@ import type {
   gostring,
   int64,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
+import { hostInteger } from "../../host-integer.js";
 
 type Decimal = {
   readonly digits: bigint;
@@ -42,7 +43,7 @@ export function FormatFloat(
   }
 
   const format = String.fromCharCode(formatCode);
-  const precision = Number(requestedPrecision);
+  const precision = hostInteger(requestedPrecision);
   const sign = parts.negative ? "-" : "";
   if (format === "b") {
     return `${sign}${parts.mantissa}p${signedExponent(parts.exponent2, false)}`;
@@ -87,12 +88,12 @@ export function FormatFloat(
 }
 
 function decompose(input: number, bitSize: int64): FloatParts {
-  if (bitSize === 32) {
+  if (bitSize === 32n) {
     const value = Math.fround(input);
     bitsView.setFloat32(0, value, false);
     return partsFromBits(BigInt(bitsView.getUint32(0, false)), value, 23, 8, 127);
   }
-  if (bitSize === 64) {
+  if (bitSize === 64n) {
     bitsView.setFloat64(0, input, false);
     return partsFromBits(bitsView.getBigUint64(0, false), input, 52, 11, 1023);
   }
@@ -145,7 +146,7 @@ function shortestDecimal(value: number, bitSize: int64): Decimal {
   if (value === 0) {
     return { digits: 0n, scale: 0 };
   }
-  if (bitSize === 64) {
+  if (bitSize === 64n) {
     return parseDecimal(value.toString());
   }
   for (let precision = 1; precision <= 9; precision += 1) {

@@ -10,6 +10,11 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import type { int64 } from "../src/internal/scalars.js";
+import {
+  hostInteger,
+  integerFromHost,
+} from "../src/internal/host-integer.js";
 
 import type { TextMarshaler } from "../src/encoding.js";
 import {
@@ -28,28 +33,31 @@ class Sortable extends ProviderInterfaceValue implements Interface {
     super(sortableType);
   }
 
-  Len(): number {
-    return this.values.length;
+  Len(): int64 {
+    return integerFromHost(this.values.length);
   }
 
-  Less(left: number, right: number): boolean {
-    return (this.values[left]?.key ?? 0) < (this.values[right]?.key ?? 0);
+  Less(left: int64, right: int64): boolean {
+    return (this.values[hostInteger(left)]?.key ?? 0)
+      < (this.values[hostInteger(right)]?.key ?? 0);
   }
 
-  Swap(left: number, right: number): void {
-    const saved = this.values[left];
-    if (saved === undefined || this.values[right] === undefined) {
+  Swap(left: int64, right: int64): void {
+    const leftIndex = hostInteger(left);
+    const rightIndex = hostInteger(right);
+    const saved = this.values[leftIndex];
+    if (saved === undefined || this.values[rightIndex] === undefined) {
       throw new Error("test index is outside the sortable value");
     }
-    this.values[left] = this.values[right];
-    this.values[right] = saved;
+    this.values[leftIndex] = this.values[rightIndex];
+    this.values[rightIndex] = saved;
   }
 }
 
 test("sort.Search finds the first true index", (): void => {
-  assert.equal(Search(10, (index): boolean => index >= 6), 6);
-  assert.equal(Search(10, (): boolean => false), 10);
-  assert.equal(Search(0, (): boolean => true), 0);
+  assert.equal(Search(10n, (index): boolean => index >= 6n), 6n);
+  assert.equal(Search(10n, (): boolean => false), 10n);
+  assert.equal(Search(0n, (): boolean => true), 0n);
 });
 
 test("sort interface operations are in-place and stable when requested", (): void => {
@@ -89,7 +97,7 @@ test("encoding.TextMarshaler remains a static contract", (): void => {
 });
 
 test("encoding/hex appends encoded and partially decoded bytes", (): void => {
-  assert.equal(EncodedLen(3), 6);
+  assert.equal(EncodedLen(3n), 6n);
   const encoded = AppendEncode(
     RuntimeSlice.literal([0x78]),
     RuntimeSlice.literal([0xab, 0xcd]),

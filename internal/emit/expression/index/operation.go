@@ -103,15 +103,6 @@ func Apply(
 			values,
 			tsgo.NodeFlagsNone,
 		))
-		if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
-			target = context.Factory().CallExpression(
-				api.TargetIntrinsicBigInt.Expression(context.Factory()),
-				nil,
-				nil,
-				[]tsgo.Expression{target},
-				tsgo.NodeFlagsNone,
-			)
-		}
 		result, err := api.NewExpressionEmission(
 			ordered.Before(),
 			target,

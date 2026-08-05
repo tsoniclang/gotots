@@ -15,24 +15,36 @@ type providerCallableProfileLookup struct {
 }
 
 type ProviderCallableProfileDocument struct {
-	SourceIdentity              string                                     `json:"sourceIdentity"`
-	ProfileKey                  string                                     `json:"profileKey"`
-	Export                      string                                     `json:"export"`
-	Required                    bool                                       `json:"required,omitempty"`
-	Receiver                    bool                                       `json:"receiver,omitempty"`
-	CanonicalParameters         []int                                      `json:"canonicalParameters"`
-	CanonicalResults            []int                                      `json:"canonicalResults"`
-	CanonicalValues             []string                                   `json:"canonicalValues,omitempty"`
-	CanonicalTypeArguments      []string                                   `json:"canonicalTypeArguments,omitempty"`
-	GuardInterfaces             []string                                   `json:"guardInterfaces,omitempty"`
-	ContractInterfaces          []string                                   `json:"contractInterfaces,omitempty"`
-	FromProviderInterfaces      []string                                   `json:"fromProviderInterfaces,omitempty"`
-	ImplementedResultInterfaces []string                                   `json:"implementedResultInterfaces,omitempty"`
-	Interfaces                  []ProviderCallableProfileInterfaceDocument `json:"interfaces,omitempty"`
-	CallableParameters          []ProviderCallableParameterDocument        `json:"callableParameters,omitempty"`
-	Effect                      EffectKind                                 `json:"effect"`
-	ImplementationOwner         string                                     `json:"implementationOwner"`
-	TargetFingerprint           string                                     `json:"targetFingerprint"`
+	SourceIdentity              string                                          `json:"sourceIdentity"`
+	ProfileKey                  string                                          `json:"profileKey"`
+	Export                      string                                          `json:"export"`
+	Required                    bool                                            `json:"required,omitempty"`
+	Receiver                    bool                                            `json:"receiver,omitempty"`
+	CanonicalParameters         []int                                           `json:"canonicalParameters"`
+	CanonicalResults            []int                                           `json:"canonicalResults"`
+	CanonicalValues             []ProviderCallableProfileCanonicalValueDocument `json:"canonicalValues,omitempty"`
+	CanonicalTypeArguments      []string                                        `json:"canonicalTypeArguments,omitempty"`
+	CapabilityViews             []ProviderCallableProfileCapabilityViewDocument `json:"capabilityViews,omitempty"`
+	GuardInterfaces             []string                                        `json:"guardInterfaces,omitempty"`
+	ContractInterfaces          []string                                        `json:"contractInterfaces,omitempty"`
+	FromProviderInterfaces      []string                                        `json:"fromProviderInterfaces,omitempty"`
+	ImplementedResultInterfaces []string                                        `json:"implementedResultInterfaces,omitempty"`
+	Interfaces                  []ProviderCallableProfileInterfaceDocument      `json:"interfaces,omitempty"`
+	CallableParameters          []ProviderCallableParameterDocument             `json:"callableParameters,omitempty"`
+	Effect                      EffectKind                                      `json:"effect"`
+	ImplementationOwner         string                                          `json:"implementationOwner"`
+	TargetFingerprint           string                                          `json:"targetFingerprint"`
+}
+
+type ProviderCallableProfileCanonicalValueDocument struct {
+	SourceIdentity  string `json:"sourceIdentity"`
+	TargetParameter string `json:"targetParameter"`
+}
+
+type ProviderCallableProfileCapabilityViewDocument struct {
+	BaseSourceIdentity   string `json:"baseSourceIdentity"`
+	TargetSourceIdentity string `json:"targetSourceIdentity"`
+	TargetParameter      string `json:"targetParameter"`
 }
 
 type ProviderCallableProfileInterfaceDocument struct {
@@ -103,12 +115,16 @@ func (p ProviderCallableProfile) CanonicalResults() []int {
 	return slices.Clone(p.profile.CanonicalResults)
 }
 
-func (p ProviderCallableProfile) CanonicalValues() []string {
+func (p ProviderCallableProfile) CanonicalValues() []ProviderCallableProfileCanonicalValueDocument {
 	return slices.Clone(p.profile.CanonicalValues)
 }
 
 func (p ProviderCallableProfile) CanonicalTypeArguments() []string {
 	return slices.Clone(p.profile.CanonicalTypeArguments)
+}
+
+func (p ProviderCallableProfile) CapabilityViews() []ProviderCallableProfileCapabilityViewDocument {
+	return slices.Clone(p.profile.CapabilityViews)
 }
 
 func (p ProviderCallableProfile) GuardInterfaces() []string {
@@ -173,6 +189,13 @@ func (p ProviderCallableProfile) TargetFingerprint() string {
 
 type ProviderCallableProfileInterface struct {
 	document ProviderCallableProfileInterfaceDocument
+}
+
+func (i ProviderCallableProfileInterface) Valid() bool {
+	return i.document.SourceIdentity != "" &&
+		i.document.Export != "" &&
+		i.document.ProviderInterface.Mode.Valid() &&
+		i.document.TargetFingerprint != ""
 }
 
 func (i ProviderCallableProfileInterface) SourceIdentity() string {
@@ -350,6 +373,7 @@ func cloneProviderCallableProfile(
 	result.CanonicalResults = slices.Clone(source.CanonicalResults)
 	result.CanonicalValues = slices.Clone(source.CanonicalValues)
 	result.CanonicalTypeArguments = slices.Clone(source.CanonicalTypeArguments)
+	result.CapabilityViews = slices.Clone(source.CapabilityViews)
 	result.GuardInterfaces = slices.Clone(source.GuardInterfaces)
 	result.ContractInterfaces = slices.Clone(source.ContractInterfaces)
 	result.FromProviderInterfaces = slices.Clone(source.FromProviderInterfaces)

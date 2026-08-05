@@ -66,7 +66,7 @@ test("provider named-struct storage capabilities preserve exact values", (): voi
   assert.equal(TimeTimerOperations.$fromStorage(
     TimeTimerOperations.$storageOf(timer),
   ), timer);
-  const ticker = NewTicker(new Duration(1_000_000_000));
+  const ticker = NewTicker(new Duration(1_000_000_000n));
   assert.equal(TimeTickerOperations.$fromStorage(
     TimeTickerOperations.$storageOf(ticker),
   ), ticker);
@@ -74,7 +74,7 @@ test("provider named-struct storage capabilities preserve exact values", (): voi
 
   const ranges16 = RuntimeSlice.literal<Range16>([]);
   const ranges32 = RuntimeSlice.literal<Range32>([]);
-  const table = UnicodeRangeTableOperations.$make(ranges16, ranges32, 0);
+  const table = UnicodeRangeTableOperations.$make(ranges16, ranges32, 0n);
   assert.equal(UnicodeRangeTableOperations.$fromStorage(
     UnicodeRangeTableOperations.$storageOf(table),
   ), table);

@@ -14,6 +14,7 @@ func ApplyVariableShift(
 	context api.Context,
 	operator token.Token,
 	carrier integervalue.Carrier,
+	countCarrier integervalue.Carrier,
 	left api.ExpressionEmission,
 	right api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
@@ -32,27 +33,39 @@ func ApplyVariableShift(
 		return api.ExpressionEmission{}, true, err
 	}
 	var target tsgo.Expression
-	switch context.IntegerRepresentation() {
-	case api.IntegerRepresentationNumber:
-		target = numberVariableShift(
+	carrierRepresentation, represented := integervalue.CarrierRepresentation(
+		context.IntegerRepresentation(),
+		carrier,
+	)
+	if !represented {
+		return api.ExpressionEmission{}, false, nil
+	}
+	switch carrierRepresentation {
+	case api.IntegerCarrierNumber:
+		target, err = numberVariableShift(
 			context,
 			panicReference.Name(),
 			operator,
 			carrier,
+			countCarrier,
 			left.Value(),
 			right.Value(),
 		)
-	case api.IntegerRepresentationBigInt:
-		target = bigIntVariableShift(
+	case api.IntegerCarrierBigInt:
+		target, err = bigIntVariableShift(
 			context,
 			panicReference.Name(),
 			operator,
 			carrier,
+			countCarrier,
 			left.Value(),
 			right.Value(),
 		)
 	default:
 		return api.ExpressionEmission{}, false, nil
+	}
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
 	return api.DirectExpression(
 		target,
@@ -69,13 +82,35 @@ func numberVariableShift(
 	panicName string,
 	operator token.Token,
 	carrier integervalue.Carrier,
+	countCarrier integervalue.Carrier,
 	left tsgo.Expression,
 	right tsgo.Expression,
-) tsgo.Expression {
+) (tsgo.Expression, error) {
 	factory := context.Factory()
-	zero := tsgo.Expression(
-		factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+	countZero, err := integervalue.CarrierLiteral(context, countCarrier, "0")
+	if err != nil {
+		return nil, err
+	}
+	countWidth, err := integervalue.CarrierLiteral(
+		context,
+		countCarrier,
+		fmt.Sprintf("%d", carrier.Width()),
 	)
+	if err != nil {
+		return nil, err
+	}
+	shiftCount, represented := alignShiftCount(
+		context,
+		carrier,
+		countCarrier,
+		right,
+	)
+	if !represented {
+		return nil, &api.IntegerRepresentationError{
+			Representation: context.IntegerRepresentation(),
+		}
+	}
+	zero := tsgo.Expression(factory.NumericLiteral("0", tsgo.TokenFlagsNone))
 	normalized := normalizeNumber(factory, carrier, left)
 	shifted := normalizeNumber(
 		factory,
@@ -85,21 +120,18 @@ func numberVariableShift(
 			normalized,
 			nil,
 			shiftOperator(factory, operator, carrier.Signed()),
-			right,
+			shiftCount,
 		),
 	)
 	return guardedShift(
 		context,
 		panicName,
 		right,
-		zero,
-		factory.NumericLiteral(
-			fmt.Sprintf("%d", carrier.Width()),
-			tsgo.TokenFlagsNone,
-		),
+		countZero,
+		countWidth,
 		wideShiftResult(factory, operator, carrier.Signed(), normalized, zero),
 		shifted,
-	)
+	), nil
 }
 
 func bigIntVariableShift(
@@ -107,13 +139,35 @@ func bigIntVariableShift(
 	panicName string,
 	operator token.Token,
 	carrier integervalue.Carrier,
+	countCarrier integervalue.Carrier,
 	left tsgo.Expression,
 	right tsgo.Expression,
-) tsgo.Expression {
+) (tsgo.Expression, error) {
 	factory := context.Factory()
-	zero := tsgo.Expression(
-		factory.BigIntLiteral("0n", tsgo.TokenFlagsNone),
+	countZero, err := integervalue.CarrierLiteral(context, countCarrier, "0")
+	if err != nil {
+		return nil, err
+	}
+	countWidth, err := integervalue.CarrierLiteral(
+		context,
+		countCarrier,
+		fmt.Sprintf("%d", carrier.Width()),
 	)
+	if err != nil {
+		return nil, err
+	}
+	shiftCount, represented := alignShiftCount(
+		context,
+		carrier,
+		countCarrier,
+		right,
+	)
+	if !represented {
+		return nil, &api.IntegerRepresentationError{
+			Representation: context.IntegerRepresentation(),
+		}
+	}
+	zero := tsgo.Expression(factory.BigIntLiteral("0n", tsgo.TokenFlagsNone))
 	normalized := normalizeBigInt(factory, carrier, left)
 	shifted := normalizeBigInt(
 		factory,
@@ -123,21 +177,18 @@ func bigIntVariableShift(
 			normalized,
 			nil,
 			shiftOperator(factory, operator, true),
-			right,
+			shiftCount,
 		),
 	)
 	return guardedShift(
 		context,
 		panicName,
 		right,
-		zero,
-		factory.BigIntLiteral(
-			fmt.Sprintf("%dn", carrier.Width()),
-			tsgo.TokenFlagsNone,
-		),
+		countZero,
+		countWidth,
 		wideShiftResult(factory, operator, carrier.Signed(), normalized, zero),
 		shifted,
-	)
+	), nil
 }
 
 func guardedShift(

@@ -15,7 +15,7 @@ import (
 func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 16,
+	  "schemaVersion": 20,
   "facets": [],
   "genericOperationSets": [
     {
@@ -41,7 +41,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 		t.Fatalf("generic operations = %#v", selected)
 	}
 
-	payload = `{"schemaVersion":16,"facets":[],"genericOperationSets":[
+	payload = `{"schemaVersion":20,"facets":[],"genericOperationSets":[
   {"sourceIdentity":"x","operations":[
     {"kind":"invented","parameters":[],"results":[{"kind":"type-parameter","typeParameter":0}]}
   ]}
@@ -57,7 +57,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 func TestFacetMapOwnsClosedGenericCallableKernels(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 16,
+	  "schemaVersion": 20,
 	  "facets": [{
 	    "kind":"generic-callable-kernel",
 	    "sourceIdentity":"slices|kind=4|receiver=|name=Grow",
@@ -99,7 +99,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 ) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 16,
+	  "schemaVersion": 20,
   "facets": [],
   "providerStatefulProfiles": [{
     "sourceIdentity": "example.com/source|kind=2|receiver=|name=State",
@@ -152,7 +152,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 func TestImplementedResultRequiresContractOwner(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 16,
+	  "schemaVersion": 20,
   "facets": [],
   "providerCallableProfiles": [{
     "sourceIdentity": "example.com/source|kind=4|receiver=|name=Build",
@@ -235,6 +235,63 @@ func TestProviderProfileSeedsAllowBoundaryModesButRejectDuplicateTargets(t *test
 		[]providerStatefulProfileSeed{stateful, stateful},
 	); err == nil || !strings.Contains(err.Error(), "duplicated") {
 		t.Fatalf("duplicate stateful target error = %v", err)
+	}
+}
+
+func TestProviderCapabilitySeedExactJoinsBaseProfileAndTarget(t *testing.T) {
+	profile := providerCallableProfileSeed{
+		SourceIdentity:      "errors|kind=4|receiver=|name=Is",
+		Specifier:           "@gotots/gostdlib/internal/facets/provider-error.js",
+		SourcePath:          "src/internal/facets/provider-error.ts",
+		Export:              "ErrorsIsCanonical",
+		CanonicalParameters: []int{0},
+		Interfaces: []providerCallableProfileInterfaceSeed{
+			{
+				SourceIdentity: "go:universe|error",
+				Export:         "CanonicalError",
+			},
+			{
+				SourceIdentity: "protocol|error-unwrap",
+				Export:         "ProviderErrorUnwrap",
+			},
+		},
+	}
+	capability := providerInterfaceCapabilitySeed{
+		Usage:                 gostdlib.ProviderInterfaceCapabilityUsageGeneratedBridge,
+		BaseSourceIdentity:    profile.Interfaces[0].SourceIdentity,
+		BaseExport:            profile.Interfaces[0].Export,
+		ProfileSourceIdentity: profile.SourceIdentity,
+		ProfileExport:         profile.Export,
+		TargetExport:          profile.Interfaces[1].Export,
+		Specifier:             profile.Specifier,
+		SourcePath:            profile.SourcePath,
+		ViewExport:            "AsProviderErrorUnwrap",
+	}
+	if _, err := validateProviderInterfaceCapabilitySeeds(
+		[]providerInterfaceCapabilitySeed{capability},
+		[]providerCallableProfileSeed{profile},
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	mutations := []func(*providerInterfaceCapabilitySeed){
+		func(selected *providerInterfaceCapabilitySeed) {
+			selected.Usage = gostdlib.ProviderInterfaceCapabilityUsageInvalid
+		},
+		func(selected *providerInterfaceCapabilitySeed) { selected.BaseExport = "Missing" },
+		func(selected *providerInterfaceCapabilitySeed) { selected.ProfileExport = "Missing" },
+		func(selected *providerInterfaceCapabilitySeed) { selected.TargetExport = "Missing" },
+	}
+	for index, mutate := range mutations {
+		selected := capability
+		mutate(&selected)
+		if _, err := validateProviderInterfaceCapabilitySeeds(
+			[]providerInterfaceCapabilitySeed{selected},
+			[]providerCallableProfileSeed{profile},
+			nil,
+		); err == nil {
+			t.Fatalf("mutation %d passed", index)
+		}
 	}
 }
 

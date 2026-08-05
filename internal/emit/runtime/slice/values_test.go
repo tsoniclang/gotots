@@ -174,9 +174,9 @@ func TestScalarSlicesBigIntProfileRemainsStrictAndTyped(t *testing.T) {
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	typecheck(t, workingDirectory, targetPaths)
 	for _, fragment := range []string{
-		"RuntimeSlice.make<int32>(0n, null, 0n)",
+		"RuntimeSlice.make<int32>(0n, null, 0)",
 		".get(1n)",
-		".set(1n, 9n)",
+		".set(1n, 9)",
 		"BigInt(values.length)",
 		"BigInt(values.capacity)",
 		"BigInt(RuntimeSlice.copy<int32>(",

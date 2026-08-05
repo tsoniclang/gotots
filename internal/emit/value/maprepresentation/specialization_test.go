@@ -74,14 +74,8 @@ func testStaticSpecialization(
 			len(printed),
 		)
 	}
-	keyType := "number"
-	keyConversion := "new Key(x, y)"
-	if integer == api.IntegerRepresentationBigInt {
-		keyType = "bigint"
-		keyConversion = "new Key(BigInt(x), BigInt(y))"
-	}
 	runner := `class Key {
-    constructor(public x: ` + keyType + `, public y: ` + keyType + `) {}
+    constructor(public x: number, public y: number) {}
 }
 class GoPanic {
     static raiseRuntime(message: string): never { throw new Error(message); }
@@ -101,7 +95,7 @@ class GoDenseIndex {
 class Box {
     constructor(public value: number) {}
 }
-const key = (x: number, y: number): Key => ` + keyConversion + `;
+const key = (x: number, y: number): Key => new Key(x, y);
 ` + printed + `
 const nilMap = StaticMap.nil();
 const missing = nilMap.lookupOk(key(1, 2));
@@ -555,9 +549,17 @@ func (v staticSpecializationValues) Hash(
 	if sourceType != v.key {
 		panic("unexpected specialization hash type")
 	}
+	abi, err := api.NewScalarABIFromSizes(
+		context.IntegerRepresentation(),
+		context.TypesSizes(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	one, err := api.IntegerLiteral(
 		context.Factory(),
-		context.IntegerRepresentation(),
+		abi,
+		api.PrimitiveInt32,
 		"1",
 	)
 	if err != nil {
@@ -572,15 +574,6 @@ func (v staticSpecializationValues) Hash(
 		),
 		one,
 	))
-	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
-		hash = context.Factory().CallExpression(
-			context.Factory().Identifier("Number"),
-			nil,
-			nil,
-			[]tsgo.Expression{hash},
-			tsgo.NodeFlagsNone,
-		)
-	}
 	return api.DirectExpression(
 		hash,
 	), nil

@@ -14,7 +14,7 @@ import (
 func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 	assembled, err := AssemblePackage(
 		tsgo.NewFactory(),
-		api.IntegerRepresentationNumber,
+		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsDisabled,
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeStringIndex: {},
@@ -55,6 +55,7 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 		Type    string `json:"type"`
 		GoToTS  struct {
 			IntegerRepresentation string `json:"integerRepresentation"`
+			NativeIntegerBits     uint8  `json:"nativeIntegerBits"`
 		} `json:"gotots"`
 		Exports map[string]struct {
 			Types   string `json:"types"`
@@ -69,6 +70,9 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 		manifest.Type != "module" ||
 		manifest.GoToTS.IntegerRepresentation != "number" {
 		t.Fatalf("runtime manifest metadata = %#v", manifest)
+	}
+	if manifest.GoToTS.NativeIntegerBits != 64 {
+		t.Fatalf("runtime native integer width = %d, want 64", manifest.GoToTS.NativeIntegerBits)
 	}
 	if len(manifest.Exports) != len(wantPaths) {
 		t.Fatalf(
@@ -90,7 +94,7 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 func TestAssemblePackageRejectsDuplicateAliases(t *testing.T) {
 	_, err := AssemblePackage(
 		tsgo.NewFactory(),
-		api.IntegerRepresentationNumber,
+		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsDisabled,
 		nil,
 		[]api.PrimitiveAlias{
@@ -107,7 +111,7 @@ func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
 	factory := tsgo.NewFactory()
 	without, err := AssemblePackage(
 		factory,
-		api.IntegerRepresentationNumber,
+		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsCooperative,
 		nil,
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
@@ -123,7 +127,7 @@ func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
 
 	with, err := AssemblePackage(
 		factory,
-		api.IntegerRepresentationNumber,
+		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsCooperative,
 		map[api.RuntimeSymbol]struct{}{api.RuntimeAwaitable: {}},
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
@@ -142,6 +146,18 @@ func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
 			t.Fatalf("scalar support statement %d = %#v, want %s", index, statement, wantNames[index])
 		}
 	}
+}
+
+func testScalarABI(
+	t *testing.T,
+	profile api.IntegerRepresentation,
+) api.ScalarABI {
+	t.Helper()
+	abi, err := api.NewScalarABI(profile, api.NativeIntegerWidth64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return abi
 }
 
 func TestDefinitionsExactJoinRequestedSymbols(t *testing.T) {

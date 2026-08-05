@@ -71,6 +71,14 @@ func materializeClosure(
 	t *testing.T,
 	emission emit.ProgramEmission,
 ) closureArtifacts {
+	return materializeClosureWithSetup(t, emission, nil)
+}
+
+func materializeClosureWithSetup(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	setup func(string, emit.ProgramEmission),
+) closureArtifacts {
 	t.Helper()
 	workingDirectory := t.TempDir()
 	client, err := tsgo.StartClient(repositoryRoot(t), workingDirectory)
@@ -157,6 +165,9 @@ func materializeClosure(
 	); err != nil {
 		t.Fatal(err)
 	}
+	if setup != nil {
+		setup(workingDirectory, emission)
+	}
 	if err := tsgo.Compile(
 		ctx,
 		repositoryRoot(t),
@@ -169,6 +180,60 @@ func materializeClosure(
 	result.workingDirectory = workingDirectory
 	result.targetPaths = slices.Clone(targetPaths)
 	return result
+}
+
+func executeLinkedRun(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	artifacts closureArtifacts,
+	want int,
+) {
+	t.Helper()
+	sourceModule := ""
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFileSource &&
+			file.PackageName() == "externallinked" {
+			sourceModule = "./" + strings.TrimSuffix(
+				filepath.ToSlash(file.OutputPath()),
+				".ts",
+			) + ".js"
+			break
+		}
+	}
+	if sourceModule == "" {
+		t.Fatal("linked source module is absent")
+	}
+	arguments := []string{
+		"--target", "es2022",
+		"--module", "nodenext",
+		"--moduleResolution", "nodenext",
+		"--strict",
+	}
+	arguments = append(arguments, artifacts.targetPaths...)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := tsgo.Compile(
+		ctx,
+		repositoryRoot(t),
+		artifacts.workingDirectory,
+		arguments,
+	); err != nil {
+		t.Fatal(err)
+	}
+	runner := fmt.Sprintf(
+		"import { Run } from %q;\nif (Run() !== %d) throw new Error('linked result');\n",
+		sourceModule,
+		want,
+	)
+	runnerPath := filepath.Join(artifacts.workingDirectory, "linked-runner.mjs")
+	if err := os.WriteFile(runnerPath, []byte(runner), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.CommandContext(ctx, "node", runnerPath)
+	command.Dir = artifacts.workingDirectory
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("execute linked function: %v\n%s", err, output)
+	}
 }
 
 func executeExternalClosure(

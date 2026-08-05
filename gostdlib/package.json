@@ -72,6 +72,10 @@
       "types": "./dist/src/internal/abi.d.ts",
       "default": "./dist/src/internal/abi.js"
     },
+    "./internal/scalars.js": {
+      "types": "./dist/src/internal/scalars.d.ts",
+      "default": "./dist/src/internal/scalars.js"
+    },
     "./internal/facets/generic-cmp-kernel.js": {
       "types": "./dist/src/internal/facets/generic-cmp-kernel.d.ts",
       "default": "./dist/src/internal/facets/generic-cmp-kernel.js"

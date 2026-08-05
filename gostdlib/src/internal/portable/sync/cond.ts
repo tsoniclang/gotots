@@ -1,6 +1,6 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable } from "@gotots/runtime/scalars.js";
+import type { Awaitable } from "@gotots/gostdlib/internal/scalars.js";
 
 type Waiter = () => void;
 

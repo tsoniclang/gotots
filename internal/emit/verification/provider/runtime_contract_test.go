@@ -26,6 +26,20 @@ func TestReflectTypeForUsesCanonicalGeneratedMetadata(t *testing.T) {
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	rootSource := readProviderRuntimeRootSource(t, emission, workingDirectory)
+	for _, required := range []string{
+		".Field(BigInt.asIntN(64, goNumberToBigInt(",
+		"globalThis.Number(BigInt.asIntN(64, goInterfaceNonNil<",
+		").NumField()))",
+	} {
+		if !strings.Contains(rootSource, required) {
+			t.Fatalf(
+				"number-profile interface call lacks scalar boundary %q:\n%s",
+				required,
+				rootSource,
+			)
+		}
+	}
 	reflectionSource := readGeneratedArtifact(
 		t,
 		workingDirectory,
@@ -240,17 +254,80 @@ func TestUnselectedProviderDoesNotExpandRuntimeClosure(t *testing.T) {
 	}
 }
 
-func TestSelectedProviderRejectsUncertifiedIntegerProfile(t *testing.T) {
+func TestSelectedProviderSupportsCertifiedBigIntProfile(t *testing.T) {
 	program := loadProviderRuntimeProgram(t)
 	root := mustProviderRoot(
 		t,
-		program.Roots()[0].Types().Scope().Lookup("ReflectType"),
+		program.Roots()[0].Types().Scope().Lookup("ReflectStatic"),
 	)
 	options := emit.DefaultOptions()
 	options.IntegerRepresentation = emit.IntegerRepresentationBigInt
 	options.StandardLibrary = linkedProviderCertificate(t)
-	if _, err := emit.CompileWithOptions(program, []emit.Root{root}, options); err == nil {
-		t.Fatal("provider accepted an uncertified integer profile")
+	emission, err := emit.CompileWithOptions(program, []emit.Root{root}, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	rootSource := readProviderRuntimeRootSource(t, emission, workingDirectory)
+	for _, redundant := range []string{"goNumberToBigInt", "globalThis.Number("} {
+		if strings.Contains(rootSource, redundant) {
+			t.Fatalf(
+				"bigint-profile interface call retained %q conversion:\n%s",
+				redundant,
+				rootSource,
+			)
+		}
+	}
+	for _, required := range []string{
+		".Field(__gotots_argument_0)",
+		".NumField()",
+	} {
+		if !strings.Contains(rootSource, required) {
+			t.Fatalf(
+				"bigint-profile interface call lacks direct shape %q:\n%s",
+				required,
+				rootSource,
+			)
+		}
+	}
+	if !strings.Contains(artifacts.printed, "export type int = bigint;") ||
+		!strings.Contains(artifacts.printed, "export type int64 = bigint;") {
+		t.Fatalf("bigint provider profile lacks exact scalar aliases:\n%s", artifacts.printed)
+	}
+	reflectionSource := readGeneratedArtifact(
+		t,
+		workingDirectory,
+		output.ReflectionTypeSupportPath,
+	)
+	if !strings.Contains(reflectionSource, "kind: 25n") ||
+		!strings.Contains(reflectionSource, "size: 16n") ||
+		!strings.Contains(reflectionSource, "align: 8n") {
+		t.Fatalf("bigint reflection metadata lacks provider scalar ABI:\n%s", reflectionSource)
+	}
+	assemblyPath := ""
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFilePackageAssembly &&
+			file.PackageName() == "providerruntime" {
+			assemblyPath = file.OutputPath()
+			break
+		}
+	}
+	if assemblyPath == "" {
+		t.Fatal("bigint provider runtime package assembly is absent")
+	}
+	targetOutput := executeProviderTypeScript(
+		t,
+		workingDirectory,
+		artifacts.paths,
+		assemblyPath,
+		[]string{"ReflectStatic"},
+		`const [kind, tag, fields] = ReflectStatic();
+console.log(kind + "|" + tag + "|" + fields);
+`,
+	)
+	if targetOutput != "struct|name|1\n" {
+		t.Fatalf("bigint reflection differential = %q", targetOutput)
 	}
 }
 
@@ -318,4 +395,23 @@ func readGeneratedArtifact(
 		t.Fatal(err)
 	}
 	return string(source)
+}
+
+func readProviderRuntimeRootSource(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	workingDirectory string,
+) string {
+	t.Helper()
+	for _, file := range emission.Files() {
+		if strings.HasSuffix(file.OutputPath(), "/_root/source.ts") {
+			return readGeneratedArtifact(
+				t,
+				workingDirectory,
+				file.OutputPath(),
+			)
+		}
+	}
+	t.Fatal("provider runtime root source is absent")
+	return ""
 }

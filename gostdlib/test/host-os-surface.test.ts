@@ -85,7 +85,9 @@ test("host OS modules expose only selected clean Go names", () => {
   assert.notEqual(os.O_TRUNC, 0);
 });
 
-test("public declarations do not expose internal Node ownership", () => {
+test("public declarations expose only the certified provider scalar support module", () => {
+  const scalarModule = "@gotots/gostdlib/internal/scalars.js";
+  let scalarImports = 0;
   for (const path of [
     "../src/flag.d.ts",
     "../src/os.d.ts",
@@ -94,8 +96,14 @@ test("public declarations do not expose internal Node ownership", () => {
     "../src/syscall.d.ts",
   ]) {
     const declaration = readFileSync(new URL(path, import.meta.url), "utf8");
-    assert.equal(declaration.includes("/internal/"), false, path);
+    scalarImports += declaration.split(scalarModule).length - 1;
+    assert.equal(
+      declaration.replaceAll(scalarModule, "").includes("/internal/"),
+      false,
+      path,
+    );
   }
+  assert.ok(scalarImports > 0);
 });
 
 function staticMembers(value: Function): string[] {

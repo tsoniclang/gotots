@@ -1,9 +1,9 @@
 import type {
   bool,
   gostring,
-  int64,
-  uint64,
-} from "@gotots/runtime/scalars.js";
+  int,
+  uintptr,
+} from "@gotots/gostdlib/internal/scalars.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import {
   caller,
@@ -21,15 +21,15 @@ export { MemStats };
 export const GOOS: gostring = goOperatingSystem();
 export const GOARCH: gostring = goArchitecture();
 
-export function Caller(skip: int64): [uint64, gostring, int64, bool] {
+export function Caller(skip: int): [uintptr, gostring, int, bool] {
   return caller(skip);
 }
 
 export function GC(): void {}
 
-export function GOMAXPROCS(n: int64): int64 {
+export function GOMAXPROCS(n: int): int {
   void n;
-  return 1;
+  return 1n;
 }
 
 export function ReadMemStats(m: MemStats | undefined): void {

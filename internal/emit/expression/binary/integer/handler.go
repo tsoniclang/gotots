@@ -53,6 +53,17 @@ func Emit(
 		return api.ExpressionEmission{}, true, err
 	}
 	facts, hasFacts := context.TypesInfo().TypeAndValue(source.Y)
+	rightCarrier := carrier
+	if source.Op == token.SHL || source.Op == token.SHR {
+		var rightOK bool
+		rightCarrier, rightOK = shiftCountCarrier(
+			context.TypesSizes(),
+			rightType,
+		)
+		if !rightOK {
+			return api.ExpressionEmission{}, false, nil
+		}
+	}
 	var target api.ExpressionEmission
 	var handled bool
 	if (source.Op == token.SHL || source.Op == token.SHR) &&
@@ -62,6 +73,7 @@ func Emit(
 			context,
 			source.Op,
 			carrier,
+			rightCarrier,
 			operands.Left(),
 			operands.Right(),
 		)
@@ -70,6 +82,7 @@ func Emit(
 			context,
 			source.Op,
 			carrier,
+			rightCarrier,
 			operands.Left(),
 			operands.Right(),
 		)
@@ -85,41 +98,37 @@ func Apply(
 	context api.Context,
 	operator token.Token,
 	carrier integervalue.Carrier,
+	rightCarrier integervalue.Carrier,
 	left api.ExpressionEmission,
 	right api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
 	if symbol, ok := runtimeOperation(
 		context.IntegerRepresentation(),
+		carrier,
 		operator,
 	); ok {
-		reference, err := context.Names().Runtime(
-			symbol,
-			api.ImportPhaseValue,
+		result, err := callRuntime(context, symbol, left, right)
+		return result, true, err
+	}
+	rightValue := right.Value()
+	if operator == token.SHL || operator == token.SHR {
+		var represented bool
+		rightValue, represented = alignShiftCount(
+			context,
+			carrier,
+			rightCarrier,
+			rightValue,
 		)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
+		if !represented {
+			return api.ExpressionEmission{}, false, nil
 		}
-		return api.DirectExpression(
-			context.Factory().CallExpression(
-				reference.Expression(context.Factory()),
-				nil,
-				nil,
-				[]tsgo.Expression{left.Value(), right.Value()},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(
-				left.Requests(),
-				right.Requests(),
-				reference.Requests(),
-			)...,
-		), true, nil
 	}
 	target, ok := target(
 		context,
 		operator,
 		carrier,
 		left.Value(),
-		right.Value(),
+		rightValue,
 	)
 	if !ok {
 		return api.ExpressionEmission{}, false, nil
@@ -130,19 +139,60 @@ func Apply(
 	), true, nil
 }
 
+func alignShiftCount(
+	context api.Context,
+	left integervalue.Carrier,
+	right integervalue.Carrier,
+	value tsgo.Expression,
+) (tsgo.Expression, bool) {
+	leftRepresentation, leftOK := integervalue.CarrierRepresentation(
+		context.IntegerRepresentation(),
+		left,
+	)
+	rightRepresentation, rightOK := integervalue.CarrierRepresentation(
+		context.IntegerRepresentation(),
+		right,
+	)
+	if !leftOK || !rightOK {
+		return nil, false
+	}
+	if leftRepresentation == rightRepresentation {
+		return value, true
+	}
+	intrinsic := api.TargetIntrinsicNumber
+	if leftRepresentation == api.IntegerCarrierBigInt {
+		intrinsic = api.TargetIntrinsicBigInt
+	}
+	return context.Factory().CallExpression(
+		intrinsic.Expression(context.Factory()),
+		nil,
+		nil,
+		[]tsgo.Expression{value},
+		tsgo.NodeFlagsNone,
+	), true
+}
+
 func runtimeOperation(
 	representation api.IntegerRepresentation,
+	carrier integervalue.Carrier,
 	operator token.Token,
 ) (api.RuntimeSymbol, bool) {
-	switch representation {
-	case api.IntegerRepresentationBigInt:
+	carrierRepresentation, ok := integervalue.CarrierRepresentation(
+		representation,
+		carrier,
+	)
+	if !ok {
+		return api.RuntimeInvalid, false
+	}
+	switch carrierRepresentation {
+	case api.IntegerCarrierBigInt:
 		switch operator {
 		case token.QUO:
 			return api.RuntimeIntegerDivide, true
 		case token.REM:
 			return api.RuntimeIntegerRemainder, true
 		}
-	case api.IntegerRepresentationNumber:
+	case api.IntegerCarrierNumber:
 		switch operator {
 		case token.QUO:
 			return api.RuntimeNumberIntDivide, true
@@ -152,6 +202,35 @@ func runtimeOperation(
 	default:
 	}
 	return api.RuntimeInvalid, false
+}
+
+func callRuntime(
+	context api.Context,
+	symbol api.RuntimeSymbol,
+	left api.ExpressionEmission,
+	right api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	reference, err := context.Names().Runtime(
+		symbol,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.DirectExpression(
+		context.Factory().CallExpression(
+			reference.Expression(context.Factory()),
+			nil,
+			nil,
+			[]tsgo.Expression{left.Value(), right.Value()},
+			tsgo.NodeFlagsNone,
+		),
+		api.CombineRequests(
+			left.Requests(),
+			right.Requests(),
+			reference.Requests(),
+		)...,
+	), nil
 }
 
 func operationTypes(
@@ -259,11 +338,7 @@ func target(
 		right,
 	))
 	if needsUint32Normalization(context, carrier, operator) {
-		zero, err := api.IntegerLiteral(
-			context.Factory(),
-			api.IntegerRepresentationNumber,
-			"0",
-		)
+		zero, err := integervalue.CarrierLiteral(context, carrier, "0")
 		if err != nil {
 			return nil, false
 		}

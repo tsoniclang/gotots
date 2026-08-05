@@ -3,7 +3,7 @@ import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoMapHash } from "@gotots/runtime/map.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
 import { GoEmptyStruct } from "@gotots/runtime/struct.js";
 
 import { ProviderChannel } from "../portable/concurrency/channel.js";

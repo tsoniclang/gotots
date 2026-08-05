@@ -22,16 +22,16 @@ test("atomic cells implement load, store, swap, add, and compare-and-swap", () =
   assert.equal(Int32.CompareAndSwap(signed32, -2, 9), true);
 
   const signed64 = new Int64();
-  Int64.Store(signed64, 10);
-  assert.equal(Int64.Add(signed64, 2), 12);
-  assert.equal(Int64.CompareAndSwap(signed64, 12, 20), true);
+  Int64.Store(signed64, 10n);
+  assert.equal(Int64.Add(signed64, 2n), 12n);
+  assert.equal(Int64.CompareAndSwap(signed64, 12n, 20n), true);
 
   const unsigned32 = new Uint32();
   Uint32.Store(unsigned32, 0xffff_ffff);
   assert.equal(Uint32.Add(unsigned32, 1), 0);
 
   const unsigned64 = new Uint64();
-  assert.equal(Uint64.Add(unsigned64, 3), 3);
-  assert.equal(Uint64.CompareAndSwap(unsigned64, 3, 5), true);
-  assert.equal(Uint64.Load(unsigned64), 5);
+  assert.equal(Uint64.Add(unsigned64, 3n), 3n);
+  assert.equal(Uint64.CompareAndSwap(unsigned64, 3n, 5n), true);
+  assert.equal(Uint64.Load(unsigned64), 5n);
 });

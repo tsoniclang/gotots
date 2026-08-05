@@ -6,7 +6,8 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
+	externalcertify "github.com/tsoniclang/gotots/internal/contracts/externals/certify"
+	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
@@ -352,7 +353,8 @@ type Options struct {
 	IntegerRepresentation IntegerRepresentation
 	EvaluationOrder       EvaluationOrder
 	ConcurrencySemantics  ConcurrencySemantics
-	StandardLibrary       *certify.Certificate
+	StandardLibrary       *gostdlibcertify.Certificate
+	ExternalProvider      *externalcertify.Certificate
 }
 
 func DefaultOptions() Options {
@@ -427,6 +429,12 @@ func (o Options) validate() error {
 	if o.StandardLibrary != nil && !o.StandardLibrary.Valid() {
 		return &OptionsError{
 			Field:  "standard library",
+			Reason: "certificate is invalid",
+		}
+	}
+	if o.ExternalProvider != nil && !o.ExternalProvider.Valid() {
+		return &OptionsError{
+			Field:  "external provider",
 			Reason: "certificate is invalid",
 		}
 	}

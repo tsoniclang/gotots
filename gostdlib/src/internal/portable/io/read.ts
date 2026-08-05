@@ -3,7 +3,9 @@ import type {
   GoInterfaceValue,
 } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 import { ProviderError } from "../../runtime/error.js";
 import { goInterfaceEqual } from "../../runtime/interface.js";
@@ -15,11 +17,11 @@ export const shortBuffer: GoError = new ProviderError("short buffer");
 export const noProgress: GoError = new ProviderError("multiple Read calls return no data or error");
 
 export function readFullSync<Failure extends GoInterfaceValue>(
-  read: (destination: RuntimeSlice<uint8>) => [int64, Failure | undefined],
+  read: (destination: RuntimeSlice<uint8>) => [int, Failure | undefined],
   destination: RuntimeSlice<uint8>,
   eof: Failure,
   unexpected: Failure,
-): [int64, Failure | undefined] {
+): [int, Failure | undefined] {
   let total = 0;
   let failure: Failure | undefined;
   while (total < destination.length && failure === undefined) {
@@ -27,26 +29,26 @@ export function readFullSync<Failure extends GoInterfaceValue>(
       ? destination
       : destination.slice(total, destination.length, null);
     const result = read(target);
-    const count = result[0];
+    const count = hostInteger(result[0]);
     failure = result[1];
     total += count;
   }
   if (total >= destination.length) {
-    return [total, undefined];
+    return [integerFromHost(total), undefined];
   }
   return total > 0 && goInterfaceEqual(failure, eof)
-    ? [total, unexpected]
-    : [total, failure];
+    ? [integerFromHost(total), unexpected]
+    : [integerFromHost(total), failure];
 }
 
 export async function readFullAsync<Failure extends GoInterfaceValue>(
   read: (
     destination: RuntimeSlice<uint8>,
-  ) => Awaitable<[int64, Failure | undefined]>,
+  ) => Awaitable<[int, Failure | undefined]>,
   destination: RuntimeSlice<uint8>,
   eof: Failure,
   unexpected: Failure,
-): Promise<[int64, Failure | undefined]> {
+): Promise<[int, Failure | undefined]> {
   let total = 0;
   let failure: Failure | undefined;
   while (total < destination.length && failure === undefined) {
@@ -54,36 +56,37 @@ export async function readFullAsync<Failure extends GoInterfaceValue>(
       ? destination
       : destination.slice(total, destination.length, null);
     const result = await read(target);
-    const count = result[0];
+    const count = hostInteger(result[0]);
     failure = result[1];
     total += count;
   }
   if (total >= destination.length) {
-    return [total, undefined];
+    return [integerFromHost(total), undefined];
   }
   return total > 0 && goInterfaceEqual(failure, eof)
-    ? [total, unexpected]
-    : [total, failure];
+    ? [integerFromHost(total), unexpected]
+    : [integerFromHost(total), failure];
 }
 
 export function writeAll(
   writer: Writer,
   source: RuntimeSlice<uint8>,
-): [int64, GoError | undefined] {
+): [int, GoError | undefined] {
   let total = 0;
   while (total < source.length) {
     const remaining = source.slice(total, source.length, null);
-    const [count, failure] = writer.Write(remaining);
+    const [goCount, failure] = writer.Write(remaining);
+    const count = hostInteger(goCount);
     if (count < 0 || count > remaining.length) {
-      return [total, new ProviderError("invalid write result")];
+      return [integerFromHost(total), new ProviderError("invalid write result")];
     }
     total += count;
     if (failure !== undefined) {
-      return [total, failure];
+      return [integerFromHost(total), failure];
     }
     if (count === 0) {
-      return [total, shortWrite];
+      return [integerFromHost(total), shortWrite];
     }
   }
-  return [total, undefined];
+  return [integerFromHost(total), undefined];
 }

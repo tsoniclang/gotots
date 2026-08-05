@@ -1,6 +1,8 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool, int64 } from "@gotots/gostdlib/internal/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+
+import { integerFromHost } from "../../host-integer.js";
 
 import {
   type BinaryLess,
@@ -31,22 +33,27 @@ export function BinarySearch<S, E, EStorage>(
   let high = values.length;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    const value = readElement(values, middle, copyElement, fromStorage);
-    if (orderedCompare(less, equal, value, target) < 0) {
+    const value = readElement(
+      values,
+      integerFromHost(middle),
+      copyElement,
+      fromStorage,
+    );
+    if (orderedCompare(less, equal, value, target) < 0n) {
       low = middle + 1;
     } else {
       high = middle;
     }
   }
   return [
-    low,
+    integerFromHost(low),
     low < values.length
       && orderedCompare(
         less,
         equal,
-        readElement(values, low, copyElement, fromStorage),
+        readElement(values, integerFromHost(low), copyElement, fromStorage),
         target,
-      ) === 0,
+      ) === 0n,
   ];
 }
 
@@ -66,9 +73,14 @@ export async function BinarySearchFunc<S, E, EStorage, Target>(
     if (
       await callComparison(
         compare,
-        readElement(values, middle, copyElement, fromStorage),
+        readElement(
+          values,
+          integerFromHost(middle),
+          copyElement,
+          fromStorage,
+        ),
         target,
-      ) < 0
+      ) < 0n
     ) {
       low = middle + 1;
     } else {
@@ -76,13 +88,13 @@ export async function BinarySearchFunc<S, E, EStorage, Target>(
     }
   }
   return [
-    low,
+    integerFromHost(low),
     low < values.length
       && await callComparison(
         compare,
-        readElement(values, low, copyElement, fromStorage),
+        readElement(values, integerFromHost(low), copyElement, fromStorage),
         target,
-      ) === 0,
+      ) === 0n,
   ];
 }
 
@@ -102,10 +114,10 @@ export function Compare<S, E, EStorage>(
     const result = orderedCompare(
       less,
       equal,
-      readElement(leftValues, index, copyElement, fromStorage),
-      readElement(rightValues, index, copyElement, fromStorage),
+      readElement(leftValues, integerFromHost(index), copyElement, fromStorage),
+      readElement(rightValues, integerFromHost(index), copyElement, fromStorage),
     );
-    if (result !== 0) {
+    if (result !== 0n) {
       return result;
     }
   }
@@ -129,10 +141,10 @@ export async function CompareFunc<S1, S2, E1, E1Storage, E2, E2Storage>(
   for (let index = 0; index < count; index += 1) {
     const result = await callComparison(
       compare,
-      readElement(leftValues, index, copyLeft, fromLeftStorage),
-      readElement(rightValues, index, copyRight, fromRightStorage),
+      readElement(leftValues, integerFromHost(index), copyLeft, fromLeftStorage),
+      readElement(rightValues, integerFromHost(index), copyRight, fromRightStorage),
     );
-    if (result !== 0) {
+    if (result !== 0n) {
       return result;
     }
   }
@@ -153,7 +165,7 @@ export function Contains<S, E, EStorage>(
     equal,
     fromStorage,
     target,
-  ) >= 0;
+  ) >= 0n;
 }
 
 export async function ContainsFunc<S, E, EStorage>(
@@ -168,7 +180,7 @@ export async function ContainsFunc<S, E, EStorage>(
     copyElement,
     fromStorage,
     predicate,
-  ) >= 0;
+  ) >= 0n;
 }
 
 export function Equal<S, E, EStorage>(
@@ -187,8 +199,8 @@ export function Equal<S, E, EStorage>(
   for (let index = 0; index < leftValues.length; index += 1) {
     if (
       !equal(
-        readElement(leftValues, index, copyElement, fromStorage),
-        readElement(rightValues, index, copyElement, fromStorage),
+        readElement(leftValues, integerFromHost(index), copyElement, fromStorage),
+        readElement(rightValues, integerFromHost(index), copyElement, fromStorage),
       )
     ) {
       return false;
@@ -217,8 +229,8 @@ export async function EqualFunc<S1, S2, E1, E1Storage, E2, E2Storage>(
     if (
       !await callEquality(
         equal,
-        readElement(leftValues, index, copyLeft, fromLeftStorage),
-        readElement(rightValues, index, copyRight, fromRightStorage),
+        readElement(leftValues, integerFromHost(index), copyLeft, fromLeftStorage),
+        readElement(rightValues, integerFromHost(index), copyRight, fromRightStorage),
       )
     ) {
       return false;
@@ -267,11 +279,14 @@ function indexBy<E, EStorage>(
   target: E,
 ): int64 {
   for (let index = 0; index < source.length; index += 1) {
-    if (equal(readElement(source, index, copyElement, fromStorage), target)) {
-      return index;
+    if (equal(
+      readElement(source, integerFromHost(index), copyElement, fromStorage),
+      target,
+    )) {
+      return integerFromHost(index);
     }
   }
-  return -1;
+  return -1n;
 }
 
 async function indexFuncBy<E, EStorage>(
@@ -284,13 +299,18 @@ async function indexFuncBy<E, EStorage>(
     if (
       await callPredicate(
         predicate,
-        readElement(source, index, copyElement, fromStorage),
+        readElement(
+          source,
+          integerFromHost(index),
+          copyElement,
+          fromStorage,
+        ),
       )
     ) {
-      return index;
+      return integerFromHost(index);
     }
   }
-  return -1;
+  return -1n;
 }
 
 export async function callPredicate<T>(

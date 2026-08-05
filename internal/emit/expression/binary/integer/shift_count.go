@@ -60,3 +60,10 @@ func isDefinedIntegerShiftCount(
 	_, ok = integervalue.Describe(sizes, underlying)
 	return ok
 }
+
+func shiftCountCarrier(
+	sizes types.Sizes,
+	sourceType types.Type,
+) (integervalue.Carrier, bool) {
+	return integervalue.DescribeUnderlying(sizes, sourceType)
+}

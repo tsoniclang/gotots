@@ -7,7 +7,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
-	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -37,11 +36,24 @@ func emitProviderProfileFunction(
 		children,
 		source,
 		signature,
-		detached,
+		true,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, nil, err
 	}
+	arguments, providerBefore, providerRequests, err :=
+		providerboundary.ToProviderProfileArguments(
+			context,
+			children,
+			signature.Params(),
+			selection.Reference().Profile(),
+			arguments,
+		)
+	if err != nil {
+		return api.ExpressionEmission{}, true, nil, err
+	}
+	before = append(before, providerBefore...)
+	requests = api.CombineRequests(requests, providerRequests)
 	target, err := emitProviderProfileInvocation(
 		context,
 		children,
@@ -97,15 +109,26 @@ func emitProviderProfileMethod(
 		children,
 		source,
 		signature,
-		detached,
+		true,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, nil, err
+	}
+	arguments, providerBefore, providerRequests, err :=
+		providerboundary.ToProviderProfileArguments(
+			context,
+			children,
+			signature.Params(),
+			profile.Reference().Profile(),
+			arguments,
+		)
 	if err != nil {
 		return api.ExpressionEmission{}, true, nil, err
 	}
 	before := receiver.Before()
 	receiverValue := receiver.Value()
 	var receiverRequests []api.RootRequest
-	if len(argumentBefore) != 0 || detached {
+	if len(argumentBefore) != 0 || len(providerBefore) != 0 || detached {
 		receiverValue, receiverRequests, before, err = captureReceiver(
 			context,
 			receiver,
@@ -115,6 +138,7 @@ func emitProviderProfileMethod(
 		}
 	}
 	before = append(before, argumentBefore...)
+	before = append(before, providerBefore...)
 	arguments = append([]tsgo.Expression{receiverValue}, arguments...)
 	target, err := emitProviderProfileInvocation(
 		context,
@@ -128,6 +152,7 @@ func emitProviderProfileMethod(
 			receiver.Requests(),
 			receiverRequests,
 			argumentRequests,
+			providerRequests,
 		),
 		discarded,
 		detached,
@@ -148,16 +173,28 @@ func emitProviderProfileInvocation(
 	detached bool,
 ) (api.ExpressionEmission, error) {
 	reference := selection.Reference()
+	profile := reference.Profile().Interfaces()
+	profileContext, err := context.WithProviderProfile(profile)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	typeArguments := make([]tsgo.TypeNode, 0, len(reference.CanonicalTypeArguments()))
 	for _, sourceType := range reference.CanonicalTypeArguments() {
-		represented, err := interfacetype.EmitNonNil(
-			context.WithRole(api.RoleCallTypeArgument),
+		represented, handled, err := providerboundary.EmitProfileInterfaceType(
+			profileContext.WithRole(api.RoleCallTypeArgument),
 			children,
 			source,
 			sourceType,
+			true,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
+		}
+		if !handled {
+			return api.ExpressionEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "provider callable-profile type argument is not certified",
+			}
 		}
 		typeArguments = append(typeArguments, represented.Value())
 		requests = append(requests, represented.Requests()...)
@@ -182,20 +219,23 @@ func emitProviderProfileInvocation(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		converted, _, err := providerboundary.FromProviderValue(
-			context,
+		canonical, err := providerboundary.CanonicalProfileValue(
+			profileContext,
 			children,
-			nil,
-			"",
+			profile,
 			variable.Type(),
 			raw,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		before = append(before, converted.Before()...)
-		arguments = append(arguments, converted.Value())
-		requests = append(requests, converted.Requests()...)
+		before = append(before, canonical.Before()...)
+		arguments = append(arguments, canonical.Value())
+		requests = append(requests, canonical.Requests()...)
+	}
+	for _, view := range reference.CapabilityViews() {
+		arguments = append(arguments, view.Expression(context.Factory()))
+		requests = append(requests, view.Requests()...)
 	}
 	for _, guardType := range reference.Guards() {
 		guard, err := context.Names().InterfaceContract(guardType)
@@ -255,7 +295,7 @@ func emitProviderProfileInvocation(
 		context,
 		children,
 		signature.Results(),
-		reference.Profile().CanonicalResults(),
+		reference.Profile(),
 		target,
 	)
 }

@@ -3,6 +3,7 @@ import { readFile, readdir } from "node:fs/promises";
 const sourceRoot = new URL("../src/", import.meta.url);
 const packageFile = new URL("../package.json", import.meta.url);
 const contractFile = new URL("../contract/manifest.json", import.meta.url);
+const runtimeContractFile = new URL("../contract/runtime.json", import.meta.url);
 const packageName = "@gotots/gostdlib";
 const forbidden = [
   /\$argument/u,
@@ -33,6 +34,7 @@ for (const file of files) {
 
 const packageManifest = JSON.parse(await readFile(packageFile, "utf8"));
 const contractManifest = JSON.parse(await readFile(contractFile, "utf8"));
+const runtimeContract = JSON.parse(await readFile(runtimeContractFile, "utf8"));
 const publicExports = files
   .map((file) => file.pathname.slice(sourceRoot.pathname.length))
   .filter((path) => !path.startsWith("internal/") || path === "internal/abi.ts")
@@ -54,7 +56,21 @@ const facetExports = contractManifest.facetModules
     return modulePath;
   })
   .sort();
-const expectedExports = [...publicExports, ...facetExports].sort();
+const supportExports = [runtimeContract.providerScalarModule];
+if (
+  supportExports.some((modulePath) =>
+    typeof modulePath !== "string" ||
+    !modulePath.startsWith("./internal/") ||
+    !modulePath.endsWith(".js")
+  )
+) {
+  throw new Error("runtime contract has an invalid provider support module");
+}
+const expectedExports = [
+  ...publicExports,
+  ...facetExports,
+  ...supportExports,
+].sort();
 const actualExports = Object.keys(packageManifest.exports)
   .filter((path) => path !== "./package.json")
   .sort();

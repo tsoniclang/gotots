@@ -132,11 +132,11 @@ func TestIntegerRepresentationDefaultsToDirectNumberSyntax(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertIntegerCarrier(t, emission, tsgo.SyntaxKindNumberKeyword)
+	assertIntegerCarrier(t, emission, false)
 	assertEmissionHasNoIntegerNoise(t, emission)
 }
 
-func TestIntegerRepresentationCanSelectBigIntForTheWholeEmission(t *testing.T) {
+func TestBigIntProfilePreservesNarrowIntegerCarriers(t *testing.T) {
 	program := loadDemandProgram(t)
 	roots, err := emit.ExportedAPIRoots(program.Roots()[0])
 	if err != nil {
@@ -149,10 +149,10 @@ func TestIntegerRepresentationCanSelectBigIntForTheWholeEmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertIntegerCarrier(t, emission, tsgo.SyntaxKindBigIntKeyword)
+	assertIntegerCarrier(t, emission, true)
 	printed := printIntegerEmission(t, emission)
-	if !strings.Contains(printed, "0n") && !strings.Contains(printed, "1n") {
-		t.Fatalf("BigInt emission contains no BigInt literal:\n%s", printed)
+	if strings.Contains(printed, "0n") || strings.Contains(printed, "1n") {
+		t.Fatalf("narrow-only BigInt-profile emission contains BigInt syntax:\n%s", printed)
 	}
 	assertNoIntegerNoise(t, printed)
 }
@@ -237,7 +237,7 @@ func TestEvaluationOrderSelectionParsesOnlyClosedProfiles(t *testing.T) {
 func assertIntegerCarrier(
 	t *testing.T,
 	emission emit.ProgramEmission,
-	want tsgo.SyntaxKind,
+	exact bool,
 ) {
 	t.Helper()
 	found := false
@@ -251,6 +251,11 @@ func assertIntegerCarrier(
 				continue
 			}
 			found = true
+			want := tsgo.SyntaxKindNumberKeyword
+			if exact && (alias.Name().Text() == "int64" ||
+				alias.Name().Text() == "uint64") {
+				want = tsgo.SyntaxKindBigIntKeyword
+			}
 			if alias.Type().Kind() != want {
 				t.Fatalf("%s carrier = %d, want %d", alias.Name().Text(), alias.Type().Kind(), want)
 			}

@@ -98,13 +98,44 @@ func metadataExpression(
 	targetType api.NameReference,
 ) (tsgo.ObjectLiteralExpression, []api.RootRequest, error) {
 	factory := context.Factory()
+	providerScalar, providerScalarOK := context.ProviderScalarABI()
+	if !providerScalarOK {
+		return nil, nil, &api.GeneratedArtifactShapeError{
+			Artifact: identity,
+			Reason:   "reflection metadata provider scalar ABI is absent",
+		}
+	}
 	description, err := describe(context.TypesSizes(), sourceType)
 	if err != nil {
 		return nil, nil, err
 	}
 	properties := []tsgo.ObjectLiteralElementLike{
 		stringProperty(factory, "identity", identity),
-		numberProperty(factory, "kind", int64(description.kind)),
+	}
+	appendInteger := func(
+		name string,
+		value int64,
+		alias api.PrimitiveAlias,
+	) error {
+		property, propertyErr := integerProperty(
+			factory,
+			providerScalar,
+			name,
+			value,
+			alias,
+		)
+		if propertyErr != nil {
+			return propertyErr
+		}
+		properties = append(properties, property)
+		return nil
+	}
+	if err := appendInteger(
+		"kind",
+		int64(description.kind),
+		api.PrimitiveUint64,
+	); err != nil {
+		return nil, nil, err
 	}
 	if description.name != "" {
 		properties = append(properties, stringProperty(factory, "name", description.name))
@@ -112,22 +143,30 @@ func metadataExpression(
 	if description.pkgPath != "" {
 		properties = append(properties, stringProperty(factory, "pkgPath", description.pkgPath))
 	}
-	properties = append(properties,
-		stringProperty(factory, "text", description.text),
-		numberProperty(factory, "size", description.size),
-		numberProperty(factory, "align", description.align),
-	)
+	properties = append(properties, stringProperty(factory, "text", description.text))
+	if err := appendInteger("size", description.size, api.PrimitiveUint64); err != nil {
+		return nil, nil, err
+	}
+	if err := appendInteger("align", description.align, api.PrimitiveInt64); err != nil {
+		return nil, nil, err
+	}
 	if description.bits != 0 {
-		properties = append(properties, numberProperty(factory, "bits", description.bits))
+		if err := appendInteger("bits", description.bits, api.PrimitiveInt64); err != nil {
+			return nil, nil, err
+		}
 	}
 	if !types.Comparable(sourceType) {
 		properties = append(properties, booleanProperty(factory, "comparable", false))
 	}
 	if description.length != 0 {
-		properties = append(properties, numberProperty(factory, "length", description.length))
+		if err := appendInteger("length", description.length, api.PrimitiveInt64); err != nil {
+			return nil, nil, err
+		}
 	}
 	if description.chanDir != 0 {
-		properties = append(properties, numberProperty(factory, "chanDir", description.chanDir))
+		if err := appendInteger("chanDir", description.chanDir, api.PrimitiveInt64); err != nil {
+			return nil, nil, err
+		}
 	}
 	if description.variadic {
 		properties = append(properties, booleanProperty(factory, "variadic", true))
@@ -171,6 +210,7 @@ func metadataExpression(
 	}
 	fields, fieldRequests, err := fieldMetadata(
 		factory,
+		providerScalar,
 		names,
 		reflectionType,
 		targetType,
@@ -312,6 +352,7 @@ func basicKind(sizes types.Sizes, source *types.Basic) (int, int64) {
 
 func fieldMetadata(
 	factory tsgo.Factory,
+	providerScalar api.ScalarABI,
 	names api.ReflectionNames,
 	reflectionType *types.TypeName,
 	targetType api.NameReference,
@@ -348,7 +389,17 @@ func fieldMetadata(
 			properties = append(properties, stringProperty(factory, "tag", tag))
 		}
 		if offsets[index] != 0 {
-			properties = append(properties, numberProperty(factory, "offset", offsets[index]))
+			offset, offsetErr := integerProperty(
+				factory,
+				providerScalar,
+				"offset",
+				offsets[index],
+				api.PrimitiveUint64,
+			)
+			if offsetErr != nil {
+				return nil, nil, offsetErr
+			}
+			properties = append(properties, offset)
 		}
 		if field.Embedded() {
 			properties = append(properties, booleanProperty(factory, "anonymous", true))
@@ -384,13 +435,32 @@ func stringProperty(factory tsgo.Factory, name string, value string) tsgo.Proper
 	)
 }
 
-func numberProperty(factory tsgo.Factory, name string, value int64) tsgo.PropertyAssignment {
+func integerProperty(
+	factory tsgo.Factory,
+	abi api.ScalarABI,
+	name string,
+	value int64,
+	alias api.PrimitiveAlias,
+) (tsgo.PropertyAssignment, error) {
+	literal, err := api.IntegerLiteral(
+		factory,
+		abi,
+		alias,
+		strconv.FormatInt(value, 10),
+	)
+	if err != nil {
+		return nil, err
+	}
+	_, keyword, err := api.PrimitiveAliasRepresentation(alias, abi)
+	if err != nil {
+		return nil, err
+	}
 	return typedExpressionProperty(
 		factory,
 		name,
-		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
-		factory.NumericLiteral(strconv.FormatInt(value, 10), tsgo.TokenFlagsNone),
-	)
+		factory.KeywordTypeNode(keyword),
+		literal,
+	), nil
 }
 
 func booleanProperty(factory tsgo.Factory, name string, value bool) tsgo.PropertyAssignment {

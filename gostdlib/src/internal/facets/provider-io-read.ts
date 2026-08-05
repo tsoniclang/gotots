@@ -1,7 +1,7 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { readFullAsync } from "../portable/io/read.js";
 import type { CanonicalReader } from "./provider-io-contract.js";
@@ -19,7 +19,7 @@ export async function IoReadFullCanonical<
   destination: RuntimeSlice<uint8>,
   eof: Failure | undefined,
   unexpectedEOF: Failure | undefined,
-): Promise<[int64, Failure | undefined]> {
+): Promise<[int, Failure | undefined]> {
   const source = requireValue(reader, "io.Reader");
   return readFullAsync(
     (target) => source.Read(target),

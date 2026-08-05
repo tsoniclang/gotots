@@ -28,6 +28,7 @@ rerun the checker.
 | Truth | Sole owner |
 |---|---|
 | selected source files and package classes | selected toolchain plus `go/packages` metadata |
+| `//go:embed` patterns, selected files, and exact payload bytes | selected toolchain plus loader-owned immutable evidence joined to the declaration's `go/types.Var` |
 | Go syntax and validity | selected toolchain parser and type checker |
 | bindings, types, constants, instances, selections, signatures | the one selected `go/types` graph |
 | construct meaning in context | the semantic handler selected by the parent-owned child role |
@@ -68,6 +69,14 @@ toolchain metadata, not import-path spelling, to distinguish:
 
 A load fails on parse/type errors, inconsistent package identity, an
 unavailable selected file, or build-profile drift.
+
+The loader requests the selected toolchain's embed patterns and files, joins
+each parsed `//go:embed` directive to its exact package variable identity, and
+reads each selected payload once. Emission consumes that immutable evidence;
+it never rescans source text, expands patterns independently at emission time,
+or reads payloads from the host at runtime. Ordinary patterns exclude hidden
+and underscore-prefixed files while `all:` patterns include them, including
+when both forms overlap in one package.
 
 ## Owner-Directed Dispatch
 
@@ -300,9 +309,14 @@ Defaults prefer readable source and no semantic machinery:
 - copy, pointer, interface, map, channel, and runtime support is demanded only
   when a selected occurrence requires it.
 
-GoToTS-owned scalar aliases preserve Go type identity for future consumers
-while mapping to ordinary TypeScript primitives. Generated output imports no
-unrelated compiler.
+GoToTS-owned scalar aliases preserve every selected Go basic identity. In
+particular, `int`, `uint`, and `uintptr` remain distinct aliases rather than
+being rewritten as `int32`/`int64` or `uint32`/`uint64`. Their carrier width is
+derived once from the selected package graph's `types.Sizes`; inconsistent
+width evidence in one compilation fails before emission. The `number` profile
+maps every integer alias to `number`. The `bigint` profile maps 64-bit aliases,
+including 64-bit native integers, to `bigint` and keeps narrower aliases as
+`number`. Generated output imports no unrelated compiler.
 
 Nil-capable values use `undefined` unless their family requires a distinct
 carrier. Zero, copy, equality, hashing, conversion, and mutation are each owned
@@ -611,6 +625,11 @@ callbacks from named callable values, describes interface methods, and resolves
 typed provider protocols. No consumer repeats those decisions or moves them
 into serialized documents.
 
+`internal/contracts/externals/certify` is the sole transient owner that reloads
+and exact-joins source declarations for an external-provider certificate. It
+may read the selected Go AST and type graph while certifying; the finalized
+external contract and every downstream consumer remain graph-free.
+
 The provider source is independently built against a generated direct-profile
 runtime contract. A linked product owns its selected generated runtime package;
 cooperative products consume the provider declarations through certified
@@ -645,6 +664,66 @@ Generated inputs cross the inverse bridge only where representation differs.
 Nested callbacks, tuples, containers, fields, and results follow the same
 type-directed boundary rule. Missing or ambiguous conversion fails
 certification; TypeScript assignability alone is not semantic evidence.
+
+The provider's scalar ABI is a separate certified fact from the product's
+selected integer profile. For a selected provider build, the runtime contract
+records one provider integer representation and one native integer width. The
+provider imports its GoToTS-owned scalar aliases from a provider-owned module;
+it never imports product-selected scalar aliases from `@gotots/runtime`.
+Provider implementations therefore strict-typecheck once against a stable,
+exact ABI. For the 64-bit `bigint` provider ABI, `int64`, `uint64`, `int`,
+`uint`, and `uintptr` are `bigint`; narrower integer aliases are `number`.
+
+Generated static facades compare the source Go type's product carrier with the
+certified provider carrier. Equal carriers cross unchanged. A differing
+carrier is converted in the facade with typed TS-Go AST (`BigInt` plus
+`BigInt.asIntN`/`asUintN`, or `Number` according to the declared `number`
+profile tradeoff). The source-facing callable retains exactly its Go
+parameters; no profile, policy, converter, or hidden scalar argument is added.
+Host APIs that require JavaScript `number` receive it only at a provider-owned,
+range-checked host boundary. Provider algorithms whose Go contract requires
+64-bit arithmetic operate on `bigint` and never narrow through `Number`.
+
+A provider bridge is revised by the same exact interface-contract demand graph
+as a generated concrete adapter. If a provider-created value of a base Go
+interface can also implement another reached Go interface, the provider
+certificate owns one static capability view:
+
+```ts
+function asProviderUnwrapper(
+  value: ProviderError,
+): ProviderUnwrapper | undefined;
+```
+
+The view parameter is the certified provider representation of the base Go
+interface. Its non-nil result is the certified provider representation of the
+target Go interface. Certification exact-checks both identities, the complete
+target method contract, one synchronous view call, and the implementation
+owner. The view implementation may use provider-owned classes or other static
+provider facts; it may not inspect member spelling or host object shape.
+
+Every exported capability view has one closed certified usage. A
+`provider-internal` view supports a hand-maintained provider algorithm and is
+never visible to generated bridge reconstruction. A `generated-bridge` view is
+eligible for reverse Go-interface demand. It may certify either the ordinary
+direct provider ABI or the selected callable profile's canonical ABI. Bridge
+construction selects the view whose complete certified base interface equals
+the active direct provider ABI, or whose method effects equal the active
+canonical generated ABI; a demanded contract with no exact candidate fails.
+The compiler indexes only `generated-bridge` views; neither export naming,
+TypeScript assignability, nor a source/profile spelling may choose a view or
+promote a provider-internal view into generated output.
+
+Only a reached source assertion, type switch, or certified facade guard creates
+the corresponding bridge demand. Bridge reconstruction evaluates each demanded
+view once per crossing, adds the target generated method tokens only for a
+non-nil view, and delegates demanded methods through the stored typed view.
+Absent capability evidence means provider-created values do not implement that
+target; it never triggers inference. Same-name incompatible Go method
+signatures are represented by exact TypeScript overloads, and capability views
+for those mutually exclusive Go contracts must not both select one value.
+Capability views and method tokens remain private bridge mechanics and never
+change a translated source signature.
 
 A provider-owned named callable has the source type-parameter arity and the
 canonical indirect callable representation. A provider-private callable ABI is
@@ -737,6 +816,10 @@ Each Go package emits deterministic ESM modules plus one package assembly.
 Mutable package variables live in one state module. Checker
 `types.Info.InitOrder` and the package import graph determine package and
 program initialization order; target import order does not.
+Compiler-supplied `//go:embed` values initialize their owning package storage
+before source initializers through the same package-state assignment path.
+String payload materialization preserves every Go byte, including NUL and
+invalid UTF-8, rather than interpreting payload text as Unicode source.
 
 The package assembly exports the exact observable contract of each exported
 Go declaration. That contract contains the source-facing binding and any

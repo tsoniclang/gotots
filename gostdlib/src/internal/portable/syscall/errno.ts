@@ -5,10 +5,11 @@ import {
 } from "@gotots/runtime/interface-value.js";
 
 import type { Errno } from "../../../syscall.js";
+import { hostInteger } from "../../host-integer.js";
 
 const errnoType = Object.freeze({ comparable: true });
 
-class ErrnoError extends GoInterfaceValue implements GoError {
+export class ErrnoError extends GoInterfaceValue implements GoError {
   readonly $go$type = errnoType;
   readonly $go$methods: ReadonlySet<object> = new Set<object>([
     GoErrorMethodToken,
@@ -23,6 +24,10 @@ class ErrnoError extends GoInterfaceValue implements GoError {
     return this.errno.Error();
   }
 
+  Is(target: GoError | undefined): boolean {
+    return this.errno.Is(target);
+  }
+
   $go$implements(contract: readonly object[]): boolean {
     return contract.every((token: object): boolean => this.$go$methods.has(token));
   }
@@ -33,7 +38,7 @@ class ErrnoError extends GoInterfaceValue implements GoError {
   }
 
   $go$hash(): number {
-    return this.errno.value;
+    return hostInteger(this.errno.value);
   }
 
   $go$format(verb: string, _flags: string, _precision: number | undefined): string {

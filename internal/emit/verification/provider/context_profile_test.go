@@ -136,6 +136,7 @@ func main() {
 	}
 	for _, required := range []string{
 		"ContextWithValueCanonical",
+		"$from(provider_context.ContextWithValueCanonical",
 		"context__from_gostdlib.Background",
 		"context__from_gostdlib.TODO",
 		"$contract);",
@@ -145,7 +146,6 @@ func main() {
 		}
 	}
 	for _, forbidden := range []string{
-		"$from(provider_context.ContextWithValueCanonical",
 		" as any",
 		" as unknown",
 		".apply(",

@@ -482,7 +482,8 @@ func providerInterfaceIsCooperative(
 	for _, method := range ordinary.Methods {
 		selected, ok := cooperativeMethods[method.SourceIdentity]
 		if !ok || selected.Kind != method.Kind ||
-			selected.SourceSignature != method.SourceSignature {
+			selected.SourceSignature != method.SourceSignature ||
+			selected.ContractSignature != method.ContractSignature {
 			return false
 		}
 		if method.Kind == gostdlib.ProviderInterfaceMethodCallable &&

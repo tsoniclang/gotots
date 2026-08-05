@@ -45,13 +45,21 @@ func validateProviderCallableProfile(
 	); err != nil {
 		return err
 	}
-	for index, identity := range profile.CanonicalValues {
-		if identity == "" || index != 0 && identity <= profile.CanonicalValues[index-1] {
+	parameters := make(map[string]struct{}, len(profile.CanonicalValues))
+	for index, value := range profile.CanonicalValues {
+		if value.SourceIdentity == "" || value.TargetParameter == "" {
 			return manifestError(
-				field+".canonicalValues",
-				"values are empty, duplicated, or not strictly ordered",
+				fmt.Sprintf("%s.canonicalValues[%d]", field, index),
+				"source identity or target parameter is empty",
 			)
 		}
+		if _, duplicate := parameters[value.TargetParameter]; duplicate {
+			return manifestError(
+				field+".canonicalValues",
+				"target parameter is duplicated",
+			)
+		}
+		parameters[value.TargetParameter] = struct{}{}
 	}
 	keyInterfaces := make(
 		[]ProviderCallableProfileKeyInterface,
@@ -129,6 +137,43 @@ func validateProviderCallableProfile(
 			SourceIdentity: identity,
 			Methods:        methods,
 		})
+	}
+	viewKeys := make(map[string]struct{}, len(profile.CapabilityViews))
+	viewParameters := make(map[string]struct{}, len(profile.CapabilityViews))
+	for index, view := range profile.CapabilityViews {
+		viewField := fmt.Sprintf("%s.capabilityViews[%d]", field, index)
+		if view.BaseSourceIdentity == "" || view.TargetSourceIdentity == "" ||
+			view.TargetParameter == "" ||
+			view.BaseSourceIdentity == view.TargetSourceIdentity {
+			return manifestError(viewField, "capability view is incomplete")
+		}
+		if _, found := interfaceIdentities[view.BaseSourceIdentity]; !found {
+			return manifestError(
+				viewField+".baseSourceIdentity",
+				"value has no profile-interface evidence",
+			)
+		}
+		if _, found := interfaceIdentities[view.TargetSourceIdentity]; !found {
+			return manifestError(
+				viewField+".targetSourceIdentity",
+				"value has no profile-interface evidence",
+			)
+		}
+		key := view.BaseSourceIdentity + "\x00" + view.TargetSourceIdentity
+		if _, duplicate := viewKeys[key]; duplicate {
+			return manifestError(
+				field+".capabilityViews",
+				"base/target pair is duplicated",
+			)
+		}
+		if _, duplicate := viewParameters[view.TargetParameter]; duplicate {
+			return manifestError(
+				field+".capabilityViews",
+				"target parameter is duplicated",
+			)
+		}
+		viewKeys[key] = struct{}{}
+		viewParameters[view.TargetParameter] = struct{}{}
 	}
 	keyCallables := make(
 		[]ProviderCallableProfileKeyCallable,

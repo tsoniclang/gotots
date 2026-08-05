@@ -1,5 +1,5 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable } from "@gotots/runtime/scalars.js";
+import type { Awaitable } from "@gotots/gostdlib/internal/scalars.js";
 
 export class Once {
   #state: "idle" | "running" | "done" = "idle";

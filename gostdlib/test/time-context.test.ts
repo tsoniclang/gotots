@@ -65,16 +65,16 @@ class NilDoneFailedContext extends ProviderInterfaceValue implements Context {
 }
 
 test("ParseDuration preserves Go units, fractions, and diagnostics", (): void => {
-  const valid: ReadonlyArray<readonly [string, number]> = [
-    ["0", 0],
-    ["+0", 0],
-    ["300ms", 300_000_000],
-    ["-1.5h", -5_400_000_000_000],
-    ["2h45m", 9_900_000_000_000],
-    [".5s", 500_000_000],
-    ["1us", 1_000],
-    ["1µs", 1_000],
-    ["1μs", 1_000],
+  const valid: ReadonlyArray<readonly [string, bigint]> = [
+    ["0", 0n],
+    ["+0", 0n],
+    ["300ms", 300_000_000n],
+    ["-1.5h", -5_400_000_000_000n],
+    ["2h45m", 9_900_000_000_000n],
+    [".5s", 500_000_000n],
+    ["1us", 1_000n],
+    ["1µs", 1_000n],
+    ["1μs", 1_000n],
   ];
   for (const [source, want] of valid) {
     const [duration, failure] = ParseDuration(source);
@@ -91,22 +91,22 @@ test("ParseDuration preserves Go units, fractions, and diagnostics", (): void =>
   ];
   for (const [source, want] of invalid) {
     const [duration, failure] = ParseDuration(source);
-    assert.equal(duration.Nanoseconds(), 0, source);
+    assert.equal(duration.Nanoseconds(), 0n, source);
     assert.equal(failure?.Error(), want, source);
   }
 });
 
 test("Duration and Time preserve arithmetic, ordering, formatting, and zero", () => {
-  const duration = new Duration(1_250_000_000);
-  assert.equal(duration.Nanoseconds(), 1_250_000_000);
+  const duration = new Duration(1_250_000_000n);
+  assert.equal(duration.Nanoseconds(), 1_250_000_000n);
   assert.equal(duration.Seconds(), 1.25);
   assert.equal(duration.String(), "1.25s");
 
-  const epoch = UnixMilli(0);
+  const epoch = UnixMilli(0n);
   const later = epoch.Add(duration);
   assert.equal(epoch.Before(later), true);
   assert.equal(later.After(epoch), true);
-  assert.equal(epoch.Equal(UnixMilli(0)), true);
+  assert.equal(epoch.Equal(UnixMilli(0n)), true);
   assert.equal(later.Sub(epoch).Nanoseconds(), duration.Nanoseconds());
   const localEpoch = new Date(0);
   const hour = localEpoch.getHours() % 12 || 12;
@@ -114,27 +114,27 @@ test("Duration and Time preserve arithmetic, ordering, formatting, and zero", ()
     + `${String(localEpoch.getMinutes()).padStart(2, "0")}:`
     + `${String(localEpoch.getSeconds()).padStart(2, "0")} `
     + `${localEpoch.getHours() < 12 ? "AM" : "PM"}`;
-  assert.equal(UnixMilli(0).Format("03:04:05 PM"), expectedTime);
+  assert.equal(UnixMilli(0n).Format("03:04:05 PM"), expectedTime);
   assert.equal(new Time().IsZero(), true);
-  assert.equal(UnixMilli(0).UnixMilli(), 0);
-  assert.equal(UnixMilli(0).UnixNano(), 0);
-  assert.match(UnixMilli(0).String(), /1970/u);
+  assert.equal(UnixMilli(0n).UnixMilli(), 0n);
+  assert.equal(UnixMilli(0n).UnixNano(), 0n);
+  assert.match(UnixMilli(0n).String(), /1970/u);
   const prefix = RuntimeSlice.literal([0x61, 0x74, 0x3d]);
-  const appended = UnixMilli(0).AppendFormat(prefix, "2006");
+  const appended = UnixMilli(0n).AppendFormat(prefix, "2006");
   const bytes = Array.from(
     { length: appended.length },
     (_, index): number => appended.get(index),
   );
   assert.equal(new TextDecoder().decode(Uint8Array.from(bytes)), "at=1970");
-  assert.equal(Millisecond.Nanoseconds(), 1_000_000);
-  assert.equal(Nanosecond.Nanoseconds(), 1);
-  assert.equal(Microsecond.Nanoseconds(), 1_000);
-  assert.equal(Second.Nanoseconds(), 1_000_000_000);
-  assert.equal(Hour.Nanoseconds(), 3_600_000_000_000);
+  assert.equal(Millisecond.Nanoseconds(), 1_000_000n);
+  assert.equal(Nanosecond.Nanoseconds(), 1n);
+  assert.equal(Microsecond.Nanoseconds(), 1_000n);
+  assert.equal(Second.Nanoseconds(), 1_000_000_000n);
+  assert.equal(Hour.Nanoseconds(), 3_600_000_000_000n);
   const now = Now();
   assert.equal(now.IsZero(), false);
-  assert.ok(Since(now).Nanoseconds() >= 0);
-  assert.ok(Until(now.Add(new Duration(1_000_000_000))).Nanoseconds() > 0);
+  assert.ok(Since(now).Nanoseconds() >= 0n);
+  assert.ok(Until(now.Add(new Duration(1_000_000_000n))).Nanoseconds() > 0n);
 });
 
 test("Time.UnmarshalText preserves the parsed instant and fixed offset", (): void => {
@@ -159,7 +159,7 @@ test("Time.UnmarshalText preserves the parsed instant and fixed offset", (): voi
   );
   assert.equal(parsed.Equal(sameInstant), true);
 
-  const invalid = UnixMilli(0);
+  const invalid = UnixMilli(0n);
   const failure = invalid.UnmarshalText(RuntimeSlice.literal(Array.from(
     new TextEncoder().encode("not-a-time"),
   )));
@@ -200,9 +200,9 @@ test("time.Parse consumes Go reference layouts", (): void => {
 });
 
 test("Timer delivers once, supports reset, and reports stop state", async () => {
-  const timer = NewTimer(new Duration(50_000_000));
+  const timer = NewTimer(new Duration(50_000_000n));
   assert.equal(Timer.Stop(timer), true);
-  assert.equal(Timer.Reset(timer, new Duration(1_000_000)), false);
+  assert.equal(Timer.Reset(timer, new Duration(1_000_000n)), false);
   const [fired, ok] = await timer.C!.receive();
   assert.equal(ok, true);
   assert.equal(fired.IsZero(), false);
@@ -210,18 +210,18 @@ test("Timer delivers once, supports reset, and reports stop state", async () => 
 });
 
 test("Ticker produces values until stopped", async () => {
-  const ticker = NewTicker(new Duration(1_000_000));
+  const ticker = NewTicker(new Duration(1_000_000n));
   const [, ok] = await ticker.C.receive();
   assert.equal(ok, true);
   Ticker.Stop(ticker);
 });
 
 test("After and AfterFunc schedule through the provider clock", async () => {
-  const [, open] = await After(new Duration(1_000_000)).receive();
+  const [, open] = await After(new Duration(1_000_000n)).receive();
   assert.equal(open, true);
 
   let called = false;
-  const timer = AfterFunc(new Duration(1_000_000), async () => {
+  const timer = AfterFunc(new Duration(1_000_000n), async () => {
     called = true;
   });
   await new Promise<void>((resolve) => setTimeout(resolve, 5));
@@ -231,13 +231,13 @@ test("After and AfterFunc schedule through the provider clock", async () => {
 
 test("Sleep delays positive durations and accepts non-positive durations", async () => {
   const order: string[] = [];
-  const sleeping = Sleep(new Duration(1_000_000)).then(() => order.push("awake"));
+  const sleeping = Sleep(new Duration(1_000_000n)).then(() => order.push("awake"));
   order.push("scheduled");
   await sleeping;
   assert.deepEqual(order, ["scheduled", "awake"]);
 
-  await Sleep(new Duration(0));
-  await Sleep(new Duration(-1));
+  await Sleep(new Duration(0n));
+  await Sleep(new Duration(-1n));
 });
 
 test("Context cancellation, causes, values, and deadlines propagate", async () => {
@@ -288,7 +288,7 @@ test("Context cancellation, causes, values, and deadlines propagate", async () =
   assert.equal(caused.Err(), state.Canceled);
   assert.equal(Cause(caused), cause);
 
-  const [timed, stop] = WithTimeout(root, new Duration(1_000_000));
+  const [timed, stop] = WithTimeout(root, new Duration(1_000_000n));
   const [, deadlineOpen] = await timed.Done()!.receive();
   assert.equal(deadlineOpen, false);
   assert.match(timed.Err()!.Error(), /deadline exceeded/u);

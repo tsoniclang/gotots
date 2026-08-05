@@ -8,9 +8,11 @@ import type {
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
+  int,
   int64,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "../src/internal/scalars.js";
+import { integerFromHost } from "../src/internal/host-integer.js";
 
 import { Is } from "../src/errors.js";
 import { DirectoryFile } from "../src/internal/portable/io/filesystem.js";
@@ -44,7 +46,7 @@ const fileSystemType = Object.freeze({ comparable: true });
 class TestInfo extends ProviderInterfaceValue implements FileInfo {
   constructor(
     private readonly name: string,
-    private readonly size: number,
+    private readonly size: int64,
     private readonly mode: FileMode,
   ) {
     super(infoType);
@@ -111,16 +113,19 @@ class TestFile extends ProviderInterfaceValue implements File {
     return undefined;
   }
 
-  Read(destination: RuntimeSlice<uint8>): [int64, GoError | undefined] {
+  Read(destination: RuntimeSlice<uint8>): [int, GoError | undefined] {
     if (this.offset >= this.data.length) {
-      return [0, ioState.EOF];
+      return [0n, ioState.EOF];
     }
     const count = Math.min(destination.length, this.data.length - this.offset);
     for (let index = 0; index < count; index += 1) {
       destination.set(index, this.data[this.offset + index] ?? 0);
     }
     this.offset += count;
-    return [count, this.offset === this.data.length ? ioState.EOF : undefined];
+    return [
+      integerFromHost(count),
+      this.offset === this.data.length ? ioState.EOF : undefined,
+    ];
   }
 
   Stat(): [FileInfo, undefined] {
@@ -140,8 +145,8 @@ class TestDirectory extends DirectoryFile {
     return undefined;
   }
 
-  Read(): [int64, GoError] {
-    return [0, ioState.EOF];
+  Read(): [int, GoError] {
+    return [0n, ioState.EOF];
   }
 
   Stat(): [FileInfo, undefined] {
@@ -159,10 +164,10 @@ class TestFS extends ProviderInterfaceValue implements FS {
   }
 
   Open(name: string): [File | undefined, GoError | undefined] {
-    const root = new TestInfo(".", 0, ModeDir);
-    const directory = new TestInfo("dir", 0, ModeDir);
-    const first = new TestInfo("a.txt", 5, new FileMode(0));
-    const nested = new TestInfo("z.txt", 1, new FileMode(0));
+    const root = new TestInfo(".", 0n, ModeDir);
+    const directory = new TestInfo("dir", 0n, ModeDir);
+    const first = new TestInfo("a.txt", 5n, new FileMode(0));
+    const nested = new TestInfo("z.txt", 1n, new FileMode(0));
     switch (name) {
       case ".":
         return [
@@ -189,7 +194,7 @@ test("filesystem functions read, stat, sort, and walk", async () => {
 
   const [information, statFailure] = Stat(fileSystem, "a.txt");
   assert.equal(statFailure, undefined);
-  assert.equal(information?.Size(), 5);
+  assert.equal(information?.Size(), 5n);
   assert.equal(FileInfoToDirEntry(information)?.Name(), "a.txt");
 
   const [entries, directoryFailure] = ReadDir(fileSystem, ".");

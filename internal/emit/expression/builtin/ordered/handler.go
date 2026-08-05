@@ -70,11 +70,17 @@ func Emit(
 		return target, true, err
 	}
 	classifiedType := resultType
+	operationContext := context
 	defined, definedResult := definedtype.ResolveBasic(resultType)
 	if definedResult {
+		var err error
+		operationContext, err = defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
 		classifiedType = defined.Underlying()
 	}
-	family, ok := classify(context, classifiedType)
+	family, ok := classify(operationContext, classifiedType)
 	if !ok {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -109,17 +115,17 @@ func Emit(
 			emissions[index] = unwrapped
 		}
 	}
-	values, before, requests, err := arrange(context, emissions)
+	values, before, requests, err := arrange(operationContext, emissions)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
 	var target tsgo.Expression
 	switch family {
 	case familyNumber:
-		target = mathCall(context, selected, values)
+		target = mathCall(operationContext, selected, values)
 	case familyBigInt, familyString:
 		target, requests, err = runtimeFold(
-			context,
+			operationContext,
 			selected,
 			family,
 			values,
@@ -155,18 +161,14 @@ func classify(
 	context api.Context,
 	sourceType types.Type,
 ) (valueFamily, bool) {
-	if _, ok := integervalue.Describe(
+	if carrier, ok := integervalue.Describe(
 		context.TypesSizes(),
 		sourceType,
 	); ok {
-		switch context.IntegerRepresentation() {
-		case api.IntegerRepresentationNumber:
-			return familyNumber, true
-		case api.IntegerRepresentationBigInt:
+		if integervalue.UsesBigInt(context.IntegerRepresentation(), carrier) {
 			return familyBigInt, true
-		default:
-			return familyInvalid, false
 		}
+		return familyNumber, true
 	}
 	if _, ok := floatvalue.Describe(sourceType); ok {
 		return familyNumber, true

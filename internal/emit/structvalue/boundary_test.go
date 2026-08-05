@@ -100,6 +100,41 @@ func (value Value) Unused() Value {
 	}
 }
 
+func TestSingleStructReturnCopiesBorrowedField(t *testing.T) {
+	emission, err := compileTemporaryStructProgram(t, `package boundary
+
+type Point struct {
+	X int32
+}
+
+type Box struct {
+	Point Point
+}
+
+func Snapshot(value *Box) Point {
+	return value.Point
+}
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	function := targetFunction(t, structTargetSource(t, emission), "Snapshot")
+	result := function.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression()
+	call, ok := result.(tsgo.CallExpression)
+	if !ok {
+		t.Fatalf("Snapshot result = %T, want Point.$copy call", result)
+	}
+	receiver, member := targetProperty(call.Expression())
+	if receiver != "Point" || member != "$copy" || len(call.Arguments()) != 1 {
+		t.Fatalf(
+			"Snapshot result = %s.%s with %d arguments, want Point.$copy with one argument",
+			receiver,
+			member,
+			len(call.Arguments()),
+		)
+	}
+}
+
 func compileTemporaryStructSource(t *testing.T, source string) error {
 	t.Helper()
 	_, err := compileTemporaryStructProgram(t, source)

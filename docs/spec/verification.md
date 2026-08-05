@@ -206,6 +206,21 @@ Each type/value family has focused differentials and mutations:
 | strings | bytes/runes, indexing, range, slicing, conversions |
 | defined types | identity, projection/wrap, methods, nil-capable families |
 
+Integer-profile proof pins the append-only scalar alias identities, including
+distinct `int`, `uint`, and `uintptr`, and checks their carrier matrix under
+32-bit and 64-bit `types.Sizes`. A mutation that restores native-to-fixed alias
+collapse fails before printing. Both complete runtime packages are generated
+through TS-Go AST and strict-typechecked; artifacts must show source alias
+names unchanged and only their primitive carrier changed.
+
+Embed fixtures exact-join parsed directives, selected toolchain patterns,
+selected files, variable identities, and immutable payload bytes. They cover
+quoted names, ordinary versus overlapping `all:` trees, string, byte-slice,
+and filesystem declarations. Emitted string fixtures include NUL and invalid
+UTF-8, then print through TS-Go, strict-typecheck, and compare executed bytes
+with Go. Mutations remove selected-file evidence, zero an embedded variable,
+or leak hidden files through an ordinary pattern; each fails at its owner.
+
 Every test inspects generated source and reports bytes/AST nodes. A mutation
 that always emits copy carriers/helpers, uses JavaScript identity for Go map
 keys, drops nil checks, or restores a target non-null assertion must fail.
@@ -373,6 +388,10 @@ A nested-control fixture labels a non-breakable `if` containing both a switch
 and a loop while non-structural gotos target the label. Artifact inspection
 requires exactly one emitted target label on the direct `if`; propagating its
 target-label capability to either nested breakable child must fail the gate.
+The inverse nesting matrix also covers a loop inside a fallthrough-lowered
+switch and a switch inside a labeled loop. Mutations that retain the outer
+break target when entering either inner construct must fail before product
+execution.
 
 Signature inspection proves ordinary callable/function/interface/provider
 contracts contain no recovery parameter. Private deferred entries are present
@@ -467,6 +486,49 @@ For each generated static facade, proof records:
 - effect and exact generic instance;
 - produced facade AST.
 
+Scalar-boundary fixtures cross every signedness, fixed-width, and native-width
+class in both directions. Equal product/provider carriers must produce no
+conversion AST. Differing carriers must produce the one width-aware static
+conversion and no extra source parameter. Differential cases include signed
+minimums, unsigned maximums, values above JavaScript's safe-integer range, and
+multi-result tuples. Mutations change the provider profile or native width,
+remove one conversion, replace unsigned normalization with signed
+normalization, or restore a product-scalar import in provider source; each
+fails at the runtime contract, strict typecheck, artifact gate, or execution
+differential.
+
+The provider is independently strict-typechecked against its certified scalar
+module. Exact 64-bit algorithms (binary encoding, parsing, bit operations,
+hash folding, and counters) execute against Go. Node/host boundaries have
+focused range tests; unchecked `bigint`-to-`number` narrowing is forbidden by
+source-shape and mutation gates.
+
+Provider-created dynamic-interface proof additionally exact-joins every
+configured capability view to its base Go interface, target Go interface,
+provider parameter type, optional provider result type, target method set,
+module/export, implementation owner, and fingerprint. Differential fixtures
+cover a provider value with and without each capability, direct assertions,
+comma-ok assertions, type switches, and facade guards. Error fixtures include
+`Is(error) bool`, `Unwrap() error`, and `Unwrap() []error`; filesystem fixtures
+include every provider-created optional interface actually implemented by the
+selected provider.
+
+Certification also exact-joins each view's closed usage. Artifact inspection
+proves provider-internal views never enter generated bridges and each demanded
+generated-bridge view is evaluated once per provider crossing. Mutating the
+usage, substituting a direct-profile view for a canonical-profile view, or
+removing the sole ABI-compatible candidate must fail before printing generated
+source. Direct and cooperative differential fixtures inspect the emitted view
+calls and reject the opposite ABI even when its Go method contract is identical.
+
+Mutations remove a view, change its base or target type, return the target
+unconditionally, drop or add a method token, omit delegated result conversion,
+make two incompatible same-name capability views select one value, bypass the
+reverse demand, or restore member-spelling/shape inspection. Each fails at its
+certificate, artifact-shape, strict-typecheck, or differential owner. Artifact
+inspection proves ordinary bridges contain no undemanded capability members and
+each demanded call remains constant-size as provider implementer count grows.
+
 The source-shape gate verifies facade arity. Artifact inspection proves calls
 contain only source arguments and support is imported at module scope.
 Provider-owned named-callable fixtures prove that generated annotations retain
@@ -529,6 +591,26 @@ obligation files. Every selected bodyless/external declaration has one exact
 typed throwing body and canonical identity. Linked mode removes each satisfied
 placeholder and admits no dual path. Publication fails on any reachable
 obligation.
+
+External-function linkage tests begin from the unlinked obligation artifact,
+then compile again with a target derived from that exact obligation. They inspect
+the TS-Go AST and printed TypeScript for the static module or portable-source
+call, strict-typecheck the linked module, execute it against the Go result, and
+assert that the obligation and throwing body are absent. Independent mutations
+duplicate a binding, reuse it under another build profile or module version,
+select a mismatched source signature, omit the target export, and provide an
+unreachable extra binding. Each fails at the binding join or strict module
+boundary; no runtime lookup is exercised.
+
+The production proof uses the verified provider certificate rather than a test
+binding slice. Certification independently reloads the pinned Go modules under
+the manifest build profile, re-derives source and portable-target contracts,
+inspects module exports through TS-Go, fingerprints their public symbol shapes,
+hashes the complete provider source tree, and reproduces canonical manifest
+bytes. Mutations change the source module version, signature, target profile,
+standard-library dependency digest, module export, target fingerprint,
+implementation owner, and provider source bytes. Each is rejected before the
+compiler can resolve an obligation.
 
 Mutations classify by import spelling, omit an obligation, duplicate one,
 execute a `declare`-only ESM binding, read an optional provider artifact

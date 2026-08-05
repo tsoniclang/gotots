@@ -145,6 +145,24 @@ func main() {
 	if strings.Contains(artifacts.printed, "ErrorsIsCanonical(") {
 		t.Fatalf("direct errors.Is output selected cooperative boundary:\n%s", artifacts.printed)
 	}
+	for _, view := range []string{
+		"provider_error.AsProviderErrorIsDirect(value)",
+		"provider_error.AsProviderErrorUnwrapDirect(value)",
+		"provider_error.AsProviderErrorUnwrapManyDirect(value)",
+	} {
+		if count := strings.Count(artifacts.printed, view); count != 1 {
+			t.Fatalf("direct provider capability view %q calls = %d, want 1:\n%s", view, count, artifacts.printed)
+		}
+	}
+	for _, cooperativeView := range []string{
+		"provider_error.AsProviderErrorIs(value)",
+		"provider_error.AsProviderErrorUnwrap(value)",
+		"provider_error.AsProviderErrorUnwrapMany(value)",
+	} {
+		if strings.Contains(artifacts.printed, cooperativeView) {
+			t.Fatalf("direct provider bridge selected cooperative view %q:\n%s", cooperativeView, artifacts.printed)
+		}
+	}
 }
 
 func TestErrorsIsSelectsCooperativeOptionalProtocol(t *testing.T) {

@@ -7,12 +7,36 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func sourceArtifactOwnerOrder(
+	sites map[types.Object]declarationSite,
+) func(api.ArtifactOwner, api.ArtifactOwner) int {
+	return func(left api.ArtifactOwner, right api.ArtifactOwner) int {
+		leftObject, leftSource := left.Source()
+		rightObject, rightSource := right.Source()
+		if leftSource && rightSource {
+			leftSite, leftIndexed := sites[leftObject]
+			rightSite, rightIndexed := sites[rightObject]
+			if leftIndexed && rightIndexed {
+				if order := declarationindex.CompareSites(
+					leftSite,
+					rightSite,
+				); order != 0 {
+					return order
+				}
+			}
+		}
+		return emitordering.CompareArtifactOwners(left, right)
+	}
+}
 
 func (e *emitter) context(names api.Names) (api.Context, error) {
 	byteOrder, err := e.source.Program().BuildProfile().ByteOrder()
@@ -30,17 +54,21 @@ func (e *emitter) context(names api.Names) (api.Context, error) {
 		names,
 		e.values,
 		storage.Owner{},
-		e.integer,
+		e.scalar.IntegerRepresentation(),
 		e.order,
 		e.concurrency,
 	)
 	if err != nil {
 		return api.Context{}, err
 	}
+	if e.providerScalar.Valid() {
+		context = context.WithProviderScalarABI(e.providerScalar)
+	}
 	return context.
 		WithGenericCallableResolver(e.generic).
 		WithCooperativeCallableResolver(e.cooperative).
 		WithRecoveryCallableResolver(e.recovery).
+		WithExternalFunctionResolver(e.external).
 		WithGoRuntimeContract(e.goRuntime), nil
 }
 
@@ -203,7 +231,10 @@ func (s *programSession) packageAssemblyFile(
 	statements := placement.Statements(s.factory)
 	var initialization []tsgo.Statement
 	for _, storage := range builder.storage {
-		initialization = append(initialization, storage.zeroStatements...)
+		initialization = append(
+			initialization,
+			storage.initializationStatements...,
+		)
 	}
 	for _, artifact := range builder.initialization {
 		if len(artifact.statements) == 0 {

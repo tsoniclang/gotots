@@ -2,7 +2,7 @@ import type {
   GoError,
   GoInterfaceValue,
 } from "@gotots/runtime/interface-value.js";
-import type { uint64 } from "@gotots/runtime/scalars.js";
+import type { uint64 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderError } from "../../runtime/error.js";
 
@@ -18,16 +18,16 @@ export function errnoMatchesSentinel(
   target: GoInterfaceValue | undefined,
 ): boolean {
   if (target === permission) {
-    return value === 13 || value === 1;
+    return value === 13n || value === 1n;
   }
   if (target === exists) {
-    return value === 17 || value === 39;
+    return value === 17n || value === 39n;
   }
   if (target === notExists) {
-    return value === 2;
+    return value === 2n;
   }
   if (target === unsupported) {
-    return value === 38 || value === 95;
+    return value === 38n || value === 95n;
   }
   return false;
 }

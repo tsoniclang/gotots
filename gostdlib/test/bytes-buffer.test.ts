@@ -10,6 +10,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { hostInteger } from "../src/internal/host-integer.js";
 
 import {
   Buffer as ByteBuffer,
@@ -24,17 +25,17 @@ test("Buffer.Read advances exactly and preserves empty-read boundaries", (): voi
   const empty = RuntimeSlice.nil<number>();
   const target = RuntimeSlice.literal([9, 9]);
 
-  assert.deepEqual(ByteBuffer.Read(buffer, empty), [0, undefined]);
-  assert.deepEqual(ByteBuffer.Read(buffer, target), [2, undefined]);
+  assert.deepEqual(ByteBuffer.Read(buffer, empty), [0n, undefined]);
+  assert.deepEqual(ByteBuffer.Read(buffer, target), [2n, undefined]);
   assert.deepEqual(sliceValues(target), [1, 2]);
-  assert.deepEqual(ByteBuffer.Read(buffer, target), [1, undefined]);
+  assert.deepEqual(ByteBuffer.Read(buffer, target), [1n, undefined]);
   assert.deepEqual(sliceValues(target), [3, 2]);
-  assert.deepEqual(ByteBuffer.Read(buffer, target), [0, ioState.EOF]);
-  assert.deepEqual(ByteBuffer.Read(buffer, empty), [0, undefined]);
+  assert.deepEqual(ByteBuffer.Read(buffer, target), [0n, ioState.EOF]);
+  assert.deepEqual(ByteBuffer.Read(buffer, empty), [0n, undefined]);
 
   assert.deepEqual(
     ByteBuffer.Read(new ByteBuffer(), RuntimeSlice.nil<number>()),
-    [0, undefined],
+    [0n, undefined],
   );
   assert.throws((): void => {
     ByteBuffer.Read(undefined, target);
@@ -43,14 +44,14 @@ test("Buffer.Read advances exactly and preserves empty-read boundaries", (): voi
 
 test("Buffer exposes unread length, growth, next, and write behavior", (): void => {
   const buffer = NewBuffer(RuntimeSlice.literal([1, 2, 3]));
-  assert.equal(ByteBuffer.Len(buffer), 3);
-  assert.deepEqual(sliceValues(ByteBuffer.Next(buffer, 2)), [1, 2]);
-  assert.equal(ByteBuffer.Len(buffer), 1);
-  ByteBuffer.Grow(buffer, 4);
-  assert.equal(ByteBuffer.Available(buffer) >= 4, true);
+  assert.equal(ByteBuffer.Len(buffer), 3n);
+  assert.deepEqual(sliceValues(ByteBuffer.Next(buffer, 2n)), [1, 2]);
+  assert.equal(ByteBuffer.Len(buffer), 1n);
+  ByteBuffer.Grow(buffer, 4n);
+  assert.equal(ByteBuffer.Available(buffer) >= 4n, true);
   assert.equal(ByteBuffer.AvailableBuffer(buffer).length, 0);
-  assert.deepEqual(ByteBuffer.Write(buffer, RuntimeSlice.literal([4, 5])), [2, undefined]);
-  assert.deepEqual(sliceValues(ByteBuffer.Next(buffer, 10)), [3, 4, 5]);
+  assert.deepEqual(ByteBuffer.Write(buffer, RuntimeSlice.literal([4, 5])), [2n, undefined]);
+  assert.deepEqual(sliceValues(ByteBuffer.Next(buffer, 10n)), [3, 4, 5]);
 });
 
 test("Buffer and NewBuffer agree with Go", (): void => {
@@ -69,7 +70,7 @@ function providerResult(): string {
   for (let readIndex = 0; readIndex < 3; readIndex += 1) {
     const [count, failure] = ByteBuffer.Read(buffer, target);
     rows.push({
-      n: count,
+      n: hostInteger(count),
       error: failure?.Error() ?? "",
       destination: sliceValues(target),
     });
@@ -80,7 +81,7 @@ function providerResult(): string {
     RuntimeSlice.nil<number>(),
   );
   rows.push({
-    n: emptyCount,
+    n: hostInteger(emptyCount),
     error: emptyFailure?.Error() ?? "",
     destination: [],
   });

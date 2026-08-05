@@ -11,7 +11,8 @@ import test from "node:test";
 
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { int, uint8 } from "../src/internal/scalars.js";
+import { integerFromHost } from "../src/internal/host-integer.js";
 
 import {
   NewScanner,
@@ -40,9 +41,9 @@ class ChunkReader extends ProviderInterfaceValue implements Reader {
     super(chunkReaderType);
   }
 
-  Read(destination: RuntimeSlice<uint8>): [int64, GoError | undefined] {
+  Read(destination: RuntimeSlice<uint8>): [int, GoError | undefined] {
     if (this.#offset >= this.source.length) {
-      return [0, this.terminalFailure];
+      return [0n, this.terminalFailure];
     }
     const count = Math.min(
       destination.length,
@@ -53,7 +54,7 @@ class ChunkReader extends ProviderInterfaceValue implements Reader {
       destination.set(index, this.source.charCodeAt(this.#offset + index));
     }
     this.#offset += count;
-    return [count, undefined];
+    return [integerFromHost(count), undefined];
   }
 }
 
@@ -65,7 +66,7 @@ class AsyncChunkReader extends ProviderInterfaceValue implements CanonicalReader
     this.#source = new ChunkReader(source, chunkSize);
   }
 
-  Read(destination: RuntimeSlice<uint8>): Promise<[int64, GoError | undefined]> {
+  Read(destination: RuntimeSlice<uint8>): Promise<[int, GoError | undefined]> {
     return Promise.resolve(this.#source.Read(destination));
   }
 }

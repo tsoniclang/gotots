@@ -161,11 +161,16 @@ func encodeWaveThreeProgram(
 }
 
 type waveThreeArtifacts struct {
-	paths        []string
-	sourceModule string
-	source       string
-	bytes        int
-	largest      int
+	paths                      []string
+	sourceModule               string
+	source                     string
+	bytes                      int
+	nodes                      int
+	largest                    int
+	genericConcretizations     int
+	genericConcretizationBytes int
+	genericCapabilities        int
+	genericCapabilityBytes     int
 }
 
 func materializeWaveThreeExpressions(
@@ -193,9 +198,11 @@ func materializeWaveThreeExpressions(
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := tsgo.EncodeSourceFile(file.SourceFile()); err != nil {
+		encoded, err := tsgo.EncodeSourceFile(file.SourceFile())
+		if err != nil {
 			t.Fatal(err)
 		}
+		result.nodes += waveFourEncodedNodes(t, encoded)
 		for _, forbidden := range []string{
 			": any",
 			": unknown",
@@ -222,6 +229,20 @@ func materializeWaveThreeExpressions(
 		writeProgramFile(t, targetPath, printed)
 		result.paths = append(result.paths, targetPath)
 		result.bytes += len(printed)
+		switch {
+		case strings.HasPrefix(
+			file.OutputPath(),
+			"support/generics/concretizations/",
+		):
+			result.genericConcretizations++
+			result.genericConcretizationBytes += len(printed)
+		case strings.HasPrefix(
+			file.OutputPath(),
+			"support/generics/capabilities/",
+		):
+			result.genericCapabilities++
+			result.genericCapabilityBytes += len(printed)
+		}
 		largest = append(largest, len(printed))
 		if file.Kind() == emit.TargetFileSource {
 			if result.sourceModule != "" {
@@ -238,10 +259,35 @@ func materializeWaveThreeExpressions(
 	}
 	sort.Sort(sort.Reverse(sort.IntSlice(largest)))
 	result.largest = largest[0]
-	if result.bytes > 55_000 || result.largest > 22_000 {
+	t.Logf(
+		"Wave 3 artifacts: files=%d bytes=%d nodes=%d largest=%d concretizations=%d/%d capabilities=%d/%d",
+		len(result.paths),
+		result.bytes,
+		result.nodes,
+		result.largest,
+		result.genericConcretizations,
+		result.genericConcretizationBytes,
+		result.genericCapabilities,
+		result.genericCapabilityBytes,
+	)
+	if result.genericConcretizations != 1 ||
+		result.genericConcretizationBytes > 850 ||
+		result.genericCapabilities != 1 ||
+		result.genericCapabilityBytes > 200 {
 		t.Fatalf(
-			"Wave 3 artifact bounds exceeded: total=%d largest=%d",
+			"Wave 3 generic artifact bounds exceeded: concretizations=%d/%d capabilities=%d/%d",
+			result.genericConcretizations,
+			result.genericConcretizationBytes,
+			result.genericCapabilities,
+			result.genericCapabilityBytes,
+		)
+	}
+	if result.bytes > 55_000 || result.nodes > 11_250 ||
+		result.largest > 22_200 {
+		t.Fatalf(
+			"Wave 3 artifact bounds exceeded: total=%d nodes=%d largest=%d",
 			result.bytes,
+			result.nodes,
 			result.largest,
 		)
 	}

@@ -4,11 +4,8 @@ import (
 	"go/ast"
 	"go/types"
 
-	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
-	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
-	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
@@ -106,6 +103,7 @@ func emitMethod(
 			method,
 			selection,
 			signature,
+			discarded,
 			detached,
 		)
 	}
@@ -339,91 +337,6 @@ func emitConcretizedConstraintMethod(
 		return target, err
 	}
 	return invocation.FromProviderResults(context, children, target)
-}
-
-func emitInterfaceMethod(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.CallExpr,
-	selector *ast.SelectorExpr,
-	method *types.Func,
-	selection *types.Selection,
-	signature *types.Signature,
-	detached bool,
-) (api.ExpressionEmission, error) {
-	providerInterface, providerOwned, err :=
-		context.Names().ProviderInterface(selection.Recv())
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	nativeProvider := providerOwned && providerInterface.Mode() ==
-		gostdlib.ProviderInterfaceModeSealedNative
-	receiver, err := children.Expression(
-		context.
-			WithRole(api.RoleReceiverValue).
-			WithExpectedType(selection.Recv()),
-		selector.X,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	arguments, argumentBefore, argumentRequests, err := emitArguments(
-		context,
-		children,
-		source,
-		signature,
-		true,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	target, err := interfaceoperation.Apply(
-		context,
-		children,
-		selector.X,
-		selection.Recv(),
-		receiver,
-		method,
-		arguments,
-		argumentBefore,
-		argumentRequests,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if nativeProvider {
-		contract, contractErr := environmentcontract.Describe(method.Origin())
-		if contractErr != nil {
-			return api.ExpressionEmission{}, contractErr
-		}
-		certificate, found := providerInterface.Method(contract.Identity())
-		member, memberErr := context.Names().InterfaceMethodName(method)
-		if memberErr != nil {
-			return api.ExpressionEmission{}, memberErr
-		}
-		if !found ||
-			certificate.Kind() != gostdlib.ProviderInterfaceMethodCallable ||
-			certificate.Member() != member ||
-			certificate.Effect() != gostdlib.EffectSynchronous {
-			return api.ExpressionEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "sealed provider interface method certificate is invalid",
-			}
-		}
-		return target, nil
-	}
-	callableReference, err :=
-		context.Names().InterfaceMethodCallable(method)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return cooperativecall.InterfaceMethodCall(
-		context,
-		source,
-		callableReference,
-		target,
-		detached,
-	)
 }
 
 func emitConstraintMethod(

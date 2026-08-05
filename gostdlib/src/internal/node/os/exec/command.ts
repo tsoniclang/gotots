@@ -2,7 +2,8 @@ import { spawnSync } from "node:child_process";
 import type { SpawnSyncOptionsWithBufferEncoding } from "node:child_process";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, gostring, uint8 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, gostring, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import { hostInteger, integerFromHost } from "../../../host-integer.js";
 import {
   state as ioState,
 } from "../../../../io.js";
@@ -82,7 +83,9 @@ export function commandOutput(
   }
   const arguments_ = sliceValues(receiver.Args).slice(1);
   const result = spawnSync(receiver.Path, arguments_, options);
-  receiver.Process = result.pid === undefined ? undefined : new Process(result.pid);
+  receiver.Process = result.pid === undefined
+    ? undefined
+    : new Process(integerFromHost(result.pid));
   receiver.ProcessState = new ProcessState();
 
   const stderr = receiver.Stderr ?? new CaptureWriter();
@@ -141,7 +144,7 @@ function spawnOptions(command: CommandValue): SpawnSyncOptionsWithBufferEncoding
       "pipe",
     ];
     for (const file of sliceValues(command.ExtraFiles)) {
-      stdio.push(file === undefined ? "ignore" : File.Fd(file));
+      stdio.push(file === undefined ? "ignore" : hostInteger(File.Fd(file)));
     }
     options.stdio = stdio;
   }
@@ -174,16 +177,16 @@ function validateAttributes(
     || attributes.Setctty
     || attributes.Noctty
     || attributes.Foreground
-    || attributes.Pgid !== 0
-    || attributes.Pdeathsig.value !== 0
-    || attributes.Cloneflags !== 0
-    || attributes.Unshareflags !== 0
+    || attributes.Pgid !== 0n
+    || attributes.Pdeathsig.value !== 0n
+    || attributes.Cloneflags !== 0n
+    || attributes.Unshareflags !== 0n
     || !attributes.UidMappings.isNil()
     || !attributes.GidMappings.isNil()
     || attributes.GidMappingsEnableSetgroups
     || !attributes.AmbientCaps.isNil()
     || attributes.UseCgroupFD
-    || attributes.CgroupFD !== 0
+    || attributes.CgroupFD !== 0n
     || attributes.PidFD !== undefined
     || (
       attributes.Credential !== undefined
@@ -204,9 +207,9 @@ class CaptureWriter extends ProviderInterfaceValue implements Writer {
     super(captureWriterType);
   }
 
-  Write(buffer: RuntimeSlice<uint8>): [number, GoError | undefined] {
+  Write(buffer: RuntimeSlice<uint8>): [bigint, GoError | undefined] {
     this.#content.push(...sliceValues(buffer));
-    return [buffer.length, undefined];
+    return [integerFromHost(buffer.length), undefined];
   }
 
   Bytes(): RuntimeSlice<uint8> {
@@ -235,7 +238,8 @@ function readStandardInput(
   let emptyReads = 0;
   while (true) {
     const buffer = RuntimeSlice.make<uint8>(32 * 1024, null, 0);
-    const [count, error] = reader.Read(buffer);
+    const [goCount, error] = reader.Read(buffer);
+    const count = hostInteger(goCount);
     for (let index = 0; index < count; index += 1) {
       chunks.push(buffer.get(index));
     }

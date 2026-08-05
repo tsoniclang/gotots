@@ -29,7 +29,7 @@ func TestUnnamedArrayKeyOperationsInlineStaticTypedSemantics(t *testing.T) {
 		{
 			name:       "bigint",
 			integer:    api.IntegerRepresentationBigInt,
-			hashMember: "GoMapHash.bigint(",
+			hashMember: "GoMapHash.number(",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -387,6 +387,21 @@ func (aggregateNames) ProviderInterfaceBridge(
 	return api.NameReference{}, false, nil
 }
 
+func (aggregateNames) ProviderProfileInterfaceBridge(
+	types.Type,
+	[]gostdlib.ProviderCallableProfileInterface,
+) (api.ProviderProfileBridgeReference, bool, error) {
+	return api.ProviderProfileBridgeReference{}, false, nil
+}
+
+func (aggregateNames) ProviderInterfaceCapability(
+	types.Type,
+	types.Type,
+	string,
+) (api.ProviderInterfaceCapabilityReference, bool, error) {
+	return api.ProviderInterfaceCapabilityReference{}, false, nil
+}
+
 func (aggregateNames) ProviderCallableProfile(
 	*types.Func,
 	string,
@@ -454,6 +469,16 @@ func (aggregateNames) Primitive(
 	return api.NewNameReference(name)
 }
 
+func (aggregateNames) ProviderPrimitive(
+	alias api.PrimitiveAlias,
+) (api.NameReference, error) {
+	name, err := api.PrimitiveAliasName(alias)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return api.NewNameReference(name)
+}
+
 func (aggregateNames) Runtime(
 	symbol api.RuntimeSymbol,
 	_ api.ImportPhase,
@@ -463,6 +488,13 @@ func (aggregateNames) Runtime(
 		return api.NameReference{}, err
 	}
 	return api.NewNameReference(contract.ExportedName())
+}
+
+func (aggregateNames) ExternalProviderFunction(
+	string,
+	string,
+) (api.NameReference, error) {
+	panic("unused")
 }
 
 func (n *aggregateNames) Temporary(kind api.TemporaryKind) (string, error) {

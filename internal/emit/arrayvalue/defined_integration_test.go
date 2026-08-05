@@ -16,7 +16,6 @@ func TestDefinedArrayZeroCopyConversionIndexAndAddressMatchGo(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
-		suffix  string
 	}{
 		{name: "number", options: emit.DefaultOptions()},
 		{
@@ -25,7 +24,6 @@ func TestDefinedArrayZeroCopyConversionIndexAndAddressMatchGo(t *testing.T) {
 				IntegerRepresentation: emit.IntegerRepresentationBigInt,
 				EvaluationOrder:       emit.EvaluationOrderPreserveGo,
 			},
-			suffix: "n",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -45,7 +43,7 @@ func TestDefinedArrayZeroCopyConversionIndexAndAddressMatchGo(t *testing.T) {
 				}
 			}
 			runner := filepath.Join(workingDirectory, "runner.ts")
-			writeFile(t, runner, definedArrayRunner(target, testCase.suffix))
+			writeFile(t, runner, definedArrayRunner(target))
 			writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 			target.paths = append(target.paths, runner)
 			if err := compileTypeScript(t, workingDirectory, target.paths); err != nil {
@@ -175,7 +173,6 @@ func compileDefinedArrayFixture(
 
 func definedArrayRunner(
 	target materializedProgram,
-	suffix string,
 ) string {
 	return `import "` + target.programInit + `";
 import * as values from "` + target.sourceModule + `";
@@ -183,7 +180,7 @@ import * as values from "` + target.sourceModule + `";
 const element = values.ElementFromInt;
 const show = (value: values.Pair) =>
     values.PairValues(value).map(item => String(values.IntFromElement(item))).join(" ");
-const pair = values.NewPair(element(3` + suffix + `), element(4` + suffix + `));
+const pair = values.NewPair(element(3), element(4));
 console.log(show(pair));
 console.log(show(values.ZeroPair()));
 const [original, copied] = values.CopyPair(pair);

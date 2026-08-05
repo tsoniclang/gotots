@@ -92,6 +92,18 @@ func buildProviderCallableProfile(
 			"target type-parameter count does not match canonical type arguments",
 		)
 	}
+	canonicalValueOffset := signature.Params().Len()
+	if seed.Receiver {
+		canonicalValueOffset++
+	}
+	if err := validateCanonicalProfileValueParameters(
+		project,
+		profileTarget,
+		canonicalValueOffset,
+		seed.CanonicalValues,
+	); err != nil {
+		return providerCallableProfileBuild{}, err
+	}
 	owner, err := singleImplementationOwner(
 		seed.Export,
 		profileTarget.ImplementationOwners(),
@@ -123,7 +135,7 @@ func buildProviderCallableProfile(
 		0,
 		len(seed.Interfaces)+len(seed.Protocols),
 	)
-	guardInterfaces := slices.Clone(seed.GuardInterfaces)
+	var guardInterfaces []string
 	appendInterface := func(
 		identity string,
 		export string,
@@ -253,10 +265,22 @@ func buildProviderCallableProfile(
 	if seed.Receiver {
 		baseParameters++
 	}
+	if err := verifyProviderCapabilityViews(
+		project,
+		profileTarget,
+		baseParameters,
+		seed.CapabilityViews,
+		interfaces,
+		targets,
+		source,
+	); err != nil {
+		return providerCallableProfileBuild{}, err
+	}
 	if err := verifyProviderSupportParameters(
 		project,
 		profileTarget,
 		baseParameters,
+		len(seed.CapabilityViews),
 		len(guardInterfaces),
 		len(seed.ContractInterfaces),
 		len(seed.FromProviderInterfaces),
@@ -286,6 +310,7 @@ func buildProviderCallableProfile(
 			CanonicalResults:       slices.Clone(seed.CanonicalResults),
 			CanonicalValues:        slices.Clone(seed.CanonicalValues),
 			CanonicalTypeArguments: slices.Clone(seed.CanonicalTypeArguments),
+			CapabilityViews:        slices.Clone(seed.CapabilityViews),
 			GuardInterfaces:        guardInterfaces,
 			ContractInterfaces:     slices.Clone(seed.ContractInterfaces),
 			FromProviderInterfaces: slices.Clone(seed.FromProviderInterfaces),
@@ -463,10 +488,11 @@ func buildProtocolProviderInterface(
 
 func validateCanonicalProfileValues(
 	source goSurface,
-	identities []string,
+	values []gostdlib.ProviderCallableProfileCanonicalValueDocument,
 	profileIdentity string,
 ) error {
-	for _, identity := range identities {
+	for _, value := range values {
+		identity := value.SourceIdentity
 		evidence, ok := source.objects[identity]
 		if !ok {
 			return certifyError(
@@ -482,6 +508,36 @@ func validateCanonicalProfileValues(
 				"build provider callable profile",
 				profileIdentity,
 				"canonical value is not a package variable: "+identity,
+			)
+		}
+	}
+	return nil
+}
+
+func validateCanonicalProfileValueParameters(
+	project *tsgo.ProjectInspection,
+	target tsgo.ProjectExport,
+	offset int,
+	values []gostdlib.ProviderCallableProfileCanonicalValueDocument,
+) error {
+	parameters, err := project.CallableParameterNames(target)
+	if err != nil {
+		return err
+	}
+	for index, value := range values {
+		targetIndex := offset + index
+		if targetIndex >= len(parameters) {
+			return certifyError(
+				"build provider callable profile",
+				target.Name(),
+				"canonical value target parameter is outside the callable signature",
+			)
+		}
+		if parameters[targetIndex] != value.TargetParameter {
+			return certifyError(
+				"build provider callable profile",
+				target.Name(),
+				"canonical value target parameter does not match the certified slot",
 			)
 		}
 	}
@@ -531,26 +587,4 @@ func buildProfileProviderInterface(
 		)
 	}
 	return providerInterface, nil
-}
-
-func validateProfileRootBounds(
-	indexes []int,
-	values *types.Tuple,
-	name string,
-	sourceIdentity string,
-) error {
-	length := 0
-	if values != nil {
-		length = values.Len()
-	}
-	for _, index := range indexes {
-		if index < 0 || index >= length {
-			return certifyError(
-				"build provider callable profile",
-				sourceIdentity,
-				name+" root is outside the source callable signature",
-			)
-		}
-	}
-	return nil
 }

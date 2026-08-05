@@ -1,5 +1,9 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool, int64 } from "@gotots/gostdlib/internal/scalars.js";
+import {
+  hostInteger,
+  integerFromHost,
+} from "../../host-integer.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import { Seq } from "../iter/sequence.js";
@@ -62,7 +66,7 @@ export async function AppendSeq<S, E, EStorage>(
   for (let index = 0; index < values.length; index += 1) {
     storeElement(
       result,
-      index,
+      integerFromHost(index),
       fromStorage(values.get(index)),
       copyElement,
       toStorage,
@@ -71,7 +75,7 @@ export async function AppendSeq<S, E, EStorage>(
   for (const [index, value] of appended.entries()) {
     storeElement(
       result,
-      values.length + index,
+      integerFromHost(values.length + index),
       value,
       copyElement,
       toStorage,
@@ -106,7 +110,7 @@ export async function Sorted<E, EStorage>(
   const result = await Collect(copyElement, toStorage, sequence);
   const values = logicalValues(result, copyElement, fromStorage);
   values.sort(
-    (left, right): number => orderedCompare(less, equal, left, right),
+    (left, right): number => hostInteger(orderedCompare(less, equal, left, right)),
   );
   return RuntimeSlice.literal(
     values.map((value): EStorage => toStorage(copyElement(value))),
@@ -143,7 +147,7 @@ export function Values<S, E, EStorage>(
     }
     for (let index = 0; index < values.length; index += 1) {
       if (!await yieldValue(
-        readElement(values, index, copyElement, fromStorage),
+        readElement(values, integerFromHost(index), copyElement, fromStorage),
       )) {
         return;
       }
@@ -158,7 +162,12 @@ function logicalValues<E, EStorage>(
 ): E[] {
   const values: E[] = [];
   for (let index = 0; index < source.length; index += 1) {
-    values.push(readElement(source, index, copyElement, fromStorage));
+    values.push(readElement(
+      source,
+      integerFromHost(index),
+      copyElement,
+      fromStorage,
+    ));
   }
   return values;
 }

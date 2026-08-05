@@ -1,7 +1,9 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+
+import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 import { state as ioState } from "../../../io.js";
 
@@ -22,12 +24,12 @@ export class Buffer {
   static Read(
     receiver: Buffer | undefined,
     target: RuntimeSlice<uint8>,
-  ): [int64, GoError | undefined] {
+  ): [int, GoError | undefined] {
     const buffer = requireBuffer(receiver);
     if (buffer.#offset >= buffer.#source.length) {
       buffer.#source = buffer.#source.slice(0, 0, null);
       buffer.#offset = 0;
-      return target.length === 0 ? [0, undefined] : [0, ioState.EOF];
+      return target.length === 0 ? [0n, undefined] : [0n, ioState.EOF];
     }
 
     const unread = buffer.#source.slice(
@@ -37,12 +39,12 @@ export class Buffer {
     );
     const count = RuntimeSlice.copy(target, unread);
     buffer.#offset += count;
-    return [count, undefined];
+    return [integerFromHost(count), undefined];
   }
 
-  static Available(receiver: Buffer | undefined): int64 {
+  static Available(receiver: Buffer | undefined): int {
     const buffer = requireBuffer(receiver);
-    return buffer.#source.capacity - buffer.#source.length;
+    return integerFromHost(buffer.#source.capacity - buffer.#source.length);
   }
 
   static AvailableBuffer(receiver: Buffer | undefined): RuntimeSlice<uint8> {
@@ -50,16 +52,17 @@ export class Buffer {
     return buffer.#source.slice(buffer.#source.length, buffer.#source.length, null);
   }
 
-  static Grow(receiver: Buffer | undefined, count: int64): void {
+  static Grow(receiver: Buffer | undefined, count: int): void {
     const buffer = requireBuffer(receiver);
-    if (!Number.isSafeInteger(count) || count < 0) {
+    if (count < 0n) {
       GoPanic.raiseRuntime("bytes.Buffer.Grow: negative count");
     }
+    const hostCount = hostInteger(count);
     const unread = buffer.#source.length - buffer.#offset;
-    if (buffer.#source.capacity - buffer.#source.length >= count) {
+    if (buffer.#source.capacity - buffer.#source.length >= hostCount) {
       return;
     }
-    const target = RuntimeSlice.make<uint8>(unread, unread + count, 0);
+    const target = RuntimeSlice.make<uint8>(unread, unread + hostCount, 0);
     RuntimeSlice.copy(
       target,
       buffer.#source.slice(buffer.#offset, buffer.#source.length, null),
@@ -68,14 +71,17 @@ export class Buffer {
     buffer.#offset = 0;
   }
 
-  static Len(receiver: Buffer | undefined): int64 {
+  static Len(receiver: Buffer | undefined): int {
     const buffer = requireBuffer(receiver);
-    return buffer.#source.length - buffer.#offset;
+    return integerFromHost(buffer.#source.length - buffer.#offset);
   }
 
-  static Next(receiver: Buffer | undefined, count: int64): RuntimeSlice<uint8> {
+  static Next(receiver: Buffer | undefined, count: int): RuntimeSlice<uint8> {
     const buffer = requireBuffer(receiver);
-    const selected = Math.max(0, Math.min(Math.trunc(count), Buffer.Len(buffer)));
+    const selected = Math.max(
+      0,
+      Math.min(hostInteger(count), hostInteger(Buffer.Len(buffer))),
+    );
     const result = buffer.#source.slice(
       buffer.#offset,
       buffer.#offset + selected,
@@ -88,18 +94,18 @@ export class Buffer {
   static Write(
     receiver: Buffer | undefined,
     source: RuntimeSlice<uint8>,
-  ): [int64, GoError | undefined] {
+  ): [int, GoError | undefined] {
     const buffer = requireBuffer(receiver);
     if (source.length === 0) {
-      return [0, undefined];
+      return [0n, undefined];
     }
-    Buffer.Grow(buffer, source.length);
+    Buffer.Grow(buffer, integerFromHost(source.length));
     const values: uint8[] = [];
     for (let index = 0; index < source.length; index += 1) {
       values.push(source.get(index));
     }
     buffer.#source = buffer.#source.append(0, values);
-    return [source.length, undefined];
+    return [integerFromHost(source.length), undefined];
   }
 }
 

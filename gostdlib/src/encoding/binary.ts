@@ -9,7 +9,7 @@ import type {
   uint32,
   uint64,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
 
 import { nativeEndian } from "../internal/node/encoding/binary/native.js";
 import {

@@ -85,13 +85,14 @@ func (k EffectKind) MaySuspend() bool {
 }
 
 type FacetModuleDocument struct {
-	Specifier          string                             `json:"specifier"`
-	SourcePath         string                             `json:"sourcePath"`
-	Representations    []ProviderRepresentationDocument   `json:"representations,omitempty"`
-	ProviderInterfaces []ProviderInterfaceBindingDocument `json:"providerInterfaces,omitempty"`
-	CallableProfiles   []ProviderCallableProfileDocument  `json:"callableProfiles,omitempty"`
-	StatefulProfiles   []ProviderStatefulProfileDocument  `json:"statefulProfiles,omitempty"`
-	Facets             []FacetDocument                    `json:"facets"`
+	Specifier                     string                                `json:"specifier"`
+	SourcePath                    string                                `json:"sourcePath"`
+	Representations               []ProviderRepresentationDocument      `json:"representations,omitempty"`
+	ProviderInterfaces            []ProviderInterfaceBindingDocument    `json:"providerInterfaces,omitempty"`
+	ProviderInterfaceCapabilities []ProviderInterfaceCapabilityDocument `json:"providerInterfaceCapabilities,omitempty"`
+	CallableProfiles              []ProviderCallableProfileDocument     `json:"callableProfiles,omitempty"`
+	StatefulProfiles              []ProviderStatefulProfileDocument     `json:"statefulProfiles,omitempty"`
+	Facets                        []FacetDocument                       `json:"facets"`
 }
 
 type ProviderRepresentationDocument struct {
@@ -179,6 +180,17 @@ func (m FacetModule) ProviderInterfaces() []ProviderInterfaceBinding {
 	result := make([]ProviderInterfaceBinding, len(m.document.ProviderInterfaces))
 	for index, selected := range m.document.ProviderInterfaces {
 		result[index] = newProviderInterfaceBinding(m.document, selected)
+	}
+	return result
+}
+
+func (m FacetModule) ProviderInterfaceCapabilities() []ProviderInterfaceCapability {
+	result := make(
+		[]ProviderInterfaceCapability,
+		len(m.document.ProviderInterfaceCapabilities),
+	)
+	for index, selected := range m.document.ProviderInterfaceCapabilities {
+		result[index] = resolveProviderInterfaceCapability(m.document, selected)
 	}
 	return result
 }
@@ -298,6 +310,9 @@ func cloneFacetModule(source FacetModuleDocument) FacetModuleDocument {
 		result.ProviderInterfaces[index] =
 			cloneProviderInterfaceBinding(selected)
 	}
+	result.ProviderInterfaceCapabilities = slices.Clone(
+		source.ProviderInterfaceCapabilities,
+	)
 	result.CallableProfiles = make(
 		[]ProviderCallableProfileDocument,
 		len(source.CallableProfiles),

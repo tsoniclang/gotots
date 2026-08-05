@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -82,11 +83,10 @@ func Build(
 	}
 	sourceArguments := targetSignature.ParameterReferences(context.Factory())
 	var (
-		call             tsgo.CallExpression
-		deferredCall     tsgo.CallExpression
-		callRequests     []api.RootRequest
-		deferredRequests []api.RootRequest
-		typeRequests     []api.RootRequest
+		call                   api.ExpressionEmission
+		deferredCall           api.ExpressionEmission
+		typeRequests           []api.RootRequest
+		providerKernelBoundary bool
 	)
 	if declaration.Recv() == nil {
 		kernelNames, ok := context.Names().(api.GenericKernelNames)
@@ -99,6 +99,7 @@ func Build(
 		if nameErr != nil {
 			return nil, nil, nameErr
 		}
+		providerKernelBoundary = kernel.ProviderBoundary()
 		typeArguments, requests, typeErr :=
 			genericinstance.EmitFunctionTypeArguments(
 				context,
@@ -119,15 +120,37 @@ func Build(
 		if joinErr != nil {
 			return nil, nil, joinErr
 		}
-		callArguments := append(mechanics, sourceArguments...)
-		call = context.Factory().CallExpression(
-			kernel.Expression(context.Factory()),
-			nil,
-			typeArguments,
-			callArguments,
-			tsgo.NodeFlagsNone,
+		kernelArguments := sourceArguments
+		var kernelBefore []tsgo.Statement
+		var kernelRequests []api.RootRequest
+		if providerKernelBoundary {
+			kernelArguments, kernelBefore, kernelRequests, err =
+				providerboundary.ToProviderGenericArguments(
+					context,
+					children,
+					declaration.Params(),
+					wrapperSignature.Params(),
+					sourceArguments,
+				)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+		callArguments := append(mechanics, kernelArguments...)
+		call, err = api.NewExpressionEmission(
+			kernelBefore,
+			context.Factory().CallExpression(
+				kernel.Expression(context.Factory()),
+				nil,
+				typeArguments,
+				callArguments,
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(kernel.Requests(), kernelRequests),
 		)
-		callRequests = kernel.Requests()
+		if err != nil {
+			return nil, nil, err
+		}
 		if deferred {
 			deferredKernel, deferredErr :=
 				kernelNames.DeferredGenericKernel(owner)
@@ -145,14 +168,29 @@ func Build(
 				return nil, nil, deferredErr
 			}
 			deferredReference := deferredKernel.Reference()
-			deferredCall = context.Factory().CallExpression(
-				deferredReference.Expression(context.Factory()),
-				nil,
-				typeArguments,
-				deferredArguments,
-				tsgo.NodeFlagsNone,
+			if deferredReference.ProviderBoundary() != providerKernelBoundary {
+				return nil, nil, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "generic kernel variants disagree on provider ownership",
+				}
+			}
+			deferredCall, err = api.NewExpressionEmission(
+				kernelBefore,
+				context.Factory().CallExpression(
+					deferredReference.Expression(context.Factory()),
+					nil,
+					typeArguments,
+					deferredArguments,
+					tsgo.NodeFlagsNone,
+				),
+				api.CombineRequests(
+					deferredReference.Requests(),
+					kernelRequests,
+				),
 			)
-			deferredRequests = deferredReference.Requests()
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	} else {
 		if len(sourceArguments) == 0 {
@@ -191,7 +229,7 @@ func Build(
 		if joinErr != nil {
 			return nil, nil, joinErr
 		}
-		call, callRequests, err = callable.SelectedMethodCall(
+		selectedCall, callRequests, callErr := callable.SelectedMethodCall(
 			context,
 			owner,
 			api.GenericKernelSuffix,
@@ -199,11 +237,12 @@ func Build(
 			typeArguments,
 			mechanics,
 		)
-		if err != nil {
-			return nil, nil, err
+		if callErr != nil {
+			return nil, nil, callErr
 		}
+		call = api.DirectExpression(selectedCall, callRequests...)
 		if deferred {
-			deferredCall, deferredRequests, err =
+			selectedDeferred, deferredRequests, deferredErr :=
 				callable.SelectedDeferredMethodCall(
 					context,
 					owner,
@@ -215,6 +254,46 @@ func Build(
 					),
 					mechanics,
 				)
+			if deferredErr != nil {
+				return nil, nil, deferredErr
+			}
+			deferredCall = api.DirectExpression(
+				selectedDeferred,
+				deferredRequests...,
+			)
+		}
+	}
+	if providerKernelBoundary {
+		if observation.Cooperative() {
+			call, err = awaitEmission(context, call)
+			if err != nil {
+				return nil, nil, err
+			}
+			if deferred {
+				deferredCall, err = awaitEmission(context, deferredCall)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+		}
+		call, err = providerboundary.FromProviderGenericResults(
+			context,
+			children,
+			declaration.Results(),
+			wrapperSignature.Results(),
+			call,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		if deferred {
+			deferredCall, err = providerboundary.FromProviderGenericResults(
+				context,
+				children,
+				declaration.Results(),
+				wrapperSignature.Results(),
+				deferredCall,
+			)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -233,9 +312,7 @@ func Build(
 		targetSignature.Parameters(),
 		resultType,
 		context.Factory().Block(
-			[]tsgo.Statement{
-				context.Factory().ReturnStatement(call),
-			},
+			returnStatements(context.Factory(), call),
 			true,
 		),
 	)
@@ -263,9 +340,7 @@ func Build(
 				),
 				resultType,
 				context.Factory().Block(
-					[]tsgo.Statement{
-						context.Factory().ReturnStatement(deferredCall),
-					},
+					returnStatements(context.Factory(), deferredCall),
 					true,
 				),
 			),
@@ -275,11 +350,29 @@ func Build(
 		targetSignature.Requests(),
 		capabilityRequests,
 		typeRequests,
-		callRequests,
-		deferredRequests,
+		call.Requests(),
+		deferredCall.Requests(),
 		recoveryRequests,
 		observation.Requests(),
 	), nil
+}
+
+func awaitEmission(
+	context api.Context,
+	emission api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	return api.NewExpressionEmission(
+		emission.Before(),
+		context.Factory().AwaitExpression(emission.Value()),
+		emission.Requests(),
+	)
+}
+
+func returnStatements(
+	factory tsgo.Factory,
+	emission api.ExpressionEmission,
+) []tsgo.Statement {
+	return append(emission.Before(), factory.ReturnStatement(emission.Value()))
 }
 
 func receiverFreeSignature(

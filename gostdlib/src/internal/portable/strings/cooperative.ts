@@ -1,5 +1,7 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool, gostring, int32, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool, gostring, int, int32 } from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 import { decodeRuneAt, encodeRune } from "../utf8/codec.js";
 
@@ -9,20 +11,20 @@ export async function ContainsFunc(
   text: gostring,
   predicate: Predicate,
 ): Promise<bool> {
-  return await IndexFunc(text, predicate) >= 0;
+  return await IndexFunc(text, predicate) >= 0n;
 }
 
 export async function IndexFunc(
   text: gostring,
   predicate: Predicate,
-): Promise<int64> {
+): Promise<int> {
   return findByPredicate(text, predicate, true, false);
 }
 
 export async function LastIndexFunc(
   text: gostring,
   predicate: Predicate,
-): Promise<int64> {
+): Promise<int> {
   return findByPredicate(text, predicate, true, true);
 }
 
@@ -40,7 +42,7 @@ export async function Map(
     if (mapped >= 0) {
       result += encodeRune(mapped);
     }
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
   }
   return result;
 }
@@ -57,7 +59,7 @@ export async function TrimLeftFunc(
   predicate: Predicate,
 ): Promise<gostring> {
   const index = await findByPredicate(text, predicate, false, false);
-  return index < 0 ? "" : text.slice(index);
+  return index < 0n ? "" : text.slice(hostInteger(index));
 }
 
 export async function TrimRightFunc(
@@ -65,11 +67,12 @@ export async function TrimRightFunc(
   predicate: Predicate,
 ): Promise<gostring> {
   const index = await findByPredicate(text, predicate, false, true);
-  if (index < 0) {
+  if (index < 0n) {
     return "";
   }
-  const [, width] = decodeRuneAt(text, index);
-  return text.slice(0, index + Math.max(1, width));
+  const hostIndex = hostInteger(index);
+  const [, width] = decodeRuneAt(text, hostIndex);
+  return text.slice(0, hostIndex + Math.max(1, hostInteger(width)));
 }
 
 async function findByPredicate(
@@ -77,7 +80,7 @@ async function findByPredicate(
   predicate: Predicate,
   expected: boolean,
   last: boolean,
-): Promise<int64> {
+): Promise<int> {
   if (predicate === undefined && text.length > 0) {
     GoPanic.raiseRuntime("call of nil predicate function");
   }
@@ -87,10 +90,10 @@ async function findByPredicate(
     if (predicate !== undefined && await predicate(rune) === expected) {
       found = index;
       if (!last) {
-        return found;
+        return integerFromHost(found);
       }
     }
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
   }
-  return found;
+  return integerFromHost(found);
 }

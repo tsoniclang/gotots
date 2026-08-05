@@ -7,7 +7,7 @@ import type {
   bool,
   gostring,
   int64,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
 import { ProviderError } from "../../runtime/error.js";
 import { sliceValues } from "../../runtime/slice.js";
 
@@ -36,7 +36,7 @@ interface FlagSetState {
 }
 
 const states = new WeakMap<FlagSetValue, FlagSetState>();
-const continueOnError: ErrorHandlingValue = Object.freeze({ value: 0 });
+const continueOnError: ErrorHandlingValue = Object.freeze({ value: 0n });
 
 export function initializeFlagSet(
   receiver: FlagSetValue,
@@ -178,10 +178,10 @@ function add(
 }
 
 function failure(state: FlagSetState, message: string): GoError {
-  if (state.errorHandling.value === 2) {
+  if (state.errorHandling.value === 2n) {
     GoPanic.raiseRuntime(message);
   }
-  if (state.errorHandling.value === 1) {
+  if (state.errorHandling.value === 1n) {
     process.exit(2);
   }
   return new ProviderError(

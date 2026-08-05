@@ -1,6 +1,6 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoMapValue } from "@gotots/runtime/map.js";
-import type { Awaitable, bool } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool } from "@gotots/gostdlib/internal/scalars.js";
 
 import { Seq } from "../iter/sequence.js";
 

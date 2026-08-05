@@ -1,4 +1,4 @@
-import type { int64 } from "@gotots/runtime/scalars.js";
+import type { int64 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { ErrorHandling } from "../../flag.js";
 

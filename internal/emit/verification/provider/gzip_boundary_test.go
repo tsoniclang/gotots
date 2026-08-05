@@ -164,9 +164,10 @@ func main() {
 	}
 	if targetOutput != string(sourceOutput) {
 		t.Fatalf(
-			"gzip differential:\nGo:\n%s\nTypeScript:\n%s",
+			"gzip differential:\nGo:\n%s\nTypeScript:\n%s\nArtifacts:\n%s",
 			sourceOutput,
 			targetOutput,
+			artifacts.printed,
 		)
 	}
 	for _, required := range []string{

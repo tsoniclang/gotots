@@ -68,9 +68,9 @@ test("strings operate on Go UTF-8 bytes rather than JavaScript UTF-16 indexes", 
   assert.equal(text.length, 5);
   assert.equal(ContainsRune(text, 0x03a3), true);
   assert.equal(ContainsAny(text, goText("λΣ")), true);
-  assert.equal(IndexAny(text, goText("Σ")), 3);
-  assert.equal(IndexRune(text, 0x03a3), 3);
-  assert.equal(Count(text, ""), 4);
+  assert.equal(IndexAny(text, goText("Σ")), 3n);
+  assert.equal(IndexRune(text, 0x03a3), 3n);
+  assert.equal(Count(text, ""), 4n);
   assert.deepEqual(Cut(text, goText("é")), ["A", goText("Σ"), true]);
   assert.equal(EqualFold(goText("K"), goText("K")), true);
   assert.equal(EqualFold(goText("Σ"), goText("ς")), true);
@@ -112,23 +112,23 @@ test("strings transformations preserve invalid bytes and simple Unicode case", (
 
 test("strings selected search, join, replacement, and trim functions retain boundaries", () => {
   assert.equal(Clone("text"), "text");
-  assert.equal(Compare("a", "b"), -1);
-  assert.equal(Compare("b", "a"), 1);
-  assert.equal(Compare("a", "a"), 0);
+  assert.equal(Compare("a", "b"), -1n);
+  assert.equal(Compare("b", "a"), 1n);
+  assert.equal(Compare("a", "a"), 0n);
   assert.equal(Contains("abc", "bc"), true);
   assert.equal(HasPrefix("abc", "ab"), true);
   assert.equal(HasSuffix("abc", "bc"), true);
-  assert.equal(Index("ababa", "ba"), 1);
-  assert.equal(IndexByte("ab", 0x62), 1);
-  assert.equal(IndexFunc("abc", (rune) => rune === 0x62), 1);
-  assert.equal(IndexFunc("", undefined), -1);
+  assert.equal(Index("ababa", "ba"), 1n);
+  assert.equal(IndexByte("ab", 0x62), 1n);
+  assert.equal(IndexFunc("abc", (rune) => rune === 0x62), 1n);
+  assert.equal(IndexFunc("", undefined), -1n);
   assert.throws(() => IndexFunc("x", undefined));
   assert.equal(ContainsFunc(goText("a世界"), (rune) => rune === 0x4e16), true);
   assert.equal(ContainsFunc("", undefined), false);
   assert.throws(() => ContainsFunc("x", undefined));
-  assert.equal(LastIndex("ababa", "ba"), 3);
-  assert.equal(LastIndexByte("aba", 0x61), 2);
-  assert.equal(LastIndexFunc("abca", (rune) => rune === 0x61), 3);
+  assert.equal(LastIndex("ababa", "ba"), 3n);
+  assert.equal(LastIndexByte("aba", 0x61), 2n);
+  assert.equal(LastIndexFunc("abca", (rune) => rune === 0x61), 3n);
   assert.deepEqual(CutPrefix("prefix-value", "prefix-"), ["value", true]);
   assert.deepEqual(CutSuffix("value.suffix", ".suffix"), ["value", true]);
   assert.equal(Join(RuntimeSlice.literal(["a", "b", "c"]), ":"), "a:b:c");
@@ -148,37 +148,37 @@ test("strings splitting, replacement, and repetition follow Go boundaries", () =
     sliceValues(Split(goText("éΣ"), "")).map(hostText),
     ["é", "Σ"],
   );
-  assert.equal(SplitN("a,b", ",", 0).isNil(), true);
-  assert.deepEqual(sliceValues(SplitN("a,b,c", ",", 2)), ["a", "b,c"]);
-  assert.deepEqual(sliceValues(SplitN("a,b,c", ",", -1)), ["a", "b", "c"]);
+  assert.equal(SplitN("a,b", ",", 0n).isNil(), true);
+  assert.deepEqual(sliceValues(SplitN("a,b,c", ",", 2n)), ["a", "b,c"]);
+  assert.deepEqual(sliceValues(SplitN("a,b,c", ",", -1n)), ["a", "b", "c"]);
   assert.deepEqual(
-    sliceValues(SplitN(goText("éΣx"), "", 2)).map(hostText),
+    sliceValues(SplitN(goText("éΣx"), "", 2n)).map(hostText),
     ["é", "Σx"],
   );
-  assert.equal(Replace(goText("é"), "", ".", -1), `.${goText("é")}.`);
-  assert.equal(Replace("aaaa", "aa", "b", 1), "baa");
-  assert.equal(Repeat("ab", 3), "ababab");
-  assert.throws(() => Repeat("x", -1));
+  assert.equal(Replace(goText("é"), "", ".", -1n), `.${goText("é")}.`);
+  assert.equal(Replace("aaaa", "aa", "b", 1n), "baa");
+  assert.equal(Repeat("ab", 3n), "ababab");
+  assert.throws(() => Repeat("x", -1n));
   const builder = new Builder();
-  assert.throws(() => Builder.Grow(builder, -1));
+  assert.throws(() => Builder.Grow(builder, -1n));
 });
 
 test("strings named types expose clean static receiver operations", () => {
   const builder = new Builder();
-  assert.deepEqual(Builder.WriteString(builder, "go"), [2, undefined]);
-  assert.deepEqual(Builder.WriteRune(builder, 0x00e9), [2, undefined]);
+  assert.deepEqual(Builder.WriteString(builder, "go"), [2n, undefined]);
+  assert.deepEqual(Builder.WriteRune(builder, 0x00e9), [2n, undefined]);
   assert.equal(hostText(Builder.String(builder)), "goé");
-  assert.equal(Builder.Len(builder), 4);
+  assert.equal(Builder.Len(builder), 4n);
   Builder.Reset(builder);
   assert.equal(Builder.String(builder), "");
 
   const reader = NewReader("abc");
   const buffer = RuntimeSlice.make<number>(2, 2, 0);
-  assert.deepEqual(Reader.Read(reader, buffer), [2, undefined]);
+  assert.deepEqual(Reader.Read(reader, buffer), [2n, undefined]);
   assert.deepEqual(sliceValues(buffer), [0x61, 0x62]);
-  assert.deepEqual(Reader.Read(reader, buffer), [1, undefined]);
+  assert.deepEqual(Reader.Read(reader, buffer), [1n, undefined]);
   const [count, end] = Reader.Read(reader, buffer);
-  assert.equal(count, 0);
+  assert.equal(count, 0n);
   assert.equal(end, ioState.EOF);
 
   const replacer = NewReplacer(RuntimeSlice.literal(["", "X", "a", "Y"]));

@@ -4,11 +4,11 @@ import (
 	"go/types"
 	"sort"
 
-	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 )
 
 type profileBoundaryAnalyzer struct {
@@ -316,6 +316,14 @@ func (a *profileBoundaryAnalyzer) ensureInterface(
 		if !ok {
 			return boundaryInvariant(a.context, "provider interface method type is invalid")
 		}
+		scalarMismatch, err := profileScalarABIMismatch(
+			a.context,
+			methodSignature,
+		)
+		if err != nil {
+			return err
+		}
+		node.directMismatch = node.directMismatch || scalarMismatch
 		if err := a.collectSignature(
 			methodSignature,
 			interfaceIdentity,
@@ -328,6 +336,86 @@ func (a *profileBoundaryAnalyzer) ensureInterface(
 		return node.methods[left].identity < node.methods[right].identity
 	})
 	return nil
+}
+
+func profileScalarABIMismatch(
+	context api.Context,
+	source types.Type,
+) (bool, error) {
+	provider, ok := context.ProviderScalarABI()
+	if !ok {
+		return false, boundaryInvariant(context, "provider scalar ABI is absent")
+	}
+	visited := make(map[types.Type]struct{})
+	var inspect func(types.Type) (bool, error)
+	inspect = func(current types.Type) (bool, error) {
+		if current == nil {
+			return false, nil
+		}
+		current = types.Unalias(current)
+		if _, seen := visited[current]; seen {
+			return false, nil
+		}
+		visited[current] = struct{}{}
+		if carrier, integer := integervalue.DescribeUnderlying(
+			context.TypesSizes(),
+			current,
+		); integer {
+			sourceCarrier, err := context.ScalarABI().Carrier(carrier.Alias())
+			if err != nil {
+				return false, err
+			}
+			providerCarrier, err := provider.Carrier(carrier.Alias())
+			if err != nil {
+				return false, err
+			}
+			return sourceCarrier != providerCarrier, nil
+		}
+		switch selected := current.(type) {
+		case *types.Named:
+			if _, interfaceType := selected.Underlying().(*types.Interface); interfaceType {
+				return false, nil
+			}
+			return inspect(selected.Underlying())
+		case *types.Pointer:
+			return inspect(selected.Elem())
+		case *types.Slice:
+			return inspect(selected.Elem())
+		case *types.Array:
+			return inspect(selected.Elem())
+		case *types.Chan:
+			return inspect(selected.Elem())
+		case *types.Map:
+			left, err := inspect(selected.Key())
+			if err != nil || left {
+				return left, err
+			}
+			return inspect(selected.Elem())
+		case *types.Struct:
+			for index := range selected.NumFields() {
+				mismatch, err := inspect(selected.Field(index).Type())
+				if err != nil || mismatch {
+					return mismatch, err
+				}
+			}
+		case *types.Signature:
+			for _, tuple := range []*types.Tuple{selected.Params(), selected.Results()} {
+				mismatch, err := inspect(tuple)
+				if err != nil || mismatch {
+					return mismatch, err
+				}
+			}
+		case *types.Tuple:
+			for index := range selected.Len() {
+				mismatch, err := inspect(selected.At(index).Type())
+				if err != nil || mismatch {
+					return mismatch, err
+				}
+			}
+		}
+		return false, nil
+	}
+	return inspect(source)
 }
 
 func (a *profileBoundaryAnalyzer) affectedInterfaces() map[string]struct{} {
@@ -441,12 +529,5 @@ func sameIdentitySet(left map[string]struct{}, right map[string]struct{}) bool {
 }
 
 func sourceObjectIdentity(object types.Object) (string, error) {
-	if object == types.Universe.Lookup("error") {
-		return gostdlib.LanguageErrorInterfaceIdentity, nil
-	}
-	contract, err := environmentcontract.Describe(object)
-	if err != nil {
-		return "", err
-	}
-	return contract.Identity(), nil
+	return gostdlibsource.ObjectIdentity(object)
 }

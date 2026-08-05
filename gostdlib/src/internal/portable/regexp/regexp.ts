@@ -7,8 +7,10 @@ import type {
   Awaitable,
   bool,
   gostring,
-  int64,
-} from "@gotots/runtime/scalars.js";
+  int,
+} from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 import { ProviderError } from "../../runtime/error.js";
 import {
@@ -75,7 +77,7 @@ export class Regexp {
     text: gostring,
   ): RuntimeSlice<gostring> {
     const regexp = requireRegexp(receiver);
-    const match = regexp.#matches(text, 1)[0];
+    const match = regexp.#matches(text, 1n)[0];
     if (match === undefined) {
       return RuntimeSlice.nil<gostring>();
     }
@@ -85,7 +87,7 @@ export class Regexp {
   }
 
   static MatchString(receiver: Regexp | undefined, text: gostring): bool {
-    return requireRegexp(receiver).#matches(text, 1).length > 0;
+    return requireRegexp(receiver).#matches(text, 1n).length > 0;
   }
 
   static ReplaceAllString(
@@ -117,9 +119,9 @@ export class Regexp {
   static Split(
     receiver: Regexp | undefined,
     source: gostring,
-    count: int64,
+    count: int,
   ): RuntimeSlice<gostring> {
-    if (count === 0) {
+    if (count === 0n) {
       return RuntimeSlice.nil<gostring>();
     }
     const regexp = requireRegexp(receiver);
@@ -131,7 +133,7 @@ export class Regexp {
     let begin = 0;
     let end = 0;
     for (const match of matches) {
-      if (count > 0 && output.length >= count - 1) {
+      if (count > 0n && integerFromHost(output.length) >= count - 1n) {
         break;
       }
       const whole = match.ranges[0];
@@ -150,14 +152,14 @@ export class Regexp {
     return RuntimeSlice.literal(output);
   }
 
-  #matches(source: gostring, limit: int64): MatchRecord[] {
-    if (limit === 0) {
+  #matches(source: gostring, limit: int): MatchRecord[] {
+    if (limit === 0n) {
       return [];
     }
     const decoded = decodeText(source);
     const regexp = new globalThis.RegExp(this.#pattern.source, this.#pattern.flags);
     const matches: MatchRecord[] = [];
-    while (limit < 0 || matches.length < limit) {
+    while (limit < 0n || integerFromHost(matches.length) < limit) {
       const match = regexp.exec(decoded.host);
       if (match === null) {
         break;
@@ -186,7 +188,7 @@ export class Regexp {
   #replace(source: gostring, replacement: (match: MatchRecord) => gostring): gostring {
     let result = "";
     let lastEnd = 0;
-    for (const match of this.#matches(source, -1)) {
+    for (const match of this.#matches(source, -1n)) {
       const whole = match.ranges[0];
       if (whole === undefined) {
         continue;
@@ -203,7 +205,7 @@ export class Regexp {
   #replacementPlan(source: gostring): ReplacementPlan {
     const parts: ReplacementPart[] = [];
     let lastEnd = 0;
-    for (const match of this.#matches(source, -1)) {
+    for (const match of this.#matches(source, -1n)) {
       const whole = match.ranges[0];
       if (whole === undefined) {
         continue;
@@ -299,7 +301,7 @@ function decodeText(source: gostring): DecodedText {
     if (scalar.length === 2) {
       byteAtHost.push(index);
     }
-    index += Math.max(1, width);
+    index += Math.max(1, hostInteger(width));
     byteAtHost.push(index);
   }
   return { host, byteAtHost };

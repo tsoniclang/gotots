@@ -1,6 +1,7 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { int32, int64, uint16, uint32 } from "@gotots/runtime/scalars.js";
+import type { bool, int, int32, uint16, uint32 } from "@gotots/gostdlib/internal/scalars.js";
+import { integerFromHost } from "../../host-integer.js";
 
 export class Range16 {
   constructor(
@@ -22,11 +23,11 @@ export class RangeTable {
   constructor(
     public R16: RuntimeSlice<Range16> = RuntimeSlice.nil<Range16>(),
     public R32: RuntimeSlice<Range32> = RuntimeSlice.nil<Range32>(),
-    public LatinOffset: int64 = 0,
+    public LatinOffset: int = 0n,
   ) {}
 }
 
-export function Is(table: RangeTable | undefined, rune: int32): boolean {
+export function Is(table: RangeTable | undefined, rune: int32): bool {
   if (table === undefined) {
     GoPanic.raiseRuntime("nil *unicode.RangeTable");
   }
@@ -45,7 +46,7 @@ export function Is(table: RangeTable | undefined, rune: int32): boolean {
 export function In(
   rune: int32,
   tables: RuntimeSlice<RangeTable | undefined>,
-): boolean {
+): bool {
   for (let index = 0; index < tables.length; index += 1) {
     if (Is(tables.get(index), rune)) {
       return true;
@@ -62,7 +63,7 @@ export function rangeTable(
   return new RangeTable(
     RuntimeSlice.literal(ranges16.map(([lo, hi, stride]) => new Range16(lo, hi, stride))),
     RuntimeSlice.literal(ranges32.map(([lo, hi, stride]) => new Range32(lo, hi, stride))),
-    latinOffset,
+    integerFromHost(latinOffset),
   );
 }
 

@@ -165,23 +165,23 @@ func runDefinedTypeScript(
 	t *testing.T,
 	workingDirectory string,
 	artifacts printedDefined,
-	suffix string,
+	nativeSuffix string,
 ) string {
 	t.Helper()
 	runner := `import * as values from "` + artifacts.sourceModule + `";
-const count = values.CountFromInt(7` + suffix + `);
+const count = values.CountFromInt(7);
 const other = values.OtherFromCount(count);
 console.log(String(values.IntFromCount(values.CountFromOther(other))));
 console.log(String(values.IntFromCount(values.AliasIdentity(count))));
 console.log(String(values.IntFromCount(values.CountZero())));
-console.log(values.CountArithmetic(count, values.CountFromInt(3` + suffix + `)).map(value => String(values.IntFromCount(value))).join(" "));
-console.log(values.CountBits(count, values.CountFromInt(3` + suffix + `)).map(value => String(values.IntFromCount(value))).join(" "));
+console.log(values.CountArithmetic(count, values.CountFromInt(3)).map(value => String(values.IntFromCount(value))).join(" "));
+console.log(values.CountBits(count, values.CountFromInt(3)).map(value => String(values.IntFromCount(value))).join(" "));
 console.log(values.CountUnary(count).map(value => String(values.IntFromCount(value))).join(" "));
-console.log(values.CountOrder(count, values.CountFromInt(3` + suffix + `)).join(" "));
+console.log(values.CountOrder(count, values.CountFromInt(3)).join(" "));
 const left = values.LabelFromString("a");
 const right = values.LabelFromString("z");
 console.log(values.StringFromLabel(values.LabelJoin(left, right)));
-console.log(String(values.LabelIndex(values.LabelFromString("path"), 2` + suffix + `)));
+console.log(String(values.LabelIndex(values.LabelFromString("path"), 2` + nativeSuffix + `)));
 console.log(values.LabelOrder(left, right).join(" "));
 console.log(String(values.BoolFromSwitch(values.SwitchNot(values.SwitchFromBool(true)))));
 const ratio = values.RatioFromFloat(7.5);
@@ -195,34 +195,34 @@ console.log(String(complex.real), String(complex.imag));
 console.log(String(values.SignalEqual(signal, signal)));
 console.log(String(values.IntFromCount(values.ConstantValue())));
 console.log(String(values.IntFromCount(values.UntypedConstantValue())));
-console.log(String(values.IntFromCount(values.CountWithLiteral(values.CountFromInt(5` + suffix + `)))));
-console.log(String(values.IntFromCount(values.CountVariableShift(values.OtherFromCount(values.CountFromInt(3` + suffix + `))))));
-console.log(String(values.IntFromCount(values.CountVariableShiftUpdate(values.OtherFromCount(values.CountFromInt(4` + suffix + `))))));
-console.log(String(values.IntFromCount(values.CountShiftUntyped(values.CountFromInt(1` + suffix + `)))), String(values.IntFromCount(values.CountShiftTyped(values.CountFromInt(2` + suffix + `)))));
+console.log(String(values.IntFromCount(values.CountWithLiteral(values.CountFromInt(5)))));
+console.log(String(values.IntFromCount(values.CountVariableShift(values.OtherFromCount(values.CountFromInt(3))))));
+console.log(String(values.IntFromCount(values.CountVariableShiftUpdate(values.OtherFromCount(values.CountFromInt(4))))));
+console.log(String(values.IntFromCount(values.CountShiftUntyped(values.CountFromInt(1)))), String(values.IntFromCount(values.CountShiftTyped(values.CountFromInt(2)))));
 console.log(String(values.IntFromCount(values.FoldedCount())));
-console.log(String(values.LocalTypes(6` + suffix + `)));
-console.log(String(values.IntFromCount(values.CountUpdate(values.CountFromInt(4` + suffix + `)))));
+console.log(String(values.LocalTypes(6)));
+console.log(String(values.IntFromCount(values.CountUpdate(values.CountFromInt(4)))));
 const [minimum, maximum, length] = values.DefinedBuiltins(
-  values.CountFromInt(9` + suffix + `),
-  values.CountFromInt(4` + suffix + `),
+  values.CountFromInt(9),
+  values.CountFromInt(4),
   values.LabelFromString("hello"),
 );
 console.log(String(values.IntFromCount(minimum)), String(values.IntFromCount(maximum)), String(length));
-console.log(String(values.IntFromCount(values.CountPointer(values.CountFromInt(8` + suffix + `)))));
-console.log(String(values.CountSwitch(values.CountFromInt(1` + suffix + `))));
-console.log(String(values.CountSwitch(values.CountFromInt(3` + suffix + `))));
-console.log(String(values.CountSwitch(values.CountFromInt(5` + suffix + `))));
+console.log(String(values.IntFromCount(values.CountPointer(values.CountFromInt(8)))));
+console.log(String(values.CountSwitch(values.CountFromInt(1))));
+console.log(String(values.CountSwitch(values.CountFromInt(3))));
+console.log(String(values.CountSwitch(values.CountFromInt(5))));
 const [original, copied, equal] = values.CountArrayValues();
 console.log(
-  String(values.IntFromCount(original.get(0` + suffix + `))),
-  String(values.IntFromCount(copied.get(0` + suffix + `))),
+  String(values.IntFromCount(original.get(0` + nativeSuffix + `))),
+  String(values.IntFromCount(copied.get(0` + nativeSuffix + `))),
   String(equal),
 );
 const slice = values.CountSliceValues();
 console.log(
-  String(values.IntFromCount(slice.get(0` + suffix + `))),
-  String(values.IntFromCount(slice.get(1` + suffix + `))),
-  String(values.IntFromCount(slice.get(2` + suffix + `))),
+  String(values.IntFromCount(slice.get(0` + nativeSuffix + `))),
+  String(values.IntFromCount(slice.get(1` + nativeSuffix + `))),
+  String(values.IntFromCount(slice.get(2` + nativeSuffix + `))),
 );
 const [found, missing, ok] = values.CountMapValues();
 console.log(values.StringFromLabel(found), values.StringFromLabel(missing), String(ok));

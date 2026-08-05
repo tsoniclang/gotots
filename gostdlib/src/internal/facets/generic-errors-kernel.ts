@@ -1,10 +1,11 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
-import type { Awaitable, bool, gostring } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool, gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   MessageWrappedErrors,
   WrappedProviderError,
 } from "../portable/errors/tree.js";
+import { sliceValues } from "../runtime/slice.js";
 
 interface KernelError extends GoInterfaceValue {
   Error(): Awaitable<gostring>;
@@ -38,7 +39,7 @@ function asType<ErrorType>(
       continue;
     }
     if (current instanceof MessageWrappedErrors) {
-      for (const cause of current.UnwrapAll()) {
+      for (const cause of sliceValues(current.Unwrap())) {
         const nested = asType(assertError, cause, absent);
         if (nested[1]) {
           return nested;

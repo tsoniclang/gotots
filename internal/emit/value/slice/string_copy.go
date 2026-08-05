@@ -52,15 +52,6 @@ func CopyString(
 		"charCodeAt",
 		index,
 	))
-	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
-		character = context.Factory().CallExpression(
-			api.TargetIntrinsicBigInt.Expression(context.Factory()),
-			nil,
-			nil,
-			[]tsgo.Expression{character},
-			tsgo.NodeFlagsNone,
-		)
-	}
 	statements := append([]tsgo.Statement(nil), before...)
 	statements = append(
 		statements,

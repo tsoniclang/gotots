@@ -1,12 +1,14 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { bool, gostring, int64 } from "@gotots/runtime/scalars.js";
+import type { bool, gostring, int } from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 export interface Interface extends GoInterfaceValue {
-  Len(): int64;
-  Less(left: int64, right: int64): bool;
-  Swap(left: int64, right: int64): void;
+  Len(): int;
+  Less(left: int, right: int): bool;
+  Swap(left: int, right: int): void;
 }
 
 export function Sort(data: Interface | undefined): void {
@@ -33,15 +35,18 @@ function reorder(data: Interface | undefined): void {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
   const length = data.Len();
-  if (!Number.isInteger(length) || length < 0) {
+  if (length < 0n) {
     GoPanic.raiseRuntime("sort: invalid interface length");
   }
-  const order = Array.from({ length }, (_value, index): number => index);
+  const order = Array.from(
+    { length: hostInteger(length) },
+    (_value, index): number => index,
+  );
   order.sort((left, right): number => {
-    if (data.Less(left, right)) {
+    if (data.Less(integerFromHost(left), integerFromHost(right))) {
       return -1;
     }
-    if (data.Less(right, left)) {
+    if (data.Less(integerFromHost(right), integerFromHost(left))) {
       return 1;
     }
     return left - right;
@@ -64,7 +69,7 @@ function applyPermutation(data: Interface, order: readonly number[]): void {
     if (source === target) {
       continue;
     }
-    data.Swap(target, source);
+    data.Swap(integerFromHost(target), integerFromHost(source));
     const displaced = current[target];
     if (displaced === undefined) {
       GoPanic.raiseRuntime("sort: invalid permutation");

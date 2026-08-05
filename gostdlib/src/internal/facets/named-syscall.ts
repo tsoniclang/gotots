@@ -1,4 +1,4 @@
-import type { int64, uint64 } from "@gotots/runtime/scalars.js";
+import type { int64, uint64 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { Errno, Signal } from "../../syscall.js";
 

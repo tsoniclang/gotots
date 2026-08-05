@@ -235,14 +235,28 @@ func measurePackageStateScale(
 				if !ok || function.Name().Text() != "$initialize" {
 					continue
 				}
-				for _, bodyStatement := range function.Body().(tsgo.Block).Statements() {
-					if _, ok := bodyStatement.(tsgo.ExpressionStatement); ok {
-						result.assemblyAssignments++
-					}
-				}
+				result.assemblyAssignments += countPackageStateAssignments(
+					function.Body().(tsgo.Block).Statements(),
+				)
 			case emit.TargetFilePackageState:
 				inspectPackageStateStatement(t, statement, &result)
 			}
+		}
+	}
+	return result
+}
+
+func countPackageStateAssignments(statements []tsgo.Statement) int {
+	result := 0
+	for _, statement := range statements {
+		switch statement := statement.(type) {
+		case tsgo.ExpressionStatement:
+			assignment, ok := statement.Expression().(tsgo.BinaryExpression)
+			if ok && assignment.OperatorToken().Kind() == tsgo.SyntaxKindEqualsToken {
+				result++
+			}
+		case tsgo.Block:
+			result += countPackageStateAssignments(statement.Statements())
 		}
 	}
 	return result

@@ -16,7 +16,6 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
-		suffix  string
 	}{
 		{name: "number", options: emit.DefaultOptions()},
 		{
@@ -25,7 +24,6 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 				IntegerRepresentation: emit.IntegerRepresentationBigInt,
 				EvaluationOrder:       emit.EvaluationOrderPreserveGo,
 			},
-			suffix: "n",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -99,7 +97,7 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 				}
 			}
 			runner := filepath.Join(directory, "runner.ts")
-			writeFile(t, runner, aggregateArrayRunner(target, testCase.suffix))
+			writeFile(t, runner, aggregateArrayRunner(target))
 			writeFile(t, filepath.Join(directory, "package.json"), "{\"type\":\"module\"}\n")
 			target.paths = append(target.paths, runner)
 			if err := compileTypeScript(t, directory, target.paths); err != nil {
@@ -175,7 +173,6 @@ func compileAggregateArrayFixture(
 
 func aggregateArrayRunner(
 	target materializedProgram,
-	suffix string,
 ) string {
 	return `import "` + target.programInit + `";
 import { GoPanic } from "./runtime/panic.js";
@@ -187,8 +184,8 @@ console.log(values.NamedCopyIsDeep().map(String).join(" "));
 console.log(values.NestedCopyIsDeep().map(String).join(" "));
 console.log(values.SparseLiteralZerosAreFresh().map(String).join(" "));
 console.log(String(values.GenericZeroLengthPhantom()));
-const left = values.NewBoxes(1` + suffix + `, 2` + suffix + `);
-const right = values.NewBoxes(1` + suffix + `, 2` + suffix + `);
+const left = values.NewBoxes(1, 2);
+const right = values.NewBoxes(1, 2);
 console.log(values.Equal(left, right));
 const pointed = values.PointerStore(left);
 console.log(String(values.First(pointed)), String(values.Second(pointed)));

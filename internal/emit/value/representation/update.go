@@ -60,11 +60,16 @@ func (Owner) BinaryUpdate(
 		return primitiveBinaryUpdate(
 			context,
 			sourceType,
+			rightRepresentation,
 			operator,
 			left,
 			right,
 			constantEvidence(context, rightSource),
 		)
+	}
+	operationContext, err := model.OperationContext(context)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
 	underlying, valid := model.Basic()
 	if !valid {
@@ -79,7 +84,7 @@ func (Owner) BinaryUpdate(
 	if rightConstant != nil {
 		var err error
 		right, err = constantvalue.EmitValue(
-			context.WithRole(api.RoleAssignmentValue),
+			operationContext.WithRole(api.RoleAssignmentValue),
 			rightSource,
 			model.Underlying(),
 			rightConstant,
@@ -113,9 +118,10 @@ func (Owner) BinaryUpdate(
 		return api.ExpressionEmission{}, true, err
 	}
 	result, handled, err := definedbinary.ApplyUnderlying(
-		context,
+		operationContext,
 		operator,
 		underlying,
+		rightRepresentation,
 		leftValue,
 		right,
 		rightConstant,
@@ -162,11 +168,16 @@ func (Owner) Increment(
 		return primitiveBinaryUpdate(
 			context,
 			sourceType,
+			sourceType,
 			binaryOperator,
 			left,
 			right,
 			one,
 		)
+	}
+	operationContext, err := model.OperationContext(context)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
 	underlying, valid := model.Basic()
 	if !valid {
@@ -182,7 +193,7 @@ func (Owner) Increment(
 	}
 	one := constant.MakeInt64(1)
 	right, err := constantvalue.EmitValue(
-		context.WithRole(api.RoleAssignmentValue),
+		operationContext.WithRole(api.RoleAssignmentValue),
 		source,
 		model.Underlying(),
 		one,
@@ -198,8 +209,9 @@ func (Owner) Increment(
 		return api.ExpressionEmission{}, true, err
 	}
 	result, handled, err := definedbinary.ApplyUnderlying(
-		context,
+		operationContext,
 		binaryOperator,
+		underlying,
 		underlying,
 		leftValue,
 		right,
@@ -226,6 +238,7 @@ func incrementOperator(operator token.Token) (token.Token, bool) {
 func primitiveBinaryUpdate(
 	context api.Context,
 	sourceType types.Type,
+	rightType types.Type,
 	operator token.Token,
 	left tsgo.Expression,
 	right api.ExpressionEmission,
@@ -245,6 +258,17 @@ func primitiveBinaryUpdate(
 		context.TypesSizes(),
 		sourceType,
 	); ok {
+		rightCarrier := carrier
+		if operator == token.SHL || operator == token.SHR {
+			var rightOK bool
+			rightCarrier, rightOK = integervalue.DescribeUnderlying(
+				context.TypesSizes(),
+				rightType,
+			)
+			if !rightOK {
+				return api.ExpressionEmission{}, false, nil
+			}
+		}
 		switch {
 		case (operator == token.SHL || operator == token.SHR) &&
 			rightConstant == nil &&
@@ -257,6 +281,7 @@ func primitiveBinaryUpdate(
 				context,
 				operator,
 				carrier,
+				rightCarrier,
 				leftValue,
 				rightValue,
 			)
@@ -279,6 +304,7 @@ func primitiveBinaryUpdate(
 				context,
 				operator,
 				carrier,
+				rightCarrier,
 				leftValue,
 				rightValue,
 			)

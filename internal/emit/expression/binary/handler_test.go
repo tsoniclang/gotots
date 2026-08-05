@@ -321,6 +321,21 @@ func (unusedNames) ProviderInterfaceBridge(
 	return api.NameReference{}, false, nil
 }
 
+func (unusedNames) ProviderProfileInterfaceBridge(
+	types.Type,
+	[]gostdlib.ProviderCallableProfileInterface,
+) (api.ProviderProfileBridgeReference, bool, error) {
+	return api.ProviderProfileBridgeReference{}, false, nil
+}
+
+func (unusedNames) ProviderInterfaceCapability(
+	types.Type,
+	types.Type,
+	string,
+) (api.ProviderInterfaceCapabilityReference, bool, error) {
+	return api.ProviderInterfaceCapabilityReference{}, false, nil
+}
+
 func (unusedNames) ProviderCallableProfile(
 	*types.Func,
 	string,
@@ -413,9 +428,22 @@ func (unusedNames) Primitive(api.PrimitiveAlias) (api.NameReference, error) {
 	panic("unused")
 }
 
+func (unusedNames) ProviderPrimitive(
+	api.PrimitiveAlias,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) Runtime(
 	api.RuntimeSymbol,
 	api.ImportPhase,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) ExternalProviderFunction(
+	string,
+	string,
 ) (api.NameReference, error) {
 	panic("unused")
 }

@@ -9,38 +9,194 @@ import (
 
 func constructor(
 	factory tsgo.Factory,
-	providerType api.NameReference,
+	providerType tsgo.TypeNode,
 	contractName string,
+	capabilities []capabilitySelection,
+	conflicts []capabilityConflict,
+	panicName string,
 ) tsgo.ConstructorDeclaration {
 	value := factory.Identifier("value")
+	body := make([]tsgo.Statement, 0, len(capabilities)*2+len(conflicts)+1)
+	for _, capability := range capabilities {
+		body = append(body, capabilityViewDeclaration(
+			factory,
+			capability,
+			value,
+		))
+	}
+	for _, conflict := range conflicts {
+		body = append(body, capabilityConflictStatement(
+			factory,
+			conflict,
+			panicName,
+		))
+	}
+	body = append(body, factory.ExpressionStatement(
+		factory.CallExpression(
+			factory.SuperExpression(),
+			nil,
+			nil,
+			[]tsgo.Expression{
+				value,
+				capabilityContracts(factory, contractName, capabilities),
+			},
+			tsgo.NodeFlagsNone,
+		),
+	))
+	for _, capability := range capabilities {
+		body = append(body, capabilityFieldAssignment(factory, capability))
+	}
 	return factory.ConstructorDeclaration(
 		[]tsgo.ModifierLike{factory.PrivateKeyword()},
 		nil,
 		[]tsgo.ParameterDeclaration{
-			parameter(
-				factory,
-				value,
-				factory.TypeReferenceNode(providerType.EntityName(factory), nil),
-			),
+			parameter(factory, value, providerType),
 		},
 		nil,
-		factory.Block(
-			[]tsgo.Statement{
-				factory.ExpressionStatement(
+		factory.Block(body, true),
+	)
+}
+
+func capabilityFieldDeclaration(
+	factory tsgo.Factory,
+	capability capabilitySelection,
+) tsgo.PropertyDeclaration {
+	return factory.PropertyDeclaration(
+		[]tsgo.ModifierLike{
+			factory.PrivateKeyword(),
+			factory.ReadonlyKeyword(),
+		},
+		factory.Identifier(capability.fieldName),
+		nil,
+		nullableReferenceType(factory, capability.reference.Target()),
+		nil,
+	)
+}
+
+func capabilityViewDeclaration(
+	factory tsgo.Factory,
+	capability capabilitySelection,
+	value tsgo.Expression,
+) tsgo.VariableStatement {
+	return factory.VariableStatement(
+		nil,
+		factory.VariableDeclarationList(
+			[]tsgo.VariableDeclaration{
+				factory.VariableDeclaration(
+					factory.Identifier(capability.fieldName),
+					nil,
+					nil,
 					factory.CallExpression(
-						factory.SuperExpression(),
+						capability.reference.View().Expression(factory),
 						nil,
 						nil,
-						[]tsgo.Expression{
-							value,
-							factory.Identifier(contractName),
-						},
+						[]tsgo.Expression{value},
 						tsgo.NodeFlagsNone,
 					),
 				),
 			},
+			tsgo.NodeFlagsConst,
+		),
+	)
+}
+
+func capabilityConflictStatement(
+	factory tsgo.Factory,
+	conflict capabilityConflict,
+	panicName string,
+) tsgo.IfStatement {
+	return factory.IfStatement(
+		factory.BinaryExpression(
+			nil,
+			isDefined(factory, factory.Identifier(conflict.left)),
+			nil,
+			factory.BinaryOperatorToken(
+				tsgo.BinaryOperatorAmpersandAmpersandToken,
+			),
+			isDefined(factory, factory.Identifier(conflict.right)),
+		),
+		factory.Block(
+			[]tsgo.Statement{
+				factory.ExpressionStatement(panicruntime.Call(
+					factory,
+					panicName,
+					factory.StringLiteral(
+						"provider exposed incompatible Go interface capabilities",
+						tsgo.TokenFlagsNone,
+					),
+				)),
+			},
 			true,
 		),
+		nil,
+	)
+}
+
+func capabilityContracts(
+	factory tsgo.Factory,
+	base string,
+	capabilities []capabilitySelection,
+) tsgo.Expression {
+	if len(capabilities) == 0 {
+		return factory.Identifier(base)
+	}
+	elements := []tsgo.Expression{
+		factory.SpreadElement(factory.Identifier(base)),
+	}
+	for _, capability := range capabilities {
+		elements = append(elements, factory.SpreadElement(
+			factory.ConditionalExpression(
+				isDefined(
+					factory,
+					factory.Identifier(capability.fieldName),
+				),
+				factory.QuestionToken(),
+				factory.Identifier(capability.canonical.ContractName()),
+				factory.ColonToken(),
+				factory.ArrayLiteralExpression(nil, false),
+			),
+		))
+	}
+	return factory.ArrayLiteralExpression(elements, false)
+}
+
+func capabilityFieldAssignment(
+	factory tsgo.Factory,
+	capability capabilitySelection,
+) tsgo.ExpressionStatement {
+	return factory.ExpressionStatement(factory.BinaryExpression(
+		nil,
+		capabilityField(factory, capability.fieldName),
+		nil,
+		factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
+		factory.Identifier(capability.fieldName),
+	))
+}
+
+func capabilityField(
+	factory tsgo.Factory,
+	fieldName string,
+) tsgo.PropertyAccessExpression {
+	return factory.PropertyAccessExpression(
+		factory.ThisExpression(),
+		nil,
+		factory.Identifier(fieldName),
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func isDefined(
+	factory tsgo.Factory,
+	value tsgo.Expression,
+) tsgo.BinaryExpression {
+	return factory.BinaryExpression(
+		nil,
+		value,
+		nil,
+		factory.BinaryOperatorToken(
+			tsgo.BinaryOperatorExclamationEqualsEqualsToken,
+		),
+		factory.Identifier("undefined"),
 	)
 }
 

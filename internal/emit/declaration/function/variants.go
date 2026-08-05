@@ -221,7 +221,7 @@ func emitCallableVariant(
 	}
 	var body api.BlockEmission
 	if source.Body == nil {
-		body, err = emitExternalBody(context, function)
+		body, err = emitExternalBody(context, function, targetSignature)
 	} else {
 		body, err = callable.EmitBody(
 			context,

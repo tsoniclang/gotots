@@ -18,7 +18,8 @@ func (facetOnlyProvider) Valid() bool { return true }
 
 func (facetOnlyProvider) ToolchainKey() string { return "toolchain" }
 
-func (facetOnlyProvider) ProviderModules() []string { return nil }
+func (facetOnlyProvider) ProviderModules() []string    { return nil }
+func (facetOnlyProvider) ProviderScalarModule() string { return "" }
 
 func (facetOnlyProvider) Binding(string) (gostdlib.Binding, bool) {
 	return gostdlib.Binding{}, false
@@ -43,6 +44,12 @@ func (facetOnlyProvider) ProviderInterface(
 	string,
 ) (gostdlib.ProviderInterfaceBinding, bool) {
 	return gostdlib.ProviderInterfaceBinding{}, false
+}
+
+func (facetOnlyProvider) ProviderInterfaceCapabilities(
+	string,
+) []gostdlib.ProviderInterfaceCapability {
+	return nil
 }
 
 func (facetOnlyProvider) ProviderCallableProfile(

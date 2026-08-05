@@ -3,7 +3,7 @@ import type {
   GoInterfaceValue,
 } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import type { Reader } from "../../../../io.js";
 import { state as ioState } from "../../../../io.js";
@@ -29,7 +29,7 @@ export type GzipSourceStep<Result, Failure> =
     readonly kind: "read";
     readonly destination: RuntimeSlice<uint8>;
     readonly resume: (
-      count: int64,
+      count: int,
       failure: Failure | undefined,
     ) => GzipSourceStep<Result, Failure>;
   };
@@ -252,7 +252,7 @@ export class GzipSourceState<Failure extends GoInterfaceValue> {
       kind: "read",
       destination,
       resume: (count, failure) => {
-        if (count === 0 && failure === undefined) {
+        if (count === 0n && failure === undefined) {
           this.emptyReads += 1;
           if (this.emptyReads >= 100) {
             this.terminalFailure = this.noProgress;
@@ -278,7 +278,7 @@ export function runGzipSourceSync<Result, Failure>(
   initial: GzipSourceStep<Result, Failure>,
   readSource: (
     destination: RuntimeSlice<uint8>,
-  ) => [int64, Failure | undefined],
+  ) => [int, Failure | undefined],
 ): Result {
   let current = initial;
   while (current.kind === "read") {
@@ -292,7 +292,7 @@ export async function runGzipSourceAsync<Result, Failure>(
   initial: GzipSourceStep<Result, Failure>,
   readSource: (
     destination: RuntimeSlice<uint8>,
-  ) => Awaitable<[int64, Failure | undefined]>,
+  ) => Awaitable<[int, Failure | undefined]>,
 ): Promise<Result> {
   let current = initial;
   while (current.kind === "read") {

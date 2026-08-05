@@ -1,6 +1,7 @@
 package representation
 
 import (
+	"go/ast"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -11,6 +12,38 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func representedAtDestination(
+	actualType types.Type,
+	destinationType types.Type,
+) bool {
+	basic, basicOK := types.Unalias(actualType).(*types.Basic)
+	return basicOK && basic.Info()&types.IsUntyped != 0
+}
+
+func ownsFreshValue(context api.Context, source ast.Node) bool {
+	switch source := source.(type) {
+	case *ast.CallExpr, *ast.CompositeLit:
+		return true
+	case *ast.IndexExpr:
+		sourceType := context.TypesInfo().TypeOf(source.X)
+		if sourceType == nil {
+			return false
+		}
+		_, ok := types.Unalias(sourceType).Underlying().(*types.Map)
+		return ok
+	case *ast.ParenExpr:
+		return ownsFreshValue(context, source.X)
+	case *ast.SelectorExpr:
+		selection := context.TypesInfo().SelectionOf(source)
+		return selection != nil &&
+			selection.Kind() == types.FieldVal &&
+			!selection.Indirect() &&
+			ownsFreshValue(context, source.X)
+	default:
+		return false
+	}
+}
 
 func (owner Owner) PointerRepresentation(
 	context api.Context,

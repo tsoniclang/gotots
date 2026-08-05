@@ -46,9 +46,8 @@ func valuePointerMethodReceiver(
 		receiver api.ExpressionEmission
 		err      error
 	)
-	if receiverABI == api.MethodReceiverABIContractDirect ||
-		representation.Representation() ==
-			api.PointerRepresentationDirectClass {
+	switch {
+	case receiverABI == api.MethodReceiverABIContractDirect:
 		root, expressionErr := children.Expression(
 			context.
 				WithRole(api.RoleReceiverValue).
@@ -65,7 +64,22 @@ func valuePointerMethodReceiver(
 			resolved,
 			root,
 		)
-	} else {
+	case representation.Representation() ==
+		api.PointerRepresentationDirectClass && len(resolved.fields) == 0:
+		target, targetErr := children.StoreTarget(
+			context.
+				WithRole(api.RoleReceiverValue).
+				WithExpectedType(resolved.root),
+			source.X,
+		)
+		if targetErr != nil {
+			return api.ExpressionEmission{}, targetErr
+		}
+		receiver, err = target.MutableValue(
+			context.WithRole(api.RoleReceiverValue),
+			source.X,
+		)
+	default:
 		receiver, err = addressSource(
 			context,
 			children,

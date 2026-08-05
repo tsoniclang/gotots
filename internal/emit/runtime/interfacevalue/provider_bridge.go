@@ -111,15 +111,7 @@ func providerBridgeConstructor(
 							factory.Identifier("Set"),
 							[]tsgo.TypeNode{objectType(factory)},
 							[]tsgo.Expression{
-								factory.ArrayLiteralExpression(
-									[]tsgo.Expression{
-										factory.SpreadElement(
-											providerValueMember(factory, interfacecontract.MethodsMember),
-										),
-										factory.SpreadElement(factory.Identifier("methods")),
-									},
-									false,
-								),
+								factory.Identifier("methods"),
 							},
 						),
 					),

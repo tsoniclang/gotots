@@ -2,7 +2,7 @@ import type {
   AppendByteOrder,
   ByteOrder,
 } from "../../encoding/binary.js";
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 export interface BinaryEndianRepresentation
   extends ByteOrder, AppendByteOrder {

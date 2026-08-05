@@ -11,3 +11,6 @@ export type uint64 = number;
 export type gostring = string;
 export type float32 = number;
 export type float64 = number;
+export type int = number;
+export type uint = number;
+export type uintptr = number;

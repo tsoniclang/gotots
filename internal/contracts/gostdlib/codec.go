@@ -92,6 +92,7 @@ func Parse(payload []byte) (Manifest, error) {
 		map[providerStatefulProfileLookup]ProviderStatefulProfile,
 	)
 	providerInterfaces := make(map[string]ProviderInterfaceBinding)
+	providerCapabilities := make(map[string][]ProviderInterfaceCapability)
 	for _, module := range document.FacetModules {
 		for _, representation := range module.Representations {
 			representations[providerRepresentationLookup{
@@ -115,6 +116,12 @@ func Parse(payload []byte) (Manifest, error) {
 			providerInterfaces[selected.SourceIdentity] =
 				newProviderInterfaceBinding(module, selected)
 		}
+		for _, selected := range module.ProviderInterfaceCapabilities {
+			providerCapabilities[selected.BaseSourceIdentity] = append(
+				providerCapabilities[selected.BaseSourceIdentity],
+				resolveProviderInterfaceCapability(module, selected),
+			)
+		}
 	}
 	facets := make(map[facetLookup]Facet)
 	for _, module := range document.FacetModules {
@@ -133,14 +140,15 @@ func Parse(payload []byte) (Manifest, error) {
 		}
 	}
 	return Manifest{
-		document:           cloneDocument(document),
-		payload:            canonical,
-		bindings:           bindings,
-		facets:             facets,
-		representations:    representations,
-		providerInterfaces: providerInterfaces,
-		callableProfiles:   callableProfiles,
-		statefulProfiles:   statefulProfiles,
+		document:             cloneDocument(document),
+		payload:              canonical,
+		bindings:             bindings,
+		facets:               facets,
+		representations:      representations,
+		providerInterfaces:   providerInterfaces,
+		providerCapabilities: providerCapabilities,
+		callableProfiles:     callableProfiles,
+		statefulProfiles:     statefulProfiles,
 	}, nil
 }
 

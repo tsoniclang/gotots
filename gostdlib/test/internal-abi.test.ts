@@ -12,8 +12,8 @@ import {
 
 test("internal/abi Type preserves selected descriptor fields", () => {
   const descriptor = new Type({
-    Size_: 16,
-    PtrBytes: 8,
+    Size_: 16n,
+    PtrBytes: 8n,
     Hash: 0x1234,
     TFlag: new TFlag(1),
     Align_: 8,
@@ -24,7 +24,7 @@ test("internal/abi Type preserves selected descriptor fields", () => {
     Str: new NameOff(7),
     PtrToThis: new TypeOff(9),
   });
-  assert.equal(descriptor.Size_, 16);
+  assert.equal(descriptor.Size_, 16n);
   assert.equal(descriptor.Kind_.value, 25);
   assert.equal(descriptor.Str.value, 7);
   assert.equal(descriptor.PtrToThis.value, 9);

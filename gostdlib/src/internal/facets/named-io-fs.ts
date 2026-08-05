@@ -1,7 +1,7 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
-import type { gostring } from "@gotots/runtime/scalars.js";
-import type { uint32 } from "@gotots/runtime/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
+import type { uint32 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { FileMode, PathError } from "../../io/fs.js";
 import type { CanonicalError } from "./provider-io-contract.js";

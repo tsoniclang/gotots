@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	SchemaVersion = 22
+	SchemaVersion = 25
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -137,14 +137,15 @@ type BindingDocument struct {
 }
 
 type Manifest struct {
-	document           Document
-	payload            []byte
-	bindings           map[string]Binding
-	facets             map[facetLookup]Facet
-	representations    map[providerRepresentationLookup]ProviderRepresentation
-	providerInterfaces map[string]ProviderInterfaceBinding
-	callableProfiles   map[providerCallableProfileLookup]ProviderCallableProfile
-	statefulProfiles   map[providerStatefulProfileLookup]ProviderStatefulProfile
+	document             Document
+	payload              []byte
+	bindings             map[string]Binding
+	facets               map[facetLookup]Facet
+	representations      map[providerRepresentationLookup]ProviderRepresentation
+	providerInterfaces   map[string]ProviderInterfaceBinding
+	providerCapabilities map[string][]ProviderInterfaceCapability
+	callableProfiles     map[providerCallableProfileLookup]ProviderCallableProfile
+	statefulProfiles     map[providerStatefulProfileLookup]ProviderStatefulProfile
 }
 
 func (m Manifest) Digest() string {
@@ -263,6 +264,15 @@ func (m Manifest) ProviderInterface(
 ) (ProviderInterfaceBinding, bool) {
 	selected, ok := m.providerInterfaces[sourceIdentity]
 	return selected, ok
+}
+
+func (m Manifest) ProviderInterfaceCapabilities(
+	baseSourceIdentity string,
+) []ProviderInterfaceCapability {
+	source := m.providerCapabilities[baseSourceIdentity]
+	result := make([]ProviderInterfaceCapability, len(source))
+	copy(result, source)
+	return result
 }
 
 func (m Manifest) ProviderCallableProfile(

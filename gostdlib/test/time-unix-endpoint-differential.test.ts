@@ -57,11 +57,11 @@ test("time parsing agrees with Go on instants, layouts, and rejection", () => {
 
 function providerResult(): string {
   const values = [
-    Unix(0, 0),
-    Unix(0, -1),
-    Unix(1, 1_500_001),
-    Unix(-2, 2_000_000_001),
-    Unix(2, -1_000_000_001),
+    Unix(0n, 0n),
+    Unix(0n, -1n),
+    Unix(1n, 1_500_001n),
+    Unix(-2n, 2_000_000_001n),
+    Unix(2n, -1_000_000_001n),
   ];
   const instants = values.map((value) => (
     `${value.Unix()}:${value.UnixMilli()}:${value.UnixNano()}:${value.Nanosecond()}`
@@ -70,7 +70,7 @@ function providerResult(): string {
   return [
     instants,
     timeTextLine(new Time()),
-    timeTextLine(Unix(0, -1).UTC()),
+    timeTextLine(Unix(0n, -1n).UTC()),
   ].join("\n");
 }
 

@@ -242,6 +242,50 @@ func compareDeclarationRequirements(
 			return 0
 		}
 	}
+	if left.Kind() == api.DeclarationRequirementProviderInterfaceCapability {
+		leftArtifact, _, leftKey, leftOK :=
+			left.ProviderInterfaceCapability()
+		rightArtifact, _, rightKey, rightOK :=
+			right.ProviderInterfaceCapability()
+		if order := compareGeneratedArtifacts(
+			leftArtifact,
+			rightArtifact,
+		); order != 0 {
+			return order
+		}
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		case leftKey < rightKey:
+			return -1
+		case leftKey > rightKey:
+			return 1
+		default:
+			return 0
+		}
+	}
+	if left.Kind() == api.DeclarationRequirementProviderProfileInterfaceCapability {
+		leftArtifact, leftTarget, leftOK :=
+			left.ProviderProfileInterfaceCapability()
+		rightArtifact, rightTarget, rightOK :=
+			right.ProviderProfileInterfaceCapability()
+		if order := compareGeneratedArtifacts(
+			leftArtifact,
+			rightArtifact,
+		); order != 0 {
+			return order
+		}
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		default:
+			return compareGeneratedArtifacts(leftTarget, rightTarget)
+		}
+	}
 	if artifactKinds(left.Kind()) {
 		leftArtifact, _ := left.GeneratedArtifact()
 		rightArtifact, _ := right.GeneratedArtifact()

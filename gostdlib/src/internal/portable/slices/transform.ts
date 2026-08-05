@@ -1,6 +1,8 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool, int64 } from "@gotots/gostdlib/internal/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+
+import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 import { sliceValues } from "../../runtime/slice.js";
 import { callEquality, callPredicate } from "./read.js";
@@ -69,12 +71,14 @@ export function Delete<T>(
   start: int64,
   end: int64,
 ): RuntimeSlice<T> {
-  validateRange(source.length, start, end);
+  const startIndex = hostInteger(start);
+  const endIndex = hostInteger(end);
+  validateRange(source.length, startIndex, endIndex);
   if (start === end) {
     return source;
   }
   const values = sliceValues(source);
-  values.splice(start, end - start);
+  values.splice(startIndex, endIndex - startIndex);
   return resultLike(source, values);
 }
 
@@ -93,14 +97,20 @@ export async function DeleteFunc<S, E, EStorage>(
   for (let read = 0; read < values.length; read += 1) {
     const value = fromStorage(values.get(read));
     if (!await callPredicate(predicate, value)) {
-      storeElement(values, write, value, copyElement, toStorage);
+      storeElement(
+        values,
+        integerFromHost(write),
+        value,
+        copyElement,
+        toStorage,
+      );
       write += 1;
     }
   }
   for (let index = write; index < values.length; index += 1) {
     storeElement(
       values,
-      index,
+      integerFromHost(index),
       zeroElement(),
       copyElement,
       toStorage,
@@ -114,12 +124,13 @@ export function Insert<T>(
   index: int64,
   values: RuntimeSlice<T>,
 ): RuntimeSlice<T> {
-  validateIndex(source.length, index, true);
+  const hostIndex = hostInteger(index);
+  validateIndex(source.length, hostIndex, true);
   if (values.length === 0) {
     return source;
   }
   const result = sliceValues(source);
-  result.splice(index, 0, ...sliceValues(values));
+  result.splice(hostIndex, 0, ...sliceValues(values));
   return RuntimeSlice.literal(result);
 }
 
@@ -134,10 +145,10 @@ export function Grow<S, E, EStorage>(
   amount: int64,
 ): S {
   const values = toSlice(source);
-  const numericAmount = globalThis.Number(amount);
-  if (!Number.isSafeInteger(numericAmount) || numericAmount < 0) {
+  if (amount < 0n) {
     GoPanic.raiseRuntime("cannot be negative");
   }
+  const numericAmount = hostInteger(amount);
   const requiredCapacity = values.length + numericAmount;
   if (!Number.isSafeInteger(requiredCapacity)) {
     GoPanic.raiseRuntime("cannot be negative");
@@ -163,7 +174,7 @@ export function Grow<S, E, EStorage>(
   for (let index = 0; index < values.length; index += 1) {
     storeElement(
       result,
-      index,
+      integerFromHost(index),
       fromStorage(values.get(index)),
       copyElement,
       toStorage,
@@ -176,15 +187,16 @@ export function Repeat<T>(
   source: RuntimeSlice<T>,
   count: int64,
 ): RuntimeSlice<T> {
-  if (!Number.isSafeInteger(count) || count < 0) {
+  if (count < 0n) {
     GoPanic.raiseRuntime("the result of (len(x) * count) overflows");
   }
-  const resultLength = source.length * count;
+  const hostCount = hostInteger(count);
+  const resultLength = source.length * hostCount;
   if (!Number.isSafeInteger(resultLength)) {
     GoPanic.raiseRuntime("the result of (len(x) * count) overflows");
   }
   const values: T[] = [];
-  for (let repetition = 0; repetition < count; repetition += 1) {
+  for (let repetition = 0; repetition < hostCount; repetition += 1) {
     values.push(...sliceValues(source));
   }
   return RuntimeSlice.literal(values);
@@ -196,9 +208,11 @@ export function Replace<T>(
   end: int64,
   replacement: RuntimeSlice<T>,
 ): RuntimeSlice<T> {
-  validateRange(source.length, start, end);
+  const startIndex = hostInteger(start);
+  const endIndex = hostInteger(end);
+  validateRange(source.length, startIndex, endIndex);
   const values = sliceValues(source);
-  values.splice(start, end - start, ...sliceValues(replacement));
+  values.splice(startIndex, endIndex - startIndex, ...sliceValues(replacement));
   return resultLike(source, values);
 }
 

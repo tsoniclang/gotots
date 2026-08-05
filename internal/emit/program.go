@@ -7,12 +7,11 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
+	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
-	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	"github.com/tsoniclang/gotots/internal/emit/runtime/gocontract"
@@ -55,32 +54,34 @@ type RuntimePackage struct {
 type declarationSite = declarationindex.Site
 
 type programSession struct {
-	source                  *load.Program
-	factory                 tsgo.Factory
-	integer                 api.IntegerRepresentation
-	evaluationOrder         api.EvaluationOrder
-	concurrency             api.ConcurrencySemantics
-	registry                *emitnaming.Registry
-	scheduler               *scheduler
-	requirements            *declarationRequirementScheduler
-	artifacts               *artifactstate.Graph
-	sites                   map[types.Object]declarationSite
-	emitters                map[*load.Package]*emitter
-	builders                map[string]*targetFileBuilder
-	packageBuilders         map[*load.Package]*packageTargetBuilder
-	packageExports          *packageExportScheduler
-	environmentBuilders     map[*load.Package]*environmentContractBuilder
-	packageInitializations  *packageInitializationScheduler
-	genericOperations       map[genericOperationIdentity]*api.GenericOperationContract
-	genericConcretizations  map[genericConcretizationIdentity]*api.GenericConcretization
-	classMembers            map[*types.Func]classMemberContribution
-	goRuntime               *gocontract.Contract
-	runtimePackage          RuntimePackage
-	compareArtifactOwners   func(api.ArtifactOwner, api.ArtifactOwner) int
-	requirementRemovalOwner api.ArtifactOwner
-	standardLibrary         *certify.Certificate
-	externalFunctions       map[*types.Func]ExternalFunctionObligation
-	sealed                  bool
+	source                   *load.Program
+	factory                  tsgo.Factory
+	scalar                   api.ScalarABI
+	providerScalar           api.ScalarABI
+	evaluationOrder          api.EvaluationOrder
+	concurrency              api.ConcurrencySemantics
+	registry                 *emitnaming.Registry
+	scheduler                *scheduler
+	requirements             *declarationRequirementScheduler
+	artifacts                *artifactstate.Graph
+	sites                    map[types.Object]declarationSite
+	emitters                 map[*load.Package]*emitter
+	builders                 map[string]*targetFileBuilder
+	packageBuilders          map[*load.Package]*packageTargetBuilder
+	packageExports           *packageExportScheduler
+	environmentBuilders      map[*load.Package]*environmentContractBuilder
+	packageInitializations   *packageInitializationScheduler
+	genericOperations        map[genericOperationIdentity]*api.GenericOperationContract
+	genericConcretizations   map[genericConcretizationIdentity]*api.GenericConcretization
+	classMembers             map[*types.Func]classMemberContribution
+	goRuntime                *gocontract.Contract
+	runtimePackage           RuntimePackage
+	compareArtifactOwners    func(api.ArtifactOwner, api.ArtifactOwner) int
+	requirementRemovalOwner  api.ArtifactOwner
+	standardLibrary          *gostdlibcertify.Certificate
+	externalFunctions        map[*types.Func]ExternalFunctionObligation
+	externalFunctionBindings map[*types.Func]api.ExternalFunctionTarget
+	sealed                   bool
 }
 
 type targetDeclaration struct {
@@ -290,7 +291,29 @@ func newProgramSession(
 	source *load.Program,
 	options Options,
 ) (*programSession, error) {
+	scalar, err := programScalarABI(source, options.IntegerRepresentation)
+	if err != nil {
+		return nil, err
+	}
+	providerScalar, err := certifiedProviderScalarABI(
+		options.StandardLibrary,
+		scalar.NativeIntegerWidth(),
+	)
+	if err != nil {
+		return nil, err
+	}
 	sites, err := declarationindex.Program(source)
+	if err != nil {
+		return nil, err
+	}
+	externalBindings, externalModules, err := resolveExternalFunctionProvider(
+		source,
+		sites,
+		options.ExternalProvider,
+		options.StandardLibrary,
+		options.IntegerRepresentation,
+		options.ConcurrencySemantics,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -299,6 +322,7 @@ func newProgramSession(
 		source.Packages(),
 		source.EnvironmentPackages(),
 		options.StandardLibrary,
+		externalModules,
 	); err != nil {
 		return nil, err
 	}
@@ -310,7 +334,8 @@ func newProgramSession(
 	session := &programSession{
 		source:          source,
 		factory:         tsgo.NewFactory(),
-		integer:         options.IntegerRepresentation,
+		scalar:          scalar,
+		providerScalar:  providerScalar,
 		evaluationOrder: options.EvaluationOrder,
 		concurrency:     options.ConcurrencySemantics,
 		registry:        registry,
@@ -321,30 +346,33 @@ func newProgramSession(
 		artifacts: artifactstate.NewGraph(
 			compareArtifactOwners,
 		),
-		sites:                  sites,
-		emitters:               make(map[*load.Package]*emitter),
-		builders:               make(map[string]*targetFileBuilder),
-		packageBuilders:        make(map[*load.Package]*packageTargetBuilder),
-		packageExports:         newPackageExportScheduler(),
-		environmentBuilders:    make(map[*load.Package]*environmentContractBuilder),
-		packageInitializations: newPackageInitializationScheduler(),
-		genericOperations:      make(map[genericOperationIdentity]*api.GenericOperationContract),
-		genericConcretizations: make(map[genericConcretizationIdentity]*api.GenericConcretization),
-		classMembers:           make(map[*types.Func]classMemberContribution),
-		goRuntime:              goRuntime,
-		compareArtifactOwners:  compareArtifactOwners,
-		standardLibrary:        options.StandardLibrary,
-		externalFunctions:      make(map[*types.Func]ExternalFunctionObligation),
+		sites:                    sites,
+		emitters:                 make(map[*load.Package]*emitter),
+		builders:                 make(map[string]*targetFileBuilder),
+		packageBuilders:          make(map[*load.Package]*packageTargetBuilder),
+		packageExports:           newPackageExportScheduler(),
+		environmentBuilders:      make(map[*load.Package]*environmentContractBuilder),
+		packageInitializations:   newPackageInitializationScheduler(),
+		genericOperations:        make(map[genericOperationIdentity]*api.GenericOperationContract),
+		genericConcretizations:   make(map[genericConcretizationIdentity]*api.GenericConcretization),
+		classMembers:             make(map[*types.Func]classMemberContribution),
+		goRuntime:                goRuntime,
+		compareArtifactOwners:    compareArtifactOwners,
+		standardLibrary:          options.StandardLibrary,
+		externalFunctions:        make(map[*types.Func]ExternalFunctionObligation),
+		externalFunctionBindings: externalBindings,
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
 			sourcePackage,
 			session.factory,
 			session.registry,
-			options.IntegerRepresentation,
+			scalar,
+			providerScalar,
 			options.EvaluationOrder,
 			options.ConcurrencySemantics,
 			session.require,
+			session,
 			session,
 			session,
 			session,
@@ -422,28 +450,6 @@ func newProgramSession(
 		}
 	}
 	return session, nil
-}
-
-func sourceArtifactOwnerOrder(
-	sites map[types.Object]declarationSite,
-) func(api.ArtifactOwner, api.ArtifactOwner) int {
-	return func(left api.ArtifactOwner, right api.ArtifactOwner) int {
-		leftObject, leftSource := left.Source()
-		rightObject, rightSource := right.Source()
-		if leftSource && rightSource {
-			leftSite, leftIndexed := sites[leftObject]
-			rightSite, rightIndexed := sites[rightObject]
-			if leftIndexed && rightIndexed {
-				if order := declarationindex.CompareSites(
-					leftSite,
-					rightSite,
-				); order != 0 {
-					return order
-				}
-			}
-		}
-		return emitordering.CompareArtifactOwners(left, right)
-	}
 }
 
 func (s *programSession) emit(object types.Object) error {

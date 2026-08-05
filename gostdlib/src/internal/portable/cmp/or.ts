@@ -1,5 +1,5 @@
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { bool } from "@gotots/runtime/scalars.js";
+import type { bool } from "@gotots/gostdlib/internal/scalars.js";
 
 type CopyValue<T> = (value: T) => T;
 type EqualValue<T> = (left: T, right: T) => bool;

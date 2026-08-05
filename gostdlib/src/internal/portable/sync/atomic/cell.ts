@@ -4,7 +4,7 @@ import type {
   int64,
   uint32,
   uint64,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 
 abstract class Cell<T> {
@@ -71,7 +71,7 @@ export class Int32 extends Cell<int32> {
 }
 
 export class Int64 extends Cell<int64> {
-  constructor(value: int64 = 0) {
+  constructor(value: int64 = 0n) {
     super(value);
   }
 
@@ -120,7 +120,7 @@ export class Uint32 extends Cell<uint32> {
 }
 
 export class Uint64 extends Cell<uint64> {
-  constructor(value: uint64 = 0) {
+  constructor(value: uint64 = 0n) {
     super(value);
   }
 

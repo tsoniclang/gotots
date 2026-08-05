@@ -6,8 +6,8 @@ import {
 } from "@gotots/runtime/interface-value.js";
 
 export class ProviderError extends GoInterfaceValue {
-	static readonly comparable = true;
-	readonly $go$type: { readonly comparable: boolean } = ProviderError;
+  static readonly comparable = true;
+  readonly $go$type: { readonly comparable: boolean } = ProviderError;
   readonly $go$methods: ReadonlySet<object>;
   readonly $go$formatString = false;
 

@@ -4,9 +4,10 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   Awaitable,
   gostring,
-  int64,
+  int,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
+import { integerFromHost } from "../../host-integer.js";
 
 import type { WriteCloser, Writer } from "../../../io.js";
 import { ProviderInterfaceValue } from "../io/value.js";
@@ -74,9 +75,9 @@ export class Encoding {
     return requireEncoding(receiver).#encodeBytes(sliceValues(source));
   }
 
-  static EncodedLen(receiver: Encoding | undefined, length: int64): int64 {
+  static EncodedLen(receiver: Encoding | undefined, length: int): int {
     requireEncoding(receiver);
-    return Math.floor((length + 2) / 3) * 4;
+    return ((length + 2n) / 3n) * 4n;
   }
 
   #encodeBytes(source: readonly uint8[]): gostring {
@@ -239,9 +240,9 @@ export class Base64EncoderState<Failure> {
 
   beginWrite(
     source: RuntimeSlice<uint8>,
-  ): Base64EncoderStep<[int64, Failure | undefined], Failure> {
+  ): Base64EncoderStep<[int, Failure | undefined], Failure> {
     if (this.#failure !== undefined) {
-      return done([0, this.#failure]);
+      return done([0n, this.#failure]);
     }
     const values = sliceValues(source);
     let consumed = 0;
@@ -251,7 +252,7 @@ export class Base64EncoderState<Failure> {
         consumed += 1;
       }
       if (this.#pending.length < 3) {
-        return done([consumed, undefined]);
+        return done([integerFromHost(consumed), undefined]);
       }
       const output = this.#encode(this.#pending);
       return write(output, (failure) => {
@@ -280,7 +281,7 @@ export class Base64EncoderState<Failure> {
   #writeInterior(
     values: readonly uint8[],
     consumed: number,
-  ): Base64EncoderStep<[int64, Failure | undefined], Failure> {
+  ): Base64EncoderStep<[int, Failure | undefined], Failure> {
     const completeLength = Math.min(
       Math.floor((values.length - consumed) / 3) * 3,
       768,
@@ -302,20 +303,20 @@ export class Base64EncoderState<Failure> {
   #finishWrite(
     values: readonly uint8[],
     consumed: number,
-  ): Base64EncoderStep<[int64, Failure | undefined], Failure> {
+  ): Base64EncoderStep<[int, Failure | undefined], Failure> {
     while (consumed < values.length) {
       this.#pending.push(values[consumed] ?? 0);
       consumed += 1;
     }
-    return done([consumed, undefined]);
+    return done([integerFromHost(consumed), undefined]);
   }
 
   #failWrite(
     consumed: number,
     failure: Failure,
-  ): Base64EncoderStep<[int64, Failure | undefined], Failure> {
+  ): Base64EncoderStep<[int, Failure | undefined], Failure> {
     this.#failure = failure;
-    return done([consumed, failure]);
+    return done([integerFromHost(consumed), failure]);
   }
 
   #encode(source: readonly uint8[]): RuntimeSlice<uint8> {
@@ -330,7 +331,7 @@ export function runBase64EncoderSync<Result, Failure>(
   initial: Base64EncoderStep<Result, Failure>,
   writeOutput: (
     output: RuntimeSlice<uint8>,
-  ) => [int64, Failure | undefined],
+  ) => [int, Failure | undefined],
 ): Result {
   let current = initial;
   while (current.kind === "write") {
@@ -344,7 +345,7 @@ export async function runBase64EncoderAsync<Result, Failure>(
   initial: Base64EncoderStep<Result, Failure>,
   writeOutput: (
     output: RuntimeSlice<uint8>,
-  ) => Awaitable<[int64, Failure | undefined]>,
+  ) => Awaitable<[int, Failure | undefined]>,
 ): Promise<Result> {
   let current = initial;
   while (current.kind === "write") {
@@ -366,7 +367,7 @@ class Base64Encoder extends ProviderInterfaceValue implements WriteCloser {
     this.#state = new Base64EncoderState(encoding);
   }
 
-  Write(source: RuntimeSlice<uint8>): [int64, GoError | undefined] {
+  Write(source: RuntimeSlice<uint8>): [int, GoError | undefined] {
     return runBase64EncoderSync(
       this.#state.beginWrite(source),
       (output) => requireWriter(this.writer).Write(output),

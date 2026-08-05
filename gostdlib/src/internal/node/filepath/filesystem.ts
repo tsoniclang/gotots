@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { realpathSync } from "node:fs";
 
 import type { GoError } from "@gotots/runtime/interface-value.js";
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import { providerError } from "../../runtime/error.js";
 import { fromHostString } from "../../portable/utf8/codec.js";

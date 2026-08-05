@@ -8,6 +8,7 @@ import (
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -162,6 +163,33 @@ func emitGeneric(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	contract, ok := owner.Type().(*types.Signature)
+	if !ok {
+		return api.ExpressionEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic callable owner has no signature",
+		}
+	}
+	if reference.ProviderBoundary() {
+		var providerBefore []tsgo.Statement
+		var providerRequests []api.RootRequest
+		arguments, providerBefore, providerRequests, err =
+			providerboundary.ToProviderGenericArguments(
+				context,
+				children,
+				contract.Params(),
+				signature.Params(),
+				arguments,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		before = append(before, providerBefore...)
+		argumentRequests = api.CombineRequests(
+			argumentRequests,
+			providerRequests,
+		)
+	}
 	arguments = append(mechanicArgs, arguments...)
 	result, err := api.NewExpressionEmission(
 		before,
@@ -194,6 +222,15 @@ func emitGeneric(
 			context,
 			source,
 			callableFacet,
+			result,
+		)
+	}
+	if err == nil && reference.ProviderBoundary() && !detached && !discarded {
+		result, err = providerboundary.FromProviderGenericResults(
+			context,
+			children,
+			contract.Results(),
+			signature.Results(),
 			result,
 		)
 	}

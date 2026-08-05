@@ -1,6 +1,6 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { bool, gostring } from "@gotots/runtime/scalars.js";
+import type { bool, gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 import type { CanonicalReader } from "./provider-io-contract.js";
 import {

@@ -52,6 +52,22 @@ func GenericClone[T any](source []T) []T {
 	return slices.Clone(source)
 }
 
+func GenericGrow[T any](source []T, count int) []T {
+	return slices.Grow(source, count)
+}
+
+func GenericGrowValue[T any]() func([]T, int) []T {
+	return slices.Grow[[]T, T]
+}
+
+func DeferredGenericGrow[T any](source []T, count int) {
+	defer slices.Grow(source, count)
+}
+
+func SortValues[T any](source []T, compare func(T, T) int) {
+	slices.SortFunc(source, compare)
+}
+
 func GenericCloneValue[T any]() func([]T) []T {
 	return slices.Clone[[]T, T]
 }
@@ -100,6 +116,10 @@ func TimeAddress() time.Time {
 			mustProviderRoot(t, scope.Lookup("Concat")),
 			mustProviderRoot(t, scope.Lookup("Clone")),
 			mustProviderRoot(t, scope.Lookup("GenericClone")),
+			mustProviderRoot(t, scope.Lookup("GenericGrow")),
+			mustProviderRoot(t, scope.Lookup("GenericGrowValue")),
+			mustProviderRoot(t, scope.Lookup("DeferredGenericGrow")),
+			mustProviderRoot(t, scope.Lookup("SortValues")),
 			mustProviderRoot(t, scope.Lookup("GenericCloneValue")),
 			mustProviderRoot(t, scope.Lookup("CompareValue")),
 			mustProviderRoot(t, scope.Lookup("DeferredCompare")),
@@ -118,7 +138,7 @@ func TimeAddress() time.Time {
 	printed := artifacts.printed
 	for _, exact := range []string{
 		"SlicesConcatKernel<gostring>(",
-		"MapsCloneKernel<GoMapValue<gostring, int64>, gostring, int64>(",
+		"MapsCloneKernel<GoMapValue<gostring, int>, gostring, int>(",
 		"SlicesGrowKernel<RuntimeSlice<gostring>, gostring, gostring>(",
 		"SlicesCloneKernel<GoContainerStorage<T>>(",
 		"SlicesCloneKernel<GoContainerStorage<T>>($argument0)",
@@ -127,6 +147,9 @@ func TimeAddress() time.Time {
 		"ErrorsAsTypeKernel<code__from_providerprojection>($goCapability_",
 		"GenericAddress$kernel<T>",
 		"GoPointerType<T>",
+		"BigInt.asIntN(64, goNumberToBigInt(count))",
+		"BigInt.asIntN(64, goNumberToBigInt($argument1))",
+		"BigInt.asIntN(64, goNumberToBigInt(__gotots_argument_1))",
 	} {
 		if !strings.Contains(printed, exact) {
 			t.Fatalf("provider generic projection lacks %q:\n%s", exact, printed)

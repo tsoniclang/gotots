@@ -1,7 +1,7 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring, int64 } from "@gotots/runtime/scalars.js";
+import type { gostring, int } from "@gotots/gostdlib/internal/scalars.js";
 
 import { formatOperands, formatText } from "../portable/fmt/format.js";
 import { byteSlice } from "../runtime/slice.js";
@@ -18,7 +18,7 @@ export async function FprintCanonical<
 >(
   writer: Target | undefined,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
-): Promise<[int64, Failure | undefined]> {
+): Promise<[int, Failure | undefined]> {
   return write(writer, formatOperands(arguments_, false));
 }
 
@@ -29,7 +29,7 @@ export async function FprintfCanonical<
   writer: Target | undefined,
   format: gostring,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
-): Promise<[int64, Failure | undefined]> {
+): Promise<[int, Failure | undefined]> {
   return write(writer, formatText(format, arguments_).text);
 }
 
@@ -39,7 +39,7 @@ export async function FprintlnCanonical<
 >(
   writer: Target | undefined,
   arguments_: RuntimeSlice<GoInterfaceValue | undefined>,
-): Promise<[int64, Failure | undefined]> {
+): Promise<[int, Failure | undefined]> {
   return write(writer, formatOperands(arguments_, true));
 }
 
@@ -49,7 +49,7 @@ async function write<
 >(
   writer: Target | undefined,
   text: string,
-): Promise<[int64, Failure | undefined]> {
+): Promise<[int, Failure | undefined]> {
   return requireWriter(writer).Write(
     byteSlice(new TextEncoder().encode(text)),
   );

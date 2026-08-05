@@ -69,6 +69,10 @@ func (owner Owner) Equal(
 		)), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		leftValue, err := defined.Project(
 			context.WithRole(api.RoleDefinedValue),
 			api.DirectExpression(left),
@@ -84,7 +88,7 @@ func (owner Owner) Equal(
 			return api.ExpressionEmission{}, err
 		}
 		result, err := (Owner{}).Equal(
-			context.WithRole(api.RoleDefinedValue),
+			operationContext.WithRole(api.RoleDefinedValue),
 			source,
 			defined.Underlying(),
 			leftValue.Value(),

@@ -67,32 +67,36 @@ import (
 	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type emitter struct {
-	source      *load.Package
-	factory     tsgo.Factory
-	names       *emitnaming.Owner
-	values      api.Values
-	integer     api.IntegerRepresentation
-	order       api.EvaluationOrder
-	concurrency api.ConcurrencySemantics
-	require     func(types.Object) error
-	generic     api.GenericCallableResolver
-	cooperative api.CooperativeCallableResolver
-	recovery    api.RecoveryCallableResolver
-	pointer     api.PointerRepresentationResolver
-	goRuntime   api.GoRuntimeContract
+	source         *load.Package
+	factory        tsgo.Factory
+	names          *emitnaming.Owner
+	values         api.Values
+	scalar         api.ScalarABI
+	providerScalar api.ScalarABI
+	order          api.EvaluationOrder
+	concurrency    api.ConcurrencySemantics
+	require        func(types.Object) error
+	generic        api.GenericCallableResolver
+	cooperative    api.CooperativeCallableResolver
+	recovery       api.RecoveryCallableResolver
+	pointer        api.PointerRepresentationResolver
+	external       api.ExternalFunctionResolver
+	goRuntime      api.GoRuntimeContract
 }
 
 func newEmitter(
 	source *load.Package,
 	factory tsgo.Factory,
 	registry *emitnaming.Registry,
-	integer api.IntegerRepresentation,
+	scalar api.ScalarABI,
+	providerScalar api.ScalarABI,
 	order api.EvaluationOrder,
 	concurrency api.ConcurrencySemantics,
 	require func(types.Object) error,
@@ -100,6 +104,7 @@ func newEmitter(
 	cooperative api.CooperativeCallableResolver,
 	recovery api.RecoveryCallableResolver,
 	pointer api.PointerRepresentationResolver,
+	external api.ExternalFunctionResolver,
 	goRuntime api.GoRuntimeContract,
 ) *emitter {
 	var typesInfo *types.Info
@@ -109,18 +114,20 @@ func newEmitter(
 		packageScope = source.Types().Scope()
 	}
 	target := &emitter{
-		source:      source,
-		factory:     factory,
-		names:       emitnaming.NewOwner(packageScope, typesInfo, registry),
-		integer:     integer,
-		order:       order,
-		concurrency: concurrency,
-		require:     require,
-		generic:     generic,
-		cooperative: cooperative,
-		recovery:    recovery,
-		pointer:     pointer,
-		goRuntime:   goRuntime,
+		source:         source,
+		factory:        factory,
+		names:          emitnaming.NewOwner(packageScope, typesInfo, registry),
+		scalar:         scalar,
+		providerScalar: providerScalar,
+		order:          order,
+		concurrency:    concurrency,
+		require:        require,
+		generic:        generic,
+		cooperative:    cooperative,
+		recovery:       recovery,
+		pointer:        pointer,
+		external:       external,
+		goRuntime:      goRuntime,
 	}
 	target.values = representation.NewOwner(target)
 	return target
@@ -518,6 +525,15 @@ func (e *emitter) RepresentedType(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if target, handled, err := providerboundary.EmitProfileInterfaceType(
+		context,
+		e,
+		source,
+		sourceType,
+		false,
+	); handled {
+		return target, err
+	}
 	if target, handled, err := goruntimetype.Emit(
 		context,
 		source,

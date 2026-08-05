@@ -1,7 +1,7 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic, type GoRecovery } from "@gotots/runtime/panic.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { Awaitable, int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
   Base64EncoderState,
@@ -22,7 +22,7 @@ export interface CanonicalWriteCloser<Failure extends GoInterfaceValue>
   Write(
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Awaitable<[int64, Failure | undefined]>;
+  ): Awaitable<[int, Failure | undefined]>;
   Close(recovery?: GoRecovery): Awaitable<Failure | undefined>;
 }
 
@@ -48,7 +48,7 @@ class CanonicalBase64Encoder<
   Write(
     source: RuntimeSlice<uint8>,
     recovery?: GoRecovery,
-  ): Promise<[int64, Failure | undefined]> {
+  ): Promise<[int, Failure | undefined]> {
     return runBase64EncoderAsync(
       this.#state.beginWrite(source),
       (output) => requireTarget(this.target).Write(output, recovery),

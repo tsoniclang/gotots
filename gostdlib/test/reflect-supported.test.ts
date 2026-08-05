@@ -23,15 +23,15 @@ import {
 import { ProviderError } from "../src/internal/runtime/error.js";
 
 test("reflect kind values retain the selected Go numbering", () => {
-  assert.equal(Bool.value, 1);
-  assert.equal(Int.value, 2);
-  assert.equal(Uint64.value, 11);
-  assert.equal(Float64.value, 14);
-  assert.equal(Array.value, 17);
-  assert.equal(Map.value, 21);
-  assert.equal(Slice.value, 23);
-  assert.equal(String.value, 24);
-  assert.equal(Struct.value, 25);
+  assert.equal(Bool.value, 1n);
+  assert.equal(Int.value, 2n);
+  assert.equal(Uint64.value, 11n);
+  assert.equal(Float64.value, 14n);
+  assert.equal(Array.value, 17n);
+  assert.equal(Map.value, 21n);
+  assert.equal(Slice.value, 23n);
+  assert.equal(String.value, 24n);
+  assert.equal(Struct.value, 25n);
 });
 
 test("reflect StructField.IsExported uses package-path evidence", () => {
@@ -40,8 +40,8 @@ test("reflect StructField.IsExported uses package-path evidence", () => {
     PkgPath: "",
     Type: undefined,
     Tag: new StructTag(""),
-    Offset: 0,
-    Index: RuntimeSlice.literal([0]),
+    Offset: 0n,
+    Index: RuntimeSlice.literal([0n]),
     Anonymous: false,
   });
   const privateField = new StructField({
@@ -49,8 +49,8 @@ test("reflect StructField.IsExported uses package-path evidence", () => {
     PkgPath: "example.com/project/model",
     Type: undefined,
     Tag: new StructTag(""),
-    Offset: 0,
-    Index: RuntimeSlice.literal([0]),
+    Offset: 0n,
+    Index: RuntimeSlice.literal([0n]),
     Anonymous: false,
   });
   assert.equal(exported.IsExported(), true);

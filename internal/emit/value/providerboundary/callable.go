@@ -4,6 +4,7 @@ import (
 	"go/types"
 	"strconv"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
@@ -31,6 +32,28 @@ func fromProviderCallable(
 	model definedtype.Model,
 	source api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
+	return fromProviderCallableSelected(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		nil,
+		signature,
+		model,
+		source,
+	)
+}
+
+func fromProviderCallableSelected(
+	context api.Context,
+	children api.ChildEmitter,
+	owner *types.Named,
+	ownerBridge string,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	signature *types.Signature,
+	model definedtype.Model,
+	source api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
 	target, err := callable.EmitABIAdapter(context, children, nil, signature)
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
@@ -47,11 +70,12 @@ func fromProviderCallable(
 	var argumentRequests []api.RootRequest
 	changed := false
 	for index, parameter := range parameters {
-		converted, selected, convertErr := ToProviderValue(
+		converted, selected, convertErr := toProviderValueSelected(
 			context,
 			children,
 			owner,
 			ownerBridge,
+			profile,
 			signature.Params().At(index).Type(),
 			api.DirectExpression(parameter),
 		)
@@ -81,11 +105,13 @@ func fromProviderCallable(
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
 	}
-	result, resultChanged, err := fromProviderResults(
+	result, resultChanged, err := fromProviderResultsSelected(
 		context,
 		children,
 		owner,
 		ownerBridge,
+		nil,
+		profile,
 		signature.Results(),
 		call,
 	)
@@ -100,7 +126,7 @@ func fromProviderCallable(
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
 	}
-	cooperative, contractRequests, err := cooperativecall.ValueContract(
+	cooperative, contractRequests, err := providerCallableContract(
 		context,
 		signature,
 	)
@@ -163,6 +189,28 @@ func toProviderCallable(
 	model definedtype.Model,
 	source api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
+	return toProviderCallableSelected(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		nil,
+		signature,
+		model,
+		source,
+	)
+}
+
+func toProviderCallableSelected(
+	context api.Context,
+	children api.ChildEmitter,
+	owner *types.Named,
+	ownerBridge string,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	signature *types.Signature,
+	model definedtype.Model,
+	source api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
 	parameters := make([]tsgo.ParameterDeclaration, 0, signature.Params().Len())
 	arguments := make([]tsgo.Expression, 0, signature.Params().Len())
 	var argumentBefore []tsgo.Statement
@@ -178,11 +226,12 @@ func toProviderCallable(
 			nil,
 			nil,
 		))
-		converted, selected, err := FromProviderValue(
+		converted, selected, err := fromProviderValueSelected(
 			context,
 			children,
 			owner,
 			ownerBridge,
+			profile,
 			signature.Params().At(index).Type(),
 			api.DirectExpression(context.Factory().Identifier(name)),
 		)
@@ -198,7 +247,7 @@ func toProviderCallable(
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
 	}
-	cooperative, contractRequests, err := cooperativecall.ValueContract(
+	cooperative, contractRequests, err := providerCallableContract(
 		context,
 		signature,
 	)
@@ -356,4 +405,13 @@ func isUndefined(factory tsgo.Factory, name string) tsgo.Expression {
 
 func boundaryInvariant(context api.Context, reason string) error {
 	return &api.InvariantError{Role: context.Role(), Reason: reason}
+}
+
+func providerCallableContract(
+	context api.Context,
+	signature *types.Signature,
+) (bool, []api.RootRequest, error) {
+	_, requests, err := cooperativecall.ValueContract(context, signature)
+	return context.ConcurrencySemantics() == api.ConcurrencySemanticsCooperative,
+		requests, err
 }

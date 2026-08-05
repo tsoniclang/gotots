@@ -6,7 +6,7 @@ import type {
   uint32,
   uint64,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
 
 import { ProviderInterfaceValue } from "../../io/value.js";
 import { sliceValues } from "../../../runtime/slice.js";
@@ -86,8 +86,8 @@ export class BigEndianOrder extends EndianOrder {
 
   PutUint64(buffer: RuntimeSlice<uint8>, value: uint64): void {
     this.require(buffer, 8);
-    const high = Math.floor(value / 0x1_0000_0000);
-    const low = value >>> 0;
+    const high = Number((value >> 32n) & 0xffff_ffffn);
+    const low = Number(value & 0xffff_ffffn);
     buffer.set(0, (high >>> 24) & 0xff);
     buffer.set(1, (high >>> 16) & 0xff);
     buffer.set(2, (high >>> 8) & 0xff);
@@ -131,7 +131,7 @@ export class BigEndianOrder extends EndianOrder {
       + buffer.get(6) * 0x100
       + buffer.get(7)
     ) >>> 0;
-    return high * 0x1_0000_0000 + low;
+    return BigInt(high) * 0x1_0000_0000n + BigInt(low);
   }
 }
 
@@ -156,8 +156,8 @@ export class LittleEndianOrder extends EndianOrder {
 
   PutUint64(buffer: RuntimeSlice<uint8>, value: uint64): void {
     this.require(buffer, 8);
-    const low = value >>> 0;
-    const high = Math.floor(value / 0x1_0000_0000);
+    const low = Number(value & 0xffff_ffffn);
+    const high = Number((value >> 32n) & 0xffff_ffffn);
     buffer.set(0, low & 0xff);
     buffer.set(1, (low >>> 8) & 0xff);
     buffer.set(2, (low >>> 16) & 0xff);
@@ -201,6 +201,6 @@ export class LittleEndianOrder extends EndianOrder {
       + buffer.get(6) * 0x1_0000
       + buffer.get(7) * 0x1_000_000
     ) >>> 0;
-    return low + high * 0x1_0000_0000;
+    return BigInt(low) + BigInt(high) * 0x1_0000_0000n;
   }
 }

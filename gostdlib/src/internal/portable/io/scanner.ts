@@ -1,8 +1,9 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { bool, gostring, int64, uint8 } from "@gotots/runtime/scalars.js";
+import type { bool, gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 
+import { hostInteger } from "../../host-integer.js";
 import { goInterfaceEqual } from "../../runtime/interface.js";
 
 type ScannerStep =
@@ -64,21 +65,22 @@ export class ScannerState<Failure extends GoInterfaceValue> {
 
   AcceptRead(
     target: RuntimeSlice<uint8>,
-    count: int64,
+    count: int,
     failure: Failure | undefined,
   ): void {
-    if (!Number.isInteger(count) || count < 0 || count > target.length) {
+    if (count < 0n || count > BigInt(target.length)) {
       this.#failure = this.badReadCount;
       this.#done = true;
       return;
     }
-    for (let index = 0; index < count; index += 1) {
+    const hostCount = hostInteger(count);
+    for (let index = 0; index < hostCount; index += 1) {
       this.#buffer.push(target.get(index));
     }
     if (failure !== undefined) {
       this.#pendingFailure = failure;
     }
-    if (count === 0 && failure === undefined) {
+    if (count === 0n && failure === undefined) {
       this.#emptyReads += 1;
       if (this.#emptyReads > 100) {
         this.#failure = this.noProgress;
@@ -91,7 +93,7 @@ export class ScannerState<Failure extends GoInterfaceValue> {
 }
 
 interface ProviderReader<Failure extends GoInterfaceValue> {
-  Read(target: RuntimeSlice<uint8>): [int64, Failure | undefined];
+  Read(target: RuntimeSlice<uint8>): [int, Failure | undefined];
 }
 
 export class ProviderScanner<

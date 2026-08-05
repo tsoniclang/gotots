@@ -6,7 +6,7 @@ import type {
   uint32,
   uint64,
   uint8,
-} from "@gotots/runtime/scalars.js";
+} from "@gotots/gostdlib/internal/scalars.js";
 
 import type { ByteOrder } from "../../encoding/binary.js";
 

@@ -1,5 +1,5 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
-import type { gostring, int64 } from "@gotots/runtime/scalars.js";
+import type { gostring, int } from "@gotots/gostdlib/internal/scalars.js";
 import type { Writer } from "../io.js";
 import {
   beginCpuProfile,
@@ -21,7 +21,7 @@ export class Profile {
   static WriteTo(
     receiver: Profile | undefined,
     w: Writer | undefined,
-    debug: int64,
+    debug: int,
   ): GoError | undefined {
     void debug;
     if (receiver === undefined || w === undefined) {
@@ -56,7 +56,7 @@ function write(writer: Writer, content: Uint8Array): GoError | undefined {
   if (failure !== undefined) {
     return failure;
   }
-  return count === content.length
+  return count === BigInt(content.length)
     ? undefined
     : new ProviderError("pprof: short write");
 }

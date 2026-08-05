@@ -11,9 +11,9 @@ import (
 
 func TestConversionsExecuteDifferentially(t *testing.T) {
 	for _, testCase := range []struct {
-		name    string
-		options emit.Options
-		suffix  string
+		name       string
+		options    emit.Options
+		wideSuffix string
 	}{
 		{"number", emit.DefaultOptions(), ""},
 		{
@@ -107,7 +107,7 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 				workingDirectory,
 				targetPaths,
 				sourceModule,
-				testCase.suffix,
+				testCase.wideSuffix,
 			)
 			if targetOutput != goOutput {
 				t.Fatalf(
@@ -122,16 +122,16 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 
 func TestUnsafePointerIntegerConversionsEnforceLiveAddressBoundary(t *testing.T) {
 	for _, testCase := range []struct {
-		name        string
-		options     emit.Options
-		integerType string
-		one         string
+		name          string
+		options       emit.Options
+		uintptrOne    string
+		pointerScalar string
 	}{
 		{
-			name:        "number",
-			options:     emit.DefaultOptions(),
-			integerType: "number",
-			one:         "1",
+			name:          "number",
+			options:       emit.DefaultOptions(),
+			uintptrOne:    "1",
+			pointerScalar: "1",
 		},
 		{
 			name: "bigint",
@@ -139,8 +139,8 @@ func TestUnsafePointerIntegerConversionsEnforceLiveAddressBoundary(t *testing.T)
 				IntegerRepresentation: emit.IntegerRepresentationBigInt,
 				EvaluationOrder:       emit.EvaluationOrderDirect,
 			},
-			integerType: "bigint",
-			one:         "1n",
+			uintptrOne:    "1n",
+			pointerScalar: "1",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -165,10 +165,10 @@ function fails(action: () => void): boolean {
     }
 }
 
-console.log(fails(() => { values.IntegerToUnsafePointer(` + testCase.one + `); }));
+console.log(fails(() => { values.IntegerToUnsafePointer(` + testCase.uintptrOne + `); }));
 console.log(fails(() => {
     values.UnsafePointerToInteger(
-        GoPointer.cell<` + testCase.integerType + `, ` + testCase.integerType + `>(` + testCase.one + `),
+        GoPointer.cell<number, number>(` + testCase.pointerScalar + `),
     );
 }));
 `
@@ -186,19 +186,12 @@ console.log(fails(() => {
 
 func TestUnsafePointerMemoryAliasesAndOffsetsDifferentially(t *testing.T) {
 	for _, testCase := range []struct {
-		name        string
-		options     emit.Options
-		integerType string
-		integerZero string
-		integerMark string
-		values      string
+		name    string
+		options emit.Options
 	}{
 		{
-			name:        "number",
-			options:     emit.DefaultOptions(),
-			integerType: "number",
-			integerZero: "0",
-			values:      "1, 2, 3, 4, 5, 6, 7, 8",
+			name:    "number",
+			options: emit.DefaultOptions(),
 		},
 		{
 			name: "bigint",
@@ -206,10 +199,6 @@ func TestUnsafePointerMemoryAliasesAndOffsetsDifferentially(t *testing.T) {
 				IntegerRepresentation: emit.IntegerRepresentationBigInt,
 				EvaluationOrder:       emit.EvaluationOrderDirect,
 			},
-			integerType: "bigint",
-			integerZero: "0n",
-			integerMark: "n",
-			values:      "1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -224,9 +213,9 @@ func TestUnsafePointerMemoryAliasesAndOffsetsDifferentially(t *testing.T) {
 import { GoPointer } from "./runtime/pointer.js";
 import * as values from "` + sourceModule + `";
 
-const scalar = GoPointer.cell<` + testCase.integerType + `, ` + testCase.integerType + `>(16909060` + testCase.integerMark + `);
-const bytes = GoPointer.cell<GoArray<` + testCase.integerType + `, 8>, GoArray<` + testCase.integerType + `, 8>>(
-    GoArray.literal<` + testCase.integerType + `, 8>(8, ` + testCase.integerZero + `, [0, 1, 2, 3, 4, 5, 6, 7], [` + testCase.values + `]),
+const scalar = GoPointer.cell<number, number>(16909060);
+const bytes = GoPointer.cell<GoArray<number, 8>, GoArray<number, 8>>(
+    GoArray.literal<number, 8>(8, 0, [0, 1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7, 8]),
 );
 console.log(String(values.UnsafePointerAliases(scalar)));
 console.log(String(values.UnsafePointerOffset(bytes)));

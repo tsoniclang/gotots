@@ -149,7 +149,7 @@ test("named-struct facets expose only selected static operations", (): void => {
   assert.equal(description.Description, "detail");
 
   const memStats = RuntimeMemStatsOperations.$zero();
-  assert.equal(memStats.Alloc, 0);
+  assert.equal(memStats.Alloc, 0n);
   assert.equal(memStats.EnableGC, false);
 
   const invalid = ReflectValueOperations.$zero();
@@ -161,8 +161,8 @@ test("named-struct facets expose only selected static operations", (): void => {
     PkgPath: "",
     Type: undefined,
     Tag: new StructTag('json:"original"'),
-    Offset: 8,
-    Index: RuntimeSlice.literal([1, 2]),
+    Offset: 8n,
+    Index: RuntimeSlice.literal([1n, 2n]),
     Anonymous: false,
   });
   const fieldCopy = ReflectStructFieldOperations.$copy(field);
@@ -187,12 +187,12 @@ test("named-struct facets expose only selected static operations", (): void => {
   const atomicUint32Copy = SyncAtomicUint32Operations.$copy(atomicUint32);
   const atomicUint64Copy = SyncAtomicUint64Operations.$copy(atomicUint64);
   AtomicInt32.Store(atomicInt32, 1);
-  AtomicInt64.Store(atomicInt64, 1);
+  AtomicInt64.Store(atomicInt64, 1n);
   AtomicUint32.Store(atomicUint32, 1);
   assert.equal(AtomicInt32.Load(atomicInt32Copy), 0);
-  assert.equal(AtomicInt64.Load(atomicInt64Copy), 0);
+  assert.equal(AtomicInt64.Load(atomicInt64Copy), 0n);
   assert.equal(AtomicUint32.Load(atomicUint32Copy), 0);
-  assert.equal(AtomicUint64.Load(atomicUint64Copy), 0);
+  assert.equal(AtomicUint64.Load(atomicUint64Copy), 0n);
   assert.equal(SyncAtomicInt32Operations.$fromStorage(
     SyncAtomicInt32Operations.$storageOf(atomicInt32),
   ), atomicInt32);
@@ -253,9 +253,9 @@ test("named-struct facets expose only selected static operations", (): void => {
 
 test("recovery facets preserve the direct provider ABI", (): void => {
   const reader = NewReader({
-    Read(destination): [number, undefined] {
+    Read(destination): [bigint, undefined] {
       destination.set(0, 65);
-      return [1, undefined];
+      return [1n, undefined];
     },
 		$go$type: Object.freeze({ comparable: true }),
     $go$methods: new Set<object>(),
@@ -266,12 +266,12 @@ test("recovery facets preserve the direct provider ABI", (): void => {
     $go$format(): string { return "reader"; },
   });
   const destination = RuntimeSlice.make<number>(1, 1, 0);
-  assert.deepEqual(BufioReaderRead(reader, destination), [1, undefined]);
+  assert.deepEqual(BufioReaderRead(reader, destination), [1n, undefined]);
   assert.equal(destination.get(0), 65);
   const buffer = NewBuffer(RuntimeSlice.nil<number>());
   assert.deepEqual(
     BytesBufferWrite(buffer, RuntimeSlice.literal([66, 67])),
-    [2, undefined],
+    [2n, undefined],
   );
   assert.equal(SyscallErrnoIs(EPERM, fsState.ErrPermission), true);
   const parseFailure = new ParseError(

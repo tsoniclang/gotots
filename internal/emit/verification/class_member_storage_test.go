@@ -38,6 +38,7 @@ func TestClassMembersPreserveReceiverSemanticsDifferentially(t *testing.T) {
 		".bind(",
 		".call(",
 		".apply(",
+		"Counter.Reset(Counter.$copy(",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
 			t.Fatalf("class-member artifact contains %q", forbidden)
@@ -412,7 +413,8 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 		"Value(): Awaitable<T>;",
 		"Value(): Awaitable<int32>;",
 		"export async function GenericInterfaceAudit(): Promise<int32>",
-		"return await goInterfaceNonNil<GenericValue<T>>(__gotots_receiver_0).Value()",
+		"const __gotots_argument_0 = await goInterfaceNonNil<GenericValue<T>>(__gotots_receiver_0).Value();",
+		"return $go$copy_",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf(

@@ -5,6 +5,7 @@ import (
 	"go/types"
 	"slices"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
@@ -15,21 +16,20 @@ import (
 )
 
 type Selection struct {
-	owner               *types.Func
-	signature           *types.Signature
-	facet               api.CallableFacet
-	target              api.MethodTarget
-	memberSuffix        string
-	typeArguments       []tsgo.TypeNode
-	concretized         bool
-	concretization      api.GenericConcretizationReference
-	openKernel          bool
-	operations          []*api.GenericOperationContract
-	capabilities        []genericabi.Binding[tsgo.Expression]
-	statefulProfile     bool
-	canonicalParameters []int
-	canonicalResults    []int
-	requests            []api.RootRequest
+	owner           *types.Func
+	signature       *types.Signature
+	facet           api.CallableFacet
+	target          api.MethodTarget
+	memberSuffix    string
+	typeArguments   []tsgo.TypeNode
+	concretized     bool
+	concretization  api.GenericConcretizationReference
+	openKernel      bool
+	operations      []*api.GenericOperationContract
+	capabilities    []genericabi.Binding[tsgo.Expression]
+	statefulProfile bool
+	profile         []gostdlib.ProviderCallableProfileInterface
+	requests        []api.RootRequest
 }
 
 func Resolve(
@@ -195,8 +195,7 @@ func resolveStatefulBoundary(
 		return selection, err
 	}
 	selection.statefulProfile = true
-	selection.canonicalParameters = boundary.CanonicalParameters()
-	selection.canonicalResults = boundary.CanonicalResults()
+	selection.profile = boundary.Interfaces()
 	return selection, nil
 }
 
@@ -288,11 +287,13 @@ func (s Selection) FromProviderResults(
 		return emission, nil
 	}
 	if s.statefulProfile {
-		return providerboundary.FromProviderProfileResults(
+		return providerboundary.FromProviderProfileResultsForBridge(
 			context,
 			children,
+			nil,
+			"",
 			s.signature.Results(),
-			s.canonicalResults,
+			s.profile,
 			emission,
 		)
 	}
@@ -322,11 +323,13 @@ func (s Selection) providerArguments(
 		return slices.Clone(sourceArguments), nil, nil, nil
 	}
 	if s.statefulProfile {
-		return providerboundary.ToProviderProfileArguments(
+		return providerboundary.ToProviderProfileArgumentsForBridge(
 			context,
 			children,
 			s.signature.Params(),
-			s.canonicalParameters,
+			nil,
+			"",
+			s.profile,
 			sourceArguments,
 		)
 	}

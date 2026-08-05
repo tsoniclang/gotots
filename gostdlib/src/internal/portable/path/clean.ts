@@ -1,4 +1,4 @@
-import type { gostring } from "@gotots/runtime/scalars.js";
+import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 
 export function cleanSlashPath(path: gostring): gostring {
   if (path.length === 0) {

@@ -1,6 +1,8 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { Awaitable, bool, int64 } from "@gotots/runtime/scalars.js";
+import type { Awaitable, bool, int64 } from "@gotots/gostdlib/internal/scalars.js";
+
+import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 export interface Interface extends GoInterfaceValue {
   Len(): Awaitable<int64>;
@@ -20,20 +22,20 @@ export async function Search(
   length: int64,
   predicate: ((index: int64) => Awaitable<bool>) | undefined,
 ): Promise<int64> {
-  if (length < 0) {
+  if (length < 0n) {
     GoPanic.raiseRuntime("sort: negative length");
   }
   if (predicate === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
-  let low = 0;
+  let low = 0n;
   let high = length;
   while (low < high) {
-    const middle = low + Math.trunc((high - low) / 2);
+    const middle = low + (high - low) / 2n;
     if (await predicate(middle)) {
       high = middle;
     } else {
-      low = middle + 1;
+      low = middle + 1n;
     }
   }
   return low;
@@ -44,10 +46,13 @@ async function reorder(data: Interface | undefined): Promise<void> {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
   }
   const length = await data.Len();
-  if (!Number.isInteger(length) || length < 0) {
+  if (length < 0n) {
     GoPanic.raiseRuntime("sort: invalid interface length");
   }
-  const order = Array.from({ length }, (_value, index): number => index);
+  const order = Array.from(
+    { length: hostInteger(length) },
+    (_value, index): number => index,
+  );
   await sortOrder(data, order);
   await applyPermutation(data, order);
 }
@@ -64,8 +69,8 @@ async function sortOrder(data: Interface, order: number[]): Promise<void> {
         let takeRight = right < end && left >= middle;
         if (right < end && left < middle) {
           takeRight = await data.Less(
-            requiredIndex(order, right),
-            requiredIndex(order, left),
+            integerFromHost(requiredIndex(order, right)),
+            integerFromHost(requiredIndex(order, left)),
           );
         }
         if (takeRight) {
@@ -95,7 +100,7 @@ async function applyPermutation(
     if (source === target) {
       continue;
     }
-    await data.Swap(target, source);
+    await data.Swap(integerFromHost(target), integerFromHost(source));
     const displaced = requiredIndex(current, target);
     current[target] = wanted;
     current[source] = displaced;

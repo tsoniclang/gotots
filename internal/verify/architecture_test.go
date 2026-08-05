@@ -129,6 +129,7 @@ func verifyProductionFile(relative string, sourcePath string) error {
 		if importPath == "go/ast" || importPath == "go/types" {
 			if !strings.HasPrefix(relative, "internal/load/") &&
 				!strings.HasPrefix(relative, "internal/contracts/environment/") &&
+				!strings.HasPrefix(relative, "internal/contracts/externals/certify/") &&
 				!strings.HasPrefix(relative, "internal/contracts/gostdlib/certify/") &&
 				!strings.HasPrefix(relative, "internal/contracts/gostdlib/sourcecontract/") &&
 				!strings.HasPrefix(relative, "internal/emit/") {
@@ -324,8 +325,8 @@ import _ "reflect"
 `,
 		},
 		"semantic graph outside owner": {
-			relative: "internal/output/leak.go",
-			source: `package output
+			relative: "internal/contracts/externals/leak.go",
+			source: `package externals
 import _ "go/ast"
 `,
 		},

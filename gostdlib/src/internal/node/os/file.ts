@@ -5,7 +5,11 @@ import {
 } from "node:fs";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring, int64, uint64, uint8 } from "@gotots/runtime/scalars.js";
+import type { gostring, int, uint64, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import {
+  integerFromHost,
+  unsignedIntegerFromHost,
+} from "../../host-integer.js";
 import { state as ioState } from "../../../io.js";
 import { state as fsState } from "../../../io/fs.js";
 import {
@@ -14,7 +18,7 @@ import {
 } from "../../runtime/slice.js";
 import { nodeError } from "./error.js";
 
-const invalidDescriptor = 0xffffffffffffffff;
+const invalidDescriptor: uint64 = 0xffffffffffffffffn;
 
 interface FileDescriptor {
   readonly descriptor: number;
@@ -81,22 +85,22 @@ export function fileDescriptor(receiver: object | undefined): uint64 {
   if (state === undefined || state.closed) {
     return invalidDescriptor;
   }
-  return state.descriptor;
+  return unsignedIntegerFromHost(state.descriptor);
 }
 
 export function readFile(
   receiver: object | undefined,
   buffer: RuntimeSlice<uint8>,
-): [int64, GoError | undefined] {
+): [int, GoError | undefined] {
   if (receiver === undefined) {
-    return [0, fsState.ErrInvalid];
+    return [0n, fsState.ErrInvalid];
   }
   const state = descriptorOf(receiver);
   if (state === undefined) {
-    return [0, nodeError("invalid", "read")];
+    return [0n, nodeError("invalid", "read")];
   }
   if (state.closed) {
-    return [0, nodeError("closed", "read", state.name)];
+    return [0n, nodeError("closed", "read", state.name)];
   }
   const target = new Uint8Array(buffer.length);
   try {
@@ -108,28 +112,28 @@ export function readFile(
       null,
     );
     if (count === 0) {
-      return [0, ioState.EOF];
+      return [0n, ioState.EOF];
     }
     writeBytes(buffer, target.subarray(0, count));
-    return [count, undefined];
+    return [integerFromHost(count), undefined];
   } catch {
-    return [0, nodeError("operation", "read", state.name)];
+    return [0n, nodeError("operation", "read", state.name)];
   }
 }
 
 export function writeFile(
   receiver: object | undefined,
   buffer: RuntimeSlice<uint8>,
-): [int64, GoError | undefined] {
+): [int, GoError | undefined] {
   if (receiver === undefined) {
-    return [0, fsState.ErrInvalid];
+    return [0n, fsState.ErrInvalid];
   }
   const state = descriptorOf(receiver);
   if (state === undefined) {
-    return [0, nodeError("invalid", "write")];
+    return [0n, nodeError("invalid", "write")];
   }
   if (state.closed) {
-    return [0, nodeError("closed", "write", state.name)];
+    return [0n, nodeError("closed", "write", state.name)];
   }
   try {
     const count = writeSync(
@@ -139,30 +143,30 @@ export function writeFile(
       buffer.length,
       null,
     );
-    return [count, undefined];
+    return [integerFromHost(count), undefined];
   } catch {
-    return [0, nodeError("operation", "write", state.name)];
+    return [0n, nodeError("operation", "write", state.name)];
   }
 }
 
 export function writeFileString(
   receiver: object | undefined,
   text: gostring,
-): [int64, GoError | undefined] {
+): [int, GoError | undefined] {
   if (receiver === undefined) {
-    return [0, fsState.ErrInvalid];
+    return [0n, fsState.ErrInvalid];
   }
   const state = descriptorOf(receiver);
   if (state === undefined) {
-    return [0, nodeError("invalid", "write")];
+    return [0n, nodeError("invalid", "write")];
   }
   if (state.closed) {
-    return [0, nodeError("closed", "write", state.name)];
+    return [0n, nodeError("closed", "write", state.name)];
   }
   try {
-    return [writeSync(state.descriptor, text), undefined];
+    return [integerFromHost(writeSync(state.descriptor, text)), undefined];
   } catch {
-    return [0, nodeError("operation", "write", state.name)];
+    return [0n, nodeError("operation", "write", state.name)];
   }
 }
 

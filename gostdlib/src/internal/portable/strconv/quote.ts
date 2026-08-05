@@ -1,6 +1,7 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
-import type { gostring, int32, uint8 } from "@gotots/runtime/scalars.js";
+import type { gostring, int32, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import { hostInteger } from "../../host-integer.js";
 
 import { decodeRuneAt, encodeRune, RuneError, validRune } from "../utf8/codec.js";
 import { ErrSyntax } from "./number-error.js";
@@ -16,13 +17,13 @@ export function Quote(value: gostring): gostring {
   let result = '"';
   for (let index = 0; index < value.length; ) {
     const [rune, width] = decodeRuneAt(value, index);
-    if (rune === RuneError && width === 1) {
+    if (rune === RuneError && width === 1n) {
       result += `\\x${hex(value.charCodeAt(index), 2)}`;
       index += 1;
       continue;
     }
     result += quoteRuneBody(rune, '"');
-    index += width;
+    index += hostInteger(width);
   }
   return `${result}"`;
 }
@@ -68,11 +69,11 @@ export function Unquote(value: gostring): [gostring, GoError | undefined] {
       return ["", ErrSyntax];
     }
     const [rune, width] = decodeRuneAt(value, index);
-    if (rune === RuneError && width === 1) {
+    if (rune === RuneError && width === 1n) {
       return ["", ErrSyntax];
     }
-    result += value.slice(index, index + width);
-    index += width;
+    result += value.slice(index, index + hostInteger(width));
+    index += hostInteger(width);
     runes += 1;
   }
   if (quote === "'" && runes !== 1) {

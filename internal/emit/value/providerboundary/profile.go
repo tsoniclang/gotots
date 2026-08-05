@@ -333,12 +333,41 @@ func matchCallableProfileCandidate(
 	for _, identity := range profile.GuardInterfaces() {
 		guardIdentities[identity] = struct{}{}
 	}
+	viewDocuments := profile.CapabilityViews()
+	viewTypes := candidate.CapabilityViews()
+	if len(viewDocuments) != len(viewTypes) {
+		return matchedProfile{}, false, "capability-view count differs", nil
+	}
+	viewTargetIdentities := make(map[string]struct{}, len(viewDocuments))
+	for index, view := range viewDocuments {
+		baseIdentity, err := sourceObjectIdentity(viewTypes[index].Base().Obj())
+		if err != nil {
+			return matchedProfile{}, false, "", err
+		}
+		targetIdentity, err := sourceObjectIdentity(viewTypes[index].Target().Obj())
+		if err != nil {
+			return matchedProfile{}, false, "", err
+		}
+		if baseIdentity != view.BaseSourceIdentity ||
+			targetIdentity != view.TargetSourceIdentity {
+			return matchedProfile{}, false, "capability-view identity differs", nil
+		}
+		if selected.analyzer.nodes[baseIdentity] == nil {
+			return matchedProfile{}, false, "capability-view base is not transported", nil
+		}
+		viewTargetIdentities[targetIdentity] = struct{}{}
+	}
 	profileInterfaces := profile.Interfaces()
 	boundaryIdentities := make(map[string]struct{}, len(profileInterfaces))
 	for _, selectedInterface := range profileInterfaces {
-		if _, guard := guardIdentities[selectedInterface.SourceIdentity()]; !guard {
-			boundaryIdentities[selectedInterface.SourceIdentity()] = struct{}{}
+		identity := selectedInterface.SourceIdentity()
+		if _, guard := guardIdentities[identity]; guard {
+			continue
 		}
+		if _, capabilityTarget := viewTargetIdentities[identity]; capabilityTarget {
+			continue
+		}
+		boundaryIdentities[identity] = struct{}{}
 	}
 	expectedBoundaryIdentities := cloneIdentitySet(selected.affected)
 	for identity := range implemented {
@@ -356,6 +385,21 @@ func matchCallableProfileCandidate(
 		}
 		if err := selected.analyzer.collectProfileInterface(
 			guard,
+			certificate,
+		); err != nil {
+			return matchedProfile{}, false, "", err
+		}
+	}
+	for index, view := range viewTypes {
+		certificate, ok := profile.Interface(
+			viewDocuments[index].TargetSourceIdentity,
+		)
+		if !ok {
+			return matchedProfile{}, false,
+				"capability-view target certificate is absent", nil
+		}
+		if err := selected.analyzer.collectProfileInterface(
+			view.Target(),
 			certificate,
 		); err != nil {
 			return matchedProfile{}, false, "", err
