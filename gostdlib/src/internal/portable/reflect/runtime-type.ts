@@ -26,7 +26,10 @@ import {
   Value,
 } from "../../../reflect.js";
 import { ProviderError } from "../../runtime/error.js";
-import { bindRuntimeTypeResolver } from "./runtime-value.js";
+import {
+  bindRuntimeTypeResolver,
+  recordPointerDescriptor,
+} from "./runtime-value.js";
 
 export interface RuntimeStructFieldMetadata {
   readonly name: gostring;
@@ -319,6 +322,9 @@ export function createRuntimeType(
   const result = new RuntimeType(metadata, methodTokens);
   if (metadata.dynamicType !== undefined) {
     runtimeTypesByDynamicType.set(metadata.dynamicType, result);
+  }
+  if (metadata.kind === 22n && metadata.elem !== undefined) {
+    recordPointerDescriptor(result, metadata.elem);
   }
   return result;
 }

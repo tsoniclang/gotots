@@ -82,6 +82,36 @@ export interface RuntimeValueOperations {
     box: GoInterfaceValue,
   ) => readonly GoInterfaceValue[];
   readonly makeMap?: () => GoInterfaceValue;
+  readonly zero?: () => GoInterfaceValue;
+  readonly boxInt?: (value: int64) => GoInterfaceValue;
+  readonly boxUint?: (value: uint64) => GoInterfaceValue;
+  readonly boxFloat?: (value: float64) => GoInterfaceValue;
+  readonly boxBool?: (value: bool) => GoInterfaceValue;
+  readonly newPointer?: () => GoInterfaceValue;
+}
+
+const pointerDescriptors: Array<[Type, () => Type]> = [];
+
+// recordPointerDescriptor remembers one pointer-kind descriptor with its
+// lazy element thunk; the thunk is never called during registration so
+// forward descriptor references stay valid.
+export function recordPointerDescriptor(
+  type: Type,
+  element: () => Type,
+): void {
+  pointerDescriptors.push([type, element]);
+}
+
+// pointerDescriptorFor resolves the canonical pointer descriptor whose
+// element is the given descriptor, evaluating element thunks only at
+// lookup time.
+export function pointerDescriptorFor(element: Type): Type | undefined {
+  for (const entry of pointerDescriptors) {
+    if (entry[1]() === element) {
+      return entry[0];
+    }
+  }
+  return undefined;
 }
 
 const operationsByType = new Map<Type, RuntimeValueOperations>();

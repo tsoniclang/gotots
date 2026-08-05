@@ -73,14 +73,14 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 		)
 	}
 
-	convert, ok := byIdentity["reflect|kind=4|receiver=reflect.Value|name=Convert"]
+	deepEqual, ok := byIdentity["reflect|kind=4|receiver=|name=DeepEqual"]
 	if !ok {
-		t.Fatal("reflect.Value.Convert has no certified binding")
+		t.Fatal("reflect.DeepEqual has no certified binding")
 	}
-	if convert.Disposition() != gostdlib.DispositionPlaceholder {
+	if deepEqual.Disposition() != gostdlib.DispositionPlaceholder {
 		t.Fatalf(
-			"reflect.Value.Convert disposition = %v, want placeholder",
-			convert.Disposition(),
+			"reflect.DeepEqual disposition = %v, want placeholder",
+			deepEqual.Disposition(),
 		)
 	}
 
@@ -114,9 +114,9 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 	// implemented bodies retain their conservative private value-level
 	// dependencies resolved to exact symbols.
 	foundCanonical := false
-	for _, dependency := range convert.ImplementationDependencies() {
+	for _, dependency := range deepEqual.ImplementationDependencies() {
 		if dependency == "" {
-			t.Fatal("reflect.Value.Convert recorded an anonymous dependency")
+			t.Fatal("reflect.DeepEqual recorded an anonymous dependency")
 		}
 		if gostdlib.CanonicalPlaceholderDependency(dependency) {
 			foundCanonical = true
@@ -124,8 +124,8 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 	}
 	if !foundCanonical {
 		t.Fatalf(
-			"reflect.Value.Convert placeholder does not depend on the canonical placeholder symbol: %v",
-			convert.ImplementationDependencies(),
+			"reflect.DeepEqual placeholder does not depend on the canonical placeholder symbol: %v",
+			deepEqual.ImplementationDependencies(),
 		)
 	}
 	for _, dependency := range elem.ImplementationDependencies() {

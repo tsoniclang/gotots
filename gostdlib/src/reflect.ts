@@ -24,6 +24,7 @@ import {
 import { ProviderError } from "./internal/runtime/error.js";
 import { providerPlaceholder } from "./internal/runtime/placeholder.js";
 import {
+  pointerDescriptorFor,
   resolveRuntimeType,
   runtimeValueOperations,
   type RuntimeValueLocation,
@@ -141,7 +142,16 @@ export abstract class Value {
     );
   }
 
-  Addr(): Value { return providerPlaceholder("reflect.Value.Addr requires generated reflection metadata"); }
+  Addr(): Value {
+    if (!this.addressable || this.location === undefined) {
+      return GoPanic.raise(
+        new ProviderError(
+          "reflect.Value.Addr of unaddressable value",
+        ),
+      );
+    }
+    return new AddressValue(this.location);
+  }
 
   Bool(): bool {
     const operation = this.operations()?.bool;
@@ -168,7 +178,9 @@ export abstract class Value {
     }
     return bytes(box);
   }
-  CanInt(): bool { return providerPlaceholder("reflect.Value.CanInt requires generated reflection metadata"); }
+  CanInt(): bool {
+    return this.operations()?.int !== undefined;
+  }
   CanSet(): bool {
     return this.addressable &&
       this.location !== undefined &&
@@ -181,7 +193,80 @@ export abstract class Value {
     }
     return operation(this.source);
   }
-  Convert(_target: Type | undefined): Value { return providerPlaceholder("reflect.Value.Convert requires generated reflection metadata"); }
+  Convert(target: Type | undefined): Value {
+    const operations = this.operations();
+    const type = this.resolvedType();
+    if (operations === undefined || type === undefined) {
+      return this.operationPanic("Convert");
+    }
+    if (target === undefined) {
+      return GoPanic.raise(
+        new ProviderError("reflect: Value.Convert(nil)"),
+      );
+    }
+    const targetOperations = runtimeValueOperations(target);
+    const converted =
+      targetOperations === undefined
+        ? undefined
+        : this.convertedBox(operations, targetOperations);
+    if (converted === undefined) {
+      return GoPanic.raise(
+        new ProviderError(
+          `reflect.Value.Convert: value of type ${type.String()} cannot be converted to type ${target.String()}`,
+        ),
+      );
+    }
+    return new InterfaceValue(converted);
+  }
+
+  private convertedBox(
+    operations: RuntimeValueOperations,
+    target: RuntimeValueOperations,
+  ): GoInterfaceValue | undefined {
+    const box = this.source;
+    if (box === undefined) {
+      return undefined;
+    }
+    if (operations.int !== undefined || operations.uint !== undefined) {
+      const wide =
+        operations.int !== undefined
+          ? operations.int(box)
+          : operations.uint!(box);
+      if (target.boxInt !== undefined) {
+        return target.boxInt(wide);
+      }
+      if (target.boxUint !== undefined) {
+        return target.boxUint(wide);
+      }
+      if (target.boxFloat !== undefined) {
+        return target.boxFloat(globalThis.Number(wide));
+      }
+      if (target.boxString !== undefined) {
+        return target.boxString(stringFromRune(wide));
+      }
+      return undefined;
+    }
+    if (operations.float !== undefined) {
+      const wide = operations.float(box);
+      if (target.boxFloat !== undefined) {
+        return target.boxFloat(wide);
+      }
+      if (target.boxInt !== undefined) {
+        return target.boxInt(globalThis.BigInt(globalThis.Math.trunc(wide)));
+      }
+      if (target.boxUint !== undefined) {
+        return target.boxUint(globalThis.BigInt(globalThis.Math.trunc(wide)));
+      }
+      return undefined;
+    }
+    if (operations.string !== undefined) {
+      if (target.boxString !== undefined) {
+        return target.boxString(operations.string(box));
+      }
+      return undefined;
+    }
+    return undefined;
+  }
   Elem(): Value {
     const operation = this.operations()?.elem;
     if (operation === undefined || this.source === undefined) {
@@ -342,7 +427,14 @@ export abstract class Value {
     }
     return this.location;
   }
-  SetBool(_value: bool): void { return providerPlaceholder("reflect.Value.SetBool requires generated reflection metadata"); }
+  SetBool(value: bool): void {
+    const target = this.settableLocation("SetBool");
+    const box = this.operations()?.boxBool;
+    if (box === undefined) {
+      return this.operationPanic("SetBool");
+    }
+    target.set(box(value));
+  }
   SetBytes(value: RuntimeSlice<uint8>): void {
     const target = this.settableLocation("SetBytes");
     const operations = this.operations();
@@ -364,8 +456,22 @@ export abstract class Value {
     }
     target.set(boxBytes(value));
   }
-  SetFloat(_value: float64): void { return providerPlaceholder("reflect.Value.SetFloat requires generated reflection metadata"); }
-  SetInt(_value: int64): void { return providerPlaceholder("reflect.Value.SetInt requires generated reflection metadata"); }
+  SetFloat(value: float64): void {
+    const target = this.settableLocation("SetFloat");
+    const box = this.operations()?.boxFloat;
+    if (box === undefined) {
+      return this.operationPanic("SetFloat");
+    }
+    target.set(box(value));
+  }
+  SetInt(value: int64): void {
+    const target = this.settableLocation("SetInt");
+    const box = this.operations()?.boxInt;
+    if (box === undefined) {
+      return this.operationPanic("SetInt");
+    }
+    target.set(box(value));
+  }
   SetIterKey(iterator: MapIter | undefined): void {
     const target = this.settableLocation("SetIterKey");
     const state = mapIteratorState(iterator, "SetIterKey");
@@ -427,8 +533,22 @@ export abstract class Value {
     }
     target.set(box(value));
   }
-  SetUint(_value: uint64): void { return providerPlaceholder("reflect.Value.SetUint requires generated reflection metadata"); }
-  SetZero(): void { return providerPlaceholder("reflect.Value.SetZero requires generated reflection metadata"); }
+  SetUint(value: uint64): void {
+    const target = this.settableLocation("SetUint");
+    const box = this.operations()?.boxUint;
+    if (box === undefined) {
+      return this.operationPanic("SetUint");
+    }
+    target.set(box(value));
+  }
+  SetZero(): void {
+    const target = this.settableLocation("SetZero");
+    const zero = this.operations()?.zero;
+    if (zero === undefined) {
+      return this.operationPanic("SetZero");
+    }
+    target.set(zero());
+  }
 
   String(): gostring {
     if (this.source === undefined) {
@@ -485,6 +605,31 @@ class LocatedValue extends Value {
     addressable: bool = false,
   ) {
     super(source, location, addressable);
+  }
+}
+
+// AddressValue is the exact pointer view produced by Addr: it has no
+// interface box of its own, is always valid and non-nil, and Elem returns
+// the held addressable location.
+class AddressValue extends Value {
+  constructor(private readonly held: RuntimeValueLocation) {
+    super(undefined, undefined, false);
+  }
+
+  override IsValid(): bool {
+    return true;
+  }
+
+  override IsNil(): bool {
+    return false;
+  }
+
+  override Kind(): Kind {
+    return Pointer;
+  }
+
+  override Elem(): Value {
+    return new LocatedValue(this.held.get(), this.held, true);
   }
 }
 
@@ -777,16 +922,46 @@ export function MapOf(
   );
 }
 
-export function New(_type: Type | undefined): Value {
-  return providerPlaceholder("reflect.New requires generated reflection metadata");
+export function New(type: Type | undefined): Value {
+  if (type === undefined) {
+    return GoPanic.raise(new ProviderError("reflect: New(nil)"));
+  }
+  const pointerType = pointerDescriptorFor(type);
+  const operation =
+    pointerType === undefined
+      ? undefined
+      : runtimeValueOperations(pointerType)?.newPointer;
+  if (operation === undefined) {
+    return GoPanic.raise(
+      new ProviderError(
+        `reflect: New requires a generated pointer facet for ${type.String()}`,
+      ),
+    );
+  }
+  return new InterfaceValue(operation());
 }
 
-export function PointerTo(_type: Type | undefined): Type | undefined {
-  return providerPlaceholder("reflect.PointerTo requires generated reflection metadata");
+export function PointerTo(type: Type | undefined): Type | undefined {
+  if (type === undefined) {
+    return GoPanic.raise(new ProviderError("reflect: PointerTo(nil)"));
+  }
+  const pointerType = pointerDescriptorFor(type);
+  if (pointerType === undefined) {
+    return GoPanic.raise(
+      new ProviderError(
+        `reflect: PointerTo requires a generated descriptor for *${type.String()}`,
+      ),
+    );
+  }
+  return pointerType;
 }
 
-export function SliceOf(_type: Type | undefined): Type | undefined {
-  return providerPlaceholder("reflect.SliceOf requires generated reflection metadata");
+export function SliceOf(type: Type | undefined): Type | undefined {
+  return GoPanic.raise(
+    new ProviderError(
+      `reflect: SliceOf requires a generated descriptor for []${type === undefined ? "?" : type.String()}`,
+    ),
+  );
 }
 
 export function TypeAssert<T>(_value: Value): [T, bool] {
@@ -801,8 +976,35 @@ export function TypeOf(_value: GoInterfaceValue | undefined): Type | undefined {
   return providerPlaceholder("reflect.TypeOf requires generated reflection metadata");
 }
 
-export function Zero(_type: Type | undefined): Value {
-  return providerPlaceholder("reflect.Zero requires generated reflection metadata");
+export function Zero(type: Type | undefined): Value {
+  if (type === undefined) {
+    return GoPanic.raise(new ProviderError("reflect: Zero(nil)"));
+  }
+  const operation = runtimeValueOperations(type)?.zero;
+  if (operation === undefined) {
+    return GoPanic.raise(
+      new ProviderError(
+        `reflect: Zero requires a generated value facet for ${type.String()}`,
+      ),
+    );
+  }
+  return new InterfaceValue(operation());
+}
+
+// stringFromRune is the exact Go integer-to-string conversion: one rune,
+// with values outside the valid Unicode code point range replaced by
+// U+FFFD.
+function stringFromRune(value: int64 | uint64): gostring {
+  const code = globalThis.Number(value);
+  if (
+    !globalThis.Number.isInteger(code) ||
+    code < 0 ||
+    code > 0x10ffff ||
+    (code >= 0xd800 && code <= 0xdfff)
+  ) {
+    return "\uFFFD";
+  }
+  return globalThis.String.fromCodePoint(code);
 }
 
 const kindNames: readonly string[] = [

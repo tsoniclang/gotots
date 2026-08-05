@@ -379,7 +379,34 @@ func mapValueProperties(
 			)},
 		)),
 	)
+	zero := factory.ArrowFunction(
+		nil,
+		nil,
+		nil,
+		factory.TypeReferenceNode(
+			scaffold.boxType.EntityName(factory),
+			nil,
+		),
+		factory.EqualsGreaterThanToken(),
+		factory.ParenthesizedExpression(factory.NewExpression(
+			scaffold.adapter.Expression(factory),
+			nil,
+			[]tsgo.Expression{factory.CallExpression(
+				factory.PropertyAccessExpression(
+					runtimeMap.Expression(factory),
+					nil,
+					factory.Identifier("nil"),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{elementZero},
+				tsgo.NodeFlagsNone,
+			)},
+		)),
+	)
 	return []tsgo.ObjectLiteralElementLike{
+		expressionProperty(factory, "zero", zero),
 		expressionProperty(factory, "len", length),
 		expressionProperty(factory, "mapIndex", mapIndex),
 		expressionProperty(factory, "mapStore", mapStore),

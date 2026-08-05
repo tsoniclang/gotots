@@ -96,7 +96,30 @@ func pointerValueProperties(
 	)
 	return []tsgo.ObjectLiteralElementLike{
 		expressionProperty(factory, "elem", elem),
+		pointerZeroProperty(scaffold),
 	}, nil
+}
+
+// pointerZeroProperty is the boxed nil pointer of one pointer type.
+func pointerZeroProperty(
+	scaffold *locationScaffold,
+) tsgo.ObjectLiteralElementLike {
+	factory := scaffold.factory
+	return expressionProperty(factory, "zero", factory.ArrowFunction(
+		nil,
+		nil,
+		nil,
+		factory.TypeReferenceNode(
+			scaffold.boxType.EntityName(factory),
+			nil,
+		),
+		factory.EqualsGreaterThanToken(),
+		factory.ParenthesizedExpression(factory.NewExpression(
+			scaffold.adapter.Expression(factory),
+			nil,
+			[]tsgo.Expression{factory.Identifier("undefined")},
+		)),
+	))
 }
 
 // structValueProperties adds the numField and field callbacks of one
@@ -319,7 +342,65 @@ func pointerCellValueProperties(
 		factory.EqualsGreaterThanToken(),
 		body,
 	)
-	return []tsgo.ObjectLiteralElementLike{
+	properties := []tsgo.ObjectLiteralElementLike{
 		expressionProperty(factory, "elem", elem),
-	}, nil
+		pointerZeroProperty(scaffold),
+	}
+	if pointeeBasic, basicOK := types.Unalias(pointee).
+		Underlying().(*types.Basic); basicOK {
+		pointeeZero, zeroErr := scalarZeroExpression(
+			context,
+			factory,
+			pointeeBasic,
+		)
+		if zeroErr != nil {
+			return nil, zeroErr
+		}
+		if pointeeZero != nil {
+			runtimePointer, pointerErr := context.Names().Runtime(
+				api.RuntimePointer,
+				api.ImportPhaseValue,
+			)
+			if pointerErr != nil {
+				return nil, pointerErr
+			}
+			scaffold.requests = append(
+				scaffold.requests,
+				runtimePointer.Requests()...,
+			)
+			properties = append(properties, expressionProperty(
+				factory,
+				"newPointer",
+				factory.ArrowFunction(
+					nil,
+					nil,
+					nil,
+					factory.TypeReferenceNode(
+						scaffold.boxType.EntityName(factory),
+						nil,
+					),
+					factory.EqualsGreaterThanToken(),
+					factory.ParenthesizedExpression(
+						factory.NewExpression(
+							scaffold.adapter.Expression(factory),
+							nil,
+							[]tsgo.Expression{factory.CallExpression(
+								factory.PropertyAccessExpression(
+									runtimePointer.Expression(factory),
+									nil,
+									factory.Identifier("cell"),
+									tsgo.NodeFlagsNone,
+								),
+								nil,
+								nil,
+								[]tsgo.Expression{pointeeZero},
+								tsgo.NodeFlagsNone,
+							)},
+						),
+					),
+				),
+			))
+		}
+	}
+	return properties, nil
 }

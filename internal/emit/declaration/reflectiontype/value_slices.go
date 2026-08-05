@@ -357,6 +357,39 @@ func sliceValueProperties(
 		return nil, err
 	}
 	scaffold.requests = append(scaffold.requests, elementProduct.Requests()...)
+	properties = append(properties, expressionProperty(
+		factory,
+		"zero",
+		factory.ArrowFunction(
+			nil,
+			nil,
+			nil,
+			factory.TypeReferenceNode(
+				scaffold.boxType.EntityName(factory),
+				nil,
+			),
+			factory.EqualsGreaterThanToken(),
+			factory.ParenthesizedExpression(factory.NewExpression(
+				scaffold.adapter.Expression(factory),
+				nil,
+				[]tsgo.Expression{factory.CallExpression(
+					factory.PropertyAccessExpression(
+						runtimeSlice.Expression(factory),
+						nil,
+						factory.Identifier("nil"),
+						tsgo.NodeFlagsNone,
+					),
+					nil,
+					[]tsgo.TypeNode{factory.TypeReferenceNode(
+						elementProduct.EntityName(factory),
+						nil,
+					)},
+					nil,
+					tsgo.NodeFlagsNone,
+				)},
+			)),
+		),
+	))
 	filler := factory.CallExpression(
 		factory.PropertyAccessExpression(
 			factory.NewExpression(
