@@ -125,7 +125,7 @@ type DefinedValueRepresentationKind uint8
 const (
 	DefinedValueRepresentationInvalid DefinedValueRepresentationKind = iota
 	DefinedValueRepresentationGeneratedWrapper
-	DefinedValueRepresentationProviderIdentity
+	DefinedValueRepresentationProviderCanonical
 	DefinedValueRepresentationProviderOperations
 )
 
@@ -139,22 +139,12 @@ type DefinedValueRepresentation struct {
 	operations NameReference
 }
 
-func NewProviderIdentityDefinedValueRepresentation() (
-	DefinedValueRepresentation,
-	error,
-) {
-	return DefinedValueRepresentation{
-		kind: DefinedValueRepresentationProviderIdentity,
-	}, nil
-}
-
 func NewDefinedValueRepresentation(
 	kind DefinedValueRepresentationKind,
 	operations NameReference,
 ) (DefinedValueRepresentation, error) {
 	hasOperations := operations.Name() != ""
 	if !kind.Valid() ||
-		kind == DefinedValueRepresentationProviderIdentity ||
 		(kind == DefinedValueRepresentationProviderOperations) != hasOperations {
 		return DefinedValueRepresentation{}, &NameError{
 			Name:   operations.Name(),

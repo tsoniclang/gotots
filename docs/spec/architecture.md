@@ -728,6 +728,10 @@ change a translated source signature.
 A provider-owned named callable has the source type-parameter arity and the
 canonical indirect callable representation. A provider-private callable ABI is
 not a source type argument, default, constraint, or alternate public alias.
+Certification derives that canonical representation for every methodless named
+callable; no source-identity list selects it. A named callable with methods must
+instead have an explicit operations owner, because erasing its nominal carrier
+would erase observable behavior.
 When provider parameter or result representations differ from generated ones,
 the static provider facade owns one typed adapter at the crossing; ordinary
 generated declarations and values never inherit the provider ABI.
@@ -755,9 +759,10 @@ emission. Emission consumes this certified set and cannot discover profiles one
 call site at a time.
 
 An unnamed function parameter is a directly transported callable. A named
-function type is instead certified once by its defined-value representation and
-all uses reference that owner; it is not reclassified as a fresh direct callback
-at every parameter. If a recursively nested callable shape has no typed path
+function type is instead certified once by its defined-value representation;
+every generated use renders that certificate's canonical underlying callable
+shape rather than importing a provider-private alias or reclassifying the type
+at each parameter. If a recursively nested callable shape has no typed path
 representation in the current contract schema, certification rejects the
 provider surface explicitly rather than flattening it into its outer effect.
 

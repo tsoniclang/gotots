@@ -209,7 +209,7 @@ func TestManifestRequiresEffectsExactlyOnCallableBindings(t *testing.T) {
 	binding := &document.Modules[0].Bindings[0]
 	binding.Kind = gostdlib.BindingType
 	binding.Representation = gostdlib.RepresentationDirect
-	binding.DefinedValue = gostdlib.DefinedValueRepresentationIdentity
+	binding.DefinedValue = gostdlib.DefinedValueRepresentationCanonical
 	if _, err := gostdlib.Seal(document); err != nil {
 		t.Fatalf("canonical callable identity was rejected: %v", err)
 	}

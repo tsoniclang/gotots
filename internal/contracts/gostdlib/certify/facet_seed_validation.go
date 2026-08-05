@@ -78,35 +78,6 @@ func validateSeedIndexes(source []int) error {
 	return nil
 }
 
-func validateDefinedValueIdentities(source []string) (map[string]struct{}, error) {
-	result := make(map[string]struct{}, len(source))
-	for index, identity := range source {
-		if identity == "" {
-			return nil, certifyError(
-				"configure defined values",
-				identity,
-				"identity is empty",
-			)
-		}
-		if _, duplicate := result[identity]; duplicate {
-			return nil, certifyError(
-				"configure defined values",
-				identity,
-				"identity owner is duplicated",
-			)
-		}
-		if index != 0 && identity < source[index-1] {
-			return nil, certifyError(
-				"configure defined values",
-				identity,
-				"identities are not ordered",
-			)
-		}
-		result[identity] = struct{}{}
-	}
-	return result, nil
-}
-
 func validateProviderRepresentationSeeds(
 	source []providerRepresentationSeed,
 ) (

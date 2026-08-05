@@ -37,61 +37,37 @@ func TestDefinedValueRepresentationsAreTotalAndExclusive(t *testing.T) {
 		source,
 		modules,
 		operations,
-		map[string]struct{}{callableIdentity: {}},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	bindings := selected[0].Bindings
 	if bindings[0].DefinedValue != gostdlib.DefinedValueRepresentationOperations ||
-		bindings[1].DefinedValue != gostdlib.DefinedValueRepresentationIdentity {
+		bindings[1].DefinedValue != gostdlib.DefinedValueRepresentationCanonical {
 		t.Fatalf("defined value assignments = %#v", bindings)
 	}
 
 	for _, testCase := range []struct {
-		name       string
-		facets     []facetSeed
-		identities map[string]struct{}
-		want       string
+		name   string
+		facets []facetSeed
+		want   string
 	}{
 		{
-			name:       "missing",
-			identities: map[string]struct{}{callableIdentity: {}},
-			want:       basicIdentity,
+			name: "missing",
+			want: basicIdentity,
 		},
 		{
 			name:   "duplicate class",
 			facets: append(append([]facetSeed{}, operations...), operations...),
-			identities: map[string]struct{}{
-				callableIdentity: {},
-			},
-			want: "operation representation is duplicated",
+			want:   "operation representation is duplicated",
 		},
 		{
-			name:   "identity and operations",
-			facets: operations,
-			identities: map[string]struct{}{
-				basicIdentity:    {},
-				callableIdentity: {},
-			},
-			want: "missing or duplicated",
-		},
-		{
-			name: "non-callable identity",
-			identities: map[string]struct{}{
-				basicIdentity:    {},
-				callableIdentity: {},
-			},
-			want: "identity representation is not callable",
-		},
-		{
-			name:   "orphan",
-			facets: operations,
-			identities: map[string]struct{}{
-				callableIdentity: {},
-				"absent":         {},
-			},
-			want: "identity representation has no selected type",
+			name: "orphan",
+			facets: append(append([]facetSeed{}, operations...), facetSeed{
+				Kind:           gostdlib.FacetDefinedValueOperations,
+				SourceIdentity: "absent",
+			}),
+			want: "operation representation has no selected type",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -99,12 +75,25 @@ func TestDefinedValueRepresentationsAreTotalAndExclusive(t *testing.T) {
 				source,
 				modules,
 				testCase.facets,
-				testCase.identities,
 			)
 			if err == nil || !strings.Contains(err.Error(), testCase.want) {
 				t.Fatalf("error = %v, want %q", err, testCase.want)
 			}
 		})
+	}
+
+	methodIdentity := "example|kind=2|receiver=|name=MethodAction"
+	methodSource := goSurface{objects: map[string]goObject{
+		methodIdentity: {object: testDefinedCallableWithMethod("MethodAction")},
+	}}
+	methodModules := []gostdlib.ModuleDocument{{Bindings: []gostdlib.BindingDocument{{
+		Identity: methodIdentity,
+		Kind:     gostdlib.BindingType,
+		Access:   gostdlib.AccessExport,
+	}}}}
+	_, err = applyDefinedValueRepresentations(methodSource, methodModules, nil)
+	if err == nil || !strings.Contains(err.Error(), "no exact representation owner") {
+		t.Fatalf("method-bearing callable error = %v", err)
 	}
 }
 
@@ -121,4 +110,18 @@ func testDefinedType(name string, underlying types.Type) *types.TypeName {
 
 func testSignature() *types.Signature {
 	return types.NewSignatureType(nil, nil, nil, nil, nil, false)
+}
+
+func testDefinedCallableWithMethod(name string) *types.TypeName {
+	object := testDefinedType(name, testSignature())
+	named := object.Type().(*types.Named)
+	receiver := types.NewVar(token.NoPos, object.Pkg(), "receiver", named)
+	method := types.NewFunc(
+		token.NoPos,
+		object.Pkg(),
+		"Method",
+		types.NewSignatureType(receiver, nil, nil, nil, nil, false),
+	)
+	named.AddMethod(method)
+	return object
 }

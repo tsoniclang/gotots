@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 25,
+  "schemaVersion": 26,
   "packageName": "@gotots/gostdlib",
   "packageVersion": "0.0.0",
   "backend": "node",
@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "67ea43638501e69def92784a715bd71b5592f07ff9eb981fdb2cf26b3cba27d6",
-  "providerDigest": "2997a4631ad5e3a624fa9c25e8774ba49236208caa036dc45df7b2a6186777e4",
+  "providerDigest": "f835c22d12456082e3cd56b5d8cbe63302b7fdf7ce925fa25674758cf31f43f0",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -721,7 +721,7 @@
           "kind": "type",
           "access": "export",
           "representation": "direct",
-          "definedValue": "identity",
+          "definedValue": "canonical",
           "export": "CancelCauseFunc",
           "sourceSignature": "defined=context.CancelCauseFunc|underlying=func(cause error)",
           "sourceLocation": "context/context.go:255:6",
@@ -733,7 +733,7 @@
           "kind": "type",
           "access": "export",
           "representation": "direct",
-          "definedValue": "identity",
+          "definedValue": "canonical",
           "export": "CancelFunc",
           "sourceSignature": "defined=context.CancelFunc|underlying=func()",
           "sourceLocation": "context/context.go:231:6",
@@ -2381,7 +2381,7 @@
           "kind": "type",
           "access": "export",
           "representation": "direct",
-          "definedValue": "identity",
+          "definedValue": "canonical",
           "export": "WalkDirFunc",
           "sourceSignature": "defined=io/fs.WalkDirFunc|underlying=func(path string, d io/fs.DirEntry, err error) error",
           "sourceLocation": "io/fs/walk.go:69:6",
@@ -19342,5 +19342,5 @@
       ]
     }
   ],
-  "manifestDigest": "ff327ee51904a46bc1c903b7d9066040ddb9dbc16a2f5e34bf86adf5019206e1"
+  "manifestDigest": "ab3a527efb1bcc54144e67b8a38d941ac53ac17401cf9fdb8b5d775751db8e05"
 }

@@ -194,14 +194,12 @@ func SequenceTotal(sequence iter.Seq[int]) int {
 		"globalThis.Number(BigInt.asIntN(64, named_time.TimeDurationValueOperations.$project(value)))",
 		"named_time.TimeDurationValueOperations.$wrap(BigInt.asIntN(64, goNumberToBigInt(value)))",
 		"IterSeqValueOperations.$project",
-		"context__from_gostdlib.CancelFunc",
-		"fs__from_gostdlib.WalkDirFunc",
+		"cancel: (() => Awaitable<void>) | undefined",
+		"callback: (($0: gostring, $1:",
 		"const __gotots_callee_0 = cancel;",
 		"const __gotots_callee_1 = callback;",
 		"await __gotots_callee_0();",
-		".$from(await __gotots_callee_1(",
-		".$to(__gotots_argument_1)",
-		".$to(__gotots_argument_2)",
+		"return await __gotots_callee_1(",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("provider defined-value artifact lacks %q:\n%s", required, printed)
@@ -212,6 +210,8 @@ func SequenceTotal(sequence iter.Seq[int]) int {
 		"callback.$value",
 		"sequence.$value",
 		"value.$value",
+		"context__from_gostdlib.CancelFunc",
+		"fs__from_gostdlib.WalkDirFunc",
 		"new Duration(",
 		"GoMapHash.number(named_time.TimeDurationValueOperations.$project",
 	} {

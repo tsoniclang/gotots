@@ -29,8 +29,11 @@ func (n *File) DefinedValueRepresentation(
 		)
 	}
 	switch binding.providerDefinedValue {
-	case gostdlib.DefinedValueRepresentationIdentity:
-		return api.NewProviderIdentityDefinedValueRepresentation()
+	case gostdlib.DefinedValueRepresentationCanonical:
+		return api.NewDefinedValueRepresentation(
+			api.DefinedValueRepresentationProviderCanonical,
+			api.NameReference{},
+		)
 	case gostdlib.DefinedValueRepresentationOperations:
 		reference, providerOwned, err := n.providerFacetReference(
 			typeName,

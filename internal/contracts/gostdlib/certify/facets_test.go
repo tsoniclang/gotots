@@ -15,7 +15,7 @@ import (
 func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 20,
+	  "schemaVersion": 21,
   "facets": [],
   "genericOperationSets": [
     {
@@ -41,7 +41,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 		t.Fatalf("generic operations = %#v", selected)
 	}
 
-	payload = `{"schemaVersion":20,"facets":[],"genericOperationSets":[
+	payload = `{"schemaVersion":21,"facets":[],"genericOperationSets":[
   {"sourceIdentity":"x","operations":[
     {"kind":"invented","parameters":[],"results":[{"kind":"type-parameter","typeParameter":0}]}
   ]}
@@ -57,7 +57,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 func TestFacetMapOwnsClosedGenericCallableKernels(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 20,
+	  "schemaVersion": 21,
 	  "facets": [{
 	    "kind":"generic-callable-kernel",
 	    "sourceIdentity":"slices|kind=4|receiver=|name=Grow",
@@ -99,7 +99,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 ) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 20,
+	  "schemaVersion": 21,
   "facets": [],
   "providerStatefulProfiles": [{
     "sourceIdentity": "example.com/source|kind=2|receiver=|name=State",
@@ -152,7 +152,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 func TestImplementedResultRequiresContractOwner(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 20,
+	  "schemaVersion": 21,
   "facets": [],
   "providerCallableProfiles": [{
     "sourceIdentity": "example.com/source|kind=4|receiver=|name=Build",

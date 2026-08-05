@@ -102,7 +102,6 @@ func Generate(config Config) ([]byte, error) {
 			source,
 			seed,
 			seeds.genericOperations,
-			seeds.definedValueIdentities,
 			effectMarker,
 			scalarAliases,
 			&scalarErrors,
@@ -136,7 +135,6 @@ func Generate(config Config) ([]byte, error) {
 		source,
 		modules,
 		seeds.facets,
-		seeds.definedValueIdentities,
 	)
 	if err != nil {
 		client.Close()
@@ -203,7 +201,6 @@ func buildModule(
 	source goSurface,
 	seed moduleSeed,
 	genericOperations map[string][]gostdlib.GenericOperationDocument,
-	definedValueIdentities map[string]struct{},
 	effectMarker tsgo.ProjectExport,
 	scalarAliases map[string]string,
 	scalarErrors *[]error,

@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	SchemaVersion = 25
+	SchemaVersion = 26
 	PackageName   = "@gotots/gostdlib"
 )
 
@@ -59,12 +59,12 @@ type DefinedValueRepresentationKind string
 
 const (
 	DefinedValueRepresentationInvalid    DefinedValueRepresentationKind = ""
-	DefinedValueRepresentationIdentity   DefinedValueRepresentationKind = "identity"
+	DefinedValueRepresentationCanonical  DefinedValueRepresentationKind = "canonical"
 	DefinedValueRepresentationOperations DefinedValueRepresentationKind = "operations"
 )
 
 func (k DefinedValueRepresentationKind) Valid() bool {
-	return k == DefinedValueRepresentationIdentity ||
+	return k == DefinedValueRepresentationCanonical ||
 		k == DefinedValueRepresentationOperations
 }
 

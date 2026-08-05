@@ -19,6 +19,19 @@ func Emit(
 	if !ok {
 		return api.TypeEmission{}, false, nil
 	}
+	representation, err := model.Representation(context)
+	if err != nil {
+		return api.TypeEmission{}, true, err
+	}
+	if representation.Kind() ==
+		api.DefinedValueRepresentationProviderCanonical {
+		target, err := children.RepresentedType(
+			context.WithRole(api.RoleDefinedUnderlyingType),
+			source,
+			model.Underlying(),
+		)
+		return target, true, err
+	}
 	reference, err := context.Names().TypeReference(model.TypeName())
 	if err != nil {
 		return api.TypeEmission{}, true, err

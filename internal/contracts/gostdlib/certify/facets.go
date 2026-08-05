@@ -12,12 +12,11 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 )
 
-const facetMapSchemaVersion = 20
+const facetMapSchemaVersion = 21
 
 type facetMapDocument struct {
 	SchemaVersion                 int                               `json:"schemaVersion"`
 	Representations               []providerRepresentationSeed      `json:"representations,omitempty"`
-	DefinedValueIdentities        []string                          `json:"definedValueIdentities,omitempty"`
 	Facets                        []facetSeed                       `json:"facets"`
 	ProviderCallableProfiles      []providerCallableProfileSeed     `json:"providerCallableProfiles,omitempty"`
 	ProviderProtocols             []providerProtocolSeed            `json:"providerProtocols,omitempty"`
@@ -97,14 +96,13 @@ type providerInterfaceSeed struct {
 }
 
 type facetSeedSet struct {
-	facets                 []facetSeed
-	representations        []providerRepresentationSeed
-	callableProfiles       []providerCallableProfileSeed
-	statefulProfiles       []providerStatefulProfileSeed
-	definedValueIdentities map[string]struct{}
-	genericOperations      map[string][]gostdlib.GenericOperationDocument
-	providerInterfaces     []providerInterfaceSeed
-	providerCapabilities   []providerInterfaceCapabilitySeed
+	facets               []facetSeed
+	representations      []providerRepresentationSeed
+	callableProfiles     []providerCallableProfileSeed
+	statefulProfiles     []providerStatefulProfileSeed
+	genericOperations    map[string][]gostdlib.GenericOperationDocument
+	providerInterfaces   []providerInterfaceSeed
+	providerCapabilities []providerInterfaceCapabilitySeed
 }
 
 func readFacetSeeds(sourcePath string) (facetSeedSet, error) {
@@ -165,10 +163,6 @@ func readFacetSeeds(sourcePath string) (facetSeedSet, error) {
 	if err != nil {
 		return facetSeedSet{}, err
 	}
-	identities, err := validateDefinedValueIdentities(document.DefinedValueIdentities)
-	if err != nil {
-		return facetSeedSet{}, err
-	}
 	facets, err := validateFacetSeeds(document.Facets, representationIndex)
 	if err != nil {
 		return facetSeedSet{}, err
@@ -180,14 +174,13 @@ func readFacetSeeds(sourcePath string) (facetSeedSet, error) {
 		return facetSeedSet{}, err
 	}
 	return facetSeedSet{
-		facets:                 facets,
-		representations:        representations,
-		callableProfiles:       profiles,
-		statefulProfiles:       statefulProfiles,
-		definedValueIdentities: identities,
-		genericOperations:      operations,
-		providerInterfaces:     providerInterfaces,
-		providerCapabilities:   providerCapabilities,
+		facets:               facets,
+		representations:      representations,
+		callableProfiles:     profiles,
+		statefulProfiles:     statefulProfiles,
+		genericOperations:    operations,
+		providerInterfaces:   providerInterfaces,
+		providerCapabilities: providerCapabilities,
 	}, nil
 }
 

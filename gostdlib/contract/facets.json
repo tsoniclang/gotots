@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 20,
+  "schemaVersion": 21,
   "representations": [
     {
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
@@ -15,11 +15,6 @@
         "encoding/binary|kind=2|receiver=|name=ByteOrder"
       ]
     }
-  ],
-  "definedValueIdentities": [
-    "context|kind=2|receiver=|name=CancelCauseFunc",
-    "context|kind=2|receiver=|name=CancelFunc",
-    "io/fs|kind=2|receiver=|name=WalkDirFunc"
   ],
   "providerInterfaces": [
     {

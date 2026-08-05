@@ -40,7 +40,6 @@ func applyDefinedValueRepresentations(
 	source goSurface,
 	modules []gostdlib.ModuleDocument,
 	facets []facetSeed,
-	identities map[string]struct{},
 ) ([]gostdlib.ModuleDocument, error) {
 	operations := make(map[string]struct{})
 	for _, facet := range facets {
@@ -56,7 +55,7 @@ func applyDefinedValueRepresentations(
 		}
 		operations[facet.SourceIdentity] = struct{}{}
 	}
-	claimed := make(map[string]struct{}, len(identities)+len(operations))
+	claimed := make(map[string]struct{}, len(operations))
 	result := append([]gostdlib.ModuleDocument(nil), modules...)
 	for moduleIndex := range result {
 		result[moduleIndex].Bindings = append(
@@ -81,37 +80,22 @@ func applyDefinedValueRepresentations(
 			if !ok || typeName.IsAlias() || !definedValueType(typeName.Type()) {
 				continue
 			}
-			_, identity := identities[binding.Identity]
 			_, operation := operations[binding.Identity]
-			if identity == operation {
+			if operation {
+				binding.DefinedValue = gostdlib.DefinedValueRepresentationOperations
+				claimed[binding.Identity] = struct{}{}
+				continue
+			}
+			named, namedOK := types.Unalias(typeName.Type()).(*types.Named)
+			_, callable := typeName.Type().Underlying().(*types.Signature)
+			if !namedOK || !callable || named.NumMethods() != 0 {
 				return nil, certifyError(
 					"bind defined value",
 					binding.Identity,
-					"representation owner is missing or duplicated",
+					"defined value has no exact representation owner",
 				)
 			}
-			if identity {
-				if _, callable := typeName.Type().Underlying().(*types.Signature); !callable {
-					return nil, certifyError(
-						"bind defined value",
-						binding.Identity,
-						"identity representation is not callable",
-					)
-				}
-				binding.DefinedValue = gostdlib.DefinedValueRepresentationIdentity
-			} else {
-				binding.DefinedValue = gostdlib.DefinedValueRepresentationOperations
-			}
-			claimed[binding.Identity] = struct{}{}
-		}
-	}
-	for identity := range identities {
-		if _, ok := claimed[identity]; !ok {
-			return nil, certifyError(
-				"bind defined value",
-				identity,
-				"identity representation has no selected type",
-			)
+			binding.DefinedValue = gostdlib.DefinedValueRepresentationCanonical
 		}
 	}
 	for identity := range operations {

@@ -195,8 +195,8 @@ func (m Model) ProviderCarrier(context api.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return representation.Kind() == api.DefinedValueRepresentationProviderIdentity ||
-		representation.Kind() == api.DefinedValueRepresentationProviderOperations, nil
+	return representation.Kind() ==
+		api.DefinedValueRepresentationProviderOperations, nil
 }
 
 func (m Model) OperationContext(context api.Context) (api.Context, error) {
@@ -216,7 +216,7 @@ func (m Model) Project(
 		return api.ExpressionEmission{}, err
 	}
 	switch representation.Kind() {
-	case api.DefinedValueRepresentationProviderIdentity:
+	case api.DefinedValueRepresentationProviderCanonical:
 		return value, nil
 	case api.DefinedValueRepresentationProviderOperations:
 		operations, ok := representation.Operations()
@@ -281,7 +281,7 @@ func (m Model) Wrap(
 		return api.ExpressionEmission{}, err
 	}
 	switch representation.Kind() {
-	case api.DefinedValueRepresentationProviderIdentity:
+	case api.DefinedValueRepresentationProviderCanonical:
 		return value, nil
 	case api.DefinedValueRepresentationProviderOperations:
 		operations, ok := representation.Operations()
