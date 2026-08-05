@@ -96,6 +96,10 @@
       "types": "./dist/src/internal/facets/named-encoding-binary.d.ts",
       "default": "./dist/src/internal/facets/named-encoding-binary.js"
     },
+    "./internal/facets/named-bytes.js": {
+      "types": "./dist/src/internal/facets/named-bytes.d.ts",
+      "default": "./dist/src/internal/facets/named-bytes.js"
+    },
     "./internal/facets/named-flag.js": {
       "types": "./dist/src/internal/facets/named-flag.d.ts",
       "default": "./dist/src/internal/facets/named-flag.js"
@@ -119,6 +123,10 @@
     "./internal/facets/named-net-url.js": {
       "types": "./dist/src/internal/facets/named-net-url.d.ts",
       "default": "./dist/src/internal/facets/named-net-url.js"
+    },
+    "./internal/facets/named-os.js": {
+      "types": "./dist/src/internal/facets/named-os.d.ts",
+      "default": "./dist/src/internal/facets/named-os.js"
     },
     "./internal/facets/named-runtime-metrics.js": {
       "types": "./dist/src/internal/facets/named-runtime-metrics.d.ts",

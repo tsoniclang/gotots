@@ -1431,6 +1431,10 @@
       "typeArguments": [
         "go:universe|error",
         "io|kind=2|receiver=|name=Reader"
+      ],
+      "operations": [
+        "assign",
+        "copy"
       ]
     },
     {
@@ -1471,6 +1475,10 @@
       "typeArguments": [
         "go:universe|error",
         "io|kind=2|receiver=|name=Writer"
+      ],
+      "operations": [
+        "assign",
+        "copy"
       ]
     },
     {
@@ -1496,6 +1504,10 @@
         "compress/flate|kind=2|receiver=|name=Reader",
         "go:universe|error",
         "io|kind=2|receiver=|name=ReadCloser"
+      ],
+      "operations": [
+        "assign",
+        "copy"
       ]
     },
     {
@@ -1513,6 +1525,10 @@
         "go:universe|error"
       ],
       "operations": [
+        "assign",
+        "copy",
+        "equal",
+        "hash",
         "make",
         "storage"
       ]
@@ -1707,6 +1723,50 @@
     },
     {
       "kind": "named-struct-operations",
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "BufioReaderOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "BufioWriterOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "bytes|kind=2|receiver=|name=Buffer",
+      "specifier": "@gotots/gostdlib/internal/facets/named-bytes.js",
+      "sourcePath": "src/internal/facets/named-bytes.ts",
+      "export": "BytesBufferOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "compress/gzip|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip.js",
+      "sourcePath": "src/internal/facets/provider-compress-gzip.ts",
+      "export": "GzipReaderOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
       "sourceIdentity": "encoding/binary|kind=2|receiver=|name=bigEndian",
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
       "sourcePath": "src/internal/facets/named-encoding-binary.ts",
@@ -1760,6 +1820,10 @@
       "sourcePath": "src/internal/facets/named-io-fs.ts",
       "export": "IoFsPathErrorOperations",
       "capabilities": [
+        "assign",
+        "copy",
+        "equal",
+        "hash",
         "make",
         "storage"
       ],
@@ -1799,6 +1863,19 @@
         "storage"
       ],
       "storageExport": "NetUrlURLStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "os|kind=2|receiver=|name=File",
+      "specifier": "@gotots/gostdlib/internal/facets/named-os.js",
+      "sourcePath": "src/internal/facets/named-os.ts",
+      "export": "OsFileOperations",
+      "capabilities": [
+        "assign",
+        "copy",
+        "equal",
+        "hash"
+      ]
     },
     {
       "kind": "named-struct-operations",
@@ -2100,6 +2177,19 @@
         "zero"
       ],
       "storageExport": "SyncAtomicUint64Storage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "strings|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/named-strings.js",
+      "sourcePath": "src/internal/facets/named-strings.ts",
+      "export": "StringsReaderOperations",
+      "capabilities": [
+        "assign",
+        "copy",
+        "equal",
+        "hash"
+      ]
     },
     {
       "kind": "named-struct-operations",

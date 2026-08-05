@@ -46,6 +46,28 @@ export class FileMode {
     return (this.value & modeTypeMask) === 0;
   }
 
+  String(): gostring {
+    const typeLetters = "dalTLDpSugct?";
+    let result = "";
+    for (let index = 0; index < typeLetters.length; index += 1) {
+      const mask = 2 ** (31 - index);
+      if ((this.value & mask) !== 0) {
+        result += typeLetters[index] ?? "";
+      }
+    }
+    if (result === "") {
+      result = "-";
+    }
+    const permissionLetters = "rwxrwxrwx";
+    for (let index = 0; index < permissionLetters.length; index += 1) {
+      const mask = 2 ** (8 - index);
+      result += (this.value & mask) !== 0
+        ? permissionLetters[index] ?? ""
+        : "-";
+    }
+    return result;
+  }
+
   Type(): FileMode {
     return new FileMode((this.value & modeTypeMask) >>> 0);
   }
@@ -97,22 +119,6 @@ export class PathError extends WrappedProviderError {
       return "<nil>";
     }
     return receiver.Error();
-  }
-
-  static $make(
-    operation: gostring,
-    path: gostring,
-    failure: GoError | undefined,
-  ): PathError {
-    return new PathError(operation, path, failure);
-  }
-
-  static $storageOf(source: PathError): PathError {
-    return source;
-  }
-
-  static $fromStorage(source: PathError): PathError {
-    return source;
   }
 
   Error(): gostring {

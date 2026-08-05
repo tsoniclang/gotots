@@ -14,6 +14,7 @@ import {
 import { bytes, writeBytes } from "../runtime/slice.js";
 import { goInterfaceEqual } from "../runtime/interface.js";
 import { Time, UnixMilli } from "../../time.js";
+import { timeRepresentationCopy } from "../portable/time/time.js";
 import {
   CanonicalBoundaryError,
 } from "./provider-io-contract.js";
@@ -154,8 +155,35 @@ export class CanonicalGzipReader<
 
   constructor(
     public Header: Header,
-    private readonly state: CanonicalGzipReaderState<Failure>,
+    private state: CanonicalGzipReaderState<Failure>,
   ) {}
+
+  static $copy<
+    FlateReader extends GoInterfaceValue,
+    Failure extends CanonicalError,
+    ReadCloser extends GoInterfaceValue,
+  >(
+    source: CanonicalGzipReader<FlateReader, Failure, ReadCloser>,
+  ): CanonicalGzipReader<FlateReader, Failure, ReadCloser> {
+    return new CanonicalGzipReader(
+      copyHeader(source.Header),
+      source.state,
+    );
+  }
+
+  static $assign<
+    FlateReader extends GoInterfaceValue,
+    Failure extends CanonicalError,
+    ReadCloser extends GoInterfaceValue,
+  >(
+    target: CanonicalGzipReader<FlateReader, Failure, ReadCloser>,
+    source: CanonicalGzipReader<FlateReader, Failure, ReadCloser>,
+  ): void {
+    const header = copyHeader(source.Header);
+    const state = source.state;
+    target.Header = header;
+    target.state = state;
+  }
 
   static Close<
     FlateReader extends GoInterfaceValue,
@@ -198,6 +226,39 @@ export class CanonicalGzipReader<
   ): Promise<[int, CanonicalError | undefined]> {
     return this.state.Read(destination, recovery);
   }
+}
+
+export class GzipReaderOperations {
+  static $copy<
+    FlateReader extends GoInterfaceValue,
+    Failure extends CanonicalError,
+    ReadCloser extends GoInterfaceValue,
+  >(
+    source: CanonicalGzipReader<FlateReader, Failure, ReadCloser>,
+  ): CanonicalGzipReader<FlateReader, Failure, ReadCloser> {
+    return CanonicalGzipReader.$copy(source);
+  }
+
+  static $assign<
+    FlateReader extends GoInterfaceValue,
+    Failure extends CanonicalError,
+    ReadCloser extends GoInterfaceValue,
+  >(
+    target: CanonicalGzipReader<FlateReader, Failure, ReadCloser>,
+    source: CanonicalGzipReader<FlateReader, Failure, ReadCloser>,
+  ): void {
+    CanonicalGzipReader.$assign(target, source);
+  }
+}
+
+function copyHeader(source: Header): Header {
+  return new Header(
+    source.Comment,
+    source.Extra.slice(0, source.Extra.length, source.Extra.capacity),
+    timeRepresentationCopy(source.ModTime),
+    source.Name,
+    source.OS,
+  );
 }
 
 async function initializeGzipReader<Failure extends CanonicalError>(

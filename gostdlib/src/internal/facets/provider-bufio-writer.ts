@@ -19,20 +19,42 @@ export type {
 const defaultBufferSize = 4096;
 
 class WriterBuffer<Failure> {
-  readonly #values: number[] = [];
+  readonly #values: number[];
   readonly #shortWrite: Failure;
+  #length: number;
   #pendingFailure: Failure | undefined;
 
-  constructor(shortWrite: Failure) {
+  constructor(
+    shortWrite: Failure,
+    values: number[] = [],
+    length = 0,
+    pendingFailure: Failure | undefined = undefined,
+  ) {
     this.#shortWrite = shortWrite;
+    this.#values = values;
+    this.#length = length;
+    this.#pendingFailure = pendingFailure;
+  }
+
+  copy(): WriterBuffer<Failure> {
+    return new WriterBuffer(
+      this.#shortWrite,
+      this.#values,
+      this.#length,
+      this.#pendingFailure,
+    );
+  }
+
+  get shortWrite(): Failure {
+    return this.#shortWrite;
   }
 
   get length(): number {
-    return this.#values.length;
+    return this.#length;
   }
 
   get available(): number {
-    return defaultBufferSize - this.#values.length;
+    return defaultBufferSize - this.#length;
   }
 
   get failure(): Failure | undefined {
@@ -40,7 +62,7 @@ class WriterBuffer<Failure> {
   }
 
   source(): RuntimeSlice<uint8> {
-    return byteSlice(this.#values);
+    return byteSlice(this.#values.slice(0, this.#length));
   }
 
   acceptFailure(failure: Failure | undefined): void {
@@ -51,30 +73,34 @@ class WriterBuffer<Failure> {
     count: int,
     reportedFailure: Failure | undefined,
   ): Failure | undefined {
-    const bufferedLength = this.#values.length;
+    const bufferedLength = this.#length;
     const hostCount = hostInteger(count);
     const failure = hostCount < bufferedLength && reportedFailure === undefined
       ? this.#shortWrite
       : reportedFailure;
     if (failure !== undefined) {
       if (hostCount > 0) {
-        this.#values.splice(0, Math.min(hostCount, bufferedLength));
+        const accepted = Math.min(hostCount, bufferedLength);
+        this.#values.copyWithin(0, accepted, bufferedLength);
+        this.#length = bufferedLength - accepted;
       }
       this.#pendingFailure = failure;
       return failure;
     }
-    this.#values.splice(0, bufferedLength);
+    this.#length = 0;
     return undefined;
   }
 
   append(source: RuntimeSlice<uint8>, offset: number, count: number): void {
     for (let index = 0; index < count; index += 1) {
-      this.#values.push(source.get(offset + index));
+      this.#values[this.#length + index] = source.get(offset + index);
     }
+    this.#length += count;
   }
 
   appendByte(value: uint8): void {
-    this.#values.push(value);
+    this.#values[this.#length] = value;
+    this.#length += 1;
   }
 }
 
@@ -82,8 +108,8 @@ export class CanonicalBufioWriter<
   Failure extends GoInterfaceValue,
   Target extends CanonicalWriter<Failure>,
 > {
-  readonly #state: WriterBuffer<Failure>;
-  readonly #target: Target | undefined;
+  #state: WriterBuffer<Failure>;
+  #target: Target | undefined;
 
   constructor(
     target: Target | undefined,
@@ -91,6 +117,33 @@ export class CanonicalBufioWriter<
   ) {
     this.#target = target;
     this.#state = new WriterBuffer(shortWrite);
+  }
+
+  static $copy<
+    Failure extends GoInterfaceValue,
+    Target extends CanonicalWriter<Failure>,
+  >(
+    source: CanonicalBufioWriter<Failure, Target>,
+  ): CanonicalBufioWriter<Failure, Target> {
+    const target = new CanonicalBufioWriter(
+      source.#target,
+      source.#state.shortWrite,
+    );
+    target.#state = source.#state.copy();
+    return target;
+  }
+
+  static $assign<
+    Failure extends GoInterfaceValue,
+    Target extends CanonicalWriter<Failure>,
+  >(
+    target: CanonicalBufioWriter<Failure, Target>,
+    source: CanonicalBufioWriter<Failure, Target>,
+  ): void {
+    const state = source.#state.copy();
+    const providerTarget = source.#target;
+    target.#state = state;
+    target.#target = providerTarget;
   }
 
   static Flush<
@@ -184,6 +237,27 @@ export class CanonicalBufioWriter<
     }
     this.#state.appendByte(value);
     return undefined;
+  }
+}
+
+export class BufioWriterOperations {
+  static $copy<
+    Failure extends GoInterfaceValue,
+    Target extends CanonicalWriter<Failure>,
+  >(
+    source: CanonicalBufioWriter<Failure, Target>,
+  ): CanonicalBufioWriter<Failure, Target> {
+    return CanonicalBufioWriter.$copy(source);
+  }
+
+  static $assign<
+    Failure extends GoInterfaceValue,
+    Target extends CanonicalWriter<Failure>,
+  >(
+    target: CanonicalBufioWriter<Failure, Target>,
+    source: CanonicalBufioWriter<Failure, Target>,
+  ): void {
+    CanonicalBufioWriter.$assign(target, source);
   }
 }
 

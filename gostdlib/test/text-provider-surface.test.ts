@@ -213,7 +213,7 @@ test("receiver operations are class-owned static members", () => {
     Object.getOwnPropertyNames(bytes.Buffer)
       .filter((name) => !["length", "name", "prototype"].includes(name))
       .sort(),
-    ["Available", "AvailableBuffer", "Grow", "Len", "Next", "Read", "Write"].sort(),
+    ["Available", "AvailableBuffer", "Grow", "Len", "Next", "Read", "String", "Write"].sort(),
   );
 });
 

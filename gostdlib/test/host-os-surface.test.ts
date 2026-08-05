@@ -72,6 +72,7 @@ test("host OS modules expose only selected clean Go names", () => {
     "WriteString",
   ]);
   assert.deepEqual(staticMembers(os.Process), ["Signal"]);
+  assert.deepEqual(staticMembers(FsPathError), ["Error", "Unwrap"]);
   assert.deepEqual(staticMembers(exec.Cmd), ["Output"]);
   assert.deepEqual(staticMembers(flag.FlagSet), ["Bool", "Parse", "String"]);
   assert.deepEqual(

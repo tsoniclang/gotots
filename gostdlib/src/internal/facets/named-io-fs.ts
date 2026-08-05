@@ -1,10 +1,13 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
+import { GoMapHash } from "@gotots/runtime/map.js";
+import type { GoError } from "@gotots/runtime/interface-value.js";
 import type { GoRecovery } from "@gotots/runtime/panic.js";
 import type { gostring } from "@gotots/gostdlib/internal/scalars.js";
 import type { uint32 } from "@gotots/gostdlib/internal/scalars.js";
 
 import { FileMode, PathError } from "../../io/fs.js";
 import type { CanonicalError } from "./provider-io-contract.js";
+import { goInterfaceEqual } from "../runtime/interface.js";
 
 export type { CanonicalError } from "./provider-io-contract.js";
 
@@ -20,7 +23,48 @@ export class IoFsFileModeValueOperations {
 
 export type IoFsPathErrorStorage = PathError;
 
-export const IoFsPathErrorOperations = PathError;
+export class IoFsPathErrorOperations {
+  static $make(
+    operation: gostring,
+    path: gostring,
+    failure: GoError | undefined,
+  ): PathError {
+    return new PathError(operation, path, failure);
+  }
+
+  static $copy(source: PathError): PathError {
+    return new PathError(source.Op, source.Path, source.Err);
+  }
+
+  static $assign(target: PathError, source: PathError): void {
+    const operation = source.Op;
+    const path = source.Path;
+    const failure = source.Err;
+    target.Op = operation;
+    target.Path = path;
+    target.Err = failure;
+  }
+
+  static $equal(left: PathError, right: PathError): boolean {
+    return left.Op === right.Op &&
+      left.Path === right.Path &&
+      goInterfaceEqual(left.Err, right.Err);
+  }
+
+  static $hash(source: PathError): number {
+    let hash = GoMapHash.string(source.Op);
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.Path));
+    return GoMapHash.mix(hash, source.Err?.$go$hash() ?? 0);
+  }
+
+  static $storageOf(source: PathError): IoFsPathErrorStorage {
+    return source;
+  }
+
+  static $fromStorage(source: IoFsPathErrorStorage): PathError {
+    return source;
+  }
+}
 
 export class CanonicalPathError<Failure extends CanonicalError> {
   constructor(
@@ -35,6 +79,41 @@ export class CanonicalPathError<Failure extends CanonicalError> {
     failure: Failure | undefined,
   ): CanonicalPathError<Failure> {
     return new CanonicalPathError(operation, path, failure);
+  }
+
+  static $copy<Failure extends CanonicalError>(
+    source: CanonicalPathError<Failure>,
+  ): CanonicalPathError<Failure> {
+    return new CanonicalPathError(source.Op, source.Path, source.Err);
+  }
+
+  static $assign<Failure extends CanonicalError>(
+    target: CanonicalPathError<Failure>,
+    source: CanonicalPathError<Failure>,
+  ): void {
+    const operation = source.Op;
+    const path = source.Path;
+    const failure = source.Err;
+    target.Op = operation;
+    target.Path = path;
+    target.Err = failure;
+  }
+
+  static $equal<Failure extends CanonicalError>(
+    left: CanonicalPathError<Failure>,
+    right: CanonicalPathError<Failure>,
+  ): boolean {
+    return left.Op === right.Op &&
+      left.Path === right.Path &&
+      goInterfaceEqual(left.Err, right.Err);
+  }
+
+  static $hash<Failure extends CanonicalError>(
+    source: CanonicalPathError<Failure>,
+  ): number {
+    let hash = GoMapHash.string(source.Op);
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.Path));
+    return GoMapHash.mix(hash, source.Err?.$go$hash() ?? 0);
   }
 
   static $storageOf<Failure extends CanonicalError>(

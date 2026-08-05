@@ -3,6 +3,7 @@ import {
   readSync,
   writeSync,
 } from "node:fs";
+import { GoMapHash } from "@gotots/runtime/map.js";
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type { gostring, int, uint64, uint8 } from "@gotots/gostdlib/internal/scalars.js";
@@ -53,6 +54,24 @@ export function attachStandardFileDescriptor(
     closeDescriptor: true,
     closed: false,
   });
+}
+
+export function assignFileValue(target: object, source: object): void {
+  const state = descriptors.get(source);
+  if (state === undefined) {
+    descriptors.delete(target);
+    return;
+  }
+  descriptors.set(target, state);
+}
+
+export function fileValueEqual(left: object, right: object): boolean {
+  return descriptors.get(left) === descriptors.get(right);
+}
+
+export function fileValueHash(source: object): number {
+  const state = descriptors.get(source);
+  return state === undefined ? 0 : GoMapHash.object(state);
 }
 
 export function closeFile(receiver: object | undefined): GoError | undefined {

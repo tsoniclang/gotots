@@ -19,11 +19,34 @@ export type {
 const defaultBufferSize = 4096;
 
 class ReaderBuffer<Failure> {
-  readonly #values: number[] = [];
+  readonly #values: number[];
+  #read: number;
+  #written: number;
   #pendingFailure: Failure | undefined;
 
+  constructor(
+    values: number[] = [],
+    read = 0,
+    written = 0,
+    pendingFailure: Failure | undefined = undefined,
+  ) {
+    this.#values = values;
+    this.#read = read;
+    this.#written = written;
+    this.#pendingFailure = pendingFailure;
+  }
+
+  copy(): ReaderBuffer<Failure> {
+    return new ReaderBuffer(
+      this.#values,
+      this.#read,
+      this.#written,
+      this.#pendingFailure,
+    );
+  }
+
   shouldFill(): boolean {
-    return this.#values.length === 0 && this.#pendingFailure === undefined;
+    return this.#read === this.#written && this.#pendingFailure === undefined;
   }
 
   accept(
@@ -32,8 +55,10 @@ class ReaderBuffer<Failure> {
     failure: Failure | undefined,
   ): void {
     const hostCount = hostInteger(count);
+    this.#read = 0;
+    this.#written = hostCount;
     for (let index = 0; index < hostCount; index += 1) {
-      this.#values.push(source.get(index));
+      this.#values[index] = source.get(index);
     }
     this.#pendingFailure = failure;
   }
@@ -43,20 +68,22 @@ class ReaderBuffer<Failure> {
   }
 
   read(destination: RuntimeSlice<uint8>): [int, Failure | undefined] {
-    if (this.#values.length === 0) {
+    if (this.#read === this.#written) {
       return [0n, this.#takeFailure()];
     }
-    const count = Math.min(destination.length, this.#values.length);
-    writeBytes(destination, this.#values.slice(0, count));
-    this.#values.splice(0, count);
+    const count = Math.min(destination.length, this.#written - this.#read);
+    writeBytes(destination, this.#values.slice(this.#read, this.#read + count));
+    this.#read += count;
     return [integerFromHost(count), undefined];
   }
 
   readByte(): [uint8, Failure | undefined] {
-    const value = this.#values.shift();
-    return value === undefined
-      ? [0, this.#takeFailure()]
-      : [value, undefined];
+    if (this.#read === this.#written) {
+      return [0, this.#takeFailure()];
+    }
+    const value = this.#values[this.#read] ?? 0;
+    this.#read += 1;
+    return [value, undefined];
   }
 
   #takeFailure(): Failure | undefined {
@@ -70,9 +97,9 @@ export class CanonicalBufioReader<
   Failure extends GoInterfaceValue,
   Source extends CanonicalReader<Failure>,
 > {
-  readonly #state = new ReaderBuffer<Failure>();
-  readonly #source: Source | undefined;
-  readonly #noProgress: Failure;
+  #state = new ReaderBuffer<Failure>();
+  #source: Source | undefined;
+  #noProgress: Failure;
 
   constructor(
     source: Source | undefined,
@@ -80,6 +107,32 @@ export class CanonicalBufioReader<
   ) {
     this.#source = source;
     this.#noProgress = noProgress;
+  }
+
+  static $copy<
+    Failure extends GoInterfaceValue,
+    Source extends CanonicalReader<Failure>,
+  >(
+    source: CanonicalBufioReader<Failure, Source>,
+  ): CanonicalBufioReader<Failure, Source> {
+    const target = new CanonicalBufioReader(source.#source, source.#noProgress);
+    target.#state = source.#state.copy();
+    return target;
+  }
+
+  static $assign<
+    Failure extends GoInterfaceValue,
+    Source extends CanonicalReader<Failure>,
+  >(
+    target: CanonicalBufioReader<Failure, Source>,
+    source: CanonicalBufioReader<Failure, Source>,
+  ): void {
+    const state = source.#state.copy();
+    const providerSource = source.#source;
+    const noProgress = source.#noProgress;
+    target.#state = state;
+    target.#source = providerSource;
+    target.#noProgress = noProgress;
   }
 
   static Read<
@@ -163,6 +216,27 @@ export class CanonicalBufioReader<
       }
     }
     this.#state.setFailure(this.#noProgress);
+  }
+}
+
+export class BufioReaderOperations {
+  static $copy<
+    Failure extends GoInterfaceValue,
+    Source extends CanonicalReader<Failure>,
+  >(
+    source: CanonicalBufioReader<Failure, Source>,
+  ): CanonicalBufioReader<Failure, Source> {
+    return CanonicalBufioReader.$copy(source);
+  }
+
+  static $assign<
+    Failure extends GoInterfaceValue,
+    Source extends CanonicalReader<Failure>,
+  >(
+    target: CanonicalBufioReader<Failure, Source>,
+    source: CanonicalBufioReader<Failure, Source>,
+  ): void {
+    CanonicalBufioReader.$assign(target, source);
   }
 }
 

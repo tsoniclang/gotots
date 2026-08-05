@@ -77,6 +77,16 @@ export class Time {
     return receiver.UnmarshalText(source);
   }
 
+  static UnmarshalJSON(
+    receiver: Time | undefined,
+    source: RuntimeSlice<uint8>,
+  ): GoError | undefined {
+    if (receiver === undefined) {
+      return GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
+    }
+    return receiver.UnmarshalJSON(source);
+  }
+
   Add(d: Duration): Time {
     if (this.epochMilliseconds === undefined) {
       return new Time();
@@ -226,6 +236,22 @@ export class Time {
     this.offsetSeconds = parsed.offsetSeconds;
     this.zoneName = parsed.zoneName;
     return undefined;
+  }
+
+  UnmarshalJSON(source: RuntimeSlice<uint8>): GoError | undefined {
+    if (source.length === 4 &&
+      source.get(0) === 0x6e &&
+      source.get(1) === 0x75 &&
+      source.get(2) === 0x6c &&
+      source.get(3) === 0x6c) {
+      return undefined;
+    }
+    if (source.length < 2 ||
+      source.get(0) !== 0x22 ||
+      source.get(source.length - 1) !== 0x22) {
+      return new ProviderError("Time.UnmarshalJSON: input is not a JSON string");
+    }
+    return this.UnmarshalText(source.slice(1, source.length - 1, null));
   }
 
   UTC(): Time {

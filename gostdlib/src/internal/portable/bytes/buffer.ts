@@ -1,23 +1,54 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import type { int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
+import type { gostring, int, uint8 } from "@gotots/gostdlib/internal/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 import { state as ioState } from "../../../io.js";
+import { bytes } from "../../runtime/slice.js";
 
 let createBuffer: (source: RuntimeSlice<uint8>) => Buffer;
+let assignBufferRepresentation: (target: Buffer, source: Buffer) => void;
+let copyBufferRepresentation: (source: Buffer) => Buffer;
 
 export class Buffer {
   #source = RuntimeSlice.nil<uint8>();
   #offset = 0;
+
+  static String(receiver: Buffer | undefined): gostring {
+    if (receiver === undefined) {
+      return "<nil>";
+    }
+    return new TextDecoder().decode(bytes(
+      receiver.#source.slice(
+        receiver.#offset,
+        receiver.#source.length,
+        null,
+      ),
+    ));
+  }
 
   static {
     createBuffer = (source: RuntimeSlice<uint8>): Buffer => {
       const buffer = new Buffer();
       buffer.#source = source;
       return buffer;
+    };
+    assignBufferRepresentation = (target: Buffer, source: Buffer): void => {
+      const sourceSlice = source.#source.slice(
+        0,
+        source.#source.length,
+        source.#source.capacity,
+      );
+      const sourceOffset = source.#offset;
+      target.#source = sourceSlice;
+      target.#offset = sourceOffset;
+    };
+    copyBufferRepresentation = (source: Buffer): Buffer => {
+      const target = new Buffer();
+      assignBufferRepresentation(target, source);
+      return target;
     };
   }
 
@@ -111,6 +142,17 @@ export class Buffer {
 
 export function NewBuffer(source: RuntimeSlice<uint8>): Buffer {
   return createBuffer(source);
+}
+
+export function bufferRepresentationAssign(
+  target: Buffer,
+  source: Buffer,
+): void {
+  assignBufferRepresentation(target, source);
+}
+
+export function bufferRepresentationCopy(source: Buffer): Buffer {
+  return copyBufferRepresentation(source);
 }
 
 function requireBuffer(receiver: Buffer | undefined): Buffer {
