@@ -19,8 +19,7 @@ func TestManifestSealsCanonicalExternalBindings(t *testing.T) {
 	}
 	if manifest.Digest() == "" || manifest.ProviderDigest() != digest('b') ||
 		manifest.StandardLibraryDigest() != digest('a') ||
-		manifest.IntegerRepresentation() != "number" ||
-		manifest.ConcurrencySemantics() != "cooperative" {
+		manifest.ProviderIntegerRepresentation() != "bigint" {
 		t.Fatalf("manifest metadata is incomplete: %#v", manifest)
 	}
 	bindings := manifest.Bindings()
@@ -49,7 +48,7 @@ func TestManifestRejectsStaleOrAmbiguousEvidence(t *testing.T) {
 			document.StandardLibraryDigest = "stale"
 		},
 		"target profile": func(document *Document) {
-			document.IntegerRepresentation = "mixed"
+			document.ProviderIntegerRepresentation = "mixed"
 		},
 		"binding order": func(document *Document) {
 			document.Bindings[0], document.Bindings[1] =
@@ -99,18 +98,17 @@ func TestManifestDigestRejectsPayloadMutation(t *testing.T) {
 
 func testDocument() Document {
 	return Document{
-		SchemaVersion:         SchemaVersion,
-		PackageName:           PackageName,
-		PackageVersion:        "0.0.0",
-		Backend:               "node",
-		GoVersion:             "go1.26.4",
-		GOOS:                  "linux",
-		GOARCH:                "amd64",
-		BuildTags:             []string{"noasm"},
-		IntegerRepresentation: "number",
-		ConcurrencySemantics:  "cooperative",
-		StandardLibraryDigest: digest('a'),
-		ProviderDigest:        digest('b'),
+		SchemaVersion:                 SchemaVersion,
+		PackageName:                   PackageName,
+		PackageVersion:                "0.0.0",
+		Backend:                       "node",
+		GoVersion:                     "go1.26.4",
+		GOOS:                          "linux",
+		GOARCH:                        "amd64",
+		BuildTags:                     []string{"noasm"},
+		ProviderIntegerRepresentation: "bigint",
+		StandardLibraryDigest:         digest('a'),
+		ProviderDigest:                digest('b'),
 		Bindings: []BindingDocument{
 			{
 				SourceIdentity:      "example.com/native|kind=4|receiver=|name=Accelerated",

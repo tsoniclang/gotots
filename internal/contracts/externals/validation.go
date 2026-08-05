@@ -31,12 +31,9 @@ func validateDocument(document Document, sealed bool) error {
 		return manifestError("packageVersion", "value is empty")
 	case document.Backend == "":
 		return manifestError("backend", "value is empty")
-	case document.IntegerRepresentation != "number" &&
-		document.IntegerRepresentation != "bigint":
-		return manifestError("integerRepresentation", "value is invalid")
-	case document.ConcurrencySemantics != "disabled" &&
-		document.ConcurrencySemantics != "cooperative":
-		return manifestError("concurrencySemantics", "value is invalid")
+	case document.ProviderIntegerRepresentation != "number" &&
+		document.ProviderIntegerRepresentation != "bigint":
+		return manifestError("providerIntegerRepresentation", "value is invalid")
 	case !validDigest(document.StandardLibraryDigest):
 		return manifestError("standardLibraryDigest", "value is not a sha256 digest")
 	case !validDigest(document.ProviderDigest):

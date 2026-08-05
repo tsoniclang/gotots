@@ -6,6 +6,9 @@
     "paths": {
       "@gotots/gostdlib/syscall.js": [
         "../gostdlib/dist/src/syscall.d.ts"
+      ],
+      "@gotots/gostdlib/internal/scalars.js": [
+        "../gostdlib/dist/src/internal/scalars.d.ts"
       ]
     },
     "strict": true,

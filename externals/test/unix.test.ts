@@ -5,12 +5,12 @@ import { RawSyscall, Syscall, Syscall6 } from "../src/golang.org/x/sys/unix.js";
 
 test("unsupported Node syscalls return ENOSYS", (): void => {
   for (const result of [
-    Syscall(0, 0, 0, 0),
-    Syscall6(0, 0, 0, 0, 0, 0, 0),
-    RawSyscall(0, 0, 0, 0),
+    Syscall(0n, 0n, 0n, 0n),
+    Syscall6(0n, 0n, 0n, 0n, 0n, 0n, 0n),
+    RawSyscall(0n, 0n, 0n, 0n),
   ]) {
-    assert.equal(result[0], 0);
-    assert.equal(result[1], 0);
+    assert.equal(result[0], 0n);
+    assert.equal(result[1], 0n);
     assert.equal(result[2].value, 38n);
   }
 });

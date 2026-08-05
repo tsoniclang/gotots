@@ -94,18 +94,11 @@ func (c *Certificate) Backend() string {
 	return c.manifest.Backend()
 }
 
-func (c *Certificate) IntegerRepresentation() string {
+func (c *Certificate) ProviderIntegerRepresentation() string {
 	if c == nil {
 		return ""
 	}
-	return c.manifest.IntegerRepresentation()
-}
-
-func (c *Certificate) ConcurrencySemantics() string {
-	if c == nil {
-		return ""
-	}
-	return c.manifest.ConcurrencySemantics()
+	return c.manifest.ProviderIntegerRepresentation()
 }
 
 func (c *Certificate) BuildProfile() (environmentcontract.BuildProfile, bool) {

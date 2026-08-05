@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	SchemaVersion = 1
+	SchemaVersion = 2
 	PackageName   = "@gotots/externals"
 )
 
@@ -30,21 +30,20 @@ func (k TargetKind) Valid() bool {
 }
 
 type Document struct {
-	SchemaVersion         int               `json:"schemaVersion"`
-	PackageName           string            `json:"packageName"`
-	PackageVersion        string            `json:"packageVersion"`
-	Backend               string            `json:"backend"`
-	GoVersion             string            `json:"goVersion"`
-	GOOS                  string            `json:"goos"`
-	GOARCH                string            `json:"goarch"`
-	CGOEnabled            bool              `json:"cgoEnabled"`
-	BuildTags             []string          `json:"buildTags"`
-	IntegerRepresentation string            `json:"integerRepresentation"`
-	ConcurrencySemantics  string            `json:"concurrencySemantics"`
-	StandardLibraryDigest string            `json:"standardLibraryDigest"`
-	ProviderDigest        string            `json:"providerDigest"`
-	Bindings              []BindingDocument `json:"bindings"`
-	ManifestDigest        string            `json:"manifestDigest,omitempty"`
+	SchemaVersion                 int               `json:"schemaVersion"`
+	PackageName                   string            `json:"packageName"`
+	PackageVersion                string            `json:"packageVersion"`
+	Backend                       string            `json:"backend"`
+	GoVersion                     string            `json:"goVersion"`
+	GOOS                          string            `json:"goos"`
+	GOARCH                        string            `json:"goarch"`
+	CGOEnabled                    bool              `json:"cgoEnabled"`
+	BuildTags                     []string          `json:"buildTags"`
+	ProviderIntegerRepresentation string            `json:"providerIntegerRepresentation"`
+	StandardLibraryDigest         string            `json:"standardLibraryDigest"`
+	ProviderDigest                string            `json:"providerDigest"`
+	Bindings                      []BindingDocument `json:"bindings"`
+	ManifestDigest                string            `json:"manifestDigest,omitempty"`
 }
 
 type BindingDocument struct {
@@ -179,12 +178,8 @@ func (m Manifest) StandardLibraryDigest() string {
 	return m.document.StandardLibraryDigest
 }
 
-func (m Manifest) IntegerRepresentation() string {
-	return m.document.IntegerRepresentation
-}
-
-func (m Manifest) ConcurrencySemantics() string {
-	return m.document.ConcurrencySemantics
+func (m Manifest) ProviderIntegerRepresentation() string {
+	return m.document.ProviderIntegerRepresentation
 }
 
 func (m Manifest) BuildProfile() (environmentcontract.BuildProfile, bool) {

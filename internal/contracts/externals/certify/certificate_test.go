@@ -1,8 +1,10 @@
 package certify
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
@@ -16,8 +18,7 @@ func TestCheckedExternalProviderCertificateIsReproducible(t *testing.T) {
 	}
 	if !certificate.Valid() || certificate.ManifestDigest() == "" ||
 		certificate.StandardLibraryDigest() == "" ||
-		certificate.IntegerRepresentation() != "number" ||
-		certificate.ConcurrencySemantics() != "cooperative" {
+		certificate.ProviderIntegerRepresentation() != "bigint" {
 		t.Fatal("external provider certificate is incomplete")
 	}
 	bindings := certificate.Bindings()
@@ -38,6 +39,28 @@ func TestCheckedExternalProviderCertificateIsReproducible(t *testing.T) {
 	}
 	if modules != 3 || sources != 6 {
 		t.Fatalf("target counts = module %d, source %d", modules, sources)
+	}
+}
+
+func TestStandardLibraryRuntimeContractOwnsProviderProfile(t *testing.T) {
+	config := testConfig(t)
+	payload, err := os.ReadFile(config.StandardLibraryRuntimePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutatedPath := filepath.Join(t.TempDir(), "runtime.json")
+	if err := os.WriteFile(mutatedPath, append(payload, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = readStandardLibraryContract(
+		config.StandardLibraryManifestPath,
+		mutatedPath,
+	)
+	if err == nil || !strings.Contains(
+		err.Error(),
+		"content digest does not match the standard-library manifest",
+	) {
+		t.Fatalf("runtime-contract mutation error = %v", err)
 	}
 }
 
@@ -68,9 +91,8 @@ func testConfig(t *testing.T) Config {
 		BindingMapPath:              filepath.Join(repository, "externals", "contract", "bindings.json"),
 		TSConfigPath:                filepath.Join(repository, "externals", "tsconfig.json"),
 		StandardLibraryManifestPath: filepath.Join(repository, "gostdlib", "contract", "manifest.json"),
+		StandardLibraryRuntimePath:  filepath.Join(repository, "gostdlib", "contract", "runtime.json"),
 		BuildProfile:                profile,
 		Backend:                     "node",
-		IntegerRepresentation:       "number",
-		ConcurrencySemantics:        "cooperative",
 	}
 }

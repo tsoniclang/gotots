@@ -761,12 +761,22 @@ linked to `@gotots/externals/golang.org/x/sys/unix.js` emits:
 import * as unix from "@gotots/externals/golang.org/x/sys/unix.js";
 
 export function Syscall(trap: uint64, a1: uint64, a2: uint64, a3: uint64) {
-  return unix.Syscall(trap, a1, a2, a3);
+  const result = unix.Syscall(
+    BigInt.asUintN(64, goNumberToBigInt(trap)),
+    BigInt.asUintN(64, goNumberToBigInt(a1)),
+    BigInt.asUintN(64, goNumberToBigInt(a2)),
+    BigInt.asUintN(64, goNumberToBigInt(a3)),
+  );
+  return [Number(result[0]), Number(result[1]), result[2]];
 }
 ```
 
-No provider argument appears in the source-facing signature. A portable-source
-binding emits the same direct wrapper call to the selected translated function.
+This example is the product `number` profile crossing the certified provider
+`bigint` scalar ABI. Under the product `bigint` profile, the same wrapper calls
+`unix.Syscall(trap, a1, a2, a3)` directly. No provider argument appears in the
+source-facing signature. A portable-source binding emits the same direct
+wrapper call to the selected translated function and requires no provider
+scalar conversion.
 Missing, duplicate, stale-profile, stale-module-version, incompatible-signature,
 extra, or unconsumed bindings fail before target files are sealed. The initial
 linkage contract covers nonvariadic nongeneric package functions; every other
@@ -774,7 +784,7 @@ bodyless callable remains an explicit obligation until its exact source ABI is
 specified rather than being widened heuristically.
 
 The certificate records the provider package/version/digest, its exact
-`@gotots/gostdlib` manifest dependency, integer and concurrency profiles, each
+`@gotots/gostdlib` manifest dependency, provider integer representation, each
 source identity/signature/module version, and each target export fingerprint or
 portable-source identity/signature. Compiler code joins only those typed facts;
 it never selects a target from package spelling, function spelling, source-file

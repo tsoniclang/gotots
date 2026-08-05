@@ -15,10 +15,9 @@ type Config struct {
 	BindingMapPath              string
 	TSConfigPath                string
 	StandardLibraryManifestPath string
+	StandardLibraryRuntimePath  string
 	BuildProfile                environmentcontract.BuildProfile
 	Backend                     string
-	IntegerRepresentation       string
-	ConcurrencySemantics        string
 }
 
 type resolvedConfig struct {
@@ -28,10 +27,9 @@ type resolvedConfig struct {
 	bindingMapPath              string
 	tsConfigPath                string
 	standardLibraryManifestPath string
+	standardLibraryRuntimePath  string
 	buildProfile                environmentcontract.BuildProfile
 	backend                     string
-	integerRepresentation       string
-	concurrencySemantics        string
 }
 
 type Error struct {
@@ -54,10 +52,8 @@ func (e *Error) Error() string {
 
 func resolveConfig(source Config) (resolvedConfig, error) {
 	result := resolvedConfig{
-		buildProfile:          source.BuildProfile,
-		backend:               source.Backend,
-		integerRepresentation: source.IntegerRepresentation,
-		concurrencySemantics:  source.ConcurrencySemantics,
+		buildProfile: source.BuildProfile,
+		backend:      source.Backend,
 	}
 	paths := []struct {
 		name   string
@@ -73,6 +69,11 @@ func resolveConfig(source Config) (resolvedConfig, error) {
 			"standard-library manifest",
 			source.StandardLibraryManifestPath,
 			&result.standardLibraryManifestPath,
+		},
+		{
+			"standard-library runtime contract",
+			source.StandardLibraryRuntimePath,
+			&result.standardLibraryRuntimePath,
 		},
 	}
 	for _, selected := range paths {
@@ -93,11 +94,7 @@ func resolveConfig(source Config) (resolvedConfig, error) {
 		}
 		*selected.target = absolute
 	}
-	if !result.buildProfile.Valid() || result.backend == "" ||
-		result.integerRepresentation != "number" &&
-			result.integerRepresentation != "bigint" ||
-		result.concurrencySemantics != "disabled" &&
-			result.concurrencySemantics != "cooperative" {
+	if !result.buildProfile.Valid() || result.backend == "" {
 		return resolvedConfig{}, certifyError(
 			"configure",
 			"provider profile",

@@ -1,33 +1,34 @@
 import { Errno } from "@gotots/gostdlib/syscall.js";
+import type { uintptr } from "@gotots/gostdlib/internal/scalars.js";
 
 const ENOSYS = 38n;
 
 export function Syscall(
-  _trap: number,
-  _a1: number,
-  _a2: number,
-  _a3: number,
-): [number, number, Errno] {
-  return [0, 0, new Errno(ENOSYS)];
+  _trap: uintptr,
+  _a1: uintptr,
+  _a2: uintptr,
+  _a3: uintptr,
+): [uintptr, uintptr, Errno] {
+  return [0n, 0n, new Errno(ENOSYS)];
 }
 
 export function Syscall6(
-  _trap: number,
-  _a1: number,
-  _a2: number,
-  _a3: number,
-  _a4: number,
-  _a5: number,
-  _a6: number,
-): [number, number, Errno] {
-  return [0, 0, new Errno(ENOSYS)];
+  _trap: uintptr,
+  _a1: uintptr,
+  _a2: uintptr,
+  _a3: uintptr,
+  _a4: uintptr,
+  _a5: uintptr,
+  _a6: uintptr,
+): [uintptr, uintptr, Errno] {
+  return [0n, 0n, new Errno(ENOSYS)];
 }
 
 export function RawSyscall(
-  trap: number,
-  a1: number,
-  a2: number,
-  a3: number,
-): [number, number, Errno] {
+  trap: uintptr,
+  a1: uintptr,
+  a2: uintptr,
+  a3: uintptr,
+): [uintptr, uintptr, Errno] {
   return Syscall(trap, a1, a2, a3);
 }

@@ -19,8 +19,8 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "contract:generate": "cd .. && go run ./internal/contracts/externals/generate -repository . -provider externals -manifest externals/contract/manifest.json -bindings externals/contract/bindings.json -tsconfig externals/tsconfig.json -gostdlib-manifest gostdlib/contract/manifest.json -goos linux -goarch amd64 -tags noasm -backend node -integer number -concurrency cooperative",
-    "contract:check": "cd .. && go run ./internal/contracts/externals/generate -repository . -provider externals -manifest externals/contract/manifest.json -bindings externals/contract/bindings.json -tsconfig externals/tsconfig.json -gostdlib-manifest gostdlib/contract/manifest.json -goos linux -goarch amd64 -tags noasm -backend node -integer number -concurrency cooperative -check",
+    "contract:generate": "cd .. && go run ./internal/contracts/externals/generate -repository . -provider externals -manifest externals/contract/manifest.json -bindings externals/contract/bindings.json -tsconfig externals/tsconfig.json -gostdlib-manifest gostdlib/contract/manifest.json -gostdlib-runtime gostdlib/contract/runtime.json -goos linux -goarch amd64 -tags noasm -backend node",
+    "contract:check": "cd .. && go run ./internal/contracts/externals/generate -repository . -provider externals -manifest externals/contract/manifest.json -bindings externals/contract/bindings.json -tsconfig externals/tsconfig.json -gostdlib-manifest gostdlib/contract/manifest.json -gostdlib-runtime gostdlib/contract/runtime.json -goos linux -goarch amd64 -tags noasm -backend node -check",
     "build": "cd .. && go tool tsgo -p externals/tsconfig.json",
     "assemble:local": "node assembly/local-dependencies.mjs",
     "check": "npm run contract:check && npm run build && npm run assemble:local && node --test dist/test/**/*.test.js"

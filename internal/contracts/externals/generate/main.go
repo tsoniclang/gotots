@@ -19,12 +19,11 @@ func main() {
 	var bindings string
 	var tsconfig string
 	var standardLibraryManifest string
+	var standardLibraryRuntime string
 	var goos string
 	var goarch string
 	var tags string
 	var backend string
-	var integer string
-	var concurrency string
 	var check bool
 	flag.StringVar(&repository, "repository", "", "repository root")
 	flag.StringVar(&provider, "provider", "", "external provider root")
@@ -37,12 +36,16 @@ func main() {
 		"",
 		"checked gostdlib manifest path",
 	)
+	flag.StringVar(
+		&standardLibraryRuntime,
+		"gostdlib-runtime",
+		"",
+		"checked gostdlib runtime-contract path",
+	)
 	flag.StringVar(&goos, "goos", "", "selected GOOS")
 	flag.StringVar(&goarch, "goarch", "", "selected GOARCH")
 	flag.StringVar(&tags, "tags", "", "comma-separated build tags")
 	flag.StringVar(&backend, "backend", "", "provider backend")
-	flag.StringVar(&integer, "integer", "", "integer representation")
-	flag.StringVar(&concurrency, "concurrency", "", "concurrency semantics")
 	flag.BoolVar(&check, "check", false, "verify without writing")
 	flag.Parse()
 	selectedTags := []string{}
@@ -66,10 +69,9 @@ func main() {
 		BindingMapPath:              bindings,
 		TSConfigPath:                tsconfig,
 		StandardLibraryManifestPath: standardLibraryManifest,
+		StandardLibraryRuntimePath:  standardLibraryRuntime,
 		BuildProfile:                profile,
 		Backend:                     backend,
-		IntegerRepresentation:       integer,
-		ConcurrencySemantics:        concurrency,
 	}
 	generated, err := externalcertify.Generate(config)
 	if err != nil {

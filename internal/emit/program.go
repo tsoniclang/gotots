@@ -320,8 +320,7 @@ func newProgramSession(
 		sites,
 		options.ExternalProvider,
 		options.StandardLibrary,
-		options.IntegerRepresentation,
-		options.ConcurrencySemantics,
+		providerScalar,
 	)
 	if err != nil {
 		return nil, err

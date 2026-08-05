@@ -48,36 +48,73 @@ func TestCertifiedExternalModuleLinksBodylessFunctionExactly(t *testing.T) {
 	}
 
 	standardLibrary, externalProvider := externalProviderCertificates(t, profile)
-	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
-	options.StandardLibrary = standardLibrary
-	options.ExternalProvider = externalProvider
-	linked, err := emit.CompileWithOptions(program, []emit.Root{run}, options)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if remaining := linked.ExternalFunctionObligations(); len(remaining) != 0 {
-		t.Fatalf("linked external obligations = %d, want 0", len(remaining))
-	}
-	artifacts := materializeClosureWithSetup(
-		t,
-		linked,
-		func(directory string, emission emit.ProgramEmission) {
-			installCertifiedProviderPackages(t, directory, emission)
+	tests := []struct {
+		name          string
+		integer       emit.IntegerRepresentation
+		resultLiteral string
+		required      []string
+		forbidden     []string
+	}{
+		{
+			name:          "number product",
+			integer:       emit.IntegerRepresentationNumber,
+			resultLiteral: "0",
+			required: []string{
+				"goNumberToBigInt(trap)",
+				"globalThis.Number(BigInt.asUintN(64, __gotots_results_0[0]))",
+			},
 		},
-	)
-	for _, required := range []string{
-		`from "@gotots/externals/golang.org/x/sys/unix.js"`,
-		".Syscall(trap, a1, a2, a3)",
-	} {
-		if !strings.Contains(artifacts.printed, required) {
-			t.Fatalf("linked artifact lacks %q:\n%s", required, artifacts.printed)
-		}
+		{
+			name:          "bigint product",
+			integer:       emit.IntegerRepresentationBigInt,
+			resultLiteral: "0n",
+			required:      []string{"unix.Syscall(trap, a1, a2, a3)"},
+			forbidden: []string{
+				"unix.Syscall(BigInt.asUintN(64, goNumberToBigInt(trap))",
+				"globalThis.Number(BigInt.asUintN(64, __gotots_results_0[0]))",
+			},
+		},
 	}
-	if strings.Contains(artifacts.printed, "unresolved external Go function") {
-		t.Fatalf("linked artifact retained a placeholder:\n%s", artifacts.printed)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			options := emit.DefaultOptions()
+			options.IntegerRepresentation = test.integer
+			options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
+			options.StandardLibrary = standardLibrary
+			options.ExternalProvider = externalProvider
+			linked, err := emit.CompileWithOptions(program, []emit.Root{run}, options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if remaining := linked.ExternalFunctionObligations(); len(remaining) != 0 {
+				t.Fatalf("linked external obligations = %d, want 0", len(remaining))
+			}
+			artifacts := materializeClosureWithSetup(
+				t,
+				linked,
+				func(directory string, emission emit.ProgramEmission) {
+					installCertifiedProviderPackages(t, directory, emission)
+				},
+			)
+			for _, required := range append(
+				[]string{`from "@gotots/externals/golang.org/x/sys/unix.js"`},
+				test.required...,
+			) {
+				if !strings.Contains(artifacts.printed, required) {
+					t.Fatalf("linked artifact lacks %q", required)
+				}
+			}
+			for _, forbidden := range append(
+				[]string{"unresolved external Go function"},
+				test.forbidden...,
+			) {
+				if strings.Contains(artifacts.printed, forbidden) {
+					t.Fatalf("linked artifact contains %q", forbidden)
+				}
+			}
+			executeLinkedRun(t, linked, artifacts, test.resultLiteral)
+		})
 	}
-	executeLinkedRun(t, linked, artifacts, 0)
 }
 
 func TestCertifiedExternalSourceLinksBodylessFunctionExactly(t *testing.T) {
@@ -222,10 +259,9 @@ func externalProviderCertificates(
 		BindingMapPath:              filepath.Join(repository, "externals", "contract", "bindings.json"),
 		TSConfigPath:                filepath.Join(repository, "externals", "tsconfig.json"),
 		StandardLibraryManifestPath: filepath.Join(repository, "gostdlib", "contract", "manifest.json"),
+		StandardLibraryRuntimePath:  filepath.Join(repository, "gostdlib", "contract", "runtime.json"),
 		BuildProfile:                profile,
 		Backend:                     "node",
-		IntegerRepresentation:       "number",
-		ConcurrencySemantics:        "cooperative",
 	})
 	if err != nil {
 		t.Fatal(err)

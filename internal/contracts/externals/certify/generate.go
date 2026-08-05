@@ -2,6 +2,8 @@ package certify
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"go/types"
 	"os"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/contracts/externals"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	runtimecontract "github.com/tsoniclang/gotots/internal/contracts/runtime"
 )
 
 func Generate(config Config) ([]byte, error) {
@@ -27,8 +30,9 @@ func Generate(config Config) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	standardLibraryDigest, err := readStandardLibraryDigest(
+	standardLibraryDigest, providerIntegerRepresentation, err := readStandardLibraryContract(
 		resolved.standardLibraryManifestPath,
+		resolved.standardLibraryRuntimePath,
 	)
 	if err != nil {
 		return nil, err
@@ -103,20 +107,19 @@ func Generate(config Config) ([]byte, error) {
 		return nil, err
 	}
 	return externals.Seal(externals.Document{
-		SchemaVersion:         externals.SchemaVersion,
-		PackageName:           externals.PackageName,
-		PackageVersion:        providerPackage.Version,
-		Backend:               resolved.backend,
-		GoVersion:             resolved.buildProfile.ToolchainVersion(),
-		GOOS:                  resolved.buildProfile.GOOS(),
-		GOARCH:                resolved.buildProfile.GOARCH(),
-		CGOEnabled:            resolved.buildProfile.CgoEnabled(),
-		BuildTags:             resolved.buildProfile.Tags(),
-		IntegerRepresentation: resolved.integerRepresentation,
-		ConcurrencySemantics:  resolved.concurrencySemantics,
-		StandardLibraryDigest: standardLibraryDigest,
-		ProviderDigest:        integrity,
-		Bindings:              bindings,
+		SchemaVersion:                 externals.SchemaVersion,
+		PackageName:                   externals.PackageName,
+		PackageVersion:                providerPackage.Version,
+		Backend:                       resolved.backend,
+		GoVersion:                     resolved.buildProfile.ToolchainVersion(),
+		GOOS:                          resolved.buildProfile.GOOS(),
+		GOARCH:                        resolved.buildProfile.GOARCH(),
+		CGOEnabled:                    resolved.buildProfile.CgoEnabled(),
+		BuildTags:                     resolved.buildProfile.Tags(),
+		ProviderIntegerRepresentation: providerIntegerRepresentation,
+		StandardLibraryDigest:         standardLibraryDigest,
+		ProviderDigest:                integrity,
+		Bindings:                      bindings,
 	})
 }
 
@@ -125,32 +128,59 @@ func linkableSignature(signature *types.Signature) bool {
 		signature.TypeParams().Len() == 0 && !signature.Variadic()
 }
 
-func readStandardLibraryDigest(sourcePath string) (string, error) {
-	payload, err := os.ReadFile(sourcePath)
+func readStandardLibraryContract(
+	manifestPath string,
+	runtimePath string,
+) (string, string, error) {
+	payload, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return "", certifyError(
+		return "", "", certifyError(
 			"read standard-library manifest",
-			sourcePath,
+			manifestPath,
 			err.Error(),
 		)
 	}
 	manifest, err := gostdlib.Parse(payload)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	canonical, err := gostdlib.Encode(manifest)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if !bytes.Equal(canonical, payload) {
-		return "", certifyError(
+		return "", "", certifyError(
 			"read standard-library manifest",
-			sourcePath,
+			manifestPath,
 			"manifest bytes are not canonical",
 		)
 	}
 	if manifest.Digest() == "" {
-		return "", fmt.Errorf("standard-library manifest digest is absent")
+		return "", "", fmt.Errorf("standard-library manifest digest is absent")
 	}
-	return manifest.Digest(), nil
+	runtimePayload, err := os.ReadFile(runtimePath)
+	if err != nil {
+		return "", "", certifyError(
+			"read standard-library runtime contract",
+			runtimePath,
+			err.Error(),
+		)
+	}
+	requirements, err := runtimecontract.Decode(runtimePayload)
+	if err != nil {
+		return "", "", certifyError(
+			"read standard-library runtime contract",
+			runtimePath,
+			err.Error(),
+		)
+	}
+	digest := sha256.Sum256(runtimePayload)
+	if hex.EncodeToString(digest[:]) != manifest.RuntimeDigest() {
+		return "", "", certifyError(
+			"read standard-library runtime contract",
+			runtimePath,
+			"content digest does not match the standard-library manifest",
+		)
+	}
+	return manifest.Digest(), requirements.ProviderProfile().String(), nil
 }

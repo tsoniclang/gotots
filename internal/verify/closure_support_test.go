@@ -186,7 +186,7 @@ func executeLinkedRun(
 	t *testing.T,
 	emission emit.ProgramEmission,
 	artifacts closureArtifacts,
-	want int,
+	wantLiteral string,
 ) {
 	t.Helper()
 	sourceModule := ""
@@ -221,9 +221,9 @@ func executeLinkedRun(
 		t.Fatal(err)
 	}
 	runner := fmt.Sprintf(
-		"import { Run } from %q;\nif (Run() !== %d) throw new Error('linked result');\n",
+		"import { Run } from %q;\nif (Run() !== %s) throw new Error('linked result');\n",
 		sourceModule,
-		want,
+		wantLiteral,
 	)
 	runnerPath := filepath.Join(artifacts.workingDirectory, "linked-runner.mjs")
 	if err := os.WriteFile(runnerPath, []byte(runner), 0o644); err != nil {

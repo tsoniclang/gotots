@@ -632,6 +632,12 @@ into serialized documents.
 and exact-joins source declarations for an external-provider certificate. It
 may read the selected Go AST and type graph while certifying; the finalized
 external contract and every downstream consumer remain graph-free.
+External module bindings use the same certified provider scalar ABI as
+`gostdlib`; portable source redirects remain in the selected product ABI.
+The compiler emits type-directed scalar conversion only around a module
+binding whose provider and product carriers differ. The external certificate
+therefore records the provider integer representation, not a product integer
+or concurrency profile.
 
 The provider source is independently built against a generated direct-profile
 runtime contract. A linked product owns its selected generated runtime package;

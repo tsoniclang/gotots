@@ -29,8 +29,7 @@ func resolveExternalFunctionProvider(
 	sites map[types.Object]declarationSite,
 	provider *externalcertify.Certificate,
 	standardLibrary *gostdlibcertify.Certificate,
-	integer api.IntegerRepresentation,
-	concurrency api.ConcurrencySemantics,
+	providerScalar api.ScalarABI,
 ) (map[*types.Func]api.ExternalFunctionTarget, []string, error) {
 	resolved := make(map[*types.Func]api.ExternalFunctionTarget)
 	if provider == nil {
@@ -40,8 +39,7 @@ func resolveExternalFunctionProvider(
 		source,
 		provider,
 		standardLibrary,
-		integer,
-		concurrency,
+		providerScalar,
 	); err != nil {
 		return nil, nil, err
 	}
@@ -87,8 +85,7 @@ func validateExternalProviderProfile(
 	source *load.Program,
 	provider *externalcertify.Certificate,
 	standardLibrary *gostdlibcertify.Certificate,
-	integer api.IntegerRepresentation,
-	concurrency api.ConcurrencySemantics,
+	providerScalar api.ScalarABI,
 ) error {
 	if source == nil || !provider.Valid() {
 		return &ExternalFunctionBindingError{Reason: "provider certificate is invalid"}
@@ -112,8 +109,9 @@ func validateExternalProviderProfile(
 		return err
 	}
 	if selectedKey != sourceKey || provider.Backend() != "node" ||
-		provider.IntegerRepresentation() != integer.String() ||
-		provider.ConcurrencySemantics() != concurrency.String() {
+		!providerScalar.Valid() ||
+		provider.ProviderIntegerRepresentation() !=
+			providerScalar.IntegerRepresentation().String() {
 		return &ExternalFunctionBindingError{
 			Reason: "provider target profile does not match compilation",
 		}
