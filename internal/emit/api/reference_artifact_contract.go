@@ -154,6 +154,13 @@ type ReflectionNames interface {
 	ReflectionType(types.Type, *types.TypeName) (NameReference, error)
 	ReflectionOperations(*types.TypeName) (NameReference, error)
 	ReflectionTypeOf(types.Type, *types.TypeName) (NameReference, error)
+	// ReflectionValueOf demands the canonical descriptor plus the generated
+	// value-operation facet for one reflected operand type and returns the
+	// metadata operation reference carrying those requests.
+	ReflectionValueOf(types.Type, *types.TypeName) (NameReference, error)
+	// ReflectionValueOperationsDemanded reports whether the value-operation
+	// facet was demanded for one canonical reflection artifact.
+	ReflectionValueOperationsDemanded(string) bool
 }
 
 type UnsafeCodecNames interface {

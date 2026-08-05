@@ -26,6 +26,7 @@ import {
   Value,
 } from "../../../reflect.js";
 import { ProviderError } from "../../runtime/error.js";
+import { bindRuntimeTypeResolver } from "./runtime-value.js";
 
 export interface RuntimeStructFieldMetadata {
   readonly name: gostring;
@@ -329,6 +330,10 @@ export function runtimeTypeOf(
     ? undefined
     : runtimeTypesByDynamicType.get(value.$go$type);
 }
+
+bindRuntimeTypeResolver((value: GoInterfaceValue): Type | undefined =>
+  runtimeTypesByDynamicType.get(value.$go$type),
+);
 
 function materializeField(
   field: RuntimeStructFieldMetadata,

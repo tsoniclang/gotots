@@ -477,5 +477,23 @@ func (r *Registry) interfaceAdapterReflectionRequest(
 	if err != nil {
 		return api.RootRequest{}, err
 	}
+	if r.contractDemandsValueOperations(binding) {
+		r.reflectionValueDemands[binding.key] = struct{}{}
+	}
 	return api.NewReflectionTypeRequest(reflection.owner)
+}
+
+// contractDemandsValueOperations reports whether any observed reflection
+// contract reached by one adapter demands generated value operations.
+func (r *Registry) contractDemandsValueOperations(
+	binding interfaceAdapterBinding,
+) bool {
+	for contractKey := range r.reflectionValueContracts {
+		if reached, ok := r.interfaceAdaptersByContract[contractKey]; ok {
+			if _, member := reached[binding.key]; member {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -119,6 +119,77 @@ func (n *File) ReflectionTypeOf(
 	return operations.WithRequests(api.CombineRequests(requests)...)
 }
 
+// ReflectionValueOf demands the canonical descriptor plus the generated
+// value-operation facet for one reflected operand type. Interface operands
+// subscribe the canonical contract so every concrete adapter reaching the
+// contract, before or after this observation, demands its value facet.
+func (n *File) ReflectionValueOf(
+	argumentType types.Type,
+	reflectionType *types.TypeName,
+) (api.NameReference, error) {
+	if argumentType == nil || reflectionType == nil || reflectionType.IsAlias() {
+		return api.NameReference{}, &api.NameError{
+			Reason: "reflection ValueOf contract is invalid",
+		}
+	}
+	registry := n.owner.registry
+	operations, err := n.ReflectionOperations(reflectionType)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	requests := operations.Requests()
+	if _, isInterface := types.Unalias(argumentType).Underlying().(*types.Interface); isInterface {
+		contract, key, contractErr := n.canonicalInterfaceContract(argumentType)
+		if contractErr != nil {
+			return api.NameReference{}, contractErr
+		}
+		registry.reflectionValueContracts[key] = struct{}{}
+		dynamicReadiness, demandErr := registry.recordInterfaceReflectionDemand(
+			key,
+			contract,
+			reflectionType,
+		)
+		if demandErr != nil {
+			return api.NameReference{}, demandErr
+		}
+		requests = api.CombineRequests(requests, dynamicReadiness)
+	} else {
+		artifactKey, keyErr := typeidentity.BuildKey(
+			argumentType,
+			n.generatedNamedObjectIdentity,
+		)
+		if keyErr != nil {
+			return api.NameReference{}, keyErr
+		}
+		registry.reflectionValueDemands[artifactKey] = struct{}{}
+		staticType, typeErr := n.ReflectionType(argumentType, reflectionType)
+		if typeErr != nil {
+			return api.NameReference{}, typeErr
+		}
+		requests = api.CombineRequests(requests, staticType.Requests())
+	}
+	modulePath, err := output.ModuleSpecifier(
+		n.targetPath,
+		output.ReflectionTypeSupportPath,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	initialize, err := api.NewSideEffectImportRequest(n.factory, modulePath)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	requests = api.CombineRequests(requests, []api.RootRequest{initialize})
+	return operations.WithRequests(requests...)
+}
+
+// ReflectionValueOperationsDemanded reports whether the value-operation
+// facet was demanded for one canonical reflection artifact.
+func (n *File) ReflectionValueOperationsDemanded(artifactKey string) bool {
+	_, demanded := n.owner.registry.reflectionValueDemands[artifactKey]
+	return demanded
+}
+
 func (r *Registry) internReflectionType(
 	artifactKey string,
 	sourceType types.Type,

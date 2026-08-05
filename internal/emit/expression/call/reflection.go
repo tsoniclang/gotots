@@ -11,6 +11,7 @@ import (
 )
 
 const reflectTypeForIdentity = "reflect|kind=4|receiver=|name=TypeFor"
+const reflectValueOfIdentity = "reflect|kind=4|receiver=|name=ValueOf"
 const reflectTypeOfIdentity = "reflect|kind=4|receiver=|name=TypeOf"
 
 func emitReflectionTypeOf(
@@ -217,4 +218,107 @@ func emitReflectionTypeFor(
 		reference.Expression(context.Factory()),
 		reference.Requests()...,
 	), true, nil
+}
+
+// emitReflectionValueOf intercepts reflect.ValueOf to demand the canonical
+// descriptor plus the generated value-operation facet for the exact operand
+// type, then emits the ordinary provider call unchanged: the source-facing
+// call keeps its one Go argument and its certified provider binding.
+func emitReflectionValueOf(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	discarded bool,
+	detached bool,
+) (api.ExpressionEmission, bool, error) {
+	owner, ok := calleeObject(context.TypesInfo(), source.Fun)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
+	}
+	contract, err := environmentcontract.Describe(owner)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if contract.Identity() != reflectValueOfIdentity {
+		return api.ExpressionEmission{}, false, nil
+	}
+	if detached {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	signature, ok := owner.Type().(*types.Signature)
+	if !ok || signature.Results() == nil || signature.Results().Len() != 1 ||
+		signature.Params() == nil || signature.Params().Len() != 1 ||
+		len(source.Args) != 1 {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if err := validateResults(context, source, signature, discarded); err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	callee, err := context.Names().Reference(owner)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	arguments, before, argumentRequests, err := emitArguments(
+		context,
+		children,
+		source,
+		signature,
+		false,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	requests := api.CombineRequests(callee.Requests(), argumentRequests)
+	argumentType := context.TypesInfo().TypeOf(source.Args[0])
+	if argumentType == nil {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	untypedNil := false
+	if basic, basicOK := types.Unalias(argumentType).(*types.Basic); basicOK &&
+		basic.Kind() == types.UntypedNil {
+		untypedNil = true
+	}
+	if !untypedNil {
+		if api.ContainsGenericTypeParameter(argumentType) {
+			return api.ExpressionEmission{}, true,
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		reflectTypeObject, typeOK := owner.Pkg().
+			Scope().
+			Lookup("Type").(*types.TypeName)
+		if !typeOK {
+			return api.ExpressionEmission{}, true, &api.ContextError{
+				Reason: "reflect package has no Type declaration",
+			}
+		}
+		names, namesOK := context.Names().(api.ReflectionNames)
+		if !namesOK {
+			return api.ExpressionEmission{}, true, &api.ContextError{
+				Reason: "reflection names are unavailable",
+			}
+		}
+		metadata, metadataErr := names.ReflectionValueOf(
+			argumentType,
+			reflectTypeObject,
+		)
+		if metadataErr != nil {
+			return api.ExpressionEmission{}, true, metadataErr
+		}
+		requests = api.CombineRequests(requests, metadata.Requests())
+	}
+	emission, err := api.NewExpressionEmission(
+		before,
+		context.Factory().CallExpression(
+			callee.Expression(context.Factory()),
+			nil,
+			nil,
+			arguments,
+			tsgo.NodeFlagsNone,
+		),
+		requests,
+	)
+	return emission, true, err
 }

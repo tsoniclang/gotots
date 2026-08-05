@@ -257,6 +257,8 @@ type Registry struct {
 	deferredCallableRegistryNames       map[string]string
 	pointerRepresentations              map[string]pointerRepresentationBinding
 	reflectionTypes                     map[string]reflectionTypeBinding
+	reflectionValueDemands              map[string]struct{}
+	reflectionValueContracts            map[string]struct{}
 	reflectionTypeNames                 map[string]string
 	unsafeCodecs                        map[string]unsafeCodecBinding
 	unsafeCodecNames                    map[string]string
@@ -306,6 +308,8 @@ func NewRegistry() *Registry {
 		deferredCallableRegistryNames:       make(map[string]string),
 		pointerRepresentations:              make(map[string]pointerRepresentationBinding),
 		reflectionTypes:                     make(map[string]reflectionTypeBinding),
+		reflectionValueDemands:              make(map[string]struct{}),
+		reflectionValueContracts:            make(map[string]struct{}),
 		reflectionTypeNames:                 make(map[string]string),
 		unsafeCodecs:                        make(map[string]unsafeCodecBinding),
 		unsafeCodecNames:                    make(map[string]string),

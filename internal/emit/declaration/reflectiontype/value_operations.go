@@ -1,0 +1,314 @@
+package reflectiontype
+
+import (
+	"go/types"
+
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+// valueOperationCallback is one generated typed value callback: the object
+// literal property name, the provider-facing result primitive, and whether
+// the projected payload converts to the provider 64-bit carrier.
+type valueOperationCallback struct {
+	name      string
+	result    api.PrimitiveAlias
+	toBigInt  bool
+	nilCheck  bool
+	operation string
+}
+
+// valueOperationsStatement builds the generated value-operation
+// registration for one reflection-visible type when its value facet is
+// demanded. Every callback performs the exact generated adapter guard and
+// projects the represented payload; message strings never select behavior.
+func valueOperationsStatement(
+	context api.Context,
+	operations api.NameReference,
+	sourceType types.Type,
+	descriptorName string,
+) (tsgo.Statement, []api.RootRequest, bool, error) {
+	callbacks, ok, err := selectValueCallbacks(context, sourceType)
+	if err != nil || !ok {
+		return nil, nil, false, err
+	}
+	factory := context.Factory()
+	adapter, err := context.Names().InterfaceAdapter(sourceType, nil)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	boxType, err := context.Names().Runtime(
+		api.RuntimeInterfaceValue,
+		api.ImportPhaseType,
+	)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	panicReference, err := context.Names().Runtime(
+		api.RuntimePanic,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	requests := api.CombineRequests(
+		adapter.Requests(),
+		boxType.Requests(),
+		panicReference.Requests(),
+	)
+	properties := make([]tsgo.ObjectLiteralElementLike, 0, len(callbacks))
+	for _, callback := range callbacks {
+		var resultType tsgo.TypeNode
+		if callback.nilCheck {
+			resultType = factory.KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindBooleanKeyword,
+			)
+		} else {
+			result, resultErr := context.Names().ProviderPrimitive(
+				callback.result,
+			)
+			if resultErr != nil {
+				return nil, nil, false, resultErr
+			}
+			requests = append(requests, result.Requests()...)
+			resultType = factory.TypeReferenceNode(
+				result.EntityName(factory),
+				nil,
+			)
+		}
+		payload := factory.PropertyAccessExpression(
+			factory.Identifier("box"),
+			nil,
+			factory.Identifier("$go$value"),
+			tsgo.NodeFlagsNone,
+		)
+		var projected tsgo.Expression
+		switch {
+		case callback.nilCheck:
+			projected = factory.BinaryExpression(
+				nil,
+				payload,
+				nil,
+				factory.BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+				),
+				factory.Identifier("undefined"),
+			)
+		case callback.toBigInt:
+			projected = factory.CallExpression(
+				factory.PropertyAccessExpression(
+					factory.Identifier("globalThis"),
+					nil,
+					factory.Identifier("BigInt"),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{payload},
+				tsgo.NodeFlagsNone,
+			)
+		default:
+			projected = payload
+		}
+		guarded := factory.ConditionalExpression(
+			factory.CallExpression(
+				factory.PropertyAccessExpression(
+					adapter.Expression(factory),
+					nil,
+					factory.Identifier("$is"),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{factory.Identifier("box")},
+				tsgo.NodeFlagsNone,
+			),
+			factory.QuestionToken(),
+			projected,
+			factory.ColonToken(),
+			factory.CallExpression(
+				factory.PropertyAccessExpression(
+					panicReference.Expression(factory),
+					nil,
+					factory.Identifier("raiseRuntime"),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{factory.StringLiteral(
+					"reflect: "+callback.operation+
+						" received a foreign interface box",
+					tsgo.TokenFlagsNone,
+				)},
+				tsgo.NodeFlagsNone,
+			),
+		)
+		arrow := factory.ArrowFunction(
+			nil,
+			nil,
+			[]tsgo.ParameterDeclaration{factory.ParameterDeclaration(
+				nil,
+				nil,
+				factory.Identifier("box"),
+				nil,
+				factory.TypeReferenceNode(
+					boxType.EntityName(factory),
+					nil,
+				),
+				nil,
+			)},
+			resultType,
+			factory.EqualsGreaterThanToken(),
+			guarded,
+		)
+		properties = append(properties, factory.PropertyAssignment(
+			nil,
+			factory.Identifier(callback.name),
+			nil,
+			factory.FunctionTypeNode(
+				nil,
+				[]tsgo.ParameterDeclaration{factory.ParameterDeclaration(
+					nil,
+					nil,
+					factory.Identifier("box"),
+					nil,
+					factory.TypeReferenceNode(
+						boxType.EntityName(factory),
+						nil,
+					),
+					nil,
+				)},
+				resultType,
+			),
+			arrow,
+		))
+	}
+	statement := factory.ExpressionStatement(factory.CallExpression(
+		factory.PropertyAccessExpression(
+			operations.Expression(factory),
+			nil,
+			factory.Identifier("$registerValue"),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		[]tsgo.Expression{
+			factory.Identifier(descriptorName),
+			factory.ObjectLiteralExpression(properties, true),
+		},
+		tsgo.NodeFlagsNone,
+	))
+	return statement, requests, true, nil
+}
+
+// selectValueCallbacks derives the exact callback set admitted by one
+// type's kind. Only plain basic scalars and pointers participate in the
+// scalar slice; later slices add aggregate, slice, and map callbacks.
+func selectValueCallbacks(
+	context api.Context,
+	sourceType types.Type,
+) ([]valueOperationCallback, bool, error) {
+	switch selected := types.Unalias(sourceType).(type) {
+	case *types.Basic:
+		provider, ok := context.ProviderScalarABI()
+		if !ok {
+			return nil, false, &api.GeneratedArtifactShapeError{
+				Artifact: selected.String(),
+				Reason:   "reflection value provider scalar ABI is absent",
+			}
+		}
+		info := selected.Info()
+		switch {
+		case info&types.IsBoolean != 0:
+			return []valueOperationCallback{{
+				name:      "bool",
+				result:    api.PrimitiveBool,
+				operation: "Value.Bool",
+			}}, true, nil
+		case info&types.IsString != 0:
+			return []valueOperationCallback{{
+				name:      "string",
+				result:    api.PrimitiveString,
+				operation: "Value.String",
+			}}, true, nil
+		case info&types.IsUnsigned != 0:
+			toBigInt, err := carrierWidens(
+				context,
+				provider,
+				sourceType,
+				api.PrimitiveUint64,
+			)
+			if err != nil {
+				return nil, false, err
+			}
+			return []valueOperationCallback{{
+				name:      "uint",
+				result:    api.PrimitiveUint64,
+				toBigInt:  toBigInt,
+				operation: "Value.Uint",
+			}}, true, nil
+		case info&types.IsInteger != 0:
+			toBigInt, err := carrierWidens(
+				context,
+				provider,
+				sourceType,
+				api.PrimitiveInt64,
+			)
+			if err != nil {
+				return nil, false, err
+			}
+			return []valueOperationCallback{{
+				name:      "int",
+				result:    api.PrimitiveInt64,
+				toBigInt:  toBigInt,
+				operation: "Value.Int",
+			}}, true, nil
+		case info&types.IsFloat != 0:
+			return []valueOperationCallback{{
+				name:      "float",
+				result:    api.PrimitiveFloat64,
+				operation: "Value.Float",
+			}}, true, nil
+		default:
+			return nil, false, nil
+		}
+	case *types.Pointer:
+		return []valueOperationCallback{{
+			name:      "isNil",
+			nilCheck:  true,
+			operation: "Value.IsNil",
+		}}, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+// carrierWidens reports whether projecting one scalar payload to the
+// provider 64-bit carrier requires the BigInt widening conversion.
+func carrierWidens(
+	context api.Context,
+	provider api.ScalarABI,
+	sourceType types.Type,
+	target api.PrimitiveAlias,
+) (bool, error) {
+	targetCarrier, err := provider.Carrier(target)
+	if err != nil {
+		return false, err
+	}
+	sourceAlias, ok := basictype.PrimitiveAlias(
+		context.TypesSizes(),
+		types.Unalias(sourceType).(*types.Basic),
+	)
+	if !ok {
+		return false, &api.GeneratedArtifactShapeError{
+			Artifact: sourceType.String(),
+			Reason:   "reflection value scalar has no primitive alias",
+		}
+	}
+	sourceCarrier, err := context.ScalarABI().Carrier(sourceAlias)
+	if err != nil {
+		return false, err
+	}
+	return targetCarrier != sourceCarrier, nil
+}

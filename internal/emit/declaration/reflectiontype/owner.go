@@ -81,12 +81,30 @@ func Build(
 			tsgo.NodeFlagsConst,
 		),
 	)
-	return []tsgo.Statement{statement}, api.CombineRequests(
+	statements := []tsgo.Statement{statement}
+	requests := api.CombineRequests(
 		operations.Requests(),
 		contract.Requests(),
 		targetType.Requests(),
 		metadataRequests,
-	), nil
+	)
+	if names.ReflectionValueOperationsDemanded(artifact.ArtifactKey()) {
+		registration, registrationRequests, handled, valueErr :=
+			valueOperationsStatement(
+				context,
+				operations,
+				sourceType,
+				artifact.TargetName(),
+			)
+		if valueErr != nil {
+			return nil, nil, valueErr
+		}
+		if handled {
+			statements = append(statements, registration)
+			requests = api.CombineRequests(requests, registrationRequests)
+		}
+	}
+	return statements, requests, nil
 }
 
 func metadataExpression(

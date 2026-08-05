@@ -21,7 +21,13 @@ import {
   getStructTag,
   lookupStructTag,
 } from "./internal/portable/reflect/struct-tag.js";
+import { ProviderError } from "./internal/runtime/error.js";
 import { providerPlaceholder } from "./internal/runtime/placeholder.js";
+import {
+  resolveRuntimeType,
+  runtimeValueOperations,
+  type RuntimeValueOperations,
+} from "./internal/portable/reflect/runtime-value.js";
 import type { Seq } from "./iter.js";
 
 export class ChanDir {
@@ -68,8 +74,38 @@ export const UnsafePointer = new Kind(26n);
 export abstract class Value {
   protected constructor(protected readonly source?: GoInterfaceValue) {}
 
+  private resolvedType(): Type | undefined {
+    return this.source === undefined
+      ? undefined
+      : resolveRuntimeType(this.source);
+  }
+
+  private operations(): RuntimeValueOperations | undefined {
+    return runtimeValueOperations(this.resolvedType());
+  }
+
+  private kindText(): string {
+    const type = this.resolvedType();
+    return type === undefined ? "zero" : `${type.Kind().String()}`;
+  }
+
+  private operationPanic(operation: string): never {
+    return GoPanic.raise(
+      new ProviderError(
+        `reflect: call of reflect.Value.${operation} on ${this.kindText()} Value`,
+      ),
+    );
+  }
+
   Addr(): Value { return providerPlaceholder("reflect.Value.Addr requires generated reflection metadata"); }
-  Bool(): bool { return providerPlaceholder("reflect.Value.Bool requires generated reflection metadata"); }
+
+  Bool(): bool {
+    const operation = this.operations()?.bool;
+    if (operation === undefined || this.source === undefined) {
+      return this.operationPanic("Bool");
+    }
+    return operation(this.source);
+  }
   Bytes(): RuntimeSlice<uint8> { return providerPlaceholder("reflect.Value.Bytes requires generated reflection metadata"); }
   CanInt(): bool { return providerPlaceholder("reflect.Value.CanInt requires generated reflection metadata"); }
   CanSet(): bool { return providerPlaceholder("reflect.Value.CanSet requires generated reflection metadata"); }
@@ -77,10 +113,22 @@ export abstract class Value {
   Convert(_target: Type | undefined): Value { return providerPlaceholder("reflect.Value.Convert requires generated reflection metadata"); }
   Elem(): Value { return providerPlaceholder("reflect.Value.Elem requires generated reflection metadata"); }
   Field(_index: int): Value { return providerPlaceholder("reflect.Value.Field requires generated reflection metadata"); }
-  Float(): float64 { return providerPlaceholder("reflect.Value.Float requires generated reflection metadata"); }
+  Float(): float64 {
+    const operation = this.operations()?.float;
+    if (operation === undefined || this.source === undefined) {
+      return this.operationPanic("Float");
+    }
+    return operation(this.source);
+  }
   Grow(_capacity: int): void { return providerPlaceholder("reflect.Value.Grow requires generated reflection metadata"); }
   Index(_index: int): Value { return providerPlaceholder("reflect.Value.Index requires generated reflection metadata"); }
-  Int(): int64 { return providerPlaceholder("reflect.Value.Int requires generated reflection metadata"); }
+  Int(): int64 {
+    const operation = this.operations()?.int;
+    if (operation === undefined || this.source === undefined) {
+      return this.operationPanic("Int");
+    }
+    return operation(this.source);
+  }
 
   Interface(): GoInterfaceValue | undefined {
     if (this.source === undefined) {
@@ -89,12 +137,19 @@ export abstract class Value {
     return this.source;
   }
 
-  IsNil(): bool { return providerPlaceholder("reflect.Value.IsNil requires generated reflection metadata"); }
+  IsNil(): bool {
+    const operation = this.operations()?.isNil;
+    if (operation === undefined || this.source === undefined) {
+      return this.operationPanic("IsNil");
+    }
+    return operation(this.source);
+  }
   IsValid(): bool { return this.source !== undefined; }
   IsZero(): bool { return providerPlaceholder("reflect.Value.IsZero requires generated reflection metadata"); }
 
   Kind(): Kind {
-    return this.source === undefined ? Invalid : providerPlaceholder("reflect.Value.Kind requires generated reflection metadata");
+    const type = this.resolvedType();
+    return type === undefined ? Invalid : type.Kind();
   }
 
   Len(): int { return providerPlaceholder("reflect.Value.Len requires generated reflection metadata"); }
@@ -115,13 +170,42 @@ export abstract class Value {
   SetZero(): void { return providerPlaceholder("reflect.Value.SetZero requires generated reflection metadata"); }
 
   String(): gostring {
-    return this.source === undefined
+    if (this.source === undefined) {
+      return "<invalid Value>";
+    }
+    const operation = this.operations()?.string;
+    if (operation !== undefined) {
+      return operation(this.source);
+    }
+    const type = this.resolvedType();
+    return type === undefined
       ? "<invalid Value>"
-      : providerPlaceholder("reflect.Value.String requires generated reflection metadata");
+      : `<${type.String()} Value>`;
   }
 
-  Type(): Type | undefined { return providerPlaceholder("reflect.Value.Type requires generated reflection metadata"); }
-  Uint(): uint64 { return providerPlaceholder("reflect.Value.Uint requires generated reflection metadata"); }
+  Type(): Type | undefined {
+    if (this.source === undefined) {
+      return GoPanic.raise(
+        new ProviderError(
+          "reflect: call of reflect.Value.Type on zero Value",
+        ),
+      );
+    }
+    const type = this.resolvedType();
+    if (type === undefined) {
+      return GoPanic.raiseRuntime(
+        "reflect: value type has no registered canonical descriptor",
+      );
+    }
+    return type;
+  }
+  Uint(): uint64 {
+    const operation = this.operations()?.uint;
+    if (operation === undefined || this.source === undefined) {
+      return this.operationPanic("Uint");
+    }
+    return operation(this.source);
+  }
   UnsafePointer(): GoUnsafePointer | undefined {
     return providerPlaceholder("reflect.Value.UnsafePointer requires generated reflection metadata");
   }
