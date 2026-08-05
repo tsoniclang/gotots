@@ -23,17 +23,11 @@ func mapValueProperties(
 	factory := scaffold.factory
 	keyBasic, keyOK := types.Unalias(mapType.Key()).(*types.Basic)
 	elementBasic, elementOK := types.Unalias(mapType.Elem()).(*types.Basic)
-	if !keyOK || !elementOK ||
+	supported := keyOK && elementOK &&
 		keyBasic.Info()&(types.IsBoolean|types.IsString|
-			types.IsInteger|types.IsFloat) == 0 ||
+			types.IsInteger|types.IsFloat) != 0 &&
 		elementBasic.Info()&(types.IsBoolean|types.IsString|
-			types.IsInteger|types.IsFloat) == 0 {
-		return nil, &api.GeneratedArtifactShapeError{
-			Artifact: mapType.String(),
-			Reason: "reflection value map " + mapType.String() +
-				" is outside the supported scalar location model",
-		}
-	}
+			types.IsInteger|types.IsFloat) != 0
 	provider, providerOK := context.ProviderScalarABI()
 	if !providerOK {
 		return nil, &api.GeneratedArtifactShapeError{
@@ -51,6 +45,55 @@ func mapValueProperties(
 	extentType, err := context.Names().ProviderPrimitive(api.PrimitiveInt64)
 	if err != nil {
 		return nil, err
+	}
+	lengthCall := factory.CallExpression(
+		factory.PropertyAccessExpression(
+			boxPayload(factory),
+			nil,
+			factory.Identifier("length"),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		nil,
+		tsgo.NodeFlagsNone,
+	)
+	var lengthProjected tsgo.Expression = lengthCall
+	if carrier == api.IntegerCarrierBigInt {
+		lengthProjected = factory.CallExpression(
+			factory.PropertyAccessExpression(
+				factory.Identifier("globalThis"),
+				nil,
+				factory.Identifier("BigInt"),
+				tsgo.NodeFlagsNone,
+			),
+			nil,
+			nil,
+			[]tsgo.Expression{lengthCall},
+			tsgo.NodeFlagsNone,
+		)
+	}
+	length := factory.ArrowFunction(
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{boxParameter(scaffold)},
+		factory.TypeReferenceNode(extentType.EntityName(factory), nil),
+		factory.EqualsGreaterThanToken(),
+		factory.ParenthesizedExpression(guardedProjection(
+			scaffold,
+			"Value.Len",
+			lengthProjected,
+		)),
+	)
+	if !supported {
+		// Key or element kinds sit outside the location model: the map
+		// keeps exact nil and length evidence while entry navigation
+		// stays a loud typed boundary through operation absence.
+		scaffold.requests = append(scaffold.requests, extentType.Requests()...)
+		return []tsgo.ObjectLiteralElementLike{
+			runtimeNilCallback(scaffold),
+			expressionProperty(factory, "len", length),
+		}, nil
 	}
 	keyAdapter, err := context.Names().InterfaceAdapter(mapType.Key(), nil)
 	if err != nil {
@@ -109,45 +152,6 @@ func mapValueProperties(
 		elementDescriptor.Requests()...,
 	)
 	scaffold.requests = append(scaffold.requests, runtimeMap.Requests()...)
-	lengthCall := factory.CallExpression(
-		factory.PropertyAccessExpression(
-			boxPayload(factory),
-			nil,
-			factory.Identifier("length"),
-			tsgo.NodeFlagsNone,
-		),
-		nil,
-		nil,
-		nil,
-		tsgo.NodeFlagsNone,
-	)
-	var lengthProjected tsgo.Expression = lengthCall
-	if carrier == api.IntegerCarrierBigInt {
-		lengthProjected = factory.CallExpression(
-			factory.PropertyAccessExpression(
-				factory.Identifier("globalThis"),
-				nil,
-				factory.Identifier("BigInt"),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			nil,
-			[]tsgo.Expression{lengthCall},
-			tsgo.NodeFlagsNone,
-		)
-	}
-	length := factory.ArrowFunction(
-		nil,
-		nil,
-		[]tsgo.ParameterDeclaration{boxParameter(scaffold)},
-		factory.TypeReferenceNode(extentType.EntityName(factory), nil),
-		factory.EqualsGreaterThanToken(),
-		factory.ParenthesizedExpression(guardedProjection(
-			scaffold,
-			"Value.Len",
-			lengthProjected,
-		)),
-	)
 	keyParameter := factory.ParameterDeclaration(
 		nil,
 		nil,

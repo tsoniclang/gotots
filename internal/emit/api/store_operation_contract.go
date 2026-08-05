@@ -480,6 +480,7 @@ const (
 	GenericOperationDeferredCallableRegistry = genericoperation.GenericOperationDeferredCallableRegistry
 	GenericOperationAppendSpread             = genericoperation.GenericOperationAppendSpread
 	GenericOperationReflectionType           = genericoperation.GenericOperationReflectionType
+	GenericOperationReflectionValue          = genericoperation.GenericOperationReflectionValue
 )
 
 type GenericOperationSelection = genericoperation.GenericOperationSelection

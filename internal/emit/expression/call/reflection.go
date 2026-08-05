@@ -21,6 +21,8 @@ const reflectSliceOfIdentity = "reflect|kind=4|receiver=|name=SliceOf"
 const reflectNewIdentity = "reflect|kind=4|receiver=|name=New"
 const reflectZeroIdentity = "reflect|kind=4|receiver=|name=Zero"
 const reflectDeepEqualIdentity = "reflect|kind=4|receiver=|name=DeepEqual"
+const binaryReadIdentity = "encoding/binary|kind=4|receiver=|name=Read"
+const binaryWriteIdentity = "encoding/binary|kind=4|receiver=|name=Write"
 
 func emitReflectionTypeOf(
 	context api.Context,
@@ -290,10 +292,6 @@ func emitReflectionValueOf(
 		untypedNil = true
 	}
 	if !untypedNil {
-		if api.ContainsGenericTypeParameter(argumentType) {
-			return api.ExpressionEmission{}, true,
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
 		reflectTypeObject, typeOK := owner.Pkg().
 			Scope().
 			Lookup("Type").(*types.TypeName)
@@ -302,20 +300,38 @@ func emitReflectionValueOf(
 				Reason: "reflect package has no Type declaration",
 			}
 		}
-		names, namesOK := context.Names().(api.ReflectionNames)
-		if !namesOK {
-			return api.ExpressionEmission{}, true, &api.ContextError{
-				Reason: "reflection names are unavailable",
+		if api.ContainsGenericTypeParameter(argumentType) {
+			// A type-parameter operand cannot demand its facet statically;
+			// the value-demanding reflection capability registers on the
+			// enclosing generic function so every concrete instantiation
+			// materializes the exact descriptor and value metadata.
+			reference, referenceErr := genericoperation.Reference(
+				context,
+				source,
+				api.GenericOperationReflectionValue,
+				[]types.Type{types.NewPointer(argumentType)},
+				[]types.Type{reflectTypeObject.Type()},
+			)
+			if referenceErr != nil {
+				return api.ExpressionEmission{}, true, referenceErr
 			}
+			requests = api.CombineRequests(requests, reference.Requests())
+		} else {
+			names, namesOK := context.Names().(api.ReflectionNames)
+			if !namesOK {
+				return api.ExpressionEmission{}, true, &api.ContextError{
+					Reason: "reflection names are unavailable",
+				}
+			}
+			metadata, metadataErr := names.ReflectionValueOf(
+				argumentType,
+				reflectTypeObject,
+			)
+			if metadataErr != nil {
+				return api.ExpressionEmission{}, true, metadataErr
+			}
+			requests = api.CombineRequests(requests, metadata.Requests())
 		}
-		metadata, metadataErr := names.ReflectionValueOf(
-			argumentType,
-			reflectTypeObject,
-		)
-		if metadataErr != nil {
-			return api.ExpressionEmission{}, true, metadataErr
-		}
-		requests = api.CombineRequests(requests, metadata.Requests())
 	}
 	emission, err := api.NewExpressionEmission(
 		before,

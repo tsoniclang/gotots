@@ -3,7 +3,6 @@ package provider_test
 import (
 	"context"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -61,24 +60,19 @@ func Decode(mutex *sync.Mutex) error {
 	options := emit.DefaultOptions()
 	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
-	// encoding/binary.Read is a certified placeholder until the reflection
-	// family lands; the used-provider closure must fail this compilation
-	// before any target file is sealed. The profile-ABI artifact
-	// assertions return with the implemented family.
-	_, err = emit.CompileWithOptions(
+	// encoding/binary.Read is implemented over the reflection value model:
+	// the compilation passes the used-provider closure and preserves the
+	// certified reader and error profile ABI.
+	emission, err := emit.CompileWithOptions(
 		program,
 		[]emit.Root{mustProviderRoot(t, scope.Lookup("Decode"))},
 		options,
 	)
-	if err == nil {
-		t.Fatal("used encoding/binary.Read placeholder passed the closure gate")
+	if err != nil {
+		t.Fatalf("implemented encoding/binary.Read failed the closure gate: %v", err)
 	}
-	if !strings.Contains(err.Error(), "used provider placeholders") ||
-		!strings.Contains(
-			err.Error(),
-			"encoding/binary|kind=4|receiver=|name=Read",
-		) {
-		t.Fatalf("closure diagnostic = %v", err)
+	if len(emission.Files()) == 0 {
+		t.Fatal("binary profile compilation emitted no target files")
 	}
 }
 
@@ -164,10 +158,10 @@ func Encode(mutex *sync.Mutex) error {
 	options := emit.DefaultOptions()
 	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
 	options.StandardLibrary = linkedProviderCertificate(t)
-	// Both selected placeholders must be named by one typed closure
-	// diagnostic with identity-keyed lists; the behavior assertions return
-	// with the implemented family.
-	_, err = emit.CompileWithOptions(
+	// Both callables are implemented over the reflection value model: the
+	// combined order, stream, and error profile ABI compiles through the
+	// used-provider closure.
+	emission, err := emit.CompileWithOptions(
 		program,
 		[]emit.Root{
 			mustProviderRoot(t, scope.Lookup("Decode")),
@@ -175,15 +169,10 @@ func Encode(mutex *sync.Mutex) error {
 		},
 		options,
 	)
-	if err == nil {
-		t.Fatal("used encoding/binary placeholders passed the closure gate")
+	if err != nil {
+		t.Fatalf("implemented encoding/binary family failed the closure gate: %v", err)
 	}
-	for _, expected := range []string{
-		"encoding/binary|kind=4|receiver=|name=Read",
-		"encoding/binary|kind=4|receiver=|name=Write",
-	} {
-		if !strings.Contains(err.Error(), expected) {
-			t.Fatalf("closure diagnostic lacks %q: %v", expected, err)
-		}
+	if len(emission.Files()) == 0 {
+		t.Fatal("combined binary profile compilation emitted no target files")
 	}
 }

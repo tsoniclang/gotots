@@ -1868,6 +1868,8 @@
       "sourcePath": "src/internal/facets/named-time.ts",
       "export": "TimeParseErrorOperations",
       "capabilities": [
+        "equal",
+        "hash",
         "make",
         "storage"
       ],

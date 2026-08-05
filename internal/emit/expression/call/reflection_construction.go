@@ -6,6 +6,7 @@ import (
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -434,4 +435,139 @@ func emitReflectionDeepEqual(
 		api.CombineRequests(callee.Requests(), argumentRequests, demand),
 	)
 	return emission, true, err
+}
+
+// emitBinaryCodec intercepts encoding/binary Read and Write to demand the
+// generated value facet of the data operand's exact type — the provider
+// codec walks the value model, so the operand's descriptors and callbacks
+// must exist — then emits the ordinary provider call.
+func emitBinaryCodec(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	discarded bool,
+	detached bool,
+) (api.ExpressionEmission, bool, error) {
+	owner, ok := calleeObject(context.TypesInfo(), source.Fun)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
+	}
+	contract, err := environmentcontract.Describe(owner)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if contract.Identity() != binaryReadIdentity &&
+		contract.Identity() != binaryWriteIdentity {
+		return api.ExpressionEmission{}, false, nil
+	}
+	if detached {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	signature, ok := owner.Type().(*types.Signature)
+	if !ok || signature.Results() == nil || signature.Results().Len() != 1 ||
+		signature.Params() == nil || signature.Params().Len() != 3 ||
+		len(source.Args) != 3 {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if err := validateResults(context, source, signature, discarded); err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	demand, err := reflectionOperandDemand(context, source, owner, source.Args[2])
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	// The reader/writer parameters need the certified provider-profile
+	// interface bridges, so the call keeps the ordinary profile emission.
+	target, selected, _, err := emitProviderProfileFunction(
+		context,
+		children,
+		source,
+		owner,
+		signature,
+		discarded,
+		detached,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if !selected {
+		return api.ExpressionEmission{}, false, nil
+	}
+	merged, err := api.NewExpressionEmission(
+		target.Before(),
+		target.Value(),
+		api.CombineRequests(target.Requests(), demand),
+	)
+	return merged, true, err
+}
+
+// reflectionOperandDemand derives the value-facet demand of one operand
+// flowing into a reflective provider callable: untyped nil demands
+// nothing, a type-parameter operand registers the value-demanding generic
+// capability, and a concrete operand demands its descriptor and value
+// facet directly.
+func reflectionOperandDemand(
+	context api.Context,
+	source *ast.CallExpr,
+	owner types.Object,
+	argument ast.Expr,
+) ([]api.RootRequest, error) {
+	argumentType := context.TypesInfo().TypeOf(argument)
+	if argumentType == nil {
+		return nil, api.Unsupported(
+			context,
+			api.CategoryExpression,
+			source,
+		)
+	}
+	if basic, ok := types.Unalias(argumentType).(*types.Basic); ok &&
+		basic.Kind() == types.UntypedNil {
+		return nil, nil
+	}
+	reflectPackage := owner.Pkg()
+	if reflectPackage.Path() != "reflect" {
+		for _, imported := range reflectPackage.Imports() {
+			if imported.Path() == "reflect" {
+				reflectPackage = imported
+				break
+			}
+		}
+	}
+	reflectTypeObject, ok := reflectPackage.
+		Scope().
+		Lookup("Type").(*types.TypeName)
+	if !ok {
+		return nil, &api.ContextError{
+			Reason: "reflect package has no Type declaration",
+		}
+	}
+	if api.ContainsGenericTypeParameter(argumentType) {
+		reference, err := genericoperation.Reference(
+			context,
+			source,
+			api.GenericOperationReflectionValue,
+			[]types.Type{types.NewPointer(argumentType)},
+			[]types.Type{reflectTypeObject.Type()},
+		)
+		if err != nil {
+			return nil, err
+		}
+		return reference.Requests(), nil
+	}
+	names, ok := context.Names().(api.ReflectionNames)
+	if !ok {
+		return nil, &api.ContextError{
+			Reason: "reflection names are unavailable",
+		}
+	}
+	metadata, err := names.ReflectionValueOf(
+		argumentType,
+		reflectTypeObject,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return metadata.Requests(), nil
 }

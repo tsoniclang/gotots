@@ -321,9 +321,16 @@ func carrierWidens(
 	if err != nil {
 		return false, err
 	}
+	basic, basicOK := types.Unalias(sourceType).Underlying().(*types.Basic)
+	if !basicOK {
+		return false, &api.GeneratedArtifactShapeError{
+			Artifact: sourceType.String(),
+			Reason:   "reflection value scalar has no basic underlying type",
+		}
+	}
 	sourceAlias, ok := basictype.PrimitiveAlias(
 		context.TypesSizes(),
-		types.Unalias(sourceType).(*types.Basic),
+		basic,
 	)
 	if !ok {
 		return false, &api.GeneratedArtifactShapeError{

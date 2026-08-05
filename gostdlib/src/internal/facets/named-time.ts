@@ -1,3 +1,4 @@
+import { GoMapHash } from "@gotots/runtime/map.js";
 import type { gostring, int64 } from "@gotots/gostdlib/internal/scalars.js";
 
 import {
@@ -72,6 +73,26 @@ export class TimeParseErrorOperations {
       layoutElement,
       valueElement,
       message,
+    );
+  }
+
+  static $hash(source: ParseError): number {
+    let hash = 2166136261;
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.Layout));
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.Value));
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.LayoutElem));
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.ValueElem));
+    hash = GoMapHash.mix(hash, GoMapHash.string(source.Message));
+    return hash;
+  }
+
+  static $equal(left: ParseError, right: ParseError): boolean {
+    return (
+      left.Layout === right.Layout &&
+      left.Value === right.Value &&
+      left.LayoutElem === right.LayoutElem &&
+      left.ValueElem === right.ValueElem &&
+      left.Message === right.Message
     );
   }
 

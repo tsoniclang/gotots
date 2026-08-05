@@ -21,9 +21,15 @@ func pointerValueProperties(
 	scaffold *locationScaffold,
 ) ([]tsgo.ObjectLiteralElementLike, error) {
 	factory := scaffold.factory
-	structType, err := supportedValueStruct(pointee)
-	if err != nil {
-		return nil, err
+	structType, structOK := types.Unalias(pointee).
+		Underlying().(*types.Struct)
+	if !structOK || !locationModelStruct(structType) {
+		// The pointee is outside the location model: the pointer keeps
+		// its exact nil and zero evidence while elem stays a loud typed
+		// boundary through operation absence.
+		return []tsgo.ObjectLiteralElementLike{
+			pointerZeroProperty(scaffold),
+		}, nil
 	}
 	elemAdapter, err := context.Names().InterfaceAdapter(pointee, nil)
 	if err != nil {
@@ -135,12 +141,20 @@ func structValueProperties(
 	scaffold *locationScaffold,
 ) ([]tsgo.ObjectLiteralElementLike, error) {
 	factory := scaffold.factory
-	if _, err := supportedValueStruct(structType); err != nil {
-		return nil, err
-	}
-	cloned, err := structClonedProperty(context, sourceType, scaffold)
-	if err != nil {
-		return nil, err
+	fullySupported := locationModelStruct(structType)
+	var cloned tsgo.ObjectLiteralElementLike
+	if fullySupported {
+		if _, isNamed := types.Unalias(sourceType).(*types.Named); isNamed {
+			var clonedErr error
+			cloned, clonedErr = structClonedProperty(
+				context,
+				sourceType,
+				scaffold,
+			)
+			if clonedErr != nil {
+				return nil, clonedErr
+			}
+		}
 	}
 	provider, ok := context.ProviderScalarABI()
 	if !ok {
@@ -167,6 +181,27 @@ func structValueProperties(
 	cases := make([]tsgo.CaseOrDefaultClause, 0, structType.NumFields()+1)
 	for index := range structType.NumFields() {
 		field := structType.Field(index)
+		if !locationModelField(field.Type()) {
+			caseLiteral, caseErr := api.IntegerLiteral(
+				factory,
+				provider,
+				api.PrimitiveInt64,
+				strconv.Itoa(index),
+			)
+			if caseErr != nil {
+				return nil, caseErr
+			}
+			cases = append(cases, factory.CaseClause(
+				caseLiteral,
+				[]tsgo.Statement{factory.ReturnStatement(runtimePanic(
+					scaffold,
+					"reflect: field "+field.Name()+
+						" of "+structType.String()+
+						" is outside the generated location model",
+				))},
+			))
+			continue
+		}
 		fieldAdapter, adapterErr := context.Names().InterfaceAdapter(
 			field.Type(),
 			nil,
@@ -267,11 +302,35 @@ func structValueProperties(
 		factory.EqualsGreaterThanToken(),
 		body,
 	)
-	return []tsgo.ObjectLiteralElementLike{
+	properties := []tsgo.ObjectLiteralElementLike{
 		numField,
 		expressionProperty(factory, "field", field),
-		cloned,
-	}, nil
+	}
+	if cloned != nil {
+		properties = append(properties, cloned)
+	}
+	return properties, nil
+}
+
+// locationModelField reports whether one struct field participates in the
+// generated location model. Unsupported field kinds keep exact loud typed
+// boundaries at their Field cases rather than blocking the whole type.
+func locationModelField(fieldType types.Type) bool {
+	basic, ok := types.Unalias(fieldType).(*types.Basic)
+	return ok && basic.Info()&(types.IsBoolean|types.IsString|
+		types.IsInteger|types.IsFloat) != 0
+}
+
+// locationModelStruct reports whether every field of one struct is inside
+// the location model, which gates whole-value operations such as the
+// interface clone.
+func locationModelStruct(structType *types.Struct) bool {
+	for index := range structType.NumFields() {
+		if !locationModelField(structType.Field(index).Type()) {
+			return false
+		}
+	}
+	return true
 }
 
 // structClonedProperty binds the canonical class copy operation so

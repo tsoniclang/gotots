@@ -23,16 +23,6 @@ func sliceValueProperties(
 ) ([]tsgo.ObjectLiteralElementLike, error) {
 	factory := scaffold.factory
 	elementType := sliceType.Elem()
-	elementBasic, ok := types.Unalias(elementType).(*types.Basic)
-	if !ok || elementBasic.Info()&(types.IsBoolean|types.IsString|
-		types.IsInteger|types.IsFloat) == 0 {
-		return nil, &api.GeneratedArtifactShapeError{
-			Artifact: sliceType.String(),
-			Reason: "reflection value slice element type " +
-				elementType.String() +
-				" is outside the supported scalar location model",
-		}
-	}
 	provider, providerOK := context.ProviderScalarABI()
 	if !providerOK {
 		return nil, &api.GeneratedArtifactShapeError{
@@ -50,6 +40,34 @@ func sliceValueProperties(
 	indexType, err := context.Names().ProviderPrimitive(api.PrimitiveInt64)
 	if err != nil {
 		return nil, err
+	}
+	elementBasic, elementSupported := types.Unalias(elementType).(*types.Basic)
+	if elementSupported && elementBasic.Info()&(types.IsBoolean|
+		types.IsString|types.IsInteger|types.IsFloat) == 0 {
+		elementSupported = false
+	}
+	if !elementSupported {
+		// The element is outside the location model: the slice keeps its
+		// exact nil and extent evidence while element navigation stays a
+		// loud typed boundary through operation absence.
+		scaffold.requests = append(scaffold.requests, indexType.Requests()...)
+		return []tsgo.ObjectLiteralElementLike{
+			runtimeNilCallback(scaffold),
+			expressionProperty(factory, "len", sliceExtentCallback(
+				scaffold,
+				"length",
+				carrier,
+				indexType,
+				"Value.Len",
+			)),
+			expressionProperty(factory, "cap", sliceExtentCallback(
+				scaffold,
+				"capacity",
+				carrier,
+				indexType,
+				"Value.Cap",
+			)),
+		}, nil
 	}
 	elementAdapter, err := context.Names().InterfaceAdapter(elementType, nil)
 	if err != nil {

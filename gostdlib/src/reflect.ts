@@ -354,7 +354,23 @@ export abstract class Value {
       );
     }
     const cloned = this.operations()?.cloned;
-    return cloned === undefined ? box : cloned(box);
+    if (cloned !== undefined) {
+      return cloned(box);
+    }
+    const type = this.resolvedType();
+    if (
+      this.location !== undefined &&
+      type !== undefined &&
+      type.Kind().value === Struct.value
+    ) {
+      // An aliasing view must never masquerade as the Go copy.
+      return GoPanic.raise(
+        new ProviderError(
+          `reflect: Value.Interface of ${type.String()} requires a generated clone facet`,
+        ),
+      );
+    }
+    return box;
   }
 
   IsNil(): bool {

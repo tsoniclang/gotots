@@ -76,6 +76,7 @@ const (
 	GenericOperationDeferredCallableRegistry
 	GenericOperationAppendSpread
 	GenericOperationReflectionType
+	GenericOperationReflectionValue
 )
 
 var genericOperationIdentifiers = [...]string{
@@ -129,11 +130,12 @@ var genericOperationIdentifiers = [...]string{
 	GenericOperationDeferredCallableRegistry: "deferred_callable_registry",
 	GenericOperationAppendSpread:             "append_spread",
 	GenericOperationReflectionType:           "reflection_type",
+	GenericOperationReflectionValue:          "reflection_value",
 }
 
 func (o GenericOperation) Valid() bool {
 	return o >= GenericOperationZero &&
-		o <= GenericOperationReflectionType
+		o <= GenericOperationReflectionValue
 }
 
 func (o GenericOperation) Identifier() string {
@@ -209,6 +211,8 @@ func (o GenericOperation) String() string {
 		return "append-spread"
 	case GenericOperationReflectionType:
 		return "reflection-type"
+	case GenericOperationReflectionValue:
+		return "reflection-value"
 	default:
 		if source, ok := o.BinaryToken(); ok {
 			return "binary-" + source.String()

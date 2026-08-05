@@ -72,6 +72,15 @@ func emit(
 	); handled {
 		return target, err
 	}
+	if target, handled, err := emitBinaryCodec(
+		context,
+		children,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
 	if target, handled, err := emitReflectionDeepEqual(
 		context,
 		children,

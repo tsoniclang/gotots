@@ -86,34 +86,6 @@ func extendedValueProperties(
 	}
 }
 
-// supportedValueStruct admits one struct into the value location model
-// exactly when every field is a plain basic scalar. Aggregate field kinds
-// join with their own construct slices; until then the demand fails closed
-// at emission.
-func supportedValueStruct(structLike types.Type) (*types.Struct, error) {
-	structType, ok := types.Unalias(structLike).Underlying().(*types.Struct)
-	if !ok {
-		return nil, &api.GeneratedArtifactShapeError{
-			Artifact: structLike.String(),
-			Reason:   "reflection value location target is not a struct",
-		}
-	}
-	for index := range structType.NumFields() {
-		fieldType := structType.Field(index).Type()
-		basic, basicOK := types.Unalias(fieldType).(*types.Basic)
-		if !basicOK || basic.Info()&(types.IsBoolean|types.IsString|
-			types.IsInteger|types.IsFloat) == 0 {
-			return nil, &api.GeneratedArtifactShapeError{
-				Artifact: structType.String(),
-				Reason: "reflection value struct field type " +
-					fieldType.String() +
-					" is outside the supported scalar location model",
-			}
-		}
-	}
-	return structType, nil
-}
-
 // locationCallbacks is the exact content of one generated location
 // literal: the descriptor thunk target, generated settability evidence,
 // the boxing read expression, and the write body.
