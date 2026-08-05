@@ -78,6 +78,7 @@ export abstract class Value {
     private readonly stored?: GoInterfaceValue,
     private readonly location?: RuntimeValueLocation,
     private readonly addressable: bool = false,
+    private readonly staticType?: Type,
   ) {}
 
   // $unbox exposes the canonical interface box to generated support
@@ -126,6 +127,12 @@ export abstract class Value {
   }
 
   private resolvedType(): Type | undefined {
+    if (this.staticType !== undefined) {
+      return this.staticType;
+    }
+    if (this.location !== undefined) {
+      return this.location.type();
+    }
     return this.source === undefined
       ? undefined
       : resolveRuntimeType(this.source);
@@ -274,11 +281,18 @@ export abstract class Value {
     return undefined;
   }
   Elem(): Value {
+    const source = this.source;
+    const type = this.resolvedType();
+    if (type !== undefined && type.Kind().value === Interface.value) {
+      return source === undefined
+        ? new InterfaceValue(undefined)
+        : new InterfaceValue(source);
+    }
     const operation = this.operations()?.elem;
-    if (operation === undefined || this.source === undefined) {
+    if (operation === undefined || source === undefined) {
       return this.operationPanic("Elem");
     }
-    const location = operation(this.source);
+    const location = operation(source);
     return location === undefined
       ? new LocatedValue(undefined)
       : Value.located(location);
@@ -346,7 +360,7 @@ export abstract class Value {
 
   Interface(): GoInterfaceValue | undefined {
     const box = this.source;
-    if (box === undefined) {
+    if (!this.IsValid()) {
       return GoPanic.raise(
         new ProviderError(
           "reflect: call of reflect.Value.Interface on zero Value",
@@ -354,7 +368,7 @@ export abstract class Value {
       );
     }
     const cloned = this.operations()?.cloned;
-    if (cloned !== undefined) {
+    if (cloned !== undefined && box !== undefined) {
       return cloned(box);
     }
     const type = this.resolvedType();
@@ -374,16 +388,28 @@ export abstract class Value {
   }
 
   IsNil(): bool {
+    const type = this.resolvedType();
+    if (type !== undefined && type.Kind().value === Interface.value) {
+      return this.source === undefined;
+    }
     const operation = this.operations()?.isNil;
     if (operation === undefined || this.source === undefined) {
       return this.operationPanic("IsNil");
     }
     return operation(this.source);
   }
-  IsValid(): bool { return this.source !== undefined; }
+  IsValid(): bool {
+    return this.location !== undefined ||
+      this.staticType !== undefined ||
+      this.source !== undefined;
+  }
   IsZero(): bool {
     const operations = this.operations();
     const box = this.source;
+    const type = this.resolvedType();
+    if (type !== undefined && type.Kind().value === Interface.value) {
+      return box === undefined;
+    }
     if (box === undefined) {
       return this.operationPanic("IsZero");
     }
@@ -456,17 +482,19 @@ export abstract class Value {
   }
   Set(value: Value): void {
     const target = this.settableLocation("Set");
-    const payload = value.source;
-    if (payload === undefined) {
+    if (!value.IsValid()) {
       return GoPanic.raise(
         new ProviderError("reflect: Set using zero Value argument"),
       );
     }
+    const payload = target.type().Kind().value === Interface.value
+      ? value.Interface()
+      : value.source;
     target.set(payload);
   }
 
   private settableLocation(operation: string): RuntimeValueLocation {
-    if (this.location === undefined || this.source === undefined) {
+    if (this.location === undefined || !this.IsValid()) {
       return this.operationPanic(operation);
     }
     if (!this.addressable || !this.location.settable) {
@@ -602,12 +630,13 @@ export abstract class Value {
   }
 
   String(): gostring {
-    if (this.source === undefined) {
+    if (!this.IsValid()) {
       return "<invalid Value>";
     }
+    const source = this.source;
     const operation = this.operations()?.string;
-    if (operation !== undefined) {
-      return operation(this.source);
+    if (operation !== undefined && source !== undefined) {
+      return operation(source);
     }
     const type = this.resolvedType();
     return type === undefined
@@ -616,7 +645,7 @@ export abstract class Value {
   }
 
   Type(): Type | undefined {
-    if (this.source === undefined) {
+    if (!this.IsValid()) {
       return GoPanic.raise(
         new ProviderError(
           "reflect: call of reflect.Value.Type on zero Value",
@@ -648,8 +677,8 @@ export abstract class Value {
 }
 
 class InterfaceValue extends Value {
-  constructor(source: GoInterfaceValue | undefined) {
-    super(source);
+  constructor(source: GoInterfaceValue | undefined, type?: Type) {
+    super(source, undefined, false, type);
   }
 }
 
@@ -1188,7 +1217,7 @@ export function Zero(type: Type | undefined): Value {
       ),
     );
   }
-  return new InterfaceValue(operation());
+  return new InterfaceValue(operation(), type);
 }
 
 // stringFromRune is the exact Go integer-to-string conversion: one rune,

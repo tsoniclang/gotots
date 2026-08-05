@@ -96,6 +96,8 @@ func extendedValueProperties(
 			selected,
 			scaffold,
 		)
+	case *types.Interface:
+		return interfaceValueProperties(scaffold), nil
 	default:
 		return nil, nil
 	}
@@ -128,10 +130,7 @@ func locationLiteral(
 				nil,
 				nil,
 				nil,
-				factory.TypeReferenceNode(
-					scaffold.boxType.EntityName(factory),
-					nil,
-				),
+				optionalInterfaceBoxType(factory, scaffold.boxType),
 				factory.EqualsGreaterThanToken(),
 				factory.ParenthesizedExpression(callbacks.get),
 			)),
@@ -143,10 +142,7 @@ func locationLiteral(
 					nil,
 					factory.Identifier("value"),
 					nil,
-					factory.TypeReferenceNode(
-						scaffold.boxType.EntityName(factory),
-						nil,
-					),
+					optionalInterfaceBoxType(factory, scaffold.boxType),
 					nil,
 				)},
 				factory.KeywordTypeNode(

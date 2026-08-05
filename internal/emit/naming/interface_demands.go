@@ -349,6 +349,55 @@ func (r *Registry) recordInterfaceReflectionDemand(
 	return requests, nil
 }
 
+// recordReflectionValueContract joins one reflected interface slot to every
+// reflected concrete adapter that implements it. The join is replayed over
+// existing adapters here and over later adapters in
+// interfaceAdapterContractRequests, making discovery order irrelevant.
+func (r *Registry) recordReflectionValueContract(
+	sourceKey string,
+	source *types.Interface,
+	reflectionType *types.TypeName,
+) ([]api.RootRequest, error) {
+	contract, err := r.internInterfaceContract(sourceKey, source)
+	if err != nil {
+		return nil, err
+	}
+	r.reflectionValueContracts[sourceKey] = struct{}{}
+	requests, err := r.recordInterfaceReflectionDemand(
+		sourceKey,
+		contract,
+		reflectionType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	adapterKeys := make([]string, 0, len(r.interfaceAdapters))
+	for key := range r.interfaceAdapters {
+		adapterKeys = append(adapterKeys, key)
+	}
+	sort.Strings(adapterKeys)
+	for _, key := range adapterKeys {
+		if _, reflected := r.reflectionValueDemands[key]; !reflected {
+			continue
+		}
+		binding := r.interfaceAdapters[key]
+		sourceType, ok := binding.owner.InterfaceAdapterType()
+		if !ok || !types.Implements(sourceType, contract) {
+			continue
+		}
+		selected, selectedErr := r.interfaceAdapterContractRequests(
+			binding,
+			sourceKey,
+			contract,
+		)
+		if selectedErr != nil {
+			return nil, selectedErr
+		}
+		requests = append(requests, selected...)
+	}
+	return requests, nil
+}
+
 func (r *Registry) interfaceAdapterContractRequests(
 	binding interfaceAdapterBinding,
 	directKey string,
@@ -365,27 +414,45 @@ func (r *Registry) interfaceAdapterContractRequests(
 			Reason: "interface adapter demand has no concrete source type",
 		}
 	}
+	type pendingContract struct {
+		key      string
+		contract *types.Interface
+	}
+	var pending []pendingContract
 	if direct == nil {
 		if directKey != "" {
 			return nil, &api.NameError{
 				Reason: "interface adapter has a contract key without a contract",
 			}
 		}
-		return nil, nil
-	}
-	if directKey == "" || !types.Implements(sourceType, direct) {
-		return nil, &api.NameError{
-			Reason: "interface adapter does not implement its direct target contract",
+		if _, reflected := r.reflectionValueDemands[binding.key]; !reflected {
+			return nil, nil
 		}
+		keys := make([]string, 0, len(r.reflectionValueContracts))
+		for key := range r.reflectionValueContracts {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			contract := r.interfaceContracts[key]
+			if contract != nil && types.Implements(sourceType, contract) {
+				pending = append(pending, pendingContract{
+					key:      key,
+					contract: contract,
+				})
+			}
+		}
+	} else {
+		if directKey == "" || !types.Implements(sourceType, direct) {
+			return nil, &api.NameError{
+				Reason: "interface adapter does not implement its direct target contract",
+			}
+		}
+		pending = append(pending, pendingContract{
+			key:      directKey,
+			contract: direct,
+		})
 	}
-	type pendingContract struct {
-		key      string
-		contract *types.Interface
-	}
-	pending := []pendingContract{{
-		key:      directKey,
-		contract: direct,
-	}}
 	selected := make(map[string]*types.Interface)
 	visited := make(map[string]struct{})
 	for len(pending) != 0 {

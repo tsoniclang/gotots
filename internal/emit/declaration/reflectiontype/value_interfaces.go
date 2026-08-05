@@ -1,0 +1,120 @@
+package reflectiontype
+
+import (
+	"go/types"
+
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+// optionalInterfaceBoxType is the runtime value carried by a reflection
+// location. Undefined is a valid payload only for a statically typed nil
+// interface; the location's descriptor keeps that Value distinct from the
+// invalid zero Value.
+func optionalInterfaceBoxType(
+	factory tsgo.Factory,
+	boxType api.NameReference,
+) tsgo.TypeNode {
+	return factory.UnionTypeNode([]tsgo.TypeNode{
+		factory.TypeReferenceNode(boxType.EntityName(factory), nil),
+		factory.KeywordTypeNode(
+			tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+		),
+	})
+}
+
+// interfaceValueProperties supplies the exact zero of an interface type.
+// Its nil payload remains a valid reflect.Value because Zero carries the
+// requested static descriptor separately in the provider runtime.
+func interfaceValueProperties(
+	scaffold *locationScaffold,
+) []tsgo.ObjectLiteralElementLike {
+	factory := scaffold.factory
+	return []tsgo.ObjectLiteralElementLike{expressionProperty(
+		factory,
+		"zero",
+		factory.ArrowFunction(
+			nil,
+			nil,
+			nil,
+			optionalInterfaceBoxType(factory, scaffold.boxType),
+			factory.EqualsGreaterThanToken(),
+			factory.Identifier("undefined"),
+		),
+	)}
+}
+
+// interfaceFieldCallbacks preserve one interface slot as its existing
+// canonical dynamic box. Writes admit nil or a box satisfying the field's
+// exact generated method contract; no concrete adapter can represent an
+// interface type itself.
+func interfaceFieldCallbacks(
+	context api.Context,
+	field *types.Var,
+	fieldAccess tsgo.Expression,
+	scaffold *locationScaffold,
+) (
+	tsgo.Expression,
+	tsgo.Block,
+	[]api.RootRequest,
+	error,
+) {
+	factory := scaffold.factory
+	if field.Name() == "_" {
+		return factory.Identifier("undefined"), factory.Block(
+			[]tsgo.Statement{factory.ExpressionStatement(runtimePanic(
+				scaffold,
+				"reflect: Value.Set using unaddressable value",
+			))},
+			true,
+		), nil, nil
+	}
+	contract, err := context.Names().InterfaceContract(field.Type())
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	value := factory.Identifier("value")
+	nilValue := factory.BinaryExpression(
+		nil,
+		value,
+		nil,
+		factory.BinaryOperatorToken(
+			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+		),
+		factory.Identifier("undefined"),
+	)
+	implements := factory.CallExpression(
+		factory.Identifier(contract.GuardName()),
+		nil,
+		nil,
+		[]tsgo.Expression{value},
+		tsgo.NodeFlagsNone,
+	)
+	accepted := factory.BinaryExpression(
+		nil,
+		nilValue,
+		nil,
+		factory.BinaryOperatorToken(tsgo.BinaryOperatorBarBarToken),
+		implements,
+	)
+	assigned := factory.ConditionalExpression(
+		accepted,
+		factory.QuestionToken(),
+		value,
+		factory.ColonToken(),
+		runtimePanic(
+			scaffold,
+			"reflect: Value.Set received a value outside the interface contract",
+		),
+	)
+	set := factory.Block([]tsgo.Statement{factory.ExpressionStatement(
+		factory.BinaryExpression(
+			nil,
+			fieldAccess,
+			nil,
+			factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
+			assigned,
+		),
+	)}, true)
+	return fieldAccess, set, contract.Requests(), nil
+}

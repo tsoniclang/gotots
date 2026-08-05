@@ -87,6 +87,98 @@ func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 	}
 }
 
+func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
+	_, contract, _ := interfaceDemandTypes()
+	source := namedDemandType("Reflected", "First")
+	reflectionType := reflectionContractType()
+	placement := generatedArtifactPlacement{
+		kind: api.GeneratedArtifactPlacementCompilation,
+	}
+
+	adapterFirst := NewRegistry()
+	firstBinding := internDemandAdapter(
+		t,
+		adapterFirst,
+		"a",
+		source,
+		placement,
+	)
+	adapterFirst.reflectionValueDemands[firstBinding.key] = struct{}{}
+	before, err := adapterFirst.interfaceAdapterContractRequests(
+		firstBinding,
+		"",
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countAdapterContractRequests(before) != 0 {
+		t.Fatal("reflected adapter acquired an absent interface contract")
+	}
+	after, err := adapterFirst.recordReflectionValueContract(
+		"first",
+		contract,
+		reflectionType,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertReflectionValueJoin(t, "adapter-first", after)
+
+	contractFirst := NewRegistry()
+	before, err = contractFirst.recordReflectionValueContract(
+		"first",
+		contract,
+		reflectionType,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countAdapterContractRequests(before) != 0 {
+		t.Fatal("reflection contract selected an absent adapter")
+	}
+	lateKey := strings.Repeat("b", 64)
+	contractFirst.reflectionValueDemands[lateKey] = struct{}{}
+	lateBinding := internDemandAdapter(
+		t,
+		contractFirst,
+		"b",
+		source,
+		placement,
+	)
+	late, err := contractFirst.interfaceAdapterContractRequests(
+		lateBinding,
+		"",
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertReflectionValueJoin(t, "contract-first", late)
+}
+
+func assertReflectionValueJoin(
+	t *testing.T,
+	order string,
+	requests []api.RootRequest,
+) {
+	t.Helper()
+	if countAdapterContractRequests(requests) != 1 {
+		t.Fatalf(
+			"%s adapter contract requests = %d, want 1",
+			order,
+			countAdapterContractRequests(requests),
+		)
+	}
+	if countReflectionRequests(requests) != 1 {
+		t.Fatalf(
+			"%s reflection requests = %d, want 1",
+			order,
+			countReflectionRequests(requests),
+		)
+	}
+}
+
 func namedDemandType(name string, methods ...string) *types.Named {
 	pkg := types.NewPackage("example.com/demand", "demand")
 	typeName := types.NewTypeName(token.NoPos, pkg, name, nil)
@@ -142,6 +234,21 @@ func countReflectionRequests(requests []api.RootRequest) int {
 	for _, request := range requests {
 		requirement, ok := request.DeclarationRequirement()
 		if ok && requirement.Kind() == api.DeclarationRequirementReflectionType {
+			count++
+		}
+	}
+	return count
+}
+
+func countAdapterContractRequests(requests []api.RootRequest) int {
+	count := 0
+	for _, request := range requests {
+		requirement, ok := request.DeclarationRequirement()
+		if !ok {
+			continue
+		}
+		_, _, _, contract := requirement.InterfaceAdapterContract()
+		if contract {
 			count++
 		}
 	}

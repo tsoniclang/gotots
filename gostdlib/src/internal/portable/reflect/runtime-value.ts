@@ -19,8 +19,8 @@ import type { Type } from "../../../reflect.js";
 export interface RuntimeValueLocation {
   readonly type: () => Type;
   readonly settable: bool;
-  readonly get: () => GoInterfaceValue;
-  readonly set: (box: GoInterfaceValue) => void;
+  readonly get: () => GoInterfaceValue | undefined;
+  readonly set: (box: GoInterfaceValue | undefined) => void;
 }
 
 // RuntimeValueOperations are the generated per-type typed value callbacks
@@ -83,7 +83,7 @@ export interface RuntimeValueOperations {
     box: GoInterfaceValue,
   ) => readonly GoInterfaceValue[];
   readonly makeMap?: () => GoInterfaceValue;
-  readonly zero?: () => GoInterfaceValue;
+  readonly zero?: () => GoInterfaceValue | undefined;
   readonly boxInt?: (value: int64) => GoInterfaceValue;
   readonly boxUint?: (value: uint64) => GoInterfaceValue;
   readonly boxFloat?: (value: float64) => GoInterfaceValue;

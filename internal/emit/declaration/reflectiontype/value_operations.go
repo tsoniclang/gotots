@@ -42,9 +42,13 @@ func valueOperationsStatement(
 		return nil, nil, false, err
 	}
 	factory := context.Factory()
-	adapter, err := context.Names().InterfaceAdapter(sourceType, nil)
-	if err != nil {
-		return nil, nil, false, err
+	_, interfaceSource := types.Unalias(sourceType).Underlying().(*types.Interface)
+	var adapter api.NameReference
+	if !interfaceSource {
+		adapter, err = context.Names().InterfaceAdapter(sourceType, nil)
+		if err != nil {
+			return nil, nil, false, err
+		}
 	}
 	boxType, err := context.Names().Runtime(
 		api.RuntimeInterfaceValue,
@@ -53,18 +57,22 @@ func valueOperationsStatement(
 	if err != nil {
 		return nil, nil, false, err
 	}
-	panicReference, err := context.Names().Runtime(
-		api.RuntimePanic,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return nil, nil, false, err
+	requests := boxType.Requests()
+	var panicReference api.NameReference
+	if !interfaceSource {
+		panicReference, err = context.Names().Runtime(
+			api.RuntimePanic,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		requests = api.CombineRequests(
+			adapter.Requests(),
+			boxType.Requests(),
+			panicReference.Requests(),
+		)
 	}
-	requests := api.CombineRequests(
-		adapter.Requests(),
-		boxType.Requests(),
-		panicReference.Requests(),
-	)
 	properties := make([]tsgo.ObjectLiteralElementLike, 0, len(callbacks))
 	for _, callback := range callbacks {
 		var resultType tsgo.TypeNode

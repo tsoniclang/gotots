@@ -254,13 +254,6 @@ func structValueProperties(
 			))
 			continue
 		}
-		fieldAdapter, adapterErr := context.Names().InterfaceAdapter(
-			field.Type(),
-			nil,
-		)
-		if adapterErr != nil {
-			return nil, adapterErr
-		}
 		descriptor, descriptorErr := names.ReflectionValueType(
 			field.Type(),
 			reflectionType,
@@ -274,10 +267,6 @@ func structValueProperties(
 		}
 		scaffold.requests = append(
 			scaffold.requests,
-			fieldAdapter.Requests()...,
-		)
-		scaffold.requests = append(
-			scaffold.requests,
 			descriptor.Requests()...,
 		)
 		fieldAccess := tsgo.Expression(memberAccess(
@@ -285,79 +274,115 @@ func structValueProperties(
 			"instance",
 			member,
 		))
-		fieldValue := fieldAccess
 		settable := field.Exported()
-		var setStatements []tsgo.Statement
-		if field.Name() == "_" {
-			zero, zeroErr := context.Values().Zero(
-				context.WithRole(api.RoleStructZeroField),
-				nil,
-				field.Type(),
-			)
-			if zeroErr != nil {
-				return nil, zeroErr
-			}
-			if len(zero.Before()) != 0 {
-				return nil, &api.GeneratedArtifactShapeError{
-					Artifact: field.Type().String(),
-					Reason:   "blank reflection field zero is not expression-only",
-				}
-			}
-			scaffold.requests = append(
-				scaffold.requests,
-				zero.Requests()...,
-			)
-			fieldValue = zero.Value()
-			settable = false
-			setStatements = []tsgo.Statement{factory.ExpressionStatement(
-				runtimePanic(
-					scaffold,
-					"reflect: Value.Set using unaddressable value",
-				),
-			)}
-		} else {
-			copied, copyErr := context.Values().Transfer(
-				context.WithRole(api.RoleStructCopyField),
-				nil,
-				field.Type(),
-				field.Type(),
-				api.ValueTransferCopy,
-				api.DirectExpression(guardedForeignPayload(
-					scaffold,
-					fieldAdapter,
-					"Value.Set",
-				)),
-			)
-			if copyErr != nil {
-				return nil, copyErr
-			}
-			scaffold.requests = append(
-				scaffold.requests,
-				copied.Requests()...,
-			)
-			setStatements = append(setStatements, copied.Before()...)
-			setStatements = append(
-				setStatements,
-				factory.ExpressionStatement(factory.BinaryExpression(
-					nil,
+		var boxedField tsgo.Expression
+		var setBlock tsgo.Block
+		if _, isInterface := types.Unalias(field.Type()).Underlying().(*types.Interface); isInterface {
+			var interfaceRequests []api.RootRequest
+			boxedField, setBlock, interfaceRequests, descriptorErr =
+				interfaceFieldCallbacks(
+					context,
+					field,
 					fieldAccess,
-					nil,
-					factory.BinaryOperatorToken(
-						tsgo.BinaryOperatorEqualsToken,
-					),
-					copied.Value(),
-				)),
+					scaffold,
+				)
+			if descriptorErr != nil {
+				return nil, descriptorErr
+			}
+			scaffold.requests = append(
+				scaffold.requests,
+				interfaceRequests...,
 			)
+			if field.Name() == "_" {
+				settable = false
+			}
+		} else {
+			fieldAdapter, adapterErr := context.Names().InterfaceAdapter(
+				field.Type(),
+				nil,
+			)
+			if adapterErr != nil {
+				return nil, adapterErr
+			}
+			scaffold.requests = append(
+				scaffold.requests,
+				fieldAdapter.Requests()...,
+			)
+			fieldValue := fieldAccess
+			var setStatements []tsgo.Statement
+			if field.Name() == "_" {
+				zero, zeroErr := context.Values().Zero(
+					context.WithRole(api.RoleStructZeroField),
+					nil,
+					field.Type(),
+				)
+				if zeroErr != nil {
+					return nil, zeroErr
+				}
+				if len(zero.Before()) != 0 {
+					return nil, &api.GeneratedArtifactShapeError{
+						Artifact: field.Type().String(),
+						Reason:   "blank reflection field zero is not expression-only",
+					}
+				}
+				scaffold.requests = append(
+					scaffold.requests,
+					zero.Requests()...,
+				)
+				fieldValue = zero.Value()
+				settable = false
+				setStatements = []tsgo.Statement{factory.ExpressionStatement(
+					runtimePanic(
+						scaffold,
+						"reflect: Value.Set using unaddressable value",
+					),
+				)}
+			} else {
+				copied, copyErr := context.Values().Transfer(
+					context.WithRole(api.RoleStructCopyField),
+					nil,
+					field.Type(),
+					field.Type(),
+					api.ValueTransferCopy,
+					api.DirectExpression(guardedForeignPayload(
+						scaffold,
+						fieldAdapter,
+						"Value.Set",
+					)),
+				)
+				if copyErr != nil {
+					return nil, copyErr
+				}
+				scaffold.requests = append(
+					scaffold.requests,
+					copied.Requests()...,
+				)
+				setStatements = append(setStatements, copied.Before()...)
+				setStatements = append(
+					setStatements,
+					factory.ExpressionStatement(factory.BinaryExpression(
+						nil,
+						fieldAccess,
+						nil,
+						factory.BinaryOperatorToken(
+							tsgo.BinaryOperatorEqualsToken,
+						),
+						copied.Value(),
+					)),
+				)
+			}
+			boxedField = factory.NewExpression(
+				fieldAdapter.Expression(factory),
+				nil,
+				[]tsgo.Expression{fieldValue},
+			)
+			setBlock = factory.Block(setStatements, true)
 		}
 		location := locationLiteral(scaffold, locationCallbacks{
 			descriptor: descriptor,
 			settable:   settable,
-			get: factory.NewExpression(
-				fieldAdapter.Expression(factory),
-				nil,
-				[]tsgo.Expression{fieldValue},
-			),
-			set: factory.Block(setStatements, true),
+			get:        boxedField,
+			set:        setBlock,
 		})
 		caseLiteral, caseErr := api.IntegerLiteral(
 			factory,
