@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -14,13 +15,37 @@ import (
 func basicValueProperties(
 	context api.Context,
 	scaffold *locationScaffold,
+	sourceType types.Type,
 	basic *types.Basic,
 ) ([]tsgo.ObjectLiteralElementLike, error) {
 	factory := scaffold.factory
-	zero, err := scalarZeroExpression(context, factory, basic)
+	operationContext, err := scalarOperationContext(context, sourceType)
+	if err != nil {
+		return nil, err
+	}
+	zero, err := scalarZeroExpression(operationContext, factory, basic)
 	if err != nil || zero == nil {
 		return nil, err
 	}
+	payload, payloadRequests, err := projectedScalarPayload(
+		context,
+		sourceType,
+		boxPayload(factory),
+	)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, payloadRequests...)
+	scaffold.payload = payload
+	zeroBoxed, zeroRequests, err := constructedScalarValue(
+		context,
+		sourceType,
+		zero,
+	)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, zeroRequests...)
 	isZero := factory.ArrowFunction(
 		nil,
 		nil,
@@ -32,7 +57,7 @@ func basicValueProperties(
 			"Value.IsZero",
 			factory.BinaryExpression(
 				nil,
-				boxPayload(factory),
+				payload,
 				nil,
 				factory.BinaryOperatorToken(
 					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
@@ -55,11 +80,16 @@ func basicValueProperties(
 			factory.ParenthesizedExpression(factory.NewExpression(
 				scaffold.adapter.Expression(factory),
 				nil,
-				[]tsgo.Expression{zero},
+				[]tsgo.Expression{zeroBoxed},
 			)),
 		)),
 	}
-	boxing, err := scalarBoxingProperty(context, scaffold, basic)
+	boxing, err := scalarBoxingProperty(
+		operationContext,
+		scaffold,
+		sourceType,
+		basic,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +106,18 @@ func basicValueProperties(
 		scaffold.requests = append(
 			scaffold.requests,
 			parameterType.Requests()...,
+		)
+		stringBoxed, stringRequests, stringErr := constructedScalarValue(
+			context,
+			sourceType,
+			factory.Identifier("value"),
+		)
+		if stringErr != nil {
+			return nil, stringErr
+		}
+		scaffold.requests = append(
+			scaffold.requests,
+			stringRequests...,
 		)
 		boxString := factory.ArrowFunction(
 			nil,
@@ -99,7 +141,7 @@ func basicValueProperties(
 			factory.NewExpression(
 				scaffold.adapter.Expression(factory),
 				nil,
-				[]tsgo.Expression{factory.Identifier("value")},
+				[]tsgo.Expression{stringBoxed},
 			),
 		)
 		properties = append(
@@ -149,6 +191,7 @@ func scalarZeroExpression(
 func scalarBoxingProperty(
 	context api.Context,
 	scaffold *locationScaffold,
+	sourceType types.Type,
 	basic *types.Basic,
 ) (tsgo.ObjectLiteralElementLike, error) {
 	factory := scaffold.factory
@@ -256,6 +299,15 @@ func scalarBoxingProperty(
 			)
 		}
 	}
+	boxed, boxedRequests, err := constructedScalarValue(
+		context,
+		sourceType,
+		narrowed,
+	)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, boxedRequests...)
 	return expressionProperty(factory, name, factory.ArrowFunction(
 		nil,
 		nil,
@@ -278,7 +330,22 @@ func scalarBoxingProperty(
 		factory.ParenthesizedExpression(factory.NewExpression(
 			scaffold.adapter.Expression(factory),
 			nil,
-			[]tsgo.Expression{narrowed},
+			[]tsgo.Expression{boxed},
 		)),
 	)), nil
+}
+
+// scalarOperationContext selects the scalar representation context of one
+// registered type: provider-operations defined types project to the
+// provider carrier, so their zero literals and boxing widths follow the
+// provider scalar representation.
+func scalarOperationContext(
+	context api.Context,
+	sourceType types.Type,
+) (api.Context, error) {
+	model, defined := definedtype.Resolve(sourceType)
+	if !defined {
+		return context, nil
+	}
+	return model.OperationContext(context)
 }

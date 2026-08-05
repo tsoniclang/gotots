@@ -415,13 +415,6 @@ func NewReflectionTypeRequest(
 	return generatedDefinitionRequest(requirement, err)
 }
 
-func NewReflectionValueOperationsRequest(
-	artifact *GeneratedArtifact,
-) (RootRequest, error) {
-	requirement, err := NewReflectionValueOperationsRequirement(artifact)
-	return generatedDefinitionRequest(requirement, err)
-}
-
 func NewUnsafeCodecRequest(
 	artifact *GeneratedArtifact,
 ) (RootRequest, error) {

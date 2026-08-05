@@ -560,3 +560,26 @@ func (b ValueReceiverBinding) CopySelected() bool {
 func (b ValueReceiverBinding) CopyRequest() (RootRequest, error) {
 	return NewValueReceiverCopyRequest(b.method)
 }
+
+func NewReflectionValueOperationsRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewReflectionValueOperationsRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+// NewReflectionValueOperationsRequirement is the value-operation facet
+// requirement of one canonical reflection descriptor. Its distinct identity
+// requeues an already-constructed descriptor artifact when a value demand
+// arrives after the metadata-only construction, so the generated
+// registration is never dropped by request deduplication.
+func NewReflectionValueOperationsRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	return newGeneratedDefinitionRequirement(
+		artifact,
+		GeneratedArtifactReflectionType,
+		DeclarationRequirementReflectionValueOperations,
+		"reflection value operations",
+	)
+}

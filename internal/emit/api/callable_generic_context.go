@@ -556,3 +556,22 @@ func (t GotoTarget) StateName() string {
 func (t GotoTarget) State() int {
 	return t.state
 }
+
+func (f TypeRepresentationFacet) Valid() bool {
+	return f == TypeRepresentationStorage ||
+		f == TypeRepresentationContainerStorage ||
+		f == TypeRepresentationPointer
+}
+
+func (f TypeRepresentationFacet) String() string {
+	switch f {
+	case TypeRepresentationStorage:
+		return "storage"
+	case TypeRepresentationContainerStorage:
+		return "container-storage"
+	case TypeRepresentationPointer:
+		return "pointer"
+	default:
+		return "invalid"
+	}
+}

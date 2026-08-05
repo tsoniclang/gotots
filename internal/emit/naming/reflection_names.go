@@ -231,6 +231,16 @@ func (n *File) ReflectionValueType(
 	)...)
 }
 
+// ProviderOwnedDeclaration reports whether one declaration's truth is a
+// certified provider facet, which excludes its class internals from the
+// generated location model.
+func (n *File) ProviderOwnedDeclaration(
+	object types.Object,
+) (bool, error) {
+	_, owned, err := n.providerFacetOwner(object)
+	return owned, err
+}
+
 // reflectionValueOperationsRequest builds the value-operation facet
 // requirement of one interned canonical descriptor.
 func (r *Registry) reflectionValueOperationsRequest(

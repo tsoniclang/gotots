@@ -17,10 +17,37 @@ func mapValueProperties(
 	context api.Context,
 	names api.ReflectionNames,
 	reflectionType *types.TypeName,
+	sourceType types.Type,
 	mapType *types.Map,
 	scaffold *locationScaffold,
 ) ([]tsgo.ObjectLiteralElementLike, error) {
 	factory := scaffold.factory
+	payload, payloadRequests, err := projectedScalarPayload(
+		context,
+		sourceType,
+		boxPayload(scaffold.factory),
+	)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, payloadRequests...)
+	scaffold.payload = payload
+	var wrapFailure error
+	wrapMap := func(raw tsgo.Expression) tsgo.Expression {
+		wrapped, wrapRequests, wrapErr := constructedScalarValue(
+			context,
+			sourceType,
+			raw,
+		)
+		if wrapErr != nil {
+			if wrapFailure == nil {
+				wrapFailure = wrapErr
+			}
+			return raw
+		}
+		scaffold.requests = append(scaffold.requests, wrapRequests...)
+		return wrapped
+	}
 	keyBasic, keyOK := types.Unalias(mapType.Key()).(*types.Basic)
 	elementBasic, elementOK := types.Unalias(mapType.Elem()).(*types.Basic)
 	supported := keyOK && elementOK &&
@@ -48,7 +75,7 @@ func mapValueProperties(
 	}
 	lengthCall := factory.CallExpression(
 		factory.PropertyAccessExpression(
-			boxPayload(factory),
+			scaffoldPayload(scaffold),
 			nil,
 			factory.Identifier("length"),
 			tsgo.NodeFlagsNone,
@@ -182,7 +209,7 @@ func mapValueProperties(
 	)
 	mapIndexBody := factory.Block([]tsgo.Statement{
 		foreignBoxGuardStatement(scaffold, "Value.MapIndex"),
-		constStatement(factory, "instance", boxPayload(factory)),
+		constStatement(factory, "instance", scaffoldPayload(scaffold)),
 		constStatement(factory, "entry", lookupCall),
 		factory.ReturnStatement(factory.ConditionalExpression(
 			factory.ElementAccessExpression(
@@ -232,7 +259,7 @@ func mapValueProperties(
 	)
 	mapStoreBody := factory.Block([]tsgo.Statement{
 		foreignBoxGuardStatement(scaffold, "Value.SetMapIndex"),
-		constStatement(factory, "instance", boxPayload(factory)),
+		constStatement(factory, "instance", scaffoldPayload(scaffold)),
 		constStatement(factory, "entry", guardedForeignOperand(
 			scaffold,
 			keyAdapter,
@@ -311,7 +338,7 @@ func mapValueProperties(
 				factory.PropertyAccessExpression(
 					factory.CallExpression(
 						factory.PropertyAccessExpression(
-							boxPayload(factory),
+							scaffoldPayload(scaffold),
 							nil,
 							factory.Identifier("keys"),
 							tsgo.NodeFlagsNone,
@@ -365,7 +392,7 @@ func mapValueProperties(
 		factory.ParenthesizedExpression(factory.NewExpression(
 			scaffold.adapter.Expression(factory),
 			nil,
-			[]tsgo.Expression{factory.CallExpression(
+			[]tsgo.Expression{wrapMap(factory.CallExpression(
 				factory.PropertyAccessExpression(
 					runtimeMap.Expression(factory),
 					nil,
@@ -380,7 +407,7 @@ func mapValueProperties(
 					factory.ArrayLiteralExpression(nil, false),
 				},
 				tsgo.NodeFlagsNone,
-			)},
+			))},
 		)),
 	)
 	zero := factory.ArrowFunction(
@@ -395,7 +422,7 @@ func mapValueProperties(
 		factory.ParenthesizedExpression(factory.NewExpression(
 			scaffold.adapter.Expression(factory),
 			nil,
-			[]tsgo.Expression{factory.CallExpression(
+			[]tsgo.Expression{wrapMap(factory.CallExpression(
 				factory.PropertyAccessExpression(
 					runtimeMap.Expression(factory),
 					nil,
@@ -406,9 +433,12 @@ func mapValueProperties(
 				nil,
 				[]tsgo.Expression{elementZero},
 				tsgo.NodeFlagsNone,
-			)},
+			))},
 		)),
 	)
+	if wrapFailure != nil {
+		return nil, wrapFailure
+	}
 	return []tsgo.ObjectLiteralElementLike{
 		runtimeNilCallback(scaffold),
 		expressionProperty(factory, "zero", zero),

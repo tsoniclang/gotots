@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -17,13 +19,21 @@ func pointerValueProperties(
 	context api.Context,
 	names api.ReflectionNames,
 	reflectionType *types.TypeName,
+	sourceType types.Type,
 	pointee types.Type,
 	scaffold *locationScaffold,
 ) ([]tsgo.ObjectLiteralElementLike, error) {
 	factory := scaffold.factory
+	observation, err := pointertype.Observe(context, sourceType, false)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, observation.Requests()...)
+	directClass := observation.Representation() ==
+		api.PointerRepresentationDirectClass
 	structType, structOK := types.Unalias(pointee).
 		Underlying().(*types.Struct)
-	if !structOK || !locationModelStruct(structType) {
+	if !directClass || !structOK || !locationModelStruct(structType) {
 		// The pointee is outside the location model: the pointer keeps
 		// its exact nil and zero evidence while elem stays a loud typed
 		// boundary through operation absence.
@@ -141,7 +151,24 @@ func structValueProperties(
 	scaffold *locationScaffold,
 ) ([]tsgo.ObjectLiteralElementLike, error) {
 	factory := scaffold.factory
-	fullySupported := locationModelStruct(structType)
+	providerRepresented := false
+	if model, defined := definedtype.Resolve(sourceType); defined {
+		provider, providerErr := model.ProviderCarrier(context)
+		if providerErr != nil {
+			return nil, providerErr
+		}
+		providerRepresented = provider
+	}
+	if named, isNamed := types.Unalias(sourceType).(*types.Named); isNamed &&
+		named.Obj() != nil {
+		owned, ownedErr := names.ProviderOwnedDeclaration(named.Obj())
+		if ownedErr != nil {
+			return nil, ownedErr
+		}
+		providerRepresented = providerRepresented || owned
+	}
+	fullySupported := !providerRepresented &&
+		locationModelStruct(structType)
 	var cloned tsgo.ObjectLiteralElementLike
 	if fullySupported {
 		if _, isNamed := types.Unalias(sourceType).(*types.Named); isNamed {
@@ -181,7 +208,7 @@ func structValueProperties(
 	cases := make([]tsgo.CaseOrDefaultClause, 0, structType.NumFields()+1)
 	for index := range structType.NumFields() {
 		field := structType.Field(index)
-		if !locationModelField(field.Type()) {
+		if providerRepresented || !locationModelField(field.Type()) {
 			caseLiteral, caseErr := api.IntegerLiteral(
 				factory,
 				provider,
@@ -421,13 +448,46 @@ func pointerCellValueProperties(
 	scaffold.requests = append(scaffold.requests, sliceAdapter.Requests()...)
 	scaffold.requests = append(scaffold.requests, descriptor.Requests()...)
 	cellValue := memberAccess(factory, "instance", "value")
+	// Scalar pointer cells hold the raw carrier storage: reads wrap the
+	// raw value into the pointee's branded representation for boxing, and
+	// writes project the boxed payload back to raw storage. Container
+	// cells hold the represented value directly.
+	cellRead := cellValue
+	cellWrite := guardedForeignPayload(
+		scaffold,
+		sliceAdapter,
+		"Value.Set",
+	)
+	if _, basicPointee := types.Unalias(pointee).
+		Underlying().(*types.Basic); basicPointee {
+		wrapped, readRequests, readErr := constructedScalarValue(
+			context,
+			pointee,
+			cellValue,
+		)
+		if readErr != nil {
+			return nil, readErr
+		}
+		scaffold.requests = append(scaffold.requests, readRequests...)
+		cellRead = wrapped
+		projected, writeRequests, writeErr := projectedScalarPayload(
+			context,
+			pointee,
+			cellWrite,
+		)
+		if writeErr != nil {
+			return nil, writeErr
+		}
+		scaffold.requests = append(scaffold.requests, writeRequests...)
+		cellWrite = projected
+	}
 	location := locationLiteral(scaffold, locationCallbacks{
 		descriptor: descriptor,
 		settable:   true,
 		get: factory.NewExpression(
 			sliceAdapter.Expression(factory),
 			nil,
-			[]tsgo.Expression{cellValue},
+			[]tsgo.Expression{cellRead},
 		),
 		set: factory.Block([]tsgo.Statement{
 			factory.ExpressionStatement(factory.BinaryExpression(
@@ -435,11 +495,7 @@ func pointerCellValueProperties(
 				cellValue,
 				nil,
 				factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
-				guardedForeignPayload(
-					scaffold,
-					sliceAdapter,
-					"Value.Set",
-				),
+				cellWrite,
 			)),
 		}, true),
 	})

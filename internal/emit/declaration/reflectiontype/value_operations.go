@@ -5,6 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -32,7 +33,11 @@ func valueOperationsStatement(
 	sourceType types.Type,
 	descriptorName string,
 ) (tsgo.Statement, []api.RootRequest, bool, error) {
-	callbacks, _, err := selectValueCallbacks(context, sourceType)
+	scalarContext, err := scalarOperationContext(context, sourceType)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	callbacks, _, err := selectValueCallbacks(scalarContext, sourceType)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -80,12 +85,20 @@ func valueOperationsStatement(
 				nil,
 			)
 		}
-		payload := factory.PropertyAccessExpression(
-			factory.Identifier("box"),
-			nil,
-			factory.Identifier("$go$value"),
-			tsgo.NodeFlagsNone,
+		payload, payloadRequests, payloadErr := projectedScalarPayload(
+			context,
+			sourceType,
+			factory.PropertyAccessExpression(
+				factory.Identifier("box"),
+				nil,
+				factory.Identifier("$go$value"),
+				tsgo.NodeFlagsNone,
+			),
 		)
+		if payloadErr != nil {
+			return nil, nil, false, payloadErr
+		}
+		requests = append(requests, payloadRequests...)
 		var projected tsgo.Expression
 		switch {
 		case callback.nilCheck:
@@ -343,4 +356,44 @@ func carrierWidens(
 		return false, err
 	}
 	return targetCarrier != sourceCarrier, nil
+}
+
+// projectedScalarPayload routes one boxed payload through the defined-type
+// projection when the registered type carries a branded representation, so
+// scalar callbacks always operate on the raw carrier.
+func projectedScalarPayload(
+	context api.Context,
+	sourceType types.Type,
+	payload tsgo.Expression,
+) (tsgo.Expression, []api.RootRequest, error) {
+	model, defined := definedtype.Resolve(sourceType)
+	if !defined {
+		return payload, nil, nil
+	}
+	projected, err := model.Project(
+		context,
+		api.DirectExpression(payload),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return projected.Value(), projected.Requests(), nil
+}
+
+// constructedScalarValue wraps one raw carrier value back into the
+// registered type's branded representation when one exists.
+func constructedScalarValue(
+	context api.Context,
+	sourceType types.Type,
+	value tsgo.Expression,
+) (tsgo.Expression, []api.RootRequest, error) {
+	model, defined := definedtype.Resolve(sourceType)
+	if !defined {
+		return value, nil, nil
+	}
+	constructed, err := model.Construct(context, value)
+	if err != nil {
+		return nil, nil, err
+	}
+	return constructed.Value(), constructed.Requests(), nil
 }

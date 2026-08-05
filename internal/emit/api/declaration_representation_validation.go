@@ -399,25 +399,6 @@ const (
 	TypeRepresentationPointer          TypeRepresentationFacet = 3
 )
 
-func (f TypeRepresentationFacet) Valid() bool {
-	return f == TypeRepresentationStorage ||
-		f == TypeRepresentationContainerStorage ||
-		f == TypeRepresentationPointer
-}
-
-func (f TypeRepresentationFacet) String() string {
-	switch f {
-	case TypeRepresentationStorage:
-		return "storage"
-	case TypeRepresentationContainerStorage:
-		return "container-storage"
-	case TypeRepresentationPointer:
-		return "pointer"
-	default:
-		return "invalid"
-	}
-}
-
 func SupportsTypeRepresentation(typeName *types.TypeName) bool {
 	if typeName == nil || typeName.IsAlias() {
 		return false

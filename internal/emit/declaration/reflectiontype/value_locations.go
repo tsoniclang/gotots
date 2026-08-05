@@ -17,6 +17,18 @@ type locationScaffold struct {
 	panicRef   api.NameReference
 	targetType api.NameReference
 	requests   []api.RootRequest
+	// payload is the raw represented payload of the walked type's box:
+	// the boxed value routed through the defined-type projection when the
+	// registered type carries a branded representation.
+	payload tsgo.Expression
+}
+
+// scaffoldPayload is the raw payload expression of the walked type.
+func scaffoldPayload(scaffold *locationScaffold) tsgo.Expression {
+	if scaffold.payload != nil {
+		return scaffold.payload
+	}
+	return boxPayload(scaffold.factory)
 }
 
 // extendedValueProperties derives the location-model callbacks admitted by
@@ -34,7 +46,7 @@ func extendedValueProperties(
 ) ([]tsgo.ObjectLiteralElementLike, error) {
 	switch selected := types.Unalias(sourceType).Underlying().(type) {
 	case *types.Basic:
-		return basicValueProperties(context, scaffold, selected)
+		return basicValueProperties(context, scaffold, sourceType, selected)
 	case *types.Pointer:
 		switch types.Unalias(selected.Elem()).Underlying().(type) {
 		case *types.Struct:
@@ -42,6 +54,7 @@ func extendedValueProperties(
 				context,
 				names,
 				reflectionType,
+				sourceType,
 				selected.Elem(),
 				scaffold,
 			)
@@ -70,6 +83,7 @@ func extendedValueProperties(
 			context,
 			names,
 			reflectionType,
+			sourceType,
 			selected,
 			scaffold,
 		)
@@ -78,6 +92,7 @@ func extendedValueProperties(
 			context,
 			names,
 			reflectionType,
+			sourceType,
 			selected,
 			scaffold,
 		)
