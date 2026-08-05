@@ -1927,6 +1927,8 @@
       "export": "SyncCondOperations",
       "capabilities": [
         "copy",
+        "equal",
+        "hash",
         "storage",
         "zero"
       ],
@@ -1953,6 +1955,8 @@
       "export": "SyncMutexOperations",
       "capabilities": [
         "copy",
+        "equal",
+        "hash",
         "storage",
         "zero"
       ],
@@ -1966,6 +1970,8 @@
       "export": "SyncOnceOperations",
       "capabilities": [
         "copy",
+        "equal",
+        "hash",
         "storage",
         "zero"
       ],
@@ -1992,6 +1998,8 @@
       "export": "SyncRWMutexOperations",
       "capabilities": [
         "copy",
+        "equal",
+        "hash",
         "storage",
         "zero"
       ],
@@ -2005,6 +2013,8 @@
       "export": "SyncWaitGroupOperations",
       "capabilities": [
         "copy",
+        "equal",
+        "hash",
         "storage",
         "zero"
       ],

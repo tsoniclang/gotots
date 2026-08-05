@@ -8,7 +8,15 @@ export class SyncCondOperations {
   }
 
   static $copy(source: Cond): Cond {
-    return new Cond(source.L);
+    return Cond.$copy(source);
+  }
+
+  static $equal(left: Cond, right: Cond): boolean {
+    return Cond.$equal(left, right);
+  }
+
+  static $hash(source: Cond): number {
+    return Cond.$hash(source);
   }
 
   static $storageOf(source: Cond): SyncCondStorage {
@@ -47,8 +55,16 @@ export class SyncMutexOperations {
     return new Mutex();
   }
 
-  static $copy(_source: Mutex): Mutex {
-    return new Mutex();
+  static $copy(source: Mutex): Mutex {
+    return Mutex.$copy(source);
+  }
+
+  static $equal(left: Mutex, right: Mutex): boolean {
+    return Mutex.$equal(left, right);
+  }
+
+  static $hash(source: Mutex): number {
+    return Mutex.$hash(source);
   }
 
   static $storageOf(source: Mutex): SyncMutexStorage {
@@ -67,8 +83,16 @@ export class SyncOnceOperations {
     return new Once();
   }
 
-  static $copy(_source: Once): Once {
-    return new Once();
+  static $copy(source: Once): Once {
+    return Once.$copy(source);
+  }
+
+  static $equal(left: Once, right: Once): boolean {
+    return Once.$equal(left, right);
+  }
+
+  static $hash(source: Once): number {
+    return Once.$hash(source);
   }
 
   static $storageOf(source: Once): SyncOnceStorage {
@@ -107,8 +131,16 @@ export class SyncRWMutexOperations {
     return new RWMutex();
   }
 
-  static $copy(_source: RWMutex): RWMutex {
-    return new RWMutex();
+  static $copy(source: RWMutex): RWMutex {
+    return RWMutex.$copy(source);
+  }
+
+  static $equal(left: RWMutex, right: RWMutex): boolean {
+    return RWMutex.$equal(left, right);
+  }
+
+  static $hash(source: RWMutex): number {
+    return RWMutex.$hash(source);
   }
 
   static $storageOf(source: RWMutex): SyncRWMutexStorage {
@@ -127,8 +159,16 @@ export class SyncWaitGroupOperations {
     return new WaitGroup();
   }
 
-  static $copy(_source: WaitGroup): WaitGroup {
-    return new WaitGroup();
+  static $copy(source: WaitGroup): WaitGroup {
+    return WaitGroup.$copy(source);
+  }
+
+  static $equal(left: WaitGroup, right: WaitGroup): boolean {
+    return WaitGroup.$equal(left, right);
+  }
+
+  static $hash(source: WaitGroup): number {
+    return WaitGroup.$hash(source);
   }
 
   static $storageOf(source: WaitGroup): SyncWaitGroupStorage {

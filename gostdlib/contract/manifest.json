@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "67ea43638501e69def92784a715bd71b5592f07ff9eb981fdb2cf26b3cba27d6",
-  "providerDigest": "af5a3c149abe9dd7633dbd73d12ae46e9d25097855f01c3ba3188cfaa4ec57c6",
+  "providerDigest": "0498d4b29284a93ecd17d993895464b4db0bd5f8c7cd9fbc99e445c4aef5bff2",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -14040,10 +14040,13 @@
           "sourceSignature": "defined=sync.Cond|underlying=struct{noCopy sync.noCopy; L sync.Locker; notify sync.notifyList; checker sync.copyChecker}",
           "sourceLocation": "sync/cond.go:37:6",
           "implementationOwner": "src/internal/portable/sync/cond.ts",
-          "targetFingerprint": "94b49b0c8a9cd863e3b4643a77f46ef22173078d86e8a8385f3a87b22c5edf8a",
+          "targetFingerprint": "d8cdb14b11536bb4dc05eab0267cd359e4a904f140dc1298d0d27eb76b4221e2",
           "disposition": "implemented",
+          "dependencies": [
+            "src/internal/portable/sync/cond.ts#nextConditionIdentity@46"
+          ],
           "implementationSites": [
-            "src/internal/portable/sync/cond.ts#Cond@53"
+            "src/internal/portable/sync/cond.ts#Cond@73"
           ]
         },
         {
@@ -14085,7 +14088,7 @@
           "targetFingerprint": "cdd43c5a8b62009a6b5184da54c44367c70fb6d54c79ae92084652f3164263e9",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/cond.ts#Locker@29"
+            "src/internal/portable/sync/cond.ts#Locker@49"
           ]
         },
         {
@@ -14112,10 +14115,10 @@
           "sourceSignature": "defined=sync.Mutex|underlying=struct{_ sync.noCopy; mu internal/sync.Mutex}",
           "sourceLocation": "sync/mutex.go:30:6",
           "implementationOwner": "src/internal/portable/sync/mutex.ts",
-          "targetFingerprint": "fa81c057b1325117358f7a699da5e8c597f807997bee4a376be8cc57596bfcc3",
+          "targetFingerprint": "63fb3e910e59d6c19c7789ff3fbf4f50d38f0ac3681e2c05f6384c553f519753",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#Mutex@36"
+            "src/internal/portable/sync/mutex.ts#Mutex@43"
           ]
         },
         {
@@ -14127,10 +14130,10 @@
           "sourceSignature": "defined=sync.Once|underlying=struct{_ sync.noCopy; done sync/atomic.Bool; m sync.Mutex}",
           "sourceLocation": "sync/once.go:20:6",
           "implementationOwner": "src/internal/portable/sync/once.ts",
-          "targetFingerprint": "d371af3e295fa69566899dc4491cce97c771e1bcaf8f7f72a24ed7b9db61f6cb",
+          "targetFingerprint": "68d2e1f923e2e1a86082cb97c6e56a6a21aeba38dedbcb1d22e4001f2fbd4913",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/once.ts#Once@17"
+            "src/internal/portable/sync/once.ts#Once@24"
           ]
         },
         {
@@ -14168,10 +14171,10 @@
           "sourceSignature": "defined=sync.RWMutex|underlying=struct{w sync.Mutex; writerSem uint32; readerSem uint32; readerCount sync/atomic.Int32; readerWait sync/atomic.Int32}",
           "sourceLocation": "sync/rwmutex.go:39:6",
           "implementationOwner": "src/internal/portable/sync/mutex.ts",
-          "targetFingerprint": "7527a56aadbe58d2d8af84dd86b9e858bf5a366f8d713ce57062a0e8147a01b0",
+          "targetFingerprint": "9cd3b15e3c919029875ccc9715eaf0c381482f9f22b289de8318691dfa2ccd8e",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#RWMutex@224"
+            "src/internal/portable/sync/mutex.ts#RWMutex@361"
           ]
         },
         {
@@ -14183,10 +14186,10 @@
           "sourceSignature": "defined=sync.WaitGroup|underlying=struct{noCopy sync.noCopy; state sync/atomic.Uint64; sema uint32}",
           "sourceLocation": "sync/waitgroup.go:48:6",
           "implementationOwner": "src/internal/portable/sync/wait-group.ts",
-          "targetFingerprint": "b2c86504f0ae2acb9a97cb5c3ce4bae15b5469fa030ad04eae8adf4a711725e1",
+          "targetFingerprint": "fb25f979bb7620824c296c875d36430b6c96535409c7f9f695f6de2c3335cd7c",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#WaitGroup@19"
+            "src/internal/portable/sync/wait-group.ts#WaitGroup@26"
           ]
         },
         {
@@ -14202,10 +14205,10 @@
           "targetFingerprint": "fefcf303cd24eea81246a8cc7578639abf795c9478c1e36ad0d4965d20dcdfcd",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/cond.ts#requireCond@268"
+            "src/internal/portable/sync/cond.ts#requireCond@529"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/cond.ts#Broadcast@198"
+            "src/internal/portable/sync/cond.ts#Broadcast@410"
           ]
         },
         {
@@ -14221,10 +14224,10 @@
           "targetFingerprint": "0e1a2f9d74e365c0a4bbf5008b74a4ed1fde1d8f92cbec75f18b10a492e04bcf",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/cond.ts#requireCond@268"
+            "src/internal/portable/sync/cond.ts#requireCond@529"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/cond.ts#Signal@163"
+            "src/internal/portable/sync/cond.ts#Signal@369"
           ]
         },
         {
@@ -14240,12 +14243,12 @@
           "targetFingerprint": "d715c7245354793e9439788b6bc18b40ce7e8d48e63e0beb2e3242233c870fa4",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/cond.ts#L@69",
-            "src/internal/portable/sync/cond.ts#requireCond@268",
-            "src/internal/portable/sync/cond.ts#requireLocker@298"
+            "src/internal/portable/sync/cond.ts#L@98",
+            "src/internal/portable/sync/cond.ts#requireCond@529",
+            "src/internal/portable/sync/cond.ts#requireLocker@559"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/cond.ts#Wait@81"
+            "src/internal/portable/sync/cond.ts#Wait@281"
           ]
         },
         {
@@ -14385,10 +14388,10 @@
           "targetFingerprint": "74451041d92694ec91c2987377828fa0cd9ed710e5ee4c2eb657514f21723346",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/mutex.ts#nilReceiver@15"
+            "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#Lock@53"
+            "src/internal/portable/sync/mutex.ts#Lock@190"
           ]
         },
         {
@@ -14404,10 +14407,10 @@
           "targetFingerprint": "226a6e67a4c813e85b42ea54445c41e1e3d439a7f1415e2899f3370f838c6b80",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/mutex.ts#nilReceiver@15"
+            "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#Unlock@119"
+            "src/internal/portable/sync/mutex.ts#Unlock@256"
           ]
         },
         {
@@ -14429,7 +14432,7 @@
           "targetFingerprint": "dd19140c38745ec620db9c35fa947bf72f0768d6784cccc1ec4d6ca6f7080efd",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/once.ts#Do@44"
+            "src/internal/portable/sync/once.ts#Do@138"
           ]
         },
         {
@@ -14480,10 +14483,10 @@
           "targetFingerprint": "10166aedd09ff5008126ee1110b7da32f0afaa30d4fef93e2e2309504ab7c494",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/mutex.ts#nilReceiver@15"
+            "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#Lock@244"
+            "src/internal/portable/sync/mutex.ts#Lock@591"
           ]
         },
         {
@@ -14499,10 +14502,10 @@
           "targetFingerprint": "9ca17383fc8a7086b977390437a2fe56d21b8fb10ff03b33e867404b96a662a1",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/mutex.ts#nilReceiver@15"
+            "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#RLock@382"
+            "src/internal/portable/sync/mutex.ts#RLock@729"
           ]
         },
         {
@@ -14518,10 +14521,10 @@
           "targetFingerprint": "1f1995bba69898609a2be1d75816bfe445e9c895642dbd18e316883151dd040e",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/mutex.ts#nilReceiver@15"
+            "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#RUnlock@485"
+            "src/internal/portable/sync/mutex.ts#RUnlock@832"
           ]
         },
         {
@@ -14537,10 +14540,10 @@
           "targetFingerprint": "e35442adf9c5ea2b6d8c8429c9ba56c0986874927d684b2e5564f727e944d1a6",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/mutex.ts#nilReceiver@15"
+            "src/internal/portable/sync/mutex.ts#nilReceiver@22"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/mutex.ts#Unlock@328"
+            "src/internal/portable/sync/mutex.ts#Unlock@675"
           ]
         },
         {
@@ -14556,7 +14559,7 @@
           "targetFingerprint": "dbf1e3a61215da685c19122f3c41397af6660a5002f8ba4870cae0ce4d64f516",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Add@41"
+            "src/internal/portable/sync/wait-group.ts#Add@178"
           ]
         },
         {
@@ -14572,11 +14575,11 @@
           "targetFingerprint": "bcaa4a7ea3323b7f01841984f6611e364b6bd48bdb5b81429c184bd2b5db8ebc",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/wait-group.ts#Add@41",
-            "src/internal/portable/sync/wait-group.ts#WaitGroup@19"
+            "src/internal/portable/sync/wait-group.ts#Add@178",
+            "src/internal/portable/sync/wait-group.ts#WaitGroup@26"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Done@132"
+            "src/internal/portable/sync/wait-group.ts#Done@269"
           ]
         },
         {
@@ -14598,12 +14601,12 @@
           "targetFingerprint": "77be91b791732159ffdfb2cec218fc31e9a4a95478a599bd0dec2dbe831ad50d",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/wait-group.ts#Add@41",
-            "src/internal/portable/sync/wait-group.ts#Done@132",
-            "src/internal/portable/sync/wait-group.ts#WaitGroup@19"
+            "src/internal/portable/sync/wait-group.ts#Add@178",
+            "src/internal/portable/sync/wait-group.ts#Done@269",
+            "src/internal/portable/sync/wait-group.ts#WaitGroup@26"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Go@156"
+            "src/internal/portable/sync/wait-group.ts#Go@293"
           ]
         },
         {
@@ -14619,7 +14622,7 @@
           "targetFingerprint": "6563d89c84dbd3fc5ef6b50030e3098355c14fc93205f162088a1b27cdbfaacc",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Wait@238"
+            "src/internal/portable/sync/wait-group.ts#Wait@375"
           ]
         },
         {
@@ -14634,10 +14637,10 @@
           "targetFingerprint": "d20cc1cd89c2c8436081b9585da178b6777d15bcadedecac4857c0fe6cbe5c95",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/cond.ts#Cond@53"
+            "src/internal/portable/sync/cond.ts#Cond@73"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/cond.ts#NewCond@247"
+            "src/internal/portable/sync/cond.ts#NewCond@508"
           ]
         },
         {
@@ -14658,7 +14661,7 @@
           "targetFingerprint": "e8b87a0a4acb86cb16b96665552825a1b75dd40911f551ff176ae9e6bc7c37ee",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/once.ts#OnceFunc@183"
+            "src/internal/portable/sync/once.ts#OnceFunc@277"
           ]
         },
         {
@@ -14685,7 +14688,7 @@
           "targetFingerprint": "ee13ae71a14d98a472157ddab5a078f9499a1fce272b164f3389387598031c2f",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/once.ts#OnceValue@262"
+            "src/internal/portable/sync/once.ts#OnceValue@356"
           ]
         }
       ]
@@ -19626,6 +19629,8 @@
           "sourceIdentity": "sync|kind=2|receiver=|name=Cond",
           "capabilities": [
             "copy",
+            "equal",
+            "hash",
             "storage",
             "zero"
           ],
@@ -19633,7 +19638,7 @@
           "storageExport": "SyncCondStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/cond.ts",
-          "targetFingerprint": "929c90dcd8bb24175ff769bd34b0110c7b4683985951c4b573790734855f44de",
+          "targetFingerprint": "f7b831259efc5fb418b593c7b1f4e1ea1e299dd3f2441de7db8e103c14363d10",
           "storageTargetFingerprint": "1d87b5bea913cea3d59d351e761d7ee718efcd36ee881a95f518bc6de847ae0c",
           "implementationSites": [
             "src/internal/facets/named-sync.ts#SyncCondOperations@28"
@@ -19654,7 +19659,7 @@
           "targetFingerprint": "71d6a0056fcecf1e8ddcc780d562a8f44437778078ed6c188b14d626d7825d14",
           "storageTargetFingerprint": "a489678083c9782ac47953a1168299626552e2c08e7a60ebd775c5b0ee9037b4",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncMapOperations@102"
+            "src/internal/facets/named-sync.ts#SyncMapOperations@145"
           ]
         },
         {
@@ -19662,6 +19667,8 @@
           "sourceIdentity": "sync|kind=2|receiver=|name=Mutex",
           "capabilities": [
             "copy",
+            "equal",
+            "hash",
             "storage",
             "zero"
           ],
@@ -19669,10 +19676,10 @@
           "storageExport": "SyncMutexStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/mutex.ts",
-          "targetFingerprint": "3559d6dac359061c038a0447e8133d9309761c0fb92ddfe8d0a67ba99672887f",
+          "targetFingerprint": "75f55973f4df367d4d244efbee5c5edb69ec8d1577f48734ae27e8fc9fa9936f",
           "storageTargetFingerprint": "cd7aabb3a224893419d76942ddf095072b8e4180feb06c0981bc32519132d60c",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncMutexOperations@173"
+            "src/internal/facets/named-sync.ts#SyncMutexOperations@216"
           ]
         },
         {
@@ -19680,6 +19687,8 @@
           "sourceIdentity": "sync|kind=2|receiver=|name=Once",
           "capabilities": [
             "copy",
+            "equal",
+            "hash",
             "storage",
             "zero"
           ],
@@ -19687,10 +19696,10 @@
           "storageExport": "SyncOnceStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/once.ts",
-          "targetFingerprint": "5c078dfc2c15d830fac39984eff67d0d9c9b256cf1688f017bb662aee8530105",
+          "targetFingerprint": "eb9df8b594b396721c6cf2b4fc2efbdfd6f7e7d91b8fee062a633d418dd86dbd",
           "storageTargetFingerprint": "85618d431bdbebbe1261382e1fb4bcdd75f54ded2a30e549544b5d91f558fdea",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncOnceOperations@244"
+            "src/internal/facets/named-sync.ts#SyncOnceOperations@333"
           ]
         },
         {
@@ -19708,7 +19717,7 @@
           "targetFingerprint": "a91f0d41ff7a7207e9a0ffb7732f160a0572cb98af7879e585f7b3ec8e949087",
           "storageTargetFingerprint": "cef67a67c61a5b0386d321d4551396860636a13f2294cc1a5957b26165373932",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncPoolOperations@315"
+            "src/internal/facets/named-sync.ts#SyncPoolOperations@450"
           ]
         },
         {
@@ -19716,6 +19725,8 @@
           "sourceIdentity": "sync|kind=2|receiver=|name=RWMutex",
           "capabilities": [
             "copy",
+            "equal",
+            "hash",
             "storage",
             "zero"
           ],
@@ -19723,10 +19734,10 @@
           "storageExport": "SyncRWMutexStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/mutex.ts",
-          "targetFingerprint": "abe5575bd922d99606236ee33814ea3513c4319ecc5d7d00cbe8b3e832f1e03a",
+          "targetFingerprint": "6f1e3c681e3007cd61eac7c15c609e7ca9b81a22993baa35433802b13b92600d",
           "storageTargetFingerprint": "b3f4db5108c807b70b959f252597a0719661f3a3e0a3776486d94abd88aaeb08",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncRWMutexOperations@389"
+            "src/internal/facets/named-sync.ts#SyncRWMutexOperations@524"
           ]
         },
         {
@@ -19734,6 +19745,8 @@
           "sourceIdentity": "sync|kind=2|receiver=|name=WaitGroup",
           "capabilities": [
             "copy",
+            "equal",
+            "hash",
             "storage",
             "zero"
           ],
@@ -19741,10 +19754,10 @@
           "storageExport": "SyncWaitGroupStorage",
           "implementationOwner": "src/internal/facets/named-sync.ts",
           "storageImplementationOwner": "src/internal/portable/sync/wait-group.ts",
-          "targetFingerprint": "95f0bacb12386120b53cccc5a668558e74df37ccbbcda40f98c92aed3564ff3c",
+          "targetFingerprint": "89380bac80d6f2342807c1b54f33cef0789eeadad16314061bf3dc84922f4325",
           "storageTargetFingerprint": "82b60b062fb280c49bf3f9c78c6d1aa801a308e81a7a4a88b860f9ed0cf1b5bd",
           "implementationSites": [
-            "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@460"
+            "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@641"
           ]
         }
       ]
@@ -26250,33 +26263,41 @@
       "identity": "src/internal/facets/named-sync.ts#SyncCondOperations@28",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/cond.ts#L@69",
+        "src/internal/portable/sync/cond.ts#$copy@110",
+        "src/internal/portable/sync/cond.ts#$equal@157",
+        "src/internal/portable/sync/cond.ts#$hash@207",
         "src/sync.ts#Cond@6"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncMapOperations@102",
+      "identity": "src/internal/facets/named-sync.ts#SyncMapOperations@145",
       "disposition": "implemented",
       "dependencies": [
         "src/sync.ts#Map@16"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncMutexOperations@173",
+      "identity": "src/internal/facets/named-sync.ts#SyncMutexOperations@216",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/mutex.ts#$copy@60",
+        "src/internal/portable/sync/mutex.ts#$equal@104",
+        "src/internal/portable/sync/mutex.ts#$hash@143",
         "src/sync.ts#Mutex@22"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncOnceOperations@244",
+      "identity": "src/internal/facets/named-sync.ts#SyncOnceOperations@333",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/once.ts#$copy@51",
+        "src/internal/portable/sync/once.ts#$equal@92",
+        "src/internal/portable/sync/once.ts#$hash@117",
         "src/sync.ts#Once@30"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncPoolOperations@315",
+      "identity": "src/internal/facets/named-sync.ts#SyncPoolOperations@450",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/sync/pool.ts#New@38",
@@ -26284,16 +26305,22 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncRWMutexOperations@389",
+      "identity": "src/internal/facets/named-sync.ts#SyncRWMutexOperations@524",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/mutex.ts#$copy@381",
+        "src/internal/portable/sync/mutex.ts#$equal@434",
+        "src/internal/portable/sync/mutex.ts#$hash@515",
         "src/sync.ts#RWMutex@24"
       ]
     },
     {
-      "identity": "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@460",
+      "identity": "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@641",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/sync/wait-group.ts#$copy@48",
+        "src/internal/portable/sync/wait-group.ts#$equal@92",
+        "src/internal/portable/sync/wait-group.ts#$hash@131",
         "src/sync.ts#WaitGroup@46"
       ]
     },
@@ -27495,7 +27522,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncMutexUnlock@44",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/mutex.ts#Unlock@119",
+        "src/internal/portable/sync/mutex.ts#Unlock@256",
         "src/sync.ts#Mutex@22"
       ]
     },
@@ -27511,7 +27538,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncRWMutexRUnlock@106",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/mutex.ts#RUnlock@485",
+        "src/internal/portable/sync/mutex.ts#RUnlock@832",
         "src/sync.ts#RWMutex@24"
       ]
     },
@@ -27519,7 +27546,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncRWMutexUnlock@133",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/mutex.ts#Unlock@328",
+        "src/internal/portable/sync/mutex.ts#Unlock@675",
         "src/sync.ts#RWMutex@24"
       ]
     },
@@ -27527,7 +27554,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncWaitGroupDone@160",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/wait-group.ts#Done@132",
+        "src/internal/portable/sync/wait-group.ts#Done@269",
         "src/sync.ts#WaitGroup@46"
       ]
     },
@@ -31451,23 +31478,110 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/cond.ts#L@69",
+      "identity": "src/internal/portable/sync/cond.ts#$copy@110",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/cond.ts#Cond@73",
+        "src/internal/portable/sync/cond.ts#L@98"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sync/cond.ts#$equal@157",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/cond.ts#L@98",
+        "src/internal/runtime/interface.ts#goInterfaceEqual@10"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sync/cond.ts#$hash@207",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/cond.ts#L@98"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sync/cond.ts#L@98",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/cond.ts#requireCond@268",
+      "identity": "src/internal/portable/sync/cond.ts#nextConditionIdentity@46",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/cond.ts#requireLocker@298",
+      "identity": "src/internal/portable/sync/cond.ts#requireCond@529",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/mutex.ts#nilReceiver@15",
+      "identity": "src/internal/portable/sync/cond.ts#requireLocker@559",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/mutex.ts#$copy@381",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/mutex.ts#RWMutex@361"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sync/mutex.ts#$copy@60",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/mutex.ts#Mutex@43"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sync/mutex.ts#$equal@104",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/mutex.ts#$equal@434",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/mutex.ts#$hash@143",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/mutex.ts#$hash@515",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/mutex.ts#nilReceiver@22",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/once.ts#$copy@51",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/once.ts#Once@24"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sync/once.ts#$equal@92",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/once.ts#$hash@117",
       "disposition": "implemented"
     },
     {
       "identity": "src/internal/portable/sync/pool.ts#New@38",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/wait-group.ts#$copy@48",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/sync/wait-group.ts#WaitGroup@26"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/sync/wait-group.ts#$equal@92",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/wait-group.ts#$hash@131",
       "disposition": "implemented"
     },
     {
@@ -33380,5 +33494,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "484ed74308af6a0f7e1f78c43e63197ff5ceb46bdc0dba450bc3e4195e9774e5"
+  "manifestDigest": "c9e843bc403c4f351bb5b88815e81fbcc292049236e697102d26ce8e9ccfc55c"
 }

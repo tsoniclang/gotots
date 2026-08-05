@@ -352,3 +352,170 @@ func main() {
 		)
 	}
 }
+
+func TestSyncComparableFacetsMatchGo(t *testing.T) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/synccomparable\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package synccomparable
+
+import (
+	"fmt"
+	"sync"
+)
+
+type State struct {
+	Mutex sync.Mutex
+	Once sync.Once
+	ReadWrite sync.RWMutex
+	Wait sync.WaitGroup
+	Condition sync.Cond
+}
+
+func Facts() string {
+	var left State
+	var right State
+	var zero State
+	zeroValues := map[State]string{left: "zero"}
+	before := fmt.Sprintf("%t %s", left == right, zeroValues[right])
+
+	left.Mutex.Lock()
+	left.Mutex.Unlock()
+	right.Mutex.Lock()
+	right.Mutex.Unlock()
+	mutexValues := map[sync.Mutex]string{left.Mutex: "mutex"}
+
+	left.Once.Do(func() {})
+	right.Once.Do(func() {})
+	onceValues := map[sync.Once]string{left.Once: "once"}
+
+	left.ReadWrite.RLock()
+	left.ReadWrite.RUnlock()
+	right.ReadWrite.RLock()
+	right.ReadWrite.RUnlock()
+	readWriteValues := map[sync.RWMutex]string{left.ReadWrite: "rw"}
+
+	left.Wait.Add(1)
+	left.Wait.Done()
+	right.Wait.Add(1)
+	right.Wait.Done()
+	waitValues := map[sync.WaitGroup]string{left.Wait: "wait"}
+
+	left.Condition.Signal()
+	right.Condition.Signal()
+	conditionValues := map[sync.Cond]string{left.Condition: "cond"}
+
+	return fmt.Sprintf(
+		"%s | %t %t %s | %t %t %s | %t %t %s | %t %t %s | %t %t %s %s",
+		before,
+		left.Mutex == zero.Mutex,
+		left.Mutex == right.Mutex,
+		mutexValues[right.Mutex],
+		left.Once == zero.Once,
+		left.Once == right.Once,
+		onceValues[right.Once],
+		left.ReadWrite == zero.ReadWrite,
+		left.ReadWrite == right.ReadWrite,
+		readWriteValues[right.ReadWrite],
+		left.Wait == zero.Wait,
+		left.Wait == right.Wait,
+		waitValues[right.Wait],
+		left.Condition == zero.Condition,
+		left.Condition == right.Condition,
+		conditionValues[left.Condition],
+		conditionValues[right.Condition],
+	)
+}
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory:    project,
+		Pattern:      ".",
+		BuildProfile: linkedProviderBuildProfile(t),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := emit.DefaultOptions()
+	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
+	options.StandardLibrary = linkedProviderCertificate(t)
+	emission, err := emit.CompileWithOptions(
+		program,
+		[]emit.Root{mustProviderRoot(
+			t,
+			program.Roots()[0].Types().Scope().Lookup("Facts"),
+		)},
+		options,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	for _, owner := range []string{
+		"SyncCondOperations",
+		"SyncMutexOperations",
+		"SyncOnceOperations",
+		"SyncRWMutexOperations",
+		"SyncWaitGroupOperations",
+	} {
+		for _, operation := range []string{"$equal", "$hash"} {
+			required := owner + "." + operation
+			if !strings.Contains(artifacts.printed, required) {
+				t.Fatalf("sync comparable artifact lacks %q", required)
+			}
+		}
+	}
+	assemblyPath := ""
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFilePackageAssembly &&
+			file.PackageName() == "synccomparable" {
+			assemblyPath = file.OutputPath()
+			break
+		}
+	}
+	if assemblyPath == "" {
+		t.Fatal("sync comparable package assembly is absent")
+	}
+	targetOutput := executeProviderTypeScript(
+		t,
+		workingDirectory,
+		artifacts.paths,
+		assemblyPath,
+		[]string{"Facts"},
+		"console.log(await Facts());\n",
+	)
+	runnerDirectory := filepath.Join(project, "cmd", "compare")
+	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+
+import (
+	"fmt"
+
+	fixture "example.com/synccomparable"
+)
+
+func main() {
+	fmt.Println(fixture.Facts())
+}
+`)
+	sourceContext, sourceCancel := context.WithTimeout(
+		context.Background(),
+		2*time.Minute,
+	)
+	defer sourceCancel()
+	command := exec.CommandContext(sourceContext, "go", "run", ".")
+	command.Dir = runnerDirectory
+	sourceOutput, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("execute Go sync comparison: %v\n%s", err, sourceOutput)
+	}
+	if targetOutput != string(sourceOutput) {
+		t.Fatalf(
+			"sync comparable differential:\nGo:\n%s\nTypeScript:\n%s",
+			sourceOutput,
+			targetOutput,
+		)
+	}
+}

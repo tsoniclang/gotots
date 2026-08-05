@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { GoPanic } from "@gotots/runtime/panic.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import {
@@ -34,6 +35,7 @@ import {
   SyncAtomicUint64Operations,
 } from "../src/internal/facets/named-sync-atomic.js";
 import {
+  SyncCondOperations,
   SyncMapOperations,
   SyncMutexOperations,
   SyncOnceOperations,
@@ -79,7 +81,7 @@ import {
   Uint32 as AtomicUint32,
   Uint64 as AtomicUint64,
 } from "../src/sync/atomic.js";
-import { Pool } from "../src/sync.js";
+import { Cond, Mutex, Once, Pool, RWMutex, WaitGroup } from "../src/sync.js";
 import { EPERM } from "../src/syscall.js";
 import { Builder as StringBuilder } from "../src/strings.js";
 import { state as binaryState } from "../src/encoding/binary.js";
@@ -268,6 +270,74 @@ test("named-struct facets expose only selected static operations", (): void => {
   const poolCopy = SyncPoolOperations.$copy(copiedPoolSource);
   assert.notEqual(poolCopy, copiedPoolSource);
   assert.equal(poolCopy.New, poolNew);
+});
+
+test("sync value facets preserve comparable state", async (): Promise<void> => {
+  const mutex = new Mutex();
+  const otherMutex = new Mutex();
+  assert.equal(SyncMutexOperations.$equal(mutex, otherMutex), true);
+  assert.equal(
+    SyncMutexOperations.$hash(mutex),
+    SyncMutexOperations.$hash(otherMutex),
+  );
+
+  const once = new Once();
+  const otherOnce = new Once();
+  assert.equal(SyncOnceOperations.$equal(once, otherOnce), true);
+  assert.equal(SyncOnceOperations.$hash(once), SyncOnceOperations.$hash(otherOnce));
+
+  const readWrite = new RWMutex();
+  const otherReadWrite = new RWMutex();
+  assert.equal(SyncRWMutexOperations.$equal(readWrite, otherReadWrite), true);
+  assert.equal(
+    SyncRWMutexOperations.$hash(readWrite),
+    SyncRWMutexOperations.$hash(otherReadWrite),
+  );
+
+  const waitGroup = new WaitGroup();
+  const otherWaitGroup = new WaitGroup();
+  assert.equal(SyncWaitGroupOperations.$equal(waitGroup, otherWaitGroup), true);
+  assert.equal(
+    SyncWaitGroupOperations.$hash(waitGroup),
+    SyncWaitGroupOperations.$hash(otherWaitGroup),
+  );
+
+  const condition = new Cond();
+  const otherCondition = new Cond();
+  assert.equal(SyncCondOperations.$equal(condition, otherCondition), true);
+  assert.equal(
+    SyncCondOperations.$hash(condition),
+    SyncCondOperations.$hash(otherCondition),
+  );
+
+  await Mutex.Lock(mutex);
+  Mutex.Unlock(mutex);
+  await Once.Do(once, (): void => undefined);
+  await Once.Do(otherOnce, (): void => undefined);
+  await RWMutex.RLock(readWrite);
+  RWMutex.RUnlock(readWrite);
+  WaitGroup.Add(waitGroup, 1n);
+  WaitGroup.Done(waitGroup);
+  Cond.Signal(condition);
+  Cond.Signal(otherCondition);
+
+  assert.equal(SyncMutexOperations.$equal(mutex, otherMutex), true);
+  assert.equal(SyncOnceOperations.$equal(once, otherOnce), true);
+  assert.equal(SyncRWMutexOperations.$equal(readWrite, otherReadWrite), true);
+  assert.equal(SyncWaitGroupOperations.$equal(waitGroup, otherWaitGroup), true);
+  assert.equal(SyncCondOperations.$equal(condition, otherCondition), false);
+
+  const conditionCopy = SyncCondOperations.$copy(condition);
+  assert.equal(SyncCondOperations.$equal(condition, conditionCopy), true);
+  assert.equal(
+    SyncCondOperations.$hash(condition),
+    SyncCondOperations.$hash(conditionCopy),
+  );
+  assert.throws(
+    () => Cond.Signal(conditionCopy),
+    (failure: unknown): boolean => failure instanceof GoPanic &&
+      failure.value.$go$format("v", "", undefined) === "sync.Cond is copied",
+  );
 });
 
 test("recovery facets preserve the direct provider ABI", (): void => {

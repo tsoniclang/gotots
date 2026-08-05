@@ -1,3 +1,4 @@
+import { GoMapHash } from "@gotots/runtime/map.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 
 type Waiter = () => void;
@@ -9,6 +10,24 @@ function nilReceiver(name: string): never {
 export class Mutex {
   #locked = false;
   readonly #waiters: Waiter[] = [];
+
+  static $copy(source: Mutex): Mutex {
+    const result = new Mutex();
+    result.#locked = source.#locked;
+    result.#waiters.push(...source.#waiters);
+    return result;
+  }
+
+  static $equal(left: Mutex, right: Mutex): boolean {
+    return left.#locked === right.#locked &&
+      left.#waiters.length === right.#waiters.length;
+  }
+
+  static $hash(source: Mutex): number {
+    let hash = GoMapHash.boolean(source.#locked);
+    hash = GoMapHash.mix(hash, GoMapHash.number(source.#waiters.length));
+    return hash;
+  }
 
   static async Lock(receiver: Mutex | undefined): Promise<void> {
     if (receiver === undefined) {
@@ -45,6 +64,36 @@ export class RWMutex {
   #readers = 0;
   #writer = false;
   readonly #waiters: LockWaiter[] = [];
+
+  static $copy(source: RWMutex): RWMutex {
+    const result = new RWMutex();
+    result.#readers = source.#readers;
+    result.#writer = source.#writer;
+    result.#waiters.push(...source.#waiters);
+    return result;
+  }
+
+  static $equal(left: RWMutex, right: RWMutex): boolean {
+    if (
+      left.#readers !== right.#readers ||
+      left.#writer !== right.#writer ||
+      left.#waiters.length !== right.#waiters.length
+    ) {
+      return false;
+    }
+    return left.#waiters.every(
+      (waiter, index) => waiter.kind === right.#waiters[index]?.kind,
+    );
+  }
+
+  static $hash(source: RWMutex): number {
+    let hash = GoMapHash.number(source.#readers);
+    hash = GoMapHash.mix(hash, GoMapHash.boolean(source.#writer));
+    for (const waiter of source.#waiters) {
+      hash = GoMapHash.mix(hash, waiter.kind === "reader" ? 1 : 2);
+    }
+    return hash;
+  }
 
   static async Lock(receiver: RWMutex | undefined): Promise<void> {
     if (receiver === undefined) {

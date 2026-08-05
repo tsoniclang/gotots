@@ -1,9 +1,25 @@
+import { GoMapHash } from "@gotots/runtime/map.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { Awaitable } from "@gotots/gostdlib/internal/scalars.js";
 
 export class Once {
   #state: "idle" | "running" | "done" = "idle";
   #completion: Promise<void> = Promise.resolve();
+
+  static $copy(source: Once): Once {
+    const result = new Once();
+    result.#state = source.#state;
+    result.#completion = source.#completion;
+    return result;
+  }
+
+  static $equal(left: Once, right: Once): boolean {
+    return left.#state === right.#state;
+  }
+
+  static $hash(source: Once): number {
+    return GoMapHash.string(source.#state);
+  }
 
   static async Do(
     receiver: Once | undefined,
