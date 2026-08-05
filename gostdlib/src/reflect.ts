@@ -80,6 +80,12 @@ export abstract class Value {
     private readonly addressable: bool = false,
   ) {}
 
+  // $unbox exposes the canonical interface box to generated support
+  // code (type assertions select exact adapters emitter-side).
+  $unbox(): GoInterfaceValue | undefined {
+    return this.source;
+  }
+
   // source reads live through the location so mutations that replace the
   // represented value (Set, SetLen, Grow, SetBytes) stay visible to every
   // subsequent read of the same Value, exactly like Go's pointer-backed
