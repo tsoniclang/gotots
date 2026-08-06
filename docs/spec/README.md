@@ -201,13 +201,24 @@ static form nor a finite exact concretization, compilation fails explicitly.
   metadata and never appears in the public package name.
 - **true external:** unavailable or host/native behavior represented by an
   explicit contract rather than inferred from import spelling.
+- **source implementation:** a project-selected, certified strict-ESM module
+  that owns the final TypeScript implementation of one exact source package
+  contract instead of the translated package bodies. It is selected by
+  canonical package identity, never package spelling in compiler code.
+- **equivalence envelope:** the explicit observable-behavior boundary for one
+  source implementation. `exact` requires Go-equivalent results. A narrower
+  project-specific envelope may change an internal algorithm only after its
+  consumers prove the changed value is not externally observed; public
+  signatures, determinism, required equality behavior, and failure behavior
+  remain certified.
 
 ## Product Boundaries
 
 All imported packages obey the same Go language. Toolchain metadata separately
 identifies:
 
-- workspace and source-available dependency packages, which are translated;
+- workspace and source-available dependency packages, which are translated
+  unless an exact certified package implementation is selected;
 - standard-library declarations, whose selected-`GOROOT` contracts are
   generated and whose behavior is completed in reusable `gostdlib`;
 - toolchain pseudo-packages and intrinsics, which have explicit compiler
@@ -224,6 +235,23 @@ implementation replaces it. It is not converted into an ambient package and
 does not prevent the rest of the source graph from being generated and
 typechecked. Executing the placeholder fails by its Go declaration identity;
 publication requires every reachable placeholder to be gone.
+
+A project may instead select one certified source implementation for an exact
+source package contract. The final output then contains the implementation
+module and no translated package body, placeholder, or second owner for that
+package. This is a general project mechanism, not a compiler conditional for a
+known package. The selected implementation preserves the generated package
+assembly surface and is parsed into the pinned TS-Go AST before it becomes a
+target file.
+
+An equivalence envelope may relax an algorithm only when the selected product
+proves the relaxed result is internal. For example, an internal content-cache
+hash may use a different fast deterministic 128-bit hash when no hash value is
+serialized, exposed, or compared with a specified digest. The implementation
+must still make equal inputs equal, keep the advertised collision width, and
+preserve cache correctness. A checksum, protocol digest, persisted key, test
+vector, or public return value is observable and therefore requires exact
+behavior.
 
 ## Non-Negotiable Results
 

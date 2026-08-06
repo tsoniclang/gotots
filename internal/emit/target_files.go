@@ -10,6 +10,7 @@ import (
 	declarationorder "github.com/tsoniclang/gotots/internal/emit/declaration/order"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
+	"github.com/tsoniclang/gotots/internal/emit/sourcepackage"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -205,10 +206,103 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 			kind:       TargetFileSupport,
 		})
 	}
+	files, err = s.replaceSourceImplementations(files)
+	if err != nil {
+		return nil, err
+	}
 	sort.Slice(files, func(left, right int) bool {
 		return files[left].outputPath < files[right].outputPath
 	})
 	return files, nil
+}
+
+func (s *programSession) replaceSourceImplementations(
+	files []TargetFile,
+) ([]TargetFile, error) {
+	if s.sourceImplementations == nil {
+		return files, nil
+	}
+	replaced := slices.Clone(files)
+	for _, implementation := range s.sourceImplementations.Implementations() {
+		sourcePackage := s.source.PackageByPath(implementation.PackagePath())
+		paths, err := sourcepackage.ResolvePaths(sourcePackage)
+		if err != nil {
+			return nil, sourceImplementationError(implementation.PackagePath(), err)
+		}
+		consumers := make([]sourcepackage.Consumer, len(replaced))
+		for index, file := range replaced {
+			consumers[index] = sourcepackage.Consumer{
+				OutputPath: file.outputPath,
+				SourceFile: file.sourceFile,
+			}
+		}
+		consumers, err = sourcepackage.RebindConsumers(
+			s.factory,
+			paths,
+			implementation,
+			consumers,
+		)
+		if err != nil {
+			return nil, sourceImplementationError(implementation.PackagePath(), err)
+		}
+		for index := range replaced {
+			replaced[index].sourceFile = consumers[index].SourceFile
+		}
+		filtered := make([]TargetFile, 0, len(replaced))
+		assemblyFound := false
+		for _, file := range replaced {
+			if !paths.Owns(file.outputPath) {
+				filtered = append(filtered, file)
+				continue
+			}
+			if file.outputPath != paths.AssemblyPath() {
+				continue
+			}
+			if assemblyFound || file.kind != TargetFilePackageAssembly {
+				return nil, sourceImplementationError(
+					implementation.PackagePath(),
+					fmt.Errorf("generated package assembly ownership is invalid"),
+				)
+			}
+			assemblyFound = true
+			if err := sourcepackage.VerifyExports(
+				implementation,
+				file.sourceFile,
+			); err != nil {
+				return nil, sourceImplementationError(implementation.PackagePath(), err)
+			}
+		}
+		if !assemblyFound {
+			return nil, sourceImplementationError(
+				implementation.PackagePath(),
+				fmt.Errorf("generated package assembly is absent"),
+			)
+		}
+		filtered = append(filtered, TargetFile{
+			outputPath:  paths.AssemblyPath(),
+			packageName: sourcePackage.Name(),
+			sourceFile:  implementation.SourceFile(),
+			kind:        TargetFileSourceImplementation,
+		})
+		for _, module := range implementation.PrivateModules() {
+			outputPath, _ := paths.SourcePath(module.GoFile())
+			filtered = append(filtered, TargetFile{
+				outputPath:  outputPath,
+				packageName: sourcePackage.Name(),
+				sourceFile:  module.SourceFile(),
+				kind:        TargetFileSourceImplementation,
+			})
+		}
+		replaced = filtered
+	}
+	return replaced, nil
+}
+
+func sourceImplementationError(packagePath string, cause error) error {
+	return &ScheduleError{
+		Object: packagePath,
+		Reason: "install source implementation: " + cause.Error(),
+	}
 }
 
 func committedTargetFilePlacement(

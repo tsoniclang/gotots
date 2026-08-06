@@ -706,6 +706,48 @@ edges, with both one-sided residual lists reported on every mismatch.
 
 ## Artifact And Cost Review
 
+### Project And Source-Implementation Proof
+
+Configuration tests prove strict versioned decoding, exact `-c`/`--config`
+selection, config-relative paths, defaults < file < CLI precedence, and the
+absence of ancestor/home/environment lookup. A registry-totality test proves
+every semantic CLI switch and JSON field resolve through the same owner.
+Relocating unchanged source and implementation trees preserves the semantic
+digest; changing implementation bytes or its envelope changes it.
+
+The production `gotots build` command writes a canonical resolved project on
+request, emits every TypeScript file through pinned TS-Go, records the semantic
+digest and exact output membership in `gotots-manifest.json`, declares the
+project ESM in a root `package.json`, and runs the strict generated-project
+typecheck before reporting success. Removing `type: module` must make a
+cooperative program with top-level await fail at that strict gate.
+
+For each source implementation, certification independently inspects the
+selected Go package, the ordinary generated package assembly, and the authored
+strict TypeScript project. It exact-joins exported names and checked types,
+binds the build and compilation profiles, parses every authored module through
+pinned TS-Go, rebinds public generated imports to the package assembly, proves
+each residual private contract module body-free and exact by imported name,
+and inspects the final target file set. Required mutations alter a Go
+signature, TypeScript export, package identity, build or compilation profile,
+source digest, private module identity, or envelope; add an executable
+private-module statement;
+duplicate a generated and manual owner; retain one generated package file; or
+feed text directly to the output writer. Each fails at its owning gate.
+
+An equivalence envelope requires product-level evidence. For an internal hash,
+tests prove equal-input stability, unequal-input behavior over an adversarial
+corpus, streaming/one-shot agreement when exposed, collision-safe consumer
+behavior, and unchanged externally observable compiler output. A mutation that
+exports or persists the relaxed hash invalidates the envelope. Exact hash-vector
+comparison is required only when the hash value itself is part of the selected
+observable contract.
+
+Artifact evidence reports removed generated files, source bytes, TS-Go AST
+nodes, strict-typecheck time/RSS, runtime time/RSS, and the top profile frames.
+The selected package must contribute one final implementation module, zero
+translated bodies, and zero unsafe-pointer traffic from the removed package.
+
 Every material checkpoint reports absolute values and parent deltas for:
 
 - Go source and generated TypeScript bytes/tokens/TS-Go AST nodes;

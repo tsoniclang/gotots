@@ -1,6 +1,7 @@
 package tsgo
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -26,6 +27,9 @@ func EncodeSourceFile(sourceFile SourceFile) ([]byte, error) {
 func EncodeNode(root Node) ([]byte, error) {
 	if root == nil {
 		return nil, &EncodeError{Reason: "root is nil"}
+	}
+	if official, ok := root.(officialEncodedNode); ok {
+		return bytes.Clone(official.officialEncoding()), nil
 	}
 	state := encoderState{
 		strings:    newStringTable(),

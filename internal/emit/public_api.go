@@ -10,6 +10,7 @@ import (
 	externalcertify "github.com/tsoniclang/gotots/internal/contracts/externals/certify"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
+	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
@@ -367,6 +368,7 @@ type Options struct {
 	ConcurrencySemantics  ConcurrencySemantics
 	StandardLibrary       *gostdlibcertify.Certificate
 	ExternalProvider      *externalcertify.Certificate
+	SourceImplementations *sourceimplementation.Certificate
 }
 
 func DefaultOptions() Options {
@@ -455,6 +457,22 @@ func (o Options) validate() error {
 			Reason: "certificate is invalid",
 		}
 	}
+	if o.SourceImplementations != nil && !o.SourceImplementations.Valid() {
+		return &OptionsError{
+			Field:  "source implementations",
+			Reason: "certificate is invalid",
+		}
+	}
+	if o.SourceImplementations != nil && !o.SourceImplementations.SupportsCompilation(
+		o.IntegerRepresentation.String(),
+		o.EvaluationOrder.String(),
+		o.ConcurrencySemantics.String(),
+	) {
+		return &OptionsError{
+			Field:  "source implementations",
+			Reason: "certificate compilation profile differs",
+		}
+	}
 	return nil
 }
 
@@ -469,6 +487,27 @@ func (e *OptionsError) Error() string {
 	}
 	return fmt.Sprintf("validate compilation option %q: %s", e.Field, e.Reason)
 }
+
+type TargetFile struct {
+	outputPath  string
+	packageName string
+	sourceFile  tsgo.SourceFile
+	kind        TargetFileKind
+}
+
+type TargetFileKind uint8
+
+const (
+	TargetFileInvalid TargetFileKind = iota
+	TargetFileSource
+	TargetFilePackageState
+	TargetFilePackageAssembly
+	TargetFileProgramInitialization
+	TargetFileSupport
+	TargetFileEnvironmentContract
+	TargetFileStandardLibraryConstantProjection
+	TargetFileSourceImplementation
+)
 
 // rootUseDemand classifies the closed use demand created by requesting one
 // emission root from the referenced object kind.

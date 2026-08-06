@@ -303,6 +303,27 @@ checkpoint. A newly observed blocker changes this sequence only when concrete
 evidence invalidates the architecture; its directive must pass WCBUBWHB and
 the review gate first.
 
+## Performance Selection And Source Implementations
+
+Performance work proceeds in measured owner order:
+
+1. add the versioned project config, `-c`/`--config`, immutable resolution, and
+   semantic digest;
+2. add one certified source-package implementation owner and prove atomic
+   generated-package replacement through pinned TS-Go AST;
+3. select the fast internal-hash implementation only under its product-proved
+   equivalence envelope and reprofile the generated compiler;
+4. fix the next measured generic runtime or representation owner, deleting the
+   superseded path before advancing.
+
+Each item starts with a failing owner-level contract and ends with focused
+shape, strict-typecheck, differential/equivalence, mutation, final-artifact,
+and cost evidence. Full generation and runtime jobs are batched at milestone
+boundaries under the repository memory guard. A package implementation is not
+accepted merely because runtime is faster: its final public surface and stated
+observable behavior must be certified, and the translated package files must
+be absent.
+
 ## Checkpoint Evidence
 
 Every pushed checkpoint records:

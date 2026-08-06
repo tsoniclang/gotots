@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
+	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
@@ -18,26 +19,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
-)
-
-type TargetFile struct {
-	outputPath  string
-	packageName string
-	sourceFile  tsgo.SourceFile
-	kind        TargetFileKind
-}
-
-type TargetFileKind uint8
-
-const (
-	TargetFileInvalid TargetFileKind = iota
-	TargetFileSource
-	TargetFilePackageState
-	TargetFilePackageAssembly
-	TargetFileProgramInitialization
-	TargetFileSupport
-	TargetFileEnvironmentContract
-	TargetFileStandardLibraryConstantProjection
 )
 
 type ProgramEmission struct {
@@ -80,6 +61,7 @@ type programSession struct {
 	compareArtifactOwners    func(api.ArtifactOwner, api.ArtifactOwner) int
 	requirementRemovalOwner  api.ArtifactOwner
 	standardLibrary          *gostdlibcertify.Certificate
+	sourceImplementations    *sourceimplementation.Certificate
 	externalFunctions        map[*types.Func]ExternalFunctionObligation
 	externalFunctionBindings map[*types.Func]api.ExternalFunctionTarget
 	sealed                   bool
@@ -367,6 +349,7 @@ func newProgramSession(
 		goRuntime:                goRuntime,
 		compareArtifactOwners:    compareArtifactOwners,
 		standardLibrary:          options.StandardLibrary,
+		sourceImplementations:    options.SourceImplementations,
 		externalFunctions:        make(map[*types.Func]ExternalFunctionObligation),
 		externalFunctionBindings: externalBindings,
 	}

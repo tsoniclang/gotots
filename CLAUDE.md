@@ -131,7 +131,9 @@ All Go imports share the same language semantics. Toolchain metadata—not impor
 spelling—distinguishes workspace source, source-available dependencies,
 standard-library packages, toolchain packages, and true external boundaries.
 
-- Source-available packages are translated normally.
+- Source-available packages are translated normally unless one exact package
+  contract has a project-selected certified source implementation; that
+  implementation becomes the sole final target owner.
 - Every load resolves and records one explicit Go build profile; ambient shell
   `GOOS`, `GOARCH`, `CGO_ENABLED`, `GOFLAGS`, and tags never select source.
 - The selected `GOROOT` defines the standard-library declarations.
