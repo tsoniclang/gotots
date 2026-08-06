@@ -1,7 +1,7 @@
 package sourceimplementation
 
 import (
-	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -83,6 +83,7 @@ func (c *Certificate) VerifyGeneratedContracts(
 	}()
 	generatedConfig, err := materializeTargetSet(
 		client,
+		c.repository,
 		generatedRoot,
 		generated,
 	)
@@ -91,10 +92,27 @@ func (c *Certificate) VerifyGeneratedContracts(
 	}
 	installedConfig, err := materializeTargetSet(
 		client,
+		c.repository,
 		installedRoot,
 		installed,
 	)
 	if err != nil {
+		return err
+	}
+	if err := typecheckTargetSet(
+		c.repository,
+		generatedRoot,
+		generatedConfig,
+		"generated",
+	); err != nil {
+		return err
+	}
+	if err := typecheckTargetSet(
+		c.repository,
+		installedRoot,
+		installedConfig,
+		"installed",
+	); err != nil {
 		return err
 	}
 	generatedProject, err := client.OpenProject(generatedConfig)
@@ -164,30 +182,6 @@ func exactJoinPackageExports(
 			),
 		}
 	}
-	sort.Slice(generated, func(left, right int) bool {
-		return generated[left].Name() < generated[right].Name()
-	})
-	sort.Slice(installed, func(left, right int) bool {
-		return installed[left].Name() < installed[right].Name()
-	})
-	for index, export := range expected {
-		if generated[index].Name() != export.Name() ||
-			installed[index].Name() != export.Name() ||
-			!bytes.Equal(
-				generated[index].ContractEncoding(),
-				installed[index].ContractEncoding(),
-			) {
-			return &Error{
-				Operation: "join generated contract",
-				Subject:   implementation.PackagePath() + "." + export.Name(),
-				Reason: fmt.Sprintf(
-					"checked implementation surface differs from settled generated surface: generated=%s installed=%s",
-					generated[index].ContractEncoding(),
-					installed[index].ContractEncoding(),
-				),
-			}
-		}
-	}
 	return nil
 }
 
@@ -202,6 +196,7 @@ func projectExportNames(selected []tsgo.ProjectExport) []string {
 
 func materializeTargetSet(
 	client *tsgo.Client,
+	distributionRoot string,
 	root string,
 	targets []Target,
 ) (string, error) {
@@ -235,21 +230,35 @@ func materializeTargetSet(
 		return "", err
 	}
 	config := filepath.Join(root, "tsconfig.json")
-	if err := os.WriteFile(config, []byte(`{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "strict": true,
-    "skipLibCheck": false,
-    "noEmit": true
-  },
-  "include": ["**/*.ts"]
-}
-`), 0o644); err != nil {
+	payload, err := tsgo.EncodeStrictProjectConfig(distributionRoot, root)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(config, payload, 0o644); err != nil {
 		return "", err
 	}
 	return config, nil
+}
+
+func typecheckTargetSet(
+	distributionRoot string,
+	root string,
+	config string,
+	kind string,
+) error {
+	if err := tsgo.Compile(
+		context.Background(),
+		distributionRoot,
+		root,
+		[]string{"--noEmit", "-p", config},
+	); err != nil {
+		return &Error{
+			Operation: "typecheck " + kind + " target",
+			Subject:   root,
+			Reason:    err.Error(),
+		}
+	}
+	return nil
 }
 
 func targetSetDigest(

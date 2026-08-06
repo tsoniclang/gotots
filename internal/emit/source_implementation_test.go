@@ -33,7 +33,7 @@ func Value() int {
 func ReadExisting(current *int) int { return fast.Read(current) }
 `)
 	implementationRoot := filepath.Join(root, "implementation")
-	implementationSource := `export function Read(value: number): number { return value; }
+	implementationSource := `export function Read(input: number): number { return input; }
 export function Sum(value: string): number { return value.length; }
 `
 	writeSourceImplementationFixture(t, filepath.Join(implementationRoot, "package.ts"), implementationSource)
@@ -230,8 +230,11 @@ export function Sum(value: string): number { return value.length; }
 	}
 	options.SourceImplementations = resultMismatch
 	if _, err := CompileWithOptions(program, roots, options); err == nil ||
-		!strings.Contains(err.Error(), "fast.Read") ||
-		!strings.Contains(err.Error(), "surface differs") {
+		!strings.Contains(err.Error(), "typecheck installed target") ||
+		!strings.Contains(
+			err.Error(),
+			"Type 'string' is not assignable to type 'number'",
+		) {
 		t.Fatalf("result-contract mutation error = %v", err)
 	}
 	writeSourceImplementationFixture(
