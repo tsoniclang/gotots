@@ -526,6 +526,13 @@ comma-ok assertions, type switches, and facade guards. Error fixtures include
 include every provider-created optional interface actually implemented by the
 selected provider.
 
+Sealed-native interface proof performs an ordinary Go type assertion and a
+reflective interface-field read/write through the public pipeline. The
+generated artifact must contain one statically typed predicate to the certified
+provider type, backed by the canonical method-token guard, and no wrapper,
+cast, host-shape check, or duplicated contract. Removing that predicate must
+fail strict typechecking before execution.
+
 Certification also exact-joins each view's closed usage. Artifact inspection
 proves provider-internal views never enter generated bridges and each demanded
 generated-bridge view is evaluated once per provider crossing. Mutating the

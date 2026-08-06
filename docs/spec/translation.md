@@ -60,6 +60,13 @@ Names are reserved by exact `types.Object` identity in deterministic package
 and source order. Target-only collision suffixes are stable and readable.
 Source spelling never acts as semantic identity.
 
+A compilation-global artifact keeps an imported derived export unqualified
+when that export is unique in the selected source universe. The naming owner
+preindexes exact declaration identities and adds the package qualifier only
+when two distinct source modules can provide the same local derived export, or
+when the local target scope is already occupied. Collision safety must not add
+hash or package suffixes to every ordinary generated reference.
+
 Target host intrinsics have one closed identity owner. Value references use
 `globalThis.<name>`, so a valid Go declaration such as
 `func String(string) Token` keeps its source-shaped name without shadowing the

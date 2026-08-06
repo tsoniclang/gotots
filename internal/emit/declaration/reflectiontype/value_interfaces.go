@@ -4,6 +4,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -86,10 +87,6 @@ func admittedInterfaceFieldValue(
 	scaffold *locationScaffold,
 ) (tsgo.Expression, []api.RootRequest, error) {
 	factory := scaffold.factory
-	contract, err := context.Names().InterfaceContract(field.Type())
-	if err != nil {
-		return nil, nil, err
-	}
 	value := factory.Identifier("value")
 	nilValue := factory.BinaryExpression(
 		nil,
@@ -100,19 +97,20 @@ func admittedInterfaceFieldValue(
 		),
 		factory.Identifier("undefined"),
 	)
-	implements := factory.CallExpression(
-		factory.Identifier(contract.GuardName()),
-		nil,
-		nil,
-		[]tsgo.Expression{value},
-		tsgo.NodeFlagsNone,
+	implements, err := interfacevalue.ContractTest(
+		context,
+		field.Type(),
+		value,
 	)
+	if err != nil {
+		return nil, nil, err
+	}
 	accepted := factory.BinaryExpression(
 		nil,
 		nilValue,
 		nil,
 		factory.BinaryOperatorToken(tsgo.BinaryOperatorBarBarToken),
-		implements,
+		implements.Value(),
 	)
 	assigned := factory.ConditionalExpression(
 		accepted,
@@ -124,5 +122,5 @@ func admittedInterfaceFieldValue(
 			"reflect: Value.Set received a value outside the interface contract",
 		),
 	)
-	return assigned, contract.Requests(), nil
+	return assigned, implements.Requests(), nil
 }

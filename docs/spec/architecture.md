@@ -674,6 +674,16 @@ Nested callbacks, tuples, containers, fields, and results follow the same
 type-directed boundary rule. Missing or ambiguous conversion fails
 certification; TypeScript assignability alone is not semantic evidence.
 
+A provider interface certified as sealed-native is already one canonical
+`GoInterfaceValue`; it receives no wrapper or open-interface bridge. Its
+generated method-token contract remains the runtime assertion truth. Where a
+TypeScript control-flow boundary must recover the sealed provider type (for
+example an interface assertion or reflective interface-field assignment), the
+interface-value owner emits a typed predicate that delegates to that canonical
+contract guard and narrows to the certified provider type. It does not cast,
+inspect host shape, repeat the method test, or introduce a second admission
+rule.
+
 A direct provider-owned Go struct remains one object identity across the
 boundary, but each exported field is independently certified against its
 selected Go field identity and type. A field whose provider and product

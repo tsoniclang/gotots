@@ -358,6 +358,32 @@ func (a RuntimeArray) Equal(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	if a.Length() == 0 {
+		before := append(leftStorage.Before(), rightStorage.Before()...)
+		before = append(
+			before,
+			arrayComparisonVariable(
+				context,
+				tsgo.NodeFlagsConst,
+				leftName,
+				leftStorage.Value(),
+			),
+			arrayComparisonVariable(
+				context,
+				tsgo.NodeFlagsConst,
+				rightName,
+				rightStorage.Value(),
+			),
+		)
+		return api.NewExpressionEmission(
+			before,
+			context.Factory().TrueLiteral(),
+			api.CombineRequests(
+				leftStorage.Requests(),
+				rightStorage.Requests(),
+			),
+		)
+	}
 	indexName, err := context.Names().Temporary(api.TemporaryArrayComparison)
 	if err != nil {
 		return api.ExpressionEmission{}, err

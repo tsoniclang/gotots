@@ -363,7 +363,33 @@ func runReflectDifferentialInspect(
 	inspect func(renderedArtifacts),
 ) {
 	t.Helper()
+	runReflectDifferentialProjectInspect(
+		t,
+		source,
+		rootName,
+		packageName,
+		typescriptRunner,
+		goRunner,
+		nil,
+		inspect,
+	)
+}
+
+func runReflectDifferentialProjectInspect(
+	t *testing.T,
+	source string,
+	rootName string,
+	packageName string,
+	typescriptRunner string,
+	goRunner string,
+	prepare func(string),
+	inspect func(renderedArtifacts),
+) {
+	t.Helper()
 	project := t.TempDir()
+	if prepare != nil {
+		prepare(project)
+	}
 	emission := compileReflectFixture(t, project, source, []string{rootName})
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)

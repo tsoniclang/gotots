@@ -126,3 +126,53 @@ func main() {
 		},
 	)
 }
+
+func TestReflectProviderInterfaceFieldLocationMatchesGo(t *testing.T) {
+	source := `package reflectvalue
+
+import (
+	"fmt"
+	"reflect"
+)
+
+type TypeHolder struct {
+	Value reflect.Type
+}
+
+func ProviderInterfaceFieldFacts() string {
+	holder := &TypeHolder{Value: reflect.TypeOf(int32(0))}
+	field := reflect.ValueOf(holder).Elem().Field(0)
+	before := field.Interface().(reflect.Type).String()
+	field.Set(reflect.ValueOf(reflect.TypeOf("")))
+	return fmt.Sprintf("%s %s", before, holder.Value.String())
+}
+`
+	typescriptRunner := `const facts = await ProviderInterfaceFieldFacts();
+console.log(facts);
+`
+	goRunner := `package main
+
+import (
+	"fmt"
+
+	fixture "example.com/reflectvalue"
+)
+
+func main() {
+	fmt.Println(fixture.ProviderInterfaceFieldFacts())
+}
+`
+	runReflectDifferentialInspect(
+		t,
+		source,
+		"ProviderInterfaceFieldFacts",
+		"reflectvalue",
+		typescriptRunner,
+		goRunner,
+		func(artifacts renderedArtifacts) {
+			if !strings.Contains(artifacts.printed, "$candidate is reflect.Type") {
+				t.Fatal("sealed provider interface field lacks its typed admission guard")
+			}
+		},
+	)
+}

@@ -26,42 +26,18 @@ func pointerCellValueProperties(
 	scaffold.requests = append(scaffold.requests, sliceAdapter.Requests()...)
 	scaffold.requests = append(scaffold.requests, descriptor.Requests()...)
 	cellValue := memberAccess(factory, "instance", "value")
-	cellRead := cellValue
 	cellWrite := guardedForeignPayload(
 		scaffold,
 		sliceAdapter,
 		"Value.Set",
 	)
-	if _, basicPointee := types.Unalias(pointee).
-		Underlying().(*types.Basic); basicPointee {
-		wrapped, readRequests, readErr := constructedScalarValue(
-			context,
-			pointee,
-			cellValue,
-		)
-		if readErr != nil {
-			return nil, readErr
-		}
-		scaffold.requests = append(scaffold.requests, readRequests...)
-		cellRead = wrapped
-		projected, writeRequests, writeErr := projectedScalarPayload(
-			context,
-			pointee,
-			cellWrite,
-		)
-		if writeErr != nil {
-			return nil, writeErr
-		}
-		scaffold.requests = append(scaffold.requests, writeRequests...)
-		cellWrite = projected
-	}
 	location := locationLiteral(scaffold, locationCallbacks{
 		descriptor: descriptor,
 		settable:   true,
 		get: factory.NewExpression(
 			sliceAdapter.Expression(factory),
 			nil,
-			[]tsgo.Expression{cellRead},
+			[]tsgo.Expression{cellValue},
 		),
 		set: factory.Block([]tsgo.Statement{
 			factory.ExpressionStatement(factory.BinaryExpression(
@@ -116,6 +92,14 @@ func pointerCellValueProperties(
 			return nil, zeroErr
 		}
 		if pointeeZero != nil {
+			logicalZero, zeroRequests, constructErr := constructedScalarValue(
+				context,
+				pointee,
+				pointeeZero,
+			)
+			if constructErr != nil {
+				return nil, constructErr
+			}
 			runtimePointer, pointerErr := context.Names().Runtime(
 				api.RuntimePointer,
 				api.ImportPhaseValue,
@@ -126,6 +110,10 @@ func pointerCellValueProperties(
 			scaffold.requests = append(
 				scaffold.requests,
 				runtimePointer.Requests()...,
+			)
+			scaffold.requests = append(
+				scaffold.requests,
+				zeroRequests...,
 			)
 			properties = append(properties, expressionProperty(
 				factory,
@@ -152,7 +140,7 @@ func pointerCellValueProperties(
 								),
 								nil,
 								nil,
-								[]tsgo.Expression{pointeeZero},
+								[]tsgo.Expression{logicalZero},
 								tsgo.NodeFlagsNone,
 							)},
 						),

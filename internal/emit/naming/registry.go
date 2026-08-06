@@ -217,6 +217,7 @@ type Registry struct {
 	provider                            standardLibraryProvider
 	providerImportNameByModule          map[string]string
 	byObject                            map[types.Object]targetBinding
+	sourceBindingPathsByName            map[string]map[string]struct{}
 	memberNameByObject                  map[*types.Var]string
 	packageVariables                    map[*types.Var]packageVariableBinding
 	assemblyPathByPackage               map[*types.Package]string
@@ -267,6 +268,7 @@ type Registry struct {
 func NewRegistry() *Registry {
 	return &Registry{
 		byObject:                            make(map[types.Object]targetBinding),
+		sourceBindingPathsByName:            make(map[string]map[string]struct{}),
 		providerImportNameByModule:          make(map[string]string),
 		memberNameByObject:                  make(map[*types.Var]string),
 		packageVariables:                    make(map[*types.Var]packageVariableBinding),
@@ -541,5 +543,17 @@ func (r *Registry) reserve(
 		return nil
 	}
 	r.byObject[object] = binding
+	if binding.sourceOwned() && binding.name != "" && binding.sourcePath != "" {
+		paths := r.sourceBindingPathsByName[binding.name]
+		if paths == nil {
+			paths = make(map[string]struct{})
+			r.sourceBindingPathsByName[binding.name] = paths
+		}
+		paths[binding.sourcePath] = struct{}{}
+	}
 	return nil
+}
+
+func (r *Registry) sourceBindingNameCollides(name string) bool {
+	return r != nil && len(r.sourceBindingPathsByName[name]) > 1
 }

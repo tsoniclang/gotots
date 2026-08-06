@@ -50,19 +50,25 @@ func (n *File) derivedSourceReference(
 		return api.NewNameReference(exportedName, requests...)
 	}
 	referencePath := binding.sourcePath
-	crossPackage := n.packageScope != nil &&
-		object.Pkg() != nil &&
-		object.Pkg().Scope() != n.packageScope
+	crossPackage := object.Pkg() != nil &&
+		(n.packageScope == nil || object.Pkg().Scope() != n.packageScope)
 	localName := exportedName
 	if crossPackage {
 		key := referencePath + "\x00" + exportedName
 		localName = n.derivedImports[key]
 		if localName == "" {
-			qualifier, qualifierErr := n.packageImportQualifier(object.Pkg())
-			if qualifierErr != nil {
-				return api.NameReference{}, qualifierErr
+			localName = exportedName
+			if n.owner.registry.sourceBindingNameCollides(binding.name) ||
+				n.sourceNameExists(exportedName) ||
+				n.hasImportName(exportedName) {
+				qualifier, qualifierErr := n.packageImportQualifier(object.Pkg())
+				if qualifierErr != nil {
+					return api.NameReference{}, qualifierErr
+				}
+				localName = n.allocateImportName(exportedName, qualifier)
+			} else {
+				n.importNames[localName] = struct{}{}
 			}
-			localName = n.allocateImportName(exportedName, qualifier)
 			n.derivedImports[key] = localName
 		}
 	}

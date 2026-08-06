@@ -53,20 +53,15 @@ func Test(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		contract, err := context.Names().InterfaceContract(targetType)
+		test, err := ContractTest(context, targetType, value)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return api.DirectExpression(
-			context.Factory().CallExpression(
-				context.Factory().Identifier(contract.GuardName()),
-				nil,
-				nil,
-				[]tsgo.Expression{value},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(contract.Requests(), demands)...,
-		), nil
+		return api.NewExpressionEmission(
+			test.Before(),
+			test.Value(),
+			api.CombineRequests(test.Requests(), demands),
+		)
 	}
 	adapter, err := context.Names().InterfaceAdapter(targetType, nil)
 	if err != nil {

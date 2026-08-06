@@ -25,6 +25,24 @@ func (a RuntimeArray) Hash(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	if a.Length() == 0 {
+		return api.NewExpressionEmission(
+			append(
+				stored.Before(),
+				arrayComparisonVariable(
+					context,
+					tsgo.NodeFlagsConst,
+					arrayName,
+					stored.Value(),
+				),
+			),
+			context.Factory().NumericLiteral(
+				"2166136261",
+				tsgo.TokenFlagsNone,
+			),
+			stored.Requests(),
+		)
+	}
 	indexName, err := context.Names().Temporary(api.TemporaryArrayHash)
 	if err != nil {
 		return api.ExpressionEmission{}, err

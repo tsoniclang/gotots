@@ -47,6 +47,15 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 			if strings.Count(runtime, "function goArrayAllocate") != 1 {
 				t.Fatalf("aggregate storage allocator is not emitted exactly once:\n%s", runtime)
 			}
+			for path, artifact := range target.printed {
+				if strings.Contains(artifact, "< 0;") {
+					t.Fatalf(
+						"zero-length array retained unreachable element traversal in %s:\n%s",
+						path,
+						artifact,
+					)
+				}
+			}
 			sliceRuntime := target.printed["runtime/slice.ts"]
 			for artifact, fragments := range map[string][]string{
 				"runtime/array.ts": {
@@ -184,6 +193,7 @@ console.log(values.NamedCopyIsDeep().map(String).join(" "));
 console.log(values.NestedCopyIsDeep().map(String).join(" "));
 console.log(values.SparseLiteralZerosAreFresh().map(String).join(" "));
 console.log(String(values.GenericZeroLengthPhantom()));
+console.log(String(values.ZeroLengthPointerKey()));
 const left = values.NewBoxes(1, 2);
 const right = values.NewBoxes(1, 2);
 console.log(values.Equal(left, right));
@@ -249,6 +259,7 @@ func main() {
 	fmt.Println(values.NestedCopyIsDeep())
 	fmt.Println(values.SparseLiteralZerosAreFresh())
 	fmt.Println(values.GenericZeroLengthPhantom())
+	fmt.Println(values.ZeroLengthPointerKey())
 	left := values.Boxes{{Value: 1}, {Value: 2}}
 	right := values.Boxes{{Value: 1}, {Value: 2}}
 	fmt.Println(values.Equal(left, right))

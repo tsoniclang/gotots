@@ -20,76 +20,68 @@ func nonBlankStructFieldCallbacks(
 	[]api.RootRequest,
 	error,
 ) {
-	factory := scaffold.factory
-	target, storageBacked, err := namedstructstorage.FieldTarget(
+	target, err := reflectedStructFieldTarget(
 		context.WithRole(api.RoleStructField),
+		sourceType,
+		field,
+		api.DirectExpression(scaffold.factory.Identifier("instance")),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	return storageStructFieldCallbacks(
+		context,
+		field,
+		target,
+		scaffold,
+	)
+}
+
+func reflectedStructFieldTarget(
+	context api.Context,
+	sourceType types.Type,
+	field *types.Var,
+	receiver api.ExpressionEmission,
+) (api.StoreTargetEmission, error) {
+	target, storageBacked, err := namedstructstorage.FieldTarget(
+		context,
 		nil,
 		sourceType,
 		field,
-		api.DirectExpression(factory.Identifier("instance")),
+		receiver,
 	)
-	if err != nil {
-		return nil, nil, nil, nil, err
+	if err != nil || storageBacked {
+		return target, err
 	}
-	if storageBacked {
-		return storageStructFieldCallbacks(context, field, target, scaffold)
+	named, namedOK := types.Unalias(sourceType).(*types.Named)
+	if namedOK && named.Obj() != nil && !field.Exported() &&
+		field.Pkg() != named.Obj().Pkg() {
+		owner, member, ownerErr := namedstructstorage.DemandFieldOwner(
+			context,
+			sourceType,
+			field,
+			receiver,
+		)
+		if ownerErr != nil {
+			return api.StoreTargetEmission{}, ownerErr
+		}
+		return api.NewCanonicalStoragePropertyStoreTargetEmission(
+			context.Factory(),
+			owner,
+			member,
+			field.Type(),
+		)
 	}
 	member, err := context.Names().Member(field)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return api.StoreTargetEmission{}, err
 	}
-	fieldAccess := tsgo.Expression(memberAccess(
-		factory,
-		"instance",
+	return api.NewPropertyStoreTargetEmission(
+		context.Factory(),
+		receiver,
 		member,
-	))
-	if _, isInterface := types.Unalias(field.Type()).Underlying().(*types.Interface); isInterface {
-		boxed, set, requests, callbackErr := interfaceFieldCallbacks(
-			context,
-			field,
-			fieldAccess,
-			scaffold,
-		)
-		return boxed, nil, set, requests, callbackErr
-	}
-	fieldAdapter, err := context.Names().InterfaceAdapter(field.Type(), nil)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	copied, err := context.Values().Transfer(
-		context.WithRole(api.RoleStructCopyField),
-		nil,
 		field.Type(),
-		field.Type(),
-		api.ValueTransferCopy,
-		api.DirectExpression(guardedForeignPayload(
-			scaffold,
-			fieldAdapter,
-			"Value.Set",
-		)),
 	)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	setStatements := append([]tsgo.Statement(nil), copied.Before()...)
-	setStatements = append(
-		setStatements,
-		factory.ExpressionStatement(factory.BinaryExpression(
-			nil,
-			fieldAccess,
-			nil,
-			factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
-			copied.Value(),
-		)),
-	)
-	return factory.NewExpression(
-			fieldAdapter.Expression(factory),
-			nil,
-			[]tsgo.Expression{fieldAccess},
-		), nil, factory.Block(setStatements, true), api.CombineRequests(
-			fieldAdapter.Requests(),
-			copied.Requests(),
-		), nil
 }
 
 func storageStructFieldCallbacks(
