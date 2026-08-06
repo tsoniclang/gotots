@@ -443,14 +443,7 @@ func (s *programSession) ResolveCallableABI(
 	if s == nil || function == nil {
 		return callableabi.Callable{}, false
 	}
-	if s.sourceImplementations != nil && function.Pkg() != nil {
-		if selected, ok := s.sourceImplementations.ResolveCallableABI(
-			function.Pkg().Path(),
-			function.Name(),
-		); ok {
-			return selected, true
-		}
-	}
-	selected, ok := s.callableABIs[function]
-	return selected, ok
+	return s.artifacts.CallableABI(
+		api.MustSourceArtifactOwner(function.Origin()),
+	)
 }

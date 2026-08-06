@@ -15,12 +15,20 @@ type callableUseEvidence struct {
 	observed bool
 }
 
-func Infer(
+type Binding struct {
+	function *types.Func
+	callable callableabi.Callable
+}
+
+func (b Binding) Function() *types.Func          { return b.function }
+func (b Binding) Callable() callableabi.Callable { return b.callable }
+
+func Select(
 	program *load.Program,
 	scalar api.ScalarABI,
 	manual *sourceimplementation.Certificate,
-) (map[*types.Func]callableabi.Callable, error) {
-	result := make(map[*types.Func]callableabi.Callable)
+) ([]Binding, error) {
+	var result []Binding
 	uses := directCallableUses(program)
 	for _, sourcePackage := range program.Packages() {
 		if sourcePackage.Kind() != load.PackageSource {
@@ -39,10 +47,14 @@ func Infer(
 					continue
 				}
 				if manual != nil {
-					if _, selected := manual.ResolveCallableABI(
+					if selected, ok := manual.ResolveCallableABI(
 						function.Pkg().Path(),
 						function.Name(),
-					); selected {
+					); ok {
+						result = append(result, Binding{
+							function: function,
+							callable: selected,
+						})
 						continue
 					}
 				}
@@ -99,7 +111,10 @@ func Infer(
 				if err != nil {
 					return nil, err
 				}
-				result[function] = selected
+				result = append(result, Binding{
+					function: function,
+					callable: selected,
+				})
 			}
 		}
 	}

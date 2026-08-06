@@ -7,7 +7,6 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -64,7 +63,6 @@ type programSession struct {
 	requirementRemovalOwner  api.ArtifactOwner
 	standardLibrary          *gostdlibcertify.Certificate
 	sourceImplementations    *sourceimplementation.Certificate
-	callableABIs             map[*types.Func]callableabi.Callable
 	externalFunctions        map[*types.Func]ExternalFunctionObligation
 	externalFunctionBindings map[*types.Func]api.ExternalFunctionTarget
 	sealed                   bool
@@ -356,13 +354,21 @@ func newProgramSession(
 		externalFunctions:        make(map[*types.Func]ExternalFunctionObligation),
 		externalFunctionBindings: externalBindings,
 	}
-	session.callableABIs, err = callableprojection.Infer(
+	callableBindings, err := callableprojection.Select(
 		source,
 		scalar,
 		options.SourceImplementations,
 	)
 	if err != nil {
 		return nil, err
+	}
+	for _, binding := range callableBindings {
+		if err := session.artifacts.AdmitCallableABI(
+			api.MustSourceArtifactOwner(binding.Function().Origin()),
+			binding.Callable(),
+		); err != nil {
+			return nil, err
+		}
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(

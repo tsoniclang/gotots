@@ -1,7 +1,9 @@
 package callableabi
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"slices"
@@ -132,11 +134,34 @@ func (c Callable) Valid() bool {
 func (c Callable) Identity() string        { return c.identity }
 func (c Callable) Parameters() []Parameter { return slices.Clone(c.parameters) }
 func (c Callable) Fingerprint() string     { return c.fingerprint }
+func (c Callable) CanonicalEncoding() []byte {
+	if !c.Valid() {
+		return nil
+	}
+	var encoded bytes.Buffer
+	writeCanonicalString(&encoded, c.identity)
+	var count [8]byte
+	binary.BigEndian.PutUint64(count[:], uint64(len(c.parameters)))
+	encoded.Write(count[:])
+	for _, parameter := range c.parameters {
+		encoded.WriteByte(byte(parameter.projection))
+		encoded.WriteByte(byte(parameter.nilPolicy))
+		writeCanonicalString(&encoded, parameter.targetType)
+	}
+	return encoded.Bytes()
+}
 func (c Callable) Parameter(index int) (Parameter, bool) {
 	if index < 0 || index >= len(c.parameters) {
 		return Parameter{}, false
 	}
 	return c.parameters[index], true
+}
+
+func writeCanonicalString(target *bytes.Buffer, value string) {
+	var length [8]byte
+	binary.BigEndian.PutUint64(length[:], uint64(len(value)))
+	target.Write(length[:])
+	target.WriteString(value)
 }
 
 type Error struct {
