@@ -1,9 +1,11 @@
 package tsgo
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -16,6 +18,70 @@ type projectNodeEvidence struct {
 
 type projectSourceEvidence struct {
 	nodes []projectNodeEvidence
+	wire  []byte
+}
+
+type officialEncodedNode interface {
+	officialEncoding() []byte
+}
+
+type officialSourceFile struct {
+	nodeCore
+	wire []byte
+}
+
+func (*officialSourceFile) isDeclarationBase() {}
+func (*officialSourceFile) isNodeBase()        {}
+func (*officialSourceFile) isSourceFile()      {}
+
+func (s *officialSourceFile) Statements() []Statement {
+	panic("official source file is opaque outside TS-Go encoding")
+}
+
+func (s *officialSourceFile) EndOfFileToken() EndOfFile {
+	panic("official source file is opaque outside TS-Go encoding")
+}
+
+func (s *officialSourceFile) SourceData() SourceFileData {
+	panic("official source file is opaque outside TS-Go encoding")
+}
+
+func (s *officialSourceFile) targetEncoding() nodeEncoding {
+	panic("official source file must use its official TS-Go encoding")
+}
+
+func (s *officialSourceFile) officialEncoding() []byte {
+	return bytes.Clone(s.wire)
+}
+
+func (p *ProjectInspection) SourceFile(sourceFile string) (SourceFile, error) {
+	if p == nil || p.client == nil || p.snapshot == 0 || p.project == "" {
+		return nil, &ProjectInspectionError{
+			Operation: "source file",
+			Path:      sourceFile,
+			Reason:    "project inspection is invalid",
+		}
+	}
+	absolute, err := filepath.Abs(sourceFile)
+	if err != nil {
+		return nil, projectInspectionError("source file", sourceFile, err)
+	}
+	path := filepath.ToSlash(absolute)
+	evidence, err := p.projectSourceEvidence(path)
+	if err != nil {
+		return nil, err
+	}
+	if len(evidence.wire) == 0 {
+		return nil, &ProjectInspectionError{
+			Operation: "source file",
+			Path:      path,
+			Reason:    "official AST encoding is absent",
+		}
+	}
+	return &officialSourceFile{
+		nodeCore: newNodeCore(SyntaxKindSourceFile, NodeFlagsNone),
+		wire:     bytes.Clone(evidence.wire),
+	}, nil
 }
 
 func (p *ProjectInspection) projectSourceEvidence(
@@ -111,7 +177,7 @@ func decodeProjectSourceEvidence(
 			)
 		}
 	}
-	return projectSourceEvidence{nodes: nodes}, nil
+	return projectSourceEvidence{nodes: nodes, wire: raw}, nil
 }
 
 func (p *ProjectInspection) projectMemberAccess(
