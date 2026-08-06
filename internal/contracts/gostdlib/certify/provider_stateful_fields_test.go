@@ -53,7 +53,16 @@ func TestStatefulProfileTargetFieldsExactJoin(t *testing.T) {
 		{Member: "Close"},
 		{Member: "Read"},
 	}
-	if err := verifyStatefulProfileTargetMembers(target, fields, methods, nil); err != nil {
+	operations := []gostdlib.FacetCapability{
+		gostdlib.FacetCapabilityAssign,
+		gostdlib.FacetCapabilityCopy,
+	}
+	if err := verifyStatefulProfileTargetMembers(
+		target,
+		fields,
+		methods,
+		operations,
+	); err != nil {
 		t.Fatal(err)
 	}
 	tests := []struct {
@@ -81,7 +90,12 @@ func TestStatefulProfileTargetFieldsExactJoin(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := verifyStatefulProfileTargetMembers(target, test.fields, methods, nil)
+			err := verifyStatefulProfileTargetMembers(
+				target,
+				test.fields,
+				methods,
+				operations,
+			)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("field mutation error = %v, want %q", err, test.want)
 			}
@@ -138,6 +152,10 @@ func TestStatefulProfileOperationsExactJoin(t *testing.T) {
 		{Member: "Unwrap"},
 	}
 	operations := []gostdlib.FacetCapability{
+		gostdlib.FacetCapabilityAssign,
+		gostdlib.FacetCapabilityCopy,
+		gostdlib.FacetCapabilityEqual,
+		gostdlib.FacetCapabilityHash,
 		gostdlib.FacetCapabilityMake,
 		gostdlib.FacetCapabilityStorage,
 	}
@@ -153,7 +171,7 @@ func TestStatefulProfileOperationsExactJoin(t *testing.T) {
 		target,
 		fields,
 		methods,
-		operations[:1],
+		operations[:len(operations)-1],
 	)
 	if err == nil || !strings.Contains(err.Error(), "unowned public static member") {
 		t.Fatalf("dropped storage-operation error = %v", err)
