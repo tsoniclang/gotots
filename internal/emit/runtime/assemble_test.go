@@ -154,7 +154,7 @@ func TestUnsafePointerRuntimeHasCodecAndMemoryOwner(t *testing.T) {
 	class, ok := definitions[1].Statement().(tsgo.ClassDeclaration)
 	if !ok ||
 		class.Name().Text() != "GoUnsafePointer" ||
-		len(class.Members()) != 15 {
+		len(class.Members()) != 16 {
 		t.Fatalf(
 			"unsafe-pointer definition = %T with unexpected shape",
 			definitions[1].Statement(),
