@@ -833,10 +833,15 @@ exactly one entry or remain an explicit obligation.
 ### Certified Source-Package Implementations
 
 A project-selected source implementation replaces a coherent package contract,
-not isolated identifiers. It exports the same generated package-assembly names
-and TypeScript types, including demanded storage and operation facets. Callsites
-remain ordinary imports and calls; no policy, bridge, digest, or implementation
-selector is added to a Go callable.
+not isolated identifiers. It exports the exact selected package-assembly names
+and satisfies every target type demanded by generated consumers. Both the
+ordinary generated target set and the installed target set must pass strict
+TypeScript checking under the same final project configuration.
+Package-private storage and operation implementation may differ inside a
+declared equivalence envelope;
+that freedom does not extend to a source-visible callable ABI or to any type a
+selected consumer requires. Callsites remain ordinary imports and calls; no
+policy, bridge, digest, or implementation selector is added to a Go callable.
 
 The checked authored signature may select a closed representation projection
 without a configuration entry. Given:

@@ -1039,13 +1039,19 @@ repeatable `--tag` and `--implementation-bundle` flags.
 
 A certified source implementation owns one exact source package's final target
 module set. Certification joins canonical Go module, package, version,
-selected build and compilation profiles, generated package surface, strict
-TypeScript export surface, implementation source digests, and equivalence
-envelope. Selection is settled once before target files are sealed. The final
-file set replaces the complete generated package module set atomically; no
-generated body, package state, initializer, compatibility wrapper, or fallback
-for the selected package may survive. References keep the ordinary package
-assembly path and source-facing contract.
+selected build and compilation profiles, exact export identities, callable ABI
+projections, implementation source digests, and the equivalence envelope. It
+strict-typechecks both the complete ordinary generated target set and the
+complete installed target set under the same final module-resolution and
+strictness contract. The installed check is the authoritative proof that every
+selected generated consumer accepts the replacement. TypeScript display text,
+parameter names, and package-private representation shape are not semantic
+package contracts and must not be compared as if they were. Selection is
+settled once before target files are sealed. The final file set replaces the
+complete generated package module set atomically; no generated body, package
+state, initializer, compatibility wrapper, or fallback for the selected
+package may survive. References keep the ordinary package assembly path and
+source-facing contract.
 
 For callable exports, the surface join is signature-exact rather than
 name-only. Certification compares the selected Go signature, every selected

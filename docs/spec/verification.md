@@ -724,11 +724,18 @@ cooperative program with top-level await fail at that strict gate.
 
 For each source implementation, certification independently inspects the
 selected Go package, the ordinary generated package assembly, and the authored
-strict TypeScript project. It exact-joins exported names and checked types,
-binds the build and compilation profiles, parses every authored module through
-pinned TS-Go, rebinds public generated imports to the package assembly, proves
-each residual private contract module body-free and exact by imported name,
-and inspects the final target file set. Required mutations alter a Go
+strict TypeScript project. It exact-joins exported identities, binds the build
+and compilation profiles, parses every authored module through pinned TS-Go,
+rebinds public generated imports to the package assembly, proves each residual
+private contract module body-free and exact by imported name, and inspects the
+final target file set. Before checker evidence is trusted, the complete ordinary
+generated target set and the complete installed target set are independently
+strict-typechecked with the same final module-resolution configuration. The
+installed check proves all selected consumer requirements; callable source
+signatures and projections are joined separately by the callable ABI owner.
+Display-oriented checker strings, parameter spellings, and replacement-private
+storage layouts are forbidden as package-contract equality evidence. Required
+mutations alter a Go
 signature, TypeScript export, package identity, build or compilation profile,
 source digest, private module identity, or envelope; add an executable
 private-module statement;
