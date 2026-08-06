@@ -239,6 +239,13 @@ Every test inspects generated source and reports bytes/AST nodes. A mutation
 that always emits copy carriers/helpers, uses JavaScript identity for Go map
 keys, drops nil checks, or restores a target non-null assertion must fail.
 
+The native defined-numeric fixture includes an explicit conversion assigned by
+both short declaration and inferred `var`. Its generated declarations must
+carry the converted basic type while the expression remains a runtime identity
+operation. Removing either annotation must produce the pinned strict
+TypeScript diagnostic; adding runtime coercion or annotating ordinary direct
+numeric declarations fails the artifact-shape gate.
+
 Unsafe-pointer proof runs under all integer profiles and at the selected
 GOOS/GOARCH. It exact-compares `unsafe.Sizeof`, `Alignof`, and `Offsetof` facts
 used by each codec against the selected Go toolchain; different source
@@ -420,6 +427,14 @@ call, forward it one call deeper, omit registry registration, key the registry
 by storage location/spelling, reverse defer order, capture arguments late, or
 swallow a host exception. Each fails differential behavior or structural
 walls.
+
+Possibly nil callable fixtures inspect the TS-Go AST and generated source to
+prove one callee capture, source-ordered argument captures, and one invocation
+through the nullish nil-call boundary. Moving the boundary ahead of argument
+evaluation must fail the Go/TypeScript differential; removing it must fail
+strict typechecking and nil-call behavior. A pinned-checker fixture proves the
+nullish expression narrows the callable without a helper call. Broad artifact
+search rejects the former conditional and assertion paths.
 
 ## Cooperative-Concurrency Proof
 

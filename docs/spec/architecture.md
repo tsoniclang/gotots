@@ -337,6 +337,13 @@ Within cooperative compilation, this single ABI replaces callable-profile
 matrices, public cooperative variants, effect-dependent named-type arity, and
 runtime Promise detection.
 
+Possibly nil indirect calls have one target owner. The emitter captures the
+callee, captures every argument in Go order, then calls
+`(callee ?? GoPanic.raiseRuntime("call of nil function"))`. The statically
+typed nullish expression adds no helper invocation, source parameter, erased
+type, host-shape inspection, or semantic dispatch. Statically non-nil callees
+omit it. No conditional, target assertion, or alternate nil-call path coexists.
+
 ## Values And Representations
 
 The representation owner chooses the smallest exact direct TypeScript shape.
@@ -384,6 +391,12 @@ profile-dependent, non-numeric, provider-owned, and otherwise non-identity
 families retain their canonical wrapper or provider representation. All
 consumers query this one representation owner; none infer it from target
 spelling or structural assignability.
+
+When an identity conversion from that nominal enum initializes a target whose
+TypeScript type would otherwise be inferred, the declaration owner emits the
+selected converted basic type annotation. This is a static inference boundary,
+not a second representation or runtime conversion; declarations and contexts
+that already preserve the selected type emit no annotation.
 
 Nil-capable values use `undefined` unless their family requires a distinct
 carrier. Zero, copy, equality, hashing, conversion, and mutation are each owned

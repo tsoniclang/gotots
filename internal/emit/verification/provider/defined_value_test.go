@@ -200,8 +200,8 @@ func SequenceTotal(sequence iter.Seq[int]) int {
 		"callback: (($0: gostring, $1:",
 		"const __gotots_callee_0 = cancel;",
 		"const __gotots_callee_1 = callback;",
-		"await (__gotots_callee_0 === void 0 ? GoPanic.raiseRuntime(\"call of nil function\") : __gotots_callee_0)();",
-		"return await (__gotots_callee_1 === void 0 ? GoPanic.raiseRuntime(\"call of nil function\") : __gotots_callee_1)(",
+		"await (__gotots_callee_0 ?? GoPanic.raiseRuntime(\"call of nil function\"))();",
+		"return await (__gotots_callee_1 ?? GoPanic.raiseRuntime(\"call of nil function\"))(",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("provider defined-value artifact lacks %q:\n%s", required, printed)

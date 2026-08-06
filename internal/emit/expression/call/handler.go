@@ -305,7 +305,6 @@ func emit(
 			callable.NilGuardExpression(
 				context,
 				targetCallee,
-				targetCallee,
 			)
 		if err != nil {
 			return api.ExpressionEmission{}, err

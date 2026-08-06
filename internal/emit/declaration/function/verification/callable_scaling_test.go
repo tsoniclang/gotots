@@ -175,15 +175,15 @@ func assertCallableScalingTree(t *testing.T, source tsgo.SourceFile, count int) 
 	}
 	parenthesized, ok := call.Expression().(tsgo.ParenthesizedExpression)
 	if !ok {
-		t.Fatalf("Run callee = %T, want parenthesized nil guard", call.Expression())
+		t.Fatalf("Run callee = %T, want parenthesized nil boundary", call.Expression())
 	}
-	guard, ok := parenthesized.Expression().(tsgo.ConditionalExpression)
-	if !ok {
-		t.Fatalf("Run guard = %T, want conditional expression", parenthesized.Expression())
+	checked, ok := parenthesized.Expression().(tsgo.BinaryExpression)
+	if !ok || checked.OperatorToken().Kind() != tsgo.SyntaxKindQuestionQuestionToken {
+		t.Fatalf("Run callable check = %T, want nullish expression", parenthesized.Expression())
 	}
-	callee, ok := guard.WhenFalse().(tsgo.Identifier)
+	callee, ok := checked.Left().(tsgo.Identifier)
 	if !ok || !strings.HasPrefix(callee.Text(), "__gotots_callee_") {
-		t.Fatalf("Run non-nil callee = %T, want captured callable", guard.WhenFalse())
+		t.Fatalf("Run checked value = %T, want captured callable", checked.Left())
 	}
 	if len(runStatements) != 4 {
 		t.Fatalf("Run statements = %d, want callback, callee, argument, return", len(runStatements))

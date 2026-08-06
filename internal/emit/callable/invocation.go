@@ -85,7 +85,6 @@ func NilGuard(
 func NilGuardExpression(
 	context api.Context,
 	callee tsgo.Expression,
-	nonNil tsgo.Expression,
 ) (tsgo.Expression, []api.RootRequest, error) {
 	reference, err := context.Names().Runtime(
 		api.RuntimePanic,
@@ -94,17 +93,6 @@ func NilGuardExpression(
 	if err != nil {
 		return nil, nil, err
 	}
-	condition := context.Factory().BinaryExpression(
-		nil,
-		callee,
-		nil,
-		context.Factory().BinaryOperatorToken(
-			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-		),
-		context.Factory().VoidExpression(
-			context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
-		),
-	)
 	raise := panicruntime.Call(
 		context.Factory(),
 		reference.Name(),
@@ -114,12 +102,14 @@ func NilGuardExpression(
 		),
 	)
 	return context.Factory().ParenthesizedExpression(
-		context.Factory().ConditionalExpression(
-			condition,
-			context.Factory().QuestionToken(),
+		context.Factory().BinaryExpression(
+			nil,
+			callee,
+			nil,
+			context.Factory().BinaryOperatorToken(
+				tsgo.BinaryOperatorQuestionQuestionToken,
+			),
 			raise,
-			context.Factory().ColonToken(),
-			nonNil,
 		),
 	), reference.Requests(), nil
 }

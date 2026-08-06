@@ -344,21 +344,20 @@ func EmitDeferred(
 				),
 			),
 		)
-		ordinaryCall := context.Factory().CallExpression(
+		guarded, guardRequests, guardErr := callable.NilGuardExpression(
+			context,
 			targetCallee,
+		)
+		if guardErr != nil {
+			return api.ExpressionEmission{}, guardErr
+		}
+		ordinaryCall := context.Factory().CallExpression(
+			guarded,
 			nil,
 			nil,
 			arguments,
 			tsgo.NodeFlagsNone,
 		)
-		guarded, guardRequests, guardErr := callable.NilGuardExpression(
-			context,
-			targetCallee,
-			ordinaryCall,
-		)
-		if guardErr != nil {
-			return api.ExpressionEmission{}, guardErr
-		}
 		deferredCall := context.Factory().CallExpression(
 			context.Factory().Identifier(deferredName),
 			nil,
@@ -384,7 +383,7 @@ func EmitDeferred(
 				context.Factory().Identifier("undefined"),
 			),
 			context.Factory().QuestionToken(),
-			guarded,
+			ordinaryCall,
 			context.Factory().ColonToken(),
 			deferredCall,
 		)

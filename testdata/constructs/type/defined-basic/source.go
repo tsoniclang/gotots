@@ -62,6 +62,16 @@ func CountIsZero(value Count) bool {
 	return value == 0
 }
 
+func ConvertedCountIsZero(value Count) bool {
+	shortConverted := int32(value)
+	return shortConverted == 0
+}
+
+func DeclaredConvertedCountIsZero(value Count) bool {
+	var declaredConverted = int32(value)
+	return declaredConverted == 0
+}
+
 func LabelFromString(value string) Label {
 	return Label(value)
 }

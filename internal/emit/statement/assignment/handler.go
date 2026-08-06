@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	conversionexpression "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -343,11 +344,12 @@ func emitDefinitionList(
 			return nil, nil, nil, err
 		}
 	}
-	targetType, typeRequests, err := pointerAnnotation(
+	targetType, typeRequests, err := inferenceAnnotation(
 		context.WithRole(api.RoleLocalType),
 		children,
 		name,
 		contextualType,
+		source.Rhs[0],
 	)
 	if err != nil {
 		return nil, nil, nil, err
@@ -470,6 +472,31 @@ func typedVariableStatement(
 			flags,
 		),
 	)
+}
+
+func inferenceAnnotation(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	sourceType types.Type,
+	initializer ast.Expr,
+) (tsgo.TypeNode, []api.RootRequest, error) {
+	required, err := conversionexpression.RequiresInferenceAnnotation(
+		context,
+		initializer,
+		sourceType,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !required {
+		return pointerAnnotation(context, children, source, sourceType)
+	}
+	target, err := children.RepresentedType(context, source, sourceType)
+	if err != nil {
+		return nil, nil, err
+	}
+	return target.Value(), target.Requests(), nil
 }
 
 func pointerAnnotation(

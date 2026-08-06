@@ -71,7 +71,7 @@ func TestCallableValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		"return (value: int32): int32 =>",
 	) || !strings.Contains(
 		printed,
-		`GoPanic.raiseRuntime("call of nil function")`,
+		`?? GoPanic.raiseRuntime("call of nil function")`,
 	) || !strings.Contains(
 		printed,
 		"return Apply(Double, value);",
@@ -84,10 +84,7 @@ func TestCallableValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	ordered := printedFunction(t, printed, "OrderedCalleeAndArguments")
 	calleeCapture := strings.Index(ordered, "const __gotots_callee_")
 	argumentCapture := strings.Index(ordered, "const __gotots_results_")
-	guard := strings.Index(
-		ordered,
-		`GoPanic.raiseRuntime("call of nil function")`,
-	)
+	guard := strings.Index(ordered, `?? GoPanic.raiseRuntime("call of nil function")`)
 	if calleeCapture < 0 ||
 		argumentCapture < 0 ||
 		guard < 0 ||
@@ -124,24 +121,27 @@ func TestCallableValuesCreateNativeTargetTrees(t *testing.T) {
 	}
 	parenthesized, ok := call.Expression().(tsgo.ParenthesizedExpression)
 	if !ok {
-		t.Fatalf("Apply callee = %T, want parenthesized nil guard", call.Expression())
+		t.Fatalf("Apply callee = %T, want parenthesized nil boundary", call.Expression())
 	}
-	guard, ok := parenthesized.Expression().(tsgo.ConditionalExpression)
+	checked, ok := parenthesized.Expression().(tsgo.BinaryExpression)
 	if !ok {
-		t.Fatalf("Apply guard = %T, want conditional expression", parenthesized.Expression())
+		t.Fatalf("Apply check = %T, want nullish expression", parenthesized.Expression())
 	}
-	callee, ok := guard.WhenFalse().(tsgo.Identifier)
+	if checked.OperatorToken().Kind() != tsgo.SyntaxKindQuestionQuestionToken {
+		t.Fatalf("Apply callable check has the wrong target shape")
+	}
+	callee, ok := checked.Left().(tsgo.Identifier)
 	if !ok || !strings.HasPrefix(callee.Text(), "__gotots_callee_") {
-		t.Fatalf("Apply non-nil callee = %T %#v, want captured callable", guard.WhenFalse(), guard.WhenFalse())
+		t.Fatalf("Apply checked value = %T %#v, want captured callable", checked.Left(), checked.Left())
+	}
+	if _, ok := checked.Right().(tsgo.CallExpression); !ok {
+		t.Fatalf("Apply nil branch = %T, want runtime panic call", checked.Right())
 	}
 	if _, ok := statements[0].(tsgo.VariableStatement); !ok {
 		t.Fatalf("Apply callee capture = %T, want variable statement", statements[0])
 	}
 	if _, ok := statements[1].(tsgo.VariableStatement); !ok {
 		t.Fatalf("Apply argument capture = %T, want variable statement", statements[1])
-	}
-	if _, ok := guard.WhenTrue().(tsgo.CallExpression); !ok {
-		t.Fatalf("Apply nil branch = %T, want panic call", guard.WhenTrue())
 	}
 
 	offset := targetFunction(t, targetFile, "Offset")

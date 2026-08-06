@@ -359,6 +359,23 @@ complex values, and all other defined families retain their exact existing
 representation. Type-representation demands whose storage is already the enum
 value consume no class marker or auxiliary carrier.
 
+A conversion from that enum representation to an ordinary basic type is a
+runtime identity operation. When it initializes an inference-owned target
+declaration, the declaration carries the exact converted type so TypeScript
+does not retain the nominal source enum:
+
+```go
+position := int32(node.Pos())
+```
+
+```ts
+let position: int32 = node.Pos();
+```
+
+No coercion, wrapper, or annotation on unrelated locals is emitted. Explicitly
+typed declarations already carry their selected type; non-declaration uses are
+checked by their parent context.
+
 ### Structs
 
 ```go
@@ -787,6 +804,25 @@ export async function Consume(
 
 The source still has one parameter. No synchronous/cooperative public variants,
 hidden effect parameters, or runtime Promise tests exist.
+
+Every possibly nil function value is evaluated once, its arguments are then
+evaluated in source order, and one generic runtime check returns the identical
+statically typed callable or raises Go's nil-function runtime panic:
+
+```go
+result := callback(argument())
+```
+
+```ts
+const callee = callback;
+const value = argument();
+const result = (callee ?? GoPanic.raiseRuntime("call of nil function"))(value);
+```
+
+The nullish check adds no helper call, source ABI parameter, cast, dynamic
+dispatch, or result adaptation. Statically non-nil declarations and literals
+call directly. A conditional, assertion, or alternate nil-call path is
+forbidden.
 
 `go f(args)` captures/copies immediately and schedules one closure. `select`
 evaluates operands once, chooses a ready case fairly, commits once, and

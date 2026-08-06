@@ -262,8 +262,7 @@ func assertWaveFourArtifactShape(t *testing.T, printed string) {
 	}
 	guardedCall := regexp.MustCompile(
 		`\(` + regexp.QuoteMeta(callee[1]) +
-			` === void 0 \? GoPanic\.raiseRuntime\("call of nil function"\) : ` +
-			regexp.QuoteMeta(callee[1]) + `\)\(\)`,
+			` \?\? GoPanic\.raiseRuntime\("call of nil function"\)\)\(\)`,
 	)
 	if calls := guardedCall.FindAllString(rangeFunction, -1); len(calls) != 1 {
 		t.Fatalf(
