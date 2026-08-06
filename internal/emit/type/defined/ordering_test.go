@@ -77,7 +77,12 @@ func assertCompoundArtifactShape(t *testing.T, printed string) {
 	}
 	if right < 0 ||
 		rightEnd < 0 ||
-		!strings.Contains(body[right:right+rightEnd], "= __gotots_callee_") {
+		!strings.Contains(
+			body[right:right+rightEnd],
+			`GoPanic.raiseRuntime("call of nil function")`,
+		) ||
+		!strings.Contains(body[right:right+rightEnd], ": __gotots_callee_") ||
+		!strings.Contains(body[right:right+rightEnd], "= (__gotots_callee_") {
 		t.Fatalf("accessor compound has no captured guarded-call result:\n%s", body)
 	}
 	compound := body[right:]

@@ -351,7 +351,7 @@ func EmitDeferred(
 			arguments,
 			tsgo.NodeFlagsNone,
 		)
-		guarded, guardRequests, guardErr := callable.DetachedNilGuard(
+		guarded, guardRequests, guardErr := callable.NilGuardExpression(
 			context,
 			targetCallee,
 			ordinaryCall,

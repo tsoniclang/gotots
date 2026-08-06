@@ -38,6 +38,7 @@ func Emit(
 		children,
 		source.X,
 		model,
+		comparison(source.Op),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -48,6 +49,7 @@ func Emit(
 		children,
 		source.Y,
 		model,
+		comparison(source.Op),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -150,17 +152,30 @@ func operand(
 	children api.ChildEmitter,
 	source ast.Expr,
 	model definedtype.Model,
+	wrapLiteral bool,
 ) (api.ExpressionEmission, error) {
 	sourceType := context.TypesInfo().TypeOf(source)
 	if literalConstant(source) {
 		facts, ok := context.TypesInfo().TypeAndValue(source)
 		if ok && facts.Value != nil {
-			return constantvalue.EmitValue(
+			target, err := constantvalue.EmitValue(
 				operationContext,
 				source,
 				model.Underlying(),
 				facts.Value,
 			)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+			representation, err := model.Representation(context)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+			if wrapLiteral && representation.Kind() ==
+				api.DefinedValueRepresentationGeneratedNumeric {
+				return model.Wrap(context, target)
+			}
+			return target, nil
 		}
 	}
 	expected := sourceType

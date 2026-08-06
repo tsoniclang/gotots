@@ -58,6 +58,10 @@ func CountOrder(left, right Count) (bool, bool, bool, bool, bool, bool) {
 		left >= right
 }
 
+func CountIsZero(value Count) bool {
+	return value == 0
+}
+
 func LabelFromString(value string) Label {
 	return Label(value)
 }

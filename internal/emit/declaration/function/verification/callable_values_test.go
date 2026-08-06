@@ -84,7 +84,10 @@ func TestCallableValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	ordered := printedFunction(t, printed, "OrderedCalleeAndArguments")
 	calleeCapture := strings.Index(ordered, "const __gotots_callee_")
 	argumentCapture := strings.Index(ordered, "const __gotots_results_")
-	guard := strings.Index(ordered, "if (__gotots_callee_")
+	guard := strings.Index(
+		ordered,
+		`GoPanic.raiseRuntime("call of nil function")`,
+	)
 	if calleeCapture < 0 ||
 		argumentCapture < 0 ||
 		guard < 0 ||
@@ -108,20 +111,28 @@ func TestCallableValuesCreateNativeTargetTrees(t *testing.T) {
 
 	apply := targetFunction(t, targetFile, "Apply")
 	statements := apply.Body().(tsgo.Block).Statements()
-	if len(statements) != 4 {
-		t.Fatalf("Apply statements = %d, want callee, argument, guard, return", len(statements))
+	if len(statements) != 3 {
+		t.Fatalf("Apply statements = %d, want callee, argument, return", len(statements))
 	}
-	result, ok := statements[3].(tsgo.ReturnStatement)
+	result, ok := statements[2].(tsgo.ReturnStatement)
 	if !ok {
-		t.Fatalf("Apply final statement = %T, want return", statements[3])
+		t.Fatalf("Apply final statement = %T, want return", statements[2])
 	}
 	call, ok := result.Expression().(tsgo.CallExpression)
 	if !ok {
 		t.Fatalf("Apply return = %T, want direct call", result.Expression())
 	}
-	callee, ok := call.Expression().(tsgo.Identifier)
+	parenthesized, ok := call.Expression().(tsgo.ParenthesizedExpression)
+	if !ok {
+		t.Fatalf("Apply callee = %T, want parenthesized nil guard", call.Expression())
+	}
+	guard, ok := parenthesized.Expression().(tsgo.ConditionalExpression)
+	if !ok {
+		t.Fatalf("Apply guard = %T, want conditional expression", parenthesized.Expression())
+	}
+	callee, ok := guard.WhenFalse().(tsgo.Identifier)
 	if !ok || !strings.HasPrefix(callee.Text(), "__gotots_callee_") {
-		t.Fatalf("Apply callee = %T %#v, want captured callable", call.Expression(), call.Expression())
+		t.Fatalf("Apply non-nil callee = %T %#v, want captured callable", guard.WhenFalse(), guard.WhenFalse())
 	}
 	if _, ok := statements[0].(tsgo.VariableStatement); !ok {
 		t.Fatalf("Apply callee capture = %T, want variable statement", statements[0])
@@ -129,8 +140,8 @@ func TestCallableValuesCreateNativeTargetTrees(t *testing.T) {
 	if _, ok := statements[1].(tsgo.VariableStatement); !ok {
 		t.Fatalf("Apply argument capture = %T, want variable statement", statements[1])
 	}
-	if _, ok := statements[2].(tsgo.IfStatement); !ok {
-		t.Fatalf("Apply guard = %T, want if statement", statements[2])
+	if _, ok := guard.WhenTrue().(tsgo.CallExpression); !ok {
+		t.Fatalf("Apply nil branch = %T, want panic call", guard.WhenTrue())
 	}
 
 	offset := targetFunction(t, targetFile, "Offset")
@@ -334,8 +345,8 @@ func TestDirectNilCallIsSmallerThanIIFEForm(t *testing.T) {
 	targetFile := compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
 	direct := targetFunction(t, targetFile, "Apply")
 	statements := direct.Body().(tsgo.Block).Statements()
-	if len(statements) != 4 {
-		t.Fatalf("direct Apply statements = %d, want four", len(statements))
+	if len(statements) != 3 {
+		t.Fatalf("direct Apply statements = %d, want three", len(statements))
 	}
 	capture := statements[0].(tsgo.VariableStatement).
 		DeclarationList().

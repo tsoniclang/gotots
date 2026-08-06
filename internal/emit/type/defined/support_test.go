@@ -95,6 +95,7 @@ func main() {
 	a, b, c = values.CountUnary(count)
 	fmt.Println(values.IntFromCount(a), values.IntFromCount(b), values.IntFromCount(c))
 	fmt.Println(values.CountOrder(count, values.CountFromInt(3)))
+	fmt.Println(values.CountIsZero(values.CountZero()), values.CountIsZero(count))
 	left := values.LabelFromString("a")
 	right := values.LabelFromString("z")
 	fmt.Println(values.StringFromLabel(values.LabelJoin(left, right)))
@@ -184,6 +185,7 @@ console.log(values.CountArithmetic(count, values.CountFromInt(3)).map(value => S
 console.log(values.CountBits(count, values.CountFromInt(3)).map(value => String(values.IntFromCount(value))).join(" "));
 console.log(values.CountUnary(count).map(value => String(values.IntFromCount(value))).join(" "));
 console.log(values.CountOrder(count, values.CountFromInt(3)).join(" "));
+console.log(String(values.CountIsZero(values.CountZero())), String(values.CountIsZero(count)));
 const left = values.LabelFromString("a");
 const right = values.LabelFromString("z");
 console.log(values.StringFromLabel(values.LabelJoin(left, right)));

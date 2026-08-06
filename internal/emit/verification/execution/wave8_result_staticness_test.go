@@ -150,7 +150,7 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 		`const (__gotots_callee_[0-9]+) = invoke;`,
 	).FindStringSubmatch(ordinary)
 	if len(ordinaryCallee) != 2 ||
-		!strings.Contains(ordinary, ordinaryCallee[1]+"();") ||
+		!strings.Contains(ordinary, ": "+ordinaryCallee[1]+")();") ||
 		strings.Contains(ordinary, ordinaryCallee[1]+"($go$recovery);") {
 		t.Fatalf("ordinary invocation did not omit recovery authority:\n%s", ordinary)
 	}

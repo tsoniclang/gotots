@@ -117,3 +117,27 @@ func TestSourceContractPublishesExplicitAdditionalBindings(t *testing.T) {
 		t.Fatal("absent additional package binding was accepted")
 	}
 }
+
+func TestSourceContractPublishesEnumTypeAndValueBinding(t *testing.T) {
+	factory := tsgo.NewFactory()
+	contract, err := ProjectSourceContract(
+		factory,
+		"Flags",
+		nil,
+		[]tsgo.Statement{factory.EnumDeclaration(
+			[]tsgo.ModifierLike{factory.ExportKeyword()},
+			factory.Identifier("Flags"),
+			[]tsgo.EnumMember{factory.EnumMember(
+				factory.Identifier("$goType"),
+				factory.NumericLiteral("1", tsgo.TokenFlagsNone),
+			)},
+		)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exports, ok := contract.ExportedBindings()
+	if !ok || len(exports) != 1 || exports[0] != "Flags" {
+		t.Fatalf("enum source package exports = %v, present=%t", exports, ok)
+	}
+}

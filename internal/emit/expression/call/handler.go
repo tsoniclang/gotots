@@ -301,24 +301,14 @@ func emit(
 	before = append(before, argumentBefore...)
 	var guardRequests []api.RootRequest
 	if guardNil {
-		if detached {
-			targetCallee, guardRequests, err =
-				callable.DetachedNilGuard(
-					context,
-					targetCallee,
-					targetCallee,
-				)
-			if err != nil {
-				return api.ExpressionEmission{}, err
-			}
-		} else {
-			guard, requests, guardErr :=
-				callable.NilGuard(context, targetCallee)
-			if guardErr != nil {
-				return api.ExpressionEmission{}, guardErr
-			}
-			before = append(before, guard)
-			guardRequests = requests
+		targetCallee, guardRequests, err =
+			callable.NilGuardExpression(
+				context,
+				targetCallee,
+				targetCallee,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
 		}
 	}
 	call := context.Factory().CallExpression(

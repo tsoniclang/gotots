@@ -207,7 +207,7 @@ func TestWaveNineKeepsTransportedCallableABIByteStableAcrossRoots(t *testing.T) 
 	for _, required := range []string{
 		"export async function WhollySynchronous(): Promise<gostring>",
 		"(($0: gostring) => Awaitable<gostring>) | undefined",
-		"return await __gotots_callee_",
+		"return await (__gotots_callee_",
 	} {
 		if !strings.Contains(synchronousFunction, required) {
 			t.Fatalf(

@@ -82,7 +82,7 @@ func NilGuard(
 	), reference.Requests(), nil
 }
 
-func DetachedNilGuard(
+func NilGuardExpression(
 	context api.Context,
 	callee tsgo.Expression,
 	nonNil tsgo.Expression,
