@@ -759,6 +759,12 @@ join, package/function projection condition, projection config field, caller
 allowlist, text patch, unchecked cast, duplicate signature store, or migrated
 scalar-pointer carrier on a certified pointee-value path.
 
+Pointer-runtime mutation tests require address construction to remain behind a
+lazy accessor. Differential fixtures compare repeated field addresses, pointer
+equality and hashing, writes through aliases, and safe/unsafe alias
+synchronization. Deterministic structure checks prove that pointer creation
+cannot perform address-map operations until an identity boundary is reached.
+
 An equivalence envelope requires product-level evidence. For an internal hash,
 tests prove equal-input stability, unequal-input behavior over an adversarial
 corpus, streaming/one-shot agreement when exposed, collision-safe consumer

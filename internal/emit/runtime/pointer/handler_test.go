@@ -39,8 +39,8 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 		t.Fatalf("pointer type parameters = %v, want L and S", parameters)
 	}
 	members := class.Members()
-	if len(members) != 18 {
-		t.Fatalf("pointer class members = %d, want 18", len(members))
+	if len(members) != 20 {
+		t.Fatalf("pointer class members = %d, want 20", len(members))
 	}
 	for _, member := range members {
 		method, ok := member.(tsgo.MethodDeclaration)
@@ -52,24 +52,20 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 			t.Fatal("ordinary pointer runtime carries the projection facet")
 		}
 	}
-	constructor, ok := members[3].(tsgo.ConstructorDeclaration)
+	constructor, ok := members[4].(tsgo.ConstructorDeclaration)
 	if !ok {
-		t.Fatalf("pointer member = %T, want constructor", members[3])
+		t.Fatalf("pointer member = %T, want constructor", members[4])
 	}
 	constructorParameters := constructor.Parameters()
 	if len(constructorParameters) != 3 {
 		t.Fatalf("pointer constructor parameters = %d, want 3", len(constructorParameters))
 	}
-	for index, name := range []string{pointer.AddressName, "read", "write"} {
+	for index, name := range []string{"$go$getAddress", "read", "write"} {
 		parameter := constructorParameters[index]
 		modifiers := parameter.Modifiers()
 		validModifiers := len(modifiers) == 2 &&
 			modifiers[0].Kind() == tsgo.SyntaxKindPrivateKeyword &&
 			modifiers[1].Kind() == tsgo.SyntaxKindReadonlyKeyword
-		if index == 0 {
-			validModifiers = len(modifiers) == 1 &&
-				modifiers[0].Kind() == tsgo.SyntaxKindReadonlyKeyword
-		}
 		if parameter.Name().(tsgo.Identifier).Text() != name ||
 			!validModifiers {
 			t.Fatalf("pointer constructor parameter %d = %#v", index, parameter)
@@ -160,14 +156,19 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 			t.Errorf("close TS-Go client: %v", err)
 		}
 	})
+	class := pointer.BuildWithCapabilities(
+		factory,
+		pointerClassName(t),
+		panicClassName(t),
+		denseIndexClassName(t),
+		pointer.Capabilities{
+			Projection:   true,
+			Region:       true,
+			UnsafeMemory: true,
+		},
+	).(tsgo.ClassDeclaration)
 	printed, err := client.PrintNode(
-		pointer.BuildWithCapabilities(
-			factory,
-			pointerClassName(t),
-			panicClassName(t),
-			denseIndexClassName(t),
-			pointer.Capabilities{Projection: true},
-		),
+		class,
 		tsgo.PrintOptions{},
 	)
 	if err != nil {
@@ -176,7 +177,10 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 	for _, required := range []string{
 		"export class GoPointer<L, S>",
 		"private static readonly roots: WeakMap<object, object>",
-		"private constructor(readonly $go$address: object",
+		"private $go$resolvedAddress?: object",
+		"private constructor(private readonly $go$getAddress: () => object",
+		"get $go$address(): object",
+		"this.$go$resolvedAddress ??= this.$go$getAddress()",
 		"static cell<L, S>(value: S): GoPointer<L, S>",
 		"static field<L, PL, PS extends object, K extends keyof PS>",
 		"static objectField<L, O extends object, K extends keyof O>",
@@ -198,6 +202,12 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("pointer runtime lacks %q:\n%s", required, printed)
 		}
+	}
+	field := pointerMethod(t, class, pointer.FieldName)
+	fieldReturn := field.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
+	created := fieldReturn.Expression().(tsgo.NewExpression)
+	if created.Arguments()[0].Kind() != tsgo.SyntaxKindArrowFunction {
+		t.Fatalf("field address source = %T, want lazy arrow", created.Arguments()[0])
 	}
 	for _, forbidden := range []string{
 		"any",

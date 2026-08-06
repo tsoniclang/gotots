@@ -101,7 +101,14 @@ func (b builder) unsafeViewMethod() tsgo.MethodDeclaration {
 			b.id(b.className),
 			[]tsgo.TypeNode{typeL, typeS},
 			[]tsgo.Expression{
-				b.id("address"),
+				b.factory.ArrowFunction(
+					nil,
+					nil,
+					nil,
+					nil,
+					b.factory.EqualsGreaterThanToken(),
+					b.id("address"),
+				),
 				b.id("read"),
 				b.id("write"),
 				b.id("region"),

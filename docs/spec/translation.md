@@ -430,6 +430,10 @@ type-switch case bindings. The binding owner emits the carrier; a later address
 or implicit pointer-receiver call may request it, but may never fabricate a
 carrier name at the use site.
 
+Canonical address tokens are created lazily at pointer identity, hash, or
+unsafe boundaries. Constructing, reading, or writing an otherwise ordinary
+carrier does not touch the address-token maps.
+
 ### Interfaces
 
 An interface value is nil or a canonical dynamic-type token plus represented

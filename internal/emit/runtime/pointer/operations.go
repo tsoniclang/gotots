@@ -349,6 +349,14 @@ func (b builder) newPointerWithWriteBodyAndRegion(
 	write []tsgo.Statement,
 	region tsgo.Expression,
 ) tsgo.NewExpression {
+	addressArrow := b.factory.ArrowFunction(
+		nil,
+		nil,
+		nil,
+		nil,
+		b.factory.EqualsGreaterThanToken(),
+		b.factory.ParenthesizedExpression(address),
+	)
 	readArrow := b.factory.ArrowFunction(
 		nil,
 		nil,
@@ -370,7 +378,7 @@ func (b builder) newPointerWithWriteBodyAndRegion(
 		b.factory.EqualsGreaterThanToken(),
 		b.factory.Block(write, true),
 	)
-	arguments := []tsgo.Expression{address, readArrow, writeArrow}
+	arguments := []tsgo.Expression{addressArrow, readArrow, writeArrow}
 	if b.capabilities.Region {
 		if region == nil {
 			region = b.undefined()
@@ -420,8 +428,16 @@ func (b builder) viewMethod() tsgo.MethodDeclaration {
 			nil,
 		),
 		b.factory.ReturnStatement(func() tsgo.Expression {
-			arguments := []tsgo.Expression{
+			address := b.factory.ArrowFunction(
+				nil,
+				nil,
+				nil,
+				nil,
+				b.factory.EqualsGreaterThanToken(),
 				b.property(pointer, AddressName),
+			)
+			arguments := []tsgo.Expression{
+				address,
 				b.property(pointer, "read"),
 				b.property(pointer, "write"),
 			}

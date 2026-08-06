@@ -387,6 +387,11 @@ address comparison, or nil pointer behavior requires it. Read-only scalar
 arguments do not become carriers merely because Go's source type is a pointer
 when the checker and use contract prove direct representation exact.
 
+A carrier's location identity is canonical but demand-materialized: ordinary
+reads and writes do not allocate address tokens or populate identity maps.
+Equality, hashing, and unsafe conversion request the token and cache it on the
+carrier.
+
 ### Unsafe Pointer Memory
 
 `unsafe.Pointer` is a typed compilation policy over the selected toolchain's
