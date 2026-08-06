@@ -63,7 +63,8 @@ Every compilation records an immutable Go build profile:
 Ambient shell values do not silently change selection. The loader uses
 toolchain metadata, not import-path spelling, to distinguish:
 
-- workspace and source-available dependency packages, which are translated;
+- workspace and source-available dependency packages, which are translated
+  unless an exact certified package implementation is selected;
 - standard-library packages, whose declarations come from the selected
   `GOROOT` and whose behavior comes from `gostdlib`;
 - toolchain/language pseudo-packages, which have explicit compiler ownership;
@@ -968,6 +969,46 @@ The publication scope is the exact settled closure, not the entire standard
 library.
 
 ## Package, Runtime, And Target Output
+
+### Project Configuration And Source Implementations
+
+One versioned project-local `gotots.json` is the configuration truth owner.
+The command selects it with `-c` or `--config`; omission means exactly
+`./gotots.json` in the invocation directory. No parent, home, global, ambient
+environment, emitter-local, or package-name configuration path exists.
+Relative source, implementation, output, and report paths resolve from the
+configuration file's directory. Resolution order is typed defaults, project
+file, then explicit CLI values. Unknown fields, versions, identities, and
+conflicting owners fail.
+
+The resolved project is split before compilation into immutable loader,
+compilation, implementation, and output contracts. Emitters receive only the
+typed compilation and certified implementation contracts; they never read
+JSON, flags, paths, or environment variables. The semantic project digest
+includes build and compilation profiles plus implementation contract and
+source digests, but excludes output/report paths.
+
+A certified source implementation owns one exact source package's final target
+module. Certification joins canonical Go module, package, version, selected
+build profile, generated package surface, strict TypeScript export surface,
+implementation source digest, and equivalence envelope. Selection is settled
+once before target files are sealed. The final file set replaces the complete
+generated package module set atomically; no generated body, package state,
+initializer, compatibility wrapper, or fallback for the selected package may
+survive. References keep the ordinary package assembly path and source-facing
+contract.
+
+Authored implementation source is not copied as output text. Pinned TS-Go
+parses it, returns its official external AST encoding, and that typed
+`SourceFile` is carried to the same `printNode` path as generated nodes. The
+compiler never patches or reparses printed output.
+
+An implementation may use private native JavaScript storage and a declared
+equivalence envelope. The envelope is admissible only at the package contract
+owner and must name every intentionally relaxed observable. Exact public
+types, source arity, deterministic behavior, equality/collision obligations,
+and failure boundaries remain mandatory. If a value escapes the proved
+envelope, certification fails rather than silently selecting the replacement.
 
 Each Go package emits deterministic ESM modules plus one package assembly.
 Mutable package variables live in one state module. Checker

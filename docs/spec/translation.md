@@ -830,6 +830,33 @@ name, or call-site heuristics. Unused entries in a certified provider catalog ar
 not compilation overrides. A selected matching source declaration must consume
 exactly one entry or remain an explicit obligation.
 
+### Certified Source-Package Implementations
+
+A project-selected source implementation replaces a coherent package contract,
+not isolated identifiers. It exports the same generated package-assembly names
+and TypeScript types, including demanded storage and operation facets. Callsites
+remain ordinary imports and calls; no policy, bridge, digest, or implementation
+selector is added to a Go callable.
+
+For an internal hash package, Go source such as:
+
+```go
+hash := xxh3.HashString128(text)
+if hash == previous { reuse() }
+```
+
+may be backed by a certified fast deterministic TypeScript hash when the
+selected product proves the numeric hash is not otherwise observed. The target
+still calls `HashString128(text)`, receives the exact generated `Uint128`
+surface, and compares through its normal equality operation. The translated
+unsafe-pointer hash body is absent. If the same value is printed, persisted,
+sent over a protocol, or checked against XXH3 vectors, that envelope is invalid
+and an exact implementation is required.
+
+Package replacement is selected only from the resolved project's certified
+implementation set. Translation handlers never branch on import path,
+package/function spelling, source location, or product identity.
+
 ## Failure
 
 Translation fails at the owning occurrence when:

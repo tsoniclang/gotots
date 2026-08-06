@@ -706,6 +706,37 @@ edges, with both one-sided residual lists reported on every mismatch.
 
 ## Artifact And Cost Review
 
+### Project And Source-Implementation Proof
+
+Configuration tests prove strict versioned decoding, exact `-c`/`--config`
+selection, config-relative paths, defaults < file < CLI precedence, and the
+absence of ancestor/home/environment lookup. A registry-totality test proves
+every semantic CLI switch and JSON field resolve through the same owner.
+Relocating unchanged source and implementation trees preserves the semantic
+digest; changing implementation bytes or its envelope changes it.
+
+For each source implementation, certification independently inspects the
+selected Go package, the ordinary generated package assembly, and the authored
+strict TypeScript project. It exact-joins exported names and checked types,
+parses the authored source through pinned TS-Go, and inspects the final target
+file set. Required mutations alter a Go signature, TypeScript export, package
+identity, build profile, source digest, or envelope; duplicate a generated and
+manual owner; retain one generated package file; or feed text directly to the
+output writer. Each fails at its owning gate.
+
+An equivalence envelope requires product-level evidence. For an internal hash,
+tests prove equal-input stability, unequal-input behavior over an adversarial
+corpus, streaming/one-shot agreement when exposed, collision-safe consumer
+behavior, and unchanged externally observable compiler output. A mutation that
+exports or persists the relaxed hash invalidates the envelope. Exact hash-vector
+comparison is required only when the hash value itself is part of the selected
+observable contract.
+
+Artifact evidence reports removed generated files, source bytes, TS-Go AST
+nodes, strict-typecheck time/RSS, runtime time/RSS, and the top profile frames.
+The selected package must contribute one final implementation module, zero
+translated bodies, and zero unsafe-pointer traffic from the removed package.
+
 Every material checkpoint reports absolute values and parent deltas for:
 
 - Go source and generated TypeScript bytes/tokens/TS-Go AST nodes;
