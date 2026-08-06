@@ -324,7 +324,7 @@ func (n *File) pointerRepresentation(
 	}
 	definition, err := api.NewPointerRepresentationRequest(
 		binding.owner,
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.PointerRepresentationReference{}, err

@@ -151,6 +151,7 @@ type ProviderStatefulProfileCandidate struct {
 }
 
 type ReflectionNames interface {
+	ProviderOwnershipNames
 	ReflectionType(types.Type, *types.TypeName) (NameReference, error)
 	ReflectionOperations(*types.TypeName) (NameReference, error)
 	ReflectionTypeOf(types.Type, *types.TypeName) (NameReference, error)
@@ -164,9 +165,6 @@ type ReflectionNames interface {
 	// ReflectionValueType returns the canonical descriptor reference for
 	// one type while joining its value-operation facet demand.
 	ReflectionValueType(types.Type, *types.TypeName) (NameReference, error)
-	// ProviderOwnedDeclaration reports whether one declaration's truth is
-	// a certified provider facet.
-	ProviderOwnedDeclaration(types.Object) (bool, error)
 }
 
 type UnsafeCodecNames interface {

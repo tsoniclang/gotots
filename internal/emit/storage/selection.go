@@ -47,13 +47,12 @@ func (owner Owner) Read(
 	representation, err := pointertype.Observe(
 		context,
 		types.NewPointer(sourceType),
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
+	if representation.Representation().DirectClass() {
 		value := api.DirectExpression(
 			context.Factory().Identifier(name),
 			representation.Requests()...,
@@ -123,13 +122,12 @@ func (owner Owner) StoreTarget(
 	representation, err := pointertype.Observe(
 		context,
 		types.NewPointer(sourceType),
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, true, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
+	if representation.Representation().DirectClass() {
 		target, err := api.NewStableIdentityStoreTargetEmission(
 			api.DirectExpression(
 				context.Factory().Identifier(name),
@@ -177,13 +175,12 @@ func (Owner) Cell(
 	representation, err := pointertype.Observe(
 		context,
 		types.NewPointer(sourceType),
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
+	if representation.Representation().DirectClass() {
 		return api.NewExpressionEmission(
 			value.Before(),
 			value.Value(),

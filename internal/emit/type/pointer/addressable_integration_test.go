@@ -33,14 +33,14 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(string(runtimeSource), "static fields<") != 1 ||
+	if strings.Contains(string(runtimeSource), "static fields<") ||
 		strings.Contains(string(runtimeSource), "function goPointerFields") {
-		t.Fatalf("pointer field-path runtime ownership is invalid:\n%s", runtimeSource)
+		t.Fatalf("unused pointer field-path runtime was emitted:\n%s", runtimeSource)
 	}
 	for _, required := range []string{
 		"GoPointer.cell",
 		"GoPointer.field",
-		"GoPointer.fields",
+		"GoPointer.objectField",
 		"GoPointer.index",
 		"goSliceAddress",
 		"value$storage",
@@ -68,35 +68,17 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 			t.Fatalf("addressable pointer artifact contains %q:\n%s", forbidden, target)
 		}
 	}
-	for _, fieldPath := range []struct {
-		name           string
-		path           string
-		directBoundary string
-	}{
-		{name: "NestedField", path: "$go$storage.Box.Count"},
-		{
-			name:           "DeepField",
-			path:           "$go$storage.Box.Count",
-			directBoundary: "GoPointer.objectField<Container",
-		},
+	for _, fieldPath := range []struct{ name string }{
+		{name: "NestedField"},
+		{name: "DeepField"},
 	} {
 		body := exportedFunction(t, target, fieldPath.name)
-		if strings.Count(body, "GoPointer.fields") != 2 ||
-			strings.Contains(body, "GoPointer.field<") ||
-			!strings.Contains(body, fieldPath.path) ||
-			!strings.Contains(
-				body,
-				"$go$storage => $go$storage.Box.Count",
-			) ||
-			!strings.Contains(
-				body,
-				"($go$storage, $go$next) => "+
-					"$go$storage.Box.Count = $go$next",
-			) ||
-			(fieldPath.directBoundary != "" &&
-				!strings.Contains(body, fieldPath.directBoundary)) {
+		if strings.Contains(body, "GoPointer.fields") ||
+			!strings.Contains(body, "GoPointer.field<") ||
+			!strings.Contains(body, "GoPointer.objectField") ||
+			!strings.Contains(body, "$storageOf") {
 			t.Fatalf(
-				"%s did not use one flat location per address:\n%s",
+				"%s did not use its stable direct parent location:\n%s",
 				fieldPath.name,
 				body,
 			)

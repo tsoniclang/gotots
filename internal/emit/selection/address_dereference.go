@@ -42,7 +42,7 @@ func dereferencePointer(
 	representation, err := pointertype.Observe(
 		context,
 		types.NewPointer(element),
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
@@ -59,8 +59,7 @@ func dereferencePointer(
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
+	if representation.Representation().DirectClass() {
 		emission, err := api.NewExpressionEmission(
 			pointer.Before(),
 			pointerruntime.Direct(

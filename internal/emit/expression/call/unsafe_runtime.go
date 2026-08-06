@@ -119,7 +119,11 @@ func unsafePointerTypeArguments(
 			Reason: "unsafe runtime pointer type is nil",
 		}
 	}
-	representation, err := pointertype.Observe(context, pointer, true)
+	representation, err := pointertype.Observe(
+		context,
+		pointer,
+		api.PointerRepresentationDemandDynamicLocation,
+	)
 	if err != nil {
 		return api.TypeEmission{}, api.TypeEmission{}, nil, err
 	}
@@ -137,6 +141,13 @@ func unsafePointerTypeArguments(
 		pointer.Elem(),
 		representation,
 	)
+	if representation.Representation().DirectClass() {
+		storage, err = context.Values().StorageType(
+			context.WithRole(api.RoleStorageType),
+			source,
+			pointer.Elem(),
+		)
+	}
 	if err != nil {
 		return api.TypeEmission{}, api.TypeEmission{}, nil, err
 	}

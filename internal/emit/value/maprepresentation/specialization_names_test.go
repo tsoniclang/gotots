@@ -34,6 +34,12 @@ func (staticSpecializationNames) DefinedValueRepresentation(
 	)
 }
 
+func (staticSpecializationNames) ProviderOwnedDeclaration(
+	types.Object,
+) (bool, error) {
+	return false, nil
+}
+
 func (staticSpecializationNames) TypeReference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }

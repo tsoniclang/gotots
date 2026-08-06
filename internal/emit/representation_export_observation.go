@@ -16,7 +16,7 @@ import (
 func (e *emitter) ObservePointerRepresentation(
 	consumer api.ArtifactOwner,
 	artifact *api.GeneratedArtifact,
-	carrierDemand bool,
+	demand api.PointerRepresentationDemand,
 ) (api.PointerRepresentationObservation, error) {
 	if e.pointer == nil {
 		return api.PointerRepresentationObservation{}, &api.InvariantError{
@@ -26,14 +26,14 @@ func (e *emitter) ObservePointerRepresentation(
 	return e.pointer.ObservePointerRepresentation(
 		consumer,
 		artifact,
-		carrierDemand,
+		demand,
 	)
 }
 
 func (s *programSession) ObservePointerRepresentation(
 	consumer api.ArtifactOwner,
 	artifact *api.GeneratedArtifact,
-	carrierDemand bool,
+	demand api.PointerRepresentationDemand,
 ) (api.PointerRepresentationObservation, error) {
 	if !consumer.Valid() {
 		return api.PointerRepresentationObservation{}, &ScheduleError{
@@ -47,28 +47,33 @@ func (s *programSession) ObservePointerRepresentation(
 	if err != nil {
 		return api.PointerRepresentationObservation{}, err
 	}
-	if carrierDemand {
-		representation = api.PointerRepresentationCarrierCanonical
-	} else {
-		for _, requirement := range s.requirements.appliedFor(
-			api.MustGeneratedArtifactOwner(artifact),
-		) {
-			selected, carrier, ok := requirement.PointerRepresentation()
-			if !ok || selected != artifact {
-				return api.PointerRepresentationObservation{}, &ScheduleError{
-					Object: artifact.TargetName(),
-					Reason: "pointer representation has a foreign requirement",
-				}
-			}
-			if carrier {
-				representation =
-					api.PointerRepresentationCarrierCanonical
+	stableLocation := demand == api.PointerRepresentationDemandStableLocation
+	dynamicLocation := demand == api.PointerRepresentationDemandDynamicLocation
+	for _, requirement := range s.requirements.appliedFor(
+		api.MustGeneratedArtifactOwner(artifact),
+	) {
+		selected, appliedDemand, ok := requirement.PointerRepresentation()
+		if !ok || selected != artifact {
+			return api.PointerRepresentationObservation{}, &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "pointer representation has a foreign requirement",
 			}
 		}
+		stableLocation = stableLocation ||
+			appliedDemand == api.PointerRepresentationDemandStableLocation
+		dynamicLocation = dynamicLocation ||
+			appliedDemand == api.PointerRepresentationDemandDynamicLocation
+	}
+	if dynamicLocation ||
+		representation != api.PointerRepresentationDirectClass && stableLocation {
+		representation = api.PointerRepresentationCarrierCanonical
+	} else if representation == api.PointerRepresentationDirectClass &&
+		stableLocation {
+		representation = api.PointerRepresentationDirectClassStorageIdentity
 	}
 	var requests []api.RootRequest
-	if carrierDemand {
-		request, err := api.NewPointerRepresentationRequest(artifact, true)
+	if demand != api.PointerRepresentationDemandNone {
+		request, err := api.NewPointerRepresentationRequest(artifact, demand)
 		if err != nil {
 			return api.PointerRepresentationObservation{}, err
 		}

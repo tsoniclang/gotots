@@ -415,16 +415,27 @@ func NewLexicalGenericCapabilityArtifact(
 type PointerRepresentation uint8
 
 const (
-	PointerRepresentationInvalid          PointerRepresentation = 0
-	PointerRepresentationDirectClass      PointerRepresentation = 1
-	PointerRepresentationCarrierLogical   PointerRepresentation = 2
-	PointerRepresentationCarrierCanonical PointerRepresentation = 3
+	PointerRepresentationInvalid                    PointerRepresentation = 0
+	PointerRepresentationDirectClass                PointerRepresentation = 1
+	PointerRepresentationCarrierLogical             PointerRepresentation = 2
+	PointerRepresentationCarrierCanonical           PointerRepresentation = 3
+	PointerRepresentationDirectClassStorageIdentity PointerRepresentation = 4
 )
 
 func (r PointerRepresentation) Valid() bool {
 	return r == PointerRepresentationDirectClass ||
 		r == PointerRepresentationCarrierLogical ||
-		r == PointerRepresentationCarrierCanonical
+		r == PointerRepresentationCarrierCanonical ||
+		r == PointerRepresentationDirectClassStorageIdentity
+}
+
+func (r PointerRepresentation) DirectClass() bool {
+	return r == PointerRepresentationDirectClass ||
+		r == PointerRepresentationDirectClassStorageIdentity
+}
+
+func (r PointerRepresentation) UsesStorageIdentity() bool {
+	return r == PointerRepresentationDirectClassStorageIdentity
 }
 
 func (r PointerRepresentation) String() string {
@@ -435,6 +446,8 @@ func (r PointerRepresentation) String() string {
 		return "carrier-logical"
 	case PointerRepresentationCarrierCanonical:
 		return "carrier-canonical"
+	case PointerRepresentationDirectClassStorageIdentity:
+		return "direct-class-storage-identity"
 	default:
 		return "invalid"
 	}
@@ -445,10 +458,7 @@ type PointerRepresentationReference struct {
 	requests []RootRequest
 }
 
-func NewPointerRepresentationReference(
-	artifact *GeneratedArtifact,
-	requests ...RootRequest,
-) (PointerRepresentationReference, error) {
+func NewPointerRepresentationReference(artifact *GeneratedArtifact, requests ...RootRequest) (PointerRepresentationReference, error) {
 	if _, ok := artifact.PointerRepresentation(); !ok {
 		return PointerRepresentationReference{}, &RootRequestError{
 			Reason: "pointer-representation reference is invalid",
@@ -478,10 +488,7 @@ type PointerRepresentationObservation struct {
 	requests       []RootRequest
 }
 
-func NewPointerRepresentationObservation(
-	representation PointerRepresentation,
-	requests ...RootRequest,
-) (PointerRepresentationObservation, error) {
+func NewPointerRepresentationObservation(representation PointerRepresentation, requests ...RootRequest) (PointerRepresentationObservation, error) {
 	if !representation.Valid() {
 		return PointerRepresentationObservation{}, &RootRequestError{
 			Reason: "pointer-representation observation is invalid",
@@ -502,40 +509,40 @@ func (o PointerRepresentationObservation) Representation() PointerRepresentation
 	return o.representation
 }
 
+func (o PointerRepresentationObservation) UsesStorageIdentity() bool {
+	return o.representation.UsesStorageIdentity()
+}
+
 func (o PointerRepresentationObservation) Requests() []RootRequest {
 	return slices.Clone(o.requests)
 }
 
-type GeneratedArtifactPlacementError struct {
-	TypeName string
-	Reason   string
+type PointerRepresentationDemand uint8
+
+const (
+	PointerRepresentationDemandInvalid PointerRepresentationDemand = iota
+	PointerRepresentationDemandNone
+	PointerRepresentationDemandStableLocation
+	PointerRepresentationDemandDynamicLocation
+)
+
+func (d PointerRepresentationDemand) Valid() bool {
+	return d == PointerRepresentationDemandNone ||
+		d == PointerRepresentationDemandStableLocation ||
+		d == PointerRepresentationDemandDynamicLocation
 }
 
-func (e *GeneratedArtifactPlacementError) Error() string {
-	if e.TypeName == "" {
-		return "place generated type: " + e.Reason
+func (d PointerRepresentationDemand) String() string {
+	switch d {
+	case PointerRepresentationDemandNone:
+		return "none"
+	case PointerRepresentationDemandStableLocation:
+		return "stable-location"
+	case PointerRepresentationDemandDynamicLocation:
+		return "dynamic-location"
+	default:
+		return "invalid"
 	}
-	return fmt.Sprintf(
-		"place generated type containing %q: %s",
-		e.TypeName,
-		e.Reason,
-	)
-}
-
-type GeneratedArtifactShapeError struct {
-	Artifact string
-	Reason   string
-}
-
-func (e *GeneratedArtifactShapeError) Error() string {
-	if e.Artifact == "" {
-		return "emit generated type: " + e.Reason
-	}
-	return fmt.Sprintf(
-		"emit generated type %q: %s",
-		e.Artifact,
-		e.Reason,
-	)
 }
 
 type GeneratedArtifactError struct {

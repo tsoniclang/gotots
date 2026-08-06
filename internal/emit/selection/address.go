@@ -105,6 +105,49 @@ func FieldStoreTarget(
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	fieldRepresentation, err := pointertype.Observe(
+		context,
+		types.NewPointer(field.Type()),
+		api.PointerRepresentationDemandNone,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	if fieldRepresentation.Representation().DirectClass() &&
+		fieldRepresentation.UsesStorageIdentity() {
+		fieldValue, fieldType, err := projectFieldValue(
+			context,
+			children,
+			source,
+			receiverType,
+			receiver,
+			field,
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		if !types.Identical(fieldType, field.Type()) {
+			return api.StoreTargetEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "stable struct-field target projected the wrong type",
+			}
+		}
+		fieldValue, err = api.NewExpressionEmission(
+			fieldValue.Before(),
+			fieldValue.Value(),
+			api.CombineRequests(
+				fieldValue.Requests(),
+				fieldRepresentation.Requests(),
+			),
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		return api.NewStableIdentityStoreTargetEmission(
+			fieldValue,
+			field.Type(),
+		)
+	}
 	receiver, err = joinNominalFieldCallableABI(
 		context,
 		receiverType,
@@ -359,10 +402,50 @@ func projectFieldPointer(
 	fieldRepresentation, err := pointertype.Observe(
 		fieldContext,
 		types.NewPointer(field.Type()),
-		true,
+		api.PointerRepresentationDemandStableLocation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if fieldRepresentation.Representation().DirectClass() {
+		logicalParent := parent
+		if !parentDirect {
+			logicalParent, _, err = dereferenceValue(
+				context,
+				children,
+				source,
+				types.NewPointer(parentType),
+				parent,
+			)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+		}
+		projected, projectedType, err := projectFieldValue(
+			context,
+			children,
+			source,
+			parentType,
+			logicalParent,
+			field,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !types.Identical(projectedType, field.Type()) {
+			return api.ExpressionEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "direct struct-field pointer projected the wrong type",
+			}
+		}
+		return api.NewExpressionEmission(
+			projected.Before(),
+			projected.Value(),
+			api.CombineRequests(
+				projected.Requests(),
+				fieldRepresentation.Requests(),
+			),
+		)
 	}
 	fieldType, err := children.RepresentedType(
 		fieldContext.WithRole(api.RoleFieldReceiver),
@@ -400,7 +483,7 @@ func projectFieldPointer(
 		parentRepresentation, representationErr := pointertype.Observe(
 			fieldContext,
 			types.NewPointer(parentType),
-			true,
+			api.PointerRepresentationDemandStableLocation,
 		)
 		if representationErr != nil {
 			return api.ExpressionEmission{}, representationErr

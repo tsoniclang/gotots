@@ -145,25 +145,21 @@ func (owner Owner) Equal(
 		representation, err := owner.PointerRepresentation(
 			context,
 			pointer,
-			false,
+			api.PointerRepresentationDemandNone,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		if representation.Representation() ==
-			api.PointerRepresentationDirectClass {
-			return api.DirectExpression(
-				context.Factory().BinaryExpression(
-					nil,
-					left,
-					nil,
-					context.Factory().BinaryOperatorToken(
-						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-					),
-					right,
-				),
-				representation.Requests()...,
-			), nil
+		if representation.Representation().DirectClass() {
+			return owner.directClassPointerEqual(
+				context,
+				source,
+				pointer.Elem(),
+				left,
+				right,
+				representation.UsesStorageIdentity(),
+				representation.Requests(),
+			)
 		}
 		reference, err := context.Names().Runtime(
 			api.RuntimePointer,
@@ -229,4 +225,137 @@ func (owner Owner) Equal(
 		api.NamedStructOperationEqual,
 		[]tsgo.Expression{left, right},
 	)
+}
+
+func (owner Owner) directClassPointerEqual(
+	context api.Context,
+	source ast.Node,
+	element types.Type,
+	left tsgo.Expression,
+	right tsgo.Expression,
+	requiresStorageIdentity bool,
+	requests []api.RootRequest,
+) (api.ExpressionEmission, error) {
+	usesStorageIdentity := false
+	if requiresStorageIdentity {
+		var err error
+		usesStorageIdentity, err = owner.directPointerUsesStorageIdentity(
+			context,
+			element,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	if !usesStorageIdentity {
+		return api.DirectExpression(
+			context.Factory().BinaryExpression(
+				nil,
+				left,
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+				),
+				right,
+			),
+			requests...,
+		), nil
+	}
+	before := make([]tsgo.Statement, 0, 2)
+	var err error
+	left, before, err = captureEqualityValue(context, left, before)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	right, before, err = captureEqualityValue(context, right, before)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	leftStorage, err := owner.ToStorage(
+		context.WithRole(api.RoleBinaryLeft),
+		source,
+		element,
+		api.DirectExpression(left),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	rightStorage, err := owner.ToStorage(
+		context.WithRole(api.RoleBinaryRight),
+		source,
+		element,
+		api.DirectExpression(right),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if len(leftStorage.Before()) != 0 || len(rightStorage.Before()) != 0 {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "direct pointer equality produced deferred storage work",
+		}
+	}
+	undefined := context.Factory().Identifier("undefined")
+	strict := func(left tsgo.Expression, operator tsgo.BinaryOperator, right tsgo.Expression) tsgo.Expression {
+		return context.Factory().BinaryExpression(
+			nil,
+			left,
+			nil,
+			context.Factory().BinaryOperatorToken(operator),
+			right,
+		)
+	}
+	identity := strict(left, tsgo.BinaryOperatorEqualsEqualsEqualsToken, right)
+	sameStorage := strict(
+		leftStorage.Value(),
+		tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+		rightStorage.Value(),
+	)
+	nonNil := strict(left, tsgo.BinaryOperatorExclamationEqualsEqualsToken, undefined)
+	nonNil = strict(
+		nonNil,
+		tsgo.BinaryOperatorAmpersandAmpersandToken,
+		strict(right, tsgo.BinaryOperatorExclamationEqualsEqualsToken, undefined),
+	)
+	nonNil = strict(
+		nonNil,
+		tsgo.BinaryOperatorAmpersandAmpersandToken,
+		sameStorage,
+	)
+	return api.NewExpressionEmission(
+		before,
+		strict(identity, tsgo.BinaryOperatorBarBarToken, nonNil),
+		api.CombineRequests(
+			leftStorage.Requests(),
+			rightStorage.Requests(),
+			requests,
+		),
+	)
+}
+
+func captureEqualityValue(
+	context api.Context,
+	value tsgo.Expression,
+	before []tsgo.Statement,
+) (tsgo.Expression, []tsgo.Statement, error) {
+	if value.Kind() == tsgo.SyntaxKindIdentifier {
+		return value, before, nil
+	}
+	name, err := context.Names().Temporary(api.TemporaryEqualityOperand)
+	if err != nil {
+		return nil, nil, err
+	}
+	before = append(before, context.Factory().VariableStatement(
+		nil,
+		context.Factory().VariableDeclarationList(
+			[]tsgo.VariableDeclaration{context.Factory().VariableDeclaration(
+				context.Factory().Identifier(name),
+				nil,
+				nil,
+				value,
+			)},
+			tsgo.NodeFlagsConst,
+		),
+	))
+	return context.Factory().Identifier(name), before, nil
 }

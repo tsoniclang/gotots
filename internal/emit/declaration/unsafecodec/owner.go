@@ -41,7 +41,11 @@ func Build(
 		names:    names,
 	}
 	if pointer, pointerOK := pointerSource(sourceType); pointerOK {
-		selection, err := pointertype.Observe(context, pointer, true)
+		selection, err := pointertype.Observe(
+			context,
+			pointer,
+			api.PointerRepresentationDemandDynamicLocation,
+		)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -102,16 +106,13 @@ func (b *builder) storageType(sourceType types.Type) (tsgo.TypeNode, error) {
 	selection, err := pointertype.Observe(
 		b.context,
 		types.NewPointer(sourceType),
-		true,
+		api.PointerRepresentationDemandDynamicLocation,
 	)
 	if err != nil {
 		return nil, err
 	}
 	target, err := b.context.ContainerStorage().PointerStorageType(
-		b.context.WithRole(api.RoleStorageType),
-		nil,
-		sourceType,
-		selection,
+		b.context.WithRole(api.RoleStorageType), nil, sourceType, selection,
 	)
 	if err != nil {
 		return nil, err

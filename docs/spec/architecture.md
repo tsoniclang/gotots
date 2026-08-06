@@ -387,6 +387,33 @@ address comparison, or nil pointer behavior requires it. Read-only scalar
 arguments do not become carriers merely because Go's source type is a pointer
 when the checker and use contract prove direct representation exact.
 
+A pointer to a represented named struct uses the represented class reference
+plus `undefined` only while every selected origin is stable. A local or fresh
+class object is self-identifying: dereference is a nil guard, assignment mutates
+that object, equality/hash use object identity, and no storage facet is emitted.
+An origin that can reconstruct a wrapper over an existing location (`&field`,
+`&packageVariable`, or conversion between layout-identical pointer types)
+selects the distinct direct-storage-identity outcome. Only then does the class
+own canonical mutable storage, whole-value assignment recursively preserve
+demanded child storage, and equality/hash use storage identity. Provider-owned
+canonical classes retain certified object identity rather than demanding a
+generated storage facet.
+
+Pointer-origin demand is a closed semantic disposition joined at the canonical
+pointer-family artifact. Ordinary transport and a local/fresh direct class
+origin have no additional location demand because the object itself is the
+stable identity. A package location, selected field, or layout-preserving
+pointer conversion demands stable storage identity. A slice/array element
+address or unsafe live-memory view is dynamic because later access must resolve
+the then-current container element or byte-backed storage. One dynamic origin
+promotes that pointer family to its canonical typed carrier and reconstructs
+all dependent signatures and uses. It is not materialized only at the boundary:
+that would split one Go pointer identity into unsynchronized representations.
+A stable origin never promotes an otherwise-direct named-struct family to a
+carrier, while scalar and other already-carried families remain carriers.
+Pointer-to-pointer mutation retains a carrier for the outer pointer. No package,
+function, or spelling exception selects representation.
+
 A carrier's location identity is canonical but demand-materialized: ordinary
 reads and writes do not allocate address tokens or populate identity maps.
 Equality, hashing, and unsafe conversion request the token and cache it on the
@@ -396,15 +423,17 @@ unsafe support must not add a branch to every ordinary pointer read and write;
 composed field and index locations call the parent's active access function
 directly.
 
-A contiguous carrier-backed field-address path has one location object, not
-one location per selector. The address owner consumes the maximal typed path
-and emits direct root-to-leaf read and write projections. It splits the path at
-pointer dereference, direct-object, provider, or indexed-representation
-boundaries. The projections read the current root storage on every access; an
-intermediate aggregate is never cached, because replacing the root aggregate
-must remain visible through an existing Go field pointer. Canonical address
-tokens follow the same ordered field path and remain lazy. Generated code does
-not interpret an erased or dynamically typed property path.
+A contiguous carrier field-address path has one location object, not one per
+selector. The address owner consumes the maximal typed path and emits direct
+root-to-leaf read and write projections. A carrier root uses its active
+read/write functions. A stable direct named-struct child address instead uses
+the child class whose canonical storage is preserved recursively by every
+assignment to its owning field or aggregate. The carrier path splits at pointer
+dereference, provider, or indexed-representation boundaries. Its projections
+read the current root storage on every access; an intermediate aggregate is
+never cached. Canonical address tokens follow the same ordered field path and
+remain lazy. Generated code does not interpret an erased or dynamically typed
+property path.
 
 A class-member-only runtime facility is selected by one typed runtime-feature
 request. The request emits no import and owns no duplicate top-level runtime

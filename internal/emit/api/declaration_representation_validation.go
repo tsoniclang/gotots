@@ -32,7 +32,7 @@ func (r DeclarationRequirement) Valid() bool {
 		return false
 	}
 	if r.kind != DeclarationRequirementPointerRepresentation &&
-		r.pointerCarrier {
+		r.pointerDemand != PointerRepresentationDemandInvalid {
 		return false
 	}
 	if r.kind != DeclarationRequirementGenericConcretization &&
@@ -311,7 +311,7 @@ func (r DeclarationRequirement) Valid() bool {
 			GeneratedArtifactCallableABI,
 		)
 	case DeclarationRequirementPointerRepresentation:
-		return r.validGeneratedDefinition(
+		return r.pointerDemand.Valid() && r.validGeneratedDefinition(
 			GeneratedArtifactPointerRepresentation,
 		)
 	case DeclarationRequirementProviderInterfaceBridge:

@@ -105,7 +105,7 @@ func emitValueOperation(
 			canonicalStorage,
 		)
 	case api.NamedStructOperationAssign:
-		member = assignMethod(
+		member, requests, err = assignMethod(
 			context,
 			memberName,
 			classType,

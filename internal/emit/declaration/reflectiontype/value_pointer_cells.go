@@ -29,7 +29,7 @@ func pointerCellValueProperties(
 	representation, err := pointertype.Observe(
 		context,
 		types.NewPointer(pointee),
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return nil, err

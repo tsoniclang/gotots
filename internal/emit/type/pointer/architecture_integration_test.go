@@ -67,7 +67,12 @@ fmt.Println(pointer.Boolean(true))
 `,
 	)
 	if tsOutput != goOutput {
-		t.Fatalf("TypeScript output = %q, Go output = %q", tsOutput, goOutput)
+		t.Fatalf(
+			"TypeScript output = %q, Go output = %q:\n%s",
+			tsOutput,
+			goOutput,
+			typescript,
+		)
 	}
 	for _, required := range []string{
 		"function NewBox(value: int32): Box | undefined",
@@ -81,14 +86,92 @@ fmt.Println(pointer.Boolean(true))
 	}
 	for _, forbidden := range []string{
 		"GoPointer<Box",
-		"Box$Storage",
 		"GoPointer.cell<Box",
+		"type Box$Storage",
+		"Box.$storageOf(",
 		"goPointerHash",
 		"any",
 		"unknown",
 	} {
 		if strings.Contains(typescript, forbidden) {
 			t.Fatalf("direct pointer output contains %q:\n%s", forbidden, typescript)
+		}
+	}
+}
+
+func TestStableNamedStructLocationsPreserveCanonicalStorage(
+	t *testing.T,
+) {
+	source := `package pointerarchitecture
+
+type Child struct { Value int32 }
+type Parent struct { Child Child }
+
+var Global = Parent{Child: Child{Value: 1}}
+
+func Nested(value int32) (int32, bool) {
+	parent := Parent{Child: Child{Value: value}}
+	pointer := &parent.Child
+	parent = Parent{Child: Child{Value: value + 1}}
+	pointer.Value++
+	return parent.Child.Value, pointer == &parent.Child
+}
+
+func Field(value int32) (int32, bool) {
+	parent := Parent{Child: Child{Value: value}}
+	pointer := &parent.Child
+	parent.Child = Child{Value: value + 2}
+	pointer.Value++
+	return parent.Child.Value, pointer == &parent.Child
+}
+
+func Package(value int32) (int32, bool) {
+	pointer := &Global.Child
+	Global = Parent{Child: Child{Value: value}}
+	pointer.Value++
+	return Global.Child.Value, pointer == &Global.Child
+}
+`
+	typescript, goOutput, tsOutput := compileAndRunPointerArchitecture(
+		t,
+		source,
+		`import "__INITIALIZE__";
+import { Field, Nested, Package } from "__SOURCE__";
+
+console.log(...Nested(40));
+console.log(...Field(50));
+console.log(...Package(60));
+`,
+		`fmt.Println(pointer.Nested(40))
+fmt.Println(pointer.Field(50))
+fmt.Println(pointer.Package(60))
+`,
+	)
+	if tsOutput != goOutput {
+		t.Fatalf(
+			"TypeScript output = %q, Go output = %q:\n%s",
+			tsOutput,
+			goOutput,
+			typescript,
+		)
+	}
+	for _, required := range []string{
+		"let pointer: Child | undefined",
+		"Child.$assign($target.Child, $value.Child)",
+		"Child.$storageOf(pointer) === Child.$storageOf",
+	} {
+		if !strings.Contains(typescript, required) {
+			t.Fatalf("stable struct-pointer output lacks %q:\n%s", required, typescript)
+		}
+	}
+	for _, forbidden := range []string{
+		"GoPointer<Child",
+		"GoPointer.cell<Child",
+		"any",
+		"unknown",
+	} {
+		if strings.Contains(typescript, forbidden) {
+			t.Fatalf("stable struct-pointer output contains %q:\n%s", forbidden, typescript)
 		}
 	}
 }
@@ -189,7 +272,7 @@ fmt.Println(pointer.StringPointer("ok").Value)
 		"function DirectInt(value: int32): GoPointer<Box<int32",
 		"RuntimeSlice.literal<Box$Storage<int32>>",
 		"goSliceAddress<Box<int32",
-		"GoPointer.view<Left, Right",
+		"Right.$fromStorage(Left.$storageOf(left))",
 		"goPointerHash",
 		"function StringPointer(value: gostring): GoPointer<Box<gostring>, Box$Storage<gostring>>",
 	} {
@@ -198,6 +281,7 @@ fmt.Println(pointer.StringPointer("ok").Value)
 		}
 	}
 	for _, forbidden := range []string{
+		"GoPointer.view<Left, Right",
 		"GoPointer.optionalStorage",
 		"indexView",
 		"AddressView",
@@ -273,13 +357,13 @@ fmt.Println(pointer.GenericNil())
 	}
 	if !strings.Contains(
 		typescript,
-		"static Put$kernel<T>(s: GoPointer<Shelf<T>, Shelf$Storage<T>>",
+		"static Put$kernel<T>(s: Shelf<T> | undefined",
 	) || !strings.Contains(
 		typescript,
 		"Put$concrete_",
 	) || !strings.Contains(
 		typescript,
-		"GoPointer.objectField<Shelf<int32>",
+		"GoPointer.direct<Store>(store$storage).Shelf",
 	) {
 		t.Fatalf(
 			"generic receiver did not use its declaration ABI:\n%s",
@@ -356,9 +440,9 @@ fmt.Println(pointer.ForeignAdapter().Ready())
 	}
 	if !strings.Contains(
 		typescript,
-		"static Set$kernel<K, V>(ledger: GoPointer<Ledger<K, V>, Ledger$Storage<K, V>>",
+		"static Set$kernel<K, V>(ledger: Ledger<K, V> | undefined",
 	) {
-		t.Fatalf("foreign generic method lacks the family carrier ABI:\n%s", typescript)
+		t.Fatalf("foreign generic method lacks the direct family ABI:\n%s", typescript)
 	}
 	if !strings.Contains(typescript, "class $goInterfaceAdapter_") {
 		t.Fatalf("foreign generic adapter was not emitted:\n%s", typescript)
@@ -434,7 +518,10 @@ func compileAndRunPointerArchitectureFiles(
 	writeFile(
 		t,
 		runnerPath,
-		strings.ReplaceAll(runner, "__SOURCE__", sourceModule),
+		strings.NewReplacer(
+			"__SOURCE__", sourceModule,
+			"__INITIALIZE__", artifacts.programInitialization,
+		).Replace(runner),
 	)
 	tsOutput := executeMaterializedTypeScript(
 		t,

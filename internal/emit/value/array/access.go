@@ -117,13 +117,17 @@ func (a RuntimeArray) EmitStoreTarget(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewContainerStorageAccessorStoreTargetEmission(
+	target, err := api.NewContainerStorageAccessorStoreTargetEmission(
 		targetReceiver,
 		arraymember.Get.Name(),
 		arraymember.Set.Name(),
 		[]api.ExpressionEmission{index},
 		a.ElementType(),
 	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	return target, nil
 }
 
 func (a RuntimeArray) EmitLength(

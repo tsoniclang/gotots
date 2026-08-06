@@ -424,6 +424,27 @@ proves that doing so cannot change Go behavior; uncertainty retains the
 carrier. Representation is selected once and propagated to all users through
 observable facets.
 
+Pointers to represented named structs use the class reference plus `undefined`
+when all observed origins are stable. For example, `func Read(p *Node) int {
+return p.Pos }` receives `Node | undefined`. A local/fresh `*Node` is the class
+object itself and compares/hashes by object identity without a storage facet.
+`func Child(p *Node) *Child { return &p.Child }` can reconstruct a `Child`
+wrapper, so that family selects direct storage identity. Assigning either the
+field or the whole `Node` then recursively updates the demanded child storage,
+and the returned pointer observes the replacement. Certified provider classes
+retain provider object identity.
+
+The pointer-family owner joins closed origin demands. `&local` and `&T{...}`
+already have stable class-object identity. `&pkg.Value`, `&value.Field`, and
+layout-preserving pointer conversion demand stable storage identity.
+`&slice[i]`, `&array[i]`, and a live unsafe byte view are dynamic locations and
+select one canonical typed carrier for every use of that pointer family. For
+example, after `p := &slice[0]; slice[0] = next`, `p` must read `next`; a class
+wrapper detached from the index cannot preserve that behavior. Unsafe mutation
+likewise cannot be confined to an ephemeral boundary carrier because later
+direct reads must observe it. Selection is semantic and type-owned, never an
+escape heuristic or a package-specific override.
+
 Storage demand is joined back to the declaration of every addressable binding,
 including parameters, locals, named results, range variables, and implicit
 type-switch case bindings. The binding owner emits the carrier; a later address
@@ -440,10 +461,12 @@ Nested selectors whose address remains in one carrier representation lower to
 one root-linked location with typed direct property projections. For example,
 `&outer.middle.value` reads and writes `root.middle.value` through the current
 root storage and derives the lazy identity `root -> middle -> value`; it does
-not allocate nested field-location carriers. A representation boundary ends
-the projection and starts a new exact location segment. Encountering the flat
-segment records the typed pointer field-path runtime feature; programs without
-such a segment do not emit the supporting class member.
+not allocate nested field-location carriers. A stable direct named-struct child
+uses its existing class storage instead. A representation boundary ends the
+projection and starts a new exact location segment. Encountering a
+carrier-rooted flat segment records the typed pointer field-path runtime
+feature; programs without such a segment do not emit the supporting class
+member.
 
 ### Interfaces
 

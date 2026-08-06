@@ -33,7 +33,7 @@ type DeclarationRequirement struct {
 	genericParameter       *types.TypeParam
 	genericFacet           GenericRepresentationFacet
 	typeRepresentation     TypeRepresentationFacet
-	pointerCarrier         bool
+	pointerDemand          PointerRepresentationDemand
 	concretizationDeferred bool
 	enclosing              ast.Node
 	callable               ast.Node

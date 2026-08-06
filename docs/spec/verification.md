@@ -774,6 +774,26 @@ intermediate fields. Artifact checks require one location per maximal carrier
 segment, require one root access plus one direct projection, and reject
 restored nested field-location construction.
 
+Named-struct pointer fixtures independently cover direct parameter/receiver
+transport, nil panic, pointer equality/hash, interface boxing, `&field`,
+promoted deep fields, whole-value `*p = next`, copying before address-taking,
+pointer-to-pointer rebinding, package-variable replacement, nested child
+replacement, array/slice element replacement, and safe/unsafe alias
+synchronization. Generated artifact checks require stable-only `*Struct`
+signatures and calls to use the class reference directly, require recursive
+stable assignment to preserve child storage, and require any dynamic container
+or unsafe origin to reconstruct that pointer family as one canonical carrier.
+Local/fresh-only controls require direct object equality/hash and reject an
+unused generated storage facet; field/package/conversion controls require the
+direct-storage-identity outcome and its storage facet.
+Provider controls must not request a generated storage facet merely to compare
+or hash a direct provider pointer. Mutations that collapse stable and dynamic
+demand, rebind instead of stable-assigning, compare generated wrappers by
+wrapper identity, compare provider values through generated storage, cache an
+intermediate carrier aggregate, or confine unsafe aliasing to an ephemeral
+boundary carrier must fail at the representation, differential, provider, or
+strict-typecheck gate.
+
 Runtime-feature tests exact-join the final feature requests to assembled class
 members. A no-flat-path control retains the prior pointer member count, while a
 flat-path fixture adds exactly the field-path member without adding an import

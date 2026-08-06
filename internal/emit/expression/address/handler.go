@@ -153,7 +153,7 @@ func packageVariable(
 	representation, err := pointertype.Observe(
 		context,
 		types.NewPointer(variableType),
-		true,
+		api.PointerRepresentationDemandStableLocation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -161,6 +161,28 @@ func packageVariable(
 	target, err := context.Names().PackageVariable(variable)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if representation.Representation().DirectClass() {
+		logical, err := context.Values().FromStorage(
+			context.WithRole(api.RoleUnaryOperand),
+			source,
+			variableType,
+			api.DirectExpression(
+				target.Expression(context.Factory()),
+				target.Requests()...,
+			),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			logical.Before(),
+			logical.Value(),
+			api.CombineRequests(
+				logical.Requests(),
+				representation.Requests(),
+			),
+		)
 	}
 	logicalType, err := children.RepresentedType(
 		context.WithRole(api.RoleUnaryOperand),

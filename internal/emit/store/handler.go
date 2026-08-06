@@ -187,13 +187,13 @@ func canonicalPointerTarget(
 	representation, err := pointertype.Observe(
 		context,
 		types.NewPointer(element),
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
+	if representation.Representation().DirectClass() &&
+		representation.UsesStorageIdentity() {
 		logical, err := children.RepresentedType(
 			context.WithRole(api.RoleAssignmentTarget),
 			source,
@@ -333,13 +333,17 @@ func sliceIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewContainerStorageAccessorStoreTargetEmission(
+	target, err := api.NewContainerStorageAccessorStoreTargetEmission(
 		receiver,
 		runtimeslice.MemberName(runtimeslice.MemberGet),
 		runtimeslice.MemberName(runtimeslice.MemberSet),
 		[]api.ExpressionEmission{index},
 		elementType,
 	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	return target, nil
 }
 
 func mapIndex(
@@ -508,9 +512,49 @@ func packageVariable(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
+	representation, err := pointertype.Observe(
+		context,
+		types.NewPointer(variable.Type()),
+		api.PointerRepresentationDemandNone,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	if representation.Representation().DirectClass() {
+		logical, err := context.Values().FromStorage(
+			context.WithRole(api.RoleAssignmentTarget),
+			nil,
+			variable.Type(),
+			api.DirectExpression(
+				reference.Expression(context.Factory()),
+				reference.Requests()...,
+			),
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		logical, err = api.NewExpressionEmission(
+			logical.Before(),
+			logical.Value(),
+			api.CombineRequests(
+				logical.Requests(),
+				representation.Requests(),
+			),
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		return api.NewStableIdentityStoreTargetEmission(
+			logical,
+			variable.Type(),
+		)
+	}
 	return api.NewCanonicalStorageTargetEmission(
 		reference.Expression(context.Factory()),
 		variable.Type(),
-		reference.Requests(),
+		api.CombineRequests(
+			reference.Requests(),
+			representation.Requests(),
+		),
 	)
 }

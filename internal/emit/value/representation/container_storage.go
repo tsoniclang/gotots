@@ -25,7 +25,7 @@ func (owner Owner) ContainerStorageType(
 	selection, err := owner.PointerRepresentation(
 		context,
 		types.NewPointer(sourceType),
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.TypeEmission{}, err
@@ -100,7 +100,7 @@ func (owner Owner) ToContainerStorage(
 	selection, err := owner.PointerRepresentation(
 		context,
 		types.NewPointer(sourceType),
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -164,7 +164,7 @@ func (owner Owner) FromContainerStorage(
 	selection, err := owner.PointerRepresentation(
 		context,
 		types.NewPointer(sourceType),
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

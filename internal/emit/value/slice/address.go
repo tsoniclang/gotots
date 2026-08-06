@@ -39,7 +39,7 @@ func Address(
 	representation, err := pointertype.Observe(
 		context,
 		types.NewPointer(element),
-		true,
+		api.PointerRepresentationDemandDynamicLocation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

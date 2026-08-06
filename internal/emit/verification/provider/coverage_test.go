@@ -245,8 +245,6 @@ func assertProviderReceiverProjection(
 		}
 	}
 	for _, projected := range []string{
-		"SyncMutexOperations.$fromStorage(__gotots_receiver_",
-		"StringsBuilderOperations.$fromStorage(__gotots_receiver_",
 		"await sync__from_gostdlib.Mutex.Lock(",
 	} {
 		if !strings.Contains(printed, projected) {
@@ -258,6 +256,8 @@ func assertProviderReceiverProjection(
 		"SyncMutexUnlock(GoPointer.objectField",
 		"Builder.Len(GoPointer.objectField",
 		"await strings__from_gostdlib.Builder.Len(",
+		"SyncMutexOperations.$fromStorage(__gotots_receiver_",
+		"StringsBuilderOperations.$fromStorage(__gotots_receiver_",
 	} {
 		if strings.Contains(printed, bypass) {
 			t.Fatalf("stored provider receiver bypasses projection with %q:\n%s", bypass, printed)

@@ -212,7 +212,11 @@ func dereferenceValue(
 	); handled || err != nil {
 		return logical, element, err
 	}
-	representation, err := pointertype.Observe(context, raw, false)
+	representation, err := pointertype.Observe(
+		context,
+		raw,
+		api.PointerRepresentationDemandNone,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
@@ -228,8 +232,7 @@ func dereferenceValue(
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
+	if representation.Representation().DirectClass() {
 		logical, err := api.NewExpressionEmission(
 			value.Before(),
 			pointerruntime.Direct(

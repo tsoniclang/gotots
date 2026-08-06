@@ -65,12 +65,15 @@ func emitExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	representation, err := pointertype.Observe(context, pointer, false)
+	representation, err := pointertype.Observe(
+		context,
+		pointer,
+		api.PointerRepresentationDemandNone,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
+	if representation.Representation().DirectClass() {
 		return api.NewExpressionEmission(
 			value.Before(),
 			value.Value(),

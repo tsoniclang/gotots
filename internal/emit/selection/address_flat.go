@@ -24,7 +24,7 @@ func projectFieldPathPointer(
 	parentRepresentation, err := pointertype.Observe(
 		context,
 		types.NewPointer(parentType),
-		true,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, 0, err
@@ -87,7 +87,7 @@ func projectFieldPathPointer(
 		fieldRepresentation, observeErr := pointertype.Observe(
 			context,
 			types.NewPointer(field.Type()),
-			true,
+			api.PointerRepresentationDemandStableLocation,
 		)
 		if observeErr != nil {
 			return api.ExpressionEmission{}, 0, observeErr

@@ -136,11 +136,17 @@ func TestPointerRepresentationSelectionRequiresCanonicalDefinitionAndDemand(
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition, err := NewPointerRepresentationRequirement(artifact, false)
+	definition, err := NewPointerRepresentationRequirement(
+		artifact,
+		PointerRepresentationDemandNone,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	demand, err := NewPointerRepresentationRequirement(artifact, true)
+	demand, err := NewPointerRepresentationRequirement(
+		artifact,
+		PointerRepresentationDemandDynamicLocation,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +159,36 @@ func TestPointerRepresentationSelectionRequiresCanonicalDefinitionAndDemand(
 	); err == nil {
 		t.Fatal("duplicate pointer definition was accepted")
 	}
+	stable, err := NewPointerRepresentationRequirement(
+		artifact,
+		PointerRepresentationDemandStableLocation,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	selected, err := SelectPointerRepresentation(
+		artifact,
+		[]DeclarationRequirement{definition, stable},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selected != PointerRepresentationDirectClassStorageIdentity {
+		t.Fatalf("stable pointer representation = %v", selected)
+	}
+	if _, err := SelectPointerRepresentation(
+		artifact,
+		[]DeclarationRequirement{definition, stable, stable},
+	); err == nil {
+		t.Fatal("duplicate stable-location demand was accepted")
+	}
+	if _, err := SelectPointerRepresentation(
+		artifact,
+		[]DeclarationRequirement{definition, demand, demand},
+	); err == nil {
+		t.Fatal("duplicate dynamic-location demand was accepted")
+	}
+	selected, err = SelectPointerRepresentation(
 		artifact,
 		[]DeclarationRequirement{definition, demand},
 	)
@@ -162,6 +197,12 @@ func TestPointerRepresentationSelectionRequiresCanonicalDefinitionAndDemand(
 	}
 	if selected != PointerRepresentationCarrierCanonical {
 		t.Fatalf("demanded pointer representation = %v", selected)
+	}
+	if PointerRepresentationDemandNone != 1 ||
+		PointerRepresentationDemandStableLocation != 2 ||
+		PointerRepresentationDemandDynamicLocation != 3 ||
+		PointerRepresentationDirectClassStorageIdentity != 4 {
+		t.Fatal("pointer representation demand IDs changed")
 	}
 }
 

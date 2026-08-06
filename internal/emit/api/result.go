@@ -566,3 +566,27 @@ type ResultError struct {
 func (e *ResultError) Error() string {
 	return fmt.Sprintf("create %s emission: %s", e.Result, e.Reason)
 }
+
+type GeneratedArtifactPlacementError struct {
+	TypeName string
+	Reason   string
+}
+
+func (e *GeneratedArtifactPlacementError) Error() string {
+	if e.TypeName == "" {
+		return "place generated type: " + e.Reason
+	}
+	return fmt.Sprintf("place generated type containing %q: %s", e.TypeName, e.Reason)
+}
+
+type GeneratedArtifactShapeError struct {
+	Artifact string
+	Reason   string
+}
+
+func (e *GeneratedArtifactShapeError) Error() string {
+	if e.Artifact == "" {
+		return "emit generated type: " + e.Reason
+	}
+	return fmt.Sprintf("emit generated type %q: %s", e.Artifact, e.Reason)
+}

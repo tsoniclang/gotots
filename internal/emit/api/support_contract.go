@@ -183,145 +183,6 @@ func (r DefinedValueRepresentation) Operations() (NameReference, bool) {
 	return r.operations, r.operations.Name() != ""
 }
 
-type PointerRepresentationResolver interface {
-	ObservePointerRepresentation(
-		ArtifactOwner,
-		*GeneratedArtifact,
-		bool,
-	) (PointerRepresentationObservation, error)
-}
-
-type PointerRepresentationNames interface {
-	PointerRepresentation(
-		*types.Pointer,
-	) (PointerRepresentationReference, error)
-	SourcePointerRepresentation(
-		types.Object,
-		*types.Pointer,
-	) (PointerRepresentationReference, error)
-}
-
-type PointerRepresentationValues interface {
-	PointerRepresentation(
-		Context,
-		*types.Pointer,
-		bool,
-	) (PointerRepresentationObservation, error)
-	SourcePointerRepresentation(
-		Context,
-		types.Object,
-		*types.Pointer,
-		bool,
-	) (PointerRepresentationObservation, error)
-}
-
-func NewPointerRepresentationRequirement(
-	artifact *GeneratedArtifact,
-	carrier bool,
-) (DeclarationRequirement, error) {
-	if _, ok := artifact.PointerRepresentation(); !ok {
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "pointer-representation requirement is invalid",
-		}
-	}
-	return DeclarationRequirement{
-		owner:          artifact.ReconstructionOwner(),
-		kind:           DeclarationRequirementPointerRepresentation,
-		generated:      artifact,
-		pointerCarrier: carrier,
-	}, nil
-}
-
-func NewPointerRepresentationRequest(
-	artifact *GeneratedArtifact,
-	carrier bool,
-) (RootRequest, error) {
-	requirement, err := NewPointerRepresentationRequirement(
-		artifact,
-		carrier,
-	)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return newDeclarationRequirementRequest(requirement), nil
-}
-
-func (r DeclarationRequirement) PointerRepresentation() (
-	*GeneratedArtifact,
-	bool,
-	bool,
-) {
-	if !r.Valid() ||
-		r.kind != DeclarationRequirementPointerRepresentation {
-		return nil, false, false
-	}
-	return r.generated, r.pointerCarrier, true
-}
-
-func SelectPointerRepresentation(
-	artifact *GeneratedArtifact,
-	requirements []DeclarationRequirement,
-) (PointerRepresentation, error) {
-	if _, ok := artifact.PointerRepresentation(); !ok {
-		return PointerRepresentationInvalid, &InvariantError{
-			Reason: "pointer-representation artifact is invalid",
-		}
-	}
-	definitions := 0
-	carrierDemands := 0
-	for _, requirement := range requirements {
-		selected, carrier, ok := requirement.PointerRepresentation()
-		if !ok || selected != artifact {
-			return PointerRepresentationInvalid, &InvariantError{
-				Reason: "pointer-representation requirement has foreign ownership",
-			}
-		}
-		if carrier {
-			carrierDemands++
-		} else {
-			definitions++
-		}
-	}
-	if definitions != 1 || carrierDemands > 1 {
-		return PointerRepresentationInvalid, &InvariantError{
-			Reason: "pointer-representation requirements are not canonical",
-		}
-	}
-	if carrierDemands != 0 {
-		return PointerRepresentationCarrierCanonical, nil
-	}
-	return DefaultPointerRepresentation(artifact)
-}
-
-func DefaultPointerRepresentation(
-	artifact *GeneratedArtifact,
-) (PointerRepresentation, error) {
-	pointer, ok := artifact.PointerRepresentation()
-	if !ok {
-		return PointerRepresentationInvalid, &InvariantError{
-			Reason: "pointer-representation artifact is invalid",
-		}
-	}
-	return DefaultPointerRepresentationForType(pointer)
-}
-
-func DefaultPointerRepresentationForType(
-	pointer *types.Pointer,
-) (PointerRepresentation, error) {
-	if pointer == nil || pointer.Elem() == nil {
-		return PointerRepresentationInvalid, &InvariantError{
-			Reason: "pointer-representation type is invalid",
-		}
-	}
-	named, namedOK := types.Unalias(pointer.Elem()).(*types.Named)
-	if namedOK {
-		if _, structOK := named.Underlying().(*types.Struct); structOK {
-			return PointerRepresentationDirectClass, nil
-		}
-	}
-	return PointerRepresentationCarrierLogical, nil
-}
-
 const TargetGlobalAnchorName = "globalThis"
 
 type TargetIntrinsic uint8
@@ -586,4 +447,149 @@ func NewSideEffectImportRequest(
 		importPhase:     ImportPhaseValue,
 		moduleSpecifier: factory.StringLiteral(modulePath, tsgo.TokenFlagsNone),
 	}}, nil
+}
+
+type PointerRepresentationResolver interface {
+	ObservePointerRepresentation(
+		ArtifactOwner,
+		*GeneratedArtifact,
+		PointerRepresentationDemand,
+	) (PointerRepresentationObservation, error)
+}
+
+type PointerRepresentationNames interface {
+	PointerRepresentation(*types.Pointer) (PointerRepresentationReference, error)
+	SourcePointerRepresentation(
+		types.Object,
+		*types.Pointer,
+	) (PointerRepresentationReference, error)
+}
+
+type PointerRepresentationValues interface {
+	PointerRepresentation(
+		Context,
+		*types.Pointer,
+		PointerRepresentationDemand,
+	) (PointerRepresentationObservation, error)
+	SourcePointerRepresentation(
+		Context,
+		types.Object,
+		*types.Pointer,
+		PointerRepresentationDemand,
+	) (PointerRepresentationObservation, error)
+}
+
+func NewPointerRepresentationRequirement(
+	artifact *GeneratedArtifact,
+	demand PointerRepresentationDemand,
+) (DeclarationRequirement, error) {
+	if _, ok := artifact.PointerRepresentation(); !ok || !demand.Valid() {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "pointer-representation requirement is invalid",
+		}
+	}
+	return DeclarationRequirement{
+		owner:         artifact.ReconstructionOwner(),
+		kind:          DeclarationRequirementPointerRepresentation,
+		generated:     artifact,
+		pointerDemand: demand,
+	}, nil
+}
+
+func NewPointerRepresentationRequest(
+	artifact *GeneratedArtifact,
+	demand PointerRepresentationDemand,
+) (RootRequest, error) {
+	requirement, err := NewPointerRepresentationRequirement(artifact, demand)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
+func (r DeclarationRequirement) PointerRepresentation() (
+	*GeneratedArtifact,
+	PointerRepresentationDemand,
+	bool,
+) {
+	if !r.Valid() || r.kind != DeclarationRequirementPointerRepresentation {
+		return nil, PointerRepresentationDemandInvalid, false
+	}
+	return r.generated, r.pointerDemand, true
+}
+
+func SelectPointerRepresentation(
+	artifact *GeneratedArtifact,
+	requirements []DeclarationRequirement,
+) (PointerRepresentation, error) {
+	if _, ok := artifact.PointerRepresentation(); !ok {
+		return PointerRepresentationInvalid, &InvariantError{
+			Reason: "pointer-representation artifact is invalid",
+		}
+	}
+	definitions := 0
+	demands := map[PointerRepresentationDemand]int{}
+	for _, requirement := range requirements {
+		selected, demand, ok := requirement.PointerRepresentation()
+		if !ok || selected != artifact {
+			return PointerRepresentationInvalid, &InvariantError{
+				Reason: "pointer-representation requirement has foreign ownership",
+			}
+		}
+		if demand == PointerRepresentationDemandNone {
+			definitions++
+		} else {
+			demands[demand]++
+		}
+	}
+	if definitions != 1 ||
+		demands[PointerRepresentationDemandStableLocation] > 1 ||
+		demands[PointerRepresentationDemandDynamicLocation] > 1 {
+		return PointerRepresentationInvalid, &InvariantError{
+			Reason: "pointer-representation requirements are not canonical",
+		}
+	}
+	baseline, err := DefaultPointerRepresentation(artifact)
+	if err != nil {
+		return PointerRepresentationInvalid, err
+	}
+	if demands[PointerRepresentationDemandDynamicLocation] != 0 ||
+		baseline != PointerRepresentationDirectClass &&
+			demands[PointerRepresentationDemandStableLocation] != 0 {
+		return PointerRepresentationCarrierCanonical, nil
+	}
+	if baseline == PointerRepresentationDirectClass &&
+		demands[PointerRepresentationDemandStableLocation] != 0 {
+		return PointerRepresentationDirectClassStorageIdentity, nil
+	}
+	return baseline, nil
+}
+
+func DefaultPointerRepresentation(
+	artifact *GeneratedArtifact,
+) (PointerRepresentation, error) {
+	pointer, ok := artifact.PointerRepresentation()
+	if !ok {
+		return PointerRepresentationInvalid, &InvariantError{
+			Reason: "pointer-representation artifact is invalid",
+		}
+	}
+	return DefaultPointerRepresentationForType(pointer)
+}
+
+func DefaultPointerRepresentationForType(
+	pointer *types.Pointer,
+) (PointerRepresentation, error) {
+	if pointer == nil || pointer.Elem() == nil {
+		return PointerRepresentationInvalid, &InvariantError{
+			Reason: "pointer-representation type is invalid",
+		}
+	}
+	named, namedOK := types.Unalias(pointer.Elem()).(*types.Named)
+	if namedOK {
+		if _, structOK := named.Underlying().(*types.Struct); structOK {
+			return PointerRepresentationDirectClass, nil
+		}
+	}
+	return PointerRepresentationCarrierLogical, nil
 }

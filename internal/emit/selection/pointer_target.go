@@ -28,13 +28,12 @@ func canonicalPointerTarget(
 	representation, err := pointertype.Observe(
 		context,
 		types.NewPointer(element),
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
+	if representation.Representation().DirectClass() {
 		logical, err := children.RepresentedType(
 			context.WithRole(api.RoleAssignmentTarget),
 			source,

@@ -182,7 +182,11 @@ func Prepare(
 	default:
 		return nil
 	}
-	observation, err := pointertype.Observe(context, selected, true)
+	observation, err := pointertype.Observe(
+		context,
+		selected,
+		api.PointerRepresentationDemandDynamicLocation,
+	)
 	if err != nil {
 		return err
 	}
@@ -206,7 +210,11 @@ func pointerContract(
 			Reason: "unsafe conversion pointer contract is absent",
 		}
 	}
-	observation, err := pointertype.Observe(context, pointer, true)
+	observation, err := pointertype.Observe(
+		context,
+		pointer,
+		api.PointerRepresentationDemandDynamicLocation,
+	)
 	if err != nil {
 		return nil, nil, api.NameReference{}, nil, err
 	}
@@ -224,6 +232,13 @@ func pointerContract(
 		pointer.Elem(),
 		observation,
 	)
+	if observation.Representation().DirectClass() {
+		storage, err = context.Values().StorageType(
+			context.WithRole(api.RoleStorageType),
+			nil,
+			pointer.Elem(),
+		)
+	}
 	if err != nil {
 		return nil, nil, api.NameReference{}, nil, err
 	}
