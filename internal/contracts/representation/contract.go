@@ -95,6 +95,15 @@ func (a ScalarABI) Carrier(alias PrimitiveAlias) (IntegerCarrier, error) {
 	return IntegerCarrierRepresentation(alias, a)
 }
 
+func (a ScalarABI) UsesBigInt(source types.Type) bool {
+	alias, ok := PrimitiveAliasFor(source)
+	if !ok {
+		return false
+	}
+	carrier, err := a.Carrier(alias)
+	return err == nil && carrier == IntegerCarrierBigInt
+}
+
 func (r IntegerRepresentation) String() string {
 	switch r {
 	case IntegerRepresentationNumber:
@@ -105,6 +114,19 @@ func (r IntegerRepresentation) String() string {
 		return "fixed64-bigint"
 	default:
 		return fmt.Sprintf("integer-representation(%d)", r)
+	}
+}
+
+func ParseIntegerRepresentation(value string) (IntegerRepresentation, error) {
+	switch value {
+	case "number":
+		return IntegerRepresentationNumber, nil
+	case "bigint":
+		return IntegerRepresentationBigInt, nil
+	case "fixed64-bigint":
+		return IntegerRepresentationFixed64BigInt, nil
+	default:
+		return IntegerRepresentationInvalid, &IntegerRepresentationError{}
 	}
 }
 
@@ -216,6 +238,73 @@ const (
 	PrimitiveUint
 	PrimitiveUintptr
 )
+
+func PrimitiveAliasFor(source types.Type) (PrimitiveAlias, bool) {
+	basic, ok := types.Unalias(source).(*types.Basic)
+	if !ok {
+		return PrimitiveInvalid, false
+	}
+	switch basic.Kind() {
+	case types.Bool:
+		return PrimitiveBool, true
+	case types.Int8:
+		return PrimitiveInt8, true
+	case types.Int16:
+		return PrimitiveInt16, true
+	case types.Int32:
+		return PrimitiveInt32, true
+	case types.Int64:
+		return PrimitiveInt64, true
+	case types.Uint8:
+		return PrimitiveUint8, true
+	case types.Uint16:
+		return PrimitiveUint16, true
+	case types.Uint32:
+		return PrimitiveUint32, true
+	case types.Uint64:
+		return PrimitiveUint64, true
+	case types.String:
+		return PrimitiveString, true
+	case types.Float32:
+		return PrimitiveFloat32, true
+	case types.Float64:
+		return PrimitiveFloat64, true
+	case types.Int:
+		return PrimitiveInt, true
+	case types.Uint:
+		return PrimitiveUint, true
+	case types.Uintptr:
+		return PrimitiveUintptr, true
+	default:
+		return PrimitiveInvalid, false
+	}
+}
+
+func PrimitiveTypeScriptType(
+	source types.Type,
+	abi ScalarABI,
+) (string, bool) {
+	alias, ok := PrimitiveAliasFor(source)
+	if !ok {
+		return "", false
+	}
+	_, keyword, err := PrimitiveAliasRepresentation(alias, abi)
+	if err != nil {
+		return "", false
+	}
+	switch keyword {
+	case tsgo.KeywordTypeSyntaxKindBooleanKeyword:
+		return "boolean", true
+	case tsgo.KeywordTypeSyntaxKindStringKeyword:
+		return "string", true
+	case tsgo.KeywordTypeSyntaxKindNumberKeyword:
+		return "number", true
+	case tsgo.KeywordTypeSyntaxKindBigIntKeyword:
+		return "bigint", true
+	default:
+		return "", false
+	}
+}
 
 type IntegerCarrier uint8
 

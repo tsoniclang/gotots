@@ -49,7 +49,10 @@ func TestPointerCopyAndOrdinaryLocalsUseOnlyRequiredStorage(t *testing.T) {
 	assertPointerCellAccess(t, store.Left(), "pointer")
 
 	read := targetReturn(t, targetFunction(t, source, "Read"))
-	assertPointerCellAccess(t, read.Expression(), "pointer")
+	readValue, ok := read.Expression().(tsgo.Identifier)
+	if !ok || readValue.Text() != "pointer" {
+		t.Fatalf("read-only pointer projection = %T, want direct pointer value", read.Expression())
+	}
 
 	alias := targetFunction(t, source, "Alias").Body().(tsgo.Block).Statements()
 	aliasDeclaration := alias[1].(tsgo.VariableStatement).
@@ -157,7 +160,7 @@ console.log(SharedIsNil());
 const pointer = NewValue(41);
 SetShared(pointer);
 console.log(SharedValue());
-console.log(Read(pointer));
+console.log(Read(41));
 try {
     NilRead();
     console.log("nil-succeeded");

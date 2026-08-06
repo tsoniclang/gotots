@@ -6,7 +6,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	sliceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	unsafepointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafepointer"
-	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -364,7 +363,7 @@ func (b *builder) sliceOperations(
 
 func (b *builder) integerConverter(sourceType types.Type) tsgo.Expression {
 	intrinsic := api.TargetIntrinsicNumber
-	if integervalue.TypeUsesBigInt(b.context, sourceType) {
+	if b.context.ScalarABI().UsesBigInt(sourceType) {
 		intrinsic = api.TargetIntrinsicBigInt
 	}
 	return intrinsic.Expression(b.factory)

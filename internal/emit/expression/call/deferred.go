@@ -246,11 +246,13 @@ func EmitDeferred(
 		}
 	}
 	requests = append(requests, contractRequests...)
-	arguments, argumentBefore, argumentRequests, err := emitArguments(
+	selectedABI, _ := context.ResolveCallableABI(directOwner)
+	arguments, argumentBefore, argumentRequests, err := emitArgumentsWithABI(
 		context,
 		children,
 		source,
 		signature,
+		selectedABI,
 		true,
 	)
 	if err != nil {

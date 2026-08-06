@@ -7,7 +7,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
-	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -48,7 +47,7 @@ func emitCompound(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	if !integervalue.TypeUsesBigInt(context, target.SourceType()) &&
+	if !context.ScalarABI().UsesBigInt(target.SourceType()) &&
 		!target.IsAccessor() &&
 		!target.IsProperty() &&
 		(!target.UsesCanonicalStorage() ||

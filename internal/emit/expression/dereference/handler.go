@@ -5,8 +5,8 @@ import (
 	"go/token"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
@@ -42,6 +42,23 @@ func Emit(
 	if zeroFromNew(context, source, pointerType, element) {
 		return context.Values().Zero(context, source, element)
 	}
+	if projected, ok, err := projectedParameter(
+		context,
+		children,
+		source.X,
+		element,
+	); err != nil {
+		return api.ExpressionEmission{}, err
+	} else if ok {
+		return context.Values().Transfer(
+			context,
+			source,
+			element,
+			element,
+			api.ValueTransferCopy,
+			projected,
+		)
+	}
 	pointer, err := children.Expression(
 		context.
 			WithRole(api.RoleUnaryOperand).
@@ -51,27 +68,59 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if definedOK {
-		pointer, err = defined.Project(context, pointer)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
-	if value, handled, err := genericpointer.Load(
+	return context.PointeeValues().Pointee(
 		context,
 		source,
-		element,
+		pointerType,
 		pointer,
-	); handled || err != nil {
-		return value, err
-	}
-	representation, err := pointertype.Observe(
-		context,
-		types.NewPointer(element),
-		false,
 	)
+}
+
+func projectedParameter(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Expr,
+	element types.Type,
+) (api.ExpressionEmission, bool, error) {
+	for {
+		parenthesized, ok := source.(*ast.ParenExpr)
+		if !ok {
+			break
+		}
+		source = parenthesized.X
+	}
+	identifier, ok := source.(*ast.Ident)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
+	}
+	parameter, ok := context.TypesInfo().UseOf(identifier).(*types.Var)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
+	}
+	selected, ok := context.CallableParameterABI(parameter)
+	if !ok || selected.Projection() != callableabi.ProjectionPointeeValue {
+		return api.ExpressionEmission{}, false, nil
+	}
+	pointer, ok := types.Unalias(parameter.Type()).(*types.Pointer)
+	if !ok || !types.Identical(pointer.Elem(), element) {
+		return api.ExpressionEmission{}, false, nil
+	}
+	reference, err := context.Names().Reference(parameter)
 	if err != nil {
-		return api.ExpressionEmission{}, err
+		return api.ExpressionEmission{}, false, err
+	}
+	projected := api.DirectExpression(
+		reference.Expression(context.Factory()),
+		reference.Requests()...,
+	)
+	if selected.NilPolicy() == callableabi.NilPolicyRejectAtBoundary {
+		return projected, true, nil
+	}
+	if selected.NilPolicy() != callableabi.NilPolicyPreserve {
+		return api.ExpressionEmission{}, false, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "projected parameter has an invalid nil policy",
+		}
 	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleUnaryOperand),
@@ -79,80 +128,28 @@ func Emit(
 		element,
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, err
+		return api.ExpressionEmission{}, false, err
 	}
-	reference, err := context.Names().Runtime(
+	runtime, err := context.Names().Runtime(
 		api.RuntimePointer,
 		api.ImportPhaseValue,
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, err
+		return api.ExpressionEmission{}, false, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
-		guarded, err := api.NewExpressionEmission(
-			pointer.Before(),
-			pointerruntime.Direct(
-				context.Factory(),
-				reference.Name(),
-				targetElement.Value(),
-				pointer.Value(),
-			),
-			api.CombineRequests(
-				pointer.Requests(),
-				targetElement.Requests(),
-				reference.Requests(),
-				representation.Requests(),
-			),
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return context.Values().Transfer(
-			context,
-			source,
-			element,
-			element,
-			api.ValueTransferCopy,
-			guarded,
-		)
-	}
-	storageType, err := context.ContainerStorage().PointerStorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		element,
-		representation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	stored, err := api.NewExpressionEmission(
-		pointer.Before(),
-		pointerruntime.CellValue(
+	return api.DirectExpression(
+		pointerruntime.Direct(
 			context.Factory(),
-			reference.Name(),
+			runtime.Name(),
 			targetElement.Value(),
-			storageType.Value(),
-			pointer.Value(),
+			projected.Value(),
 		),
 		api.CombineRequests(
-			pointer.Requests(),
+			projected.Requests(),
 			targetElement.Requests(),
-			storageType.Requests(),
-			reference.Requests(),
-			representation.Requests(),
-		),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return context.ContainerStorage().FromPointerStorage(
-		context,
-		source,
-		element,
-		representation,
-		stored,
-	)
+			runtime.Requests(),
+		)...,
+	), true, nil
 }
 
 func zeroFromNew(

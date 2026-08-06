@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -49,7 +50,10 @@ func VerifyAll(config Config) (
 	}()
 	paths := slices.Clone(config.ContractPaths)
 	slices.Sort(paths)
-	certificate = &Certificate{byPath: make(map[string]Implementation)}
+	certificate = &Certificate{
+		byPath:     make(map[string]Implementation),
+		byCallable: make(map[string]callableabi.Callable),
+	}
 	if err := certificate.bindCompilation(config.Compilation); err != nil {
 		return nil, err
 	}
@@ -161,6 +165,15 @@ func verifyOne(
 	if err != nil {
 		return Implementation{}, err
 	}
+	callables, err := verifyCallableABIs(
+		selected,
+		project,
+		projectExports,
+		document.Compilation,
+	)
+	if err != nil {
+		return Implementation{}, err
+	}
 	sourceFile, err := project.SourceFile(sourcePath)
 	if err != nil {
 		return Implementation{}, err
@@ -211,6 +224,10 @@ func verifyOne(
 		implementationHash.Write([]byte{0})
 		implementationHash.Write([]byte(export.fingerprint))
 	}
+	for _, callable := range callables {
+		implementationHash.Write([]byte{0})
+		implementationHash.Write([]byte(callable.Fingerprint()))
+	}
 	for index, module := range privateModules {
 		implementationHash.Write([]byte{0})
 		implementationHash.Write([]byte(module.goFile))
@@ -232,6 +249,7 @@ func verifyOne(
 		exports:        exports,
 		sourceFile:     sourceFile,
 		privateModules: privateModules,
+		callables:      callables,
 	}, nil
 }
 

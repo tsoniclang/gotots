@@ -1,7 +1,7 @@
 package api
 
 import (
-	representationcontract "github.com/tsoniclang/gotots/internal/emit/api/representation"
+	representationcontract "github.com/tsoniclang/gotots/internal/contracts/representation"
 	runtimecontract "github.com/tsoniclang/gotots/internal/emit/api/runtimecontract"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"go/types"

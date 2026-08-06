@@ -7,10 +7,12 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	"github.com/tsoniclang/gotots/internal/emit/callableprojection"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
@@ -62,6 +64,7 @@ type programSession struct {
 	requirementRemovalOwner  api.ArtifactOwner
 	standardLibrary          *gostdlibcertify.Certificate
 	sourceImplementations    *sourceimplementation.Certificate
+	callableABIs             map[*types.Func]callableabi.Callable
 	externalFunctions        map[*types.Func]ExternalFunctionObligation
 	externalFunctionBindings map[*types.Func]api.ExternalFunctionTarget
 	sealed                   bool
@@ -353,6 +356,14 @@ func newProgramSession(
 		externalFunctions:        make(map[*types.Func]ExternalFunctionObligation),
 		externalFunctionBindings: externalBindings,
 	}
+	session.callableABIs, err = callableprojection.Infer(
+		source,
+		scalar,
+		options.SourceImplementations,
+	)
+	if err != nil {
+		return nil, err
+	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
 			sourcePackage,
@@ -362,6 +373,7 @@ func newProgramSession(
 			providerScalar,
 			options.EvaluationOrder,
 			options.ConcurrencySemantics,
+			session,
 			session,
 			session,
 			session,

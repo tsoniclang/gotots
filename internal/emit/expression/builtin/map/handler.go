@@ -7,7 +7,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
-	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -249,7 +248,7 @@ func emitLen(
 		receiver.Value(),
 		lengthName,
 	))
-	if integervalue.TypeUsesBigInt(context, resultType) {
+	if context.ScalarABI().UsesBigInt(resultType) {
 		target = context.Factory().CallExpression(
 			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,
