@@ -1,4 +1,4 @@
-package callableabi
+package callablefacts
 
 import (
 	"go/ast"
@@ -9,10 +9,12 @@ import (
 	"testing"
 )
 
-func TestPointeeValuePolicySeparatesEntrySnapshotsFromLocations(t *testing.T) {
+func TestPointeeValueEvidenceSeparatesEntrySnapshotsFromLocations(t *testing.T) {
 	fileSet := token.NewFileSet()
 	file, err := parser.ParseFile(fileSet, "source.go", `package source
 func Read(value *int) int { return *value }
+type Reader struct{}
+func (Reader) Method(value *int) int { return *value }
 func Conditional(value *int, selected bool) int {
 	if selected { return *value }
 	return *value + 1
@@ -49,18 +51,19 @@ func Synchronize(value *int, ready chan struct{}) int { <-ready; return *value }
 	); err != nil {
 		t.Fatal(err)
 	}
-	expected := map[string]NilPolicy{
-		"Read":        NilPolicyRejectAtBoundary,
-		"Conditional": NilPolicyInvalid,
-		"LocalWork":   NilPolicyRejectAtBoundary,
-		"Convert":     NilPolicyRejectAtBoundary,
-		"Mutate":      NilPolicyInvalid,
-		"Escape":      NilPolicyInvalid,
-		"Delayed":     NilPolicyInvalid,
-		"StoreGlobal": NilPolicyInvalid,
-		"StoreAlias":  NilPolicyInvalid,
-		"Capture":     NilPolicyInvalid,
-		"Synchronize": NilPolicyInvalid,
+	expected := map[string]PointeeReadEvidence{
+		"Read":        PointeeReadEntryStable,
+		"Method":      PointeeReadEntryStable,
+		"Conditional": PointeeReadInvalid,
+		"LocalWork":   PointeeReadEntryStable,
+		"Convert":     PointeeReadEntryStable,
+		"Mutate":      PointeeReadInvalid,
+		"Escape":      PointeeReadInvalid,
+		"Delayed":     PointeeReadInvalid,
+		"StoreGlobal": PointeeReadInvalid,
+		"StoreAlias":  PointeeReadInvalid,
+		"Capture":     PointeeReadInvalid,
+		"Synchronize": PointeeReadInvalid,
 	}
 	for _, declaration := range file.Decls {
 		function, ok := declaration.(*ast.FuncDecl)
@@ -68,14 +71,18 @@ func Synchronize(value *int, ready chan struct{}) int { <-ready; return *value }
 			continue
 		}
 		object := info.Defs[function.Name].(*types.Func)
-		actual := PointeeValuePolicy(
+		identity, identityErr := SourceCallableIdentity(object)
+		if identityErr != nil || identity == "" {
+			t.Fatalf("%s identity = %q, error %v", function.Name.Name, identity, identityErr)
+		}
+		actual := PointeeValueEvidence(
 			function,
 			object.Signature().Params().At(0),
 			info,
 		)
 		if actual != expected[function.Name.Name] {
 			t.Fatalf(
-				"%s pointee-value policy = %d, want %d",
+				"%s pointee-value evidence = %d, want %d",
 				function.Name.Name,
 				actual,
 				expected[function.Name.Name],

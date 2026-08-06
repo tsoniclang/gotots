@@ -1,19 +1,27 @@
-package callableabi
+package callablefacts
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
+
+	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
+)
+
+type PointeeReadEvidence uint8
+
+const (
+	PointeeReadInvalid PointeeReadEvidence = iota
+	PointeeReadEntryStable
 )
 
 func SourceCallableIdentity(function *types.Func) (string, error) {
 	if function == nil || function.Pkg() == nil || function.Name() == "" {
-		return "", &Error{Reason: "source callable identity is incomplete"}
+		return "", &callableabi.Error{Reason: "source callable identity is incomplete"}
 	}
 	signature := function.Signature()
 	if signature.Recv() == nil {
-		return PackageFunctionIdentity(function.Pkg().Path(), function.Name())
+		return callableabi.PackageFunctionIdentity(function.Pkg().Path(), function.Name())
 	}
 	receiver := types.TypeString(signature.Recv().Type(), func(
 		selected *types.Package,
@@ -23,27 +31,20 @@ func SourceCallableIdentity(function *types.Func) (string, error) {
 		}
 		return selected.Path()
 	})
-	if receiver == "" {
-		return "", &Error{
-			Function: function.FullName(),
-			Reason:   "method receiver identity is absent",
-		}
-	}
-	return fmt.Sprintf(
-		"method\x00%s\x00%s\x00%s",
+	return callableabi.MethodIdentity(
 		function.Pkg().Path(),
 		receiver,
 		function.Name(),
-	), nil
+	)
 }
 
-func PointeeValuePolicy(
+func PointeeValueEvidence(
 	declaration *ast.FuncDecl,
 	parameter *types.Var,
 	info *types.Info,
-) NilPolicy {
+) PointeeReadEvidence {
 	if declaration == nil || declaration.Body == nil || parameter == nil || info == nil {
-		return NilPolicyInvalid
+		return PointeeReadInvalid
 	}
 	parents := parentNodes(declaration.Body)
 	if !pointeeValueReadAtEntry(declaration, parameter, info) ||
@@ -53,9 +54,9 @@ func PointeeValuePolicy(
 			info,
 			parents,
 		) || bodyMayMutatePointee(declaration.Body, info, parents) {
-		return NilPolicyInvalid
+		return PointeeReadInvalid
 	}
-	return NilPolicyRejectAtBoundary
+	return PointeeReadEntryStable
 }
 
 func pointeeValueReadAtEntry(
@@ -263,7 +264,11 @@ func bodyMayMutatePointee(
 			if target == nil {
 				unsafe = true
 			} else {
-				_, unsafe = types.Unalias(target).Underlying().(*types.Chan)
+				underlying := types.Unalias(target).Underlying()
+				switch underlying.(type) {
+				case *types.Chan, *types.Signature:
+					unsafe = true
+				}
 			}
 		}
 		return !unsafe

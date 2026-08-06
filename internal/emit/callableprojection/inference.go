@@ -9,6 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/load/callablefacts"
 )
 
 type callableUseEvidence struct {
@@ -71,7 +72,7 @@ func Select(
 					nilPolicy := callableabi.NilPolicyNotApplicable
 					targetType := types.TypeString(parameter.Type(), packagePath)
 					if pointer, ok := types.Unalias(parameter.Type()).(*types.Pointer); ok {
-						policy := callableabi.PointeeValuePolicy(
+						evidence := callablefacts.PointeeValueEvidence(
 							functionDeclaration,
 							parameter,
 							sourcePackage.TypesInfo(),
@@ -79,10 +80,9 @@ func Select(
 						if primitive, ok := representationcontract.PrimitiveTypeScriptType(
 							pointer.Elem(),
 							scalar,
-						); ok && (policy == callableabi.NilPolicyRejectAtBoundary ||
-							policy == callableabi.NilPolicyPreserve) {
+						); ok && evidence == callablefacts.PointeeReadEntryStable {
 							projection = callableabi.ProjectionPointeeValue
-							nilPolicy = policy
+							nilPolicy = callableabi.NilPolicyRejectAtBoundary
 							targetType = primitive
 							projected = true
 						}
@@ -100,7 +100,7 @@ func Select(
 				if !projected {
 					continue
 				}
-				identity, err := callableabi.SourceCallableIdentity(function)
+				identity, err := callablefacts.SourceCallableIdentity(function)
 				if err != nil {
 					return nil, err
 				}

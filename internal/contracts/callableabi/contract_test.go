@@ -53,3 +53,24 @@ func TestCallableProjectionIsClosedAndFingerprintIsStructural(t *testing.T) {
 		t.Fatal("nil-policy mutation did not change the callable fingerprint")
 	}
 }
+
+func TestCallableIdentitiesDistinguishFunctionsAndMethods(t *testing.T) {
+	function, err := PackageFunctionIdentity("example.test/source", "Read")
+	if err != nil {
+		t.Fatal(err)
+	}
+	method, err := MethodIdentity(
+		"example.test/source",
+		"*example.test/source.Reader",
+		"Read",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if function == method {
+		t.Fatal("package function and method identities collided")
+	}
+	if _, err := MethodIdentity("example.test/source", "", "Read"); err == nil {
+		t.Fatal("method identity accepted an absent receiver")
+	}
+}

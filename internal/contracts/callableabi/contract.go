@@ -105,6 +105,19 @@ func PackageFunctionIdentity(packagePath string, name string) (string, error) {
 	return "package-function\x00" + packagePath + "\x00" + name, nil
 }
 
+func MethodIdentity(
+	packagePath string,
+	receiver string,
+	name string,
+) (string, error) {
+	if strings.TrimSpace(packagePath) != packagePath || packagePath == "" ||
+		strings.TrimSpace(receiver) != receiver || receiver == "" ||
+		strings.TrimSpace(name) != name || name == "" {
+		return "", &Error{Reason: "method identity is incomplete"}
+	}
+	return "method\x00" + packagePath + "\x00" + receiver + "\x00" + name, nil
+}
+
 func New(identity string, parameters []Parameter) (Callable, error) {
 	if identity == "" {
 		return Callable{}, &Error{Reason: "callable identity is absent"}
