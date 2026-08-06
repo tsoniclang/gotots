@@ -68,25 +68,24 @@ func Select(
 				for index := range function.Signature().Params().Len() {
 					parameter := function.Signature().Params().At(index)
 					projection := callableabi.ProjectionIdentity
+					nilPolicy := callableabi.NilPolicyNotApplicable
 					targetType := types.TypeString(parameter.Type(), packagePath)
-					if pointer, ok := types.Unalias(parameter.Type()).(*types.Pointer); ok &&
-						callableabi.PointeeValueReadAtEntry(
+					if pointer, ok := types.Unalias(parameter.Type()).(*types.Pointer); ok {
+						policy := callableabi.PointeeValuePolicy(
 							functionDeclaration,
 							parameter,
 							sourcePackage.TypesInfo(),
-						) {
+						)
 						if primitive, ok := representationcontract.PrimitiveTypeScriptType(
 							pointer.Elem(),
 							scalar,
-						); ok {
+						); ok && (policy == callableabi.NilPolicyRejectAtBoundary ||
+							policy == callableabi.NilPolicyPreserve) {
 							projection = callableabi.ProjectionPointeeValue
+							nilPolicy = policy
 							targetType = primitive
 							projected = true
 						}
-					}
-					nilPolicy := callableabi.NilPolicyNotApplicable
-					if projection == callableabi.ProjectionPointeeValue {
-						nilPolicy = callableabi.NilPolicyRejectAtBoundary
 					}
 					var err error
 					parameters[index], err = callableabi.NewParameter(

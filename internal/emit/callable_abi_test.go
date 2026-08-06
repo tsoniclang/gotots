@@ -18,9 +18,20 @@ func TestAutomaticPointeeValueABIReconstructsDefinitionAndDirectCallers(
 
 func Read(value *int) int { return *value }
 
+func ReadThenCompute(value *int) int {
+	current := *value
+	current++
+	return current + *value
+}
+
 func Value() int {
 	current := 41
 	return Read(&current)
+}
+
+func ConditionalValue() int {
+	current := 41
+	return ReadThenCompute(&current)
 }
 
 func Existing(value *int) int { return Read(value) }
@@ -33,9 +44,11 @@ func ThroughValue(value *int) int {
 func Deferred(value *int) {
 	defer Read(value)
 }
+
 `)
 	for _, required := range []string{
 		"export function Read(value: int): int {\n    return value;\n}",
+		"export function ReadThenCompute(value: int): int",
 		"return Read(current);",
 		"return Read(GoPointer.dereference<int, int>(value).value);",
 		"=> Read(GoPointer.dereference<int, int>",

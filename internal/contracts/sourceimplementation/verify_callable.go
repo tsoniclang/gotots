@@ -210,11 +210,13 @@ func verifyPrimitivePointerProjection(
 		return callableabi.ProjectionInvalid, callableabi.NilPolicyInvalid, err
 	}
 	if primitiveOK && primitive.Kind() == projectPrimitiveKind(pointeeType) {
-		if !callableabi.PointeeValueReadAtEntry(
+		policy := callableabi.PointeeValuePolicy(
 			declaration,
 			function.Signature().Params().At(index),
 			info,
-		) {
+		)
+		if policy != callableabi.NilPolicyRejectAtBoundary &&
+			policy != callableabi.NilPolicyPreserve {
 			return callableabi.ProjectionInvalid,
 				callableabi.NilPolicyInvalid,
 				&Error{
@@ -229,6 +231,18 @@ func verifyPrimitivePointerProjection(
 		if primitive.Optional() {
 			return callableabi.ProjectionPointeeValue,
 				callableabi.NilPolicyPreserve, nil
+		}
+		if policy != callableabi.NilPolicyRejectAtBoundary {
+			return callableabi.ProjectionInvalid,
+				callableabi.NilPolicyInvalid,
+				&Error{
+					Operation: "join callable ABI",
+					Subject:   function.FullName(),
+					Reason: fmt.Sprintf(
+						"parameter %d cannot drop a source-observable nil value",
+						index,
+					),
+				}
 		}
 		return callableabi.ProjectionPointeeValue,
 			callableabi.NilPolicyRejectAtBoundary, nil
