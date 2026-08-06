@@ -46,6 +46,18 @@ func TestAggregateSliceOperationsPrintTypecheckAndMatchGo(t *testing.T) {
 			if strings.Count(printed.runtime, "function goSliceAllocate") != 1 {
 				t.Fatalf("aggregate storage allocator is not emitted exactly once:\n%s", printed.runtime)
 			}
+			for _, shared := range []string{
+				"const resolvedCapacity = globalThis.Number(capacity ?? numericLength);",
+				"const nextCapacity = RuntimeSlice.$grownCapacity(this.capacity, newLength);",
+				"return this.slice(0, length, null);",
+			} {
+				if !strings.Contains(printed.runtime, shared) {
+					t.Fatalf("aggregate slice runtime lacks shared operation %q:\n%s", shared, printed.runtime)
+				}
+			}
+			if strings.Count(printed.runtime, "while (nextCapacity < length)") != 1 {
+				t.Fatalf("aggregate slice runtime duplicates capacity growth:\n%s", printed.runtime)
+			}
 			for _, forbidden := range []string{
 				": any",
 				": unknown",

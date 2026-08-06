@@ -66,14 +66,17 @@ func BuildWithCapabilities(
 		target.getMethod(),
 		target.setMethod(),
 		target.sliceMethod(),
-		target.appendMethod(),
+		target.appendMethod(capabilities.Storage),
 		target.copyMethod(),
 	)
 	if capabilities.Storage {
 		members = append(members, target.storageMethods()...)
 	}
 	if capabilities.AppendSlice {
-		members = append(members, target.appendSliceMethod())
+		members = append(
+			members,
+			target.appendSliceMethod(capabilities.Storage),
+		)
 	}
 	if capabilities.Clear {
 		members = append(members, target.clearMethod())
@@ -258,6 +261,56 @@ func (b builder) subtract(
 	right tsgo.Expression,
 ) tsgo.BinaryExpression {
 	return b.binary(left, tsgo.BinaryOperatorMinusToken, right)
+}
+
+func (b builder) resolvedCapacity(
+	capacity tsgo.Expression,
+	fallback tsgo.Expression,
+) tsgo.Expression {
+	return b.toNumber(b.binary(
+		capacity,
+		tsgo.BinaryOperatorQuestionQuestionToken,
+		fallback,
+	))
+}
+
+func (b builder) initialGrowthCapacity(
+	capacity tsgo.Expression,
+) tsgo.Expression {
+	return b.factory.ConditionalExpression(
+		b.binary(
+			capacity,
+			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+			b.number("0"),
+		),
+		b.factory.QuestionToken(),
+		b.number("1"),
+		b.factory.ColonToken(),
+		b.binary(
+			capacity,
+			tsgo.BinaryOperatorAsteriskToken,
+			b.number("2"),
+		),
+	)
+}
+
+func (b builder) growCapacityLoop(
+	length tsgo.Expression,
+) tsgo.WhileStatement {
+	return b.factory.WhileStatement(
+		b.binary(
+			b.id("nextCapacity"),
+			tsgo.BinaryOperatorLessThanToken,
+			length,
+		),
+		b.factory.Block([]tsgo.Statement{
+			b.factory.ExpressionStatement(b.binary(
+				b.id("nextCapacity"),
+				tsgo.BinaryOperatorAsteriskEqualsToken,
+				b.number("2"),
+			)),
+		}, true),
+	)
 }
 
 func (b builder) variable(
