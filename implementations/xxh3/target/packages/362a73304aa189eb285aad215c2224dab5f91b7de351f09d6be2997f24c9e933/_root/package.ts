@@ -206,29 +206,52 @@ export class Hasher {
     return new Hasher(makeState(0));
   }
 
+  public static $copy(source: Hasher): Hasher {
+    const state = source.$storage;
+    return Hasher.$make(
+      state.h1,
+      state.h2,
+      state.h3,
+      state.h4,
+      state.length,
+      state.seed,
+    );
+  }
+
+  public static $assign(target: Hasher, source: Hasher): void {
+    const targetState = target.$storage;
+    const sourceState = source.$storage;
+    targetState.h1 = sourceState.h1;
+    targetState.h2 = sourceState.h2;
+    targetState.h3 = sourceState.h3;
+    targetState.h4 = sourceState.h4;
+    targetState.length = sourceState.length;
+    targetState.seed = sourceState.seed;
+  }
+
   public static Reset(
-    hasher: GoPointer<Hasher, Hasher$Storage> | undefined,
+    hasher: Hasher | undefined,
   ): void {
-    resetState(GoPointer.dereference(hasher).value);
+    resetState(GoPointer.direct(hasher).$storage);
   }
 
   public static Sum128(
-    hasher: GoPointer<Hasher, Hasher$Storage> | undefined,
+    hasher: Hasher | undefined,
   ): Uint128 {
-    return digest(GoPointer.dereference(hasher).value);
+    return digest(GoPointer.direct(hasher).$storage);
   }
 
   public static Sum64(
-    hasher: GoPointer<Hasher, Hasher$Storage> | undefined,
+    hasher: Hasher | undefined,
   ): uint64 {
     return Hasher.Sum128(hasher).Lo;
   }
 
   public static Write(
-    hasher: GoPointer<Hasher, Hasher$Storage> | undefined,
+    hasher: Hasher | undefined,
     value: RuntimeSlice<uint8>,
   ): [int64, GoError | undefined] {
-    const state = GoPointer.dereference(hasher).value;
+    const state = GoPointer.direct(hasher).$storage;
     for (let index = 0; index < value.length; index++) {
       mixByte(state, value.get(index));
     }
@@ -236,10 +259,10 @@ export class Hasher {
   }
 
   public static WriteString(
-    hasher: GoPointer<Hasher, Hasher$Storage> | undefined,
+    hasher: Hasher | undefined,
     value: gostring,
   ): [int64, GoError | undefined] {
-    const state = GoPointer.dereference(hasher).value;
+    const state = GoPointer.direct(hasher).$storage;
     const written = mixString(state, value);
     return [written, undefined];
   }
@@ -273,8 +296,6 @@ export function HashSeed(
   return Hash128Seed(value, seed).Lo;
 }
 
-export function New(): GoPointer<Hasher, Hasher$Storage> | undefined {
-  return GoPointer.cell<Hasher, Hasher$Storage>(
-    Hasher.$storageOf(Hasher.$zero()),
-  );
+export function New(): Hasher | undefined {
+  return Hasher.$zero();
 }

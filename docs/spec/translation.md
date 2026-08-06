@@ -444,6 +444,9 @@ wrapper detached from the index cannot preserve that behavior. Unsafe mutation
 likewise cannot be confined to an ephemeral boundary carrier because later
 direct reads must observe it. Selection is semantic and type-owned, never an
 escape heuristic or a package-specific override.
+The join treats duplicate and reordered origin observations identically; no
+observations select the family's default. Requirement removal may therefore
+reconstruct a still-reachable artifact without inventing a definition row.
 
 Storage demand is joined back to the declaration of every addressable binding,
 including parameters, locals, named results, range variables, and implicit

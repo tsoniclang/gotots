@@ -527,39 +527,29 @@ func SelectPointerRepresentation(
 			Reason: "pointer-representation artifact is invalid",
 		}
 	}
-	definitions := 0
-	demands := map[PointerRepresentationDemand]int{}
+	demand := PointerRepresentationDemandNone
 	for _, requirement := range requirements {
-		selected, demand, ok := requirement.PointerRepresentation()
+		selected, observed, ok := requirement.PointerRepresentation()
 		if !ok || selected != artifact {
 			return PointerRepresentationInvalid, &InvariantError{
 				Reason: "pointer-representation requirement has foreign ownership",
 			}
 		}
-		if demand == PointerRepresentationDemandNone {
-			definitions++
-		} else {
-			demands[demand]++
-		}
-	}
-	if definitions != 1 ||
-		demands[PointerRepresentationDemandStableLocation] > 1 ||
-		demands[PointerRepresentationDemandDynamicLocation] > 1 {
-		return PointerRepresentationInvalid, &InvariantError{
-			Reason: "pointer-representation requirements are not canonical",
+		if observed > demand {
+			demand = observed
 		}
 	}
 	baseline, err := DefaultPointerRepresentation(artifact)
 	if err != nil {
 		return PointerRepresentationInvalid, err
 	}
-	if demands[PointerRepresentationDemandDynamicLocation] != 0 ||
+	if demand == PointerRepresentationDemandDynamicLocation ||
 		baseline != PointerRepresentationDirectClass &&
-			demands[PointerRepresentationDemandStableLocation] != 0 {
+			demand == PointerRepresentationDemandStableLocation {
 		return PointerRepresentationCarrierCanonical, nil
 	}
 	if baseline == PointerRepresentationDirectClass &&
-		demands[PointerRepresentationDemandStableLocation] != 0 {
+		demand == PointerRepresentationDemandStableLocation {
 		return PointerRepresentationDirectClassStorageIdentity, nil
 	}
 	return baseline, nil

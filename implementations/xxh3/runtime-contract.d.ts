@@ -19,13 +19,8 @@ declare module "@gotots/runtime/array.js" {
 }
 
 declare module "@gotots/runtime/pointer.js" {
-  export class GoPointer<L, S> {
-    static cell<L, S>(value: S): GoPointer<L, S>;
-    static dereference<L, S>(
-      pointer: GoPointer<L, S> | undefined,
-    ): GoPointer<L, S>;
-    get value(): S;
-    set value(value: S);
+  export class GoPointer<L, S = L> {
+    static direct<L>(pointer: L | undefined): L;
   }
 }
 

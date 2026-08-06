@@ -192,8 +192,7 @@ func canonicalPointerTarget(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	if representation.Representation().DirectClass() &&
-		representation.UsesStorageIdentity() {
+	if representation.Representation().DirectClass() {
 		logical, err := children.RepresentedType(
 			context.WithRole(api.RoleAssignmentTarget),
 			source,

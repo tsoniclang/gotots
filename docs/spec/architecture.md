@@ -409,6 +409,10 @@ the then-current container element or byte-backed storage. One dynamic origin
 promotes that pointer family to its canonical typed carrier and reconstructs
 all dependent signatures and uses. It is not materialized only at the boundary:
 that would split one Go pointer identity into unsynchronized representations.
+A demand join is order-independent, idempotent, and total: repeated origin
+evidence has no effect, and the empty set selects the family's default during
+transactional requirement removal. Artifact reachability is owned by the root
+scheduler, never inferred from a synthetic definition requirement.
 A stable origin never promotes an otherwise-direct named-struct family to a
 carrier, while scalar and other already-carried families remain carriers.
 Pointer-to-pointer mutation retains a carrier for the outer pointer. No package,

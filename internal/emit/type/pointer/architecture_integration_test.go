@@ -29,11 +29,16 @@ func NewBox(value int32) *Box {
 	return &Box{Value: value}
 }
 
+func overwriteBox(pointer *Box, value Box) {
+	*pointer = value
+}
+
 func Direct(value int32) (int32, int32, bool) {
 	box := Box{Value: value}
 	pointer := &box
 	alias := pointer
 	previous := replace(pointer, Box{Value: value + 2})
+	overwriteBox(pointer, Box{Value: pointer.Value + 1})
 	return previous.Value, pointer.Value, pointer == alias
 }
 
@@ -77,6 +82,7 @@ fmt.Println(pointer.Boolean(true))
 	for _, required := range []string{
 		"function NewBox(value: int32): Box | undefined",
 		"static $assign(",
+		"Box.$assign(GoPointer.direct<Box>(pointer), Box.$copy(value))",
 		"GoPointerType<T>",
 		"class Box implements GoPointerRepresentedValue<Box>",
 	} {
