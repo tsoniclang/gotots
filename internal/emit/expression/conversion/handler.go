@@ -115,6 +115,15 @@ func Emit(
 	); err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	if target, handled, offsetErr := unsafepointerconversion.EmitClosedOffset(
+		context,
+		children,
+		source,
+		sourceType,
+		targetType,
+	); handled {
+		return target, true, offsetErr
+	}
 	operandExpected := operandFacts.Type
 	if _, interfaceTarget := interfacetype.Resolve(targetType); interfaceTarget {
 		operandExpected = interfacevalue.DynamicType(operandExpected)

@@ -38,6 +38,7 @@ func TestBuildPrintsIndexedAddressAndProportionalRegionOperations(t *testing.T) 
 	}
 	for _, required := range []string{
 		"private static allocationAtAddress(value: number): GoUnsafePointer | undefined",
+		"static fromRelative(value: GoUnsafePointer | undefined, address: number | bigint, zero: number | bigint): GoUnsafePointer | undefined",
 		"while (low <= high)",
 		"const first: number = Math.floor(offset / codec.size);",
 		"const last: number = Math.ceil((offset + length) / codec.size);",
@@ -72,7 +73,7 @@ func TestBuildCreatesTypedUnsafeMemoryOwner(t *testing.T) {
 	if class.Name().Text() != "GoUnsafePointer" ||
 		len(class.Modifiers()) != 1 ||
 		class.Modifiers()[0].Kind() != tsgo.SyntaxKindExportKeyword ||
-		len(class.Members()) != 16 {
+		len(class.Members()) != 17 {
 		t.Fatalf("unsafe-pointer class has unexpected shape")
 	}
 	constructor, ok := class.Members()[4].(tsgo.ConstructorDeclaration)
@@ -96,6 +97,9 @@ func TestBuildCreatesTypedUnsafeMemoryOwner(t *testing.T) {
 	}
 	if method := concreteMethod(t, class, allocationAtAddressName); len(method.Parameters()) != 1 {
 		t.Fatal("unsafe-pointer allocation index has an unexpected signature")
+	}
+	if method := concreteMethod(t, class, FromRelativeName); len(method.Parameters()) != 3 {
+		t.Fatal("unsafe-pointer relative decoder has an unexpected signature")
 	}
 	if method := concreteMethod(t, class, ToIntegerName); len(method.Parameters()) != 2 {
 		t.Fatal("unsafe-pointer integer encoder has an unexpected signature")

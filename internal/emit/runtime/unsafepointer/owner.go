@@ -6,6 +6,7 @@ const (
 	FromName                = "from"
 	ToName                  = "to"
 	FromIntegerName         = "fromInteger"
+	FromRelativeName        = "fromRelative"
 	ToIntegerName           = "toInteger"
 	addressName             = "address"
 	atName                  = "at"
@@ -48,6 +49,7 @@ func Build(
 			target.from(),
 			target.to(),
 			target.allocationAtAddress(),
+			target.fromRelative(),
 			target.fromInteger(),
 			target.toIntegerNumberOverload(),
 			target.toIntegerBigIntOverload(),

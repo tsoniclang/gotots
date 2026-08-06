@@ -129,6 +129,66 @@ func (b builder) allocationAtAddress() tsgo.MethodDeclaration {
 	)
 }
 
+func (b builder) fromRelative() tsgo.MethodDeclaration {
+	value := b.id("value")
+	address := b.id("address")
+	zero := b.id("zero")
+	numeric := b.id("numeric")
+	offset := b.id("offset")
+	return b.method(
+		[]tsgo.ModifierLike{b.factory.PublicKeyword(), b.factory.StaticKeyword()},
+		FromRelativeName,
+		nil,
+		[]tsgo.ParameterDeclaration{
+			b.parameter("value", b.optional(b.unsafeType()), nil),
+			b.parameter("address", b.integerType(), nil),
+			b.parameter("zero", b.integerType(), nil),
+		},
+		b.optional(b.unsafeType()),
+		b.factory.IfStatement(
+			b.binary(value, tsgo.BinaryOperatorEqualsEqualsEqualsToken, b.undefined()),
+			b.factory.Block([]tsgo.Statement{
+				b.factory.IfStatement(
+					b.binary(address, tsgo.BinaryOperatorEqualsEqualsEqualsToken, zero),
+					b.factory.Block([]tsgo.Statement{
+						b.factory.ReturnStatement(b.undefined()),
+					}, true),
+					b.panic("unsafe integer address does not identify live generated memory"),
+				),
+			}, true),
+			nil,
+		),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"numeric",
+			b.numberType(),
+			b.factory.CallExpression(
+				b.property(b.id("globalThis"), "Number"),
+				nil,
+				nil,
+				[]tsgo.Expression{address},
+				tsgo.NodeFlagsNone,
+			),
+		),
+		b.factory.IfStatement(
+			b.notSafeInteger(numeric),
+			b.panic("unsafe integer address is not representable"),
+			nil,
+		),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"offset",
+			b.numberType(),
+			b.binary(
+				numeric,
+				tsgo.BinaryOperatorMinusToken,
+				b.property(value, "base"),
+			),
+		),
+		b.factory.ReturnStatement(b.call(value, atName, offset)),
+	)
+}
+
 func (b builder) fromInteger() tsgo.MethodDeclaration {
 	value := b.id("value")
 	zero := b.id("zero")

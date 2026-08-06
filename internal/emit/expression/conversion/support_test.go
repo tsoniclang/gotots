@@ -177,6 +177,9 @@ func main() {
 	bytes := [8]byte{1, 2, 3, 4, 5, 6, 7, 8}
 	fmt.Println(values.UnsafePointerAliases(&scalar))
 	fmt.Println(values.UnsafePointerOffset(&bytes))
+	fmt.Println(values.UnsafePointerInlineOffset(&bytes))
+	fmt.Println(values.UnsafePointerInlineOffsetOrdered(&bytes), values.UnsafePointerOffsetTrace())
+	fmt.Println(values.UnsafePointerInlineNilOffset())
 	fmt.Println(values.UnsafePointerSafeThenUnsafe(&scalar))
 	fmt.Println(values.UnsafeStructLayout())
 	fmt.Println(values.UnsafeStringHeaderLength())

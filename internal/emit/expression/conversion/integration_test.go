@@ -56,6 +56,7 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 				"GoUnsafePointer.to<UnsafeBox, UnsafeBox$Storage>(",
 				"GoUnsafePointer.toInteger(",
 				"GoUnsafePointer.fromInteger(",
+				"GoUnsafePointer.fromRelative(",
 				"export const $goUnsafeCodec_",
 				"new GoUnsafeCodec<",
 				"export function String(value: gostring): gostring",
@@ -80,6 +81,16 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 			); got != 1 {
 				t.Fatalf(
 					"slice-array pointer helpers = %d, want one:\n%s",
+					got,
+					printed,
+				)
+			}
+			if got := strings.Count(
+				printed,
+				"GoUnsafePointer.fromRelative(",
+			); got != 3 {
+				t.Fatalf(
+					"closed unsafe offsets = %d, want 3:\n%s",
 					got,
 					printed,
 				)
@@ -219,6 +230,9 @@ const bytes = GoPointer.cell<GoArray<number, 8>, GoArray<number, 8>>(
 );
 console.log(String(values.UnsafePointerAliases(scalar)));
 console.log(String(values.UnsafePointerOffset(bytes)));
+console.log(String(values.UnsafePointerInlineOffset(bytes)));
+console.log(String(values.UnsafePointerInlineOffsetOrdered(bytes)), String(values.UnsafePointerOffsetTrace()));
+console.log(String(values.UnsafePointerInlineNilOffset()));
 console.log(String(values.UnsafePointerSafeThenUnsafe(scalar)));
 console.log(String(values.UnsafeStructLayout()));
 console.log(String(values.UnsafeStringHeaderLength()));
