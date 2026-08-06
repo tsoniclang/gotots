@@ -97,6 +97,14 @@ representation of the source program.
 - Ordinary statically selected receiver methods must not accidentally become
   target-language virtual dispatch. Genuine interface dispatch must be O(1)
   per call and must not expand with implementer count.
+- Every source-facing callable preserves its selected Go value-parameter
+  order and cardinality. A value receiver may become `this`, a pointer receiver
+  may become one explicit first parameter, and a variadic slot may use its one
+  exact target representation. Recovery authorities, operation dictionaries,
+  provider policies, bridges, scheduler/effect state, and other compiler
+  mechanics must not appear as translated source parameters. Source generic
+  arity is likewise exact; representation facets and callable profiles stay in
+  private support artifacts or finite exact concretizations.
 - No semantic recovery through `any`, `unknown`, unchecked casts, reflection,
   spelling lookup, source scans, or runtime semantic dispatch.
 - Definitions are emitted once. References may repeat. All helper and import
@@ -124,9 +132,13 @@ spelling—distinguishes workspace source, source-available dependencies,
 standard-library packages, toolchain packages, and true external boundaries.
 
 - Source-available packages are translated normally.
+- Every load resolves and records one explicit Go build profile; ambient shell
+  `GOOS`, `GOARCH`, `CGO_ENABLED`, `GOFLAGS`, and tags never select source.
 - The selected `GOROOT` defines the standard-library declarations.
 - `gostdlib` supplies manually completed behavior against generated contracts.
 - True externals receive exact typed contracts and explicit placeholders.
+- A selected bodyless source declaration emits one exact typed throwing body
+  and one canonical obligation; it never becomes an executable `declare`.
 - Generated primitive aliases and reusable runtime modules are GoToTS-owned
   output, not external environment contracts.
 - Runtime helpers exist only for Go behavior that direct TypeScript cannot

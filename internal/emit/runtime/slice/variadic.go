@@ -46,7 +46,7 @@ func (b builder) appendSliceMethod() tsgo.MethodDeclaration {
 							b.id("index"),
 						),
 					),
-					b.index(b.id("values"), b.id("index")),
+					b.indexedValue(b.id("values"), b.id("index")),
 				),
 			),
 		),
@@ -99,7 +99,7 @@ func (b builder) appendSliceMethod() tsgo.MethodDeclaration {
 		b.factory.ExpressionStatement(
 			b.assign(
 				b.index(b.id("backing"), b.id("index")),
-				b.index(
+				b.indexedValue(
 					b.id("existingBacking"),
 					b.add(b.thisProperty("offset"), b.id("index")),
 				),
@@ -117,7 +117,7 @@ func (b builder) appendSliceMethod() tsgo.MethodDeclaration {
 						b.id("index"),
 					),
 				),
-				b.index(b.id("values"), b.id("index")),
+				b.indexedValue(b.id("values"), b.id("index")),
 			),
 		),
 	)

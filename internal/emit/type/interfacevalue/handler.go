@@ -70,7 +70,7 @@ func EmitNonNil(
 			children,
 			source,
 			named.Origin().Obj(),
-			named.TypeArgs(),
+			api.TypeArgumentsFromGo(named.TypeArgs()),
 		)
 		if err != nil {
 			return api.TypeEmission{}, err
@@ -79,7 +79,7 @@ func EmitNonNil(
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			arguments,
 		),
 		requests...,

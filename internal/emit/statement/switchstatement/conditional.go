@@ -103,12 +103,10 @@ func emitConditional(
 		context,
 		clauses,
 		selected,
+		targetLabel,
 	)
 	requests = append(requests, executionRequests...)
-	statements = append(
-		statements,
-		labeledTarget(context, targetLabel, execution),
-	)
+	statements = append(statements, execution)
 	return api.NewStatementEmission(
 		[]tsgo.Statement{context.Factory().Block(statements, true)},
 		requests,
@@ -216,7 +214,16 @@ func conditionalExecution(
 	context api.Context,
 	clauses []clauseEmission,
 	selected tsgo.Expression,
-) (tsgo.SwitchStatement, []api.RootRequest) {
+	targetLabel string,
+) (tsgo.Statement, []api.RootRequest) {
+	if containsFallthrough(clauses) {
+		return fallthroughExecution(
+			context,
+			clauses,
+			selected,
+			targetLabel,
+		)
+	}
 	targets := make([]tsgo.CaseOrDefaultClause, 0, len(clauses))
 	var requests []api.RootRequest
 	for index, clause := range clauses {
@@ -233,9 +240,78 @@ func conditionalExecution(
 			),
 		)
 	}
-	return context.Factory().SwitchStatement(
-		selected,
-		context.Factory().CaseBlock(targets),
+	return labeledTarget(
+		context,
+		targetLabel,
+		context.Factory().SwitchStatement(
+			selected,
+			context.Factory().CaseBlock(targets),
+		),
+	), requests
+}
+
+func containsFallthrough(clauses []clauseEmission) bool {
+	for _, clause := range clauses {
+		if clause.fallsThrough {
+			return true
+		}
+	}
+	return false
+}
+
+func fallthroughExecution(
+	context api.Context,
+	clauses []clauseEmission,
+	selected tsgo.Expression,
+	targetLabel string,
+) (tsgo.Statement, []api.RootRequest) {
+	if targetLabel == "" {
+		panic("fallthrough control target is empty")
+	}
+	statements := make([]tsgo.Statement, 0, len(clauses))
+	var requests []api.RootRequest
+	for index, clause := range clauses {
+		body := make([]tsgo.Statement, 0, len(clause.body)+1)
+		for _, emission := range clause.body {
+			body = append(body, emission.Statements()...)
+			requests = append(requests, emission.Requests()...)
+		}
+		if clause.fallsThrough {
+			body = append(
+				body,
+				selectClause(context, selected, index+1),
+			)
+		} else {
+			body = append(
+				body,
+				context.Factory().BreakStatement(
+					context.Factory().Identifier(targetLabel),
+				),
+			)
+		}
+		statements = append(
+			statements,
+			context.Factory().IfStatement(
+				context.Factory().BinaryExpression(
+					nil,
+					selected,
+					nil,
+					context.Factory().BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					),
+					context.Factory().NumericLiteral(
+						strconv.Itoa(index),
+						tsgo.TokenFlagsNone,
+					),
+				),
+				context.Factory().Block(body, true),
+				nil,
+			),
+		)
+	}
+	return context.Factory().LabeledStatement(
+		context.Factory().Identifier(targetLabel),
+		context.Factory().Block(statements, true),
 	), requests
 }
 

@@ -32,6 +32,7 @@ func Emit(
 	}
 	return Convert(
 		context,
+		context.ScalarABI(),
 		source,
 		sourceType,
 		targetType,
@@ -41,6 +42,7 @@ func Emit(
 
 func Convert(
 	context api.Context,
+	sourceABI api.ScalarABI,
 	source ast.Node,
 	sourceType types.Type,
 	targetType types.Type,
@@ -52,7 +54,7 @@ func Convert(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	sourceCarrier, floatSource := floatvalue.Describe(sourceType)
-	_, integerSource := integervalue.Describe(
+	integerCarrier, integerSource := integervalue.Describe(
 		context.TypesSizes(),
 		sourceType,
 	)
@@ -62,8 +64,15 @@ func Convert(
 	}
 	value := operand.Value()
 	requests := operand.Requests()
-	if integerSource &&
-		context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
+	sourceRepresentation := api.IntegerCarrierInvalid
+	if integerSource {
+		var err error
+		sourceRepresentation, err = sourceABI.Carrier(integerCarrier.Alias())
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	if sourceRepresentation == api.IntegerCarrierBigInt {
 		value = context.Factory().CallExpression(
 			api.TargetIntrinsicNumber.Expression(context.Factory()),
 			nil,
@@ -82,7 +91,7 @@ func Convert(
 			return api.ExpressionEmission{}, err
 		}
 		value = context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{value},

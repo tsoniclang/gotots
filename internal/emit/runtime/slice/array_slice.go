@@ -6,10 +6,7 @@ const ArrayViewMember = "$view"
 
 func (b builder) arrayViewMethod() tsgo.MethodDeclaration {
 	return b.method(
-		[]tsgo.ModifierLike{
-			b.factory.PublicKeyword(),
-			b.factory.StaticKeyword(),
-		},
+		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		ArrayViewMember,
 		[]tsgo.TypeParameterDeclaration{b.typeParameter()},
 		[]tsgo.ParameterDeclaration{

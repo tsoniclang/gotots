@@ -92,7 +92,7 @@ func CopyAggregate(
 			context.Factory().CallExpression(
 				sliceProperty(
 					context,
-					context.Factory().Identifier("Math"),
+					api.TargetIntrinsicMath.Expression(context.Factory()),
 					"min",
 				),
 				nil,

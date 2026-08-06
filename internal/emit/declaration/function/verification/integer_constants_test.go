@@ -156,7 +156,7 @@ func TestBigIntProfileTypechecksAndExecutesBeyondSafeNumberRange(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if file.Kind() == emit.TargetFileSupport &&
+		if file.OutputPath() == "runtime/scalars.ts" &&
 			!strings.Contains(printed, "export type int64 = bigint;") {
 			t.Fatalf("BigInt support artifact:\n%s", printed)
 		}

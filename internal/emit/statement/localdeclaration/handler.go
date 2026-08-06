@@ -14,6 +14,7 @@ import (
 type binding struct {
 	sourceName      *ast.Ident
 	object          *types.Var
+	sourceType      types.Type
 	value           api.ExpressionEmission
 	omitInitializer bool
 }
@@ -86,7 +87,7 @@ func emitSpec(
 	bindings := make([]binding, 0, len(source.Names))
 	var requests []api.RootRequest
 	for index, sourceName := range source.Names {
-		object, ok := context.TypesInfo().Defs[sourceName].(*types.Var)
+		object, ok := context.TypesInfo().DefOf(sourceName).(*types.Var)
 		if !ok {
 			return nil, nil,
 				api.Unsupported(
@@ -95,8 +96,9 @@ func emitSpec(
 					sourceName,
 				)
 		}
+		objectType := context.TypesInfo().TypeOfObject(object)
 		if source.Type != nil &&
-			!types.Identical(context.TypesInfo().TypeOf(source.Type), object.Type()) {
+			!types.Identical(context.TypesInfo().TypeOf(source.Type), objectType) {
 			return nil, nil,
 				api.Unsupported(
 					context.WithRole(api.RoleLocalType),
@@ -106,7 +108,7 @@ func emitSpec(
 		}
 
 		callableZero := len(source.Values) == 0 &&
-			omitCallableZeroInitializer(object.Type())
+			omitCallableZeroInitializer(objectType)
 		var value api.ExpressionEmission
 		var err error
 		if callableZero {
@@ -122,7 +124,7 @@ func emitSpec(
 				source,
 				sourceName,
 				index,
-				object,
+				objectType,
 			)
 			if err != nil {
 				return nil, nil, err
@@ -131,6 +133,7 @@ func emitSpec(
 		bindings = append(bindings, binding{
 			sourceName:      sourceName,
 			object:          object,
+			sourceType:      objectType,
 			value:           value,
 			omitInitializer: callableZero,
 		})
@@ -252,7 +255,7 @@ func localVariableDeclaration(
 			context,
 			children,
 			sourceName,
-			object.Type(),
+			binding.sourceType,
 			value,
 		)
 	}
@@ -262,11 +265,11 @@ func localVariableDeclaration(
 	var targetType tsgo.TypeNode
 	requests := value.Requests()
 	if !selected &&
-		context.Values().RequiresExplicitType(context, object.Type()) {
+		context.Values().RequiresExplicitType(context, binding.sourceType) {
 		represented, err := children.RepresentedType(
 			context.WithRole(api.RoleLocalType),
 			sourceName,
-			object.Type(),
+			binding.sourceType,
 		)
 		if err != nil {
 			return nil, nil, nil, err
@@ -301,17 +304,17 @@ func localValue(
 	source *ast.ValueSpec,
 	sourceName *ast.Ident,
 	index int,
-	object *types.Var,
+	objectType types.Type,
 ) (api.ExpressionEmission, error) {
 	valueContext := context.
 		WithRole(api.RoleLocalValue).
-		WithExpectedType(object.Type())
+		WithExpectedType(objectType)
 	if len(source.Values) == 0 {
-		return context.Values().Zero(valueContext, sourceName, object.Type())
+		return context.Values().Zero(valueContext, sourceName, objectType)
 	}
 	sourceValue := source.Values[index]
 	valueType := context.TypesInfo().TypeOf(sourceValue)
-	if valueType == nil || !types.AssignableTo(valueType, object.Type()) {
+	if valueType == nil || !types.AssignableTo(valueType, objectType) {
 		return api.ExpressionEmission{},
 			api.Unsupported(
 				valueContext,
@@ -327,7 +330,7 @@ func localValue(
 		valueContext,
 		sourceValue,
 		valueType,
-		object.Type(),
+		objectType,
 		api.ValueTransferCopy,
 		value,
 	)

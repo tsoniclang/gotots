@@ -39,6 +39,7 @@ func TestChannelAndSchedulerRuntimePrintStrictAndExecute(t *testing.T) {
 		"const order: number[] = [];",
 		"Math.random() * (remaining + 1)",
 		"this.bufferHead >= 64 && this.bufferHead * 2 >= this.buffer.length",
+		"GoDenseIndex.get(this.buffer, this.bufferHead)",
 		"this.senders.add(offer)",
 		"this.receivers.add(receive)",
 		"senders.delete(offer)",
@@ -52,6 +53,7 @@ func TestChannelAndSchedulerRuntimePrintStrictAndExecute(t *testing.T) {
 		t.Fatalf("channel runtime = %d bytes, want <= 24000", len(printed))
 	}
 	if strings.Contains(printed, "nextListener") ||
+		strings.Contains(printed, "this.buffer[this.bufferHead]") ||
 		strings.Contains(printed, "Map<number, () => void>") ||
 		strings.Contains(printed, "private listeners") ||
 		strings.Contains(printed, "selectSenders") ||
@@ -389,6 +391,7 @@ func materializeRuntime(t *testing.T, directory string) (string, string) {
 			api.RuntimeErrorMethodToken,
 			api.RuntimeRuntimeErrorToken,
 		},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -400,6 +403,16 @@ func materializeRuntime(t *testing.T, directory string) (string, string) {
 			api.RuntimePanicValue,
 			api.RuntimePanic,
 		},
+		api.ConcurrencySemanticsDisabled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	denseDefinitions, err := runtimeemission.Build(
+		factory,
+		api.RuntimeModuleDenseIndex,
+		[]api.RuntimeSymbol{api.RuntimeDenseIndex},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -417,6 +430,7 @@ func materializeRuntime(t *testing.T, directory string) (string, string) {
 			api.RuntimeSelect,
 			api.RuntimeScheduler,
 		},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -425,6 +439,7 @@ func materializeRuntime(t *testing.T, directory string) (string, string) {
 	for _, definitions := range [][]runtimeemission.Definition{
 		interfaceDefinitions,
 		panicDefinitions,
+		denseDefinitions,
 		channelDefinitions,
 	} {
 		for _, definition := range definitions {
@@ -481,6 +496,7 @@ func typecheck(t *testing.T, directory string, paths ...string) {
 		"--module", "nodenext",
 		"--moduleResolution", "nodenext",
 		"--strict",
+		"--noUncheckedIndexedAccess",
 		"--outDir", filepath.Join(directory, "out"),
 	}
 	arguments = append(arguments, paths...)

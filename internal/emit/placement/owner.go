@@ -63,7 +63,7 @@ func (p *Owner) Requests() []api.RootRequest {
 }
 
 func (p *Owner) Apply(requests []api.RootRequest) error {
-	return api.WalkRootRequests(requests, func(request api.RootRequest) error {
+	return api.WalkUniqueRootRequestPayloads(requests, func(request api.RootRequest) error {
 		if request.Kind() != api.RootRequestImport ||
 			request.LegalScope() != api.ScopeFileImports ||
 			request.PreferredScope() != api.ScopeFileImports ||
@@ -111,12 +111,14 @@ func (p *Owner) RequireTypeOnly() error {
 func (p *Owner) Statements(factory tsgo.Factory) []tsgo.Statement {
 	type importGroup struct {
 		phase      api.ImportPhase
+		binding    api.ImportBindingKind
 		modulePath string
 	}
 	byGroup := make(map[importGroup][]api.RootRequest)
 	for _, request := range p.requests {
 		group := importGroup{
 			phase:      request.ImportPhase(),
+			binding:    request.ImportBinding(),
 			modulePath: request.ModulePath(),
 		}
 		byGroup[group] = append(byGroup[group], request)
@@ -129,7 +131,13 @@ func (p *Owner) Statements(factory tsgo.Factory) []tsgo.Statement {
 		if groups[left].phase != groups[right].phase {
 			return groups[left].phase < groups[right].phase
 		}
-		return groups[left].modulePath < groups[right].modulePath
+		if groups[left].modulePath != groups[right].modulePath {
+			return groups[left].modulePath < groups[right].modulePath
+		}
+		if groups[left].binding != groups[right].binding {
+			return groups[left].binding < groups[right].binding
+		}
+		return false
 	})
 
 	statements := make([]tsgo.Statement, 0, len(groups))
@@ -138,18 +146,38 @@ func (p *Owner) Statements(factory tsgo.Factory) []tsgo.Statement {
 		sort.Slice(requests, func(left, right int) bool {
 			return requests[left].LocalName() < requests[right].LocalName()
 		})
-		specifiers := make([]tsgo.ImportSpecifier, 0, len(requests))
-		for _, request := range requests {
-			specifiers = append(specifiers, request.Specifier())
-		}
 		var phase tsgo.ImportPhaseModifierSyntaxKind
 		if group.phase == api.ImportPhaseType {
 			phase = tsgo.ImportPhaseModifierSyntaxKindTypeKeyword
 		}
+		var bindings tsgo.NamedImportBindings
+		switch group.binding {
+		case api.ImportBindingNamed:
+			specifiers := make([]tsgo.ImportSpecifier, 0, len(requests))
+			for _, request := range requests {
+				specifiers = append(specifiers, request.Specifier())
+			}
+			bindings = factory.NamedImports(specifiers)
+		case api.ImportBindingNamespace:
+			if len(requests) != 1 {
+				panic("namespace import group has multiple owners")
+			}
+			bindings = requests[0].NamespaceSpecifier()
+		case api.ImportBindingSideEffect:
+			statements = append(statements, factory.ImportDeclaration(
+				nil,
+				nil,
+				requests[0].ModuleSpecifier(),
+				nil,
+			))
+			continue
+		default:
+			panic("import group has invalid binding kind")
+		}
 		clause := factory.ImportClause(
 			phase,
 			nil,
-			factory.NamedImports(specifiers),
+			bindings,
 		)
 		statements = append(statements, factory.ImportDeclaration(
 			nil,

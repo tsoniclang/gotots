@@ -126,20 +126,31 @@ func assertLexicalMapArtifacts(
 	) {
 		t.Fatal("nested-block map class was hoisted to function scope")
 	}
-	if !strings.Contains(
-		source[nestedLiteralStart:],
-		"function (): int32 {\n        class Key",
-	) ||
-		!strings.Contains(
-			source[nestedLiteralStart:],
-			"class $goMap_",
-		) {
+	if !containsLexicalMapClasses(source[nestedLiteralStart:]) {
 		t.Fatal("nested function-literal map class escaped its lexical body")
 	}
-	if !strings.Contains(assembly, "function (): int32 {\n        class Key") ||
-		!strings.Contains(assembly, "class $goMap_") {
+	if !containsLexicalMapClasses(assembly) {
 		t.Fatal("package initializer map class escaped its function literal")
 	}
+}
+
+func containsLexicalMapClasses(source string) bool {
+	start := strings.Index(source, "(): int32 => {")
+	if start < 0 {
+		return false
+	}
+	closure := source[start:]
+	end := strings.Index(closure, "})()")
+	declarationEnd := strings.Index(closure, "\n    };")
+	if end < 0 || declarationEnd >= 0 && declarationEnd < end {
+		end = declarationEnd
+	}
+	if end < 0 {
+		return false
+	}
+	body := closure[:end]
+	return strings.Contains(body, "class Key") &&
+		strings.Contains(body, "class $goMap_")
 }
 
 func executeLexicalMapGo(t *testing.T, workingDirectory string) string {

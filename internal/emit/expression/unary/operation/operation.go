@@ -102,9 +102,10 @@ func integerOperation(
 		return api.ExpressionEmission{}, false, nil
 	}
 	target := operand.Value()
+	requests := operand.Requests()
 	switch operator {
 	case token.ADD:
-		if context.IntegerRepresentation() == api.IntegerRepresentationNumber {
+		if !integervalue.UsesBigInt(context.IntegerRepresentation(), carrier) {
 			target = context.Factory().PrefixUnaryExpression(
 				tsgo.PrefixUnaryExpressionOperatorKindPlusToken,
 				target,
@@ -115,23 +116,42 @@ func integerOperation(
 			tsgo.PrefixUnaryExpressionOperatorKindMinusToken,
 			target,
 		)
+		if integervalue.UsesBigInt(
+			context.IntegerRepresentation(),
+			carrier,
+		) {
+			normalized, err := integervalue.NormalizeFixedWidth(
+				context,
+				carrier,
+				target,
+			)
+			if err != nil {
+				return api.ExpressionEmission{}, true, err
+			}
+			target = normalized.Value()
+			requests = api.CombineRequests(
+				requests,
+				normalized.Requests(),
+			)
+		}
 	case token.XOR:
 		target = context.Factory().PrefixUnaryExpression(
 			tsgo.PrefixUnaryExpressionOperatorKindTildeToken,
 			target,
 		)
-		var err error
-		target, err = normalizeComplement(context, carrier, target)
+		normalized, err := normalizeComplement(context, carrier, target)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
+		target = normalized.Value()
+		requests = api.CombineRequests(requests, normalized.Requests())
 	default:
 		return api.ExpressionEmission{}, false, nil
 	}
 	result, err := api.NewExpressionEmission(
 		operand.Before(),
 		target,
-		operand.Requests(),
+		requests,
 	)
 	return result, true, err
 }
@@ -140,21 +160,22 @@ func normalizeComplement(
 	context api.Context,
 	carrier integervalue.Carrier,
 	target tsgo.Expression,
-) (tsgo.Expression, error) {
+) (api.ExpressionEmission, error) {
 	switch {
+	case integervalue.UsesBigInt(
+		context.IntegerRepresentation(),
+		carrier,
+	):
+		return integervalue.NormalizeFixedWidth(context, carrier, target)
 	case integervalue.RequiresUint32Normalization(
 		context.IntegerRepresentation(),
 		carrier,
 	):
-		zero, err := api.IntegerLiteral(
-			context.Factory(),
-			api.IntegerRepresentationNumber,
-			"0",
-		)
+		zero, err := integervalue.CarrierLiteral(context, carrier, "0")
 		if err != nil {
-			return nil, err
+			return api.ExpressionEmission{}, err
 		}
-		return context.Factory().BinaryExpression(
+		return api.DirectExpression(context.Factory().BinaryExpression(
 			nil,
 			target,
 			nil,
@@ -162,27 +183,23 @@ func normalizeComplement(
 				tsgo.BinaryOperatorGreaterThanGreaterThanGreaterThanToken,
 			),
 			zero,
-		), nil
-	case context.IntegerRepresentation() == api.IntegerRepresentationNumber &&
+		)), nil
+	case !integervalue.UsesBigInt(context.IntegerRepresentation(), carrier) &&
 		carrier.Width() > 32:
-		return target, nil
+		return api.DirectExpression(target), nil
 	case !carrier.Signed():
 		mask, ok := integervalue.UnsignedMask(carrier)
 		if !ok {
-			return nil, &api.InvariantError{
+			return api.ExpressionEmission{}, &api.InvariantError{
 				Role:   context.Role(),
 				Reason: "unsigned complement has no width mask",
 			}
 		}
-		maskLiteral, err := api.IntegerLiteral(
-			context.Factory(),
-			context.IntegerRepresentation(),
-			mask,
-		)
+		maskLiteral, err := integervalue.CarrierLiteral(context, carrier, mask)
 		if err != nil {
-			return nil, err
+			return api.ExpressionEmission{}, err
 		}
-		return context.Factory().BinaryExpression(
+		return api.DirectExpression(context.Factory().BinaryExpression(
 			nil,
 			target,
 			nil,
@@ -190,9 +207,9 @@ func normalizeComplement(
 				tsgo.BinaryOperatorAmpersandToken,
 			),
 			maskLiteral,
-		), nil
+		)), nil
 	default:
-		return target, nil
+		return api.DirectExpression(target), nil
 	}
 }
 

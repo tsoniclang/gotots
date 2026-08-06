@@ -375,7 +375,7 @@ func repositoryRoot() string {
 	return filepath.Join("..", "..", "..")
 }
 
-func TestGenericReceiverMethodDefersThroughCanonicalABI(t *testing.T) {
+func TestGenericReceiverMethodWithoutRecoverDefersThroughOrdinaryEntry(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
@@ -416,9 +416,10 @@ func TestGenericReceiverMethodDefersThroughCanonicalABI(t *testing.T) {
 			workingDirectory := t.TempDir()
 			artifacts := materializeArtifacts(t, emission, workingDirectory)
 			for _, required := range []string{
-				"export class Box<T, T$Storage, T$Pointer>",
+				"export class Box<T>",
 				"static $go$private_",
-				"Box.$go$private_",
+				"export function store$concrete_",
+				"$kernel<int32>($argument0, $goCapability_",
 				"__gotots_defers_",
 				"$go$recovery",
 			} {
@@ -431,7 +432,10 @@ func TestGenericReceiverMethodDefersThroughCanonicalABI(t *testing.T) {
 				}
 			}
 			for _, forbidden := range []string{
-				"export function Box_store",
+				"export function Box_store(",
+				"$kernel$deferred",
+				"$deferred($go$recovery",
+				"GoDeferredRegistry",
 				".bind(",
 				".call(",
 				".apply(",

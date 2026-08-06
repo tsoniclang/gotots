@@ -414,7 +414,7 @@ func TestGenericCooperativeFacetsCarryExactCallableIdentity(t *testing.T) {
 		CallableFacetGenericCapability != 4 ||
 		CallableFacetGenericOperation != 5 ||
 		CallableFacetPackageInitializer != 6 ||
-		CallableFacetGenericProfile != 7 ||
+		CallableFacetKind(7).Valid() ||
 		CallableFacetInterfaceMethod != 8 ||
 		CallableFacetInvalid.Valid() ||
 		CallableFacetKind(9).Valid() {

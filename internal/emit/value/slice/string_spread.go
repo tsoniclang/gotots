@@ -61,15 +61,6 @@ func AppendString(
 		"charCodeAt",
 		index,
 	))
-	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
-		character = context.Factory().CallExpression(
-			context.Factory().Identifier("BigInt"),
-			nil,
-			nil,
-			[]tsgo.Expression{character},
-			tsgo.NodeFlagsNone,
-		)
-	}
 	statements := append([]tsgo.Statement(nil), before...)
 	statements = append(statements, zero.Before()...)
 	statements = append(

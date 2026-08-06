@@ -1,11 +1,9 @@
 package api
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
-	"slices"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -43,8 +41,18 @@ const (
 	ImportPhaseValue
 )
 
+type ImportBindingKind uint8
+
+const (
+	ImportBindingInvalid ImportBindingKind = iota
+	ImportBindingNamed
+	ImportBindingNamespace
+	ImportBindingSideEffect
+)
+
 type RootRequestOwner struct {
 	kind                   RootRequestKind
+	importBinding          ImportBindingKind
 	modulePath             string
 	exportedName           string
 	declarationRequirement DeclarationRequirement
@@ -57,6 +65,7 @@ type rootRequestPayload struct {
 	localName       string
 	moduleSpecifier tsgo.StringLiteral
 	specifier       tsgo.ImportSpecifier
+	namespace       tsgo.NamespaceImport
 	primitiveAlias  PrimitiveAlias
 	runtimeSymbol   RuntimeSymbol
 }
@@ -91,9 +100,10 @@ func NewImportRequest(
 	}
 	return RootRequest{payload: &rootRequestPayload{
 		owner: RootRequestOwner{
-			kind:         RootRequestImport,
-			modulePath:   modulePath,
-			exportedName: exportedName,
+			kind:          RootRequestImport,
+			importBinding: ImportBindingNamed,
+			modulePath:    modulePath,
+			exportedName:  exportedName,
 		},
 		importPhase:     phase,
 		localName:       localName,
@@ -103,6 +113,34 @@ func NewImportRequest(
 			propertyName,
 			factory.Identifier(localName),
 		),
+	}}, nil
+}
+
+func NewNamespaceImportRequest(
+	factory tsgo.Factory,
+	phase ImportPhase,
+	modulePath string,
+	localName string,
+) (RootRequest, error) {
+	if phase != ImportPhaseType && phase != ImportPhaseValue {
+		return RootRequest{}, &RootRequestError{Reason: "invalid import phase"}
+	}
+	if modulePath == "" {
+		return RootRequest{}, &RootRequestError{Reason: "module path is empty"}
+	}
+	if localName == "" {
+		return RootRequest{}, &RootRequestError{Reason: "local name is empty"}
+	}
+	return RootRequest{payload: &rootRequestPayload{
+		owner: RootRequestOwner{
+			kind:          RootRequestImport,
+			importBinding: ImportBindingNamespace,
+			modulePath:    modulePath,
+		},
+		importPhase:     phase,
+		localName:       localName,
+		moduleSpecifier: factory.StringLiteral(modulePath, tsgo.TokenFlagsNone),
+		namespace:       factory.NamespaceImport(factory.Identifier(localName)),
 	}}, nil
 }
 
@@ -141,7 +179,8 @@ func NewRuntimeImportRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
-	if !contract.AllowsImportPhase(phase) {
+	if phase != ImportPhaseValue &&
+		(phase != ImportPhaseType || !contract.TypeUsable()) {
 		return RootRequest{}, &RootRequestError{
 			Reason: "runtime symbol does not allow the requested import phase",
 		}
@@ -369,6 +408,34 @@ func NewInterfaceDynamicTypeTokenRequest(
 	return generatedDefinitionRequest(requirement, err)
 }
 
+func NewReflectionTypeRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewReflectionTypeRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewUnsafeCodecRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewUnsafeCodecRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewProviderInterfaceBridgeRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewProviderInterfaceBridgeRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewProviderStatefulRepresentationRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewProviderStatefulRepresentationRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
 func generatedDefinitionRequest(
 	requirement DeclarationRequirement,
 	err error,
@@ -438,6 +505,13 @@ func (r RootRequest) ImportPhase() ImportPhase {
 	return r.payload.importPhase
 }
 
+func (r RootRequest) ImportBinding() ImportBindingKind {
+	if r.payload == nil {
+		return ImportBindingInvalid
+	}
+	return r.payload.owner.importBinding
+}
+
 func (r RootRequest) ModulePath() string {
 	if r.payload == nil {
 		return ""
@@ -467,10 +541,19 @@ func (r RootRequest) ModuleSpecifier() tsgo.StringLiteral {
 }
 
 func (r RootRequest) Specifier() tsgo.ImportSpecifier {
-	if r.payload == nil {
+	if r.payload == nil ||
+		r.payload.owner.importBinding != ImportBindingNamed {
 		return nil
 	}
 	return r.payload.specifier
+}
+
+func (r RootRequest) NamespaceSpecifier() tsgo.NamespaceImport {
+	if r.payload == nil ||
+		r.payload.owner.importBinding != ImportBindingNamespace {
+		return nil
+	}
+	return r.payload.namespace
 }
 
 func (r RootRequest) PrimitiveAlias() (PrimitiveAlias, bool) {
@@ -512,84 +595,4 @@ func (r RootRequest) ArtifactDependency() (ArtifactDependency, bool) {
 		return ArtifactDependency{}, false
 	}
 	return dependency, true
-}
-
-type RootRequestError struct {
-	Reason string
-}
-
-func (e *RootRequestError) Error() string {
-	return fmt.Sprintf("create root request: %s", e.Reason)
-}
-
-type rootRequestSequence struct {
-	children []RootRequest
-}
-
-type rootRequestFrame struct {
-	requests []RootRequest
-	index    int
-}
-
-func combineRootRequests(groups ...[]RootRequest) []RootRequest {
-	rootCount := 0
-	for _, group := range groups {
-		rootCount += len(group)
-	}
-	switch rootCount {
-	case 0:
-		return nil
-	case 1:
-		for _, group := range groups {
-			if len(group) != 0 {
-				return slices.Clone(group)
-			}
-		}
-		panic("non-empty root request group disappeared")
-	}
-
-	children := make([]RootRequest, 0, rootCount)
-	for _, group := range groups {
-		children = append(children, group...)
-	}
-	return []RootRequest{{
-		sequence: &rootRequestSequence{children: children},
-	}}
-}
-
-func WalkRootRequests(
-	requests []RootRequest,
-	visit func(RootRequest) error,
-) error {
-	if visit == nil {
-		return &RootRequestError{Reason: "root request visitor is nil"}
-	}
-	frames := []rootRequestFrame{{requests: requests}}
-	for len(frames) != 0 {
-		frame := &frames[len(frames)-1]
-		if frame.index == len(frame.requests) {
-			frames = frames[:len(frames)-1]
-			continue
-		}
-		request := frame.requests[frame.index]
-		frame.index++
-		if request.sequence != nil {
-			if len(request.sequence.children) == 0 {
-				return &RootRequestError{
-					Reason: "root request sequence is empty",
-				}
-			}
-			frames = append(frames, rootRequestFrame{
-				requests: request.sequence.children,
-			})
-			continue
-		}
-		if request.Kind() == RootRequestInvalid {
-			return &RootRequestError{Reason: "root request is invalid"}
-		}
-		if err := visit(request); err != nil {
-			return err
-		}
-	}
-	return nil
 }

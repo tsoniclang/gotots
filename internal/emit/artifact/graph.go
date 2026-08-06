@@ -3,6 +3,8 @@ package artifact
 import (
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
@@ -15,10 +17,11 @@ type artifactRecord struct {
 }
 
 type Graph struct {
-	records map[api.ArtifactOwner]*artifactRecord
-	reverse map[api.ArtifactDependency]map[api.ArtifactOwner]struct{}
-	dirty   artifactOwnerQueue
-	compare func(api.ArtifactOwner, api.ArtifactOwner) int
+	records      map[api.ArtifactOwner]*artifactRecord
+	reverse      map[api.ArtifactDependency]map[api.ArtifactOwner]struct{}
+	dirty        artifactOwnerQueue
+	removalDirty map[api.ArtifactOwner]struct{}
+	compare      func(api.ArtifactOwner, api.ArtifactOwner) int
 }
 
 type GraphError struct {
@@ -43,16 +46,44 @@ func (e *GraphError) Error() string {
 }
 
 type ArtifactConvergenceError struct {
-	Object api.ArtifactOwner
-	Facets []api.ArtifactFacet
+	Object      api.ArtifactOwner
+	Facets      []api.ArtifactFacet
+	Transitions []ArtifactFacetTransition
+}
+
+type ArtifactFacetTransition struct {
+	Facet               api.ArtifactFacet
+	CurrentBytes        int
+	CandidateBytes      int
+	CommonPrefixBytes   int
+	CommonSuffixBytes   int
+	CurrentDifference   string
+	CandidateDifference string
 }
 
 func (e *ArtifactConvergenceError) Error() string {
-	return fmt.Sprintf(
+	message := fmt.Sprintf(
 		"reconstruct target artifact %q: observable contract oscillates on facets %v",
 		e.Object.Name(),
 		e.Facets,
 	)
+	if len(e.Transitions) == 0 {
+		return message
+	}
+	parts := make([]string, len(e.Transitions))
+	for index, transition := range e.Transitions {
+		parts[index] = fmt.Sprintf(
+			"%s current=%dB candidate=%dB prefix=%dB suffix=%dB current-diff=%s candidate-diff=%s",
+			transition.Facet,
+			transition.CurrentBytes,
+			transition.CandidateBytes,
+			transition.CommonPrefixBytes,
+			transition.CommonSuffixBytes,
+			transition.CurrentDifference,
+			transition.CandidateDifference,
+		)
+	}
+	return message + "; " + strings.Join(parts, "; ")
 }
 
 func NewGraph(
@@ -66,8 +97,9 @@ func NewGraph(
 		reverse: make(
 			map[api.ArtifactDependency]map[api.ArtifactOwner]struct{},
 		),
-		dirty:   newArtifactOwnerQueue(compare),
-		compare: compare,
+		dirty:        newArtifactOwnerQueue(compare),
+		removalDirty: make(map[api.ArtifactOwner]struct{}),
+		compare:      compare,
 	}
 }
 
@@ -75,6 +107,23 @@ func (g *Graph) Commit(
 	owner api.ArtifactOwner,
 	contract Contract,
 	dependencies []api.ArtifactDependency,
+) error {
+	return g.commit(owner, contract, dependencies, false)
+}
+
+func (g *Graph) CommitHistoricalReplacement(
+	owner api.ArtifactOwner,
+	contract Contract,
+	dependencies []api.ArtifactDependency,
+) error {
+	return g.commit(owner, contract, dependencies, true)
+}
+
+func (g *Graph) commit(
+	owner api.ArtifactOwner,
+	contract Contract,
+	dependencies []api.ArtifactDependency,
+	historicalReplacement bool,
 ) error {
 	if !owner.Valid() {
 		return &GraphError{Reason: "target artifact owner is invalid"}
@@ -95,16 +144,24 @@ func (g *Graph) Commit(
 	}
 
 	current := g.records[owner]
+	_, removalCaused := g.removalDirty[owner]
+	historicalAuthorized := historicalReplacement || removalCaused
 	var previousContract Contract
 	changed := changedArtifactFacets(Contract{}, nextContract)
 	if current != nil {
 		previousContract = current.contract
 		changed = changedArtifactFacets(current.contract, nextContract)
 		if len(changed) != 0 {
-			if current.history.contains(current.contract, nextContract) {
+			if current.history.contains(current.contract, nextContract) &&
+				!historicalAuthorized {
 				return &ArtifactConvergenceError{
 					Object: owner,
 					Facets: append([]api.ArtifactFacet(nil), changed...),
+					Transitions: artifactFacetTransitions(
+						current.contract,
+						nextContract,
+						changed,
+					),
 				}
 			}
 		}
@@ -124,13 +181,17 @@ func (g *Graph) Commit(
 
 	if len(current.history.entries) == 0 {
 		current.history.initialize(nextContract)
-		for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
+		for facet := api.ArtifactFacetCallableSignature; facet < api.ArtifactFacetCount; facet++ {
 			if !nextContract.hasFacet(facet) {
 				continue
 			}
 			current.facetRevisions[facet] = 1
 		}
-		return g.invalidateConsumers(owner, changed)
+		return g.invalidateConsumers(
+			owner,
+			changed,
+			historicalAuthorized,
+		)
 	}
 	if len(changed) == 0 {
 		return nil
@@ -139,12 +200,49 @@ func (g *Graph) Commit(
 	for _, facet := range changed {
 		current.facetRevisions[facet]++
 	}
-	return g.invalidateConsumers(owner, changed)
+	return g.invalidateConsumers(owner, changed, historicalAuthorized)
+}
+
+func artifactFacetTransitions(
+	current Contract,
+	candidate Contract,
+	facets []api.ArtifactFacet,
+) []ArtifactFacetTransition {
+	result := make([]ArtifactFacetTransition, 0, len(facets))
+	for _, facet := range facets {
+		currentValue, _ := current.facet(facet)
+		candidateValue, _ := candidate.facet(facet)
+		prefix := commonPrefixLength(currentValue, candidateValue)
+		suffix := commonSuffixLength(
+			currentValue[prefix:],
+			candidateValue[prefix:],
+		)
+		result = append(result, ArtifactFacetTransition{
+			Facet:               facet,
+			CurrentBytes:        len(currentValue),
+			CandidateBytes:      len(candidateValue),
+			CommonPrefixBytes:   prefix,
+			CommonSuffixBytes:   suffix,
+			CurrentDifference:   quotedDifference(currentValue, prefix),
+			CandidateDifference: quotedDifference(candidateValue, prefix),
+		})
+	}
+	return result
+}
+
+func quotedDifference(value []byte, start int) string {
+	const maximumEvidenceBytes = 96
+	if start >= len(value) {
+		return strconv.Quote("")
+	}
+	end := min(start+maximumEvidenceBytes, len(value))
+	return strconv.QuoteToASCII(string(value[start:end]))
 }
 
 func (g *Graph) invalidateConsumers(
 	owner api.ArtifactOwner,
 	facets []api.ArtifactFacet,
+	removalCaused bool,
 ) error {
 	for _, facet := range facets {
 		dependency, dependencyError := api.NewArtifactDependency(owner, facet)
@@ -153,6 +251,9 @@ func (g *Graph) invalidateConsumers(
 		}
 		for consumer := range g.reverse[dependency] {
 			g.dirty.push(consumer)
+			if removalCaused {
+				g.removalDirty[consumer] = struct{}{}
+			}
 		}
 	}
 	return nil
@@ -191,6 +292,7 @@ func (g *Graph) NextDirty() (api.ArtifactOwner, bool) {
 
 func (g *Graph) DiscardDirty(owner api.ArtifactOwner) {
 	g.dirty.discard(owner)
+	delete(g.removalDirty, owner)
 }
 
 func (g *Graph) HasPending() bool {

@@ -35,12 +35,10 @@ func TestClassMembersPreserveReceiverSemanticsDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	for _, forbidden := range []string{
-		"export function Counter_Bump",
-		"export function Counter_Read",
-		"export function Counter_Reset",
 		".bind(",
 		".call(",
 		".apply(",
+		"Counter.Reset(Counter.$copy(",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
 			t.Fatalf("class-member artifact contains %q", forbidden)
@@ -412,9 +410,11 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 	for _, required := range []string{
 		"export interface GenericValue<T>",
 		"export interface IntValue",
-		"Value($go$recovery?: GoRecovery): Promise<T>",
+		"Value(): Awaitable<T>;",
+		"Value(): Awaitable<int32>;",
 		"export async function GenericInterfaceAudit(): Promise<int32>",
-		"return await goInterfaceNonNil<GenericValue<T>>(__gotots_receiver_0).Value()",
+		"const __gotots_argument_0 = await goInterfaceNonNil<GenericValue<T>>(__gotots_receiver_0).Value();",
+		"return $go$copy_",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf(
@@ -424,12 +424,9 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 			)
 		}
 	}
-	if methods := strings.Count(
-		artifacts.printed,
-		"async Value($go$recovery?: GoRecovery): Promise<",
-	); methods < 2 {
+	if methods := strings.Count(artifacts.printed, "Value$deferred"); methods != 0 {
 		t.Fatalf(
-			"generic interface adapters have %d async Value methods, want at least two:\n%s",
+			"non-recovering generic interface adapters have %d recovery entries, want zero:\n%s",
 			methods,
 			artifacts.printed,
 		)
@@ -445,6 +442,10 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 	}
 	if strings.Contains(artifacts.printed, "$goInterfaceCallable_") {
 		t.Fatal("contract-only interface callable leaked into TypeScript output")
+	}
+	if strings.Contains(artifacts.printed, "Value(): Promise<T>;") ||
+		strings.Contains(artifacts.printed, "Value$cooperative_") {
+		t.Fatal("generic interface retained a callable profile variant")
 	}
 	runner := filepath.Join(workingDirectory, "runner.ts")
 	writeProgramFile(t, runner, `import "./program.js";

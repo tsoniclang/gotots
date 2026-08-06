@@ -18,6 +18,10 @@ func Emit(
 	if !ok {
 		return api.ExpressionEmission{}, false, nil
 	}
+	operationContext, err := model.OperationContext(context)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	operandType := context.TypesInfo().TypeOf(source.X)
 	if !types.AssignableTo(operandType, model.Type()) {
 		return api.ExpressionEmission{}, true,
@@ -32,16 +36,12 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	operand, err = api.NewExpressionEmission(
-		operand.Before(),
-		model.Unwrap(context.Factory(), operand.Value()),
-		operand.Requests(),
-	)
+	operand, err = model.Project(context, operand)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
 	target, handled, err := unaryoperation.Apply(
-		context,
+		operationContext,
 		source.Op,
 		model.Underlying(),
 		operand,

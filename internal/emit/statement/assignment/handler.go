@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -47,7 +48,8 @@ func emitCompound(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	if !target.IsAccessor() &&
+	if !integervalue.TypeUsesBigInt(context, target.SourceType()) &&
+		!target.IsAccessor() &&
 		!target.IsProperty() &&
 		(!target.UsesCanonicalStorage() ||
 			!context.Values().RequiresStorageProjection(
@@ -289,8 +291,12 @@ func emitDefinitionList(
 	if !ok {
 		return nil, nil, nil, api.Unsupported(context, api.CategoryStatement, source)
 	}
-	object, ok := context.TypesInfo().Defs[name].(*types.Var)
+	object, ok := context.TypesInfo().DefOf(name).(*types.Var)
 	if !ok {
+		return nil, nil, nil, api.Unsupported(context, api.CategoryStatement, source)
+	}
+	contextualType := context.TypesInfo().TypeOfObject(object)
+	if contextualType == nil {
 		return nil, nil, nil, api.Unsupported(context, api.CategoryStatement, source)
 	}
 	targetName, selected := context.AddressableStorage().Name(context, object)
@@ -302,14 +308,14 @@ func emitDefinitionList(
 		return nil, nil, nil, err
 	}
 	sourceType := context.TypesInfo().TypeOf(source.Rhs[0])
-	if sourceType == nil || !types.AssignableTo(sourceType, object.Type()) {
+	if sourceType == nil || !types.AssignableTo(sourceType, contextualType) {
 		return nil, nil, nil,
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	value, err := children.Expression(
 		context.
 			WithRole(api.RoleLocalValue).
-			WithExpectedType(object.Type()),
+			WithExpectedType(contextualType),
 		source.Rhs[0],
 	)
 	if err != nil {
@@ -319,7 +325,7 @@ func emitDefinitionList(
 		context.WithRole(api.RoleLocalValue),
 		source.Rhs[0],
 		sourceType,
-		object.Type(),
+		contextualType,
 		api.ValueTransferCopy,
 		value,
 	)
@@ -331,7 +337,7 @@ func emitDefinitionList(
 			context,
 			children,
 			name,
-			object.Type(),
+			contextualType,
 			value,
 		)
 		if err != nil {
@@ -342,7 +348,7 @@ func emitDefinitionList(
 		context.WithRole(api.RoleLocalType),
 		children,
 		name,
-		object.Type(),
+		contextualType,
 	)
 	if err != nil {
 		return nil, nil, nil, err

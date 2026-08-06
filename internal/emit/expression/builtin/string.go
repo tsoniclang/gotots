@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -52,11 +53,7 @@ func emitStringLength(
 		return api.ExpressionEmission{}, err
 	}
 	if definedArgument {
-		value, err = api.NewExpressionEmission(
-			value.Before(),
-			defined.Unwrap(context.Factory(), value.Value()),
-			value.Requests(),
-		)
+		value, err = defined.Project(context, value)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
@@ -67,9 +64,9 @@ func emitStringLength(
 		context.Factory().Identifier("length"),
 		tsgo.NodeFlagsNone,
 	))
-	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
+	if integervalue.TypeUsesBigInt(context, context.TypesInfo().TypeOf(source)) {
 		length = context.Factory().CallExpression(
-			context.Factory().Identifier("BigInt"),
+			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{length},

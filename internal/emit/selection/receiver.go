@@ -44,17 +44,24 @@ func methodReceiver(
 	selected *types.Selection,
 	copyValue bool,
 ) (api.ExpressionEmission, *types.Func, error) {
-	resolved, method, ok := methodPath(selected)
+	resolved, method, ok := methodPath(context, selected)
 	if !ok || !Valid(context, source, selected, types.MethodVal) {
 		return api.ExpressionEmission{}, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	signature := method.Type().(*types.Signature)
-	declared := signature.Recv().Type()
-	abiReceiver, ok := methodABIReceiver(method)
+	signature, ok := contextualMethodSignature(context, method)
 	if !ok {
 		return api.ExpressionEmission{}, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	declared := signature.Recv().Type()
+	abiReceiver, receiverABI, err := methodABIReceiver(
+		context,
+		method,
+		resolved.effective,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
 	}
 	_, declaredElement, _, declaredPointer := pointerType(declared)
 	_, _, _, effectivePointer := pointerType(resolved.effective)
@@ -68,6 +75,7 @@ func methodReceiver(
 			resolved,
 			method,
 			abiReceiver,
+			receiverABI,
 		)
 		return receiver, method, err
 	}
@@ -99,7 +107,7 @@ func DirectMethodSetReceiver(
 	selected *types.Selection,
 	root api.ExpressionEmission,
 ) (api.ExpressionEmission, types.Type, *types.Func, error) {
-	resolved, method, ok := methodPath(selected)
+	resolved, method, ok := methodPath(context, selected)
 	if !ok ||
 		selected.Kind() != types.MethodVal ||
 		!types.Identical(selected.Recv(), resolved.root) {
@@ -127,12 +135,19 @@ func methodSetReceiver(
 	root api.ExpressionEmission,
 	copyValue bool,
 ) (api.ExpressionEmission, error) {
-	signature := method.Type().(*types.Signature)
-	declared := signature.Recv().Type()
-	abiReceiver, ok := methodABIReceiver(method)
+	signature, ok := contextualMethodSignature(context, method)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	declared := signature.Recv().Type()
+	abiReceiver, receiverABI, err := methodABIReceiver(
+		context,
+		method,
+		resolved.effective,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	abiPointer, _, _, abiIsPointer := pointerType(abiReceiver)
 	_, declaredElement, _, declaredPointer := pointerType(declared)
@@ -153,6 +168,20 @@ func methodSetReceiver(
 			root,
 			false,
 		)
+	}
+	if receiverABI == api.MethodReceiverABIContractDirect {
+		value, selected, err := projectProviderRepresentationMethodReceiver(
+			context,
+			children,
+			source,
+			resolved,
+			method,
+			root,
+			copyValue,
+		)
+		if err != nil || selected {
+			return value, err
+		}
 	}
 	value, err := projectValue(
 		context,
@@ -175,6 +204,7 @@ func methodSetReceiver(
 			method.Origin(),
 			abiPointer,
 			effectiveRaw,
+			receiverABI,
 			value,
 		)
 	case !declaredPointer &&
@@ -217,17 +247,24 @@ func MethodExpressionReceiver(
 	selected *types.Selection,
 	root api.ExpressionEmission,
 ) (api.ExpressionEmission, *types.Func, error) {
-	resolved, method, ok := methodPath(selected)
+	resolved, method, ok := methodPath(context, selected)
 	if !ok || !Valid(context, source, selected, types.MethodExpr) {
 		return api.ExpressionEmission{}, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	signature := method.Type().(*types.Signature)
-	declared := signature.Recv().Type()
-	abiReceiver, ok := methodABIReceiver(method)
+	signature, ok := contextualMethodSignature(context, method)
 	if !ok {
 		return api.ExpressionEmission{}, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	declared := signature.Recv().Type()
+	abiReceiver, receiverABI, err := methodABIReceiver(
+		context,
+		method,
+		resolved.effective,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
 	}
 	abiPointer, _, _, abiIsPointer := pointerType(abiReceiver)
 	_, declaredElement, _, declaredPointer := pointerType(declared)
@@ -251,6 +288,20 @@ func MethodExpressionReceiver(
 		)
 		return receiver, method, err
 	}
+	if receiverABI == api.MethodReceiverABIContractDirect {
+		value, selected, err := projectProviderRepresentationMethodReceiver(
+			context,
+			children,
+			source,
+			resolved,
+			method,
+			root,
+			true,
+		)
+		if err != nil || selected {
+			return value, method, err
+		}
+	}
 	value, err := projectValue(
 		context,
 		children,
@@ -272,6 +323,7 @@ func MethodExpressionReceiver(
 			method.Origin(),
 			abiPointer,
 			effectiveRaw,
+			receiverABI,
 			value,
 		)
 		return value, method, err
@@ -306,6 +358,56 @@ func MethodExpressionReceiver(
 	return value, method, err
 }
 
+func projectProviderRepresentationMethodReceiver(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	resolved path,
+	method *types.Func,
+	root api.ExpressionEmission,
+	copyValue bool,
+) (api.ExpressionEmission, bool, error) {
+	current := root
+	currentType := resolved.root
+	for index := 0; ; index++ {
+		owns, err := context.Names().ProviderRepresentationOwnsMethod(
+			currentType,
+			method,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, false, err
+		}
+		if owns {
+			if !copyValue {
+				return current, true, nil
+			}
+			current, err = context.Values().Transfer(
+				context.WithRole(api.RoleReceiverValue),
+				source,
+				currentType,
+				currentType,
+				api.ValueTransferCopy,
+				current,
+			)
+			return current, true, err
+		}
+		if index == len(resolved.fields) {
+			return api.ExpressionEmission{}, false, nil
+		}
+		current, currentType, err = projectFieldValue(
+			context,
+			children,
+			source,
+			currentType,
+			current,
+			resolved.fields[index],
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, false, err
+		}
+	}
+}
+
 func DirectMethodExpression(
 	context api.Context,
 	source *ast.SelectorExpr,
@@ -314,13 +416,28 @@ func DirectMethodExpression(
 	if !Valid(context, source, selected, types.MethodExpr) {
 		return nil, false
 	}
-	resolved, method, ok := methodPath(selected)
+	resolved, method, ok := methodPath(context, selected)
 	if !ok || len(resolved.fields) != 0 {
 		return nil, false
 	}
-	signature := method.Type().(*types.Signature)
+	signature, ok := contextualMethodSignature(context, method)
+	if !ok {
+		return nil, false
+	}
 	return method, types.Identical(
 		resolved.root,
 		signature.Recv().Type(),
 	)
+}
+
+func contextualMethodSignature(
+	context api.Context,
+	method *types.Func,
+) (*types.Signature, bool) {
+	if method == nil {
+		return nil, false
+	}
+	target := method.Type()
+	signature, ok := target.(*types.Signature)
+	return signature, ok && signature.Recv() != nil
 }

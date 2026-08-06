@@ -6,23 +6,48 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-// EmitUse emits one bare use of a source-declared untyped constant. Identifier,
-// package-selector, and dot-import handlers only identify the object and
-// delegate here; this is the sole owner of contextual projection selection.
+// EmitUse emits one source-declared constant use that cannot use an ordinary
+// value binding. Untyped constants select their contextual projection. A
+// source-owned package constant with a defined-basic runtime representation
+// invokes its cycle-safe typed value thunk.
 func EmitUse(
 	context api.Context,
 	source ast.Expr,
 	selected *types.Const,
 ) (api.ExpressionEmission, error) {
-	if source == nil || selected == nil || !IsUntyped(selected.Type()) {
+	if source == nil || selected == nil {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
-			Reason: "untyped constant use identity is invalid",
+			Reason: "constant use identity is invalid",
 		}
 	}
-	facts, ok := context.TypesInfo().Types[source]
+	if RequiresDeferredBinding(selected) {
+		reference, invoke, err := context.Names().ConstantValue(selected)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		target := reference.Expression(context.Factory())
+		if invoke {
+			target = context.Factory().CallExpression(
+				target,
+				nil,
+				nil,
+				nil,
+				tsgo.NodeFlagsNone,
+			)
+		}
+		return api.DirectExpression(target, reference.Requests()...), nil
+	}
+	if !IsUntyped(selected.Type()) {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "typed constant does not require deferred use emission",
+		}
+	}
+	facts, ok := context.TypesInfo().TypeAndValue(source)
 	if !ok || facts.Value == nil {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -45,7 +70,7 @@ func EmitUse(
 			return api.ExpressionEmission{}, err
 		}
 		target := api.DirectExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			reference.Requests()...,
 		)
 		if wrapsDefined {
@@ -149,7 +174,7 @@ func EmitFolded(
 	if source == nil {
 		return api.ExpressionEmission{}, false, nil
 	}
-	facts, ok := context.TypesInfo().Types[source]
+	facts, ok := context.TypesInfo().TypeAndValue(source)
 	if !ok || facts.Value == nil {
 		return api.ExpressionEmission{}, false, nil
 	}

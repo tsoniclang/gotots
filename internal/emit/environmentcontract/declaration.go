@@ -57,41 +57,20 @@ func callableDeclaration(
 			Reason: "environment callable has no signature",
 		}
 	}
-	profiles, err := api.SelectGenericCallableProfiles(
-		function,
-		requirements,
-	)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
 	recovery, err := requiresRecoveryAuthority(function, requirements)
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-	variants := make(
-		[]*api.GenericCallableProfile,
-		1,
-		len(profiles)+1,
+	declarations, requests, err := callableContractDeclaration(
+		context,
+		children,
+		function,
+		signature,
+		requirements,
+		recovery,
 	)
-	variants = append(variants, profiles...)
-	declarations := make([]tsgo.Statement, 0, len(variants))
-	var requests []api.RootRequest
-	for _, profile := range variants {
-		declaration, variantRequests, err :=
-			callableVariantDeclaration(
-				context,
-				children,
-				function,
-				signature,
-				requirements,
-				profile,
-				recovery,
-			)
-		if err != nil {
-			return api.DeclarationEmission{}, err
-		}
-		declarations = append(declarations, declaration)
-		requests = append(requests, variantRequests...)
+	if err != nil {
+		return api.DeclarationEmission{}, err
 	}
 	return api.NewDeclarationEmission(
 		declarations,
@@ -99,23 +78,19 @@ func callableDeclaration(
 	)
 }
 
-func callableVariantDeclaration(
+func callableContractDeclaration(
 	context api.Context,
 	children api.ChildEmitter,
 	function *types.Func,
 	signature *types.Signature,
 	requirements []api.DeclarationRequirement,
-	profile *api.GenericCallableProfile,
 	recovery bool,
-) (tsgo.Statement, []api.RootRequest, error) {
+) ([]tsgo.Statement, []api.RootRequest, error) {
 	generic, err := enterGeneric(context, function, requirements)
 	if err != nil {
 		return nil, nil, err
 	}
 	context = generic.context
-	if profile != nil {
-		context = context.WithGenericCallableProfile(profile)
-	}
 	target, err := callable.EmitEnvironmentContract(
 		context,
 		children,
@@ -145,33 +120,43 @@ func callableVariantDeclaration(
 		)
 		requests = api.CombineRequests(receiver.Requests(), requests)
 	}
-	if recovery {
-		parameter, recoveryRequests, err :=
-			callable.RecoveryAuthorityParameter(context)
-		if err != nil {
-			return nil, nil, err
-		}
-		parameters = append(parameters, parameter)
-		requests = api.CombineRequests(requests, recoveryRequests)
-	}
 	name, err := context.Names().Declare(function)
 	if err != nil {
 		return nil, nil, err
 	}
-	if profile != nil {
-		name += profile.Suffix()
+	declarations := []tsgo.Statement{context.Factory().FunctionDeclaration(
+		exportDeclare(context),
+		nil,
+		context.Factory().Identifier(name),
+		generic.parameters,
+		parameters,
+		target.Result(),
+		nil,
+	)}
+	if recovery {
+		recoveryParameter, recoveryRequests, recoveryErr :=
+			callable.RecoveryAuthorityParameter(context)
+		if recoveryErr != nil {
+			return nil, nil, recoveryErr
+		}
+		declarations = append(
+			declarations,
+			context.Factory().FunctionDeclaration(
+				exportDeclare(context),
+				nil,
+				context.Factory().Identifier(name+api.DeferredEntrySuffix),
+				generic.parameters,
+				append(
+					[]tsgo.ParameterDeclaration{recoveryParameter},
+					parameters...,
+				),
+				target.Result(),
+				nil,
+			),
+		)
+		requests = api.CombineRequests(requests, recoveryRequests)
 	}
-	return context.Factory().FunctionDeclaration(
-			exportDeclare(context),
-			nil,
-			context.Factory().Identifier(name),
-			generic.parameters,
-			parameters,
-			target.Result(),
-			nil,
-		),
-		requests,
-		nil
+	return declarations, requests, nil
 }
 
 func requiresRecoveryAuthority(
@@ -181,9 +166,7 @@ func requiresRecoveryAuthority(
 	selected := false
 	for _, requirement := range requirements {
 		if requirement.Kind() ==
-			api.DeclarationRequirementGenericCallableProfile ||
-			requirement.Kind() ==
-				api.DeclarationRequirementGenericRepresentation {
+			api.DeclarationRequirementGenericRepresentation {
 			continue
 		}
 		owner, enclosing, callable, control, ok :=

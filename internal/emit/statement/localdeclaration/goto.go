@@ -24,7 +24,7 @@ func gotoLocalAssignment(
 			context,
 			children,
 			selected.sourceName,
-			selected.object.Type(),
+			selected.sourceType,
 			value,
 		)
 	} else {

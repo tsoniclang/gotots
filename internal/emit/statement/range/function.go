@@ -45,6 +45,15 @@ func emitIterator(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
+	if model, defined := definedtype.ResolveCallable(sourceType); defined {
+		operand, err = model.Project(
+			context.WithRole(api.RoleRangeExpression),
+			operand,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+	}
 	iterator, before, requests, err := capture(
 		context,
 		api.TemporaryRangeOperand,
@@ -54,9 +63,6 @@ func emitIterator(
 		return api.StatementEmission{}, err
 	}
 	targetIterator := tsgo.Expression(iterator)
-	if model, defined := definedtype.ResolveCallable(sourceType); defined {
-		targetIterator = model.Unwrap(context.Factory(), targetIterator)
-	}
 	if !callable.StaticallyNonNil(context.TypesInfo(), source.X) {
 		guard, guardRequests, guardErr := callable.NilGuard(
 			context.WithRole(api.RoleRangeExpression),

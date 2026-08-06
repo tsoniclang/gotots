@@ -37,10 +37,13 @@ func buildSlice(
 			capabilities.ArrayView = true
 		case api.RuntimeSliceStorage:
 			capabilities.Storage = true
+		case api.RuntimeSliceProjection:
 		case api.RuntimeSliceAppendSlice:
 			capabilities.AppendSlice = true
 		case api.RuntimeSliceClear:
 			capabilities.Clear = true
+		case api.RuntimeSliceRegion:
+			capabilities.Region = true
 		default:
 			return nil, &api.RuntimeSymbolError{Symbol: symbol}
 		}
@@ -53,12 +56,34 @@ func buildSlice(
 	if err != nil {
 		return nil, err
 	}
+	denseIndexContract, err := api.RuntimeContract(api.RuntimeDenseIndex)
+	if err != nil {
+		return nil, err
+	}
+	pointerName := ""
+	pointerProjectName := ""
+	if capabilities.Address {
+		pointerContract, pointerErr := api.RuntimeContract(api.RuntimePointer)
+		if pointerErr != nil {
+			return nil, pointerErr
+		}
+		pointerName = pointerContract.ExportedName()
+		pointerProjectContract, pointerProjectErr := api.RuntimeContract(
+			api.RuntimePointerProjection,
+		)
+		if pointerProjectErr != nil {
+			return nil, pointerProjectErr
+		}
+		pointerProjectName = pointerProjectContract.ExportedName()
+	}
 	class, err := NewDefinition(
 		api.RuntimeSlice,
 		runtimeslice.BuildWithCapabilities(
 			factory,
 			sliceContract.ExportedName(),
 			panicContract.ExportedName(),
+			denseIndexContract.ExportedName(),
+			pointerName,
 			capabilities,
 		),
 	)
@@ -67,6 +92,29 @@ func buildSlice(
 	}
 	definitions := []Definition{class}
 	for _, symbol := range symbols[1:] {
+		if symbol == api.RuntimeSliceProjection {
+			projectionContract, err := api.RuntimeContract(symbol)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(
+				symbol,
+				runtimeslice.BuildProjection(
+					factory,
+					projectionContract.ExportedName(),
+					sliceContract.ExportedName(),
+					panicContract.ExportedName(),
+					pointerName,
+					pointerProjectName,
+					capabilities,
+				),
+			)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+			continue
+		}
 		statement, err := buildSliceOperation(
 			factory,
 			symbol,
@@ -91,7 +139,8 @@ func buildSliceOperation(
 ) (tsgo.Statement, error) {
 	if symbol != api.RuntimeSliceAddress &&
 		symbol != api.RuntimeSliceArrayPointer &&
-		symbol != api.RuntimeArraySlice {
+		symbol != api.RuntimeArraySlice &&
+		symbol != api.RuntimeSliceRegion {
 		return runtimeslice.BuildOperation(factory, symbol)
 	}
 	addressContract, err := api.RuntimeContract(symbol)
@@ -135,6 +184,18 @@ func buildSliceOperation(
 			sliceName,
 			arrayContract.ExportedName(),
 			locationContract.ExportedName(),
+		), nil
+	}
+	if symbol == api.RuntimeSliceRegion {
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeslice.BuildRegion(
+			factory,
+			addressContract.ExportedName(),
+			sliceName,
+			panicContract.ExportedName(),
 		), nil
 	}
 	return runtimeslice.BuildAddress(

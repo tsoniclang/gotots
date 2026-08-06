@@ -64,7 +64,7 @@ func FieldTarget(
 		receiver.Before(),
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(api.StructStorageOfMember),
 				tsgo.NodeFlagsNone,
@@ -118,7 +118,7 @@ func DemandFieldOwner(
 		receiver.Before(),
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(api.StructStorageOfMember),
 				tsgo.NodeFlagsNone,

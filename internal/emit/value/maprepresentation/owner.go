@@ -30,7 +30,7 @@ func EmitType(
 		return api.DirectType(
 			context.Factory().UnionTypeNode([]tsgo.TypeNode{
 				context.Factory().TypeReferenceNode(
-					context.Factory().Identifier(reference.Name()),
+					reference.EntityName(context.Factory()),
 					nil,
 				),
 				context.Factory().KeywordTypeNode(
@@ -65,7 +65,7 @@ func EmitType(
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			[]tsgo.TypeNode{key.Value(), value.Value()},
 		),
 		api.CombineRequests(
@@ -216,7 +216,7 @@ func Reference(
 		keyRequests,
 		valueRequests,
 	)
-	reference, err = api.NewNameReference(reference.Name(), requests...)
+	reference, err = reference.WithRequests(requests...)
 	if err != nil {
 		return api.NameReference{}, nil, err
 	}
@@ -287,7 +287,7 @@ func Make(
 	return model.Wrap(context, api.DirectExpression(
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(makeName),
 				tsgo.NodeFlagsNone,
@@ -310,6 +310,40 @@ func storageKeyType(sourceType types.Type) types.Type {
 		return model.Underlying()
 	}
 	return sourceType
+}
+
+func storageKeyOperationContext(
+	context api.Context,
+	sourceType types.Type,
+) (api.Context, error) {
+	model, defined := definedtype.ResolveBasic(sourceType)
+	if !defined {
+		return context, nil
+	}
+	return model.OperationContext(context)
+}
+
+func EmitStorageKeyType(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	sourceType types.Type,
+) (api.TypeEmission, error) {
+	if children == nil || sourceType == nil || !types.Comparable(sourceType) {
+		return api.TypeEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "map storage key type contract is invalid",
+		}
+	}
+	operationContext, err := storageKeyOperationContext(context, sourceType)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return children.RepresentedType(
+		operationContext.WithRole(api.RoleStorageType),
+		source,
+		storageKeyType(sourceType),
+	)
 }
 
 func directKey(
@@ -353,7 +387,7 @@ func representedType(
 			return nil, nil, err
 		}
 		return context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			nil,
 		), reference.Requests(), nil
 	}
@@ -380,7 +414,7 @@ func primitiveType(
 		return nil, nil, err
 	}
 	return context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(reference.Name()),
+		reference.EntityName(context.Factory()),
 		nil,
 	), reference.Requests(), nil
 }

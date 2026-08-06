@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 )
 
 func emitInteger(
@@ -31,7 +32,14 @@ func emitInteger(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
+	operationContext := context
+	operationType := iterationType
 	if model, ok := definedtype.ResolveBasic(iterationType); ok {
+		operationContext, err = model.OperationContext(context)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		operationType = model.Underlying()
 		operand, err = model.Project(context, operand)
 		if err != nil {
 			return api.StatementEmission{}, err
@@ -82,8 +90,7 @@ func emitInteger(
 		limit,
 		targetBody.Value(),
 		targetBody.Requests(),
-		context.IntegerRepresentation() ==
-			api.IntegerRepresentationBigInt,
+		integervalue.TypeUsesBigInt(operationContext, operationType),
 		targetLabel,
 	)
 }
@@ -101,7 +108,7 @@ func integerIterationType(
 				if !ok {
 					return nil
 				}
-				if object, ok := context.TypesInfo().Defs[identifier].(*types.Var); ok {
+				if object, ok := context.TypesInfo().DefOf(identifier).(*types.Var); ok {
 					return object.Type()
 				}
 			}

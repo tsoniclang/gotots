@@ -6,6 +6,8 @@ import (
 	"slices"
 	"sort"
 
+	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
@@ -26,23 +28,24 @@ type packageInitializationScheduler struct {
 }
 
 type packageStorage struct {
-	owner             api.ArtifactOwner
-	variable          *types.Var
-	source            ast.Node
-	field             tsgo.PropertyDeclaration
-	zeroStatements    []tsgo.Statement
-	statePlacement    *targetplacement.Owner
-	assemblyPlacement *targetplacement.Owner
-	reconstructions   uint64
+	owner                    api.ArtifactOwner
+	variable                 *types.Var
+	source                   ast.Node
+	field                    tsgo.PropertyDeclaration
+	initializationStatements []tsgo.Statement
+	statePlacement           *targetplacement.Owner
+	assemblyPlacement        *targetplacement.Owner
+	reconstructions          uint64
 }
 
 type packageStorageRevision struct {
-	field             tsgo.PropertyDeclaration
-	zeroStatements    []tsgo.Statement
-	statePlacement    *targetplacement.Owner
-	assemblyPlacement *targetplacement.Owner
-	dependencies      []api.ArtifactDependency
-	contract          artifactstate.Contract
+	field                    tsgo.PropertyDeclaration
+	initializationStatements []tsgo.Statement
+	statePlacement           *targetplacement.Owner
+	assemblyPlacement        *targetplacement.Owner
+	dependencies             []api.ArtifactDependency
+	requirements             []api.DeclarationRequirement
+	contract                 artifactstate.Contract
 }
 
 type packageInitializationArtifact struct {
@@ -61,24 +64,26 @@ type packageInitFunction struct {
 }
 
 type packageTargetBuilder struct {
-	sourcePackage      *load.Package
-	assemblyOwner      api.ArtifactOwner
-	statePath          string
-	assemblyPath       string
-	emitter            *emitter
-	stateContext       api.Context
-	assemblyContext    api.Context
-	statePlacement     *targetplacement.Owner
-	assemblyPlacement  *targetplacement.Owner
-	storage            []packageStorage
-	storageByObject    map[*types.Var]int
-	initialization     []packageInitializationArtifact
-	initializerByOwner map[api.ArtifactOwner]int
-	initFunctions      []packageInitFunction
-	exportObjects      map[types.Object]struct{}
-	exportStatements   []tsgo.Statement
-	exportPublished    bool
-	exportRevisions    uint64
+	sourcePackage          *load.Package
+	assemblyOwner          api.ArtifactOwner
+	statePath              string
+	assemblyPath           string
+	emitter                *emitter
+	stateContext           api.Context
+	assemblyContext        api.Context
+	statePlacement         *targetplacement.Owner
+	assemblyPlacement      *targetplacement.Owner
+	exportPlacement        *targetplacement.Owner
+	storage                []packageStorage
+	storageByObject        map[*types.Var]int
+	initialization         []packageInitializationArtifact
+	initializerByOwner     map[api.ArtifactOwner]int
+	initFunctions          []packageInitFunction
+	exportObjects          map[types.Object]struct{}
+	exportStatements       []tsgo.Statement
+	constantInitialization []tsgo.Statement
+	exportPublished        bool
+	exportRevisions        uint64
 }
 
 func newPackageInitializationScheduler() *packageInitializationScheduler {
@@ -160,6 +165,7 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 		assemblyContext:    assemblyContext,
 		statePlacement:     targetplacement.New(),
 		assemblyPlacement:  targetplacement.New(),
+		exportPlacement:    targetplacement.New(),
 		storageByObject:    make(map[*types.Var]int),
 		initializerByOwner: make(map[api.ArtifactOwner]int),
 		exportObjects:      make(map[types.Object]struct{}),
@@ -242,22 +248,23 @@ func (s *programSession) emitPackageStorage(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
 	builder.storageByObject[variable] = len(builder.storage)
 	builder.storage = append(builder.storage, packageStorage{
-		owner:             owner,
-		variable:          variable,
-		source:            source,
-		field:             revision.field,
-		zeroStatements:    revision.zeroStatements,
-		statePlacement:    revision.statePlacement,
-		assemblyPlacement: revision.assemblyPlacement,
+		owner:                    owner,
+		variable:                 variable,
+		source:                   source,
+		field:                    revision.field,
+		initializationStatements: revision.initializationStatements,
+		statePlacement:           revision.statePlacement,
+		assemblyPlacement:        revision.assemblyPlacement,
 	})
 	return nil
 }
@@ -303,27 +310,33 @@ func (s *programSession) buildPackageStorageRevision(
 		return packageStorageRevision{}, err
 	}
 	defer finishAssembly()
+	var embedded *load.EmbedValue
+	if value, ok := site.Source.Embed(variable); ok {
+		embedded = &value
+	}
 	emission, err := packagevariable.EmitStorage(
 		builder.stateContext.WithArtifactOwner(owner),
 		builder.assemblyContext.WithArtifactOwner(owner),
 		builder.emitter,
 		source,
 		variable,
+		embedded,
 	)
 	if err != nil {
 		return packageStorageRevision{}, err
 	}
-	statePlacement, stateDependencies, err := s.consumeArtifactRequests(
-		owner,
-		emission.StateRequests(),
-	)
+	statePlacement, stateDependencies, stateRequirements, err :=
+		s.consumeArtifactRequests(
+			owner,
+			emission.StateRequests(),
+		)
 	if err != nil {
 		return packageStorageRevision{}, err
 	}
 	if err := statePlacement.RequireTypeOnly(); err != nil {
 		return packageStorageRevision{}, err
 	}
-	assemblyPlacement, assemblyDependencies, err :=
+	assemblyPlacement, assemblyDependencies, assemblyRequirements, err :=
 		s.consumeArtifactRequests(
 			owner,
 			emission.AssemblyRequests(),
@@ -336,14 +349,18 @@ func (s *programSession) buildPackageStorageRevision(
 		return packageStorageRevision{}, err
 	}
 	return packageStorageRevision{
-		field:             emission.Field(),
-		zeroStatements:    emission.ZeroStatements(),
-		statePlacement:    statePlacement,
-		assemblyPlacement: assemblyPlacement,
+		field:                    emission.Field(),
+		initializationStatements: emission.InitializationStatements(),
+		statePlacement:           statePlacement,
+		assemblyPlacement:        assemblyPlacement,
 		dependencies: append(
 			stateDependencies,
 			assemblyDependencies...,
 		),
+		requirements: canonicalDeclarationRequirements(append(
+			stateRequirements,
+			assemblyRequirements...,
+		)),
 		contract: contract,
 	}, nil
 }
@@ -401,16 +418,17 @@ func (s *programSession) reconstructPackageStorage(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
 	s.artifacts.DiscardDirty(owner)
 	storage.field = revision.field
-	storage.zeroStatements = revision.zeroStatements
+	storage.initializationStatements = revision.initializationStatements
 	storage.statePlacement = revision.statePlacement
 	storage.assemblyPlacement = revision.assemblyPlacement
 	storage.reconstructions++
@@ -501,7 +519,11 @@ func (s *programSession) emitPackageInitFunctions(
 					Reason: "package init has no function identity",
 				}
 			}
-			if err := s.require(object); err != nil {
+			if err := s.RequireUse(
+				object,
+				environmentidentity.UseDemandInitializer,
+				gostdlib.NoUseSelection(),
+			); err != nil {
 				return err
 			}
 			binding, ok := s.registry.Target(object)

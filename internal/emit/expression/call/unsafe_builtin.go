@@ -7,7 +7,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	unsafeoperation "github.com/tsoniclang/gotots/internal/emit/expression/builtin/unsafeoperation"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func emitUnsafeBuiltin(
@@ -20,7 +19,7 @@ func emitUnsafeBuiltin(
 	kind := unsafeoperation.Classify(builtin)
 	switch {
 	case kind.Constant():
-		facts, ok := context.TypesInfo().Types[source]
+		facts, ok := context.TypesInfo().TypeAndValue(source)
 		if !ok || facts.Type == nil || facts.Value == nil {
 			return api.ExpressionEmission{},
 				true,
@@ -66,31 +65,15 @@ func emitUnsafeBuiltin(
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
-		reference, err := context.Names().Reference(builtin)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
-		requirement, err := api.NewEnvironmentBuiltinRequest(
-			builtin,
+		target, err := emitUnsafeRuntimeCall(
+			context,
+			children,
+			source,
+			kind,
 			signature,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
-		target, err := api.NewExpressionEmission(
+			arguments,
 			before,
-			context.Factory().CallExpression(
-				context.Factory().Identifier(reference.Name()),
-				nil,
-				nil,
-				arguments,
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(
-				reference.Requests(),
-				requests,
-				[]api.RootRequest{requirement},
-			),
+			requests,
 		)
 		return target, true, err
 	default:

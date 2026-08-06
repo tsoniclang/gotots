@@ -69,10 +69,11 @@ func identifier(
 	source *ast.Ident,
 	element types.Type,
 ) (api.ExpressionEmission, error) {
-	variable, ok := context.TypesInfo().Uses[source].(*types.Var)
+	variable, ok := context.TypesInfo().UseOf(source).(*types.Var)
+	variableType := context.TypesInfo().TypeOfObject(variable)
 	if !ok ||
 		variable.IsField() ||
-		!types.Identical(variable.Type(), element) {
+		!types.Identical(variableType, element) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -84,7 +85,17 @@ func identifier(
 		context,
 		variable,
 	); selected {
-		return api.DirectExpression(context.Factory().Identifier(name)), nil
+		requirement, err := context.AddressableStorage().Requirement(
+			context,
+			variable,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().Identifier(name),
+			requirement,
+		), nil
 	}
 	var receiverRequest []api.RootRequest
 	if receiver, ok := context.ValueReceiver(variable); ok {
@@ -97,7 +108,7 @@ func identifier(
 	value, err := children.Expression(
 		context.
 			WithRole(api.RoleUnaryOperand).
-			WithExpectedType(variable.Type()),
+			WithExpectedType(variableType),
 		source,
 	)
 	if err != nil {
@@ -107,7 +118,7 @@ func identifier(
 		context,
 		children,
 		source,
-		variable.Type(),
+		variableType,
 		value,
 	)
 	if err != nil {
@@ -134,9 +145,14 @@ func packageVariable(
 	source ast.Node,
 	variable *types.Var,
 ) (api.ExpressionEmission, error) {
+	variableType := context.TypesInfo().TypeOfObject(variable)
+	if variableType == nil {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	representation, err := pointertype.Observe(
 		context,
-		types.NewPointer(variable.Type()),
+		types.NewPointer(variableType),
 		true,
 	)
 	if err != nil {
@@ -149,7 +165,7 @@ func packageVariable(
 	logicalType, err := children.RepresentedType(
 		context.WithRole(api.RoleUnaryOperand),
 		source,
-		variable.Type(),
+		variableType,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -198,20 +214,23 @@ func selector(
 	source *ast.SelectorExpr,
 	element types.Type,
 ) (api.ExpressionEmission, error) {
-	selection := context.TypesInfo().Selections[source]
+	selection := context.TypesInfo().SelectionOf(source)
 	if selection == nil {
 		qualifier, ok := source.X.(*ast.Ident)
 		if !ok {
 			return api.ExpressionEmission{},
 				api.Unsupported(context, api.CategoryExpression, source)
 		}
-		packageName, ok := context.TypesInfo().Uses[qualifier].(*types.PkgName)
-		variable, variableOK := context.TypesInfo().Uses[source.Sel].(*types.Var)
+		packageName, ok := context.TypesInfo().UseOf(qualifier).(*types.PkgName)
+		variable, variableOK := context.TypesInfo().UseOf(source.Sel).(*types.Var)
 		if !ok ||
 			!variableOK ||
 			variable.Pkg() != packageName.Imported() ||
 			variable.Parent() != variable.Pkg().Scope() ||
-			!types.Identical(variable.Type(), element) {
+			!types.Identical(
+				context.TypesInfo().TypeOfObject(variable),
+				element,
+			) {
 			return api.ExpressionEmission{},
 				api.Unsupported(context, api.CategoryExpression, source)
 		}
@@ -220,7 +239,10 @@ func selector(
 	field, ok := selection.Obj().(*types.Var)
 	if !ok ||
 		selection.Kind() != types.FieldVal ||
-		!types.Identical(field.Type(), element) {
+		!types.Identical(
+			field.Type(),
+			element,
+		) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}

@@ -6,6 +6,8 @@ import (
 	"go/token"
 	"go/types"
 	"testing"
+
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 )
 
 func TestMethodIdentityUsesVisibilityPackageAndExactSignature(t *testing.T) {
@@ -73,15 +75,15 @@ func TestMethodIdentityUsesVisibilityPackageAndExactSignature(t *testing.T) {
 		return result
 	}
 	if key(exportedFirst) != key(exportedSecond) ||
-		!Equivalent(exportedFirst, exportedSecond) {
+		!environmentcontract.EquivalentMethods(exportedFirst, exportedSecond) {
 		t.Fatal("exported equivalent methods do not share identity")
 	}
 	if key(privateFirst) == key(privateSecond) ||
-		Equivalent(privateFirst, privateSecond) {
+		environmentcontract.EquivalentMethods(privateFirst, privateSecond) {
 		t.Fatal("unexported methods from different packages share identity")
 	}
 	if key(exportedFirst) == key(different) ||
-		Equivalent(exportedFirst, different) {
+		environmentcontract.EquivalentMethods(exportedFirst, different) {
 		t.Fatal("different method signatures share identity")
 	}
 }
@@ -189,7 +191,8 @@ func (Box) Get() int32 { return 0 }
 	if err != nil {
 		t.Fatal(err)
 	}
-	if interfaceKey != boxKey || !Equivalent(interfaceMethod, boxMethod) {
+	if interfaceKey != boxKey ||
+		!environmentcontract.EquivalentMethods(interfaceMethod, boxMethod) {
 		t.Fatal("instantiated generic interface method does not match its concrete implementation")
 	}
 }
@@ -239,11 +242,11 @@ type Different[T any] interface {
 		return result
 	}
 	if key("First") != key("Renamed") ||
-		!Equivalent(method("First"), method("Renamed")) {
+		!environmentcontract.EquivalentMethods(method("First"), method("Renamed")) {
 		t.Fatal("alpha-equivalent generic interface methods do not share identity")
 	}
 	if key("First") == key("Different") ||
-		Equivalent(method("First"), method("Different")) {
+		environmentcontract.EquivalentMethods(method("First"), method("Different")) {
 		t.Fatal("differently named generic interface methods share identity")
 	}
 }

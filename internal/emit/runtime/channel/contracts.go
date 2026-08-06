@@ -28,6 +28,7 @@ func Build(
 	selectReadyName string,
 	selectAttemptName string,
 	panicName string,
+	denseIndexName string,
 ) (tsgo.Statement, error) {
 	target := builder{
 		factory:           factory,
@@ -39,6 +40,7 @@ func Build(
 		selectReadyName:   selectReadyName,
 		selectAttemptName: selectAttemptName,
 		panicName:         panicName,
+		denseIndexName:    denseIndexName,
 	}
 	switch symbol {
 	case api.RuntimeChannel:

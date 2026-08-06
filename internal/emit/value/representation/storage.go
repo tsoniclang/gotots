@@ -8,6 +8,7 @@ import (
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -17,6 +18,9 @@ func (owner Owner) RequiresStorageProjection(
 ) bool {
 	if panicNilRuntimeValue(context, sourceType) {
 		return false
+	}
+	if model, ok := maprepresentation.Source(context, sourceType); ok {
+		return model.Nominal()
 	}
 	if _, ok := definedStorageModel(sourceType); ok {
 		return true
@@ -34,10 +38,12 @@ func (owner Owner) StorageType(
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
 	if parameter, generic := api.GenericTypeParameter(sourceType); generic {
-		return context.GenericParameterRepresentation(
+		return owner.genericStorageType(
+			context,
 			source,
 			parameter,
 			api.GenericRepresentationStorage,
+			api.RuntimeStorageType,
 		)
 	}
 	if panicNilRuntimeValue(context, sourceType) {
@@ -47,9 +53,22 @@ func (owner Owner) StorageType(
 			sourceType,
 		)
 	}
-	if defined, ok := definedStorageModel(sourceType); ok {
-		return owner.StorageType(
+	if model, ok := maprepresentation.Source(context, sourceType); ok &&
+		model.Nominal() {
+		return maprepresentation.EmitType(
 			context.WithRole(api.RoleDefinedUnderlyingType),
+			owner.children,
+			source,
+			model.Map(),
+		)
+	}
+	if defined, ok := definedStorageModel(sourceType); ok {
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return owner.StorageType(
+			operationContext.WithRole(api.RoleDefinedUnderlyingType),
 			source,
 			defined.Underlying(),
 		)
@@ -61,7 +80,7 @@ func (owner Owner) StorageType(
 		}
 		return api.DirectType(
 			context.Factory().TypeReferenceNode(
-				context.Factory().Identifier(reference.Name()),
+				reference.EntityName(context.Factory()),
 				nil,
 			),
 			reference.Requests()...,
@@ -88,7 +107,7 @@ func (owner Owner) StorageType(
 					owner.children,
 					source,
 					named.Origin().Obj(),
-					named.TypeArgs(),
+					api.TypeArgumentsFromGo(named.TypeArgs()),
 				)
 			if err != nil {
 				return api.TypeEmission{}, err
@@ -96,7 +115,7 @@ func (owner Owner) StorageType(
 		}
 		return api.DirectType(
 			context.Factory().TypeReferenceNode(
-				context.Factory().Identifier(reference.Name()),
+				reference.EntityName(context.Factory()),
 				typeArguments,
 			),
 			api.CombineRequests(
@@ -131,13 +150,21 @@ func (owner Owner) ToStorage(
 	if panicNilRuntimeValue(context, sourceType) {
 		return value, nil
 	}
+	if model, ok := maprepresentation.Source(context, sourceType); ok &&
+		model.Nominal() {
+		return model.ReadReceiver(context, source, value)
+	}
 	if defined, ok := definedStorageModel(sourceType); ok {
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		projected, err := defined.Project(context, value)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
 		return owner.ToStorage(
-			context.WithRole(api.RoleDefinedUnderlyingType),
+			operationContext.WithRole(api.RoleDefinedUnderlyingType),
 			source,
 			defined.Underlying(),
 			projected,
@@ -199,9 +226,17 @@ func (owner Owner) FromStorage(
 	if panicNilRuntimeValue(context, sourceType) {
 		return value, nil
 	}
+	if model, ok := maprepresentation.Source(context, sourceType); ok &&
+		model.Nominal() {
+		return model.Wrap(context, value)
+	}
 	if defined, ok := definedStorageModel(sourceType); ok {
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		restored, err := owner.FromStorage(
-			context.WithRole(api.RoleDefinedUnderlyingType),
+			operationContext.WithRole(api.RoleDefinedUnderlyingType),
 			source,
 			defined.Underlying(),
 			value,
@@ -267,7 +302,7 @@ func callStorageMember(
 		value.Before(),
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(member),
 				tsgo.NodeFlagsNone,

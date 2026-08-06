@@ -13,10 +13,15 @@ import (
 
 const (
 	ProgramInitializationPath  = "program.ts"
-	ScalarSupportPath          = "support/scalars.ts"
+	RuntimePackageName         = "@gotots/runtime"
+	RuntimePackageRootPath     = "runtime"
+	RuntimePackageManifestPath = "runtime/package.json"
+	ScalarSupportPath          = "runtime/scalars.ts"
 	AnonymousStructSupportPath = "support/anonymous-structs.ts"
 	InterfaceMethodSupportPath = "support/interface-methods.ts"
 	InterfaceTypeSupportPath   = "support/interface-types.ts"
+	ReflectionTypeSupportPath  = "support/reflection-types.ts"
+	UnsafeCodecSupportPath     = "support/unsafe-codecs.ts"
 )
 
 func EnvironmentContractPath(
@@ -76,6 +81,34 @@ func EnvironmentContractPath(
 			Reason: "environment contract ownership is invalid",
 		}
 	}
+}
+
+func StandardLibraryConstantProjectionPath(
+	sourcePackage *load.Package,
+) (string, error) {
+	if sourcePackage == nil ||
+		sourcePackage.Kind() != load.PackageStandardLibraryContract ||
+		sourcePackage.Path() == "" ||
+		sourcePackage.ToolchainKey() == "" {
+		return "", &PathError{Reason: "standard-library projection owner is invalid"}
+	}
+	importPath := sourcePackage.Path()
+	if path.IsAbs(importPath) ||
+		path.Clean(importPath) != importPath ||
+		importPath == "." ||
+		strings.HasPrefix(importPath, "../") {
+		return "", &PathError{
+			Source: importPath,
+			Reason: "standard-library projection import path is not canonical",
+		}
+	}
+	return path.Join(
+		"support",
+		"constant-projections",
+		sourcePackage.ToolchainKey(),
+		importPath,
+		"index.ts",
+	), nil
 }
 
 const (
@@ -148,8 +181,24 @@ func InterfaceAdapterPath(artifactKey string) (string, error) {
 	return generatedArtifactPath("interfaces/adapters", artifactKey)
 }
 
+func ProviderInterfaceBridgePath(artifactKey string) (string, error) {
+	return generatedArtifactPath("interfaces/provider-bridges", artifactKey)
+}
+
+func ProviderStatefulRepresentationPath(artifactKey string) (string, error) {
+	return generatedArtifactPath("providers/stateful-representations", artifactKey)
+}
+
 func GenericCapabilityPath(artifactKey string) (string, error) {
 	return generatedArtifactPath("generics/capabilities", artifactKey)
+}
+
+func GenericConcretizationPath(artifactKey string) (string, error) {
+	return generatedArtifactPath("generics/concretizations", artifactKey)
+}
+
+func DeferredCallableRegistryPath(artifactKey string) (string, error) {
+	return generatedArtifactPath("callables/deferred", artifactKey)
 }
 
 func AnonymousInterfacePath(artifactKey string) (string, error) {

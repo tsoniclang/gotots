@@ -108,7 +108,7 @@ func directLabels(
 		if !ok {
 			continue
 		}
-		object, ok := context.TypesInfo().Defs[labeled.Label].(*types.Label)
+		object, ok := context.TypesInfo().DefOf(labeled.Label).(*types.Label)
 		if !ok {
 			return nil, api.Unsupported(
 				context,
@@ -196,7 +196,8 @@ func hasNonGotoLabelUse(
 	for _, position := range context.GotoUses(label.object) {
 		gotoPositions[position] = struct{}{}
 	}
-	for identifier, object := range context.TypesInfo().Uses {
+	for _, use := range context.TypesInfo().Uses() {
+		identifier, object := use.Identifier, use.Object
 		if object != label.object {
 			continue
 		}

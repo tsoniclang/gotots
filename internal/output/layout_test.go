@@ -84,16 +84,16 @@ func TestLayoutRejectsForeignFilesAndSameModuleImports(t *testing.T) {
 
 func TestScalarSupportPathProducesCanonicalRelativeSpecifier(t *testing.T) {
 	const sourcePath = "modules/example/package/source.ts"
-	if ScalarSupportPath != "support/scalars.ts" {
-		t.Fatalf("scalar support path = %q, want support/scalars.ts", ScalarSupportPath)
+	if ScalarSupportPath != "runtime/scalars.ts" {
+		t.Fatalf("scalar support path = %q, want runtime/scalars.ts", ScalarSupportPath)
 	}
 	specifier, err := ModuleSpecifier(sourcePath, ScalarSupportPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if specifier != "../../../support/scalars.js" {
+	if specifier != "../../../runtime/scalars.js" {
 		t.Fatalf(
-			"scalar support specifier = %q, want ../../../support/scalars.js",
+			"scalar support specifier = %q, want ../../../runtime/scalars.js",
 			specifier,
 		)
 	}
@@ -217,6 +217,15 @@ func TestEnvironmentContractPathUsesPackageIdentityWithoutFabricatedModule(
 		!strings.HasPrefix(first, "gostdlib/") ||
 		!strings.HasSuffix(first, "/context/index.ts") {
 		t.Fatalf("environment contract path = %q / %q", first, second)
+	}
+	projection, err := StandardLibraryConstantProjectionPath(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projection == first ||
+		!strings.HasPrefix(projection, "support/constant-projections/") ||
+		!strings.HasSuffix(projection, "/context/index.ts") {
+		t.Fatalf("standard-library constant projection path = %q", projection)
 	}
 	if _, err := PackageAssemblyPath(contract); err == nil {
 		t.Fatal("environment contract accepted fabricated source-module assembly")

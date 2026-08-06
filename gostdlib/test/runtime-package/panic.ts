@@ -1,0 +1,62 @@
+import { GoErrorMethodToken, GoInterfaceValue, GoRuntimeErrorMethodToken } from "./interface-value.js";
+export class GoPanic {
+    private constructor(public readonly value: GoInterfaceValue) {
+    }
+    static createRuntime(message: string): GoPanic {
+        return new GoPanic(new GoRuntimePanicValue(message));
+    }
+    static raise(value: GoInterfaceValue): never {
+        throw new GoPanic(value);
+    }
+    static raiseRuntime(message: string): never {
+        throw new GoPanic(new GoRuntimePanicValue(message));
+    }
+    static rethrow(failure: object): never {
+        throw failure;
+    }
+}
+export class GoRuntimePanicValue implements GoInterfaceValue {
+    static readonly comparable: boolean = true;
+    constructor(public readonly message: string) {
+    }
+    readonly $go$type: {
+        readonly comparable: boolean;
+    } = GoRuntimePanicValue;
+    readonly $go$methods: ReadonlySet<object> = new Set<object>([GoErrorMethodToken, GoRuntimeErrorMethodToken]);
+    $go$implements(contract: readonly object[]): boolean {
+        return contract.every((token: object): boolean => this.$go$methods.has(token));
+    }
+    $go$equal(other: GoInterfaceValue): boolean {
+        return this === other;
+    }
+    $go$hash(): number {
+        return 0;
+    }
+    readonly $go$formatString: boolean = false;
+    $go$format(verb: string, _flags: string, _precision: number | undefined): string {
+        if (verb === "T") {
+            return "runtime.errorString";
+        }
+        return this.message;
+    }
+    Error(): string {
+        return this.message;
+    }
+    RuntimeError(): void {
+    }
+}
+export class GoRecovery {
+    constructor(private pending: GoPanic | undefined) {
+    }
+    take(): GoInterfaceValue | undefined {
+        const pending = this.pending;
+        if (pending === undefined) {
+            return undefined;
+        }
+        this.pending = undefined;
+        return pending.value;
+    }
+    recovered(): boolean {
+        return this.pending === undefined;
+    }
+}

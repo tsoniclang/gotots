@@ -39,6 +39,15 @@ func Emit(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
+	fallthroughLowering := requiresFallthroughLowering(source)
+	if fallthroughLowering && targetLabel == "" {
+		targetLabel, err = context.Names().Temporary(
+			api.TemporaryControlTarget,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+	}
 	initializer, err := emitInitializer(context, children, source)
 	if err != nil {
 		return api.StatementEmission{}, err
@@ -47,18 +56,33 @@ func Emit(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
+	if tag.expressionless && targetLabel == "" {
+		targetLabel, err = context.Names().Temporary(
+			api.TemporaryControlTarget,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+	}
 	clauses, err := emitClauses(
 		context,
 		children,
 		source,
 		tag,
 		targetLabel,
+		fallthroughLowering,
 	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
 	var target api.StatementEmission
-	if directEligible(context, tag, clauses) {
+	if expressionlessDirectEligible(tag, clauses) {
+		target, err = emitExpressionlessDirect(
+			context,
+			clauses,
+			targetLabel,
+		)
+	} else if directEligible(context, tag, clauses) {
 		target, err = emitDirect(context, tag, clauses, targetLabel)
 	} else {
 		target, err = emitConditional(context, tag, clauses, targetLabel)
@@ -140,6 +164,7 @@ func emitClauses(
 	source *ast.SwitchStmt,
 	tag tagEmission,
 	targetLabel string,
+	fallthroughLowering bool,
 ) ([]clauseEmission, error) {
 	clauses := make([]clauseEmission, 0, len(source.Body.List))
 	defaultSeen := false
@@ -183,6 +208,7 @@ func emitClauses(
 			sourceClause,
 			index+1 < len(source.Body.List),
 			targetLabel,
+			fallthroughLowering,
 		)
 		if err != nil {
 			return nil, err

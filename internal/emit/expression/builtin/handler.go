@@ -260,7 +260,7 @@ func emitConstantMeasure(
 	if source == nil || len(source.Args) != 1 {
 		return api.ExpressionEmission{}, false, nil
 	}
-	facts, ok := context.TypesInfo().Types[source]
+	facts, ok := context.TypesInfo().TypeAndValue(source)
 	if !ok || facts.Type == nil || facts.Value == nil {
 		return api.ExpressionEmission{}, false, nil
 	}
@@ -283,28 +283,28 @@ func emitConstantMeasure(
 }
 
 func Object(
-	info *types.Info,
+	info api.TypeInfoView,
 	source ast.Expr,
 ) (*types.Builtin, bool) {
-	if info == nil {
+	if !info.Valid() {
 		return nil, false
 	}
 	switch selected := source.(type) {
 	case *ast.Ident:
-		return FromObject(info.Uses[selected])
+		return FromObject(info.UseOf(selected))
 	case *ast.SelectorExpr:
-		if info.Selections[selected] != nil {
+		if info.SelectionOf(selected) != nil {
 			return nil, false
 		}
 		qualifier, ok := selected.X.(*ast.Ident)
 		if !ok {
 			return nil, false
 		}
-		packageName, ok := info.Uses[qualifier].(*types.PkgName)
+		packageName, ok := info.UseOf(qualifier).(*types.PkgName)
 		if !ok {
 			return nil, false
 		}
-		builtin, ok := FromObject(info.Uses[selected.Sel])
+		builtin, ok := FromObject(info.UseOf(selected.Sel))
 		if !ok ||
 			builtin.Pkg() == nil ||
 			builtin.Pkg() != packageName.Imported() {

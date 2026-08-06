@@ -5,8 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
-	definedmodel "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	typefacet "github.com/tsoniclang/gotots/internal/emit/declaration/typefacet"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -16,17 +15,24 @@ func typeDeclaration(
 	typeName *types.TypeName,
 	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
-	for _, requirement := range requirements {
-		owner, _, _, ok := requirement.GenericRepresentation()
-		if !ok || owner != typeName {
-			return api.DeclarationEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "environment type received a foreign declaration requirement",
-			}
-		}
+	genericRequirements, representationFacets, err :=
+		partitionTypeRequirements(context, typeName, requirements)
+	if err != nil {
+		return api.DeclarationEmission{}, err
 	}
 	if typeName.IsAlias() {
-		return aliasDeclaration(context, children, typeName, requirements)
+		if len(representationFacets) != 0 {
+			return api.DeclarationEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "environment alias acquired type representation",
+			}
+		}
+		return aliasDeclaration(
+			context,
+			children,
+			typeName,
+			genericRequirements,
+		)
 	}
 	named, ok := typeName.Type().(*types.Named)
 	if !ok {
@@ -37,12 +43,18 @@ func typeDeclaration(
 	}
 	switch underlying := named.Underlying().(type) {
 	case *types.Interface:
+		if len(representationFacets) != 0 {
+			return api.DeclarationEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "environment interface acquired type representation",
+			}
+		}
 		return interfaceDeclaration(
 			context,
 			children,
 			typeName,
 			underlying.Complete(),
-			requirements,
+			genericRequirements,
 		)
 	case *types.Struct:
 		return structDeclaration(
@@ -50,7 +62,8 @@ func typeDeclaration(
 			children,
 			typeName,
 			underlying,
-			requirements,
+			genericRequirements,
+			representationFacets,
 		)
 	default:
 		return definedDeclaration(
@@ -58,9 +71,44 @@ func typeDeclaration(
 			children,
 			typeName,
 			underlying,
-			requirements,
+			genericRequirements,
+			representationFacets,
 		)
 	}
+}
+
+func partitionTypeRequirements(
+	context api.Context,
+	typeName *types.TypeName,
+	requirements []api.DeclarationRequirement,
+) (
+	[]api.DeclarationRequirement,
+	[]api.TypeRepresentationFacet,
+	error,
+) {
+	var generic []api.DeclarationRequirement
+	var facets []api.TypeRepresentationFacet
+	for _, requirement := range requirements {
+		if owner, _, _, ok := requirement.GenericRepresentation(); ok {
+			if owner != typeName {
+				return nil, nil, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "environment type received a foreign generic representation",
+				}
+			}
+			generic = append(generic, requirement)
+			continue
+		}
+		owner, artifact, facet, ok := requirement.TypeRepresentation()
+		if !ok || owner != typeName || artifact != nil {
+			return nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "environment type received a foreign declaration requirement",
+			}
+		}
+		facets = append(facets, facet)
+	}
+	return generic, facets, nil
 }
 
 func aliasDeclaration(
@@ -148,24 +196,13 @@ func interfaceDeclaration(
 		if err != nil {
 			return api.DeclarationEmission{}, err
 		}
-		cooperative, contractRequests, err :=
-			cooperativecall.InterfaceMethodContract(
-				context,
-				callableReference,
-			)
-		if err != nil {
-			return api.DeclarationEmission{}, err
-		}
 		memberName, err := context.Names().InterfaceMethodName(method)
 		if err != nil {
 			return api.DeclarationEmission{}, err
 		}
-		resultType := target.Result()
-		if cooperative {
-			resultType = callable.PromiseResult(
-				context.Factory(),
-				resultType,
-			)
+		resultType, err := callable.IndirectResult(context, target.Result())
+		if err != nil {
+			return api.DeclarationEmission{}, err
 		}
 		members = append(members,
 			context.Factory().MethodSignatureDeclaration(
@@ -174,11 +211,12 @@ func interfaceDeclaration(
 				nil,
 				nil,
 				target.Parameters(),
-				resultType,
+				resultType.Value(),
 			),
 		)
 		requests = append(requests, target.Requests()...)
-		requests = append(requests, contractRequests...)
+		requests = append(requests, resultType.Requests()...)
+		requests = append(requests, callableReference.Requests()...)
 	}
 	interfaceType := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(name),
@@ -250,6 +288,7 @@ func structDeclaration(
 	typeName *types.TypeName,
 	source *types.Struct,
 	requirements []api.DeclarationRequirement,
+	representationFacets []api.TypeRepresentationFacet,
 ) (api.DeclarationEmission, error) {
 	generic, err := enterGeneric(context, typeName, requirements)
 	if err != nil {
@@ -277,6 +316,18 @@ func structDeclaration(
 		context.Factory().Identifier(storageName),
 		generic.arguments,
 	)
+	markers, err := typefacet.Build(
+		context,
+		typeName.Type(),
+		classType,
+		storageType,
+		representationFacets,
+		true,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	requests = api.CombineRequests(requests, markers.Requests())
 	members := make([]tsgo.ClassElement, 0, len(fields)+10)
 	members = append(members, context.Factory().PropertyDeclaration(
 		[]tsgo.ModifierLike{
@@ -299,6 +350,7 @@ func structDeclaration(
 			nil,
 		))
 	}
+	members = append(members, markers.Members()...)
 	members = append(members, context.Factory().ConstructorDeclaration(
 		[]tsgo.ModifierLike{context.Factory().PrivateKeyword()},
 		nil,
@@ -328,7 +380,7 @@ func structDeclaration(
 			exportDeclare(context),
 			context.Factory().Identifier(name),
 			generic.parameters,
-			nil,
+			markers.Heritage(),
 			members,
 		),
 	}
@@ -463,87 +515,4 @@ func typeElements(
 		result = append(result, field)
 	}
 	return result
-}
-
-func definedDeclaration(
-	context api.Context,
-	children api.ChildEmitter,
-	typeName *types.TypeName,
-	underlying types.Type,
-	requirements []api.DeclarationRequirement,
-) (api.DeclarationEmission, error) {
-	generic, err := enterGeneric(context, typeName, requirements)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	context = generic.context
-	target, err := children.RepresentedType(
-		context.WithRole(api.RoleDefinedUnderlyingType),
-		nil,
-		underlying,
-	)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	name, err := context.Names().Declare(typeName)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	typeParameters := generic.parameters
-	valueType := target.Value()
-	if definedmodel.RequiresValueFacet(typeName.Type()) {
-		typeParameters = append(
-			typeParameters,
-			definedmodel.ValueTypeParameterDeclaration(
-				context.Factory(),
-				target.Value(),
-			),
-		)
-		valueType = definedmodel.ValueTypeParameterReference(
-			context.Factory(),
-		)
-	}
-	members := []tsgo.ClassElement{
-		context.Factory().PropertyDeclaration(
-			[]tsgo.ModifierLike{
-				context.Factory().PrivateKeyword(),
-				context.Factory().ReadonlyKeyword(),
-			},
-			context.Factory().Identifier(definedmodel.BrandMember),
-			nil,
-			context.Factory().KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindVoidKeyword,
-			),
-			nil,
-		),
-		context.Factory().PropertyDeclaration(
-			[]tsgo.ModifierLike{
-				context.Factory().PublicKeyword(),
-				context.Factory().ReadonlyKeyword(),
-			},
-			context.Factory().Identifier(definedmodel.ValueMember),
-			nil,
-			valueType,
-			nil,
-		),
-		context.Factory().ConstructorDeclaration(
-			nil,
-			nil,
-			[]tsgo.ParameterDeclaration{
-				parameter(context, definedmodel.ValueMember, valueType),
-			},
-			nil,
-			nil,
-		),
-	}
-	return api.DirectDeclaration(
-		context.Factory().ClassDeclaration(
-			exportDeclare(context),
-			context.Factory().Identifier(name),
-			typeParameters,
-			nil,
-			members,
-		),
-		target.Requests()...,
-	), nil
 }

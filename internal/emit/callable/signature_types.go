@@ -217,8 +217,14 @@ func validateFields(
 				if variable.Name() != "" {
 					return api.Unsupported(context, api.CategoryType, field)
 				}
-			} else if context.TypesInfo().Defs[field.Names[fieldIndex]] != variable {
-				return api.Unsupported(context, api.CategoryType, field.Names[fieldIndex])
+			} else if context.TypesInfo().DefOf(
+				field.Names[fieldIndex],
+			) != variable {
+				return api.Unsupported(
+					context,
+					api.CategoryType,
+					field.Names[fieldIndex],
+				)
 			}
 			index++
 		}
@@ -238,7 +244,22 @@ func Signature(sourceType types.Type) (*types.Signature, bool) {
 		sourceType = named.Underlying()
 	}
 	signature, ok := sourceType.(*types.Signature)
-	return signature, ok && Supports(signature)
+	if !ok {
+		return nil, false
+	}
+	return ValueSignature(signature)
+}
+
+func IsValue(sourceType types.Type) bool {
+	if sourceType == nil {
+		return false
+	}
+	sourceType = types.Unalias(sourceType)
+	if named, ok := sourceType.(*types.Named); ok {
+		sourceType = named.Underlying()
+	}
+	signature, ok := sourceType.(*types.Signature)
+	return ok && signature.Recv() == nil && signature.TypeParams().Len() == 0
 }
 
 func Supports(signature *types.Signature) bool {

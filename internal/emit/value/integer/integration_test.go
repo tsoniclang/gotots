@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -40,7 +41,7 @@ func TestIntegerNumberProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 		"WidenUnsigned",
 	)
 	emission := compileIntegerFamily(t, loaded, emit.DefaultOptions(), names...)
-	assertIntegerAliases(t, emission, tsgo.SyntaxKindNumberKeyword)
+	assertIntegerAliases(t, emission, false)
 	printed := printIntegerFamily(t, emission)
 	assertDirectIntegerArtifact(t, printed, false)
 
@@ -69,7 +70,7 @@ func TestIntegerBigIntProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 	options := emit.DefaultOptions()
 	options.IntegerRepresentation = emit.IntegerRepresentationBigInt
 	emission := compileIntegerFamily(t, loaded, options, names...)
-	assertIntegerAliases(t, emission, tsgo.SyntaxKindBigIntKeyword)
+	assertIntegerAliases(t, emission, true)
 	assertBigIntDivisionUsesRuntime(t, emission)
 	printed := printIntegerFamily(t, emission)
 	assertDirectIntegerArtifact(t, printed, true)
@@ -79,45 +80,6 @@ func TestIntegerBigIntProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 	targetOutput := executeIntegerFamilyTS(t, emission, workingDirectory, true)
 	if targetOutput != goOutput {
 		t.Fatalf("BigInt TypeScript output = %q, Go output = %q", targetOutput, goOutput)
-	}
-}
-
-func assertBigIntDivisionUsesRuntime(
-	t *testing.T,
-	emission emit.ProgramEmission,
-) {
-	t.Helper()
-	function := targetFunction(
-		t,
-		integerFamilySourceFile(t, emission),
-		"BigSigned",
-	)
-	returned := function.Body().(tsgo.Block).
-		Statements()[0].(tsgo.ReturnStatement).
-		Expression().(tsgo.ArrayLiteralExpression).
-		Elements()
-	for index, expected := range []string{
-		"goIntegerDivide",
-		"goIntegerRemainder",
-	} {
-		call, ok := returned[index].(tsgo.CallExpression)
-		if !ok {
-			t.Fatalf(
-				"BigSigned result %d = %T, want %s runtime call",
-				index,
-				returned[index],
-				expected,
-			)
-		}
-		callee, calleeOK := call.Expression().(tsgo.Identifier)
-		if !calleeOK || callee.Text() != expected {
-			t.Fatalf(
-				"BigSigned result %d = %T, want %s runtime call",
-				index,
-				returned[index],
-				expected,
-			)
-		}
 	}
 }
 
@@ -286,12 +248,13 @@ func compileIntegerFamily(
 func assertIntegerAliases(
 	t *testing.T,
 	emission emit.ProgramEmission,
-	carrier tsgo.SyntaxKind,
+	exact bool,
 ) {
 	t.Helper()
 	want := []string{
 		"int8", "int16", "int32", "int64",
 		"uint8", "uint16", "uint32", "uint64",
+		"int", "uint", "uintptr",
 	}
 	var got []string
 	for _, file := range emission.Files() {
@@ -302,6 +265,15 @@ func assertIntegerAliases(
 			alias, ok := statement.(tsgo.TypeAliasDeclaration)
 			if !ok || alias.Name().Text() == "bool" {
 				continue
+			}
+			carrier := tsgo.SyntaxKindNumberKeyword
+			wideNative := strconv.IntSize == 64 &&
+				(alias.Name().Text() == "int" ||
+					alias.Name().Text() == "uint" ||
+					alias.Name().Text() == "uintptr")
+			if exact && (alias.Name().Text() == "int64" ||
+				alias.Name().Text() == "uint64" || wideNative) {
+				carrier = tsgo.SyntaxKindBigIntKeyword
 			}
 			if alias.Type().Kind() != carrier {
 				t.Fatalf("%s carrier = %d, want %d", alias.Name().Text(), alias.Type().Kind(), carrier)
@@ -331,8 +303,12 @@ func assertDirectIntegerArtifact(t *testing.T, printed string, bigint bool) {
 			t.Fatalf("integer artifact contains %q:\n%s", forbidden, printed)
 		}
 	}
-	if bigint && (!strings.Contains(printed, "1n") || strings.Contains(printed, " = number;")) {
-		t.Fatalf("BigInt artifact mixes carriers:\n%s", printed)
+	if bigint && (!strings.Contains(printed, "1n") ||
+		!strings.Contains(printed, "export type int32 = number;") ||
+		!strings.Contains(printed, "export type int64 = bigint;") ||
+		strconv.IntSize == 64 &&
+			!strings.Contains(printed, "export type int = bigint;")) {
+		t.Fatalf("exact-width artifact lacks its number/BigInt carrier split:\n%s", printed)
 	}
 	if !bigint && regexp.MustCompile(`[0-9]n(?:\W|$)`).MatchString(printed) {
 		t.Fatalf("number artifact contains BigInt syntax:\n%s", printed)
@@ -406,15 +382,15 @@ const panics = (operation: () => void): boolean => {
 console.log(row(values.BigSigned(9007199254740993n, 7n)));
 console.log(row(values.BigUnsigned(18446744073709551600n, 15n)));
 console.log(row(values.BigShifts(-9007199254740993n)));
-console.log(row(values.BigVariableShift(-9n, 3n)));
-console.log(row(values.BigVariableShift(-9n, 64n)));
-console.log(String(panics(() => { values.BigVariableSignedShift(1n, -1n); })));
-console.log(row(values.BigVariableUnsignedShift(15n, 80n)));
-console.log(row(values.DefinedShift(-9n, new values.DefinedShiftCount(3n))));
+console.log(row(values.BigVariableShift(-9n, 3)));
+console.log(row(values.BigVariableShift(-9n, 64)));
+console.log(String(panics(() => { values.BigVariableSignedShift(1n, -1); })));
+console.log(row(values.BigVariableUnsignedShift(15n, 80)));
+console.log(row(values.DefinedShift(-9n, new values.DefinedShiftCount(3))));
 console.log(row(values.BigUnary(9007199254740993n)));
-console.log(show(values.WidenSigned(-8n)));
-console.log(show(values.WidenUnsigned(4000000000n)));
-console.log(values.CompareSigned(-8n, 4n).join(" "));
+console.log(show(values.WidenSigned(-8)));
+console.log(show(values.WidenUnsigned(4000000000)));
+console.log(values.CompareSigned(-8, 4).join(" "));
 console.log(values.CompareUnsigned(8n, 4n).join(" "));
 `
 	} else {
@@ -442,9 +418,9 @@ console.log(values.CompareUnsigned(8, 4).join(" "));
 	}
 	runner += `
 console.log(show(values.ConstantConversion()));
-console.log(show(values.UnsignedComplement8(240` + suffix + `)));
-console.log(String(values.UntypedBooleanNot(3` + suffix + `, 4` + suffix + `)));
-console.log(show(values.Int8(-5` + suffix + `, 3` + suffix + `)));
+console.log(show(values.UnsignedComplement8(240)));
+console.log(String(values.UntypedBooleanNot(3, 4)));
+console.log(show(values.Int8(-5, 3)));
 console.log(show(values.Uint64(40` + suffix + `, 2` + suffix + `)));
 `
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
@@ -581,8 +557,4 @@ func loadIntegerFamily(t *testing.T) *load.Package {
 
 func integerFamilyDirectory() string {
 	return filepath.Join(repositoryRoot(), "testdata", "constructs", "value", "integer-family")
-}
-
-func integerBoundaryDirectory() string {
-	return filepath.Join(repositoryRoot(), "testdata", "constructs", "value", "integer-boundaries")
 }

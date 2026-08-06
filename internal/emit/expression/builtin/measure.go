@@ -14,6 +14,7 @@ import (
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -200,13 +201,13 @@ func representMeasure(
 	context api.Context,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if context.IntegerRepresentation() != api.IntegerRepresentationBigInt {
+	if !integervalue.TypeUsesBigInt(context, types.Typ[types.Int]) {
 		return value, nil
 	}
 	return api.NewExpressionEmission(
 		value.Before(),
 		context.Factory().CallExpression(
-			context.Factory().Identifier("BigInt"),
+			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{value.Value()},

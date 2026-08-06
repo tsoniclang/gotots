@@ -74,22 +74,28 @@ func testStaticSpecialization(
 			len(printed),
 		)
 	}
-	keyType := "number"
-	keyConversion := "new Key(x, y)"
-	if integer == api.IntegerRepresentationBigInt {
-		keyType = "bigint"
-		keyConversion = "new Key(BigInt(x), BigInt(y))"
-	}
 	runner := `class Key {
-    constructor(public x: ` + keyType + `, public y: ` + keyType + `) {}
+    constructor(public x: number, public y: number) {}
 }
 class GoPanic {
     static raiseRuntime(message: string): never { throw new Error(message); }
 }
+class GoDenseIndex {
+    private static present<T>(values: readonly T[], index: number, value: T | undefined): value is T {
+        return index in values;
+    }
+    static get<T>(values: readonly T[], index: number): T {
+        const value = values[index];
+        if (!GoDenseIndex.present(values, index, value)) {
+            GoPanic.raiseRuntime("dense storage index is absent");
+        }
+        return value;
+    }
+}
 class Box {
     constructor(public value: number) {}
 }
-const key = (x: number, y: number): Key => ` + keyConversion + `;
+const key = (x: number, y: number): Key => new Key(x, y);
 ` + printed + `
 const nilMap = StaticMap.nil();
 const missing = nilMap.lookupOk(key(1, 2));
@@ -191,6 +197,7 @@ func assertStaticSpecializationArtifact(t *testing.T, source string) {
 		"StaticMap.$equal(entry[0], key)",
 		"StaticMap.$copyKey(key)",
 		"StaticMap.$copyValue(value)",
+		"GoDenseIndex.get(bucket, index)",
 	} {
 		if !strings.Contains(source, required) {
 			t.Fatalf("specialization lacks %q:\n%s", required, source)
@@ -281,6 +288,7 @@ func compileAndRunSpecialization(t *testing.T, source string) string {
 			"--module", "nodenext",
 			"--moduleResolution", "nodenext",
 			"--strict",
+			"--noUncheckedIndexedAccess",
 			"--outDir", "out",
 			sourcePath,
 		},
@@ -327,6 +335,7 @@ func staticSpecializationContext(
 		types.NewPackage("example.com/specialization", "specialization"),
 		&types.Info{},
 		types.SizesFor("gc", "amd64"),
+		api.MemoryByteOrderLittleEndian,
 		tsgo.NewFactory(),
 		staticSpecializationNames{},
 		values,
@@ -540,9 +549,17 @@ func (v staticSpecializationValues) Hash(
 	if sourceType != v.key {
 		panic("unexpected specialization hash type")
 	}
+	abi, err := api.NewScalarABIFromSizes(
+		context.IntegerRepresentation(),
+		context.TypesSizes(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	one, err := api.IntegerLiteral(
 		context.Factory(),
-		context.IntegerRepresentation(),
+		abi,
+		api.PrimitiveInt32,
 		"1",
 	)
 	if err != nil {
@@ -557,39 +574,7 @@ func (v staticSpecializationValues) Hash(
 		),
 		one,
 	))
-	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
-		hash = context.Factory().CallExpression(
-			context.Factory().Identifier("Number"),
-			nil,
-			nil,
-			[]tsgo.Expression{hash},
-			tsgo.NodeFlagsNone,
-		)
-	}
 	return api.DirectExpression(
 		hash,
 	), nil
-}
-
-func (v staticSpecializationValues) BinaryUpdate(
-	api.Context,
-	ast.Node,
-	ast.Expr,
-	types.Type,
-	types.Type,
-	token.Token,
-	tsgo.Expression,
-	api.ExpressionEmission,
-) (api.ExpressionEmission, bool, error) {
-	panic("unused")
-}
-
-func (v staticSpecializationValues) Increment(
-	api.Context,
-	ast.Node,
-	types.Type,
-	token.Token,
-	tsgo.Expression,
-) (api.ExpressionEmission, bool, error) {
-	panic("unused")
 }

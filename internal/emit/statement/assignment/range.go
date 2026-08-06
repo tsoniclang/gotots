@@ -53,6 +53,7 @@ type rangeBinding struct {
 	storage     bool
 	target      api.StoreTargetEmission
 	sourceType  types.Type
+	targetType  types.Type
 	value       api.ExpressionEmission
 	fresh       bool
 }
@@ -202,8 +203,14 @@ func rangeBindings(
 				return nil,
 					api.Unsupported(context, api.CategoryStatement, source)
 			}
-			object, ok := context.TypesInfo().Defs[identifier].(*types.Var)
-			if !ok || !types.AssignableTo(selected.sourceType, object.Type()) {
+			object, ok := context.TypesInfo().DefOf(identifier).(*types.Var)
+			if !ok {
+				return nil,
+					api.Unsupported(context, api.CategoryStatement, identifier)
+			}
+			targetType := context.TypesInfo().TypeOfObject(object)
+			if targetType == nil ||
+				!types.AssignableTo(selected.sourceType, targetType) {
 				return nil,
 					api.Unsupported(context, api.CategoryStatement, identifier)
 			}
@@ -222,6 +229,7 @@ func rangeBindings(
 				declaration: true,
 				storage:     storage,
 				sourceType:  selected.sourceType,
+				targetType:  targetType,
 				value:       selected.emission,
 				fresh:       selected.fresh,
 			})
@@ -251,7 +259,7 @@ func rangeBindings(
 
 func (b rangeBinding) valueType() types.Type {
 	if b.declaration {
-		return b.object.Type()
+		return b.targetType
 	}
 	return b.target.SourceType()
 }
@@ -268,7 +276,7 @@ func declareRangeBinding(
 			context,
 			children,
 			binding.source,
-			binding.object.Type(),
+			binding.targetType,
 			value,
 		)
 		if err != nil {
@@ -278,11 +286,11 @@ func declareRangeBinding(
 	var targetType tsgo.TypeNode
 	var requests []api.RootRequest
 	if !binding.storage &&
-		context.Values().RequiresExplicitType(context, binding.object.Type()) {
+		context.Values().RequiresExplicitType(context, binding.targetType) {
 		represented, err := children.RepresentedType(
 			context.WithRole(api.RoleLocalType),
 			binding.source,
-			binding.object.Type(),
+			binding.targetType,
 		)
 		if err != nil {
 			return nil, nil, err

@@ -10,6 +10,7 @@ import (
 	clearoperation "github.com/tsoniclang/gotots/internal/emit/expression/builtin/clear"
 	conversionoperation "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
 	indexoperation "github.com/tsoniclang/gotots/internal/emit/expression/index"
+	slicingoperation "github.com/tsoniclang/gotots/internal/emit/expression/slicing"
 	assertionoperation "github.com/tsoniclang/gotots/internal/emit/expression/typeassertion/operation"
 	"github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
@@ -279,6 +280,39 @@ func emitValue(
 			)
 		}
 		return target, nil
+	case api.GenericOperationSlice, api.GenericOperationSliceFull:
+		full := operation == api.GenericOperationSliceFull
+		wantParameters := 3
+		if full {
+			wantParameters = 4
+		}
+		if len(arguments) != wantParameters ||
+			signature.Params().Len() != wantParameters {
+			return api.ExpressionEmission{}, shapeError(context, operation)
+		}
+		bounds := make([]api.ExpressionEmission, 0, wantParameters-1)
+		for _, argument := range arguments[1:] {
+			bounds = append(bounds, api.DirectExpression(argument))
+		}
+		target, handled, err := slicingoperation.Apply(
+			context,
+			nil,
+			signature.Params().At(0).Type(),
+			signature.Results().At(0).Type(),
+			api.DirectExpression(arguments[0]),
+			bounds,
+			full,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !handled {
+			return api.ExpressionEmission{}, invariant(
+				context,
+				"generic slicing capability has no concrete operation",
+			)
+		}
+		return target, nil
 	case api.GenericOperationMapConstruct:
 		return emitMapConstruct(
 			context,
@@ -342,6 +376,34 @@ func emitValue(
 			)
 		}
 		return target, nil
+	case api.GenericOperationAppendSpread:
+		if len(arguments) != 2 ||
+			signature.Params().Len() != 2 {
+			return api.ExpressionEmission{}, shapeError(context, operation)
+		}
+		target, handled, err := builtinoperation.ApplyAppendSpread(
+			context,
+			nil,
+			signature.Results().At(0).Type(),
+			signature.Params().At(0).Type(),
+			signature.Params().At(1).Type(),
+			api.DirectExpression(arguments[0]),
+			api.DirectExpression(arguments[1]),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !handled {
+			return api.ExpressionEmission{}, invariant(
+				context,
+				"generic append-spread capability has no concrete operation",
+			)
+		}
+		return target, nil
+	case api.GenericOperationReflectionType:
+		return emitReflectionType(context, operation, signature, arguments)
+	case api.GenericOperationReflectionValue:
+		return emitReflectionValue(context, operation, signature, arguments)
 	case api.GenericOperationConstraintMethod:
 		return emitConstraintMethod(
 			context,

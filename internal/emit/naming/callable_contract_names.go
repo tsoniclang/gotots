@@ -192,32 +192,19 @@ func (n *File) CallableABI(
 	return n.callableABI(signature, signatureKey, nil)
 }
 
-func (n *File) GenericCallableProfile(
-	profile *api.GenericCallableProfile,
+func (n *File) DeferredCallable(
+	owner *types.Func,
+	variantSuffix string,
 ) (api.NameReference, error) {
-	if !profile.Valid() {
+	if owner == nil {
 		return api.NameReference{}, &api.NameError{
-			Reason: "generic callable profile reference is invalid",
+			Reason: "deferred callable owner is nil",
 		}
 	}
-	requirement, err := api.NewGenericCallableProfileRequest(profile)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	reference, err := n.derivedSourceReference(
-		profile.Owner(),
-		profile.Suffix(),
+	return n.derivedSourceReference(
+		owner.Origin(),
+		variantSuffix+api.DeferredEntrySuffix,
 		api.ArtifactFacetCallableSignature,
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	return api.NewNameReference(
-		reference.Name(),
-		api.CombineRequests(
-			reference.Requests(),
-			[]api.RootRequest{requirement},
-		)...,
 	)
 }
 

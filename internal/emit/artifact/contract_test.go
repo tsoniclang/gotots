@@ -2,66 +2,56 @@ package artifact
 
 import (
 	"bytes"
-	"errors"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestObservableFunctionContractIgnoresBody(t *testing.T) {
+func TestContractFingerprintTracksOnlyCanonicalObservableFacets(t *testing.T) {
 	factory := tsgo.NewFactory()
-	first := artifactTestFunction(factory, "value", nil)
-	second := artifactTestFunction(
+	baseline, err := ProjectContract(
 		factory,
-		"value",
-		[]tsgo.Statement{factory.ReturnStatement(
-			factory.NumericLiteral("1", tsgo.TokenFlagsNone),
+		[]tsgo.Statement{artifactTestFunction(factory, "value", nil)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodyOnly, err := ProjectContract(
+		factory,
+		[]tsgo.Statement{artifactTestFunction(
+			factory,
+			"value",
+			[]tsgo.Statement{factory.ReturnStatement(
+				factory.NumericLiteral("1", tsgo.TokenFlagsNone),
+			)},
 		)},
 	)
-	firstContract, err := ProjectContract(factory, []tsgo.Statement{first})
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondContract, err := ProjectContract(factory, []tsgo.Statement{second})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(
-		artifactFacetBytes(firstContract, api.ArtifactFacetCallableSignature),
-		artifactFacetBytes(secondContract, api.ArtifactFacetCallableSignature),
-	) {
-		t.Fatal("function body changed the observable callable signature")
-	}
-
-	changed := factory.FunctionDeclaration(
-		first.Modifiers(),
-		nil,
-		first.Name(),
-		nil,
-		[]tsgo.ParameterDeclaration{factory.ParameterDeclaration(
-			nil,
-			nil,
-			factory.Identifier("flag"),
-			nil,
-			factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
-			nil,
-		)},
-		first.Type(),
-		first.Body(),
-	)
-	changedContract, err := ProjectContract(
+	renamed, err := ProjectContract(
 		factory,
-		[]tsgo.Statement{changed},
+		[]tsgo.Statement{artifactTestFunction(factory, "other", nil)},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Equal(
-		artifactFacetBytes(firstContract, api.ArtifactFacetCallableSignature),
-		artifactFacetBytes(changedContract, api.ArtifactFacetCallableSignature),
-	) {
-		t.Fatal("parameter change was absent from the callable signature")
+	baselineFingerprint, baselineOK := baseline.Fingerprint()
+	bodyFingerprint, bodyOK := bodyOnly.Fingerprint()
+	renamedFingerprint, renamedOK := renamed.Fingerprint()
+	if !baselineOK ||
+		!bodyOK ||
+		!renamedOK ||
+		len(baselineFingerprint) != 64 ||
+		baselineFingerprint != bodyFingerprint ||
+		baselineFingerprint == renamedFingerprint {
+		t.Fatalf(
+			"fingerprints baseline=%q body=%q renamed=%q",
+			baselineFingerprint,
+			bodyFingerprint,
+			renamedFingerprint,
+		)
 	}
 }
 
@@ -342,239 +332,4 @@ func TestObservableValueContractIgnoresInitializer(t *testing.T) {
 	) {
 		t.Fatal("variable type change was absent from the value surface")
 	}
-}
-
-func TestObservableInterfaceAndAliasUseInstanceTypeFacet(t *testing.T) {
-	factory := tsgo.NewFactory()
-	numberType := factory.KeywordTypeNode(
-		tsgo.KeywordTypeSyntaxKindNumberKeyword,
-	)
-	interfaceDeclaration := factory.InterfaceDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.Identifier("Readable"),
-		nil,
-		nil,
-		[]tsgo.TypeElement{factory.MethodSignatureDeclaration(
-			nil,
-			factory.Identifier("value"),
-			nil,
-			nil,
-			nil,
-			numberType,
-		)},
-	)
-	aliasDeclaration := factory.TypeAliasDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.Identifier("Count"),
-		nil,
-		numberType,
-	)
-	contract, err := ProjectContract(
-		factory,
-		[]tsgo.Statement{interfaceDeclaration, aliasDeclaration},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	instanceSurface, present := contract.facet(
-		api.ArtifactFacetInstanceTypeSurface,
-	)
-	if contract.present !=
-		uint8(1)<<api.ArtifactFacetInstanceTypeSurface|
-			uint8(1)<<api.ArtifactFacetExportSurface ||
-		!present ||
-		len(instanceSurface) == 0 {
-		t.Fatalf("contract facets = %#v", contract)
-	}
-
-	changed, err := ProjectContract(
-		factory,
-		[]tsgo.Statement{
-			factory.InterfaceDeclaration(
-				interfaceDeclaration.Modifiers(),
-				interfaceDeclaration.Name(),
-				nil,
-				nil,
-				[]tsgo.TypeElement{factory.MethodSignatureDeclaration(
-					nil,
-					factory.Identifier("value"),
-					nil,
-					nil,
-					nil,
-					factory.KeywordTypeNode(
-						tsgo.KeywordTypeSyntaxKindStringKeyword,
-					),
-				)},
-			),
-			aliasDeclaration,
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if bytes.Equal(
-		artifactFacetBytes(contract, api.ArtifactFacetInstanceTypeSurface),
-		artifactFacetBytes(changed, api.ArtifactFacetInstanceTypeSurface),
-	) {
-		t.Fatal("interface member change did not change instance type surface")
-	}
-}
-
-func TestObservableContractRejectsInferenceDependentSurface(t *testing.T) {
-	factory := tsgo.NewFactory()
-	for name, statements := range map[string][]tsgo.Statement{
-		"function": {
-			factory.FunctionDeclaration(
-				nil,
-				nil,
-				factory.Identifier("value"),
-				nil,
-				nil,
-				nil,
-				factory.Block([]tsgo.Statement{
-					factory.ReturnStatement(
-						factory.NumericLiteral("1", tsgo.TokenFlagsNone),
-					),
-				}, true),
-			),
-		},
-		"variable": {
-			factory.VariableStatement(
-				nil,
-				factory.VariableDeclarationList(
-					[]tsgo.VariableDeclaration{
-						factory.VariableDeclaration(
-							factory.Identifier("value"),
-							nil,
-							nil,
-							factory.NumericLiteral("1", tsgo.TokenFlagsNone),
-						),
-					},
-					tsgo.NodeFlagsConst,
-				),
-			),
-		},
-		"property": {
-			factory.ClassDeclaration(
-				nil,
-				factory.Identifier("Record"),
-				nil,
-				nil,
-				[]tsgo.ClassElement{factory.PropertyDeclaration(
-					nil,
-					factory.Identifier("value"),
-					nil,
-					nil,
-					factory.NumericLiteral("1", tsgo.TokenFlagsNone),
-				)},
-			),
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := ProjectContract(factory, statements)
-			var contractError *ContractError
-			if !errors.As(err, &contractError) {
-				t.Fatalf("error = %#v, want ContractError", err)
-			}
-		})
-	}
-}
-
-func artifactTestFunction(
-	factory tsgo.Factory,
-	name string,
-	body []tsgo.Statement,
-) tsgo.FunctionDeclaration {
-	return factory.FunctionDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		nil,
-		factory.Identifier(name),
-		nil,
-		nil,
-		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
-		factory.Block(body, true),
-	)
-}
-
-func artifactTestClass(
-	factory tsgo.Factory,
-	bodyValue string,
-	fieldType string,
-) tsgo.ClassDeclaration {
-	var targetFieldType tsgo.TypeNode
-	switch fieldType {
-	case "number":
-		targetFieldType = factory.KeywordTypeNode(
-			tsgo.KeywordTypeSyntaxKindNumberKeyword,
-		)
-	case "string":
-		targetFieldType = factory.KeywordTypeNode(
-			tsgo.KeywordTypeSyntaxKindStringKeyword,
-		)
-	default:
-		panic("unknown test field type")
-	}
-	return factory.ClassDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.Identifier("Record"),
-		nil,
-		nil,
-		[]tsgo.ClassElement{
-			factory.ConstructorDeclaration(
-				nil,
-				nil,
-				nil,
-				nil,
-				factory.Block(nil, true),
-			),
-			factory.PropertyDeclaration(
-				nil,
-				factory.Identifier("value"),
-				nil,
-				targetFieldType,
-				factory.NumericLiteral("0", tsgo.TokenFlagsNone),
-			),
-			factory.MethodDeclaration(
-				[]tsgo.ModifierLike{factory.StaticKeyword()},
-				nil,
-				factory.Identifier("make"),
-				nil,
-				nil,
-				nil,
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindNumberKeyword,
-				),
-				factory.Block(
-					[]tsgo.Statement{factory.ReturnStatement(
-						factory.Identifier(bodyValue),
-					)},
-					true,
-				),
-			),
-		},
-	)
-}
-
-func assertArtifactFacetEqual(
-	t *testing.T,
-	left Contract,
-	right Contract,
-	facets ...api.ArtifactFacet,
-) {
-	t.Helper()
-	for _, facet := range facets {
-		leftValue, leftOK := left.facet(facet)
-		rightValue, rightOK := right.facet(facet)
-		if leftOK != rightOK || !bytes.Equal(leftValue, rightValue) {
-			t.Fatalf("facet %v changed unexpectedly", facet)
-		}
-	}
-}
-
-func artifactFacetBytes(
-	contract Contract,
-	facet api.ArtifactFacet,
-) []byte {
-	value, _ := contract.facet(facet)
-	return value
 }

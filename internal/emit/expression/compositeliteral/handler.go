@@ -9,13 +9,16 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/expression/mapliteral"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
+	"github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type element struct {
-	fieldIndex int
-	source     ast.Expr
-	value      api.ExpressionEmission
+	fieldIndex       int
+	declarationField *types.Var
+	selectedField    *types.Var
+	source           ast.Expr
+	value            api.ExpressionEmission
 }
 
 func Emit(
@@ -81,6 +84,7 @@ func Emit(
 		context,
 		children,
 		source,
+		named,
 		structType,
 		elements,
 		canonicalStorage,
@@ -101,7 +105,7 @@ func Emit(
 			before,
 			context.Factory().CallExpression(
 				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
+					reference.Expression(context.Factory()),
 					nil,
 					context.Factory().Identifier(api.StructMakeMember),
 					tsgo.NodeFlagsNone,
@@ -132,7 +136,9 @@ func Emit(
 				)
 		}
 	} else {
-		reference, err = context.Names().Reference(named.Obj())
+		reference, err = context.Names().NamedStructConstructor(
+			named.Origin().Obj(),
+		)
 	}
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -141,7 +147,7 @@ func Emit(
 		before,
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(api.StructMakeMember),
 				tsgo.NodeFlagsNone,
@@ -274,7 +280,7 @@ func emitRestrictedNamedStruct(
 	))
 	requests = append(requests, zero.Requests()...)
 	for index, element := range elements {
-		field := structType.Field(element.fieldIndex)
+		field := element.selectedField
 		if !field.Exported() &&
 			field.Pkg() != nil &&
 			field.Pkg() != context.TypesPackage() {
@@ -315,7 +321,7 @@ func emitRestrictedNamedStruct(
 			requests = append(requests, stored.Requests()...)
 			continue
 		}
-		name, err := context.Names().Member(field)
+		name, err := context.Names().Member(element.declarationField)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
@@ -379,22 +385,36 @@ func emitElements(
 	seen := make(map[int]struct{}, len(source.Elts))
 	keyedCount := 0
 	for sourceIndex, sourceElement := range source.Elts {
-		fieldIndex := sourceIndex
+		field, fieldOK := context.TypesInfo().StructFieldAt(source, sourceIndex)
 		valueSource := sourceElement
 		if keyed, ok := sourceElement.(*ast.KeyValueExpr); ok {
 			keyedCount++
 			identifier, identifierOK := keyed.Key.(*ast.Ident)
-			field, fieldOK := context.TypesInfo().Uses[identifier].(*types.Var)
-			if !identifierOK || !fieldOK {
+			if !identifierOK {
 				return nil, api.Unsupported(
 					context.WithRole(api.RoleCompositeElement),
 					api.CategoryExpression,
 					sourceElement,
 				)
 			}
-			fieldIndex = structFieldIndex(structType, field)
+			field, fieldOK = context.TypesInfo().StructFieldOf(source, identifier)
+			if !fieldOK {
+				return nil, api.Unsupported(
+					context.WithRole(api.RoleCompositeElement),
+					api.CategoryExpression,
+					sourceElement,
+				)
+			}
 			valueSource = keyed.Value
 		}
+		if !fieldOK {
+			return nil, api.Unsupported(
+				context.WithRole(api.RoleCompositeElement),
+				api.CategoryExpression,
+				sourceElement,
+			)
+		}
+		fieldIndex := field.Index()
 		if fieldIndex < 0 || fieldIndex >= structType.NumFields() {
 			return nil, api.Unsupported(
 				context.WithRole(api.RoleCompositeElement),
@@ -410,8 +430,8 @@ func emitElements(
 			)
 		}
 		seen[fieldIndex] = struct{}{}
-		field := structType.Field(fieldIndex)
-		fieldType := field.Type()
+		selectedField := field.Selected()
+		fieldType := selectedField.Type()
 		valueType := context.TypesInfo().TypeOf(valueSource)
 		if valueType == nil || !types.AssignableTo(valueType, fieldType) {
 			return nil, api.Unsupported(
@@ -443,7 +463,7 @@ func emitElements(
 		requests, err := cooperative.JoinNominalFieldCallableABIs(
 			context.WithRole(api.RoleCompositeElement),
 			named,
-			field,
+			selectedField,
 		)
 		if err != nil {
 			return nil, err
@@ -456,10 +476,25 @@ func emitElements(
 		if err != nil {
 			return nil, err
 		}
+		if named != nil {
+			value, _, err = providerboundary.ToProviderStructField(
+				context.WithRole(api.RoleCompositeElement),
+				children,
+				valueSource,
+				named,
+				selectedField,
+				value,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
 		result = append(result, element{
-			fieldIndex: fieldIndex,
-			source:     valueSource,
-			value:      value,
+			fieldIndex:       fieldIndex,
+			declarationField: field.Declaration(),
+			selectedField:    selectedField,
+			source:           valueSource,
+			value:            value,
 		})
 	}
 	if keyedCount != 0 && keyedCount != len(source.Elts) {
@@ -479,118 +514,4 @@ func emitElements(
 		)
 	}
 	return result, nil
-}
-
-func arrange(
-	context api.Context,
-	_ api.ChildEmitter,
-	source *ast.CompositeLit,
-	structType *types.Struct,
-	elements []element,
-	canonicalStorage bool,
-) (
-	[]tsgo.Statement,
-	[]api.RootRequest,
-	[]tsgo.Expression,
-	error,
-) {
-	if canonicalStorage {
-		elements = append([]element(nil), elements...)
-		for index := range elements {
-			fieldType := structType.Field(elements[index].fieldIndex).Type()
-			stored, err := context.Values().ToStorage(
-				context.WithRole(api.RoleStructAssignField),
-				elements[index].source,
-				fieldType,
-				elements[index].value,
-			)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-			elements[index].value = stored
-		}
-	}
-	capture := false
-	for index, element := range elements {
-		reordersSource := element.fieldIndex != index &&
-			context.EvaluationOrder() == api.EvaluationOrderPreserveGo
-		blankField := structType.Field(element.fieldIndex).Name() == "_"
-		if reordersSource || blankField || len(element.value.Before()) != 0 {
-			capture = true
-			break
-		}
-	}
-	byField := make(map[int]tsgo.Expression, len(elements))
-	var before []tsgo.Statement
-	var requests []api.RootRequest
-	for _, element := range elements {
-		requests = append(requests, element.value.Requests()...)
-		if !capture {
-			byField[element.fieldIndex] = element.value.Value()
-			continue
-		}
-		name, err := context.Names().Temporary(api.TemporaryCompositeField)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		before = append(before, element.value.Before()...)
-		before = append(before, context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{context.Factory().VariableDeclaration(
-					context.Factory().Identifier(name),
-					nil,
-					nil,
-					element.value.Value(),
-				)},
-				tsgo.NodeFlagsConst,
-			),
-		))
-		byField[element.fieldIndex] = context.Factory().Identifier(name)
-	}
-	values := make([]tsgo.Expression, 0, structType.NumFields())
-	for fieldIndex := range structType.NumFields() {
-		if value := byField[fieldIndex]; value != nil {
-			values = append(values, value)
-			continue
-		}
-		zero, err := context.Values().Zero(
-			context.WithRole(api.RoleStructZeroField),
-			source,
-			structType.Field(fieldIndex).Type(),
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		if canonicalStorage {
-			zero, err = context.Values().ToStorage(
-				context.WithRole(api.RoleStructZeroField),
-				source,
-				structType.Field(fieldIndex).Type(),
-				zero,
-			)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-		}
-		if len(zero.Before()) != 0 {
-			return nil, nil, nil, api.Unsupported(
-				context.WithRole(api.RoleStructZeroField),
-				api.CategoryExpression,
-				source,
-			)
-		}
-		values = append(values, zero.Value())
-		requests = append(requests, zero.Requests()...)
-	}
-	return before, requests, values, nil
-}
-
-func structFieldIndex(structType *types.Struct, field *types.Var) int {
-	for index := range structType.NumFields() {
-		if structType.Field(index) == field {
-			return index
-		}
-	}
-	return -1
 }

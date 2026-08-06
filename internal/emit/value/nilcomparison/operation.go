@@ -56,7 +56,11 @@ func Apply(
 			nil,
 		)
 	}
-	switch types.Unalias(sourceType).(type) {
+	switch underlying := types.Unalias(sourceType).(type) {
+	case *types.Basic:
+		if underlying.Kind() == types.UnsafePointer {
+			return direct(context, value)
+		}
 	case *types.Pointer, *types.Chan:
 		return direct(context, value)
 	}

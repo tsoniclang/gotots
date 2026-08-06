@@ -21,7 +21,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
 
-	functionObject, ok := context.TypesInfo().Defs[source.Name].(*types.Func)
+	functionObject, ok := context.TypesInfo().DefOf(source.Name).(*types.Func)
 	if !ok {
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
@@ -32,15 +32,6 @@ func Emit(
 		(source.Recv == nil) != (signature.Recv() == nil) {
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
-	}
-	if source.Body == nil {
-		return api.DeclarationEmission{},
-			api.ExternalFunctionObligation(
-				context,
-				source,
-				functionObject,
-				signature,
-			)
 	}
 	context, err := emitstorage.ApplyRequirements(
 		context,

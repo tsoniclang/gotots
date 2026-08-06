@@ -16,6 +16,7 @@ func TestBuildCreatesOneNonErasedPanicCarrierAndRecoveryAuthority(t *testing.T) 
 		"GoInterfaceValue",
 		"GoRuntimePanicValue",
 		"GoRecovery",
+		"goDeferPop",
 		"GoErrorMethodToken",
 		"GoRuntimeErrorMethodToken",
 	)
@@ -48,6 +49,7 @@ func TestBuildCreatesOneNonErasedPanicCarrierAndRecoveryAuthority(t *testing.T) 
 		"GoInterfaceValue",
 		"GoRuntimePanicValue",
 		"GoRecovery",
+		"goDeferPop",
 		"GoErrorMethodToken",
 		"GoRuntimeErrorMethodToken",
 	)
@@ -61,6 +63,37 @@ func TestBuildCreatesOneNonErasedPanicCarrierAndRecoveryAuthority(t *testing.T) 
 			className(recovery),
 			len(recovery.Members()),
 		)
+	}
+}
+
+func TestBuildCreatesCheckedGenericDeferPop(t *testing.T) {
+	target, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeDeferPop,
+		"GoPanic",
+		"GoInterfaceValue",
+		"GoRuntimePanicValue",
+		"GoRecovery",
+		"goDeferPop",
+		"GoErrorMethodToken",
+		"GoRuntimeErrorMethodToken",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	function, ok := target.(tsgo.FunctionDeclaration)
+	if !ok ||
+		function.Name().Text() != "goDeferPop" ||
+		len(function.TypeParameters()) != 1 ||
+		len(function.Parameters()) != 1 {
+		t.Fatalf("defer pop target = %T with unexpected signature", target)
+	}
+	statements := function.Body().(tsgo.Block).Statements()
+	if len(statements) != 3 ||
+		statements[0].Kind() != tsgo.SyntaxKindVariableStatement ||
+		statements[1].Kind() != tsgo.SyntaxKindIfStatement ||
+		statements[2].Kind() != tsgo.SyntaxKindReturnStatement {
+		t.Fatalf("defer pop statements = %#v", statements)
 	}
 }
 

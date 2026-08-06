@@ -21,7 +21,7 @@ func emitCaseBody(
 	var statements []tsgo.Statement
 	var requests []api.RootRequest
 	if selected.binding != nil && selected.binding.Name != "_" {
-		binding, ok := context.TypesInfo().Implicits[clause].(*types.Var)
+		binding, ok := context.TypesInfo().ImplicitOf(clause).(*types.Var)
 		if !ok || binding.Name() != selected.binding.Name {
 			return nil, nil, api.Unsupported(
 				context.WithRole(api.RoleTypeSwitchBinding),
@@ -41,14 +41,6 @@ func emitCaseBody(
 			)
 		}
 		name, err := context.Names().Declare(binding)
-		if err != nil {
-			return nil, nil, err
-		}
-		targetType, err := children.RepresentedType(
-			context.WithRole(api.RoleTypeSwitchBinding),
-			clause,
-			binding.Type(),
-		)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -90,6 +82,38 @@ func emitCaseBody(
 				clause,
 			)
 		}
+		targetName := name
+		var targetType tsgo.TypeNode
+		flags := tsgo.NodeFlagsLet
+		if storageName, addressable := context.AddressableStorage().Name(
+			context,
+			binding,
+		); addressable {
+			targetName = storageName
+			flags = tsgo.NodeFlagsConst
+			initial, err = context.AddressableStorage().Cell(
+				context.WithRole(api.RoleTypeSwitchBinding),
+				children,
+				clause,
+				binding.Type(),
+				initial,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+		} else {
+			represented, typeErr := children.RepresentedType(
+				context.WithRole(api.RoleTypeSwitchBinding),
+				clause,
+				binding.Type(),
+			)
+			if typeErr != nil {
+				return nil, nil, typeErr
+			}
+			targetType = represented.Value()
+			requests = append(requests, represented.Requests()...)
+		}
+		statements = append(statements, initial.Before()...)
 		statements = append(
 			statements,
 			context.Factory().VariableStatement(
@@ -97,19 +121,18 @@ func emitCaseBody(
 				context.Factory().VariableDeclarationList(
 					[]tsgo.VariableDeclaration{
 						context.Factory().VariableDeclaration(
-							context.Factory().Identifier(name),
+							context.Factory().Identifier(targetName),
 							nil,
-							targetType.Value(),
+							targetType,
 							initial.Value(),
 						),
 					},
-					tsgo.NodeFlagsConst,
+					flags,
 				),
 			),
 		)
-		requests = append(requests, targetType.Requests()...)
 		requests = append(requests, initial.Requests()...)
-	} else if context.TypesInfo().Implicits[clause] != nil {
+	} else if context.TypesInfo().ImplicitOf(clause) != nil {
 		return nil, nil, api.Unsupported(
 			context.WithRole(api.RoleTypeSwitchBinding),
 			api.CategoryStatement,

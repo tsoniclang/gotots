@@ -10,6 +10,7 @@ import (
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	conversionexpression "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -36,6 +37,76 @@ func emit(
 	discarded bool,
 ) (api.ExpressionEmission, error) {
 	context, detached := context.TakeDetachedInvocation()
+	if target, handled, err := emitReflectionTypeOf(
+		context,
+		children,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := emitReflectionMapOf(
+		context,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := emitReflectionMakeSlice(
+		context,
+		children,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := emitReflectionValueOf(
+		context,
+		children,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := emitBinaryCodec(
+		context,
+		children,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := emitReflectionDeepEqual(
+		context,
+		children,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := emitReflectionTypeAssert(
+		context,
+		children,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := emitReflectionTypeFor(
+		context,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
 	if target, handled, err := emitGeneric(
 		context,
 		children,
@@ -104,7 +175,7 @@ func emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if identifier, directIdentifier := source.Fun.(*ast.Ident); directIdentifier {
-		switch context.TypesInfo().Uses[identifier].(type) {
+		switch context.TypesInfo().UseOf(identifier).(type) {
 		case *types.Func, *types.Var:
 		default:
 			return api.ExpressionEmission{},
@@ -114,9 +185,51 @@ func emit(
 	if err := validateResults(context, source, signature, discarded); err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	callee, static, err := emitCallee(context, children, source.Fun, signature)
+	var profileRequests []api.RootRequest
+	if provider, direct := calleeObject(
+		context.TypesInfo(),
+		source.Fun,
+	); direct {
+		target, selected, requests, err := emitProviderProfileFunction(
+			context,
+			children,
+			source,
+			provider,
+			signature,
+			discarded,
+			detached,
+		)
+		if selected || err != nil {
+			return target, err
+		}
+		profileRequests = requests
+	}
+	callee, static, providerBoundary, err := emitCallee(
+		context,
+		children,
+		source.Fun,
+		signature,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if model, defined := definedtype.ResolveCallable(
+		context.TypesInfo().TypeOf(source.Fun),
+	); defined {
+		providerCarrier, carrierErr := model.ProviderCarrier(
+			context.WithRole(api.RoleCallCallee),
+		)
+		if carrierErr != nil {
+			return api.ExpressionEmission{}, carrierErr
+		}
+		providerBoundary = providerBoundary || providerCarrier
+		callee, err = model.Project(
+			context.WithRole(api.RoleCallCallee),
+			callee,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	guardNil := !static &&
 		!callable.StaticallyNonNil(context.TypesInfo(), source.Fun)
@@ -130,17 +243,26 @@ func emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	targetCallee := callee.Value()
-	if _, defined := definedtype.ResolveCallable(
-		context.TypesInfo().TypeOf(source.Fun),
-	); defined {
-		targetCallee = context.Factory().PropertyAccessExpression(
-			targetCallee,
-			nil,
-			context.Factory().Identifier(definedtype.ValueMember),
-			tsgo.NodeFlagsNone,
+	if providerBoundary {
+		var providerBefore []tsgo.Statement
+		var providerRequests []api.RootRequest
+		arguments, providerBefore, providerRequests, err =
+			providerboundary.ToProviderArguments(
+				context,
+				children,
+				signature.Params(),
+				arguments,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		argumentBefore = append(argumentBefore, providerBefore...)
+		argumentRequests = api.CombineRequests(
+			argumentRequests,
+			providerRequests,
 		)
 	}
+	targetCallee := callee.Value()
 	before := callee.Before()
 	if static && len(before) != 0 {
 		return api.ExpressionEmission{},
@@ -207,6 +329,7 @@ func emit(
 		callee.Requests(),
 		argumentRequests,
 		guardRequests,
+		profileRequests,
 	)
 	target, err := api.NewExpressionEmission(before, call, requests)
 	if err != nil {
@@ -240,10 +363,21 @@ func emit(
 				target,
 			)
 		}
-		return cooperativecall.SourceCall(
+		target, err := cooperativecall.SourceCall(
 			context,
 			source,
 			provider,
+			target,
+		)
+		if err != nil || discarded || !providerBoundary {
+			return target, err
+		}
+		return providerboundary.FromProviderResults(
+			context,
+			children,
+			nil,
+			"",
+			signature.Results(),
 			target,
 		)
 	}
@@ -255,10 +389,21 @@ func emit(
 			target,
 		)
 	}
-	return cooperativecall.ValueCall(
+	target, err = cooperativecall.ValueCall(
 		context,
 		source,
 		signature,
+		target,
+	)
+	if err != nil || discarded || !providerBoundary {
+		return target, err
+	}
+	return providerboundary.FromProviderResults(
+		context,
+		children,
+		nil,
+		"",
+		signature.Results(),
 		target,
 	)
 }
@@ -290,27 +435,27 @@ func validateResults(
 	}
 }
 
-func calleeObject(info *types.Info, source ast.Expr) (*types.Func, bool) {
-	if info == nil {
+func calleeObject(info api.TypeInfoView, source ast.Expr) (*types.Func, bool) {
+	if !info.Valid() {
 		return nil, false
 	}
 	switch source := source.(type) {
 	case *ast.Ident:
-		object, ok := info.Uses[source].(*types.Func)
+		object, ok := info.UseOf(source).(*types.Func)
 		return object, ok
 	case *ast.SelectorExpr:
-		if info.Selections[source] != nil {
+		if info.SelectionOf(source) != nil {
 			return nil, false
 		}
 		qualifier, ok := source.X.(*ast.Ident)
 		if !ok {
 			return nil, false
 		}
-		packageName, ok := info.Uses[qualifier].(*types.PkgName)
+		packageName, ok := info.UseOf(qualifier).(*types.PkgName)
 		if !ok {
 			return nil, false
 		}
-		object, ok := info.Uses[source.Sel].(*types.Func)
+		object, ok := info.UseOf(source.Sel).(*types.Func)
 		if !ok || object.Pkg() != packageName.Imported() {
 			return nil, false
 		}
@@ -325,12 +470,12 @@ func emitCallee(
 	children api.ChildEmitter,
 	source ast.Expr,
 	signature *types.Signature,
-) (api.ExpressionEmission, bool, error) {
+) (api.ExpressionEmission, bool, bool, error) {
 	static := false
 	if object, ok := calleeObject(context.TypesInfo(), source); ok {
 		objectSignature, valid := callable.Signature(object.Type())
 		if !valid || !types.Identical(objectSignature, signature) {
-			return api.ExpressionEmission{}, false,
+			return api.ExpressionEmission{}, false, false,
 				api.Unsupported(
 					context.WithRole(api.RoleCallCallee),
 					api.CategoryExpression,
@@ -339,12 +484,12 @@ func emitCallee(
 		}
 		reference, err := context.Names().Reference(object)
 		if err != nil {
-			return api.ExpressionEmission{}, false, err
+			return api.ExpressionEmission{}, false, false, err
 		}
 		return api.DirectExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			reference.Requests()...,
-		), true, nil
+		), true, reference.ProviderBoundary(), nil
 	} else if _, ok := directFunctionLiteral(source); ok {
 		target, err := children.Expression(
 			context.
@@ -354,13 +499,13 @@ func emitCallee(
 			source,
 		)
 		if err != nil {
-			return api.ExpressionEmission{}, false, err
+			return api.ExpressionEmission{}, false, false, err
 		}
-		return target, false, nil
+		return target, false, false, nil
 	} else if identifier, ok := source.(*ast.Ident); ok {
-		variable, valid := context.TypesInfo().Uses[identifier].(*types.Var)
+		variable, valid := context.TypesInfo().UseOf(identifier).(*types.Var)
 		if !valid {
-			return api.ExpressionEmission{}, false,
+			return api.ExpressionEmission{}, false, false,
 				api.Unsupported(
 					context.WithRole(api.RoleCallCallee),
 					api.CategoryExpression,
@@ -369,7 +514,7 @@ func emitCallee(
 		}
 		variableSignature, represented := callable.Signature(variable.Type())
 		if !represented || !types.Identical(variableSignature, signature) {
-			return api.ExpressionEmission{}, false,
+			return api.ExpressionEmission{}, false, false,
 				api.Unsupported(
 					context.WithRole(api.RoleCallCallee),
 					api.CategoryExpression,
@@ -384,9 +529,9 @@ func emitCallee(
 		source,
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, false, err
+		return api.ExpressionEmission{}, false, false, err
 	}
-	return target, static, nil
+	return target, static, false, nil
 }
 
 func directFunctionLiteral(source ast.Expr) (*ast.FuncLit, bool) {
@@ -400,180 +545,4 @@ func directFunctionLiteral(source ast.Expr) (*ast.FuncLit, bool) {
 			return nil, false
 		}
 	}
-}
-
-func emitArguments(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.CallExpr,
-	signature *types.Signature,
-	captureAll bool,
-) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	if len(source.Args) == 1 {
-		if results, ok := context.TypesInfo().TypeOf(source.Args[0]).(*types.Tuple); ok {
-			if signature.Variadic() {
-				return emitVariadicMultipleArgument(
-					context,
-					children,
-					source,
-					signature,
-					results,
-					captureAll,
-				)
-			}
-			arguments, before, requests, err := emitMultipleArgument(
-				context,
-				children,
-				source,
-				signature,
-				results,
-			)
-			if err != nil || !captureAll {
-				return arguments, before, requests, err
-			}
-			return captureArgumentExpressions(
-				context,
-				arguments,
-				before,
-				requests,
-			)
-		}
-	}
-	if signature.Variadic() {
-		return emitVariadicArguments(
-			context,
-			children,
-			source,
-			signature,
-			captureAll,
-		)
-	}
-	if signature.Params().Len() != len(source.Args) {
-		return nil, nil, nil,
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	emissions := make([]api.ExpressionEmission, 0, len(source.Args))
-	requiresCapture := false
-	for index, argument := range source.Args {
-		argumentType := context.TypesInfo().TypeOf(argument)
-		if argumentType == nil ||
-			!types.AssignableTo(argumentType, signature.Params().At(index).Type()) {
-			return nil, nil, nil,
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		target, err := children.Expression(
-			context.
-				WithRole(api.RoleCallArgument).
-				WithExpectedType(signature.Params().At(index).Type()),
-			argument,
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		target, err = context.Values().Transfer(
-			context.WithRole(api.RoleCallArgument),
-			argument,
-			argumentType,
-			signature.Params().At(index).Type(),
-			api.ValueTransferCopy,
-			target,
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		if len(target.Before()) != 0 {
-			requiresCapture = true
-		}
-		emissions = append(emissions, target)
-	}
-	if requiresCapture || captureAll {
-		return captureArguments(context, children, source, signature, emissions)
-	}
-	arguments := make([]tsgo.Expression, 0, len(emissions))
-	var requests []api.RootRequest
-	for _, target := range emissions {
-		arguments = append(arguments, target.Value())
-		requests = append(requests, target.Requests()...)
-	}
-	return arguments, nil, requests, nil
-}
-
-func captureArgumentExpressions(
-	context api.Context,
-	expressions []tsgo.Expression,
-	before []tsgo.Statement,
-	requests []api.RootRequest,
-) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	arguments := make([]tsgo.Expression, 0, len(expressions))
-	for _, expression := range expressions {
-		temporaryName, err := context.Names().Temporary(
-			api.TemporaryCallArgument,
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		before = append(
-			before,
-			context.Factory().VariableStatement(
-				nil,
-				context.Factory().VariableDeclarationList(
-					[]tsgo.VariableDeclaration{
-						context.Factory().VariableDeclaration(
-							context.Factory().Identifier(temporaryName),
-							nil,
-							nil,
-							expression,
-						),
-					},
-					tsgo.NodeFlagsConst,
-				),
-			),
-		)
-		arguments = append(
-			arguments,
-			context.Factory().Identifier(temporaryName),
-		)
-	}
-	return arguments, before, requests, nil
-}
-
-func captureArguments(
-	context api.Context,
-	_ api.ChildEmitter,
-	_ *ast.CallExpr,
-	_ *types.Signature,
-	emissions []api.ExpressionEmission,
-) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	arguments := make([]tsgo.Expression, 0, len(emissions))
-	var before []tsgo.Statement
-	var requests []api.RootRequest
-	for _, emission := range emissions {
-		temporaryName, err := context.Names().Temporary(api.TemporaryCallArgument)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		declaration := context.Factory().VariableDeclaration(
-			context.Factory().Identifier(temporaryName),
-			nil,
-			nil,
-			emission.Value(),
-		)
-		before = append(before, emission.Before()...)
-		before = append(
-			before,
-			context.Factory().VariableStatement(
-				nil,
-				context.Factory().VariableDeclarationList(
-					[]tsgo.VariableDeclaration{declaration},
-					tsgo.NodeFlagsConst,
-				),
-			),
-		)
-		arguments = append(
-			arguments,
-			context.Factory().Identifier(temporaryName),
-		)
-		requests = append(requests, emission.Requests()...)
-	}
-	return arguments, before, requests, nil
 }

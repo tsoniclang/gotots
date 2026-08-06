@@ -23,7 +23,7 @@ func Emit(
 		return api.ExpressionEmission{}, false, nil
 	}
 	info := context.TypesInfo()
-	if info == nil ||
+	if !info.Valid() ||
 		!types.AssignableTo(info.TypeOf(source), types.Typ[types.Bool]) {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -60,10 +60,10 @@ func Emit(
 }
 
 func SelectSource(
-	info *types.Info,
+	info api.TypeInfoView,
 	source *ast.BinaryExpr,
 ) (ast.Expr, api.Role, types.Type, bool, bool) {
-	if info == nil ||
+	if !info.Valid() ||
 		source == nil ||
 		(source.Op != token.EQL && source.Op != token.NEQ) {
 		return nil, api.Role(""), nil, false, false
@@ -85,7 +85,7 @@ func SelectSource(
 	return nil, api.Role(""), nil, false, false
 }
 
-func isNil(info *types.Info, source ast.Expr) bool {
+func isNil(info api.TypeInfoView, source ast.Expr) bool {
 	identifier, ok := source.(*ast.Ident)
-	return ok && info.Uses[identifier] == types.Universe.Lookup("nil")
+	return ok && info.UseOf(identifier) == types.Universe.Lookup("nil")
 }

@@ -8,6 +8,35 @@ import (
 	. "github.com/tsoniclang/gotots/internal/emit/api"
 )
 
+func TestNestedControlSelectsNearestLexicalTarget(t *testing.T) {
+	insideSwitch := (Context{}).
+		EnterLoopTarget("outer-loop").
+		EnterBreakable()
+	if insideSwitch.BreakTarget() != "" {
+		t.Fatalf(
+			"switch break inherited outer loop target %q",
+			insideSwitch.BreakTarget(),
+		)
+	}
+	if insideSwitch.ContinueTarget() != "outer-loop" {
+		t.Fatalf(
+			"switch lost enclosing loop continue target %q",
+			insideSwitch.ContinueTarget(),
+		)
+	}
+
+	insideLoop := (Context{}).
+		EnterBreakableTarget("outer-switch").
+		EnterLoop()
+	if insideLoop.BreakTarget() != "" || insideLoop.ContinueTarget() != "" {
+		t.Fatalf(
+			"inner loop inherited outer targets break=%q continue=%q",
+			insideLoop.BreakTarget(),
+			insideLoop.ContinueTarget(),
+		)
+	}
+}
+
 func TestGotoTargetsUseExactLabelIdentity(t *testing.T) {
 	sourcePackage := types.NewPackage("example.com/labels", "labels")
 	first := types.NewLabel(token.Pos(10), sourcePackage, "again")

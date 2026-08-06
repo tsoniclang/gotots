@@ -1,0 +1,31 @@
+{
+  "name": "@gotots/externals",
+  "version": "0.0.0",
+  "description": "Certified native boundaries for GoToTS",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "files": [
+    "dist/src",
+    "contract/manifest.json",
+    "README.md"
+  ],
+  "exports": {
+    "./golang.org/x/sys/unix.js": {
+      "types": "./dist/src/golang.org/x/sys/unix.d.ts",
+      "default": "./dist/src/golang.org/x/sys/unix.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "contract:generate": "cd .. && go run ./internal/contracts/externals/generate -repository . -provider externals -manifest externals/contract/manifest.json -bindings externals/contract/bindings.json -tsconfig externals/tsconfig.json -gostdlib-manifest gostdlib/contract/manifest.json -gostdlib-runtime gostdlib/contract/runtime.json -goos linux -goarch amd64 -tags noasm -backend node",
+    "contract:check": "cd .. && go run ./internal/contracts/externals/generate -repository . -provider externals -manifest externals/contract/manifest.json -bindings externals/contract/bindings.json -tsconfig externals/tsconfig.json -gostdlib-manifest gostdlib/contract/manifest.json -gostdlib-runtime gostdlib/contract/runtime.json -goos linux -goarch amd64 -tags noasm -backend node -check",
+    "build": "cd .. && go tool tsgo -p externals/tsconfig.json",
+    "assemble:local": "node assembly/local-dependencies.mjs",
+    "check": "npm run contract:check && npm run build && npm run assemble:local && node --test dist/test/**/*.test.js"
+  },
+  "peerDependencies": {
+    "@gotots/gostdlib": "0.0.0"
+  }
+}

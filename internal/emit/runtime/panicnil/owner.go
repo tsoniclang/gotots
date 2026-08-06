@@ -65,6 +65,20 @@ func panicNilError(
 		[]tsgo.ClassElement{
 			factory.PropertyDeclaration(
 				[]tsgo.ModifierLike{
+					factory.StaticKeyword(),
+					factory.ReadonlyKeyword(),
+				},
+				factory.Identifier(
+					interfacecontract.DynamicTypeComparable,
+				),
+				nil,
+				factory.KeywordTypeNode(
+					tsgo.KeywordTypeSyntaxKindBooleanKeyword,
+				),
+				factory.TrueLiteral(),
+			),
+			factory.PropertyDeclaration(
+				[]tsgo.ModifierLike{
 					factory.DeclareKeyword(),
 					factory.PrivateKeyword(),
 					factory.ReadonlyKeyword(),
@@ -112,9 +126,7 @@ func panicNilValue(
 				},
 				factory.Identifier(interfacecontract.DynamicTypeMember),
 				nil,
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindObjectKeyword,
-				),
+				interfacecontract.DynamicType(factory),
 				factory.Identifier(errorName),
 			),
 			panicNilCreate(

@@ -167,10 +167,8 @@ func executeMatrixTypeScript(
 	t.Helper()
 	artifacts := materializeIntegerFamily(t, emission, workingDirectory)
 	prefix := "Number"
-	suffix := ""
 	if representation == emit.IntegerRepresentationBigInt {
 		prefix = "Big"
-		suffix = "n"
 	}
 	var runner strings.Builder
 	fmt.Fprintf(
@@ -181,6 +179,11 @@ func executeMatrixTypeScript(
 		artifacts.module(t, "source.ts"),
 	)
 	for _, sourceType := range matrixTypes {
+		suffix := ""
+		if representation == emit.IntegerRepresentationBigInt &&
+			(sourceType.name == "Int64" || sourceType.name == "Uint64") {
+			suffix = "n"
+		}
 		left := "12"
 		if !sourceType.unsigned {
 			left = "-12"

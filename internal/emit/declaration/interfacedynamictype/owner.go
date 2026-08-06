@@ -1,12 +1,52 @@
 package interfacedynamictype
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 func Build(
 	factory tsgo.Factory,
 	name string,
 	modifiers []tsgo.ModifierLike,
+	comparable bool,
 ) tsgo.VariableStatement {
+	return build(
+		factory,
+		name,
+		modifiers,
+		comparable,
+		api.TargetIntrinsicObject.Expression(factory),
+	)
+}
+
+func BuildIsolated(
+	factory tsgo.Factory,
+	name string,
+	modifiers []tsgo.ModifierLike,
+	comparable bool,
+) tsgo.VariableStatement {
+	return build(
+		factory,
+		name,
+		modifiers,
+		comparable,
+		api.TargetIntrinsicObject.UnshadowedExpression(factory),
+	)
+}
+
+func build(
+	factory tsgo.Factory,
+	name string,
+	modifiers []tsgo.ModifierLike,
+	comparable bool,
+	object tsgo.Expression,
+) tsgo.VariableStatement {
+	comparableValue := tsgo.Expression(factory.FalseLiteral())
+	if comparable {
+		comparableValue = factory.TrueLiteral()
+	}
 	return factory.VariableStatement(
 		modifiers,
 		factory.VariableDeclarationList(
@@ -14,12 +54,10 @@ func Build(
 				factory.VariableDeclaration(
 					factory.Identifier(name),
 					nil,
-					factory.KeywordTypeNode(
-						tsgo.KeywordTypeSyntaxKindObjectKeyword,
-					),
+					interfacecontract.DynamicType(factory),
 					factory.CallExpression(
 						factory.PropertyAccessExpression(
-							factory.Identifier("Object"),
+							object,
 							nil,
 							factory.Identifier("freeze"),
 							tsgo.NodeFlagsNone,
@@ -27,7 +65,20 @@ func Build(
 						nil,
 						nil,
 						[]tsgo.Expression{
-							factory.ObjectLiteralExpression(nil, false),
+							factory.ObjectLiteralExpression(
+								[]tsgo.ObjectLiteralElementLike{
+									factory.PropertyAssignment(
+										nil,
+										factory.Identifier(interfacecontract.DynamicTypeComparable),
+										nil,
+										factory.KeywordTypeNode(
+											tsgo.KeywordTypeSyntaxKindBooleanKeyword,
+										),
+										comparableValue,
+									),
+								},
+								false,
+							),
 						},
 						tsgo.NodeFlagsNone,
 					),

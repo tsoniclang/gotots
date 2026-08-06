@@ -33,17 +33,15 @@ func Distinct() {
 		t.Fatalf("anonymous struct types = %d, want 8", len(structTypes))
 	}
 	registry := NewRegistry()
-	names := NewOwner(
-		sourcePackage.Scope(),
-		info,
-		registry,
-	).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(sourcePackage.Scope(), info, registry),
 		sourceFile,
 		sourcePackage.Scope(),
 		tsgo.NewFactory(),
 		"modules/identity/source.ts",
 		nil,
-	).(*File)
+	)
 	references := make([]api.NameReference, len(structTypes))
 	for index, structType := range structTypes {
 		var err error
@@ -72,7 +70,9 @@ func Distinct() {
 }
 
 func TestAnonymousStructImportPhaseIsDemandedExplicitly(t *testing.T) {
-	names := NewOwner(nil, nil, NewRegistry()).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(nil, nil, NewRegistry()),
 		nil,
 		nil,
 		tsgo.NewFactory(),
@@ -161,17 +161,15 @@ func Second() {
 			t.Fatal(err)
 		}
 	}
-	names := NewOwner(
-		sourcePackage.Scope(),
-		info,
-		registry,
-	).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(sourcePackage.Scope(), info, registry),
 		sourceFile,
 		sourcePackage.Scope(),
 		tsgo.NewFactory(),
 		"modules/identity/source.ts",
 		nil,
-	).(*File)
+	)
 	var references []api.NameReference
 	for index, structType := range structTypes {
 		finish, err := names.BeginArtifact(
@@ -259,13 +257,15 @@ func Use() {
 	); err != nil {
 		t.Fatal(err)
 	}
-	names := owner.ForFile(
+	names := testFileNames(
+		t,
+		owner,
 		sourceFile,
 		sourcePackage.Scope(),
 		tsgo.NewFactory(),
 		"modules/identity/source.ts",
 		nil,
-	).(*File)
+	)
 	finish, err := names.BeginArtifact(
 		api.MustSourceArtifactOwner(function),
 		declaration,

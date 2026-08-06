@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -15,7 +16,7 @@ func EmitTypeArguments(
 	children api.ChildEmitter,
 	source ast.Node,
 	declaration types.Object,
-	arguments *types.TypeList,
+	arguments api.TypeArgumentList,
 ) ([]tsgo.TypeNode, []api.RootRequest, error) {
 	profile, resolved, err :=
 		context.ResolveGenericRepresentationProfile(declaration)
@@ -23,8 +24,7 @@ func EmitTypeArguments(
 		return nil, nil, err
 	}
 	parameters := profile.Parameters()
-	if arguments == nil ||
-		!resolved ||
+	if !resolved ||
 		arguments.Len() != len(parameters) {
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),
@@ -59,11 +59,100 @@ func EmitTypeArguments(
 			if representationErr != nil {
 				return nil, nil, representationErr
 			}
-			targets = append(targets, representation.Value())
 			requests = append(requests, representation.Requests()...)
 		}
 	}
 	return targets, api.CombineRequests(requests), nil
+}
+
+func EmitFunctionTypeArguments(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	declaration *types.Func,
+	arguments api.TypeArgumentList,
+) ([]tsgo.TypeNode, []api.RootRequest, error) {
+	projection, providerOwned, err :=
+		context.Names().ProviderGenericTypeArguments(declaration)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !providerOwned {
+		return EmitTypeArguments(
+			context,
+			children,
+			source,
+			declaration,
+			arguments,
+		)
+	}
+	if arguments.Len() == 0 {
+		return nil, nil, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "provider generic callable has no source type arguments",
+		}
+	}
+	targets := make([]tsgo.TypeNode, 0, len(projection))
+	var requests []api.RootRequest
+	for _, projected := range projection {
+		index := projected.Parameter()
+		if index < 0 || index >= arguments.Len() {
+			return nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "provider generic type-argument projection is outside the source instance",
+			}
+		}
+		target, err := emitProviderTypeArgument(
+			context,
+			children,
+			source,
+			arguments.At(index),
+			projected.Facet(),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		targets = append(targets, target.Value())
+		requests = append(requests, target.Requests()...)
+	}
+	return targets, api.CombineRequests(requests), nil
+}
+
+func emitProviderTypeArgument(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	argument types.Type,
+	facet api.GenericTypeArgumentFacet,
+) (api.TypeEmission, error) {
+	if facet == api.GenericTypeArgumentLogical {
+		return children.RepresentedType(
+			context.WithRole(api.RoleCallArgumentType),
+			source,
+			argument,
+		)
+	}
+	var representation api.GenericRepresentationFacet
+	switch facet {
+	case api.GenericTypeArgumentStorage:
+		representation = api.GenericRepresentationStorage
+	case api.GenericTypeArgumentContainerStorage:
+		representation = api.GenericRepresentationContainerStorage
+	case api.GenericTypeArgumentPointer:
+		representation = api.GenericRepresentationPointer
+	default:
+		return api.TypeEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "provider generic type-argument facet is invalid",
+		}
+	}
+	return emitRepresentationArgument(
+		context,
+		children,
+		source,
+		argument,
+		representation,
+	)
 }
 
 func emitRepresentationArgument(
@@ -73,21 +162,23 @@ func emitRepresentationArgument(
 	argument types.Type,
 	facet api.GenericRepresentationFacet,
 ) (api.TypeEmission, error) {
+	var target api.TypeEmission
+	var err error
 	switch facet {
 	case api.GenericRepresentationStorage:
-		return context.Values().StorageType(
+		target, err = context.Values().StorageType(
 			context.WithRole(api.RoleStorageType),
 			source,
 			argument,
 		)
 	case api.GenericRepresentationContainerStorage:
-		return context.ContainerStorage().ContainerStorageType(
+		target, err = context.ContainerStorage().ContainerStorageType(
 			context.WithRole(api.RoleStorageType),
 			source,
 			argument,
 		)
 	case api.GenericRepresentationPointer:
-		return pointertype.EmitNonNilRepresented(
+		target, err = pointertype.EmitNonNilRepresented(
 			context.WithRole(api.RoleCallArgumentType),
 			children,
 			source,
@@ -99,13 +190,28 @@ func emitRepresentationArgument(
 			Reason: "generic representation argument facet is invalid",
 		}
 	}
+	if err != nil {
+		return target, err
+	}
+	facetRequests, err := typeRepresentationRequests(
+		context,
+		argument,
+		facet,
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return api.DirectType(
+		target.Value(),
+		api.CombineRequests(target.Requests(), facetRequests)...,
+	), nil
 }
 
 func EmitCapabilities(
 	context api.Context,
 	source ast.Node,
 	operationSet api.GenericOperationSet,
-	arguments *types.TypeList,
+	arguments api.TypeArgumentList,
 ) ([]genericabi.Binding[tsgo.Expression], []api.RootRequest, error) {
 	targets := make(
 		[]genericabi.Binding[tsgo.Expression],
@@ -132,7 +238,20 @@ func EmitCapabilities(
 				api.GenericFunctionOperationConsumer() &&
 				operation.Operation() ==
 					api.GenericOperationConstraintMethod
-		if api.ContainsGenericTypeParameter(signature) {
+		if operation.Operation() ==
+			api.GenericOperationDeferredCallableRegistry &&
+			!api.ContainsGenericTypeParameter(signature) {
+			registry, registryErr := deferredregistry.Reference(
+				context,
+				source,
+				signature,
+			)
+			err = registryErr
+			if err == nil {
+				referenceName = registry.Name()
+				referenceRequests = registry.Requests()
+			}
+		} else if api.ContainsGenericTypeParameter(signature) {
 			reference, referenceErr := context.ProjectGenericOperation(
 				source,
 				operation,
@@ -192,8 +311,7 @@ func EmitCapabilities(
 				providerObservation.Requests(),
 				consumerObservation.Requests(),
 			)
-			if providerObservation.Cooperative() &&
-				!consumerObservation.Cooperative() {
+			if providerObservation.Cooperative() {
 				request, requestErr :=
 					api.NewCooperativeCallableRequest(consumerFacet)
 				if requestErr != nil {

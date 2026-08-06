@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 )
 
 type ToolError struct {
@@ -39,6 +41,7 @@ func resolvePinnedTool(moduleDirectory string) (string, error) {
 	}
 	command := exec.Command(goExecutable, "tool", "-n", filepath.Base(pinnedToolPackage))
 	command.Dir = moduleDirectory
+	command.Env = nativeToolEnvironment()
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return "", &ToolError{Path: goExecutable, Reason: fmt.Sprintf("%v: %s", err, strings.TrimSpace(string(output)))}
@@ -51,6 +54,10 @@ func resolvePinnedTool(moduleDirectory string) (string, error) {
 		return "", err
 	}
 	return toolPath, nil
+}
+
+func nativeToolEnvironment() []string {
+	return environmentcontract.HostEnvironment()
 }
 
 func verifyPinnedTool(toolPath string) error {

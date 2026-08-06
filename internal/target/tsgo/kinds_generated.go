@@ -1400,3 +1400,44 @@ func RequiresBindingIdentifierEscape(text string) bool {
 		return false
 	}
 }
+func IsTypeNodeSyntaxKind(kind SyntaxKind) bool {
+	switch kind {
+	case
+		SyntaxKindArrayType,
+		SyntaxKindConditionalType,
+		SyntaxKindConstructorType,
+		SyntaxKindFunctionType,
+		SyntaxKindImportType,
+		SyntaxKindIndexedAccessType,
+		SyntaxKindInferType,
+		SyntaxKindIntersectionType,
+		SyntaxKindJSDocAllType,
+		SyntaxKindJSDocNameReference,
+		SyntaxKindJSDocNonNullableType,
+		SyntaxKindJSDocNullableType,
+		SyntaxKindJSDocOptionalType,
+		SyntaxKindJSDocSignature,
+		SyntaxKindJSDocTypeExpression,
+		SyntaxKindJSDocTypeLiteral,
+		SyntaxKindJSDocVariadicType,
+		SyntaxKindLiteralType,
+		SyntaxKindMappedType,
+		SyntaxKindNamedTupleMember,
+		SyntaxKindOptionalType,
+		SyntaxKindParenthesizedType,
+		SyntaxKindRestType,
+		SyntaxKindTemplateLiteralType,
+		SyntaxKindTemplateLiteralTypeSpan,
+		SyntaxKindThisType,
+		SyntaxKindTupleType,
+		SyntaxKindTypeLiteral,
+		SyntaxKindTypeOperator,
+		SyntaxKindTypePredicate,
+		SyntaxKindTypeQuery,
+		SyntaxKindTypeReference,
+		SyntaxKindUnionType:
+		return true
+	default:
+		return false
+	}
+}

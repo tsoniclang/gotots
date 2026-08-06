@@ -237,7 +237,6 @@ func fromStorageMethod(
 
 func storageFieldMembers(
 	context api.Context,
-	source ast.Node,
 	selected layoutField,
 ) (tsgo.GetAccessorDeclaration, tsgo.SetAccessorDeclaration, []api.RootRequest, error) {
 	storageValue := context.Factory().PropertyAccessExpression(
@@ -260,13 +259,6 @@ func storageFieldMembers(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if len(restored.Before()) != 0 {
-		return nil, nil, nil, api.Unsupported(
-			context.WithRole(api.RoleStructField),
-			api.CategoryDeclaration,
-			source,
-		)
-	}
 	value := context.Factory().Identifier("$value")
 	stored, err := context.Values().ToStorage(
 		context.WithRole(api.RoleStructAssignField),
@@ -277,25 +269,30 @@ func storageFieldMembers(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if len(stored.Before()) != 0 {
-		return nil, nil, nil, api.Unsupported(
-			context.WithRole(api.RoleStructAssignField),
-			api.CategoryDeclaration,
-			source,
-		)
-	}
+	getterBody := append([]tsgo.Statement(nil), restored.Before()...)
+	getterBody = append(
+		getterBody,
+		context.Factory().ReturnStatement(restored.Value()),
+	)
+	setterBody := append([]tsgo.Statement(nil), stored.Before()...)
+	setterBody = append(setterBody, context.Factory().ExpressionStatement(
+		context.Factory().BinaryExpression(
+			nil,
+			storageValue,
+			nil,
+			context.Factory().BinaryOperatorToken(
+				tsgo.BinaryOperatorEqualsToken,
+			),
+			stored.Value(),
+		),
+	))
 	getter := context.Factory().GetAccessorDeclaration(
 		[]tsgo.ModifierLike{context.Factory().PublicKeyword()},
 		context.Factory().Identifier(selected.field.name),
 		nil,
 		nil,
 		selected.logicalType,
-		context.Factory().Block(
-			[]tsgo.Statement{
-				context.Factory().ReturnStatement(restored.Value()),
-			},
-			true,
-		),
+		context.Factory().Block(getterBody, true),
 	)
 	setter := context.Factory().SetAccessorDeclaration(
 		[]tsgo.ModifierLike{context.Factory().PublicKeyword()},
@@ -310,20 +307,7 @@ func storageFieldMembers(
 			nil,
 		)},
 		nil,
-		context.Factory().Block(
-			[]tsgo.Statement{context.Factory().ExpressionStatement(
-				context.Factory().BinaryExpression(
-					nil,
-					storageValue,
-					nil,
-					context.Factory().BinaryOperatorToken(
-						tsgo.BinaryOperatorEqualsToken,
-					),
-					stored.Value(),
-				),
-			)},
-			true,
-		),
+		context.Factory().Block(setterBody, true),
 	)
 	return getter, setter, api.CombineRequests(
 		restored.Requests(),

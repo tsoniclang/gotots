@@ -57,17 +57,19 @@ func TestArtifactReferencesRecordExactConsumedFacet(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	names := NewOwner(
-		sourcePackage.Scope(),
-		&types.Info{Defs: make(map[*ast.Ident]types.Object)},
-		registry,
-	).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(
+			sourcePackage.Scope(),
+			&types.Info{Defs: make(map[*ast.Ident]types.Object)},
+			registry,
+		),
 		sourceFile,
 		sourcePackage.Scope(),
 		tsgo.NewFactory(),
 		"modules/current/source.ts",
 		nil,
-	).(*File)
+	)
 	consumer := types.NewFunc(
 		token.Pos(10),
 		sourcePackage,
@@ -184,7 +186,9 @@ func TestGeneratedArtifactSourceReferencesUseDefiningModulesAndAliases(
 			t.Fatal(err)
 		}
 	}
-	names := NewOwner(nil, nil, registry).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(nil, nil, registry),
 		nil,
 		nil,
 		tsgo.NewFactory(),
@@ -215,6 +219,107 @@ func TestGeneratedArtifactSourceReferencesUseDefiningModulesAndAliases(
 		secondReference,
 		"../modules/second/source.js",
 	)
+}
+
+func TestGeneratedArtifactDerivedReferencesUseDefiningPackageAliases(
+	t *testing.T,
+) {
+	firstPackage := types.NewPackage("example.com/first", "model")
+	secondPackage := types.NewPackage("example.com/second", "model")
+	first := types.NewTypeName(token.Pos(1), firstPackage, "Host", nil)
+	second := types.NewTypeName(token.Pos(2), secondPackage, "Host", nil)
+	types.NewNamed(first, types.NewInterfaceType(nil, nil).Complete(), nil)
+	types.NewNamed(second, types.NewInterfaceType(nil, nil).Complete(), nil)
+	firstPackage.Scope().Insert(first)
+	secondPackage.Scope().Insert(second)
+
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers([]*types.Package{
+		firstPackage,
+		secondPackage,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for object, path := range map[types.Object]string{
+		first:  "modules/first/source.ts",
+		second: "modules/second/source.ts",
+	} {
+		if err := registry.reserve(object, targetBinding{
+			name:       "Host",
+			sourceFile: &ast.File{},
+			sourcePath: path,
+			kind:       targetBindingSource,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	names := testFileNames(
+		t,
+		NewOwner(nil, nil, registry),
+		nil,
+		nil,
+		tsgo.NewFactory(),
+		"support/reflection-types.ts",
+		nil,
+	)
+	firstContract, err := names.InterfaceContract(first.Type())
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondContract, err := names.InterfaceContract(second.Type())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstContract.ContractName() == secondContract.ContractName() ||
+		firstContract.GuardName() == secondContract.GuardName() {
+		t.Fatalf(
+			"compilation artifact derived imports collide: %q/%q and %q/%q",
+			firstContract.ContractName(),
+			firstContract.GuardName(),
+			secondContract.ContractName(),
+			secondContract.GuardName(),
+		)
+	}
+}
+
+func TestGeneratedArtifactUniqueDerivedReferenceKeepsExportName(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	host := types.NewTypeName(token.Pos(1), sourcePackage, "Host", nil)
+	types.NewNamed(host, types.NewInterfaceType(nil, nil).Complete(), nil)
+	sourcePackage.Scope().Insert(host)
+
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers([]*types.Package{sourcePackage}); err != nil {
+		t.Fatal(err)
+	}
+	if err := registry.reserve(host, targetBinding{
+		name:       "Host",
+		sourceFile: &ast.File{},
+		sourcePath: "modules/model/source.ts",
+		kind:       targetBindingSource,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	names := testFileNames(
+		t,
+		NewOwner(nil, nil, registry),
+		nil,
+		nil,
+		tsgo.NewFactory(),
+		"support/reflection-types.ts",
+		nil,
+	)
+	contract, err := names.InterfaceContract(host.Type())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contract.ContractName() != "Host$contract" || contract.GuardName() != "Host$is" {
+		t.Fatalf(
+			"unique derived reference = %q/%q",
+			contract.ContractName(),
+			contract.GuardName(),
+		)
+	}
 }
 
 func assertGeneratedSourceImport(
@@ -275,17 +380,15 @@ func Parameter(value func(chan int32) int32) {}
 		t.Fatal(err)
 	}
 	registry := NewRegistry()
-	names := NewOwner(
-		sourcePackage.Scope(),
-		info,
-		registry,
-	).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(sourcePackage.Scope(), info, registry),
 		source,
 		sourcePackage.Scope(),
 		tsgo.NewFactory(),
 		"modules/callableabi/source.ts",
 		nil,
-	).(*File)
+	)
 
 	signatures := []*types.Signature{
 		callableSignature(t, sourcePackage.Scope().Lookup("Package").Type()),
@@ -394,17 +497,15 @@ type IntValue interface {
 		t.Fatal(err)
 	}
 	registry := NewRegistry()
-	names := NewOwner(
-		sourcePackage.Scope(),
-		info,
-		registry,
-	).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(sourcePackage.Scope(), info, registry),
 		source,
 		sourcePackage.Scope(),
 		tsgo.NewFactory(),
 		"modules/interfacecallable/source.ts",
 		nil,
-	).(*File)
+	)
 	interfaceMethod := func(typeName string) *types.Func {
 		t.Helper()
 		named := sourcePackage.Scope().Lookup(typeName).Type().(*types.Named)

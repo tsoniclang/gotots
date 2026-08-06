@@ -45,33 +45,37 @@ func emitGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	expression, expressionRequests, err :=
-		call.expression(context, call.arguments, nil)
+	invoked, err := call.expression(context, children)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	target, err := api.NewExpressionEmission(
-		call.before,
-		expression,
-		api.CombineRequests(call.requests, expressionRequests),
+		append(call.before, invoked.Before()...),
+		invoked.Value(),
+		api.CombineRequests(call.requests, invoked.Requests()),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	if detached {
-		return cooperativecall.DetachedGenericCall(
+		target, err = cooperativecall.DetachedGenericCall(
+			context,
+			source,
+			call.invocation.Facet(),
+			target,
+		)
+	} else {
+		target, err = cooperativecall.GenericCall(
 			context,
 			source,
 			call.invocation.Facet(),
 			target,
 		)
 	}
-	return cooperativecall.GenericCall(
-		context,
-		source,
-		call.invocation.Facet(),
-		target,
-	)
+	if err != nil || discarded {
+		return target, err
+	}
+	return call.invocation.FromProviderResults(context, children, target)
 }
 
 func emitDeferredGenericReceiverMethod(
@@ -97,9 +101,42 @@ func emitDeferredGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	expression, expressionRequests, err :=
-		call.expression(
+	recoveryObservation, err :=
+		context.ObserveRecoveryCallable(call.invocation.Facet())
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if !recoveryObservation.Recovery() {
+		expression, expressionErr := call.expression(context, children)
+		if expressionErr != nil {
+			return api.ExpressionEmission{}, expressionErr
+		}
+		cooperative, contractRequests, contractErr :=
+			cooperativecall.GenericContract(
+				context,
+				call.invocation.Facet(),
+			)
+		if contractErr != nil {
+			return api.ExpressionEmission{}, contractErr
+		}
+		return deferredInvocation(
 			context,
+			append(call.before, expression.Before()...),
+			nil,
+			expression.Value(),
+			cooperative,
+			api.CombineRequests(
+				call.requests,
+				expression.Requests(),
+				contractRequests,
+				recoveryObservation.Requests(),
+			),
+		)
+	}
+	expression, providerRecovery, recoveryCooperative, err :=
+		call.recoveryExpression(
+			context,
+			children,
 			call.arguments,
 			context.Factory().Identifier(
 				callable.RecoveryAuthorityName,
@@ -108,24 +145,29 @@ func emitDeferredGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	cooperative, contractRequests, err :=
-		cooperativecall.GenericContract(
-			context,
-			call.invocation.Facet(),
-		)
-	if err != nil {
-		return api.ExpressionEmission{}, err
+	cooperative := recoveryCooperative
+	var contractRequests []api.RootRequest
+	if !providerRecovery {
+		cooperative, contractRequests, err =
+			cooperativecall.GenericContract(
+				context,
+				call.invocation.Facet(),
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	return deferredInvocation(
 		context,
-		call.before,
+		append(call.before, expression.Before()...),
 		nil,
-		expression,
+		expression.Value(),
 		cooperative,
 		api.CombineRequests(
 			call.requests,
-			expressionRequests,
+			expression.Requests(),
 			contractRequests,
+			recoveryObservation.Requests(),
 		),
 	)
 }
@@ -218,11 +260,30 @@ func prepareGenericReceiverMethodCall(
 
 func (c genericReceiverMethodCall) expression(
 	context api.Context,
+	children api.ChildEmitter,
+) (api.ExpressionEmission, error) {
+	return c.invocation.Invoke(
+		context,
+		children,
+		c.receiver,
+		c.arguments,
+	)
+}
+
+func (c genericReceiverMethodCall) recoveryExpression(
+	context api.Context,
+	children api.ChildEmitter,
 	arguments []tsgo.Expression,
 	recovery tsgo.Expression,
-) (tsgo.CallExpression, []api.RootRequest, error) {
-	return c.invocation.Call(
+) (
+	api.ExpressionEmission,
+	bool,
+	bool,
+	error,
+) {
+	return c.invocation.RecoveryCall(
 		context,
+		children,
 		c.receiver,
 		arguments,
 		recovery,

@@ -19,6 +19,19 @@ func Emit(
 	if !ok {
 		return api.TypeEmission{}, false, nil
 	}
+	representation, err := model.Representation(context)
+	if err != nil {
+		return api.TypeEmission{}, true, err
+	}
+	if representation.Kind() ==
+		api.DefinedValueRepresentationProviderCanonical {
+		target, err := children.RepresentedType(
+			context.WithRole(api.RoleDefinedUnderlyingType),
+			source,
+			model.Underlying(),
+		)
+		return target, true, err
+	}
 	reference, err := context.Names().TypeReference(model.TypeName())
 	if err != nil {
 		return api.TypeEmission{}, true, err
@@ -31,46 +44,18 @@ func Emit(
 			children,
 			source,
 			model.TypeName(),
-			model.Type().TypeArgs(),
+			api.TypeArgumentsFromGo(model.Type().TypeArgs()),
 		)
 		if err != nil {
 			return api.TypeEmission{}, true, err
 		}
-	}
-	_, profiled := context.GenericCallableProfile()
-	if RequiresValueFacet(model.Type()) &&
-		(profiled || model.Type().TypeArgs().Len() != 0) {
-		underlying, err := valueFacetType(
-			context,
-			children,
-			source,
-			model,
-		)
-		if err != nil {
-			return api.TypeEmission{}, true, err
-		}
-		arguments = append(arguments, underlying.Value())
-		requests = append(requests, underlying.Requests()...)
 	}
 	target := context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(reference.Name()),
+		reference.EntityName(context.Factory()),
 		arguments,
 	)
 	return api.DirectType(
 		target,
 		api.CombineRequests(reference.Requests(), requests)...,
 	), true, nil
-}
-
-func valueFacetType(
-	context api.Context,
-	children api.ChildEmitter,
-	source ast.Node,
-	model Model,
-) (api.TypeEmission, error) {
-	return children.RepresentedType(
-		context.WithRole(api.RoleDefinedUnderlyingType),
-		source,
-		model.Underlying(),
-	)
 }

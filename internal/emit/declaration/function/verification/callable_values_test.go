@@ -36,9 +36,9 @@ func TestFunctionLiteralAndSignatureOwnersCreateNativeTargetTree(t *testing.T) {
 		t.Fatal("Offset source target is absent")
 	}
 	offset := targetFunction(t, sourceFile, "Offset")
-	literal, ok := targetReturn(t, offset).Expression().(tsgo.FunctionExpression)
+	literal, ok := targetReturn(t, offset).Expression().(tsgo.ArrowFunction)
 	if !ok {
-		t.Fatalf("Offset return = %T, want FunctionExpression", targetReturn(t, offset).Expression())
+		t.Fatalf("Offset return = %T, want ArrowFunction", targetReturn(t, offset).Expression())
 	}
 	offsetType, ok := offset.Type().(tsgo.UnionTypeNode)
 	if !ok || len(offsetType.Types()) != 2 {
@@ -65,10 +65,10 @@ func TestCallableValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	if !strings.Contains(
 		printed,
-		"transform: (($0: int32, $go$recovery?: GoRecovery) => int32) | undefined",
+		"transform: (($0: int32) => int32) | undefined",
 	) || !strings.Contains(
 		printed,
-		"return function (value: int32): int32",
+		"return (value: int32): int32 =>",
 	) || !strings.Contains(
 		printed,
 		`GoPanic.raiseRuntime("call of nil function")`,
@@ -134,9 +134,9 @@ func TestCallableValuesCreateNativeTargetTrees(t *testing.T) {
 	}
 
 	offset := targetFunction(t, targetFile, "Offset")
-	literal, ok := targetReturn(t, offset).Expression().(tsgo.FunctionExpression)
+	literal, ok := targetReturn(t, offset).Expression().(tsgo.ArrowFunction)
 	if !ok {
-		t.Fatalf("Offset return = %T, want FunctionExpression", targetReturn(t, offset).Expression())
+		t.Fatalf("Offset return = %T, want ArrowFunction", targetReturn(t, offset).Expression())
 	}
 	if len(literal.Parameters()) != 1 || literal.Parameters()[0].Name().Kind() != tsgo.SyntaxKindIdentifier {
 		t.Fatal("Offset literal parameter is not a native typed parameter")

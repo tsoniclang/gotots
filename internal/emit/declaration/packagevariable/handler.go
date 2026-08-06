@@ -2,11 +2,14 @@ package packagevariable
 
 import (
 	"go/ast"
+	"go/constant"
 	"go/types"
 	"slices"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
+	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -16,10 +19,10 @@ const (
 )
 
 type StorageEmission struct {
-	field            tsgo.PropertyDeclaration
-	zeroStatements   []tsgo.Statement
-	stateRequests    []api.RootRequest
-	assemblyRequests []api.RootRequest
+	field                    tsgo.PropertyDeclaration
+	initializationStatements []tsgo.Statement
+	stateRequests            []api.RootRequest
+	assemblyRequests         []api.RootRequest
 }
 
 func EmitStorage(
@@ -28,6 +31,7 @@ func EmitStorage(
 	children api.ChildEmitter,
 	source ast.Node,
 	variable *types.Var,
+	embedded *load.EmbedValue,
 ) (StorageEmission, error) {
 	if variable == nil ||
 		variable.IsField() ||
@@ -62,10 +66,11 @@ func EmitStorage(
 	if err != nil {
 		return StorageEmission{}, err
 	}
-	zero, err := assemblyContext.Values().Zero(
-		assemblyContext.WithRole(api.RolePackageVariableZero),
+	initial, role, err := emitInitialStorageValue(
+		assemblyContext,
 		source,
-		variable.Type(),
+		variable,
+		embedded,
 	)
 	if err != nil {
 		return StorageEmission{}, err
@@ -79,16 +84,16 @@ func EmitStorage(
 		return StorageEmission{}, err
 	}
 	assigned, err := target.StoreValue(
-		assemblyContext.WithRole(api.RolePackageVariableZero),
+		assemblyContext.WithRole(role),
 		source,
-		zero,
+		initial,
 	)
 	if err != nil {
 		return StorageEmission{}, err
 	}
-	zeroStatements := assigned.Before()
-	zeroStatements = append(
-		zeroStatements,
+	initializationStatements := assigned.Before()
+	initializationStatements = append(
+		initializationStatements,
 		assemblyContext.Factory().ExpressionStatement(assigned.Value()),
 	)
 	return StorageEmission{
@@ -99,12 +104,51 @@ func EmitStorage(
 			targetType.Value(),
 			nil,
 		),
-		zeroStatements: zeroStatements,
-		stateRequests:  targetType.Requests(),
+		initializationStatements: initializationStatements,
+		stateRequests:            targetType.Requests(),
 		assemblyRequests: api.CombineRequests(
 			assigned.Requests(),
 		),
 	}, nil
+}
+
+func emitInitialStorageValue(
+	context api.Context,
+	source ast.Node,
+	variable *types.Var,
+	embedded *load.EmbedValue,
+) (api.ExpressionEmission, api.Role, error) {
+	if embedded == nil {
+		value, err := context.Values().Zero(
+			context.WithRole(api.RolePackageVariableZero),
+			source,
+			variable.Type(),
+		)
+		return value, api.RolePackageVariableZero, err
+	}
+	if embedded.Kind() != load.EmbedString {
+		return api.ExpressionEmission{}, api.RolePackageVariableValue,
+			api.Unsupported(
+				context.WithRole(api.RolePackageVariableValue),
+				api.CategoryDeclaration,
+				source,
+			)
+	}
+	content, ok := embedded.String()
+	if !ok {
+		return api.ExpressionEmission{}, api.RolePackageVariableValue,
+			&api.InvariantError{
+				Role:   context.Role(),
+				Reason: "embedded string storage lacks exactly one selected file",
+			}
+	}
+	value, err := constantvalue.EmitValue(
+		context.WithRole(api.RolePackageVariableValue),
+		source,
+		variable.Type(),
+		constant.MakeString(content),
+	)
+	return value, api.RolePackageVariableValue, err
 }
 
 func EmitInitializer(
@@ -396,8 +440,8 @@ func (e StorageEmission) Field() tsgo.PropertyDeclaration {
 	return e.field
 }
 
-func (e StorageEmission) ZeroStatements() []tsgo.Statement {
-	return slices.Clone(e.zeroStatements)
+func (e StorageEmission) InitializationStatements() []tsgo.Statement {
+	return slices.Clone(e.initializationStatements)
 }
 
 func (e StorageEmission) StateRequests() []api.RootRequest {

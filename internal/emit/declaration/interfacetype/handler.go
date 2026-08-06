@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -67,6 +66,7 @@ func Emit(
 		parameters.Nodes(),
 		parameters.References(),
 		len(parameters.Nodes()) == 0,
+		api.TargetIntrinsicObject.Expression(context.Factory()),
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, true, err
@@ -93,6 +93,29 @@ func Build(
 		nil,
 		nil,
 		true,
+		api.TargetIntrinsicObject.Expression(context.Factory()),
+	)
+}
+
+func BuildIsolated(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	name string,
+	interfaceType *types.Interface,
+	modifiers []tsgo.ModifierLike,
+) ([]tsgo.Statement, []api.RootRequest, error) {
+	return build(
+		context,
+		children,
+		source,
+		name,
+		interfaceType,
+		modifiers,
+		nil,
+		nil,
+		true,
+		api.TargetIntrinsicObject.UnshadowedExpression(context.Factory()),
 	)
 }
 
@@ -106,6 +129,7 @@ func build(
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
 	emitRuntimeContract bool,
+	object tsgo.Expression,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	if name == "" ||
 		interfaceType == nil ||
@@ -160,24 +184,13 @@ func build(
 		if err != nil {
 			return nil, nil, err
 		}
-		cooperative, contractRequests, err :=
-			cooperativecall.InterfaceMethodContract(
-				context,
-				callableReference,
-			)
-		if err != nil {
-			return nil, nil, err
-		}
 		memberName, err := context.Names().InterfaceMethodName(method)
 		if err != nil {
 			return nil, nil, err
 		}
-		resultType := target.Result()
-		if cooperative {
-			resultType = callable.PromiseResult(
-				context.Factory(),
-				resultType,
-			)
+		resultType, err := callable.IndirectResult(context, target.Result())
+		if err != nil {
+			return nil, nil, err
 		}
 		members = append(
 			members,
@@ -187,14 +200,15 @@ func build(
 				nil,
 				nil,
 				target.Parameters(),
-				resultType,
+				resultType.Value(),
 			),
 		)
 		requests = append(
 			requests,
 			target.Requests()...,
 		)
-		requests = append(requests, contractRequests...)
+		requests = append(requests, resultType.Requests()...)
+		requests = append(requests, callableReference.Requests()...)
 		if emitRuntimeContract {
 			token, tokenErr :=
 				context.Names().InterfaceMethodToken(method)
@@ -232,7 +246,13 @@ func build(
 	if emitRuntimeContract {
 		statements = append(
 			statements,
-			contractDeclaration(context.Factory(), name, modifiers, tokens),
+			contractDeclaration(
+				context.Factory(),
+				name,
+				modifiers,
+				tokens,
+				object,
+			),
 			guardDeclaration(
 				context.Factory(),
 				name,
@@ -267,7 +287,7 @@ func sourceInterface(
 	for _, candidate := range declaration.Specs {
 		source, ok := candidate.(*ast.TypeSpec)
 		if ok &&
-			context.TypesInfo().Defs[source.Name] == typeName {
+			context.TypesInfo().DefOf(source.Name) == typeName {
 			return source, interfaceType, true
 		}
 	}

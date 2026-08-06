@@ -19,8 +19,6 @@ func Test(
 	value tsgo.Expression,
 ) (api.ExpressionEmission, error) {
 	switch context.GoRuntimeType(targetType) {
-	case api.GoRuntimeTypeBuiltinError:
-		return runtimeInterfaceTest(context, api.RuntimeBuiltinErrorGuard, value)
 	case api.GoRuntimeTypeError:
 		return runtimeInterfaceTest(context, api.RuntimeErrorGuard, value)
 	case api.GoRuntimeTypePanicNilPointer:
@@ -34,7 +32,7 @@ func Test(
 		return api.DirectExpression(
 			context.Factory().CallExpression(
 				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
+					reference.Expression(context.Factory()),
 					nil,
 					context.Factory().Identifier(panicnilruntime.GuardName),
 					tsgo.NodeFlagsNone,
@@ -55,20 +53,15 @@ func Test(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		contract, err := context.Names().InterfaceContract(targetType)
+		test, err := ContractTest(context, targetType, value)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return api.DirectExpression(
-			context.Factory().CallExpression(
-				context.Factory().Identifier(contract.GuardName()),
-				nil,
-				nil,
-				[]tsgo.Expression{value},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(contract.Requests(), demands)...,
-		), nil
+		return api.NewExpressionEmission(
+			test.Before(),
+			test.Value(),
+			api.CombineRequests(test.Requests(), demands),
+		)
 	}
 	adapter, err := context.Names().InterfaceAdapter(targetType, nil)
 	if err != nil {
@@ -98,8 +91,6 @@ func Extract(
 	value tsgo.Expression,
 ) (api.ExpressionEmission, error) {
 	switch context.GoRuntimeType(targetType) {
-	case api.GoRuntimeTypeBuiltinError:
-		return runtimeInterfaceExtract(context, api.RuntimeBuiltinErrorType, value)
 	case api.GoRuntimeTypeError:
 		return runtimeInterfaceExtract(context, api.RuntimeErrorType, value)
 	case api.GoRuntimeTypePanicNilPointer:
@@ -172,7 +163,7 @@ func runtimeInterfaceTest(
 	}
 	return api.DirectExpression(
 		context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{value},

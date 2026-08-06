@@ -6,26 +6,13 @@ import (
 	"go/types"
 	"strconv"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 )
 
 func Signature(method *types.Func) (*types.Signature, bool) {
-	if method == nil {
-		return nil, false
-	}
-	source, ok := method.Type().(*types.Signature)
-	if !ok {
-		return nil, false
-	}
-	return types.NewSignatureType(
-		nil,
-		nil,
-		nil,
-		source.Params(),
-		source.Results(),
-		source.Variadic(),
-	), true
+	return environmentcontract.MethodSignature(method)
 }
 
 func BuildKey(
@@ -174,32 +161,4 @@ func identityParameters(method *types.Func) []*types.TypeParam {
 		)
 	}
 	return parameters
-}
-
-func Equivalent(left *types.Func, right *types.Func) bool {
-	if left == nil || right == nil {
-		return false
-	}
-	leftDescriptor, leftErr := ContractDescriptor(
-		left,
-		typeidentity.NamedObjectKey,
-	)
-	rightDescriptor, rightErr := ContractDescriptor(
-		right,
-		typeidentity.NamedObjectKey,
-	)
-	if leftErr == nil && rightErr == nil {
-		return leftDescriptor == rightDescriptor
-	}
-	leftSignature, leftOK := Signature(left)
-	rightSignature, rightOK := Signature(right)
-	return leftOK &&
-		rightOK &&
-		left.Name() == right.Name() &&
-		left.Exported() == right.Exported() &&
-		types.Identical(leftSignature, rightSignature) &&
-		(left.Exported() ||
-			left.Pkg() != nil &&
-				right.Pkg() != nil &&
-				left.Pkg().Path() == right.Pkg().Path())
 }

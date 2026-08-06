@@ -17,7 +17,7 @@ func emitBlankAwareSpec(
 	var requests []api.RootRequest
 	for index, sourceName := range source.Names {
 		if sourceName.Name == "_" {
-			if object := context.TypesInfo().Defs[sourceName]; object != nil &&
+			if object := context.TypesInfo().DefOf(sourceName); object != nil &&
 				object.Name() != "_" {
 				return nil, nil, api.Unsupported(
 					context.WithRole(api.RoleLocalDeclaration),
@@ -40,7 +40,7 @@ func emitBlankAwareSpec(
 			requests = append(requests, discarded.Requests()...)
 			continue
 		}
-		object, ok := context.TypesInfo().Defs[sourceName].(*types.Var)
+		object, ok := context.TypesInfo().DefOf(sourceName).(*types.Var)
 		if !ok {
 			return nil, nil, api.Unsupported(
 				context.WithRole(api.RoleLocalDeclaration),
@@ -48,15 +48,16 @@ func emitBlankAwareSpec(
 				sourceName,
 			)
 		}
+		objectType := context.TypesInfo().TypeOfObject(object)
 		callableZero := len(source.Values) == 0 &&
-			omitCallableZeroInitializer(object.Type())
+			omitCallableZeroInitializer(objectType)
 		value, err := localValue(
 			context,
 			children,
 			source,
 			sourceName,
 			index,
-			object,
+			objectType,
 		)
 		if err != nil {
 			return nil, nil, err
@@ -64,6 +65,7 @@ func emitBlankAwareSpec(
 		selected := binding{
 			sourceName:      sourceName,
 			object:          object,
+			sourceType:      objectType,
 			value:           value,
 			omitInitializer: callableZero,
 		}
@@ -114,7 +116,7 @@ func discardedLocalValue(
 			source,
 		)
 	}
-	if facts, ok := context.TypesInfo().Types[source]; ok && facts.Value != nil {
+	if facts, ok := context.TypesInfo().TypeAndValue(source); ok && facts.Value != nil {
 		return api.NewStatementEmission(nil, nil)
 	}
 	expectedType := sourceType

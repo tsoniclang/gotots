@@ -27,15 +27,24 @@ func (s *programSession) validateGeneratedArtifact(
 	case api.GeneratedArtifactInterfaceAdapter,
 		api.GeneratedArtifactAnonymousInterface,
 		api.GeneratedArtifactInterfaceMethodToken,
-		api.GeneratedArtifactInterfaceDynamicTypeToken:
-		return s.validateInterfaceArtifact(artifact)
+		api.GeneratedArtifactInterfaceDynamicTypeToken,
+		api.GeneratedArtifactProviderInterfaceBridge,
+		api.GeneratedArtifactReflectionType,
+		api.GeneratedArtifactUnsafeCodec:
+		return s.validateRepresentationArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
 		return s.validateGenericCapabilityArtifact(artifact)
+	case api.GeneratedArtifactGenericConcretization:
+		return s.validateGenericConcretizationArtifact(artifact)
 	case api.GeneratedArtifactCallableABI,
 		api.GeneratedArtifactInterfaceMethodCallable:
 		return s.validateCallableContractArtifact(artifact)
 	case api.GeneratedArtifactPointerRepresentation:
 		return s.validatePointerRepresentationArtifact(artifact)
+	case api.GeneratedArtifactProviderStatefulRepresentation:
+		return s.validateProviderStatefulArtifact(artifact)
+	case api.GeneratedArtifactDeferredCallableRegistry:
+		return s.validateDeferredCallableRegistry(artifact)
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
@@ -56,15 +65,24 @@ func (s *programSession) reconstructGeneratedArtifact(
 	case api.GeneratedArtifactInterfaceAdapter,
 		api.GeneratedArtifactAnonymousInterface,
 		api.GeneratedArtifactInterfaceMethodToken,
-		api.GeneratedArtifactInterfaceDynamicTypeToken:
-		err = s.reconstructInterfaceArtifact(artifact)
+		api.GeneratedArtifactInterfaceDynamicTypeToken,
+		api.GeneratedArtifactProviderInterfaceBridge,
+		api.GeneratedArtifactReflectionType,
+		api.GeneratedArtifactUnsafeCodec:
+		err = s.reconstructRepresentationArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
 		err = s.reconstructGenericCapabilityArtifact(artifact)
+	case api.GeneratedArtifactGenericConcretization:
+		err = s.reconstructGenericConcretizationArtifact(artifact)
 	case api.GeneratedArtifactCallableABI,
 		api.GeneratedArtifactInterfaceMethodCallable:
 		err = s.reconstructCallableContractArtifact(artifact)
 	case api.GeneratedArtifactPointerRepresentation:
 		err = s.reconstructPointerRepresentationArtifact(artifact)
+	case api.GeneratedArtifactProviderStatefulRepresentation:
+		err = s.reconstructProviderStatefulArtifact(artifact)
+	case api.GeneratedArtifactDeferredCallableRegistry:
+		err = s.reconstructDeferredCallableRegistry(artifact)
 	default:
 		err = &ScheduleError{
 			Object: artifact.TargetName(),
@@ -141,10 +159,11 @@ func (s *programSession) reconstructMapSpecialization(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
@@ -219,17 +238,18 @@ func (s *programSession) buildMapSpecializationRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	mapModel, ok := maprepresentation.Source(context, mapType)
+	_, ok = maprepresentation.Source(context, mapType)
 	if !ok {
 		return artifactRevision{}, &ScheduleError{
 			Object: artifact.TargetName(),
 			Reason: "generated map specialization has no representation model",
 		}
 	}
-	storageKeyType, err := builder.emitter.RepresentedType(
-		context.WithRole(api.RoleStorageType),
+	storageKeyType, err := maprepresentation.EmitStorageKeyType(
+		context,
+		builder.emitter,
 		nil,
-		mapModel.StorageKey(),
+		mapType.Key(),
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -267,7 +287,8 @@ func (s *programSession) buildMapSpecializationRevision(
 		valueType.Requests(),
 		specialization.Requests(),
 	)
-	placement, dependencies, err := s.consumeArtifactRequests(owner, requests)
+	placement, dependencies, requirements, err :=
+		s.consumeArtifactRequests(owner, requests)
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -282,6 +303,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		statements:     []tsgo.Statement{statement},
 		placement:      placement,
 		dependencies:   dependencies,
+		requirements:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
@@ -355,10 +377,11 @@ func (s *programSession) reconstructGenericCapabilityArtifact(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
@@ -439,10 +462,11 @@ func (s *programSession) buildGenericCapabilityRevision(
 		return artifactRevision{}, err
 	}
 	statements := []tsgo.Statement{statement}
-	placement, dependencies, err := s.consumeArtifactRequests(
-		owner,
-		api.CombineRequests(requests, observation.Requests()),
-	)
+	placement, dependencies, requirements, err :=
+		s.consumeArtifactRequests(
+			owner,
+			api.CombineRequests(requests, observation.Requests()),
+		)
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -454,6 +478,7 @@ func (s *programSession) buildGenericCapabilityRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
+		requirements:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil

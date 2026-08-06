@@ -33,9 +33,6 @@ func emit(
 	var symbol api.RuntimeSymbol
 	nilCapable := false
 	switch context.GoRuntimeType(sourceType) {
-	case api.GoRuntimeTypeBuiltinError:
-		symbol = api.RuntimeBuiltinErrorType
-		nilCapable = true
 	case api.GoRuntimeTypeError:
 		symbol = api.RuntimeErrorType
 		nilCapable = true
@@ -49,7 +46,7 @@ func emit(
 		return api.TypeEmission{}, true, err
 	}
 	target := tsgo.TypeNode(context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(reference.Name()),
+		reference.EntityName(context.Factory()),
 		nil,
 	))
 	if nilCapable && includeNil {

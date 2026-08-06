@@ -1,22 +1,106 @@
 package emit
 
 import (
+	"fmt"
 	"slices"
 	"sort"
 
+	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	declarationorder "github.com/tsoniclang/gotots/internal/emit/declaration/order"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
+	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func programScalarABI(
+	source *load.Program,
+	integer api.IntegerRepresentation,
+) (api.ScalarABI, error) {
+	if source == nil {
+		return api.ScalarABI{}, &ScheduleError{Reason: "source program is nil"}
+	}
+	packages := append(source.Packages(), source.EnvironmentPackages()...)
+	var selected api.ScalarABI
+	for _, sourcePackage := range packages {
+		if sourcePackage == nil {
+			return api.ScalarABI{}, &ScheduleError{
+				Reason: "source package is nil while resolving scalar ABI",
+			}
+		}
+		current, err := api.NewScalarABIFromSizes(
+			integer,
+			sourcePackage.TypesSizes(),
+		)
+		if err != nil {
+			return api.ScalarABI{}, &ScheduleError{
+				Object: sourcePackage.Types().Path(),
+				Reason: "resolve scalar ABI: " + err.Error(),
+			}
+		}
+		if !selected.Valid() {
+			selected = current
+			continue
+		}
+		if current != selected {
+			return api.ScalarABI{}, &ScheduleError{
+				Object: sourcePackage.Types().Path(),
+				Reason: fmt.Sprintf(
+					"native integer width %d differs from compilation width %d",
+					current.NativeIntegerWidth(),
+					selected.NativeIntegerWidth(),
+				),
+			}
+		}
+	}
+	if !selected.Valid() {
+		return api.ScalarABI{}, &ScheduleError{
+			Reason: "source program has no scalar ABI evidence",
+		}
+	}
+	return selected, nil
+}
+
+func certifiedProviderScalarABI(
+	provider *gostdlibcertify.Certificate,
+	productWidth api.NativeIntegerWidth,
+) (api.ScalarABI, error) {
+	if provider == nil {
+		return api.ScalarABI{}, nil
+	}
+	contract, ok := provider.RuntimeRequirements()
+	if !ok {
+		return api.ScalarABI{}, &OptionsError{
+			Field:  "standard library provider",
+			Reason: "provider runtime contract is absent",
+		}
+	}
+	requirements, err := runtimeemission.ResolvePackageRequirements(contract)
+	if err != nil {
+		return api.ScalarABI{}, err
+	}
+	selected := requirements.ProviderScalarABI()
+	if selected.NativeIntegerWidth() != productWidth {
+		return api.ScalarABI{}, &OptionsError{
+			Field: "standard library provider",
+			Reason: fmt.Sprintf(
+				"provider native integer width %d differs from selected product width %d",
+				selected.NativeIntegerWidth(),
+				productWidth,
+			),
+		}
+	}
+	return selected, nil
+}
 
 func (s *programSession) targetFiles() ([]TargetFile, error) {
 	if s.sealed {
 		return nil, &ScheduleError{Reason: "target files were sealed more than once"}
 	}
 	if s.scheduler.hasPending() ||
+		s.packageExports.hasPending() ||
 		s.requirements.hasPending() ||
 		s.artifacts.HasPending() ||
 		s.packageInitializations.hasPending() {
@@ -32,20 +116,14 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 	}
 	sort.Strings(paths)
 	files := make([]TargetFile, 0, len(paths)+1)
-	primitiveAliases := make(map[api.PrimitiveAlias]struct{})
-	runtimeSymbols := make(map[api.RuntimeSymbol]struct{})
+	requirements := s.newTargetRequirements()
 	for _, outputPath := range paths {
 		builder := s.builders[outputPath]
 		placement, err := committedTargetFilePlacement(builder)
 		if err != nil {
 			return nil, err
 		}
-		for _, alias := range placement.PrimitiveAliases() {
-			primitiveAliases[alias] = struct{}{}
-		}
-		for _, symbol := range placement.RuntimeSymbols() {
-			runtimeSymbols[symbol] = struct{}{}
-		}
+		requirements.observe(placement)
 		orderInput := make(
 			[]declarationorder.Declaration,
 			len(builder.declarations),
@@ -91,57 +169,42 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		}
 		files = append(files, target)
 	}
-	environmentFiles, err := s.environmentTargetFiles(
-		primitiveAliases,
-		runtimeSymbols,
-	)
+	environmentFiles, err := s.environmentTargetFiles(requirements)
 	if err != nil {
 		return nil, err
 	}
 	files = append(files, environmentFiles...)
-	packageFiles, err := s.packageTargetFiles(primitiveAliases)
+	packageFiles, err := s.packageTargetFiles(requirements)
 	if err != nil {
 		return nil, err
 	}
 	files = append(files, packageFiles...)
-	for _, builder := range s.packageBuilders {
-		for _, symbol := range builder.statePlacement.RuntimeSymbols() {
-			runtimeSymbols[symbol] = struct{}{}
-		}
-		for _, symbol := range builder.assemblyPlacement.RuntimeSymbols() {
-			runtimeSymbols[symbol] = struct{}{}
-		}
-		for _, storage := range builder.storage {
-			for _, symbol := range storage.statePlacement.RuntimeSymbols() {
-				runtimeSymbols[symbol] = struct{}{}
-			}
-			for _, symbol := range storage.assemblyPlacement.RuntimeSymbols() {
-				runtimeSymbols[symbol] = struct{}{}
-			}
-		}
-	}
-	programFile, err := s.programInitializationFile()
+	programFile, err := s.programInitializationFile(requirements)
 	if err != nil {
 		return nil, err
 	}
 	files = append(files, programFile)
-	if len(primitiveAliases) != 0 {
-		aliases := make([]api.PrimitiveAlias, 0, len(primitiveAliases))
-		for alias := range primitiveAliases {
-			aliases = append(aliases, alias)
-		}
-		slices.Sort(aliases)
-		support, err := s.scalarSupportFile(aliases)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, support)
+	if err := requirements.addProviderRuntime(s); err != nil {
+		return nil, err
 	}
-	runtimeFiles, err := s.runtimeSupportFiles(runtimeSymbols)
+	runtimePackage, err := runtimeemission.AssemblePackage(
+		s.factory,
+		s.scalar,
+		s.concurrency,
+		requirements.runtimeSymbols,
+		requirements.aliases(),
+	)
 	if err != nil {
 		return nil, err
 	}
-	files = append(files, runtimeFiles...)
+	s.runtimePackage = RuntimePackage{assembled: runtimePackage}
+	for _, runtimeFile := range runtimePackage.Files() {
+		files = append(files, TargetFile{
+			outputPath: runtimeFile.OutputPath(),
+			sourceFile: runtimeFile.SourceFile(),
+			kind:       TargetFileSupport,
+		})
+	}
 	sort.Slice(files, func(left, right int) bool {
 		return files[left].outputPath < files[right].outputPath
 	})
@@ -174,7 +237,9 @@ func committedTargetFilePlacement(
 	return placement, nil
 }
 
-func (s *programSession) programInitializationFile() (TargetFile, error) {
+func (s *programSession) programInitializationFile(
+	requirements *targetRequirements,
+) (TargetFile, error) {
 	order, err := s.packageInitializationOrder()
 	if err != nil {
 		return TargetFile{}, err
@@ -231,12 +296,97 @@ func (s *programSession) programInitializationFile() (TargetFile, error) {
 	}
 	statements := placement.Statements(s.factory)
 	statements = append(statements, calls...)
+	requirements.observe(placement)
 	return s.sourceFile(
 		targetoutput.ProgramInitializationPath,
 		"",
 		TargetFileProgramInitialization,
 		statements,
 	)
+}
+
+type targetRequirements struct {
+	primitiveAliases         map[api.PrimitiveAlias]struct{}
+	runtimeSymbols           map[api.RuntimeSymbol]struct{}
+	certifiedProviderModules map[string]struct{}
+	selectedProviderModules  map[string]struct{}
+}
+
+func (s *programSession) newTargetRequirements() *targetRequirements {
+	result := &targetRequirements{
+		primitiveAliases:         make(map[api.PrimitiveAlias]struct{}),
+		runtimeSymbols:           make(map[api.RuntimeSymbol]struct{}),
+		certifiedProviderModules: make(map[string]struct{}),
+		selectedProviderModules:  make(map[string]struct{}),
+	}
+	if s.standardLibrary == nil {
+		return result
+	}
+	for _, module := range s.standardLibrary.ProviderModules() {
+		result.certifiedProviderModules[module] = struct{}{}
+	}
+	return result
+}
+
+func (r *targetRequirements) observe(placement *targetplacement.Owner) {
+	for _, alias := range placement.PrimitiveAliases() {
+		r.primitiveAliases[alias] = struct{}{}
+	}
+	for _, symbol := range placement.RuntimeSymbols() {
+		r.runtimeSymbols[symbol] = struct{}{}
+	}
+	for _, request := range placement.Requests() {
+		module := request.ModulePath()
+		if _, certified := r.certifiedProviderModules[module]; certified {
+			r.selectedProviderModules[module] = struct{}{}
+		}
+	}
+}
+
+func (r *targetRequirements) addProviderRuntime(s *programSession) error {
+	if len(r.selectedProviderModules) == 0 {
+		return nil
+	}
+	if s.standardLibrary == nil {
+		return &ScheduleError{Reason: "selected provider has no certificate"}
+	}
+	contract, ok := s.standardLibrary.RuntimeRequirements()
+	if !ok {
+		return &ScheduleError{Reason: "selected provider has no runtime contract"}
+	}
+	requirements, err := runtimeemission.ResolvePackageRequirements(contract)
+	if err != nil {
+		return err
+	}
+	if !requirements.AllowsProfile(s.scalar.IntegerRepresentation()) {
+		return &OptionsError{
+			Field: "integer representation",
+			Reason: "selected provider runtime does not admit " +
+				s.scalar.IntegerRepresentation().String(),
+		}
+	}
+	if requirements.ProviderScalarABI() != s.providerScalar {
+		return &OptionsError{
+			Field:  "standard library provider",
+			Reason: "selected provider scalar ABI changed after session creation",
+		}
+	}
+	for _, alias := range requirements.PrimitiveAliases() {
+		r.primitiveAliases[alias] = struct{}{}
+	}
+	for symbol := range requirements.RuntimeSymbols() {
+		r.runtimeSymbols[symbol] = struct{}{}
+	}
+	return nil
+}
+
+func (r *targetRequirements) aliases() []api.PrimitiveAlias {
+	aliases := make([]api.PrimitiveAlias, 0, len(r.primitiveAliases))
+	for alias := range r.primitiveAliases {
+		aliases = append(aliases, alias)
+	}
+	slices.Sort(aliases)
+	return aliases
 }
 
 func (s *programSession) packageInitializationOrder() (
@@ -321,240 +471,4 @@ func (s *programSession) sourceFile(
 			},
 		),
 	}, nil
-}
-
-func (s *programSession) scalarSupportFile(
-	aliases []api.PrimitiveAlias,
-) (TargetFile, error) {
-	statements := make([]tsgo.Statement, 0, len(aliases))
-	for _, alias := range aliases {
-		name, keyword, err := api.PrimitiveAliasRepresentation(
-			alias,
-			s.integer,
-		)
-		if err != nil {
-			return TargetFile{}, err
-		}
-		statements = append(statements, s.factory.TypeAliasDeclaration(
-			[]tsgo.ModifierLike{s.factory.ExportKeyword()},
-			s.factory.Identifier(name),
-			nil,
-			s.factory.KeywordTypeNode(keyword),
-		))
-	}
-	return s.sourceFile(
-		targetoutput.ScalarSupportPath,
-		"",
-		TargetFileSupport,
-		statements,
-	)
-}
-
-func (s *programSession) runtimeSupportFiles(
-	requested map[api.RuntimeSymbol]struct{},
-) ([]TargetFile, error) {
-	requested, err := runtimeDependencyClosure(requested)
-	if err != nil {
-		return nil, err
-	}
-	byModule := make(map[api.RuntimeModule][]api.RuntimeSymbol)
-	paths := make(map[api.RuntimeModule]string)
-	for symbol := range requested {
-		contract, err := api.RuntimeContract(symbol)
-		if err != nil {
-			return nil, err
-		}
-		module := contract.Module()
-		if existing := paths[module]; existing != "" &&
-			existing != contract.OutputPath() {
-			return nil, &runtimeemission.AssemblyError{
-				Module: module,
-				Symbol: symbol,
-				Reason: "one runtime module has multiple output paths",
-			}
-		}
-		paths[module] = contract.OutputPath()
-		byModule[module] = append(byModule[module], symbol)
-	}
-	modules := make([]api.RuntimeModule, 0, len(byModule))
-	for module := range byModule {
-		modules = append(modules, module)
-	}
-	sort.Slice(modules, func(left, right int) bool {
-		return modules[left] < modules[right]
-	})
-	files := make([]TargetFile, 0, len(modules))
-	for _, module := range modules {
-		symbols := byModule[module]
-		sort.Slice(symbols, func(left, right int) bool {
-			return symbols[left] < symbols[right]
-		})
-		definitions, err := runtimeemission.Build(s.factory, module, symbols)
-		if err != nil {
-			return nil, err
-		}
-		statements, err := exactRuntimeDefinitions(module, symbols, definitions)
-		if err != nil {
-			return nil, err
-		}
-		imports, err := s.runtimeModuleImports(paths[module], module, symbols)
-		if err != nil {
-			return nil, err
-		}
-		statements = append(imports, statements...)
-		file, err := s.sourceFile(
-			paths[module],
-			"",
-			TargetFileSupport,
-			statements,
-		)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, file)
-	}
-	return files, nil
-}
-
-func runtimeDependencyClosure(
-	requested map[api.RuntimeSymbol]struct{},
-) (map[api.RuntimeSymbol]struct{}, error) {
-	result := make(map[api.RuntimeSymbol]struct{}, len(requested))
-	state := make(map[api.RuntimeSymbol]uint8, len(requested))
-	var visit func(api.RuntimeSymbol) error
-	visit = func(symbol api.RuntimeSymbol) error {
-		switch state[symbol] {
-		case 1:
-			return &runtimeemission.AssemblyError{
-				Symbol: symbol,
-				Reason: "runtime dependency graph contains a cycle",
-			}
-		case 2:
-			return nil
-		}
-		contract, err := api.RuntimeContract(symbol)
-		if err != nil {
-			return err
-		}
-		state[symbol] = 1
-		dependencies := contract.Dependencies()
-		slices.Sort(dependencies)
-		for _, dependency := range dependencies {
-			if err := visit(dependency); err != nil {
-				return err
-			}
-		}
-		state[symbol] = 2
-		result[symbol] = struct{}{}
-		return nil
-	}
-	symbols := make([]api.RuntimeSymbol, 0, len(requested))
-	for symbol := range requested {
-		symbols = append(symbols, symbol)
-	}
-	slices.Sort(symbols)
-	for _, symbol := range symbols {
-		if err := visit(symbol); err != nil {
-			return nil, err
-		}
-	}
-	return result, nil
-}
-
-func (s *programSession) runtimeModuleImports(
-	outputPath string,
-	module api.RuntimeModule,
-	symbols []api.RuntimeSymbol,
-) ([]tsgo.Statement, error) {
-	placement := targetplacement.New()
-	for _, symbol := range symbols {
-		contract, err := api.RuntimeContract(symbol)
-		if err != nil {
-			return nil, err
-		}
-		for _, dependency := range contract.Dependencies() {
-			dependencyContract, err := api.RuntimeContract(dependency)
-			if err != nil {
-				return nil, err
-			}
-			if dependencyContract.Module() == module {
-				continue
-			}
-			modulePath, err := targetoutput.ModuleSpecifier(
-				outputPath,
-				dependencyContract.OutputPath(),
-			)
-			if err != nil {
-				return nil, err
-			}
-			request, err := api.NewRuntimeImportRequest(
-				s.factory,
-				api.ImportPhaseValue,
-				modulePath,
-				dependency,
-				dependencyContract.ExportedName(),
-			)
-			if err != nil {
-				return nil, err
-			}
-			if err := placement.Apply([]api.RootRequest{request}); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return placement.Statements(s.factory), nil
-}
-
-func exactRuntimeDefinitions(
-	module api.RuntimeModule,
-	symbols []api.RuntimeSymbol,
-	definitions []runtimeemission.Definition,
-) ([]tsgo.Statement, error) {
-	requested := make(map[api.RuntimeSymbol]struct{}, len(symbols))
-	for _, symbol := range symbols {
-		requested[symbol] = struct{}{}
-	}
-	bySymbol := make(map[api.RuntimeSymbol]tsgo.Statement, len(definitions))
-	for _, definition := range definitions {
-		symbol := definition.Symbol()
-		contract, err := api.RuntimeContract(symbol)
-		if err != nil {
-			return nil, err
-		}
-		if contract.Module() != module {
-			return nil, &runtimeemission.AssemblyError{
-				Module: module,
-				Symbol: symbol,
-				Reason: "definition belongs to another runtime module",
-			}
-		}
-		if _, ok := requested[symbol]; !ok {
-			return nil, &runtimeemission.AssemblyError{
-				Module: module,
-				Symbol: symbol,
-				Reason: "definition was not requested",
-			}
-		}
-		if _, duplicate := bySymbol[symbol]; duplicate {
-			return nil, &runtimeemission.AssemblyError{
-				Module: module,
-				Symbol: symbol,
-				Reason: "runtime symbol has duplicate definitions",
-			}
-		}
-		bySymbol[symbol] = definition.Statement()
-	}
-	statements := make([]tsgo.Statement, 0, len(symbols))
-	for _, symbol := range symbols {
-		statement := bySymbol[symbol]
-		if statement == nil {
-			return nil, &runtimeemission.AssemblyError{
-				Module: module,
-				Symbol: symbol,
-				Reason: "requested runtime symbol has no definition",
-			}
-		}
-		statements = append(statements, statement)
-	}
-	return statements, nil
 }

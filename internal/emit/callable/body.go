@@ -5,6 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	statementsequence "github.com/tsoniclang/gotots/internal/emit/statement/sequence"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -26,6 +28,10 @@ func EmitBody(
 			Reason: "callable body input is nil",
 		}
 	}
+	sourceSignature, err := sourceCallableSignature(context, signature)
+	if err != nil {
+		return api.BlockEmission{}, err
+	}
 	parameterPrologue, parameterRequests, err := addressableParameterPrologue(
 		context,
 		children,
@@ -39,7 +45,7 @@ func EmitBody(
 		context,
 		children,
 		sourceType,
-		signature.Results(),
+		sourceSignature.Results(),
 	)
 	if err != nil {
 		return api.BlockEmission{}, err
@@ -64,13 +70,64 @@ func EmitBody(
 	}
 	statements := append(parameterPrologue, prologue...)
 	statements = append(statements, body.Value().Statements()...)
+	var guardRequests []api.RootRequest
+	if sourceSignature.Results().Len() != 0 &&
+		resultEndGuardRequired(statements) {
+		guard, err := unreachableResultEnd(context)
+		if err != nil {
+			return api.BlockEmission{}, err
+		}
+		statements = append(statements, guard.Statements()...)
+		guardRequests = guard.Requests()
+	}
 	return api.DirectBlock(
 		context.Factory().Block(statements, true),
 		api.CombineRequests(
 			parameterRequests,
 			prologueRequests,
 			body.Requests(),
+			guardRequests,
 		)...,
+	), nil
+}
+
+func resultEndGuardRequired(statements []tsgo.Statement) bool {
+	if !statementsequence.FallsThrough(statements) || len(statements) == 0 {
+		return false
+	}
+	return !isNativeSwitch(statements[len(statements)-1])
+}
+
+func isNativeSwitch(statement tsgo.Statement) bool {
+	switch statement := statement.(type) {
+	case tsgo.SwitchStatement:
+		return true
+	case tsgo.LabeledStatement:
+		return isNativeSwitch(statement.Statement())
+	default:
+		return false
+	}
+}
+
+func unreachableResultEnd(context api.Context) (api.StatementEmission, error) {
+	factory := context.Factory()
+	panicReference, err := context.Names().Runtime(
+		api.RuntimePanic,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	return api.DirectStatement(
+		factory.ExpressionStatement(panicruntime.Call(
+			factory,
+			panicReference.Name(),
+			factory.StringLiteral(
+				"unreachable Go function end",
+				tsgo.TokenFlagsNone,
+			),
+		)),
+		panicReference.Requests()...,
 	), nil
 }
 
@@ -88,6 +145,7 @@ func namedResultPrologue(
 	var requests []api.RootRequest
 	for index, sourceName := range names {
 		result := results.At(index)
+		resultType := context.TypesInfo().TypeOfObject(result)
 		targetName, selected := context.AddressableStorage().Name(context, result)
 		if !selected {
 			targetName, err = context.Names().Result(result, index)
@@ -100,7 +158,7 @@ func namedResultPrologue(
 			targetType, err := children.RepresentedType(
 				context.WithRole(api.RoleResultType),
 				sourceName,
-				result.Type(),
+				resultType,
 			)
 			if err != nil {
 				return nil, nil, false, err
@@ -111,7 +169,7 @@ func namedResultPrologue(
 		zero, err := context.Values().Zero(
 			context.WithRole(api.RoleNamedResultZero),
 			sourceName,
-			result.Type(),
+			resultType,
 		)
 		if err != nil {
 			return nil, nil, false, err
@@ -121,7 +179,7 @@ func namedResultPrologue(
 				context,
 				children,
 				sourceName,
-				result.Type(),
+				resultType,
 				zero,
 			)
 			if err != nil {
@@ -178,7 +236,7 @@ func namedResultSyntax(
 	for index, sourceName := range names {
 		if sourceName == nil ||
 			sourceName.Name == "" ||
-			context.TypesInfo().Defs[sourceName] != results.At(index) ||
+			context.TypesInfo().DefOf(sourceName) != results.At(index) ||
 			results.At(index).Name() == "" {
 			return nil, api.Unsupported(
 				context.WithRole(api.RoleResultType),

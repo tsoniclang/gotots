@@ -94,7 +94,7 @@ func Apply(
 			return api.ExpressionEmission{}, true, err
 		}
 		value = context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{value},

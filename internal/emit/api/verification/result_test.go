@@ -54,6 +54,7 @@ func TestAccessorReadPreservesReceiverPrerequisitesAndRequests(t *testing.T) {
 		types.NewPackage("example.com/accessor", "accessor"),
 		&types.Info{},
 		types.SizesFor("gc", "amd64"),
+		api.MemoryByteOrderLittleEndian,
 		factory,
 		services,
 		services,
@@ -185,6 +186,7 @@ func TestFunctionStoreTargetOwnsTypedImmutableOperations(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !target.IsAccessor() ||
+		!target.Valid() ||
 		target.AccessorArguments()[0].Value().(tsgo.Identifier).Text() !=
 			"pointer" ||
 		len(requestNames) != 2 ||
@@ -197,6 +199,11 @@ func TestFunctionStoreTargetOwnsTypedImmutableOperations(t *testing.T) {
 	if target.AccessorArguments()[0].Value().(tsgo.Identifier).Text() !=
 		"pointer" {
 		t.Fatal("function store target exposed argument backing")
+	}
+	if _, err := api.NewNamedReturnControl("return", []api.StoreTargetEmission{
+		target,
+	}); err != nil {
+		t.Fatalf("named return rejected a valid function-backed store: %v", err)
 	}
 }
 
@@ -297,7 +304,7 @@ func TestEmissionResultsOwnImmutableTargetNodesAndRequests(t *testing.T) {
 	request, err := api.NewImportRequest(
 		factory,
 		api.ImportPhaseType,
-		"../../../support/scalars.js",
+		"../../../runtime/scalars.js",
 		"int64",
 		"int64",
 	)
@@ -341,7 +348,7 @@ func TestPrimitiveAliasRequestCarriesGeneratedSupportIdentity(t *testing.T) {
 	factory := tsgo.NewFactory()
 	request, err := api.NewPrimitiveAliasRequest(
 		factory,
-		"../../../support/scalars.js",
+		"../../../runtime/scalars.js",
 		api.PrimitiveInt64,
 		"sourceInt64",
 	)
@@ -383,8 +390,94 @@ func TestImportRequestCarriesExactPlacementPolicy(t *testing.T) {
 	if request.ModuleSpecifier().Text() != "./logic.js" {
 		t.Fatalf("module = %q, want ./logic.js", request.ModuleSpecifier().Text())
 	}
+	if request.ImportBinding() != api.ImportBindingNamed ||
+		request.NamespaceSpecifier() != nil {
+		t.Fatalf("named import binding = %d", request.ImportBinding())
+	}
 	if request.Specifier().Name().Text() != "flip" {
 		t.Fatalf("local name = %q, want flip", request.Specifier().Name().Text())
+	}
+}
+
+func TestNamespaceImportRequestCarriesExactPlacementPolicy(t *testing.T) {
+	factory := tsgo.NewFactory()
+	request, err := api.NewNamespaceImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"@gotots/gostdlib/strings.js",
+		"strings",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.Kind() != api.RootRequestImport ||
+		request.ImportBinding() != api.ImportBindingNamespace ||
+		request.ExportedName() != "" ||
+		request.LocalName() != "strings" ||
+		request.Specifier() != nil ||
+		request.NamespaceSpecifier().Name().Text() != "strings" {
+		t.Fatalf("namespace request = %#v", request)
+	}
+}
+
+func TestSideEffectImportRequestCarriesExactPlacementPolicy(t *testing.T) {
+	factory := tsgo.NewFactory()
+	request, err := api.NewSideEffectImportRequest(factory, "./reflection-types.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.Kind() != api.RootRequestImport ||
+		request.ImportPhase() != api.ImportPhaseValue ||
+		request.ImportBinding() != api.ImportBindingSideEffect ||
+		request.ExportedName() != "" ||
+		request.LocalName() != "" ||
+		request.Specifier() != nil ||
+		request.NamespaceSpecifier() != nil ||
+		request.ModuleSpecifier().Text() != "./reflection-types.js" {
+		t.Fatalf("side-effect request = %#v", request)
+	}
+}
+
+func TestQualifiedNameReferenceBuildsTypedValueAndTypePaths(t *testing.T) {
+	factory := tsgo.NewFactory()
+	request, err := api.NewNamespaceImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"@gotots/gostdlib/strings.js",
+		"strings",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reference, err := api.NewQualifiedNameReference(
+		"strings",
+		"Builder",
+		request,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qualifier, qualified := reference.Qualifier()
+	value := reference.Expression(factory).(tsgo.PropertyAccessExpression)
+	entity := reference.EntityName(factory).(tsgo.QualifiedName)
+	member, err := reference.MemberExpression(factory, "String")
+	if err != nil {
+		t.Fatal(err)
+	}
+	valueName, valueNameOK := value.Name().(tsgo.Identifier)
+	memberName, memberNameOK := member.Name().(tsgo.Identifier)
+	if !qualified ||
+		qualifier != "strings" ||
+		reference.Name() != "Builder" ||
+		value.Expression().(tsgo.Identifier).Text() != "strings" ||
+		!valueNameOK ||
+		valueName.Text() != "Builder" ||
+		entity.Left().(tsgo.Identifier).Text() != "strings" ||
+		entity.Right().Text() != "Builder" ||
+		!memberNameOK ||
+		memberName.Text() != "String" ||
+		len(reference.Requests()) != 1 {
+		t.Fatalf("qualified reference = %#v", reference)
 	}
 }
 

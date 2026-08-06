@@ -215,11 +215,11 @@ func assertWaveFiveShape(t *testing.T, printed string) {
 	t.Helper()
 	for _, required := range []string{
 		"export class Base",
-		"Read($go$recovery?: GoRecovery): int32",
+		"Read(): int32",
 		"static Add(base:",
 		"static Name(derived:",
-		".Read($go$recovery)",
-		"=> Base.Add(",
+		".Read()",
+		"Base.Add(__gotots_receiver_",
 		"return Base.Name(base);",
 		"__go_constructor",
 	} {
@@ -239,6 +239,10 @@ func assertWaveFiveShape(t *testing.T, printed string) {
 		".apply(",
 		"goPointerHash",
 		"class GoMapHash",
+		"Read($go$recovery",
+		"$goDeferred_",
+		"GoDeferredRegistry",
+		"deferred-registry.js",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("Wave 5 artifacts contain %q:\n%s", forbidden, printed)

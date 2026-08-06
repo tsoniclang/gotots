@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -153,7 +154,7 @@ func emitMeasure(
 		context.Factory().Identifier(runtimeslice.MemberName(member)),
 		tsgo.NodeFlagsNone,
 	))
-	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
+	if integervalue.TypeUsesBigInt(context, types.Typ[types.Int]) {
 		target = bigInt(context, target)
 	}
 	return api.NewExpressionEmission(
@@ -454,7 +455,7 @@ func emitCopyMode(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if context.IntegerRepresentation() != api.IntegerRepresentationBigInt {
+	if !integervalue.TypeUsesBigInt(context, types.Typ[types.Int]) {
 		return result, nil
 	}
 	return api.NewExpressionEmission(

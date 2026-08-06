@@ -37,11 +37,27 @@ func emitUnary(
 	default:
 		return api.ExpressionEmission{}, shapeError(context, operation)
 	}
+	operationContext := context
+	operand := api.DirectExpression(arguments[0])
+	operandType := signature.Params().At(0).Type()
+	model, defined := definedtype.ResolveBasic(operandType)
+	if defined {
+		var err error
+		operationContext, err = model.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		operand, err = model.Project(context, operand)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		operandType = model.Underlying()
+	}
 	result, handled, err := unaryoperation.Apply(
-		context,
+		operationContext,
 		sourceToken,
-		signature.Params().At(0).Type(),
-		api.DirectExpression(arguments[0]),
+		operandType,
+		operand,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -52,6 +68,12 @@ func emitUnary(
 			"generic unary capability has no concrete operation: "+
 				operation.String(),
 		)
+	}
+	if defined {
+		result, err = model.Wrap(context, result)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	return result, nil
 }
@@ -117,13 +139,20 @@ func emitOrderedComparison(
 		if !valid {
 			return api.ExpressionEmission{}, shapeError(context, operation)
 		}
-		left = api.DirectExpression(
-			model.Unwrap(context.Factory(), arguments[0]),
-		)
-		right = api.DirectExpression(
-			model.Unwrap(context.Factory(), arguments[1]),
-		)
+		var err error
+		left, err = model.Project(context, left)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		right, err = model.Project(context, right)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		leftType = basic
+		context, err = model.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	var (
 		result  api.ExpressionEmission
@@ -137,6 +166,7 @@ func emitOrderedComparison(
 		result, handled, err = integerbinary.Apply(
 			context,
 			sourceToken,
+			carrier,
 			carrier,
 			left,
 			right,

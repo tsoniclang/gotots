@@ -91,7 +91,11 @@ var _ = Adapt[int32]
 	for _, instance := range info.Instances {
 		arguments = instance.TypeArgs
 	}
-	instantiated, err := InstantiateOperation(set, operation, arguments)
+	instantiated, err := InstantiateOperation(
+		set,
+		operation,
+		api.TypeArgumentsFromGo(arguments),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

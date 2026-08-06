@@ -1,6 +1,7 @@
 package emit
 
 import (
+	"fmt"
 	"go/token"
 	"go/types"
 
@@ -10,15 +11,18 @@ import (
 	interfacedynamictype "github.com/tsoniclang/gotots/internal/emit/declaration/interfacedynamictype"
 	interfacemethodtoken "github.com/tsoniclang/gotots/internal/emit/declaration/interfacemethodtoken"
 	interfacetypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
+	providerinterfacebridge "github.com/tsoniclang/gotots/internal/emit/declaration/providerinterfacebridge"
+	reflectiontypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/reflectiontype"
+	unsafecodecdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/unsafecodec"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func (s *programSession) validateInterfaceArtifact(
+func (s *programSession) validateRepresentationArtifact(
 	artifact *api.GeneratedArtifact,
 ) error {
 	if !artifact.Valid() {
-		return &ScheduleError{Reason: "interface artifact is invalid"}
+		return &ScheduleError{Reason: "representation artifact is invalid"}
 	}
 	binding, ok := s.registry.GeneratedArtifact(
 		artifact.Kind(),
@@ -27,7 +31,7 @@ func (s *programSession) validateInterfaceArtifact(
 	if !ok || binding != artifact {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact has no exact canonical binding",
+			Reason: "representation artifact has no exact canonical binding",
 		}
 	}
 	switch artifact.Kind() {
@@ -67,36 +71,64 @@ func (s *programSession) validateInterfaceArtifact(
 				Reason: "interface dynamic-type token has inconsistent source type",
 			}
 		}
+	case api.GeneratedArtifactProviderInterfaceBridge:
+		source, sourceOK := artifact.ProviderInterfaceBridgeType()
+		bound, boundOK := binding.ProviderInterfaceBridgeType()
+		if !sourceOK || !boundOK || !types.Identical(source, bound) {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "provider-interface bridge has inconsistent source type",
+			}
+		}
+	case api.GeneratedArtifactReflectionType:
+		source, reflectionType, sourceOK := artifact.ReflectionType()
+		bound, boundReflectionType, boundOK := binding.ReflectionType()
+		if !sourceOK || !boundOK || !types.Identical(source, bound) ||
+			reflectionType != boundReflectionType {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "reflection type has inconsistent source contract",
+			}
+		}
+	case api.GeneratedArtifactUnsafeCodec:
+		source, sourceOK := artifact.UnsafeCodecType()
+		bound, boundOK := binding.UnsafeCodecType()
+		if !sourceOK || !boundOK || !types.Identical(source, bound) {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "unsafe codec has inconsistent source type",
+			}
+		}
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact kind is invalid",
+			Reason: "representation artifact kind is invalid",
 		}
 	}
 	return nil
 }
 
-func (s *programSession) reconstructInterfaceArtifact(
+func (s *programSession) reconstructRepresentationArtifact(
 	artifact *api.GeneratedArtifact,
 ) error {
 	if s.sealed {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact reconstructed after target files were sealed",
+			Reason: "representation artifact reconstructed after target files were sealed",
 		}
 	}
-	if err := s.validateInterfaceArtifact(artifact); err != nil {
+	if err := s.validateRepresentationArtifact(artifact); err != nil {
 		return err
 	}
 	if artifact.Placement() != api.GeneratedArtifactPlacementCompilation {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "lexical interface artifact must reconstruct through its source artifact",
+			Reason: "lexical representation artifact must reconstruct through its source artifact",
 		}
 	}
 	builder, err := s.compilationGeneratedArtifactBuilder(
 		artifact,
-		"interface artifact",
+		"representation artifact",
 	)
 	if err != nil {
 		return err
@@ -107,7 +139,7 @@ func (s *programSession) reconstructInterfaceArtifact(
 	if exists {
 		temporaryStart = builder.declarations[index].temporaryStart
 	}
-	revision, err := s.buildInterfaceArtifactRevision(
+	revision, err := s.buildRepresentationArtifactRevision(
 		builder,
 		artifact,
 		temporaryStart,
@@ -116,10 +148,11 @@ func (s *programSession) reconstructInterfaceArtifact(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
@@ -144,7 +177,7 @@ func (s *programSession) reconstructInterfaceArtifact(
 	return nil
 }
 
-func (s *programSession) buildInterfaceArtifactRevision(
+func (s *programSession) buildRepresentationArtifactRevision(
 	builder *targetFileBuilder,
 	artifact *api.GeneratedArtifact,
 	temporaryStart emitnaming.TemporarySnapshot,
@@ -154,7 +187,7 @@ func (s *programSession) buildInterfaceArtifactRevision(
 	if !ok {
 		return artifactRevision{}, &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact has no concrete name owner",
+			Reason: "representation artifact has no concrete name owner",
 		}
 	}
 	if !reconstruction {
@@ -173,30 +206,50 @@ func (s *programSession) buildInterfaceArtifactRevision(
 	context := builder.context.WithArtifactOwner(owner)
 	requirements := s.requirements.appliedFor(owner)
 	var adapterContracts []*types.Interface
+	var providerCapabilities []providerinterfacebridge.CapabilityContract
+	var providerProfileCapabilities []providerinterfacebridge.ProfileCapabilityContract
 	if artifact.Kind() == api.GeneratedArtifactInterfaceAdapter {
 		adapterContracts, err = interfaceadapterdeclaration.Contracts(
 			artifact,
 			requirements,
 		)
+	} else if artifact.Kind() == api.GeneratedArtifactProviderInterfaceBridge {
+		if _, profile, profiled := artifact.ProviderProfileInterfaceBridge(); profiled && len(profile) != 0 {
+			providerCapabilities, providerProfileCapabilities, err =
+				providerinterfacebridge.ProfileRequirements(
+					artifact,
+					requirements,
+				)
+		} else {
+			providerCapabilities, err = providerinterfacebridge.Requirements(
+				artifact,
+				requirements,
+			)
+		}
+	} else if artifact.Kind() == api.GeneratedArtifactReflectionType {
+		err = reflectionRepresentationRequirements(requirements, artifact)
 	} else {
-		err = exactInterfaceRequirement(requirements, artifact)
+		err = exactRepresentationRequirement(requirements, artifact)
 	}
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	statements, requests, err := buildInterfaceArtifact(
+	statements, requests, err := buildRepresentationArtifact(
 		builder,
 		context,
 		artifact,
 		adapterContracts,
+		providerCapabilities,
+		providerProfileCapabilities,
 	)
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	placement, dependencies, err := s.consumeArtifactRequests(
-		owner,
-		requests,
-	)
+	placement, dependencies, requirements, err :=
+		s.consumeArtifactRequests(
+			owner,
+			requests,
+		)
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -208,16 +261,19 @@ func (s *programSession) buildInterfaceArtifactRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
+		requirements:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
 }
 
-func buildInterfaceArtifact(
+func buildRepresentationArtifact(
 	builder *targetFileBuilder,
 	context api.Context,
 	artifact *api.GeneratedArtifact,
 	adapterContracts []*types.Interface,
+	providerCapabilities []providerinterfacebridge.CapabilityContract,
+	providerProfileCapabilities []providerinterfacebridge.ProfileCapabilityContract,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	switch artifact.Kind() {
 	case api.GeneratedArtifactInterfaceMethodToken:
@@ -238,11 +294,11 @@ func buildInterfaceArtifact(
 			if err != nil {
 				return nil, nil, err
 			}
-			initializer = context.Factory().Identifier(reference.Name())
+			initializer = reference.Expression(context.Factory())
 			requests = reference.Requests()
 		}
 		return []tsgo.Statement{
-			interfacemethodtoken.Build(
+			interfacemethodtoken.BuildIsolated(
 				builder.context.Factory(),
 				artifact.TargetName(),
 				[]tsgo.ModifierLike{
@@ -252,13 +308,21 @@ func buildInterfaceArtifact(
 			),
 		}, requests, nil
 	case api.GeneratedArtifactInterfaceDynamicTypeToken:
+		source, ok := artifact.InterfaceDynamicType()
+		if !ok {
+			return nil, nil, &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "interface dynamic-type source is invalid",
+			}
+		}
 		return []tsgo.Statement{
-			interfacedynamictype.Build(
+			interfacedynamictype.BuildIsolated(
 				builder.context.Factory(),
 				artifact.TargetName(),
 				[]tsgo.ModifierLike{
 					builder.context.Factory().ExportKeyword(),
 				},
+				types.Comparable(source),
 			),
 		}, nil, nil
 	case api.GeneratedArtifactAnonymousInterface:
@@ -269,7 +333,7 @@ func buildInterfaceArtifact(
 				Reason: "anonymous-interface source is invalid",
 			}
 		}
-		return interfacetypedeclaration.Build(
+		return interfacetypedeclaration.BuildIsolated(
 			context,
 			builder.emitter,
 			nil,
@@ -297,265 +361,130 @@ func buildInterfaceArtifact(
 				builder.context.Factory().ExportKeyword(),
 			},
 		)
+	case api.GeneratedArtifactProviderInterfaceBridge:
+		source, ok := artifact.ProviderInterfaceBridgeType()
+		if !ok {
+			return nil, nil, &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "provider-interface bridge source is invalid",
+			}
+		}
+		profileSource, profile, profiled := artifact.ProviderProfileInterfaceBridge()
+		if profiled {
+			if !types.Identical(source, profileSource) {
+				return nil, nil, &ScheduleError{
+					Object: artifact.TargetName(),
+					Reason: "provider profile-interface bridge received incompatible capabilities",
+				}
+			}
+			return providerinterfacebridge.BuildProfile(
+				context,
+				builder.emitter,
+				artifact.TargetName(),
+				source,
+				profile,
+				providerCapabilities,
+				providerProfileCapabilities,
+				[]tsgo.ModifierLike{
+					builder.context.Factory().ExportKeyword(),
+				},
+			)
+		}
+		if len(providerProfileCapabilities) != 0 {
+			return nil, nil, &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "ordinary provider interface bridge received profile capabilities",
+			}
+		}
+		return providerinterfacebridge.Build(
+			context,
+			builder.emitter,
+			artifact.TargetName(),
+			source,
+			providerCapabilities,
+			[]tsgo.ModifierLike{
+				builder.context.Factory().ExportKeyword(),
+			},
+		)
+	case api.GeneratedArtifactReflectionType:
+		return reflectiontypedeclaration.Build(context, artifact)
+	case api.GeneratedArtifactUnsafeCodec:
+		return unsafecodecdeclaration.Build(
+			context,
+			builder.emitter,
+			artifact,
+		)
 	default:
 		return nil, nil, &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact kind is invalid",
+			Reason: "representation artifact kind is invalid",
 		}
 	}
 }
 
-func exactInterfaceRequirement(
+// reflectionRepresentationRequirements admits the closed facet set of one
+// canonical reflection descriptor: the definition requirement plus at most
+// one value-operation facet requirement, both bound to the same artifact.
+func reflectionRepresentationRequirements(
+	requirements []api.DeclarationRequirement,
+	artifact *api.GeneratedArtifact,
+) error {
+	if len(requirements) == 0 || len(requirements) > 2 {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: fmt.Sprintf(
+				"reflection artifact requires one definition and at most one value facet, received %d",
+				len(requirements),
+			),
+		}
+	}
+	seen := make(map[api.DeclarationRequirementKind]struct{}, 2)
+	for _, requirement := range requirements {
+		kind := requirement.Kind()
+		if kind != api.DeclarationRequirementReflectionType &&
+			kind != api.DeclarationRequirementReflectionValueOperations {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "reflection artifact received a foreign requirement kind",
+			}
+		}
+		if _, duplicate := seen[kind]; duplicate {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "reflection artifact received a duplicate facet requirement",
+			}
+		}
+		seen[kind] = struct{}{}
+		selected, ok := requirement.GeneratedArtifact()
+		if !ok || selected != artifact {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "representation artifact received a foreign requirement",
+			}
+		}
+	}
+	return nil
+}
+
+func exactRepresentationRequirement(
 	requirements []api.DeclarationRequirement,
 	artifact *api.GeneratedArtifact,
 ) error {
 	if len(requirements) != 1 {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact requires exactly one definition request",
+			Reason: fmt.Sprintf(
+				"representation artifact requires exactly one definition request, received %d",
+				len(requirements),
+			),
 		}
 	}
 	selected, ok := requirements[0].GeneratedArtifact()
 	if !ok || selected != artifact {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "interface artifact received a foreign requirement",
+			Reason: "representation artifact received a foreign requirement",
 		}
 	}
 	return nil
-}
-
-func (e *emitter) ObservePointerRepresentation(
-	consumer api.ArtifactOwner,
-	artifact *api.GeneratedArtifact,
-	carrierDemand bool,
-) (api.PointerRepresentationObservation, error) {
-	if e.pointer == nil {
-		return api.PointerRepresentationObservation{}, &api.InvariantError{
-			Reason: "pointer representation resolver is unavailable",
-		}
-	}
-	return e.pointer.ObservePointerRepresentation(
-		consumer,
-		artifact,
-		carrierDemand,
-	)
-}
-
-func (s *programSession) ObservePointerRepresentation(
-	consumer api.ArtifactOwner,
-	artifact *api.GeneratedArtifact,
-	carrierDemand bool,
-) (api.PointerRepresentationObservation, error) {
-	if !consumer.Valid() {
-		return api.PointerRepresentationObservation{}, &ScheduleError{
-			Reason: "pointer-representation consumer is invalid",
-		}
-	}
-	if err := s.ensurePointerRepresentationBaseline(artifact); err != nil {
-		return api.PointerRepresentationObservation{}, err
-	}
-	representation, err := api.DefaultPointerRepresentation(artifact)
-	if err != nil {
-		return api.PointerRepresentationObservation{}, err
-	}
-	if carrierDemand {
-		representation = api.PointerRepresentationCarrierCanonical
-	} else {
-		for _, requirement := range s.requirements.appliedFor(
-			api.MustGeneratedArtifactOwner(artifact),
-		) {
-			selected, carrier, ok := requirement.PointerRepresentation()
-			if !ok || selected != artifact {
-				return api.PointerRepresentationObservation{}, &ScheduleError{
-					Object: artifact.TargetName(),
-					Reason: "pointer representation has a foreign requirement",
-				}
-			}
-			if carrier {
-				representation =
-					api.PointerRepresentationCarrierCanonical
-			}
-		}
-	}
-	var requests []api.RootRequest
-	if carrierDemand {
-		request, err := api.NewPointerRepresentationRequest(artifact, true)
-		if err != nil {
-			return api.PointerRepresentationObservation{}, err
-		}
-		requests = append(requests, request)
-	}
-	owner := api.MustGeneratedArtifactOwner(artifact)
-	if consumer != owner {
-		dependency, err := api.NewGeneratedArtifactDependencyRequest(
-			artifact,
-			api.ArtifactFacetInstanceTypeSurface,
-		)
-		if err != nil {
-			return api.PointerRepresentationObservation{}, err
-		}
-		requests = append(requests, dependency)
-	}
-	return api.NewPointerRepresentationObservation(
-		representation,
-		requests...,
-	)
-}
-
-func (s *programSession) validatePointerRepresentationArtifact(
-	artifact *api.GeneratedArtifact,
-) error {
-	pointer, ok := artifact.PointerRepresentation()
-	binding, found := s.registry.GeneratedArtifact(
-		api.GeneratedArtifactPointerRepresentation,
-		artifact.ArtifactKey(),
-	)
-	bound, boundOK := binding.PointerRepresentation()
-	if !ok ||
-		!found ||
-		binding != artifact ||
-		!boundOK ||
-		!types.Identical(bound, pointer) ||
-		artifact.Placement() != api.GeneratedArtifactPlacementContract {
-		return &ScheduleError{
-			Object: artifact.TargetName(),
-			Reason: "pointer representation has no exact canonical binding",
-		}
-	}
-	return nil
-}
-
-func (s *programSession) ensurePointerRepresentationBaseline(
-	artifact *api.GeneratedArtifact,
-) error {
-	if err := s.validatePointerRepresentationArtifact(artifact); err != nil {
-		return err
-	}
-	owner := api.MustGeneratedArtifactOwner(artifact)
-	if s.artifacts.FacetRevision(
-		owner,
-		api.ArtifactFacetInstanceTypeSurface,
-	) != 0 {
-		return nil
-	}
-	representation, err := api.DefaultPointerRepresentation(artifact)
-	if err != nil {
-		return err
-	}
-	contract, err := pointerRepresentationContract(representation)
-	if err != nil {
-		return err
-	}
-	return s.artifacts.Commit(owner, contract, nil)
-}
-
-func (s *programSession) reconstructPointerRepresentationArtifact(
-	artifact *api.GeneratedArtifact,
-) error {
-	if s.sealed {
-		return &ScheduleError{
-			Object: artifact.TargetName(),
-			Reason: "pointer representation reconstructed after target files were sealed",
-		}
-	}
-	if err := s.validatePointerRepresentationArtifact(artifact); err != nil {
-		return err
-	}
-	owner := api.MustGeneratedArtifactOwner(artifact)
-	representation, err := api.SelectPointerRepresentation(
-		artifact,
-		s.requirements.appliedFor(owner),
-	)
-	if err != nil {
-		return err
-	}
-	contract, err := pointerRepresentationContract(representation)
-	if err != nil {
-		return err
-	}
-	if err := s.artifacts.Commit(owner, contract, nil); err != nil {
-		return err
-	}
-	s.artifacts.DiscardDirty(owner)
-	return nil
-}
-
-func pointerRepresentationContract(
-	representation api.PointerRepresentation,
-) (artifactstate.Contract, error) {
-	return artifactstate.NewContractFacet(
-		api.ArtifactFacetInstanceTypeSurface,
-		[]byte(representation.String()),
-	)
-}
-
-func compareGenericRepresentationRequirements(
-	left api.DeclarationRequirement,
-	right api.DeclarationRequirement,
-) int {
-	leftOwner, leftParameter, leftFacet, leftOK :=
-		left.GenericRepresentation()
-	rightOwner, rightParameter, rightFacet, rightOK :=
-		right.GenericRepresentation()
-	switch {
-	case !leftOK && rightOK:
-		return -1
-	case leftOK && !rightOK:
-		return 1
-	case !leftOK:
-		return 0
-	}
-	leftIndex, leftIndexed :=
-		api.GenericDeclarationParameterIndex(leftOwner, leftParameter)
-	rightIndex, rightIndexed :=
-		api.GenericDeclarationParameterIndex(rightOwner, rightParameter)
-	switch {
-	case !leftIndexed && rightIndexed:
-		return -1
-	case leftIndexed && !rightIndexed:
-		return 1
-	case leftIndex < rightIndex:
-		return -1
-	case leftIndex > rightIndex:
-		return 1
-	case leftFacet < rightFacet:
-		return -1
-	case leftFacet > rightFacet:
-		return 1
-	default:
-		return 0
-	}
-}
-
-func (s *programSession) ResolveGenericRepresentationProfile(
-	declaration types.Object,
-) (api.GenericRepresentationProfile, bool, error) {
-	owner := api.GenericDeclarationOrigin(declaration)
-	if owner == nil || len(api.GenericDeclarationParameters(owner)) == 0 {
-		return api.GenericRepresentationProfile{}, false, nil
-	}
-	if _, ok := s.sites[owner]; ok {
-		profile, err := api.SelectGenericRepresentationProfile(
-			owner,
-			s.requirements.appliedFor(api.MustSourceArtifactOwner(owner)),
-		)
-		return profile, err == nil, err
-	}
-	sourcePackage := s.source.EnvironmentForTypes(owner.Pkg())
-	if sourcePackage == nil {
-		return api.GenericRepresentationProfile{}, false, &ScheduleError{
-			Object: owner.Name(),
-			Reason: "generic representation owner has no declaration",
-		}
-	}
-	var requirements []api.DeclarationRequirement
-	if builder := s.environmentBuilders[sourcePackage]; builder != nil {
-		requirements = builder.environmentRequirements(owner)
-	}
-	profile, err := api.SelectGenericRepresentationProfile(
-		owner,
-		requirements,
-	)
-	return profile, err == nil, err
 }

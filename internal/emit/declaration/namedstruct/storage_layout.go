@@ -11,6 +11,7 @@ import (
 type layoutEmission struct {
 	declarations []tsgo.Statement
 	members      []tsgo.ClassElement
+	storageType  tsgo.TypeNode
 	requests     []api.RootRequest
 }
 
@@ -90,8 +91,9 @@ func emitLayout(
 			moduleExport,
 			typeParameters,
 		)},
-		members:  members,
-		requests: api.CombineRequests(requests, memberRequests),
+		members:     members,
+		storageType: storageType,
+		requests:    api.CombineRequests(requests, memberRequests),
 	}, nil
 }
 
@@ -330,7 +332,6 @@ func storageMembers(
 		}
 		getter, setter, fieldRequests, err := storageFieldMembers(
 			context,
-			source,
 			selected,
 		)
 		if err != nil {

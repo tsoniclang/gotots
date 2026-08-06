@@ -137,14 +137,24 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementCallableControl != 13 ||
 		DeclarationRequirementCooperativeCallable != 14 ||
 		DeclarationRequirementCallableABI != 15 ||
-		DeclarationRequirementEnvironmentBuiltin != 16 ||
-		DeclarationRequirementGenericCallableProfile != 17 ||
+		DeclarationRequirementKind(16).Valid() ||
+		DeclarationRequirementKind(17).Valid() ||
 		DeclarationRequirementClassMethod != 18 ||
 		DeclarationRequirementValueReceiverCopy != 19 ||
 		DeclarationRequirementGenericRepresentation != 20 ||
 		DeclarationRequirementInterfaceMethodCallable != 21 ||
 		DeclarationRequirementPointerRepresentation != 22 ||
-		DeclarationRequirementKind(23).Valid() {
+		DeclarationRequirementProviderInterfaceBridge != 23 ||
+		DeclarationRequirementProviderStatefulRepresentation != 24 ||
+		DeclarationRequirementDeferredCallableRegistry != 25 ||
+		DeclarationRequirementGenericConcretization != 26 ||
+		DeclarationRequirementTypeRepresentation != 27 ||
+		DeclarationRequirementReflectionType != 28 ||
+		DeclarationRequirementUnsafeCodec != 29 ||
+		DeclarationRequirementProviderInterfaceCapability != 30 ||
+		DeclarationRequirementProviderProfileInterfaceCapability != 31 ||
+		DeclarationRequirementReflectionValueOperations != 32 ||
+		DeclarationRequirementKind(33).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }

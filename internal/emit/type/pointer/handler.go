@@ -81,11 +81,36 @@ func EmitNonNilRepresented(
 			api.Unsupported(context, api.CategoryType, source)
 	}
 	if parameter, generic := api.GenericTypeParameter(element); generic {
-		return context.GenericParameterRepresentation(
-			source,
-			parameter,
-			api.GenericRepresentationPointer,
+		facetRequests, err :=
+			context.RequireGenericParameterRepresentation(
+				parameter,
+				api.GenericRepresentationPointer,
+			)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		logical, err := children.RepresentedType(context, source, element)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		projection, err := context.Names().Runtime(
+			api.RuntimePointerType,
+			api.ImportPhaseType,
 		)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return api.DirectType(
+			context.Factory().TypeReferenceNode(
+				projection.EntityName(context.Factory()),
+				[]tsgo.TypeNode{logical.Value()},
+			),
+			api.CombineRequests(
+				facetRequests,
+				logical.Requests(),
+				projection.Requests(),
+			)...,
+		), nil
 	}
 	representation, err := Observe(context, sourceType, false)
 	if err != nil {
@@ -123,7 +148,7 @@ func EmitNonNilRepresented(
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			[]tsgo.TypeNode{elementType.Value(), storageType.Value()},
 		),
 		api.CombineRequests(

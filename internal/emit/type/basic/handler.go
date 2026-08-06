@@ -36,7 +36,7 @@ func EmitRepresented(
 			context.Factory().UnionTypeNode(
 				[]tsgo.TypeNode{
 					context.Factory().TypeReferenceNode(
-						context.Factory().Identifier(reference.Name()),
+						reference.EntityName(context.Factory()),
 						nil,
 					),
 					context.Factory().KeywordTypeNode(
@@ -54,13 +54,19 @@ func EmitRepresented(
 	if !ok {
 		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 	}
-	reference, err := context.Names().Primitive(alias)
+	var reference api.NameReference
+	var err error
+	if context.ProviderScalarRepresentation() {
+		reference, err = context.Names().ProviderPrimitive(alias)
+	} else {
+		reference, err = context.Names().Primitive(alias)
+	}
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			nil,
 		),
 		reference.Requests()...,
@@ -68,7 +74,10 @@ func EmitRepresented(
 }
 
 func SupportsUnsafePointer(sourceType types.Type) bool {
-	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	if sourceType == nil {
+		return false
+	}
+	basic, ok := types.Unalias(sourceType).Underlying().(*types.Basic)
 	return ok && basic.Kind() == types.UnsafePointer
 }
 

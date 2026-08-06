@@ -20,11 +20,15 @@ func addressableParameterPrologue(
 			Reason: "addressable parameter signature is nil",
 		}
 	}
+	sourceSignature, err := sourceCallableSignature(context, signature)
+	if err != nil {
+		return nil, nil, err
+	}
 	var statements []tsgo.Statement
 	var requests []api.RootRequest
 	variables := make([]*types.Var, 0, signature.Params().Len()+1)
 	names := make([]string, 0, signature.Params().Len()+1)
-	if receiver := signature.Recv(); receiver != nil {
+	if receiver := sourceSignature.Recv(); receiver != nil {
 		name, err := context.Names().Parameter(
 			receiver,
 			signature.Params().Len(),
@@ -35,8 +39,8 @@ func addressableParameterPrologue(
 		variables = append(variables, receiver)
 		names = append(names, name)
 	}
-	for index := range signature.Params().Len() {
-		parameter := signature.Params().At(index)
+	for index := range sourceSignature.Params().Len() {
+		parameter := sourceSignature.Params().At(index)
 		name, err := context.Names().Parameter(parameter, index)
 		if err != nil {
 			return nil, nil, err
@@ -45,6 +49,7 @@ func addressableParameterPrologue(
 		names = append(names, name)
 	}
 	for index, variable := range variables {
+		variableType := context.TypesInfo().TypeOfObject(variable)
 		storageName, selected := context.AddressableStorage().Name(
 			context,
 			variable,
@@ -61,8 +66,8 @@ func addressableParameterPrologue(
 				copied, err := context.Values().Transfer(
 					context.WithRole(api.RoleReceiverValue),
 					source,
-					variable.Type(),
-					variable.Type(),
+					variableType,
+					variableType,
 					api.ValueTransferCopy,
 					initial,
 				)
@@ -76,7 +81,7 @@ func addressableParameterPrologue(
 			context,
 			children,
 			source,
-			variable.Type(),
+			variableType,
 			initial,
 		)
 		if err != nil {

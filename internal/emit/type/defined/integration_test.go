@@ -22,9 +22,9 @@ func TestDefinedBasicFamilyExecutesDifferentially(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, testCase := range []struct {
-		name    string
-		options emit.Options
-		suffix  string
+		name         string
+		options      emit.Options
+		nativeSuffix string
 	}{
 		{"number", emit.DefaultOptions(), ""},
 		{
@@ -67,7 +67,7 @@ func TestDefinedBasicFamilyExecutesDifferentially(t *testing.T) {
 				t,
 				workingDirectory,
 				artifacts,
-				testCase.suffix,
+				testCase.nativeSuffix,
 			)
 			if targetOutput != goOutput {
 				t.Fatalf(

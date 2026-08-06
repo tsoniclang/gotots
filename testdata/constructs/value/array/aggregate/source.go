@@ -21,6 +21,12 @@ func GenericZeroLengthPhantom() int32 {
 	return genericZeroLengthPhantom[Box](17)
 }
 
+func ZeroLengthPointerKey() int32 {
+	key := [0]*Box{}
+	values := map[[0]*Box]int32{key: 29}
+	return values[key]
+}
+
 func NewBoxes(left, right int32) Boxes {
 	return Boxes{{Value: left}, {Value: right}}
 }

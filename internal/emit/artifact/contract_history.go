@@ -24,8 +24,8 @@ type contractHistory struct {
 }
 
 type contractReverseDelta struct {
-	facets  [api.ArtifactFacetExportSurface + 1]facetReverseDelta
-	changed uint8
+	facets  [api.ArtifactFacetCount]facetReverseDelta
+	changed uint16
 }
 
 type facetReverseDelta struct {
@@ -116,15 +116,15 @@ func reverseContractDelta(
 			result.facets[facet].prefix = 0
 			result.facets[facet].suffix = 0
 		}
-		result.changed |= uint8(1) << facet
+		result.changed |= uint16(1) << facet
 	}
 	return result
 }
 
 func (d contractReverseDelta) restore(next Contract) Contract {
 	previous := next
-	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
-		if d.changed&(uint8(1)<<facet) == 0 {
+	for facet := api.ArtifactFacetCallableSignature; facet < api.ArtifactFacetCount; facet++ {
+		if d.changed&(uint16(1)<<facet) == 0 {
 			continue
 		}
 		change := d.facets[facet]
@@ -148,10 +148,10 @@ func (d contractReverseDelta) restore(next Contract) Contract {
 				nextValue[len(nextValue)-change.suffix:],
 			)
 			previous.facets[facet] = value
-			previous.present |= uint8(1) << facet
+			previous.present |= uint16(1) << facet
 		} else {
 			previous.facets[facet] = nil
-			previous.present &^= uint8(1) << facet
+			previous.present &^= uint16(1) << facet
 		}
 	}
 	return previous
@@ -160,7 +160,7 @@ func (d contractReverseDelta) restore(next Contract) Contract {
 func (h contractHistory) retainedPayloadBytes() int {
 	total := 0
 	for _, entry := range h.entries {
-		for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
+		for facet := api.ArtifactFacetCallableSignature; facet < api.ArtifactFacetCount; facet++ {
 			total += len(entry.previous.facets[facet].previousMiddle.data)
 		}
 	}
@@ -196,8 +196,9 @@ func fingerprintContract(contract Contract) contractFingerprint {
 		second *= 14029467366897019727
 		second ^= second >> 29
 	}
-	mix(contract.present)
-	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
+	mix(byte(contract.present))
+	mix(byte(contract.present >> 8))
+	for facet := api.ArtifactFacetCallableSignature; facet < api.ArtifactFacetCount; facet++ {
 		value, present := contract.facet(facet)
 		mix(byte(facet))
 		if !present {

@@ -6,9 +6,9 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
@@ -307,9 +307,9 @@ func Run() int32 {
 	}
 	storage := builder.storage[index]
 	if storage.owner != api.MustSourceArtifactOwner(variable) ||
-		storage.reconstructions != 1 {
+		storage.reconstructions != 0 {
 		t.Fatalf(
-			"package callable owner/reconstructions = %q/%d, want exact owner/1",
+			"package callable owner/reconstructions = %q/%d, want exact owner/0",
 			storage.owner.Name(),
 			storage.reconstructions,
 		)
@@ -329,10 +329,17 @@ func Run() int32 {
 		)
 	}
 	result, ok := callable.Type().(tsgo.TypeReferenceNode)
-	if !ok || result.TypeName().(tsgo.Identifier).Text() != "Promise" {
+	if !ok {
 		t.Fatalf(
-			"package callable result = %T, want Promise",
+			"package callable result = %T, want Awaitable<value>",
 			callable.Type(),
+		)
+	}
+	awaitable, ok := result.TypeName().(tsgo.Identifier)
+	if !ok || awaitable.Text() != "Awaitable" {
+		t.Fatalf(
+			"package callable result name = %T, want Awaitable",
+			result.TypeName(),
 		)
 	}
 	if session.requirements.hasPending() ||
@@ -362,7 +369,13 @@ type Box struct {
 	Value int32
 }
 
+type Derived Box
+
 func demandBox(values []Box) *Box {
+	return &values[0]
+}
+
+func demandDerived(values []Derived) *Derived {
 	return &values[0]
 }
 `),
@@ -380,15 +393,20 @@ func demandBox(values []Box) *Box {
 	sourcePackage := program.Roots()[0]
 	writer := sourcePackage.Types().Scope().Lookup("Writer")
 	box := sourcePackage.Types().Scope().Lookup("Box")
+	derived := sourcePackage.Types().Scope().Lookup("Derived")
 	demandBox := sourcePackage.Types().Scope().Lookup("demandBox")
+	demandDerived := sourcePackage.Types().Scope().Lookup("demandDerived")
 	session, err := newProgramSession(program, DefaultOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(writer); err != nil {
+	if err := session.RequireUse(writer, rootUseDemand(writer), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(box); err != nil {
+	if err := session.RequireUse(box, rootUseDemand(box), gostdlib.NoUseSelection()); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.RequireUse(derived, rootUseDemand(derived), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -398,7 +416,7 @@ func demandBox(values []Box) *Box {
 	}
 	if got := packageExportBindings(builder.exportStatements); !equalStrings(
 		got,
-		[]string{"Box", "Writer", "Writer$contract", "Writer$is"},
+		[]string{"Box", "Box$Storage", "Derived", "Writer"},
 	) {
 		t.Fatalf("initial assembly exports = %v", got)
 	}
@@ -407,31 +425,56 @@ func demandBox(values []Box) *Box {
 	)
 	if !ok || !equalStrings(
 		writerBindings,
-		[]string{"Writer", "Writer$contract", "Writer$is"},
+		[]string{"Writer"},
 	) {
 		t.Fatalf("committed Writer export surface = %v, %t", writerBindings, ok)
 	}
 	initialRevisions := builder.exportRevisions
+	if initialRevisions != 0 {
+		t.Fatalf(
+			"initial package export reconstructions = %d, want one batched publication",
+			initialRevisions,
+		)
+	}
 	initialFacetRevision := session.artifacts.FacetRevision(
 		builder.assemblyOwner,
 		api.ArtifactFacetImplementation,
 	)
-	if err := session.require(demandBox); err != nil {
+	if err := session.RequireUse(demandBox, rootUseDemand(demandBox), gostdlib.NoUseSelection()); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.RequireUse(demandDerived, rootUseDemand(demandDerived), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
 	want := []string{
 		"Box",
 		"Box$Storage",
+		"Derived",
+		"Derived$Storage",
 		"Writer",
-		"Writer$contract",
-		"Writer$is",
 	}
 	contractBindings, ok := session.artifacts.ExportedBindings(
 		api.MustSourceArtifactOwner(box),
 	)
-	if !ok || !equalStrings(contractBindings, []string{"Box", "Box$Storage"}) {
+	if !ok || !equalStrings(
+		contractBindings,
+		[]string{"Box", "Box$Storage"},
+	) {
 		t.Fatalf("committed Box export surface = %v, %t", contractBindings, ok)
+	}
+	derivedBindings, ok := session.artifacts.ExportedBindings(
+		api.MustSourceArtifactOwner(derived),
+	)
+	if !ok || !equalStrings(
+		derivedBindings,
+		[]string{"Derived", "Derived$Storage"},
+	) {
+		t.Fatalf(
+			"committed Derived export surface = %v, %t",
+			derivedBindings,
+			ok,
+		)
 	}
 	if got := packageExportBindings(builder.exportStatements); !equalStrings(
 		got,
@@ -441,7 +484,7 @@ func demandBox(values []Box) *Box {
 	}
 	if builder.exportRevisions != initialRevisions+1 {
 		t.Fatalf(
-			"package export reconstructions = %d, want %d",
+			"package export reconstructions = %d, want %d after storage demand",
 			builder.exportRevisions,
 			initialRevisions+1,
 		)
@@ -450,7 +493,11 @@ func demandBox(values []Box) *Box {
 		builder.assemblyOwner,
 		api.ArtifactFacetImplementation,
 	); revision != initialFacetRevision+1 {
-		t.Fatalf("package export facet revision = %d, want %d", revision, initialFacetRevision+1)
+		t.Fatalf(
+			"package export facet revision = %d, want %d after storage demand",
+			revision,
+			initialFacetRevision+1,
+		)
 	}
 	files, err := session.targetFiles()
 	if err != nil {
@@ -501,56 +548,4 @@ func demandBox(values []Box) *Box {
 		graphError.Facet != api.ArtifactFacetExportSurface {
 		t.Fatalf("omitted export-surface mutation error = %#v", err)
 	}
-}
-
-func packageExportBindings(statements []tsgo.Statement) []string {
-	var names []string
-	for _, statement := range statements {
-		declaration, ok := statement.(tsgo.ExportDeclaration)
-		if !ok {
-			continue
-		}
-		exports, ok := declaration.ExportClause().(tsgo.NamedExports)
-		if !ok {
-			continue
-		}
-		for _, specifier := range exports.Elements() {
-			name, ok := specifier.Name().(tsgo.Identifier)
-			if ok {
-				names = append(names, name.Text())
-			}
-		}
-	}
-	sort.Strings(names)
-	return names
-}
-
-func packageInitializerForVariable(
-	t *testing.T,
-	sourcePackage *load.Package,
-	variable *types.Var,
-) *types.Initializer {
-	t.Helper()
-	var selected *types.Initializer
-	for _, initializer := range sourcePackage.TypesInfo().InitOrder {
-		for _, target := range initializer.Lhs {
-			if target != variable {
-				continue
-			}
-			if selected != nil {
-				t.Fatalf(
-					"variable %s belongs to multiple package initializers",
-					variable.Name(),
-				)
-			}
-			selected = initializer
-		}
-	}
-	if selected == nil {
-		t.Fatalf(
-			"variable %s has no package initializer",
-			variable.Name(),
-		)
-	}
-	return selected
 }

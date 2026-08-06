@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -57,15 +58,22 @@ func (a RuntimeArray) ApplyIndex(
 		return api.ExpressionEmission{}, err
 	}
 	values := ordered.Values()
+	storedReceiver, err := a.storage(
+		context.WithRole(api.RoleArrayReceiver),
+		api.DirectExpression(values[0]),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	stored, err := api.NewExpressionEmission(
-		ordered.Before(),
+		append(ordered.Before(), storedReceiver.Before()...),
 		callMember(
 			context,
-			a.storage(context, values[0]),
+			storedReceiver.Value(),
 			arraymember.Get,
 			values[1],
 		),
-		ordered.Requests(),
+		api.CombineRequests(ordered.Requests(), storedReceiver.Requests()),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -103,10 +111,9 @@ func (a RuntimeArray) EmitStoreTarget(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	targetReceiver, err := api.NewExpressionEmission(
-		receiver.Before(),
-		a.storage(context, receiver.Value()),
-		receiver.Requests(),
+	targetReceiver, err := a.storage(
+		context.WithRole(api.RoleArrayReceiver),
+		receiver,
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
@@ -149,14 +156,21 @@ func (a RuntimeArray) Measure(
 	context api.Context,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	stored, err := a.storage(
+		context.WithRole(api.RoleBuiltinArgument),
+		value,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	target := tsgo.Expression(memberProperty(
 		context,
-		a.storage(context, value.Value()),
+		stored.Value(),
 		arraymember.Length,
 	))
-	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
+	if integervalue.TypeUsesBigInt(context, types.Typ[types.Int]) {
 		target = context.Factory().CallExpression(
-			context.Factory().Identifier("BigInt"),
+			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{target},
@@ -164,9 +178,9 @@ func (a RuntimeArray) Measure(
 		)
 	}
 	return api.NewExpressionEmission(
-		value.Before(),
+		stored.Before(),
 		target,
-		value.Requests(),
+		stored.Requests(),
 	)
 }
 
@@ -176,16 +190,31 @@ func (a RuntimeArray) RangeElement(
 	receiver tsgo.Expression,
 	index tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	stored, err := a.storage(
+		context.WithRole(api.RoleArrayReceiver),
+		api.DirectExpression(receiver),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	loaded, err := api.NewExpressionEmission(
+		stored.Before(),
+		callMember(
+			context,
+			stored.Value(),
+			arraymember.Get,
+			index,
+		),
+		stored.Requests(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	return context.ContainerStorage().FromContainerStorage(
 		context.WithRole(api.RoleArrayElement),
 		source,
 		a.ElementType(),
-		api.DirectExpression(callMember(
-			context,
-			a.storage(context, receiver),
-			arraymember.Get,
-			index,
-		)),
+		loaded,
 	)
 }
 

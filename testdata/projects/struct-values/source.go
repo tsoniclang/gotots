@@ -36,6 +36,17 @@ func NewBox(value int32) Box {
 	}
 }
 
+func Snapshot(value *Box) Point {
+	return value.Point
+}
+
+func ReturnSnapshotResult() int32 {
+	value := NewBox(1)
+	snapshot := Snapshot(&value)
+	value.Point.X = 2
+	return snapshot.X*10 + value.Point.X
+}
+
 func ZeroIsFresh() bool {
 	var left Box
 	var right Box

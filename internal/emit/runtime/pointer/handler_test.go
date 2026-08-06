@@ -18,6 +18,7 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 		factory,
 		pointerClassName(t),
 		panicClassName(t),
+		denseIndexClassName(t),
 	)
 
 	class, ok := statement.(tsgo.ClassDeclaration)
@@ -40,6 +41,16 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 	members := class.Members()
 	if len(members) != 18 {
 		t.Fatalf("pointer class members = %d, want 18", len(members))
+	}
+	for _, member := range members {
+		method, ok := member.(tsgo.MethodDeclaration)
+		if !ok {
+			continue
+		}
+		name, ok := method.Name().(tsgo.Identifier)
+		if ok && name.Text() == pointer.ProjectName {
+			t.Fatal("ordinary pointer runtime carries the projection facet")
+		}
 	}
 	constructor, ok := members[3].(tsgo.ConstructorDeclaration)
 	if !ok {
@@ -79,6 +90,7 @@ func TestNilDereferenceSuccessMutationRemovesRequiredThrow(t *testing.T) {
 		tsgo.NewFactory(),
 		pointerClassName(t),
 		panicClassName(t),
+		denseIndexClassName(t),
 	).(tsgo.ClassDeclaration)
 	guard := pointerMethod(t, class, pointer.DereferenceName)
 	body := guard.Body().(tsgo.Block).Statements()
@@ -108,6 +120,7 @@ func TestPointerRuntimeBuildExactJoinsItsFrozenSymbol(t *testing.T) {
 		factory,
 		api.RuntimeModulePointer,
 		[]api.RuntimeSymbol{api.RuntimePointer},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -124,6 +137,7 @@ func TestPointerRuntimeBuildExactJoinsItsFrozenSymbol(t *testing.T) {
 			factory,
 			api.RuntimeModulePointer,
 			symbols,
+			api.ConcurrencySemanticsDisabled,
 		)
 		var assemblyError *runtimeemission.AssemblyError
 		if !errors.As(err, &assemblyError) {
@@ -147,10 +161,12 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		}
 	})
 	printed, err := client.PrintNode(
-		pointer.Build(
+		pointer.BuildWithCapabilities(
 			factory,
 			pointerClassName(t),
 			panicClassName(t),
+			denseIndexClassName(t),
+			pointer.Capabilities{Projection: true},
 		),
 		tsgo.PrintOptions{},
 	)
@@ -167,6 +183,9 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		"static element<L, S>",
 		"static index<L, S, PL, O extends",
 		"static arrayRegion<L, T, S extends",
+		"static project<FL, FS, TL, TS>",
+		"fromSource(pointer.value)",
+		"pointer.value = toSource(next)",
 		"const numericIndex = globalThis.Number(index);",
 		"static equal<LL, LS, RL, RS>",
 		"static dereference<L, S>",
@@ -235,6 +254,15 @@ func pointerClassName(t *testing.T) string {
 func panicClassName(t *testing.T) string {
 	t.Helper()
 	contract, err := api.RuntimeContract(api.RuntimePanic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contract.ExportedName()
+}
+
+func denseIndexClassName(t *testing.T) string {
+	t.Helper()
+	contract, err := api.RuntimeContract(api.RuntimeDenseIndex)
 	if err != nil {
 		t.Fatal(err)
 	}

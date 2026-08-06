@@ -46,6 +46,14 @@ type ByteSequence interface {
 	~string | ~[]byte
 }
 
+type FixedSequence[E any] interface {
+	~[4]E
+}
+
+type NamedBytes []byte
+
+type NamedText string
+
 type ValueReader interface {
 	ReadValue() int32
 }
@@ -57,6 +65,10 @@ type Box[T any] struct {
 type EmbeddedBox[T any] struct {
 	Box[T]
 }
+
+type ConcreteBox Box[int32]
+
+type DerivedBox[T any] Box[T]
 
 type Alias[T any] = Box[T]
 
@@ -232,8 +244,8 @@ func Arithmetic[T Integer](left, right T) T {
 	return (left-right)*right/right%left | left&right ^ left&^right
 }
 
-func AuditBigIntOperations() int32 {
-	return Arithmetic(int32(6), int32(3))
+func AuditBigIntOperations() int64 {
+	return Arithmetic(int64(6), int64(3))
 }
 
 func Ordered[T Integer](left, right T) bool {
@@ -266,6 +278,32 @@ func ByteSequenceValue[S ByteSequence](values S, index int) byte {
 
 func ByteSequenceSize[S ByteSequence](values S) int32 {
 	return int32(len(values))
+}
+
+func SlicePrefix[S ByteSequence](values S, high int) S {
+	return values[:high]
+}
+
+func SliceWindow[S Sequence[E], E any](values S, low, high int) S {
+	return values[low:high]
+}
+
+func SliceCapacity[S Sequence[E], E any](
+	values S,
+	low, high, maximum int,
+) S {
+	return values[low:high:maximum]
+}
+
+func SliceTail[S Sequence[E], E any](values S, low int) S {
+	return values[low:]
+}
+
+func SliceArray[A FixedSequence[E], E any](
+	values A,
+	low, high int,
+) []E {
+	return values[low:high]
 }
 
 func GenericMapValue[T comparable](key T) int32 {
@@ -586,6 +624,14 @@ func LocalTypeCapability() int32 {
 	return GenericMapValue(entry{value: 24})
 }
 
+func DefinedInstantiatedGeneric() int32 {
+	value := ConcreteBox{Value: 7}
+	value.Value += 2
+	generic := DerivedBox[int32]{Value: 10}
+	generic.Value += 3
+	return value.Value + generic.Value
+}
+
 func AuditGenericMethodAdapters() []int32 {
 	first := ComparableBox[int32]{Value: 17}
 	equal := ComparableBox[int32]{Value: 17}
@@ -648,6 +694,15 @@ func Audit() []int32 {
 		GenericMapOperations(int32(15), int32(17))
 	definedMapValue, nilDefinedMapValue :=
 		GenericDefinedMapValue(int32(22))
+	textPrefix := SlicePrefix("abcd", 2)
+	bytePrefix := SlicePrefix([]byte{65, 66, 67}, 2)
+	namedTextPrefix := SlicePrefix(NamedText("wxyz"), 3)
+	namedBytePrefix := SlicePrefix(NamedBytes{67, 68, 69}, 2)
+	sliceWindow := SliceWindow([]int32{20, 21, 22}, 1, 3)
+	sliceTail := SliceTail([]int32{23, 24, 25}, 1)
+	arrayWindow := SliceArray([4]int32{26, 27, 28, 29}, 1, 3)
+	capacitySource := make([]int32, 4, 6)
+	capacitySlice := SliceCapacity(capacitySource, 1, 3, 5)
 	textValue, textOrdered := TextOperations("go", "ts")
 	interfaceValue := InterfaceValue(int32(10))
 	zero := Zero[int32]()
@@ -702,6 +757,17 @@ func Audit() []int32 {
 		int32(ByteSequenceValue([]byte{66}, 0)),
 		ByteSequenceSize("abc"),
 		ByteSequenceSize([]byte{1, 2}),
+		int32(len(textPrefix)),
+		int32(textPrefix[1]),
+		int32(bytePrefix[1]),
+		int32(len(namedTextPrefix)),
+		int32(namedTextPrefix[2]),
+		int32(namedBytePrefix[1]),
+		sliceWindow[0],
+		sliceTail[0],
+		arrayWindow[1],
+		int32(len(capacitySlice)),
+		int32(cap(capacitySlice)),
 		GenericMapValue(int32(15)),
 		mapValue,
 		mapCount,
@@ -715,6 +781,7 @@ func Audit() []int32 {
 		definedMapValue,
 		nilDefinedMapValue,
 		LocalTypeCapability(),
+		DefinedInstantiatedGeneric(),
 	}
 }
 

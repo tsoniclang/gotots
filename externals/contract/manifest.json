@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 2,
+  "packageName": "@gotots/externals",
+  "packageVersion": "0.0.0",
+  "backend": "node",
+  "goVersion": "go1.26.4",
+  "goos": "linux",
+  "goarch": "amd64",
+  "cgoEnabled": false,
+  "buildTags": [
+    "noasm"
+  ],
+  "providerIntegerRepresentation": "bigint",
+  "standardLibraryDigest": "777b7f8f199d1ad30451eae4527cd92f456d4957a67042ba51261aaa5f9c5c47",
+  "providerDigest": "9a8511faed04a2a82ff1173a3a3bd99a5fbdc5c8c8bed8ce8a9c07ab2614c3a0",
+  "bindings": [
+    {
+      "sourceIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumAVX2",
+      "sourceSignature": "func(acc *[8]github.com/zeebo/xxh3.u64, data unsafe.Pointer, key unsafe.Pointer, len github.com/zeebo/xxh3.u64)|params=acc,data,key,len|results=",
+      "sourceModulePath": "github.com/zeebo/xxh3",
+      "sourceModuleVersion": "v1.1.0",
+      "sourceLocation": "accum_stubs_amd64.go:18:1",
+      "targetKind": "source",
+      "targetIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumScalar",
+      "targetSignature": "func(accs *[8]github.com/zeebo/xxh3.u64, p github.com/zeebo/xxh3.ptr, secret github.com/zeebo/xxh3.ptr, l github.com/zeebo/xxh3.u64)|params=accs,p,secret,l|results=",
+      "targetLocation": "accum_generic.go:7:1"
+    },
+    {
+      "sourceIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumAVX512",
+      "sourceSignature": "func(acc *[8]github.com/zeebo/xxh3.u64, data unsafe.Pointer, key unsafe.Pointer, len github.com/zeebo/xxh3.u64)|params=acc,data,key,len|results=",
+      "sourceModulePath": "github.com/zeebo/xxh3",
+      "sourceModuleVersion": "v1.1.0",
+      "sourceLocation": "accum_stubs_amd64.go:21:1",
+      "targetKind": "source",
+      "targetIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumScalar",
+      "targetSignature": "func(accs *[8]github.com/zeebo/xxh3.u64, p github.com/zeebo/xxh3.ptr, secret github.com/zeebo/xxh3.ptr, l github.com/zeebo/xxh3.u64)|params=accs,p,secret,l|results=",
+      "targetLocation": "accum_generic.go:7:1"
+    },
+    {
+      "sourceIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumBlockAVX2",
+      "sourceSignature": "func(acc *[8]github.com/zeebo/xxh3.u64, data unsafe.Pointer, key unsafe.Pointer)|params=acc,data,key|results=",
+      "sourceModulePath": "github.com/zeebo/xxh3",
+      "sourceModuleVersion": "v1.1.0",
+      "sourceLocation": "accum_stubs_amd64.go:27:1",
+      "targetKind": "source",
+      "targetIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumBlockScalar",
+      "targetSignature": "func(accs *[8]github.com/zeebo/xxh3.u64, p github.com/zeebo/xxh3.ptr, secret github.com/zeebo/xxh3.ptr)|params=accs,p,secret|results=",
+      "targetLocation": "accum_generic.go:235:1"
+    },
+    {
+      "sourceIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumBlockAVX512",
+      "sourceSignature": "func(acc *[8]github.com/zeebo/xxh3.u64, data unsafe.Pointer, key unsafe.Pointer)|params=acc,data,key|results=",
+      "sourceModulePath": "github.com/zeebo/xxh3",
+      "sourceModuleVersion": "v1.1.0",
+      "sourceLocation": "accum_stubs_amd64.go:30:1",
+      "targetKind": "source",
+      "targetIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumBlockScalar",
+      "targetSignature": "func(accs *[8]github.com/zeebo/xxh3.u64, p github.com/zeebo/xxh3.ptr, secret github.com/zeebo/xxh3.ptr)|params=accs,p,secret|results=",
+      "targetLocation": "accum_generic.go:235:1"
+    },
+    {
+      "sourceIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumBlockSSE",
+      "sourceSignature": "func(acc *[8]github.com/zeebo/xxh3.u64, data unsafe.Pointer, key unsafe.Pointer)|params=acc,data,key|results=",
+      "sourceModulePath": "github.com/zeebo/xxh3",
+      "sourceModuleVersion": "v1.1.0",
+      "sourceLocation": "accum_stubs_amd64.go:33:1",
+      "targetKind": "source",
+      "targetIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumBlockScalar",
+      "targetSignature": "func(accs *[8]github.com/zeebo/xxh3.u64, p github.com/zeebo/xxh3.ptr, secret github.com/zeebo/xxh3.ptr)|params=accs,p,secret|results=",
+      "targetLocation": "accum_generic.go:235:1"
+    },
+    {
+      "sourceIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumSSE",
+      "sourceSignature": "func(acc *[8]github.com/zeebo/xxh3.u64, data unsafe.Pointer, key unsafe.Pointer, len github.com/zeebo/xxh3.u64)|params=acc,data,key,len|results=",
+      "sourceModulePath": "github.com/zeebo/xxh3",
+      "sourceModuleVersion": "v1.1.0",
+      "sourceLocation": "accum_stubs_amd64.go:24:1",
+      "targetKind": "source",
+      "targetIdentity": "github.com/zeebo/xxh3|kind=4|receiver=|name=accumScalar",
+      "targetSignature": "func(accs *[8]github.com/zeebo/xxh3.u64, p github.com/zeebo/xxh3.ptr, secret github.com/zeebo/xxh3.ptr, l github.com/zeebo/xxh3.u64)|params=accs,p,secret,l|results=",
+      "targetLocation": "accum_generic.go:7:1"
+    },
+    {
+      "sourceIdentity": "golang.org/x/sys/unix|kind=4|receiver=|name=RawSyscall",
+      "sourceSignature": "func(trap uintptr, a1 uintptr, a2 uintptr, a3 uintptr) (r1 uintptr, r2 uintptr, err syscall.Errno)|params=trap,a1,a2,a3|results=r1,r2,err",
+      "sourceModulePath": "golang.org/x/sys",
+      "sourceModuleVersion": "v0.46.0",
+      "sourceLocation": "syscall_unix_gc.go:13:1",
+      "targetKind": "module",
+      "moduleSpecifier": "@gotots/externals/golang.org/x/sys/unix.js",
+      "export": "RawSyscall",
+      "implementationOwner": "src/golang.org/x/sys/unix.ts",
+      "targetFingerprint": "24ac4d630ce998b2ccd9baeb08735b7f4dd5534400a17c2e79268db656c7412b"
+    },
+    {
+      "sourceIdentity": "golang.org/x/sys/unix|kind=4|receiver=|name=Syscall",
+      "sourceSignature": "func(trap uintptr, a1 uintptr, a2 uintptr, a3 uintptr) (r1 uintptr, r2 uintptr, err syscall.Errno)|params=trap,a1,a2,a3|results=r1,r2,err",
+      "sourceModulePath": "golang.org/x/sys",
+      "sourceModuleVersion": "v0.46.0",
+      "sourceLocation": "syscall_unix_gc.go:11:1",
+      "targetKind": "module",
+      "moduleSpecifier": "@gotots/externals/golang.org/x/sys/unix.js",
+      "export": "Syscall",
+      "implementationOwner": "src/golang.org/x/sys/unix.ts",
+      "targetFingerprint": "e05c871b4504167d2dc83ebe9d186da053ebcf9e7cf7c3ae69af5d294122438c"
+    },
+    {
+      "sourceIdentity": "golang.org/x/sys/unix|kind=4|receiver=|name=Syscall6",
+      "sourceSignature": "func(trap uintptr, a1 uintptr, a2 uintptr, a3 uintptr, a4 uintptr, a5 uintptr, a6 uintptr) (r1 uintptr, r2 uintptr, err syscall.Errno)|params=trap,a1,a2,a3,a4,a5,a6|results=r1,r2,err",
+      "sourceModulePath": "golang.org/x/sys",
+      "sourceModuleVersion": "v0.46.0",
+      "sourceLocation": "syscall_unix_gc.go:12:1",
+      "targetKind": "module",
+      "moduleSpecifier": "@gotots/externals/golang.org/x/sys/unix.js",
+      "export": "Syscall6",
+      "implementationOwner": "src/golang.org/x/sys/unix.ts",
+      "targetFingerprint": "dfec101630ff03e42ce6deb72c0d47799ac2632e41e233881997134d617d1204"
+    }
+  ],
+  "manifestDigest": "2f01627b504c5a27b221b250930a2c337851647d1c960db9f6a9cbcf3143a5ce"
+}

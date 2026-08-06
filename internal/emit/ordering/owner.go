@@ -2,8 +2,6 @@ package ordering
 
 import (
 	"go/types"
-	"strconv"
-	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
@@ -29,19 +27,61 @@ func StableTypeString(source types.Type) string {
 }
 
 func CompareObjects(left types.Object, right types.Object) int {
-	leftKey := stableObjectOrderKey(left)
-	rightKey := stableObjectOrderKey(right)
+	return compareObjects(left, right, StableTypeString)
+}
+
+func compareObjects(
+	left types.Object,
+	right types.Object,
+	typeString func(types.Type) string,
+) int {
 	switch {
-	case leftKey < rightKey:
-		return -1
-	case leftKey > rightKey:
-		return 1
+	case left == right:
+		return 0
 	case left == nil && right != nil:
 		return -1
 	case left != nil && right == nil:
 		return 1
-	case left == nil:
-		return 0
+	}
+	leftPackage := ""
+	if left.Pkg() != nil {
+		leftPackage = left.Pkg().Path()
+	}
+	rightPackage := ""
+	if right.Pkg() != nil {
+		rightPackage = right.Pkg().Path()
+	}
+	if order := compareStrings(leftPackage, rightPackage); order != 0 {
+		return order
+	}
+	if order := compareInts(
+		objectKindOrder(left),
+		objectKindOrder(right),
+	); order != 0 {
+		return order
+	}
+	leftReceiver := receiverType(left)
+	rightReceiver := receiverType(right)
+	if leftReceiver != nil || rightReceiver != nil {
+		if order := compareStrings(
+			typeStringOrEmpty(leftReceiver, typeString),
+			typeStringOrEmpty(rightReceiver, typeString),
+		); order != 0 {
+			return order
+		}
+	}
+	if order := compareStrings(left.Name(), right.Name()); order != 0 {
+		return order
+	}
+	if left.Type() != nil || right.Type() != nil {
+		if order := compareStrings(
+			typeStringOrEmpty(left.Type(), typeString),
+			typeStringOrEmpty(right.Type(), typeString),
+		); order != 0 {
+			return order
+		}
+	}
+	switch {
 	case left.Pos() < right.Pos():
 		return -1
 	case left.Pos() > right.Pos():
@@ -51,30 +91,48 @@ func CompareObjects(left types.Object, right types.Object) int {
 	}
 }
 
-func stableObjectOrderKey(object types.Object) string {
-	if object == nil {
+func typeStringOrEmpty(
+	source types.Type,
+	typeString func(types.Type) string,
+) string {
+	if source == nil {
 		return ""
 	}
-	var key strings.Builder
-	if object.Pkg() != nil {
-		key.WriteString(object.Pkg().Path())
+	return typeString(source)
+}
+
+func receiverType(object types.Object) types.Type {
+	function, ok := object.(*types.Func)
+	if !ok {
+		return nil
 	}
-	key.WriteByte(0)
-	key.WriteString(strconv.Itoa(objectKindOrder(object)))
-	key.WriteByte(0)
-	if function, ok := object.(*types.Func); ok {
-		signature, _ := function.Type().(*types.Signature)
-		if signature != nil && signature.Recv() != nil {
-			key.WriteString(StableTypeString(signature.Recv().Type()))
-		}
+	signature, _ := function.Type().(*types.Signature)
+	if signature == nil || signature.Recv() == nil {
+		return nil
 	}
-	key.WriteByte(0)
-	key.WriteString(object.Name())
-	key.WriteByte(0)
-	if object.Type() != nil {
-		key.WriteString(StableTypeString(object.Type()))
+	return signature.Recv().Type()
+}
+
+func compareStrings(left string, right string) int {
+	switch {
+	case left < right:
+		return -1
+	case left > right:
+		return 1
+	default:
+		return 0
 	}
-	return key.String()
+}
+
+func compareInts(left int, right int) int {
+	switch {
+	case left < right:
+		return -1
+	case left > right:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func objectKindOrder(object types.Object) int {
@@ -104,6 +162,9 @@ func CompareArtifactOwners(
 	left api.ArtifactOwner,
 	right api.ArtifactOwner,
 ) int {
+	if left == right {
+		return 0
+	}
 	leftSource, leftIsSource := left.Source()
 	rightSource, rightIsSource := right.Source()
 	switch {

@@ -17,6 +17,7 @@ func TestRuntimeAssemblyExactJoinsFrozenSliceSymbol(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModuleSlice,
 		[]api.RuntimeSymbol{api.RuntimeSlice},
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -31,6 +32,7 @@ func TestRuntimeAssemblyExactJoinsFrozenSliceSymbol(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeModuleSlice,
 		[]api.RuntimeSymbol{api.RuntimeSlice, api.RuntimeSlice},
+		api.ConcurrencySemanticsDisabled,
 	); err == nil {
 		t.Fatal("runtime slice assembly accepted a non-exact symbol multiset")
 	}
@@ -42,6 +44,7 @@ func TestRuntimeSliceBuilderConsumesInjectedContractName(t *testing.T) {
 		tsgo.NewFactory(),
 		changedContractName,
 		runtimePanicClassName(t),
+		runtimeDenseIndexClassName(t),
 	)
 	if class.Name().Text() != changedContractName {
 		t.Fatalf(
@@ -69,6 +72,7 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 		tsgo.NewFactory(),
 		className,
 		runtimePanicClassName(t),
+		runtimeDenseIndexClassName(t),
 	)
 	if class.Name().Text() != className ||
 		len(class.TypeParameters()) != 1 ||
@@ -94,6 +98,10 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 	if _, ok := backing.Types()[0].(tsgo.ArrayTypeNode); !ok {
 		t.Fatalf("runtime slice internal backing = %T, want typed array", backing.Types()[0])
 	}
+	if len(constructor.Modifiers()) != 1 ||
+		constructor.Modifiers()[0].Kind() != tsgo.SyntaxKindProtectedKeyword {
+		t.Fatal("runtime slice constructor does not admit only typed runtime subclasses")
+	}
 	var methods []string
 	for _, member := range members[1:] {
 		method, ok := member.(tsgo.MethodDeclaration)
@@ -115,6 +123,31 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 	}
 	if !slices.Equal(methods, want) {
 		t.Fatalf("runtime slice methods = %v, want %v", methods, want)
+	}
+}
+
+func TestRuntimeSliceProjectionIsOneDemandedTypedSubclass(t *testing.T) {
+	definitions, err := runtimeemission.Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleSlice,
+		[]api.RuntimeSymbol{
+			api.RuntimeSlice,
+			api.RuntimeSliceProjection,
+		},
+		api.ConcurrencySemanticsDisabled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 2 ||
+		definitions[1].Symbol() != api.RuntimeSliceProjection {
+		t.Fatalf("projected slice definitions = %#v", definitions)
+	}
+	projection, ok := definitions[1].Statement().(tsgo.ClassDeclaration)
+	if !ok || projection.Name().Text() != "RuntimeSliceProjection" ||
+		len(projection.TypeParameters()) != 2 ||
+		len(projection.HeritageClauses()) != 1 {
+		t.Fatalf("projected slice declaration = %#v", projection)
 	}
 }
 
@@ -178,6 +211,15 @@ func runtimeSliceClassName(t *testing.T) string {
 func runtimePanicClassName(t *testing.T) string {
 	t.Helper()
 	contract, err := api.RuntimeContract(api.RuntimePanic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contract.ExportedName()
+}
+
+func runtimeDenseIndexClassName(t *testing.T) string {
+	t.Helper()
+	contract, err := api.RuntimeContract(api.RuntimeDenseIndex)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -18,7 +18,7 @@ func emitBlankAssignment(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	if facts, ok := context.TypesInfo().Types[sourceValue]; ok &&
+	if facts, ok := context.TypesInfo().TypeAndValue(sourceValue); ok &&
 		facts.Value != nil {
 		return api.NewStatementEmission(nil, nil)
 	}

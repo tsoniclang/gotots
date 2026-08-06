@@ -1,0 +1,3196 @@
+{
+  "schemaVersion": 21,
+  "representations": [
+    {
+      "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
+      "sourcePath": "src/internal/facets/named-encoding-binary.ts",
+      "export": "BinaryEndianRepresentation",
+      "sourceTypes": [
+        "encoding/binary|kind=2|receiver=|name=bigEndian",
+        "encoding/binary|kind=2|receiver=|name=littleEndian",
+        "encoding/binary|kind=2|receiver=|name=nativeEndian"
+      ],
+      "sourceInterfaces": [
+        "encoding/binary|kind=2|receiver=|name=AppendByteOrder",
+        "encoding/binary|kind=2|receiver=|name=ByteOrder"
+      ]
+    }
+  ],
+  "providerInterfaces": [
+    {
+      "sourceIdentity": "go:universe|error",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ProviderErrorInterface"
+    }
+  ],
+  "providerInterfaceCapabilities": [
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "ProviderErrorInterface",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsDirect",
+      "targetExport": "ProviderErrorIsDirect",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorIsDirect"
+    },
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "ProviderErrorInterface",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsDirect",
+      "targetExport": "ProviderErrorUnwrapDirect",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorUnwrapDirect"
+    },
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "ProviderErrorInterface",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsDirect",
+      "targetExport": "ProviderErrorUnwrapManyDirect",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorUnwrapManyDirect"
+    },
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "CanonicalError",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsCanonical",
+      "targetExport": "ProviderErrorIs",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorIs"
+    },
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "CanonicalError",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsCanonical",
+      "targetExport": "ProviderErrorUnwrap",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorUnwrap"
+    },
+    {
+      "usage": "generated-bridge",
+      "baseSourceIdentity": "go:universe|error",
+      "baseExport": "CanonicalError",
+      "profileSourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "profileExport": "ErrorsIsCanonical",
+      "targetExport": "ProviderErrorUnwrapMany",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "viewExport": "AsProviderErrorUnwrapMany"
+    }
+  ],
+  "providerProtocols": [
+    {
+      "name": "error-is",
+      "protocol": {
+        "methods": [
+          {
+            "name": "Is",
+            "parameters": [
+              { "kind": "callable-parameter", "callableParameter": 1 }
+            ],
+            "results": [
+              { "kind": "bool" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "error-is-source",
+      "protocol": {
+        "methods": [
+          {
+            "name": "Is",
+            "parameters": [
+              { "kind": "callable-parameter", "callableParameter": 0 }
+            ],
+            "results": [
+              { "kind": "bool" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "error-unwrap",
+      "protocol": {
+        "methods": [
+          {
+            "name": "Unwrap",
+            "results": [
+              { "kind": "callable-parameter", "callableParameter": 0 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "error-unwrap-many",
+      "protocol": {
+        "methods": [
+          {
+            "name": "Unwrap",
+            "results": [
+              {
+                "kind": "slice",
+                "element": {
+                  "kind": "callable-parameter",
+                  "callableParameter": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "providerCallableProfiles": [
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsDirect",
+      "required": true,
+      "canonicalParameters": [
+        0,
+        1
+      ],
+      "protocols": [
+        {
+          "protocol": "error-is",
+          "export": "ProviderErrorIsDirect",
+          "valueParameter": 0
+        },
+        {
+          "protocol": "error-unwrap",
+          "export": "ProviderErrorUnwrapDirect",
+          "valueParameter": 0
+        },
+        {
+          "protocol": "error-unwrap-many",
+          "export": "ProviderErrorUnwrapManyDirect",
+          "valueParameter": 0
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsIsCanonical",
+      "required": true,
+      "canonicalParameters": [
+        0,
+        1
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ],
+      "protocols": [
+        {
+          "protocol": "error-is",
+          "export": "ProviderErrorIs",
+          "valueParameter": 0
+        },
+        {
+          "protocol": "error-unwrap",
+          "export": "ProviderErrorUnwrap",
+          "valueParameter": 0
+        },
+        {
+          "protocol": "error-unwrap-many",
+          "export": "ProviderErrorUnwrapMany",
+          "valueParameter": 0
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Unwrap",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsUnwrapDirect",
+      "required": true,
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "ProviderErrorInterface"
+        }
+      ],
+      "protocols": [
+        {
+          "protocol": "error-unwrap",
+          "export": "ProviderErrorUnwrapDirect",
+          "valueParameter": 0
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=Unwrap",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-error.js",
+      "sourcePath": "src/internal/facets/provider-error.ts",
+      "export": "ErrorsUnwrapCanonical",
+      "required": true,
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ],
+      "protocols": [
+        {
+          "protocol": "error-unwrap",
+          "export": "ProviderErrorUnwrap",
+          "valueParameter": 0
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithCancel",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithCancelCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
+          "targetParameter": "canceled"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": [
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "CanonicalContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithCancelCause",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithCancelCauseCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0,
+        1
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
+          "targetParameter": "canceled"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": [
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "CanonicalContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithTimeout",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithTimeoutCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
+          "targetParameter": "canceled"
+        },
+        {
+          "sourceIdentity": "context|kind=3|receiver=|name=DeadlineExceeded",
+          "targetParameter": "deadlineExceeded"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": [
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "CanonicalContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=AfterFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextAfterFuncCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "CanonicalContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=Cause",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextCauseCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "CanonicalContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "context|kind=4|receiver=|name=WithValue",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-context.js",
+      "sourcePath": "src/internal/facets/provider-context.ts",
+      "export": "ContextWithValueCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": [
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "CanonicalContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=|name=StartCPUProfile",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofStartCPUProfileCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "contractInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "runtime/pprof|kind=4|receiver=*runtime/pprof.Profile|name=WriteTo",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/provider-runtime-pprof.ts",
+      "export": "PprofProfileWriteToCanonical",
+      "receiver": true,
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "contractInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprint",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        1
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintf",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintfCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        1
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "fmt|kind=4|receiver=|name=Fprintln",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-fmt-writer.js",
+      "sourcePath": "src/internal/facets/provider-fmt-writer.ts",
+      "export": "FprintlnCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        1
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewReader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "NewReaderCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
+          "targetParameter": "noProgress"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReader"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewScanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "NewScannerCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "bufio|kind=3|receiver=|name=ErrBadReadCount",
+          "targetParameter": "badReadCount"
+        },
+        {
+          "sourceIdentity": "bufio|kind=3|receiver=|name=ErrTooLong",
+          "targetParameter": "tooLong"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
+          "targetParameter": "noProgress"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReader"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=4|receiver=|name=NewWriter",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "NewWriterCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrShortWrite",
+          "targetParameter": "shortWrite"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "compress/gzip|kind=4|receiver=|name=NewReader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip.js",
+      "sourcePath": "src/internal/facets/provider-compress-gzip.ts",
+      "export": "GzipNewReaderCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0,
+        1
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrUnexpectedEOF",
+          "targetParameter": "unexpectedEOF"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrNoProgress",
+          "targetParameter": "noProgress"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "compress/flate|kind=2|receiver=|name=Reader",
+        "go:universe|error",
+        "io|kind=2|receiver=|name=ReadCloser"
+      ],
+      "contractInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "compress/flate|kind=2|receiver=|name=Reader",
+          "export": "CanonicalFlateReader"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=ReadCloser",
+          "export": "CanonicalReadCloser"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReader"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "os|kind=4|receiver=|name=IsNotExist",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-error.js",
+      "sourcePath": "src/internal/facets/provider-os-error.ts",
+      "export": "OsIsNotExistDirect",
+      "required": true,
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io/fs|kind=3|receiver=|name=ErrNotExist",
+          "targetParameter": "target"
+        }
+      ],
+      "protocols": [
+        {
+          "protocol": "error-is-source",
+          "export": "ProviderOsErrorIsDirect",
+          "valueParameter": 0
+        },
+        {
+          "protocol": "error-unwrap",
+          "export": "ProviderErrorUnwrapDirect",
+          "valueParameter": 0
+        },
+        {
+          "protocol": "error-unwrap-many",
+          "export": "ProviderErrorUnwrapManyDirect",
+          "valueParameter": 0
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "os|kind=4|receiver=|name=IsNotExist",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-error.js",
+      "sourcePath": "src/internal/facets/provider-os-error.ts",
+      "export": "OsIsNotExistCanonical",
+      "required": true,
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io/fs|kind=3|receiver=|name=ErrNotExist",
+          "targetParameter": "target"
+        }
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ],
+      "protocols": [
+        {
+          "protocol": "error-is-source",
+          "export": "ProviderOsErrorIs",
+          "valueParameter": 0
+        },
+        {
+          "protocol": "error-unwrap",
+          "export": "ProviderErrorUnwrap",
+          "valueParameter": 0
+        },
+        {
+          "protocol": "error-unwrap-many",
+          "export": "ProviderErrorUnwrapMany",
+          "valueParameter": 0
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryReadCanonical",
+      "canonicalParameters": [
+        0,
+        1
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "contractInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReader"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io|kind=4|receiver=|name=ReadFull",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-read.js",
+      "sourcePath": "src/internal/facets/provider-io-read.ts",
+      "export": "IoReadFullCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        1
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        },
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=ErrUnexpectedEOF",
+          "targetParameter": "unexpectedEOF"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReader"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/binary|kind=4|receiver=|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-binary.js",
+      "sourcePath": "src/internal/facets/provider-encoding-binary.ts",
+      "export": "EncodingBinaryWriteCanonical",
+      "canonicalParameters": [
+        0,
+        1
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "contractInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "encoding/binary|kind=2|receiver=|name=ByteOrder",
+          "export": "CanonicalByteOrder"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadDir",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsReadDirCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0,
+        1
+      ],
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "targetParameter": "asReadDirFS"
+        },
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "targetParameter": "asReadDirFile"
+        }
+      ],
+      "fromProviderInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+          "export": "CanonicalDirEntry"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "CanonicalFileInfo"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "export": "CanonicalReadDirFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "export": "CanonicalReadDirFile"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=ReadFile",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsReadFileCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        1
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io|kind=3|receiver=|name=EOF",
+          "targetParameter": "eof"
+        }
+      ],
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
+          "targetParameter": "asReadFileFS"
+        }
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "CanonicalFileInfo"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadFileFS",
+          "export": "CanonicalReadFileFS"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=Stat",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsStatCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0,
+        1
+      ],
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "targetParameter": "asStatFS"
+        }
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "CanonicalFileInfo"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "export": "CanonicalStatFS"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=WalkDir",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsWalkDirCanonical",
+      "canonicalParameters": [
+        0,
+        2
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "io/fs|kind=3|receiver=|name=SkipAll",
+          "targetParameter": "skipAll"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=3|receiver=|name=SkipDir",
+          "targetParameter": "skipDir"
+        }
+      ],
+      "capabilityViews": [
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "targetParameter": "asReadDirFS"
+        },
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "targetParameter": "asReadDirFile"
+        },
+        {
+          "baseSourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "targetSourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "targetParameter": "asStatFS"
+        }
+      ],
+      "contractInterfaces": [
+        "io/fs|kind=2|receiver=|name=DirEntry"
+      ],
+      "fromProviderInterfaces": [
+        "go:universe|error"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+          "export": "CanonicalDirEntry"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FS",
+          "export": "CanonicalFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=File",
+          "export": "CanonicalFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "CanonicalFileInfo"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFS",
+          "export": "CanonicalReadDirFS"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=ReadDirFile",
+          "export": "CanonicalReadDirFile"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=StatFS",
+          "export": "CanonicalStatFS"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "os/signal|kind=4|receiver=|name=NotifyContext",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
+      "sourcePath": "src/internal/facets/provider-os-signal.ts",
+      "export": "OsSignalNotifyContextCanonical",
+      "canonicalParameters": [
+        0,
+        1
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalValues": [
+        {
+          "sourceIdentity": "context|kind=3|receiver=|name=Canceled",
+          "targetParameter": "canceled"
+        }
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "contractInterfaces": [
+        "context|kind=2|receiver=|name=Context"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "context|kind=2|receiver=|name=Context",
+          "export": "CanonicalContext"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "os|kind=2|receiver=|name=Signal",
+          "export": "CanonicalSignal"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "os|kind=4|receiver=*os.Process|name=Signal",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-os-signal.js",
+      "sourcePath": "src/internal/facets/provider-os-signal.ts",
+      "export": "OsProcessSignalCanonical",
+      "receiver": true,
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "os|kind=2|receiver=|name=Signal",
+          "export": "CanonicalSignal"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "encoding/base64|kind=4|receiver=|name=NewEncoder",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
+      "export": "Base64NewEncoderCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "canonicalTypeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "contractInterfaces": [
+        "io|kind=2|receiver=|name=WriteCloser"
+      ],
+      "implementedResultInterfaces": [
+        "io|kind=2|receiver=|name=WriteCloser"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=WriteCloser",
+          "export": "CanonicalWriteCloser"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriter"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=4|receiver=|name=FileInfoToDirEntry",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-io-fs.js",
+      "sourcePath": "src/internal/facets/provider-io-fs.ts",
+      "export": "IoFsFileInfoToDirEntryCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "canonicalResults": [
+        0
+      ],
+      "contractInterfaces": [
+        "io/fs|kind=2|receiver=|name=DirEntry"
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=DirEntry",
+          "export": "CanonicalDirEntry"
+        },
+        {
+          "sourceIdentity": "io/fs|kind=2|receiver=|name=FileInfo",
+          "export": "CanonicalFileInfo"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "regexp|kind=4|receiver=*regexp.Regexp|name=ReplaceAllStringFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-regexp.js",
+      "sourcePath": "src/internal/facets/provider-regexp.ts",
+      "export": "RegexpReplaceAllStringFuncCanonical",
+      "receiver": true,
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "sort|kind=4|receiver=|name=Search",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
+      "sourcePath": "src/internal/facets/provider-sort.ts",
+      "export": "SortSearchCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "sort|kind=4|receiver=|name=Sort",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
+      "sourcePath": "src/internal/facets/provider-sort.ts",
+      "export": "SortCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
+          "export": "SortInterfaceCanonical"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "sort|kind=4|receiver=|name=Stable",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-sort.js",
+      "sourcePath": "src/internal/facets/provider-sort.ts",
+      "export": "SortStableCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "sort|kind=2|receiver=|name=Interface",
+          "export": "SortInterfaceCanonical"
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=ContainsFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsContainsFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=IndexFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsIndexFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=LastIndexFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsLastIndexFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=Map",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsMapCanonical",
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=TrimFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsTrimFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=TrimLeftFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsTrimLeftFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "strings|kind=4|receiver=|name=TrimRightFunc",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-strings.js",
+      "sourcePath": "src/internal/facets/provider-strings.ts",
+      "export": "StringsTrimRightFuncCanonical",
+      "canonicalParameters": [
+        1
+      ],
+      "interfaces": []
+    },
+    {
+      "sourceIdentity": "syscall|kind=4|receiver=syscall.Errno|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-syscall.js",
+      "sourcePath": "src/internal/facets/provider-syscall.ts",
+      "export": "SyscallErrnoIsCanonical",
+      "receiver": true,
+      "canonicalParameters": [
+        0
+      ],
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ]
+    }
+  ],
+  "providerStatefulProfiles": [
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "CanonicalBufioReader",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReader"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ],
+      "operations": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "CanonicalBufioScanner",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Reader",
+          "export": "CanonicalReader"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Reader"
+      ]
+    },
+    {
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "CanonicalBufioWriter",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=Writer",
+          "export": "CanonicalWriter"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error",
+        "io|kind=2|receiver=|name=Writer"
+      ],
+      "operations": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "sourceIdentity": "compress/gzip|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip.js",
+      "sourcePath": "src/internal/facets/provider-compress-gzip.ts",
+      "export": "CanonicalGzipReader",
+      "interfaces": [
+        {
+          "sourceIdentity": "compress/flate|kind=2|receiver=|name=Reader",
+          "export": "CanonicalFlateReader"
+        },
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        },
+        {
+          "sourceIdentity": "io|kind=2|receiver=|name=ReadCloser",
+          "export": "CanonicalReadCloser"
+        }
+      ],
+      "typeArguments": [
+        "compress/flate|kind=2|receiver=|name=Reader",
+        "go:universe|error",
+        "io|kind=2|receiver=|name=ReadCloser"
+      ],
+      "operations": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "sourceIdentity": "io/fs|kind=2|receiver=|name=PathError",
+      "specifier": "@gotots/gostdlib/internal/facets/named-io-fs.js",
+      "sourcePath": "src/internal/facets/named-io-fs.ts",
+      "export": "CanonicalPathError",
+      "interfaces": [
+        {
+          "sourceIdentity": "go:universe|error",
+          "export": "CanonicalError"
+        }
+      ],
+      "typeArguments": [
+        "go:universe|error"
+      ],
+      "operations": [
+        "assign",
+        "copy",
+        "equal",
+        "hash",
+        "make",
+        "storage"
+      ]
+    }
+  ],
+  "facets": [
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "flag|kind=2|receiver=|name=ErrorHandling",
+      "specifier": "@gotots/gostdlib/internal/facets/named-flag.js",
+      "sourcePath": "src/internal/facets/named-flag.ts",
+      "export": "FlagErrorHandlingValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "internal/abi|kind=2|receiver=|name=Kind",
+      "specifier": "@gotots/gostdlib/internal/facets/named-internal-abi.js",
+      "sourcePath": "src/internal/facets/named-internal-abi.ts",
+      "export": "InternalABIKindValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "internal/abi|kind=2|receiver=|name=NameOff",
+      "specifier": "@gotots/gostdlib/internal/facets/named-internal-abi.js",
+      "sourcePath": "src/internal/facets/named-internal-abi.ts",
+      "export": "InternalABINameOffValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "internal/abi|kind=2|receiver=|name=TFlag",
+      "specifier": "@gotots/gostdlib/internal/facets/named-internal-abi.js",
+      "sourcePath": "src/internal/facets/named-internal-abi.ts",
+      "export": "InternalABITFlagValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "internal/abi|kind=2|receiver=|name=TypeOff",
+      "specifier": "@gotots/gostdlib/internal/facets/named-internal-abi.js",
+      "sourcePath": "src/internal/facets/named-internal-abi.ts",
+      "export": "InternalABITypeOffValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "io/fs|kind=2|receiver=|name=FileMode",
+      "specifier": "@gotots/gostdlib/internal/facets/named-io-fs.js",
+      "sourcePath": "src/internal/facets/named-io-fs.ts",
+      "export": "IoFsFileModeValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "iter|kind=2|receiver=|name=Seq",
+      "specifier": "@gotots/gostdlib/internal/facets/named-iter.js",
+      "sourcePath": "src/internal/facets/named-iter.ts",
+      "export": "IterSeqValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "iter|kind=2|receiver=|name=Seq2",
+      "specifier": "@gotots/gostdlib/internal/facets/named-iter.js",
+      "sourcePath": "src/internal/facets/named-iter.ts",
+      "export": "IterSeq2ValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "math/big|kind=2|receiver=|name=Accuracy",
+      "specifier": "@gotots/gostdlib/internal/facets/named-math-big.js",
+      "sourcePath": "src/internal/facets/named-math-big.ts",
+      "export": "MathBigAccuracyValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=ChanDir",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectChanDirValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "reflection-type-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Type",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectTypeMetadataOperations",
+      "capabilities": [
+        "metadata"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Kind",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectKindValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=StructTag",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectStructTagValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=ValueKind",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime-metrics.js",
+      "sourcePath": "src/internal/facets/named-runtime-metrics.ts",
+      "export": "RuntimeMetricsValueKindValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "syscall|kind=2|receiver=|name=Errno",
+      "specifier": "@gotots/gostdlib/internal/facets/named-syscall.js",
+      "sourcePath": "src/internal/facets/named-syscall.ts",
+      "export": "SyscallErrnoValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "syscall|kind=2|receiver=|name=Signal",
+      "specifier": "@gotots/gostdlib/internal/facets/named-syscall.js",
+      "sourcePath": "src/internal/facets/named-syscall.ts",
+      "export": "SyscallSignalValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "defined-value-operations",
+      "sourceIdentity": "time|kind=2|receiver=|name=Duration",
+      "specifier": "@gotots/gostdlib/internal/facets/named-time.js",
+      "sourcePath": "src/internal/facets/named-time.ts",
+      "export": "TimeDurationValueOperations",
+      "capabilities": [
+        "project",
+        "wrap"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
+      "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
+      "export": "BufioReaderOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
+      "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
+      "export": "BufioWriterOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "bytes|kind=2|receiver=|name=Buffer",
+      "specifier": "@gotots/gostdlib/internal/facets/named-bytes.js",
+      "sourcePath": "src/internal/facets/named-bytes.ts",
+      "export": "BytesBufferOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "compress/gzip|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip.js",
+      "sourcePath": "src/internal/facets/provider-compress-gzip.ts",
+      "export": "GzipReaderOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "encoding/binary|kind=2|receiver=|name=bigEndian",
+      "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
+      "sourcePath": "src/internal/facets/named-encoding-binary.ts",
+      "export": "BinaryBigEndianOperations",
+      "capabilities": [
+        "copy",
+        "equal",
+        "hash",
+        "representation",
+        "storage"
+      ],
+      "representationExport": "BinaryEndianRepresentation",
+      "storageExport": "BinaryBigEndianStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "encoding/binary|kind=2|receiver=|name=littleEndian",
+      "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
+      "sourcePath": "src/internal/facets/named-encoding-binary.ts",
+      "export": "BinaryLittleEndianOperations",
+      "capabilities": [
+        "copy",
+        "equal",
+        "hash",
+        "representation",
+        "storage"
+      ],
+      "representationExport": "BinaryEndianRepresentation",
+      "storageExport": "BinaryLittleEndianStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "encoding/binary|kind=2|receiver=|name=nativeEndian",
+      "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
+      "sourcePath": "src/internal/facets/named-encoding-binary.ts",
+      "export": "BinaryNativeEndianOperations",
+      "capabilities": [
+        "copy",
+        "equal",
+        "hash",
+        "representation",
+        "storage"
+      ],
+      "representationExport": "BinaryEndianRepresentation",
+      "storageExport": "BinaryNativeEndianStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "io/fs|kind=2|receiver=|name=PathError",
+      "specifier": "@gotots/gostdlib/internal/facets/named-io-fs.js",
+      "sourcePath": "src/internal/facets/named-io-fs.ts",
+      "export": "IoFsPathErrorOperations",
+      "capabilities": [
+        "assign",
+        "copy",
+        "equal",
+        "hash",
+        "make",
+        "storage"
+      ],
+      "storageExport": "IoFsPathErrorStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "math/big|kind=2|receiver=|name=Float",
+      "specifier": "@gotots/gostdlib/internal/facets/named-math-big.js",
+      "sourcePath": "src/internal/facets/named-math-big.ts",
+      "export": "MathBigFloatOperations",
+      "capabilities": [
+        "storage",
+        "zero"
+      ],
+      "storageExport": "MathBigFloatStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "math/big|kind=2|receiver=|name=Int",
+      "specifier": "@gotots/gostdlib/internal/facets/named-math-big.js",
+      "sourcePath": "src/internal/facets/named-math-big.ts",
+      "export": "MathBigIntOperations",
+      "capabilities": [
+        "storage",
+        "zero"
+      ],
+      "storageExport": "MathBigIntStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "net/url|kind=2|receiver=|name=URL",
+      "specifier": "@gotots/gostdlib/internal/facets/named-net-url.js",
+      "sourcePath": "src/internal/facets/named-net-url.ts",
+      "export": "NetUrlURLOperations",
+      "capabilities": [
+        "storage"
+      ],
+      "storageExport": "NetUrlURLStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "os|kind=2|receiver=|name=File",
+      "specifier": "@gotots/gostdlib/internal/facets/named-os.js",
+      "sourcePath": "src/internal/facets/named-os.ts",
+      "export": "OsFileOperations",
+      "capabilities": [
+        "assign",
+        "copy",
+        "equal",
+        "hash"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "runtime|kind=2|receiver=|name=MemStats",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime.js",
+      "sourcePath": "src/internal/facets/named-runtime.ts",
+      "export": "RuntimeMemStatsOperations",
+      "capabilities": [
+        "copy",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "RuntimeMemStatsStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=StructField",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectStructFieldOperations",
+      "capabilities": [
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=Value",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectValueOperations",
+      "capabilities": [
+        "copy",
+        "zero"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "time|kind=2|receiver=|name=Ticker",
+      "specifier": "@gotots/gostdlib/internal/facets/named-time.js",
+      "sourcePath": "src/internal/facets/named-time.ts",
+      "export": "TimeTickerOperations",
+      "capabilities": [
+        "storage"
+      ],
+      "storageExport": "TimeTickerStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "time|kind=2|receiver=|name=Time",
+      "specifier": "@gotots/gostdlib/internal/facets/named-time.js",
+      "sourcePath": "src/internal/facets/named-time.ts",
+      "export": "TimeOperations",
+      "capabilities": [
+        "assign",
+        "copy",
+        "equal",
+        "hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "TimeStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "time|kind=2|receiver=|name=ParseError",
+      "specifier": "@gotots/gostdlib/internal/facets/named-time.js",
+      "sourcePath": "src/internal/facets/named-time.ts",
+      "export": "TimeParseErrorOperations",
+      "capabilities": [
+        "assign",
+        "copy",
+        "equal",
+        "hash",
+        "make",
+        "storage"
+      ],
+      "storageExport": "TimeParseErrorStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "time|kind=2|receiver=|name=Timer",
+      "specifier": "@gotots/gostdlib/internal/facets/named-time.js",
+      "sourcePath": "src/internal/facets/named-time.ts",
+      "export": "TimeTimerOperations",
+      "capabilities": [
+        "assign",
+        "copy",
+        "equal",
+        "hash",
+        "storage"
+      ],
+      "storageExport": "TimeTimerStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "unicode|kind=2|receiver=|name=Range16",
+      "specifier": "@gotots/gostdlib/internal/facets/named-unicode.js",
+      "sourcePath": "src/internal/facets/named-unicode.ts",
+      "export": "UnicodeRange16Operations",
+      "capabilities": [
+        "make"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "unicode|kind=2|receiver=|name=Range32",
+      "specifier": "@gotots/gostdlib/internal/facets/named-unicode.js",
+      "sourcePath": "src/internal/facets/named-unicode.ts",
+      "export": "UnicodeRange32Operations",
+      "capabilities": [
+        "make"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "unicode|kind=2|receiver=|name=RangeTable",
+      "specifier": "@gotots/gostdlib/internal/facets/named-unicode.js",
+      "sourcePath": "src/internal/facets/named-unicode.ts",
+      "export": "UnicodeRangeTableOperations",
+      "capabilities": [
+        "make",
+        "storage"
+      ],
+      "storageExport": "UnicodeRangeTableStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=Cond",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncCondOperations",
+      "capabilities": [
+        "copy",
+        "equal",
+        "hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncCondStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=Map",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncMapOperations",
+      "capabilities": [
+        "copy",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncMapStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=Mutex",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncMutexOperations",
+      "capabilities": [
+        "assign",
+        "copy",
+        "equal",
+        "hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncMutexStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=Once",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncOnceOperations",
+      "capabilities": [
+        "copy",
+        "equal",
+        "hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncOnceStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=Pool",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncPoolOperations",
+      "capabilities": [
+        "copy",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncPoolStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=RWMutex",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncRWMutexOperations",
+      "capabilities": [
+        "copy",
+        "equal",
+        "hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncRWMutexStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync|kind=2|receiver=|name=WaitGroup",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync.js",
+      "sourcePath": "src/internal/facets/named-sync.ts",
+      "export": "SyncWaitGroupOperations",
+      "capabilities": [
+        "copy",
+        "equal",
+        "hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncWaitGroupStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Bool",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync-atomic.js",
+      "sourcePath": "src/internal/facets/named-sync-atomic.ts",
+      "export": "SyncAtomicBoolOperations",
+      "capabilities": [
+		"copy",
+		"equal",
+		"hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncAtomicBoolStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Int32",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync-atomic.js",
+      "sourcePath": "src/internal/facets/named-sync-atomic.ts",
+      "export": "SyncAtomicInt32Operations",
+      "capabilities": [
+		"copy",
+		"equal",
+		"hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncAtomicInt32Storage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Int64",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync-atomic.js",
+      "sourcePath": "src/internal/facets/named-sync-atomic.ts",
+      "export": "SyncAtomicInt64Operations",
+      "capabilities": [
+		"copy",
+		"equal",
+		"hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncAtomicInt64Storage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Uint32",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync-atomic.js",
+      "sourcePath": "src/internal/facets/named-sync-atomic.ts",
+      "export": "SyncAtomicUint32Operations",
+      "capabilities": [
+		"copy",
+		"equal",
+		"hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncAtomicUint32Storage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "sync/atomic|kind=2|receiver=|name=Uint64",
+      "specifier": "@gotots/gostdlib/internal/facets/named-sync-atomic.js",
+      "sourcePath": "src/internal/facets/named-sync-atomic.ts",
+      "export": "SyncAtomicUint64Operations",
+      "capabilities": [
+		"copy",
+		"equal",
+		"hash",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "SyncAtomicUint64Storage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "strings|kind=2|receiver=|name=Reader",
+      "specifier": "@gotots/gostdlib/internal/facets/named-strings.js",
+      "sourcePath": "src/internal/facets/named-strings.ts",
+      "export": "StringsReaderOperations",
+      "capabilities": [
+        "assign",
+        "copy",
+        "equal",
+        "hash"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "strings|kind=2|receiver=|name=Builder",
+      "specifier": "@gotots/gostdlib/internal/facets/named-strings.js",
+      "sourcePath": "src/internal/facets/named-strings.ts",
+      "export": "StringsBuilderOperations",
+      "capabilities": [
+        "assign",
+        "copy",
+        "storage",
+        "zero"
+      ],
+      "storageExport": "StringsBuilderStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=Description",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime-metrics.js",
+      "sourcePath": "src/internal/facets/named-runtime-metrics.ts",
+      "export": "RuntimeMetricsDescriptionOperations",
+      "capabilities": [
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=Sample",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime-metrics.js",
+      "sourcePath": "src/internal/facets/named-runtime-metrics.ts",
+      "export": "RuntimeMetricsSampleOperations",
+      "capabilities": [
+        "copy",
+        "make",
+        "zero"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "runtime/metrics|kind=2|receiver=|name=Value",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime-metrics.js",
+      "sourcePath": "src/internal/facets/named-runtime-metrics.ts",
+      "export": "RuntimeMetricsValueOperations",
+      "capabilities": [
+        "zero"
+      ]
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "bufio|kind=4|receiver=*bufio.Reader|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "BufioReaderRead",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "bufio|kind=4|receiver=*bufio.Writer|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "BufioWriterWrite",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "bytes|kind=4|receiver=*bytes.Buffer|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "BytesBufferRead",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "bytes|kind=4|receiver=*bytes.Buffer|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "BytesBufferWrite",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "compress/gzip|kind=4|receiver=*compress/gzip.Reader|name=Close",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "GzipReaderClose",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "compress/gzip|kind=4|receiver=*compress/gzip.Reader|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "GzipReaderRead",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "io/fs|kind=4|receiver=*io/fs.PathError|name=Error",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "IoFsPathErrorError",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "os|kind=4|receiver=*os.File|name=Close",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "OsFileClose",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "os|kind=4|receiver=*os.File|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "OsFileRead",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "os|kind=4|receiver=*os.File|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "OsFileWrite",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "strings|kind=4|receiver=*strings.Builder|name=Write",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "StringsBuilderWrite",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "strings|kind=4|receiver=*strings.Reader|name=Read",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-io.js",
+      "sourcePath": "src/internal/facets/recovery-io.ts",
+      "export": "StringsReaderRead",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "cmp|kind=4|receiver=|name=Compare",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "CmpCompare",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "syscall|kind=4|receiver=syscall.Errno|name=Error",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "SyscallErrnoError",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "syscall|kind=4|receiver=syscall.Errno|name=Is",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "SyscallErrnoIs",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "syscall|kind=4|receiver=syscall.Signal|name=Signal",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "SyscallSignalSignal",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "syscall|kind=4|receiver=syscall.Signal|name=String",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "SyscallSignalString",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=*time.Ticker|name=Stop",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTickerStop",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Duration|name=String",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeDurationString",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=*time.ParseError|name=Error",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeParseErrorError",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Time|name=AppendText",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTimeAppendText",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Time|name=IsZero",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTimeIsZero",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Time|name=MarshalJSON",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTimeMarshalJSON",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Time|name=MarshalText",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTimeMarshalText",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "time|kind=4|receiver=time.Time|name=String",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-value.js",
+      "sourcePath": "src/internal/facets/recovery-value.ts",
+      "export": "TimeTimeString",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=PutUint16",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianPutUint16",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=PutUint32",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianPutUint32",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=PutUint64",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianPutUint64",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=String",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianString",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint16",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianUint16",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint32",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianUint32",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.bigEndian|name=Uint64",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryBigEndianUint64",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=PutUint16",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianPutUint16",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=PutUint32",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianPutUint32",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=PutUint64",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianPutUint64",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=String",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianString",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=Uint16",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianUint16",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=Uint32",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianUint32",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "encoding/binary|kind=4|receiver=encoding/binary.littleEndian|name=Uint64",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-encoding-binary.js",
+      "sourcePath": "src/internal/facets/recovery-encoding-binary.ts",
+      "export": "BinaryLittleEndianUint64",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync|kind=4|receiver=*sync.Mutex|name=Unlock",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncMutexUnlock",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync|kind=4|receiver=*sync.Pool|name=Put",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncPoolPut",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync|kind=4|receiver=*sync.RWMutex|name=RUnlock",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncRWMutexRUnlock",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync|kind=4|receiver=*sync.RWMutex|name=Unlock",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncRWMutexUnlock",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync|kind=4|receiver=*sync.WaitGroup|name=Done",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncWaitGroupDone",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {
+      "kind": "recovery-callable",
+      "sourceIdentity": "sync/atomic|kind=4|receiver=*sync/atomic.Bool|name=Store",
+      "specifier": "@gotots/gostdlib/internal/facets/recovery-sync.js",
+      "sourcePath": "src/internal/facets/recovery-sync.ts",
+      "export": "SyncAtomicBoolStore",
+      "capabilities": [
+        "recovery"
+      ],
+      "effect": "sync"
+    },
+    {"kind":"generic-callable-kernel","sourceIdentity":"cmp|kind=4|receiver=|name=Compare","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-cmp-kernel.js","sourcePath":"src/internal/facets/generic-cmp-kernel.ts","export":"CmpCompareKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"cmp|kind=4|receiver=|name=Or","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-cmp-kernel.js","sourcePath":"src/internal/facets/generic-cmp-kernel.ts","export":"CmpOrKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"errors|kind=4|receiver=|name=AsType","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-errors-kernel.js","sourcePath":"src/internal/facets/generic-errors-kernel.ts","export":"ErrorsAsTypeKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Clone","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsCloneKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Copy","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsCopyKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Equal","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsEqualKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=EqualFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":3,"facet":"logical"},{"typeParameter":4,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsEqualFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Keys","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsKeysKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"maps|kind=4|receiver=|name=Values","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-maps-kernel.js","sourcePath":"src/internal/facets/generic-maps-kernel.ts","export":"MapsValuesKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=AppendSeq","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesAppendSeqKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=BinarySearch","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesBinarySearchKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=BinarySearchFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"},{"typeParameter":2,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesBinarySearchFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Clip","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesClipKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Clone","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCloneKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Collect","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCollectKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Compact","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompactKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=CompactFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompactFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Compare","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompareKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=CompareFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":2,"facet":"container-storage"},{"typeParameter":3,"facet":"logical"},{"typeParameter":3,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesCompareFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Concat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesConcatKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Contains","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesContainsKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=ContainsFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesContainsFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Delete","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesDeleteKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=DeleteFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesDeleteFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Equal","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesEqualKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=EqualFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":2,"facet":"logical"},{"typeParameter":2,"facet":"container-storage"},{"typeParameter":3,"facet":"logical"},{"typeParameter":3,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesEqualFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Grow","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesGrowKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Index","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesIndexKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=IndexFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesIndexFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Insert","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesInsertKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Repeat","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesRepeatKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Replace","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"logical"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesReplaceKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Reverse","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesReverseKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Sort","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=SortFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=SortStableFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortStableFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Sorted","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortedKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=SortedFunc","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":0,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesSortedFuncKernel"},
+    {"kind":"generic-callable-kernel","sourceIdentity":"slices|kind=4|receiver=|name=Values","capabilities":["kernel"],"genericTypeArguments":[{"typeParameter":0,"facet":"logical"},{"typeParameter":1,"facet":"logical"},{"typeParameter":1,"facet":"container-storage"}],"specifier":"@gotots/gostdlib/internal/facets/generic-slices-kernel.js","sourcePath":"src/internal/facets/generic-slices-kernel.ts","export":"SlicesValuesKernel"}
+  ],
+  "genericOperationSets": [
+    {
+      "sourceIdentity": "cmp|kind=4|receiver=|name=Compare",
+      "operations": [
+        {
+          "kind": "binary-less",
+          "parameters": [
+            { "kind": "type-parameter", "typeParameter": 0 },
+            { "kind": "type-parameter", "typeParameter": 0 }
+          ],
+          "results": [
+            { "kind": "bool" }
+          ]
+        },
+        {
+          "kind": "equal",
+          "parameters": [
+            { "kind": "type-parameter", "typeParameter": 0 },
+            { "kind": "type-parameter", "typeParameter": 0 }
+          ],
+          "results": [
+            { "kind": "bool" }
+          ]
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "cmp|kind=4|receiver=|name=Or",
+      "operations": [
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "equal", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }, { "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "bool" }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "zero", "parameters": [], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "errors|kind=4|receiver=|name=AsType",
+      "operations": [
+        {
+          "kind": "interface-assert-ok",
+          "parameters": [
+            { "kind": "callable-parameter", "callableParameter": 0 }
+          ],
+          "results": [
+            { "kind": "type-parameter", "typeParameter": 0 },
+            { "kind": "bool" }
+          ]
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "maps|kind=4|receiver=|name=Clone",
+      "operations": [
+        {
+          "kind": "convert",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }],
+          "results": [{
+            "kind": "map",
+            "key": { "kind": "type-parameter", "typeParameter": 1 },
+            "element": { "kind": "type-parameter", "typeParameter": 2 }
+          }]
+        },
+        {
+          "kind": "convert",
+          "parameters": [{
+            "kind": "map",
+            "key": { "kind": "type-parameter", "typeParameter": 1 },
+            "element": { "kind": "type-parameter", "typeParameter": 2 }
+          }],
+          "results": [{ "kind": "type-parameter", "typeParameter": 0 }]
+        },
+        {
+          "kind": "copy",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }],
+          "results": [{ "kind": "type-parameter", "typeParameter": 1 }]
+        },
+        {
+          "kind": "copy",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 2 }],
+          "results": [{ "kind": "type-parameter", "typeParameter": 2 }]
+        },
+        {
+          "kind": "map-construct",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 2 }],
+          "results": [{
+            "kind": "map",
+            "key": { "kind": "type-parameter", "typeParameter": 1 },
+            "element": { "kind": "type-parameter", "typeParameter": 2 }
+          }]
+        },
+        {
+          "kind": "zero",
+          "parameters": [],
+          "results": [{ "kind": "type-parameter", "typeParameter": 2 }]
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "maps|kind=4|receiver=|name=Copy",
+      "operations": [
+        {
+          "kind": "convert",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }],
+          "results": [{
+            "kind": "map",
+            "key": { "kind": "type-parameter", "typeParameter": 2 },
+            "element": { "kind": "type-parameter", "typeParameter": 3 }
+          }]
+        },
+        {
+          "kind": "convert",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }],
+          "results": [{
+            "kind": "map",
+            "key": { "kind": "type-parameter", "typeParameter": 2 },
+            "element": { "kind": "type-parameter", "typeParameter": 3 }
+          }]
+        },
+        {
+          "kind": "copy",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 2 }],
+          "results": [{ "kind": "type-parameter", "typeParameter": 2 }]
+        },
+        {
+          "kind": "copy",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 3 }],
+          "results": [{ "kind": "type-parameter", "typeParameter": 3 }]
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "maps|kind=4|receiver=|name=Equal",
+      "operations": [
+        {
+          "kind": "convert",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }],
+          "results": [{
+            "kind": "map",
+            "key": { "kind": "type-parameter", "typeParameter": 2 },
+            "element": { "kind": "type-parameter", "typeParameter": 3 }
+          }]
+        },
+        {
+          "kind": "convert",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }],
+          "results": [{
+            "kind": "map",
+            "key": { "kind": "type-parameter", "typeParameter": 2 },
+            "element": { "kind": "type-parameter", "typeParameter": 3 }
+          }]
+        },
+        {
+          "kind": "equal",
+          "parameters": [
+            { "kind": "type-parameter", "typeParameter": 3 },
+            { "kind": "type-parameter", "typeParameter": 3 }
+          ],
+          "results": [{ "kind": "bool" }]
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "maps|kind=4|receiver=|name=EqualFunc",
+      "operations": [
+        {
+          "kind": "convert",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }],
+          "results": [{
+            "kind": "map",
+            "key": { "kind": "type-parameter", "typeParameter": 2 },
+            "element": { "kind": "type-parameter", "typeParameter": 3 }
+          }]
+        },
+        {
+          "kind": "convert",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }],
+          "results": [{
+            "kind": "map",
+            "key": { "kind": "type-parameter", "typeParameter": 2 },
+            "element": { "kind": "type-parameter", "typeParameter": 4 }
+          }]
+        },
+        {
+          "kind": "copy",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 3 }],
+          "results": [{ "kind": "type-parameter", "typeParameter": 3 }]
+        },
+        {
+          "kind": "copy",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 4 }],
+          "results": [{ "kind": "type-parameter", "typeParameter": 4 }]
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "maps|kind=4|receiver=|name=Keys",
+      "operations": [
+        {
+          "kind": "convert",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }],
+          "results": [{
+            "kind": "map",
+            "key": { "kind": "type-parameter", "typeParameter": 1 },
+            "element": { "kind": "type-parameter", "typeParameter": 2 }
+          }]
+        },
+        {
+          "kind": "copy",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }],
+          "results": [{ "kind": "type-parameter", "typeParameter": 1 }]
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "maps|kind=4|receiver=|name=Values",
+      "operations": [
+        {
+          "kind": "convert",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }],
+          "results": [{
+            "kind": "map",
+            "key": { "kind": "type-parameter", "typeParameter": 1 },
+            "element": { "kind": "type-parameter", "typeParameter": 2 }
+          }]
+        },
+        {
+          "kind": "copy",
+          "parameters": [{ "kind": "type-parameter", "typeParameter": 2 }],
+          "results": [{ "kind": "type-parameter", "typeParameter": 2 }]
+        }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=AppendSeq",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "convert", "parameters": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "to-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "zero", "parameters": [], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearch",
+      "operations": [
+        { "kind": "binary-less", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }, { "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "bool" }] },
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "equal", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }, { "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "bool" }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearchFunc",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=Collect",
+      "operations": [
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "to-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=Compare",
+      "operations": [
+        { "kind": "binary-less", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }, { "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "bool" }] },
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "equal", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }, { "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "bool" }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=CompareFunc",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 2 } }] },
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 3 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 2 }], "results": [{ "kind": "type-parameter", "typeParameter": 2 }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 3 }], "results": [{ "kind": "type-parameter", "typeParameter": 3 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 2 }], "results": [{ "kind": "type-parameter", "typeParameter": 2 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 3 }], "results": [{ "kind": "type-parameter", "typeParameter": 3 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=Contains",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "equal", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }, { "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "bool" }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=ContainsFunc",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=DeleteFunc",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "convert", "parameters": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "to-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "zero", "parameters": [], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=Equal",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "equal", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }, { "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "bool" }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=EqualFunc",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 2 } }] },
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 3 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 2 }], "results": [{ "kind": "type-parameter", "typeParameter": 2 }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 3 }], "results": [{ "kind": "type-parameter", "typeParameter": 3 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 2 }], "results": [{ "kind": "type-parameter", "typeParameter": 2 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 3 }], "results": [{ "kind": "type-parameter", "typeParameter": 3 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=Grow",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "convert", "parameters": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "to-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "zero", "parameters": [], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=Index",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "equal", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }, { "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "bool" }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=IndexFunc",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=Sort",
+      "operations": [
+        { "kind": "binary-less", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }, { "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "bool" }] },
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "equal", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }, { "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "bool" }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "to-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=SortFunc",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "to-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=SortStableFunc",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "to-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=Sorted",
+      "operations": [
+        { "kind": "binary-less", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }, { "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "bool" }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "equal", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }, { "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "bool" }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "to-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=SortedFunc",
+      "operations": [
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] },
+        { "kind": "to-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "type-parameter", "typeParameter": 0 }] }
+      ]
+    },
+    {
+      "sourceIdentity": "slices|kind=4|receiver=|name=Values",
+      "operations": [
+        { "kind": "convert", "parameters": [{ "kind": "type-parameter", "typeParameter": 0 }], "results": [{ "kind": "slice", "element": { "kind": "type-parameter", "typeParameter": 1 } }] },
+        { "kind": "copy", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] },
+        { "kind": "from-container-storage", "parameters": [{ "kind": "type-parameter", "typeParameter": 1 }], "results": [{ "kind": "type-parameter", "typeParameter": 1 }] }
+      ]
+    }
+  ]
+}

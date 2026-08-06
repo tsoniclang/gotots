@@ -7,8 +7,10 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
+	"github.com/tsoniclang/gotots/internal/emit/deferredregistry"
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -62,42 +64,124 @@ func EmitDeferred(
 	if err := validateResults(context, source, signature, true); err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	callee, static, err := emitCallee(
-		context,
-		children,
-		source.Fun,
-		signature,
-	)
+	directOwner, direct := calleeObject(context.TypesInfo(), source.Fun)
+	literal, directLiteral := directFunctionLiteral(source.Fun)
+	var providerRecovery api.RecoveryCallableReference
+	providerRecoverySelected := false
+	sourceRecovery := false
+	var recoveryRequests []api.RootRequest
+	var err error
+	if direct {
+		providerRecovery, providerRecoverySelected, err =
+			context.Names().RecoveryCallable(directOwner)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !providerRecoverySelected {
+			facet, facetErr := api.NewSourceCallableFacet(directOwner)
+			if facetErr != nil {
+				return api.ExpressionEmission{}, facetErr
+			}
+			observation, observationErr :=
+				context.ObserveRecoveryCallable(facet)
+			if observationErr != nil {
+				return api.ExpressionEmission{}, observationErr
+			}
+			sourceRecovery = observation.Recovery()
+			recoveryRequests = observation.Requests()
+		}
+	}
+	var callee api.ExpressionEmission
+	static := false
+	providerBoundary := false
+	if directLiteral {
+		callee, err = children.Expression(
+			context.
+				WithRole(api.RoleCallCallee).
+				WithExpectedType(signature).
+				WithStaticallySelectedCallable().
+				WithDeferredCallableSelection(),
+			source.Fun,
+		)
+	} else if direct {
+		if providerRecoverySelected {
+			callee = api.DirectExpression(
+				providerRecovery.Expression(context.Factory()),
+				providerRecovery.Requests()...,
+			)
+			providerBoundary = providerRecovery.ProviderBoundary()
+		} else if sourceRecovery {
+			deferredReference, referenceErr :=
+				context.Names().DeferredCallable(directOwner, "")
+			if referenceErr != nil {
+				return api.ExpressionEmission{}, referenceErr
+			}
+			callee = api.DirectExpression(
+				deferredReference.Expression(context.Factory()),
+				deferredReference.Requests()...,
+			)
+		} else {
+			reference, referenceErr := context.Names().Reference(directOwner)
+			if referenceErr != nil {
+				return api.ExpressionEmission{}, referenceErr
+			}
+			callee = api.DirectExpression(
+				reference.Expression(context.Factory()),
+				reference.Requests()...,
+			)
+			providerBoundary = reference.ProviderBoundary()
+		}
+		static = true
+	} else {
+		callee, static, providerBoundary, err = emitCallee(
+			context,
+			children,
+			source.Fun,
+			signature,
+		)
+	}
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	sourceType := context.TypesInfo().TypeOf(source.Fun)
+	if model, defined := definedtype.ResolveCallable(sourceType); defined {
+		providerCarrier, carrierErr := model.ProviderCarrier(
+			context.WithRole(api.RoleCallCallee),
+		)
+		if carrierErr != nil {
+			return api.ExpressionEmission{}, carrierErr
+		}
+		providerBoundary = providerBoundary || providerCarrier
+		callee, err = model.Project(
+			context.WithRole(api.RoleCallCallee),
+			callee,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
 	targetCallee := callee.Value()
 	before := callee.Before()
-	var requests []api.RootRequest
+	requests := recoveryRequests
 	var contractRequests []api.RootRequest
 	cooperative := false
-	literal, directLiteral := directFunctionLiteral(source.Fun)
 	switch {
 	case static:
-		owner, direct := calleeObject(context.TypesInfo(), source.Fun)
-		if !direct {
+		owner := directOwner
+		if !direct || owner == nil {
 			return api.ExpressionEmission{}, &api.InvariantError{
 				Role:   api.RoleCallCallee,
 				Reason: "static deferred callee has no exact function owner",
 			}
 		}
-		control, err := api.NewDirectCallableControlRequest(
-			owner.Origin(),
-			api.CallableControlRecovery,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		requests = append(requests, control)
-		cooperative, contractRequests, err =
-			cooperativecall.SourceContract(context, owner)
-		if err != nil {
-			return api.ExpressionEmission{}, err
+		if providerRecoverySelected {
+			cooperative = providerRecovery.Cooperative()
+		} else {
+			cooperative, contractRequests, err =
+				cooperativecall.SourceContract(context, owner)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
 		}
 	case directLiteral:
 		name, err := context.Names().Temporary(api.TemporaryCallCallee)
@@ -114,21 +198,12 @@ func EmitDeferred(
 			),
 		)
 		targetCallee = context.Factory().Identifier(name)
-		control, err := context.FunctionLiteralControlRequest(
-			literal,
-			api.CallableControlRecovery,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		requests = append(requests, control)
 		cooperative, contractRequests, err =
 			cooperativecall.LiteralContract(context, literal)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
 	default:
-		sourceType := context.TypesInfo().TypeOf(source.Fun)
 		targetType, err := children.RepresentedType(
 			context.WithRole(api.RoleCallCallee),
 			source.Fun,
@@ -137,13 +212,8 @@ func EmitDeferred(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		if _, defined := definedtype.ResolveCallable(sourceType); defined {
-			targetCallee = context.Factory().PropertyAccessExpression(
-				targetCallee,
-				nil,
-				context.Factory().Identifier(definedtype.ValueMember),
-				tsgo.NodeFlagsNone,
-			)
+		if _, defined := definedtype.ResolveCallable(sourceType); defined &&
+			!providerBoundary {
 			targetType, err = callable.EmitType(
 				context.WithRole(api.RoleCallCallee),
 				children,
@@ -186,32 +256,156 @@ func EmitDeferred(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	before = append(before, argumentBefore...)
-	var invocationBefore []tsgo.Statement
-	if !static &&
-		!callable.StaticallyNonNil(context.TypesInfo(), source.Fun) {
-		guard, guardRequests, err := callable.NilGuard(context, targetCallee)
+	if providerBoundary {
+		var providerBefore []tsgo.Statement
+		var providerRequests []api.RootRequest
+		arguments, providerBefore, providerRequests, err =
+			providerboundary.ToProviderArguments(
+				context,
+				children,
+				signature.Params(),
+				arguments,
+			)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		invocationBefore = append(invocationBefore, guard)
-		requests = append(requests, guardRequests...)
+		argumentBefore = append(argumentBefore, providerBefore...)
+		argumentRequests = api.CombineRequests(
+			argumentRequests,
+			providerRequests,
+		)
 	}
-	arguments = append(
-		arguments,
-		context.Factory().Identifier(callable.RecoveryAuthorityName),
-	)
-	call := context.Factory().CallExpression(
-		targetCallee,
-		nil,
-		nil,
-		arguments,
-		tsgo.NodeFlagsNone,
-	)
+	before = append(before, argumentBefore...)
+	literalRecovery := directLiteral &&
+		context.CallableControlFor(literal).Recovery()
+	var call tsgo.Expression
+	if providerRecoverySelected {
+		arguments = append(
+			arguments,
+			context.Factory().Identifier(callable.RecoveryAuthorityName),
+		)
+		call = context.Factory().CallExpression(
+			targetCallee,
+			nil,
+			nil,
+			arguments,
+			tsgo.NodeFlagsNone,
+		)
+	} else if sourceRecovery || literalRecovery {
+		arguments = append(
+			[]tsgo.Expression{
+				context.Factory().Identifier(callable.RecoveryAuthorityName),
+			},
+			arguments...,
+		)
+		call = context.Factory().CallExpression(
+			targetCallee,
+			nil,
+			nil,
+			arguments,
+			tsgo.NodeFlagsNone,
+		)
+	} else if !static && !directLiteral {
+		registry, registryErr := deferredregistry.Reference(
+			context,
+			source,
+			signature,
+		)
+		if registryErr != nil {
+			return api.ExpressionEmission{}, registryErr
+		}
+		deferredName, nameErr := context.Names().Temporary(
+			api.TemporaryDeferredCall,
+		)
+		if nameErr != nil {
+			return api.ExpressionEmission{}, nameErr
+		}
+		before = append(
+			before,
+			constantDeclaration(
+				context,
+				deferredName,
+				nil,
+				context.Factory().CallExpression(
+					context.Factory().PropertyAccessExpression(
+						registry.Expression(context.Factory()),
+						nil,
+						context.Factory().Identifier(
+							api.DeferredRegistryResolveName,
+						),
+						tsgo.NodeFlagsNone,
+					),
+					nil,
+					nil,
+					[]tsgo.Expression{targetCallee},
+					tsgo.NodeFlagsNone,
+				),
+			),
+		)
+		ordinaryCall := context.Factory().CallExpression(
+			targetCallee,
+			nil,
+			nil,
+			arguments,
+			tsgo.NodeFlagsNone,
+		)
+		guarded, guardRequests, guardErr := callable.DetachedNilGuard(
+			context,
+			targetCallee,
+			ordinaryCall,
+		)
+		if guardErr != nil {
+			return api.ExpressionEmission{}, guardErr
+		}
+		deferredCall := context.Factory().CallExpression(
+			context.Factory().Identifier(deferredName),
+			nil,
+			nil,
+			append(
+				[]tsgo.Expression{
+					context.Factory().Identifier(
+						callable.RecoveryAuthorityName,
+					),
+				},
+				arguments...,
+			),
+			tsgo.NodeFlagsNone,
+		)
+		call = context.Factory().ConditionalExpression(
+			context.Factory().BinaryExpression(
+				nil,
+				context.Factory().Identifier(deferredName),
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+				),
+				context.Factory().Identifier("undefined"),
+			),
+			context.Factory().QuestionToken(),
+			guarded,
+			context.Factory().ColonToken(),
+			deferredCall,
+		)
+		requests = append(
+			requests,
+			api.CombineRequests(
+				registry.Requests(),
+				guardRequests,
+			)...,
+		)
+	} else {
+		call = context.Factory().CallExpression(
+			targetCallee,
+			nil,
+			nil,
+			arguments,
+			tsgo.NodeFlagsNone,
+		)
+	}
 	return deferredInvocation(
 		context,
 		before,
-		invocationBefore,
+		nil,
 		call,
 		cooperative,
 		api.CombineRequests(

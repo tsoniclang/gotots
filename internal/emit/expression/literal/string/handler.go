@@ -15,7 +15,7 @@ func Emit(
 	_ api.ChildEmitter,
 	source *ast.BasicLit,
 ) (api.ExpressionEmission, error) {
-	typeAndValue, ok := context.TypesInfo().Types[source]
+	typeAndValue, ok := context.TypesInfo().TypeAndValue(source)
 	if source.Kind != token.STRING ||
 		!ok ||
 		typeAndValue.Value == nil ||

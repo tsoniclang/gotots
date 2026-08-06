@@ -5,6 +5,8 @@ import (
 	"go/token"
 	"go/types"
 	"testing"
+
+	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
 func TestCalleeObjectRejectsEverySelectedToolchainBuiltin(t *testing.T) {
@@ -18,7 +20,7 @@ func TestCalleeObjectRejectsEverySelectedToolchainBuiltin(t *testing.T) {
 		builtins++
 		identifier := &ast.Ident{Name: name}
 		info.Uses[identifier] = object
-		if actual, ok := calleeObject(info, identifier); ok {
+		if actual, ok := calleeObject(api.DirectTypeInfo(info), identifier); ok {
 			t.Fatalf("builtin %s resolved as source function %v", name, actual)
 		}
 	}
@@ -36,7 +38,7 @@ func TestCalleeObjectRejectsEverySelectedToolchainBuiltin(t *testing.T) {
 	sourcePackage.Scope().Insert(function)
 	identifier := &ast.Ident{Name: "Run"}
 	info.Uses[identifier] = function
-	if actual, ok := calleeObject(info, identifier); !ok || actual != function {
+	if actual, ok := calleeObject(api.DirectTypeInfo(info), identifier); !ok || actual != function {
 		t.Fatalf("source function resolved as %v, %v", actual, ok)
 	}
 }

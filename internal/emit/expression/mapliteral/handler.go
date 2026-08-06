@@ -36,12 +36,11 @@ func Emit(
 					element,
 				)
 		}
-		key, err := emitOperand(
+		key, err := emitMapKey(
 			context.WithRole(api.RoleMapKey),
 			children,
 			entry.Key,
-			mapType.Key(),
-			false,
+			mapType,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -145,6 +144,27 @@ func Emit(
 		target.Value(),
 		target.Requests(),
 	)
+}
+
+func emitMapKey(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Expr,
+	mapType maprepresentation.Model,
+) (api.ExpressionEmission, error) {
+	sourceType := context.TypesInfo().TypeOf(source)
+	if sourceType == nil || !types.AssignableTo(sourceType, mapType.Key()) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	value, err := children.Expression(
+		context.WithExpectedType(mapType.Key()),
+		source,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return mapType.TransferKey(context, source, value)
 }
 
 func emitOperand(

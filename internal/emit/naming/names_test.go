@@ -8,66 +8,12 @@ import (
 	"slices"
 	"testing"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
-
-func TestPortableIdentifierEscapesNonASCIIWithoutChangingASCII(t *testing.T) {
-	for source, expected := range map[string]string{
-		"value":     "value",
-		"π":         "__u3c0_",
-		"Δelta":     "__u394_elta",
-		"class":     "__go_class",
-		"await":     "__go_await",
-		"arguments": "__go_arguments",
-		"__proto__": "__go___proto__",
-	} {
-		if actual := portableIdentifier(source); actual != expected {
-			t.Fatalf("portableIdentifier(%q) = %q, want %q", source, actual, expected)
-		}
-	}
-}
-
-func TestPackageQualifiersAreGloballyUniqueAfterPortableEscaping(t *testing.T) {
-	packages := []*types.Package{
-		types.NewPackage("example.com/first", "π"),
-		types.NewPackage("example.com/second", "__u3c0_"),
-		types.NewPackage("example.com/third", "π"),
-	}
-	registry := NewRegistry()
-	if err := registry.indexPackageQualifiers(packages); err != nil {
-		t.Fatal(err)
-	}
-	seen := make(map[string]*types.Package)
-	for _, sourcePackage := range packages {
-		qualifier := registry.importQualifierByPackage[sourcePackage]
-		if qualifier == "" {
-			t.Fatalf("package %s has no qualifier", sourcePackage.Path())
-		}
-		if previous := seen[qualifier]; previous != nil {
-			t.Fatalf(
-				"packages %s and %s share qualifier %q",
-				previous.Path(),
-				sourcePackage.Path(),
-				qualifier,
-			)
-		}
-		seen[qualifier] = sourcePackage
-	}
-
-	reversed := []*types.Package{packages[2], packages[1], packages[0]}
-	second := NewRegistry()
-	if err := second.indexPackageQualifiers(reversed); err != nil {
-		t.Fatal(err)
-	}
-	for _, sourcePackage := range packages {
-		if registry.importQualifierByPackage[sourcePackage] !=
-			second.importQualifierByPackage[sourcePackage] {
-			t.Fatalf("package %s qualifier depends on input order", sourcePackage.Path())
-		}
-	}
-}
 
 func TestNameOwnerSeparatesShadowAndTemporaryNamespaces(t *testing.T) {
 	packageScope := types.NewScope(nil, token.NoPos, token.NoPos, "package")
@@ -309,21 +255,35 @@ func TestCrossPackageReferenceRequiresItsExactObjectBeforeImporting(t *testing.T
 		t.Fatal(err)
 	}
 	required := errors.New("enqueue mutation sentinel")
-	names := NewOwner(
-		currentPackage.Scope(),
-		&types.Info{Defs: make(map[*ast.Ident]types.Object)},
-		registry,
-	).ForFile(
+	names := testFileNames(
+		t,
+		NewOwner(
+			currentPackage.Scope(),
+			&types.Info{Defs: make(map[*ast.Ident]types.Object)},
+			registry,
+		),
 		sourceFile,
 		currentPackage.Scope(),
 		tsgo.NewFactory(),
 		"modules/current/current.ts",
-		func(actual types.Object) error {
+		stubEnvironmentObserver{requireUse: func(
+			actual types.Object,
+			demand environmentcontract.UseDemand,
+			selection gostdlib.UseSelection,
+		) error {
 			if actual != object {
 				t.Fatalf("required object = %v, want imported Run", actual)
 			}
+			if demand != environmentcontract.UseDemandCallable ||
+				selection.Kind() != gostdlib.UseSelectionNone {
+				t.Fatalf(
+					"required demand/selection = %v/%v, want callable/none",
+					demand,
+					selection.Kind(),
+				)
+			}
 			return required
-		},
+		}},
 	)
 	if _, err := names.Reference(object); !errors.Is(err, required) {
 		t.Fatalf("reference error = %v, want enqueue sentinel", err)
@@ -431,6 +391,50 @@ func TestValueImportDominatesTypeRequestIndependentOfOrder(t *testing.T) {
 	}
 }
 
+func TestNamespaceImportPlacementIsOneStaticBinding(t *testing.T) {
+	factory := tsgo.NewFactory()
+	typeRequest, err := api.NewNamespaceImportRequest(
+		factory,
+		api.ImportPhaseType,
+		"@gotots/gostdlib/strings.js",
+		"strings",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	valueRequest, err := api.NewNamespaceImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"@gotots/gostdlib/strings.js",
+		"strings",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if typeRequest.Owner() != valueRequest.Owner() {
+		t.Fatal("type and value namespace requests have different owners")
+	}
+	placement := targetplacement.New()
+	if err := placement.Apply([]api.RootRequest{
+		typeRequest,
+		valueRequest,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	statements := placement.Statements(factory)
+	if len(statements) != 1 {
+		t.Fatalf("namespace import declarations = %d, want one", len(statements))
+	}
+	declaration := statements[0].(tsgo.ImportDeclaration)
+	clause := declaration.ImportClause()
+	namespace, ok := clause.NamedBindings().(tsgo.NamespaceImport)
+	if !ok ||
+		clause.PhaseModifier() != 0 ||
+		namespace.Name().Text() != "strings" {
+		t.Fatalf("namespace import clause = %#v", clause)
+	}
+}
+
 func TestPrimitiveAliasImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing.T) {
 	sourcePackage := types.NewPackage("example.com/current", "current")
 	packageScope := sourcePackage.Scope()
@@ -454,7 +458,9 @@ func TestPrimitiveAliasImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing
 			{Name: "int32__from_gotots_support"}: reservedAlias,
 		},
 	})
-	names := owner.ForFile(
+	names := testFileNames(
+		t,
+		owner,
 		&ast.File{},
 		packageScope,
 		tsgo.NewFactory(),
@@ -478,7 +484,7 @@ func TestPrimitiveAliasImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing
 	if len(requests) != 1 ||
 		requests[0].ExportedName() != "int32" ||
 		requests[0].LocalName() != expectedLocal ||
-		requests[0].ModulePath() != "../../support/scalars.js" {
+		requests[0].ModulePath() != "../../runtime/scalars.js" {
 		t.Fatalf("primitive request = %#v", requests)
 	}
 	alias, ok := requests[0].PrimitiveAlias()
@@ -510,7 +516,9 @@ func TestRuntimeImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing.T) {
 			{Name: "goStringIndex__from_gotots_runtime"}: reservedAlias,
 		},
 	})
-	names := owner.ForFile(
+	names := testFileNames(
+		t,
+		owner,
 		&ast.File{},
 		packageScope,
 		tsgo.NewFactory(),

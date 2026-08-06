@@ -15,6 +15,7 @@ import (
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -121,12 +122,12 @@ func (owner Owner) Hash(
 	sourceType types.Type,
 	value tsgo.Expression,
 ) (api.ExpressionEmission, error) {
-	if parameter, ok := api.GenericTypeParameter(sourceType); ok {
+	if api.ContainsGenericTypeParameter(sourceType) {
 		return genericoperation.Call(
 			context,
 			source,
 			api.GenericOperationHash,
-			[]types.Type{parameter},
+			[]types.Type{sourceType},
 			[]types.Type{types.Typ[types.Uint32]},
 			[]api.ExpressionEmission{api.DirectExpression(value)},
 		)
@@ -195,7 +196,7 @@ func (owner Owner) Hash(
 				context.Factory().ColonToken(),
 				context.Factory().CallExpression(
 					context.Factory().PropertyAccessExpression(
-						context.Factory().Identifier(reference.Name()),
+						reference.Expression(context.Factory()),
 						nil,
 						context.Factory().Identifier(
 							mapruntime.HashObjectMember,
@@ -212,11 +213,33 @@ func (owner Owner) Hash(
 		), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
-		return (Owner{}).Hash(
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		projected, err := defined.Project(
 			context.WithRole(api.RoleDefinedValue),
+			api.DirectExpression(value),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		result, err := (Owner{}).Hash(
+			operationContext.WithRole(api.RoleDefinedValue),
 			source,
 			defined.Underlying(),
-			defined.Unwrap(context.Factory(), value),
+			projected.Value(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			append(projected.Before(), result.Before()...),
+			result.Value(),
+			api.CombineRequests(
+				projected.Requests(),
+				result.Requests(),
+			),
 		)
 	}
 	if _, ok := complexvalue.Describe(sourceType); ok {
@@ -253,7 +276,7 @@ func (owner Owner) Hash(
 		return api.DirectExpression(
 			context.Factory().CallExpression(
 				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
+					reference.Expression(context.Factory()),
 					nil,
 					context.Factory().Identifier(member),
 					tsgo.NodeFlagsNone,
@@ -293,7 +316,7 @@ func (owner Owner) Hash(
 		}
 		return api.DirectExpression(
 			context.Factory().CallExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				nil,
 				[]tsgo.Expression{value},
@@ -333,7 +356,7 @@ func (owner Owner) Hash(
 				context.Factory().ColonToken(),
 				context.Factory().CallExpression(
 					context.Factory().PropertyAccessExpression(
-						context.Factory().Identifier(reference.Name()),
+						reference.Expression(context.Factory()),
 						nil,
 						context.Factory().Identifier(
 							mapruntime.HashObjectMember,
@@ -392,7 +415,7 @@ func directObjectHash(
 			context.Factory().ColonToken(),
 			context.Factory().CallExpression(
 				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
+					reference.Expression(context.Factory()),
 					nil,
 					context.Factory().Identifier(
 						mapruntime.HashObjectMember,
@@ -423,7 +446,7 @@ func complexHash(
 	call := func(member string, arguments ...tsgo.Expression) tsgo.Expression {
 		return context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(member),
 				tsgo.NodeFlagsNone,
@@ -478,13 +501,17 @@ func hashMember(
 	case basic.Info()&types.IsFloat != 0:
 		return mapruntime.HashNumberMember, true
 	case basic.Info()&types.IsInteger != 0:
-		if _, ok := basictype.PrimitiveAlias(
+		carrier, ok := integervalue.Describe(
 			context.TypesSizes(),
 			basic,
-		); !ok {
+		)
+		if !ok {
 			return "", false
 		}
-		if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
+		if integervalue.UsesBigInt(
+			context.IntegerRepresentation(),
+			carrier,
+		) {
 			return mapruntime.HashBigIntMember, true
 		}
 		return mapruntime.HashNumberMember, true

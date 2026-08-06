@@ -11,7 +11,6 @@ import (
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	complexconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/complex"
 	floatconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/float"
-	integerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/integer"
 	pointerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/pointer"
 	slicearrayconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/slicearray"
 	stringconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/stringvalue"
@@ -23,6 +22,7 @@ import (
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
+	integerconversion "github.com/tsoniclang/gotots/internal/emit/value/integer/conversion"
 	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 )
@@ -35,7 +35,7 @@ func Emit(
 	if source == nil {
 		return api.ExpressionEmission{}, false, nil
 	}
-	calleeFacts, ok := context.TypesInfo().Types[source.Fun]
+	calleeFacts, ok := context.TypesInfo().TypeAndValue(source.Fun)
 	if !ok || !calleeFacts.IsType() {
 		return api.ExpressionEmission{}, false, nil
 	}
@@ -44,9 +44,9 @@ func Emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	targetType := context.TypesInfo().TypeOf(source)
-	resultFacts, resultOK := context.TypesInfo().Types[source]
+	resultFacts, resultOK := context.TypesInfo().TypeAndValue(source)
 	operand := source.Args[0]
-	operandFacts, operandOK := context.TypesInfo().Types[operand]
+	operandFacts, operandOK := context.TypesInfo().TypeAndValue(operand)
 	if targetType == nil ||
 		!resultOK ||
 		resultFacts.Type == nil ||
@@ -107,6 +107,13 @@ func Emit(
 			return api.ExpressionEmission{}, true, err
 		}
 		return target, true, nil
+	}
+	if err := unsafepointerconversion.Prepare(
+		context,
+		sourceType,
+		targetType,
+	); err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
 	operandExpected := operandFacts.Type
 	if _, interfaceTarget := interfacetype.Resolve(targetType); interfaceTarget {
@@ -198,7 +205,12 @@ func Apply(
 	); handled {
 		return target, true, mapErr
 	}
+	sourceOperationContext := context
 	if defined, ok := definedtype.Resolve(sourceType); ok {
+		sourceOperationContext, err = defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
 		operandValue, err = defined.Project(context, operandValue)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
@@ -207,7 +219,12 @@ func Apply(
 	}
 	representedTargetType := targetType
 	targetDefined, wrapsTarget := definedtype.Resolve(targetType)
+	targetOperationContext := context
 	if wrapsTarget {
+		targetOperationContext, err = targetDefined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
 		representedTargetType = targetDefined.Underlying()
 	}
 	var target api.ExpressionEmission
@@ -258,6 +275,8 @@ func Apply(
 		case isInteger(context, representedTargetType):
 			target, err = integerconversion.Convert(
 				context,
+				sourceOperationContext.ScalarABI(),
+				targetOperationContext.ScalarABI(),
 				source,
 				sourceType,
 				representedTargetType,
@@ -266,6 +285,7 @@ func Apply(
 		case isFloat(representedTargetType):
 			target, err = floatconversion.Convert(
 				context,
+				sourceOperationContext.ScalarABI(),
 				source,
 				sourceType,
 				representedTargetType,

@@ -86,10 +86,11 @@ func (s *programSession) reconstructAnonymousStruct(
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
@@ -142,10 +143,12 @@ func (s *programSession) buildAnonymousStructRevision(
 	defer finish()
 	context := builder.context.WithArtifactOwner(owner)
 
-	operations, err := anonymousStructOperations(
-		s.requirements.appliedFor(owner),
-		artifact,
-	)
+	operations, representationFacets, err :=
+		anonymousstructdeclaration.SelectAnonymousRequirements(
+			context.Role(),
+			artifact,
+			s.requirements.appliedFor(owner),
+		)
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -162,15 +165,17 @@ func (s *programSession) buildAnonymousStructRevision(
 		structType,
 		artifact.TargetName(),
 		operations,
+		representationFacets,
 		true,
 	)
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	placement, dependencies, err := s.consumeArtifactRequests(
-		owner,
-		emission.Requests(),
-	)
+	placement, dependencies, requirements, err :=
+		s.consumeArtifactRequests(
+			owner,
+			emission.Requests(),
+		)
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -186,64 +191,10 @@ func (s *programSession) buildAnonymousStructRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
+		requirements:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
-}
-
-func anonymousStructOperations(
-	requirements []api.DeclarationRequirement,
-	artifact *api.GeneratedArtifact,
-) ([]api.NamedStructOperation, error) {
-	var operations []api.NamedStructOperation
-	for _, requirement := range requirements {
-		selected, demand, ok := requirement.AnonymousStruct()
-		if !ok || selected != artifact {
-			return nil, &ScheduleError{
-				Object: artifact.TargetName(),
-				Reason: "anonymous-struct artifact received a foreign requirement",
-			}
-		}
-		switch demand {
-		case api.AnonymousStructDemandDefinition:
-		case api.AnonymousStructDemandZero:
-			operations = append(
-				operations,
-				api.NamedStructOperationZero,
-			)
-		case api.AnonymousStructDemandCopy:
-			operations = append(
-				operations,
-				api.NamedStructOperationCopy,
-			)
-		case api.AnonymousStructDemandEqual:
-			operations = append(
-				operations,
-				api.NamedStructOperationEqual,
-			)
-		case api.AnonymousStructDemandHash:
-			operations = append(
-				operations,
-				api.NamedStructOperationHash,
-			)
-		case api.AnonymousStructDemandConvert:
-			operations = append(
-				operations,
-				api.NamedStructOperationConvert,
-			)
-		case api.AnonymousStructDemandStorage:
-			operations = append(
-				operations,
-				api.NamedStructOperationStorage,
-			)
-		default:
-			return nil, &ScheduleError{
-				Object: artifact.TargetName(),
-				Reason: "anonymous-struct demand is invalid",
-			}
-		}
-	}
-	return operations, nil
 }
 
 func (s *programSession) anonymousStructBuilder() (

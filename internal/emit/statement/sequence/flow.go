@@ -2,7 +2,7 @@ package sequence
 
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
-func targetSequenceFallsThrough(statements []tsgo.Statement) bool {
+func FallsThrough(statements []tsgo.Statement) bool {
 	for _, statement := range statements {
 		if !targetStatementFallsThrough(statement) {
 			return false
@@ -19,9 +19,11 @@ func targetStatementFallsThrough(statement tsgo.Statement) bool {
 		tsgo.ContinueStatement:
 		return false
 	case tsgo.Block:
-		return targetSequenceFallsThrough(statement.Statements())
+		return FallsThrough(statement.Statements())
 	case tsgo.LabeledStatement:
 		return targetStatementFallsThrough(statement.Statement())
+	case tsgo.ForStatement:
+		return statement.Condition() != nil
 	case tsgo.IfStatement:
 		return statement.ElseStatement() == nil ||
 			targetStatementFallsThrough(statement.ThenStatement()) ||

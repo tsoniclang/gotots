@@ -45,7 +45,7 @@ func (owner Owner) Equal(
 		}
 		return api.DirectExpression(
 			context.Factory().CallExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				nil,
 				[]tsgo.Expression{left, right},
@@ -69,27 +69,26 @@ func (owner Owner) Equal(
 		)), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
-		leftValue := api.DirectExpression(left)
-		rightValue := api.DirectExpression(right)
-		var err error
-		if defined.NilCapable() {
-			leftValue, err = defined.Project(context, leftValue)
-			if err == nil {
-				rightValue, err = defined.Project(context, rightValue)
-			}
-		} else {
-			leftValue = api.DirectExpression(
-				defined.Unwrap(context.Factory(), left),
-			)
-			rightValue = api.DirectExpression(
-				defined.Unwrap(context.Factory(), right),
-			)
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
 		}
+		leftValue, err := defined.Project(
+			context.WithRole(api.RoleDefinedValue),
+			api.DirectExpression(left),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		rightValue, err := defined.Project(
+			context.WithRole(api.RoleDefinedValue),
+			api.DirectExpression(right),
+		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
 		result, err := (Owner{}).Equal(
-			context.WithRole(api.RoleDefinedValue),
+			operationContext.WithRole(api.RoleDefinedValue),
 			source,
 			defined.Underlying(),
 			leftValue.Value(),
@@ -98,8 +97,10 @@ func (owner Owner) Equal(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		before := append(leftValue.Before(), rightValue.Before()...)
+		before = append(before, result.Before()...)
 		return api.NewExpressionEmission(
-			result.Before(),
+			before,
 			result.Value(),
 			api.CombineRequests(
 				leftValue.Requests(),
@@ -174,7 +175,7 @@ func (owner Owner) Equal(
 		return api.DirectExpression(
 			context.Factory().CallExpression(
 				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
+					reference.Expression(context.Factory()),
 					nil,
 					context.Factory().Identifier(pointerruntime.EqualName),
 					tsgo.NodeFlagsNone,

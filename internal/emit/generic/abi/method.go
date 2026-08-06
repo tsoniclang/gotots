@@ -124,20 +124,24 @@ func capabilitySlots(
 	operations []*api.GenericOperationContract,
 ) ([]slot, error) {
 	result := make([]slot, 0, len(operations))
-	var previous string
+	seen := make(map[string]struct{}, len(operations))
 	for _, operation := range operations {
 		if !operation.Valid() ||
-			operation.Owner() != owner ||
-			(previous != "" && previous >= operation.Key()) {
+			operation.Owner() != owner {
 			return nil, invariant(
-				"generic capability ABI operations are not canonical",
+				"generic capability ABI operation is invalid",
 			)
 		}
+		if _, duplicate := seen[operation.Key()]; duplicate {
+			return nil, invariant(
+				"generic capability ABI operation is duplicated",
+			)
+		}
+		seen[operation.Key()] = struct{}{}
 		result = append(result, slot{
 			kind:      slotCapability,
 			operation: operation,
 		})
-		previous = operation.Key()
 	}
 	return result, nil
 }

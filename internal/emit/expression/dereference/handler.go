@@ -181,6 +181,6 @@ func zeroFromNew(
 	if !ok {
 		return false
 	}
-	return context.TypesInfo().Uses[identifier] ==
+	return context.TypesInfo().UseOf(identifier) ==
 		types.Universe.Lookup("new")
 }

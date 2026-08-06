@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 )
 
 func Emit(
@@ -14,7 +15,7 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.Ident,
 ) (api.ExpressionEmission, error) {
-	object := context.TypesInfo().Uses[source]
+	object := context.TypesInfo().UseOf(source)
 	if object == nil {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -37,7 +38,8 @@ func Emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if constObject, ok := object.(*types.Const); ok &&
-		constantbinding.IsUntyped(constObject.Type()) {
+		(constantbinding.IsUntyped(constObject.Type()) ||
+			constantbinding.RequiresDeferredBinding(constObject)) {
 		return constantbinding.EmitUse(context, source, constObject)
 	}
 	if variable, ok := object.(*types.Var); ok &&
@@ -48,7 +50,7 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return context.Values().FromStorage(
+		target, err := context.Values().FromStorage(
 			context,
 			source,
 			variable.Type(),
@@ -57,6 +59,18 @@ func Emit(
 				reference.Requests()...,
 			),
 		)
+		if err != nil || !reference.ProviderBoundary() {
+			return target, err
+		}
+		target, _, err = providerboundary.FromProviderValue(
+			context,
+			children,
+			nil,
+			"",
+			variable.Type(),
+			target,
+		)
+		return target, err
 	}
 	if variable, ok := object.(*types.Var); ok {
 		if selected, exists, err := context.AddressableStorage().Read(
@@ -87,10 +101,19 @@ func Emit(
 		return api.ExpressionEmission{}, err
 	}
 	target := api.DirectExpression(
-		context.Factory().Identifier(reference.Name()),
+		reference.Expression(context.Factory()),
 		reference.Requests()...,
 	)
 	if function, ok := object.(*types.Func); ok {
+		if reference.ProviderBoundary() {
+			return providerboundary.FromProviderSourceCallable(
+				context,
+				children,
+				source,
+				function,
+				target,
+			)
+		}
 		return cooperativecall.AdaptSourceValue(
 			context,
 			children,
@@ -111,7 +134,7 @@ func emitPredeclaredBoolean(
 	context api.Context,
 	source *ast.Ident,
 ) (api.ExpressionEmission, error) {
-	typeAndValue := context.TypesInfo().Types[source]
+	typeAndValue, _ := context.TypesInfo().TypeAndValue(source)
 	sourceType := context.TypesInfo().TypeOf(source)
 	targetType := context.ExpectedType()
 	if typeAndValue.Value == nil ||

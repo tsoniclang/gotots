@@ -166,6 +166,10 @@ func sourceArtifactOwnerKey(source types.Object) (string, error) {
 	return identity.String(), nil
 }
 
+func SourceObjectKey(source types.Object) (string, error) {
+	return sourceArtifactOwnerKey(source)
+}
+
 func sourceFunctionIsExact(
 	source *types.Func,
 	signature *types.Signature,

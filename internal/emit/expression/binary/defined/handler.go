@@ -28,8 +28,13 @@ func Emit(
 	if !ok {
 		return api.ExpressionEmission{}, false, nil
 	}
+	operationContext, err := model.OperationContext(context)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	left, err := operand(
 		context.WithRole(api.RoleBinaryLeft),
+		operationContext.WithRole(api.RoleBinaryLeft),
 		children,
 		source.X,
 		model,
@@ -39,6 +44,7 @@ func Emit(
 	}
 	right, err := operand(
 		context.WithRole(api.RoleBinaryRight),
+		operationContext.WithRole(api.RoleBinaryRight),
 		children,
 		source.Y,
 		model,
@@ -63,9 +69,10 @@ func Emit(
 		}
 	}
 	target, handled, err := apply(
-		context,
+		operationContext,
 		source.Op,
 		underlying,
+		context.TypesInfo().TypeOf(source.Y),
 		operands.Left(),
 		operands.Right(),
 		rightConstant(context, source.Y),
@@ -139,16 +146,17 @@ func operandsBelong(
 
 func operand(
 	context api.Context,
+	operationContext api.Context,
 	children api.ChildEmitter,
 	source ast.Expr,
 	model definedtype.Model,
 ) (api.ExpressionEmission, error) {
 	sourceType := context.TypesInfo().TypeOf(source)
 	if literalConstant(source) {
-		facts, ok := context.TypesInfo().Types[source]
+		facts, ok := context.TypesInfo().TypeAndValue(source)
 		if ok && facts.Value != nil {
 			return constantvalue.EmitValue(
-				context,
+				operationContext,
 				source,
 				model.Underlying(),
 				facts.Value,
@@ -156,8 +164,10 @@ func operand(
 		}
 	}
 	expected := sourceType
+	projectContextual := false
 	if types.AssignableTo(sourceType, model.Type()) {
 		expected = model.Type()
+		projectContextual = true
 	}
 	target, err := children.Expression(
 		context.WithExpectedType(expected),
@@ -167,11 +177,9 @@ func operand(
 		return api.ExpressionEmission{}, err
 	}
 	if sourceModel, ok := definedtype.ResolveBasic(sourceType); ok {
-		target, err = api.NewExpressionEmission(
-			target.Before(),
-			sourceModel.Unwrap(context.Factory(), target.Value()),
-			target.Requests(),
-		)
+		target, err = sourceModel.Project(context, target)
+	} else if projectContextual {
+		target, err = model.Project(context, target)
 	}
 	return target, err
 }
@@ -198,6 +206,7 @@ func apply(
 	context api.Context,
 	operator token.Token,
 	underlying *types.Basic,
+	rightType types.Type,
 	left api.ExpressionEmission,
 	right api.ExpressionEmission,
 	rightConstant constant.Value,
@@ -206,6 +215,21 @@ func apply(
 		context.TypesSizes(),
 		underlying,
 	); ok {
+		rightCarrier := carrier
+		if operator == token.SHL || operator == token.SHR {
+			if basic, ok := types.Unalias(rightType).(*types.Basic); ok &&
+				basic.Info()&types.IsUntyped != 0 {
+				rightType = types.Default(rightType)
+			}
+			var rightOK bool
+			rightCarrier, rightOK = integervalue.DescribeUnderlying(
+				context.TypesSizes(),
+				rightType,
+			)
+			if !rightOK {
+				return api.ExpressionEmission{}, false, nil
+			}
+		}
 		if (operator == token.SHL || operator == token.SHR) &&
 			rightConstant == nil {
 			if !integervalue.SupportsVariableShift(
@@ -219,6 +243,7 @@ func apply(
 				context,
 				operator,
 				carrier,
+				rightCarrier,
 				left,
 				right,
 			)
@@ -235,6 +260,7 @@ func apply(
 			context,
 			operator,
 			carrier,
+			rightCarrier,
 			left,
 			right,
 		)
@@ -271,6 +297,7 @@ func ApplyUnderlying(
 	context api.Context,
 	operator token.Token,
 	underlying *types.Basic,
+	rightType types.Type,
 	left api.ExpressionEmission,
 	right api.ExpressionEmission,
 	rightConstant constant.Value,
@@ -279,6 +306,7 @@ func ApplyUnderlying(
 		context,
 		operator,
 		underlying,
+		rightType,
 		left,
 		right,
 		rightConstant,
@@ -318,7 +346,7 @@ func integerOperation(
 }
 
 func rightConstant(context api.Context, source ast.Expr) constant.Value {
-	facts, ok := context.TypesInfo().Types[source]
+	facts, ok := context.TypesInfo().TypeAndValue(source)
 	if !ok {
 		return nil
 	}

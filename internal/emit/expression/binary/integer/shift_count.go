@@ -42,11 +42,7 @@ func projectDefinedShiftCount(
 				source.Y,
 			)
 	}
-	return api.NewExpressionEmission(
-		target.Before(),
-		model.Unwrap(context.Factory(), target.Value()),
-		target.Requests(),
-	)
+	return model.Project(context.WithRole(api.RoleBinaryRight), target)
 }
 
 func isDefinedIntegerShiftCount(
@@ -63,4 +59,11 @@ func isDefinedIntegerShiftCount(
 	}
 	_, ok = integervalue.Describe(sizes, underlying)
 	return ok
+}
+
+func shiftCountCarrier(
+	sizes types.Sizes,
+	sourceType types.Type,
+) (integervalue.Carrier, bool) {
+	return integervalue.DescribeUnderlying(sizes, sourceType)
 }

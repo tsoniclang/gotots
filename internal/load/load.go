@@ -8,18 +8,20 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
+
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 )
 
 type Request struct {
 	Directory            string
 	Pattern              string
 	ContractDependencies bool
+	BuildProfile         BuildProfile
 }
 
 type File struct {
@@ -47,6 +49,7 @@ type Package struct {
 	typesPackage  *types.Package
 	typesInfo     *types.Info
 	typesSizes    types.Sizes
+	embeds        map[*types.Var]EmbedValue
 	program       *Program
 }
 
@@ -57,6 +60,7 @@ type Program struct {
 	byPath              map[string]*Package
 	byTypes             map[*types.Package]*Package
 	environmentByTypes  map[*types.Package]*Package
+	buildProfile        BuildProfile
 }
 
 type PackageKind uint8
@@ -109,12 +113,18 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 	if request.Pattern == "" {
 		return nil, &Error{Reason: "pattern is empty"}
 	}
+	buildProfile, err := resolveBuildProfile(request.BuildProfile)
+	if err != nil {
+		return nil, err
+	}
 
 	fileSet := token.NewFileSet()
 	loaded, err := packages.Load(&packages.Config{
-		Context: ctx,
-		Dir:     request.Directory,
-		Fset:    fileSet,
+		Context:    ctx,
+		Dir:        request.Directory,
+		Fset:       fileSet,
+		Env:        selectedBuildEnvironment(buildProfile),
+		BuildFlags: buildProfile.BuildFlags(),
 		Mode: packages.NeedName |
 			packages.NeedFiles |
 			packages.NeedCompiledGoFiles |
@@ -124,7 +134,9 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 			packages.NeedSyntax |
 			packages.NeedTypesInfo |
 			packages.NeedTypesSizes |
-			packages.NeedModule,
+			packages.NeedModule |
+			packages.NeedEmbedFiles |
+			packages.NeedEmbedPatterns,
 	}, request.Pattern)
 	if err != nil {
 		return nil, &Error{Pattern: request.Pattern, Reason: err.Error()}
@@ -179,8 +191,9 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 			map[*types.Package]*Package,
 			len(environmentPackages),
 		),
+		buildProfile: buildProfile,
 	}
-	toolchainKey := currentToolchainKey()
+	toolchainKey := currentToolchainKey(buildProfile)
 	byLoaded := make(map[*packages.Package]*Package, len(sourcePackages))
 	for _, current := range sourcePackages {
 		sourcePackage, err := wrapPackage(request.Pattern, current, fileSet)
@@ -280,11 +293,12 @@ func wrapEnvironmentPackage(
 	}, nil
 }
 
-func currentToolchainKey() string {
-	digest := sha256.Sum256([]byte(
-		runtime.Version() + "\x00" + runtime.GOOS + "\x00" + runtime.GOARCH,
-	))
-	return hex.EncodeToString(digest[:])
+func currentToolchainKey(profile BuildProfile) string {
+	key, err := environmentcontract.ToolchainKey(profile)
+	if err != nil {
+		panic(err)
+	}
+	return key
 }
 
 func moduleContractKey(modulePath string, moduleVersion string) string {
@@ -328,6 +342,13 @@ func wrapPackage(
 		modulePath = selected.Module.Path
 		moduleVersion = selected.Module.Version
 	}
+	embeds, err := resolvePackageEmbeds(selected)
+	if err != nil {
+		return nil, &Error{
+			Pattern: pattern,
+			Reason:  selected.PkgPath + ": " + err.Error(),
+		}
+	}
 	return &Package{
 		path:          selected.PkgPath,
 		name:          selected.Name,
@@ -339,6 +360,7 @@ func wrapPackage(
 		typesPackage:  selected.Types,
 		typesInfo:     selected.TypesInfo,
 		typesSizes:    selected.TypesSizes,
+		embeds:        embeds,
 	}, nil
 }
 
@@ -431,6 +453,13 @@ func (p *Program) PackageForTypes(source *types.Package) *Package {
 
 func (p *Program) EnvironmentForTypes(source *types.Package) *Package {
 	return p.environmentByTypes[source]
+}
+
+func (p *Program) BuildProfile() BuildProfile {
+	if p == nil {
+		return BuildProfile{}
+	}
+	return p.buildProfile
 }
 
 func packageProblems(roots []*packages.Package) []string {

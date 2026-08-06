@@ -21,6 +21,7 @@ func Build(
 	valueName string,
 	runtimeValueName string,
 	recoveryName string,
+	deferPopName string,
 	errorTokenName string,
 	runtimeErrorTokenName string,
 ) (tsgo.Statement, error) {
@@ -37,6 +38,8 @@ func Build(
 		), nil
 	case api.RuntimeRecovery:
 		return recovery(factory, recoveryName, panicName, valueName), nil
+	case api.RuntimeDeferPop:
+		return deferPop(factory, deferPopName, panicName), nil
 	default:
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}

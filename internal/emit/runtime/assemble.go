@@ -1,21 +1,22 @@
 package runtime
 
 import (
-	"fmt"
 	"slices"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimearray "github.com/tsoniclang/gotots/internal/emit/runtime/array"
 	complexruntime "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
 	conversionruntime "github.com/tsoniclang/gotots/internal/emit/runtime/conversion"
+	deferredregistryruntime "github.com/tsoniclang/gotots/internal/emit/runtime/deferredregistry"
+	emptystructruntime "github.com/tsoniclang/gotots/internal/emit/runtime/emptystruct"
 	floatruntime "github.com/tsoniclang/gotots/internal/emit/runtime/float"
+	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
 	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
-	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
-	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
-	panicnilruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panicnil"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	storagefacetruntime "github.com/tsoniclang/gotots/internal/emit/runtime/storagefacet"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
+	unsafecodecruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafecodec"
+	unsaferuntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafeoperation"
 	unsafepointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafepointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -53,12 +54,32 @@ func Build(
 	factory tsgo.Factory,
 	module api.RuntimeModule,
 	symbols []api.RuntimeSymbol,
+	concurrency api.ConcurrencySemantics,
 ) ([]Definition, error) {
 	if module == api.RuntimeModuleInvalid {
 		return nil, &AssemblyError{Reason: "runtime module is invalid"}
 	}
 	if len(symbols) == 0 {
 		return nil, &AssemblyError{Reason: "runtime symbol set is empty"}
+	}
+	if !concurrency.Valid() {
+		return nil, &AssemblyError{Reason: "runtime concurrency profile is invalid"}
+	}
+	if module == api.RuntimeModuleScalar {
+		if len(symbols) != 1 || symbols[0] != api.RuntimeAwaitable {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "scalar runtime requires its one exact symbol",
+			}
+		}
+		definition, err := NewDefinition(
+			api.RuntimeAwaitable,
+			awaitableType(factory),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
 	}
 	if module == api.RuntimeModuleString {
 		panicContract, err := api.RuntimeContract(api.RuntimePanic)
@@ -89,17 +110,57 @@ func Build(
 		}
 		return definitions, nil
 	}
-	if module == api.RuntimeModulePointer {
-		if len(symbols) == 0 ||
-			len(symbols) > 2 ||
-			symbols[0] != api.RuntimePointer ||
-			(len(symbols) == 2 && symbols[1] != api.RuntimePointerHash) {
+	if module == api.RuntimeModuleStorage {
+		definitions := make([]Definition, 0, len(symbols))
+		for _, symbol := range symbols {
+			statement, err := storagefacetruntime.Build(factory, symbol)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(symbol, statement)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
+	if module == api.RuntimeModuleDeferredRegistry {
+		if len(symbols) != 1 || symbols[0] != api.RuntimeDeferredRegistry {
 			return nil, &AssemblyError{
 				Module: module,
-				Reason: "pointer runtime requires exactly RuntimePointer",
+				Reason: "deferred registry runtime requires its one exact symbol",
 			}
 		}
-		contract, err := api.RuntimeContract(api.RuntimePointer)
+		interfaceValue, err := api.RuntimeContract(api.RuntimeInterfaceValue)
+		if err != nil {
+			return nil, err
+		}
+		contract, err := api.RuntimeContract(api.RuntimeDeferredRegistry)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(
+			api.RuntimeDeferredRegistry,
+			deferredregistryruntime.Build(
+				factory,
+				contract.ExportedName(),
+				interfaceValue.ExportedName(),
+			),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
+	}
+	if module == api.RuntimeModuleDenseIndex {
+		if len(symbols) != 1 || symbols[0] != api.RuntimeDenseIndex {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "dense-index runtime requires exactly RuntimeDenseIndex",
+			}
+		}
+		contract, err := api.RuntimeContract(api.RuntimeDenseIndex)
 		if err != nil {
 			return nil, err
 		}
@@ -108,8 +169,8 @@ func Build(
 			return nil, err
 		}
 		definition, err := NewDefinition(
-			api.RuntimePointer,
-			pointerruntime.Build(
+			api.RuntimeDenseIndex,
+			indexedstorage.Build(
 				factory,
 				contract.ExportedName(),
 				panicContract.ExportedName(),
@@ -118,31 +179,10 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
-		definitions := []Definition{definition}
-		if len(symbols) == 1 {
-			return definitions, nil
-		}
-		hashContract, err := api.RuntimeContract(api.RuntimePointerHash)
-		if err != nil {
-			return nil, err
-		}
-		mapHashContract, err := api.RuntimeContract(api.RuntimeMapHash)
-		if err != nil {
-			return nil, err
-		}
-		hashDefinition, err := NewDefinition(
-			api.RuntimePointerHash,
-			pointerruntime.Hash(
-				factory,
-				hashContract.ExportedName(),
-				contract.ExportedName(),
-				mapHashContract.ExportedName(),
-			),
-		)
-		if err != nil {
-			return nil, err
-		}
-		return append(definitions, hashDefinition), nil
+		return []Definition{definition}, nil
+	}
+	if module == api.RuntimeModulePointer {
+		return buildPointer(factory, symbols)
 	}
 	if module == api.RuntimeModuleArray {
 		if symbols[0] != api.RuntimeArray {
@@ -155,9 +195,14 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
+		denseIndexContract, err := api.RuntimeContract(api.RuntimeDenseIndex)
+		if err != nil {
+			return nil, err
+		}
 		statement, err := runtimearray.BuildWithCapabilities(
 			factory,
 			panicContract.ExportedName(),
+			denseIndexContract.ExportedName(),
 			runtimearray.Capabilities{
 				Allocate: slices.Contains(
 					symbols,
@@ -322,6 +367,7 @@ func Build(
 				factory,
 				symbol,
 				contract.ExportedName(),
+				concurrency,
 			)
 			if err != nil {
 				return nil, err
@@ -334,67 +380,93 @@ func Build(
 		}
 		return definitions, nil
 	}
-	if module == api.RuntimeModuleChannel {
-		return buildChannel(factory, symbols)
-	}
-	if module == api.RuntimeModuleUnsafePointer {
-		if len(symbols) != 1 || symbols[0] != api.RuntimeUnsafePointer {
+	if module == api.RuntimeModuleStruct {
+		if len(symbols) != 1 || symbols[0] != api.RuntimeEmptyStruct {
 			return nil, &AssemblyError{
 				Module: module,
-				Reason: "unsafe-pointer runtime requires exactly RuntimeUnsafePointer",
+				Reason: "struct runtime requires exactly RuntimeEmptyStruct",
 			}
 		}
-		contract, err := api.RuntimeContract(api.RuntimeUnsafePointer)
+		contract, err := api.RuntimeContract(api.RuntimeEmptyStruct)
 		if err != nil {
 			return nil, err
 		}
-		panicContract, err := api.RuntimeContract(api.RuntimePanic)
-		if err != nil {
-			return nil, err
-		}
-		statement := unsafepointerruntime.Build(
-			factory,
-			contract.ExportedName(),
-			panicContract.ExportedName(),
-		)
 		definition, err := NewDefinition(
-			api.RuntimeUnsafePointer,
-			statement,
+			api.RuntimeEmptyStruct,
+			emptystructruntime.Build(factory, contract.ExportedName()),
 		)
 		if err != nil {
 			return nil, err
 		}
 		return []Definition{definition}, nil
 	}
-	if module == api.RuntimeModulePanic {
+	if module == api.RuntimeModuleChannel {
+		return buildChannel(factory, symbols)
+	}
+	if module == api.RuntimeModuleUnsafePointer {
+		if len(symbols) != 2 ||
+			symbols[0] != api.RuntimeUnsafeCodec ||
+			symbols[1] != api.RuntimeUnsafePointer {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "unsafe-pointer runtime requires codec before pointer",
+			}
+		}
+		codecContract, err := api.RuntimeContract(api.RuntimeUnsafeCodec)
+		if err != nil {
+			return nil, err
+		}
+		pointerContract, err := api.RuntimeContract(api.RuntimeUnsafePointer)
+		if err != nil {
+			return nil, err
+		}
+		goPointerContract, err := api.RuntimeContract(api.RuntimePointer)
+		if err != nil {
+			return nil, err
+		}
+		pointerMemoryContract, err := api.RuntimeContract(
+			api.RuntimePointerUnsafeMemory,
+		)
+		if err != nil {
+			return nil, err
+		}
 		panicContract, err := api.RuntimeContract(api.RuntimePanic)
 		if err != nil {
 			return nil, err
 		}
-		valueContract, err := api.RuntimeContract(api.RuntimeInterfaceValue)
+		denseIndexContract, err := api.RuntimeContract(api.RuntimeDenseIndex)
 		if err != nil {
 			return nil, err
 		}
-		runtimeValueContract, err := api.RuntimeContract(api.RuntimePanicValue)
-		if err != nil {
-			return nil, err
-		}
-		recoveryContract, err := api.RuntimeContract(api.RuntimeRecovery)
-		if err != nil {
-			return nil, err
-		}
-		errorTokenContract, err := api.RuntimeContract(
-			api.RuntimeErrorMethodToken,
+		codecDefinition, err := NewDefinition(
+			api.RuntimeUnsafeCodec,
+			unsafecodecruntime.Build(
+				factory,
+				codecContract.ExportedName(),
+				panicContract.ExportedName(),
+			),
 		)
 		if err != nil {
 			return nil, err
 		}
-		runtimeErrorTokenContract, err := api.RuntimeContract(
-			api.RuntimeRuntimeErrorToken,
+		pointerDefinition, err := NewDefinition(
+			api.RuntimeUnsafePointer,
+			unsafepointerruntime.Build(
+				factory,
+				pointerContract.ExportedName(),
+				codecContract.ExportedName(),
+				panicContract.ExportedName(),
+				goPointerContract.ExportedName(),
+				pointerMemoryContract.ExportedName(),
+				denseIndexContract.ExportedName(),
+			),
 		)
 		if err != nil {
 			return nil, err
 		}
+		return []Definition{codecDefinition, pointerDefinition}, nil
+	}
+	if module == api.RuntimeModuleUnsafe {
 		definitions := make([]Definition, 0, len(symbols))
 		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
 		for _, symbol := range symbols {
@@ -402,20 +474,11 @@ func Build(
 				return nil, &AssemblyError{
 					Module: module,
 					Symbol: symbol,
-					Reason: "panic runtime symbol is duplicated",
+					Reason: "unsafe runtime symbol is duplicated",
 				}
 			}
 			seen[symbol] = struct{}{}
-			statement, err := panicruntime.Build(
-				factory,
-				symbol,
-				panicContract.ExportedName(),
-				valueContract.ExportedName(),
-				runtimeValueContract.ExportedName(),
-				recoveryContract.ExportedName(),
-				errorTokenContract.ExportedName(),
-				runtimeErrorTokenContract.ExportedName(),
-			)
+			statement, err := unsaferuntime.Build(factory, symbol)
 			if err != nil {
 				return nil, err
 			}
@@ -427,106 +490,12 @@ func Build(
 		}
 		return definitions, nil
 	}
-	if module == api.RuntimeModulePanicNil {
-		errorContract, err := api.RuntimeContract(api.RuntimePanicNilError)
-		if err != nil {
-			return nil, err
-		}
-		valueContract, err := api.RuntimeContract(api.RuntimePanicNilValue)
-		if err != nil {
-			return nil, err
-		}
-		runtimeValueContract, err := api.RuntimeContract(api.RuntimePanicValue)
-		if err != nil {
-			return nil, err
-		}
-		interfaceValueContract, err := api.RuntimeContract(api.RuntimeInterfaceValue)
-		if err != nil {
-			return nil, err
-		}
-		definitions := make([]Definition, 0, len(symbols))
-		seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
-		for _, symbol := range symbols {
-			if _, duplicate := seen[symbol]; duplicate {
-				return nil, &AssemblyError{
-					Module: module,
-					Symbol: symbol,
-					Reason: "panic-nil runtime symbol is duplicated",
-				}
-			}
-			seen[symbol] = struct{}{}
-			statement, err := panicnilruntime.Build(
-				factory,
-				symbol,
-				errorContract.ExportedName(),
-				valueContract.ExportedName(),
-				runtimeValueContract.ExportedName(),
-				interfaceValueContract.ExportedName(),
-			)
-			if err != nil {
-				return nil, err
-			}
-			definition, err := NewDefinition(symbol, statement)
-			if err != nil {
-				return nil, err
-			}
-			definitions = append(definitions, definition)
-		}
-		return definitions, nil
+	if module == api.RuntimeModulePanic ||
+		module == api.RuntimeModulePanicNil {
+		return buildPanic(factory, module, symbols)
 	}
 	return nil, &AssemblyError{
 		Module: module,
 		Reason: "runtime module owner is not installed",
 	}
-}
-
-func buildMap(
-	factory tsgo.Factory,
-	symbols []api.RuntimeSymbol,
-) ([]Definition, error) {
-	panicContract, err := api.RuntimeContract(api.RuntimePanic)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]Definition, 0, len(symbols))
-	seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
-	for _, symbol := range symbols {
-		if _, duplicate := seen[symbol]; duplicate {
-			return nil, &AssemblyError{
-				Module: api.RuntimeModuleMap,
-				Symbol: symbol,
-				Reason: "map runtime symbol is duplicated",
-			}
-		}
-		seen[symbol] = struct{}{}
-		statement, err := mapruntime.Build(
-			factory,
-			symbol,
-			panicContract.ExportedName(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		definition, err := NewDefinition(symbol, statement)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, definition)
-	}
-	return result, nil
-}
-
-type AssemblyError struct {
-	Module api.RuntimeModule
-	Symbol api.RuntimeSymbol
-	Reason string
-}
-
-func (e *AssemblyError) Error() string {
-	return fmt.Sprintf(
-		"assemble runtime module %d symbol %d: %s",
-		e.Module,
-		e.Symbol,
-		e.Reason,
-	)
 }

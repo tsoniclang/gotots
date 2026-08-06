@@ -44,7 +44,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	resultType := context.TypesInfo().TypeOf(source)
-	resultFacts, factsOK := context.TypesInfo().Types[source]
+	resultFacts, factsOK := context.TypesInfo().TypeAndValue(source)
 	if resultType == nil || !factsOK || resultFacts.Type == nil ||
 		!types.Identical(resultFacts.Type, resultType) {
 		return api.ExpressionEmission{}, true,
@@ -70,11 +70,17 @@ func Emit(
 		return target, true, err
 	}
 	classifiedType := resultType
+	operationContext := context
 	defined, definedResult := definedtype.ResolveBasic(resultType)
 	if definedResult {
+		var err error
+		operationContext, err = defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
 		classifiedType = defined.Underlying()
 	}
-	family, ok := classify(context, classifiedType)
+	family, ok := classify(operationContext, classifiedType)
 	if !ok {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -102,28 +108,24 @@ func Emit(
 	}
 	if definedResult {
 		for index, emission := range emissions {
-			unwrapped, unwrapErr := api.NewExpressionEmission(
-				emission.Before(),
-				defined.Unwrap(context.Factory(), emission.Value()),
-				emission.Requests(),
-			)
+			unwrapped, unwrapErr := defined.Project(context, emission)
 			if unwrapErr != nil {
 				return api.ExpressionEmission{}, true, unwrapErr
 			}
 			emissions[index] = unwrapped
 		}
 	}
-	values, before, requests, err := arrange(context, emissions)
+	values, before, requests, err := arrange(operationContext, emissions)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
 	var target tsgo.Expression
 	switch family {
 	case familyNumber:
-		target = mathCall(context, selected, values)
+		target = mathCall(operationContext, selected, values)
 	case familyBigInt, familyString:
 		target, requests, err = runtimeFold(
-			context,
+			operationContext,
 			selected,
 			family,
 			values,
@@ -159,18 +161,14 @@ func classify(
 	context api.Context,
 	sourceType types.Type,
 ) (valueFamily, bool) {
-	if _, ok := integervalue.Describe(
+	if carrier, ok := integervalue.Describe(
 		context.TypesSizes(),
 		sourceType,
 	); ok {
-		switch context.IntegerRepresentation() {
-		case api.IntegerRepresentationNumber:
-			return familyNumber, true
-		case api.IntegerRepresentationBigInt:
+		if integervalue.UsesBigInt(context.IntegerRepresentation(), carrier) {
 			return familyBigInt, true
-		default:
-			return familyInvalid, false
 		}
+		return familyNumber, true
 	}
 	if _, ok := floatvalue.Describe(sourceType); ok {
 		return familyNumber, true
@@ -245,7 +243,7 @@ func mathCall(
 	factory := context.Factory()
 	return factory.CallExpression(
 		factory.PropertyAccessExpression(
-			factory.Identifier("Math"),
+			api.TargetIntrinsicMath.Expression(factory),
 			nil,
 			factory.Identifier(member),
 			tsgo.NodeFlagsNone,
@@ -282,7 +280,7 @@ func runtimeFold(
 	result := values[0]
 	for _, value := range values[1:] {
 		result = context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{result, value},

@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
-	"github.com/tsoniclang/gotots/internal/emit/expression/call/interfaceoperation"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
@@ -15,14 +14,14 @@ import (
 )
 
 func selectedMethod(
-	info *types.Info,
+	info api.TypeInfoView,
 	source ast.Expr,
 ) (*ast.SelectorExpr, *types.Func, *types.Selection, bool) {
 	selector, ok := source.(*ast.SelectorExpr)
-	if !ok || info == nil {
+	if !ok || !info.Valid() {
 		return nil, nil, nil, false
 	}
-	selection := info.Selections[selector]
+	selection := info.SelectionOf(selector)
 	if selection == nil || selection.Kind() != types.MethodVal {
 		return nil, nil, nil, false
 	}
@@ -50,6 +49,22 @@ func emitMethod(
 	if _, constraintReceiver := api.GenericTypeParameter(
 		selection.Recv(),
 	); constraintReceiver {
+		contextualReceiver := selection.Recv()
+		if _, stillOpen := api.GenericTypeParameter(
+			contextualReceiver,
+		); !stillOpen {
+			return emitConcretizedConstraintMethod(
+				context,
+				children,
+				source,
+				selector,
+				method,
+				selection,
+				contextualReceiver,
+				discarded,
+				detached,
+			)
+		}
 		return emitConstraintMethod(
 			context,
 			children,
@@ -88,8 +103,23 @@ func emitMethod(
 			method,
 			selection,
 			signature,
+			discarded,
 			detached,
 		)
+	}
+	target, selected, profileRequests, err := emitProviderProfileMethod(
+		context,
+		children,
+		source,
+		selector,
+		method,
+		selection,
+		signature,
+		discarded,
+		detached,
+	)
+	if selected || err != nil {
+		return target, err
 	}
 	invocation, err := methodcall.Resolve(
 		context,
@@ -137,99 +167,176 @@ func emitMethod(
 		}
 	}
 	before = append(before, argumentBefore...)
-	call, callRequests, err := invocation.Call(
+	invoked, err := invocation.Invoke(
 		context,
+		children,
 		receiverValue,
 		arguments,
-		nil,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	target, err := api.NewExpressionEmission(
-		before,
-		call,
+	target, err = api.NewExpressionEmission(
+		append(before, invoked.Before()...),
+		invoked.Value(),
 		api.CombineRequests(
 			receiver.Requests(),
 			receiverRequests,
 			argumentRequests,
-			callRequests,
+			invoked.Requests(),
+			profileRequests,
 		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	if detached {
-		return cooperativecall.DetachedGenericCall(
+		target, err = cooperativecall.DetachedGenericCall(
+			context,
+			source,
+			invocation.Facet(),
+			target,
+		)
+	} else {
+		target, err = cooperativecall.GenericCall(
 			context,
 			source,
 			invocation.Facet(),
 			target,
 		)
 	}
-	return cooperativecall.GenericCall(
-		context,
-		source,
-		invocation.Facet(),
-		target,
-	)
+	if err != nil || discarded {
+		return target, err
+	}
+	return invocation.FromProviderResults(context, children, target)
 }
 
-func emitInterfaceMethod(
+func emitConcretizedConstraintMethod(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CallExpr,
 	selector *ast.SelectorExpr,
-	method *types.Func,
-	selection *types.Selection,
-	signature *types.Signature,
+	contractMethod *types.Func,
+	contractSelection *types.Selection,
+	receiverType types.Type,
+	discarded bool,
 	detached bool,
 ) (api.ExpressionEmission, error) {
-	receiver, err := children.Expression(
+	methodSet := types.NewMethodSet(receiverType)
+	selected := methodSet.Lookup(contractMethod.Pkg(), contractMethod.Name())
+	expected := contractSelection.Type()
+	if selected == nil || selected.Kind() != types.MethodVal ||
+		!types.Identical(selected.Type(), expected) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	method, ok := selected.Obj().(*types.Func)
+	signature, signatureOK := method.Type().(*types.Signature)
+	if !ok || !signatureOK || signature.Recv() == nil {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	invocation, err := methodcall.Resolve(
+		context,
+		children,
+		source,
+		method,
+		signature,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	concrete := invocation.Signature()
+	if err := validateResults(context, source, concrete, discarded); err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	root, err := children.Expression(
 		context.
 			WithRole(api.RoleReceiverValue).
-			WithExpectedType(selection.Recv()),
+			WithExpectedType(receiverType),
 		selector.X,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	receiver, _, resolvedMethod, err := selectionvalue.DirectMethodSetReceiver(
+		context,
+		children,
+		selector,
+		selected,
+		root,
+	)
+	if err != nil || resolvedMethod != method {
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	arguments, argumentBefore, argumentRequests, err := emitArguments(
 		context,
 		children,
 		source,
-		signature,
-		true,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	target, err := interfaceoperation.Apply(
-		context,
-		children,
-		selector.X,
-		selection.Recv(),
-		receiver,
-		method,
-		arguments,
-		argumentBefore,
-		argumentRequests,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	callableReference, err :=
-		context.Names().InterfaceMethodCallable(method)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return cooperativecall.InterfaceMethodCall(
-		context,
-		source,
-		callableReference,
-		target,
+		concrete,
 		detached,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	before := receiver.Before()
+	receiverValue := receiver.Value()
+	var receiverRequests []api.RootRequest
+	if len(argumentBefore) != 0 || detached {
+		receiverValue, receiverRequests, before, err = captureReceiver(
+			context,
+			receiver,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	before = append(before, argumentBefore...)
+	invoked, err := invocation.Invoke(
+		context,
+		children,
+		receiverValue,
+		arguments,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	target, err := api.NewExpressionEmission(
+		append(before, invoked.Before()...),
+		invoked.Value(),
+		api.CombineRequests(
+			receiver.Requests(),
+			receiverRequests,
+			argumentRequests,
+			invoked.Requests(),
+		),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if detached {
+		target, err = cooperativecall.DetachedGenericCall(
+			context,
+			source,
+			invocation.Facet(),
+			target,
+		)
+	} else {
+		target, err = cooperativecall.GenericCall(
+			context,
+			source,
+			invocation.Facet(),
+			target,
+		)
+	}
+	if err != nil || discarded {
+		return target, err
+	}
+	return invocation.FromProviderResults(context, children, target)
 }
 
 func emitConstraintMethod(

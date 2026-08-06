@@ -3,20 +3,124 @@ package emit
 import (
 	"fmt"
 	"go/types"
-	"sort"
+	"slices"
+	"strings"
 
+	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
-	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+// declarationRecord is the canonical root scheduling record for one
+// declaration. It owns the declaration lifecycle together with the joined
+// closed use demands, the sole implementation route, the typed provider
+// selections, and whether the settled route emits a declaration artifact.
+// There is no other use ledger.
+type declarationRecord struct {
+	queued     bool
+	emitted    bool
+	emitting   bool
+	demands    uint16
+	route      environmentidentity.ImplementationRoute
+	selections []gostdlib.UseSelection
+}
+
+var declarationDemandOrder = []environmentidentity.UseDemand{
+	environmentidentity.UseDemandTypeContract,
+	environmentidentity.UseDemandValue,
+	environmentidentity.UseDemandCallable,
+	environmentidentity.UseDemandState,
+	environmentidentity.UseDemandInitializer,
+	environmentidentity.UseDemandInterfaceCapability,
+	environmentidentity.UseDemandCallbackCapability,
+	environmentidentity.UseDemandRuntimeFacet,
+}
+
+func (r *declarationRecord) joinDemand(
+	demand environmentidentity.UseDemand,
+) {
+	r.demands |= 1 << uint16(demand)
+}
+
+func (r *declarationRecord) demandList() []environmentidentity.UseDemand {
+	result := make(
+		[]environmentidentity.UseDemand,
+		0,
+		len(declarationDemandOrder),
+	)
+	for _, demand := range declarationDemandOrder {
+		if r.demands&(1<<uint16(demand)) != 0 {
+			result = append(result, demand)
+		}
+	}
+	return result
+}
+
+func (r *declarationRecord) joinSelection(selection gostdlib.UseSelection) {
+	if selection.Kind() == gostdlib.UseSelectionNone {
+		return
+	}
+	if slices.Contains(r.selections, selection) {
+		return
+	}
+	r.selections = append(r.selections, selection)
+	slices.SortFunc(r.selections, compareUseSelections)
+}
+
+// compareUseSelections orders typed provider selections structurally so the
+// settled evidence is deterministic without flattening identity to strings.
+func compareUseSelections(left, right gostdlib.UseSelection) int {
+	if left.Kind() != right.Kind() {
+		if left.Kind() < right.Kind() {
+			return -1
+		}
+		return 1
+	}
+	leftKind, leftCapability, _ := left.Facet()
+	rightKind, rightCapability, _ := right.Facet()
+	if leftKind != rightKind {
+		return strings.Compare(string(leftKind), string(rightKind))
+	}
+	if leftCapability != rightCapability {
+		return strings.Compare(
+			string(leftCapability),
+			string(rightCapability),
+		)
+	}
+	leftKey, _ := left.ProfileKey()
+	rightKey, _ := right.ProfileKey()
+	return strings.Compare(leftKey, rightKey)
+}
+
+// joinRoute settles the sole implementation route: the first observation
+// sets it, repeated identical observations succeed, and a different route
+// fails immediately.
+func (r *declarationRecord) joinRoute(
+	object types.Object,
+	route environmentidentity.ImplementationRoute,
+) error {
+	if r.route == environmentidentity.RouteInvalid {
+		r.route = route
+		return nil
+	}
+	if r.route == route {
+		return nil
+	}
+	return &ScheduleError{
+		Object: object.Name(),
+		Reason: "environment declaration selected implementation route " +
+			route.String() + " but already settled " + r.route.String(),
+	}
+}
+
 type scheduler struct {
 	queue   []types.Object
-	pending map[types.Object]struct{}
-	emitted map[types.Object]struct{}
+	records map[types.Object]*declarationRecord
 }
 
 type ScheduleError struct {
@@ -33,19 +137,26 @@ func (e *ScheduleError) Error() string {
 
 func newScheduler() *scheduler {
 	return &scheduler{
-		pending: make(map[types.Object]struct{}),
-		emitted: make(map[types.Object]struct{}),
+		records: make(map[types.Object]*declarationRecord),
 	}
 }
 
+func (s *scheduler) record(object types.Object) *declarationRecord {
+	existing := s.records[object]
+	if existing == nil {
+		existing = &declarationRecord{}
+		s.records[object] = existing
+	}
+	return existing
+}
+
 func (s *scheduler) enqueue(object types.Object) {
-	if _, done := s.emitted[object]; done {
+	record := s.record(object)
+	record.emitting = true
+	if record.emitted || record.queued {
 		return
 	}
-	if _, queued := s.pending[object]; queued {
-		return
-	}
-	s.pending[object] = struct{}{}
+	record.queued = true
 	s.queue = append(s.queue, object)
 }
 
@@ -55,16 +166,35 @@ func (s *scheduler) next() (types.Object, bool) {
 	}
 	object := s.queue[0]
 	s.queue = s.queue[1:]
-	delete(s.pending, object)
-	s.emitted[object] = struct{}{}
+	record := s.records[object]
+	record.queued = false
+	record.emitted = true
 	return object, true
 }
 
 func (s *scheduler) hasPending() bool {
-	return len(s.queue) != 0 || len(s.pending) != 0
+	if len(s.queue) != 0 {
+		return true
+	}
+	for _, record := range s.records {
+		if record.queued {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *programSession) scheduleDeclarationRequirement(
+	requirement api.DeclarationRequirement,
+) error {
+	if err := s.prepareDeclarationRequirement(requirement); err != nil {
+		return err
+	}
+	s.requirements.enqueue(requirement)
+	return nil
+}
+
+func (s *programSession) prepareDeclarationRequirement(
 	requirement api.DeclarationRequirement,
 ) error {
 	if s.sealed {
@@ -76,9 +206,6 @@ func (s *programSession) scheduleDeclarationRequirement(
 	if !requirement.Valid() {
 		return &ScheduleError{Reason: "declaration requirement is invalid"}
 	}
-	if handled, err := s.applyEnvironmentRequirement(requirement); handled {
-		return err
-	}
 	if artifact, generated := requirement.GeneratedArtifact(); generated {
 		if err := s.validateGeneratedArtifact(artifact); err != nil {
 			return err
@@ -86,13 +213,19 @@ func (s *programSession) scheduleDeclarationRequirement(
 	}
 	owner := requirement.Owner()
 	if sourceOwner, sourceOwned := owner.Source(); sourceOwned {
-		if _, ok := s.sites[sourceOwner]; !ok {
+		_, sourceDeclared := s.sites[sourceOwner]
+		environmentDeclared := s.environmentArtifactSource(sourceOwner)
+		if !sourceDeclared && !environmentDeclared {
 			return &ScheduleError{
 				Object: requirementOwnerName(requirement),
 				Reason: "declaration requirement owner has no source declaration",
 			}
 		}
-		if err := s.require(sourceOwner); err != nil {
+		if err := s.RequireUse(
+			sourceOwner,
+			environmentcontract.RequirementUseDemand(requirement),
+			gostdlib.NoUseSelection(),
+		); err != nil {
 			return err
 		}
 	} else if sourceTypes, _, initializerOwned := owner.PackageInitializer(); initializerOwned {
@@ -126,24 +259,37 @@ func (s *programSession) scheduleDeclarationRequirement(
 			return err
 		}
 	}
-	s.requirements.enqueue(requirement)
 	return nil
 }
 
 func (s *programSession) applyDeclarationRequirements(
+	owner api.ArtifactOwner,
 	requirements []api.DeclarationRequirement,
+	removed bool,
 ) error {
 	if s.sealed {
 		return &ScheduleError{
 			Reason: "declaration requirements applied after target files were sealed",
 		}
 	}
-	if len(requirements) == 0 {
-		return &ScheduleError{Reason: "declaration requirement batch is empty"}
-	}
-	owner := requirements[0].Owner()
 	if !owner.Valid() {
 		return &ScheduleError{Reason: "declaration requirement owner is invalid"}
+	}
+	if removed {
+		if s.requirementRemovalOwner.Valid() {
+			return &ScheduleError{
+				Object: owner.Name(),
+				Reason: "declaration requirement removal transaction is nested",
+			}
+		}
+		s.requirementRemovalOwner = owner
+		defer func() {
+			s.requirementRemovalOwner = api.ArtifactOwner{}
+		}()
+	}
+	if sourceOwner, sourceOwned := owner.Source(); sourceOwned &&
+		s.environmentArtifactSource(sourceOwner) {
+		return s.applyEnvironmentRequirementSet(sourceOwner, requirements)
 	}
 	if generatedOwner, ok := owner.Generated(); ok {
 		for _, requirement := range requirements {
@@ -169,6 +315,10 @@ func (s *programSession) applyDeclarationRequirements(
 					Reason: "generated-artifact requirement was not accepted by its owner",
 				}
 			}
+		}
+		if removed && len(requirements) == 0 &&
+			generatedOwner.Placement() == api.GeneratedArtifactPlacementCompilation {
+			return s.retireCompilationGeneratedArtifact(generatedOwner)
 		}
 		return s.reconstructGeneratedArtifact(generatedOwner)
 	}
@@ -243,6 +393,7 @@ type artifactRevision struct {
 	statements        []tsgo.Statement
 	placement         *targetplacement.Owner
 	dependencies      []api.ArtifactDependency
+	requirements      []api.DeclarationRequirement
 	eagerDependencies []api.ArtifactOwner
 	contract          artifactstate.Contract
 	classContribution *classMemberContribution
@@ -343,10 +494,11 @@ func (s *programSession) buildArtifactRevision(
 		}
 		requests = append(requests, request)
 	}
-	placement, dependencies, err := s.consumeArtifactRequests(
-		artifactOwner,
-		requests,
-	)
+	placement, dependencies, declarationRequirements, err :=
+		s.consumeArtifactRequests(
+			artifactOwner,
+			requests,
+		)
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -365,28 +517,56 @@ func (s *programSession) buildArtifactRevision(
 	var contract artifactstate.Contract
 	switch result.Disposition() {
 	case api.DeclarationDispositionMaterialized:
-		contract, err = artifactstate.ProjectContract(s.factory, statements)
+		publicName, nameErr := names.Declare(owner)
+		if nameErr != nil {
+			err = nameErr
+			break
+		}
+		contract, err = artifactstate.ProjectSourceContract(
+			s.factory,
+			publicName,
+			result.AdditionalPackageBindings(),
+			statements,
+		)
 	case api.DeclarationDispositionCoverageOnly:
 		contract, err = artifactstate.ProjectCoverageContract(
 			s.factory,
 			statements,
 		)
 	case api.DeclarationDispositionClassMemberContribution:
-		if contribution == nil || len(statements) != 0 {
+		if contribution == nil {
 			err = &ScheduleError{
 				Object: owner.Name(),
 				Reason: "class-member artifact lost its contribution",
 			}
 			break
 		}
-		contract, err = artifactstate.ProjectClassMemberContract(
+		contract, err = artifactstate.ProjectClassMemberArtifactContract(
 			s.factory,
 			contribution.members,
+			statements,
 		)
 	default:
 		err = &ScheduleError{
 			Object: owner.Name(),
 			Reason: "declaration emission disposition is invalid",
+		}
+	}
+	if err == nil {
+		if function, callable := owner.(*types.Func); callable {
+			recovery, recoveryErr := sourceCallableRecoveryRequirement(
+				function,
+				requirements,
+			)
+			if recoveryErr != nil {
+				err = recoveryErr
+			} else {
+				contract, err = artifactstate.WithCallableRecovery(
+					contract,
+					s.factory,
+					recovery,
+				)
+			}
 		}
 	}
 	if err != nil {
@@ -396,191 +576,10 @@ func (s *programSession) buildArtifactRevision(
 		statements:        statements,
 		placement:         placement,
 		dependencies:      dependencies,
+		requirements:      declarationRequirements,
 		eagerDependencies: eagerDeclarationDependencies(owner, dependencies),
 		contract:          contract,
 		classContribution: contribution,
 		temporaryStart:    temporaryStart,
 	}, nil
-}
-
-func (s *programSession) consumeArtifactRequests(
-	consumer api.ArtifactOwner,
-	requests []api.RootRequest,
-) (*targetplacement.Owner, []api.ArtifactDependency, error) {
-	placement := targetplacement.New()
-	imports := make([]api.RootRequest, 0, len(requests))
-	dependencies := make([]api.ArtifactDependency, 0, len(requests))
-	err := api.WalkRootRequests(requests, func(request api.RootRequest) error {
-		switch request.Kind() {
-		case api.RootRequestImport:
-			imports = append(imports, request)
-		case api.RootRequestDeclarationRequirement:
-			requirement, ok := request.DeclarationRequirement()
-			if !ok {
-				return &ScheduleError{
-					Object: consumer.Name(),
-					Reason: "declaration requirement is invalid",
-				}
-			}
-			if err := s.scheduleDeclarationRequirement(requirement); err != nil {
-				return err
-			}
-		case api.RootRequestArtifactDependency:
-			dependency, ok := request.ArtifactDependency()
-			if !ok {
-				return &ScheduleError{
-					Object: consumer.Name(),
-					Reason: "artifact dependency is invalid",
-				}
-			}
-			sourceObject, sourceProvider := dependency.Provider().Source()
-			if sourceProvider {
-				_, sourceProvider = s.sites[sourceObject]
-				sourceProvider = sourceProvider ||
-					s.environmentArtifactSource(sourceObject)
-			}
-			generated, generatedProvider := dependency.Provider().Generated()
-			if generatedProvider {
-				generatedProvider =
-					s.validateGeneratedArtifact(generated) == nil &&
-						(generated.Placement() ==
-							api.GeneratedArtifactPlacementCompilation ||
-							generated.Placement() ==
-								api.GeneratedArtifactPlacementContract)
-			}
-			if !sourceProvider && !generatedProvider {
-				return &ScheduleError{
-					Object: dependency.Provider().Name(),
-					Reason: "artifact dependency provider has no reconstructible declaration",
-				}
-			}
-			if sourceProvider {
-				if err := s.require(sourceObject); err != nil {
-					return err
-				}
-			}
-			dependencies = append(dependencies, dependency)
-		default:
-			return &ScheduleError{
-				Object: consumer.Name(),
-				Reason: "root request kind is invalid",
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := placement.Apply(imports); err != nil {
-		return nil, nil, err
-	}
-	return placement, dependencies, nil
-}
-
-func (s *programSession) reconstructArtifact(owner types.Object) error {
-	if s.sealed {
-		return &ScheduleError{
-			Object: owner.Name(),
-			Reason: "target artifact reconstructed after target files were sealed",
-		}
-	}
-	site, ok := s.sites[owner]
-	if !ok {
-		return &ScheduleError{
-			Object: owner.Name(),
-			Reason: "dirty target artifact lost its source declaration",
-		}
-	}
-	builder, err := s.builder(site)
-	if err != nil {
-		return err
-	}
-	artifactOwner := api.MustSourceArtifactOwner(owner)
-	index, ok := builder.indexByOwner[artifactOwner]
-	if !ok {
-		return &ScheduleError{
-			Object: owner.Name(),
-			Reason: "dirty target artifact was not emitted first",
-		}
-	}
-	declaration := &builder.declarations[index]
-	revision, err := s.buildArtifactRevision(
-		builder,
-		site,
-		owner,
-		declaration.temporaryStart,
-		true,
-	)
-	if err != nil {
-		return err
-	}
-	if err := s.artifacts.Commit(
-		artifactOwner,
-		revision.contract,
-		revision.dependencies,
-	); err != nil {
-		return err
-	}
-	s.commitClassMemberContribution(owner, revision.classContribution)
-	s.artifacts.DiscardDirty(artifactOwner)
-	declaration.statements = revision.statements
-	declaration.placement = revision.placement
-	declaration.eagerDependencies = revision.eagerDependencies
-	declaration.reconstructions++
-	return nil
-}
-
-func eagerDeclarationDependencies(
-	consumer types.Object,
-	dependencies []api.ArtifactDependency,
-) []api.ArtifactOwner {
-	if _, eager := consumer.(*types.Const); !eager {
-		return nil
-	}
-	seen := make(map[api.ArtifactOwner]struct{})
-	result := make([]api.ArtifactOwner, 0, len(dependencies))
-	for _, dependency := range dependencies {
-		provider := dependency.Provider()
-		if _, sourceOwned := provider.Source(); !sourceOwned ||
-			provider == api.MustSourceArtifactOwner(consumer) {
-			continue
-		}
-		if _, duplicate := seen[provider]; duplicate {
-			continue
-		}
-		seen[provider] = struct{}{}
-		result = append(result, provider)
-	}
-	sort.Slice(result, func(left, right int) bool {
-		return emitordering.CompareArtifactOwners(
-			result[left],
-			result[right],
-		) < 0
-	})
-	return result
-}
-
-func (s *programSession) reconstructScheduledArtifact(
-	owner api.ArtifactOwner,
-) error {
-	if _, ok := owner.PackageAssembly(); ok {
-		return s.reconstructPackageExports(owner)
-	}
-	if generated, ok := owner.Generated(); ok {
-		return s.reconstructGeneratedArtifact(generated)
-	}
-	if _, _, ok := owner.PackageInitializer(); ok {
-		return s.reconstructPackageInitializer(owner)
-	}
-	source, ok := owner.Source()
-	if !ok {
-		return &ScheduleError{Reason: "dirty target artifact owner is invalid"}
-	}
-	if s.environmentArtifactSource(source) {
-		return s.reconstructEnvironmentArtifact(source)
-	}
-	if variable, ok := source.(*types.Var); ok {
-		return s.reconstructPackageStorage(owner, variable)
-	}
-	return s.reconstructArtifact(source)
 }

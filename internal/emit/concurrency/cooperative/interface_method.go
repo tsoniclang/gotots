@@ -8,10 +8,9 @@ import (
 )
 
 type interfaceMethodObservations struct {
-	facets      []api.CallableFacet
-	cooperative []bool
-	any         bool
-	requests    []api.RootRequest
+	facets   []api.CallableFacet
+	any      bool
+	requests []api.RootRequest
 }
 
 func InterfaceMethodContract(
@@ -25,7 +24,8 @@ func InterfaceMethodContract(
 	if err != nil {
 		return false, nil, err
 	}
-	return observations.any, observations.requests, nil
+	return context.ConcurrencySemantics() ==
+		api.ConcurrencySemanticsCooperative, observations.requests, nil
 }
 
 func ProviderInterfaceMethodContracts(
@@ -34,11 +34,9 @@ func ProviderInterfaceMethodContracts(
 	references []api.InterfaceMethodCallableReference,
 ) (bool, bool, []api.RootRequest, error) {
 	if _, source := provider.SourceFunction(); !source {
-		if _, profile := provider.GenericProfile(); !profile {
-			return false, false, nil, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "interface-method provider facet is invalid",
-			}
+		return false, false, nil, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "interface-method provider facet is invalid",
 		}
 	}
 	observation, err := context.ObserveCooperativeCallable(provider)
@@ -46,10 +44,9 @@ func ProviderInterfaceMethodContracts(
 		return false, false, nil, err
 	}
 	providers := interfaceMethodObservations{
-		facets:      []api.CallableFacet{provider},
-		cooperative: []bool{observation.Cooperative()},
-		any:         observation.Cooperative(),
-		requests:    observation.Requests(),
+		facets:   []api.CallableFacet{provider},
+		any:      observation.Cooperative(),
+		requests: observation.Requests(),
 	}
 	return joinInterfaceMethodContracts(context, providers, references)
 }
@@ -90,20 +87,10 @@ func InterfaceMethodValueContract(
 		abiReference.Requests(),
 		abiObservation.Requests(),
 	)
-	if providers.any && !abiObservation.Cooperative() {
-		abiFacet, facetErr := context.CallableABIFacet(abiReference)
-		if facetErr != nil {
-			return false, false, nil, facetErr
-		}
-		selection, selectionErr :=
-			api.NewCooperativeCallableRequest(abiFacet)
-		if selectionErr != nil {
-			return false, false, nil, selectionErr
-		}
-		requests = append(requests, selection)
-	}
+	canonical := context.ConcurrencySemantics() ==
+		api.ConcurrencySemanticsCooperative
 	return providers.any,
-		providers.any || abiObservation.Cooperative(),
+		canonical,
 		requests,
 		nil
 }
@@ -130,7 +117,8 @@ func InterfaceMethodCall(
 			observations.requests,
 		),
 	)
-	if err != nil || !observations.any {
+	if err != nil || context.ConcurrencySemantics() !=
+		api.ConcurrencySemanticsCooperative {
 		return target, err
 	}
 	return await(context, source, target, !detached, false)
@@ -156,7 +144,8 @@ func GeneratedInterfaceMethodCall(
 			observations.requests,
 		),
 	)
-	if err != nil || !observations.any {
+	if err != nil || context.ConcurrencySemantics() !=
+		api.ConcurrencySemanticsCooperative {
 		return target, err
 	}
 	return await(context, nil, target, true, true)
@@ -173,6 +162,24 @@ func GeneratedInterfaceProviderCall(
 	return await(context, nil, target, false, true)
 }
 
+func SourceInterfaceProviderCall(
+	context api.Context,
+	source ast.Node,
+	target api.ExpressionEmission,
+	providerCooperative bool,
+) (api.ExpressionEmission, error) {
+	if source == nil {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "source interface-provider call has no source construct",
+		}
+	}
+	if !providerCooperative {
+		return target, nil
+	}
+	return await(context, source, target, false, false)
+}
+
 func joinInterfaceMethodContracts(
 	context api.Context,
 	providers interfaceMethodObservations,
@@ -182,24 +189,12 @@ func joinInterfaceMethodContracts(
 	if err != nil {
 		return false, false, nil, err
 	}
-	cooperative := providers.any || targets.any
+	cooperative := context.ConcurrencySemantics() ==
+		api.ConcurrencySemanticsCooperative
 	requests := api.CombineRequests(
 		providers.requests,
 		targets.requests,
 	)
-	if cooperative {
-		for index, facet := range targets.facets {
-			if targets.cooperative[index] {
-				continue
-			}
-			selection, selectionErr :=
-				api.NewCooperativeCallableRequest(facet)
-			if selectionErr != nil {
-				return false, false, nil, selectionErr
-			}
-			requests = append(requests, selection)
-		}
-	}
 	return providers.any, cooperative, requests, nil
 }
 
@@ -245,10 +240,6 @@ func observeInterfaceMethods(
 				return interfaceMethodObservations{}, err
 			}
 			result.facets = append(result.facets, facet)
-			result.cooperative = append(
-				result.cooperative,
-				observation.Cooperative(),
-			)
 			result.any = result.any || observation.Cooperative()
 			result.requests = append(
 				result.requests,

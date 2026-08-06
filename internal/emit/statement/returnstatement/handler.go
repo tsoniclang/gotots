@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
-	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -16,18 +15,25 @@ func Emit(
 	source *ast.ReturnStmt,
 ) (api.StatementEmission, error) {
 	if control, selected := context.IteratorRangeControl(); selected {
+		requests, err := context.IteratorReturnControlRequests()
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 		if !control.Returning() {
-			requests, err := context.IteratorReturnControlRequests()
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
 			return api.NewStatementEmission(nil, requests)
 		}
-		return emitIteratorReturn(
+		result, err := emitIteratorReturn(
 			context,
 			children,
 			source,
 			control,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		return api.NewStatementEmission(
+			result.Statements(),
+			api.CombineRequests(result.Requests(), requests),
 		)
 	}
 	if control, selected := context.ReturnControl(); selected {
@@ -137,16 +143,12 @@ func emitSingle(
 		return api.StatementEmission{}, err
 	}
 	sourceType := context.TypesInfo().TypeOf(source.Results[0])
-	mode := api.ValueTransferRepresentation
-	if _, copied := arrayvalue.Resolve(context, resultType); copied {
-		mode = api.ValueTransferCopy
-	}
 	result, err = context.Values().Transfer(
 		context.WithRole(api.RoleReturnResult),
 		source.Results[0],
 		sourceType,
 		resultType,
-		mode,
+		api.ValueTransferCopy,
 		result,
 	)
 	if err != nil {

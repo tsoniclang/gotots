@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -22,13 +21,13 @@ func Emit(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	request, err := context.CallableControlRequest(
+		api.CallableControlRecovery,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	if !context.CallableControl().Recovery() {
-		request, err := context.CallableControlRequest(
-			api.CallableControlRecovery,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
 		return api.DirectExpression(
 			context.Factory().VoidExpression(
 				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
@@ -36,11 +35,18 @@ func Emit(
 			request,
 		), true, nil
 	}
+	authority, available := context.RecoveryAuthority()
+	if !available {
+		return api.DirectExpression(
+			context.Factory().Identifier("undefined"),
+			request,
+		), true, nil
+	}
 	return api.DirectExpression(
 		context.Factory().ConditionalExpression(
 			context.Factory().BinaryExpression(
 				nil,
-				context.Factory().Identifier(callable.RecoveryAuthorityName),
+				context.Factory().Identifier(authority),
 				nil,
 				context.Factory().BinaryOperatorToken(
 					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
@@ -53,7 +59,7 @@ func Emit(
 			context.Factory().CallExpression(
 				context.Factory().PropertyAccessExpression(
 					context.Factory().Identifier(
-						callable.RecoveryAuthorityName,
+						authority,
 					),
 					nil,
 					context.Factory().Identifier(panicruntime.TakeName),
@@ -65,5 +71,6 @@ func Emit(
 				tsgo.NodeFlagsNone,
 			),
 		),
+		request,
 	), true, nil
 }

@@ -183,6 +183,7 @@ func zeroMethod(
 	canonicalStorage bool,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	arguments := make([]tsgo.Expression, 0, len(fields))
+	var body []tsgo.Statement
 	var requests []api.RootRequest
 	for _, field := range fields {
 		value, err := context.Values().Zero(
@@ -203,24 +204,19 @@ func zeroMethod(
 		if err != nil {
 			return nil, nil, err
 		}
-		if len(value.Before()) != 0 {
-			return nil, nil, api.Unsupported(
-				context.WithRole(api.RoleStructZeroField),
-				api.CategoryDeclaration,
-				source,
-			)
-		}
+		body = append(body, value.Before()...)
 		arguments = append(arguments, value.Value())
 		requests = append(requests, value.Requests()...)
 	}
+	body = append(body, context.Factory().ReturnStatement(
+		construct(context, className, typeArguments, arguments),
+	))
 	return operationMethod(
 		context,
 		memberName,
 		nil,
 		classType,
-		[]tsgo.Statement{context.Factory().ReturnStatement(
-			construct(context, className, typeArguments, arguments),
-		)},
+		body,
 		capabilities,
 		typeParameters,
 	), requests, nil

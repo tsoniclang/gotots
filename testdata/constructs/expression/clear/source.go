@@ -4,7 +4,7 @@ type Box struct {
 	Value int32
 }
 
-func ClearGeneric[C ~[]Box | ~map[int32]Box](values C) {
+func clearGeneric[C ~[]Box | ~map[int32]Box](values C) {
 	clear(values)
 }
 
@@ -34,13 +34,13 @@ func ClearAggregateMap() int32 {
 
 func ClearGenericSlice() int32 {
 	values := []Box{{Value: 1}}
-	ClearGeneric(values)
+	clearGeneric(values)
 	return values[0].Value
 }
 
 func ClearGenericMap() int32 {
 	values := map[int32]Box{1: {Value: 2}}
-	ClearGeneric(values)
+	clearGeneric(values)
 	return values[1].Value
 }
 

@@ -1,4 +1,4 @@
-import type { int32 } from "../../../support/scalars.js";
+import type { int32 } from "../../../runtime/scalars.js";
 export function Sum(limit: int32): int32 {
     let total = 0;
     for (let current = total; current < limit; current++) {

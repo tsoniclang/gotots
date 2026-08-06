@@ -87,6 +87,22 @@ const (
 	StoreTargetStorageContainer
 )
 
+func (e StoreTargetEmission) Valid() bool {
+	if e.sourceType == nil {
+		return false
+	}
+	if !e.accessor {
+		return e.value != nil
+	}
+	if e.accessorFunction {
+		return e.getterFunction.Value() != nil &&
+			e.setterFunction.Value() != nil
+	}
+	return e.accessorReceiver.Value() != nil &&
+		e.getterMember != "" &&
+		e.setterMember != ""
+}
+
 func NewPropertyStoreTargetEmission(
 	factory tsgo.Factory,
 	receiver ExpressionEmission,
@@ -305,11 +321,12 @@ func (e StatementEmission) Requests() []RootRequest {
 }
 
 type DeclarationEmission struct {
-	declarations []tsgo.Statement
-	classOwner   *types.TypeName
-	classMembers []tsgo.ClassElement
-	requests     []RootRequest
-	disposition  DeclarationDisposition
+	declarations              []tsgo.Statement
+	classOwner                *types.TypeName
+	classMembers              []tsgo.ClassElement
+	additionalPackageBindings []string
+	requests                  []RootRequest
+	disposition               DeclarationDisposition
 }
 
 type DeclarationDisposition uint8
@@ -344,6 +361,20 @@ func ClassMemberContributionEmission(
 	members []tsgo.ClassElement,
 	requests []RootRequest,
 ) (DeclarationEmission, error) {
+	return ClassMemberAndSupportContributionEmission(
+		owner,
+		members,
+		nil,
+		requests,
+	)
+}
+
+func ClassMemberAndSupportContributionEmission(
+	owner *types.TypeName,
+	members []tsgo.ClassElement,
+	support []tsgo.Statement,
+	requests []RootRequest,
+) (DeclarationEmission, error) {
 	if owner == nil {
 		return DeclarationEmission{}, &ResultError{
 			Result: "class-member contribution",
@@ -364,7 +395,16 @@ func ClassMemberContributionEmission(
 			}
 		}
 	}
+	for _, declaration := range support {
+		if declaration == nil {
+			return DeclarationEmission{}, &ResultError{
+				Result: "class-member contribution",
+				Reason: "support declaration is nil",
+			}
+		}
+	}
 	return DeclarationEmission{
+		declarations: slices.Clone(support),
 		classOwner:   owner,
 		classMembers: slices.Clone(members),
 		requests:     slices.Clone(requests),
@@ -397,6 +437,40 @@ func NewDeclarationEmission(
 	}, nil
 }
 
+func NewDeclarationEmissionWithAdditionalPackageBindings(
+	declarations []tsgo.Statement,
+	requests []RootRequest,
+	bindings []string,
+) (DeclarationEmission, error) {
+	result, err := NewDeclarationEmission(declarations, requests)
+	if err != nil {
+		return DeclarationEmission{}, err
+	}
+	if len(bindings) == 0 {
+		return DeclarationEmission{}, &ResultError{
+			Result: "declaration",
+			Reason: "additional package bindings are empty",
+		}
+	}
+	result.additionalPackageBindings = slices.Clone(bindings)
+	slices.Sort(result.additionalPackageBindings)
+	for index, binding := range result.additionalPackageBindings {
+		if binding == "" {
+			return DeclarationEmission{}, &ResultError{
+				Result: "declaration",
+				Reason: "additional package binding is empty",
+			}
+		}
+		if index != 0 && result.additionalPackageBindings[index-1] == binding {
+			return DeclarationEmission{}, &ResultError{
+				Result: "declaration",
+				Reason: "additional package binding is duplicated",
+			}
+		}
+	}
+	return result, nil
+}
+
 func DirectDeclaration(
 	declaration tsgo.Statement,
 	requests ...RootRequest,
@@ -417,6 +491,10 @@ func (e DeclarationEmission) Declarations() []tsgo.Statement {
 
 func (e DeclarationEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
+}
+
+func (e DeclarationEmission) AdditionalPackageBindings() []string {
+	return slices.Clone(e.additionalPackageBindings)
 }
 
 func (e DeclarationEmission) ClassMemberContribution() (

@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -248,9 +249,9 @@ func emitLen(
 		receiver.Value(),
 		lengthName,
 	))
-	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
+	if integervalue.TypeUsesBigInt(context, resultType) {
 		target = context.Factory().CallExpression(
-			context.Factory().Identifier("BigInt"),
+			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,
 			nil,
 			[]tsgo.Expression{target},
@@ -307,6 +308,14 @@ func emitDelete(
 			WithRole(api.RoleMapKey).
 			WithExpectedType(mapType.Key()),
 		source.Args[1],
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	key, err = mapType.TransferKey(
+		context.WithRole(api.RoleMapKey),
+		source.Args[1],
+		key,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

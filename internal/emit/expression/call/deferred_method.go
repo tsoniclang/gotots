@@ -11,7 +11,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/methodcall"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func emitDeferredMethod(
@@ -105,36 +104,79 @@ func emitDeferredMethod(
 		return api.ExpressionEmission{}, err
 	}
 	before = append(before, argumentBefore...)
-	call, callRequests, err := invocation.Call(
-		context,
-		context.Factory().Identifier(receiverName),
-		arguments,
-		context.Factory().Identifier(
-			callable.RecoveryAuthorityName,
-		),
-	)
+	recoveryObservation, err :=
+		context.ObserveRecoveryCallable(invocation.Facet())
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	cooperative, contractRequests, err :=
-		cooperativecall.GenericContract(
+	if !recoveryObservation.Recovery() {
+		call, callErr := invocation.Invoke(
 			context,
-			invocation.Facet(),
+			children,
+			context.Factory().Identifier(receiverName),
+			arguments,
+		)
+		if callErr != nil {
+			return api.ExpressionEmission{}, callErr
+		}
+		cooperative, contractRequests, contractErr :=
+			cooperativecall.GenericContract(context, invocation.Facet())
+		if contractErr != nil {
+			return api.ExpressionEmission{}, contractErr
+		}
+		return deferredInvocation(
+			context,
+			append(before, call.Before()...),
+			nil,
+			call.Value(),
+			cooperative,
+			api.CombineRequests(
+				receiver.Requests(),
+				argumentRequests,
+				call.Requests(),
+				contractRequests,
+				recoveryObservation.Requests(),
+			),
+		)
+	}
+	call, providerRecovery, recoveryCooperative, err :=
+		invocation.RecoveryCall(
+			context,
+			children,
+			context.Factory().Identifier(receiverName),
+			arguments,
+			context.Factory().Identifier(
+				callable.RecoveryAuthorityName,
+			),
 		)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	cooperative := recoveryCooperative
+	var contractRequests []api.RootRequest
+	if !providerRecovery {
+		cooperative, contractRequests, err =
+			cooperativecall.GenericContract(
+				context,
+				invocation.Facet(),
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	before = append(before, call.Before()...)
 	return deferredInvocation(
 		context,
 		before,
 		nil,
-		call,
+		call.Value(),
 		cooperative,
 		api.CombineRequests(
 			receiver.Requests(),
 			argumentRequests,
-			callRequests,
+			call.Requests(),
 			contractRequests,
+			recoveryObservation.Requests(),
 		),
 	)
 }
@@ -157,44 +199,6 @@ func emitDeferredInterfaceMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	receiverName, err := context.Names().Temporary(
-		api.TemporaryReceiverValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	receiverContract, err := interfaceoperation.NonNilType(
-		context,
-		children,
-		selector.X,
-		selection.Recv(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	nonNil, err := context.Names().Runtime(
-		api.RuntimeInterfaceNonNil,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	guardedReceiver := context.Factory().CallExpression(
-		context.Factory().Identifier(nonNil.Name()),
-		nil,
-		[]tsgo.TypeNode{receiverContract.Value()},
-		[]tsgo.Expression{receiver.Value()},
-		tsgo.NodeFlagsNone,
-	)
-	before := append(
-		receiver.Before(),
-		constantDeclaration(
-			context,
-			receiverName,
-			receiverContract.Value(),
-			guardedReceiver,
-		),
-	)
 	arguments, argumentBefore, argumentRequests, err := emitArguments(
 		context,
 		children,
@@ -205,27 +209,6 @@ func emitDeferredInterfaceMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	before = append(before, argumentBefore...)
-	member, err := context.Names().InterfaceMethodName(method)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	arguments = append(
-		arguments,
-		context.Factory().Identifier(callable.RecoveryAuthorityName),
-	)
-	call := context.Factory().CallExpression(
-		context.Factory().PropertyAccessExpression(
-			context.Factory().Identifier(receiverName),
-			nil,
-			context.Factory().Identifier(member),
-			tsgo.NodeFlagsNone,
-		),
-		nil,
-		nil,
-		arguments,
-		tsgo.NodeFlagsNone,
-	)
 	callableReference, err :=
 		context.Names().InterfaceMethodCallable(method)
 	if err != nil {
@@ -239,17 +222,37 @@ func emitDeferredInterfaceMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	call, err := interfaceoperation.ApplyDeferred(
+		context,
+		children,
+		selector,
+		selection.Recv(),
+		receiver,
+		method,
+		signature,
+		cooperative,
+		arguments,
+		context.Factory().Identifier(callable.RecoveryAuthorityName),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	call, err = api.NewExpressionEmission(
+		append(call.Before(), argumentBefore...),
+		call.Value(),
+		api.CombineRequests(call.Requests(), argumentRequests),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	return deferredInvocation(
 		context,
-		before,
+		call.Before(),
 		nil,
-		call,
+		call.Value(),
 		cooperative,
 		api.CombineRequests(
-			receiver.Requests(),
-			argumentRequests,
-			nonNil.Requests(),
-			receiverContract.Requests(),
+			call.Requests(),
 			contractRequests,
 		),
 	)

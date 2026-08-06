@@ -1,7 +1,6 @@
 package verify
 
 import (
-	"bufio"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -33,7 +32,8 @@ func TestRepositoryArchitectureWalls(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	directoryFiles := make(map[string]int)
+	productionFiles := make(map[string]int)
+	testFiles := make(map[string]int)
 	err = filepath.Walk(
 		filepath.Join(root, "internal"),
 		func(path string, info os.FileInfo, walkErr error) error {
@@ -51,7 +51,12 @@ func TestRepositoryArchitectureWalls(t *testing.T) {
 			if strings.HasSuffix(relative, "_generated.go") {
 				return nil
 			}
-			directoryFiles[filepath.ToSlash(filepath.Dir(relative))]++
+			directory := filepath.ToSlash(filepath.Dir(relative))
+			if strings.HasSuffix(relative, "_test.go") {
+				testFiles[directory]++
+			} else {
+				productionFiles[directory]++
+			}
 			lines, err := physicalLines(path)
 			if err != nil {
 				return err
@@ -71,9 +76,21 @@ func TestRepositoryArchitectureWalls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for directory, count := range directoryFiles {
-		if count > 20 {
-			t.Errorf("%s has %d maintained Go files, want at most 20", directory, count)
+	for _, sourceSet := range []struct {
+		kind   string
+		counts map[string]int
+	}{
+		{kind: "production", counts: productionFiles},
+		{kind: "test", counts: testFiles},
+	} {
+		for directory, count := range sourceSet.counts {
+			if err := directoryFileBudgetError(
+				directory,
+				sourceSet.kind,
+				count,
+			); err != nil {
+				t.Error(err)
+			}
 		}
 	}
 }
@@ -111,10 +128,14 @@ func verifyProductionFile(relative string, sourcePath string) error {
 		importAliases[importPath] = alias
 		if importPath == "go/ast" || importPath == "go/types" {
 			if !strings.HasPrefix(relative, "internal/load/") &&
+				!strings.HasPrefix(relative, "internal/contracts/environment/") &&
+				!strings.HasPrefix(relative, "internal/contracts/externals/certify/") &&
+				!strings.HasPrefix(relative, "internal/contracts/gostdlib/certify/") &&
+				!strings.HasPrefix(relative, "internal/contracts/gostdlib/sourcecontract/") &&
 				!strings.HasPrefix(relative, "internal/emit/") {
 				return &wallError{
 					source: relative,
-					reason: "Go semantic graph import is outside load/emit",
+					reason: "Go semantic graph import is outside an approved owner",
 				}
 			}
 		}
@@ -304,8 +325,8 @@ import _ "reflect"
 `,
 		},
 		"semantic graph outside owner": {
-			relative: "internal/output/leak.go",
-			source: `package output
+			relative: "internal/contracts/externals/leak.go",
+			source: `package externals
 import _ "go/ast"
 `,
 		},
@@ -391,6 +412,37 @@ func leak(context Context, source Source, value Value) {
 			t.Fatalf("standalone ownership mutation passed: %q", mutation)
 		}
 	}
+	externalRoot := t.TempDir()
+	for _, directory := range []string{"node_modules", "dist"} {
+		path := filepath.Join(externalRoot, directory, "dependency.ts")
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(
+			path,
+			[]byte("type Origin = \""+unrelatedProduct+"\";"),
+			0o644,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := verifyStandaloneOwnership(externalRoot); err != nil {
+		t.Fatalf("external/generated tree entered ownership wall: %v", err)
+	}
+	ownedPath := filepath.Join(externalRoot, "src", "owned.ts")
+	if err := os.MkdirAll(filepath.Dir(ownedPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		ownedPath,
+		[]byte("type Origin = \""+unrelatedProduct+"\";"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyStandaloneOwnership(externalRoot); err == nil {
+		t.Fatal("repository-owned source escaped standalone ownership wall")
+	}
 }
 
 func TestBuiltinIdentityResolutionHasOneOwner(t *testing.T) {
@@ -460,7 +512,8 @@ func verifyStandaloneOwnership(root string) error {
 			}
 			if info.IsDir() {
 				switch info.Name() {
-				case ".analysis", ".claude", ".git", ".temp", ".tests":
+				case ".analysis", ".claude", ".git", ".temp", ".tests",
+					"dist", "node_modules":
 					return filepath.SkipDir
 				default:
 					return nil
@@ -505,6 +558,8 @@ func layerFor(relative string) int {
 	switch {
 	case strings.HasPrefix(relative, "internal/load/"):
 		return 10
+	case strings.HasPrefix(relative, "internal/contracts/"):
+		return 10
 	case strings.HasPrefix(relative, "internal/target/tsgo/"):
 		return 10
 	case strings.HasPrefix(relative, "internal/output/"):
@@ -520,20 +575,6 @@ func layerFor(relative string) int {
 	default:
 		return 0
 	}
-}
-
-func physicalLines(path string) (int, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return 0, err
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	lines := 0
-	for scanner.Scan() {
-		lines++
-	}
-	return lines, scanner.Err()
 }
 
 type wallError struct {

@@ -1,4 +1,4 @@
-import type { int32 } from "../../../support/scalars.js";
+import type { int32 } from "../../../runtime/scalars.js";
 export function Compute(input: int32): int32 {
     let base = input;
     {

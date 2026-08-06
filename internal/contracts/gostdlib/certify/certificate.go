@@ -1,0 +1,221 @@
+package certify
+
+import (
+	"sort"
+	"strings"
+
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	runtimecontract "github.com/tsoniclang/gotots/internal/contracts/runtime"
+)
+
+type Certificate struct {
+	manifest     gostdlib.Manifest
+	toolchainKey string
+	providerRoot string
+	runtime      runtimecontract.Requirements
+}
+
+func Verify(config Config) (*Certificate, error) {
+	resolved, err := resolveConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	checkedBytes, checked, err := readManifest(resolved.manifestPath)
+	if err != nil {
+		return nil, err
+	}
+	generated, err := Generate(config)
+	if err != nil {
+		return nil, err
+	}
+	if err := compareCanonical(checkedBytes, generated); err != nil {
+		return nil, err
+	}
+	runtimeRequirements, runtimeDigest, err := readRuntimeContract(
+		resolved.runtimeContractPath,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if runtimeDigest != checked.RuntimeDigest() {
+		return nil, certifyError(
+			"verify runtime contract",
+			resolved.runtimeContractPath,
+			"content digest does not match the checked manifest",
+		)
+	}
+	selectedToolchain, err := inspectToolchain(resolved)
+	if err != nil {
+		return nil, err
+	}
+	return &Certificate{
+		manifest:     checked,
+		toolchainKey: selectedToolchain.key,
+		providerRoot: resolved.providerRoot,
+		runtime:      runtimeRequirements,
+	}, nil
+}
+
+func (c *Certificate) Valid() bool {
+	return c != nil && c.manifest.Digest() != "" &&
+		c.toolchainKey != "" && c.providerRoot != "" && c.runtime.Valid()
+}
+
+func (c *Certificate) ManifestDigest() string {
+	if c == nil {
+		return ""
+	}
+	return c.manifest.Digest()
+}
+
+func (c *Certificate) ToolchainKey() string {
+	if c == nil {
+		return ""
+	}
+	return c.toolchainKey
+}
+
+func (c *Certificate) ProviderModules() []string {
+	if !c.Valid() {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	for _, module := range c.manifest.Modules() {
+		seen[module.Specifier()] = struct{}{}
+	}
+	for _, module := range c.manifest.FacetModules() {
+		seen[module.Specifier()] = struct{}{}
+	}
+	seen[c.ProviderScalarModule()] = struct{}{}
+	modules := make([]string, 0, len(seen))
+	for module := range seen {
+		modules = append(modules, module)
+	}
+	sort.Strings(modules)
+	return modules
+}
+
+func (c *Certificate) ProviderScalarModule() string {
+	if !c.Valid() {
+		return ""
+	}
+	return strings.TrimSuffix(c.manifest.PackageName(), "/") +
+		strings.TrimPrefix(c.runtime.ProviderScalarModule(), ".")
+}
+
+func (c *Certificate) RuntimeRequirements() (
+	runtimecontract.Requirements,
+	bool,
+) {
+	if !c.Valid() {
+		return runtimecontract.Requirements{}, false
+	}
+	return c.runtime, true
+}
+
+func (c *Certificate) Binding(identity string) (gostdlib.Binding, bool) {
+	if !c.Valid() {
+		return gostdlib.Binding{}, false
+	}
+	return c.manifest.Binding(identity)
+}
+
+// FacetModules lists the certified facet modules.
+func (c *Certificate) FacetModules() []gostdlib.FacetModule {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.FacetModules()
+}
+
+// Implementations lists the certified private implementation documents.
+func (c *Certificate) Implementations() []gostdlib.ImplementationDocument {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.Implementations()
+}
+
+func (c *Certificate) Modules() []gostdlib.Module {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.Modules()
+}
+
+func (c *Certificate) Facet(
+	sourceIdentity string,
+	kind gostdlib.FacetKind,
+	capability gostdlib.FacetCapability,
+) (gostdlib.Facet, bool) {
+	if !c.Valid() {
+		return gostdlib.Facet{}, false
+	}
+	return c.manifest.Facet(sourceIdentity, kind, capability)
+}
+
+func (c *Certificate) ProviderRepresentation(
+	module string,
+	export string,
+) (gostdlib.ProviderRepresentation, bool) {
+	if !c.Valid() {
+		return gostdlib.ProviderRepresentation{}, false
+	}
+	return c.manifest.ProviderRepresentation(module, export)
+}
+
+func (c *Certificate) ProviderInterface(
+	sourceIdentity string,
+) (gostdlib.ProviderInterfaceBinding, bool) {
+	if !c.Valid() {
+		return gostdlib.ProviderInterfaceBinding{}, false
+	}
+	return c.manifest.ProviderInterface(sourceIdentity)
+}
+
+func (c *Certificate) ProviderInterfaceCapabilities(
+	baseSourceIdentity string,
+) []gostdlib.ProviderInterfaceCapability {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.ProviderInterfaceCapabilities(baseSourceIdentity)
+}
+
+func (c *Certificate) ProviderCallableProfile(
+	sourceIdentity string,
+	profileKey string,
+) (gostdlib.ProviderCallableProfile, bool) {
+	if !c.Valid() {
+		return gostdlib.ProviderCallableProfile{}, false
+	}
+	return c.manifest.ProviderCallableProfile(sourceIdentity, profileKey)
+}
+
+func (c *Certificate) ProviderCallableProfiles(
+	sourceIdentity string,
+) []gostdlib.ProviderCallableProfile {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.ProviderCallableProfiles(sourceIdentity)
+}
+
+func (c *Certificate) ProviderStatefulProfile(
+	sourceIdentity string,
+	profileKey string,
+) (gostdlib.ProviderStatefulProfile, bool) {
+	if !c.Valid() {
+		return gostdlib.ProviderStatefulProfile{}, false
+	}
+	return c.manifest.ProviderStatefulProfile(sourceIdentity, profileKey)
+}
+
+func (c *Certificate) ProviderStatefulProfiles(
+	sourceIdentity string,
+) []gostdlib.ProviderStatefulProfile {
+	if !c.Valid() {
+		return nil
+	}
+	return c.manifest.ProviderStatefulProfiles(sourceIdentity)
+}

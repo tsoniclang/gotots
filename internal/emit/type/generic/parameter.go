@@ -46,14 +46,14 @@ func Emit(
 			children,
 			source,
 			object,
-			arguments,
+			api.TypeArgumentsFromGo(arguments),
 		)
 	if err != nil {
 		return api.TypeEmission{}, true, err
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			targetArguments,
 		),
 		api.CombineRequests(

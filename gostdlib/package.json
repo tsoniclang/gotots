@@ -1,0 +1,413 @@
+{
+  "name": "@gotots/gostdlib",
+  "version": "0.0.0",
+  "description": "Go standard-library behavior for GoToTS",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "files": [
+    "dist/src",
+    "contract/manifest.json",
+    "README.md"
+  ],
+  "exports": {
+    "./bufio.js": {
+      "types": "./dist/src/bufio.d.ts",
+      "default": "./dist/src/bufio.js"
+    },
+    "./bytes.js": {
+      "types": "./dist/src/bytes.d.ts",
+      "default": "./dist/src/bytes.js"
+    },
+    "./cmp.js": {
+      "types": "./dist/src/cmp.d.ts",
+      "default": "./dist/src/cmp.js"
+    },
+    "./compress/flate.js": {
+      "types": "./dist/src/compress/flate.d.ts",
+      "default": "./dist/src/compress/flate.js"
+    },
+    "./compress/gzip.js": {
+      "types": "./dist/src/compress/gzip.d.ts",
+      "default": "./dist/src/compress/gzip.js"
+    },
+    "./context.js": {
+      "types": "./dist/src/context.d.ts",
+      "default": "./dist/src/context.js"
+    },
+    "./encoding.js": {
+      "types": "./dist/src/encoding.d.ts",
+      "default": "./dist/src/encoding.js"
+    },
+    "./encoding/base32.js": {
+      "types": "./dist/src/encoding/base32.d.ts",
+      "default": "./dist/src/encoding/base32.js"
+    },
+    "./encoding/base64.js": {
+      "types": "./dist/src/encoding/base64.d.ts",
+      "default": "./dist/src/encoding/base64.js"
+    },
+    "./encoding/binary.js": {
+      "types": "./dist/src/encoding/binary.d.ts",
+      "default": "./dist/src/encoding/binary.js"
+    },
+    "./encoding/hex.js": {
+      "types": "./dist/src/encoding/hex.d.ts",
+      "default": "./dist/src/encoding/hex.js"
+    },
+    "./errors.js": {
+      "types": "./dist/src/errors.d.ts",
+      "default": "./dist/src/errors.js"
+    },
+    "./flag.js": {
+      "types": "./dist/src/flag.d.ts",
+      "default": "./dist/src/flag.js"
+    },
+    "./fmt.js": {
+      "types": "./dist/src/fmt.d.ts",
+      "default": "./dist/src/fmt.js"
+    },
+    "./internal/abi.js": {
+      "types": "./dist/src/internal/abi.d.ts",
+      "default": "./dist/src/internal/abi.js"
+    },
+    "./internal/scalars.js": {
+      "types": "./dist/src/internal/scalars.d.ts",
+      "default": "./dist/src/internal/scalars.js"
+    },
+    "./internal/facets/generic-cmp-kernel.js": {
+      "types": "./dist/src/internal/facets/generic-cmp-kernel.d.ts",
+      "default": "./dist/src/internal/facets/generic-cmp-kernel.js"
+    },
+    "./internal/facets/generic-errors-kernel.js": {
+      "types": "./dist/src/internal/facets/generic-errors-kernel.d.ts",
+      "default": "./dist/src/internal/facets/generic-errors-kernel.js"
+    },
+    "./internal/facets/generic-maps-kernel.js": {
+      "types": "./dist/src/internal/facets/generic-maps-kernel.d.ts",
+      "default": "./dist/src/internal/facets/generic-maps-kernel.js"
+    },
+    "./internal/facets/generic-slices-kernel.js": {
+      "types": "./dist/src/internal/facets/generic-slices-kernel.d.ts",
+      "default": "./dist/src/internal/facets/generic-slices-kernel.js"
+    },
+    "./internal/facets/named-encoding-binary.js": {
+      "types": "./dist/src/internal/facets/named-encoding-binary.d.ts",
+      "default": "./dist/src/internal/facets/named-encoding-binary.js"
+    },
+    "./internal/facets/named-bytes.js": {
+      "types": "./dist/src/internal/facets/named-bytes.d.ts",
+      "default": "./dist/src/internal/facets/named-bytes.js"
+    },
+    "./internal/facets/named-flag.js": {
+      "types": "./dist/src/internal/facets/named-flag.d.ts",
+      "default": "./dist/src/internal/facets/named-flag.js"
+    },
+    "./internal/facets/named-internal-abi.js": {
+      "types": "./dist/src/internal/facets/named-internal-abi.d.ts",
+      "default": "./dist/src/internal/facets/named-internal-abi.js"
+    },
+    "./internal/facets/named-io-fs.js": {
+      "types": "./dist/src/internal/facets/named-io-fs.d.ts",
+      "default": "./dist/src/internal/facets/named-io-fs.js"
+    },
+    "./internal/facets/named-iter.js": {
+      "types": "./dist/src/internal/facets/named-iter.d.ts",
+      "default": "./dist/src/internal/facets/named-iter.js"
+    },
+    "./internal/facets/named-math-big.js": {
+      "types": "./dist/src/internal/facets/named-math-big.d.ts",
+      "default": "./dist/src/internal/facets/named-math-big.js"
+    },
+    "./internal/facets/named-net-url.js": {
+      "types": "./dist/src/internal/facets/named-net-url.d.ts",
+      "default": "./dist/src/internal/facets/named-net-url.js"
+    },
+    "./internal/facets/named-os.js": {
+      "types": "./dist/src/internal/facets/named-os.d.ts",
+      "default": "./dist/src/internal/facets/named-os.js"
+    },
+    "./internal/facets/named-runtime-metrics.js": {
+      "types": "./dist/src/internal/facets/named-runtime-metrics.d.ts",
+      "default": "./dist/src/internal/facets/named-runtime-metrics.js"
+    },
+    "./internal/facets/named-runtime.js": {
+      "types": "./dist/src/internal/facets/named-runtime.d.ts",
+      "default": "./dist/src/internal/facets/named-runtime.js"
+    },
+    "./internal/facets/named-reflect.js": {
+      "types": "./dist/src/internal/facets/named-reflect.d.ts",
+      "default": "./dist/src/internal/facets/named-reflect.js"
+    },
+    "./internal/facets/named-strings.js": {
+      "types": "./dist/src/internal/facets/named-strings.d.ts",
+      "default": "./dist/src/internal/facets/named-strings.js"
+    },
+    "./internal/facets/named-sync-atomic.js": {
+      "types": "./dist/src/internal/facets/named-sync-atomic.d.ts",
+      "default": "./dist/src/internal/facets/named-sync-atomic.js"
+    },
+    "./internal/facets/named-sync.js": {
+      "types": "./dist/src/internal/facets/named-sync.d.ts",
+      "default": "./dist/src/internal/facets/named-sync.js"
+    },
+    "./internal/facets/named-syscall.js": {
+      "types": "./dist/src/internal/facets/named-syscall.d.ts",
+      "default": "./dist/src/internal/facets/named-syscall.js"
+    },
+    "./internal/facets/named-time.js": {
+      "types": "./dist/src/internal/facets/named-time.d.ts",
+      "default": "./dist/src/internal/facets/named-time.js"
+    },
+    "./internal/facets/named-unicode.js": {
+      "types": "./dist/src/internal/facets/named-unicode.d.ts",
+      "default": "./dist/src/internal/facets/named-unicode.js"
+    },
+    "./internal/facets/provider-encoding-binary.js": {
+      "types": "./dist/src/internal/facets/provider-encoding-binary.d.ts",
+      "default": "./dist/src/internal/facets/provider-encoding-binary.js"
+    },
+    "./internal/facets/provider-encoding-base64.js": {
+      "types": "./dist/src/internal/facets/provider-encoding-base64.d.ts",
+      "default": "./dist/src/internal/facets/provider-encoding-base64.js"
+    },
+    "./internal/facets/provider-io-read.js": {
+      "types": "./dist/src/internal/facets/provider-io-read.d.ts",
+      "default": "./dist/src/internal/facets/provider-io-read.js"
+    },
+    "./internal/facets/provider-bufio-reader.js": {
+      "types": "./dist/src/internal/facets/provider-bufio-reader.d.ts",
+      "default": "./dist/src/internal/facets/provider-bufio-reader.js"
+    },
+    "./internal/facets/provider-bufio-scanner.js": {
+      "types": "./dist/src/internal/facets/provider-bufio-scanner.d.ts",
+      "default": "./dist/src/internal/facets/provider-bufio-scanner.js"
+    },
+    "./internal/facets/provider-bufio-writer.js": {
+      "types": "./dist/src/internal/facets/provider-bufio-writer.d.ts",
+      "default": "./dist/src/internal/facets/provider-bufio-writer.js"
+    },
+    "./internal/facets/provider-compress-gzip.js": {
+      "types": "./dist/src/internal/facets/provider-compress-gzip.d.ts",
+      "default": "./dist/src/internal/facets/provider-compress-gzip.js"
+    },
+    "./internal/facets/provider-context.js": {
+      "types": "./dist/src/internal/facets/provider-context.d.ts",
+      "default": "./dist/src/internal/facets/provider-context.js"
+    },
+    "./internal/facets/provider-error.js": {
+      "types": "./dist/src/internal/facets/provider-error.d.ts",
+      "default": "./dist/src/internal/facets/provider-error.js"
+    },
+    "./internal/facets/provider-fmt-writer.js": {
+      "types": "./dist/src/internal/facets/provider-fmt-writer.d.ts",
+      "default": "./dist/src/internal/facets/provider-fmt-writer.js"
+    },
+    "./internal/facets/provider-io-fs.js": {
+      "types": "./dist/src/internal/facets/provider-io-fs.d.ts",
+      "default": "./dist/src/internal/facets/provider-io-fs.js"
+    },
+    "./internal/facets/provider-os-error.js": {
+      "types": "./dist/src/internal/facets/provider-os-error.d.ts",
+      "default": "./dist/src/internal/facets/provider-os-error.js"
+    },
+    "./internal/facets/provider-runtime-pprof.js": {
+      "types": "./dist/src/internal/facets/provider-runtime-pprof.d.ts",
+      "default": "./dist/src/internal/facets/provider-runtime-pprof.js"
+    },
+    "./internal/facets/provider-regexp.js": {
+      "types": "./dist/src/internal/facets/provider-regexp.d.ts",
+      "default": "./dist/src/internal/facets/provider-regexp.js"
+    },
+    "./internal/facets/provider-os-signal.js": {
+      "types": "./dist/src/internal/facets/provider-os-signal.d.ts",
+      "default": "./dist/src/internal/facets/provider-os-signal.js"
+    },
+    "./internal/facets/provider-sort.js": {
+      "types": "./dist/src/internal/facets/provider-sort.d.ts",
+      "default": "./dist/src/internal/facets/provider-sort.js"
+    },
+    "./internal/facets/provider-strings.js": {
+      "types": "./dist/src/internal/facets/provider-strings.d.ts",
+      "default": "./dist/src/internal/facets/provider-strings.js"
+    },
+    "./internal/facets/provider-syscall.js": {
+      "types": "./dist/src/internal/facets/provider-syscall.d.ts",
+      "default": "./dist/src/internal/facets/provider-syscall.js"
+    },
+    "./internal/facets/recovery-encoding-binary.js": {
+      "types": "./dist/src/internal/facets/recovery-encoding-binary.d.ts",
+      "default": "./dist/src/internal/facets/recovery-encoding-binary.js"
+    },
+    "./internal/facets/recovery-io.js": {
+      "types": "./dist/src/internal/facets/recovery-io.d.ts",
+      "default": "./dist/src/internal/facets/recovery-io.js"
+    },
+    "./internal/facets/recovery-sync.js": {
+      "types": "./dist/src/internal/facets/recovery-sync.d.ts",
+      "default": "./dist/src/internal/facets/recovery-sync.js"
+    },
+    "./internal/facets/recovery-value.js": {
+      "types": "./dist/src/internal/facets/recovery-value.d.ts",
+      "default": "./dist/src/internal/facets/recovery-value.js"
+    },
+    "./io.js": {
+      "types": "./dist/src/io.d.ts",
+      "default": "./dist/src/io.js"
+    },
+    "./io/fs.js": {
+      "types": "./dist/src/io/fs.d.ts",
+      "default": "./dist/src/io/fs.js"
+    },
+    "./iter.js": {
+      "types": "./dist/src/iter.d.ts",
+      "default": "./dist/src/iter.js"
+    },
+    "./maps.js": {
+      "types": "./dist/src/maps.d.ts",
+      "default": "./dist/src/maps.js"
+    },
+    "./math.js": {
+      "types": "./dist/src/math.d.ts",
+      "default": "./dist/src/math.js"
+    },
+    "./math/big.js": {
+      "types": "./dist/src/math/big.d.ts",
+      "default": "./dist/src/math/big.js"
+    },
+    "./math/bits.js": {
+      "types": "./dist/src/math/bits.d.ts",
+      "default": "./dist/src/math/bits.js"
+    },
+    "./math/rand/v2.js": {
+      "types": "./dist/src/math/rand/v2.d.ts",
+      "default": "./dist/src/math/rand/v2.js"
+    },
+    "./net.js": {
+      "types": "./dist/src/net.d.ts",
+      "default": "./dist/src/net.js"
+    },
+    "./net/url.js": {
+      "types": "./dist/src/net/url.d.ts",
+      "default": "./dist/src/net/url.js"
+    },
+    "./os.js": {
+      "types": "./dist/src/os.d.ts",
+      "default": "./dist/src/os.js"
+    },
+    "./os/exec.js": {
+      "types": "./dist/src/os/exec.d.ts",
+      "default": "./dist/src/os/exec.js"
+    },
+    "./os/signal.js": {
+      "types": "./dist/src/os/signal.d.ts",
+      "default": "./dist/src/os/signal.js"
+    },
+    "./path.js": {
+      "types": "./dist/src/path.d.ts",
+      "default": "./dist/src/path.js"
+    },
+    "./path/filepath.js": {
+      "types": "./dist/src/path/filepath.d.ts",
+      "default": "./dist/src/path/filepath.js"
+    },
+    "./reflect.js": {
+      "types": "./dist/src/reflect.d.ts",
+      "default": "./dist/src/reflect.js"
+    },
+    "./regexp.js": {
+      "types": "./dist/src/regexp.d.ts",
+      "default": "./dist/src/regexp.js"
+    },
+    "./runtime.js": {
+      "types": "./dist/src/runtime.d.ts",
+      "default": "./dist/src/runtime.js"
+    },
+    "./runtime/debug.js": {
+      "types": "./dist/src/runtime/debug.d.ts",
+      "default": "./dist/src/runtime/debug.js"
+    },
+    "./runtime/metrics.js": {
+      "types": "./dist/src/runtime/metrics.d.ts",
+      "default": "./dist/src/runtime/metrics.js"
+    },
+    "./runtime/pprof.js": {
+      "types": "./dist/src/runtime/pprof.d.ts",
+      "default": "./dist/src/runtime/pprof.js"
+    },
+    "./slices.js": {
+      "types": "./dist/src/slices.d.ts",
+      "default": "./dist/src/slices.js"
+    },
+    "./sort.js": {
+      "types": "./dist/src/sort.d.ts",
+      "default": "./dist/src/sort.js"
+    },
+    "./strconv.js": {
+      "types": "./dist/src/strconv.d.ts",
+      "default": "./dist/src/strconv.js"
+    },
+    "./strings.js": {
+      "types": "./dist/src/strings.d.ts",
+      "default": "./dist/src/strings.js"
+    },
+    "./sync.js": {
+      "types": "./dist/src/sync.d.ts",
+      "default": "./dist/src/sync.js"
+    },
+    "./sync/atomic.js": {
+      "types": "./dist/src/sync/atomic.d.ts",
+      "default": "./dist/src/sync/atomic.js"
+    },
+    "./syscall.js": {
+      "types": "./dist/src/syscall.d.ts",
+      "default": "./dist/src/syscall.js"
+    },
+    "./testing.js": {
+      "types": "./dist/src/testing.d.ts",
+      "default": "./dist/src/testing.js"
+    },
+    "./time.js": {
+      "types": "./dist/src/time.d.ts",
+      "default": "./dist/src/time.js"
+    },
+    "./unicode.js": {
+      "types": "./dist/src/unicode.d.ts",
+      "default": "./dist/src/unicode.js"
+    },
+    "./unicode/utf16.js": {
+      "types": "./dist/src/unicode/utf16.d.ts",
+      "default": "./dist/src/unicode/utf16.js"
+    },
+    "./unicode/utf8.js": {
+      "types": "./dist/src/unicode/utf8.d.ts",
+      "default": "./dist/src/unicode/utf8.js"
+    },
+    "./unsafe.js": {
+      "types": "./dist/src/unsafe.d.ts",
+      "default": "./dist/src/unsafe.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "unicode:generate": "cd .. && go run ./internal/contracts/gostdlib/unicodegenerate -output gostdlib/src/internal/portable/unicode/classification-data.generated.ts",
+    "unicode:check": "cd .. && go run ./internal/contracts/gostdlib/unicodegenerate -output gostdlib/src/internal/portable/unicode/classification-data.generated.ts -check",
+    "contract:generate": "cd .. && go run ./internal/contracts/gostdlib/generate -repository . -provider gostdlib -manifest gostdlib/contract/manifest.json -modules gostdlib/contract/modules.json -facets gostdlib/contract/facets.json -runtime gostdlib/contract/runtime.json -tsconfig gostdlib/tsconfig.json -scratch .temp/gostdlib-certify -go go -goos linux -goarch amd64 -tags noasm -backend node -minimum-go go1.26.4 -maximum-go go1.26.4",
+    "contract:check": "cd .. && go run ./internal/contracts/gostdlib/generate -repository . -provider gostdlib -manifest gostdlib/contract/manifest.json -modules gostdlib/contract/modules.json -facets gostdlib/contract/facets.json -runtime gostdlib/contract/runtime.json -tsconfig gostdlib/tsconfig.json -scratch .temp/gostdlib-certify -go go -goos linux -goarch amd64 -tags noasm -backend node -minimum-go go1.26.4 -maximum-go go1.26.4 -check",
+    "runtime:generate": "cd .. && go run ./internal/emit/runtime/generate -contract gostdlib/contract/runtime.json -module . -output gostdlib/test/runtime-package -profile number -concurrency disabled",
+    "runtime:check": "cd .. && go run ./internal/emit/runtime/generate -contract gostdlib/contract/runtime.json -module . -output gostdlib/test/runtime-package -profile number -concurrency disabled -check",
+    "runtime:build": "go tool tsgo -p test/runtime-package/tsconfig.json",
+    "build:provider": "go tool tsgo -p tsconfig.json",
+    "build": "npm run clean && npm run unicode:check && npm run contract:check && npm run runtime:check && npm run runtime:build && npm run build:provider",
+    "check": "npm run build && node scripts/check-public-surface.mjs && node --test \"dist/test/**/*.test.js\"",
+    "clean": "node scripts/clean.mjs"
+  },
+  "peerDependencies": {
+    "@gotots/runtime": "0.0.0"
+  },
+  "devDependencies": {
+    "@gotots/runtime": "file:test/runtime-package",
+    "@types/node": "25.9.1"
+  }
+}

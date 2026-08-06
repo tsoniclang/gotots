@@ -30,8 +30,12 @@ func EmitValue(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if defined, ok := definedtype.ResolveBasic(targetType); ok {
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		underlying, err := EmitValue(
-			context,
+			operationContext,
 			source,
 			defined.Underlying(),
 			value,
@@ -74,6 +78,20 @@ func EmitValue(
 func IsUntyped(sourceType types.Type) bool {
 	basic, ok := sourceType.(*types.Basic)
 	return ok && basic.Info()&types.IsUntyped != 0
+}
+
+// RequiresDeferredBinding reports whether materializing a package constant at
+// ESM module evaluation would invoke the package-local runtime representation
+// of a defined basic type. Those constants use a typed value thunk so legal Go
+// same-package file cycles cannot observe an uninitialized target class.
+func RequiresDeferredBinding(selected *types.Const) bool {
+	if selected == nil || selected.Pkg() == nil ||
+		selected.Parent() != selected.Pkg().Scope() ||
+		IsUntyped(selected.Type()) {
+		return false
+	}
+	_, ok := definedtype.ResolveBasic(selected.Type())
+	return ok
 }
 
 func emitBool(

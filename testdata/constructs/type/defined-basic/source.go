@@ -161,6 +161,17 @@ func CountVariableShiftUpdate(count Other) Count {
 	return value
 }
 
+const ShiftCount = 5
+const TypedShiftCount int32 = 3
+
+func CountShiftUntyped(value Count) Count {
+	return value << ShiftCount
+}
+
+func CountShiftTyped(value Count) Count {
+	return value << TypedShiftCount
+}
+
 func FoldedCount() Count {
 	return Count(2) + 3
 }

@@ -2,15 +2,19 @@ package artifact
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"hash"
 	"slices"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
 type Contract struct {
-	facets      [api.ArtifactFacetExportSurface + 1][]byte
-	present     uint8
+	facets      [api.ArtifactFacetCount][]byte
+	present     uint16
 	exports     []string
 	exportsSet  bool
 	initialized bool
@@ -72,7 +76,7 @@ func (c Contract) WithFacet(
 		}
 	}
 	c.facets[facet] = bytes.Clone(encoded)
-	c.present |= uint8(1) << facet
+	c.present |= uint16(1) << facet
 	return c, nil
 }
 
@@ -110,6 +114,35 @@ func (c Contract) ExportedBindings() ([]string, bool) {
 	return slices.Clone(c.exports), true
 }
 
+func (c Contract) Fingerprint() (string, bool) {
+	if !c.initialized ||
+		c.hasFacet(api.ArtifactFacetExportSurface) != c.exportsSet {
+		return "", false
+	}
+	digest := sha256.New()
+	for facet := api.ArtifactFacetCallableSignature; facet < api.ArtifactFacetCount; facet++ {
+		encoded, present := c.facet(facet)
+		_, _ = digest.Write([]byte{byte(facet)})
+		if present {
+			_, _ = digest.Write([]byte{1})
+			writeFingerprintBytes(digest, encoded)
+		} else {
+			_, _ = digest.Write([]byte{0})
+		}
+	}
+	for _, exported := range c.exports {
+		writeFingerprintBytes(digest, []byte(exported))
+	}
+	return hex.EncodeToString(digest.Sum(nil)), true
+}
+
+func writeFingerprintBytes(digest hash.Hash, value []byte) {
+	var length [8]byte
+	binary.BigEndian.PutUint64(length[:], uint64(len(value)))
+	_, _ = digest.Write(length[:])
+	_, _ = digest.Write(value)
+}
+
 func (c Contract) withOwnedFacet(
 	facet api.ArtifactFacet,
 	encoded []byte,
@@ -133,14 +166,14 @@ func (c Contract) withOwnedFacet(
 		}
 	}
 	c.facets[facet] = encoded
-	c.present |= uint8(1) << facet
+	c.present |= uint16(1) << facet
 	return c, nil
 }
 
 func (c Contract) facet(
 	facet api.ArtifactFacet,
 ) ([]byte, bool) {
-	if !facet.Valid() || c.present&(uint8(1)<<facet) == 0 {
+	if !facet.Valid() || c.present&(uint16(1)<<facet) == 0 {
 		return nil, false
 	}
 	return c.facets[facet], true
@@ -176,7 +209,7 @@ func changedArtifactFacets(
 	next Contract,
 ) []api.ArtifactFacet {
 	var changed []api.ArtifactFacet
-	for facet := api.ArtifactFacetCallableSignature; facet <= api.ArtifactFacetExportSurface; facet++ {
+	for facet := api.ArtifactFacetCallableSignature; facet < api.ArtifactFacetCount; facet++ {
 		currentValue, currentOK := current.facet(facet)
 		nextValue, nextOK := next.facet(facet)
 		if currentOK != nextOK || !bytes.Equal(currentValue, nextValue) {

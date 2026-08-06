@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -40,7 +41,7 @@ func TestClassMemberContributionReconstructsTheTypeOwnedClass(t *testing.T) {
 		t.Fatal("method contribution was not assigned to its class target file")
 	}
 
-	if err := session.require(record); err != nil {
+	if err := session.RequireUse(record, rootUseDemand(record), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	object, ok := session.scheduler.next()
@@ -82,11 +83,15 @@ func TestClassMemberContributionReconstructsTheTypeOwnedClass(t *testing.T) {
 	if err := session.scheduleDeclarationRequirement(requirement); err != nil {
 		t.Fatal(err)
 	}
-	requirements, ok := session.requirements.nextBatch()
+	owner, requirements, removed, ok := session.requirements.nextBatch()
 	if !ok {
 		t.Fatal("class-member attachment requirement was not scheduled")
 	}
-	if err := session.applyDeclarationRequirements(requirements); err != nil {
+	if err := session.applyDeclarationRequirements(
+		owner,
+		requirements,
+		removed,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -241,9 +246,10 @@ func Result() int32 { return Global.Value }
 			storage.field.Type(),
 		)
 	}
-	if got := len(reference.TypeArguments()); got != 3 {
+	if got := len(reference.TypeArguments()); got != 1 ||
+		got != boxTypeParameters {
 		t.Fatalf(
-			"generic package storage facets = %d with %d reconstructions; provider parameters = %d at static revision %d, want logical/storage/pointer",
+			"generic package storage source arguments = %d with %d reconstructions; provider parameters = %d at static revision %d, want exact source arity",
 			got,
 			storage.reconstructions,
 			boxTypeParameters,
@@ -310,7 +316,7 @@ func TestAddressableStorageReconstructsOnlyOwningBodiesIncludingInit(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(caller); err != nil {
+	if err := session.RequireUse(caller, rootUseDemand(caller), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -381,18 +387,18 @@ func TestAddressableStorageRejectsForeignAndForgedSameSpellingVariables(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(addressed); err != nil {
+	if err := session.RequireUse(addressed, rootUseDemand(addressed), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
 	if err := session.scheduleDeclarationRequirement(requirement); err != nil {
 		t.Fatal(err)
 	}
-	requirements, ok := session.requirements.nextBatch()
+	owner, requirements, removed, ok := session.requirements.nextBatch()
 	if !ok {
 		t.Fatal("foreign same-spelling requirement was not scheduled")
 	}
-	err = session.applyDeclarationRequirements(requirements)
+	err = session.applyDeclarationRequirements(owner, requirements, removed)
 	var invariant *api.InvariantError
 	if !errors.As(err, &invariant) ||
 		invariant.Reason !=
@@ -418,18 +424,18 @@ func TestAddressableStorageRejectsForeignAndForgedSameSpellingVariables(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(addressed); err != nil {
+	if err := session.RequireUse(addressed, rootUseDemand(addressed), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
 	if err := session.scheduleDeclarationRequirement(requirement); err != nil {
 		t.Fatal(err)
 	}
-	requirements, ok = session.requirements.nextBatch()
+	owner, requirements, removed, ok = session.requirements.nextBatch()
 	if !ok {
 		t.Fatal("forged exact-position requirement was not scheduled")
 	}
-	err = session.applyDeclarationRequirements(requirements)
+	err = session.applyDeclarationRequirements(owner, requirements, removed)
 	var nameError *api.NameError
 	if !errors.As(err, &nameError) ||
 		nameError.Reason !=

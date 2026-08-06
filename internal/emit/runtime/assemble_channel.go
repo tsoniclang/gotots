@@ -51,7 +51,7 @@ func buildChannel(
 }
 
 func channelRuntimeNames() (map[api.RuntimeSymbol]string, error) {
-	names := make(map[api.RuntimeSymbol]string, 9)
+	names := make(map[api.RuntimeSymbol]string, 10)
 	for _, symbol := range []api.RuntimeSymbol{
 		api.RuntimeChannel,
 		api.RuntimeReceiveChannel,
@@ -62,6 +62,7 @@ func channelRuntimeNames() (map[api.RuntimeSymbol]string, error) {
 		api.RuntimeSelectReady,
 		api.RuntimeSelectAttempt,
 		api.RuntimePanic,
+		api.RuntimeDenseIndex,
 	} {
 		contract, err := api.RuntimeContract(symbol)
 		if err != nil {
@@ -96,5 +97,6 @@ func buildChannelSymbol(
 		names[api.RuntimeSelectReady],
 		names[api.RuntimeSelectAttempt],
 		names[api.RuntimePanic],
+		names[api.RuntimeDenseIndex],
 	)
 }

@@ -15,10 +15,12 @@ type Capabilities struct {
 func Build(
 	factory tsgo.Factory,
 	panicName string,
+	denseIndexName string,
 ) (tsgo.ClassDeclaration, error) {
 	return BuildWithCapabilities(
 		factory,
 		panicName,
+		denseIndexName,
 		Capabilities{},
 	)
 }
@@ -26,6 +28,7 @@ func Build(
 func BuildWithCapabilities(
 	factory tsgo.Factory,
 	panicName string,
+	denseIndexName string,
 	capabilities Capabilities,
 ) (tsgo.ClassDeclaration, error) {
 	contract, err := api.RuntimeContract(api.RuntimeArray)
@@ -66,9 +69,9 @@ func BuildWithCapabilities(
 	members = append(
 		members,
 		zeroMethod(factory, exportedName),
-		literalMethod(factory, exportedName, panicName),
+		literalMethod(factory, exportedName, panicName, denseIndexName),
 		copyMethod(factory, exportedName, elementType, lengthType),
-		getMethod(factory, elementType),
+		getMethod(factory, elementType, denseIndexName),
 		setMethod(factory, elementType),
 		checkMethod(factory, panicName),
 	)
@@ -245,6 +248,7 @@ func literalMethod(
 	factory tsgo.Factory,
 	exportedName string,
 	panicName string,
+	denseIndexName string,
 ) tsgo.MethodDeclaration {
 	elementType := typeReference(factory, "T")
 	lengthType := typeReference(factory, "N")
@@ -309,8 +313,18 @@ func literalMethod(
 					factory,
 					runtimeProperty(factory, result, arraymember.Set),
 					nil,
-					element(factory, indexes, entry),
-					element(factory, values, entry),
+					definedElement(
+						factory,
+						denseIndexName,
+						indexes,
+						entry,
+					),
+					definedElement(
+						factory,
+						denseIndexName,
+						values,
+						entry,
+					),
 				)),
 			}, true),
 		),
@@ -405,6 +419,7 @@ func copyMethod(
 func getMethod(
 	factory tsgo.Factory,
 	elementType tsgo.TypeNode,
+	denseIndexName string,
 ) tsgo.MethodDeclaration {
 	index := factory.Identifier("index")
 	return runtimeMethod(
@@ -434,8 +449,9 @@ func getMethod(
 					index,
 				),
 			),
-			factory.ReturnStatement(element(
+			factory.ReturnStatement(definedElement(
 				factory,
+				denseIndexName,
 				property(factory, factory.ThisExpression(), "$values"),
 				binary(
 					factory,
@@ -500,98 +516,4 @@ func setMethod(
 			)),
 		},
 	)
-}
-
-func checkMethod(
-	factory tsgo.Factory,
-	panicName string,
-) tsgo.MethodDeclaration {
-	index := factory.Identifier("index")
-	offset := factory.Identifier("offset")
-	negative := binary(
-		factory,
-		offset,
-		tsgo.BinaryOperatorLessThanToken,
-		factory.NumericLiteral("0", tsgo.TokenFlagsNone),
-	)
-	tooLarge := binary(
-		factory,
-		offset,
-		tsgo.BinaryOperatorGreaterThanEqualsToken,
-		runtimeProperty(
-			factory,
-			factory.ThisExpression(),
-			arraymember.Length,
-		),
-	)
-	return method(
-		factory,
-		[]tsgo.ModifierLike{factory.PrivateKeyword()},
-		"$check",
-		nil,
-		[]tsgo.ParameterDeclaration{parameter(
-			factory,
-			nil,
-			"index",
-			indexType(factory),
-		)},
-		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
-		[]tsgo.Statement{
-			variable(
-				factory,
-				tsgo.NodeFlagsConst,
-				"offset",
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindNumberKeyword,
-				),
-				call(
-					factory,
-					api.TargetIntrinsicNumber.Expression(factory),
-					nil,
-					index,
-				),
-			),
-			factory.IfStatement(
-				binary(
-					factory,
-					binary(
-						factory,
-						factory.PrefixUnaryExpression(
-							tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
-							call(
-								factory,
-								property(
-									factory,
-									api.TargetIntrinsicNumber.Expression(factory),
-									"isInteger",
-								),
-								nil,
-								offset,
-							),
-						),
-						tsgo.BinaryOperatorBarBarToken,
-						negative,
-					),
-					tsgo.BinaryOperatorBarBarToken,
-					tooLarge,
-				),
-				factory.Block([]tsgo.Statement{
-					boundsPanic(
-						factory,
-						panicName,
-						"array index out of bounds",
-					),
-				}, true),
-				nil,
-			),
-			factory.ReturnStatement(offset),
-		},
-	)
-}
-
-func indexType(factory tsgo.Factory) tsgo.UnionTypeNode {
-	return factory.UnionTypeNode([]tsgo.TypeNode{
-		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
-		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBigIntKeyword),
-	})
 }

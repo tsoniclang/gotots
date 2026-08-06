@@ -38,7 +38,7 @@ func constantLengthRangeExpression(
 	case *ast.TypeAssertExpr:
 		return constantLengthRangeExpression(context, source.X)
 	case *ast.CallExpr:
-		facts, ok := context.TypesInfo().Types[source.Fun]
+		facts, ok := context.TypesInfo().TypeAndValue(source.Fun)
 		if !ok || !facts.IsType() {
 			return false, nil
 		}

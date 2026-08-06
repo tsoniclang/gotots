@@ -6,8 +6,13 @@ import (
 	"slices"
 	"sort"
 
+	environmentidentity "github.com/tsoniclang/gotots/internal/contracts/environment"
+	externalcertify "github.com/tsoniclang/gotots/internal/contracts/externals/certify"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
+	environmentcontract "github.com/tsoniclang/gotots/internal/emit/environmentcontract"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -226,10 +231,18 @@ func (s *programSession) requireRoot(root Root) error {
 				Reason: "constant projection root does not own an untyped constant",
 			}
 		}
-		return s.require(root.object)
+		return s.RequireUse(
+			root.object,
+			rootUseDemand(root.object),
+			gostdlib.NoUseSelection(),
+		)
 	}
 	if root.kind == RootFileCoverage || root.kind == RootExportedAPI {
-		return s.require(root.object)
+		return s.RequireUse(
+			root.object,
+			rootUseDemand(root.object),
+			gostdlib.NoUseSelection(),
+		)
 	}
 	if root.kind != RootConstantProjection {
 		return &ScheduleError{
@@ -252,6 +265,28 @@ func (s *programSession) verifyRootObligations(
 	files []TargetFile,
 ) error {
 	for _, root := range roots {
+		function, genericFunction := root.object.(*types.Func)
+		if root.kind == RootExportedAPI &&
+			genericFunction &&
+			function.Signature().Recv() == nil &&
+			len(api.GenericDeclarationParameters(function)) != 0 {
+			binding, ok := s.registry.Target(root.object)
+			if !ok {
+				return &ScheduleError{
+					Object: root.object.Name(),
+					Reason: "export root has no target binding",
+				}
+			}
+			exports, ok := s.artifacts.ExportedBindings(
+				api.MustSourceArtifactOwner(root.object),
+			)
+			if !ok || !slices.Contains(exports, binding.Name) {
+				return &ScheduleError{
+					Object: root.object.Name(),
+					Reason: "export root has no exact source-facing target binding",
+				}
+			}
+		}
 		selected, ok := root.object.(*types.Const)
 		if !ok ||
 			!constantbinding.IsUntyped(selected.Type()) ||
@@ -312,9 +347,10 @@ type EvaluationOrder = api.EvaluationOrder
 type ConcurrencySemantics = api.ConcurrencySemantics
 
 const (
-	IntegerRepresentationInvalid = api.IntegerRepresentationInvalid
-	IntegerRepresentationNumber  = api.IntegerRepresentationNumber
-	IntegerRepresentationBigInt  = api.IntegerRepresentationBigInt
+	IntegerRepresentationInvalid       = api.IntegerRepresentationInvalid
+	IntegerRepresentationNumber        = api.IntegerRepresentationNumber
+	IntegerRepresentationBigInt        = api.IntegerRepresentationBigInt
+	IntegerRepresentationFixed64BigInt = api.IntegerRepresentationFixed64BigInt
 
 	EvaluationOrderInvalid    = api.EvaluationOrderInvalid
 	EvaluationOrderDirect     = api.EvaluationOrderDirect
@@ -329,6 +365,8 @@ type Options struct {
 	IntegerRepresentation IntegerRepresentation
 	EvaluationOrder       EvaluationOrder
 	ConcurrencySemantics  ConcurrencySemantics
+	StandardLibrary       *gostdlibcertify.Certificate
+	ExternalProvider      *externalcertify.Certificate
 }
 
 func DefaultOptions() Options {
@@ -345,10 +383,15 @@ func ParseIntegerRepresentation(value string) (IntegerRepresentation, error) {
 		return IntegerRepresentationNumber, nil
 	case IntegerRepresentationBigInt.String():
 		return IntegerRepresentationBigInt, nil
+	case IntegerRepresentationFixed64BigInt.String():
+		return IntegerRepresentationFixed64BigInt, nil
 	default:
 		return IntegerRepresentationInvalid, &OptionsError{
-			Field:  "integer representation",
-			Reason: fmt.Sprintf("%q is not number or bigint", value),
+			Field: "integer representation",
+			Reason: fmt.Sprintf(
+				"%q is not number, fixed64-bigint, or bigint",
+				value,
+			),
 		}
 	}
 }
@@ -400,6 +443,18 @@ func (o Options) validate() error {
 			Reason: "value is invalid",
 		}
 	}
+	if o.StandardLibrary != nil && !o.StandardLibrary.Valid() {
+		return &OptionsError{
+			Field:  "standard library",
+			Reason: "certificate is invalid",
+		}
+	}
+	if o.ExternalProvider != nil && !o.ExternalProvider.Valid() {
+		return &OptionsError{
+			Field:  "external provider",
+			Reason: "certificate is invalid",
+		}
+	}
 	return nil
 }
 
@@ -415,52 +470,72 @@ func (e *OptionsError) Error() string {
 	return fmt.Sprintf("validate compilation option %q: %s", e.Field, e.Reason)
 }
 
-func (s *programSession) require(object types.Object) error {
-	if s.sealed {
-		objectName := ""
-		if object != nil {
-			objectName = object.Name()
-		}
-		return &ScheduleError{
-			Object: objectName,
-			Reason: "declaration requested after target files were sealed",
-		}
+// rootUseDemand classifies the closed use demand created by requesting one
+// emission root from the referenced object kind.
+func rootUseDemand(object types.Object) environmentidentity.UseDemand {
+	switch object.(type) {
+	case *types.Func:
+		return environmentidentity.UseDemandCallable
+	case *types.TypeName:
+		return environmentidentity.UseDemandTypeContract
+	default:
+		return environmentidentity.UseDemandValue
 	}
-	if object == nil {
-		return &ScheduleError{Reason: "referenced object is nil"}
-	}
-	if function, ok := object.(*types.Func); ok {
-		object = function.Origin()
-	}
-	sourcePackage := s.source.PackageForTypes(object.Pkg())
-	environmentPackage := s.source.EnvironmentForTypes(object.Pkg())
-	if _, ok := s.sites[object]; !ok && environmentPackage == nil {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "object has no supported source declaration",
-		}
-	}
-	if sourcePackage == nil && environmentPackage == nil {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "object package has no declaration owner",
-		}
-	}
-	if sourcePackage != nil {
-		if err := s.requirePackage(sourcePackage); err != nil {
-			return err
-		}
-	} else {
-		if _, err := s.requireEnvironmentPackage(environmentPackage); err != nil {
-			return err
-		}
-	}
-	s.scheduler.enqueue(object)
-	return nil
 }
 
 func (e ProgramEmission) Files() []TargetFile {
 	return slices.Clone(e.files)
+}
+
+// EnvironmentProfile is the complete exact identity of the settled
+// environment evidence: build, compilation, provider, and pinned-target
+// profiles, each content-addressed by a deterministic fingerprint.
+type EnvironmentProfile = environmentcontract.Profile
+
+// EnvironmentProfile binds the settled environment evidence to the exact
+// selected build, compilation, provider, and pinned-target profiles.
+func (e ProgramEmission) EnvironmentProfile() EnvironmentProfile {
+	return e.environmentProfile
+}
+
+func (e ProgramEmission) EnvironmentObligations() []EnvironmentObligation {
+	return slices.Clone(e.environmentObligations)
+}
+
+func (e ProgramEmission) ExternalFunctionObligations() []ExternalFunctionObligation {
+	return slices.Clone(e.externalFunctionObligations)
+}
+
+func (e ProgramEmission) RuntimePackage() (RuntimePackage, bool) {
+	return e.runtimePackage, e.runtimePackage.assembled.Valid()
+}
+
+func (p RuntimePackage) Name() string {
+	return p.assembled.Name()
+}
+
+func (p RuntimePackage) RootPath() string {
+	return p.assembled.RootPath()
+}
+
+func (p RuntimePackage) ManifestPath() string {
+	return p.assembled.ManifestPath()
+}
+
+func (p RuntimePackage) IntegerRepresentation() IntegerRepresentation {
+	return p.assembled.Profile()
+}
+
+func (p RuntimePackage) ConcurrencySemantics() ConcurrencySemantics {
+	return p.assembled.Concurrency()
+}
+
+func (p RuntimePackage) Manifest() []byte {
+	return p.assembled.Manifest()
+}
+
+func (p RuntimePackage) Fingerprint() string {
+	return p.assembled.Fingerprint()
 }
 
 func (f TargetFile) OutputPath() string {

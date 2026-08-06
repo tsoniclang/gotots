@@ -6,7 +6,51 @@ import (
 	"go/types"
 	"slices"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	controlcontract "github.com/tsoniclang/gotots/internal/emit/api/control"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+type MemoryByteOrder = environmentcontract.ByteOrder
+
+type IteratorRangeState = controlcontract.IteratorRangeState
+
+const (
+	IteratorRangeStateExhausted = controlcontract.IteratorRangeStateExhausted
+	IteratorRangeStatePanicked  = controlcontract.IteratorRangeStatePanicked
+	IteratorRangeStateDone      = controlcontract.IteratorRangeStateDone
+	IteratorRangeStateReady     = controlcontract.IteratorRangeStateReady
+	IteratorRangeStateReturned  = controlcontract.IteratorRangeStateReturned
+)
+
+type IteratorRangeControl = controlcontract.IteratorRangeControl
+
+func NewIteratorRangeControl(
+	source *ast.RangeStmt,
+	stateName string,
+	resultName string,
+	returning bool,
+) (IteratorRangeControl, error) {
+	control, err := controlcontract.NewIteratorRangeControl(
+		source,
+		stateName,
+		resultName,
+		returning,
+	)
+	if controlError, ok := err.(*controlcontract.Error); ok {
+		return IteratorRangeControl{}, &InvariantError{
+			Role:   RoleRangeBody,
+			Reason: controlError.Reason,
+		}
+	}
+	return control, err
+}
+
+const (
+	MemoryByteOrderInvalid      = environmentcontract.ByteOrderInvalid
+	MemoryByteOrderLittleEndian = environmentcontract.ByteOrderLittleEndian
+	MemoryByteOrderBigEndian    = environmentcontract.ByteOrderBigEndian
 )
 
 type AddressableStorage interface {
@@ -24,58 +68,65 @@ type AddressableStorage interface {
 }
 
 type Context struct {
-	role                       Role
-	fileSet                    *token.FileSet
-	typesPackage               *types.Package
-	typesInfo                  *types.Info
-	typesSizes                 types.Sizes
-	factory                    tsgo.Factory
-	names                      Names
-	values                     Values
-	pointerNames               PointerRepresentationNames
-	pointerValues              PointerRepresentationValues
-	stableAssignments          StableAssignmentValues
-	containerStorage           ContainerStorageValues
-	storage                    AddressableStorage
-	integer                    IntegerRepresentation
-	evaluationOrder            EvaluationOrder
-	goRuntime                  GoRuntimeContract
-	concurrency                ConcurrencySemantics
-	expectedType               types.Type
-	expectedResults            *types.Tuple
-	functionResults            *types.Tuple
-	breakDepth                 uint32
-	continueDepth              uint32
-	breakTarget                string
-	continueTarget             string
-	controlLabels              map[*types.Label]ControlLabel
-	statementLabel             string
-	artifactOwner              ArtifactOwner
-	callableControls           map[ast.Node]CallableControlDemand
-	callableEnclosing          ast.Node
-	currentCallable            ast.Node
-	currentControl             CallableControlDemand
-	deferControl               DeferControl
-	returnControl              ReturnControl
-	gotoUses                   map[*types.Label][]token.Pos
-	gotoTargets                map[*types.Label]GotoTarget
-	gotoLocals                 map[*types.Var]struct{}
-	storageNames               map[*types.Var]string
-	localConstantProjections   map[*types.Const][]types.BasicKind
-	lexicalTypeRequirements    map[*types.TypeName][]DeclarationRequirement
-	genericResolver            GenericCallableResolver
-	genericConsumer            GenericOperationConsumer
-	cooperativeResolver        CooperativeCallableResolver
-	callableFacet              CallableFacet
-	cooperative                bool
-	staticallySelectedCallable bool
-	detachedInvocation         bool
-	environmentContract        bool
-	genericParameters          map[*types.TypeParam]string
-	genericParameterOwner      types.Object
-	genericCallableProfile     *GenericCallableProfile
-	iteratorRangeControls      []IteratorRangeControl
-	valueReceiver              *ValueReceiverBinding
+	role                         Role
+	fileSet                      *token.FileSet
+	typesPackage                 *types.Package
+	typesInfo                    *types.Info
+	typesSizes                   types.Sizes
+	memoryByteOrder              MemoryByteOrder
+	factory                      tsgo.Factory
+	names                        Names
+	values                       Values
+	pointerNames                 PointerRepresentationNames
+	pointerValues                PointerRepresentationValues
+	stableAssignments            StableAssignmentValues
+	containerStorage             ContainerStorageValues
+	storage                      AddressableStorage
+	scalar                       ScalarABI
+	providerScalar               ScalarABI
+	providerScalarRepresentation bool
+	providerProfile              []gostdlib.ProviderCallableProfileInterface
+	evaluationOrder              EvaluationOrder
+	goRuntime                    GoRuntimeContract
+	concurrency                  ConcurrencySemantics
+	expectedType                 types.Type
+	expectedResults              *types.Tuple
+	functionResults              *types.Tuple
+	breakDepth                   uint32
+	continueDepth                uint32
+	breakTarget                  string
+	continueTarget               string
+	controlLabels                map[*types.Label]ControlLabel
+	statementLabel               string
+	artifactOwner                ArtifactOwner
+	callableControls             map[ast.Node]CallableControlDemand
+	callableEnclosing            ast.Node
+	currentCallable              ast.Node
+	currentControl               CallableControlDemand
+	recoveryAuthority            string
+	deferControl                 DeferControl
+	returnControl                ReturnControl
+	gotoUses                     map[*types.Label][]token.Pos
+	gotoTargets                  map[*types.Label]GotoTarget
+	gotoLocals                   map[*types.Var]struct{}
+	storageNames                 map[*types.Var]string
+	localConstantProjections     map[*types.Const][]types.BasicKind
+	lexicalTypeRequirements      map[*types.TypeName][]DeclarationRequirement
+	genericResolver              GenericCallableResolver
+	genericConsumer              GenericOperationConsumer
+	cooperativeResolver          CooperativeCallableResolver
+	recoveryResolver             RecoveryCallableResolver
+	externalFunctionResolver     ExternalFunctionResolver
+	callableFacet                CallableFacet
+	cooperative                  bool
+	staticallySelectedCallable   bool
+	deferredCallableSelection    bool
+	detachedInvocation           bool
+	environmentContract          bool
+	genericParameters            map[*types.TypeParam]string
+	genericParameterOwner        types.Object
+	iteratorRangeControls        []IteratorRangeControl
+	valueReceiver                *ValueReceiverBinding
 }
 
 func (c Context) GenericParameterOwner() (types.Object, bool) {
@@ -164,6 +215,9 @@ func (c Context) WithLexicalTypeRequirements(
 				panic("non-lexical generated-artifact requirement reached lexical owner")
 			}
 			typeName, _, ok := requirement.NamedStructOperation()
+			if !ok {
+				typeName, _, _, ok = requirement.TypeRepresentation()
+			}
 			if !ok || typeName != anchor {
 				panic("lexical named-type requirement is inconsistent")
 			}
@@ -179,6 +233,7 @@ func NewContext(
 	typesPackage *types.Package,
 	typesInfo *types.Info,
 	typesSizes types.Sizes,
+	memoryByteOrder MemoryByteOrder,
 	factory tsgo.Factory,
 	names Names,
 	values Values,
@@ -198,6 +253,8 @@ func NewContext(
 		return Context{}, &ContextError{Reason: "types info is nil"}
 	case typesSizes == nil:
 		return Context{}, &ContextError{Reason: "types sizes are nil"}
+	case !memoryByteOrder.Valid():
+		return Context{}, &ContextError{Reason: "memory byte order is invalid"}
 	case names == nil:
 		return Context{}, &ContextError{Reason: "name owner is nil"}
 	case values == nil:
@@ -215,12 +272,17 @@ func NewContext(
 	pointerValues, _ := values.(PointerRepresentationValues)
 	stableAssignments, _ := values.(StableAssignmentValues)
 	containerStorage, _ := values.(ContainerStorageValues)
+	scalar, err := NewScalarABIFromSizes(integer, typesSizes)
+	if err != nil {
+		return Context{}, &ContextError{Reason: err.Error()}
+	}
 	return Context{
 		role:              role,
 		fileSet:           fileSet,
 		typesPackage:      typesPackage,
 		typesInfo:         typesInfo,
 		typesSizes:        typesSizes,
+		memoryByteOrder:   memoryByteOrder,
 		factory:           factory,
 		names:             names,
 		values:            values,
@@ -229,7 +291,7 @@ func NewContext(
 		stableAssignments: stableAssignments,
 		containerStorage:  containerStorage,
 		storage:           storage,
-		integer:           integer,
+		scalar:            scalar,
 		evaluationOrder:   evaluationOrder,
 		concurrency:       concurrency,
 	}, nil
@@ -287,6 +349,8 @@ func (c Context) EnterFunction(results *types.Tuple) Context {
 func (c Context) EnterLoop() Context {
 	c.breakDepth++
 	c.continueDepth++
+	c.breakTarget = ""
+	c.continueTarget = ""
 	return c
 }
 
@@ -302,6 +366,7 @@ func (c Context) EnterLoopTarget(name string) Context {
 
 func (c Context) EnterBreakable() Context {
 	c.breakDepth++
+	c.breakTarget = ""
 	return c
 }
 
@@ -371,12 +436,16 @@ func (c Context) TypesPackage() *types.Package {
 	return c.typesPackage
 }
 
-func (c Context) TypesInfo() *types.Info {
-	return c.typesInfo
+func (c Context) TypesInfo() TypeInfoView {
+	return newTypeInfoView(c.typesInfo)
 }
 
 func (c Context) TypesSizes() types.Sizes {
 	return c.typesSizes
+}
+
+func (c Context) MemoryByteOrder() MemoryByteOrder {
+	return c.memoryByteOrder
 }
 
 func (c Context) Factory() tsgo.Factory {
@@ -412,7 +481,11 @@ func (c Context) AddressableStorage() AddressableStorage {
 }
 
 func (c Context) IntegerRepresentation() IntegerRepresentation {
-	return c.integer
+	return c.scalar.IntegerRepresentation()
+}
+
+func (c Context) ScalarABI() ScalarABI {
+	return c.scalar
 }
 
 func (c Context) EvaluationOrder() EvaluationOrder {

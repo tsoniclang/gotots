@@ -119,6 +119,37 @@ func TestBuildCreatesExactNumberDivideAndRemainderFunctions(t *testing.T) {
 	}
 }
 
+func TestBuildCreatesExactFixedWidthFunctions(t *testing.T) {
+	statements, err := Build(
+		tsgo.NewFactory(),
+		[]api.RuntimeSymbol{
+			api.RuntimeIntegerNormalizeSigned64,
+			api.RuntimeIntegerNormalizeUnsigned64,
+		},
+		"GoPanic",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, expected := range []string{"asIntN", "asUintN"} {
+		function := statements[index].(tsgo.FunctionDeclaration)
+		if len(function.Parameters()) != 1 ||
+			function.Parameters()[0].Type().Kind() !=
+				tsgo.SyntaxKindBigIntKeyword ||
+			function.Type().Kind() != tsgo.SyntaxKindBigIntKeyword {
+			t.Fatalf("fixed-width helper %d is not bigint -> bigint", index)
+		}
+		call := function.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)
+		member := call.Expression().(tsgo.PropertyAccessExpression)
+		name := member.Name().(tsgo.Identifier)
+		if name.Text() != expected ||
+			len(call.Arguments()) != 2 ||
+			call.Arguments()[0].(tsgo.NumericLiteral).Text() != "64" {
+			t.Fatalf("fixed-width helper %d does not call BigInt.%s(64, value)", index, expected)
+		}
+	}
+}
+
 func TestBuildRejectsSymbolsOwnedByOtherRuntimeModules(t *testing.T) {
 	for _, symbols := range [][]api.RuntimeSymbol{
 		nil,

@@ -29,6 +29,16 @@ func runtimePanicValue(
 			),
 		},
 		[]tsgo.ClassElement{
+			factory.PropertyDeclaration(
+				[]tsgo.ModifierLike{
+					factory.StaticKeyword(),
+					factory.ReadonlyKeyword(),
+				},
+				factory.Identifier(interfacecontract.DynamicTypeComparable),
+				nil,
+				factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
+				factory.TrueLiteral(),
+			),
 			factory.ConstructorDeclaration(
 				nil,
 				nil,
@@ -50,9 +60,7 @@ func runtimePanicValue(
 				[]tsgo.ModifierLike{factory.ReadonlyKeyword()},
 				factory.Identifier(interfacecontract.DynamicTypeMember),
 				nil,
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindObjectKeyword,
-				),
+				interfacecontract.DynamicType(factory),
 				factory.Identifier(className),
 			),
 			factory.PropertyDeclaration(
@@ -81,9 +89,83 @@ func runtimePanicValue(
 			implementsMethod(factory),
 			equalMethod(factory, valueType),
 			hashMethod(factory),
+			formatStringProperty(factory),
+			formatMethod(factory),
 			errorMethod(factory),
 			runtimeErrorMethod(factory),
 		},
+	)
+}
+
+func formatStringProperty(factory tsgo.Factory) tsgo.PropertyDeclaration {
+	return factory.PropertyDeclaration(
+		[]tsgo.ModifierLike{factory.ReadonlyKeyword()},
+		factory.Identifier(interfacecontract.FormatStringMember),
+		nil,
+		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
+		factory.FalseLiteral(),
+	)
+}
+
+func formatMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
+	verb := factory.Identifier("verb")
+	message := factory.PropertyAccessExpression(
+		factory.ThisExpression(),
+		nil,
+		factory.Identifier("message"),
+		tsgo.NodeFlagsNone,
+	)
+	return factory.MethodDeclaration(
+		nil,
+		nil,
+		factory.Identifier(interfacecontract.FormatMember),
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{
+			parameter(
+				factory,
+				"verb",
+				factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword),
+			),
+			parameter(
+				factory,
+				"_flags",
+				factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword),
+			),
+			parameter(
+				factory,
+				"_precision",
+				factory.UnionTypeNode([]tsgo.TypeNode{
+					factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
+					factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword),
+				}),
+			),
+		},
+		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword),
+		factory.Block(
+			[]tsgo.Statement{
+				factory.IfStatement(
+					factory.BinaryExpression(
+						nil,
+						verb,
+						nil,
+						factory.BinaryOperatorToken(
+							tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+						),
+						factory.StringLiteral("T", tsgo.TokenFlagsNone),
+					),
+					factory.Block(
+						[]tsgo.Statement{factory.ReturnStatement(
+							factory.StringLiteral("runtime.errorString", tsgo.TokenFlagsNone),
+						)},
+						true,
+					),
+					nil,
+				),
+				factory.ReturnStatement(message),
+			},
+			true,
+		),
 	)
 }
 

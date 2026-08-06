@@ -13,6 +13,7 @@ type parallelTarget struct {
 	source      ast.Expr
 	identifier  *ast.Ident
 	object      *types.Var
+	sourceType  types.Type
 	name        string
 	declaration bool
 	discard     bool
@@ -66,7 +67,7 @@ func emitParallel(
 		expectedType := sourceType
 		if !target.discard {
 			if target.declaration {
-				expectedType = target.object.Type()
+				expectedType = target.sourceType
 			} else {
 				expectedType = target.target.SourceType()
 			}
@@ -137,7 +138,7 @@ func emitParallel(
 					context,
 					children,
 					target.identifier,
-					target.object.Type(),
+					target.sourceType,
 					value,
 				)
 				if err != nil {
@@ -157,7 +158,7 @@ func emitParallel(
 				context.WithRole(api.RoleLocalType),
 				children,
 				target.identifier,
-				target.object.Type(),
+				target.sourceType,
 			)
 			if err != nil {
 				return api.StatementEmission{}, err
@@ -220,7 +221,12 @@ func parallelTargets(
 			continue
 		}
 		if source.Tok == token.DEFINE && identifierOK {
-			if object, ok := context.TypesInfo().Defs[identifier].(*types.Var); ok {
+			if object, ok := context.TypesInfo().DefOf(identifier).(*types.Var); ok {
+				sourceType := context.TypesInfo().TypeOfObject(object)
+				if sourceType == nil {
+					return nil, nil, nil,
+						api.Unsupported(context, api.CategoryStatement, identifier)
+				}
 				name, selected := context.AddressableStorage().Name(
 					context,
 					object,
@@ -236,6 +242,7 @@ func parallelTargets(
 					source:      identifier,
 					identifier:  identifier,
 					object:      object,
+					sourceType:  sourceType,
 					name:        name,
 					declaration: true,
 					storage:     selected,

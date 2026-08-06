@@ -24,6 +24,7 @@ func EmitAssembly(
 	operations := make(map[api.NamedStructOperation]operationAssembly)
 	demanded := make(map[api.NamedStructOperation]bool)
 	var representationRequirements []api.DeclarationRequirement
+	var representationFacets []api.TypeRepresentationFacet
 	for _, requirement := range requirements {
 		if _, duplicate := seen[requirement]; duplicate {
 			return api.DeclarationEmission{}, &api.InvariantError{
@@ -45,6 +46,17 @@ func EmitAssembly(
 				representationRequirements,
 				requirement,
 			)
+			continue
+		}
+		if owner, artifact, facet, ok :=
+			requirement.TypeRepresentation(); ok {
+			if owner != typeName || artifact != nil {
+				return api.DeclarationEmission{}, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "named struct received a foreign type representation",
+				}
+			}
+			representationFacets = append(representationFacets, facet)
 			continue
 		}
 		if owner, operation, ok := requirement.NamedStructOperation(); ok {
@@ -103,5 +115,6 @@ func EmitAssembly(
 		typeName,
 		ordered,
 		representationRequirements,
+		representationFacets,
 	)
 }

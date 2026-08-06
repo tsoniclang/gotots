@@ -7,12 +7,13 @@ import (
 	"slices"
 	"sort"
 
+	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
-	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	"github.com/tsoniclang/gotots/internal/emit/runtime/gocontract"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
@@ -36,36 +37,52 @@ const (
 	TargetFileProgramInitialization
 	TargetFileSupport
 	TargetFileEnvironmentContract
+	TargetFileStandardLibraryConstantProjection
 )
 
 type ProgramEmission struct {
-	files []TargetFile
+	files                       []TargetFile
+	environmentObligations      []EnvironmentObligation
+	environmentProfile          EnvironmentProfile
+	externalFunctionObligations []ExternalFunctionObligation
+	runtimePackage              RuntimePackage
+}
+
+type RuntimePackage struct {
+	assembled runtimeemission.Package
 }
 
 type declarationSite = declarationindex.Site
 
 type programSession struct {
-	source                 *load.Program
-	factory                tsgo.Factory
-	integer                api.IntegerRepresentation
-	evaluationOrder        api.EvaluationOrder
-	concurrency            api.ConcurrencySemantics
-	registry               *emitnaming.Registry
-	scheduler              *scheduler
-	requirements           *declarationRequirementScheduler
-	artifacts              *artifactstate.Graph
-	sites                  map[types.Object]declarationSite
-	emitters               map[*load.Package]*emitter
-	builders               map[string]*targetFileBuilder
-	packageBuilders        map[*load.Package]*packageTargetBuilder
-	environmentBuilders    map[*load.Package]*environmentContractBuilder
-	packageInitializations *packageInitializationScheduler
-	genericOperations      map[genericOperationIdentity]*api.GenericOperationContract
-	genericProfiles        map[genericCallableProfileIdentity]*api.GenericCallableProfile
-	classMembers           map[*types.Func]classMemberContribution
-	goRuntime              *gocontract.Contract
-	compareArtifactOwners  func(api.ArtifactOwner, api.ArtifactOwner) int
-	sealed                 bool
+	source                   *load.Program
+	factory                  tsgo.Factory
+	scalar                   api.ScalarABI
+	providerScalar           api.ScalarABI
+	evaluationOrder          api.EvaluationOrder
+	concurrency              api.ConcurrencySemantics
+	registry                 *emitnaming.Registry
+	scheduler                *scheduler
+	requirements             *declarationRequirementScheduler
+	artifacts                *artifactstate.Graph
+	sites                    map[types.Object]declarationSite
+	emitters                 map[*load.Package]*emitter
+	builders                 map[string]*targetFileBuilder
+	packageBuilders          map[*load.Package]*packageTargetBuilder
+	packageExports           *packageExportScheduler
+	environmentBuilders      map[*load.Package]*environmentContractBuilder
+	packageInitializations   *packageInitializationScheduler
+	genericOperations        map[genericOperationIdentity]*api.GenericOperationContract
+	genericConcretizations   map[genericConcretizationIdentity]*api.GenericConcretization
+	classMembers             map[*types.Func]classMemberContribution
+	goRuntime                *gocontract.Contract
+	runtimePackage           RuntimePackage
+	compareArtifactOwners    func(api.ArtifactOwner, api.ArtifactOwner) int
+	requirementRemovalOwner  api.ArtifactOwner
+	standardLibrary          *gostdlibcertify.Certificate
+	externalFunctions        map[*types.Func]ExternalFunctionObligation
+	externalFunctionBindings map[*types.Func]api.ExternalFunctionTarget
+	sealed                   bool
 }
 
 type targetDeclaration struct {
@@ -141,8 +158,13 @@ func CompileWithOptions(
 			}
 			continue
 		}
-		if requirements, ok := session.requirements.nextBatch(); ok {
-			if err := session.applyDeclarationRequirements(requirements); err != nil {
+		if owner, requirements, removed, ok :=
+			session.requirements.nextBatch(); ok {
+			if err := session.applyDeclarationRequirements(
+				owner,
+				requirements,
+				removed,
+			); err != nil {
 				return ProgramEmission{}, err
 			}
 			continue
@@ -161,7 +183,25 @@ func CompileWithOptions(
 			}
 			continue
 		}
+		if session.requirements.finalizeRemovals() {
+			continue
+		}
+		if builders := session.packageExports.nextBatch(); len(builders) != 0 {
+			for _, builder := range builders {
+				if err := session.publishPackageExports(builder); err != nil {
+					return ProgramEmission{}, err
+				}
+			}
+			continue
+		}
 		break
+	}
+	obligations, err := session.environmentObligations()
+	if err != nil {
+		return ProgramEmission{}, err
+	}
+	if err := session.verifyProviderClosure(obligations); err != nil {
+		return ProgramEmission{}, err
 	}
 	files, err := session.targetFiles()
 	if err != nil {
@@ -170,7 +210,17 @@ func CompileWithOptions(
 	if err := session.verifyRootObligations(orderedRoots, files); err != nil {
 		return ProgramEmission{}, err
 	}
-	return ProgramEmission{files: files}, nil
+	profile, err := session.environmentProfile(options)
+	if err != nil {
+		return ProgramEmission{}, err
+	}
+	return ProgramEmission{
+		files:                       files,
+		environmentObligations:      obligations,
+		environmentProfile:          profile,
+		externalFunctionObligations: session.externalFunctionObligations(),
+		runtimePackage:              session.runtimePackage,
+	}, nil
 }
 
 func CompileFile(
@@ -250,7 +300,28 @@ func newProgramSession(
 	source *load.Program,
 	options Options,
 ) (*programSession, error) {
+	scalar, err := programScalarABI(source, options.IntegerRepresentation)
+	if err != nil {
+		return nil, err
+	}
+	providerScalar, err := certifiedProviderScalarABI(
+		options.StandardLibrary,
+		scalar.NativeIntegerWidth(),
+	)
+	if err != nil {
+		return nil, err
+	}
 	sites, err := declarationindex.Program(source)
+	if err != nil {
+		return nil, err
+	}
+	externalBindings, externalModules, err := resolveExternalFunctionProvider(
+		source,
+		sites,
+		options.ExternalProvider,
+		options.StandardLibrary,
+		providerScalar,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -258,6 +329,8 @@ func newProgramSession(
 	if err := registry.IndexCompilationTargets(
 		source.Packages(),
 		source.EnvironmentPackages(),
+		options.StandardLibrary,
+		externalModules,
 	); err != nil {
 		return nil, err
 	}
@@ -269,7 +342,8 @@ func newProgramSession(
 	session := &programSession{
 		source:          source,
 		factory:         tsgo.NewFactory(),
-		integer:         options.IntegerRepresentation,
+		scalar:          scalar,
+		providerScalar:  providerScalar,
 		evaluationOrder: options.EvaluationOrder,
 		concurrency:     options.ConcurrencySemantics,
 		registry:        registry,
@@ -280,27 +354,34 @@ func newProgramSession(
 		artifacts: artifactstate.NewGraph(
 			compareArtifactOwners,
 		),
-		sites:                  sites,
-		emitters:               make(map[*load.Package]*emitter),
-		builders:               make(map[string]*targetFileBuilder),
-		packageBuilders:        make(map[*load.Package]*packageTargetBuilder),
-		environmentBuilders:    make(map[*load.Package]*environmentContractBuilder),
-		packageInitializations: newPackageInitializationScheduler(),
-		genericOperations:      make(map[genericOperationIdentity]*api.GenericOperationContract),
-		genericProfiles:        make(map[genericCallableProfileIdentity]*api.GenericCallableProfile),
-		classMembers:           make(map[*types.Func]classMemberContribution),
-		goRuntime:              goRuntime,
-		compareArtifactOwners:  compareArtifactOwners,
+		sites:                    sites,
+		emitters:                 make(map[*load.Package]*emitter),
+		builders:                 make(map[string]*targetFileBuilder),
+		packageBuilders:          make(map[*load.Package]*packageTargetBuilder),
+		packageExports:           newPackageExportScheduler(),
+		environmentBuilders:      make(map[*load.Package]*environmentContractBuilder),
+		packageInitializations:   newPackageInitializationScheduler(),
+		genericOperations:        make(map[genericOperationIdentity]*api.GenericOperationContract),
+		genericConcretizations:   make(map[genericConcretizationIdentity]*api.GenericConcretization),
+		classMembers:             make(map[*types.Func]classMemberContribution),
+		goRuntime:                goRuntime,
+		compareArtifactOwners:    compareArtifactOwners,
+		standardLibrary:          options.StandardLibrary,
+		externalFunctions:        make(map[*types.Func]ExternalFunctionObligation),
+		externalFunctionBindings: externalBindings,
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
 			sourcePackage,
 			session.factory,
 			session.registry,
-			options.IntegerRepresentation,
+			scalar,
+			providerScalar,
 			options.EvaluationOrder,
 			options.ConcurrencySemantics,
-			session.require,
+			session,
+			session,
+			session,
 			session,
 			session,
 			session,
@@ -379,28 +460,6 @@ func newProgramSession(
 	return session, nil
 }
 
-func sourceArtifactOwnerOrder(
-	sites map[types.Object]declarationSite,
-) func(api.ArtifactOwner, api.ArtifactOwner) int {
-	return func(left api.ArtifactOwner, right api.ArtifactOwner) int {
-		leftObject, leftSource := left.Source()
-		rightObject, rightSource := right.Source()
-		if leftSource && rightSource {
-			leftSite, leftIndexed := sites[leftObject]
-			rightSite, rightIndexed := sites[rightObject]
-			if leftIndexed && rightIndexed {
-				if order := declarationindex.CompareSites(
-					leftSite,
-					rightSite,
-				); order != 0 {
-					return order
-				}
-			}
-		}
-		return emitordering.CompareArtifactOwners(left, right)
-	}
-}
-
 func (s *programSession) emit(object types.Object) error {
 	site, ok := s.sites[object]
 	if !ok {
@@ -430,10 +489,14 @@ func (s *programSession) emit(object types.Object) error {
 	if err != nil {
 		return err
 	}
-	if err := s.artifacts.Commit(
+	if err := s.recordExternalFunctionObligation(site, object); err != nil {
+		return err
+	}
+	if err := s.commitArtifactRevision(
 		owner,
 		revision.contract,
 		revision.dependencies,
+		revision.requirements,
 	); err != nil {
 		return err
 	}
@@ -460,7 +523,7 @@ func (s *programSession) applyRootRequests(
 		return &ScheduleError{Reason: "root request arrived after target files were sealed"}
 	}
 	imports := make([]api.RootRequest, 0, len(requests))
-	err := api.WalkRootRequests(requests, func(request api.RootRequest) error {
+	err := api.WalkUniqueRootRequestPayloads(requests, func(request api.RootRequest) error {
 		switch request.Kind() {
 		case api.RootRequestImport:
 			imports = append(imports, request)

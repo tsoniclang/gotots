@@ -12,6 +12,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
@@ -75,7 +76,7 @@ func TestArtifactReconstructionReplaysTemporaryNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(trigger); err != nil {
+	if err := session.RequireUse(trigger, rootUseDemand(trigger), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -111,7 +112,7 @@ func TestTargetFilesRejectPendingArtifactReconstruction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := session.require(caller); err != nil {
+	if err := session.RequireUse(caller, rootUseDemand(caller), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -298,19 +299,117 @@ func TestDeclarationRequirementSchedulerDeduplicatesAndUsesClosedOrder(
 	scheduler.enqueue(firstCopy)
 	scheduler.enqueue(firstCopy)
 
-	firstBatch, ok := scheduler.nextBatch()
+	firstOwner, firstBatch, removed, ok := scheduler.nextBatch()
 	if !ok ||
+		removed ||
+		firstOwner != firstCopy.Owner() ||
 		len(firstBatch) != 2 ||
 		firstBatch[0] != firstCopy ||
 		firstBatch[1] != firstEqual {
 		t.Fatalf("first requirement batch = %#v, %t", firstBatch, ok)
 	}
-	secondBatch, ok := scheduler.nextBatch()
-	if !ok || len(secondBatch) != 1 || secondBatch[0] != secondZero {
+	secondOwner, secondBatch, removed, ok := scheduler.nextBatch()
+	if !ok ||
+		removed ||
+		secondOwner != secondZero.Owner() ||
+		len(secondBatch) != 1 ||
+		secondBatch[0] != secondZero {
 		t.Fatalf("second requirement batch = %#v, %t", secondBatch, ok)
 	}
-	if actual, ok := scheduler.nextBatch(); ok || actual != nil {
+	if owner, actual, removed, ok := scheduler.nextBatch(); ok ||
+		removed ||
+		owner.Valid() ||
+		actual != nil {
 		t.Fatalf("unexpected trailing requirement batch = %#v, %t", actual, ok)
+	}
+}
+
+func TestDeclarationRequirementSchedulerReplacesConsumerRevision(
+	t *testing.T,
+) {
+	sourcePackage := types.NewPackage("example.com/revisions", "revisions")
+	provider := types.NewTypeName(token.Pos(1), sourcePackage, "Record", nil)
+	firstConsumer := api.MustSourceArtifactOwner(types.NewFunc(
+		token.Pos(2),
+		sourcePackage,
+		"First",
+		types.NewSignatureType(nil, nil, nil, nil, nil, false),
+	))
+	secondConsumer := api.MustSourceArtifactOwner(types.NewFunc(
+		token.Pos(3),
+		sourcePackage,
+		"Second",
+		types.NewSignatureType(nil, nil, nil, nil, nil, false),
+	))
+	requirement, err := api.NewNamedStructOperationRequirement(
+		provider,
+		api.NamedStructOperationCopy,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scheduler := newDeclarationRequirementScheduler(
+		emitordering.CompareArtifactOwners,
+	)
+	scheduler.replace(firstConsumer, []api.DeclarationRequirement{requirement})
+	scheduler.replace(secondConsumer, []api.DeclarationRequirement{requirement})
+	owner, selected, removed, ok := scheduler.nextBatch()
+	if !ok ||
+		removed ||
+		owner != requirement.Owner() ||
+		len(selected) != 1 ||
+		selected[0] != requirement {
+		t.Fatalf("initial replacement batch = %v %#v %t", owner, selected, ok)
+	}
+	scheduler.replace(firstConsumer, nil)
+	if scheduler.hasPending() {
+		t.Fatal("shared requirement was removed with one remaining consumer")
+	}
+	scheduler.replace(secondConsumer, nil)
+	if !scheduler.finalizeRemovals() {
+		t.Fatal("final requirement removal was not scheduled at quiescence")
+	}
+	owner, selected, removed, ok = scheduler.nextBatch()
+	if !ok || !removed ||
+		owner != requirement.Owner() ||
+		len(selected) != 0 {
+		t.Fatalf("removal batch = %v %#v %t", owner, selected, ok)
+	}
+	if scheduler.wasApplied(requirement) {
+		t.Fatal("removed requirement survived in the applied snapshot")
+	}
+}
+
+func TestDeclarationRequirementSchedulerReplacesSelfDemand(
+	t *testing.T,
+) {
+	sourcePackage := types.NewPackage("example.com/self-demand", "selfdemand")
+	record := types.NewTypeName(token.Pos(1), sourcePackage, "Record", nil)
+	requirement, err := api.NewNamedStructOperationRequirement(
+		record,
+		api.NamedStructOperationCopy,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scheduler := newDeclarationRequirementScheduler(
+		emitordering.CompareArtifactOwners,
+	)
+	scheduler.replace(
+		requirement.Owner(),
+		[]api.DeclarationRequirement{requirement},
+	)
+	if _, _, removed, ok := scheduler.nextBatch(); !ok || removed {
+		t.Fatal("self demand was not scheduled")
+	}
+	scheduler.replace(requirement.Owner(), nil)
+	if !scheduler.finalizeRemovals() {
+		t.Fatal("stale self demand was retained after exact replacement")
+	}
+	owner, requirements, removed, ok := scheduler.nextBatch()
+	if !ok || !removed || owner != requirement.Owner() ||
+		len(requirements) != 0 || scheduler.wasApplied(requirement) {
+		t.Fatal("stale self demand survived its replacement revision")
 	}
 }
 
@@ -341,7 +440,7 @@ func TestDeclarationRequirementSchedulerLookupVisitsOnlySelectedOwner(
 		scheduler.enqueue(requirement)
 	}
 	for {
-		if _, ok := scheduler.nextBatch(); !ok {
+		if _, _, _, ok := scheduler.nextBatch(); !ok {
 			break
 		}
 	}
@@ -379,7 +478,7 @@ func TestAnonymousStructDemandsUseExistingArtifactFixedPoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := session.require(definition); err != nil {
+	if err := session.RequireUse(definition, rootUseDemand(definition), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -393,7 +492,7 @@ func TestAnonymousStructDemandsUseExistingArtifactFixedPoint(t *testing.T) {
 		t.Fatal("anonymous artifact fabricated a go/types source object")
 	}
 
-	if err := session.require(copyValue); err != nil {
+	if err := session.RequireUse(copyValue, rootUseDemand(copyValue), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)
@@ -412,7 +511,7 @@ func TestAnonymousStructDemandsUseExistingArtifactFixedPoint(t *testing.T) {
 		t.Fatal("copy consumer did not reconstruct through the existing artifact graph")
 	}
 
-	if err := session.require(equal); err != nil {
+	if err := session.RequireUse(equal, rootUseDemand(equal), gostdlib.NoUseSelection()); err != nil {
 		t.Fatal(err)
 	}
 	drainProgramSession(t, session)

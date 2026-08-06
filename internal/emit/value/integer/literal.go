@@ -9,6 +9,40 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+func Literal(
+	context api.Context,
+	sourceType types.Type,
+	decimal string,
+) (tsgo.Expression, error) {
+	carrier, ok := Describe(context.TypesSizes(), sourceType)
+	if !ok {
+		return nil, &api.IntegerCarrierError{
+			Carrier: api.IntegerCarrierInvalid,
+		}
+	}
+	return CarrierLiteral(context, carrier, decimal)
+}
+
+func CarrierLiteral(
+	context api.Context,
+	carrier Carrier,
+	decimal string,
+) (tsgo.Expression, error) {
+	abi, err := api.NewScalarABIFromSizes(
+		context.IntegerRepresentation(),
+		context.TypesSizes(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return api.IntegerLiteral(
+		context.Factory(),
+		abi,
+		carrier.Alias(),
+		decimal,
+	)
+}
+
 func EmitConstant(
 	context api.Context,
 	source ast.Node,
@@ -29,11 +63,7 @@ func EmitConstant(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	target, err := api.IntegerLiteral(
-		context.Factory(),
-		context.IntegerRepresentation(),
-		magnitude,
-	)
+	target, err := CarrierLiteral(context, carrier, magnitude)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

@@ -9,14 +9,19 @@ func Audit() []int32 {
 	expression := Counter.Bump
 	expressionResult := expression(counter)
 	beforeReset := counter.Read()
+	captured := counter.Capture()
 	counter.Reset(9)
+	afterImplicitPointerReceiver := counter.Value
+	pointer := &counter
+	pointer.Reset(10)
 	return []int32{
 		direct,
-		counter.Value - 8,
+		afterImplicitPointerReceiver - 8,
 		firstBound,
 		secondBound,
 		expressionResult,
 		beforeReset,
+		captured,
 		counter.Value,
 	}
 }

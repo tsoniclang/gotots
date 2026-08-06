@@ -16,6 +16,22 @@ func Classify(value int32) int32 {
 	}
 }
 
+func ClosureCondition(flag bool) int32 {
+	changed := false
+	set := func() {
+		changed = flag
+	}
+	set()
+	switch {
+	case !flag:
+		return 1
+	case changed:
+		return 2
+	default:
+		return 3
+	}
+}
+
 func Constants() int32 {
 	const left, right int32 = 2, 5
 	const (

@@ -8,6 +8,7 @@ import (
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
+	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -30,44 +31,16 @@ func emitGeneric(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	callable, ok, err := context.ResolveGenericCallable(owner)
+	operationSet, ok, err := context.ResolveGenericCallable(owner)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
 	if !ok ||
-		instance.TypeArgs == nil ||
-		instance.TypeArgs.Len() != len(callable.Parameters()) {
+		instance.TypeArgs.Len() != len(operationSet.Parameters()) {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if err := validateResults(context, source, signature, discarded); err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	typeArguments, typeRequests, err := genericinstance.EmitTypeArguments(
-		context,
-		children,
-		source,
-		owner,
-		instance.TypeArgs,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	capabilities, capabilityRequests, err := genericinstance.EmitCapabilities(
-		context,
-		source,
-		callable,
-		instance.TypeArgs,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	capabilityArguments, err := genericabi.JoinCapabilities(
-		owner,
-		callable.Operations(),
-		capabilities,
-	)
-	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
 	arguments, before, argumentRequests, err := emitArguments(
@@ -80,26 +53,148 @@ func emitGeneric(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	declarationSignature, ok := owner.Type().(*types.Signature)
-	if !ok {
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	reference, callableFacet, _, err :=
-		cooperativecall.SelectGenericCallable(
-			context,
-			owner,
-			declarationSignature,
-			signature,
-		)
+	requiresConcretization, err :=
+		context.GenericCallableRequiresConcretization(owner)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	arguments = append(capabilityArguments, arguments...)
+	var (
+		reference     api.NameReference
+		callableFacet api.CallableFacet
+		typeArguments []tsgo.TypeNode
+		typeRequests  []api.RootRequest
+		mechanicArgs  []tsgo.Expression
+		mechanicReqs  []api.RootRequest
+	)
+	openConcretization := requiresConcretization &&
+		instance.TypeArgs.ContainsGenericTypeParameter()
+	if requiresConcretization && !openConcretization {
+		facet, selectionErr := cooperativecall.SelectGenericClassMethod(
+			context,
+			owner,
+		)
+		if selectionErr != nil {
+			return api.ExpressionEmission{}, true, selectionErr
+		}
+		concrete, concreteErr := context.ResolveGenericConcretization(
+			owner,
+			instance.TypeArgs,
+			signature,
+		)
+		if concreteErr != nil {
+			return api.ExpressionEmission{}, true, concreteErr
+		}
+		reference, err = api.NewNameReference(
+			concrete.Name(),
+			concrete.Requests()...,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		callableFacet = facet
+	} else if openConcretization {
+		facet, selectionErr := cooperativecall.SelectGenericClassMethod(
+			context,
+			owner,
+		)
+		if selectionErr != nil {
+			return api.ExpressionEmission{}, true, selectionErr
+		}
+		kernelNames, available := context.Names().(api.GenericKernelNames)
+		if !available {
+			return api.ExpressionEmission{}, true, &api.ContextError{
+				Reason: "generic kernel names are unavailable",
+			}
+		}
+		reference, err = kernelNames.GenericKernel(owner)
+		callableFacet = facet
+		typeArguments, typeRequests, err =
+			genericinstance.EmitFunctionTypeArguments(
+				context,
+				children,
+				source,
+				owner,
+				instance.TypeArgs,
+			)
+		if err == nil {
+			capabilities, capabilityRequests, capabilityErr :=
+				genericinstance.EmitCapabilities(
+					context,
+					source,
+					operationSet,
+					instance.TypeArgs,
+				)
+			if capabilityErr != nil {
+				return api.ExpressionEmission{}, true, capabilityErr
+			}
+			mechanicArgs, capabilityErr = genericabi.JoinCapabilities(
+				owner,
+				operationSet.Operations(),
+				capabilities,
+			)
+			if capabilityErr != nil {
+				return api.ExpressionEmission{}, true, capabilityErr
+			}
+			mechanicReqs = capabilityRequests
+		}
+	} else {
+		if len(operationSet.Operations()) != 0 {
+			return api.ExpressionEmission{}, true, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "generic mechanics reached a source-facing callable",
+			}
+		}
+		selected, facet, selectionErr :=
+			cooperativecall.SelectGenericCallable(context, owner)
+		if selectionErr != nil {
+			return api.ExpressionEmission{}, true, selectionErr
+		}
+		reference = selected
+		callableFacet = facet
+		typeArguments, typeRequests, err =
+			genericinstance.EmitFunctionTypeArguments(
+				context,
+				children,
+				source,
+				owner,
+				instance.TypeArgs,
+			)
+	}
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	contract, ok := owner.Type().(*types.Signature)
+	if !ok {
+		return api.ExpressionEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic callable owner has no signature",
+		}
+	}
+	if reference.ProviderBoundary() {
+		var providerBefore []tsgo.Statement
+		var providerRequests []api.RootRequest
+		arguments, providerBefore, providerRequests, err =
+			providerboundary.ToProviderGenericArguments(
+				context,
+				children,
+				contract.Params(),
+				signature.Params(),
+				arguments,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		before = append(before, providerBefore...)
+		argumentRequests = api.CombineRequests(
+			argumentRequests,
+			providerRequests,
+		)
+	}
+	arguments = append(mechanicArgs, arguments...)
 	result, err := api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			typeArguments,
 			arguments,
@@ -108,7 +203,7 @@ func emitGeneric(
 		api.CombineRequests(
 			reference.Requests(),
 			typeRequests,
-			capabilityRequests,
+			mechanicReqs,
 			argumentRequests,
 		),
 	)
@@ -130,15 +225,24 @@ func emitGeneric(
 			result,
 		)
 	}
+	if err == nil && reference.ProviderBoundary() && !detached && !discarded {
+		result, err = providerboundary.FromProviderGenericResults(
+			context,
+			children,
+			contract.Results(),
+			signature.Results(),
+			result,
+		)
+	}
 	return result, true, err
 }
 
 func genericFunctionInstance(
 	context api.Context,
 	source *ast.CallExpr,
-) (*types.Func, types.Instance, bool) {
+) (*types.Func, api.TypeInstance, bool) {
 	if source == nil {
-		return nil, types.Instance{}, false
+		return nil, api.TypeInstance{}, false
 	}
 	return genericinstance.FunctionEvidence(context.TypesInfo(), source.Fun)
 }

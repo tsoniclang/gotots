@@ -97,21 +97,12 @@ func Apply(
 		}
 		values := ordered.Values()
 		target := tsgo.Expression(context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			nil,
 			values,
 			tsgo.NodeFlagsNone,
 		))
-		if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
-			target = context.Factory().CallExpression(
-				context.Factory().Identifier("BigInt"),
-				nil,
-				nil,
-				[]tsgo.Expression{target},
-				tsgo.NodeFlagsNone,
-			)
-		}
 		result, err := api.NewExpressionEmission(
 			ordered.Before(),
 			target,

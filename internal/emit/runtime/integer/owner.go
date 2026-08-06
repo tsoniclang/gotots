@@ -57,6 +57,12 @@ func Build(
 				contract.ExportedName(),
 				panicName,
 			))
+		case api.RuntimeIntegerNormalizeSigned64, api.RuntimeIntegerNormalizeUnsigned64:
+			statements = append(statements, fixedWidthOperation(
+				factory,
+				contract.ExportedName(),
+				symbol == api.RuntimeIntegerNormalizeSigned64,
+			))
 		case api.RuntimeIntegerMax, api.RuntimeIntegerMin:
 			operator, _ := ordering(symbol)
 			statements = append(statements, orderedOperation(
@@ -72,6 +78,48 @@ func Build(
 		}
 	}
 	return statements, nil
+}
+
+func fixedWidthOperation(
+	factory tsgo.Factory,
+	name string,
+	signed bool,
+) tsgo.FunctionDeclaration {
+	value := factory.Identifier("value")
+	bigintType := factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindBigIntKeyword,
+	)
+	member := "asUintN"
+	if signed {
+		member = "asIntN"
+	}
+	return factory.FunctionDeclaration(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		nil,
+		factory.Identifier(name),
+		nil,
+		[]tsgo.ParameterDeclaration{
+			parameter(factory, value, bigintType),
+		},
+		bigintType,
+		factory.Block([]tsgo.Statement{
+			factory.ReturnStatement(factory.CallExpression(
+				factory.PropertyAccessExpression(
+					api.TargetIntrinsicBigInt.Expression(factory),
+					nil,
+					factory.Identifier(member),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{
+					factory.NumericLiteral("64", tsgo.TokenFlagsNone),
+					value,
+				},
+				tsgo.NodeFlagsNone,
+			)),
+		}, true),
+	)
 }
 
 func bigintDivisionOperation(

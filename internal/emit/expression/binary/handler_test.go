@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"testing"
 
+	gostdlib "github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -41,6 +42,7 @@ func TestParentOperatorOwnerDoesNotCreateAnIntegerFallback(t *testing.T) {
 				types.NewPackage("example.com/expression", "expression"),
 				info,
 				types.SizesFor("gc", testCase.arch),
+				api.MemoryByteOrderLittleEndian,
 				tsgo.Factory{},
 				unusedNames{},
 				unusedValues{},
@@ -79,6 +81,7 @@ func TestLogicalOperationAcceptsUntypedBooleanConditionEvidence(t *testing.T) {
 		types.NewPackage("example.com/expression", "expression"),
 		info,
 		types.SizesFor("gc", "amd64"),
+		api.MemoryByteOrderLittleEndian,
 		tsgo.Factory{},
 		unusedNames{},
 		unusedValues{},
@@ -107,6 +110,7 @@ func TestLogicalRightPrerequisitesStayInsideTheSelectedBranch(t *testing.T) {
 		types.NewPackage("example.com/expression", "expression"),
 		&types.Info{},
 		types.SizesFor("gc", "amd64"),
+		api.MemoryByteOrderLittleEndian,
 		tsgo.Factory{},
 		unusedNames{},
 		unusedValues{},
@@ -184,6 +188,15 @@ func (unusedNames) Reference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
 
+func (unusedNames) DefinedValueRepresentation(
+	*types.TypeName,
+) (api.DefinedValueRepresentation, error) {
+	return api.NewDefinedValueRepresentation(
+		api.DefinedValueRepresentationGeneratedWrapper,
+		api.NameReference{},
+	)
+}
+
 func (unusedNames) TypeReference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
@@ -231,6 +244,25 @@ func (unusedNames) InterfaceContract(
 	panic("unused")
 }
 
+func (unusedNames) RecoveryCallable(
+	*types.Func,
+) (api.RecoveryCallableReference, bool, error) {
+	panic("unused")
+}
+
+func (unusedNames) DeferredCallable(
+	*types.Func,
+	string,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) DeferredCallableRegistry(
+	*types.Signature,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) MethodTarget(*types.Func) (api.MethodTarget, error) {
 	panic("unused")
 }
@@ -271,15 +303,88 @@ func (unusedNames) SourceCallableABI(
 	panic("unused")
 }
 
-func (unusedNames) GenericCallableProfile(
-	*api.GenericCallableProfile,
+func (unusedNames) ProviderGenericTypeArguments(
+	*types.Func,
+) ([]api.GenericTypeArgumentProjection, bool, error) {
+	return nil, false, nil
+}
+
+func (unusedNames) ProviderInterface(
+	types.Type,
+) (gostdlib.ProviderInterface, bool, error) {
+	return gostdlib.ProviderInterface{}, false, nil
+}
+
+func (unusedNames) ProviderInterfaceBridge(
+	types.Type,
+) (api.NameReference, bool, error) {
+	return api.NameReference{}, false, nil
+}
+
+func (unusedNames) ProviderProfileInterfaceBridge(
+	types.Type,
+	[]gostdlib.ProviderCallableProfileInterface,
+) (api.ProviderProfileBridgeReference, bool, error) {
+	return api.ProviderProfileBridgeReference{}, false, nil
+}
+
+func (unusedNames) ProviderInterfaceCapability(
+	types.Type,
+	types.Type,
+	string,
+) (api.ProviderInterfaceCapabilityReference, bool, error) {
+	return api.ProviderInterfaceCapabilityReference{}, false, nil
+}
+
+func (unusedNames) ProviderCallableProfile(
+	*types.Func,
+	string,
+) (api.ProviderCallableProfileReference, bool, error) {
+	return api.ProviderCallableProfileReference{}, false, nil
+}
+
+func (unusedNames) ProviderCallableProfileCandidates(
+	*types.Func,
+) ([]api.ProviderCallableProfileCandidate, bool, error) {
+	return nil, false, nil
+}
+
+func (unusedNames) ProviderCallableParameters(
+	*types.Func,
+) ([]gostdlib.ProviderCallableParameterDocument, bool, error) {
+	return nil, false, nil
+}
+
+func (unusedNames) ProviderStatefulProfileCandidates(
+	*types.TypeName,
+) ([]api.ProviderStatefulProfileCandidate, bool, error) {
+	return nil, false, nil
+}
+
+func (unusedNames) ProviderStatefulProfileTarget(
+	*types.TypeName,
+	string,
+	api.ImportPhase,
 ) (api.NameReference, error) {
 	panic("unused")
+}
+
+func (unusedNames) ProviderRepresentationOwnsMethod(
+	types.Type,
+	*types.Func,
+) (bool, error) {
+	return false, nil
 }
 
 func (unusedNames) PackageVariable(
 	*types.Var,
 ) (api.PackageVariableReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) NamedStructConstructor(
+	*types.TypeName,
+) (api.NameReference, error) {
 	panic("unused")
 }
 
@@ -296,9 +401,22 @@ func (unusedNames) NamedStructStorage(
 	panic("unused")
 }
 
+func (unusedNames) ProviderStructField(
+	*types.TypeName,
+	*types.Var,
+) (gostdlib.ProviderStructField, bool, error) {
+	return gostdlib.ProviderStructField{}, false, nil
+}
+
 func (unusedNames) AnonymousStructStorage(
 	*types.Struct,
 ) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) ConstantValue(
+	*types.Const,
+) (api.NameReference, bool, error) {
 	panic("unused")
 }
 
@@ -317,9 +435,22 @@ func (unusedNames) Primitive(api.PrimitiveAlias) (api.NameReference, error) {
 	panic("unused")
 }
 
+func (unusedNames) ProviderPrimitive(
+	api.PrimitiveAlias,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) Runtime(
 	api.RuntimeSymbol,
 	api.ImportPhase,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) ExternalProviderFunction(
+	string,
+	string,
 ) (api.NameReference, error) {
 	panic("unused")
 }

@@ -125,7 +125,8 @@ func valueCall(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if !observation.Cooperative() {
+	if context.ConcurrencySemantics() !=
+		api.ConcurrencySemanticsCooperative {
 		return target, nil
 	}
 	return await(context, source, target, propagate, generated)
@@ -207,6 +208,19 @@ func Operation(
 	return await(context, source, target, true, false)
 }
 
+func ProviderProfileCall(
+	context api.Context,
+	source ast.Node,
+	target api.ExpressionEmission,
+	cooperative bool,
+	detached bool,
+) (api.ExpressionEmission, error) {
+	if !cooperative {
+		return target, nil
+	}
+	return await(context, source, target, !detached, false)
+}
+
 func ValueContract(
 	context api.Context,
 	signature *types.Signature,
@@ -271,11 +285,9 @@ func GenericValueContract(
 	signature *types.Signature,
 ) (bool, bool, []api.RootRequest, error) {
 	if _, source := provider.SourceFunction(); !source {
-		if _, profile := provider.GenericProfile(); !profile {
-			return false, false, nil, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "generic value provider facet is invalid",
-			}
+		return false, false, nil, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "generic value provider facet is invalid",
 		}
 	}
 	return providerContract(context, provider, signature)
@@ -368,8 +380,7 @@ func providerContract(
 		reference.Requests(),
 		abiObservation.Requests(),
 	)
-	if providerObservation.Cooperative() &&
-		!abiObservation.Cooperative() {
+	if providerObservation.Cooperative() {
 		abiFacet, facetErr := context.CallableABIFacet(reference)
 		if facetErr != nil {
 			return false, false, nil, facetErr

@@ -19,6 +19,7 @@ func TestPanicNilAndRuntimeFaultHaveDistinctDynamicIdentities(t *testing.T) {
 		"GoInterfaceValue",
 		"GoRuntimePanicValue",
 		"GoRecovery",
+		"goDeferPop",
 		"GoErrorMethodToken",
 		"GoRuntimeErrorMethodToken",
 	)
@@ -50,9 +51,57 @@ func TestPanicNilAndRuntimeFaultHaveDistinctDynamicIdentities(t *testing.T) {
 	if nilIdentity != "GoPanicNilError" {
 		t.Fatalf("panic-nil identity = %q", nilIdentity)
 	}
+	assertComparableDynamicIdentity(
+		t,
+		nilErrorTarget(t, factory),
+	)
 	if runtimeIdentity == nilIdentity {
 		t.Fatal("panic-nil and runtime-fault dynamic identities alias")
 	}
+}
+
+func nilErrorTarget(
+	t *testing.T,
+	factory tsgo.Factory,
+) tsgo.ClassDeclaration {
+	t.Helper()
+	target, err := panicnil.Build(
+		factory,
+		api.RuntimePanicNilError,
+		"GoPanicNilError",
+		"GoPanicNilValue",
+		"GoRuntimePanicValue",
+		"GoInterfaceValue",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return target.(tsgo.ClassDeclaration)
+}
+
+func assertComparableDynamicIdentity(
+	t *testing.T,
+	class tsgo.ClassDeclaration,
+) {
+	t.Helper()
+	for _, member := range class.Members() {
+		property, ok := member.(tsgo.PropertyDeclaration)
+		if !ok {
+			continue
+		}
+		name, ok := property.Name().(tsgo.Identifier)
+		if !ok || name.Text() != interfacecontract.DynamicTypeComparable {
+			continue
+		}
+		if _, ok := property.Initializer().(tsgo.TrueLiteral); !ok {
+			t.Fatalf("dynamic comparable initializer = %T", property.Initializer())
+		}
+		return
+	}
+	t.Fatalf(
+		"dynamic identity class has no static %s property",
+		interfacecontract.DynamicTypeComparable,
+	)
 }
 
 func dynamicIdentity(

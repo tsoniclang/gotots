@@ -260,17 +260,8 @@ func makeSlice(
 }
 
 func targetInteger(
-	context api.Context,
+	_ api.Context,
 	value tsgo.Expression,
 ) tsgo.Expression {
-	if context.IntegerRepresentation() != api.IntegerRepresentationBigInt {
-		return value
-	}
-	return context.Factory().CallExpression(
-		context.Factory().Identifier("BigInt"),
-		nil,
-		nil,
-		[]tsgo.Expression{value},
-		tsgo.NodeFlagsNone,
-	)
+	return value
 }

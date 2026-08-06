@@ -40,6 +40,18 @@ func (e ProjectionEmission) Requests() []api.RootRequest {
 	return slices.Clone(e.requests)
 }
 
+func (e ProjectionEmission) ExportedStatement(
+	factory tsgo.Factory,
+) tsgo.VariableStatement {
+	return factory.VariableStatement(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		factory.VariableDeclarationList(
+			[]tsgo.VariableDeclaration{e.declaration},
+			tsgo.NodeFlagsConst,
+		),
+	)
+}
+
 // EmitProjection materializes one untyped constant at one exact target basic
 // representation as a named exported binding. The value is the constant's
 // canonical go/constant value projected at the target basic type through the
@@ -56,7 +68,8 @@ func EmitProjection(
 	typeRole api.Role,
 	valueRole api.Role,
 ) (ProjectionEmission, error) {
-	if selected == nil || source == nil || projectionName == "" {
+	if selected == nil || projectionName == "" ||
+		(source == nil && !context.EnvironmentContract()) {
 		return ProjectionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "constant projection input is nil",

@@ -29,17 +29,24 @@ func (owner Owner) Read(
 	if !selected {
 		return api.ExpressionEmission{}, false, nil
 	}
+	sourceType := context.TypesInfo().TypeOfObject(variable)
+	if sourceType == nil {
+		return api.ExpressionEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "addressable variable has no contextual type",
+		}
+	}
 	if value, handled, err := genericpointer.Load(
 		context,
 		nil,
-		variable.Type(),
+		sourceType,
 		api.DirectExpression(context.Factory().Identifier(name)),
 	); handled || err != nil {
 		return value, true, err
 	}
 	representation, err := pointertype.Observe(
 		context,
-		types.NewPointer(variable.Type()),
+		types.NewPointer(sourceType),
 		false,
 	)
 	if err != nil {
@@ -54,8 +61,8 @@ func (owner Owner) Read(
 		copied, err := context.Values().Transfer(
 			context,
 			nil,
-			variable.Type(),
-			variable.Type(),
+			sourceType,
+			sourceType,
 			api.ValueTransferCopy,
 			value,
 		)
@@ -72,7 +79,7 @@ func (owner Owner) Read(
 	restored, err := context.ContainerStorage().FromPointerStorage(
 		context,
 		nil,
-		variable.Type(),
+		sourceType,
 		representation,
 		value,
 	)
@@ -98,17 +105,24 @@ func (owner Owner) StoreTarget(
 	if !selected {
 		return api.StoreTargetEmission{}, false, nil
 	}
+	sourceType := context.TypesInfo().TypeOfObject(variable)
+	if sourceType == nil {
+		return api.StoreTargetEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "addressable variable has no contextual type",
+		}
+	}
 	if target, handled, err := genericpointer.StoreTarget(
 		context,
 		nil,
-		variable.Type(),
+		sourceType,
 		api.DirectExpression(context.Factory().Identifier(name)),
 	); handled || err != nil {
 		return target, true, err
 	}
 	representation, err := pointertype.Observe(
 		context,
-		types.NewPointer(variable.Type()),
+		types.NewPointer(sourceType),
 		false,
 	)
 	if err != nil {
@@ -121,7 +135,7 @@ func (owner Owner) StoreTarget(
 				context.Factory().Identifier(name),
 				representation.Requests()...,
 			),
-			variable.Type(),
+			sourceType,
 		)
 		return target, true, err
 	}
@@ -137,7 +151,7 @@ func (owner Owner) StoreTarget(
 			representation.Requests()...,
 		),
 		pointerruntime.CellValueName,
-		variable.Type(),
+		sourceType,
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, true, err

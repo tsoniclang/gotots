@@ -3,6 +3,7 @@ package maprepresentation
 import (
 	"go/types"
 
+	gostdlib "github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
@@ -24,6 +25,15 @@ func (staticSpecializationNames) Reference(types.Object) (api.NameReference, err
 	panic("unused")
 }
 
+func (staticSpecializationNames) DefinedValueRepresentation(
+	*types.TypeName,
+) (api.DefinedValueRepresentation, error) {
+	return api.NewDefinedValueRepresentation(
+		api.DefinedValueRepresentationGeneratedWrapper,
+		api.NameReference{},
+	)
+}
+
 func (staticSpecializationNames) TypeReference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
@@ -31,6 +41,12 @@ func (staticSpecializationNames) TypeReference(types.Object) (api.NameReference,
 func (staticSpecializationNames) PackageVariable(
 	*types.Var,
 ) (api.PackageVariableReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) NamedStructConstructor(
+	*types.TypeName,
+) (api.NameReference, error) {
 	panic("unused")
 }
 
@@ -45,6 +61,13 @@ func (staticSpecializationNames) NamedStructStorage(
 	*types.TypeName,
 ) (api.NameReference, error) {
 	panic("unused")
+}
+
+func (staticSpecializationNames) ProviderStructField(
+	*types.TypeName,
+	*types.Var,
+) (gostdlib.ProviderStructField, bool, error) {
+	return gostdlib.ProviderStructField{}, false, nil
 }
 
 func (staticSpecializationNames) AnonymousStructStorage(
@@ -100,6 +123,25 @@ func (staticSpecializationNames) InterfaceContract(
 	panic("unused")
 }
 
+func (staticSpecializationNames) RecoveryCallable(
+	*types.Func,
+) (api.RecoveryCallableReference, bool, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) DeferredCallable(
+	*types.Func,
+	string,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) DeferredCallableRegistry(
+	*types.Signature,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) MethodTarget(
 	*types.Func,
 ) (api.MethodTarget, error) {
@@ -144,9 +186,82 @@ func (staticSpecializationNames) SourceCallableABI(
 	panic("unused")
 }
 
-func (staticSpecializationNames) GenericCallableProfile(
-	*api.GenericCallableProfile,
+func (staticSpecializationNames) ProviderGenericTypeArguments(
+	*types.Func,
+) ([]api.GenericTypeArgumentProjection, bool, error) {
+	return nil, false, nil
+}
+
+func (staticSpecializationNames) ProviderInterface(
+	types.Type,
+) (gostdlib.ProviderInterface, bool, error) {
+	return gostdlib.ProviderInterface{}, false, nil
+}
+
+func (staticSpecializationNames) ProviderInterfaceBridge(
+	types.Type,
+) (api.NameReference, bool, error) {
+	return api.NameReference{}, false, nil
+}
+
+func (staticSpecializationNames) ProviderProfileInterfaceBridge(
+	types.Type,
+	[]gostdlib.ProviderCallableProfileInterface,
+) (api.ProviderProfileBridgeReference, bool, error) {
+	return api.ProviderProfileBridgeReference{}, false, nil
+}
+
+func (staticSpecializationNames) ProviderInterfaceCapability(
+	types.Type,
+	types.Type,
+	string,
+) (api.ProviderInterfaceCapabilityReference, bool, error) {
+	return api.ProviderInterfaceCapabilityReference{}, false, nil
+}
+
+func (staticSpecializationNames) ProviderCallableProfile(
+	*types.Func,
+	string,
+) (api.ProviderCallableProfileReference, bool, error) {
+	return api.ProviderCallableProfileReference{}, false, nil
+}
+
+func (staticSpecializationNames) ProviderCallableProfileCandidates(
+	*types.Func,
+) ([]api.ProviderCallableProfileCandidate, bool, error) {
+	return nil, false, nil
+}
+
+func (staticSpecializationNames) ProviderCallableParameters(
+	*types.Func,
+) ([]gostdlib.ProviderCallableParameterDocument, bool, error) {
+	return nil, false, nil
+}
+
+func (staticSpecializationNames) ProviderStatefulProfileCandidates(
+	*types.TypeName,
+) ([]api.ProviderStatefulProfileCandidate, bool, error) {
+	return nil, false, nil
+}
+
+func (staticSpecializationNames) ProviderStatefulProfileTarget(
+	*types.TypeName,
+	string,
+	api.ImportPhase,
 ) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) ProviderRepresentationOwnsMethod(
+	types.Type,
+	*types.Func,
+) (bool, error) {
+	return false, nil
+}
+
+func (staticSpecializationNames) ConstantValue(
+	*types.Const,
+) (api.NameReference, bool, error) {
 	panic("unused")
 }
 
@@ -167,14 +282,31 @@ func (staticSpecializationNames) Primitive(
 	panic("unused")
 }
 
+func (staticSpecializationNames) ProviderPrimitive(
+	api.PrimitiveAlias,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) Runtime(
 	symbol api.RuntimeSymbol,
 	_ api.ImportPhase,
 ) (api.NameReference, error) {
-	if symbol != api.RuntimePanic {
+	switch symbol {
+	case api.RuntimePanic:
+		return api.NewNameReference("GoPanic")
+	case api.RuntimeDenseIndex:
+		return api.NewNameReference("GoDenseIndex")
+	default:
 		panic("unexpected runtime symbol")
 	}
-	return api.NewNameReference("GoPanic")
+}
+
+func (staticSpecializationNames) ExternalProviderFunction(
+	string,
+	string,
+) (api.NameReference, error) {
+	panic("unused")
 }
 
 func (staticSpecializationNames) Temporary(api.TemporaryKind) (string, error) {

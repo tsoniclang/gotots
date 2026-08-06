@@ -80,6 +80,39 @@ only when structural comparison says that subscribed facet changed. The final
 target file is sealed and printed only after all requests and affected
 artifacts reach a fixed point.
 
+## Source-Shape Conservation
+
+Every target declaration that represents a Go function, method, function
+literal, defined callable, interface method, or environment callable preserves
+the selected `go/types.Signature` as its public/source-facing contract.
+
+- Go value parameters remain in the same order and cardinality.
+- A value receiver may become TypeScript `this`; a pointer receiver may become
+  one explicit first receiver parameter so nil can enter the method body.
+- A Go variadic parameter remains one semantic parameter. Its exact target
+  representation may be a represented Go slice or a TypeScript rest parameter,
+  but it may not create an additional source argument.
+- Cooperative execution may map a result to `Promise<R>` or
+  `Awaitable<R>` where the selected profile requires it; it never adds a
+  scheduler, effect, recovery, bridge, policy, or capability parameter.
+- Source type-parameter arity is preserved. Logical/storage distinctions and
+  callable effects do not become extra public type parameters.
+
+Compiler mechanics may appear only in compiler-owned private support artifacts
+that do not claim a Go source identity. Such artifacts may be selected by exact
+Go identity and imported statically, but they may not leak through package
+assembly, environment declarations, function values, interfaces, or ordinary
+source calls. In particular, translated source contracts never contain hidden
+operation functions, recovery authorities, provider policies, bridge sets,
+representation facets, profile selectors, or digest-named public variants.
+
+When direct TypeScript cannot implement a representation-dependent generic
+operation, the compiler concretizes only the reached declaration/type operation
+at its exact `go/types.Instance`. A concretization has the same source value
+parameters after type substitution and is an internal generated definition;
+it is not a second generic ABI. If a required open case has neither a direct
+static form nor a finite exact concretization, compilation fails explicitly.
+
 ## Vocabulary
 
 - **Go construct:** a grammar form represented by Go syntax, such as an
@@ -136,16 +169,36 @@ artifacts reach a fixed point.
   deduplicated type aliases or behaviorally real runtime operations required by
   generated files. It is constructed through TS-Go AST like every other output
   file and has no external compiler dependency.
+- **source-facing contract:** the target callable or type surface corresponding
+  to one selected Go declaration. Its value and type-parameter shape obeys
+  Source-Shape Conservation even when generated modules import a private
+  concretization or provider facade to implement it.
+- **concretization:** a private generated definition reconstructed directly
+  from one Go generic declaration at one exact reached `go/types.Instance`
+  because its body needs representation-dependent operations that TypeScript
+  cannot express over the open type parameter. It carries no operation
+  dictionary and is keyed by Go identity plus exact type arguments.
 - **representation rule:** the direct rule choosing the TypeScript shape
   required by the selected profile for a Go type, method, interface, value, or
   operation.
 - **compilation profile:** the immutable compilation-wide selection of every
   semantic tradeoff axis. The initial axes are integer representation
-  (`number` or `bigint`), evaluation order (`direct` or `preserve-go`), and
-  concurrency semantics (`disabled` or explicitly selected `cooperative`).
+  (`number`, `fixed64-bigint`, or `bigint`), evaluation order (`direct` or
+  `preserve-go`), and concurrency semantics (`disabled` or explicitly selected
+  `cooperative`).
   Generated files in one compilation cannot mix selections.
+- **Go build profile:** the loader-owned selected toolchain identity, `GOOS`,
+  `GOARCH`, `CGO_ENABLED`, and sorted build tags. The default is the explicitly
+  materialized host profile, not ambient shell state. Cross-target selection
+  changes source files, sizes, standard-library contracts, and runtime
+  constants as one atomic choice.
 - **manual obligation:** an exact generated declaration whose implementation
   must be supplied manually.
+- **standard-library provider:** the GoToTS-owned `@gotots/gostdlib` package.
+  Its public ESM subpaths mirror Go standard-library import paths, its named
+  exports preserve Go declaration names, and its implementation satisfies the
+  exact selected-`GOROOT` contract. The selected host backend is implementation
+  metadata and never appears in the public package name.
 - **true external:** unavailable or host/native behavior represented by an
   explicit contract rather than inferred from import spelling.
 
@@ -163,6 +216,14 @@ identifies:
   receive exact contracts and explicit placeholders.
 
 No import-path prefix decides these classes.
+
+A source-available package may contain a selected bodyless native declaration.
+That declaration remains source-owned and emits one exact typed throwing
+placeholder plus one canonical obligation until an explicit provider
+implementation replaces it. It is not converted into an ambient package and
+does not prevent the rest of the source graph from being generated and
+typechecked. Executing the placeholder fails by its Go declaration identity;
+publication requires every reachable placeholder to be gone.
 
 ## Non-Negotiable Results
 

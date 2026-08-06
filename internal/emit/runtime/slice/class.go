@@ -2,14 +2,17 @@ package slice
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type builder struct {
-	factory   tsgo.Factory
-	className string
-	panicName string
+	factory        tsgo.Factory
+	className      string
+	panicName      string
+	denseIndexName string
+	pointerName    string
 }
 
 type Capabilities struct {
@@ -19,32 +22,22 @@ type Capabilities struct {
 	Clear        bool
 	ArrayPointer bool
 	ArrayView    bool
+	Region       bool
 }
 
 func Build(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
+	denseIndexName string,
 ) tsgo.ClassDeclaration {
 	return BuildWithCapabilities(
 		factory,
 		className,
 		panicName,
+		denseIndexName,
+		"",
 		Capabilities{},
-	)
-}
-
-func BuildWithAddress(
-	factory tsgo.Factory,
-	className string,
-	panicName string,
-	withAddress bool,
-) tsgo.ClassDeclaration {
-	return BuildWithCapabilities(
-		factory,
-		className,
-		panicName,
-		Capabilities{Address: withAddress},
 	)
 }
 
@@ -52,12 +45,16 @@ func BuildWithCapabilities(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
+	denseIndexName string,
+	pointerName string,
 	capabilities Capabilities,
 ) tsgo.ClassDeclaration {
 	target := builder{
-		factory:   factory,
-		className: className,
-		panicName: panicName,
+		factory:        factory,
+		className:      className,
+		panicName:      panicName,
+		denseIndexName: denseIndexName,
+		pointerName:    pointerName,
 	}
 	members := []tsgo.ClassElement{target.constructor()}
 	members = append(
@@ -84,10 +81,10 @@ func BuildWithCapabilities(
 	if capabilities.Address {
 		members = append(members, target.addressMethod())
 	}
-	if capabilities.ArrayPointer {
+	if capabilities.ArrayPointer || capabilities.Region {
 		members = append(members, target.arrayLocationMethod())
 	}
-	if capabilities.ArrayView {
+	if capabilities.ArrayView || capabilities.Region {
 		members = append(members, target.arrayViewMethod())
 	}
 	return factory.ClassDeclaration(
@@ -372,6 +369,18 @@ func (b builder) index(
 	)
 }
 
+func (b builder) indexedValue(
+	value tsgo.Expression,
+	index tsgo.Expression,
+) tsgo.CallExpression {
+	return indexedstorage.Element(
+		b.factory,
+		b.denseIndexName,
+		value,
+		index,
+	)
+}
+
 func (b builder) loop(
 	limit tsgo.Expression,
 	body ...tsgo.Statement,
@@ -393,9 +402,9 @@ func (b builder) loop(
 			tsgo.BinaryOperatorLessThanToken,
 			limit,
 		),
-		b.assign(
+		b.factory.PostfixUnaryExpression(
 			b.id("index"),
-			b.add(b.id("index"), b.number("1")),
+			tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken,
 		),
 		b.factory.Block(body, true),
 	)

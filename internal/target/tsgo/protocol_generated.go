@@ -5,6 +5,8 @@ package tsgo
 const pinnedToolModule = "github.com/microsoft/typescript-go"
 const pinnedToolPackage = "github.com/microsoft/typescript-go/cmd/tsgo"
 const pinnedToolVersion = "v0.0.0-20260613021236-c78d39e7075b"
+const pinnedSchemaRevision = "c78d39e7075b4fc641b12b1f35d905c54cdc13ef"
+const pinnedSchemaContractDigest = "6ee46fe90b72a1d12f8b4b8a0d7d1017207a057d18f6ff10aba02d5394b8c786"
 
 const (
 	protocolVersion                = 5

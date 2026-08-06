@@ -11,6 +11,7 @@ import (
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -155,8 +156,12 @@ func (owner Owner) Zero(
 		), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
+		operationContext, err := defined.OperationContext(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		zero, err := owner.Zero(
-			context.WithRole(api.RoleDefinedValue),
+			operationContext.WithRole(api.RoleDefinedValue),
 			source,
 			defined.Underlying(),
 		)
@@ -208,11 +213,7 @@ func (owner Owner) Zero(
 			literal = context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone)
 		default:
 			var err error
-			literal, err = api.IntegerLiteral(
-				context.Factory(),
-				context.IntegerRepresentation(),
-				"0",
-			)
+			literal, err = integervalue.Literal(context, sourceType, "0")
 			if err != nil {
 				return api.ExpressionEmission{}, err
 			}
@@ -318,8 +319,13 @@ func (owner Owner) Transfer(
 		}
 	}
 	if !types.Identical(actualType, destinationType) {
+		actualOperationContext := context
 		if actual, ok := definedtype.Resolve(actualType); ok {
 			var err error
+			actualOperationContext, err = actual.OperationContext(context)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
 			value, err = actual.Project(context, value)
 			if err != nil {
 				return api.ExpressionEmission{}, err
@@ -327,10 +333,26 @@ func (owner Owner) Transfer(
 			actualType = actual.Underlying()
 		}
 		if destination, ok := definedtype.Resolve(destinationType); ok {
+			destinationOperationContext, err := destination.OperationContext(context)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+			value, err = transferIntegerRepresentation(
+				context,
+				actualType,
+				destination.Underlying(),
+				actualOperationContext.ScalarABI(),
+				destinationOperationContext.ScalarABI(),
+				value,
+			)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
 			if mode == api.ValueTransferCopy {
-				var err error
 				value, err = owner.copyExact(
-					context.WithRole(api.RoleDefinedValue),
+					destinationOperationContext.WithRole(
+						api.RoleDefinedValue,
+					),
 					source,
 					destination.Underlying(),
 					value,
@@ -341,22 +363,23 @@ func (owner Owner) Transfer(
 			}
 			return destination.Wrap(context, value)
 		}
+		var err error
+		value, err = transferIntegerRepresentation(
+			context,
+			actualType,
+			destinationType,
+			actualOperationContext.ScalarABI(),
+			context.ScalarABI(),
+			value,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	if mode == api.ValueTransferRepresentation {
 		return value, nil
 	}
 	return owner.copyExact(context, source, destinationType, value)
-}
-
-func representedAtDestination(
-	actualType types.Type,
-	destinationType types.Type,
-) bool {
-	basic, basicOK := types.Unalias(actualType).(*types.Basic)
-	if basicOK && basic.Info()&types.IsUntyped != 0 {
-		return true
-	}
-	return false
 }
 
 func (owner Owner) copyExact(
@@ -461,30 +484,6 @@ func (owner Owner) copyExact(
 		target.Value(),
 		api.CombineRequests(value.Requests(), target.Requests()),
 	)
-}
-
-func ownsFreshValue(context api.Context, source ast.Node) bool {
-	switch source := source.(type) {
-	case *ast.CallExpr, *ast.CompositeLit:
-		return true
-	case *ast.IndexExpr:
-		sourceType := context.TypesInfo().TypeOf(source.X)
-		if sourceType == nil {
-			return false
-		}
-		_, ok := types.Unalias(sourceType).Underlying().(*types.Map)
-		return ok
-	case *ast.ParenExpr:
-		return ownsFreshValue(context, source.X)
-	case *ast.SelectorExpr:
-		selection := context.TypesInfo().Selections[source]
-		return selection != nil &&
-			selection.Kind() == types.FieldVal &&
-			!selection.Indirect() &&
-			ownsFreshValue(context, source.X)
-	default:
-		return false
-	}
 }
 
 func (Owner) Assign(

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,12 +25,18 @@ func (e *ClientError) Error() string {
 }
 
 type RemoteError struct {
-	Code    int
-	Message string
+	Operation string
+	Code      int
+	Message   string
 }
 
 func (e *RemoteError) Error() string {
-	return fmt.Sprintf("TS-Go printNode error [%d]: %s", e.Code, e.Message)
+	return fmt.Sprintf(
+		"TS-Go %s error [%d]: %s",
+		e.Operation,
+		e.Code,
+		e.Message,
+	)
 }
 
 type Client struct {
@@ -62,6 +69,7 @@ func StartClient(moduleDirectory string, workingDirectory string) (*Client, erro
 	}
 
 	command := exec.Command(toolPath, "--api", "--async", "--cwd", workingDirectory)
+	command.Env = nativeToolEnvironment()
 	client := &Client{command: command}
 	command.Stderr = &client.stderr
 	client.stdin, err = command.StdinPipe()
@@ -84,73 +92,131 @@ func StartClient(moduleDirectory string, workingDirectory string) (*Client, erro
 }
 
 func (c *Client) print(params printNodeParams) (string, error) {
+	encoded, err := json.Marshal(params)
+	if err != nil {
+		return "", &ClientError{
+			Operation: "encode printNode request",
+			Reason:    err.Error(),
+		}
+	}
+	result, err := c.request("printNode", encoded)
+	if err != nil {
+		return "", err
+	}
+	var printed string
+	if err := json.Unmarshal(result, &printed); err != nil {
+		return "", &ClientError{
+			Operation: "decode printNode result",
+			Reason:    err.Error(),
+		}
+	}
+	return printed, nil
+}
+
+func (c *Client) request(
+	operation string,
+	params json.RawMessage,
+) (json.RawMessage, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if c.closed {
-		return "", &ClientError{Operation: "printNode", Reason: "client is closed"}
+		return nil, &ClientError{
+			Operation: operation,
+			Reason:    "client is closed",
+		}
 	}
 	c.requestID++
 	request := rpcRequest{
 		JSONRPC: "2.0",
 		ID:      c.requestID,
-		Method:  "printNode",
+		Method:  operation,
 		Params:  params,
 	}
 	payload, err := json.Marshal(request)
 	if err != nil {
-		return "", &ClientError{Operation: "encode request", Reason: err.Error()}
+		return nil, &ClientError{
+			Operation: "encode " + operation + " request",
+			Reason:    err.Error(),
+		}
 	}
 	if _, err := fmt.Fprintf(c.writer, "Content-Length: %d\r\n\r\n", len(payload)); err != nil {
-		return "", &ClientError{Operation: "write header", Reason: err.Error()}
+		return nil, &ClientError{
+			Operation: "write " + operation + " header",
+			Reason:    err.Error(),
+		}
 	}
 	if _, err := c.writer.Write(payload); err != nil {
-		return "", &ClientError{Operation: "write payload", Reason: err.Error()}
+		return nil, &ClientError{
+			Operation: "write " + operation + " payload",
+			Reason:    err.Error(),
+		}
 	}
 	if err := c.writer.Flush(); err != nil {
-		return "", &ClientError{Operation: "flush request", Reason: err.Error()}
+		return nil, &ClientError{
+			Operation: "flush " + operation + " request",
+			Reason:    err.Error(),
+		}
 	}
 
 	contentLength, err := readContentLength(c.reader)
 	if err != nil {
-		return "", &ClientError{Operation: "read response header", Reason: err.Error()}
+		return nil, &ClientError{
+			Operation: "read " + operation + " response header",
+			Reason:    err.Error(),
+		}
 	}
 	limited := &io.LimitedReader{R: c.reader, N: int64(contentLength)}
 	decoder := json.NewDecoder(limited)
 	decoder.DisallowUnknownFields()
 	var response rpcResponse
 	if err := decoder.Decode(&response); err != nil {
-		return "", &ClientError{Operation: "decode response", Reason: err.Error()}
+		return nil, &ClientError{
+			Operation: "decode " + operation + " response",
+			Reason:    err.Error(),
+		}
 	}
 	var extra json.RawMessage
 	if err := decoder.Decode(&extra); err != io.EOF {
 		if err == nil {
 			err = fmt.Errorf("multiple JSON values")
 		}
-		return "", &ClientError{Operation: "decode response", Reason: err.Error()}
+		return nil, &ClientError{
+			Operation: "decode " + operation + " response",
+			Reason:    err.Error(),
+		}
 	}
 	if limited.N != 0 {
-		return "", &ClientError{Operation: "decode response", Reason: fmt.Sprintf("%d unread bytes", limited.N)}
+		return nil, &ClientError{
+			Operation: "decode " + operation + " response",
+			Reason:    fmt.Sprintf("%d unread bytes", limited.N),
+		}
 	}
 	if response.JSONRPC != "2.0" || response.ID != c.requestID {
-		return "", &ClientError{Operation: "correlate response", Reason: fmt.Sprintf(
-			"jsonrpc=%q id=%d, want jsonrpc=%q id=%d",
-			response.JSONRPC,
-			response.ID,
-			"2.0",
-			c.requestID,
-		)}
+		return nil, &ClientError{
+			Operation: "correlate " + operation + " response",
+			Reason: fmt.Sprintf(
+				"jsonrpc=%q id=%d, want jsonrpc=%q id=%d",
+				response.JSONRPC,
+				response.ID,
+				"2.0",
+				c.requestID,
+			),
+		}
 	}
 	if response.Error != nil {
-		return "", &RemoteError{Code: response.Error.Code, Message: response.Error.Message}
+		return nil, &RemoteError{
+			Operation: operation,
+			Code:      response.Error.Code,
+			Message:   response.Error.Message,
+		}
 	}
 	if response.Result == nil {
-		return "", &ClientError{Operation: "decode response", Reason: "result is absent"}
+		return nil, &ClientError{
+			Operation: "decode " + operation + " response",
+			Reason:    "result is absent",
+		}
 	}
-	var result string
-	if err := json.Unmarshal(response.Result, &result); err != nil {
-		return "", &ClientError{Operation: "decode result", Reason: err.Error()}
-	}
-	return result, nil
+	return slices.Clone(response.Result), nil
 }
 
 func (c *Client) Close() error {
@@ -180,7 +246,7 @@ type rpcRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      uint64          `json:"id"`
 	Method  string          `json:"method"`
-	Params  printNodeParams `json:"params"`
+	Params  json.RawMessage `json:"params"`
 }
 
 type rpcResponse struct {

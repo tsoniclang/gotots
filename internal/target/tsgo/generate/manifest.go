@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -17,6 +19,10 @@ type targetManifest struct {
 	Revision        string            `json:"revision"`
 	ProtocolVersion int               `json:"protocolVersion"`
 	Files           []json.RawMessage `json:"files"`
+
+	// contractDigest is the sha256 of the canonical manifest bytes; it
+	// content-addresses the complete pinned schema contract.
+	contractDigest string
 }
 
 func loadTargetManifest(directory string) (targetManifest, error) {
@@ -33,5 +39,10 @@ func loadTargetManifest(directory string) (targetManifest, error) {
 	if manifest.Module == "" || manifest.ToolPackage == "" || manifest.ToolVersion == "" {
 		return targetManifest{}, fmt.Errorf("manifest.json has incomplete tool identity")
 	}
+	if manifest.Revision == "" {
+		return targetManifest{}, fmt.Errorf("manifest.json has no pinned revision")
+	}
+	digest := sha256.Sum256(data)
+	manifest.contractDigest = hex.EncodeToString(digest[:])
 	return manifest, nil
 }

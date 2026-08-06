@@ -111,8 +111,8 @@ func unaryConstantEvidenceIsIncomplete(
 	default:
 		return false
 	}
-	result, resultExists := context.TypesInfo().Types[source]
-	operand, operandExists := context.TypesInfo().Types[source.X]
+	result, resultExists := context.TypesInfo().TypeAndValue(source)
+	operand, operandExists := context.TypesInfo().TypeAndValue(source.X)
 	return resultExists &&
 		result.Value == nil &&
 		operandExists &&

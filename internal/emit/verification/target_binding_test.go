@@ -61,7 +61,7 @@ func packageAssemblyExports(
 	return false
 }
 
-func TestTargetBindingsOrderEagerDependenciesAndProtectIntrinsics(
+func TestTargetBindingsDeferConstructedConstantsAndProtectIntrinsics(
 	t *testing.T,
 ) {
 	directory, err := filepath.Abs(targetBindingDirectory())
@@ -177,13 +177,17 @@ func assertTargetBindingAST(t *testing.T, emission emit.ProgramEmission) {
 				if statement.Name().Text() == "Number" {
 					classIndex = index
 				}
-			case tsgo.VariableStatement:
-				for _, declaration := range statement.
-					DeclarationList().
-					Declarations() {
-					name, ok := declaration.Name().(tsgo.Identifier)
-					if ok && name.Text() == "Before" {
-						constantIndex = index
+			case tsgo.FunctionDeclaration:
+				if statement.Name().Text() == "Before$constant" {
+					constantIndex = index
+					body := statement.Body().(tsgo.Block).Statements()
+					if len(body) != 1 {
+						t.Fatalf("constant thunk body statements = %d, want one", len(body))
+					}
+					returned := body[0].(tsgo.ReturnStatement).Expression()
+					constructed, ok := returned.(tsgo.NewExpression)
+					if !ok || constructed.Expression().(tsgo.Identifier).Text() != "Number" {
+						t.Fatalf("constant thunk returns %T, want new Number", returned)
 					}
 				}
 			}
@@ -191,13 +195,6 @@ func assertTargetBindingAST(t *testing.T, emission emit.ProgramEmission) {
 		if classIndex < 0 || constantIndex < 0 {
 			t.Fatalf(
 				"target declarations absent: class=%d constant=%d",
-				classIndex,
-				constantIndex,
-			)
-		}
-		if classIndex >= constantIndex {
-			t.Fatalf(
-				"eager dependency order = class %d, constant %d",
 				classIndex,
 				constantIndex,
 			)
@@ -346,7 +343,7 @@ func EmptyHolder() Holder {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	if !strings.Contains(
 		artifacts.printed,
-		"public Box: Box<int64> | undefined",
+		"public Box: Box<int> | undefined",
 	) {
 		t.Fatalf(
 			"alias to generic instantiation was not canonicalized:\n%s",
@@ -354,8 +351,9 @@ func EmptyHolder() Holder {
 		)
 	}
 	for _, forbidden := range []string{
-		"GoPointer<Box<int64",
-		"Box$Storage<int64",
+		"Box<int64>",
+		"GoPointer<Box<int>",
+		"Box$Storage<int>",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
 			t.Fatalf(
@@ -366,144 +364,4 @@ func EmptyHolder() Holder {
 		}
 	}
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
-}
-
-func TestGenericContainerStorageBindsExactTargetFacets(t *testing.T) {
-	directory := filepath.Join(
-		repositoryRoot(),
-		"testdata",
-		"constructs",
-		"generic",
-		"container-storage",
-	)
-	directory, err := filepath.Abs(directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	program, err := load.Load(context.Background(), load.Request{
-		Directory: directory,
-		Pattern:   ".",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	root, err := emit.NewRoot(
-		program.Roots()[0].Types().Scope().Lookup("Audit"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	emission, err := emit.Compile(program, []emit.Root{root})
-	if err != nil {
-		t.Fatal(err)
-	}
-	workingDirectory := t.TempDir()
-	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	if artifacts.bytes > 50_000 ||
-		artifacts.nodes > 8_500 ||
-		artifacts.largest > 22_000 {
-		t.Fatalf(
-			"generic container-storage artifact bounds exceeded: bytes=%d nodes=%d largest=%d",
-			artifacts.bytes,
-			artifacts.nodes,
-			artifacts.largest,
-		)
-	}
-	for _, required := range []string{
-		"class Bag<T, T$ContainerStorage",
-		"class Arena<T, T$ContainerStorage",
-		"RuntimeSlice<T$ContainerStorage>",
-		"Bag.$zero<PlainItem, PlainItem>",
-		"Arena.$zero<Item, Item$Storage>",
-		"GoPointer<Item, Item$Storage>",
-		"GoPointer<int32, int32>",
-		"function ArrayAddress<T, T$ContainerStorage, T$Pointer>",
-		"RuntimeSlice.literal<Item$Storage>([Item.$storageOf(",
-	} {
-		if !strings.Contains(artifacts.printed, required) {
-			t.Fatalf(
-				"generic container-storage artifact lacks %q",
-				required,
-			)
-		}
-	}
-	if strings.Contains(artifacts.printed, "RuntimeSlice<PlainItem$Storage>") {
-		t.Fatal("unaddressed generic container uses whole-value storage")
-	}
-	runner := filepath.Join(workingDirectory, "runner.ts")
-	writeProgramFile(t, runner, `import "./program.js";
-import { Audit } from "`+artifacts.sourceModule+`";
-
-const values = Audit();
-console.log(Array.from({ length: values.length }, (_, index) =>
-    String(values.get(index))).join(" "));
-`)
-	writeProgramFile(
-		t,
-		filepath.Join(workingDirectory, "package.json"),
-		"{\"type\":\"module\"}\n",
-	)
-	waveThreeTypecheck(
-		t,
-		workingDirectory,
-		append(artifacts.paths, runner),
-	)
-	targetOutput := runProgram(
-		t,
-		workingDirectory,
-		"node",
-		filepath.Join(workingDirectory, "out", "runner.js"),
-	)
-	goRunner := filepath.Join(workingDirectory, "go-runner")
-	writeProgramFile(t, filepath.Join(goRunner, "go.mod"), fmt.Sprintf(
-		`module example.com/runner
-
-go 1.26.4
-
-require example.com/genericcontainerstorage v0.0.0
-
-replace example.com/genericcontainerstorage => %s
-`,
-		filepath.ToSlash(directory),
-	))
-	writeProgramFile(t, filepath.Join(goRunner, "main.go"), `package main
-
-import (
-	"fmt"
-
-	values "example.com/genericcontainerstorage"
-)
-
-func main() {
-	result := values.Audit()
-	for index, value := range result {
-		if index != 0 {
-			fmt.Print(" ")
-		}
-		fmt.Print(value)
-	}
-	fmt.Println()
-}
-`)
-	goOutput := runProgram(
-		t,
-		goRunner,
-		filepath.Join(runtime.GOROOT(), "bin", "go"),
-		"run",
-		".",
-	)
-	if targetOutput != goOutput {
-		t.Fatalf(
-			"generic container-storage output differs\nTypeScript: %q\nGo: %q",
-			targetOutput,
-			goOutput,
-		)
-	}
-	t.Logf(
-		"generic container-storage artifacts files=%d bytes=%d nodes=%d largest=%d",
-		len(artifacts.paths),
-		artifacts.bytes,
-		artifacts.nodes,
-		artifacts.largest,
-	)
 }

@@ -23,7 +23,7 @@ func TestDirectSeamsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	printed := printTargetFile(t, targetFile, workingDirectory)
 	for _, expected := range []string{
 		"const low: int32 = 3;",
-		"switch (true)",
+		"if (value < low)",
 		"for (current = 0; current < limit; current = current + 1)",
 		"for (Touch(); value < 2; Touch())",
 		"let __gotots_for_first_",
@@ -41,17 +41,21 @@ func TestDirectSeamsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 }
 
-func TestExpressionlessSwitchUsesNativeBooleanTarget(t *testing.T) {
+func TestExpressionlessSwitchUsesConditionalChain(t *testing.T) {
 	loaded := loadDirectSeamsProject(t)
 	targetFile := compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
 	classify := targetFunction(t, targetFile, "Classify")
 	statements := classify.Body().(tsgo.Block).Statements()
-	targetSwitch, ok := statements[2].(tsgo.SwitchStatement)
+	targetLabel, ok := statements[2].(tsgo.LabeledStatement)
 	if !ok {
-		t.Fatalf("Classify statement 2 = %T, want SwitchStatement", statements[2])
+		t.Fatalf("Classify statement 2 = %T, want LabeledStatement", statements[2])
 	}
-	if targetSwitch.Expression().Kind() != tsgo.SyntaxKindTrueKeyword {
-		t.Fatalf("switch tag kind = %d, want true keyword", targetSwitch.Expression().Kind())
+	targetBlock, ok := targetLabel.Statement().(tsgo.Block)
+	if !ok || len(targetBlock.Statements()) != 1 {
+		t.Fatalf("expressionless switch target = %#v, want one-statement block", targetLabel.Statement())
+	}
+	if _, ok := targetBlock.Statements()[0].(tsgo.IfStatement); !ok {
+		t.Fatalf("expressionless switch body = %T, want IfStatement", targetBlock.Statements()[0])
 	}
 }
 
@@ -119,6 +123,8 @@ func main() {
 	fmt.Println(seams.Classify(1))
 	fmt.Println(seams.Classify(5))
 	fmt.Println(seams.Classify(9))
+	fmt.Println(seams.ClosureCondition(true))
+	fmt.Println(seams.ClosureCondition(false))
 	fmt.Println(seams.Constants())
 	fmt.Println(seams.Scoped(-2))
 	fmt.Println(seams.Scoped(4))
@@ -145,6 +151,7 @@ func executeDirectSeamsTypeScript(
 	writeFile(t, runnerPath, `import {
 	    CallClauses,
 	    Classify,
+	    ClosureCondition,
 	    Constants,
 	    IncInitializers,
 	    Loop,
@@ -158,6 +165,8 @@ func executeDirectSeamsTypeScript(
 console.log(Classify(1));
 console.log(Classify(5));
 console.log(Classify(9));
+console.log(ClosureCondition(true));
+console.log(ClosureCondition(false));
 console.log(Constants());
 console.log(Scoped(-2));
 console.log(Scoped(4));

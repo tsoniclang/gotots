@@ -108,6 +108,7 @@ func main() {
 	fmt.Println(real(values.ConstantComplex()), imag(values.ConstantComplex()))
 	fmt.Println(values.IntegerStringSummary())
 	fmt.Println(values.BytesStringSummary())
+	fmt.Println(values.ShadowedStringIntrinsic())
 	fmt.Println(values.RunesStringSummary())
 	fmt.Println(values.StringBytesSummary())
 	fmt.Println(values.StringRunesSummary())
@@ -136,6 +137,50 @@ func main() {
 	fmt.Println(values.NilConversions())
 	fmt.Println(values.GenericNilPointerIsNil())
 	fmt.Println(values.NilUnsafePointerRoundTrip())
+	fmt.Println(values.NilUnsafeIntegerRoundTrip())
+}
+`)
+	return runCommand(
+		t,
+		runnerDirectory,
+		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		"run",
+		".",
+	)
+}
+
+func runUnsafePointerMemoryGo(t *testing.T, workingDirectory string) string {
+	t.Helper()
+	modulePath, err := filepath.Abs(conversionFixtureDirectory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runnerDirectory := filepath.Join(workingDirectory, "go-runner-unsafe-pointer")
+	writeFile(t, filepath.Join(runnerDirectory, "go.mod"), `module example.com/runner
+
+go 1.26.4
+
+require example.com/conversion v0.0.0
+
+replace example.com/conversion => `+filepath.ToSlash(modulePath)+`
+`)
+	writeFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+
+import (
+	"fmt"
+
+	values "example.com/conversion"
+)
+
+func main() {
+	scalar := uint32(0x01020304)
+	bytes := [8]byte{1, 2, 3, 4, 5, 6, 7, 8}
+	fmt.Println(values.UnsafePointerAliases(&scalar))
+	fmt.Println(values.UnsafePointerOffset(&bytes))
+	fmt.Println(values.UnsafePointerSafeThenUnsafe(&scalar))
+	fmt.Println(values.UnsafeStructLayout())
+	fmt.Println(values.UnsafeStringHeaderLength())
+	fmt.Println(values.UnsafeSliceHeaderMutation())
 }
 `)
 	return runCommand(
@@ -152,7 +197,7 @@ func runConversionTypeScript(
 	workingDirectory string,
 	targetPaths []string,
 	sourceModule string,
-	suffix string,
+	wideSuffix string,
 ) string {
 	t.Helper()
 	runner := `import * as values from "` + sourceModule + `";
@@ -167,13 +212,13 @@ const panics = (action: () => void): boolean => {
         throw error;
     }
 };
-console.log(show(values.NarrowSigned(130` + suffix + `)));
-console.log(show(values.NarrowUnsigned(-1` + suffix + `)));
-console.log(show(values.Sign32(-1` + suffix + `)));
+console.log(show(values.NarrowSigned(130` + wideSuffix + `)));
+console.log(show(values.NarrowUnsigned(-1` + wideSuffix + `)));
+console.log(show(values.Sign32(-1)));
 console.log(show(values.Sign64EvaluatesOnce()));
-console.log(show(values.Widen(-8` + suffix + `)));
-console.log(show(values.IntegerToFloat64(9007199254740991` + suffix + `)));
-console.log(show(values.UnsignedToFloat32(16777217` + suffix + `)));
+console.log(show(values.Widen(-8)));
+console.log(show(values.IntegerToFloat64(9007199254740991` + wideSuffix + `)));
+console.log(show(values.UnsignedToFloat32(16777217` + wideSuffix + `)));
 console.log(show(values.FloatToInt8(130.9)));
 console.log(show(values.FloatToUint32(-1.9)));
 console.log(show(values.FloatToInt64(-123.9)));
@@ -190,6 +235,7 @@ const constantComplex = values.ConstantComplex();
 console.log(constantComplex.real, constantComplex.imag);
 console.log(show(values.IntegerStringSummary()));
 console.log(show(values.BytesStringSummary()));
+console.log(values.ShadowedStringIntrinsic());
 console.log(show(values.RunesStringSummary()));
 console.log(show(values.StringBytesSummary()));
 console.log(show(values.StringRunesSummary()));
@@ -218,6 +264,7 @@ console.log(show(values.PointerNestedFieldConversion()));
 console.log(values.NilConversions());
 console.log(values.GenericNilPointerIsNil());
 console.log(values.NilUnsafePointerRoundTrip());
+console.log(values.NilUnsafeIntegerRoundTrip());
 `
 	return executeConversionTypeScript(
 		t,

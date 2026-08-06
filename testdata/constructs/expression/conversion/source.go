@@ -119,6 +119,20 @@ func NilUnsafePointerRoundTrip() bool {
 	return (*int32)(unsafe.Pointer(value)) == nil
 }
 
+func NilUnsafeIntegerRoundTrip() bool {
+	var value unsafe.Pointer
+	integer := uintptr(value)
+	return integer == 0 && unsafe.Pointer(integer) == nil
+}
+
+func UnsafePointerToInteger(value *int32) uintptr {
+	return uintptr(unsafe.Pointer(value))
+}
+
+func IntegerToUnsafePointer(value uintptr) unsafe.Pointer {
+	return unsafe.Pointer(value)
+}
+
 type UnsafeBox struct {
 	Value int32
 }
@@ -126,6 +140,56 @@ type UnsafeBox struct {
 func NilUnsafeStructRoundTrip() bool {
 	var value *UnsafeBox
 	return (*UnsafeBox)(unsafe.Pointer(value)) == nil
+}
+
+func UnsafePointerAliases(value *uint32) uint32 {
+	bytes := (*[4]byte)(unsafe.Pointer(value))
+	bytes[0] = 0x78
+	return *value
+}
+
+func UnsafePointerOffset(value *[8]byte) uint32 {
+	base := uintptr(unsafe.Pointer(value))
+	return *(*uint32)(unsafe.Pointer(base + 2))
+}
+
+func UnsafePointerSafeThenUnsafe(value *uint32) byte {
+	bytes := (*[4]byte)(unsafe.Pointer(value))
+	*value = 0x11223344
+	return bytes[0]
+}
+
+type UnsafeLayout struct {
+	Prefix byte
+	Value  uint32
+	Pair   [2]uint16
+}
+
+func UnsafeStructLayout() uint32 {
+	value := UnsafeLayout{
+		Prefix: 1,
+		Value:  0x02030405,
+		Pair:   [2]uint16{0x0607, 0x0809},
+	}
+	bytes := (*[12]byte)(unsafe.Pointer(&value))
+	bytes[4] = 0x0a
+	if value.Prefix != 1 || value.Pair != [2]uint16{0x0607, 0x0809} {
+		return 0
+	}
+	return value.Value
+}
+
+func UnsafeStringHeaderLength() uintptr {
+	value := "hello"
+	header := (*[2]uintptr)(unsafe.Pointer(&value))
+	return header[1]
+}
+
+func UnsafeSliceHeaderMutation() int {
+	value := []byte{1, 2, 3}
+	header := (*[3]uintptr)(unsafe.Pointer(&value))
+	header[1] = 2
+	return len(value)*10 + cap(value)
 }
 
 type Bytes []byte
@@ -145,6 +209,14 @@ func BytesStringSummary() int32 {
 	return int32(len(text))*100000 +
 		int32(text[0])*100 +
 		int32(text[1])
+}
+
+func String(value string) string {
+	return value
+}
+
+func ShadowedStringIntrinsic() string {
+	return string([]byte{'A'}) + String("B")
 }
 
 func RunesStringSummary() int32 {

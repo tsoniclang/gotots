@@ -5,7 +5,9 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-const RecoveryAuthorityName = "$go$recovery"
+const (
+	RecoveryAuthorityName = "$go$recovery"
+)
 
 func RecoveryAuthorityParameter(
 	context api.Context,
@@ -21,9 +23,9 @@ func RecoveryAuthorityParameter(
 		nil,
 		nil,
 		context.Factory().Identifier(RecoveryAuthorityName),
-		context.Factory().QuestionToken(),
+		nil,
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			nil,
 		),
 		nil,

@@ -14,18 +14,49 @@ func PromiseResult(
 	result tsgo.TypeNode,
 ) tsgo.TypeNode {
 	return factory.TypeReferenceNode(
-		factory.Identifier("Promise"),
+		api.TargetIntrinsicPromise.TypeName(factory),
 		[]tsgo.TypeNode{result},
 	)
+}
+
+func IndirectResult(
+	context api.Context,
+	result tsgo.TypeNode,
+) (api.TypeEmission, error) {
+	if context.ConcurrencySemantics() !=
+		api.ConcurrencySemanticsCooperative {
+		return api.DirectType(result), nil
+	}
+	return AwaitableResult(context, result)
+}
+
+func AwaitableResult(
+	context api.Context,
+	result tsgo.TypeNode,
+) (api.TypeEmission, error) {
+	reference, err := context.Names().Runtime(
+		api.RuntimeAwaitable,
+		api.ImportPhaseType,
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return api.DirectType(
+		context.Factory().TypeReferenceNode(
+			context.Factory().Identifier(reference.Name()),
+			[]tsgo.TypeNode{result},
+		),
+		reference.Requests()...,
+	), nil
 }
 
 func ValueSignature(
 	signature *types.Signature,
 ) (*types.Signature, bool) {
-	if !Supports(signature) {
+	if signature == nil || signature.TypeParams().Len() != 0 {
 		return nil, false
 	}
-	if signature.Recv() == nil {
+	if signature.Recv() == nil && signature.RecvTypeParams().Len() == 0 {
 		return signature, true
 	}
 	return types.NewSignatureType(
@@ -66,21 +97,36 @@ func EmitInlineAwaitableType(
 	signature *types.Signature,
 	awaitable bool,
 ) (api.TypeEmission, error) {
-	return emitInlineNonNilType(
+	target, err := emitRepresented(
 		context,
 		children,
 		source,
 		signature,
-		func(result tsgo.TypeNode) tsgo.TypeNode {
-			if awaitable {
-				return context.Factory().UnionTypeNode([]tsgo.TypeNode{
-					result,
-					PromiseResult(context.Factory(), result),
-				})
-			}
-			return result
+		api.RoleCallableParameter,
+		api.RoleCallableResult,
+		func(_ *types.Var, index int) (string, error) {
+			return "$" + strconv.Itoa(index), nil
 		},
+		false,
 	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	result := api.DirectType(target.Result())
+	if awaitable {
+		result, err = IndirectResult(context, target.Result())
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+	}
+	return api.DirectType(
+		context.Factory().FunctionTypeNode(
+			nil,
+			target.Parameters(),
+			result.Value(),
+		),
+		api.CombineRequests(target.Requests(), result.Requests())...,
+	), nil
 }
 
 func emitInlineNonNilType(
@@ -102,10 +148,6 @@ func emitInlineNonNilType(
 		},
 		false,
 	)
-	if err != nil {
-		return api.TypeEmission{}, err
-	}
-	target, err = withRecoveryAuthority(context, target)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}

@@ -27,7 +27,7 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	argumentFacts, ok := context.TypesInfo().Types[source.Args[0]]
+	argumentFacts, ok := context.TypesInfo().TypeAndValue(source.Args[0])
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -115,7 +115,7 @@ func Emit(
 	return api.DirectExpression(
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(reference.Name()),
+				reference.Expression(context.Factory()),
 				nil,
 				context.Factory().Identifier(pointerruntime.CellName),
 				tsgo.NodeFlagsNone,

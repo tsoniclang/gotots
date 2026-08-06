@@ -79,7 +79,7 @@ func (a RuntimeArray) EmitType(
 		}
 		return api.DirectType(
 			context.Factory().TypeReferenceNode(
-				context.Factory().Identifier(reference.Name()),
+				reference.EntityName(context.Factory()),
 				nil,
 			),
 			reference.Requests()...,
@@ -102,7 +102,7 @@ func (a RuntimeArray) EmitType(
 	}
 	return api.DirectType(
 		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
+			reference.EntityName(context.Factory()),
 			[]tsgo.TypeNode{
 				element.Value(),
 				context.Factory().LiteralTypeNode(a.lengthLiteral(context)),
@@ -117,12 +117,12 @@ func (a RuntimeArray) EmitType(
 
 func (a RuntimeArray) storage(
 	context api.Context,
-	value tsgo.Expression,
-) tsgo.Expression {
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
 	if !a.nominal {
-		return value
+		return value, nil
 	}
-	return a.defined.Unwrap(context.Factory(), value)
+	return a.defined.Project(context, value)
 }
 
 func (a RuntimeArray) wrap(
@@ -167,7 +167,7 @@ func (a RuntimeArray) runtimeOperation(
 		return nil, nil, err
 	}
 	return context.Factory().CallExpression(
-		context.Factory().Identifier(reference.Name()),
+		reference.Expression(context.Factory()),
 		nil,
 		typeArguments,
 		arguments,
@@ -187,7 +187,7 @@ func (a RuntimeArray) callStatic(
 	}
 	return context.Factory().CallExpression(
 		context.Factory().PropertyAccessExpression(
-			context.Factory().Identifier(reference.Name()),
+			reference.Expression(context.Factory()),
 			nil,
 			context.Factory().Identifier(member.Name()),
 			tsgo.NodeFlagsNone,

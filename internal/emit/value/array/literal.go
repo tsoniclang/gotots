@@ -205,7 +205,8 @@ func (a RuntimeArray) emitLiteralElements(
 		index := next
 		valueSource := sourceElement
 		if keyed, ok := sourceElement.(*ast.KeyValueExpr); ok {
-			keyValue := context.TypesInfo().Types[keyed.Key].Value
+			keyFacts, _ := context.TypesInfo().TypeAndValue(keyed.Key)
+			keyValue := keyFacts.Value
 			var exact bool
 			if keyValue != nil {
 				index, exact = constant.Int64Val(keyValue)

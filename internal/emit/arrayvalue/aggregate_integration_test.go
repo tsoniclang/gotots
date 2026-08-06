@@ -16,7 +16,6 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
-		suffix  string
 	}{
 		{name: "number", options: emit.DefaultOptions()},
 		{
@@ -25,7 +24,6 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 				IntegerRepresentation: emit.IntegerRepresentationBigInt,
 				EvaluationOrder:       emit.EvaluationOrderPreserveGo,
 			},
-			suffix: "n",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -49,6 +47,15 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 			if strings.Count(runtime, "function goArrayAllocate") != 1 {
 				t.Fatalf("aggregate storage allocator is not emitted exactly once:\n%s", runtime)
 			}
+			for path, artifact := range target.printed {
+				if strings.Contains(artifact, "< 0;") {
+					t.Fatalf(
+						"zero-length array retained unreachable element traversal in %s:\n%s",
+						path,
+						artifact,
+					)
+				}
+			}
 			sliceRuntime := target.printed["runtime/slice.ts"]
 			for artifact, fragments := range map[string][]string{
 				"runtime/array.ts": {
@@ -56,7 +63,7 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 					"function goArrayLocation",
 				},
 				"runtime/slice.ts": {
-					"public static $view<T>",
+					"static $view<T>",
 					"function goArraySlice",
 				},
 			} {
@@ -99,7 +106,7 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 				}
 			}
 			runner := filepath.Join(directory, "runner.ts")
-			writeFile(t, runner, aggregateArrayRunner(target, testCase.suffix))
+			writeFile(t, runner, aggregateArrayRunner(target))
 			writeFile(t, filepath.Join(directory, "package.json"), "{\"type\":\"module\"}\n")
 			target.paths = append(target.paths, runner)
 			if err := compileTypeScript(t, directory, target.paths); err != nil {
@@ -175,7 +182,6 @@ func compileAggregateArrayFixture(
 
 func aggregateArrayRunner(
 	target materializedProgram,
-	suffix string,
 ) string {
 	return `import "` + target.programInit + `";
 import { GoPanic } from "./runtime/panic.js";
@@ -187,8 +193,9 @@ console.log(values.NamedCopyIsDeep().map(String).join(" "));
 console.log(values.NestedCopyIsDeep().map(String).join(" "));
 console.log(values.SparseLiteralZerosAreFresh().map(String).join(" "));
 console.log(String(values.GenericZeroLengthPhantom()));
-const left = values.NewBoxes(1` + suffix + `, 2` + suffix + `);
-const right = values.NewBoxes(1` + suffix + `, 2` + suffix + `);
+console.log(String(values.ZeroLengthPointerKey()));
+const left = values.NewBoxes(1, 2);
+const right = values.NewBoxes(1, 2);
 console.log(values.Equal(left, right));
 const pointed = values.PointerStore(left);
 console.log(String(values.First(pointed)), String(values.Second(pointed)));
@@ -252,6 +259,7 @@ func main() {
 	fmt.Println(values.NestedCopyIsDeep())
 	fmt.Println(values.SparseLiteralZerosAreFresh())
 	fmt.Println(values.GenericZeroLengthPhantom())
+	fmt.Println(values.ZeroLengthPointerKey())
 	left := values.Boxes{{Value: 1}, {Value: 2}}
 	right := values.Boxes{{Value: 1}, {Value: 2}}
 	fmt.Println(values.Equal(left, right))

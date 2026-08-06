@@ -1,4 +1,4 @@
-import type { int32 } from "../../../support/scalars.js";
+import type { int32 } from "../../../runtime/scalars.js";
 export class $PackageState {
     declare first: int32;
     declare second: int32;

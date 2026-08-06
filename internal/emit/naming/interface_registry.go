@@ -1,10 +1,14 @@
 package naming
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"go/types"
+	"strings"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
 	"github.com/tsoniclang/gotots/internal/output"
 )
 
@@ -123,6 +127,167 @@ func (r *Registry) internAnonymousInterface(
 	return binding, nil
 }
 
+func (r *Registry) internProviderInterfaceBridge(
+	artifactKey string,
+	sourceType *types.Named,
+) (providerInterfaceBridgeBinding, error) {
+	if r == nil || sourceType == nil || sourceType.Obj() == nil ||
+		artifactKey == "" {
+		return providerInterfaceBridgeBinding{}, &api.NameError{
+			Reason: "provider-interface bridge canonicalization input is invalid",
+		}
+	}
+	contract, ok := sourceType.Underlying().(*types.Interface)
+	if !ok || !contract.Complete().IsMethodSet() {
+		return providerInterfaceBridgeBinding{}, &api.NameError{
+			Name:   sourceType.Obj().Name(),
+			Reason: "provider-interface bridge source is not an interface",
+		}
+	}
+	if existing, found := r.providerInterfaceBridges[artifactKey]; found {
+		existingType, valid := existing.owner.ProviderInterfaceBridgeType()
+		if !valid || !types.Identical(existingType, sourceType) {
+			return providerInterfaceBridgeBinding{}, &api.NameError{
+				Name:   existing.name,
+				Reason: "provider-interface bridge key joined non-identical Go types",
+			}
+		}
+		return existing, nil
+	}
+	name, err := interfaceTargetName("$goProviderInterfaceBridge_", artifactKey)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	if err := reserveGeneratedName(
+		r.providerInterfaceBridgeNames,
+		name,
+		artifactKey,
+		"provider-interface bridge",
+	); err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	outputPath, err := output.ProviderInterfaceBridgePath(artifactKey)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	owner, err := api.NewCompilationGeneratedArtifact(
+		api.GeneratedArtifactProviderInterfaceBridge,
+		sourceType,
+		artifactKey,
+		name,
+		outputPath,
+	)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	binding := providerInterfaceBridgeBinding{
+		owner: owner,
+		name:  name,
+		key:   artifactKey,
+	}
+	r.providerInterfaceBridges[artifactKey] = binding
+	return binding, nil
+}
+
+func (r *Registry) internProviderProfileInterfaceBridge(
+	sourceKey string,
+	sourceType *types.Named,
+	profile []gostdlib.ProviderCallableProfileInterface,
+) (providerInterfaceBridgeBinding, error) {
+	if r == nil || sourceType == nil || sourceType.Obj() == nil ||
+		sourceKey == "" || len(profile) == 0 {
+		return providerInterfaceBridgeBinding{}, &api.NameError{
+			Reason: "provider-profile bridge canonicalization input is invalid",
+		}
+	}
+	contract, ok := sourceType.Underlying().(*types.Interface)
+	if !ok || !contract.Complete().IsMethodSet() {
+		return providerInterfaceBridgeBinding{}, &api.NameError{
+			Name:   sourceType.Obj().Name(),
+			Reason: "provider-profile bridge source is not an interface",
+		}
+	}
+	selected, err := providerProfileBridgeClosure(sourceType, profile)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	var descriptor strings.Builder
+	descriptor.WriteString(sourceKey)
+	for _, current := range selected {
+		if !current.Valid() {
+			return providerInterfaceBridgeBinding{}, &api.NameError{
+				Reason: "provider-profile bridge certificate is invalid",
+			}
+		}
+		descriptor.WriteByte(0)
+		descriptor.WriteString(current.SourceIdentity())
+		descriptor.WriteByte(0)
+		descriptor.WriteString(current.TargetFingerprint())
+	}
+	digest := sha256.Sum256([]byte(descriptor.String()))
+	artifactKey := hex.EncodeToString(digest[:])
+	if existing, found := r.providerInterfaceBridges[artifactKey]; found {
+		existingType, boundProfile, valid := existing.owner.ProviderProfileInterfaceBridge()
+		if !valid || !types.Identical(existingType, sourceType) ||
+			!sameProviderProfileInterfaces(boundProfile, selected) {
+			return providerInterfaceBridgeBinding{}, &api.NameError{
+				Name:   existing.name,
+				Reason: "provider-profile bridge key joined inconsistent evidence",
+			}
+		}
+		return existing, nil
+	}
+	name, err := interfaceTargetName("$goProviderProfileBridge_", artifactKey)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	if err := reserveGeneratedName(
+		r.providerInterfaceBridgeNames,
+		name,
+		artifactKey,
+		"provider-profile bridge",
+	); err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	outputPath, err := output.ProviderInterfaceBridgePath(artifactKey)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	owner, err := api.NewCompilationProviderProfileBridgeArtifact(
+		sourceType,
+		selected,
+		artifactKey,
+		name,
+		outputPath,
+	)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
+	binding := providerInterfaceBridgeBinding{
+		owner: owner,
+		name:  name,
+		key:   artifactKey,
+	}
+	r.providerInterfaceBridges[artifactKey] = binding
+	return binding, nil
+}
+
+func sameProviderProfileInterfaces(
+	left []gostdlib.ProviderCallableProfileInterface,
+	right []gostdlib.ProviderCallableProfileInterface,
+) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index].SourceIdentity() != right[index].SourceIdentity() ||
+			left[index].TargetFingerprint() != right[index].TargetFingerprint() {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *Registry) internInterfaceMethodToken(
 	artifactKey string,
 	method *types.Func,
@@ -146,7 +311,7 @@ func (r *Registry) internInterfaceMethodToken(
 		if !valid ||
 			!runtimeValid ||
 			existingRuntime != runtime ||
-			!methodidentity.Equivalent(existing.method, method) {
+			!environmentcontract.EquivalentMethods(existing.method, method) {
 			return interfaceMethodTokenBinding{}, &api.NameError{
 				Name:   existing.name,
 				Reason: "interface-method-token key joined non-identical contracts",
@@ -202,7 +367,7 @@ func (r *Registry) internInterfaceMethodCallable(
 	if existing, ok := r.interfaceMethodCallables[artifactKey]; ok {
 		_, valid := existing.owner.InterfaceMethodCallableSignature()
 		if !valid ||
-			!methodidentity.Equivalent(existing.method, method) {
+			!environmentcontract.EquivalentMethods(existing.method, method) {
 			return interfaceMethodCallableBinding{}, &api.NameError{
 				Name: existing.name,
 				Reason: "interface-method callable key joined " +

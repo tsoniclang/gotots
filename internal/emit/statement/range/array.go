@@ -9,6 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -305,11 +306,11 @@ func profileIndex(
 	context api.Context,
 	index tsgo.Expression,
 ) tsgo.Expression {
-	if context.IntegerRepresentation() != api.IntegerRepresentationBigInt {
+	if !integervalue.TypeUsesBigInt(context, types.Typ[types.Int]) {
 		return index
 	}
 	return context.Factory().CallExpression(
-		context.Factory().Identifier("BigInt"),
+		api.TargetIntrinsicBigInt.Expression(context.Factory()),
 		nil,
 		nil,
 		[]tsgo.Expression{index},

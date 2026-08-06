@@ -29,7 +29,7 @@ func genericNamedStructTypeArguments(
 		children,
 		source,
 		named.Origin().Obj(),
-		named.TypeArgs(),
+		api.TypeArgumentsFromGo(named.TypeArgs()),
 	)
 	if err != nil {
 		return nil, nil, err

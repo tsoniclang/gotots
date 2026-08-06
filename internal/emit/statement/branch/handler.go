@@ -15,23 +15,33 @@ func Emit(
 	source *ast.BranchStmt,
 ) (api.StatementEmission, error) {
 	if source.Label != nil {
-		label, ok := context.TypesInfo().Uses[source.Label].(*types.Label)
+		label, ok := context.TypesInfo().UseOf(source.Label).(*types.Label)
 		if !ok {
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
 		}
 		if source.Tok == token.GOTO {
-			if target, selected := context.GotoTarget(label); selected {
-				return emitGoto(context, target)
+			request, err := context.GotoControlRequest(
+				label,
+				source.Label.Pos(),
+			)
+			if err != nil {
+				return api.StatementEmission{}, err
 			}
-			if !context.CallableControl().Goto() {
-				request, err := context.GotoControlRequest(
-					label,
-					source.Label.Pos(),
-				)
+			if target, selected := context.GotoTarget(label); selected {
+				result, err := emitGoto(context, target)
 				if err != nil {
 					return api.StatementEmission{}, err
 				}
+				return api.NewStatementEmission(
+					result.Statements(),
+					api.CombineRequests(
+						result.Requests(),
+						[]api.RootRequest{request},
+					),
+				)
+			}
+			if !context.CallableControl().Goto() {
 				return api.NewStatementEmission(
 					nil,
 					[]api.RootRequest{request},

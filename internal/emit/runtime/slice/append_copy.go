@@ -22,7 +22,7 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 						b.id("index"),
 					),
 				),
-				b.index(b.id("values"), b.id("index")),
+				b.indexedValue(b.id("values"), b.id("index")),
 			),
 		),
 	)
@@ -90,48 +90,27 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 		b.factory.ExpressionStatement(
 			b.assign(
 				b.index(b.id("backing"), b.id("index")),
-				b.index(
+				b.indexedValue(
 					b.id("existingBacking"),
 					b.add(b.thisProperty("offset"), b.id("index")),
 				),
 			),
 		),
 	)
-	copyAppended := b.factory.ForStatement(
-		b.factory.VariableDeclarationList(
-			[]tsgo.VariableDeclaration{
-				b.factory.VariableDeclaration(
-					b.id("index"),
-					nil,
-					nil,
-					b.number("0"),
-				),
-			},
-			tsgo.NodeFlagsLet,
-		),
-		b.binary(
-			b.id("index"),
-			tsgo.BinaryOperatorLessThanToken,
-			b.property(b.id("values"), "length"),
-		),
-		b.assign(
-			b.id("index"),
-			b.add(b.id("index"), b.number("1")),
-		),
-		b.factory.Block([]tsgo.Statement{
-			b.factory.ExpressionStatement(
-				b.assign(
-					b.index(
-						b.id("backing"),
-						b.add(
-							b.thisProperty(MemberName(MemberLength)),
-							b.id("index"),
-						),
+	copyAppended := b.loop(
+		b.property(b.id("values"), "length"),
+		b.factory.ExpressionStatement(
+			b.assign(
+				b.index(
+					b.id("backing"),
+					b.add(
+						b.thisProperty(MemberName(MemberLength)),
+						b.id("index"),
 					),
-					b.index(b.id("values"), b.id("index")),
 				),
+				b.indexedValue(b.id("values"), b.id("index")),
 			),
-		}, true),
+		),
 	)
 	statements := []tsgo.Statement{
 		b.variable(tsgo.NodeFlagsConst, "newLength", newLength),
@@ -237,7 +216,7 @@ func (b builder) copyMethod() tsgo.MethodDeclaration {
 						b.id("index"),
 					),
 				),
-				b.index(
+				b.indexedValue(
 					b.id("sourceBacking"),
 					b.add(
 						b.property(b.id("source"), "offset"),
@@ -246,6 +225,35 @@ func (b builder) copyMethod() tsgo.MethodDeclaration {
 				),
 			),
 		),
+	)
+	directCopy := b.factory.Block([]tsgo.Statement{
+		b.factory.IfStatement(
+			sameBacking,
+			b.factory.ExpressionStatement(copyWithin),
+			distinctCopy,
+		),
+		b.returnStatement(b.id("count")),
+	}, true)
+	values := b.factory.NewExpression(
+		b.id("Array"),
+		[]tsgo.TypeNode{b.typeT()},
+		[]tsgo.Expression{b.id("count")},
+	)
+	captureProjected := b.loop(
+		b.id("count"),
+		b.factory.ExpressionStatement(b.assign(
+			b.index(b.id("values"), b.id("index")),
+			b.call(b.id("source"), MemberName(MemberGet), b.id("index")),
+		)),
+	)
+	writeProjected := b.loop(
+		b.id("count"),
+		b.factory.ExpressionStatement(b.call(
+			b.id("target"),
+			MemberName(MemberSet),
+			b.id("index"),
+			b.indexedValue(b.id("values"), b.id("index")),
+		)),
 	)
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
@@ -280,24 +288,22 @@ func (b builder) copyMethod() tsgo.MethodDeclaration {
 			b.binary(
 				b.binary(
 					b.id("targetBacking"),
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					tsgo.BinaryOperatorExclamationEqualsEqualsToken,
 					b.factory.NullLiteral(),
 				),
-				tsgo.BinaryOperatorBarBarToken,
+				tsgo.BinaryOperatorAmpersandAmpersandToken,
 				b.binary(
 					b.id("sourceBacking"),
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					tsgo.BinaryOperatorExclamationEqualsEqualsToken,
 					b.factory.NullLiteral(),
 				),
 			),
-			b.throwBounds(),
+			directCopy,
 			nil,
 		),
-		b.factory.IfStatement(
-			sameBacking,
-			b.factory.ExpressionStatement(copyWithin),
-			distinctCopy,
-		),
+		b.variable(tsgo.NodeFlagsConst, "values", values),
+		captureProjected,
+		writeProjected,
 		b.returnStatement(b.id("count")),
 	)
 }

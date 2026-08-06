@@ -3,21 +3,81 @@ package naming
 import (
 	"go/ast"
 	"go/types"
-	"slices"
 	"sort"
-	"strconv"
 
+	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/load"
-	"github.com/tsoniclang/gotots/internal/output"
 )
 
+// EnvironmentObserver is the non-optional root environment selection
+// observer consumed by every file name owner. Every target selection whose
+// object may be environment-owned must synchronously observe the canonical
+// object with one closed demand and typed provider selection before its
+// target is returned; a selection route that can produce an environment
+// target without this observation is invalid.
+type EnvironmentObserver interface {
+	RequireUse(
+		object types.Object,
+		demand environmentcontract.UseDemand,
+		selection gostdlib.UseSelection,
+	) error
+	ObserveImplementation(
+		object types.Object,
+		demand environmentcontract.UseDemand,
+		route environmentcontract.ImplementationRoute,
+	) error
+}
+
+// referenceDemand classifies the closed environment use demand of one
+// ordinary reference from the referenced object kind and import phase.
+func referenceDemand(
+	object types.Object,
+	phase api.ImportPhase,
+) environmentcontract.UseDemand {
+	if phase == api.ImportPhaseType {
+		return environmentcontract.UseDemandTypeContract
+	}
+	if _, ok := object.(*types.Func); ok {
+		return environmentcontract.UseDemandCallable
+	}
+	return environmentcontract.UseDemandValue
+}
+
+func (n *File) requireUse(
+	object types.Object,
+	demand environmentcontract.UseDemand,
+) error {
+	return n.observer.RequireUse(object, demand, gostdlib.NoUseSelection())
+}
+
+// ObserveEnvironmentImplementation forwards a compiler-intrinsic or
+// generated-runtime-facet implementation route to the non-optional root
+// environment observer.
+func (n *File) ObserveEnvironmentImplementation(
+	object types.Object,
+	demand environmentcontract.UseDemand,
+	route environmentcontract.ImplementationRoute,
+) error {
+	return n.observer.ObserveImplementation(object, demand, route)
+}
+
 type targetBinding struct {
-	name         string
-	sourceFile   *ast.File
-	sourcePath   string
-	moduleExport bool
-	kind         targetBindingKind
+	name                         string
+	sourceFile                   *ast.File
+	sourcePath                   string
+	moduleExport                 bool
+	kind                         targetBindingKind
+	providerModule               string
+	providerExport               string
+	providerMember               string
+	providerAccess               gostdlib.AccessKind
+	providerRepresentation       bool
+	providerTypeRepresentation   gostdlib.RepresentationKind
+	providerDefinedValue         gostdlib.DefinedValueRepresentationKind
+	providerEffect               gostdlib.EffectKind
+	providerGenericTypeArguments []gostdlib.GenericTypeArgumentDocument
+	providerGenericOperations    []gostdlib.GenericOperationDocument
 }
 
 type targetBindingKind uint8
@@ -26,11 +86,14 @@ const (
 	targetBindingLocal targetBindingKind = iota
 	targetBindingSource
 	targetBindingEnvironment
+	targetBindingProvider
+	targetBindingMissingProvider
 )
 
 func (b targetBinding) scheduled() bool {
 	return b.kind == targetBindingSource ||
-		b.kind == targetBindingEnvironment
+		b.kind == targetBindingEnvironment ||
+		b.kind == targetBindingProvider
 }
 
 func (b targetBinding) sourceOwned() bool {
@@ -81,12 +144,42 @@ type interfaceDynamicTypeTokenBinding struct {
 	name  string
 }
 
+type providerInterfaceBridgeBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+	key   string
+}
+
+type providerInterfaceCapabilityBinding struct {
+	key         string
+	certificate gostdlib.ProviderInterfaceCapability
+	base        *types.Named
+	target      *types.Interface
+	targetKey   string
+	demandKey   string
+}
+
+type providerStatefulRepresentationBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
 type interfaceContractDemand struct {
 	source *types.Interface
 	target *types.Interface
 }
 
+type interfaceReflectionDemand struct {
+	source         *types.Interface
+	reflectionType *types.TypeName
+}
+
 type genericCapabilityBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
+type genericConcretizationBinding struct {
 	owner *api.GeneratedArtifact
 	name  string
 }
@@ -96,8 +189,23 @@ type callableABIBinding struct {
 	name  string
 }
 
+type deferredCallableRegistryBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
 type pointerRepresentationBinding struct {
 	owner *api.GeneratedArtifact
+}
+
+type reflectionTypeBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
+type unsafeCodecBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
 }
 
 type Target struct {
@@ -106,64 +214,107 @@ type Target struct {
 }
 
 type Registry struct {
-	byObject                     map[types.Object]targetBinding
-	memberNameByObject           map[*types.Var]string
-	packageVariables             map[*types.Var]packageVariableBinding
-	assemblyPathByPackage        map[*types.Package]string
-	importQualifierByPackage     map[*types.Package]string
-	anonymousStructs             map[string]anonymousStructBinding
-	anonymousStructNames         map[string]string
-	mapSpecializations           map[string]mapSpecializationBinding
-	mapSpecializationNames       map[string]string
-	interfaceAdapters            map[string]interfaceAdapterBinding
-	interfaceAdapterNames        map[string]string
-	anonymousInterfaces          map[string]anonymousInterfaceBinding
-	anonymousInterfaceNames      map[string]string
-	interfaceMethodCallables     map[string]interfaceMethodCallableBinding
-	interfaceMethodCallableNames map[string]string
-	interfaceMethodTokens        map[string]interfaceMethodTokenBinding
-	interfaceMethodNames         map[string]string
-	interfaceDynamicTypes        map[string]interfaceDynamicTypeTokenBinding
-	interfaceDynamicNames        map[string]string
-	interfaceContracts           map[string]*types.Interface
-	interfaceAdaptersByContract  map[string]map[string]struct{}
-	interfaceContractDemands     map[string]map[string]interfaceContractDemand
-	genericCapabilities          map[string]genericCapabilityBinding
-	genericCapabilityNames       map[string]string
-	callableABIs                 map[string]callableABIBinding
-	callableABINames             map[string]string
-	pointerRepresentations       map[string]pointerRepresentationBinding
+	provider                            standardLibraryProvider
+	providerImportNameByModule          map[string]string
+	byObject                            map[types.Object]targetBinding
+	sourceBindingPathsByName            map[string]map[string]struct{}
+	memberNameByObject                  map[*types.Var]string
+	packageVariables                    map[*types.Var]packageVariableBinding
+	assemblyPathByPackage               map[*types.Package]string
+	importQualifierByPackage            map[*types.Package]string
+	anonymousStructs                    map[string]anonymousStructBinding
+	anonymousStructNames                map[string]string
+	mapSpecializations                  map[string]mapSpecializationBinding
+	mapSpecializationNames              map[string]string
+	interfaceAdapters                   map[string]interfaceAdapterBinding
+	interfaceAdapterNames               map[string]string
+	anonymousInterfaces                 map[string]anonymousInterfaceBinding
+	anonymousInterfaceNames             map[string]string
+	interfaceMethodCallables            map[string]interfaceMethodCallableBinding
+	interfaceMethodCallableNames        map[string]string
+	interfaceMethodTokens               map[string]interfaceMethodTokenBinding
+	interfaceMethodNames                map[string]string
+	interfaceDynamicTypes               map[string]interfaceDynamicTypeTokenBinding
+	interfaceDynamicNames               map[string]string
+	providerInterfaceBridges            map[string]providerInterfaceBridgeBinding
+	providerInterfaceBridgeNames        map[string]string
+	providerInterfaceCapabilities       map[string]map[string]providerInterfaceCapabilityBinding
+	providerInterfaceCapabilityDemands  map[string]providerInterfaceCapabilityBinding
+	providerInterfaceBridgesByContract  map[string]map[string]struct{}
+	providerStatefulRepresentations     map[string]providerStatefulRepresentationBinding
+	providerStatefulRepresentationNames map[string]string
+	providerObjectByIdentity            map[string]types.Object
+	interfaceContracts                  map[string]*types.Interface
+	interfaceAdaptersByContract         map[string]map[string]struct{}
+	interfaceContractDemands            map[string]map[string]interfaceContractDemand
+	interfaceReflectionDemands          map[string]interfaceReflectionDemand
+	genericCapabilities                 map[string]genericCapabilityBinding
+	genericCapabilityNames              map[string]string
+	genericConcretizations              map[string]genericConcretizationBinding
+	genericConcretizationNames          map[string]string
+	callableABIs                        map[string]callableABIBinding
+	callableABINames                    map[string]string
+	deferredCallableRegistries          map[string]deferredCallableRegistryBinding
+	deferredCallableRegistryNames       map[string]string
+	pointerRepresentations              map[string]pointerRepresentationBinding
+	reflectionTypes                     map[string]reflectionTypeBinding
+	reflectionValueDemands              map[string]struct{}
+	reflectionValueContracts            map[string]struct{}
+	reflectionTypeNames                 map[string]string
+	unsafeCodecs                        map[string]unsafeCodecBinding
+	unsafeCodecNames                    map[string]string
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
-		byObject:                     make(map[types.Object]targetBinding),
-		memberNameByObject:           make(map[*types.Var]string),
-		packageVariables:             make(map[*types.Var]packageVariableBinding),
-		assemblyPathByPackage:        make(map[*types.Package]string),
-		importQualifierByPackage:     make(map[*types.Package]string),
-		anonymousStructs:             make(map[string]anonymousStructBinding),
-		anonymousStructNames:         make(map[string]string),
-		mapSpecializations:           make(map[string]mapSpecializationBinding),
-		mapSpecializationNames:       make(map[string]string),
-		interfaceAdapters:            make(map[string]interfaceAdapterBinding),
-		interfaceAdapterNames:        make(map[string]string),
-		anonymousInterfaces:          make(map[string]anonymousInterfaceBinding),
-		anonymousInterfaceNames:      make(map[string]string),
-		interfaceMethodCallables:     make(map[string]interfaceMethodCallableBinding),
-		interfaceMethodCallableNames: make(map[string]string),
-		interfaceMethodTokens:        make(map[string]interfaceMethodTokenBinding),
-		interfaceMethodNames:         make(map[string]string),
-		interfaceDynamicTypes:        make(map[string]interfaceDynamicTypeTokenBinding),
-		interfaceDynamicNames:        make(map[string]string),
-		interfaceContracts:           make(map[string]*types.Interface),
-		interfaceAdaptersByContract:  make(map[string]map[string]struct{}),
-		interfaceContractDemands:     make(map[string]map[string]interfaceContractDemand),
-		genericCapabilities:          make(map[string]genericCapabilityBinding),
-		genericCapabilityNames:       make(map[string]string),
-		callableABIs:                 make(map[string]callableABIBinding),
-		callableABINames:             make(map[string]string),
-		pointerRepresentations:       make(map[string]pointerRepresentationBinding),
+		byObject:                            make(map[types.Object]targetBinding),
+		sourceBindingPathsByName:            make(map[string]map[string]struct{}),
+		providerImportNameByModule:          make(map[string]string),
+		memberNameByObject:                  make(map[*types.Var]string),
+		packageVariables:                    make(map[*types.Var]packageVariableBinding),
+		assemblyPathByPackage:               make(map[*types.Package]string),
+		importQualifierByPackage:            make(map[*types.Package]string),
+		anonymousStructs:                    make(map[string]anonymousStructBinding),
+		anonymousStructNames:                make(map[string]string),
+		mapSpecializations:                  make(map[string]mapSpecializationBinding),
+		mapSpecializationNames:              make(map[string]string),
+		interfaceAdapters:                   make(map[string]interfaceAdapterBinding),
+		interfaceAdapterNames:               make(map[string]string),
+		anonymousInterfaces:                 make(map[string]anonymousInterfaceBinding),
+		anonymousInterfaceNames:             make(map[string]string),
+		interfaceMethodCallables:            make(map[string]interfaceMethodCallableBinding),
+		interfaceMethodCallableNames:        make(map[string]string),
+		interfaceMethodTokens:               make(map[string]interfaceMethodTokenBinding),
+		interfaceMethodNames:                make(map[string]string),
+		interfaceDynamicTypes:               make(map[string]interfaceDynamicTypeTokenBinding),
+		interfaceDynamicNames:               make(map[string]string),
+		providerInterfaceBridges:            make(map[string]providerInterfaceBridgeBinding),
+		providerInterfaceBridgeNames:        make(map[string]string),
+		providerInterfaceCapabilities:       make(map[string]map[string]providerInterfaceCapabilityBinding),
+		providerInterfaceCapabilityDemands:  make(map[string]providerInterfaceCapabilityBinding),
+		providerInterfaceBridgesByContract:  make(map[string]map[string]struct{}),
+		providerStatefulRepresentations:     make(map[string]providerStatefulRepresentationBinding),
+		providerStatefulRepresentationNames: make(map[string]string),
+		providerObjectByIdentity:            make(map[string]types.Object),
+		interfaceContracts:                  make(map[string]*types.Interface),
+		interfaceAdaptersByContract:         make(map[string]map[string]struct{}),
+		interfaceContractDemands:            make(map[string]map[string]interfaceContractDemand),
+		interfaceReflectionDemands:          make(map[string]interfaceReflectionDemand),
+		genericCapabilities:                 make(map[string]genericCapabilityBinding),
+		genericCapabilityNames:              make(map[string]string),
+		genericConcretizations:              make(map[string]genericConcretizationBinding),
+		genericConcretizationNames:          make(map[string]string),
+		callableABIs:                        make(map[string]callableABIBinding),
+		callableABINames:                    make(map[string]string),
+		deferredCallableRegistries:          make(map[string]deferredCallableRegistryBinding),
+		deferredCallableRegistryNames:       make(map[string]string),
+		pointerRepresentations:              make(map[string]pointerRepresentationBinding),
+		reflectionTypes:                     make(map[string]reflectionTypeBinding),
+		reflectionValueDemands:              make(map[string]struct{}),
+		reflectionValueContracts:            make(map[string]struct{}),
+		reflectionTypeNames:                 make(map[string]string),
+		unsafeCodecs:                        make(map[string]unsafeCodecBinding),
+		unsafeCodecNames:                    make(map[string]string),
 	}
 }
 
@@ -179,6 +330,43 @@ func (r *Registry) Target(object types.Object) (Target, bool) {
 		Name:       binding.name,
 		SourcePath: binding.sourcePath,
 	}, true
+}
+
+func (r *Registry) HasProviderCoverageOwner(object types.Object) bool {
+	if r == nil || r.provider == nil || !r.provider.Valid() {
+		return false
+	}
+	binding, ok := r.byObject[object]
+	return ok && (binding.kind == targetBindingProvider ||
+		binding.kind == targetBindingMissingProvider)
+}
+
+// EnvironmentSelectionRoute reports the canonical implementation route
+// derived from one environment-owned declaration binding. The second result
+// is false when the object has no environment binding. A certified provider
+// binding selects the provider route; a contract-only binding selects the
+// explicit boundary route; a selected declaration whose provider binding is
+// missing reports an invalid route so the caller fails closed.
+func (r *Registry) EnvironmentSelectionRoute(
+	object types.Object,
+) (environmentcontract.ImplementationRoute, bool) {
+	if r == nil {
+		return environmentcontract.RouteInvalid, false
+	}
+	binding, ok := r.byObject[object]
+	if !ok {
+		return environmentcontract.RouteInvalid, false
+	}
+	switch binding.kind {
+	case targetBindingProvider:
+		return environmentcontract.RouteProvider, true
+	case targetBindingEnvironment:
+		return environmentcontract.RouteBoundary, true
+	case targetBindingMissingProvider:
+		return environmentcontract.RouteInvalid, true
+	default:
+		return environmentcontract.RouteInvalid, false
+	}
 }
 
 func (r *Registry) ImportQualifier(sourcePackage *types.Package) string {
@@ -217,14 +405,32 @@ func (r *Registry) GeneratedArtifact(
 	case api.GeneratedArtifactInterfaceDynamicTypeToken:
 		binding, ok := r.interfaceDynamicTypes[artifactKey]
 		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactProviderInterfaceBridge:
+		binding, ok := r.providerInterfaceBridges[artifactKey]
+		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactProviderStatefulRepresentation:
+		binding, ok := r.providerStatefulRepresentations[artifactKey]
+		return binding.owner, ok && binding.owner != nil
 	case api.GeneratedArtifactGenericCapability:
 		binding, ok := r.genericCapabilities[artifactKey]
+		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactGenericConcretization:
+		binding, ok := r.genericConcretizations[artifactKey]
 		return binding.owner, ok && binding.owner != nil
 	case api.GeneratedArtifactCallableABI:
 		binding, ok := r.callableABIs[artifactKey]
 		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactDeferredCallableRegistry:
+		binding, ok := r.deferredCallableRegistries[artifactKey]
+		return binding.owner, ok && binding.owner != nil
 	case api.GeneratedArtifactPointerRepresentation:
 		binding, ok := r.pointerRepresentations[artifactKey]
+		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactReflectionType:
+		binding, ok := r.reflectionTypes[artifactKey]
+		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactUnsafeCodec:
+		binding, ok := r.unsafeCodecs[artifactKey]
 		return binding.owner, ok && binding.owner != nil
 	default:
 		return nil, false
@@ -267,16 +473,40 @@ func (r *Registry) GeneratedArtifacts(
 		for _, binding := range r.interfaceDynamicTypes {
 			artifacts = append(artifacts, binding.owner)
 		}
+	case api.GeneratedArtifactProviderInterfaceBridge:
+		for _, binding := range r.providerInterfaceBridges {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactProviderStatefulRepresentation:
+		for _, binding := range r.providerStatefulRepresentations {
+			artifacts = append(artifacts, binding.owner)
+		}
 	case api.GeneratedArtifactGenericCapability:
 		for _, binding := range r.genericCapabilities {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactGenericConcretization:
+		for _, binding := range r.genericConcretizations {
 			artifacts = append(artifacts, binding.owner)
 		}
 	case api.GeneratedArtifactCallableABI:
 		for _, binding := range r.callableABIs {
 			artifacts = append(artifacts, binding.owner)
 		}
+	case api.GeneratedArtifactDeferredCallableRegistry:
+		for _, binding := range r.deferredCallableRegistries {
+			artifacts = append(artifacts, binding.owner)
+		}
 	case api.GeneratedArtifactPointerRepresentation:
 		for _, binding := range r.pointerRepresentations {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactReflectionType:
+		for _, binding := range r.reflectionTypes {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactUnsafeCodec:
+		for _, binding := range r.unsafeCodecs {
 			artifacts = append(artifacts, binding.owner)
 		}
 	}
@@ -297,7 +527,14 @@ func (r *Registry) reserve(
 		if existing.sourceFile != binding.sourceFile ||
 			existing.sourcePath != binding.sourcePath ||
 			existing.name != binding.name ||
-			existing.kind != binding.kind {
+			existing.kind != binding.kind ||
+			existing.providerModule != binding.providerModule ||
+			existing.providerExport != binding.providerExport ||
+			existing.providerMember != binding.providerMember ||
+			existing.providerAccess != binding.providerAccess ||
+			existing.providerRepresentation != binding.providerRepresentation ||
+			existing.providerTypeRepresentation != binding.providerTypeRepresentation ||
+			existing.providerDefinedValue != binding.providerDefinedValue {
 			return &api.NameError{
 				Name:   objectName(object),
 				Reason: "declaration has conflicting target ownership",
@@ -306,197 +543,17 @@ func (r *Registry) reserve(
 		return nil
 	}
 	r.byObject[object] = binding
-	return nil
-}
-
-func (r *Registry) IndexCompilationTargets(
-	sourcePackages []*load.Package,
-	environmentPackages []*load.Package,
-) error {
-	if r == nil {
-		return &api.NameError{Reason: "declaration registry is nil"}
-	}
-	packages := make(
-		[]*types.Package,
-		0,
-		len(sourcePackages)+len(environmentPackages),
-	)
-	for _, sourcePackage := range sourcePackages {
-		if sourcePackage == nil || sourcePackage.Types() == nil {
-			return &api.NameError{Reason: "source package identity is nil"}
+	if binding.sourceOwned() && binding.name != "" && binding.sourcePath != "" {
+		paths := r.sourceBindingPathsByName[binding.name]
+		if paths == nil {
+			paths = make(map[string]struct{})
+			r.sourceBindingPathsByName[binding.name] = paths
 		}
-		typesPackage := sourcePackage.Types()
-		if _, duplicate := r.assemblyPathByPackage[typesPackage]; duplicate {
-			return &api.NameError{
-				Name:   typesPackage.Path(),
-				Reason: "source package identity is duplicated",
-			}
-		}
-		assemblyPath, err := output.PackageAssemblyPath(sourcePackage)
-		if err != nil {
-			return err
-		}
-		r.assemblyPathByPackage[typesPackage] = assemblyPath
-		packages = append(packages, typesPackage)
-	}
-	for _, environmentPackage := range environmentPackages {
-		if environmentPackage == nil ||
-			!environmentPackage.Kind().EnvironmentContract() ||
-			environmentPackage.Types() == nil {
-			return &api.NameError{
-				Reason: "environment package identity is invalid",
-			}
-		}
-		typesPackage := environmentPackage.Types()
-		if _, duplicate := r.assemblyPathByPackage[typesPackage]; duplicate {
-			return &api.NameError{
-				Name:   typesPackage.Path(),
-				Reason: "environment package identity is duplicated",
-			}
-		}
-		contractPath, err := output.EnvironmentContractPath(
-			environmentPackage,
-		)
-		if err != nil {
-			return err
-		}
-		r.assemblyPathByPackage[typesPackage] = contractPath
-		if err := r.indexEnvironmentPackage(
-			environmentPackage,
-			contractPath,
-		); err != nil {
-			return err
-		}
-		packages = append(packages, typesPackage)
-	}
-	return r.indexPackageQualifiers(packages)
-}
-
-func (r *Registry) indexEnvironmentPackage(
-	sourcePackage *load.Package,
-	contractPath string,
-) error {
-	scope := sourcePackage.Types().Scope()
-	names := scope.Names()
-	sort.Strings(names)
-	used := make(map[string]struct{}, len(names)+1)
-	used[api.TargetGlobalAnchorName] = struct{}{}
-	for _, sourceName := range names {
-		object := scope.Lookup(sourceName)
-		if object == nil || object.Name() == "_" {
-			continue
-		}
-		name := allocatePackageName(portableIdentifier(object.Name()), used)
-		binding := targetBinding{
-			name:         name,
-			sourcePath:   contractPath,
-			moduleExport: true,
-			kind:         targetBindingEnvironment,
-		}
-		if err := r.reserve(object, binding); err != nil {
-			return err
-		}
-		if variable, ok := object.(*types.Var); ok {
-			r.packageVariables[variable] = packageVariableBinding{
-				fieldName:    name,
-				statePath:    contractPath,
-				assemblyPath: contractPath,
-			}
-		}
-		typeName, ok := object.(*types.TypeName)
-		if !ok || typeName.IsAlias() {
-			continue
-		}
-		named, ok := types.Unalias(typeName.Type()).(*types.Named)
-		if !ok {
-			continue
-		}
-		if structure, ok := named.Underlying().(*types.Struct); ok {
-			r.indexEnvironmentFields(structure)
-		}
-		for index := range named.NumMethods() {
-			method := named.Method(index).Origin()
-			signature, ok := method.Type().(*types.Signature)
-			if !ok || signature.Recv() == nil {
-				continue
-			}
-			base := portableIdentifier(typeName.Name()) + "_" +
-				portableIdentifier(method.Name())
-			methodName := allocatePackageName(base, used)
-			if err := r.reserve(method, targetBinding{
-				name:         methodName,
-				sourcePath:   contractPath,
-				moduleExport: true,
-				kind:         targetBindingEnvironment,
-			}); err != nil {
-				return err
-			}
-		}
+		paths[binding.sourcePath] = struct{}{}
 	}
 	return nil
 }
 
-func (r *Registry) indexEnvironmentFields(structure *types.Struct) {
-	used := map[string]struct{}{"constructor": {}}
-	for index := range structure.NumFields() {
-		field := structure.Field(index)
-		name := allocatePackageName(portableIdentifier(field.Name()), used)
-		r.memberNameByObject[field] = name
-	}
-}
-
-func allocatePackageName(
-	base string,
-	used map[string]struct{},
-) string {
-	candidate := base
-	for suffix := uint64(1); ; suffix++ {
-		if _, duplicate := used[candidate]; !duplicate {
-			used[candidate] = struct{}{}
-			return candidate
-		}
-		candidate = base + "__declaration_" +
-			strconv.FormatUint(suffix, 10)
-	}
-}
-
-func (r *Registry) indexPackageQualifiers(
-	sourcePackages []*types.Package,
-) error {
-	if r == nil {
-		return &api.NameError{Reason: "declaration registry is nil"}
-	}
-	packages := slices.Clone(sourcePackages)
-	for _, sourcePackage := range packages {
-		if sourcePackage == nil ||
-			sourcePackage.Path() == "" ||
-			sourcePackage.Name() == "" {
-			return &api.NameError{Reason: "source package identity is nil"}
-		}
-	}
-	sort.Slice(packages, func(left, right int) bool {
-		return packages[left].Path() < packages[right].Path()
-	})
-	used := make(map[string]struct{}, len(packages))
-	paths := make(map[string]struct{}, len(packages))
-	for _, sourcePackage := range packages {
-		if _, duplicate := paths[sourcePackage.Path()]; duplicate {
-			return &api.NameError{
-				Name:   sourcePackage.Path(),
-				Reason: "source package path is duplicated",
-			}
-		}
-		paths[sourcePackage.Path()] = struct{}{}
-		base := portableIdentifier(sourcePackage.Name())
-		qualifier := base
-		for suffix := uint64(1); ; suffix++ {
-			if _, duplicate := used[qualifier]; !duplicate {
-				break
-			}
-			qualifier = base + "__package_" + strconv.FormatUint(suffix, 10)
-		}
-		used[qualifier] = struct{}{}
-		r.importQualifierByPackage[sourcePackage] = qualifier
-	}
-	return nil
+func (r *Registry) sourceBindingNameCollides(name string) bool {
+	return r != nil && len(r.sourceBindingPathsByName[name]) > 1
 }

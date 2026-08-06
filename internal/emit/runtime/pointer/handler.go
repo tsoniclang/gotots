@@ -3,35 +3,104 @@ package pointer
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 const (
-	AddressName     = "$go$address"
-	CellName        = "cell"
-	CellValueName   = "value"
-	DereferenceName = "dereference"
-	DirectName      = "direct"
-	EqualName       = "equal"
-	ViewName        = "view"
-	FieldName       = "field"
-	ObjectFieldName = "objectField"
-	ElementName     = "element"
-	IndexName       = "index"
-	ArrayRegionName = "arrayRegion"
+	AddressName      = "$go$address"
+	CellName         = "cell"
+	CellValueName    = "value"
+	DereferenceName  = "dereference"
+	DirectName       = "direct"
+	EqualName        = "equal"
+	ProjectName      = "project"
+	ViewName         = "view"
+	FieldName        = "field"
+	ObjectFieldName  = "objectField"
+	ElementName      = "element"
+	IndexName        = "index"
+	ArrayRegionName  = "arrayRegion"
+	RegionName       = "$go$region"
+	RegionMethod     = "region"
+	UnsafeMemoryName = "$go$unsafeMemory"
+	UnsafeViewName   = "$go$unsafeView"
+	UnsafeBindName   = "$go$unsafeBind"
+	unsafeSyncName   = "$go$unsafeSync"
 )
 
+type Capabilities struct {
+	Region       bool
+	UnsafeMemory bool
+	Projection   bool
+}
+
 type builder struct {
-	factory   tsgo.Factory
-	className string
-	panicName string
+	factory        tsgo.Factory
+	className      string
+	panicName      string
+	denseIndexName string
+	capabilities   Capabilities
 }
 
 func Build(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
+	denseIndexName string,
+) tsgo.Statement {
+	return BuildWithCapabilities(
+		factory,
+		className,
+		panicName,
+		denseIndexName,
+		Capabilities{},
+	)
+}
+
+func BuildWithCapabilities(
+	factory tsgo.Factory,
+	className string,
+	panicName string,
+	denseIndexName string,
+	capabilities Capabilities,
 ) tsgo.Statement {
 	target := builder{
-		factory:   factory,
-		className: className,
-		panicName: panicName,
+		factory:        factory,
+		className:      className,
+		panicName:      panicName,
+		denseIndexName: denseIndexName,
+		capabilities:   capabilities,
+	}
+	members := []tsgo.ClassElement{
+		target.logicalProperty(),
+		target.rootsProperty(),
+		target.childrenProperty(),
+		target.constructor(),
+		target.rootMethod(),
+		target.childMethod(),
+		target.cellMethod(),
+		target.fieldMethod(),
+		target.objectFieldMethod(),
+		target.elementMethod(),
+		target.indexMethod(),
+		target.arrayRegionMethod(),
+		target.equalMethod(),
+		target.dereferenceMethod(),
+		target.directMethod(),
+		target.viewMethod(),
+		target.valueGetter(),
+		target.valueSetter(),
+	}
+	if capabilities.Projection {
+		members = append(members, target.projectMethod())
+	}
+	if capabilities.Region {
+		members = append(members, target.regionMethod())
+	}
+	if capabilities.UnsafeMemory {
+		members = append(
+			members,
+			target.unsafeSyncProperty(),
+			target.unsafeBindMethod(),
+			target.unsafeMemoryMethod(),
+			target.unsafeViewMethod(),
+		)
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
@@ -41,26 +110,7 @@ func Build(
 			target.typeParameter("S", nil),
 		},
 		nil,
-		[]tsgo.ClassElement{
-			target.logicalProperty(),
-			target.rootsProperty(),
-			target.childrenProperty(),
-			target.constructor(),
-			target.rootMethod(),
-			target.childMethod(),
-			target.cellMethod(),
-			target.fieldMethod(),
-			target.objectFieldMethod(),
-			target.elementMethod(),
-			target.indexMethod(),
-			target.arrayRegionMethod(),
-			target.equalMethod(),
-			target.dereferenceMethod(),
-			target.directMethod(),
-			target.viewMethod(),
-			target.valueGetter(),
-			target.valueSetter(),
-		},
+		members,
 	)
 }
 
