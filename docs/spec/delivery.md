@@ -59,7 +59,7 @@ Install:
 - structs/classes and demand-created members;
 - arrays, slices, strings, pointers, and maps;
 - composite literals, indexing, slicing, range, and addressability;
-- both integer profiles and evaluation-order profiles.
+- all integer profiles and both evaluation-order profiles.
 
 Exit: focused family matrices and mutations pass; direct representations stay
 direct; carriers/helpers appear only on exact demand; size grows with source
@@ -197,15 +197,16 @@ proof; publication scope is the selected closure, not the entire standard
 library.
 
 Delivery generates and strict-typechecks the complete product runtime under
-both integer profiles. The provider build is independent of that product
+all integer profiles. The provider build is independent of that product
 selection: provider source contains no import of `@gotots/runtime/scalars.js`,
 and its certificate pins the provider representation plus native width.
 Linked-product proof executes both equal-carrier and converting facades and
 rejects stale or mismatched provider scalar contracts before target sealing.
 Runtime parity is certified only under a profile that can preserve every
 reached integer-dependent identity and control decision. If the product reaches
-exact 64-bit arithmetic, the runtime replay selects `bigint`; a successful
-`number` typecheck is not runtime-equivalence evidence.
+exact fixed-width 64-bit arithmetic, the runtime replay selects at least
+`fixed64-bigint`; if it reaches exact native 64-bit overflow, it selects
+`bigint`. A successful `number` typecheck is not runtime-equivalence evidence.
 
 ## 9. Product Proof
 

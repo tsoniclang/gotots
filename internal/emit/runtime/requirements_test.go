@@ -10,7 +10,7 @@ import (
 func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
 	contract, err := runtimecontract.Decode([]byte(`{
 	  "schemaVersion": 2,
-	  "integerRepresentations": ["number", "bigint"],
+	  "integerRepresentations": ["number", "fixed64-bigint", "bigint"],
 	  "providerIntegerRepresentation": "bigint",
 	  "providerScalarModule": "./internal/scalars.js",
 	  "nativeIntegerBits": 64,
@@ -29,6 +29,7 @@ func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !requirements.AllowsProfile(api.IntegerRepresentationNumber) ||
+		!requirements.AllowsProfile(api.IntegerRepresentationFixed64BigInt) ||
 		!requirements.AllowsProfile(api.IntegerRepresentationBigInt) {
 		t.Fatal("runtime requirement profile admission is wrong")
 	}

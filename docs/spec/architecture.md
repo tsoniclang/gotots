@@ -306,7 +306,8 @@ runtime Promise detection.
 The representation owner chooses the smallest exact direct TypeScript shape.
 Defaults prefer readable source and no semantic machinery:
 
-- integer profile defaults to `number`; `bigint` is an explicit profile;
+- integer profile defaults to `number`; `fixed64-bigint` and `bigint` are
+  explicit profiles;
 - evaluation defaults to direct TypeScript evaluation; `preserve-go` enables
   additional ordering temporaries;
 - copy, pointer, interface, map, channel, and runtime support is demanded only
@@ -317,20 +318,24 @@ particular, `int`, `uint`, and `uintptr` remain distinct aliases rather than
 being rewritten as `int32`/`int64` or `uint32`/`uint64`. Their carrier width is
 derived once from the selected package graph's `types.Sizes`; inconsistent
 width evidence in one compilation fails before emission. The `number` profile
-maps every integer alias to `number`. The `bigint` profile maps 64-bit aliases,
-including 64-bit native integers, to `bigint` and keeps narrower aliases as
-`number`. Generated output imports no unrelated compiler.
+maps every integer alias to `number`. The `fixed64-bigint` profile maps
+`int64` and `uint64` to `bigint` while retaining `number` for native-sized and
+narrower aliases. The `bigint` profile additionally maps 64-bit native
+`int`, `uint`, and `uintptr` to `bigint`. Generated output imports no unrelated
+compiler.
 
 Profile selection also fixes the overflow contract. The direct `number`
-profile retains its declared precision/overflow tradeoff. The explicit
-`bigint` profile normalizes every operation whose selected carrier is `bigint`
-to its Go width at the integer value owner. Narrower values retain direct
-`number` operations and the declared number-carrier overflow tradeoff. A
-reached identity, branch, index, or cache key that depends on exact 64-bit
-arithmetic therefore requires the `bigint` product profile; there is no
-package allowlist, adaptive representation heuristic, or hidden per-call
-profile. Wide-result normalization requests one of the two demand-generated
-integer runtime operations; repeated source sites do not duplicate the target
+profile retains its declared precision/overflow tradeoff. Both explicit
+BigInt-carrier profiles normalize every `int64` and `uint64` operation to its Go
+width at the integer value owner. The `bigint` profile does the same for
+64-bit native integers; `fixed64-bigint` deliberately retains the direct
+number-profile tradeoff for native `int`, `uint`, and `uintptr`. A reached
+identity or control decision that depends on exact fixed-width 64-bit
+arithmetic therefore requires at least `fixed64-bigint`; one that depends on
+exact 64-bit native-integer overflow requires `bigint`. There is no package
+allowlist, adaptive representation heuristic, or hidden per-call profile.
+Wide-result normalization requests one of the two demand-generated integer
+runtime operations; repeated source sites do not duplicate the target
 intrinsic expression.
 
 Nil-capable values use `undefined` unless their family requires a distinct

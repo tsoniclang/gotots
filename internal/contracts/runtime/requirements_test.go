@@ -8,7 +8,7 @@ import (
 
 const validRuntimeRequirements = `{
   "schemaVersion": 2,
-  "integerRepresentations": ["number", "bigint"],
+  "integerRepresentations": ["number", "fixed64-bigint", "bigint"],
   "providerIntegerRepresentation": "bigint",
   "providerScalarModule": "./internal/scalars.js",
   "nativeIntegerBits": 64,
@@ -23,6 +23,7 @@ func TestDecodeRetainsImmutableRuntimeRequirements(t *testing.T) {
 	}
 	if !requirements.Valid() ||
 		!requirements.AllowsProfile(ProfileNumber) ||
+		!requirements.AllowsProfile(ProfileFixed64BigInt) ||
 		!requirements.AllowsProfile(ProfileBigInt) ||
 		requirements.ProviderProfile() != ProfileBigInt ||
 		requirements.ProviderScalarModule() != "./internal/scalars.js" ||
@@ -61,7 +62,7 @@ func TestDecodeRejectsRuntimeRequirementMutations(t *testing.T) {
 		),
 		"provider profile not admitted": strings.Replace(
 			validRuntimeRequirements,
-			`["number", "bigint"]`,
+			`["number", "fixed64-bigint", "bigint"]`,
 			`["number"]`,
 			1,
 		),
@@ -91,10 +92,10 @@ func TestDecodeRejectsRuntimeRequirementMutations(t *testing.T) {
 		),
 		"second document": validRuntimeRequirements + ` {}`,
 		"unknown profile": strings.Replace(
-			validRuntimeRequirements, `"number", "bigint"`, `"wide", "bigint"`, 1,
+			validRuntimeRequirements, `"number", "fixed64-bigint"`, `"number", "wide"`, 1,
 		),
 		"duplicate profile": strings.Replace(
-			validRuntimeRequirements, `"number", "bigint"`, `"number", "number", "bigint"`, 1,
+			validRuntimeRequirements, `"number", "fixed64-bigint"`, `"number", "number", "fixed64-bigint"`, 1,
 		),
 		"duplicate alias id": strings.Replace(
 			validRuntimeRequirements,

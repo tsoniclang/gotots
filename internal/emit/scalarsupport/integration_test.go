@@ -188,8 +188,9 @@ func TestInvalidEvaluationOrderFailsAtCompilationEntry(t *testing.T) {
 
 func TestIntegerRepresentationSelectionParsesOnlyClosedProfiles(t *testing.T) {
 	for source, want := range map[string]emit.IntegerRepresentation{
-		"number": emit.IntegerRepresentationNumber,
-		"bigint": emit.IntegerRepresentationBigInt,
+		"number":         emit.IntegerRepresentationNumber,
+		"fixed64-bigint": emit.IntegerRepresentationFixed64BigInt,
+		"bigint":         emit.IntegerRepresentationBigInt,
 	} {
 		got, err := emit.ParseIntegerRepresentation(source)
 		if err != nil {

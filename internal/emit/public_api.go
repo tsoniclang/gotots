@@ -347,9 +347,10 @@ type EvaluationOrder = api.EvaluationOrder
 type ConcurrencySemantics = api.ConcurrencySemantics
 
 const (
-	IntegerRepresentationInvalid = api.IntegerRepresentationInvalid
-	IntegerRepresentationNumber  = api.IntegerRepresentationNumber
-	IntegerRepresentationBigInt  = api.IntegerRepresentationBigInt
+	IntegerRepresentationInvalid       = api.IntegerRepresentationInvalid
+	IntegerRepresentationNumber        = api.IntegerRepresentationNumber
+	IntegerRepresentationBigInt        = api.IntegerRepresentationBigInt
+	IntegerRepresentationFixed64BigInt = api.IntegerRepresentationFixed64BigInt
 
 	EvaluationOrderInvalid    = api.EvaluationOrderInvalid
 	EvaluationOrderDirect     = api.EvaluationOrderDirect
@@ -382,10 +383,15 @@ func ParseIntegerRepresentation(value string) (IntegerRepresentation, error) {
 		return IntegerRepresentationNumber, nil
 	case IntegerRepresentationBigInt.String():
 		return IntegerRepresentationBigInt, nil
+	case IntegerRepresentationFixed64BigInt.String():
+		return IntegerRepresentationFixed64BigInt, nil
 	default:
 		return IntegerRepresentationInvalid, &OptionsError{
-			Field:  "integer representation",
-			Reason: fmt.Sprintf("%q is not number or bigint", value),
+			Field: "integer representation",
+			Reason: fmt.Sprintf(
+				"%q is not number, fixed64-bigint, or bigint",
+				value,
+			),
 		}
 	}
 }

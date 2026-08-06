@@ -209,14 +209,15 @@ Each type/value family has focused differentials and mutations:
 Integer-profile proof pins the append-only scalar alias identities, including
 distinct `int`, `uint`, and `uintptr`, and checks their carrier matrix under
 32-bit and 64-bit `types.Sizes`. A mutation that restores native-to-fixed alias
-collapse fails before printing. Both complete runtime packages are generated
+collapse fails before printing. All complete runtime packages are generated
 through TS-Go AST and strict-typechecked; artifacts must show source alias
 names unchanged and only their primitive carrier changed.
 
-The `bigint` profile additionally differentially proves fixed-width overflow
-for wide signed and unsigned binary operations, shifts, unary operations,
-division's minimum-value edge, compound assignments, and increments. Narrow
-number carriers remain direct and are checked against an artifact-shape gate.
+Both BigInt-carrier profiles additionally differentially prove fixed-width
+overflow for wide signed and unsigned binary operations, shifts, unary
+operations, division's minimum-value edge, compound assignments, and
+increments. Narrow and native number carriers remain direct where selected and
+are checked against an artifact-shape gate.
 Artifact inspection requires normalization at the wide result owner, not at
 selected call sites, and requires exactly one demand-generated definition for
 each selected signedness rather than repeated intrinsic spellings. An
@@ -238,7 +239,7 @@ Every test inspects generated source and reports bytes/AST nodes. A mutation
 that always emits copy carriers/helpers, uses JavaScript identity for Go map
 keys, drops nil checks, or restores a target non-null assertion must fail.
 
-Unsafe-pointer proof runs under both integer profiles and at the selected
+Unsafe-pointer proof runs under all integer profiles and at the selected
 GOOS/GOARCH. It exact-compares `unsafe.Sizeof`, `Alignof`, and `Offsetof` facts
 used by each codec against the selected Go toolchain; different source
 spellings of the same type must select the same artifact. Differential cases

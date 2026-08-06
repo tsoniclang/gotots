@@ -136,6 +136,8 @@ func integerProfile(value string) (api.IntegerRepresentation, error) {
 		return api.IntegerRepresentationNumber, nil
 	case api.IntegerRepresentationBigInt.String():
 		return api.IntegerRepresentationBigInt, nil
+	case api.IntegerRepresentationFixed64BigInt.String():
+		return api.IntegerRepresentationFixed64BigInt, nil
 	default:
 		return api.IntegerRepresentationInvalid, fmt.Errorf(
 			"integer profile %q is invalid",

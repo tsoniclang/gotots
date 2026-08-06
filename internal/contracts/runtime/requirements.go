@@ -15,10 +15,12 @@ const (
 	ProfileInvalid Profile = iota
 	ProfileNumber
 	ProfileBigInt
+	ProfileFixed64BigInt
 )
 
 func (p Profile) Valid() bool {
-	return p == ProfileNumber || p == ProfileBigInt
+	return p == ProfileNumber || p == ProfileBigInt ||
+		p == ProfileFixed64BigInt
 }
 
 func (p Profile) String() string {
@@ -27,6 +29,8 @@ func (p Profile) String() string {
 		return "number"
 	case ProfileBigInt:
 		return "bigint"
+	case ProfileFixed64BigInt:
+		return "fixed64-bigint"
 	default:
 		return fmt.Sprintf("profile(%d)", p)
 	}
@@ -246,6 +250,8 @@ func decodeProfile(spelling string) (Profile, error) {
 		return ProfileNumber, nil
 	case ProfileBigInt.String():
 		return ProfileBigInt, nil
+	case ProfileFixed64BigInt.String():
+		return ProfileFixed64BigInt, nil
 	default:
 		return ProfileInvalid, fmt.Errorf(
 			"integer profile %q is invalid",

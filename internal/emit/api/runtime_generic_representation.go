@@ -155,9 +155,10 @@ func RuntimeContract(
 type IntegerRepresentation = representationcontract.IntegerRepresentation
 
 const (
-	IntegerRepresentationInvalid = representationcontract.IntegerRepresentationInvalid
-	IntegerRepresentationNumber  = representationcontract.IntegerRepresentationNumber
-	IntegerRepresentationBigInt  = representationcontract.IntegerRepresentationBigInt
+	IntegerRepresentationInvalid       = representationcontract.IntegerRepresentationInvalid
+	IntegerRepresentationNumber        = representationcontract.IntegerRepresentationNumber
+	IntegerRepresentationBigInt        = representationcontract.IntegerRepresentationBigInt
+	IntegerRepresentationFixed64BigInt = representationcontract.IntegerRepresentationFixed64BigInt
 )
 
 type EvaluationOrder = representationcontract.EvaluationOrder

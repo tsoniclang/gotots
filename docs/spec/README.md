@@ -183,8 +183,9 @@ static form nor a finite exact concretization, compilation fails explicitly.
   operation.
 - **compilation profile:** the immutable compilation-wide selection of every
   semantic tradeoff axis. The initial axes are integer representation
-  (`number` or `bigint`), evaluation order (`direct` or `preserve-go`), and
-  concurrency semantics (`disabled` or explicitly selected `cooperative`).
+  (`number`, `fixed64-bigint`, or `bigint`), evaluation order (`direct` or
+  `preserve-go`), and concurrency semantics (`disabled` or explicitly selected
+  `cooperative`).
   Generated files in one compilation cannot mix selections.
 - **Go build profile:** the loader-owned selected toolchain identity, `GOOS`,
   `GOARCH`, `CGO_ENABLED`, and sorted build tags. The default is the explicitly

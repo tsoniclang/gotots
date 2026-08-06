@@ -39,11 +39,13 @@ const (
 	IntegerRepresentationInvalid IntegerRepresentation = iota
 	IntegerRepresentationNumber
 	IntegerRepresentationBigInt
+	IntegerRepresentationFixed64BigInt
 )
 
 func (r IntegerRepresentation) Valid() bool {
 	return r == IntegerRepresentationNumber ||
-		r == IntegerRepresentationBigInt
+		r == IntegerRepresentationBigInt ||
+		r == IntegerRepresentationFixed64BigInt
 }
 
 type ScalarABI struct {
@@ -99,6 +101,8 @@ func (r IntegerRepresentation) String() string {
 		return "number"
 	case IntegerRepresentationBigInt:
 		return "bigint"
+	case IntegerRepresentationFixed64BigInt:
+		return "fixed64-bigint"
 	default:
 		return fmt.Sprintf("integer-representation(%d)", r)
 	}
@@ -248,7 +252,8 @@ func IntegerCarrierRepresentation(
 		PrimitiveUint32:
 		return IntegerCarrierNumber, nil
 	case PrimitiveInt64, PrimitiveUint64:
-		if abi.IntegerRepresentation() == IntegerRepresentationBigInt {
+		if abi.IntegerRepresentation() == IntegerRepresentationBigInt ||
+			abi.IntegerRepresentation() == IntegerRepresentationFixed64BigInt {
 			return IntegerCarrierBigInt, nil
 		}
 		return IntegerCarrierNumber, nil

@@ -58,38 +58,54 @@ func assertBigIntDivisionUsesRuntime(
 	}
 }
 
-func TestIntegerBigIntProfileWrapsFixedWidthOperationsDifferentially(t *testing.T) {
+func TestIntegerBigIntCarrierProfilesWrapFixedWidthOperationsDifferentially(t *testing.T) {
 	loaded := loadIntegerFamily(t)
-	options := emit.DefaultOptions()
-	options.IntegerRepresentation = emit.IntegerRepresentationBigInt
-	emission := compileIntegerFamily(
-		t,
-		loaded,
-		options,
-		"BigOverflowBinary",
-		"BigOverflowUpdate",
-		"WideHash",
-	)
-	printed := printIntegerFamily(t, emission)
-	for _, required := range []string{"goUint64(", "goInt64("} {
-		if !strings.Contains(printed, required) {
-			t.Fatalf("fixed-width artifact lacks %q:\n%s", required, printed)
-		}
-	}
-	for _, definition := range []string{
-		"export function goInt64(",
-		"export function goUint64(",
+	for _, test := range []struct {
+		name           string
+		representation emit.IntegerRepresentation
+		nativeAlias    string
+	}{
+		{"fixed64-bigint", emit.IntegerRepresentationFixed64BigInt, "export type int = number;"},
+		{"bigint", emit.IntegerRepresentationBigInt, "export type int = bigint;"},
 	} {
-		if count := strings.Count(printed, definition); count != 1 {
-			t.Fatalf("fixed-width artifact has %d %q definitions, want one", count, definition)
-		}
-	}
+		t.Run(test.name, func(t *testing.T) {
+			options := emit.DefaultOptions()
+			options.IntegerRepresentation = test.representation
+			emission := compileIntegerFamily(
+				t,
+				loaded,
+				options,
+				"BigOverflowBinary",
+				"BigOverflowUpdate",
+				"NativeInt",
+				"WideHash",
+			)
+			printed := printIntegerFamily(t, emission)
+			for _, required := range []string{
+				"goUint64(",
+				"goInt64(",
+				test.nativeAlias,
+			} {
+				if !strings.Contains(printed, required) {
+					t.Fatalf("fixed-width artifact lacks %q:\n%s", required, printed)
+				}
+			}
+			for _, definition := range []string{
+				"export function goInt64(",
+				"export function goUint64(",
+			} {
+				if count := strings.Count(printed, definition); count != 1 {
+					t.Fatalf("fixed-width artifact has %d %q definitions, want one", count, definition)
+				}
+			}
 
-	workingDirectory := t.TempDir()
-	goOutput := executeIntegerOverflowGo(t, workingDirectory)
-	targetOutput := executeIntegerOverflowTS(t, emission, workingDirectory)
-	if targetOutput != goOutput {
-		t.Fatalf("fixed-width TypeScript output = %q, Go output = %q", targetOutput, goOutput)
+			workingDirectory := t.TempDir()
+			goOutput := executeIntegerOverflowGo(t, workingDirectory)
+			targetOutput := executeIntegerOverflowTS(t, emission, workingDirectory)
+			if targetOutput != goOutput {
+				t.Fatalf("fixed-width TypeScript output = %q, Go output = %q", targetOutput, goOutput)
+			}
+		})
 	}
 }
 

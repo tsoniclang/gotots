@@ -59,6 +59,34 @@ func TestBigIntProfileSelectsCarrierByGoWidth(t *testing.T) {
 	}
 }
 
+func TestFixed64BigIntProfileLeavesNativeIntegersAsNumbers(t *testing.T) {
+	abi, err := NewScalarABI(
+		IntegerRepresentationFixed64BigInt,
+		NativeIntegerWidth64,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		alias PrimitiveAlias
+		want  IntegerCarrier
+	}{
+		{PrimitiveInt64, IntegerCarrierBigInt},
+		{PrimitiveUint64, IntegerCarrierBigInt},
+		{PrimitiveInt, IntegerCarrierNumber},
+		{PrimitiveUint, IntegerCarrierNumber},
+		{PrimitiveUintptr, IntegerCarrierNumber},
+	} {
+		got, err := abi.Carrier(test.alias)
+		if err != nil {
+			t.Fatalf("carrier for alias %d: %v", test.alias, err)
+		}
+		if got != test.want {
+			t.Fatalf("carrier for alias %d = %d, want %d", test.alias, got, test.want)
+		}
+	}
+}
+
 func TestPrimitiveAliasIDsAndNamesPreserveSourceIdentity(t *testing.T) {
 	for _, test := range []struct {
 		alias PrimitiveAlias

@@ -54,6 +54,8 @@ func ResolvePackageRequirements(
 			profile = api.IntegerRepresentationNumber
 		case runtimecontract.ProfileBigInt:
 			profile = api.IntegerRepresentationBigInt
+		case runtimecontract.ProfileFixed64BigInt:
+			profile = api.IntegerRepresentationFixed64BigInt
 		default:
 			return PackageRequirements{}, &AssemblyError{
 				Reason: "runtime package requirement has an invalid integer profile",
@@ -67,6 +69,8 @@ func ResolvePackageRequirements(
 		providerProfile = api.IntegerRepresentationNumber
 	case runtimecontract.ProfileBigInt:
 		providerProfile = api.IntegerRepresentationBigInt
+	case runtimecontract.ProfileFixed64BigInt:
+		providerProfile = api.IntegerRepresentationFixed64BigInt
 	default:
 		return PackageRequirements{}, &AssemblyError{
 			Reason: "runtime package requirement has an invalid provider integer profile",

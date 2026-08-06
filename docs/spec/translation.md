@@ -257,36 +257,40 @@ zero-on-miss. The index expression does not decide this alone.
 ### Basic Types
 
 Go basic identities map to GoToTS-owned aliases over TypeScript primitives.
-The default integer profile uses `number`; the explicit `bigint` profile
-uses `bigint` where required. No runtime marker compensates for missing
-semantics. Integer overflow not preserved by the default profile is a declared
-profile tradeoff, not silently described as exact.
+The default integer profile uses `number`; the explicit `fixed64-bigint` and
+`bigint` profiles use `bigint` for their selected wide carriers. No runtime
+marker compensates for missing semantics. Integer overflow not preserved by a
+selected number carrier is a declared profile tradeoff, not silently described
+as exact.
 
-The `bigint` profile is exact for operations whose selected carrier is
+Each BigInt-carrier profile is exact for operations whose selected carrier is
 `bigint`. Their arithmetic, bitwise, shift, unary, compound-assignment, and
 increment results are normalized to the selected Go width before they become
 observable. The demand-generated `goInt64` and `goUint64` runtime operations
 are the only wide-result wrappers; each delegates to the corresponding
 `globalThis.BigInt.asIntN` or `asUintN` operation. For example, `uint64(max) +
-1` emits `goUint64(max + 1n)` and produces zero. Narrower aliases retain direct
-`number` operations and the declared number-carrier overflow tradeoff; the
-profile does not add wrappers to ordinary `int32` expressions. This policy is
-owned by the integer value family and is never selected by package, function,
-or identifier spelling.
+1` emits `goUint64(max + 1n)` and produces zero. Number-carried aliases retain
+direct operations and the declared number-carrier overflow tradeoff; neither
+explicit profile adds wrappers to ordinary `int32` expressions, and
+`fixed64-bigint` does not add them to native `int`. This policy is owned by the
+integer value family and is never selected by package, function, or identifier
+spelling.
 
-A product whose reached behavior depends on exact wide-integer values, such as
-a hash used as a cache identity, cannot claim runtime parity under the
-`number` profile. It must select `bigint` explicitly. GoToTS neither changes a
-profile heuristically nor adds a local override for the reached package.
+A product whose reached behavior depends on exact fixed-width wide-integer
+values, such as a `uint64` hash used as a cache identity, cannot claim runtime
+parity under the `number` profile. It must select at least `fixed64-bigint`
+explicitly. A product whose behavior additionally depends on native 64-bit
+integer overflow must select `bigint`. GoToTS neither changes a profile
+heuristically nor adds a local override for the reached package.
 
 The alias name always follows the selected Go type, while the carrier follows
 the profile and selected native width:
 
 ```text
-Go type                 number profile       bigint profile (64-bit build)
-int8..int32, uint8..32  number               number
-int64, uint64           number               bigint
-int, uint, uintptr      number               bigint
+Go type                 number       fixed64-bigint    bigint (64-bit build)
+int8..int32, uint8..32  number       number            number
+int64, uint64           number       bigint            bigint
+int, uint, uintptr      number       number            bigint
 ```
 
 Thus `var index int` emits `let index: int`, never `let index: int64`; changing

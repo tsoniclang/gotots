@@ -12,8 +12,8 @@
   "buildTags": [
     "noasm"
   ],
-  "runtimeDigest": "67ea43638501e69def92784a715bd71b5592f07ff9eb981fdb2cf26b3cba27d6",
-  "providerDigest": "c63f219ed3f49834d9a986e8f0222418fa56a098f83b6e90a7f16b1c8d7affdf",
+  "runtimeDigest": "d6020382c48acd143ed2190b8bb617a7597de3a9fcc098fa0c6955eb8f353a32",
+  "providerDigest": "6d3ac49737119c296dc63d0af9b6588ff5b5f1b647784ee179abde89ce34c744",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -34030,5 +34030,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "30b13ac0fd077efabaecc2ed8e03e104136b56c095319f4a02416558782b9db7"
+  "manifestDigest": "777b7f8f199d1ad30451eae4527cd92f456d4957a67042ba51261aaa5f9c5c47"
 }

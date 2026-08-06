@@ -106,7 +106,7 @@ func MaximumFloat() float64 { return math.MaxFloat64 }
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }
 
-func TestProviderBoundaryTypechecksBothIntegerProfiles(t *testing.T) {
+func TestProviderBoundaryTypechecksAllIntegerProfiles(t *testing.T) {
 	project := t.TempDir()
 	writeProgramFile(
 		t,
@@ -175,6 +175,7 @@ func DurationMath(value time.Duration) time.Duration {
 		conversion     bool
 	}{
 		{name: "number", representation: emit.IntegerRepresentationNumber, conversion: true},
+		{name: "fixed64-bigint", representation: emit.IntegerRepresentationFixed64BigInt, conversion: true},
 		{name: "bigint", representation: emit.IntegerRepresentationBigInt},
 	}
 	for _, profile := range profiles {

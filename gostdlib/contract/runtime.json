@@ -2,6 +2,7 @@
   "schemaVersion": 2,
   "integerRepresentations": [
     "number",
+    "fixed64-bigint",
     "bigint"
   ],
   "providerIntegerRepresentation": "bigint",
