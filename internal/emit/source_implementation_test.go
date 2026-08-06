@@ -213,6 +213,34 @@ export function Sum(value: string): number { return value.length; }
 		t.Fatalf("existing pointer caller did not read its current pointee once:\n%s", callerArtifacts.String())
 	}
 
+	writeSourceImplementationFixture(t, filepath.Join(implementationRoot, "package.ts"), `export function Read(value: number): string { return String(value); }
+export function Sum(value: string): number { return value.length; }
+`)
+	resultMismatch, err := sourceimplementation.VerifyAll(sourceimplementation.Config{
+		RepositoryRoot: repository,
+		Program:        program,
+		ContractPaths:  []string{contractPath},
+		ScratchRoot:    filepath.Join(root, ".result-mismatch-scratch"),
+		Compilation: sourceimplementation.CompilationDocument{
+			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	options.SourceImplementations = resultMismatch
+	if _, err := CompileWithOptions(program, roots, options); err == nil ||
+		!strings.Contains(err.Error(), "fast.Read") ||
+		!strings.Contains(err.Error(), "surface differs") {
+		t.Fatalf("result-contract mutation error = %v", err)
+	}
+	writeSourceImplementationFixture(
+		t,
+		filepath.Join(implementationRoot, "package.ts"),
+		implementationSource,
+	)
+	options.SourceImplementations = certificate
+
 	writeSourceImplementationFixture(t, filepath.Join(implementationRoot, "package.ts"), `export function Extra(): number { return 0; }
 export function Read(value: number): number { return value; }
 export function Sum(value: string): number { return value.length; }
@@ -237,7 +265,7 @@ export function Sum(value: string): number { return value.length; }
 	}
 	options.SourceImplementations = mutated
 	if _, err := CompileWithOptions(program, roots, options); err == nil ||
-		!strings.Contains(err.Error(), "exports [Extra Read Sum] differ from generated surface [Read Sum]") {
+		!strings.Contains(err.Error(), "generated exports") {
 		t.Fatalf("generated-surface mutation error = %v", err)
 	}
 }

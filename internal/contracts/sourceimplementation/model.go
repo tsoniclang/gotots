@@ -132,6 +132,8 @@ type Certificate struct {
 	byCallable  map[string]callableabi.Callable
 	compilation CompilationDocument
 	digest      string
+	repository  string
+	scratch     string
 }
 
 func (c *Certificate) Valid() bool {

@@ -116,7 +116,19 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arguments := parameters[1:]
+	sourceArguments := parameters[1:]
+	selectedABI, _ := context.ResolveCallableABI(owner)
+	arguments, projectionBefore, projectionRequests, err :=
+		callable.ProjectArguments(
+			context,
+			source,
+			methodSignature,
+			sourceArguments,
+			selectedABI,
+		)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	call, err := invocation.Invoke(
 		context,
 		children,
@@ -127,9 +139,16 @@ func Emit(
 		return api.ExpressionEmission{}, err
 	}
 	call, err = api.NewExpressionEmission(
-		append(receiver.Before(), call.Before()...),
+		append(
+			append(receiver.Before(), projectionBefore...),
+			call.Before()...,
+		),
 		call.Value(),
-		api.CombineRequests(receiver.Requests(), call.Requests()),
+		api.CombineRequests(
+			receiver.Requests(),
+			projectionRequests,
+			call.Requests(),
+		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -183,21 +202,39 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	deferredArguments, deferredProjectionBefore,
+		deferredProjectionRequests, err := callable.ProjectArguments(
+		context,
+		source,
+		methodSignature,
+		sourceArguments,
+		selectedABI,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	deferredCall, err := invocation.InvokeDeferred(
 		context,
 		children,
 		source,
 		receiver.Value(),
-		arguments,
+		deferredArguments,
 		context.Factory().Identifier(callable.RecoveryAuthorityName),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	deferredCall, err = api.NewExpressionEmission(
-		append(receiver.Before(), deferredCall.Before()...),
+		append(
+			append(receiver.Before(), deferredProjectionBefore...),
+			deferredCall.Before()...,
+		),
 		deferredCall.Value(),
-		api.CombineRequests(receiver.Requests(), deferredCall.Requests()),
+		api.CombineRequests(
+			receiver.Requests(),
+			deferredProjectionRequests,
+			deferredCall.Requests(),
+		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -248,6 +285,7 @@ func Emit(
 			targetSignature.Requests(),
 			call.Requests(),
 			deferredCall.Requests(),
+			deferredProjectionRequests,
 			recoveryRequests,
 			registry.Requests(),
 			sourceRequests,

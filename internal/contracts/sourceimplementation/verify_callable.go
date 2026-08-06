@@ -2,6 +2,7 @@ package sourceimplementation
 
 import (
 	"fmt"
+	"go/ast"
 	"go/types"
 	"slices"
 	"strings"
@@ -32,6 +33,7 @@ func verifyCallableABIs(
 		return nil, &Error{Operation: "join callable ABI", Reason: err.Error()}
 	}
 	result := make([]callableabi.Callable, 0)
+	declarations := sourceFunctionDeclarations(selected)
 	for _, target := range exports {
 		function, ok := selected.Types().Scope().Lookup(target.Name()).(*types.Func)
 		if !ok {
@@ -42,6 +44,8 @@ func verifyCallableABIs(
 			project,
 			target,
 			scalar,
+			declarations[function],
+			selected.TypesInfo(),
 		)
 		if err != nil {
 			return nil, err
@@ -59,6 +63,8 @@ func verifyCallableABI(
 	project *tsgo.ProjectInspection,
 	target tsgo.ProjectExport,
 	scalar representationcontract.ScalarABI,
+	declaration *ast.FuncDecl,
+	info *types.Info,
 ) (callableabi.Callable, error) {
 	signature := function.Signature()
 	parameterCount, err := project.CallableParameterCount(target)
@@ -95,6 +101,8 @@ func verifyCallableABI(
 			target,
 			index,
 			scalar,
+			declaration,
+			info,
 		)
 		if err != nil {
 			return callableabi.Callable{}, err
@@ -116,6 +124,8 @@ func verifyCallableParameter(
 	target tsgo.ProjectExport,
 	index int,
 	scalar representationcontract.ScalarABI,
+	declaration *ast.FuncDecl,
+	info *types.Info,
 ) (callableabi.Parameter, error) {
 	targetType, err := project.CallableParameterTypeString(target, index)
 	if err != nil {
@@ -139,10 +149,46 @@ func verifyCallableParameter(
 				index,
 				pointer.Elem(),
 				pointeeType,
-				targetType,
+				declaration,
+				info,
 			)
 			if err != nil {
 				return callableabi.Parameter{}, err
+			}
+		} else if primitive, primitiveOK, primitiveErr :=
+			project.CallableParameterPrimitive(target, index); primitiveErr != nil {
+			return callableabi.Parameter{}, primitiveErr
+		} else if primitiveOK {
+			return callableabi.Parameter{}, &Error{
+				Operation: "join callable ABI",
+				Subject:   function.FullName(),
+				Reason: fmt.Sprintf(
+					"parameter %d projects a non-primitive pointer as primitive %d",
+					index,
+					primitive.Kind(),
+				),
+			}
+		}
+	} else if primitiveType, supported :=
+		representationcontract.PrimitiveTypeScriptType(
+			function.Signature().Params().At(index).Type(),
+			scalar,
+		); supported {
+		primitive, primitiveOK, primitiveErr :=
+			project.CallableParameterPrimitive(target, index)
+		if primitiveErr != nil {
+			return callableabi.Parameter{}, primitiveErr
+		}
+		if !primitiveOK || primitive.Optional() ||
+			primitive.Kind() != projectPrimitiveKind(primitiveType) {
+			return callableabi.Parameter{}, &Error{
+				Operation: "join callable ABI",
+				Subject:   function.FullName(),
+				Reason: fmt.Sprintf(
+					"parameter %d does not preserve primitive type %q",
+					index,
+					primitiveType,
+				),
 			}
 		}
 	}
@@ -156,18 +202,30 @@ func verifyPrimitivePointerProjection(
 	index int,
 	pointee types.Type,
 	pointeeType string,
-	targetType string,
+	declaration *ast.FuncDecl,
+	info *types.Info,
 ) (callableabi.Projection, callableabi.NilPolicy, error) {
-	alias, _ := representationcontract.PrimitiveAliasFor(pointee)
-	aliasName, err := representationcontract.PrimitiveAliasName(alias)
-	if err != nil {
-		return callableabi.ProjectionInvalid, callableabi.NilPolicyInvalid, err
-	}
 	primitive, primitiveOK, err := project.CallableParameterPrimitive(target, index)
 	if err != nil {
 		return callableabi.ProjectionInvalid, callableabi.NilPolicyInvalid, err
 	}
 	if primitiveOK && primitive.Kind() == projectPrimitiveKind(pointeeType) {
+		if !callableabi.PointeeValueReadAtEntry(
+			declaration,
+			function.Signature().Params().At(index),
+			info,
+		) {
+			return callableabi.ProjectionInvalid,
+				callableabi.NilPolicyInvalid,
+				&Error{
+					Operation: "join callable ABI",
+					Subject:   function.FullName(),
+					Reason: fmt.Sprintf(
+						"parameter %d has no exact pointee-value source proof",
+						index,
+					),
+				}
+		}
 		if primitive.Optional() {
 			return callableabi.ProjectionPointeeValue,
 				callableabi.NilPolicyPreserve, nil
@@ -175,12 +233,7 @@ func verifyPrimitivePointerProjection(
 		return callableabi.ProjectionPointeeValue,
 			callableabi.NilPolicyRejectAtBoundary, nil
 	}
-	canonicalPointer := fmt.Sprintf(
-		"GoPointer<%s, %s> | undefined",
-		aliasName,
-		aliasName,
-	)
-	if targetType == canonicalPointer {
+	if !primitiveOK {
 		return callableabi.ProjectionIdentity,
 			callableabi.NilPolicyNotApplicable, nil
 	}
@@ -188,12 +241,30 @@ func verifyPrimitivePointerProjection(
 		Operation: "join callable ABI",
 		Subject:   function.FullName(),
 		Reason: fmt.Sprintf(
-			"parameter %d type %q is neither %q nor the canonical pointer representation",
+			"parameter %d primitive target does not preserve pointee type %q",
 			index,
-			targetType,
 			pointeeType,
 		),
 	}
+}
+
+func sourceFunctionDeclarations(
+	selected *load.Package,
+) map[*types.Func]*ast.FuncDecl {
+	result := make(map[*types.Func]*ast.FuncDecl)
+	for _, sourceFile := range selected.Files() {
+		for _, declaration := range sourceFile.Syntax().Decls {
+			function, ok := declaration.(*ast.FuncDecl)
+			if !ok || function.Name == nil {
+				continue
+			}
+			object, ok := selected.TypesInfo().Defs[function.Name].(*types.Func)
+			if ok {
+				result[object] = function
+			}
+		}
+	}
+	return result
 }
 
 func projectPrimitiveKind(source string) tsgo.ProjectPrimitiveKind {

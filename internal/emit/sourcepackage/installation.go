@@ -158,6 +158,17 @@ func importedNames(clause tsgo.ImportClause) ([]string, error) {
 	return result, nil
 }
 
+func moduleExportName(name tsgo.ModuleExportName) (string, bool) {
+	switch selected := name.(type) {
+	case tsgo.Identifier:
+		return selected.Text(), true
+	case tsgo.StringLiteral:
+		return selected.Text(), true
+	default:
+		return "", false
+	}
+}
+
 func typeOnlyImport(clause tsgo.ImportClause) bool {
 	if clause == nil || clause.Name() != nil {
 		return false

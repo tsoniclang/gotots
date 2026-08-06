@@ -53,6 +53,8 @@ func VerifyAll(config Config) (
 	certificate = &Certificate{
 		byPath:     make(map[string]Implementation),
 		byCallable: make(map[string]callableabi.Callable),
+		repository: config.RepositoryRoot,
+		scratch:    config.ScratchRoot,
 	}
 	if err := certificate.bindCompilation(config.Compilation); err != nil {
 		return nil, err

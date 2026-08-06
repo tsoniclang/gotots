@@ -93,11 +93,13 @@ func emitDeferredMethod(
 			receiver.Value(),
 		),
 	)
-	arguments, argumentBefore, argumentRequests, err := emitArguments(
+	selectedABI, _ := context.ResolveCallableABI(method.Origin())
+	arguments, argumentBefore, argumentRequests, err := emitArgumentsWithABI(
 		context,
 		children,
 		source,
 		signature,
+		selectedABI,
 		true,
 	)
 	if err != nil {

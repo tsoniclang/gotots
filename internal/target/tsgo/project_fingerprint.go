@@ -29,6 +29,59 @@ type projectMemberFingerprint struct {
 	Owners []string `json:"owners"`
 }
 
+type projectExportContract struct {
+	Name           string                  `json:"name"`
+	Type           string                  `json:"type"`
+	DeclaredType   string                  `json:"declaredType"`
+	TypeParameters int                     `json:"typeParameters"`
+	Value          []projectMemberContract `json:"value,omitempty"`
+	TypeMember     []projectMemberContract `json:"typeMembers,omitempty"`
+}
+
+type projectMemberContract struct {
+	Name  string `json:"name"`
+	Flags uint32 `json:"flags"`
+	Type  string `json:"type"`
+}
+
+func (e ProjectExport) ContractEncoding() []byte {
+	if e.name == "" || e.typeString == "" {
+		return nil
+	}
+	payload, err := json.Marshal(projectExportContract{
+		Name:           e.name,
+		Type:           e.typeString,
+		DeclaredType:   e.declaredTypeString,
+		TypeParameters: e.typeParameters,
+		Value:          visibleMemberContracts(e.valueMembers),
+		TypeMember:     visibleMemberContracts(e.typeMembers),
+	})
+	if err != nil {
+		return nil
+	}
+	return payload
+}
+
+func visibleMemberContracts(
+	members []ProjectMember,
+) []projectMemberContract {
+	var result []projectMemberContract
+	for _, member := range members {
+		if !member.Visible() {
+			continue
+		}
+		result = append(result, projectMemberContract{
+			Name:  member.fingerprintName,
+			Flags: member.flags,
+			Type:  member.typeString,
+		})
+	}
+	sort.Slice(result, func(left int, right int) bool {
+		return result[left].Name < result[right].Name
+	})
+	return result
+}
+
 func (e ProjectExport) Fingerprint() string {
 	if e.name == "" || e.typeString == "" || len(e.ownerKeys) == 0 {
 		return ""

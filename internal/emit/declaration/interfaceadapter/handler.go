@@ -3,7 +3,6 @@ package interfaceadapter
 import (
 	"go/types"
 
-	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
@@ -196,68 +195,6 @@ func Build(
 	), nil
 }
 
-type demandedMethod struct {
-	selection *types.Selection
-	method    *types.Func
-	contracts []*types.Func
-}
-
-func demandedMethods(
-	sourceType types.Type,
-	contracts []*types.Interface,
-) ([]demandedMethod, error) {
-	methodSet := types.NewMethodSet(sourceType)
-	required := make(map[*types.Func][]*types.Func)
-	for _, contract := range contracts {
-		if contract == nil ||
-			!contract.Complete().IsMethodSet() ||
-			!types.Implements(sourceType, contract) {
-			return nil, &api.GeneratedArtifactShapeError{
-				Reason: "adapter contract is not implemented by its source type",
-			}
-		}
-		for index := range contract.NumMethods() {
-			method := contract.Method(index)
-			selected := methodSet.Lookup(method.Pkg(), method.Name())
-			if selected == nil {
-				return nil, &api.GeneratedArtifactShapeError{
-					Reason: "adapter contract method has no concrete selection",
-				}
-			}
-			concrete, ok := selected.Obj().(*types.Func)
-			if !ok || !environmentcontract.EquivalentMethods(concrete, method) {
-				return nil, &api.GeneratedArtifactShapeError{
-					Reason: "adapter contract method selection is not exact",
-				}
-			}
-			required[concrete] = append(required[concrete], method)
-		}
-	}
-	demanded := make([]demandedMethod, 0, len(required))
-	for index := range methodSet.Len() {
-		selection := methodSet.At(index)
-		method, ok := selection.Obj().(*types.Func)
-		if !ok {
-			return nil, &api.GeneratedArtifactShapeError{
-				Reason: "adapter method set contains a non-method object",
-			}
-		}
-		if targetContracts := required[method]; len(targetContracts) != 0 {
-			demanded = append(demanded, demandedMethod{
-				selection: selection,
-				method:    method,
-				contracts: targetContracts,
-			})
-		}
-	}
-	if len(demanded) != len(required) {
-		return nil, &api.GeneratedArtifactShapeError{
-			Reason: "adapter contract selection lost a required method",
-		}
-	}
-	return demanded, nil
-}
-
 func emitMethod(
 	context api.Context,
 	children api.ChildEmitter,
@@ -369,6 +306,17 @@ func emitMethod(
 		return nil, nil, nil, methodStageError(MethodStageContract, err)
 	}
 	sourceArguments := target.ParameterReferences(context.Factory())
+	ordinaryArguments, projectionBefore, projectionRequests, err :=
+		projectMethodArguments(
+			context,
+			signature,
+			method,
+			sourceArguments,
+			!interfaceDispatch,
+		)
+	if err != nil {
+		return nil, nil, nil, methodStageError(MethodStageInvocation, err)
+	}
 	var call api.ExpressionEmission
 	if interfaceDispatch {
 		call, err = interfaceoperation.Apply(
@@ -378,7 +326,7 @@ func emitMethod(
 			dispatchType,
 			receiver,
 			method,
-			sourceArguments,
+			ordinaryArguments,
 			nil,
 			nil,
 		)
@@ -390,7 +338,7 @@ func emitMethod(
 			context,
 			children,
 			receiver.Value(),
-			sourceArguments,
+			ordinaryArguments,
 		)
 		if err != nil {
 			return nil, nil, nil, methodStageError(
@@ -399,9 +347,16 @@ func emitMethod(
 			)
 		}
 		call, err = api.NewExpressionEmission(
-			append(receiver.Before(), call.Before()...),
+			append(
+				append(receiver.Before(), projectionBefore...),
+				call.Before()...,
+			),
 			call.Value(),
-			api.CombineRequests(receiver.Requests(), call.Requests()),
+			api.CombineRequests(
+				receiver.Requests(),
+				projectionRequests,
+				call.Requests(),
+			),
 		)
 		if err != nil {
 			return nil, nil, nil, methodStageError(MethodStageInvocation, err)
@@ -488,6 +443,17 @@ func emitMethod(
 		return nil, nil, nil, methodStageError(MethodStageABI, err)
 	}
 	var deferredCall api.ExpressionEmission
+	deferredArguments, deferredProjectionBefore,
+		deferredProjectionRequests, err := projectMethodArguments(
+		context,
+		signature,
+		method,
+		sourceArguments,
+		!interfaceDispatch,
+	)
+	if err != nil {
+		return nil, nil, nil, methodStageError(MethodStageInvocation, err)
+	}
 	if interfaceDispatch {
 		deferredCall, err = interfaceoperation.ApplyDeferred(
 			context,
@@ -498,7 +464,7 @@ func emitMethod(
 			method,
 			signature,
 			contractCooperative,
-			sourceArguments,
+			deferredArguments,
 			context.Factory().Identifier(callable.RecoveryAuthorityName),
 		)
 	} else {
@@ -507,7 +473,7 @@ func emitMethod(
 			children,
 			nil,
 			receiver.Value(),
-			sourceArguments,
+			deferredArguments,
 			context.Factory().Identifier(
 				callable.RecoveryAuthorityName,
 			),
@@ -519,10 +485,14 @@ func emitMethod(
 			)
 		}
 		deferredCall, err = api.NewExpressionEmission(
-			append(receiver.Before(), deferredCall.Before()...),
+			append(
+				append(receiver.Before(), deferredProjectionBefore...),
+				deferredCall.Before()...,
+			),
 			deferredCall.Value(),
 			api.CombineRequests(
 				receiver.Requests(),
+				deferredProjectionRequests,
 				deferredCall.Requests(),
 			),
 		)
@@ -579,20 +549,10 @@ func emitMethod(
 		target.Requests(),
 		call.Requests(),
 		deferredCall.Requests(),
+		projectionRequests,
+		deferredProjectionRequests,
 		recoveryRequests,
 		deferredSupportRequests,
 		recoveryObservationRequests,
 	), nil
-}
-
-func adapterCallBody(
-	context api.Context,
-	signature *types.Signature,
-	call api.ExpressionEmission,
-) []tsgo.Statement {
-	body := call.Before()
-	if signature.Results().Len() == 0 {
-		return append(body, context.Factory().ExpressionStatement(call.Value()))
-	}
-	return append(body, context.Factory().ReturnStatement(call.Value()))
 }
