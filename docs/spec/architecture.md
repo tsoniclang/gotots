@@ -223,6 +223,39 @@ References subscribe to closed observable facets such as:
 - constructor surface;
 - exported value surface.
 
+The callable-signature facet includes one ordered, closed target projection for
+every source parameter and result. Its authoritative key is the selected Go
+callable object, not a package/name string. The initial projection domain is:
+
+- `identity`, for the ordinary selected representation;
+- `pointee-value`, for a read-only non-escaping `*T` transported as the selected
+  value representation of `T`;
+- `direct-object-reference`, for a represented Go object whose identity and
+  mutation are already carried by the TypeScript class reference;
+- `mutable-scalar-location`, for observable scalar writes, aliases, identity,
+  or temporal sharing;
+- `owner-location`, for a field or element address that writes through to its
+  owner; and
+- `unsafe-location`, for reached dynamic address semantics.
+
+Automatic analysis and a certified authored implementation are two evidence
+sources for this one artifact, not two lowering paths. Automatic selection may
+choose `pointee-value` only after proving no write, escape, identity use, unsafe
+crossing, or observable temporal alias. For an authored implementation, its
+strictly checked TypeScript signature is compared with the selected Go
+signature and must identify exactly one admissible projection. No config key,
+annotation, package name, function name, or caller allowlist selects a
+projection.
+
+Every direct call, method value/expression, function value, callback, interface
+adapter, deferred entry, provider bridge, package export, and definition
+subscribes to the same settled signature facet. A structural projection change
+reconstructs those consumers through the ordinary reverse-dependency graph;
+an implementation-body-only change does not. A plain value projection never
+silently discards a source-observable write. Such a callable retains a location
+unless a separately specified input/output projection owns an explicit
+write-back rule.
+
 Body-only changes do not invalidate users. When a facet changes structurally,
 the root requeues only its reverse subscribers. Reconstruction transactionally
 replaces the artifact's complete AST, requests, dependencies, and facet
@@ -248,6 +281,8 @@ Every target callable that claims a Go source identity directly projects the
 selected `go/types.Signature`.
 
 - Ordinary value parameters preserve order and cardinality.
+- Their target representations may use only the settled closed callable
+  projections above; this does not add, remove, reorder, or hide a parameter.
 - A value receiver may become TypeScript `this`.
 - A pointer receiver may become one explicit first parameter so nil reaches the
   Go method body.
@@ -1011,6 +1046,16 @@ file set replaces the complete generated package module set atomically; no
 generated body, package state, initializer, compatibility wrapper, or fallback
 for the selected package may survive. References keep the ordinary package
 assembly path and source-facing contract.
+
+For callable exports, the surface join is signature-exact rather than
+name-only. Certification compares the selected Go signature, every selected
+target projection, and the checked authored TypeScript parameter/result types.
+It records the resulting projection fingerprint in compilation evidence before
+any caller is emitted. For example, a Go `Read(*int) int` and an authored
+`Read(number): number` uniquely select `pointee-value`; generated `Read(&x)`
+therefore becomes `Read(x)`, while a call through an existing pointer reads its
+current value with the ordinary nil-dereference behavior. An authored scalar
+signature is rejected when the Go contract requires an observable write.
 
 The authored module set contains exactly one executable package assembly.
 Surviving imports of its public exports are rebound to that assembly in the

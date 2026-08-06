@@ -20,6 +20,13 @@ No milestone may introduce a temporary semantic IR, hidden source ABI,
 compatibility shim, corpus-specific override, or implementation that a later
 milestone is expected to discard.
 
+Callable representation work lands as one vertical capability: the closed
+projection contract, automatic and authored-signature evidence, the canonical
+signature facet, every definition/reference consumer, superseded-path deletion,
+artifact inspection, differential and mutation proof, and measured product
+delta. A direct-call-only rewrite or a package-specific manual-call adaptation
+is not a deliverable.
+
 ## 0. Native Target And Loader
 
 Install:

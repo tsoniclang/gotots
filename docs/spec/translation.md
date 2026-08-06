@@ -838,6 +838,36 @@ and TypeScript types, including demanded storage and operation facets. Callsites
 remain ordinary imports and calls; no policy, bridge, digest, or implementation
 selector is added to a Go callable.
 
+The checked authored signature may select a closed representation projection
+without a configuration entry. Given:
+
+```go
+// package fast
+func Read(value *int) int
+
+func Use() int {
+    current := 41
+    return fast.Read(&current)
+}
+```
+
+and the certified implementation:
+
+```ts
+export function Read(value: number): number {
+    return value;
+}
+```
+
+the callable ABI owner proves that the source parameter is read-only at this
+replacement boundary, selects `pointee-value`, and emits the caller as
+`Read(current)`. If the argument is an existing `*int`, the caller emits its
+current pointee value and preserves Go's nil-dereference failure. The manual
+function does not receive or mutate a hidden cell. A Go function whose visible
+contract writes through the pointer cannot use this plain `number` signature;
+it remains a location unless an explicit write-back projection is added to the
+closed language model.
+
 For an internal hash package, Go source such as:
 
 ```go

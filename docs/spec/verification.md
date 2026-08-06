@@ -735,6 +735,23 @@ private-module statement;
 duplicate a generated and manual owner; retain one generated package file; or
 feed text directly to the output writer. Each fails at its owning gate.
 
+Callable source-implementation proof additionally exact-joins the selected Go
+signature, ordered projection kinds, projected target parameter/result types,
+and checked authored signature. The certificate fingerprint covers that join.
+Focused artifacts prove both automatic and authored `*int -> number`
+`pointee-value` selection: `Read(&x)` emits `Read(x)`, an existing pointer emits
+one guarded current-value read, and no call-induced scalar cell is requested.
+The complementary mutating fixture retains a location. Required mutations
+change the Go parameter, authored parameter, nil shape, projection kind,
+argument rewrite, method/callback adapter, or signature dependency; each fails
+at its owning join or strict consumer. A body-only authored change proves that
+the callable-signature facet and its callers remain unchanged.
+
+The final broad search rejects any source-implementation name-only surface
+join, package/function projection condition, projection config field, caller
+allowlist, text patch, unchecked cast, duplicate signature store, or migrated
+scalar-pointer carrier on a certified pointee-value path.
+
 An equivalence envelope requires product-level evidence. For an internal hash,
 tests prove equal-input stability, unequal-input behavior over an adversarial
 corpus, streaming/one-shot agreement when exposed, collision-safe consumer
