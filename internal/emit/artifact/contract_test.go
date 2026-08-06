@@ -187,6 +187,48 @@ func TestObservableClassContractPartitionsStaticAndInstanceFacets(t *testing.T) 
 	)
 }
 
+func TestObservableEnumContractOwnsTypeAndValueFacets(t *testing.T) {
+	factory := tsgo.NewFactory()
+	makeEnum := func(name, value string) tsgo.EnumDeclaration {
+		return factory.EnumDeclaration(
+			[]tsgo.ModifierLike{factory.ExportKeyword()},
+			factory.Identifier(name),
+			[]tsgo.EnumMember{factory.EnumMember(
+				factory.Identifier("$goType"),
+				factory.NumericLiteral(value, tsgo.TokenFlagsNone),
+			)},
+		)
+	}
+	baseline, err := ProjectContract(
+		factory,
+		[]tsgo.Statement{makeEnum("Flags", "1")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed, err := ProjectContract(
+		factory,
+		[]tsgo.Statement{makeEnum("Flags", "2")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, facet := range []api.ArtifactFacet{
+		api.ArtifactFacetConstructorSurface,
+		api.ArtifactFacetInstanceTypeSurface,
+	} {
+		if len(artifactFacetBytes(baseline, facet)) == 0 {
+			t.Fatalf("enum facet %s is absent", facet)
+		}
+		if bytes.Equal(
+			artifactFacetBytes(baseline, facet),
+			artifactFacetBytes(changed, facet),
+		) {
+			t.Fatalf("enum value change did not change %s", facet)
+		}
+	}
+}
+
 func TestClassMemberContractSeparatesSignatureFromImplementation(t *testing.T) {
 	factory := tsgo.NewFactory()
 	member := func(

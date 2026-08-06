@@ -204,7 +204,7 @@ Each type/value family has focused differentials and mutations:
 | unsafe pointers | typed-pointer round trip, live safe/unsafe aliasing, array/struct reinterpretation, slice/string headers, virtual-address arithmetic, fabricated/out-of-range rejection |
 | maps | nil, set/get/comma-ok/delete/clear, key equality/hash, zero-on-miss, iteration |
 | strings | bytes/runes, indexing, range, slicing, conversions |
-| defined types | identity, projection/wrap, methods, nil-capable families |
+| defined types | identity, native methodless fixed-width numerics, projection/wrap, methods, nil-capable families |
 
 Integer-profile proof pins the append-only scalar alias identities, including
 distinct `int`, `uint`, and `uintptr`, and checks their carrier matrix under

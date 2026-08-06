@@ -148,11 +148,12 @@ const (
 	DefinedValueRepresentationGeneratedWrapper
 	DefinedValueRepresentationProviderCanonical
 	DefinedValueRepresentationProviderOperations
+	DefinedValueRepresentationGeneratedNumeric
 )
 
 func (k DefinedValueRepresentationKind) Valid() bool {
 	return k >= DefinedValueRepresentationGeneratedWrapper &&
-		k <= DefinedValueRepresentationProviderOperations
+		k <= DefinedValueRepresentationGeneratedNumeric
 }
 
 type DefinedValueRepresentation struct {

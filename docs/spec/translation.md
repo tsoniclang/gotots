@@ -330,6 +330,35 @@ requires it. Operations project to the underlying family and wrap the result
 through one type owner. Public generated names remain readable; internal
 operation artifacts are not source declarations.
 
+A source-owned, non-generic defined type whose underlying type is `int8`,
+`uint8`, `int16`, `uint16`, `int32`, or `uint32` and whose value and pointer
+method sets are both empty uses one native numeric-enum representation. The
+enum is the nominal TypeScript type and its value member is the statically
+typed no-op used by conversions and operation results:
+
+```go
+type NodeFlags uint32
+
+func Add(left, right NodeFlags) NodeFlags { return left + right }
+```
+
+```ts
+export enum NodeFlags { $goType = 1 }
+
+export function Add(left: NodeFlags, right: NodeFlags): NodeFlags {
+  return (left + right) * NodeFlags.$goType;
+}
+```
+
+This representation keeps unrelated defined numeric types non-assignable
+without allocating a wrapper per value. It is selected from `go/types`
+identity, underlying kind, generic arity, and complete method sets; source
+spelling and package identity never select it. Generic types, method-bearing
+types, profile-dependent native-width integers, strings, booleans, floats,
+complex values, and all other defined families retain their exact existing
+representation. Type-representation demands whose storage is already the enum
+value consume no class marker or auxiliary carrier.
+
 ### Structs
 
 ```go

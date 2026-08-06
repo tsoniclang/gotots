@@ -169,7 +169,10 @@ func specializationOperations(
 	source ast.Node,
 	mapType *types.Map,
 ) (specializationOperationSet, []api.RootRequest, error) {
-	keyType := storageKeyType(mapType.Key())
+	keyType, err := storageKeyType(context, mapType.Key())
+	if err != nil {
+		return specializationOperationSet{}, nil, err
+	}
 	keyContext, err := storageKeyOperationContext(context, mapType.Key())
 	if err != nil {
 		return specializationOperationSet{}, nil, err

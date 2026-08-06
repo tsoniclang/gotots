@@ -150,6 +150,12 @@ func main() {
 		values.StringFromLabel(missing),
 		ok,
 	)
+	roundTrip, roundTripOK := values.CountAnyRoundTrip(count)
+	fmt.Println(
+		values.IntFromCount(roundTrip),
+		roundTripOK,
+		values.CountAnyRejectsOther(count),
+	)
 }
 `)
 	return runDefinedCommand(
@@ -226,6 +232,8 @@ console.log(
 );
 const [found, missing, ok] = values.CountMapValues();
 console.log(values.StringFromLabel(found), values.StringFromLabel(missing), String(ok));
+const [roundTrip, roundTripOK] = values.CountAnyRoundTrip(count);
+console.log(String(values.IntFromCount(roundTrip)), String(roundTripOK), String(values.CountAnyRejectsOther(count)));
 `
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeDefinedFile(t, runnerPath, runner)

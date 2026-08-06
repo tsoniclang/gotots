@@ -44,7 +44,7 @@ func Source(
 	}
 	storage := StorageSpecialized
 	if scalarKey &&
-		types.Identical(source.Key(), storageKeyType(source.Key())) &&
+		types.Identical(source.Key(), underlyingStorageKeyType(source.Key())) &&
 		representedBasic(context, source.Elem()) {
 		storage = StorageScalar
 	}

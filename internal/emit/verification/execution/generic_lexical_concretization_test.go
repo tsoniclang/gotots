@@ -77,9 +77,9 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 	for fragment, source := range map[string]string{
 		"function Twice$concrete_":        callerSource,
 		"function BothEqual$concrete_":    callerSource,
-		"class Local":                     callerSource,
-		"class Outer":                     callerSource,
-		"class Inner":                     callerSource,
+		"enum Local":                      callerSource,
+		"enum Outer":                      callerSource,
+		"enum Inner":                      callerSource,
 		"function $goCapability_":         callerSource,
 		"function Twice$kernel<T>":        providerSource,
 		"function BothEqual$kernel<A, B>": providerSource,
@@ -94,7 +94,7 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 	); count != 1 {
 		t.Fatalf("same lexical generic instance emitted %d wrappers, want 1", count)
 	}
-	inner := strings.Index(callerSource, "class Inner")
+	inner := strings.Index(callerSource, "enum Inner")
 	wrapper := strings.Index(callerSource, "function BothEqual$concrete_")
 	if inner < 0 || wrapper < inner {
 		t.Fatalf(

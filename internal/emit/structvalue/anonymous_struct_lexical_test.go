@@ -71,7 +71,7 @@ func TestAnonymousStructLexicalPlacementAcrossSourceArtifacts(
 	source := structTargetSource(t, emission)
 	nested := targetFunctionByName(t, source, "NestedLiteralResult")
 	inner := nestedFunctionExpression(t, nested)
-	assertImmediateLexicalClassPair(t, inner.Body().(tsgo.Block))
+	assertImmediateLexicalDefinitionPair(t, inner.Body().(tsgo.Block))
 	assertGroupedLexicalAnchor(t, source)
 	assertPackageInitializerLexicalPlacement(t, emission)
 
@@ -216,19 +216,23 @@ func nestedFunctionExpression(
 	return inner
 }
 
-func assertImmediateLexicalClassPair(t *testing.T, block tsgo.Block) {
+func assertImmediateLexicalDefinitionPair(t *testing.T, block tsgo.Block) {
 	t.Helper()
 	statements := block.Statements()
 	if len(statements) < 2 {
 		t.Fatalf("lexical block statements = %d", len(statements))
 	}
-	local, localOK := statements[0].(tsgo.ClassDeclaration)
+	local, localOK := statements[0].(tsgo.EnumDeclaration)
 	anonymous, anonymousOK := statements[1].(tsgo.ClassDeclaration)
 	if !localOK ||
 		!anonymousOK ||
 		strings.HasPrefix(local.Name().Text(), "$goStruct_") ||
 		!strings.HasPrefix(anonymous.Name().Text(), "$goStruct_") {
-		t.Fatalf("lexical class pair = %T/%T", statements[0], statements[1])
+		t.Fatalf(
+			"lexical definition pair = %T/%T",
+			statements[0],
+			statements[1],
+		)
 	}
 }
 
@@ -239,13 +243,21 @@ func assertGroupedLexicalAnchor(t *testing.T, source tsgo.SourceFile) {
 	if len(statements) < 4 {
 		t.Fatalf("grouped lexical statements = %d", len(statements))
 	}
-	var names []string
-	for _, statement := range statements[:4] {
-		class, ok := statement.(tsgo.ClassDeclaration)
-		if !ok {
-			t.Fatalf("grouped lexical declaration = %T", statement)
-		}
-		names = append(names, class.Name().Text())
+	before, beforeOK := statements[0].(tsgo.EnumDeclaration)
+	local, localOK := statements[1].(tsgo.EnumDeclaration)
+	anonymous, anonymousOK := statements[2].(tsgo.ClassDeclaration)
+	after, afterOK := statements[3].(tsgo.EnumDeclaration)
+	if !beforeOK || !localOK || !anonymousOK || !afterOK {
+		t.Fatalf(
+			"grouped lexical declarations = %T/%T/%T/%T",
+			statements[0], statements[1], statements[2], statements[3],
+		)
+	}
+	names := []string{
+		before.Name().Text(),
+		local.Name().Text(),
+		anonymous.Name().Text(),
+		after.Name().Text(),
 	}
 	if !strings.HasPrefix(names[0], "Before") ||
 		!strings.HasPrefix(names[1], "Local") ||
@@ -281,7 +293,7 @@ func assertPackageInitializerLexicalPlacement(
 	if len(initializers) != 3 {
 		t.Fatalf("package initializer function literals = %d, want three", len(initializers))
 	}
-	assertImmediateLexicalClassPair(
+	assertImmediateLexicalDefinitionPair(
 		t,
 		initializers[0].Body().(tsgo.Block),
 	)
@@ -293,11 +305,11 @@ func assertPackageInitializerLexicalPlacement(
 	if !ok {
 		t.Fatalf("nested-block package initializer begins with %T", blockBody[0])
 	}
-	assertImmediateLexicalClassPair(
+	assertImmediateLexicalDefinitionPair(
 		t,
 		branch.ThenStatement().(tsgo.Block),
 	)
-	assertImmediateLexicalClassPair(
+	assertImmediateLexicalDefinitionPair(
 		t,
 		initializers[2].Body().(tsgo.Block),
 	)

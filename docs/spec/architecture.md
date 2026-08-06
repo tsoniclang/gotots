@@ -374,6 +374,17 @@ Wide-result normalization requests one of the two demand-generated integer
 runtime operations; repeated source sites do not duplicate the target
 intrinsic expression.
 
+Defined-value representation is selected once from the complete `go/types`
+declaration, never from a use site. A non-generic source-owned defined
+fixed-width integer with no value or pointer methods uses a nominal TypeScript
+numeric enum and direct numeric storage. The enum's one value member provides a
+typed no-op wrap for conversions and operation results, eliminating per-value
+objects without erasing nominality. Method-bearing, generic,
+profile-dependent, non-numeric, provider-owned, and otherwise non-identity
+families retain their canonical wrapper or provider representation. All
+consumers query this one representation owner; none infer it from target
+spelling or structural assignability.
+
 Nil-capable values use `undefined` unless their family requires a distinct
 carrier. Zero, copy, equality, hashing, conversion, and mutation are each owned
 once by the value family. A class gains `$copy` only when the compilation

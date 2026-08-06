@@ -266,3 +266,15 @@ func CountMapLookup(
 	value, ok := values[key]
 	return value, ok
 }
+
+func CountAnyRoundTrip(value Count) (Count, bool) {
+	boxed := any(value)
+	result, ok := boxed.(Count)
+	return result, ok
+}
+
+func CountAnyRejectsOther(value Count) bool {
+	boxed := any(value)
+	_, ok := boxed.(Other)
+	return !ok
+}

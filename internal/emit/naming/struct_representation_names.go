@@ -23,6 +23,14 @@ func (n *File) DefinedValueRepresentation(
 	if !ok && n.owner.registry != nil {
 		binding, ok = n.owner.registry.byObject[typeName]
 	}
+	if ok &&
+		(binding.kind == targetBindingLocal || binding.kind == targetBindingSource) &&
+		generatedNumericDefinedValue(typeName) {
+		return api.NewDefinedValueRepresentation(
+			api.DefinedValueRepresentationGeneratedNumeric,
+			api.NameReference{},
+		)
+	}
 	if !ok || binding.kind != targetBindingProvider {
 		return api.NewDefinedValueRepresentation(
 			api.DefinedValueRepresentationGeneratedWrapper,
@@ -61,6 +69,29 @@ func (n *File) DefinedValueRepresentation(
 			Reason: "provider defined-value representation is uncertified",
 		}
 	}
+}
+
+func generatedNumericDefinedValue(typeName *types.TypeName) bool {
+	if typeName == nil || typeName.IsAlias() {
+		return false
+	}
+	named, ok := types.Unalias(typeName.Type()).(*types.Named)
+	if !ok || named.Obj() != typeName || named.TypeParams().Len() != 0 {
+		return false
+	}
+	basic, ok := named.Underlying().(*types.Basic)
+	if !ok {
+		return false
+	}
+	switch basic.Kind() {
+	case types.Int8, types.Uint8,
+		types.Int16, types.Uint16,
+		types.Int32, types.Uint32:
+	default:
+		return false
+	}
+	return types.NewMethodSet(named).Len() == 0 &&
+		types.NewMethodSet(types.NewPointer(named)).Len() == 0
 }
 
 func (n *File) TypeRepresentation(
