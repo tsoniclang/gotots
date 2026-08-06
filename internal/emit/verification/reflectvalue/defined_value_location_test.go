@@ -15,13 +15,22 @@ import (
 
 type DefinedText string
 type DefinedCount uint32
+type definedHolder struct {
+	count DefinedCount
+}
+
+func storeDefinedCount(target *DefinedCount, value DefinedCount) {
+	*target = value
+}
 
 func DefinedScalarFacts() string {
 	text := reflect.New(reflect.TypeOf(DefinedText("")))
 	text.Elem().SetString("named")
 	count := reflect.New(reflect.TypeOf(DefinedCount(0)))
 	count.Elem().SetUint(37)
-	return fmt.Sprintf("%s %d", text.Elem().Interface().(DefinedText), count.Elem().Interface().(DefinedCount))
+	holder := definedHolder{}
+	storeDefinedCount(&holder.count, DefinedCount(41))
+	return fmt.Sprintf("%s %d %d", text.Elem().Interface().(DefinedText), count.Elem().Interface().(DefinedCount), holder.count)
 }
 `
 	typescriptRunner := `const facts = await DefinedScalarFacts();
@@ -49,7 +58,8 @@ func main() {
 		func(artifacts renderedArtifacts) {
 			for _, required := range []string{
 				"GoPointer.cell(new DefinedText",
-				"GoPointer.cell(new DefinedCount",
+				"new DefinedCount__from_reflectvalue(instance.value)",
+				"GoPointer.cell(new DefinedCount__from_reflectvalue(0).$value)",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					t.Fatalf("defined scalar reflection artifact lacks %q", required)
