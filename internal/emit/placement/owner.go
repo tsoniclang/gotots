@@ -30,6 +30,18 @@ func (p *Owner) RuntimeSymbols() []api.RuntimeSymbol {
 	return symbols
 }
 
+func (p *Owner) RuntimeFeatures() []api.RuntimeFeature {
+	features := make([]api.RuntimeFeature, 0)
+	for _, request := range p.requests {
+		feature, ok := request.RuntimeFeature()
+		if ok {
+			features = append(features, feature)
+		}
+	}
+	slices.Sort(features)
+	return features
+}
+
 func (p *Owner) PrimitiveAliases() []api.PrimitiveAlias {
 	aliases := make([]api.PrimitiveAlias, 0)
 	seen := make(map[api.PrimitiveAlias]struct{})
@@ -64,6 +76,17 @@ func (p *Owner) Requests() []api.RootRequest {
 
 func (p *Owner) Apply(requests []api.RootRequest) error {
 	return api.WalkUniqueRootRequestPayloads(requests, func(request api.RootRequest) error {
+		if request.Kind() == api.RootRequestRuntimeFeature {
+			if request.LegalScope() != api.ScopeCompilationSupport ||
+				request.PreferredScope() != api.ScopeCompilationSupport ||
+				request.Execution() != api.ExecutionStatic {
+				return &api.PlacementError{
+					Reason: "runtime feature is not static compilation support",
+				}
+			}
+			p.requests[request.Owner()] = request
+			return nil
+		}
 		if request.Kind() != api.RootRequestImport ||
 			request.LegalScope() != api.ScopeFileImports ||
 			request.PreferredScope() != api.ScopeFileImports ||
@@ -96,6 +119,9 @@ func (p *Owner) Apply(requests []api.RootRequest) error {
 
 func (p *Owner) RequireTypeOnly() error {
 	for _, request := range p.requests {
+		if request.Kind() == api.RootRequestRuntimeFeature {
+			continue
+		}
 		if request.Kind() != api.RootRequestImport ||
 			request.ImportPhase() != api.ImportPhaseType {
 			return &api.PlacementError{
@@ -116,6 +142,9 @@ func (p *Owner) Statements(factory tsgo.Factory) []tsgo.Statement {
 	}
 	byGroup := make(map[importGroup][]api.RootRequest)
 	for _, request := range p.requests {
+		if request.Kind() == api.RootRequestRuntimeFeature {
+			continue
+		}
 		group := importGroup{
 			phase:      request.ImportPhase(),
 			binding:    request.ImportBinding(),

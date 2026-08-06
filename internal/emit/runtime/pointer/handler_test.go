@@ -48,8 +48,9 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 			continue
 		}
 		name, ok := method.Name().(tsgo.Identifier)
-		if ok && name.Text() == pointer.ProjectName {
-			t.Fatal("ordinary pointer runtime carries the projection facet")
+		if ok && (name.Text() == pointer.ProjectName ||
+			name.Text() == pointer.FieldsName) {
+			t.Fatalf("ordinary pointer runtime carries %q", name.Text())
 		}
 	}
 	constructor, ok := members[4].(tsgo.ConstructorDeclaration)
@@ -162,6 +163,7 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		panicClassName(t),
 		denseIndexClassName(t),
 		pointer.Capabilities{
+			FieldPath:    true,
 			Projection:   true,
 			Region:       true,
 			UnsafeMemory: true,
@@ -176,25 +178,33 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 	}
 	for _, required := range []string{
 		"export class GoPointer<L, S>",
+		"declare private type: (v: L) => L",
 		"private static readonly roots: WeakMap<object, object>",
 		"private $go$resolvedAddress?: object",
 		"private constructor(private readonly $go$getAddress: () => object",
+		"private readonly $go$region?: readonly",
 		"get $go$address(): object",
 		"this.$go$resolvedAddress ??= this.$go$getAddress()",
 		"static cell<L, S>(value: S): GoPointer<L, S>",
 		"static field<L, PL, PS extends object, K extends keyof PS>",
+		"static fields<L, S, PL, PS extends object>",
+		"static child(parent: object, key: PropertyKey | bigint): object",
+		"() => parent.read()[key]",
+		"(next: PS[K]) => parent.read()[key] = next",
+		"() => read(parent.read())",
+		"(next: S) => write(parent.read(), next)",
 		"static objectField<L, O extends object, K extends keyof O>",
 		"static element<L, S>",
 		"static index<L, S, PL, O extends",
 		"static arrayRegion<L, T, S extends",
 		"static project<FL, FS, TL, TS>",
-		"return parent.read()[key]",
 		"fromSource(pointer.read())",
 		"pointer.write(toSource(next))",
 		"private $go$rawAccess?: readonly",
 		"return this.read()",
 		"const numericIndex = globalThis.Number(index);",
 		"static equal<LL, LS, RL, RS>",
+		"left === right || left?.$go$address === right?.$go$address",
 		"static dereference<L, S>",
 		"static direct<L>",
 		"static view<F, T, S>",
@@ -221,7 +231,10 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		"optionalStorage",
 		"elementView",
 		"indexView",
+		"readonly PropertyKey[]",
 		"$go$unsafeSync",
+		"return parent.read()[key]",
+		"left !== void 0 && right !== void 0",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("pointer runtime contains %q:\n%s", forbidden, printed)

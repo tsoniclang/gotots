@@ -334,6 +334,8 @@ func (s *programSession) consumeArtifactRequests(
 			switch request.Kind() {
 			case api.RootRequestImport:
 				return placement.Apply([]api.RootRequest{request})
+			case api.RootRequestRuntimeFeature:
+				return placement.Apply([]api.RootRequest{request})
 			case api.RootRequestDeclarationRequirement:
 				requirement, ok := request.DeclarationRequirement()
 				if !ok {

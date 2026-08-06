@@ -396,6 +396,24 @@ unsafe support must not add a branch to every ordinary pointer read and write;
 composed field and index locations call the parent's active access function
 directly.
 
+A contiguous carrier-backed field-address path has one location object, not
+one location per selector. The address owner consumes the maximal typed path
+and emits direct root-to-leaf read and write projections. It splits the path at
+pointer dereference, direct-object, provider, or indexed-representation
+boundaries. The projections read the current root storage on every access; an
+intermediate aggregate is never cached, because replacing the root aggregate
+must remain visible through an existing Go field pointer. Canonical address
+tokens follow the same ordered field path and remain lazy. Generated code does
+not interpret an erased or dynamically typed property path.
+
+A class-member-only runtime facility is selected by one typed runtime-feature
+request. The request emits no import and owns no duplicate top-level runtime
+definition; it augments the canonical runtime class during package assembly.
+If no final generated artifact requests the feature, the member is absent.
+Flat field-address paths request the pointer field-path feature. Reconstructed
+artifacts replace their feature requests transactionally, just like imports,
+so a superseded use cannot leave stale runtime surface behind.
+
 ### Unsafe Pointer Memory
 
 `unsafe.Pointer` is a typed compilation policy over the selected toolchain's

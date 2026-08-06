@@ -56,6 +56,16 @@ func Build(
 	symbols []api.RuntimeSymbol,
 	concurrency api.ConcurrencySemantics,
 ) ([]Definition, error) {
+	return BuildWithFeatures(factory, module, symbols, nil, concurrency)
+}
+
+func BuildWithFeatures(
+	factory tsgo.Factory,
+	module api.RuntimeModule,
+	symbols []api.RuntimeSymbol,
+	features []api.RuntimeFeature,
+	concurrency api.ConcurrencySemantics,
+) ([]Definition, error) {
 	if module == api.RuntimeModuleInvalid {
 		return nil, &AssemblyError{Reason: "runtime module is invalid"}
 	}
@@ -64,6 +74,23 @@ func Build(
 	}
 	if !concurrency.Valid() {
 		return nil, &AssemblyError{Reason: "runtime concurrency profile is invalid"}
+	}
+	seenFeatures := make(map[api.RuntimeFeature]struct{}, len(features))
+	for _, feature := range features {
+		featureModule, ok := api.RuntimeFeatureModule(feature)
+		if !ok || featureModule != module {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "runtime feature has foreign module ownership",
+			}
+		}
+		if _, duplicate := seenFeatures[feature]; duplicate {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "runtime feature is duplicated",
+			}
+		}
+		seenFeatures[feature] = struct{}{}
 	}
 	if module == api.RuntimeModuleScalar {
 		if len(symbols) != 1 || symbols[0] != api.RuntimeAwaitable {
@@ -182,7 +209,11 @@ func Build(
 		return []Definition{definition}, nil
 	}
 	if module == api.RuntimeModulePointer {
-		return buildPointer(factory, symbols)
+		return buildPointer(
+			factory,
+			symbols,
+			slices.Contains(features, api.RuntimePointerFieldPath),
+		)
 	}
 	if module == api.RuntimeModuleArray {
 		if symbols[0] != api.RuntimeArray {

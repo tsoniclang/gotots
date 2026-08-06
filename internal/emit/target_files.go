@@ -192,6 +192,7 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		s.scalar,
 		s.concurrency,
 		requirements.runtimeSymbols,
+		requirements.features(),
 		requirements.aliases(),
 	)
 	if err != nil {
@@ -312,6 +313,7 @@ func (s *programSession) programInitializationFile(
 type targetRequirements struct {
 	primitiveAliases         map[api.PrimitiveAlias]struct{}
 	runtimeSymbols           map[api.RuntimeSymbol]struct{}
+	runtimeFeatures          map[api.RuntimeFeature]struct{}
 	certifiedProviderModules map[string]struct{}
 	selectedProviderModules  map[string]struct{}
 }
@@ -320,6 +322,7 @@ func (s *programSession) newTargetRequirements() *targetRequirements {
 	result := &targetRequirements{
 		primitiveAliases:         make(map[api.PrimitiveAlias]struct{}),
 		runtimeSymbols:           make(map[api.RuntimeSymbol]struct{}),
+		runtimeFeatures:          make(map[api.RuntimeFeature]struct{}),
 		certifiedProviderModules: make(map[string]struct{}),
 		selectedProviderModules:  make(map[string]struct{}),
 	}
@@ -338,6 +341,9 @@ func (r *targetRequirements) observe(placement *targetplacement.Owner) {
 	}
 	for _, symbol := range placement.RuntimeSymbols() {
 		r.runtimeSymbols[symbol] = struct{}{}
+	}
+	for _, feature := range placement.RuntimeFeatures() {
+		r.runtimeFeatures[feature] = struct{}{}
 	}
 	for _, request := range placement.Requests() {
 		module := request.ModulePath()
@@ -391,6 +397,15 @@ func (r *targetRequirements) aliases() []api.PrimitiveAlias {
 	}
 	slices.Sort(aliases)
 	return aliases
+}
+
+func (r *targetRequirements) features() []api.RuntimeFeature {
+	features := make([]api.RuntimeFeature, 0, len(r.runtimeFeatures))
+	for feature := range r.runtimeFeatures {
+		features = append(features, feature)
+	}
+	slices.Sort(features)
+	return features
 }
 
 func (s *programSession) packageInitializationOrder() (

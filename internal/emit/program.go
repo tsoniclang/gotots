@@ -523,11 +523,11 @@ func (s *programSession) applyRootRequests(
 	if s.sealed {
 		return &ScheduleError{Reason: "root request arrived after target files were sealed"}
 	}
-	imports := make([]api.RootRequest, 0, len(requests))
+	placementRequests := make([]api.RootRequest, 0, len(requests))
 	err := api.WalkUniqueRootRequestPayloads(requests, func(request api.RootRequest) error {
 		switch request.Kind() {
-		case api.RootRequestImport:
-			imports = append(imports, request)
+		case api.RootRequestImport, api.RootRequestRuntimeFeature:
+			placementRequests = append(placementRequests, request)
 		case api.RootRequestDeclarationRequirement:
 			requirement, ok := request.DeclarationRequirement()
 			if !ok {
@@ -548,7 +548,7 @@ func (s *programSession) applyRootRequests(
 	if err != nil {
 		return err
 	}
-	return placement.Apply(imports)
+	return placement.Apply(placementRequests)
 }
 
 func (s *programSession) builder(site declarationSite) (*targetFileBuilder, error) {

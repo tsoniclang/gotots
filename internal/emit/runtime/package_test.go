@@ -19,6 +19,7 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeStringIndex: {},
 		},
+		nil,
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)
 	if err != nil {
@@ -97,6 +98,7 @@ func TestAssemblePackageRejectsDuplicateAliases(t *testing.T) {
 		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsDisabled,
 		nil,
+		nil,
 		[]api.PrimitiveAlias{
 			api.PrimitiveInt32,
 			api.PrimitiveInt32,
@@ -107,12 +109,48 @@ func TestAssemblePackageRejectsDuplicateAliases(t *testing.T) {
 	}
 }
 
+func TestAssemblePackageRequiresOneRuntimeFeatureOwner(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		symbols  map[api.RuntimeSymbol]struct{}
+		features []api.RuntimeFeature
+	}{
+		{
+			name:     "missing owner",
+			features: []api.RuntimeFeature{api.RuntimePointerFieldPath},
+		},
+		{
+			name:    "duplicate feature",
+			symbols: map[api.RuntimeSymbol]struct{}{api.RuntimePointer: {}},
+			features: []api.RuntimeFeature{
+				api.RuntimePointerFieldPath,
+				api.RuntimePointerFieldPath,
+			},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, err := AssemblePackage(
+				tsgo.NewFactory(),
+				testScalarABI(t, api.IntegerRepresentationNumber),
+				api.ConcurrencySemanticsDisabled,
+				testCase.symbols,
+				testCase.features,
+				nil,
+			)
+			if err == nil {
+				t.Fatal("invalid runtime feature ownership was accepted")
+			}
+		})
+	}
+}
+
 func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
 	factory := tsgo.NewFactory()
 	without, err := AssemblePackage(
 		factory,
 		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsCooperative,
+		nil,
 		nil,
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)
@@ -130,6 +168,7 @@ func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
 		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsCooperative,
 		map[api.RuntimeSymbol]struct{}{api.RuntimeAwaitable: {}},
+		nil,
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)
 	if err != nil {

@@ -12,6 +12,8 @@ const (
 	ProjectName      = "project"
 	ViewName         = "view"
 	FieldName        = "field"
+	FieldsName       = "fields"
+	ChildName        = "child"
 	ObjectFieldName  = "objectField"
 	ElementName      = "element"
 	IndexName        = "index"
@@ -25,6 +27,7 @@ const (
 )
 
 type Capabilities struct {
+	FieldPath    bool
 	Region       bool
 	UnsafeMemory bool
 	Projection   bool
@@ -88,6 +91,9 @@ func BuildWithCapabilities(
 		target.viewMethod(),
 		target.valueGetter(),
 		target.valueSetter(),
+	}
+	if capabilities.FieldPath {
+		members = append(members, target.fieldsMethod())
 	}
 	if capabilities.Projection {
 		members = append(members, target.projectMethod())

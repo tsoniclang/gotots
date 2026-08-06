@@ -11,6 +11,7 @@ import (
 func buildPointer(
 	factory tsgo.Factory,
 	symbols []api.RuntimeSymbol,
+	fieldPath bool,
 ) ([]Definition, error) {
 	if len(symbols) == 0 || symbols[0] != api.RuntimePointer {
 		return nil, &AssemblyError{
@@ -56,6 +57,7 @@ func buildPointer(
 			panicContract.ExportedName(),
 			denseIndexContract.ExportedName(),
 			pointerruntime.Capabilities{
+				FieldPath: fieldPath,
 				Projection: slices.Contains(
 					symbols,
 					api.RuntimePointerProjection,

@@ -68,7 +68,7 @@ func (b builder) fieldMethod() tsgo.MethodDeclaration {
 	)
 	address := b.call(
 		b.id(b.className),
-		"child",
+		ChildName,
 		b.property(b.id("parent"), AddressName),
 		b.id("key"),
 	)
@@ -110,7 +110,7 @@ func (b builder) objectFieldMethod() tsgo.MethodDeclaration {
 		tsgo.NodeFlagsNone,
 	)
 	root := b.call(b.id(b.className), "root", b.id("owner"))
-	address := b.call(b.id(b.className), "child", root, b.id("key"))
+	address := b.call(b.id(b.className), ChildName, root, b.id("key"))
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		ObjectFieldName,
@@ -199,7 +199,7 @@ func (b builder) elementMethod() tsgo.MethodDeclaration {
 				typeS,
 				b.call(
 					b.id(b.className),
-					"child",
+					ChildName,
 					b.call(b.id(b.className), "root", backing),
 					index,
 				),
@@ -300,7 +300,7 @@ func (b builder) indexMethod() tsgo.MethodDeclaration {
 				typeS,
 				b.call(
 					b.id(b.className),
-					"child",
+					ChildName,
 					b.property(b.id("selected"), AddressName),
 					b.id("numericIndex"),
 				),

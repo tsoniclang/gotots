@@ -25,6 +25,7 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 			api.RuntimeSlice:         {},
 			api.RuntimeUnsafePointer: {},
 		},
+		nil,
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)
 	if err != nil {
@@ -87,6 +88,7 @@ func TestDenseIndexDistinguishesNilValueFromAbsentStorage(t *testing.T) {
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeDenseIndex: {},
 		},
+		nil,
 		nil,
 	)
 	if err != nil {

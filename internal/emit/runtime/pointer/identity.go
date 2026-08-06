@@ -6,7 +6,7 @@ func (b builder) logicalProperty() tsgo.PropertyDeclaration {
 	identityType := b.factory.FunctionTypeNode(
 		nil,
 		[]tsgo.ParameterDeclaration{
-			b.parameter("value", b.typeL()),
+			b.parameter("v", b.typeL()),
 		},
 		b.typeL(),
 	)
@@ -14,9 +14,8 @@ func (b builder) logicalProperty() tsgo.PropertyDeclaration {
 		[]tsgo.ModifierLike{
 			b.factory.DeclareKeyword(),
 			b.factory.PrivateKeyword(),
-			b.factory.ReadonlyKeyword(),
 		},
-		b.id("logical"),
+		b.id("type"),
 		nil,
 		identityType,
 		nil,
@@ -132,8 +131,8 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 			privateReadonly,
 			nil,
 			b.id(RegionName),
-			nil,
-			b.optionalRegionType(b.typeS()),
+			b.factory.QuestionToken(),
+			b.regionType(b.typeS()),
 			nil,
 		))
 	}
@@ -228,10 +227,9 @@ func (b builder) childMethod() tsgo.MethodDeclaration {
 	childrenProperty := b.property(b.id(b.className), "children")
 	return b.method(
 		[]tsgo.ModifierLike{
-			b.factory.PrivateKeyword(),
 			b.factory.StaticKeyword(),
 		},
-		"child",
+		ChildName,
 		nil,
 		[]tsgo.ParameterDeclaration{
 			b.parameter("parent", b.objectType()),

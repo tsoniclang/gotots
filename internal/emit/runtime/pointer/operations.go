@@ -27,23 +27,20 @@ func (b builder) equalMethod() tsgo.MethodDeclaration {
 	)
 	left := b.id("left")
 	right := b.id("right")
-	bothDefined := b.binary(
-		b.binary(
-			left,
-			tsgo.BinaryOperatorExclamationEqualsEqualsToken,
-			b.undefined(),
-		),
-		tsgo.BinaryOperatorAmpersandAmpersandToken,
-		b.binary(
-			right,
-			tsgo.BinaryOperatorExclamationEqualsEqualsToken,
-			b.undefined(),
-		),
-	)
 	sameAddress := b.binary(
-		b.property(left, AddressName),
+		b.factory.PropertyAccessExpression(
+			left,
+			b.factory.QuestionDotToken(),
+			b.id(AddressName),
+			tsgo.NodeFlagsOptionalChain,
+		),
 		tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-		b.property(right, AddressName),
+		b.factory.PropertyAccessExpression(
+			right,
+			b.factory.QuestionDotToken(),
+			b.id(AddressName),
+			tsgo.NodeFlagsOptionalChain,
+		),
 	)
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
@@ -61,17 +58,9 @@ func (b builder) equalMethod() tsgo.MethodDeclaration {
 		b.booleanType(),
 		b.factory.ReturnStatement(
 			b.binary(
-				b.binary(
-					left,
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-					right,
-				),
+				b.binary(left, tsgo.BinaryOperatorEqualsEqualsEqualsToken, right),
 				tsgo.BinaryOperatorBarBarToken,
-				b.binary(
-					bothDefined,
-					tsgo.BinaryOperatorAmpersandAmpersandToken,
-					sameAddress,
-				),
+				sameAddress,
 			),
 		),
 	)
@@ -253,8 +242,8 @@ func (b builder) valueSetter() tsgo.SetAccessorDeclaration {
 func (b builder) newPointer(
 	logicalType tsgo.TypeNode,
 	storageType tsgo.TypeNode,
-	address tsgo.Expression,
-	read tsgo.Expression,
+	address tsgo.ConciseBody,
+	read tsgo.ConciseBody,
 	write tsgo.Expression,
 ) tsgo.NewExpression {
 	return b.newPointerWithRegion(
@@ -270,19 +259,17 @@ func (b builder) newPointer(
 func (b builder) newPointerWithRegion(
 	logicalType tsgo.TypeNode,
 	storageType tsgo.TypeNode,
-	address tsgo.Expression,
-	read tsgo.Expression,
+	address tsgo.ConciseBody,
+	read tsgo.ConciseBody,
 	write tsgo.Expression,
 	region tsgo.Expression,
 ) tsgo.NewExpression {
-	return b.newPointerWithWriteBodyAndRegion(
+	return b.newPointerWithAccessBodies(
 		logicalType,
 		storageType,
 		address,
 		read,
-		[]tsgo.Statement{b.factory.ExpressionStatement(
-			b.assign(write, b.id("next")),
-		)},
+		b.assign(write, b.id("next")),
 		region,
 	)
 }
@@ -290,16 +277,16 @@ func (b builder) newPointerWithRegion(
 func (b builder) newPointerWithWrite(
 	logicalType tsgo.TypeNode,
 	storageType tsgo.TypeNode,
-	address tsgo.Expression,
-	read tsgo.Expression,
-	write tsgo.Expression,
+	address tsgo.ConciseBody,
+	read tsgo.ConciseBody,
+	write tsgo.ConciseBody,
 ) tsgo.NewExpression {
-	return b.newPointerWithWriteBodyAndRegion(
+	return b.newPointerWithAccessBodies(
 		logicalType,
 		storageType,
 		address,
 		read,
-		[]tsgo.Statement{b.factory.ExpressionStatement(write)},
+		write,
 		nil,
 	)
 }
@@ -307,8 +294,8 @@ func (b builder) newPointerWithWrite(
 func (b builder) newPointerWithWriteBody(
 	logicalType tsgo.TypeNode,
 	storageType tsgo.TypeNode,
-	address tsgo.Expression,
-	read tsgo.Expression,
+	address tsgo.ConciseBody,
+	read tsgo.ConciseBody,
 	write []tsgo.Statement,
 ) tsgo.NewExpression {
 	return b.newPointerWithWriteBodyAndRegion(
@@ -324,9 +311,27 @@ func (b builder) newPointerWithWriteBody(
 func (b builder) newPointerWithWriteBodyAndRegion(
 	logicalType tsgo.TypeNode,
 	storageType tsgo.TypeNode,
-	address tsgo.Expression,
-	read tsgo.Expression,
+	address tsgo.ConciseBody,
+	read tsgo.ConciseBody,
 	write []tsgo.Statement,
+	region tsgo.Expression,
+) tsgo.NewExpression {
+	return b.newPointerWithAccessBodies(
+		logicalType,
+		storageType,
+		address,
+		read,
+		b.factory.Block(write, true),
+		region,
+	)
+}
+
+func (b builder) newPointerWithAccessBodies(
+	logicalType tsgo.TypeNode,
+	storageType tsgo.TypeNode,
+	address tsgo.ConciseBody,
+	read tsgo.ConciseBody,
+	write tsgo.ConciseBody,
 	region tsgo.Expression,
 ) tsgo.NewExpression {
 	addressArrow := b.factory.ArrowFunction(
@@ -335,7 +340,7 @@ func (b builder) newPointerWithWriteBodyAndRegion(
 		nil,
 		nil,
 		b.factory.EqualsGreaterThanToken(),
-		b.factory.ParenthesizedExpression(address),
+		address,
 	)
 	readArrow := b.factory.ArrowFunction(
 		nil,
@@ -343,10 +348,7 @@ func (b builder) newPointerWithWriteBodyAndRegion(
 		nil,
 		nil,
 		b.factory.EqualsGreaterThanToken(),
-		b.factory.Block(
-			[]tsgo.Statement{b.factory.ReturnStatement(read)},
-			true,
-		),
+		read,
 	)
 	writeArrow := b.factory.ArrowFunction(
 		nil,
@@ -356,13 +358,10 @@ func (b builder) newPointerWithWriteBodyAndRegion(
 		},
 		nil,
 		b.factory.EqualsGreaterThanToken(),
-		b.factory.Block(write, true),
+		write,
 	)
 	arguments := []tsgo.Expression{addressArrow, readArrow, writeArrow}
-	if b.capabilities.Region {
-		if region == nil {
-			region = b.undefined()
-		}
+	if b.capabilities.Region && region != nil {
 		arguments = append(arguments, region)
 	}
 	return b.factory.NewExpression(

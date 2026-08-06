@@ -126,6 +126,27 @@ func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
 	}
 }
 
+func TestPointerFieldPathIsAnOptionalClassFeature(t *testing.T) {
+	definitions, err := BuildWithFeatures(
+		tsgo.NewFactory(),
+		api.RuntimeModulePointer,
+		[]api.RuntimeSymbol{api.RuntimePointer},
+		[]api.RuntimeFeature{api.RuntimePointerFieldPath},
+		api.ConcurrencySemanticsDisabled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 1 ||
+		definitions[0].Symbol() != api.RuntimePointer {
+		t.Fatalf("pointer field-path definitions = %#v", definitions)
+	}
+	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
+	if !ok || len(class.Members()) != 21 {
+		t.Fatalf("pointer field-path owner = %#v", definitions[0])
+	}
+}
+
 func TestUnsafePointerRuntimeHasCodecAndMemoryOwner(t *testing.T) {
 	definitions, err := Build(
 		tsgo.NewFactory(),

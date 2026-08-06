@@ -92,6 +92,7 @@ func AssemblePackage(
 	scalar api.ScalarABI,
 	concurrency api.ConcurrencySemantics,
 	requested map[api.RuntimeSymbol]struct{},
+	features []api.RuntimeFeature,
 	aliases []api.PrimitiveAlias,
 ) (Package, error) {
 	if !scalar.Valid() {
@@ -120,7 +121,25 @@ func AssemblePackage(
 	if err != nil {
 		return Package{}, err
 	}
-	if len(closed) == 0 && len(aliases) == 0 {
+	features = slices.Clone(features)
+	slices.Sort(features)
+	featuresByModule := make(map[api.RuntimeModule][]api.RuntimeFeature)
+	for index, feature := range features {
+		module, ok := api.RuntimeFeatureModule(feature)
+		if !ok {
+			return Package{}, &AssemblyError{
+				Reason: "runtime package feature is invalid",
+			}
+		}
+		if index != 0 && feature == features[index-1] {
+			return Package{}, &AssemblyError{
+				Module: module,
+				Reason: "runtime package feature is duplicated",
+			}
+		}
+		featuresByModule[module] = append(featuresByModule[module], feature)
+	}
+	if len(closed) == 0 && len(aliases) == 0 && len(features) == 0 {
 		return Package{}, nil
 	}
 	byModule := make(map[api.RuntimeModule][]api.RuntimeSymbol)
@@ -146,6 +165,14 @@ func AssemblePackage(
 	for module := range byModule {
 		modules = append(modules, module)
 	}
+	for module := range featuresByModule {
+		if len(byModule[module]) == 0 {
+			return Package{}, &AssemblyError{
+				Module: module,
+				Reason: "runtime feature has no selected owner symbol",
+			}
+		}
+	}
 	sort.Slice(modules, func(left, right int) bool {
 		return modules[left] < modules[right]
 	})
@@ -153,10 +180,11 @@ func AssemblePackage(
 	statements := make([]tsgo.Statement, 0, len(aliases)+1)
 	if symbols := byModule[api.RuntimeModuleScalar]; len(symbols) != 0 {
 		slices.Sort(symbols)
-		definitions, err := Build(
+		definitions, err := BuildWithFeatures(
 			factory,
 			api.RuntimeModuleScalar,
 			symbols,
+			featuresByModule[api.RuntimeModuleScalar],
 			concurrency,
 		)
 		if err != nil {
@@ -201,7 +229,13 @@ func AssemblePackage(
 		}
 		symbols := byModule[module]
 		slices.Sort(symbols)
-		definitions, err := Build(factory, module, symbols, concurrency)
+		definitions, err := BuildWithFeatures(
+			factory,
+			module,
+			symbols,
+			featuresByModule[module],
+			concurrency,
+		)
 		if err != nil {
 			return Package{}, err
 		}

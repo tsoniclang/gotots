@@ -768,6 +768,19 @@ safe/unsafe alias synchronization, and rebinding of an exposed carrier.
 Deterministic structure checks prove that pointer creation cannot perform
 address-map operations until an identity boundary is reached.
 
+Field-path fixtures include two- and three-level aggregates, promoted fields,
+whole-root replacement after taking an interior address, and pointer-valued
+intermediate fields. Artifact checks require one location per maximal carrier
+segment, require one root access plus one direct projection, and reject
+restored nested field-location construction.
+
+Runtime-feature tests exact-join the final feature requests to assembled class
+members. A no-flat-path control retains the prior pointer member count, while a
+flat-path fixture adds exactly the field-path member without adding an import
+or standalone runtime definition. Dropping the request, emitting the member
+unconditionally, or retaining a request from a replaced artifact fails its
+owning gate and the generated-size/node bounds.
+
 An equivalence envelope requires product-level evidence. For an internal hash,
 tests prove equal-input stability, unequal-input behavior over an adversarial
 corpus, streaming/one-shot agreement when exposed, collision-safe consumer

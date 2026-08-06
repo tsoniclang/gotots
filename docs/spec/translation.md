@@ -436,6 +436,14 @@ carrier does not touch the address-token maps. Field, index, and representation
 views compose the parent's active typed access functions instead of re-entering
 the public value accessor. An unsafe boundary replaces those active functions
 on only the exposed carrier while retaining its original raw storage access.
+Nested selectors whose address remains in one carrier representation lower to
+one root-linked location with typed direct property projections. For example,
+`&outer.middle.value` reads and writes `root.middle.value` through the current
+root storage and derives the lazy identity `root -> middle -> value`; it does
+not allocate nested field-location carriers. A representation boundary ends
+the projection and starts a new exact location segment. Encountering the flat
+segment records the typed pointer field-path runtime feature; programs without
+such a segment do not emit the supporting class member.
 
 ### Interfaces
 

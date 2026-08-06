@@ -178,6 +178,30 @@ func TestRuntimeContractDoesNotExposeDependencyBacking(t *testing.T) {
 	}
 }
 
+func TestRuntimeFeatureContractIsPinnedAndImportFree(t *testing.T) {
+	module, ok := api.RuntimeFeatureModule(api.RuntimePointerFieldPath)
+	if !ok || module != api.RuntimeModulePointer ||
+		api.RuntimePointerFieldPath != 1 {
+		t.Fatalf("pointer field-path feature = %d/%d/%t", api.RuntimePointerFieldPath, module, ok)
+	}
+	request, err := api.NewRuntimeFeatureRequest(api.RuntimePointerFieldPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	feature, ok := request.RuntimeFeature()
+	if request.Kind() != api.RootRequestRuntimeFeature ||
+		request.LegalScope() != api.ScopeCompilationSupport ||
+		request.Execution() != api.ExecutionStatic ||
+		!ok || feature != api.RuntimePointerFieldPath ||
+		request.ModulePath() != "" || request.ExportedName() != "" ||
+		request.Specifier() != nil {
+		t.Fatalf("runtime feature request = %#v", request)
+	}
+	if _, err := api.NewRuntimeFeatureRequest(api.RuntimeFeatureInvalid); err == nil {
+		t.Fatal("invalid runtime feature was accepted")
+	}
+}
+
 func TestRuntimeClassRequestAllowsTypeUseAndRejectsHelperTypeUse(t *testing.T) {
 	factory := tsgo.NewFactory()
 	request, err := api.NewRuntimeImportRequest(

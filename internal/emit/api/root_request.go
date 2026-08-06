@@ -15,6 +15,7 @@ const (
 	RootRequestImport
 	RootRequestDeclarationRequirement
 	RootRequestArtifactDependency
+	RootRequestRuntimeFeature
 )
 
 type PlacementScope uint8
@@ -57,6 +58,7 @@ type RootRequestOwner struct {
 	exportedName           string
 	declarationRequirement DeclarationRequirement
 	artifactDependency     ArtifactDependency
+	runtimeFeature         RuntimeFeature
 }
 
 type rootRequestPayload struct {
@@ -457,21 +459,21 @@ func (r RootRequest) LegalScope() PlacementScope {
 	if r.payload == nil {
 		return ScopeInvalid
 	}
-	if r.payload.owner.kind == RootRequestImport {
+	switch r.payload.owner.kind {
+	case RootRequestImport:
 		return ScopeFileImports
-	}
-	if r.payload.owner.kind == RootRequestDeclarationRequirement {
-		if artifact, ok := r.payload.owner.declarationRequirement.
-			GeneratedArtifact(); ok &&
-			(artifact.Placement() ==
-				GeneratedArtifactPlacementCompilation ||
-				artifact.Placement() ==
-					GeneratedArtifactPlacementContract) {
+	case RootRequestRuntimeFeature:
+		return ScopeCompilationSupport
+	case RootRequestDeclarationRequirement:
+		artifact, ok := r.payload.owner.declarationRequirement.GeneratedArtifact()
+		if ok && (artifact.Placement() == GeneratedArtifactPlacementCompilation ||
+			artifact.Placement() == GeneratedArtifactPlacementContract) {
 			return ScopeCompilationSupport
 		}
 		return ScopeOwningFile
+	default:
+		return ScopeInvalid
 	}
-	return ScopeInvalid
 }
 
 func (r RootRequest) PreferredScope() PlacementScope {
@@ -482,13 +484,12 @@ func (r RootRequest) Execution() ExecutionConstraint {
 	if r.payload == nil {
 		return ExecutionInvalid
 	}
-	if r.payload.owner.kind == RootRequestImport {
+	switch r.payload.owner.kind {
+	case RootRequestImport, RootRequestDeclarationRequirement, RootRequestRuntimeFeature:
 		return ExecutionStatic
+	default:
+		return ExecutionInvalid
 	}
-	if r.payload.owner.kind == RootRequestDeclarationRequirement {
-		return ExecutionStatic
-	}
-	return ExecutionInvalid
 }
 
 func (r RootRequest) Owner() RootRequestOwner {

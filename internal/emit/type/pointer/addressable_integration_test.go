@@ -27,9 +27,20 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 		t.Fatal(err)
 	}
 	target := string(printed)
+	runtimeSource, err := os.ReadFile(
+		filepath.Join(workingDirectory, "runtime", "pointer.ts"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(runtimeSource), "static fields<") != 1 ||
+		strings.Contains(string(runtimeSource), "function goPointerFields") {
+		t.Fatalf("pointer field-path runtime ownership is invalid:\n%s", runtimeSource)
+	}
 	for _, required := range []string{
 		"GoPointer.cell",
 		"GoPointer.field",
+		"GoPointer.fields",
 		"GoPointer.index",
 		"goSliceAddress",
 		"value$storage",
@@ -55,6 +66,40 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 	} {
 		if strings.Contains(target, forbidden) {
 			t.Fatalf("addressable pointer artifact contains %q:\n%s", forbidden, target)
+		}
+	}
+	for _, fieldPath := range []struct {
+		name           string
+		path           string
+		directBoundary string
+	}{
+		{name: "NestedField", path: "$go$storage.Box.Count"},
+		{
+			name:           "DeepField",
+			path:           "$go$storage.Box.Count",
+			directBoundary: "GoPointer.objectField<Container",
+		},
+	} {
+		body := exportedFunction(t, target, fieldPath.name)
+		if strings.Count(body, "GoPointer.fields") != 2 ||
+			strings.Contains(body, "GoPointer.field<") ||
+			!strings.Contains(body, fieldPath.path) ||
+			!strings.Contains(
+				body,
+				"$go$storage => $go$storage.Box.Count",
+			) ||
+			!strings.Contains(
+				body,
+				"($go$storage, $go$next) => "+
+					"$go$storage.Box.Count = $go$next",
+			) ||
+			(fieldPath.directBoundary != "" &&
+				!strings.Contains(body, fieldPath.directBoundary)) {
+			t.Fatalf(
+				"%s did not use one flat location per address:\n%s",
+				fieldPath.name,
+				body,
+			)
 		}
 	}
 
@@ -90,6 +135,7 @@ import {
     NewPointer,
     NewSlice,
     NewStruct,
+    DeepField,
     NestedField,
     NilPointerReceiver,
     MultipleResult,
@@ -129,6 +175,7 @@ if (closure === undefined) {
 console.log(closure(), closure());
 console.log(...Field(30));
 console.log(...NestedField(35));
+console.log(...DeepField(36));
 console.log(...Array(40));
 console.log(...ArrayThroughPointer(45));
 try {
@@ -381,6 +428,7 @@ func main() {
     fmt.Println(closure(), closure())
     fmt.Println(pointer.Field(30))
     fmt.Println(pointer.NestedField(35))
+    fmt.Println(pointer.DeepField(36))
     fmt.Println(pointer.Array(40))
     fmt.Println(pointer.ArrayThroughPointer(45))
     arrayAddressPanicked := false
@@ -472,6 +520,20 @@ func addressablePointerProjectDirectory() string {
 		"pointer",
 		"addressable",
 	)
+}
+
+func exportedFunction(t *testing.T, source string, name string) string {
+	t.Helper()
+	start := strings.Index(source, "export function "+name+"(")
+	if start < 0 {
+		t.Fatalf("exported function %s is absent", name)
+	}
+	remainder := source[start:]
+	end := strings.Index(remainder[1:], "\nexport function ")
+	if end < 0 {
+		return remainder
+	}
+	return remainder[:end+1]
 }
 
 func compileAddressablePointerProject(

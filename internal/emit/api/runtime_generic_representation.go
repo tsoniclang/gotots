@@ -9,6 +9,36 @@ import (
 )
 
 type RuntimeSymbol = runtimecontract.RuntimeSymbol
+type RuntimeFeature = runtimecontract.RuntimeFeature
+
+const (
+	RuntimeFeatureInvalid   = runtimecontract.RuntimeFeatureInvalid
+	RuntimePointerFieldPath = runtimecontract.RuntimePointerFieldPath
+)
+
+func RuntimeFeatureModule(
+	feature RuntimeFeature,
+) (RuntimeModule, bool) {
+	return runtimecontract.RuntimeFeatureModule(feature)
+}
+
+func NewRuntimeFeatureRequest(feature RuntimeFeature) (RootRequest, error) {
+	if _, ok := RuntimeFeatureModule(feature); !ok {
+		return RootRequest{}, &RootRequestError{Reason: "runtime feature is invalid"}
+	}
+	owner := RootRequestOwner{
+		kind: RootRequestRuntimeFeature, runtimeFeature: feature,
+	}
+	return RootRequest{payload: &rootRequestPayload{owner: owner}}, nil
+}
+
+func (r RootRequest) RuntimeFeature() (RuntimeFeature, bool) {
+	if r.payload == nil || r.payload.owner.kind != RootRequestRuntimeFeature ||
+		r.payload.owner.runtimeFeature == RuntimeFeatureInvalid {
+		return RuntimeFeatureInvalid, false
+	}
+	return r.payload.owner.runtimeFeature, true
+}
 
 const (
 	RuntimeInvalid                    = runtimecontract.RuntimeInvalid
