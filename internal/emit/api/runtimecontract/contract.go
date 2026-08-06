@@ -436,6 +436,20 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimePanic,
 		), nil
+	case RuntimeIntegerNormalizeSigned64:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goInt64",
+			false,
+		), nil
+	case RuntimeIntegerNormalizeUnsigned64:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goUint64",
+			false,
+		), nil
 	case RuntimeFloat32Round:
 		return runtimeContract(
 			RuntimeModuleFloat,

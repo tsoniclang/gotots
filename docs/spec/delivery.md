@@ -202,6 +202,10 @@ selection: provider source contains no import of `@gotots/runtime/scalars.js`,
 and its certificate pins the provider representation plus native width.
 Linked-product proof executes both equal-carrier and converting facades and
 rejects stale or mismatched provider scalar contracts before target sealing.
+Runtime parity is certified only under a profile that can preserve every
+reached integer-dependent identity and control decision. If the product reaches
+exact 64-bit arithmetic, the runtime replay selects `bigint`; a successful
+`number` typecheck is not runtime-equivalence evidence.
 
 ## 9. Product Proof
 

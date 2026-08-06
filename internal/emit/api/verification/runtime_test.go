@@ -67,6 +67,8 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeIntegerMin, 603, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerMin", false, nil},
 		{api.RuntimeNumberIntDivide, 604, api.RuntimeModuleInteger, "runtime/integer.ts", "goNumberIntegerDivide", false, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeNumberIntRemainder, 605, api.RuntimeModuleInteger, "runtime/integer.ts", "goNumberIntegerRemainder", false, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeIntegerNormalizeSigned64, 606, api.RuntimeModuleInteger, "runtime/integer.ts", "goInt64", false, nil},
+		{api.RuntimeIntegerNormalizeUnsigned64, 607, api.RuntimeModuleInteger, "runtime/integer.ts", "goUint64", false, nil},
 		{api.RuntimeFloat32Round, 700, api.RuntimeModuleFloat, "runtime/float.ts", "goFloat32", false, nil},
 		{api.RuntimeComplex64, 800, api.RuntimeModuleComplex, "runtime/complex.ts", "GoComplex64", true, []api.RuntimeSymbol{api.RuntimeFloat32Round}},
 		{api.RuntimeComplex128, 801, api.RuntimeModuleComplex, "runtime/complex.ts", "GoComplex128", true, nil},

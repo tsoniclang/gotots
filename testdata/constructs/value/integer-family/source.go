@@ -180,3 +180,30 @@ func CompareUnsigned(left, right uint64) (bool, bool, bool, bool, bool, bool) {
 		left > right,
 		left >= right
 }
+
+func BigOverflowBinary(unsigned uint64, signed int64) (uint64, uint64, uint64, int64, int64, int64) {
+	return unsigned + 1,
+		unsigned * 3,
+		unsigned << 1,
+		signed - 1,
+		-signed,
+		signed / -1
+}
+
+func BigOverflowUpdate(value uint64) (uint64, uint64, uint64) {
+	value += 1
+	added := value
+	value *= 3
+	multiplied := value
+	value++
+	return added, multiplied, value
+}
+
+func WideHash(value string) uint64 {
+	hash := uint64(14695981039346656037)
+	for index := 0; index < len(value); index++ {
+		hash ^= uint64(value[index])
+		hash *= 1099511628211
+	}
+	return hash
+}

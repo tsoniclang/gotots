@@ -213,6 +213,19 @@ collapse fails before printing. Both complete runtime packages are generated
 through TS-Go AST and strict-typechecked; artifacts must show source alias
 names unchanged and only their primitive carrier changed.
 
+The `bigint` profile additionally differentially proves fixed-width overflow
+for wide signed and unsigned binary operations, shifts, unary operations,
+division's minimum-value edge, compound assignments, and increments. Narrow
+number carriers remain direct and are checked against an artifact-shape gate.
+Artifact inspection requires normalization at the wide result owner, not at
+selected call sites, and requires exactly one demand-generated definition for
+each selected signedness rather than repeated intrinsic spellings. An
+independent source-available hash fixture must produce distinct, byte-exact Go
+hash values for multiple inputs; a mutation removing result normalization must
+collapse or change those keys and fail before product runtime certification.
+The same fixture under `number` is recorded as profile boundary evidence,
+never as parity.
+
 Embed fixtures exact-join parsed directives, selected toolchain patterns,
 selected files, variable identities, and immutable payload bytes. They cover
 quoted names, ordinary versus overlapping `all:` trees, string, byte-slice,

@@ -108,6 +108,15 @@ func Apply(
 		operator,
 	); ok {
 		result, err := callRuntime(context, symbol, left, right)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		result, err = normalizeExactResult(
+			context,
+			operator,
+			carrier,
+			result,
+		)
 		return result, true, err
 	}
 	rightValue := right.Value()
@@ -133,10 +142,48 @@ func Apply(
 	if !ok {
 		return api.ExpressionEmission{}, false, nil
 	}
-	return api.DirectExpression(
+	result := api.DirectExpression(
 		target,
 		api.CombineRequests(left.Requests(), right.Requests())...,
-	), true, nil
+	)
+	result, err := normalizeExactResult(
+		context,
+		operator,
+		carrier,
+		result,
+	)
+	return result, true, err
+}
+
+func normalizeExactResult(
+	context api.Context,
+	operator token.Token,
+	carrier integervalue.Carrier,
+	result api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if !integervalue.UsesBigInt(
+		context.IntegerRepresentation(),
+		carrier,
+	) ||
+		isComparison(operator) {
+		return result, nil
+	}
+	normalized, err := integervalue.NormalizeFixedWidth(
+		context,
+		carrier,
+		result.Value(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.NewExpressionEmission(
+		result.Before(),
+		normalized.Value(),
+		api.CombineRequests(
+			result.Requests(),
+			normalized.Requests(),
+		),
+	)
 }
 
 func alignShiftCount(

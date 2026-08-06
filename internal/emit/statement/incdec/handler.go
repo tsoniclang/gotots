@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -48,7 +49,8 @@ func EmitExpression(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	if basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) &&
+	if !integervalue.TypeUsesBigInt(context, target.SourceType()) &&
+		basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) &&
 		!target.IsAccessor() &&
 		!target.IsProperty() &&
 		(!target.UsesCanonicalStorage() ||

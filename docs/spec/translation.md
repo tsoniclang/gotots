@@ -262,6 +262,23 @@ uses `bigint` where required. No runtime marker compensates for missing
 semantics. Integer overflow not preserved by the default profile is a declared
 profile tradeoff, not silently described as exact.
 
+The `bigint` profile is exact for operations whose selected carrier is
+`bigint`. Their arithmetic, bitwise, shift, unary, compound-assignment, and
+increment results are normalized to the selected Go width before they become
+observable. The demand-generated `goInt64` and `goUint64` runtime operations
+are the only wide-result wrappers; each delegates to the corresponding
+`globalThis.BigInt.asIntN` or `asUintN` operation. For example, `uint64(max) +
+1` emits `goUint64(max + 1n)` and produces zero. Narrower aliases retain direct
+`number` operations and the declared number-carrier overflow tradeoff; the
+profile does not add wrappers to ordinary `int32` expressions. This policy is
+owned by the integer value family and is never selected by package, function,
+or identifier spelling.
+
+A product whose reached behavior depends on exact wide-integer values, such as
+a hash used as a cache identity, cannot claim runtime parity under the
+`number` profile. It must select `bigint` explicitly. GoToTS neither changes a
+profile heuristically nor adds a local override for the reached package.
+
 The alias name always follows the selected Go type, while the carrier follows
 the profile and selected native width:
 

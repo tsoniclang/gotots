@@ -184,7 +184,7 @@ func SequenceTotal(sequence iter.Seq[int]) int {
 		"scalars.int64",
 		"let __gotots_range_index_0 = 0n",
 		"goIntegerMax",
-		"TimeDurationValueOperations.$wrap(-named_time.TimeDurationValueOperations.$project($argument0))",
+		"TimeDurationValueOperations.$wrap(goInt64(-named_time.TimeDurationValueOperations.$project($argument0)))",
 		"values.get(named_time.TimeDurationValueOperations.$project(index))",
 		"values.slice(named_time.TimeDurationValueOperations.$project(low), named_time.TimeDurationValueOperations.$project(high), null)",
 		"RuntimeSlice.make<int>(named_time.TimeDurationValueOperations.$project(length), null, 0)",

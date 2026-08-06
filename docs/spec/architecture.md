@@ -321,6 +321,18 @@ maps every integer alias to `number`. The `bigint` profile maps 64-bit aliases,
 including 64-bit native integers, to `bigint` and keeps narrower aliases as
 `number`. Generated output imports no unrelated compiler.
 
+Profile selection also fixes the overflow contract. The direct `number`
+profile retains its declared precision/overflow tradeoff. The explicit
+`bigint` profile normalizes every operation whose selected carrier is `bigint`
+to its Go width at the integer value owner. Narrower values retain direct
+`number` operations and the declared number-carrier overflow tradeoff. A
+reached identity, branch, index, or cache key that depends on exact 64-bit
+arithmetic therefore requires the `bigint` product profile; there is no
+package allowlist, adaptive representation heuristic, or hidden per-call
+profile. Wide-result normalization requests one of the two demand-generated
+integer runtime operations; repeated source sites do not duplicate the target
+intrinsic expression.
+
 Nil-capable values use `undefined` unless their family requires a distinct
 carrier. Zero, copy, equality, hashing, conversion, and mutation are each owned
 once by the value family. A class gains `$copy` only when the compilation

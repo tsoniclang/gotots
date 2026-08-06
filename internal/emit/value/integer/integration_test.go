@@ -83,45 +83,6 @@ func TestIntegerBigIntProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 	}
 }
 
-func assertBigIntDivisionUsesRuntime(
-	t *testing.T,
-	emission emit.ProgramEmission,
-) {
-	t.Helper()
-	function := targetFunction(
-		t,
-		integerFamilySourceFile(t, emission),
-		"BigSigned",
-	)
-	returned := function.Body().(tsgo.Block).
-		Statements()[0].(tsgo.ReturnStatement).
-		Expression().(tsgo.ArrayLiteralExpression).
-		Elements()
-	for index, expected := range []string{
-		"goIntegerDivide",
-		"goIntegerRemainder",
-	} {
-		call, ok := returned[index].(tsgo.CallExpression)
-		if !ok {
-			t.Fatalf(
-				"BigSigned result %d = %T, want %s runtime call",
-				index,
-				returned[index],
-				expected,
-			)
-		}
-		callee, calleeOK := call.Expression().(tsgo.Identifier)
-		if !calleeOK || callee.Text() != expected {
-			t.Fatalf(
-				"BigSigned result %d = %T, want %s runtime call",
-				index,
-				returned[index],
-				expected,
-			)
-		}
-	}
-}
-
 func TestIntegerNumberProfileEmitsWideConstantsWithoutWrapping(t *testing.T) {
 	loaded, err := load.One(context.Background(), load.Request{
 		Directory: integerBoundaryDirectory(),
