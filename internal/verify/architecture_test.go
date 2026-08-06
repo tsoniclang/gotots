@@ -132,6 +132,7 @@ func verifyProductionFile(relative string, sourcePath string) error {
 				!strings.HasPrefix(relative, "internal/contracts/externals/certify/") &&
 				!strings.HasPrefix(relative, "internal/contracts/gostdlib/certify/") &&
 				!strings.HasPrefix(relative, "internal/contracts/gostdlib/sourcecontract/") &&
+				relative != "internal/command/roots.go" &&
 				!strings.HasPrefix(relative, "internal/emit/") {
 				return &wallError{
 					source: relative,
@@ -556,22 +557,23 @@ func verifyStandaloneText(relative string, source []byte) error {
 func layerFor(relative string) int {
 	relative = filepath.ToSlash(relative)
 	switch {
-	case strings.HasPrefix(relative, "internal/load/"):
+	case strings.HasPrefix(relative, "internal/load/"),
+		strings.HasPrefix(relative, "internal/contracts/"),
+		strings.HasPrefix(relative, "internal/target/tsgo/"):
 		return 10
-	case strings.HasPrefix(relative, "internal/contracts/"):
-		return 10
-	case strings.HasPrefix(relative, "internal/target/tsgo/"):
-		return 10
-	case strings.HasPrefix(relative, "internal/output/"):
-		return 20
-	case strings.HasPrefix(relative, "internal/emit/api/"):
+	case strings.HasPrefix(relative, "internal/output/"),
+		strings.HasPrefix(relative, "internal/emit/api/"):
 		return 20
 	case filepath.Dir(relative) == "internal/emit":
 		return 40
 	case strings.HasPrefix(relative, "internal/emit/"):
 		return 30
-	case strings.HasPrefix(relative, "internal/verify/"):
+	case strings.HasPrefix(relative, "internal/config/"):
 		return 50
+	case strings.HasPrefix(relative, "internal/command/"):
+		return 60
+	case strings.HasPrefix(relative, "internal/verify/"):
+		return 70
 	default:
 		return 0
 	}

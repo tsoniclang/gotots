@@ -715,6 +715,11 @@ every semantic CLI switch and JSON field resolve through the same owner.
 Relocating unchanged source and implementation trees preserves the semantic
 digest; changing implementation bytes or its envelope changes it.
 
+The production `gotots build` command writes a canonical resolved project on
+request, emits every TypeScript file through pinned TS-Go, records the semantic
+digest and exact output membership in `gotots-manifest.json`, and runs the
+strict generated-project typecheck before reporting success.
+
 For each source implementation, certification independently inspects the
 selected Go package, the ordinary generated package assembly, and the authored
 strict TypeScript project. It exact-joins exported names and checked types,

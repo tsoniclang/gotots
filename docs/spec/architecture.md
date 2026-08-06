@@ -988,6 +988,15 @@ JSON, flags, paths, or environment variables. The semantic project digest
 includes build and compilation profiles plus implementation contract and
 source digests, but excludes output/report paths.
 
+Schema version 1 has the closed top-level sections `distribution`, `source`,
+`go`, `semantics`, `providers`, `implementations`, and `output`.
+`distribution.root` identifies the installed GoToTS distribution that owns the
+pinned TS-Go tool and checked providers; it is operational path evidence and is
+excluded from semantic identity. `source` selects one package pattern and root
+mode. `implementations.bundles` contains exact package-contract paths. Every
+field except `schemaVersion` has one registered CLI counterpart, including
+repeatable `--tag` and `--implementation-bundle` flags.
+
 A certified source implementation owns one exact source package's final target
 module. Certification joins canonical Go module, package, version, selected
 build profile, generated package surface, strict TypeScript export surface,
