@@ -22,6 +22,31 @@ func (b builder) unsafeMemoryType(storage tsgo.TypeNode) tsgo.TypeNode {
 
 func (b builder) unsafeMemoryMethod() tsgo.MethodDeclaration {
 	pointer := b.id("pointer")
+	raw := b.id("raw")
+	readSource := b.factory.ConditionalExpression(
+		b.binary(raw, tsgo.BinaryOperatorEqualsEqualsEqualsToken, b.undefined()),
+		b.factory.QuestionToken(),
+		b.property(pointer, "read"),
+		b.factory.ColonToken(),
+		b.factory.ElementAccessExpression(
+			raw,
+			nil,
+			b.factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+			tsgo.NodeFlagsNone,
+		),
+	)
+	writeSource := b.factory.ConditionalExpression(
+		b.binary(raw, tsgo.BinaryOperatorEqualsEqualsEqualsToken, b.undefined()),
+		b.factory.QuestionToken(),
+		b.property(pointer, "write"),
+		b.factory.ColonToken(),
+		b.factory.ElementAccessExpression(
+			raw,
+			nil,
+			b.factory.NumericLiteral("1", tsgo.TokenFlagsNone),
+			tsgo.NodeFlagsNone,
+		),
+	)
 	read := b.factory.ArrowFunction(
 		nil,
 		nil,
@@ -29,7 +54,7 @@ func (b builder) unsafeMemoryMethod() tsgo.MethodDeclaration {
 		nil,
 		b.factory.EqualsGreaterThanToken(),
 		b.factory.CallExpression(
-			b.property(pointer, "read"),
+			readSource,
 			nil,
 			nil,
 			nil,
@@ -44,7 +69,7 @@ func (b builder) unsafeMemoryMethod() tsgo.MethodDeclaration {
 		nil,
 		b.factory.EqualsGreaterThanToken(),
 		b.factory.CallExpression(
-			b.property(pointer, "write"),
+			writeSource,
 			nil,
 			nil,
 			[]tsgo.Expression{next},
@@ -62,6 +87,12 @@ func (b builder) unsafeMemoryMethod() tsgo.MethodDeclaration {
 			b.parameter("pointer", b.pointerType(b.typeL(), b.typeS())),
 		},
 		b.unsafeMemoryType(b.typeS()),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"raw",
+			nil,
+			b.property(pointer, unsafeRawName),
+		),
 		b.factory.ReturnStatement(b.factory.ArrayLiteralExpression(
 			[]tsgo.Expression{
 				b.property(pointer, AddressName),

@@ -390,7 +390,11 @@ when the checker and use contract prove direct representation exact.
 A carrier's location identity is canonical but demand-materialized: ordinary
 reads and writes do not allocate address tokens or populate identity maps.
 Equality, hashing, and unsafe conversion request the token and cache it on the
-carrier.
+carrier. Unsafe synchronization is installed into the active typed access
+functions only on the carrier that crosses the unsafe boundary. Selecting
+unsafe support must not add a branch to every ordinary pointer read and write;
+composed field and index locations call the parent's active access function
+directly.
 
 ### Unsafe Pointer Memory
 

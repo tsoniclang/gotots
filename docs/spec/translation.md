@@ -432,7 +432,10 @@ carrier name at the use site.
 
 Canonical address tokens are created lazily at pointer identity, hash, or
 unsafe boundaries. Constructing, reading, or writing an otherwise ordinary
-carrier does not touch the address-token maps.
+carrier does not touch the address-token maps. Field, index, and representation
+views compose the parent's active typed access functions instead of re-entering
+the public value accessor. An unsafe boundary replaces those active functions
+on only the exposed carrier while retaining its original raw storage access.
 
 ### Interfaces
 

@@ -760,10 +760,13 @@ allowlist, text patch, unchecked cast, duplicate signature store, or migrated
 scalar-pointer carrier on a certified pointee-value path.
 
 Pointer-runtime mutation tests require address construction to remain behind a
-lazy accessor. Differential fixtures compare repeated field addresses, pointer
-equality and hashing, writes through aliases, and safe/unsafe alias
-synchronization. Deterministic structure checks prove that pointer creation
-cannot perform address-map operations until an identity boundary is reached.
+lazy accessor, ordinary value access to contain no unsafe branch, and composed
+locations to call typed active access functions rather than recursively enter
+public accessors. Differential fixtures compare repeated field addresses,
+pointer equality and hashing, whole-parent replacement, writes through aliases,
+safe/unsafe alias synchronization, and rebinding of an exposed carrier.
+Deterministic structure checks prove that pointer creation cannot perform
+address-map operations until an identity boundary is reached.
 
 An equivalence envelope requires product-level evidence. For an internal hash,
 tests prove equal-input stability, unequal-input behavior over an adversarial

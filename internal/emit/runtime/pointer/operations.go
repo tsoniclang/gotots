@@ -211,53 +211,25 @@ func (b builder) directMethod() tsgo.MethodDeclaration {
 }
 
 func (b builder) valueGetter() tsgo.GetAccessorDeclaration {
-	statements := make([]tsgo.Statement, 0, 2)
-	if b.capabilities.UnsafeMemory {
-		statements = append(statements, b.unsafeSyncCall("0"))
-	}
-	statements = append(statements,
-		b.factory.ReturnStatement(
-			b.factory.CallExpression(
-				b.property(
-					b.factory.ThisExpression(),
-					"read",
-				),
-				nil,
-				nil,
-				nil,
-				tsgo.NodeFlagsNone,
-			),
-		),
-	)
 	return b.factory.GetAccessorDeclaration(
 		nil,
 		b.id(CellValueName),
 		nil,
 		nil,
 		b.typeS(),
-		b.factory.Block(statements, true),
+		b.factory.Block([]tsgo.Statement{b.factory.ReturnStatement(
+			b.factory.CallExpression(
+				b.property(b.factory.ThisExpression(), "read"),
+				nil,
+				nil,
+				nil,
+				tsgo.NodeFlagsNone,
+			),
+		)}, true),
 	)
 }
 
 func (b builder) valueSetter() tsgo.SetAccessorDeclaration {
-	statements := make([]tsgo.Statement, 0, 3)
-	if b.capabilities.UnsafeMemory {
-		statements = append(statements, b.unsafeSyncCall("0"))
-	}
-	statements = append(statements,
-		b.factory.ExpressionStatement(
-			b.factory.CallExpression(
-				b.property(b.factory.ThisExpression(), "write"),
-				nil,
-				nil,
-				[]tsgo.Expression{b.id("value")},
-				tsgo.NodeFlagsNone,
-			),
-		),
-	)
-	if b.capabilities.UnsafeMemory {
-		statements = append(statements, b.unsafeSyncCall("1"))
-	}
 	return b.factory.SetAccessorDeclaration(
 		nil,
 		b.id(CellValueName),
@@ -266,7 +238,15 @@ func (b builder) valueSetter() tsgo.SetAccessorDeclaration {
 			b.parameter("value", b.typeS()),
 		},
 		nil,
-		b.factory.Block(statements, true),
+		b.factory.Block([]tsgo.Statement{b.factory.ExpressionStatement(
+			b.factory.CallExpression(
+				b.property(b.factory.ThisExpression(), "write"),
+				nil,
+				nil,
+				[]tsgo.Expression{b.id("value")},
+				tsgo.NodeFlagsNone,
+			),
+		)}, true),
 	)
 }
 

@@ -188,8 +188,11 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		"static index<L, S, PL, O extends",
 		"static arrayRegion<L, T, S extends",
 		"static project<FL, FS, TL, TS>",
-		"fromSource(pointer.value)",
-		"pointer.value = toSource(next)",
+		"return parent.read()[key]",
+		"fromSource(pointer.read())",
+		"pointer.write(toSource(next))",
+		"private $go$rawAccess?: readonly",
+		"return this.read()",
 		"const numericIndex = globalThis.Number(index);",
 		"static equal<LL, LS, RL, RS>",
 		"static dereference<L, S>",
@@ -218,6 +221,7 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		"optionalStorage",
 		"elementView",
 		"indexView",
+		"$go$unsafeSync",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("pointer runtime contains %q:\n%s", forbidden, printed)

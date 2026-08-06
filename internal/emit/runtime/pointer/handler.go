@@ -21,7 +21,7 @@ const (
 	UnsafeMemoryName = "$go$unsafeMemory"
 	UnsafeViewName   = "$go$unsafeView"
 	UnsafeBindName   = "$go$unsafeBind"
-	unsafeSyncName   = "$go$unsafeSync"
+	unsafeRawName    = "$go$rawAccess"
 )
 
 type Capabilities struct {
@@ -98,7 +98,7 @@ func BuildWithCapabilities(
 	if capabilities.UnsafeMemory {
 		members = append(
 			members,
-			target.unsafeSyncProperty(),
+			target.unsafeRawProperty(),
 			target.unsafeBindMethod(),
 			target.unsafeMemoryMethod(),
 			target.unsafeViewMethod(),

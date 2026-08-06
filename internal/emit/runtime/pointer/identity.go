@@ -89,6 +89,10 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 		b.factory.PrivateKeyword(),
 		b.factory.ReadonlyKeyword(),
 	}
+	accessModifiers := privateReadonly
+	if b.capabilities.UnsafeMemory {
+		accessModifiers = []tsgo.ModifierLike{b.factory.PrivateKeyword()}
+	}
 	readType := b.factory.FunctionTypeNode(nil, nil, b.typeS())
 	writeType := b.factory.FunctionTypeNode(
 		nil,
@@ -107,7 +111,7 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 			nil,
 		),
 		b.factory.ParameterDeclaration(
-			privateReadonly,
+			accessModifiers,
 			nil,
 			b.id("read"),
 			nil,
@@ -115,7 +119,7 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 			nil,
 		),
 		b.factory.ParameterDeclaration(
-			privateReadonly,
+			accessModifiers,
 			nil,
 			b.id("write"),
 			nil,
