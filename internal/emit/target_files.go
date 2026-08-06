@@ -229,6 +229,25 @@ func (s *programSession) replaceSourceImplementations(
 		if err != nil {
 			return nil, sourceImplementationError(implementation.PackagePath(), err)
 		}
+		consumers := make([]sourcepackage.Consumer, len(replaced))
+		for index, file := range replaced {
+			consumers[index] = sourcepackage.Consumer{
+				OutputPath: file.outputPath,
+				SourceFile: file.sourceFile,
+			}
+		}
+		consumers, err = sourcepackage.RebindConsumers(
+			s.factory,
+			paths,
+			implementation,
+			consumers,
+		)
+		if err != nil {
+			return nil, sourceImplementationError(implementation.PackagePath(), err)
+		}
+		for index := range replaced {
+			replaced[index].sourceFile = consumers[index].SourceFile
+		}
 		filtered := make([]TargetFile, 0, len(replaced))
 		assemblyFound := false
 		for _, file := range replaced {
@@ -265,6 +284,15 @@ func (s *programSession) replaceSourceImplementations(
 			sourceFile:  implementation.SourceFile(),
 			kind:        TargetFileSourceImplementation,
 		})
+		for _, module := range implementation.PrivateModules() {
+			outputPath, _ := paths.SourcePath(module.GoFile())
+			filtered = append(filtered, TargetFile{
+				outputPath:  outputPath,
+				packageName: sourcePackage.Name(),
+				sourceFile:  module.SourceFile(),
+				kind:        TargetFileSourceImplementation,
+			})
+		}
 		replaced = filtered
 	}
 	return replaced, nil

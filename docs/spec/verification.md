@@ -717,17 +717,23 @@ digest; changing implementation bytes or its envelope changes it.
 
 The production `gotots build` command writes a canonical resolved project on
 request, emits every TypeScript file through pinned TS-Go, records the semantic
-digest and exact output membership in `gotots-manifest.json`, and runs the
-strict generated-project typecheck before reporting success.
+digest and exact output membership in `gotots-manifest.json`, declares the
+project ESM in a root `package.json`, and runs the strict generated-project
+typecheck before reporting success. Removing `type: module` must make a
+cooperative program with top-level await fail at that strict gate.
 
 For each source implementation, certification independently inspects the
 selected Go package, the ordinary generated package assembly, and the authored
 strict TypeScript project. It exact-joins exported names and checked types,
-parses the authored source through pinned TS-Go, and inspects the final target
-file set. Required mutations alter a Go signature, TypeScript export, package
-identity, build profile, source digest, or envelope; duplicate a generated and
-manual owner; retain one generated package file; or feed text directly to the
-output writer. Each fails at its owning gate.
+binds the build and compilation profiles, parses every authored module through
+pinned TS-Go, rebinds public generated imports to the package assembly, proves
+each residual private contract module body-free and exact by imported name,
+and inspects the final target file set. Required mutations alter a Go
+signature, TypeScript export, package identity, build or compilation profile,
+source digest, private module identity, or envelope; add an executable
+private-module statement;
+duplicate a generated and manual owner; retain one generated package file; or
+feed text directly to the output writer. Each fails at its owning gate.
 
 An equivalence envelope requires product-level evidence. For an internal hash,
 tests prove equal-input stability, unequal-input behavior over an adversarial

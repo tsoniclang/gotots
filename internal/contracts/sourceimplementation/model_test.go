@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/load"
@@ -30,6 +31,9 @@ export class Digest {}
 export function Sum(value: string): Digest { return new Digest(); }
 export function $initialize(): void {}
 `)
+	writeFixture(t, filepath.Join(implementation, "private.ts"), `import type { Digest } from "./package.js";
+export type DigestView = { value: Digest };
+`)
 	writeFixture(t, filepath.Join(implementation, "tsconfig.json"), `{
   "compilerOptions": {
     "target": "ES2022",
@@ -38,7 +42,7 @@ export function $initialize(): void {}
     "strict": true,
     "noEmit": true
   },
-  "include": ["package.ts"]
+	  "files": ["package.ts", "private.ts"]
 }
 `)
 	contract := Document{
@@ -54,10 +58,16 @@ export function $initialize(): void {}
 			GOARCH:     runtime.GOARCH,
 			CGOEnabled: false,
 		},
+		Compilation: CompilationDocument{
+			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+		},
 		Source:   "package.ts",
 		TSConfig: "tsconfig.json",
 		Envelope: EnvelopeDocument{Kind: EnvelopeExact},
 		Exports:  []string{"$initialize", "Digest", "Digest$Storage", "Sum"},
+		PrivateModules: []PrivateModuleDocument{{
+			GoFile: "fast.go", Source: "private.ts", Exports: []string{"DigestView"},
+		}},
 	}
 	payload, err := json.MarshalIndent(contract, "", "  ")
 	if err != nil {
@@ -81,6 +91,9 @@ export function $initialize(): void {}
 		Program:        program,
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".scratch"),
+		Compilation: CompilationDocument{
+			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -94,6 +107,32 @@ export function $initialize(): void {}
 		implementationRecord.SourceFile() == nil ||
 		implementationRecord.Envelope() != EnvelopeExact {
 		t.Fatal("verified implementation evidence is incomplete")
+	}
+	privateModules := implementationRecord.PrivateModules()
+	if len(privateModules) != 1 || privateModules[0].GoFile() != "fast.go" ||
+		privateModules[0].SourceFile() == nil {
+		t.Fatalf("private modules = %#v", privateModules)
+	}
+
+	writeFixture(t, filepath.Join(implementation, "private.ts"), `export type DigestView = { value: string };
+export const Marker = 1;
+`)
+	contract.PrivateModules[0].Exports = []string{"DigestView", "Marker"}
+	payload, err = json.MarshalIndent(contract, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFixture(t, contractPath, string(payload)+"\n")
+	if _, err := VerifyAll(Config{
+		RepositoryRoot: repository,
+		Program:        program,
+		ContractPaths:  []string{contractPath},
+		ScratchRoot:    filepath.Join(root, ".mutation-scratch"),
+		Compilation: CompilationDocument{
+			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+		},
+	}); err == nil || !strings.Contains(err.Error(), "is executable or unsupported") {
+		t.Fatalf("executable private-module error = %v", err)
 	}
 }
 

@@ -19,6 +19,8 @@ import (
 
 const buildManifestName = "gotots-manifest.json"
 
+const projectPackageName = "package.json"
+
 func programDigest(program *load.Program) (string, error) {
 	hash := sha256.New()
 	for _, sourcePackage := range program.Packages() {
@@ -61,7 +63,7 @@ func writeEmission(
 		return 0, err
 	}
 	files := emission.Files()
-	paths := make([]string, 0, len(files)+2)
+	paths := make([]string, 0, len(files)+3)
 	for _, file := range files {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
 		if err != nil {
@@ -88,6 +90,14 @@ func writeEmission(
 		paths = append(paths, runtimePackage.ManifestPath())
 	}
 	sort.Strings(paths)
+	packageDocument, err := encodeProjectPackage()
+	if err != nil {
+		return 0, err
+	}
+	if err := writeTargetFile(outputDirectory, projectPackageName, packageDocument); err != nil {
+		return 0, err
+	}
+	paths = append(paths, projectPackageName)
 	tsconfig, err := encodeTSConfig(project, outputDirectory)
 	if err != nil {
 		return 0, err
@@ -113,6 +123,21 @@ func writeEmission(
 		return 0, err
 	}
 	return len(paths), nil
+}
+
+func encodeProjectPackage() ([]byte, error) {
+	document := struct {
+		Private bool   `json:"private"`
+		Type    string `json:"type"`
+	}{
+		Private: true,
+		Type:    "module",
+	}
+	payload, err := json.MarshalIndent(document, "", "  ")
+	if err != nil {
+		return nil, commandError("encode package", err.Error())
+	}
+	return append(payload, '\n'), nil
 }
 
 func encodeTSConfig(project config.Project, outputDirectory string) ([]byte, error) {

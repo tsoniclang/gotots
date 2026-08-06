@@ -463,6 +463,16 @@ func (o Options) validate() error {
 			Reason: "certificate is invalid",
 		}
 	}
+	if o.SourceImplementations != nil && !o.SourceImplementations.SupportsCompilation(
+		o.IntegerRepresentation.String(),
+		o.EvaluationOrder.String(),
+		o.ConcurrencySemantics.String(),
+	) {
+		return &OptionsError{
+			Field:  "source implementations",
+			Reason: "certificate compilation profile differs",
+		}
+	}
 	return nil
 }
 

@@ -8,7 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 type EnvelopeKind string
 
@@ -23,13 +23,16 @@ func (k EnvelopeKind) Valid() bool {
 }
 
 type Document struct {
-	SchemaVersion int              `json:"schemaVersion"`
-	Package       PackageDocument  `json:"package"`
-	Build         BuildDocument    `json:"build"`
-	Source        string           `json:"source"`
-	TSConfig      string           `json:"tsconfig"`
-	Envelope      EnvelopeDocument `json:"equivalenceEnvelope"`
-	Exports       []string         `json:"exports"`
+	SchemaVersion        int                     `json:"schemaVersion"`
+	Package              PackageDocument         `json:"package"`
+	Build                BuildDocument           `json:"build"`
+	Compilation          CompilationDocument     `json:"compilation"`
+	Source               string                  `json:"source"`
+	TSConfig             string                  `json:"tsconfig"`
+	CertificationSources []string                `json:"certificationSources,omitempty"`
+	Envelope             EnvelopeDocument        `json:"equivalenceEnvelope"`
+	Exports              []string                `json:"exports"`
+	PrivateModules       []PrivateModuleDocument `json:"privateModules,omitempty"`
 }
 
 type PackageDocument struct {
@@ -44,6 +47,22 @@ type BuildDocument struct {
 	GOARCH     string   `json:"goarch"`
 	CGOEnabled bool     `json:"cgoEnabled"`
 	BuildTags  []string `json:"buildTags"`
+}
+
+type CompilationDocument struct {
+	Integers        string `json:"integers"`
+	EvaluationOrder string `json:"evaluationOrder"`
+	Concurrency     string `json:"concurrency"`
+}
+
+func (d CompilationDocument) valid() bool {
+	return d.Integers != "" && d.EvaluationOrder != "" && d.Concurrency != ""
+}
+
+type PrivateModuleDocument struct {
+	GoFile  string   `json:"goFile"`
+	Source  string   `json:"source"`
+	Exports []string `json:"exports"`
 }
 
 type EnvelopeDocument struct {
@@ -63,16 +82,31 @@ func (e Export) Name() string        { return e.name }
 func (e Export) TypeString() string  { return e.typeString }
 func (e Export) Fingerprint() string { return e.fingerprint }
 
+type PrivateModule struct {
+	goFile       string
+	sourcePath   string
+	sourceDigest string
+	exports      []Export
+	sourceFile   tsgo.SourceFile
+}
+
+func (m PrivateModule) GoFile() string              { return m.goFile }
+func (m PrivateModule) SourcePath() string          { return m.sourcePath }
+func (m PrivateModule) SourceDigest() string        { return m.sourceDigest }
+func (m PrivateModule) Exports() []Export           { return slices.Clone(m.exports) }
+func (m PrivateModule) SourceFile() tsgo.SourceFile { return m.sourceFile }
+
 type Implementation struct {
-	packagePath   string
-	modulePath    string
-	moduleVersion string
-	sourcePath    string
-	digest        string
-	sourceDigest  string
-	envelope      EnvelopeKind
-	exports       []Export
-	sourceFile    tsgo.SourceFile
+	packagePath    string
+	modulePath     string
+	moduleVersion  string
+	sourcePath     string
+	digest         string
+	sourceDigest   string
+	envelope       EnvelopeKind
+	exports        []Export
+	sourceFile     tsgo.SourceFile
+	privateModules []PrivateModule
 }
 
 func (i Implementation) PackagePath() string         { return i.packagePath }
@@ -84,14 +118,28 @@ func (i Implementation) SourceDigest() string        { return i.sourceDigest }
 func (i Implementation) Envelope() EnvelopeKind      { return i.envelope }
 func (i Implementation) Exports() []Export           { return slices.Clone(i.exports) }
 func (i Implementation) SourceFile() tsgo.SourceFile { return i.sourceFile }
+func (i Implementation) PrivateModules() []PrivateModule {
+	return slices.Clone(i.privateModules)
+}
 
 type Certificate struct {
-	byPath map[string]Implementation
-	digest string
+	byPath      map[string]Implementation
+	compilation CompilationDocument
+	digest      string
 }
 
 func (c *Certificate) Valid() bool {
-	return c != nil && c.digest != "" && len(c.byPath) != 0
+	return c != nil && c.compilation.valid() && c.digest != "" && len(c.byPath) != 0
+}
+
+func (c *Certificate) SupportsCompilation(
+	integers string,
+	evaluationOrder string,
+	concurrency string,
+) bool {
+	return c != nil && c.compilation == (CompilationDocument{
+		Integers: integers, EvaluationOrder: evaluationOrder, Concurrency: concurrency,
+	})
 }
 
 func (c *Certificate) Digest() string {
@@ -149,6 +197,20 @@ func (c *Certificate) add(implementation Implementation) error {
 		return &Error{Operation: "admit", Reason: "implementation evidence is incomplete"}
 	}
 	c.byPath[implementation.packagePath] = implementation
+	return nil
+}
+
+func (c *Certificate) bindCompilation(selected CompilationDocument) error {
+	if !selected.valid() {
+		return &Error{Operation: "admit", Reason: "compilation profile is incomplete"}
+	}
+	if !c.compilation.valid() {
+		c.compilation = selected
+		return nil
+	}
+	if c.compilation != selected {
+		return &Error{Operation: "admit", Reason: "compilation profiles differ"}
+	}
 	return nil
 }
 

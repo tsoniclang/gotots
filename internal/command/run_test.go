@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func TestRunPrintsResolvedConfigWithoutBuilding(t *testing.T) {
@@ -65,6 +67,54 @@ func TestRunBuildsSimpleProgramThroughPinnedTSGo(t *testing.T) {
 	}
 	if !bytes.Contains(manifest, []byte(`"semanticDigest"`)) {
 		t.Fatalf("build manifest = %s", manifest)
+	}
+	packageDocument, err := os.ReadFile(filepath.Join(generated, "package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(packageDocument, []byte(`"type": "module"`)) {
+		t.Fatalf("project package = %s", packageDocument)
+	}
+}
+
+func TestProjectPackageIsRequiredForTopLevelAwait(t *testing.T) {
+	root := t.TempDir()
+	packageDocument, err := encodeProjectPackage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeCommandFixture(t, filepath.Join(root, "package.json"), string(packageDocument))
+	writeCommandFixture(t, filepath.Join(root, "program.ts"), "await Promise.resolve();\n")
+	writeCommandFixture(t, filepath.Join(root, "tsconfig.json"), `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true
+  },
+  "files": ["program.ts"]
+}
+`)
+	arguments := []string{"--noEmit", "-p", filepath.Join(root, "tsconfig.json")}
+	if err := tsgo.Compile(
+		context.Background(),
+		repositoryRoot(t),
+		root,
+		arguments,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(root, "package.json")); err != nil {
+		t.Fatal(err)
+	}
+	if err := tsgo.Compile(
+		context.Background(),
+		repositoryRoot(t),
+		root,
+		arguments,
+	); err == nil || !strings.Contains(err.Error(), "TS1309") {
+		t.Fatalf("CommonJS top-level-await error = %v", err)
 	}
 }
 

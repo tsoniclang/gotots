@@ -36,7 +36,7 @@ func Value() int { return fast.Sum("abcd") }
     "strict": true,
     "noEmit": true
   },
-  "include": ["package.ts"]
+	  "files": ["package.ts"]
 }
 `)
 	contract := sourceimplementation.Document{
@@ -49,6 +49,9 @@ func Value() int { return fast.Sum("abcd") }
 			GoVersion: runtime.Version(),
 			GOOS:      runtime.GOOS,
 			GOARCH:    runtime.GOARCH,
+		},
+		Compilation: sourceimplementation.CompilationDocument{
+			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
 		},
 		Source:   "package.ts",
 		TSConfig: "tsconfig.json",
@@ -83,6 +86,9 @@ func Value() int { return fast.Sum("abcd") }
 		Program:        program,
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".scratch"),
+		Compilation: sourceimplementation.CompilationDocument{
+			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -158,6 +164,9 @@ export function Sum(value: string): number { return value.length; }
 		Program:        program,
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".mutated-scratch"),
+		Compilation: sourceimplementation.CompilationDocument{
+			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
+		},
 	})
 	if err != nil {
 		t.Fatal(err)

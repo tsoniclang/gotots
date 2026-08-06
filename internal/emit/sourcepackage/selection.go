@@ -2,6 +2,7 @@ package sourcepackage
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"sort"
 
@@ -12,8 +13,9 @@ import (
 )
 
 type Paths struct {
-	assembly string
-	owned    map[string]struct{}
+	assembly     string
+	owned        map[string]struct{}
+	bySourceFile map[string]string
 }
 
 func ResolvePaths(sourcePackage *load.Package) (Paths, error) {
@@ -29,7 +31,8 @@ func ResolvePaths(sourcePackage *load.Package) (Paths, error) {
 		return Paths{}, err
 	}
 	result := Paths{
-		assembly: assemblyPath,
+		assembly:     assemblyPath,
+		bySourceFile: make(map[string]string),
 		owned: map[string]struct{}{
 			assemblyPath: {},
 			statePath:    {},
@@ -41,6 +44,11 @@ func ResolvePaths(sourcePackage *load.Package) (Paths, error) {
 			return Paths{}, err
 		}
 		result.owned[outputPath] = struct{}{}
+		name := filepath.Base(sourceFile.Path())
+		if _, duplicate := result.bySourceFile[name]; duplicate {
+			return Paths{}, fmt.Errorf("Go source filename %q is duplicated", name)
+		}
+		result.bySourceFile[name] = outputPath
 	}
 	return result, nil
 }
@@ -52,6 +60,20 @@ func (p Paths) AssemblyPath() string {
 func (p Paths) Owns(outputPath string) bool {
 	_, ok := p.owned[outputPath]
 	return ok
+}
+
+func (p Paths) SourcePath(goFile string) (string, bool) {
+	selected, ok := p.bySourceFile[goFile]
+	return selected, ok
+}
+
+func (p Paths) SourcePaths() []string {
+	result := make([]string, 0, len(p.bySourceFile))
+	for _, outputPath := range p.bySourceFile {
+		result = append(result, outputPath)
+	}
+	sort.Strings(result)
+	return result
 }
 
 func VerifyExports(

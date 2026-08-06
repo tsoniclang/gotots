@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": false,
+    "types": []
+  },
+  "files": [
+    "runtime-contract.d.ts",
+    "target/modules/362a73304aa189eb285aad215c2224dab5f91b7de351f09d6be2997f24c9e933/_root/utils.ts",
+    "target/packages/362a73304aa189eb285aad215c2224dab5f91b7de351f09d6be2997f24c9e933/_root/package.ts"
+  ]
+}

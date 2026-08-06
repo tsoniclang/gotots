@@ -988,6 +988,11 @@ JSON, flags, paths, or environment variables. The semantic project digest
 includes build and compilation profiles plus implementation contract and
 source digests, but excludes output/report paths.
 
+The output contract is strict ESM. Project assembly writes a root
+`package.json` with `type: module` before whole-project NodeNext typechecking;
+top-level await is never made valid by rewriting generated modules as
+CommonJS.
+
 Schema version 1 has the closed top-level sections `distribution`, `source`,
 `go`, `semantics`, `providers`, `implementations`, and `output`.
 `distribution.root` identifies the installed GoToTS distribution that owns the
@@ -998,14 +1003,24 @@ field except `schemaVersion` has one registered CLI counterpart, including
 repeatable `--tag` and `--implementation-bundle` flags.
 
 A certified source implementation owns one exact source package's final target
-module. Certification joins canonical Go module, package, version, selected
-build profile, generated package surface, strict TypeScript export surface,
-implementation source digest, and equivalence envelope. Selection is settled
-once before target files are sealed. The final file set replaces the complete
-generated package module set atomically; no generated body, package state,
-initializer, compatibility wrapper, or fallback for the selected package may
-survive. References keep the ordinary package assembly path and source-facing
-contract.
+module set. Certification joins canonical Go module, package, version,
+selected build and compilation profiles, generated package surface, strict
+TypeScript export surface, implementation source digests, and equivalence
+envelope. Selection is settled once before target files are sealed. The final
+file set replaces the complete generated package module set atomically; no
+generated body, package state, initializer, compatibility wrapper, or fallback
+for the selected package may survive. References keep the ordinary package
+assembly path and source-facing contract.
+
+The authored module set contains exactly one executable package assembly.
+Surviving imports of its public exports are rebound to that assembly in the
+typed target AST. The set may additionally contain only the finite body-free
+private contract modules still named by generated support artifacts. Each
+private module is bound to one selected Go source-file identity, exact-joins
+the imported private names to its checked exports, and contains no runtime
+statement. It is not a retained generated body or a general forwarding shim.
+An absent, extra, executable, value-imported-private, or profile-mismatched
+private module fails before output is sealed.
 
 Authored implementation source is not copied as output text. Pinned TS-Go
 parses it, returns its official external AST encoding, and that typed

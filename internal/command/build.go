@@ -103,6 +103,11 @@ func certifySourceImplementations(
 		RepositoryRoot: project.DistributionRoot(),
 		Program:        program,
 		ContractPaths:  bundles,
+		Compilation: sourceimplementation.CompilationDocument{
+			Integers:        project.IntegerRepresentation().String(),
+			EvaluationOrder: project.EvaluationOrder().String(),
+			Concurrency:     project.ConcurrencySemantics().String(),
+		},
 		ScratchRoot: filepath.Join(
 			project.DistributionRoot(),
 			".temp",
