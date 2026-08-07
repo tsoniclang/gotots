@@ -98,7 +98,7 @@ func writeEmissionTo(
 		paths = append(paths, runtimePackage.ManifestPath())
 	}
 	sort.Strings(paths)
-	packageDocument, err := encodeProjectPackage()
+	packageDocument, err := encodeProjectPackage(emission.PackageDependencies())
 	if err != nil {
 		return 0, err
 	}
@@ -118,13 +118,24 @@ func writeEmissionTo(
 	return len(paths), nil
 }
 
-func encodeProjectPackage() ([]byte, error) {
+func encodeProjectPackage(dependencies []emit.PackageDependency) ([]byte, error) {
 	document := struct {
-		Private bool   `json:"private"`
-		Type    string `json:"type"`
+		Private      bool              `json:"private"`
+		Type         string            `json:"type"`
+		Dependencies map[string]string `json:"dependencies"`
 	}{
-		Private: true,
-		Type:    "module",
+		Private:      true,
+		Type:         "module",
+		Dependencies: make(map[string]string, len(dependencies)),
+	}
+	for _, dependency := range dependencies {
+		if dependency.Name() == "" || dependency.Version() == "" {
+			return nil, commandError("encode package", "dependency identity is incomplete")
+		}
+		if _, duplicate := document.Dependencies[dependency.Name()]; duplicate {
+			return nil, commandError("encode package", "dependency is duplicated")
+		}
+		document.Dependencies[dependency.Name()] = dependency.Version()
 	}
 	payload, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {

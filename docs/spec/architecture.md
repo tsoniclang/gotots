@@ -1116,11 +1116,14 @@ includes build and compilation profiles plus implementation contract and
 source digests, but excludes output/report paths.
 
 The output contract is canonical strict ESM source. Project assembly writes a
-root `package.json` with `type: module`; top-level await is never made valid by
-rewriting generated modules as CommonJS. GoToTS prints and seals that source,
-but does not fabricate `@tsonic/core` declarations, emit a target `tsconfig`,
-or invoke a TypeScript checker that lacks TSTS's authoritative virtual marker
-modules. TSTS checks the exact immutable canonical source, finalizes every
+root `package.json` with `type: module` and the exact selected physical package
+dependencies (`@gotots/runtime` and any selected certified providers).
+`@tsonic/core` is omitted because TSTS supplies that authoritative virtual
+module rather than resolving a physical package. Top-level await is never made
+valid by rewriting generated modules as CommonJS. GoToTS prints and seals that
+source, but does not fabricate `@tsonic/core` declarations, emit a target
+`tsconfig`, or invoke a TypeScript checker that lacks TSTS's authoritative
+virtual marker modules. TSTS checks the exact immutable canonical source, finalizes every
 selected marker fact, and the selected target then strict-typechecks the
 executable artifact. The configured output directory is compiler-owned and is
 reconstructed through a staged replacement; a successful build cannot retain

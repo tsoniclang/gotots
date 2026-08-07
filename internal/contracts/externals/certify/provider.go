@@ -67,7 +67,8 @@ func readProviderPackage(
 	if err := json.Unmarshal(payload, &document); err != nil {
 		return packageDocument{}, certifyError("read provider package", packagePath, err.Error())
 	}
-	if document.Name != externals.PackageName || document.Version == "" {
+	if document.Name != externals.PackageName ||
+		document.Version != externals.PackageVersion {
 		return packageDocument{}, certifyError(
 			"read provider package",
 			packagePath,

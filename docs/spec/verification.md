@@ -786,8 +786,11 @@ digest; changing implementation bytes or its envelope changes it.
 The production `gotots build` command writes a canonical resolved project on
 request, emits every TypeScript file through pinned TS-Go, records the semantic
 digest and exact output membership in `gotots-manifest.json`, and declares the
-canonical project ESM in a root `package.json`. It emits neither a target
-`tsconfig` nor a fabricated `@tsonic/core` package. TSTS must strictly check
+canonical project ESM and exact selected physical dependency set in a root
+`package.json`. Removing a selected runtime/provider dependency, adding
+`@tsonic/core`, or changing a certified package version fails the package
+manifest gate. It emits neither a target `tsconfig` nor a fabricated
+`@tsonic/core` package. TSTS must strictly check
 that exact immutable source using its authoritative virtual marker modules and
 exact-join every selected marker to one finalized fact before a target runs.
 The selected target must then strict-typecheck its complete executable output;

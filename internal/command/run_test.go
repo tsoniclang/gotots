@@ -123,12 +123,20 @@ func Increment(value int32) int32 {
 	if _, err := os.Stat(filepath.Join(generated, "obsolete.ts")); !os.IsNotExist(err) {
 		t.Fatalf("canonical build retained an obsolete owned artifact: %v", err)
 	}
+	packageDocument, err := os.ReadFile(filepath.Join(generated, "package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(packageDocument, []byte(`"@gotots/runtime": "0.0.0"`)) ||
+		bytes.Contains(packageDocument, []byte(`"@tsonic/core"`)) {
+		t.Fatalf("canonical marker dependencies = %s", packageDocument)
+	}
 	assertManifestMatchesOutput(t, generated)
 }
 
 func TestProjectPackageIsRequiredForTopLevelAwait(t *testing.T) {
 	root := t.TempDir()
-	packageDocument, err := encodeProjectPackage()
+	packageDocument, err := encodeProjectPackage(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

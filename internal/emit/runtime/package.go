@@ -50,6 +50,13 @@ func (p Package) Name() string {
 	return targetoutput.RuntimePackageName
 }
 
+func (p Package) Version() string {
+	if !p.valid {
+		return ""
+	}
+	return targetoutput.RuntimePackageVersion
+}
+
 func (p Package) RootPath() string {
 	if !p.valid {
 		return ""
@@ -556,7 +563,7 @@ func packageManifest(
 	}
 	document := packageDocument{
 		Name:    targetoutput.RuntimePackageName,
-		Version: "0.0.0",
+		Version: targetoutput.RuntimePackageVersion,
 		Private: true,
 		Type:    "module",
 		GoToTS: packageMetadata{

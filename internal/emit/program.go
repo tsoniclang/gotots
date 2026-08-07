@@ -7,6 +7,8 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/tsoniclang/gotots/internal/contracts/externals"
+	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -28,6 +30,12 @@ type ProgramEmission struct {
 	environmentProfile          EnvironmentProfile
 	externalFunctionObligations []ExternalFunctionObligation
 	runtimePackage              RuntimePackage
+	packageDependencies         []PackageDependency
+}
+
+type PackageDependency struct {
+	name    string
+	version string
 }
 
 type RuntimePackage struct {
@@ -197,13 +205,54 @@ func CompileWithOptions(
 	if err != nil {
 		return ProgramEmission{}, err
 	}
+	dependencies, err := selectedPackageDependencies(options, session.runtimePackage)
+	if err != nil {
+		return ProgramEmission{}, err
+	}
 	return ProgramEmission{
 		files:                       files,
 		environmentObligations:      obligations,
 		environmentProfile:          profile,
 		externalFunctionObligations: session.externalFunctionObligations(),
 		runtimePackage:              session.runtimePackage,
+		packageDependencies:         dependencies,
 	}, nil
+}
+
+func selectedPackageDependencies(
+	options Options,
+	runtimePackage RuntimePackage,
+) ([]PackageDependency, error) {
+	var dependencies []PackageDependency
+	if runtimePackage.Name() != "" {
+		dependencies = append(dependencies, PackageDependency{
+			name: runtimePackage.Name(), version: runtimePackage.Version(),
+		})
+	}
+	if options.StandardLibrary != nil {
+		dependencies = append(dependencies, PackageDependency{
+			name: gostdlib.PackageName, version: gostdlib.PackageVersion,
+		})
+	}
+	if options.ExternalProvider != nil {
+		dependencies = append(dependencies, PackageDependency{
+			name: externals.PackageName, version: externals.PackageVersion,
+		})
+	}
+	for _, dependency := range dependencies {
+		if dependency.name == "" || dependency.version == "" {
+			return nil, &ScheduleError{Reason: "package dependency identity is incomplete"}
+		}
+	}
+	sort.Slice(dependencies, func(left, right int) bool {
+		return dependencies[left].name < dependencies[right].name
+	})
+	for index := 1; index < len(dependencies); index++ {
+		if dependencies[index-1].name == dependencies[index].name {
+			return nil, &ScheduleError{Reason: "package dependency has multiple owners"}
+		}
+	}
+	return dependencies, nil
 }
 
 func CompileFile(
