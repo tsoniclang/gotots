@@ -12,16 +12,17 @@ import (
 )
 
 const (
-	ProgramInitializationPath  = "program.ts"
-	RuntimePackageName         = "@gotots/runtime"
-	RuntimePackageRootPath     = "runtime"
-	RuntimePackageManifestPath = "runtime/package.json"
-	ScalarSupportPath          = "runtime/scalars.ts"
-	AnonymousStructSupportPath = "support/anonymous-structs.ts"
-	InterfaceMethodSupportPath = "support/interface-methods.ts"
-	InterfaceTypeSupportPath   = "support/interface-types.ts"
-	ReflectionTypeSupportPath  = "support/reflection-types.ts"
-	UnsafeCodecSupportPath     = "support/unsafe-codecs.ts"
+	ProgramInitializationPath       = "program.ts"
+	RuntimePackageName              = "@gotots/runtime"
+	RuntimePackageRootPath          = "runtime"
+	RuntimePackageManifestPath      = "runtime/package.json"
+	ScalarSupportPath               = "runtime/scalars.ts"
+	AnonymousStructSupportPath      = "support/anonymous-structs.ts"
+	InterfaceMethodSupportPath      = "support/interface-methods.ts"
+	InterfaceTypeSupportPath        = "support/interface-types.ts"
+	ReflectionTypeSupportPath       = "support/reflection-types.ts"
+	UnsafeCodecSupportPath          = "support/unsafe-codecs.ts"
+	generatedArtifactShardKeyLength = 2
 )
 
 func EnvironmentContractPath(
@@ -224,7 +225,11 @@ func generatedArtifactPath(
 			}
 		}
 	}
-	return path.Join("support", directory, artifactKey+".ts"), nil
+	return path.Join(
+		"support",
+		directory,
+		artifactKey[:generatedArtifactShardKeyLength]+".ts",
+	), nil
 }
 
 func packageArtifactPath(

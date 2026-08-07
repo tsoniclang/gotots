@@ -166,6 +166,20 @@ test("WaitGroup waits for Add, Done, and Go work", async () => {
   );
 });
 
+test("WaitGroup surfaces a task failure from Wait", async () => {
+  const group = new WaitGroup();
+  const failure = new Error("worker failure");
+  WaitGroup.Go(group, async () => {
+    await Promise.resolve();
+    throw failure;
+  });
+
+  const observed = await WaitGroup.Wait(group).catch(
+    (caught: unknown): unknown => caught,
+  );
+  assert.equal(observed, failure);
+});
+
 test("sync Map and Pool preserve stored interface values", async () => {
   const key = new ProviderError("key");
   const first = new ProviderError("first");

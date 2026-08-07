@@ -48,16 +48,23 @@ func valuePointerMethodReceiver(
 	)
 	switch {
 	case receiverABI == api.MethodReceiverABIContractDirect:
-		root, expressionErr := children.Expression(
+		target, targetErr := children.StoreTarget(
 			context.
 				WithRole(api.RoleReceiverValue).
 				WithExpectedType(resolved.root),
 			source.X,
 		)
-		if expressionErr != nil {
-			return api.ExpressionEmission{}, expressionErr
+		if targetErr != nil {
+			return api.ExpressionEmission{}, targetErr
 		}
-		receiver, err = projectValue(
+		root, mutableErr := target.MutableValue(
+			context.WithRole(api.RoleReceiverValue),
+			source.X,
+		)
+		if mutableErr != nil {
+			return api.ExpressionEmission{}, mutableErr
+		}
+		receiver, err = projectMutableValue(
 			context,
 			children,
 			source,

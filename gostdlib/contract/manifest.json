@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "d6020382c48acd143ed2190b8bb617a7597de3a9fcc098fa0c6955eb8f353a32",
-  "providerDigest": "6d3ac49737119c296dc63d0af9b6588ff5b5f1b647784ee179abde89ce34c744",
+  "providerDigest": "48a3dc43ae2a4a25aeb0d41dcae18f7282a702e35f969b9e6849857c59cb238a",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -14226,8 +14226,11 @@
           "implementationOwner": "src/internal/portable/sync/wait-group.ts",
           "targetFingerprint": "fb25f979bb7620824c296c875d36430b6c96535409c7f9f695f6de2c3335cd7c",
           "disposition": "implemented",
+          "dependencies": [
+            "src/internal/portable/sync/wait-group.ts#noTaskFailure@29"
+          ],
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#WaitGroup@26"
+            "src/internal/portable/sync/wait-group.ts#WaitGroup@35"
           ]
         },
         {
@@ -14597,7 +14600,7 @@
           "targetFingerprint": "dbf1e3a61215da685c19122f3c41397af6660a5002f8ba4870cae0ce4d64f516",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Add@178"
+            "src/internal/portable/sync/wait-group.ts#Add@200"
           ]
         },
         {
@@ -14613,11 +14616,11 @@
           "targetFingerprint": "bcaa4a7ea3323b7f01841984f6611e364b6bd48bdb5b81429c184bd2b5db8ebc",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/wait-group.ts#Add@178",
-            "src/internal/portable/sync/wait-group.ts#WaitGroup@26"
+            "src/internal/portable/sync/wait-group.ts#Add@200",
+            "src/internal/portable/sync/wait-group.ts#WaitGroup@35"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Done@269"
+            "src/internal/portable/sync/wait-group.ts#Done@291"
           ]
         },
         {
@@ -14639,12 +14642,13 @@
           "targetFingerprint": "77be91b791732159ffdfb2cec218fc31e9a4a95478a599bd0dec2dbe831ad50d",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/sync/wait-group.ts#Add@178",
-            "src/internal/portable/sync/wait-group.ts#Done@269",
-            "src/internal/portable/sync/wait-group.ts#WaitGroup@26"
+            "src/internal/portable/sync/wait-group.ts#Add@200",
+            "src/internal/portable/sync/wait-group.ts#Done@291",
+            "src/internal/portable/sync/wait-group.ts#WaitGroup@35",
+            "src/internal/portable/sync/wait-group.ts#noTaskFailure@29"
           ],
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Go@293"
+            "src/internal/portable/sync/wait-group.ts#Go@315"
           ]
         },
         {
@@ -14659,8 +14663,11 @@
           "implementationOwner": "src/internal/portable/sync/wait-group.ts",
           "targetFingerprint": "6563d89c84dbd3fc5ef6b50030e3098355c14fc93205f162088a1b27cdbfaacc",
           "disposition": "implemented",
+          "dependencies": [
+            "src/internal/portable/sync/wait-group.ts#noTaskFailure@29"
+          ],
           "implementationSites": [
-            "src/internal/portable/sync/wait-group.ts#Wait@375"
+            "src/internal/portable/sync/wait-group.ts#Wait@438"
           ]
         },
         {
@@ -18498,7 +18505,7 @@
           "implementationOwner": "src/internal/portable/slices/sort.ts",
           "targetFingerprint": "e9bf3eb357893c7ca99adb0b326265525b3e0ff2964102c5f3e05bd52e360e3d",
           "implementationSites": [
-            "src/internal/portable/slices/sort.ts#SlicesSortKernel@82"
+            "src/internal/portable/slices/sort.ts#SlicesSortKernel@89"
           ]
         },
         {
@@ -18532,7 +18539,7 @@
           "implementationOwner": "src/internal/portable/slices/sort.ts",
           "targetFingerprint": "a4344b441d83dd334ca2ab15fe4f94fd26fc595a995c9ca9d8c3a2f365c040ef",
           "implementationSites": [
-            "src/internal/portable/slices/sort.ts#SlicesSortFuncKernel@196"
+            "src/internal/portable/slices/sort.ts#SlicesSortFuncKernel@203"
           ]
         },
         {
@@ -18566,7 +18573,7 @@
           "implementationOwner": "src/internal/portable/slices/sort.ts",
           "targetFingerprint": "233de7468f9aa4e4b3285bbac0fce4695abb8974e9e6571d07d66211ecef39dc",
           "implementationSites": [
-            "src/internal/portable/slices/sort.ts#SlicesSortStableFuncKernel@290"
+            "src/internal/portable/slices/sort.ts#SlicesSortStableFuncKernel@297"
           ]
         },
         {
@@ -26563,9 +26570,9 @@
       "identity": "src/internal/facets/named-sync.ts#SyncWaitGroupOperations@665",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/wait-group.ts#$copy@48",
-        "src/internal/portable/sync/wait-group.ts#$equal@92",
-        "src/internal/portable/sync/wait-group.ts#$hash@131",
+        "src/internal/portable/sync/wait-group.ts#$copy@61",
+        "src/internal/portable/sync/wait-group.ts#$equal@114",
+        "src/internal/portable/sync/wait-group.ts#$hash@153",
         "src/sync.ts#WaitGroup@46"
       ]
     },
@@ -27925,7 +27932,7 @@
       "identity": "src/internal/facets/recovery-sync.ts#SyncWaitGroupDone@160",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/wait-group.ts#Done@269",
+        "src/internal/portable/sync/wait-group.ts#Done@291",
         "src/sync.ts#WaitGroup@46"
       ]
     },
@@ -31161,7 +31168,7 @@
       "dependencies": [
         "src/internal/portable/slices/sequence.ts#Collect@486",
         "src/internal/portable/slices/sequence.ts#logicalValues@977",
-        "src/internal/portable/slices/sort.ts#sortValues@521"
+        "src/internal/portable/slices/sort.ts#sortValues@528"
       ]
     },
     {
@@ -31199,42 +31206,42 @@
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#SlicesSortFuncKernel@196",
+      "identity": "src/internal/portable/slices/sort.ts#SlicesSortFuncKernel@203",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/sort.ts#logicalValues@368",
-        "src/internal/portable/slices/sort.ts#sortValues@521",
-        "src/internal/portable/slices/sort.ts#writeSorted@450"
+        "src/internal/portable/slices/sort.ts#logicalValues@375",
+        "src/internal/portable/slices/sort.ts#sortValues@528",
+        "src/internal/portable/slices/sort.ts#writeSorted@457"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#SlicesSortKernel@82",
+      "identity": "src/internal/portable/slices/sort.ts#SlicesSortKernel@89",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
         "src/internal/portable/slices/capabilities.ts#orderedCompare@353",
-        "src/internal/portable/slices/sort.ts#logicalValues@368",
-        "src/internal/portable/slices/sort.ts#writeSorted@450"
+        "src/internal/portable/slices/sort.ts#logicalValues@375",
+        "src/internal/portable/slices/sort.ts#writeSorted@457"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#SlicesSortStableFuncKernel@290",
+      "identity": "src/internal/portable/slices/sort.ts#SlicesSortStableFuncKernel@297",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/sort.ts#SortFunc@196"
+        "src/internal/portable/slices/sort.ts#SortFunc@203"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#SortFunc@196",
+      "identity": "src/internal/portable/slices/sort.ts#SortFunc@203",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/sort.ts#logicalValues@368",
-        "src/internal/portable/slices/sort.ts#sortValues@521",
-        "src/internal/portable/slices/sort.ts#writeSorted@450"
+        "src/internal/portable/slices/sort.ts#logicalValues@375",
+        "src/internal/portable/slices/sort.ts#sortValues@528",
+        "src/internal/portable/slices/sort.ts#writeSorted@457"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#logicalValues@368",
+      "identity": "src/internal/portable/slices/sort.ts#logicalValues@375",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
@@ -31242,14 +31249,14 @@
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#sortValues@521",
+      "identity": "src/internal/portable/slices/sort.ts#sortValues@528",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/slices/read.ts#callComparison@1768"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#writeSorted@450",
+      "identity": "src/internal/portable/slices/sort.ts#writeSorted@457",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
@@ -32054,18 +32061,22 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/wait-group.ts#$copy@48",
+      "identity": "src/internal/portable/sync/wait-group.ts#$copy@61",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/sync/wait-group.ts#WaitGroup@26"
+        "src/internal/portable/sync/wait-group.ts#WaitGroup@35"
       ]
     },
     {
-      "identity": "src/internal/portable/sync/wait-group.ts#$equal@92",
+      "identity": "src/internal/portable/sync/wait-group.ts#$equal@114",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/sync/wait-group.ts#$hash@131",
+      "identity": "src/internal/portable/sync/wait-group.ts#$hash@153",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/sync/wait-group.ts#noTaskFailure@29",
       "disposition": "implemented"
     },
     {
@@ -34030,5 +34041,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "777b7f8f199d1ad30451eae4527cd92f456d4957a67042ba51261aaa5f9c5c47"
+  "manifestDigest": "095151c100658a6fcba024d0241ad25d44dbf5cb78969a39ef36a3437c089b14"
 }

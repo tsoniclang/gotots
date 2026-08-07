@@ -337,6 +337,13 @@ Within cooperative compilation, this single ABI replaces callable-profile
 matrices, public cooperative variants, effect-dependent named-type arity, and
 runtime Promise detection.
 
+Portable algorithms receiving that canonical ABI must preserve it directly.
+They may remove avoidable recursion, allocation, and iterator layers, but they
+must not select a synchronous callback variant or inspect whether a result is a
+Promise. In particular, cooperative generic sorting uses one bounded-work
+iterative merge over two dense buffers and awaits every comparison; native
+`Array.sort` is reserved for an exact synchronous comparator contract.
+
 Possibly nil indirect calls have one target owner. The emitter captures the
 callee, captures every argument in Go order, then calls
 `(callee ?? GoPanic.raiseRuntime("call of nil function"))`. The statically
@@ -441,6 +448,14 @@ A stable origin never promotes an otherwise-direct named-struct family to a
 carrier, while scalar and other already-carried families remain carriers.
 Pointer-to-pointer mutation retains a carrier for the outer pointer. No package,
 function, or spelling exception selects representation.
+
+An implicit pointer-receiver call on an addressable value projects that value's
+mutable storage. It never performs the ordinary Go value-copy transfer before
+calling the method. This remains true when a later address use has promoted the
+binding to canonical storage and when the receiver is reached through an
+embedded or selected field. For example, after `p := &builder`,
+`builder.WriteString(text)` passes the same builder storage observed through
+`p`; it does not call `WriteString(copy(builder))`.
 
 A carrier's location identity is canonical but demand-materialized: ordinary
 reads and writes do not allocate address tokens or populate identity maps.
@@ -729,6 +744,13 @@ owning callable.
 The scheduler separately owns goroutine lifecycle, settlement, uncaught panic,
 main return, and deadlock. A `go` statement evaluates and copies callee and
 arguments immediately, then schedules one typed closure.
+
+Every cooperative task belongs to a typed settlement owner. Provider
+synchronization primitives may transport a rejected task result only to that
+owner and rethrow the exact failure when the corresponding wait settles; they
+must not discard a launched Promise or inspect/recover its payload. In
+particular, `WaitGroup.Go` task failure cannot let `WaitGroup.Wait` report
+success.
 
 Send/receive sites are O(1) apart from value copy. A `select` is O(case
 count), commits once, cancels alternatives in O(1) each, uses fair ready
@@ -1111,6 +1133,16 @@ The output contract is strict ESM. Project assembly writes a root
 `package.json` with `type: module` before whole-project NodeNext typechecking;
 top-level await is never made valid by rewriting generated modules as
 CommonJS.
+
+Compilation-scoped generated support definitions retain their full semantic
+artifact identities, but those identities do not each create a physical ESM
+module. The output owner deterministically coalesces them by semantic family
+and the first byte of the artifact digest, giving at most 256 shards per
+family. A shard is only a placement container: every definition, dependency,
+revision, and observable fingerprint remains keyed by the full artifact
+owner. Lexical artifacts remain with their lexical owner. This bounded static
+layout replaces one-module-per-artifact output; it uses no runtime registry,
+dynamic import, bundler dependency, erased lookup, or source-name grouping.
 
 Schema version 1 has the closed top-level sections `distribution`, `source`,
 `go`, `semantics`, `providers`, `implementations`, and `output`.

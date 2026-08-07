@@ -134,7 +134,8 @@ func assertAggregateMapArtifacts(
 	artifacts materialized,
 ) {
 	t.Helper()
-	generated := 0
+	generatedFiles := 0
+	generatedDefinitions := 0
 	totalBytes := 0
 	largestBytes := 0
 	largestPath := ""
@@ -142,7 +143,7 @@ func assertAggregateMapArtifacts(
 		if !strings.HasPrefix(file.OutputPath(), "support/maps/") {
 			continue
 		}
-		generated++
+		generatedFiles++
 		if file.Kind() != emit.TargetFileSupport {
 			t.Fatalf(
 				"map specialization %s has target-file kind %d",
@@ -151,23 +152,22 @@ func assertAggregateMapArtifacts(
 			)
 		}
 		source := readFile(t, artifacts.file(t, file.OutputPath()))
-		if strings.Count(source, "export class $goMap_") != 1 {
-			t.Fatalf(
-				"map specialization %s does not own exactly one class:\n%s",
-				file.OutputPath(),
-				source,
-			)
+		definitions := strings.Count(source, "export class $goMap_")
+		if definitions == 0 {
+			t.Fatalf("map specialization shard %s is empty", file.OutputPath())
 		}
+		generatedDefinitions += definitions
 		totalBytes += len(source)
 		if len(source) > largestBytes {
 			largestBytes = len(source)
 			largestPath = file.OutputPath()
 		}
-		if len(source) > 7_000 {
+		if len(source) > definitions*7_000 {
 			t.Fatalf(
-				"map specialization %s = %d bytes, want at most 7000",
+				"map specialization shard %s = %d bytes for %d definitions, want at most 7000 bytes per definition",
 				file.OutputPath(),
 				len(source),
+				definitions,
 			)
 		}
 		for _, forbidden := range []string{
@@ -190,10 +190,10 @@ func assertAggregateMapArtifacts(
 			}
 		}
 	}
-	if generated != 5 {
+	if generatedDefinitions != 5 {
 		t.Fatalf(
-			"map specialization artifacts = %d, want five exact reached shapes",
-			generated,
+			"map specialization definitions = %d, want five exact reached shapes",
+			generatedDefinitions,
 		)
 	}
 	anonymous := readFile(
@@ -208,8 +208,9 @@ func assertAggregateMapArtifacts(
 		)
 	}
 	t.Logf(
-		"map specializations=%d total-bytes=%d largest=%s/%d",
-		generated,
+		"map specialization-files=%d definitions=%d total-bytes=%d largest=%s/%d",
+		generatedFiles,
+		generatedDefinitions,
 		totalBytes,
 		largestPath,
 		largestBytes,

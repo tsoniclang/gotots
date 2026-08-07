@@ -114,6 +114,17 @@ func MutexAddress(state *ProviderState) *sync.Mutex {
 func BuilderAddress(state *ProviderState) *strings.Builder {
 	return &state.Builder
 }
+
+func ObserveBuilder(builder *strings.Builder) {}
+
+func LocalBuilder() string {
+	var builder strings.Builder
+	ObserveBuilder(&builder)
+	builder.Grow(3)
+	builder.WriteString("go")
+	builder.WriteRune('!')
+	return builder.String()
+}
 `)
 	program, err := load.Load(context.Background(), load.Request{
 		Directory:    project,
@@ -178,6 +189,7 @@ func BuilderAddress(state *ProviderState) *strings.Builder {
 			mustProviderRoot(t, scope.Lookup("StoredProviderReceivers")),
 			mustProviderRoot(t, scope.Lookup("MutexAddress")),
 			mustProviderRoot(t, scope.Lookup("BuilderAddress")),
+			mustProviderRoot(t, scope.Lookup("LocalBuilder")),
 		},
 		options,
 	)
@@ -239,6 +251,10 @@ func assertProviderReceiverProjection(
 	for _, stored := range []string{
 		"Mutex.Lock(GoPointer.direct<ProviderState>(state).Mutex)",
 		"Builder.Len(GoPointer.direct<ProviderState>(state).Builder)",
+		"Builder.Grow(builder$storage",
+		"Builder.WriteString(builder$storage",
+		"Builder.WriteRune(builder$storage",
+		"Builder.String(builder$storage",
 	} {
 		if !strings.Contains(printed, stored) {
 			t.Fatalf("stored provider receiver lacks %q:\n%s", stored, printed)
@@ -258,6 +274,10 @@ func assertProviderReceiverProjection(
 		"await strings__from_gostdlib.Builder.Len(",
 		"SyncMutexOperations.$fromStorage(__gotots_receiver_",
 		"StringsBuilderOperations.$fromStorage(__gotots_receiver_",
+		"Builder.Grow(named_strings.StringsBuilderOperations.$copy(builder$storage)",
+		"Builder.WriteString(named_strings.StringsBuilderOperations.$copy(builder$storage)",
+		"Builder.WriteRune(named_strings.StringsBuilderOperations.$copy(builder$storage)",
+		"Builder.String(named_strings.StringsBuilderOperations.$copy(builder$storage)",
 	} {
 		if strings.Contains(printed, bypass) {
 			t.Fatalf("stored provider receiver bypasses projection with %q:\n%s", bypass, printed)

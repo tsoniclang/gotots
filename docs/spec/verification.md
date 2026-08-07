@@ -275,7 +275,11 @@ Artifact assertions require value receiver as `this`, pointer receiver as
 one explicit first parameter, exact `go/types.Selection` ownership, and no
 prototype patch or duplicate top-level twin. Mutations force `extends` across
 a field-shadow/copy/nil counterexample, use virtual target selection for an
-ordinary concrete call, or copy every receiver unconditionally.
+ordinary concrete call, or copy every receiver unconditionally. A provider-
+represented addressable value is also forced into canonical storage by an
+independent address use; its implicit pointer-receiver calls must consume that
+same mutable storage. A mutation restoring the ordinary value-read/copy path
+must fail the artifact assertion and the Go/TypeScript differential.
 
 Defined-over-generic fixtures cover concrete and generic derived structs.
 Strict artifacts use the basis storage field types, concrete accessors project
@@ -446,6 +450,8 @@ The selected race-free cooperative profile exits only with:
 - ready/default/blocking select, fair choice, cancellation, same-channel and
   select-to-select rendezvous;
 - goroutine argument capture, main return, panic, deadlock, and settlement;
+- provider-spawned task failure reaching its typed wait/settlement owner rather
+  than becoming a discarded Promise rejection;
 - direct calls, first-class values, interfaces, callbacks, generic callables,
   package initializers, and deferred calls.
 
@@ -465,6 +471,13 @@ is uniform: all transported methods are synchronous for direct mode or all are
 `Awaitable` for cooperative mode. A Go identity admits at most one certificate
 per mode. Mutations adding a second certificate in either mode or mixing the
 two effects inside one certificate fail before emission.
+
+Portable cooperative sorting is exercised with both synchronous and genuinely
+asynchronous comparators, stable equal-key ordering, empty input with a nil
+comparator, and a comparison-count bound proportional to `n log n`. Provider
+source inspection rejects recursive subarray sorting, iterator-per-merge
+allocation, native sorting of an `Awaitable` comparator, and runtime Promise
+inspection.
 
 The certifier independently derives a total directional obligation multiset
 over every provider callable. It recursively records inward interface-method and
@@ -828,6 +841,17 @@ Artifact evidence reports removed generated files, source bytes, TS-Go AST
 nodes, strict-typecheck time/RSS, runtime time/RSS, and the top profile frames.
 The selected package must contribute one final implementation module, zero
 translated bodies, and zero unsafe-pointer traffic from the removed package.
+
+Generated-support topology proof exact-joins full artifact owners and
+definitions after deterministic family sharding. Layout tests prove that two
+full identities with the same first digest byte share one module, different
+bytes or semantic families do not, and malformed identities fail. Product
+evidence reports support definitions separately from physical support modules,
+the largest shard, ESM startup time/RSS, and minimal-compile time/RSS. A
+mutation restoring one physical module per artifact must fail the bounded-
+shard module-count gate, and a mutation merging semantic families must fail
+ownership or strict typechecking. Release evidence additionally compares ESM
+startup against the immediately preceding one-module-per-artifact product.
 
 Every material checkpoint reports absolute values and parent deltas for:
 

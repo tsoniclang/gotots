@@ -1,4 +1,5 @@
 import type { Awaitable, int64 } from "@gotots/gostdlib/internal/scalars.js";
+import { GoDenseIndex } from "@gotots/runtime/dense-index.js";
 import {
   hostInteger,
   integerFromHost,
@@ -121,30 +122,39 @@ export async function sortValues<E>(
   if (values.length < 2) {
     return [...values];
   }
-  const middle = Math.floor(values.length / 2);
-  const left = await sortValues(values.slice(0, middle), compare);
-  const right = await sortValues(values.slice(middle), compare);
-  const result: E[] = [];
-  const leftIterator = left[Symbol.iterator]();
-  const rightIterator = right[Symbol.iterator]();
-  let leftStep = leftIterator.next();
-  let rightStep = rightIterator.next();
-  while (!leftStep.done && !rightStep.done) {
-    if (await callComparison(compare, leftStep.value, rightStep.value) <= 0n) {
-      result.push(leftStep.value);
-      leftStep = leftIterator.next();
-    } else {
-      result.push(rightStep.value);
-      rightStep = rightIterator.next();
+  let source = [...values];
+  let target = new Array<E>(values.length);
+  for (let width = 1; width < values.length; width *= 2) {
+    for (let start = 0; start < values.length; start += width * 2) {
+      const middle = Math.min(start + width, values.length);
+      const end = Math.min(start + width * 2, values.length);
+      let left = start;
+      let right = middle;
+      let output = start;
+      while (left < middle && right < end) {
+        const leftValue = GoDenseIndex.get(source, left);
+        const rightValue = GoDenseIndex.get(source, right);
+        if (await callComparison(compare, leftValue, rightValue) <= 0n) {
+          target[output] = leftValue;
+          left += 1;
+        } else {
+          target[output] = rightValue;
+          right += 1;
+        }
+        output += 1;
+      }
+      while (left < middle) {
+        target[output] = GoDenseIndex.get(source, left);
+        left += 1;
+        output += 1;
+      }
+      while (right < end) {
+        target[output] = GoDenseIndex.get(source, right);
+        right += 1;
+        output += 1;
+      }
     }
+    [source, target] = [target, source];
   }
-  while (!leftStep.done) {
-    result.push(leftStep.value);
-    leftStep = leftIterator.next();
-  }
-  while (!rightStep.done) {
-    result.push(rightStep.value);
-    rightStep = rightIterator.next();
-  }
-  return result;
+  return source;
 }

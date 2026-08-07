@@ -227,7 +227,7 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
   assert.deepEqual(sliceValues(ordered).slice(1), [1, 2, 3]);
 
   const descending = RuntimeSlice.literal([1, 3, 2]);
-  await SortFunc(
+  await SortFunc<RuntimeSlice<number>, number, number>(
     sliceValue,
     copyValue,
     copyValue,
@@ -236,6 +236,34 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
     (left: number, right: number): bigint => BigInt(right - left),
   );
   assert.deepEqual(values(descending), [3, 2, 1]);
+
+  const asynchronous = RuntimeSlice.literal([6, 1, 5, 2, 4, 3]);
+  let comparisonCount = 0;
+  await SortFunc(
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    asynchronous,
+    async (left: number, right: number): Promise<bigint> => {
+      comparisonCount += 1;
+      await Promise.resolve();
+      return BigInt(left - right);
+    },
+  );
+  assert.deepEqual(values(asynchronous), [1, 2, 3, 4, 5, 6]);
+  assert.ok(comparisonCount <= 18);
+
+  const empty = RuntimeSlice.literal<number>([]);
+  await SortFunc<RuntimeSlice<number>, number, number>(
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    empty,
+    undefined,
+  );
+  assert.deepEqual(values(empty), []);
 
   const stable = RuntimeSlice.literal([
     { key: 1, order: "a" },

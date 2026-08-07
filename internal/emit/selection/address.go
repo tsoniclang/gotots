@@ -75,7 +75,7 @@ func FieldStoreTarget(
 	}
 	receiverType := resolved.root
 	for _, field := range resolved.fields[:len(resolved.fields)-1] {
-		receiver, receiverType, err = projectFieldValue(
+		receiver, receiverType, err = projectMutableFieldValue(
 			context,
 			children,
 			source,
@@ -115,7 +115,7 @@ func FieldStoreTarget(
 	}
 	if fieldRepresentation.Representation().DirectClass() &&
 		fieldRepresentation.UsesStorageIdentity() {
-		fieldValue, fieldType, err := projectFieldValue(
+		fieldValue, fieldType, err := projectMutableFieldValue(
 			context,
 			children,
 			source,
@@ -421,7 +421,7 @@ func projectFieldPointer(
 				return api.ExpressionEmission{}, err
 			}
 		}
-		projected, projectedType, err := projectFieldValue(
+		projected, projectedType, err := projectMutableFieldValue(
 			context,
 			children,
 			source,
