@@ -1121,6 +1121,12 @@ Relative source, implementation, output, and report paths resolve from the
 configuration file's directory. Resolution order is typed defaults, project
 file, then explicit CLI values. Unknown fields, versions, identities, and
 conflicting owners fail.
+Implementation bundles may live in the consuming project, a sibling checkout,
+or any explicitly selected absolute location. Their location conveys no
+semantic ownership: each contract owns source paths relative to its own
+directory and is selected only by canonical package, module/version, build,
+and compilation evidence. Repeated `--implementation-bundle` values replace
+the configured bundle set as one deterministic CLI override.
 
 The resolved project is split before compilation into immutable loader,
 compilation, implementation, and output contracts. Emitters receive only the
