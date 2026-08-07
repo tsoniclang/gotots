@@ -982,17 +982,19 @@ closed language model.
 For an internal hash package, Go source such as:
 
 ```go
-hash := xxh3.HashString128(text)
+hash := fasthash.Sum128(text)
 if hash == previous { reuse() }
 ```
 
 may be backed by a certified fast deterministic TypeScript hash when the
 selected product proves the numeric hash is not otherwise observed. The target
-still calls `HashString128(text)`, receives the exact generated `Uint128`
-surface, and compares through its normal equality operation. The translated
-unsafe-pointer hash body is absent. If the same value is printed, persisted,
-sent over a protocol, or checked against XXH3 vectors, that envelope is invalid
-and an exact implementation is required.
+still calls `Sum128(text)`, receives the exact generated result surface, and
+compares through its normal equality operation. The translated original body
+is absent. If the same value is printed, persisted, sent over a protocol, or
+checked against specified vectors, that envelope is invalid and an exact
+implementation is required. Concrete packages, implementation sources, and
+product evidence belong to the consuming project, never the GoToTS
+distribution.
 
 Package replacement is selected only from the resolved project's certified
 implementation set. Translation handlers never branch on import path,

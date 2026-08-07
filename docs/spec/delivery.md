@@ -318,8 +318,8 @@ Performance work proceeds in measured owner order:
    semantic digest;
 2. add one certified source-package implementation owner and prove atomic
    generated-package replacement through pinned TS-Go AST;
-3. select the fast internal-hash implementation only under its product-proved
-   equivalence envelope and reprofile the generated compiler;
+3. prove concrete implementation bundles and product equivalence evidence are
+   owned by the consuming project rather than shipped as GoToTS policy;
 4. fix the next measured generic runtime or representation owner, deleting the
    superseded path before advancing.
 

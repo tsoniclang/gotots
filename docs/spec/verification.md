@@ -832,7 +832,7 @@ owning gate and the generated-size/node bounds.
 An equivalence envelope requires product-level evidence. For an internal hash,
 tests prove equal-input stability, unequal-input behavior over an adversarial
 corpus, streaming/one-shot agreement when exposed, collision-safe consumer
-behavior, and unchanged externally observable compiler output. A mutation that
+behavior, and unchanged externally observable consumer output. A mutation that
 exports or persists the relaxed hash invalidates the envelope. Exact hash-vector
 comparison is required only when the hash value itself is part of the selected
 observable contract.
