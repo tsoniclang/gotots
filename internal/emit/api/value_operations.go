@@ -13,6 +13,7 @@ import (
 type Values interface {
 	RequiresCustomEquality(Context, types.Type) bool
 	RequiresExplicitType(Context, types.Type) bool
+	RequiresInitializerTypeAnnotation(Context, ast.Expr, types.Type) (bool, error)
 	RequiresStructuralCopy(Context, types.Type) bool
 	SupportsHash(Context, types.Type) bool
 	RequiresStorageProjection(Context, types.Type) bool

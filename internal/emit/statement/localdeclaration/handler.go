@@ -7,7 +7,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	conversionexpression "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -272,7 +271,7 @@ func localVariableDeclaration(
 	var targetType tsgo.TypeNode
 	requests := value.Requests()
 	requiresInferenceAnnotation, err :=
-		conversionexpression.RequiresInferenceAnnotation(
+		context.Values().RequiresInitializerTypeAnnotation(
 			context,
 			binding.sourceValue,
 			binding.sourceType,

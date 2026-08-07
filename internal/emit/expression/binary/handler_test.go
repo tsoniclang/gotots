@@ -469,6 +469,14 @@ func (unusedNames) ModuleExport(types.Object) (bool, error) {
 
 type unusedValues struct{}
 
+func (unusedValues) RequiresInitializerTypeAnnotation(
+	api.Context,
+	ast.Expr,
+	types.Type,
+) (bool, error) {
+	return false, nil
+}
+
 func (unusedValues) RequiresCustomEquality(api.Context, types.Type) bool {
 	panic("unused")
 }

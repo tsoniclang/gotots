@@ -122,20 +122,26 @@ export class GoUnsafePointer {
                 const backing = region[0];
                 totalLength = backing.length * codec.size;
                 readBytes = (offset: number, length: number) => {
-                    const bytes: Uint8Array = new Uint8Array(totalLength);
-                    for (let index = 0; index < backing.length; index++) {
-                        codec.write(GoDenseIndex.get(backing, index), bytes, index * codec.size);
+                    const first: number = Math.floor(offset / codec.size);
+                    const last: number = Math.ceil((offset + length) / codec.size);
+                    const bytes: Uint8Array = new Uint8Array((last - first) * codec.size);
+                    for (let index = first; index < last; index++) {
+                        codec.write(GoDenseIndex.get(backing, index), bytes, (index - first) * codec.size);
                     }
-                    return bytes.slice(offset, offset + length);
+                    const start: number = offset - first * codec.size;
+                    return bytes.slice(start, start + length);
                 };
                 writeBytes = (offset: number, replacement: Uint8Array) => {
-                    const bytes: Uint8Array = new Uint8Array(totalLength);
-                    for (let index = 0; index < backing.length; index++) {
-                        codec.write(GoDenseIndex.get(backing, index), bytes, index * codec.size);
+                    const first: number = Math.floor(offset / codec.size);
+                    const last: number = Math.ceil((offset + replacement.length) / codec.size);
+                    const bytes: Uint8Array = new Uint8Array((last - first) * codec.size);
+                    for (let index = first; index < last; index++) {
+                        codec.write(GoDenseIndex.get(backing, index), bytes, (index - first) * codec.size);
                     }
-                    bytes.set(replacement, offset);
-                    for (let index = 0; index < backing.length; index++) {
-                        backing[index] = codec.read(bytes, index * codec.size);
+                    const start: number = offset - first * codec.size;
+                    bytes.set(replacement, start);
+                    for (let index = first; index < last; index++) {
+                        backing[index] = codec.read(bytes, (index - first) * codec.size);
                     }
                 };
             }
@@ -173,6 +179,42 @@ export class GoUnsafePointer {
         codec.$bind(value, [value, read, write, void 0]);
         return GoPointer.$go$unsafeView<L, S>(value, read, write, void 0);
     }
+    private static allocationAtAddress(value: number): GoUnsafePointer | undefined {
+        let low: number = 0;
+        let high: number = GoUnsafePointer.allocations.length - 1;
+        while (low <= high) {
+            const middle: number = Math.floor((low + high) / 2);
+            const candidate: GoUnsafePointer = GoDenseIndex.get(GoUnsafePointer.allocations, middle);
+            if (candidate.base <= value) {
+                low = middle + 1;
+            }
+            else {
+                high = middle - 1;
+            }
+        }
+        if (high < 0) {
+            return void 0;
+        }
+        const candidate: GoUnsafePointer = GoDenseIndex.get(GoUnsafePointer.allocations, high);
+        if (value <= candidate.base + candidate.length) {
+            return candidate;
+        }
+        return void 0;
+    }
+    public static fromRelative(value: GoUnsafePointer | undefined, address: number | bigint, zero: number | bigint): GoUnsafePointer | undefined {
+        if (value === void 0) {
+            if (address === zero) {
+                return void 0;
+            }
+            else
+                GoPanic.raiseRuntime("unsafe integer address does not identify live generated memory");
+        }
+        const numeric: number = globalThis.Number(address);
+        if (!globalThis.Number.isSafeInteger(numeric))
+            GoPanic.raiseRuntime("unsafe integer address is not representable");
+        const offset: number = numeric - value.base;
+        return value.at(offset);
+    }
     public static fromInteger(value: number | bigint, zero: number | bigint): GoUnsafePointer | undefined {
         if (value === zero) {
             return void 0;
@@ -180,13 +222,11 @@ export class GoUnsafePointer {
         const numeric: number = globalThis.Number(value);
         if (!globalThis.Number.isSafeInteger(numeric))
             GoPanic.raiseRuntime("unsafe integer address is not representable");
-        for (const allocation of GoUnsafePointer.allocations) {
-            const offset: number = numeric - allocation.base;
-            if (offset >= 0 && offset <= allocation.length) {
-                return allocation.at(offset);
-            }
-        }
-        GoPanic.raiseRuntime("unsafe integer address does not identify live generated memory");
+        const allocation: GoUnsafePointer | undefined = GoUnsafePointer.allocationAtAddress(numeric);
+        if (allocation === void 0)
+            GoPanic.raiseRuntime("unsafe integer address does not identify live generated memory");
+        const offset: number = numeric - allocation.base;
+        return allocation.at(offset);
     }
     public static toInteger(value: GoUnsafePointer | undefined, zero: number): number;
     public static toInteger(value: GoUnsafePointer | undefined, zero: bigint): bigint;

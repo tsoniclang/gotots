@@ -8,7 +8,7 @@ export class RuntimeSlice<T> {
     }
     static make<T>(length: number | bigint, capacity: (number | bigint) | null, zero: T): RuntimeSlice<T> {
         const numericLength = globalThis.Number(length);
-        const resolvedCapacity = capacity === null ? numericLength : globalThis.Number(capacity);
+        const resolvedCapacity = globalThis.Number(capacity ?? numericLength);
         if (numericLength < 0 || resolvedCapacity < numericLength)
             GoPanic.raiseRuntime("slice bounds out of range");
         const backing = new Array<T>(resolvedCapacity).fill(zero);
@@ -58,7 +58,7 @@ export class RuntimeSlice<T> {
         }
         let nextCapacity = this.capacity === 0 ? 1 : this.capacity * 2;
         while (nextCapacity < newLength) {
-            nextCapacity = nextCapacity * 2;
+            nextCapacity *= 2;
         }
         const backing = new Array<T>(nextCapacity).fill(zero);
         if (existingBacking !== null) {

@@ -1,4 +1,4 @@
-package conversion
+package representation
 
 import (
 	"go/ast"
@@ -8,7 +8,7 @@ import (
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 )
 
-func RequiresInferenceAnnotation(
+func (Owner) RequiresInitializerTypeAnnotation(
 	context api.Context,
 	source ast.Expr,
 	targetType types.Type,

@@ -6,7 +6,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	conversionexpression "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -481,7 +480,7 @@ func inferenceAnnotation(
 	sourceType types.Type,
 	initializer ast.Expr,
 ) (tsgo.TypeNode, []api.RootRequest, error) {
-	required, err := conversionexpression.RequiresInferenceAnnotation(
+	required, err := context.Values().RequiresInitializerTypeAnnotation(
 		context,
 		initializer,
 		sourceType,
