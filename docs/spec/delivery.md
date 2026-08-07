@@ -4,7 +4,8 @@
 
 Delivery is construct-driven, test-first, and dependency-ordered. Milestones
 are capability checkpoints, not alternate compiler phases. Every milestone
-uses the same direct Go AST/`go/types` to typed TS-Go AST architecture.
+uses the same direct Go AST/`go/types` to typed TS-Go AST architecture for
+canonical source, followed by the one selected fact-driven target boundary.
 
 For each construct family:
 
@@ -12,9 +13,10 @@ For each construct family:
 2. observe the focused test fail at the owning unsupported boundary;
 3. implement the highest shared semantic owner;
 4. delete any superseded path in the same change;
-5. run focused AST, strict, differential, and mutation proof;
-6. inspect generated artifacts and cost;
-7. run broader gates before checkpointing.
+5. prove canonical AST, finalized-fact totality, and exact source occurrences;
+6. run focused target-AST, strict, differential, and mutation proof;
+7. inspect canonical and executable artifacts and cost;
+8. run broader gates before checkpointing.
 
 No milestone may introduce a temporary semantic IR, hidden source ABI,
 compatibility shim, corpus-specific override, or implementation that a later
@@ -39,9 +41,11 @@ Install:
 - root placement and revisable artifact fixed point;
 - architecture walls.
 
-Exit: a minimal valid package prints strict ESM only through pinned TS-Go; a
-schema mutation, ambient build-profile drift, text emitter, or duplicate
-artifact owner fails.
+Exit: a minimal valid package prints canonical strict ESM only through pinned
+TS-Go; TSTS finalizes every selected marker fact and occurrence; the selected
+target produces strict executable output. A schema mutation, ambient
+build-profile drift, text emitter, spelling-selected marker, source reread, or
+duplicate artifact owner fails.
 
 ## 1. Core Direct Emission
 
@@ -222,14 +226,18 @@ For each acceptance corpus, including TS-Go:
 1. select the exact build and compilation profiles;
 2. generate all source-available packages;
 3. generate and certify every provider/external obligation;
-4. print all TypeScript through pinned TS-Go;
-5. strict-typecheck the whole generated product under bounded resources;
-6. link it locally with `gostdlib` and the generated runtime;
-7. execute representative CLI/library entry points;
-8. compare behavior to the selected Go build;
-9. report source/generated size, largest expansions, time/RSS, runtime, and
+4. print all canonical TypeScript through pinned TS-Go;
+5. strict-check canonical source and exact-join every selected marker to one
+   finalized TSTS fact and authored occurrence;
+6. lower through the selected target's AST and strict-typecheck the complete
+   executable product under bounded resources;
+7. link it locally with `gostdlib`, the generated Go runtime, and any demanded
+   target runtime;
+8. execute representative CLI/library entry points;
+9. compare behavior to the selected Go build;
+10. report canonical/executable size, largest expansions, time/RSS, runtime, and
    unresolved obligations;
-10. preserve exact failure artifacts.
+11. preserve exact failure artifacts.
 
 Compile-only is not runtime completion. Runtime completion requires an actual
 generated entry point to execute with expected observable output and error
@@ -320,8 +328,11 @@ Performance work proceeds in measured owner order:
    generated-package replacement through pinned TS-Go AST;
 3. prove concrete implementation bundles and product equivalence evidence are
    owned by the consuming project rather than shipped as GoToTS policy;
-4. fix the next measured generic runtime or representation owner, deleting the
-   superseded path before advancing.
+4. place executable-representation optimizations in the selected target, keyed
+   by finalized facts and complete-flow evidence rather than GoToTS call-site
+   rewrites;
+5. fix the next measured Go-language runtime owner, deleting the superseded
+   path before advancing.
 
 Each item starts with a failing owner-level contract and ends with focused
 shape, strict-typecheck, differential/equivalence, mutation, final-artifact,

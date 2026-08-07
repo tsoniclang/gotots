@@ -7,12 +7,14 @@ Every construct family is test-first and closes through independent evidence:
 1. a smallest valid Go fixture;
 2. a focused test observed failing at the owning unsupported boundary;
 3. exact TS-Go AST shape assertions;
-4. strict TypeScript typechecking;
-5. Go-versus-generated-ESM differential execution where executable;
-6. an independent structural/semantic comparison;
-7. a mutation that the owning gate catches;
-8. generated artifact and cost inspection;
-9. broad deletion searches for the superseded path.
+4. strict canonical-source checking and total finalized marker facts;
+5. exact target-AST occurrence joins and target transformation assertions;
+6. strict executable-target typechecking;
+7. Go-versus-target differential execution where executable;
+8. an independent structural/semantic comparison;
+9. a mutation that the owning gate catches;
+10. canonical and executable artifact/cost inspection;
+11. broad deletion searches for the superseded path.
 
 Implementation tests alone do not prove architecture. Generated artifacts are
 mandatory evidence.
@@ -29,8 +31,10 @@ Every checkpoint runs, in dependency order:
 6. `go vet ./...`;
 7. `go test -count=1 ./...`;
 8. race tests for materially concurrent compiler/runtime owners;
-9. representative TS-Go encode/print and strict TypeScript checks;
-10. applicable differential/runtime and artifact-size gates.
+9. representative TS-Go encode/print and strict canonical-source checks;
+10. TSTS fact totality and exact authored-occurrence joins;
+11. selected-target AST transform and strict output checks;
+12. applicable differential/runtime and artifact-size gates.
 
 Heavy jobs run one at a time in `.temp/`, with explicit timeout,
 `GOMEMLIMIT`, low `GOMAXPROCS`, disk-backed logs, and breadcrumbs. Failure
@@ -81,6 +85,31 @@ Broad walls reject:
 - post-print text mutation;
 - imports from unpinned TS-Go internals;
 - `any`, `unknown`, unchecked casts, reflection, and dynamic shape tests.
+
+## Marker And Target Boundary Proof
+
+Every canonical marker occurrence exact-joins one finalized TSTS fact selected
+by provider declaration identity. The fact supplies one normalized source
+occurrence over the exact immutable checked document. Authored locations use
+UTF-16 code-unit offsets from the first authored token through an exclusive
+end; synthetic facts are explicitly non-authored.
+
+The selected target parses the supplied document text, indexes its own AST, and
+requires exactly one node with the occurrence range and fact-specific expected
+syntax kind. Tests cover nested calls, multiple calls on one line, comments,
+multiline syntax, CRLF, BMP and non-BMP text, overlays, synthetic facts, and
+zero/duplicate/wrong-kind failures. Mutations shift either endpoint, change the
+kind, reread different filesystem bytes, classify a local same-spelled call, or
+omit one selected fact; each must fail at its sole owner.
+
+For typed pointers, focused proof covers `addressOf`, `allocatePointer`,
+`loadPointer`, and `storePointer`; nil, alias identity, mutation through two
+aliases, argument/return transport, fresh allocation, and pointer equality;
+canonical marker AST shape; TypeScript-target location lowering; strict output;
+and Go-versus-output execution. A mutation that scalarizes one alias without
+rewriting the complete flow must change behavior and fail. Broad searches must
+find no target-side marker spelling recognition, filesystem source reread,
+checker re-entry, or second pointer fact store.
 
 An adversarial target-intrinsic fixture declares a Go `String` object while a
 conversion in the same module requires the target `String.fromCharCode`.
@@ -200,8 +229,8 @@ Each type/value family has focused differentials and mutations:
 | structs | zero, keyed/unkeyed literals, copy demand, field mutation, nested values |
 | arrays | length, zero, value copy, index/address, nested elements |
 | slices | nil, make, append, capacity, overlap copy, slicing, bounds, element storage |
-| pointers | nil, alias, read/store, equality, local/field/index addresses, read-only direct proof |
-| unsafe pointers | typed-pointer round trip, live safe/unsafe aliasing, array/struct reinterpretation, slice/string headers, virtual-address arithmetic, fabricated/out-of-range rejection |
+| pointers | canonical marker facts, nil, alias, read/store, equality, local/field/index addresses, target flow lowering |
+| unsafe pointers | typed unsupported boundary until the accepted raw-pointer contract exists |
 | maps | nil, set/get/comma-ok/delete/clear, key equality/hash, zero-on-miss, iteration |
 | strings | bytes/runes, indexing, range, slicing, conversions |
 | defined types | identity, native methodless fixed-width numerics, projection/wrap, methods, nil-capable families |
@@ -246,19 +275,13 @@ operation. Removing either annotation must produce the pinned strict
 TypeScript diagnostic; adding runtime coercion or annotating ordinary direct
 numeric declarations fails the artifact-shape gate.
 
-Unsafe-pointer proof runs under all integer profiles and at the selected
-GOOS/GOARCH. It exact-compares `unsafe.Sizeof`, `Alignof`, and `Offsetof` facts
-used by each codec against the selected Go toolchain; different source
-spellings of the same type must select the same artifact. Differential cases
-mutate a value through a safe alias and an unsafe alias in both orders, cross
-array elements by virtual-address arithmetic, reinterpret nested/padded
-structs, and exercise slice/string data headers. Mutations swap field offsets,
-detach writes from the source location, allocate a second codec for one type,
-accept a fabricated integer, recover a payload through `object`/`unknown`, or
-restore the universal runtime-throwing conversion path. Each must fail at its
-owning gate. Product evidence reports conversion counts by source/target type,
-codec count and bytes, largest codecs, virtual-memory runtime bytes, strict
-typecheck time/RSS, and representative execution results.
+Unsafe-pointer proof currently asserts the typed boundary. Fixtures cover
+`unsafe.Pointer`, offset arithmetic, reinterpretation, and pointer/integer
+conversion and require a diagnostic carrying the exact Go occurrence and
+selected source/target types. A mutation that emits the former virtual-address
+runtime, a JavaScript cast, a fabricated target-neutral fact, or a generic
+throwing placeholder must fail. Exact runtime proof resumes only after a shared
+raw-pointer contract is separately accepted.
 
 ## Struct, Receiver, And Embedding Proof
 
@@ -774,63 +797,38 @@ duplicate a generated and manual owner; retain one generated package file; or
 feed text directly to the output writer. Each fails at its owning gate.
 
 Callable source-implementation proof additionally exact-joins the selected Go
-signature, ordered projection kinds, projected target parameter/result types,
-and checked authored signature. The certificate fingerprint covers that join.
-Focused artifacts prove both automatic and authored `*int -> number`
-`pointee-value` selection: `Read(&x)` emits `Read(x)`, an existing pointer emits
-one guarded current-value read, and no call-induced scalar cell is requested.
-The complementary mutating fixture retains a location. Required mutations
-change the Go parameter, authored parameter, nil shape, projection kind,
-argument rewrite, method/callback adapter, or signature dependency; each fails
-at its owning join or strict consumer. A body-only authored change proves that
-the callable-signature facet and its callers remain unchanged.
+signature, canonical parameter/result types, and checked authored signature.
+The certificate fingerprint covers that join. Focused artifacts prove that
+`Read(*int)` remains `Read(Pointer<int> | undefined)` for generated and authored
+implementations. Required mutations change the Go parameter, authored pointer
+type, nil shape, method/callback adapter, or signature dependency; each fails at
+its owning join or strict consumer. A body-only authored change proves that the
+callable-signature facet and its callers remain unchanged.
 
 The final broad search rejects any source-implementation name-only surface
-join, package/function projection condition, projection config field, caller
-allowlist, text patch, unchecked cast, duplicate signature store, or migrated
-scalar-pointer carrier on a certified pointee-value path.
+join, package/function projection condition, pointer-scalarization config field,
+caller allowlist, text patch, unchecked cast, or duplicate signature store.
 
-Pointer-runtime mutation tests require address construction to remain behind a
-lazy accessor, ordinary value access to contain no unsafe branch, and composed
-locations to call typed active access functions rather than recursively enter
-public accessors. Differential fixtures compare repeated field addresses,
-pointer equality and hashing, whole-parent replacement, writes through aliases,
-safe/unsafe alias synchronization, and rebinding of an exposed carrier.
-Deterministic structure checks prove that pointer creation cannot perform
-address-map operations until an identity boundary is reached.
+Pointer-target mutation tests require complete-flow lowering: changing one
+definition without every reference, scalarizing one of two aliases, dropping a
+nil check, or conflating two fresh allocations must fail. Differential fixtures
+compare repeated addresses, pointer equality, whole-parent replacement, writes
+through aliases, and rebinding of a location. Raw-pointer cases remain typed
+unsupported until their shared contract exists.
 
-Field-path fixtures include two- and three-level aggregates, promoted fields,
-whole-root replacement after taking an interior address, and pointer-valued
-intermediate fields. Artifact checks require one location per maximal carrier
-segment, require one root access plus one direct projection, and reject
-restored nested field-location construction.
-
-Named-struct pointer fixtures independently cover direct parameter/receiver
-transport, nil panic, pointer equality/hash, interface boxing, `&field`,
-promoted deep fields, whole-value `*p = next`, copying before address-taking,
-pointer-to-pointer rebinding, package-variable replacement, nested child
-replacement, array/slice element replacement, and safe/unsafe alias
-synchronization. Generated artifact checks require stable-only `*Struct`
-signatures and calls to use the class reference directly, require recursive
-stable assignment to preserve child storage, and require any dynamic container
-or unsafe origin to reconstruct that pointer family as one canonical carrier.
-Local/fresh-only controls require direct object equality/hash and reject an
-unused generated storage facet; field/package/conversion controls require the
-direct-storage-identity outcome and its storage facet.
-Provider controls must not request a generated storage facet merely to compare
-or hash a direct provider pointer. Mutations that collapse stable and dynamic
-demand, rebind instead of stable-assigning, compare generated wrappers by
-wrapper identity, compare provider values through generated storage, cache an
-intermediate carrier aggregate, or confine unsafe aliasing to an ephemeral
-boundary carrier must fail at the representation, differential, provider, or
-strict-typecheck gate.
-
-Runtime-feature tests exact-join the final feature requests to assembled class
-members. A no-flat-path control retains the prior pointer member count, while a
-flat-path fixture adds exactly the field-path member without adding an import
-or standalone runtime definition. Dropping the request, emitting the member
-unconditionally, or retaining a request from a replaced artifact fails its
-owning gate and the generated-size/node bounds.
+Field-path and named-struct fixtures cover two- and three-level aggregates,
+promoted fields, whole-root replacement after taking an interior address,
+pointer-valued intermediate fields, parameter/receiver transport, nil panic,
+pointer equality, interface boxing, copying before address-taking,
+pointer-to-pointer rebinding, package variables, and array/slice elements.
+Canonical artifacts must use one `Pointer<T>` contract and exact marker facts
+for every address/load/store; no generated storage facet or JavaScript carrier
+appears. TypeScript-target artifacts must use one shared location for every
+observable alias group and may scalarize only a complete proven flow.
+Mutations that omit an occurrence, attach the wrong addressable owner, detach a
+write, cache an intermediate value, compare locations by pointee value, or
+rewrite only one consumer fail at fact totality, exact join, differential, or
+strict-target gates.
 
 An equivalence envelope requires product-level evidence. For an internal hash,
 tests prove equal-input stability, unequal-input behavior over an adversarial
@@ -843,7 +841,8 @@ observable contract.
 Artifact evidence reports removed generated files, source bytes, TS-Go AST
 nodes, strict-typecheck time/RSS, runtime time/RSS, and the top profile frames.
 The selected package must contribute one final implementation module, zero
-translated bodies, and zero unsafe-pointer traffic from the removed package.
+translated bodies, and zero unresolved raw-pointer boundaries from the removed
+package.
 
 Generated-support topology proof exact-joins full artifact owners and
 definitions after deterministic family sharding. Layout tests prove that two

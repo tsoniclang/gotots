@@ -2,7 +2,7 @@
 
 ## Design Rule
 
-GoToTS is a direct, context-aware Go-to-TypeScript compiler:
+GoToTS is a direct, context-aware Go-to-canonical-TypeScript compiler:
 
 ```text
 selected Go packages
@@ -10,13 +10,29 @@ selected Go packages
     -> one owner-directed emission walk
     -> typed values of the pinned TS-Go external AST protocol
     -> pinned TS-Go decoder, factory, and printer
-    -> strict ESM TypeScript
+    -> canonical strict ESM Tsonic-flavored TypeScript
 ```
 
 The Go AST and `go/types` graph are the only source-semantic model. Typed
 TS-Go protocol values under construction are the only target model. There is
 no source inventory, semantic IR, operation IR, call graph, lowering plan,
 handwritten TypeScript AST, text emitter, or post-print rewrite.
+
+Canonical output is consumed through a separate exact target boundary:
+
+```text
+immutable canonical text
+    -> TSTS finalized semantic facts and normalized authored occurrences
+    -> target-owned parser and AST
+    -> exact occurrence join by document + UTF-16 range + syntax kind
+    -> target-owned transformation, printer, and runtime
+```
+
+The target boundary is not a second Go semantic model. TSTS selects marker
+facts by canonical declaration identity. Targets consume those facts and must
+not recognize marker spelling, scan source text, reread files, or re-enter the
+checker. The first TypeScript target uses the `typescript` package's parser,
+factory, transformer, and printer; it does not depend on a TSTS printer API.
 
 Handlers may inspect the current Go node, its ancestors, the selected package
 graph, and existing checker evidence. They may create typed TS-Go AST nodes and
@@ -47,6 +63,9 @@ rerun the checker.
 | provider implementation disposition and private dependency closure | provider certification over the strict checked provider project |
 | provider/generated conversion | generated static facade for the selected Go callable or type |
 | target AST shape and ordering | pinned TS-Go schema and generated protocol bindings |
+| target-neutral marker identity and fact meaning | shared Tsonic/TSTS contract |
+| exact checked source snapshot and authored occurrence | finalized TSTS source program |
+| executable representation, target AST, printing, and target runtime | selected target |
 
 One fact may have many references but one producer. A second workaround in the
 same semantic class reopens its owner.
@@ -223,29 +242,20 @@ References subscribe to closed observable facets such as:
 - constructor surface;
 - exported value surface.
 
-The callable-signature facet includes one ordered, closed target projection for
-every source parameter and result. Its authoritative key is the selected Go
-callable object, not a package/name string. The initial projection domain is:
+The callable-signature facet includes one ordered canonical mapping for every
+source parameter and result. Its authoritative key is the selected Go callable
+object, not a package/name string. A Go `*T` maps to
+`Pointer<T> | undefined`; GoToTS does not replace it with `T` because a
+particular body appears read-only. Receiver and variadic mappings remain the
+only source-shape transformations explicitly owned by this specification.
 
-- `identity`, for the ordinary selected representation;
-- `pointee-value`, for a read-only non-escaping `*T` transported as the selected
-  value representation of `T`;
-- `direct-object-reference`, for a represented Go object whose identity and
-  mutation are already carried by the TypeScript class reference;
-- `mutable-scalar-location`, for observable scalar writes, aliases, identity,
-  or temporal sharing;
-- `owner-location`, for a field or element address that writes through to its
-  owner; and
-- `unsafe-location`, for reached dynamic address semantics.
-
-Automatic analysis and a certified authored implementation are two evidence
-sources for this one artifact, not two lowering paths. Automatic selection may
-choose `pointee-value` only after proving no write, escape, identity use, unsafe
-crossing, or observable temporal alias. For an authored implementation, its
-strictly checked TypeScript signature is compared with the selected Go
-signature and must identify exactly one admissible projection. No config key,
-annotation, package name, function name, or caller allowlist selects a
-projection.
+A certified authored implementation is checked against the same canonical
+surface. It may replace an algorithm or private storage under its equivalence
+envelope, but it cannot select a target representation by changing a pointer
+parameter to a scalar. Such scalarization is a selected-target optimization
+over finalized facts and must rewrite the complete location flow there. No
+GoToTS config key, annotation, package name, function name, or caller allowlist
+selects it.
 
 Every direct call, method value/expression, function value, callback, interface
 adapter, deferred entry, provider bridge, package export, and definition
@@ -411,115 +421,42 @@ once by the value family. A class gains `$copy` only when the compilation
 requests copying that class; revisable artifact reconstruction adds it before
 seal.
 
-Pointers identify addressable locations, not merely values. A direct value is
-used when no address/alias semantics are demanded. A pointer carrier is
-introduced at the owning addressable location only when mutation, aliasing,
-address comparison, or nil pointer behavior requires it. Read-only scalar
-arguments do not become carriers merely because Go's source type is a pointer
-when the checker and use contract prove direct representation exact.
+Pointers identify typed writable locations, not merely values. Canonical source
+always preserves that meaning with `Pointer<T> | undefined` and the accepted
+`addressOf`, `allocatePointer`, `loadPointer`, and `storePointer` operations from
+`@tsonic/core/lang.js`. GoToTS emits explicit Go nil checks before loads and
+stores and uses identity equality for pointer comparison. Passing, returning,
+storing, or copying a pointer preserves the same location identity.
 
-A pointer to a represented named struct uses the represented class reference
-plus `undefined` only while every selected origin is stable. A local or fresh
-class object is self-identifying: dereference is a nil guard, assignment mutates
-that object, equality/hash use object identity, and no storage facet is emitted.
-An origin that can reconstruct a wrapper over an existing location (`&field`,
-`&packageVariable`, or conversion between layout-identical pointer types)
-selects the distinct direct-storage-identity outcome. Only then does the class
-own canonical mutable storage, whole-value assignment recursively preserve
-demanded child storage, and equality/hash use storage identity. Provider-owned
-canonical classes retain certified object identity rather than demanding a
-generated storage facet.
+Addressable locals, fields, package variables, parameters, named results,
+array/slice elements, and pointer-to-pointer values remain distinguishable
+through the selected operation facts. GoToTS emits the exact marker occurrence
+from its Go AST and `go/types` evidence; it does not decide whether a target
+uses a class object, scalar snapshot, `{ value: T }` location, native pointer,
+or another representation.
 
-Pointer-origin demand is a closed semantic disposition joined at the canonical
-pointer-family artifact. Ordinary transport and a local/fresh direct class
-origin have no additional location demand because the object itself is the
-stable identity. A package location, selected field, or layout-preserving
-pointer conversion demands stable storage identity. A slice/array element
-address or unsafe live-memory view is dynamic because later access must resolve
-the then-current container element or byte-backed storage. One dynamic origin
-promotes that pointer family to its canonical typed carrier and reconstructs
-all dependent signatures and uses. It is not materialized only at the boundary:
-that would split one Go pointer identity into unsynchronized representations.
-A demand join is order-independent, idempotent, and total: repeated origin
-evidence has no effect, and the empty set selects the family's default during
-transactional requirement removal. Artifact reachability is owned by the root
-scheduler, never inferred from a synthetic definition requirement.
-A stable origin never promotes an otherwise-direct named-struct family to a
-carrier, while scalar and other already-carried families remain carriers.
-Pointer-to-pointer mutation retains a carrier for the outer pointer. No package,
-function, or spelling exception selects representation.
+TSTS owns canonical marker recognition and retains the exact call, operands,
+source types, addressable-storage evidence, and mutability evidence. The
+selected target owns flow-wide representation choice. It may eliminate a
+location only when every definition/reference in that location flow is
+rewritten and observable alias, mutation, nil, identity, and lifetime behavior
+remain exact. A local decision at one call site is forbidden.
 
-An implicit pointer-receiver call on an addressable value projects that value's
-mutable storage. It never performs the ordinary Go value-copy transfer before
-calling the method. This remains true when a later address use has promoted the
-binding to canonical storage and when the receiver is reached through an
-embedded or selected field. For example, after `p := &builder`,
-`builder.WriteString(text)` passes the same builder storage observed through
-`p`; it does not call `WriteString(copy(builder))`.
-
-A carrier's location identity is canonical but demand-materialized: ordinary
-reads and writes do not allocate address tokens or populate identity maps.
-Equality, hashing, and unsafe conversion request the token and cache it on the
-carrier. Unsafe synchronization is installed into the active typed access
-functions only on the carrier that crosses the unsafe boundary. Selecting
-unsafe support must not add a branch to every ordinary pointer read and write;
-composed field and index locations call the parent's active access function
-directly.
-
-A contiguous carrier field-address path has one location object, not one per
-selector. The address owner consumes the maximal typed path and emits direct
-root-to-leaf read and write projections. A carrier root uses its active
-read/write functions. A stable direct named-struct child address instead uses
-the child class whose canonical storage is preserved recursively by every
-assignment to its owning field or aggregate. The carrier path splits at pointer
-dereference, provider, or indexed-representation boundaries. Its projections
-read the current root storage on every access; an intermediate aggregate is
-never cached. Canonical address tokens follow the same ordered field path and
-remain lazy. Generated code does not interpret an erased or dynamically typed
-property path.
-
-A class-member-only runtime facility is selected by one typed runtime-feature
-request. The request emits no import and owns no duplicate top-level runtime
-definition; it augments the canonical runtime class during package assembly.
-If no final generated artifact requests the feature, the member is absent.
-Flat field-address paths request the pointer field-path feature. Reconstructed
-artifacts replace their feature requests transactionally, just like imports,
-so a superseded use cannot leave stale runtime surface behind.
+For example, the TypeScript target may turn a complete non-escaping read-only
+`Pointer<int>` flow into a `number`, while a flow with two mutating aliases uses
+one shared runtime location. Canonical source is unchanged in both cases, and a
+native target consumes the same finalized facts without reverse-engineering a
+Node-oriented carrier.
 
 ### Unsafe Pointer Memory
 
-`unsafe.Pointer` is a typed compilation policy over the selected toolchain's
-layout, not a JavaScript cast and not a host address. Every participating Go
-pointer requests the carrier representation. Each conversion site selects one
-canonical statically typed codec for the pointer's storage type directly from
-`go/types` and `types.Sizes`; the codec is emitted once and contains the exact
-basic, array, struct, string, slice, and pointer layout operations it needs.
-Generated source callables retain their Go parameters: codecs are private
-support references at conversion expressions, never hidden source arguments.
-
-The runtime unsafe pointer is a pair of a live addressable memory view and a
-byte offset. A view reads the current source location and commits writes back
-through that location, so safe and unsafe aliases observe one value. A
-pointer-to-`uintptr` conversion uses a deterministic virtual address assigned
-to that live view; arithmetic and conversion back recover the same view and
-offset. It never claims to expose a process address. Numeric fabrication that
-does not identify a live generated view fails closed, as do offsets or layouts
-outside the selected allocation. Native FFI owns a separate provider boundary
-and may not infer a host pointer from the virtual integer.
-
-For example, `*(*uint32)(unsafe.Pointer(&bytes[4]))` selects the byte-element
-source codec, the `uint32` target codec, and a view rooted in the slice backing
-array at offset four; the produced TypeScript reads four little-endian bytes
-through that view. `(*Header)(unsafe.Pointer(&bytes[0]))` selects the canonical
-`Header` struct codec using the selected GOOS/GOARCH field offsets. A slice or
-string header conversion uses its canonical data-pointer/length/capacity
-layout; it is not recognized by package, field name, or source spelling.
-
-There is one unsafe-memory owner. Package overrides, source-pattern rewrites,
-opaque `object` payload recovery, `any`/`unknown`, unchecked casts, host-shape
-inspection, per-target registries, and an ordinary throwing placeholder are
-forbidden. A not-yet-supported layout family is rejected while translating
-the exact conversion occurrence rather than emitted as code that fails later.
+Raw addresses are a different semantic class from typed locations. The shared
+contract does not yet define raw-address identity, offsets, reinterpretation,
+or pointer/integer conversion. GoToTS therefore emits no substitute virtual
+address, JavaScript cast, or target-specific codec in canonical source. It
+rejects the exact reached unsafe occurrence until one accepted target-neutral
+raw-pointer contract owns the class. Safe pointer semantics are never routed
+through a legacy raw-memory implementation to keep a corpus compiling.
 
 Maps use one canonical generated `GoMap<K,V>` runtime type because JavaScript
 `Map` does not preserve Go key equality, zero-on-miss, comma-ok, copy, or
@@ -681,23 +618,22 @@ Generic named types retain exactly their declared type parameters. Closed
 representation operations may be private specialized artifacts; they do not
 change public type arity.
 
-Open generic bodies refer to representation through three closed associated
-type facets owned by the representation classifier:
+Open generic bodies refer to storage representation through the closed
+associated facets owned by the representation classifier:
 
 ```ts
 type GoStorage<T> = T extends GoStoredValue<infer S> ? S : T;
 type GoContainerStorage<T> = T extends GoContainerStoredValue<infer S> ? S : T;
-type GoPointerType<T> =
-  T extends GoPointerRepresentedValue<infer P> ? P : GoPointer<T, T>;
 ```
 
 Concrete generated classes declare only the demanded zero-runtime
 `unique symbol` marker members. The marker target is the already-selected
-logical, storage, container-storage, or pointer representation; it never
+logical, storage, or container-storage representation; it never
 chooses representation itself. A provider certificate must prove an
 equivalent marker for a non-default provider representation. Identity storage
-and the canonical logical pointer carrier use the conditional fallback and
-need no marker.
+uses the conditional fallback and needs no marker. A generic pointer is the
+canonical target-neutral `Pointer<T>` and therefore has no generated associated
+pointer facet.
 
 These facets do not add source type parameters, source value parameters,
 runtime dispatch, casts, or operation kernels. A private kernel is selected
@@ -1188,14 +1124,12 @@ package may survive. References keep the ordinary package assembly path and
 source-facing contract.
 
 For callable exports, the surface join is signature-exact rather than
-name-only. Certification compares the selected Go signature, every selected
-target projection, and the checked authored TypeScript parameter/result types.
-It records the resulting projection fingerprint in compilation evidence before
-any caller is emitted. For example, a Go `Read(*int) int` and an authored
-`Read(number): number` uniquely select `pointee-value`; generated `Read(&x)`
-therefore becomes `Read(x)`, while a call through an existing pointer reads its
-current value with the ordinary nil-dereference behavior. An authored scalar
-signature is rejected when the Go contract requires an observable write.
+name-only. Certification compares the selected Go signature, its canonical
+TypeScript mapping, and the checked authored TypeScript parameter/result types.
+It records the resulting signature fingerprint in compilation evidence before
+any caller is emitted. For example, Go `Read(*int) int` requires authored
+`Read(Pointer<int> | undefined): int`; authored `Read(number): number` is a
+target-specific optimization and is rejected at this canonical boundary.
 
 The authored module set contains exactly one executable package assembly.
 Surviving imports of its public exports are rebound to that assembly in the

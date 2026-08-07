@@ -454,68 +454,61 @@ It does not emit per-site classes such as `GoMap$9e138...`.
 
 ### Pointers
 
-`&x` identifies a location. `*p` reads or writes it and preserves nil
-panic. The compiler uses direct values where no location identity can be
-observed and introduces one carrier at the highest exact addressable owner
-where aliasing/mutation requires it.
+`&x` identifies a typed location. `*p` reads or writes it and preserves nil
+panic. Canonical output records that intent with the accepted neutral pointer
+contract; it does not preselect a JavaScript carrier or scalarize a pointer:
+
+```ts
+import type { Pointer } from "@tsonic/core/lang.js";
+import {
+  addressOf,
+  allocatePointer,
+  loadPointer,
+  storePointer,
+} from "@tsonic/core/lang.js";
+```
 
 ```go
 func Read(p *int) int { return *p }
 func Set(p *int, v int) { *p = v }
 ```
 
-`Set` necessarily consumes a mutable location. `Read` may use a direct
-read-only representation only when every selected boundary and alias fact
-proves that doing so cannot change Go behavior; uncertainty retains the
-carrier. Representation is selected once and propagated to all users through
-observable facets.
+Canonical source has the human-shaped contract:
 
-Pointers to represented named structs use the class reference plus `undefined`
-when all observed origins are stable. For example, `func Read(p *Node) int {
-return p.Pos }` receives `Node | undefined`. A local/fresh `*Node` is the class
-object itself and compares/hashes by object identity without a storage facet.
-`func Child(p *Node) *Child { return &p.Child }` can reconstruct a `Child`
-wrapper, so that family selects direct storage identity. Assigning either the
-field or the whole `Node` then recursively updates the demanded child storage,
-and the returned pointer observes the replacement. Certified provider classes
-retain provider object identity.
+```ts
+function Read(pointer: Pointer<int> | undefined): int {
+  if (pointer === undefined) goPanicNil();
+  return loadPointer(pointer);
+}
 
-The pointer-family owner joins closed origin demands. `&local` and `&T{...}`
-already have stable class-object identity. `&pkg.Value`, `&value.Field`, and
-layout-preserving pointer conversion demand stable storage identity.
-`&slice[i]`, `&array[i]`, and a live unsafe byte view are dynamic locations and
-select one canonical typed carrier for every use of that pointer family. For
-example, after `p := &slice[0]; slice[0] = next`, `p` must read `next`; a class
-wrapper detached from the index cannot preserve that behavior. Unsafe mutation
-likewise cannot be confined to an ephemeral boundary carrier because later
-direct reads must observe it. Selection is semantic and type-owned, never an
-escape heuristic or a package-specific override.
-The join treats duplicate and reordered origin observations identically; no
-observations select the family's default. Requirement removal may therefore
-reconstruct a still-reachable artifact without inventing a definition row.
+function Set(pointer: Pointer<int> | undefined, value: int): void {
+  if (pointer === undefined) goPanicNil();
+  storePointer(pointer, value);
+}
 
-Storage demand is joined back to the declaration of every addressable binding,
-including parameters, locals, named results, range variables, and implicit
-type-switch case bindings. The binding owner emits the carrier; a later address
-or implicit pointer-receiver call may request it, but may never fabricate a
-carrier name at the use site.
+let value: int = 1;
+const pointer = addressOf(value);
+const fresh = allocatePointer<int>(0);
+```
 
-Canonical address tokens are created lazily at pointer identity, hash, or
-unsafe boundaries. Constructing, reading, or writing an otherwise ordinary
-carrier does not touch the address-token maps. Field, index, and representation
-views compose the parent's active typed access functions instead of re-entering
-the public value accessor. An unsafe boundary replaces those active functions
-on only the exposed carrier while retaining its original raw storage access.
-Nested selectors whose address remains in one carrier representation lower to
-one root-linked location with typed direct property projections. For example,
-`&outer.middle.value` reads and writes `root.middle.value` through the current
-root storage and derives the lazy identity `root -> middle -> value`; it does
-not allocate nested field-location carriers. A stable direct named-struct child
-uses its existing class storage instead. A representation boundary ends the
-projection and starts a new exact location segment. Encountering a
-carrier-rooted flat segment records the typed pointer field-path runtime
-feature; programs without such a segment do not emit the supporting class
-member.
+GoToTS owns the explicit nil checks because they are Go behavior. Pointer
+equality remains identity equality (`===`) over `Pointer<T> | undefined`.
+Passing, returning, or storing a pointer preserves the same location identity.
+Every marker call is emitted as TS-Go AST and selected by exact semantic
+evidence, never by marker spelling.
+
+The TypeScript target may later transform a complete location flow to a native
+value or one small `{ value: T }` location when that preserves all aliases. A
+target optimization never changes canonical source, is never selected by
+GoToTS, and must exact-join the finalized TSTS facts for every transformed
+occurrence. The unoptimized/native-target build consumes the pointer facts
+directly.
+
+`unsafe.Pointer`, raw-address arithmetic, reinterpretation, and
+pointer/integer conversion require a separate accepted raw-pointer marker
+contract. Until that contract exists, canonical output rejects the exact
+unsafe occurrence with a typed diagnostic; safe typed pointers are not lowered
+through the legacy JavaScript virtual-address representation.
 
 ### Interfaces
 
@@ -667,13 +660,13 @@ func ArrayAddress[T any](first, second T) T {
 ```
 
 The target kernel still has one `T`; it uses `GoContainerStorage<T>` for array
-slots and `GoPointerType<T>` for the element address. If a concrete `Item`
-stores as `Item$Storage`, its class declares
-`GoPointerRepresentedValue<GoPointer<Item, Item$Storage>>`. A scalar or
-identity-represented provider value uses the canonical fallback. No
-`T$Storage` or `T$Pointer` parameter is fabricated.
+slots and `Pointer<T>` for the element address. The pointer operation carries
+the exact addressable-storage fact separately, so a concrete `Item` may retain
+its target-neutral logical type while a selected target chooses the storage
+representation. No `T$Storage` or `T$Pointer` parameter is fabricated.
 
-Only the concrete type owner may emit an associated-type marker. Markers are
+Only the concrete type owner may emit a storage associated-type marker. Such
+markers are
 demand-created, type-only, and selected from the canonical representation
 observation. They are not operation capabilities and cannot by themselves
 cause a concretization or private runtime kernel.
@@ -949,8 +942,7 @@ that freedom does not extend to a source-visible callable ABI or to any type a
 selected consumer requires. Callsites remain ordinary imports and calls; no
 policy, bridge, digest, or implementation selector is added to a Go callable.
 
-The checked authored signature may select a closed representation projection
-without a configuration entry. Given:
+The checked authored signature preserves the canonical source contract. Given:
 
 ```go
 // package fast
@@ -962,22 +954,20 @@ func Use() int {
 }
 ```
 
-and the certified implementation:
+the certified implementation receives the same typed location:
 
 ```ts
-export function Read(value: number): number {
-    return value;
+export function Read(value: Pointer<int> | undefined): int {
+    if (value === undefined) goPanicNil();
+    return loadPointer(value);
 }
 ```
 
-the callable ABI owner proves that the source parameter is read-only at this
-replacement boundary, selects `pointee-value`, and emits the caller as
-`Read(current)`. If the argument is an existing `*int`, the caller emits its
-current pointee value and preserves Go's nil-dereference failure. The manual
-function does not receive or mutate a hidden cell. A Go function whose visible
-contract writes through the pointer cannot use this plain `number` signature;
-it remains a location unless an explicit write-back projection is added to the
-closed language model.
+the callable ABI owner joins that signature to `*int`; callers pass the pointer
+operation unchanged. A TypeScript target may later prove the entire flow
+read-only and lower both definition and all calls to `number`. That decision is
+not encoded in a source implementation signature and cannot be inferred by
+GoToTS from the authored body.
 
 For an internal hash package, Go source such as:
 
