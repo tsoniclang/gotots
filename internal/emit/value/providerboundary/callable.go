@@ -31,9 +31,8 @@ func FromProviderSourceCallable(
 	if err != nil || changed {
 		return converted, err
 	}
-	return cooperativecall.AdaptSourceValue(
+	return cooperativecall.TransportSourceValue(
 		context,
-		children,
 		source,
 		function,
 		target,

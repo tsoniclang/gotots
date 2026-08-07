@@ -778,17 +778,19 @@ complete compiler-owned artifact set: a seeded obsolete source file and an old
 target `tsconfig` must both disappear, and the sorted manifest membership
 (including the manifest itself) must exact-join the physical file set.
 
-For each source implementation, certification independently inspects the
+For each source implementation, GoToTS certification independently inspects the
 selected Go package, the ordinary generated package assembly, and the authored
 strict TypeScript project. It exact-joins exported identities, binds the build
 and compilation profiles, parses every authored module through pinned TS-Go,
 rebinds public generated imports to the package assembly, proves each residual
 private contract module body-free and exact by imported name, and inspects the
-final target file set. Before checker evidence is trusted, the complete ordinary
-generated target set and the complete installed target set are independently
-strict-typechecked with the same final module-resolution configuration. The
-installed check proves all selected consumer requirements; callable source
-signatures and projections are joined separately by the callable ABI owner.
+final canonical file set. It does not invoke raw TS-Go to check canonical marker
+imports. Before checker evidence is trusted, TSTS independently checks the
+complete ordinary generated canonical set and complete installed canonical set
+with its authoritative virtual modules; the selected target then lowers and
+strict-typechecks both complete executable sets with one final module-resolution
+configuration. The installed check proves all selected consumer requirements;
+TSTS exact-joins callable source signatures in that canonical check.
 Display-oriented checker strings, parameter spellings, and replacement-private
 storage layouts are forbidden as package-contract equality evidence. Required
 mutations alter a Go
@@ -798,14 +800,15 @@ private-module statement;
 duplicate a generated and manual owner; retain one generated package file; or
 feed text directly to the output writer. Each fails at its owning gate.
 
-Callable source-implementation proof additionally exact-joins the selected Go
-signature, canonical parameter/result types, and checked authored signature.
-The certificate fingerprint covers that join. Focused artifacts prove that
+Callable source-implementation proof additionally makes TSTS exact-join the
+ordinary generated parameter/result types and checked authored signature under
+one canonical provider graph. The certificate fingerprint covers the immutable
+authored source and export evidence consumed by that join. Focused artifacts prove that
 `Read(*int)` remains `Read(Pointer<int> | undefined)` for generated and authored
 implementations. Required mutations change the Go parameter, authored pointer
 type, nil shape, method/callback adapter, or signature dependency; each fails at
-its owning join or strict consumer. A body-only authored change proves that the
-callable-signature facet and its callers remain unchanged.
+the TSTS join or strict target consumer. A body-only authored change changes the
+implementation digest without changing generated callers.
 
 The final broad search rejects any source-implementation name-only surface
 join, package/function projection condition, pointer-scalarization config field,

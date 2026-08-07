@@ -368,7 +368,6 @@ func newProgramSession(
 			session,
 			session,
 			session,
-			session,
 			goRuntime,
 		)
 	}

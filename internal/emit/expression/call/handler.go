@@ -234,13 +234,11 @@ func emit(
 	}
 	guardNil := !static &&
 		!callable.StaticallyNonNil(context.TypesInfo(), source.Fun)
-	selectedABI, _ := context.ResolveCallableABI(directFunction)
-	arguments, argumentBefore, argumentRequests, err := emitArgumentsWithABI(
+	arguments, argumentBefore, argumentRequests, err := emitArguments(
 		context,
 		children,
 		source,
 		signature,
-		selectedABI,
 		guardNil || detached,
 	)
 	if err != nil {

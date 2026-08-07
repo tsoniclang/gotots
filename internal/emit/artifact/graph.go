@@ -1,14 +1,11 @@
 package artifact
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
@@ -25,7 +22,6 @@ type Graph struct {
 	reverse      map[api.ArtifactDependency]map[api.ArtifactOwner]struct{}
 	dirty        artifactOwnerQueue
 	removalDirty map[api.ArtifactOwner]struct{}
-	callableABIs map[api.ArtifactOwner]callableabi.Callable
 	compare      func(api.ArtifactOwner, api.ArtifactOwner) int
 }
 
@@ -104,52 +100,8 @@ func NewGraph(
 		),
 		dirty:        newArtifactOwnerQueue(compare),
 		removalDirty: make(map[api.ArtifactOwner]struct{}),
-		callableABIs: make(map[api.ArtifactOwner]callableabi.Callable),
 		compare:      compare,
 	}
-}
-
-func (g *Graph) AdmitCallableABI(
-	owner api.ArtifactOwner,
-	selected callableabi.Callable,
-) error {
-	if !owner.Valid() || !selected.Valid() {
-		return &GraphError{
-			Object: owner,
-			Reason: "callable ABI admission is invalid",
-		}
-	}
-	if current, exists := g.callableABIs[owner]; exists {
-		if bytes.Equal(
-			current.CanonicalEncoding(),
-			selected.CanonicalEncoding(),
-		) {
-			return nil
-		}
-		g.callableABIs[owner] = selected
-		record := g.records[owner]
-		if record == nil {
-			return nil
-		}
-		dependencies := make(
-			[]api.ArtifactDependency,
-			0,
-			len(record.dependencies),
-		)
-		for dependency := range record.dependencies {
-			dependencies = append(dependencies, dependency)
-		}
-		return g.commit(owner, record.baseContract, dependencies, false)
-	}
-	g.callableABIs[owner] = selected
-	return nil
-}
-
-func (g *Graph) CallableABI(
-	owner api.ArtifactOwner,
-) (callableabi.Callable, bool) {
-	selected, ok := g.callableABIs[owner]
-	return selected, ok
 }
 
 func (g *Graph) Commit(
@@ -180,12 +132,6 @@ func (g *Graph) commit(
 	nextContract, err := validateArtifactContract(owner, contract)
 	if err != nil {
 		return err
-	}
-	if selected, ok := g.callableABIs[owner]; ok {
-		nextContract, err = contractWithCallableABI(nextContract, selected)
-		if err != nil {
-			return &GraphError{Object: owner, Reason: err.Error()}
-		}
 	}
 	nextDependencies := make(map[api.ArtifactDependency]struct{}, len(dependencies))
 	for _, dependency := range dependencies {
@@ -257,33 +203,6 @@ func (g *Graph) commit(
 		current.facetRevisions[facet]++
 	}
 	return g.invalidateConsumers(owner, changed, historicalAuthorized)
-}
-
-func contractWithCallableABI(
-	contract Contract,
-	selected callableabi.Callable,
-) (Contract, error) {
-	signature, ok := contract.facet(api.ArtifactFacetCallableSignature)
-	if !ok {
-		return Contract{}, fmt.Errorf(
-			"callable ABI owner has no callable-signature facet",
-		)
-	}
-	projection := selected.CanonicalEncoding()
-	var signatureLength [8]byte
-	binary.BigEndian.PutUint64(signatureLength[:], uint64(len(signature)))
-	encoded := make(
-		[]byte,
-		0,
-		len(signatureLength)+len(signature)+len(projection),
-	)
-	encoded = append(encoded, signatureLength[:]...)
-	encoded = append(encoded, signature...)
-	encoded = append(encoded, projection...)
-	return contract.withOwnedFacet(
-		api.ArtifactFacetCallableSignature,
-		encoded,
-	)
 }
 
 func artifactFacetTransitions(

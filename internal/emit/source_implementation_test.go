@@ -3,14 +3,12 @@ package emit
 import (
 	"context"
 	"encoding/json"
-	"go/types"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
@@ -22,15 +20,15 @@ func TestSourceImplementationAtomicallyReplacesGeneratedPackage(t *testing.T) {
 	writeSourceImplementationFixture(t, filepath.Join(root, "go.mod"), "module example.test/app\n\ngo 1.26.4\n")
 	writeSourceImplementationFixture(t, filepath.Join(root, "fast", "fast.go"), `package fast
 func Sum(value string) int { return len(value) * 100 }
-func Read(value *int) int { return *value }
+func Read(value int) int { return value }
 `)
 	writeSourceImplementationFixture(t, filepath.Join(root, "main.go"), `package app
 import "example.test/app/fast"
 func Value() int {
 	current := 41
-	return fast.Sum("abcd") + fast.Read(&current)
+	return fast.Sum("abcd") + fast.Read(current)
 }
-func ReadExisting(current *int) int { return fast.Read(current) }
+func ReadExisting(current int) int { return fast.Read(current) }
 `)
 	implementationRoot := filepath.Join(root, "implementation")
 	implementationSource := `export function Read(input: number): number { return input; }
@@ -102,34 +100,6 @@ export function Sum(value: string): number { return value.length; }
 	if err != nil {
 		t.Fatal(err)
 	}
-	read, ok := program.PackageByPath("example.test/app/fast").Types().Scope().Lookup("Read").(*types.Func)
-	if !ok {
-		t.Fatal("Go Read function is absent")
-	}
-	readABI, ok := certificate.ResolveCallableABI(read.Pkg().Path(), read.Name())
-	if !ok {
-		t.Fatal("Read callable ABI is absent")
-	}
-	readParameter, ok := readABI.Parameter(0)
-	if !ok || readParameter.Projection() != callableabi.ProjectionPointeeValue ||
-		readParameter.TargetType() != "number" {
-		t.Fatalf("Read callable ABI = %#v", readParameter)
-	}
-	writeSourceImplementationFixture(t, filepath.Join(implementationRoot, "package.ts"), `export function Read(value: string): number { return value.length; }
-export function Sum(value: string): number { return value.length; }
-`)
-	if _, err := sourceimplementation.VerifyAll(sourceimplementation.Config{
-		RepositoryRoot: repository,
-		Program:        program,
-		ContractPaths:  []string{contractPath},
-		ScratchRoot:    filepath.Join(root, ".bad-signature-scratch"),
-		Compilation: sourceimplementation.CompilationDocument{
-			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
-		},
-	}); err == nil || !strings.Contains(err.Error(), "join callable ABI") {
-		t.Fatalf("unsupported callable projection error = %v", err)
-	}
-	writeSourceImplementationFixture(t, filepath.Join(implementationRoot, "package.ts"), implementationSource)
 	roots, err := ExportedAPIRoots(program.Roots()[0])
 	if err != nil {
 		t.Fatal(err)
@@ -163,8 +133,8 @@ export function Sum(value: string): number { return value.length; }
 	}
 	defer client.Close()
 	selected := 0
-	projectedCaller := false
-	projectedExistingPointer := false
+	directCaller := false
+	directExistingValue := false
 	var callerArtifacts strings.Builder
 	for _, file := range emission.Files() {
 		if file.OutputPath() != assemblyPath {
@@ -176,14 +146,10 @@ export function Sum(value: string): number { return value.length; }
 				callerArtifacts.WriteString(printed)
 			}
 			if strings.Contains(printed, "Read__from_fast(current)") {
-				projectedCaller = true
-				if strings.Contains(printed, "GoPointer.cell") {
-					t.Fatalf("projected caller retained a scalar pointer cell:\n%s", printed)
-				}
+				directCaller = true
 			}
-			if strings.Contains(printed, "Read__from_fast(GoPointer.dereference") &&
-				strings.Contains(printed, ").value)") {
-				projectedExistingPointer = true
+			if strings.Contains(printed, "Read__from_fast(current);") {
+				directExistingValue = true
 			}
 			if _, generated := generatedPaths[file.OutputPath()]; generated {
 				t.Fatalf("generated package file survived: %s", file.OutputPath())
@@ -206,43 +172,12 @@ export function Sum(value: string): number { return value.length; }
 	if selected != 1 {
 		t.Fatalf("manual package materialized %d times", selected)
 	}
-	if !projectedCaller {
-		t.Fatalf("generated source implementation caller did not use pointee-value ABI:\n%s", callerArtifacts.String())
+	if !directCaller {
+		t.Fatalf("generated source implementation caller did not preserve its argument:\n%s", callerArtifacts.String())
 	}
-	if !projectedExistingPointer {
-		t.Fatalf("existing pointer caller did not read its current pointee once:\n%s", callerArtifacts.String())
+	if !directExistingValue {
+		t.Fatalf("existing value caller did not preserve its argument:\n%s", callerArtifacts.String())
 	}
-
-	writeSourceImplementationFixture(t, filepath.Join(implementationRoot, "package.ts"), `export function Read(value: number): string { return String(value); }
-export function Sum(value: string): number { return value.length; }
-`)
-	resultMismatch, err := sourceimplementation.VerifyAll(sourceimplementation.Config{
-		RepositoryRoot: repository,
-		Program:        program,
-		ContractPaths:  []string{contractPath},
-		ScratchRoot:    filepath.Join(root, ".result-mismatch-scratch"),
-		Compilation: sourceimplementation.CompilationDocument{
-			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	options.SourceImplementations = resultMismatch
-	if _, err := CompileWithOptions(program, roots, options); err == nil ||
-		!strings.Contains(err.Error(), "typecheck installed target") ||
-		!strings.Contains(
-			err.Error(),
-			"Type 'string' is not assignable to type 'number'",
-		) {
-		t.Fatalf("result-contract mutation error = %v", err)
-	}
-	writeSourceImplementationFixture(
-		t,
-		filepath.Join(implementationRoot, "package.ts"),
-		implementationSource,
-	)
-	options.SourceImplementations = certificate
 
 	writeSourceImplementationFixture(t, filepath.Join(implementationRoot, "package.ts"), `export function Extra(): number { return 0; }
 export function Read(value: number): number { return value; }

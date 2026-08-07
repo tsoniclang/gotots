@@ -7,7 +7,6 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
@@ -199,7 +198,6 @@ func (e *emitter) context(names api.Names) (api.Context, error) {
 		WithGenericCallableResolver(e.generic).
 		WithCooperativeCallableResolver(e.cooperative).
 		WithRecoveryCallableResolver(e.recovery).
-		WithCallableABIResolver(e.callableABI).
 		WithExternalFunctionResolver(e.external).
 		WithGoRuntimeContract(e.goRuntime), nil
 }
@@ -564,15 +562,4 @@ func hasExportedPackageVariable(storage []packageStorage) bool {
 		}
 	}
 	return false
-}
-
-func (s *programSession) ResolveCallableABI(
-	function *types.Func,
-) (callableabi.Callable, bool) {
-	if s == nil || function == nil {
-		return callableabi.Callable{}, false
-	}
-	return s.artifacts.CallableABI(
-		api.MustSourceArtifactOwner(function.Origin()),
-	)
 }

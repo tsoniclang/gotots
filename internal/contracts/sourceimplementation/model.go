@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -108,7 +107,6 @@ type Implementation struct {
 	exports        []Export
 	sourceFile     tsgo.SourceFile
 	privateModules []PrivateModule
-	callables      []callableabi.Callable
 }
 
 func (i Implementation) PackagePath() string         { return i.packagePath }
@@ -123,13 +121,9 @@ func (i Implementation) SourceFile() tsgo.SourceFile { return i.sourceFile }
 func (i Implementation) PrivateModules() []PrivateModule {
 	return slices.Clone(i.privateModules)
 }
-func (i Implementation) Callables() []callableabi.Callable {
-	return slices.Clone(i.callables)
-}
 
 type Certificate struct {
 	byPath      map[string]Implementation
-	byCallable  map[string]callableabi.Callable
 	compilation CompilationDocument
 	digest      string
 	repository  string
@@ -169,21 +163,6 @@ func (c *Certificate) ForPackage(source *load.Package) (Implementation, bool) {
 	return selected, true
 }
 
-func (c *Certificate) ResolveCallableABI(
-	packagePath string,
-	name string,
-) (callableabi.Callable, bool) {
-	if !c.Valid() {
-		return callableabi.Callable{}, false
-	}
-	identity, err := callableabi.PackageFunctionIdentity(packagePath, name)
-	if err != nil {
-		return callableabi.Callable{}, false
-	}
-	selected, ok := c.byCallable[identity]
-	return selected, ok && selected.Valid()
-}
-
 func (c *Certificate) Implementations() []Implementation {
 	if !c.Valid() {
 		return nil
@@ -220,22 +199,6 @@ func (c *Certificate) add(implementation Implementation) error {
 		return &Error{Operation: "admit", Reason: "implementation evidence is incomplete"}
 	}
 	c.byPath[implementation.packagePath] = implementation
-	if c.byCallable == nil {
-		c.byCallable = make(map[string]callableabi.Callable)
-	}
-	for _, selected := range implementation.callables {
-		if !selected.Valid() {
-			return &Error{Operation: "admit", Reason: "callable ABI evidence is invalid"}
-		}
-		if _, duplicate := c.byCallable[selected.Identity()]; duplicate {
-			return &Error{
-				Operation: "admit",
-				Subject:   selected.Identity(),
-				Reason:    "callable has multiple ABI owners",
-			}
-		}
-		c.byCallable[selected.Identity()] = selected
-	}
 	return nil
 }
 

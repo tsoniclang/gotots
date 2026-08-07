@@ -2,7 +2,6 @@ package emit
 
 import (
 	"context"
-	"go/types"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,10 +10,10 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestAutomaticPointeeValueABIReconstructsDefinitionAndDirectCallers(
+func TestCanonicalPointerCallablePreservesDefinitionAndDirectCallers(
 	t *testing.T,
 ) {
-	target, _ := compileCallableABIFixture(t, "example.test/automatic", `package automatic
+	target := compilePointerCallableFixture(t, "example.test/pointercall", `package pointercall
 
 func Read(value *int) int { return *value }
 
@@ -29,11 +28,6 @@ func Value() int {
 	return Read(&current)
 }
 
-func ConditionalValue() int {
-	current := 41
-	return ReadThenCompute(&current)
-}
-
 func Existing(value *int) int { return Read(value) }
 
 func ThroughValue(value *int) int {
@@ -44,27 +38,26 @@ func ThroughValue(value *int) int {
 func Deferred(value *int) {
 	defer Read(value)
 }
-
 `)
 	for _, required := range []string{
-		"export function Read(value: int): int {\n    return value;\n}",
-		"export function ReadThenCompute(value: int): int",
-		"return Read(current);",
-		"return Read(GoPointer.dereference<int, int>(value).value);",
-		"=> Read(GoPointer.dereference<int, int>",
+		"export function Read(value: Pointer<int> | undefined): int",
+		"return loadPointer<int>",
+		"return Read(addressOf<int>(current));",
+		"return Read(value);",
+		"(($0: Pointer<int> | undefined) => int)",
 		"Read(__gotots_argument_",
 	} {
 		if !strings.Contains(target, required) {
-			t.Fatalf("automatic callable ABI lacks %q:\n%s", required, target)
+			t.Fatalf("canonical pointer callable lacks %q:\n%s", required, target)
 		}
 	}
-	if strings.Contains(target, "GoPointer.cell") {
-		t.Fatalf("automatic pointee-value call introduced a scalar cell:\n%s", target)
+	if strings.Contains(target, "function Read(value: int)") {
+		t.Fatalf("canonical pointer callable was scalarized:\n%s", target)
 	}
 }
 
-func TestMutatingPointerMethodRetainsLocationABI(t *testing.T) {
-	target, _ := compileCallableABIFixture(t, "example.test/mutatingmethod", `package mutatingmethod
+func TestMutatingPointerMethodPreservesLocationContract(t *testing.T) {
+	target := compilePointerCallableFixture(t, "example.test/mutatingmethod", `package mutatingmethod
 
 type Counter struct{}
 
@@ -75,9 +68,9 @@ func Apply(counter Counter, value *int) {
 }
 `)
 	for _, required := range []string{
-		"Increment(value: GoPointer<int, int> | undefined): void",
-		"const __gotots_store_0 = GoPointer.dereference<int, int>(value);",
-		"__gotots_store_0.value = __gotots_store_0.value + 1;",
+		"Increment(value: Pointer<int> | undefined): void",
+		"loadPointer(",
+		"storePointer(",
 		"counter.Increment(value);",
 	} {
 		if !strings.Contains(target, required) {
@@ -86,8 +79,8 @@ func Apply(counter Counter, value *int) {
 	}
 }
 
-func TestAutomaticPointeeValueABICoversMethodConsumers(t *testing.T) {
-	target, program := compileCallableABIFixture(t, "example.test/methodabi", `package methodabi
+func TestCanonicalPointerCallableCoversMethodConsumers(t *testing.T) {
+	target := compilePointerCallableFixture(t, "example.test/methodcall", `package methodcall
 
 type Reader struct{}
 
@@ -125,39 +118,24 @@ func ThroughInterface(value *int) int {
 	return contract.Read(value)
 }
 `)
-	session, err := newProgramSession(program, DefaultOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	reader := program.Roots()[0].Types().Scope().Lookup("Reader").Type()
-	read := types.NewMethodSet(reader).Lookup(
-		program.Roots()[0].Types(),
-		"Read",
-	).Obj().(*types.Func)
-	if selected, ok := session.ResolveCallableABI(read.Origin()); !ok || !selected.Valid() {
-		t.Fatal("projected method ABI is absent from the canonical artifact graph")
-	}
 	for _, required := range []string{
-		"Read(value: int): int",
-		"return receiver.Read(current);",
-		"receiver.Read(GoPointer.dereference<int, int>(value).value)",
-		"this.$go$value.Read(GoPointer.dereference<int, int>($argument0).value)",
+		"Read(value: Pointer<int> | undefined): int",
+		"return receiver.Read(addressOf<int>(current));",
+		"return receiver.Read(value);",
+		"this.$go$value.Read($argument0)",
 		"goInterfaceNonNil<Contract>(__gotots_receiver_2).Read(__gotots_argument_3)",
 	} {
 		if !strings.Contains(target, required) {
-			t.Fatalf("method callable ABI lacks %q:\n%s", required, target)
+			t.Fatalf("pointer method callable lacks %q:\n%s", required, target)
 		}
-	}
-	if strings.Contains(target, "Read(GoPointer.cell") {
-		t.Fatalf("projected method call introduced a scalar cell:\n%s", target)
 	}
 }
 
-func compileCallableABIFixture(
+func compilePointerCallableFixture(
 	t *testing.T,
 	module string,
 	sourceText string,
-) (string, *load.Program) {
+) string {
 	t.Helper()
 	root := t.TempDir()
 	writeSourceImplementationFixture(
@@ -202,5 +180,5 @@ func compileCallableABIFixture(
 		}
 		source.WriteString(printed)
 	}
-	return source.String(), program
+	return source.String()
 }

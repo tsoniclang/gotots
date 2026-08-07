@@ -4,88 +4,12 @@ import (
 	"go/ast"
 	"go/types"
 
-	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
-
-func (owner Owner) ProjectedPointee(
-	context api.Context,
-	source ast.Node,
-	pointerSourceType types.Type,
-	pointer api.ExpressionEmission,
-	nilPolicy callableabi.NilPolicy,
-) (api.ExpressionEmission, error) {
-	if nilPolicy == callableabi.NilPolicyRejectAtBoundary {
-		return owner.Pointee(context, source, pointerSourceType, pointer)
-	}
-	if nilPolicy != callableabi.NilPolicyPreserve {
-		return api.ExpressionEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "pointee projection has an invalid nil policy",
-		}
-	}
-	before := pointer.Before()
-	requests := pointer.Requests()
-	value := pointer.Value()
-	if value.Kind() != tsgo.SyntaxKindIdentifier {
-		name, err := context.Names().Temporary(api.TemporaryCallArgument)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		before = append(before, context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{context.Factory().VariableDeclaration(
-					context.Factory().Identifier(name),
-					nil,
-					nil,
-					value,
-				)},
-				tsgo.NodeFlagsConst,
-			),
-		))
-		value = context.Factory().Identifier(name)
-	}
-	loaded, err := owner.Pointee(
-		context,
-		source,
-		pointerSourceType,
-		api.DirectExpression(value),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if len(loaded.Before()) != 0 {
-		return api.ExpressionEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "captured pointee projection produced prerequisites",
-		}
-	}
-	return api.NewExpressionEmission(
-		before,
-		context.Factory().ConditionalExpression(
-			context.Factory().BinaryExpression(
-				nil,
-				value,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-				),
-				context.Factory().Identifier("undefined"),
-			),
-			context.Factory().QuestionToken(),
-			context.Factory().Identifier("undefined"),
-			context.Factory().ColonToken(),
-			loaded.Value(),
-		),
-		api.CombineRequests(requests, loaded.Requests()),
-	)
-}
 
 func (owner Owner) Pointee(
 	context api.Context,

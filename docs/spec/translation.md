@@ -938,9 +938,10 @@ exactly one entry or remain an explicit obligation.
 
 A project-selected source implementation replaces a coherent package contract,
 not isolated identifiers. It exports the exact selected package-assembly names
-and satisfies every target type demanded by generated consumers. Both the
-ordinary generated target set and the installed target set must pass strict
-TypeScript checking under the same final project configuration.
+and satisfies every target type demanded by generated consumers. TSTS checks
+both the ordinary generated and installed canonical sets with the same virtual
+marker modules; the selected target lowers and strict-typechecks both executable
+sets under the same final project configuration.
 Package-private storage and operation implementation may differ inside a
 declared equivalence envelope;
 that freedom does not extend to a source-visible callable ABI or to any type a
@@ -968,8 +969,8 @@ export function Read(value: Pointer<int> | undefined): int {
 }
 ```
 
-the callable ABI owner joins that signature to `*int`; callers pass the pointer
-operation unchanged. A TypeScript target may later prove the entire flow
+TSTS joins that authored signature to the canonical generated contract; callers
+pass the pointer operation unchanged. A TypeScript target may later prove the entire flow
 read-only and lower both definition and all calls to `number`. That decision is
 not encoded in a source implementation signature and cannot be inferred by
 GoToTS from the authored body.

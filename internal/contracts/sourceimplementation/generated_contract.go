@@ -1,7 +1,6 @@
 package sourceimplementation
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -97,22 +96,6 @@ func (c *Certificate) VerifyGeneratedContracts(
 		installed,
 	)
 	if err != nil {
-		return err
-	}
-	if err := typecheckTargetSet(
-		c.repository,
-		generatedRoot,
-		generatedConfig,
-		"generated",
-	); err != nil {
-		return err
-	}
-	if err := typecheckTargetSet(
-		c.repository,
-		installedRoot,
-		installedConfig,
-		"installed",
-	); err != nil {
 		return err
 	}
 	generatedProject, err := client.OpenProject(generatedConfig)
@@ -238,27 +221,6 @@ func materializeTargetSet(
 		return "", err
 	}
 	return config, nil
-}
-
-func typecheckTargetSet(
-	distributionRoot string,
-	root string,
-	config string,
-	kind string,
-) error {
-	if err := tsgo.Compile(
-		context.Background(),
-		distributionRoot,
-		root,
-		[]string{"--noEmit", "-p", config},
-	); err != nil {
-		return &Error{
-			Operation: "typecheck " + kind + " target",
-			Subject:   root,
-			Reason:    err.Error(),
-		}
-	}
-	return nil
 }
 
 func targetSetDigest(

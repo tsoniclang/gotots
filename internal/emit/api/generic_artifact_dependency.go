@@ -2,30 +2,10 @@ package api
 
 import (
 	"fmt"
-	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"go/types"
 	"slices"
 )
-
-func (c Context) CallableParameterABI(
-	parameter *types.Var,
-) (callableabi.Parameter, bool) {
-	function, ok := c.FunctionArtifactOwner()
-	if !ok || parameter == nil {
-		return callableabi.Parameter{}, false
-	}
-	selected, ok := c.ResolveCallableABI(function)
-	if !ok {
-		return callableabi.Parameter{}, false
-	}
-	for index := range function.Signature().Params().Len() {
-		if function.Signature().Params().At(index) == parameter {
-			return selected.Parameter(index)
-		}
-	}
-	return callableabi.Parameter{}, false
-}
 
 func (c Context) PointeeValues() PointeeValues {
 	return c.pointeeValues

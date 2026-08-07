@@ -6,7 +6,6 @@ import (
 	"go/types"
 	"slices"
 
-	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -80,7 +79,6 @@ type Values interface {
 
 type PointeeValues interface {
 	Pointee(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
-	ProjectedPointee(Context, ast.Node, types.Type, ExpressionEmission, callableabi.NilPolicy) (ExpressionEmission, error)
 }
 
 type ValueTransferMode uint8

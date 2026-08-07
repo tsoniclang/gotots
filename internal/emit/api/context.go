@@ -102,7 +102,6 @@ type Context struct {
 	cooperativeResolver          CooperativeCallableResolver
 	recoveryResolver             RecoveryCallableResolver
 	externalFunctionResolver     ExternalFunctionResolver
-	callableABI                  CallableABIResolver
 	callableFacet                CallableFacet
 	cooperative                  bool
 	staticallySelectedCallable   bool
