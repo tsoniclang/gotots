@@ -69,13 +69,14 @@ export interface RuntimeTypeMetadata {
   readonly methods?: () => readonly RuntimeMethodMetadata[];
   readonly inputs?: () => readonly Type[];
   readonly outputs?: () => readonly Type[];
-  readonly methodTokens?: readonly object[];
-  readonly pointerMethodTokens?: readonly object[];
+  readonly methodSet?: gostring;
+  readonly pointerMethodSet?: gostring;
   readonly pointerInheritsMethods?: bool;
 }
 
 const providerPointerSize: uint64 = 8n;
 const providerPointerAlign: int64 = 8n;
+const methodIdentityWidth = 14;
 
 const runtimeTypeDynamicType = Object.freeze({ comparable: true });
 const runtimeTypesByDynamicType = new Map<
@@ -87,7 +88,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   readonly $go$type = runtimeTypeDynamicType;
   readonly $go$methods: ReadonlySet<object>;
   readonly $go$formatString = true;
-  private readonly sourceMethodTokens: ReadonlySet<object>;
+  private readonly sourceMethodSet: gostring;
 
   constructor(
     private readonly metadata: RuntimeTypeMetadata,
@@ -95,7 +96,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   ) {
     super();
     this.$go$methods = new Set(runtimeTypeContract);
-    this.sourceMethodTokens = new Set(metadata.methodTokens ?? []);
+    this.sourceMethodSet = metadata.methodSet ?? "";
   }
 
   $go$implements(contract: readonly object[]): boolean {
@@ -228,12 +229,10 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     if (!(target instanceof RuntimeType) || target.metadata.kind !== 20n) {
       return invalidTypeOperation(this.metadata.text, "Implements");
     }
-    for (const token of target.sourceMethodTokens) {
-      if (!this.sourceMethodTokens.has(token)) {
-        return false;
-      }
-    }
-    return true;
+    return methodSetIncludes(
+      this.sourceMethodSet,
+      target.sourceMethodSet,
+    );
   }
 
   In(index: int64): Type | undefined { return sequenceAt(this.inputs(), index, "In"); }
@@ -333,11 +332,11 @@ export class RuntimeType extends GoInterfaceValue implements Type {
 
   pointerType(): Type {
     const pointerMethods = this.metadata.pointerInheritsMethods
-      ? [
-          ...this.sourceMethodTokens,
-          ...(this.metadata.pointerMethodTokens ?? []),
-        ]
-      : [...(this.metadata.pointerMethodTokens ?? [])];
+      ? mergeMethodSets(
+          this.sourceMethodSet,
+          this.metadata.pointerMethodSet ?? "",
+        )
+      : (this.metadata.pointerMethodSet ?? "");
     return new RuntimeType(
       {
         identity: `pointer(${this.metadata.identity})`,
@@ -346,11 +345,67 @@ export class RuntimeType extends GoInterfaceValue implements Type {
         size: providerPointerSize,
         align: providerPointerAlign,
         elem: () => this,
-        methodTokens: pointerMethods,
+        methodSet: pointerMethods,
       },
       this.runtimeTypeContract,
     );
   }
+}
+
+function methodSetIncludes(source: gostring, target: gostring): bool {
+  let sourceOffset = 0;
+  let targetOffset = 0;
+  while (targetOffset < target.length) {
+    if (sourceOffset >= source.length) {
+      return false;
+    }
+    const sourceIdentity = source.slice(
+      sourceOffset,
+      sourceOffset + methodIdentityWidth,
+    );
+    const targetIdentity = target.slice(
+      targetOffset,
+      targetOffset + methodIdentityWidth,
+    );
+    if (sourceIdentity < targetIdentity) {
+      sourceOffset += methodIdentityWidth;
+      continue;
+    }
+    if (sourceIdentity !== targetIdentity) {
+      return false;
+    }
+    sourceOffset += methodIdentityWidth;
+    targetOffset += methodIdentityWidth;
+  }
+  return true;
+}
+
+function mergeMethodSets(left: gostring, right: gostring): gostring {
+  let leftOffset = 0;
+  let rightOffset = 0;
+  let merged = "";
+  while (leftOffset < left.length || rightOffset < right.length) {
+    const leftIdentity = left.slice(
+      leftOffset,
+      leftOffset + methodIdentityWidth,
+    );
+    const rightIdentity = right.slice(
+      rightOffset,
+      rightOffset + methodIdentityWidth,
+    );
+    if (rightOffset >= right.length ||
+      (leftOffset < left.length && leftIdentity < rightIdentity)) {
+      merged += leftIdentity;
+      leftOffset += methodIdentityWidth;
+      continue;
+    }
+    merged += rightIdentity;
+    rightOffset += methodIdentityWidth;
+    if (leftIdentity === rightIdentity) {
+      leftOffset += methodIdentityWidth;
+    }
+  }
+  return merged;
 }
 
 export function createRuntimeType(

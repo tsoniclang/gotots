@@ -207,6 +207,7 @@ func metadataExpression(
 	}
 	methodProperties, methodRequests, err := methodSetMetadata(
 		context,
+		names,
 		sourceType,
 	)
 	if err != nil {

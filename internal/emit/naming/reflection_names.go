@@ -1,6 +1,8 @@
 package naming
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
@@ -8,6 +10,37 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/output"
 )
+
+const reflectionMethodIdentityHexLength = 20
+
+// ReflectionMethodIdentity returns the compact collision-checked encoding of
+// one canonical interface-method identity. The same token binding owner used
+// by interface contracts reserves the truncated identity before it is
+// encoded, so two distinct methods cannot silently share an identity.
+func (n *File) ReflectionMethodIdentity(
+	method *types.Func,
+) (string, error) {
+	runtime, _ := runtimeInterfaceMethodToken(method)
+	binding, err := n.interfaceMethodTokenBinding(method, runtime)
+	if err != nil {
+		return "", err
+	}
+	key := binding.owner.ArtifactKey()
+	if len(key) < reflectionMethodIdentityHexLength {
+		return "", &api.NameError{
+			Name:   method.Name(),
+			Reason: "interface method identity is too short",
+		}
+	}
+	decoded, err := hex.DecodeString(key[:reflectionMethodIdentityHexLength])
+	if err != nil {
+		return "", &api.NameError{
+			Name:   method.Name(),
+			Reason: "interface method identity is not hexadecimal",
+		}
+	}
+	return base64.RawURLEncoding.EncodeToString(decoded), nil
+}
 
 func (n *File) ReflectionType(
 	sourceType types.Type,

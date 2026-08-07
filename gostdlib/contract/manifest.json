@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "d6020382c48acd143ed2190b8bb617a7597de3a9fcc098fa0c6955eb8f353a32",
-  "providerDigest": "f6467cf3bccb0ab8d5e0ee334df357fe2973757d0ac7c2e04af780fc71b2fd44",
+  "providerDigest": "e2d706b9af4cbe9f456058615606afc4c2d7328bea2cc03a08ae5ce67306127f",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -26365,8 +26365,8 @@
       "identity": "src/internal/facets/named-reflect.ts#ReflectTypeMetadataOperations@63",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#createRuntimeType@2343",
-        "src/internal/portable/reflect/runtime-type.ts#runtimeTypeOf@2417",
+        "src/internal/portable/reflect/runtime-type.ts#createRuntimeType@2568",
+        "src/internal/portable/reflect/runtime-type.ts#runtimeTypeOf@2642",
         "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@731"
       ]
     },
@@ -30472,28 +30472,30 @@
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#InvalidRuntimeValue@2637",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#InvalidRuntimeValue@2862",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#Value@474"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#RuntimeType@412",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#RuntimeType@416",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
         "src/internal/host-integer.ts#integerFromHost@69",
-        "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@2837",
-        "src/internal/portable/reflect/runtime-type.ts#materializeField@2506",
-        "src/internal/portable/reflect/runtime-type.ts#materializeMethod@2595",
-        "src/internal/portable/reflect/runtime-type.ts#providerPointerAlign@376",
-        "src/internal/portable/reflect/runtime-type.ts#providerPointerSize@368",
-        "src/internal/portable/reflect/runtime-type.ts#runtimeTypeDynamicType@384",
-        "src/internal/portable/reflect/runtime-type.ts#sequenceAt@2733",
-        "src/internal/portable/reflect/runtime-type.ts#typeSequence@2773",
-        "src/internal/portable/reflect/runtime-type.ts#zeroMethod@2705",
-        "src/internal/portable/reflect/runtime-type.ts#zeroStructField@2661",
+        "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@3062",
+        "src/internal/portable/reflect/runtime-type.ts#materializeField@2731",
+        "src/internal/portable/reflect/runtime-type.ts#materializeMethod@2820",
+        "src/internal/portable/reflect/runtime-type.ts#mergeMethodSets@2429",
+        "src/internal/portable/reflect/runtime-type.ts#methodSetIncludes@2318",
+        "src/internal/portable/reflect/runtime-type.ts#providerPointerAlign@374",
+        "src/internal/portable/reflect/runtime-type.ts#providerPointerSize@366",
+        "src/internal/portable/reflect/runtime-type.ts#runtimeTypeDynamicType@388",
+        "src/internal/portable/reflect/runtime-type.ts#sequenceAt@2958",
+        "src/internal/portable/reflect/runtime-type.ts#typeSequence@2998",
+        "src/internal/portable/reflect/runtime-type.ts#zeroMethod@2930",
+        "src/internal/portable/reflect/runtime-type.ts#zeroStructField@2886",
         "src/iter.ts#Seq@6",
         "src/reflect.ts#ChanDir@113",
         "src/reflect.ts#Invalid@174",
@@ -30502,30 +30504,30 @@
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#createRuntimeType@2343",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#createRuntimeType@2568",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#RuntimeType@412",
-        "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@399",
+        "src/internal/portable/reflect/runtime-type.ts#RuntimeType@416",
+        "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@403",
         "src/internal/portable/reflect/runtime-value.ts#recordPointerDescriptor@593"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@2656",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@2881",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#InvalidRuntimeValue@2637"
+        "src/internal/portable/reflect/runtime-type.ts#InvalidRuntimeValue@2862"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@2837",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@3062",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#materializeField@2506",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#materializeField@2731",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
@@ -30534,61 +30536,79 @@
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#materializeMethod@2595",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#materializeMethod@2820",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@2656",
+        "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@2881",
         "src/reflect.ts#Method@4573"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#providerPointerAlign@376",
-      "disposition": "implemented"
-    },
-    {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#providerPointerSize@368",
-      "disposition": "implemented"
-    },
-    {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypeDynamicType@384",
-      "disposition": "implemented"
-    },
-    {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypeOf@2417",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#mergeMethodSets@2429",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@399"
+        "src/internal/portable/reflect/runtime-type.ts#methodIdentityWidth@382"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@399",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#methodIdentityWidth@382",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#sequenceAt@2733",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#methodSetIncludes@2318",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/reflect/runtime-type.ts#methodIdentityWidth@382"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/reflect/runtime-type.ts#providerPointerAlign@374",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/reflect/runtime-type.ts#providerPointerSize@366",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypeDynamicType@388",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypeOf@2642",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@403"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@403",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/reflect/runtime-type.ts#sequenceAt@2958",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
-        "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@2837"
+        "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@3062"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#typeSequence@2773",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#typeSequence@2998",
       "disposition": "implemented",
       "dependencies": [
         "src/iter.ts#Seq@6"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#zeroMethod@2705",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#zeroMethod@2930",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@2656",
+        "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@2881",
         "src/reflect.ts#Method@4573"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#zeroStructField@2661",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#zeroStructField@2886",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#StructField@4677",
@@ -34056,5 +34076,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "c22d093c42d478413953545338fb7eee13e32b0caf69a66a34c393448d20ffaf"
+  "manifestDigest": "2277725f61bb07b1c0546092c360c8ae484756852d71637e368650392670c1fc"
 }

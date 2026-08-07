@@ -613,11 +613,14 @@ operation owner rather than falling back to host reflection.
 Runtime type constructors compose from that same graph. For example, when a
 runtime-flowing descriptor `typ` reaches `reflect.PointerTo(typ)`, the portable
 reflection owner canonicalizes `*typ` by descriptor identity, derives its
-method set from the generated value/pointer method tokens, and preserves the
-selected provider profile's pointer size and alignment. The compiler does not
-guess a finite pointer closure, require `*T` to appear in source, or install a
-product-specific descriptor. Repeated composition (`T`, `*T`, `**T`) remains
-canonical and grows only with the types actually composed at runtime.
+method set from compact, collision-checked identities produced by the existing
+interface-method identity owner, and preserves the selected provider profile's
+pointer size and alignment. The compact set is a representation of canonical
+method tokens, not a spelling lookup or a second relation table. The compiler
+does not guess a finite pointer closure, require `*T` to appear in source, or
+install a product-specific descriptor. Repeated composition (`T`, `*T`,
+`**T`) remains canonical and grows only with the types actually composed at
+runtime.
 
 The descriptor record is sparse but named: mandatory identity/kind/text/size/
 alignment facts are explicit, while closed contract defaults and absent

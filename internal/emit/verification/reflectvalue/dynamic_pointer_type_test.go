@@ -67,8 +67,8 @@ func main() {
 		goRunner,
 		func(artifacts renderedArtifacts) {
 			for _, required := range []string{
-				"methodTokens:",
-				"pointerMethodTokens:",
+				"methodSet:",
+				"pointerMethodSet:",
 				"pointerInheritsMethods: true",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
