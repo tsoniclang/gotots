@@ -145,7 +145,8 @@ func readProviderPackage(config resolvedConfig) (packageDocument, error) {
 	if err := json.Unmarshal(payload, &document); err != nil {
 		return packageDocument{}, certifyError("read package", packagePath, err.Error())
 	}
-	if document.Name != gostdlib.PackageName || document.Version == "" ||
+	if document.Name != gostdlib.PackageName ||
+		document.Version != gostdlib.PackageVersion ||
 		len(document.Exports) == 0 {
 		return packageDocument{}, certifyError(
 			"read package",

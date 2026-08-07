@@ -549,8 +549,19 @@ func (e ProgramEmission) RuntimePackage() (RuntimePackage, bool) {
 	return e.runtimePackage, e.runtimePackage.assembled.Valid()
 }
 
+func (e ProgramEmission) PackageDependencies() []PackageDependency {
+	return slices.Clone(e.packageDependencies)
+}
+
+func (d PackageDependency) Name() string    { return d.name }
+func (d PackageDependency) Version() string { return d.version }
+
 func (p RuntimePackage) Name() string {
 	return p.assembled.Name()
+}
+
+func (p RuntimePackage) Version() string {
+	return p.assembled.Version()
 }
 
 func (p RuntimePackage) RootPath() string {

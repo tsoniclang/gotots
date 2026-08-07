@@ -14,6 +14,7 @@ import (
 const (
 	ProgramInitializationPath       = "program.ts"
 	RuntimePackageName              = "@gotots/runtime"
+	RuntimePackageVersion           = "0.0.0"
 	RuntimePackageRootPath          = "runtime"
 	RuntimePackageManifestPath      = "runtime/package.json"
 	ScalarSupportPath               = "runtime/scalars.ts"

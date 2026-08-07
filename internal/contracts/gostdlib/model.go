@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	SchemaVersion = 28
-	PackageName   = "@gotots/gostdlib"
+	SchemaVersion  = 28
+	PackageName    = "@gotots/gostdlib"
+	PackageVersion = "0.0.0"
 )
 
 type BindingKind string
