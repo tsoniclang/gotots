@@ -96,7 +96,6 @@ type DeclarationRequirementKind uint8
 const (
 	DeclarationRequirementInvalid                            DeclarationRequirementKind = 0
 	DeclarationRequirementNamedStructOperation               DeclarationRequirementKind = 1
-	DeclarationRequirementAddressableStorage                 DeclarationRequirementKind = 2
 	DeclarationRequirementConstantProjection                 DeclarationRequirementKind = 3
 	DeclarationRequirementLocalConstantProjection            DeclarationRequirementKind = 4
 	DeclarationRequirementGenericOperation                   DeclarationRequirementKind = 5
@@ -129,7 +128,6 @@ const (
 
 func (k DeclarationRequirementKind) Valid() bool {
 	return k == DeclarationRequirementNamedStructOperation ||
-		k == DeclarationRequirementAddressableStorage ||
 		k == DeclarationRequirementConstantProjection ||
 		k == DeclarationRequirementLocalConstantProjection ||
 		k == DeclarationRequirementGenericOperation ||
@@ -280,28 +278,6 @@ func GenericDeclarationOrigin(owner types.Object) types.Object {
 		}
 	}
 	return nil
-}
-
-func validAddressableStorageOwner(
-	owner ArtifactOwner,
-	variable *types.Var,
-) bool {
-	if !owner.Valid() ||
-		variable == nil ||
-		variable.IsField() ||
-		variable.Pkg() == nil ||
-		owner.Package() != variable.Pkg() {
-		return false
-	}
-	if source, ok := owner.Source(); ok {
-		_, callable := source.(*types.Func)
-		return callable
-	}
-	_, initializer, ok := owner.PackageInitializer()
-	return ok &&
-		variable.Pos().IsValid() &&
-		variable.Pos() >= initializer.Rhs.Pos() &&
-		variable.Pos() <= initializer.Rhs.End()
 }
 
 func validLexicalNamedStructOwner(

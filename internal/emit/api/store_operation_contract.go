@@ -469,9 +469,6 @@ const (
 	GenericOperationNilEqual                 = genericoperation.GenericOperationNilEqual
 	GenericOperationToStorage                = genericoperation.GenericOperationToStorage
 	GenericOperationFromStorage              = genericoperation.GenericOperationFromStorage
-	GenericOperationPointerCell              = genericoperation.GenericOperationPointerCell
-	GenericOperationPointerLoad              = genericoperation.GenericOperationPointerLoad
-	GenericOperationPointerStore             = genericoperation.GenericOperationPointerStore
 	GenericOperationToContainerStorage       = genericoperation.GenericOperationToContainerStorage
 	GenericOperationFromContainerStorage     = genericoperation.GenericOperationFromContainerStorage
 	GenericOperationIndexAddress             = genericoperation.GenericOperationIndexAddress
@@ -538,13 +535,6 @@ func SelectGenericConstraintMethod(
 		}
 	}
 	return selection, err
-}
-
-func GenericPointerOperationElement(
-	selection GenericOperationSelection,
-	signature *types.Signature,
-) (types.Type, bool) {
-	return genericoperation.GenericPointerOperationElement(selection, signature)
 }
 
 func GenericStorageOperationType(

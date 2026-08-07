@@ -443,8 +443,11 @@ uses a class object, scalar snapshot, `{ value: T }` location, native pointer,
 or another representation.
 
 TSTS owns canonical marker recognition and retains the exact call, operands,
-source types, addressable-storage evidence, and mutability evidence. The
-selected target owns flow-wide representation choice. It may eliminate a
+source types, typed location path, and mutability evidence. GoToTS does not
+emit a parallel storage cell, storage-name requirement, or generic
+cell/load/store capability: ordinary declarations remain ordinary TypeScript
+declarations and location identity exists only in the selected marker facts.
+The selected target owns flow-wide representation choice. It may eliminate a
 location only when every definition/reference in that location flow is
 rewritten and observable alias, mutation, nil, identity, and lifetime behavior
 remain exact. A local decision at one call site is forbidden.

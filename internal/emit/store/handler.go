@@ -336,12 +336,6 @@ func identifier(
 		object.Parent() == object.Pkg().Scope() {
 		return packageVariable(context, object)
 	}
-	if selected, ok, err := context.AddressableStorage().StoreTarget(
-		context,
-		object,
-	); ok || err != nil {
-		return selected, err
-	}
 	if receiver, ok := context.ValueReceiver(object); ok {
 		request, err := receiver.CopyRequest()
 		if err != nil {
@@ -418,49 +412,9 @@ func packageVariable(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	representation, err := pointertype.Observe(
-		context,
-		types.NewPointer(variable.Type()),
-		api.PointerRepresentationDemandNone,
-	)
-	if err != nil {
-		return api.StoreTargetEmission{}, err
-	}
-	if representation.Representation().DirectClass() {
-		logical, err := context.Values().FromStorage(
-			context.WithRole(api.RoleAssignmentTarget),
-			nil,
-			variable.Type(),
-			api.DirectExpression(
-				reference.Expression(context.Factory()),
-				reference.Requests()...,
-			),
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		logical, err = api.NewExpressionEmission(
-			logical.Before(),
-			logical.Value(),
-			api.CombineRequests(
-				logical.Requests(),
-				representation.Requests(),
-			),
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		return api.NewStableIdentityStoreTargetEmission(
-			logical,
-			variable.Type(),
-		)
-	}
-	return api.NewCanonicalStorageTargetEmission(
+	return api.NewStoreTargetEmission(
 		reference.Expression(context.Factory()),
 		variable.Type(),
-		api.CombineRequests(
-			reference.Requests(),
-			representation.Requests(),
-		),
+		reference.Requests(),
 	)
 }

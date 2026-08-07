@@ -12,7 +12,6 @@ type DeclarationRequirement struct {
 	operation   NamedStructOperation
 	typeName    *types.TypeName
 	classMethod *types.Func
-	variable    *types.Var
 	// constant is the untyped constant a local projection materializes. A
 	// package projection owns the constant directly (owner is the constant), so
 	// this stays nil there; a local projection is owned by the enclosing
@@ -82,35 +81,6 @@ func NewLexicalNamedStructOperationRequirement(
 		kind:      DeclarationRequirementNamedStructOperation,
 		operation: operation,
 		typeName:  typeName,
-	}, nil
-}
-
-func NewAddressableStorageRequirement(
-	owner ArtifactOwner,
-	variable *types.Var,
-) (DeclarationRequirement, error) {
-	switch {
-	case !owner.Valid():
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "addressable-storage owner is invalid",
-		}
-	case variable == nil:
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "addressable-storage variable is nil",
-		}
-	case variable.IsField():
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "addressable-storage variable is a field",
-		}
-	case !validAddressableStorageOwner(owner, variable):
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "addressable-storage owner does not contain the variable",
-		}
-	}
-	return DeclarationRequirement{
-		owner:    owner,
-		kind:     DeclarationRequirementAddressableStorage,
-		variable: variable,
 	}, nil
 }
 
@@ -474,7 +444,6 @@ func (r DeclarationRequirement) validCooperativeCallable() bool {
 	if !r.owner.Valid() ||
 		r.operation != NamedStructOperationInvalid ||
 		r.typeName != nil ||
-		r.variable != nil ||
 		r.constant != nil ||
 		r.projection != types.Invalid ||
 		r.generated != nil ||

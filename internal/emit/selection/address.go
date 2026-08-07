@@ -4,9 +4,10 @@ import (
 	"go/ast"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
 	"github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -105,49 +106,6 @@ func FieldStoreTarget(
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	fieldRepresentation, err := pointertype.Observe(
-		context,
-		types.NewPointer(field.Type()),
-		api.PointerRepresentationDemandNone,
-	)
-	if err != nil {
-		return api.StoreTargetEmission{}, err
-	}
-	if fieldRepresentation.Representation().DirectClass() &&
-		fieldRepresentation.UsesStorageIdentity() {
-		fieldValue, fieldType, err := projectMutableFieldValue(
-			context,
-			children,
-			source,
-			receiverType,
-			receiver,
-			field,
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		if !types.Identical(fieldType, field.Type()) {
-			return api.StoreTargetEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "stable struct-field target projected the wrong type",
-			}
-		}
-		fieldValue, err = api.NewExpressionEmission(
-			fieldValue.Before(),
-			fieldValue.Value(),
-			api.CombineRequests(
-				fieldValue.Requests(),
-				fieldRepresentation.Requests(),
-			),
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		return api.NewStableIdentityStoreTargetEmission(
-			fieldValue,
-			field.Type(),
-		)
-	}
 	receiver, err = joinNominalFieldCallableABI(
 		context,
 		receiverType,
@@ -201,42 +159,16 @@ func addressSource(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if _, _, _, pointer := pointerType(resolved.root); pointer {
-		root, err := children.Expression(
-			context.
-				WithRole(api.RoleFieldReceiver).
-				WithExpectedType(resolved.root),
-			rootSource,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return projectAddress(
-			context,
-			children,
-			source,
-			resolved,
-			root,
-			false,
-		)
-	}
-	root, err := children.Address(
+	root, err := children.Expression(
 		context.
 			WithRole(api.RoleFieldReceiver).
-			WithExpectedType(types.NewPointer(resolved.root)),
+			WithExpectedType(resolved.root),
 		rootSource,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return projectAddress(
-		context,
-		children,
-		source,
-		resolved,
-		root,
-		true,
-	)
+	return projectAddress(context, children, source, resolved, root)
 }
 
 func projectAddress(
@@ -245,343 +177,125 @@ func projectAddress(
 	source ast.Node,
 	resolved path,
 	root api.ExpressionEmission,
-	rootIsAddress bool,
 ) (api.ExpressionEmission, error) {
 	current := root
 	currentType := resolved.root
-	if !rootIsAddress {
+	for _, field := range resolved.fields {
 		var err error
-		current, currentType, err = rawPointer(
-			context,
-			source,
-			currentType,
-			current,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
-	for index := 0; index < len(resolved.fields); {
-		parent, parentDirect, err := dereferencePointer(
-			context,
-			children,
-			source,
-			currentType,
-			current,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if !parentDirect {
-			fieldPointer, consumed, pathErr := projectFieldPathPointer(
+		if _, _, _, pointer := pointerType(currentType); pointer {
+			current, currentType, err = loadAddressParent(
 				context,
 				children,
 				source,
 				currentType,
-				parent,
-				resolved.fields[index:],
+				current,
 			)
-			if pathErr != nil {
-				return api.ExpressionEmission{}, pathErr
-			}
-			if consumed >= 2 {
-				field := resolved.fields[index+consumed-1]
-				index += consumed
-				if index == len(resolved.fields) {
-					return fieldPointer, nil
-				}
-				if _, _, _, pointer := pointerType(field.Type()); pointer {
-					logical, _, pathErr := dereferenceValue(
-						context,
-						children,
-						source,
-						types.NewPointer(field.Type()),
-						fieldPointer,
-					)
-					if pathErr != nil {
-						return api.ExpressionEmission{}, pathErr
-					}
-					current, currentType, pathErr = rawPointer(
-						context,
-						source,
-						field.Type(),
-						logical,
-					)
-					if pathErr != nil {
-						return api.ExpressionEmission{}, pathErr
-					}
-					continue
-				}
-				current = fieldPointer
-				currentType = field.Type()
-				continue
+			if err != nil {
+				return api.ExpressionEmission{}, err
 			}
 		}
-		field := resolved.fields[index]
-		fieldPointer, err := projectFieldPointer(
+		if !fieldInType(currentType, field) {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		current, err = joinNominalFieldCallableABI(
 			context,
-			children,
-			source,
 			currentType,
-			parent,
 			field,
-			parentDirect,
+			current,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		index++
-		if index == len(resolved.fields) {
-			return fieldPointer, nil
+		providerField, providerOwned, err := providerboundary.StructField(
+			context,
+			currentType,
+			field,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
 		}
-		if _, _, _, pointer := pointerType(field.Type()); pointer {
-			logical, _, err := dereferenceValue(
-				context,
-				children,
-				source,
-				types.NewPointer(field.Type()),
-				fieldPointer,
-			)
+		name := ""
+		if providerOwned {
+			name = providerField.Member()
+		} else {
+			name, err = context.Names().Member(field)
 			if err != nil {
 				return api.ExpressionEmission{}, err
 			}
-			current, currentType, err = rawPointer(
-				context,
-				source,
-				field.Type(),
-				logical,
-			)
-			if err != nil {
-				return api.ExpressionEmission{}, err
-			}
-			continue
 		}
-		current = fieldPointer
+		current, err = api.NewExpressionEmission(
+			current.Before(),
+			context.Factory().PropertyAccessExpression(
+				current.Value(),
+				nil,
+				context.Factory().Identifier(name),
+				tsgo.NodeFlagsNone,
+			),
+			current.Requests(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		currentType = field.Type()
 	}
-	return current, nil
-}
-
-func projectFieldPointer(
-	context api.Context,
-	children api.ChildEmitter,
-	source ast.Node,
-	parentType types.Type,
-	parent api.ExpressionEmission,
-	field *types.Var,
-	parentDirect bool,
-) (api.ExpressionEmission, error) {
-	if !fieldInType(parentType, field) {
+	if !types.Identical(currentType, resolved.effective) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	parent, err := joinNominalFieldCallableABI(
+	targetType, err := children.RepresentedType(
+		context.WithRole(api.RoleUnaryOperand),
+		source,
+		resolved.effective,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return pointermarker.Operation(
 		context,
-		parentType,
-		field,
-		parent,
+		tsoniccore.SymbolAddressOf,
+		[]api.TypeEmission{targetType},
+		[]api.ExpressionEmission{current},
+	)
+}
+
+func loadAddressParent(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	sourceType types.Type,
+	pointer api.ExpressionEmission,
+) (api.ExpressionEmission, types.Type, error) {
+	_, element, defined, ok := pointerType(sourceType)
+	if !ok {
+		return api.ExpressionEmission{}, nil,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if defined {
+		model, _ := definedtype.ResolvePointer(sourceType)
+		var err error
+		pointer, err = model.Project(context, pointer)
+		if err != nil {
+			return api.ExpressionEmission{}, nil, err
+		}
+	}
+	targetElement, err := children.RepresentedType(
+		context.WithRole(api.RoleFieldReceiver),
+		source,
+		element,
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, err
+		return api.ExpressionEmission{}, nil, err
 	}
-	providerField, providerOwned, err := providerboundary.StructField(
+	guarded, err := pointermarker.Guard(context, pointer)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
+	}
+	loaded, err := pointermarker.Operation(
 		context,
-		parentType,
-		field,
+		tsoniccore.SymbolLoadPointer,
+		[]api.TypeEmission{targetElement},
+		[]api.ExpressionEmission{guarded},
 	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	fieldContext := context
-	if providerOwned {
-		fieldContext, err = context.WithProviderScalarRepresentation()
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
-	fieldRepresentation, err := pointertype.Observe(
-		fieldContext,
-		types.NewPointer(field.Type()),
-		api.PointerRepresentationDemandStableLocation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if fieldRepresentation.Representation().DirectClass() {
-		logicalParent := parent
-		if !parentDirect {
-			logicalParent, _, err = dereferenceValue(
-				context,
-				children,
-				source,
-				types.NewPointer(parentType),
-				parent,
-			)
-			if err != nil {
-				return api.ExpressionEmission{}, err
-			}
-		}
-		projected, projectedType, err := projectMutableFieldValue(
-			context,
-			children,
-			source,
-			parentType,
-			logicalParent,
-			field,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if !types.Identical(projectedType, field.Type()) {
-			return api.ExpressionEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "direct struct-field pointer projected the wrong type",
-			}
-		}
-		return api.NewExpressionEmission(
-			projected.Before(),
-			projected.Value(),
-			api.CombineRequests(
-				projected.Requests(),
-				fieldRepresentation.Requests(),
-			),
-		)
-	}
-	fieldType, err := children.RepresentedType(
-		fieldContext.WithRole(api.RoleFieldReceiver),
-		source,
-		field.Type(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	fieldStorage, err := fieldContext.Values().StorageType(
-		fieldContext.WithRole(api.RoleStorageType),
-		source,
-		field.Type(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	parentLogical, err := children.RepresentedType(
-		fieldContext.WithRole(api.RoleFieldReceiver),
-		source,
-		parentType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	var parentStorage api.TypeEmission
-	var parentRepresentationRequests []api.RootRequest
-	if parentDirect {
-		parentStorage, err = fieldContext.Values().StorageType(
-			fieldContext.WithRole(api.RoleStorageType),
-			source,
-			parentType,
-		)
-	} else {
-		parentRepresentation, representationErr := pointertype.Observe(
-			fieldContext,
-			types.NewPointer(parentType),
-			api.PointerRepresentationDemandStableLocation,
-		)
-		if representationErr != nil {
-			return api.ExpressionEmission{}, representationErr
-		}
-		parentStorage, err = fieldContext.ContainerStorage().PointerStorageType(
-			fieldContext.WithRole(api.RoleStorageType),
-			source,
-			parentType,
-			parentRepresentation,
-		)
-		parentRepresentationRequests = parentRepresentation.Requests()
-	}
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	name := ""
-	method := pointerruntime.FieldName
-	receiver := parent
-	if parentDirect && !providerOwned {
-		receiver, name, err = namedstructstorage.DemandFieldOwner(
-			context.WithRole(api.RoleStorageType),
-			parentType,
-			field,
-			parent,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		method = pointerruntime.ObjectFieldName
-	} else if providerOwned {
-		name = providerField.Member()
-		if parentDirect {
-			method = pointerruntime.ObjectFieldName
-		}
-	} else {
-		name, err = context.Names().Member(field)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
-	runtime, err := pointerRuntime(context)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	typeArguments := []tsgo.TypeNode{
-		fieldType.Value(),
-		parentLogical.Value(),
-		parentStorage.Value(),
-		context.Factory().LiteralTypeNode(
-			context.Factory().StringLiteral(name, tsgo.TokenFlagsNone),
-		),
-	}
-	if parentDirect {
-		typeArguments = []tsgo.TypeNode{
-			fieldType.Value(),
-			parentStorage.Value(),
-			context.Factory().LiteralTypeNode(
-				context.Factory().StringLiteral(name, tsgo.TokenFlagsNone),
-			),
-		}
-	}
-	raw, err := api.NewExpressionEmission(
-		receiver.Before(),
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(method),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			typeArguments,
-			[]tsgo.Expression{
-				receiver.Value(),
-				context.Factory().StringLiteral(name, tsgo.TokenFlagsNone),
-			},
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(
-			receiver.Requests(),
-			fieldType.Requests(),
-			fieldStorage.Requests(),
-			parentLogical.Requests(),
-			parentStorage.Requests(),
-			parentRepresentationRequests,
-			runtime.Requests(),
-			fieldRepresentation.Requests(),
-		),
-	)
-	if err != nil || !providerOwned {
-		return raw, err
-	}
-	return providerboundary.ProjectStructFieldPointer(
-		context,
-		fieldContext,
-		children,
-		source,
-		field.Type(),
-		raw,
-	)
+	return loaded, element, err
 }

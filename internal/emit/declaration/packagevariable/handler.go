@@ -53,7 +53,7 @@ func EmitStorage(
 			Reason: "package-state field requested an import of its own state",
 		}
 	}
-	targetType, err := stateContext.Values().StorageType(
+	targetType, err := children.RepresentedType(
 		stateContext.WithRole(api.RolePackageVariableType),
 		source,
 		variable.Type(),
@@ -75,7 +75,7 @@ func EmitStorage(
 	if err != nil {
 		return StorageEmission{}, err
 	}
-	target, err := api.NewCanonicalStorageTargetEmission(
+	target, err := api.NewStoreTargetEmission(
 		assemblyReference.Expression(assemblyContext.Factory()),
 		variable.Type(),
 		assemblyReference.Requests(),
@@ -220,7 +220,7 @@ func EmitInitializer(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	target, err := api.NewCanonicalStorageTargetEmission(
+	target, err := api.NewStoreTargetEmission(
 		reference.Expression(context.Factory()),
 		variable.Type(),
 		reference.Requests(),
@@ -359,7 +359,7 @@ func emitMultipleInitializer(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		target, err := api.NewCanonicalStorageTargetEmission(
+		target, err := api.NewStoreTargetEmission(
 			reference.Expression(context.Factory()),
 			variable.Type(),
 			reference.Requests(),

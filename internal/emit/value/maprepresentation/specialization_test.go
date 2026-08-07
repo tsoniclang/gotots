@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -339,7 +338,6 @@ func staticSpecializationContext(
 		tsgo.NewFactory(),
 		staticSpecializationNames{},
 		values,
-		storage.Owner{},
 		integer,
 		api.EvaluationOrderPreserveGo,
 		api.ConcurrencySemanticsDisabled,

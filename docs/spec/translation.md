@@ -663,10 +663,12 @@ func ArrayAddress[T any](first, second T) T {
 ```
 
 The target kernel still has one `T`; it uses `GoContainerStorage<T>` for array
-slots and `Pointer<T>` for the element address. The pointer operation carries
-the exact addressable-storage fact separately, so a concrete `Item` may retain
-its target-neutral logical type while a selected target chooses the storage
-representation. No `T$Storage` or `T$Pointer` parameter is fabricated.
+slots and `Pointer<T>` for the element address. The canonical indexed-address
+marker carries the exact container, index, logical element type, and location
+semantics, so a concrete `Item` may retain its target-neutral logical type
+while a selected target chooses the storage representation. It does not
+request a generated pointer cell or a generic cell/load/store callable. No
+`T$Storage` or `T$Pointer` parameter is fabricated.
 
 Only the concrete type owner may emit a storage associated-type marker. Such
 markers are

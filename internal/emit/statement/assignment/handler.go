@@ -298,11 +298,7 @@ func emitDefinitionList(
 	if contextualType == nil {
 		return nil, nil, nil, api.Unsupported(context, api.CategoryStatement, source)
 	}
-	targetName, selected := context.AddressableStorage().Name(context, object)
-	var err error
-	if !selected {
-		targetName, err = context.Names().Declare(object)
-	}
+	targetName, err := context.Names().Declare(object)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -331,18 +327,6 @@ func emitDefinitionList(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if selected {
-		value, err = context.AddressableStorage().Cell(
-			context,
-			children,
-			name,
-			contextualType,
-			value,
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-	}
 	targetType, typeRequests, err := inferenceAnnotation(
 		context.WithRole(api.RoleLocalType),
 		children,
@@ -352,10 +336,6 @@ func emitDefinitionList(
 	)
 	if err != nil {
 		return nil, nil, nil, err
-	}
-	if selected {
-		targetType = nil
-		typeRequests = nil
 	}
 	declaration := context.Factory().VariableDeclaration(
 		context.Factory().Identifier(targetName),

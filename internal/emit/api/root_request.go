@@ -239,17 +239,6 @@ func newDeclarationRequirementRequest(
 	}}
 }
 
-func NewAddressableStorageRequest(
-	owner ArtifactOwner,
-	variable *types.Var,
-) (RootRequest, error) {
-	requirement, err := NewAddressableStorageRequirement(owner, variable)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return newDeclarationRequirementRequest(requirement), nil
-}
-
 func NewCallableControlRequest(
 	owner ArtifactOwner,
 	enclosing ast.Node,

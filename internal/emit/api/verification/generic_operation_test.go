@@ -36,7 +36,7 @@ func TestGenericOperationIdentifiersAreTotalUniqueTargetIdentifiers(t *testing.T
 		GenericOperation(GenericOperationReflectionValue+1).Identifier() != "" {
 		t.Fatal("invalid generic operation has a target identifier")
 	}
-	if GenericOperationToContainerStorage != GenericOperationPointerStore+1 ||
+	if GenericOperationToContainerStorage != GenericOperationFromStorage+1 ||
 		GenericOperationFromContainerStorage !=
 			GenericOperationToContainerStorage+1 ||
 		GenericOperationIndexAddress !=

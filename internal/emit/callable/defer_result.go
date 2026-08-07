@@ -87,26 +87,17 @@ func namedReturnTargets(
 				Reason: "named return tuple contains an unnamed result",
 			}
 		}
-		target, selected, err := context.AddressableStorage().StoreTarget(
-			context,
-			result,
-		)
+		targetName, err := context.Names().Result(result, index)
 		if err != nil {
 			return nil, err
 		}
-		if !selected {
-			targetName, err := context.Names().Result(result, index)
-			if err != nil {
-				return nil, err
-			}
-			target, err = api.NewStoreTargetEmission(
-				context.Factory().Identifier(targetName),
-				result.Type(),
-				nil,
-			)
-			if err != nil {
-				return nil, err
-			}
+		target, err := api.NewStoreTargetEmission(
+			context.Factory().Identifier(targetName),
+			result.Type(),
+			nil,
+		)
+		if err != nil {
+			return nil, err
 		}
 		targets = append(targets, target)
 	}
@@ -172,22 +163,13 @@ func deferredFinalReturn(
 	var requests []api.RootRequest
 	for index := range count {
 		result := results.At(index)
-		value, selected, err := context.AddressableStorage().Read(
-			context,
-			result,
-		)
+		targetName, err := context.Names().Result(result, index)
 		if err != nil {
 			return nil, nil, err
 		}
-		if !selected {
-			targetName, err := context.Names().Result(result, index)
-			if err != nil {
-				return nil, nil, err
-			}
-			value = api.DirectExpression(
-				context.Factory().Identifier(targetName),
-			)
-		}
+		value := api.DirectExpression(
+			context.Factory().Identifier(targetName),
+		)
 		value, err = context.Values().Transfer(
 			context.WithRole(api.RoleReturnResult),
 			nil,

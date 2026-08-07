@@ -162,12 +162,6 @@ func prependValueReceiverCopy(
 			Reason: "value-receiver copy prologue has no selected receiver",
 		}
 	}
-	if _, addressable := context.AddressableStorage().Name(
-		context,
-		receiver,
-	); addressable {
-		return body, nil
-	}
 	copied, err := context.Values().Transfer(
 		context.WithRole(api.RoleReceiverValue),
 		source,

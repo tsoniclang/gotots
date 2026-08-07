@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	emitstorage "github.com/tsoniclang/gotots/internal/emit/storage"
 )
 
 func Emit(
@@ -33,16 +32,7 @@ func Emit(
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
-	context, err := emitstorage.ApplyRequirements(
-		context,
-		source,
-		api.MustSourceArtifactOwner(functionObject),
-		requirements,
-	)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	context, err = applyLocalConstantProjections(
+	context, err := applyLocalConstantProjections(
 		context,
 		source,
 		functionObject,

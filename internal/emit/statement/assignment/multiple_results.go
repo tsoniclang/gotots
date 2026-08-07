@@ -90,20 +90,6 @@ func emitMultipleResults(
 		element = value.Value()
 		requests = append(requests, value.Requests()...)
 		if target.declaration {
-			if target.storage {
-				cell, err := context.AddressableStorage().Cell(
-					context,
-					children,
-					target.identifier,
-					target.sourceType,
-					api.DirectExpression(element),
-				)
-				if err != nil {
-					return api.StatementEmission{}, err
-				}
-				element = cell.Value()
-				requests = append(requests, cell.Requests()...)
-			}
 			if context.IsGotoLocal(target.object) {
 				statements = append(
 					statements,
@@ -119,10 +105,6 @@ func emitMultipleResults(
 			)
 			if err != nil {
 				return api.StatementEmission{}, err
-			}
-			if target.storage {
-				targetType = nil
-				typeRequests = nil
 			}
 			statements = append(
 				statements,

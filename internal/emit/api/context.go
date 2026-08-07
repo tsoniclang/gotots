@@ -53,20 +53,6 @@ const (
 	MemoryByteOrderBigEndian    = environmentcontract.ByteOrderBigEndian
 )
 
-type AddressableStorage interface {
-	Name(Context, *types.Var) (string, bool)
-	Read(Context, *types.Var) (ExpressionEmission, bool, error)
-	StoreTarget(Context, *types.Var) (StoreTargetEmission, bool, error)
-	Cell(
-		Context,
-		ChildEmitter,
-		ast.Node,
-		types.Type,
-		ExpressionEmission,
-	) (ExpressionEmission, error)
-	Requirement(Context, *types.Var) (RootRequest, error)
-}
-
 type Context struct {
 	role                         Role
 	fileSet                      *token.FileSet
@@ -82,7 +68,6 @@ type Context struct {
 	pointerValues                PointerRepresentationValues
 	stableAssignments            StableAssignmentValues
 	containerStorage             ContainerStorageValues
-	storage                      AddressableStorage
 	scalar                       ScalarABI
 	providerScalar               ScalarABI
 	providerScalarRepresentation bool
@@ -110,7 +95,6 @@ type Context struct {
 	gotoUses                     map[*types.Label][]token.Pos
 	gotoTargets                  map[*types.Label]GotoTarget
 	gotoLocals                   map[*types.Var]struct{}
-	storageNames                 map[*types.Var]string
 	localConstantProjections     map[*types.Const][]types.BasicKind
 	lexicalTypeRequirements      map[*types.TypeName][]DeclarationRequirement
 	genericResolver              GenericCallableResolver
@@ -133,27 +117,6 @@ type Context struct {
 
 func (c Context) GenericParameterOwner() (types.Object, bool) {
 	return c.genericParameterOwner, c.genericParameterOwner != nil
-}
-
-func (c Context) WithAddressableStorage(
-	owner ArtifactOwner,
-	storageNames map[*types.Var]string,
-) (Context, error) {
-	if !owner.Valid() || c.ArtifactOwner() != owner {
-		return Context{}, &ContextError{
-			Reason: "addressable-storage owner differs from artifact owner",
-		}
-	}
-	c.storageNames = make(map[*types.Var]string, len(storageNames))
-	for variable, name := range storageNames {
-		if variable == nil || variable.IsField() || name == "" {
-			return Context{}, &ContextError{
-				Reason: "addressable-storage selection is invalid",
-			}
-		}
-		c.storageNames[variable] = name
-	}
-	return c, nil
 }
 
 func (c Context) WithLocalConstantProjections(
@@ -239,7 +202,6 @@ func NewContext(
 	factory tsgo.Factory,
 	names Names,
 	values Values,
-	storage AddressableStorage,
 	integer IntegerRepresentation,
 	evaluationOrder EvaluationOrder,
 	concurrency ConcurrencySemantics,
@@ -261,8 +223,6 @@ func NewContext(
 		return Context{}, &ContextError{Reason: "name owner is nil"}
 	case values == nil:
 		return Context{}, &ContextError{Reason: "value owner is nil"}
-	case storage == nil:
-		return Context{}, &ContextError{Reason: "addressable-storage owner is nil"}
 	case !integer.Valid():
 		return Context{}, &ContextError{Reason: "integer representation is invalid"}
 	case !evaluationOrder.Valid():
@@ -294,7 +254,6 @@ func NewContext(
 		pointerValues:     pointerValues,
 		stableAssignments: stableAssignments,
 		containerStorage:  containerStorage,
-		storage:           storage,
 		scalar:            scalar,
 		evaluationOrder:   evaluationOrder,
 		concurrency:       concurrency,
@@ -472,10 +431,6 @@ func (c Context) ContainerStorage() ContainerStorageValues {
 	return c.containerStorage
 }
 
-func (c Context) AddressableStorage() AddressableStorage {
-	return c.storage
-}
-
 func (c Context) IntegerRepresentation() IntegerRepresentation {
 	return c.scalar.IntegerRepresentation()
 }
@@ -566,14 +521,6 @@ func (c Context) LexicalTypeRequirements(
 	anchor *types.TypeName,
 ) []DeclarationRequirement {
 	return slices.Clone(c.lexicalTypeRequirements[anchor])
-}
-
-func (c Context) AddressableStorageName(variable *types.Var) (string, bool) {
-	if variable == nil {
-		return "", false
-	}
-	name, ok := c.storageNames[variable]
-	return name, ok
 }
 
 type ChildEmitter interface {

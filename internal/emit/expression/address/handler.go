@@ -4,11 +4,11 @@ import (
 	"go/ast"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -81,22 +81,6 @@ func identifier(
 		variable.Parent() == variable.Pkg().Scope() {
 		return packageVariable(context, children, source, variable)
 	}
-	if name, selected := context.AddressableStorage().Name(
-		context,
-		variable,
-	); selected {
-		requirement, err := context.AddressableStorage().Requirement(
-			context,
-			variable,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.DirectExpression(
-			context.Factory().Identifier(name),
-			requirement,
-		), nil
-	}
 	var receiverRequest []api.RootRequest
 	if receiver, ok := context.ValueReceiver(variable); ok {
 		request, err := receiver.CopyRequest()
@@ -105,36 +89,36 @@ func identifier(
 		}
 		receiverRequest = []api.RootRequest{request}
 	}
-	value, err := children.Expression(
-		context.
-			WithRole(api.RoleUnaryOperand).
-			WithExpectedType(variableType),
+	reference, err := context.Names().Reference(variable)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	targetElement, err := children.RepresentedType(
+		context.WithRole(api.RoleUnaryOperand),
 		source,
+		element,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	cell, err := context.AddressableStorage().Cell(
+	address, err := pointermarker.Operation(
 		context,
-		children,
-		source,
-		variableType,
-		value,
+		tsoniccore.SymbolAddressOf,
+		[]api.TypeEmission{targetElement},
+		[]api.ExpressionEmission{api.DirectExpression(
+			reference.Expression(context.Factory()),
+			reference.Requests()...,
+		)},
 	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	requirement, err := context.AddressableStorage().Requirement(context, variable)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	return api.NewExpressionEmission(
-		cell.Before(),
-		cell.Value(),
+		address.Before(),
+		address.Value(),
 		api.CombineRequests(
-			cell.Requests(),
+			address.Requests(),
 			receiverRequest,
-			[]api.RootRequest{requirement},
 		),
 	)
 }
@@ -150,39 +134,9 @@ func packageVariable(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	representation, err := pointertype.Observe(
-		context,
-		types.NewPointer(variableType),
-		api.PointerRepresentationDemandStableLocation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	target, err := context.Names().PackageVariable(variable)
 	if err != nil {
 		return api.ExpressionEmission{}, err
-	}
-	if representation.Representation().DirectClass() {
-		logical, err := context.Values().FromStorage(
-			context.WithRole(api.RoleUnaryOperand),
-			source,
-			variableType,
-			api.DirectExpression(
-				target.Expression(context.Factory()),
-				target.Requests()...,
-			),
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.NewExpressionEmission(
-			logical.Before(),
-			logical.Value(),
-			api.CombineRequests(
-				logical.Requests(),
-				representation.Requests(),
-			),
-		)
 	}
 	logicalType, err := children.RepresentedType(
 		context.WithRole(api.RoleUnaryOperand),
@@ -192,42 +146,15 @@ func packageVariable(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	runtime, err := pointerRuntime(context)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	state := context.Factory().Identifier(target.StateName())
-	field := context.Factory().StringLiteral(
-		target.FieldName(),
-		tsgo.TokenFlagsNone,
+	return pointermarker.Operation(
+		context,
+		tsoniccore.SymbolAddressOf,
+		[]api.TypeEmission{logicalType},
+		[]api.ExpressionEmission{api.DirectExpression(
+			target.Expression(context.Factory()),
+			target.Requests()...,
+		)},
 	)
-	return api.DirectExpression(
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(pointerruntime.ObjectFieldName),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			[]tsgo.TypeNode{
-				logicalType.Value(),
-				context.Factory().TypeQueryNode(state, nil),
-				context.Factory().LiteralTypeNode(field),
-			},
-			[]tsgo.Expression{
-				state,
-				field,
-			},
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(
-			target.Requests(),
-			logicalType.Requests(),
-			runtime.Requests(),
-			representation.Requests(),
-		)...,
-	), nil
 }
 
 func selector(

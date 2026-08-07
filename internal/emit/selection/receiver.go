@@ -166,7 +166,6 @@ func methodSetReceiver(
 			source,
 			resolved,
 			root,
-			false,
 		)
 	}
 	if receiverABI == api.MethodReceiverABIContractDirect {
@@ -284,7 +283,6 @@ func MethodExpressionReceiver(
 			source,
 			resolved,
 			root,
-			false,
 		)
 		return receiver, method, err
 	}

@@ -35,20 +35,6 @@ func compareDeclarationRequirements(
 			return emitordering.CompareObjects(leftMethod, rightMethod)
 		}
 	}
-	if left.Kind() == api.DeclarationRequirementAddressableStorage {
-		_, leftVariable, leftOK := left.AddressableStorage()
-		_, rightVariable, rightOK := right.AddressableStorage()
-		switch {
-		case !leftOK && rightOK:
-			return -1
-		case leftOK && !rightOK:
-			return 1
-		case !leftOK:
-			return 0
-		default:
-			return emitordering.CompareObjects(leftVariable, rightVariable)
-		}
-	}
 	if left.Kind() == api.DeclarationRequirementConstantProjection {
 		_, leftProjection, _ := left.ConstantProjection()
 		_, rightProjection, _ := right.ConstantProjection()

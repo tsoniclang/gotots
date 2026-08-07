@@ -9,7 +9,6 @@ import (
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
-	emitstorage "github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"go/ast"
@@ -336,15 +335,6 @@ func (s *programSession) buildPackageInitializerRevision(
 	context, err := emitnaming.WithLexicalTypeRequirements(
 		builder.assemblyContext.WithArtifactOwner(owner),
 		site.Declaration,
-		owner,
-		requirements,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
-	context, err = emitstorage.ApplyRequirements(
-		context,
-		initializer.Rhs,
 		owner,
 		requirements,
 	)

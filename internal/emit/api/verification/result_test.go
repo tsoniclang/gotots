@@ -12,7 +12,6 @@ import (
 type accessorContextServices struct {
 	api.Names
 	api.Values
-	api.AddressableStorage
 }
 
 func TestAccessorReadPreservesReceiverPrerequisitesAndRequests(t *testing.T) {
@@ -56,7 +55,6 @@ func TestAccessorReadPreservesReceiverPrerequisitesAndRequests(t *testing.T) {
 		types.SizesFor("gc", "amd64"),
 		api.MemoryByteOrderLittleEndian,
 		factory,
-		services,
 		services,
 		services,
 		api.IntegerRepresentationNumber,

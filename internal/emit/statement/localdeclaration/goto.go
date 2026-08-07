@@ -13,23 +13,8 @@ func gotoLocalAssignment(
 	if !context.IsGotoLocal(selected.object) {
 		return nil, nil, false, nil
 	}
-	name, storage := context.AddressableStorage().Name(
-		context,
-		selected.object,
-	)
+	name, err := context.Names().Declare(selected.object)
 	value := selected.value
-	var err error
-	if storage {
-		value, err = context.AddressableStorage().Cell(
-			context,
-			children,
-			selected.sourceName,
-			selected.sourceType,
-			value,
-		)
-	} else {
-		name, err = context.Names().Declare(selected.object)
-	}
 	if err != nil {
 		return nil, nil, true, err
 	}

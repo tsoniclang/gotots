@@ -17,7 +17,6 @@ type parallelTarget struct {
 	name        string
 	declaration bool
 	discard     bool
-	storage     bool
 	target      api.StoreTargetEmission
 }
 
@@ -132,21 +131,6 @@ func emitParallel(
 			context.Factory().Identifier(temporaryNames[index]),
 		)
 		if target.declaration {
-			value := api.DirectExpression(temporary)
-			if target.storage {
-				value, err = context.AddressableStorage().Cell(
-					context,
-					children,
-					target.identifier,
-					target.sourceType,
-					value,
-				)
-				if err != nil {
-					return api.StatementEmission{}, err
-				}
-				temporary = value.Value()
-				requests = append(requests, value.Requests()...)
-			}
 			if context.IsGotoLocal(target.object) {
 				statements = append(
 					statements,
@@ -162,10 +146,6 @@ func emitParallel(
 			)
 			if err != nil {
 				return api.StatementEmission{}, err
-			}
-			if target.storage {
-				targetType = nil
-				typeRequests = nil
 			}
 			statements = append(
 				statements,
@@ -227,14 +207,7 @@ func parallelTargets(
 					return nil, nil, nil,
 						api.Unsupported(context, api.CategoryStatement, identifier)
 				}
-				name, selected := context.AddressableStorage().Name(
-					context,
-					object,
-				)
-				var err error
-				if !selected {
-					name, err = context.Names().Declare(object)
-				}
+				name, err := context.Names().Declare(object)
 				if err != nil {
 					return nil, nil, nil, err
 				}
@@ -245,7 +218,6 @@ func parallelTargets(
 					sourceType:  sourceType,
 					name:        name,
 					declaration: true,
-					storage:     selected,
 				})
 				continue
 			}

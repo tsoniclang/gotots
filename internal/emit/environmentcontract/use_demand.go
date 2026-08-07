@@ -28,7 +28,6 @@ func RequirementUseDemand(
 		return environmentidentity.UseDemandCallable
 	case api.DeclarationRequirementTypeRepresentation,
 		api.DeclarationRequirementGenericRepresentation,
-		api.DeclarationRequirementAddressableStorage,
 		api.DeclarationRequirementAnonymousStruct,
 		api.DeclarationRequirementAnonymousInterface,
 		api.DeclarationRequirementPointerRepresentation,

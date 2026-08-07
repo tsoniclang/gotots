@@ -51,17 +51,12 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		target, err := context.Values().FromStorage(
-			context,
-			source,
-			variable.Type(),
-			api.DirectExpression(
-				reference.Expression(context.Factory()),
-				reference.Requests()...,
-			),
+		target := api.DirectExpression(
+			reference.Expression(context.Factory()),
+			reference.Requests()...,
 		)
-		if err != nil || !reference.ProviderBoundary() {
-			return target, err
+		if !reference.ProviderBoundary() {
+			return target, nil
 		}
 		target, _, err = providerboundary.FromProviderValue(
 			context,
@@ -74,15 +69,6 @@ func Emit(
 		return target, err
 	}
 	if variable, ok := object.(*types.Var); ok {
-		if selected, exists, err := context.AddressableStorage().Read(
-			context,
-			variable,
-		); exists || err != nil {
-			if err != nil {
-				return api.ExpressionEmission{}, err
-			}
-			return selected, nil
-		}
 		if receiver, ok := context.ValueReceiver(variable); ok {
 			value := receiver.Value()
 			var requests []api.RootRequest

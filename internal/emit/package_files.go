@@ -17,7 +17,6 @@ import (
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/emit/sourcepackage"
-	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -186,7 +185,6 @@ func (e *emitter) context(names api.Names) (api.Context, error) {
 		e.factory,
 		names,
 		e.values,
-		storage.Owner{},
 		e.scalar.IntegerRepresentation(),
 		e.order,
 		e.concurrency,

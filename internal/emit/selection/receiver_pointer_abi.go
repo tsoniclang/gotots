@@ -19,24 +19,15 @@ func valuePointerMethodReceiver(
 	declared types.Type,
 	receiverABI api.MethodReceiverABI,
 ) (api.ExpressionEmission, error) {
-	pointer, _, _, ok := pointerType(declared)
+	_, _, _, ok := pointerType(declared)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	var representation api.PointerRepresentationObservation
 	if receiverABI == api.MethodReceiverABISourceRepresentation {
-		var err error
-		representation, err = pointertype.ObserveSource(
-			context,
-			method.Origin(),
-			pointer,
-			api.PointerRepresentationDemandNone,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	} else if receiverABI != api.MethodReceiverABIContractDirect {
+		return addressSource(context, children, source, resolved)
+	}
+	if receiverABI != api.MethodReceiverABIContractDirect {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "method receiver ABI is invalid",
@@ -46,63 +37,36 @@ func valuePointerMethodReceiver(
 		receiver api.ExpressionEmission
 		err      error
 	)
-	switch {
-	case receiverABI == api.MethodReceiverABIContractDirect:
-		target, targetErr := children.StoreTarget(
-			context.
-				WithRole(api.RoleReceiverValue).
-				WithExpectedType(resolved.root),
-			source.X,
-		)
-		if targetErr != nil {
-			return api.ExpressionEmission{}, targetErr
-		}
-		root, mutableErr := target.MutableValue(
-			context.WithRole(api.RoleReceiverValue),
-			source.X,
-		)
-		if mutableErr != nil {
-			return api.ExpressionEmission{}, mutableErr
-		}
-		receiver, err = projectMutableValue(
-			context,
-			children,
-			source,
-			resolved,
-			root,
-		)
-	case representation.Representation().DirectClass() && len(resolved.fields) == 0:
-		target, targetErr := children.StoreTarget(
-			context.
-				WithRole(api.RoleReceiverValue).
-				WithExpectedType(resolved.root),
-			source.X,
-		)
-		if targetErr != nil {
-			return api.ExpressionEmission{}, targetErr
-		}
-		receiver, err = target.MutableValue(
-			context.WithRole(api.RoleReceiverValue),
-			source.X,
-		)
-	default:
-		receiver, err = addressSource(
-			context,
-			children,
-			source,
-			resolved,
-		)
+	target, targetErr := children.StoreTarget(
+		context.
+			WithRole(api.RoleReceiverValue).
+			WithExpectedType(resolved.root),
+		source.X,
+	)
+	if targetErr != nil {
+		return api.ExpressionEmission{}, targetErr
 	}
+	root, mutableErr := target.MutableValue(
+		context.WithRole(api.RoleReceiverValue),
+		source.X,
+	)
+	if mutableErr != nil {
+		return api.ExpressionEmission{}, mutableErr
+	}
+	receiver, err = projectMutableValue(
+		context,
+		children,
+		source,
+		resolved,
+		root,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	return api.NewExpressionEmission(
 		receiver.Before(),
 		receiver.Value(),
-		api.CombineRequests(
-			receiver.Requests(),
-			representation.Requests(),
-		),
+		receiver.Requests(),
 	)
 }
 
@@ -192,44 +156,7 @@ func adaptPointerMethodReceiver(
 			Reason: "method receiver ABI is invalid",
 		}
 	}
-	target, err := pointertype.ObserveSource(
-		context,
-		declarationOwner,
-		declared,
-		api.PointerRepresentationDemandNone,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	sourceDemand := api.PointerRepresentationDemandNone
-	if !target.Representation().DirectClass() {
-		sourceDemand = api.PointerRepresentationDemandStableLocation
-	}
-	sourceRepresentation, err := pointertype.Observe(
-		context,
-		effective,
-		sourceDemand,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if target.Representation().DirectClass() &&
-		!sourceRepresentation.Representation().DirectClass() {
-		return api.ExpressionEmission{}, &api.InvariantError{
-			Role: context.Role(),
-			Reason: "pointer receiver occurrence diverged from its " +
-				"declaration-family ABI",
-		}
-	}
-	return api.NewExpressionEmission(
-		value.Before(),
-		value.Value(),
-		api.CombineRequests(
-			value.Requests(),
-			target.Requests(),
-			sourceRepresentation.Requests(),
-		),
-	)
+	return value, nil
 }
 
 func projectContractDirectReceiver(

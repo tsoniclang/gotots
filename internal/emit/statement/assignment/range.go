@@ -50,7 +50,6 @@ type rangeBinding struct {
 	object      *types.Var
 	name        string
 	declaration bool
-	storage     bool
 	target      api.StoreTargetEmission
 	sourceType  types.Type
 	targetType  types.Type
@@ -214,11 +213,7 @@ func rangeBindings(
 				return nil,
 					api.Unsupported(context, api.CategoryStatement, identifier)
 			}
-			name, storage := context.AddressableStorage().Name(context, object)
-			var err error
-			if !storage {
-				name, err = context.Names().Declare(object)
-			}
+			name, err := context.Names().Declare(object)
 			if err != nil {
 				return nil, err
 			}
@@ -227,7 +222,6 @@ func rangeBindings(
 				object:      object,
 				name:        name,
 				declaration: true,
-				storage:     storage,
 				sourceType:  selected.sourceType,
 				targetType:  targetType,
 				value:       selected.emission,
@@ -270,23 +264,9 @@ func declareRangeBinding(
 	binding *rangeBinding,
 ) (tsgo.Statement, []api.RootRequest, error) {
 	value := binding.value
-	if binding.storage {
-		var err error
-		value, err = context.AddressableStorage().Cell(
-			context,
-			children,
-			binding.source,
-			binding.targetType,
-			value,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
 	var targetType tsgo.TypeNode
 	var requests []api.RootRequest
-	if !binding.storage &&
-		context.Values().RequiresExplicitType(context, binding.targetType) {
+	if context.Values().RequiresExplicitType(context, binding.targetType) {
 		represented, err := children.RepresentedType(
 			context.WithRole(api.RoleLocalType),
 			binding.source,

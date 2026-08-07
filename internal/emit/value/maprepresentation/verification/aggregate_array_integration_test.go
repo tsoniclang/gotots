@@ -10,7 +10,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -147,7 +146,6 @@ func productionAggregateContext(
 		tsgo.NewFactory(),
 		&aggregateNames{},
 		representation.Owner{},
-		storage.Owner{},
 		integer,
 		api.EvaluationOrderPreserveGo,
 		api.ConcurrencySemanticsDisabled,

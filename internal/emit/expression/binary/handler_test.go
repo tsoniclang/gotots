@@ -9,7 +9,6 @@ import (
 	gostdlib "github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -47,7 +46,6 @@ func TestParentOperatorOwnerDoesNotCreateAnIntegerFallback(t *testing.T) {
 				tsgo.Factory{},
 				unusedNames{},
 				unusedValues{},
-				storage.Owner{},
 				api.IntegerRepresentationNumber,
 				api.EvaluationOrderDirect,
 				api.ConcurrencySemanticsDisabled,
@@ -86,7 +84,6 @@ func TestLogicalOperationAcceptsUntypedBooleanConditionEvidence(t *testing.T) {
 		tsgo.Factory{},
 		unusedNames{},
 		unusedValues{},
-		storage.Owner{},
 		api.IntegerRepresentationNumber,
 		api.EvaluationOrderDirect,
 		api.ConcurrencySemanticsDisabled,
@@ -115,7 +112,6 @@ func TestLogicalRightPrerequisitesStayInsideTheSelectedBranch(t *testing.T) {
 		tsgo.Factory{},
 		unusedNames{},
 		unusedValues{},
-		storage.Owner{},
 		api.IntegerRepresentationNumber,
 		api.EvaluationOrderDirect,
 		api.ConcurrencySemanticsDisabled,

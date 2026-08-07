@@ -65,9 +65,6 @@ const (
 	GenericOperationNilEqual
 	GenericOperationToStorage
 	GenericOperationFromStorage
-	GenericOperationPointerCell
-	GenericOperationPointerLoad
-	GenericOperationPointerStore
 	GenericOperationToContainerStorage
 	GenericOperationFromContainerStorage
 	GenericOperationIndexAddress
@@ -119,9 +116,6 @@ var genericOperationIdentifiers = [...]string{
 	GenericOperationNilEqual:                 "nil_equal",
 	GenericOperationToStorage:                "to_storage",
 	GenericOperationFromStorage:              "from_storage",
-	GenericOperationPointerCell:              "pointer_cell",
-	GenericOperationPointerLoad:              "pointer_load",
-	GenericOperationPointerStore:             "pointer_store",
 	GenericOperationToContainerStorage:       "to_container_storage",
 	GenericOperationFromContainerStorage:     "from_container_storage",
 	GenericOperationIndexAddress:             "index_address",
@@ -189,12 +183,6 @@ func (o GenericOperation) String() string {
 		return "to-storage"
 	case GenericOperationFromStorage:
 		return "from-storage"
-	case GenericOperationPointerCell:
-		return "pointer-cell"
-	case GenericOperationPointerLoad:
-		return "pointer-load"
-	case GenericOperationPointerStore:
-		return "pointer-store"
 	case GenericOperationToContainerStorage:
 		return "to-container-storage"
 	case GenericOperationFromContainerStorage:
@@ -420,50 +408,6 @@ const (
 func (d GenericStorageDirection) Valid() bool {
 	return d == GenericStorageDirectionTo ||
 		d == GenericStorageDirectionFrom
-}
-
-func GenericPointerOperationElement(
-	selection GenericOperationSelection,
-	signature *types.Signature,
-) (types.Type, bool) {
-	if signature == nil {
-		return nil, false
-	}
-	operation := selection.Operation()
-	switch operation {
-	case GenericOperationPointerCell:
-		if signature.Params().Len() != 1 ||
-			signature.Results().Len() != 1 {
-			return nil, false
-		}
-		element := signature.Params().At(0).Type()
-		pointer, ok := types.Unalias(
-			signature.Results().At(0).Type(),
-		).(*types.Pointer)
-		return element, ok && types.Identical(pointer.Elem(), element)
-	case GenericOperationPointerLoad:
-		if signature.Params().Len() != 1 ||
-			signature.Results().Len() != 1 {
-			return nil, false
-		}
-		pointer, ok := types.Unalias(
-			signature.Params().At(0).Type(),
-		).(*types.Pointer)
-		result := signature.Results().At(0).Type()
-		return result, ok && types.Identical(pointer.Elem(), result)
-	case GenericOperationPointerStore:
-		if signature.Params().Len() != 2 ||
-			signature.Results().Len() != 0 {
-			return nil, false
-		}
-		pointer, ok := types.Unalias(
-			signature.Params().At(0).Type(),
-		).(*types.Pointer)
-		element := signature.Params().At(1).Type()
-		return element, ok && types.Identical(pointer.Elem(), element)
-	default:
-		return nil, false
-	}
 }
 
 func GenericStorageOperationType(

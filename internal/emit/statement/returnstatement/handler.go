@@ -82,22 +82,13 @@ func emitNamed(
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
 		}
-		value, selected, err := context.AddressableStorage().Read(
-			context,
-			result,
-		)
+		targetName, err := context.Names().Result(result, index)
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		if !selected {
-			targetName, err := context.Names().Result(result, index)
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
-			value = api.DirectExpression(
-				context.Factory().Identifier(targetName),
-			)
-		}
+		value := api.DirectExpression(
+			context.Factory().Identifier(targetName),
+		)
 		value, err = context.Values().Transfer(
 			context.WithRole(api.RoleReturnResult),
 			source,
