@@ -3,9 +3,12 @@ package command
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -77,6 +80,52 @@ func TestRunBuildsSimpleProgramThroughPinnedTSGo(t *testing.T) {
 	}
 }
 
+func TestRunEmitsCanonicalMarkersWithoutFabricatingCorePackage(t *testing.T) {
+	root := t.TempDir()
+	writeCommandFixture(t, filepath.Join(root, "go.mod"), "module example.test/markers\n\ngo 1.26.4\n")
+	writeCommandFixture(t, filepath.Join(root, "source.go"), `package markers
+
+func Increment(value int32) int32 {
+	pointer := &value
+	*pointer++
+	return value
+}
+`)
+	writeCommandFixture(t, filepath.Join(root, "gotots.json"), `{
+  "schemaVersion": 1,
+  "distribution": {"root": "`+filepath.ToSlash(repositoryRoot(t))+`"},
+  "source": {"root": ".", "package": ".", "mode": "exported"},
+  "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
+  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "providers": {"standardLibrary": false, "externals": false},
+  "implementations": {"bundles": []},
+  "output": {"directory": "generated"}
+}
+`)
+	generated := filepath.Join(root, "generated")
+	writeCommandFixture(t, filepath.Join(generated, "tsconfig.json"), "{}\n")
+	writeCommandFixture(t, filepath.Join(generated, "obsolete.ts"), "export {};\n")
+	var output bytes.Buffer
+	if err := Run(context.Background(), root, []string{"build"}, &output, &output); err != nil {
+		t.Fatal(err)
+	}
+	printed := readGeneratedTypeScript(t, generated)
+	if !strings.Contains(printed, `from "@tsonic/core/lang.js"`) ||
+		!strings.Contains(printed, `from "@tsonic/core/types.js"`) {
+		t.Fatalf("canonical marker imports are absent:\n%s", printed)
+	}
+	if _, err := os.Stat(filepath.Join(generated, "node_modules", "@tsonic", "core")); !os.IsNotExist(err) {
+		t.Fatalf("canonical build fabricated @tsonic/core: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(generated, "tsconfig.json")); !os.IsNotExist(err) {
+		t.Fatalf("canonical build retained an executable-target tsconfig: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(generated, "obsolete.ts")); !os.IsNotExist(err) {
+		t.Fatalf("canonical build retained an obsolete owned artifact: %v", err)
+	}
+	assertManifestMatchesOutput(t, generated)
+}
+
 func TestProjectPackageIsRequiredForTopLevelAwait(t *testing.T) {
 	root := t.TempDir()
 	packageDocument, err := encodeProjectPackage()
@@ -134,5 +183,63 @@ func writeCommandFixture(t *testing.T, path string, source string) {
 	}
 	if err := os.WriteFile(path, []byte(source), 0o600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func readGeneratedTypeScript(t *testing.T, root string) string {
+	t.Helper()
+	var source strings.Builder
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".ts" {
+			return nil
+		}
+		payload, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		source.Write(payload)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return source.String()
+}
+
+func assertManifestMatchesOutput(t *testing.T, root string) {
+	t.Helper()
+	payload, err := os.ReadFile(filepath.Join(root, buildManifestName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Files []string `json:"files"`
+	}
+	if err := json.Unmarshal(payload, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	actual := make([]string, 0, len(manifest.Files))
+	if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		actual = append(actual, filepath.ToSlash(relative))
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(actual)
+	if !slices.Equal(manifest.Files, actual) {
+		t.Fatalf("manifest files = %v, physical files = %v", manifest.Files, actual)
 	}
 }

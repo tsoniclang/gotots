@@ -80,7 +80,7 @@ func Build(ctx context.Context, project config.Project) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	files, err := writeEmission(ctx, project, emission, semanticDigest)
+	files, err := writeEmission(project, emission, semanticDigest)
 	if err != nil {
 		return Report{}, err
 	}

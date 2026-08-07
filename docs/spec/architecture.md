@@ -1093,10 +1093,16 @@ JSON, flags, paths, or environment variables. The semantic project digest
 includes build and compilation profiles plus implementation contract and
 source digests, but excludes output/report paths.
 
-The output contract is strict ESM. Project assembly writes a root
-`package.json` with `type: module` before whole-project NodeNext typechecking;
-top-level await is never made valid by rewriting generated modules as
-CommonJS.
+The output contract is canonical strict ESM source. Project assembly writes a
+root `package.json` with `type: module`; top-level await is never made valid by
+rewriting generated modules as CommonJS. GoToTS prints and seals that source,
+but does not fabricate `@tsonic/core` declarations, emit a target `tsconfig`,
+or invoke a TypeScript checker that lacks TSTS's authoritative virtual marker
+modules. TSTS checks the exact immutable canonical source, finalizes every
+selected marker fact, and the selected target then strict-typechecks the
+executable artifact. The configured output directory is compiler-owned and is
+reconstructed through a staged replacement; a successful build cannot retain
+an artifact from an earlier canonical build.
 
 Compilation-scoped generated support definitions retain their full semantic
 artifact identities, but those identities do not each create a physical ESM

@@ -766,10 +766,17 @@ digest; changing implementation bytes or its envelope changes it.
 
 The production `gotots build` command writes a canonical resolved project on
 request, emits every TypeScript file through pinned TS-Go, records the semantic
-digest and exact output membership in `gotots-manifest.json`, declares the
-project ESM in a root `package.json`, and runs the strict generated-project
-typecheck before reporting success. Removing `type: module` must make a
-cooperative program with top-level await fail at that strict gate.
+digest and exact output membership in `gotots-manifest.json`, and declares the
+canonical project ESM in a root `package.json`. It emits neither a target
+`tsconfig` nor a fabricated `@tsonic/core` package. TSTS must strictly check
+that exact immutable source using its authoritative virtual marker modules and
+exact-join every selected marker to one finalized fact before a target runs.
+The selected target must then strict-typecheck its complete executable output;
+removing `type: module` makes a cooperative top-level-await artifact fail at
+that target gate. Rebuilding over a populated output directory must replace the
+complete compiler-owned artifact set: a seeded obsolete source file and an old
+target `tsconfig` must both disappear, and the sorted manifest membership
+(including the manifest itself) must exact-join the physical file set.
 
 For each source implementation, certification independently inspects the
 selected Go package, the ordinary generated package assembly, and the authored
