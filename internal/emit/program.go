@@ -11,7 +11,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
-	"github.com/tsoniclang/gotots/internal/emit/callableprojection"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
@@ -353,22 +352,6 @@ func newProgramSession(
 		sourceImplementations:    options.SourceImplementations,
 		externalFunctions:        make(map[*types.Func]ExternalFunctionObligation),
 		externalFunctionBindings: externalBindings,
-	}
-	callableBindings, err := callableprojection.Select(
-		source,
-		scalar,
-		options.SourceImplementations,
-	)
-	if err != nil {
-		return nil, err
-	}
-	for _, binding := range callableBindings {
-		if err := session.artifacts.AdmitCallableABI(
-			api.MustSourceArtifactOwner(binding.Function().Origin()),
-			binding.Callable(),
-		); err != nil {
-			return nil, err
-		}
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(

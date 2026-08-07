@@ -104,6 +104,7 @@ func executeMaterializedTypeScript(
 	runnerPath string,
 ) string {
 	t.Helper()
+	installPointerMarkerFixture(t, workingDirectory)
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	outputDirectory := filepath.Join(workingDirectory, "out")
 	arguments := []string{
@@ -126,6 +127,53 @@ func executeMaterializedTypeScript(
 		t.Fatal(err)
 	}
 	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
+}
+
+func installPointerMarkerFixture(t *testing.T, workingDirectory string) {
+	t.Helper()
+	root := filepath.Join(
+		workingDirectory,
+		"node_modules",
+		"@tsonic",
+		"core",
+	)
+	writeFile(t, filepath.Join(root, "package.json"), `{
+  "type": "module",
+  "exports": {
+    "./lang.js": "./lang.js",
+    "./types.js": "./types.js"
+  }
+}
+`)
+	writeFile(t, filepath.Join(root, "types.d.ts"), `declare const pointerBrand: unique symbol;
+export interface Pointer<T> {
+    readonly [pointerBrand]: (value: T) => T;
+}
+`)
+	writeFile(t, filepath.Join(root, "types.js"), "export {};\n")
+	writeFile(t, filepath.Join(root, "lang.d.ts"), `import type { Pointer } from "./types.js";
+export declare function addressOf<T>(storage: T): Pointer<T>;
+export declare function allocatePointer<T>(initial: T): Pointer<T>;
+export declare function loadPointer<T>(pointer: Pointer<T>): T;
+export declare function storePointer<T>(pointer: Pointer<T>, value: T): void;
+export declare function equalPointer<T>(left: Pointer<T> | undefined, right: Pointer<T> | undefined): boolean;
+`)
+	writeFile(t, filepath.Join(root, "lang.js"), `export function addressOf(storage) {
+    return { value: storage };
+}
+export function allocatePointer(initial) {
+    return { value: initial };
+}
+export function loadPointer(pointer) {
+    return pointer.value;
+}
+export function storePointer(pointer, value) {
+    pointer.value = value;
+}
+export function equalPointer(left, right) {
+    return left === right;
+}
+`)
 }
 
 func compileTemporaryFunctionSource(t *testing.T, source string) error {

@@ -459,10 +459,11 @@ panic. Canonical output records that intent with the accepted neutral pointer
 contract; it does not preselect a JavaScript carrier or scalarize a pointer:
 
 ```ts
-import type { Pointer } from "@tsonic/core/lang.js";
+import type { Pointer } from "@tsonic/core/types.js";
 import {
   addressOf,
   allocatePointer,
+  equalPointer,
   loadPointer,
   storePointer,
 } from "@tsonic/core/lang.js";
@@ -492,7 +493,9 @@ const fresh = allocatePointer<int>(0);
 ```
 
 GoToTS owns the explicit nil checks because they are Go behavior. Pointer
-equality remains identity equality (`===`) over `Pointer<T> | undefined`.
+equality uses `equalPointer` over `Pointer<T> | undefined`; raw TypeScript
+`===` is not the canonical source operation because two independently formed
+addresses of the same storage must compare equal.
 Passing, returning, or storing a pointer preserves the same location identity.
 Every marker call is emitted as TS-Go AST and selected by exact semantic
 evidence, never by marker spelling.

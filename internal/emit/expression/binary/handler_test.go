@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	gostdlib "github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -448,6 +449,12 @@ func (unusedNames) ProviderPrimitive(
 func (unusedNames) Runtime(
 	api.RuntimeSymbol,
 	api.ImportPhase,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) TsonicCore(
+	tsoniccore.Symbol,
 ) (api.NameReference, error) {
 	panic("unused")
 }

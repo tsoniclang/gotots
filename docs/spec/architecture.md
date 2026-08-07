@@ -424,15 +424,20 @@ requests copying that class; revisable artifact reconstruction adds it before
 seal.
 
 Pointers identify typed writable locations, not merely values. Canonical source
-always preserves that meaning with `Pointer<T> | undefined` and the accepted
-`addressOf`, `allocatePointer`, `loadPointer`, and `storePointer` operations from
+always preserves that meaning with `Pointer<T> | undefined` from
+`@tsonic/core/types.js` and the accepted `addressOf`, `allocatePointer`,
+`loadPointer`, `storePointer`, and `equalPointer` operations from
 `@tsonic/core/lang.js`. GoToTS emits explicit Go nil checks before loads and
-stores and uses identity equality for pointer comparison. Passing, returning,
+stores and emits `equalPointer` for pointer comparison. Passing, returning,
 storing, or copying a pointer preserves the same location identity.
 
 Addressable locals, fields, package variables, parameters, named results,
 array/slice elements, and pointer-to-pointer values remain distinguishable
-through the selected operation facts. GoToTS emits the exact marker occurrence
+through the selected operation facts. An address fact retains the complete
+typed location path and its evaluation boundary: replacing a value-struct root
+retargets an interior field location, while reassigning a pointer-valued root
+does not. Slice-element locations retain the selected backing store even when
+the slice variable is later rebound. GoToTS emits the exact marker occurrence
 from its Go AST and `go/types` evidence; it does not decide whether a target
 uses a class object, scalar snapshot, `{ value: T }` location, native pointer,
 or another representation.

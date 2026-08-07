@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
@@ -499,6 +500,12 @@ func (aggregateNames) Runtime(
 		return api.NameReference{}, err
 	}
 	return api.NewNameReference(contract.ExportedName())
+}
+
+func (aggregateNames) TsonicCore(
+	tsoniccore.Symbol,
+) (api.NameReference, error) {
+	panic("unused")
 }
 
 func (aggregateNames) ExternalProviderFunction(

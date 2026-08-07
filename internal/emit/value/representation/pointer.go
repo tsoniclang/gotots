@@ -5,9 +5,9 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -114,22 +114,6 @@ func (owner Owner) Pointee(
 			return api.ExpressionEmission{}, err
 		}
 	}
-	if value, handled, err := genericpointer.Load(
-		context,
-		source,
-		element,
-		pointer,
-	); handled || err != nil {
-		return value, err
-	}
-	representation, err := pointertype.Observe(
-		context,
-		types.NewPointer(element),
-		api.PointerRepresentationDemandNone,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	targetElement, err := owner.children.RepresentedType(
 		context.WithRole(api.RoleUnaryOperand),
 		source,
@@ -138,75 +122,25 @@ func (owner Owner) Pointee(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	reference, err := context.Names().Runtime(
-		api.RuntimePointer,
-		api.ImportPhaseValue,
+	guarded, err := pointermarker.Guard(context, pointer)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	loaded, err := pointermarker.Operation(
+		context,
+		tsoniccore.SymbolLoadPointer,
+		[]api.TypeEmission{targetElement},
+		[]api.ExpressionEmission{guarded},
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if representation.Representation().DirectClass() {
-		guarded, err := api.NewExpressionEmission(
-			pointer.Before(),
-			pointerruntime.Direct(
-				context.Factory(),
-				reference.Name(),
-				targetElement.Value(),
-				pointer.Value(),
-			),
-			api.CombineRequests(
-				pointer.Requests(),
-				targetElement.Requests(),
-				reference.Requests(),
-				representation.Requests(),
-			),
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return owner.Transfer(
-			context,
-			source,
-			element,
-			element,
-			api.ValueTransferCopy,
-			guarded,
-		)
-	}
-	storageType, err := context.ContainerStorage().PointerStorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		element,
-		representation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	stored, err := api.NewExpressionEmission(
-		pointer.Before(),
-		pointerruntime.CellValue(
-			context.Factory(),
-			reference.Name(),
-			targetElement.Value(),
-			storageType.Value(),
-			pointer.Value(),
-		),
-		api.CombineRequests(
-			pointer.Requests(),
-			targetElement.Requests(),
-			storageType.Requests(),
-			reference.Requests(),
-			representation.Requests(),
-		),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return context.ContainerStorage().FromPointerStorage(
+	return owner.Transfer(
 		context,
 		source,
 		element,
-		representation,
-		stored,
+		element,
+		api.ValueTransferCopy,
+		loaded,
 	)
 }

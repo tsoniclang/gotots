@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"go/types"
 	"slices"
@@ -215,6 +216,7 @@ type Names interface {
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
 	ProviderPrimitive(PrimitiveAlias) (NameReference, error)
+	TsonicCore(tsoniccore.Symbol) (NameReference, error)
 	Runtime(RuntimeSymbol, ImportPhase) (NameReference, error)
 	ExternalProviderFunction(string, string) (NameReference, error)
 	Temporary(TemporaryKind) (string, error)

@@ -7,6 +7,7 @@ import (
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -25,6 +26,7 @@ type File struct {
 	derivedImports  map[string]string
 	projections     map[constantProjectionImport]string
 	primitives      map[api.PrimitiveAlias]string
+	tsonicCore      map[tsoniccore.Symbol]string
 	runtime         map[api.RuntimeSymbol]string
 	providerImports map[string]providerImport
 	artifactOwner   api.ArtifactOwner
@@ -92,6 +94,7 @@ func (n *Owner) ForFile(
 		derivedImports:  make(map[string]string),
 		projections:     make(map[constantProjectionImport]string),
 		primitives:      make(map[api.PrimitiveAlias]string),
+		tsonicCore:      make(map[tsoniccore.Symbol]string),
 		runtime:         make(map[api.RuntimeSymbol]string),
 		providerImports: make(map[string]providerImport),
 	}, nil

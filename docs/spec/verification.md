@@ -98,8 +98,8 @@ selected fact, classify a local same-spelled call, reparse source, or introduce
 a range join; each must fail at its sole owner.
 
 For typed pointers, focused proof covers `addressOf`, `allocatePointer`,
-`loadPointer`, and `storePointer`; nil, alias identity, mutation through two
-aliases, argument/return transport, fresh allocation, and pointer equality;
+`loadPointer`, `storePointer`, and `equalPointer`; nil, alias identity, mutation
+through two aliases, argument/return transport, fresh allocation, and pointer equality;
 canonical marker AST shape; TypeScript-target location lowering; strict output;
 and Go-versus-output execution. A mutation that scalarizes one alias without
 rewriting the complete flow must change behavior and fail. Broad searches must
