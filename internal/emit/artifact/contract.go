@@ -90,6 +90,22 @@ func ProjectContract(
 			); err != nil {
 				return Contract{}, err
 			}
+		case tsgo.EnumDeclaration:
+			nodes[api.ArtifactFacetConstructorSurface] = append(
+				nodes[api.ArtifactFacetConstructorSurface],
+				statement,
+			)
+			nodes[api.ArtifactFacetInstanceTypeSurface] = append(
+				nodes[api.ArtifactFacetInstanceTypeSurface],
+				statement,
+			)
+			if err := addExport(
+				statement.Name().Text(),
+				contractExportTypeSpace|contractExportValueSpace,
+				statement.Kind(),
+			); err != nil {
+				return Contract{}, err
+			}
 		case tsgo.InterfaceDeclaration:
 			nodes[api.ArtifactFacetInstanceTypeSurface] = append(
 				nodes[api.ArtifactFacetInstanceTypeSurface],

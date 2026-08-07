@@ -144,11 +144,13 @@ func emitMethod(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	arguments, argumentBefore, argumentRequests, err := emitArguments(
+	selectedABI, _ := context.ResolveCallableABI(method.Origin())
+	arguments, argumentBefore, argumentRequests, err := emitArgumentsWithABI(
 		context,
 		children,
 		source,
 		signature,
+		selectedABI,
 		detached,
 	)
 	if err != nil {

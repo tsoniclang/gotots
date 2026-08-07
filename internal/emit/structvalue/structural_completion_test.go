@@ -63,15 +63,18 @@ func Local(value int32) int32 {
 	}
 	body := function.Body().(tsgo.Block).Statements()
 	if len(body) != 4 {
-		t.Fatalf("lexical function statements = %d, want two classes, value, return", len(body))
+		t.Fatalf(
+			"lexical function statements = %d, want enum, class, value, return",
+			len(body),
+		)
 	}
-	localClass := body[0].(tsgo.ClassDeclaration)
+	localEnum := body[0].(tsgo.EnumDeclaration)
 	anonymousClass := body[1].(tsgo.ClassDeclaration)
-	if !strings.HasPrefix(localClass.Name().Text(), "Local") ||
+	if !strings.HasPrefix(localEnum.Name().Text(), "Local") ||
 		!strings.HasPrefix(anonymousClass.Name().Text(), "$goStruct_") {
 		t.Fatalf(
-			"lexical class order = %q/%q",
-			localClass.Name().Text(),
+			"lexical definition order = %q/%q",
+			localEnum.Name().Text(),
 			anonymousClass.Name().Text(),
 		)
 	}
@@ -127,8 +130,8 @@ func Nested(enabled bool, value int32) int32 {
 	if len(thenBlock) != 4 {
 		t.Fatalf("nested lexical statements = %d, want four", len(thenBlock))
 	}
-	if _, ok := thenBlock[0].(tsgo.ClassDeclaration); !ok {
-		t.Fatalf("nested local type = %T, want class", thenBlock[0])
+	if _, ok := thenBlock[0].(tsgo.EnumDeclaration); !ok {
+		t.Fatalf("nested local type = %T, want enum", thenBlock[0])
 	}
 	if anonymous, ok := thenBlock[1].(tsgo.ClassDeclaration); !ok ||
 		!strings.HasPrefix(anonymous.Name().Text(), "$goStruct_") {

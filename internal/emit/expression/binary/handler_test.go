@@ -197,6 +197,10 @@ func (unusedNames) DefinedValueRepresentation(
 	)
 }
 
+func (unusedNames) ProviderOwnedDeclaration(types.Object) (bool, error) {
+	return false, nil
+}
+
 func (unusedNames) TypeReference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
@@ -464,6 +468,14 @@ func (unusedNames) ModuleExport(types.Object) (bool, error) {
 }
 
 type unusedValues struct{}
+
+func (unusedValues) RequiresInitializerTypeAnnotation(
+	api.Context,
+	ast.Expr,
+	types.Type,
+) (bool, error) {
+	return false, nil
+}
 
 func (unusedValues) RequiresCustomEquality(api.Context, types.Type) bool {
 	panic("unused")

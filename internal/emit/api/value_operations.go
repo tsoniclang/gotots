@@ -6,12 +6,14 @@ import (
 	"go/types"
 	"slices"
 
+	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type Values interface {
 	RequiresCustomEquality(Context, types.Type) bool
 	RequiresExplicitType(Context, types.Type) bool
+	RequiresInitializerTypeAnnotation(Context, ast.Expr, types.Type) (bool, error)
 	RequiresStructuralCopy(Context, types.Type) bool
 	SupportsHash(Context, types.Type) bool
 	RequiresStorageProjection(Context, types.Type) bool
@@ -74,6 +76,11 @@ type Values interface {
 		token.Token,
 		tsgo.Expression,
 	) (ExpressionEmission, bool, error)
+}
+
+type PointeeValues interface {
+	Pointee(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
+	ProjectedPointee(Context, ast.Node, types.Type, ExpressionEmission, callableabi.NilPolicy) (ExpressionEmission, error)
 }
 
 type ValueTransferMode uint8

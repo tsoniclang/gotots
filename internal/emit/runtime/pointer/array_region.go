@@ -97,7 +97,7 @@ func (b builder) arrayRegionMethod() tsgo.MethodDeclaration {
 				typeS,
 				b.call(
 					b.id(b.className),
-					"child",
+					ChildName,
 					b.call(b.id(b.className), "root", backing),
 					offset,
 				),

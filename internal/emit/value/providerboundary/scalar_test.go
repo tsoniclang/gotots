@@ -161,6 +161,68 @@ func TestProviderScalarBoundaryPreservesProviderDefinedValue(t *testing.T) {
 	}
 }
 
+func TestProviderScalarBoundaryReifiesGeneratedNumericIdentity(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/boundary", "boundary")
+	typeName := types.NewTypeName(
+		token.NoPos,
+		sourcePackage,
+		"Kind",
+		nil,
+	)
+	defined := types.NewNamed(typeName, types.Typ[types.Uint32], nil)
+	representation, err := api.NewDefinedValueRepresentation(
+		api.DefinedValueRepresentationGeneratedNumeric,
+		api.NameReference{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	context := scalarBoundaryContextWithNames(
+		t,
+		"amd64",
+		api.IntegerRepresentationNumber,
+		api.IntegerRepresentationBigInt,
+		sourcePackage,
+		scalarBoundaryNames{representations: map[*types.TypeName]api.DefinedValueRepresentation{
+			typeName: representation,
+		}},
+	)
+	value := api.DirectExpression(context.Factory().Identifier("kind"))
+
+	toProvider, changed, err := ToProviderValue(
+		context,
+		nil,
+		nil,
+		"",
+		defined,
+		value,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed || toProvider.Value() != value.Value() {
+		t.Fatal("generated numeric did not project directly at the provider boundary")
+	}
+
+	fromProvider, changed, err := FromProviderValue(
+		context,
+		nil,
+		nil,
+		"",
+		defined,
+		value,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrapped, ok := fromProvider.Value().(tsgo.BinaryExpression)
+	if !changed || !ok ||
+		wrapped.OperatorToken().Kind() != tsgo.SyntaxKindAsteriskToken {
+		t.Fatalf("generated numeric provider result = %T, want nominal wrap", fromProvider.Value())
+	}
+	requireProperty(t, wrapped.Right(), "Kind", "$goType")
+}
+
 func TestProviderScalarBoundaryFailsWithoutCertifiedABI(t *testing.T) {
 	context, err := api.NewContext(
 		api.RoleCallArgument,
@@ -303,6 +365,12 @@ func requireProperty(
 type scalarBoundaryNames struct {
 	api.Names
 	representations map[*types.TypeName]api.DefinedValueRepresentation
+}
+
+func (scalarBoundaryNames) Reference(
+	object types.Object,
+) (api.NameReference, error) {
+	return api.NewNameReference(object.Name())
 }
 
 func (n scalarBoundaryNames) DefinedValueRepresentation(

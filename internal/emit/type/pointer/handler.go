@@ -112,7 +112,11 @@ func EmitNonNilRepresented(
 			)...,
 		), nil
 	}
-	representation, err := Observe(context, sourceType, false)
+	representation, err := Observe(
+		context,
+		sourceType,
+		api.PointerRepresentationDemandNone,
+	)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
@@ -120,8 +124,7 @@ func EmitNonNilRepresented(
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
+	if representation.Representation().DirectClass() {
 		return api.DirectType(
 			elementType.Value(),
 			api.CombineRequests(
@@ -163,7 +166,7 @@ func EmitNonNilRepresented(
 func Observe(
 	context api.Context,
 	sourceType types.Type,
-	carrierDemand bool,
+	demand api.PointerRepresentationDemand,
 ) (api.PointerRepresentationObservation, error) {
 	pointer, _, ok := Resolve(sourceType)
 	if !ok {
@@ -182,7 +185,7 @@ func Observe(
 	return values.PointerRepresentation(
 		context,
 		pointer,
-		carrierDemand,
+		demand,
 	)
 }
 
@@ -190,7 +193,7 @@ func ObserveSource(
 	context api.Context,
 	owner types.Object,
 	sourceType types.Type,
-	carrierDemand bool,
+	demand api.PointerRepresentationDemand,
 ) (api.PointerRepresentationObservation, error) {
 	pointer, _, ok := Resolve(sourceType)
 	if !ok || owner == nil {
@@ -210,6 +213,6 @@ func ObserveSource(
 		context,
 		owner,
 		pointer,
-		carrierDemand,
+		demand,
 	)
 }

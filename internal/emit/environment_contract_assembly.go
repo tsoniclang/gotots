@@ -364,6 +364,7 @@ func (s *programSession) requireEnvironmentPackage(
 		s,
 		s,
 		s,
+		s,
 		s.goRuntime,
 	)
 	context, err := targetEmitter.targetContext(nil, outputPath)

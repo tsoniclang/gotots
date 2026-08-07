@@ -8,7 +8,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
-	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 )
 
 func emitInteger(
@@ -90,7 +89,7 @@ func emitInteger(
 		limit,
 		targetBody.Value(),
 		targetBody.Requests(),
-		integervalue.TypeUsesBigInt(operationContext, operationType),
+		operationContext.ScalarABI().UsesBigInt(operationType),
 		targetLabel,
 	)
 }

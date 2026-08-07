@@ -39,7 +39,7 @@ func buildPointerCapability(
 	representation, err := pointertype.Observe(
 		context,
 		pointerSource,
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return nil, nil, true, err
@@ -62,8 +62,7 @@ func buildPointerCapability(
 	if err != nil {
 		return nil, nil, true, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
+	if representation.Representation().DirectClass() {
 		parameters, resultType, body, requests, err :=
 			directPointerCapabilityBody(
 				context,

@@ -11,6 +11,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	"github.com/tsoniclang/gotots/internal/emit/callableprojection"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
@@ -353,6 +354,22 @@ func newProgramSession(
 		externalFunctions:        make(map[*types.Func]ExternalFunctionObligation),
 		externalFunctionBindings: externalBindings,
 	}
+	callableBindings, err := callableprojection.Select(
+		source,
+		scalar,
+		options.SourceImplementations,
+	)
+	if err != nil {
+		return nil, err
+	}
+	for _, binding := range callableBindings {
+		if err := session.artifacts.AdmitCallableABI(
+			api.MustSourceArtifactOwner(binding.Function().Origin()),
+			binding.Callable(),
+		); err != nil {
+			return nil, err
+		}
+	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
 			sourcePackage,
@@ -362,6 +379,7 @@ func newProgramSession(
 			providerScalar,
 			options.EvaluationOrder,
 			options.ConcurrencySemantics,
+			session,
 			session,
 			session,
 			session,
@@ -505,11 +523,11 @@ func (s *programSession) applyRootRequests(
 	if s.sealed {
 		return &ScheduleError{Reason: "root request arrived after target files were sealed"}
 	}
-	imports := make([]api.RootRequest, 0, len(requests))
+	placementRequests := make([]api.RootRequest, 0, len(requests))
 	err := api.WalkUniqueRootRequestPayloads(requests, func(request api.RootRequest) error {
 		switch request.Kind() {
-		case api.RootRequestImport:
-			imports = append(imports, request)
+		case api.RootRequestImport, api.RootRequestRuntimeFeature:
+			placementRequests = append(placementRequests, request)
 		case api.RootRequestDeclarationRequirement:
 			requirement, ok := request.DeclarationRequirement()
 			if !ok {
@@ -530,7 +548,7 @@ func (s *programSession) applyRootRequests(
 	if err != nil {
 		return err
 	}
-	return placement.Apply(imports)
+	return placement.Apply(placementRequests)
 }
 
 func (s *programSession) builder(site declarationSite) (*targetFileBuilder, error) {

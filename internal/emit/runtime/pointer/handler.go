@@ -12,6 +12,8 @@ const (
 	ProjectName      = "project"
 	ViewName         = "view"
 	FieldName        = "field"
+	FieldsName       = "fields"
+	ChildName        = "child"
 	ObjectFieldName  = "objectField"
 	ElementName      = "element"
 	IndexName        = "index"
@@ -21,10 +23,11 @@ const (
 	UnsafeMemoryName = "$go$unsafeMemory"
 	UnsafeViewName   = "$go$unsafeView"
 	UnsafeBindName   = "$go$unsafeBind"
-	unsafeSyncName   = "$go$unsafeSync"
+	unsafeRawName    = "$go$rawAccess"
 )
 
 type Capabilities struct {
+	FieldPath    bool
 	Region       bool
 	UnsafeMemory bool
 	Projection   bool
@@ -71,7 +74,9 @@ func BuildWithCapabilities(
 		target.logicalProperty(),
 		target.rootsProperty(),
 		target.childrenProperty(),
+		target.resolvedAddressProperty(),
 		target.constructor(),
+		target.addressGetter(),
 		target.rootMethod(),
 		target.childMethod(),
 		target.cellMethod(),
@@ -87,6 +92,9 @@ func BuildWithCapabilities(
 		target.valueGetter(),
 		target.valueSetter(),
 	}
+	if capabilities.FieldPath {
+		members = append(members, target.fieldsMethod())
+	}
 	if capabilities.Projection {
 		members = append(members, target.projectMethod())
 	}
@@ -96,7 +104,7 @@ func BuildWithCapabilities(
 	if capabilities.UnsafeMemory {
 		members = append(
 			members,
-			target.unsafeSyncProperty(),
+			target.unsafeRawProperty(),
 			target.unsafeBindMethod(),
 			target.unsafeMemoryMethod(),
 			target.unsafeViewMethod(),

@@ -1,5 +1,7 @@
 package tsgo
 
+//go:generate go run ./generate -schema ../../../schema/tsgo -output .
+
 // PinnedToolVersion is the module version of the pinned TS-Go toolchain the
 // generated protocol bindings were derived from.
 func PinnedToolVersion() string {

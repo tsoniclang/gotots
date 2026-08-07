@@ -141,54 +141,14 @@ func encodeProjectPackage() ([]byte, error) {
 }
 
 func encodeTSConfig(project config.Project, outputDirectory string) ([]byte, error) {
-	providerPath := func(parts ...string) (string, error) {
-		target := filepath.Join(append([]string{project.DistributionRoot()}, parts...)...)
-		relative, err := filepath.Rel(outputDirectory, target)
-		if err != nil {
-			return "", err
-		}
-		result := filepath.ToSlash(relative)
-		if result != "." && len(result) > 0 && result[0] != '.' {
-			result = "./" + result
-		}
-		return result, nil
-	}
-	standardLibrary, err := providerPath("gostdlib", "dist", "src", "*.d.ts")
+	payload, err := tsgo.EncodeStrictProjectConfig(
+		project.DistributionRoot(),
+		outputDirectory,
+	)
 	if err != nil {
 		return nil, commandError("encode tsconfig", err.Error())
 	}
-	externals, err := providerPath("externals", "dist", "src", "*.d.ts")
-	if err != nil {
-		return nil, commandError("encode tsconfig", err.Error())
-	}
-	document := map[string]any{
-		"compilerOptions": map[string]any{
-			"target":           "ES2022",
-			"module":           "NodeNext",
-			"moduleResolution": "NodeNext",
-			"paths": map[string][]string{
-				"@gotots/runtime/*.js":   {"./runtime/*.ts"},
-				"@gotots/gostdlib/*.js":  {standardLibrary},
-				"@gotots/externals/*.js": {externals},
-			},
-			"strict":                           true,
-			"exactOptionalPropertyTypes":       true,
-			"noUncheckedIndexedAccess":         true,
-			"noImplicitOverride":               true,
-			"noFallthroughCasesInSwitch":       true,
-			"forceConsistentCasingInFileNames": true,
-			"skipLibCheck":                     false,
-			"types":                            []string{},
-			"noEmit":                           true,
-		},
-		"include": []string{"**/*.ts"},
-		"exclude": []string{"node_modules", "out"},
-	}
-	payload, err := json.MarshalIndent(document, "", "  ")
-	if err != nil {
-		return nil, commandError("encode tsconfig", err.Error())
-	}
-	return append(payload, '\n'), nil
+	return payload, nil
 }
 
 func writeTargetFile(root string, relative string, payload []byte) error {

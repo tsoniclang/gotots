@@ -70,7 +70,7 @@ func Build(
 			observation, err := values.PointerRepresentation(
 				context,
 				types.NewPointer(sourceType),
-				false,
+				api.PointerRepresentationDemandNone,
 			)
 			if err != nil {
 				return Emission{}, err
@@ -91,14 +91,15 @@ func Build(
 			observation, err := values.PointerRepresentation(
 				context,
 				types.NewPointer(sourceType),
-				false,
+				api.PointerRepresentationDemandNone,
 			)
 			if err != nil {
 				return Emission{}, err
 			}
 			requests = append(requests, observation.Requests()...)
 			switch observation.Representation() {
-			case api.PointerRepresentationDirectClass:
+			case api.PointerRepresentationDirectClass,
+				api.PointerRepresentationDirectClassStorageIdentity:
 				targetType = logicalType
 			case api.PointerRepresentationCarrierLogical:
 				continue

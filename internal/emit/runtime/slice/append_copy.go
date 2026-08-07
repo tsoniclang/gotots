@@ -2,7 +2,7 @@ package slice
 
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
-func (b builder) appendMethod() tsgo.MethodDeclaration {
+func (b builder) appendMethod(sharedGrowth bool) tsgo.MethodDeclaration {
 	newLength := b.add(
 		b.thisProperty(MemberName(MemberLength)),
 		b.property(b.id("values"), "length"),
@@ -46,40 +46,6 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 			),
 		),
 	}, true)
-	initialCapacity := b.factory.ConditionalExpression(
-		b.binary(
-			b.thisProperty(MemberName(MemberCapacity)),
-			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-			b.number("0"),
-		),
-		b.factory.QuestionToken(),
-		b.number("1"),
-		b.factory.ColonToken(),
-		b.binary(
-			b.thisProperty(MemberName(MemberCapacity)),
-			tsgo.BinaryOperatorAsteriskToken,
-			b.number("2"),
-		),
-	)
-	growCapacity := b.factory.WhileStatement(
-		b.binary(
-			b.id("nextCapacity"),
-			tsgo.BinaryOperatorLessThanToken,
-			b.id("newLength"),
-		),
-		b.factory.Block([]tsgo.Statement{
-			b.factory.ExpressionStatement(
-				b.assign(
-					b.id("nextCapacity"),
-					b.binary(
-						b.id("nextCapacity"),
-						tsgo.BinaryOperatorAsteriskToken,
-						b.number("2"),
-					),
-				),
-			),
-		}, true),
-	)
 	backing := b.factory.NewExpression(
 		b.id("Array"),
 		[]tsgo.TypeNode{b.typeT()},
@@ -138,11 +104,33 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 			nil,
 		),
 	}
-	statements = append(
-		statements,
-		b.variable(tsgo.NodeFlagsLet, "nextCapacity", initialCapacity),
-		growCapacity,
-	)
+	if sharedGrowth {
+		statements = append(
+			statements,
+			b.variable(
+				tsgo.NodeFlagsConst,
+				"nextCapacity",
+				b.call(
+					b.id(b.className),
+					StorageGrownCapacityMember,
+					b.thisProperty(MemberName(MemberCapacity)),
+					b.id("newLength"),
+				),
+			),
+		)
+	} else {
+		statements = append(
+			statements,
+			b.variable(
+				tsgo.NodeFlagsLet,
+				"nextCapacity",
+				b.initialGrowthCapacity(
+					b.thisProperty(MemberName(MemberCapacity)),
+				),
+			),
+			b.growCapacityLoop(b.id("newLength")),
+		)
+	}
 	statements = append(
 		statements,
 		b.variable(

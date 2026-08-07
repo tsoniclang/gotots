@@ -2,14 +2,18 @@ import type { Awaitable, int } from "@gotots/gostdlib/internal/scalars.js";
 import { GoMapHash } from "@gotots/runtime/map.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
 
+const noTaskFailure = Symbol("gotots.sync.WaitGroup.noTaskFailure");
+
 export class WaitGroup {
   #count: int = 0n;
   readonly #waiters: Array<() => void> = [];
+  #taskFailure: unknown = noTaskFailure;
 
   static $copy(source: WaitGroup): WaitGroup {
     const result = new WaitGroup();
     result.#count = source.#count;
     result.#waiters.push(...source.#waiters);
+    result.#taskFailure = source.#taskFailure;
     return result;
   }
 
@@ -48,26 +52,36 @@ export class WaitGroup {
     receiver: WaitGroup | undefined,
     f: (() => Awaitable<void>) | undefined,
   ): void {
-    WaitGroup.Add(receiver, 1n);
+    if (receiver === undefined) {
+      GoPanic.raiseRuntime("WaitGroup.Go called with nil receiver");
+    }
+    const group = receiver;
+    WaitGroup.Add(group, 1n);
     void (async (): Promise<void> => {
       try {
         if (f === undefined) {
           GoPanic.raiseRuntime("sync.WaitGroup.Go called with nil function");
         }
         await f();
+      } catch (failure) {
+        if (group.#taskFailure === noTaskFailure) {
+          group.#taskFailure = failure;
+        }
       } finally {
-        WaitGroup.Done(receiver);
+        WaitGroup.Done(group);
       }
     })();
   }
 
-  static Wait(receiver: WaitGroup | undefined): Promise<void> {
+  static async Wait(receiver: WaitGroup | undefined): Promise<void> {
     if (receiver === undefined) {
       GoPanic.raiseRuntime("WaitGroup.Wait called with nil receiver");
     }
-    if (receiver.#count === 0n) {
-      return Promise.resolve();
+    if (receiver.#count !== 0n) {
+      await new Promise<void>((resolve) => receiver.#waiters.push(resolve));
     }
-    return new Promise<void>((resolve) => receiver.#waiters.push(resolve));
+    if (receiver.#taskFailure !== noTaskFailure) {
+      throw receiver.#taskFailure;
+    }
   }
 }

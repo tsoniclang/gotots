@@ -50,17 +50,7 @@ func (b builder) allocateMethod() tsgo.MethodDeclaration {
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"resolvedCapacity",
-			b.factory.ConditionalExpression(
-				b.binary(
-					capacity,
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-					b.factory.NullLiteral(),
-				),
-				b.factory.QuestionToken(),
-				numericLength,
-				b.factory.ColonToken(),
-				b.toNumber(capacity),
-			),
+			b.resolvedCapacity(capacity, numericLength),
 		),
 		b.factory.IfStatement(invalid, b.throwBounds(), nil),
 		b.returnStatement(b.newSlice(
@@ -73,40 +63,6 @@ func (b builder) allocateMethod() tsgo.MethodDeclaration {
 }
 
 func (b builder) grownCapacityMethod() tsgo.MethodDeclaration {
-	initial := b.factory.ConditionalExpression(
-		b.binary(
-			b.id("capacity"),
-			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-			b.number("0"),
-		),
-		b.factory.QuestionToken(),
-		b.number("1"),
-		b.factory.ColonToken(),
-		b.binary(
-			b.id("capacity"),
-			tsgo.BinaryOperatorAsteriskToken,
-			b.number("2"),
-		),
-	)
-	grow := b.factory.WhileStatement(
-		b.binary(
-			b.id("nextCapacity"),
-			tsgo.BinaryOperatorLessThanToken,
-			b.id("length"),
-		),
-		b.factory.Block([]tsgo.Statement{
-			b.factory.ExpressionStatement(
-				b.assign(
-					b.id("nextCapacity"),
-					b.binary(
-						b.id("nextCapacity"),
-						tsgo.BinaryOperatorAsteriskToken,
-						b.number("2"),
-					),
-				),
-			),
-		}, true),
-	)
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		StorageGrownCapacityMember,
@@ -116,8 +72,12 @@ func (b builder) grownCapacityMethod() tsgo.MethodDeclaration {
 			b.parameter("length", b.numberType()),
 		},
 		b.numberType(),
-		b.variable(tsgo.NodeFlagsLet, "nextCapacity", initial),
-		grow,
+		b.variable(
+			tsgo.NodeFlagsLet,
+			"nextCapacity",
+			b.initialGrowthCapacity(b.id("capacity")),
+		),
+		b.growCapacityLoop(b.id("length")),
 		b.returnStatement(b.id("nextCapacity")),
 	)
 }
@@ -169,31 +129,18 @@ func (b builder) initializeMethod() tsgo.MethodDeclaration {
 }
 
 func (b builder) withLengthMethod() tsgo.MethodDeclaration {
-	invalid := b.binary(
-		b.binary(
-			b.id("length"),
-			tsgo.BinaryOperatorLessThanToken,
-			b.number("0"),
-		),
-		tsgo.BinaryOperatorBarBarToken,
-		b.binary(
-			b.id("length"),
-			tsgo.BinaryOperatorGreaterThanToken,
-			b.thisProperty(MemberName(MemberCapacity)),
-		),
-	)
 	return b.method(
 		nil,
 		StorageWithLengthMember,
 		nil,
 		[]tsgo.ParameterDeclaration{b.parameter("length", b.numberType())},
 		b.sliceType(),
-		b.factory.IfStatement(invalid, b.throwBounds(), nil),
-		b.returnStatement(b.newSlice(
-			b.thisProperty("backing"),
-			b.thisProperty("offset"),
+		b.returnStatement(b.call(
+			b.factory.ThisExpression(),
+			MemberName(MemberSlice),
+			b.number("0"),
 			b.id("length"),
-			b.thisProperty(MemberName(MemberCapacity)),
+			b.factory.NullLiteral(),
 		)),
 	)
 }

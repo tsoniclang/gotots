@@ -223,6 +223,39 @@ References subscribe to closed observable facets such as:
 - constructor surface;
 - exported value surface.
 
+The callable-signature facet includes one ordered, closed target projection for
+every source parameter and result. Its authoritative key is the selected Go
+callable object, not a package/name string. The initial projection domain is:
+
+- `identity`, for the ordinary selected representation;
+- `pointee-value`, for a read-only non-escaping `*T` transported as the selected
+  value representation of `T`;
+- `direct-object-reference`, for a represented Go object whose identity and
+  mutation are already carried by the TypeScript class reference;
+- `mutable-scalar-location`, for observable scalar writes, aliases, identity,
+  or temporal sharing;
+- `owner-location`, for a field or element address that writes through to its
+  owner; and
+- `unsafe-location`, for reached dynamic address semantics.
+
+Automatic analysis and a certified authored implementation are two evidence
+sources for this one artifact, not two lowering paths. Automatic selection may
+choose `pointee-value` only after proving no write, escape, identity use, unsafe
+crossing, or observable temporal alias. For an authored implementation, its
+strictly checked TypeScript signature is compared with the selected Go
+signature and must identify exactly one admissible projection. No config key,
+annotation, package name, function name, or caller allowlist selects a
+projection.
+
+Every direct call, method value/expression, function value, callback, interface
+adapter, deferred entry, provider bridge, package export, and definition
+subscribes to the same settled signature facet. A structural projection change
+reconstructs those consumers through the ordinary reverse-dependency graph;
+an implementation-body-only change does not. A plain value projection never
+silently discards a source-observable write. Such a callable retains a location
+unless a separately specified input/output projection owns an explicit
+write-back rule.
+
 Body-only changes do not invalidate users. When a facet changes structurally,
 the root requeues only its reverse subscribers. Reconstruction transactionally
 replaces the artifact's complete AST, requests, dependencies, and facet
@@ -248,6 +281,8 @@ Every target callable that claims a Go source identity directly projects the
 selected `go/types.Signature`.
 
 - Ordinary value parameters preserve order and cardinality.
+- Their target representations may use only the settled closed callable
+  projections above; this does not add, remove, reorder, or hide a parameter.
 - A value receiver may become TypeScript `this`.
 - A pointer receiver may become one explicit first parameter so nil reaches the
   Go method body.
@@ -302,6 +337,20 @@ Within cooperative compilation, this single ABI replaces callable-profile
 matrices, public cooperative variants, effect-dependent named-type arity, and
 runtime Promise detection.
 
+Portable algorithms receiving that canonical ABI must preserve it directly.
+They may remove avoidable recursion, allocation, and iterator layers, but they
+must not select a synchronous callback variant or inspect whether a result is a
+Promise. In particular, cooperative generic sorting uses one bounded-work
+iterative merge over two dense buffers and awaits every comparison; native
+`Array.sort` is reserved for an exact synchronous comparator contract.
+
+Possibly nil indirect calls have one target owner. The emitter captures the
+callee, captures every argument in Go order, then calls
+`(callee ?? GoPanic.raiseRuntime("call of nil function"))`. The statically
+typed nullish expression adds no helper invocation, source parameter, erased
+type, host-shape inspection, or semantic dispatch. Statically non-nil callees
+omit it. No conditional, target assertion, or alternate nil-call path coexists.
+
 ## Values And Representations
 
 The representation owner chooses the smallest exact direct TypeScript shape.
@@ -339,6 +388,23 @@ Wide-result normalization requests one of the two demand-generated integer
 runtime operations; repeated source sites do not duplicate the target
 intrinsic expression.
 
+Defined-value representation is selected once from the complete `go/types`
+declaration, never from a use site. A non-generic source-owned defined
+fixed-width integer with no value or pointer methods uses a nominal TypeScript
+numeric enum and direct numeric storage. The enum's one value member provides a
+typed no-op wrap for conversions and operation results, eliminating per-value
+objects without erasing nominality. Method-bearing, generic,
+profile-dependent, non-numeric, provider-owned, and otherwise non-identity
+families retain their canonical wrapper or provider representation. All
+consumers query this one representation owner; none infer it from target
+spelling or structural assignability.
+
+When an identity conversion from that nominal enum initializes a target whose
+TypeScript type would otherwise be inferred, the declaration owner emits the
+selected converted basic type annotation. This is a static inference boundary,
+not a second representation or runtime conversion; declarations and contexts
+that already preserve the selected type emit no annotation.
+
 Nil-capable values use `undefined` unless their family requires a distinct
 carrier. Zero, copy, equality, hashing, conversion, and mutation are each owned
 once by the value family. A class gains `$copy` only when the compilation
@@ -351,6 +417,74 @@ introduced at the owning addressable location only when mutation, aliasing,
 address comparison, or nil pointer behavior requires it. Read-only scalar
 arguments do not become carriers merely because Go's source type is a pointer
 when the checker and use contract prove direct representation exact.
+
+A pointer to a represented named struct uses the represented class reference
+plus `undefined` only while every selected origin is stable. A local or fresh
+class object is self-identifying: dereference is a nil guard, assignment mutates
+that object, equality/hash use object identity, and no storage facet is emitted.
+An origin that can reconstruct a wrapper over an existing location (`&field`,
+`&packageVariable`, or conversion between layout-identical pointer types)
+selects the distinct direct-storage-identity outcome. Only then does the class
+own canonical mutable storage, whole-value assignment recursively preserve
+demanded child storage, and equality/hash use storage identity. Provider-owned
+canonical classes retain certified object identity rather than demanding a
+generated storage facet.
+
+Pointer-origin demand is a closed semantic disposition joined at the canonical
+pointer-family artifact. Ordinary transport and a local/fresh direct class
+origin have no additional location demand because the object itself is the
+stable identity. A package location, selected field, or layout-preserving
+pointer conversion demands stable storage identity. A slice/array element
+address or unsafe live-memory view is dynamic because later access must resolve
+the then-current container element or byte-backed storage. One dynamic origin
+promotes that pointer family to its canonical typed carrier and reconstructs
+all dependent signatures and uses. It is not materialized only at the boundary:
+that would split one Go pointer identity into unsynchronized representations.
+A demand join is order-independent, idempotent, and total: repeated origin
+evidence has no effect, and the empty set selects the family's default during
+transactional requirement removal. Artifact reachability is owned by the root
+scheduler, never inferred from a synthetic definition requirement.
+A stable origin never promotes an otherwise-direct named-struct family to a
+carrier, while scalar and other already-carried families remain carriers.
+Pointer-to-pointer mutation retains a carrier for the outer pointer. No package,
+function, or spelling exception selects representation.
+
+An implicit pointer-receiver call on an addressable value projects that value's
+mutable storage. It never performs the ordinary Go value-copy transfer before
+calling the method. This remains true when a later address use has promoted the
+binding to canonical storage and when the receiver is reached through an
+embedded or selected field. For example, after `p := &builder`,
+`builder.WriteString(text)` passes the same builder storage observed through
+`p`; it does not call `WriteString(copy(builder))`.
+
+A carrier's location identity is canonical but demand-materialized: ordinary
+reads and writes do not allocate address tokens or populate identity maps.
+Equality, hashing, and unsafe conversion request the token and cache it on the
+carrier. Unsafe synchronization is installed into the active typed access
+functions only on the carrier that crosses the unsafe boundary. Selecting
+unsafe support must not add a branch to every ordinary pointer read and write;
+composed field and index locations call the parent's active access function
+directly.
+
+A contiguous carrier field-address path has one location object, not one per
+selector. The address owner consumes the maximal typed path and emits direct
+root-to-leaf read and write projections. A carrier root uses its active
+read/write functions. A stable direct named-struct child address instead uses
+the child class whose canonical storage is preserved recursively by every
+assignment to its owning field or aggregate. The carrier path splits at pointer
+dereference, provider, or indexed-representation boundaries. Its projections
+read the current root storage on every access; an intermediate aggregate is
+never cached. Canonical address tokens follow the same ordered field path and
+remain lazy. Generated code does not interpret an erased or dynamically typed
+property path.
+
+A class-member-only runtime facility is selected by one typed runtime-feature
+request. The request emits no import and owns no duplicate top-level runtime
+definition; it augments the canonical runtime class during package assembly.
+If no final generated artifact requests the feature, the member is absent.
+Flat field-address paths request the pointer field-path feature. Reconstructed
+artifacts replace their feature requests transactionally, just like imports,
+so a superseded use cannot leave stale runtime surface behind.
 
 ### Unsafe Pointer Memory
 
@@ -475,6 +609,18 @@ Metadata growth is linear in reached canonical types plus their actual
 fields/methods; it may not grow by type-pair, call-site, implementer, or package
 cross-product. An unsupported reflection operation fails at its closed
 operation owner rather than falling back to host reflection.
+
+Runtime type constructors compose from that same graph. For example, when a
+runtime-flowing descriptor `typ` reaches `reflect.PointerTo(typ)`, the portable
+reflection owner canonicalizes `*typ` by descriptor identity, derives its
+method set from compact, collision-checked identities produced by the existing
+interface-method identity owner, and preserves the selected provider profile's
+pointer size and alignment. The compact set is a representation of canonical
+method tokens, not a spelling lookup or a second relation table. The compiler
+does not guess a finite pointer closure, require `*T` to appear in source, or
+install a product-specific descriptor. Repeated composition (`T`, `*T`,
+`**T`) remains canonical and grows only with the types actually composed at
+runtime.
 
 The descriptor record is sparse but named: mandatory identity/kind/text/size/
 alignment facts are explicit, while closed contract defaults and absent
@@ -610,6 +756,13 @@ owning callable.
 The scheduler separately owns goroutine lifecycle, settlement, uncaught panic,
 main return, and deadlock. A `go` statement evaluates and copies callee and
 arguments immediately, then schedules one typed closure.
+
+Every cooperative task belongs to a typed settlement owner. Provider
+synchronization primitives may transport a rejected task result only to that
+owner and rethrow the exact failure when the corresponding wait settles; they
+must not discard a launched Promise or inspect/recover its payload. In
+particular, `WaitGroup.Go` task failure cannot let `WaitGroup.Wait` report
+success.
 
 Send/receive sites are O(1) apart from value copy. A `select` is O(case
 count), commits once, cancels alternatives in O(1) each, uses fair ready
@@ -980,6 +1133,12 @@ Relative source, implementation, output, and report paths resolve from the
 configuration file's directory. Resolution order is typed defaults, project
 file, then explicit CLI values. Unknown fields, versions, identities, and
 conflicting owners fail.
+Implementation bundles may live in the consuming project, a sibling checkout,
+or any explicitly selected absolute location. Their location conveys no
+semantic ownership: each contract owns source paths relative to its own
+directory and is selected only by canonical package, module/version, build,
+and compilation evidence. Repeated `--implementation-bundle` values replace
+the configured bundle set as one deterministic CLI override.
 
 The resolved project is split before compilation into immutable loader,
 compilation, implementation, and output contracts. Emitters receive only the
@@ -993,6 +1152,16 @@ The output contract is strict ESM. Project assembly writes a root
 top-level await is never made valid by rewriting generated modules as
 CommonJS.
 
+Compilation-scoped generated support definitions retain their full semantic
+artifact identities, but those identities do not each create a physical ESM
+module. The output owner deterministically coalesces them by semantic family
+and the first byte of the artifact digest, giving at most 256 shards per
+family. A shard is only a placement container: every definition, dependency,
+revision, and observable fingerprint remains keyed by the full artifact
+owner. Lexical artifacts remain with their lexical owner. This bounded static
+layout replaces one-module-per-artifact output; it uses no runtime registry,
+dynamic import, bundler dependency, erased lookup, or source-name grouping.
+
 Schema version 1 has the closed top-level sections `distribution`, `source`,
 `go`, `semantics`, `providers`, `implementations`, and `output`.
 `distribution.root` identifies the installed GoToTS distribution that owns the
@@ -1004,13 +1173,29 @@ repeatable `--tag` and `--implementation-bundle` flags.
 
 A certified source implementation owns one exact source package's final target
 module set. Certification joins canonical Go module, package, version,
-selected build and compilation profiles, generated package surface, strict
-TypeScript export surface, implementation source digests, and equivalence
-envelope. Selection is settled once before target files are sealed. The final
-file set replaces the complete generated package module set atomically; no
-generated body, package state, initializer, compatibility wrapper, or fallback
-for the selected package may survive. References keep the ordinary package
-assembly path and source-facing contract.
+selected build and compilation profiles, exact export identities, callable ABI
+projections, implementation source digests, and the equivalence envelope. It
+strict-typechecks both the complete ordinary generated target set and the
+complete installed target set under the same final module-resolution and
+strictness contract. The installed check is the authoritative proof that every
+selected generated consumer accepts the replacement. TypeScript display text,
+parameter names, and package-private representation shape are not semantic
+package contracts and must not be compared as if they were. Selection is
+settled once before target files are sealed. The final file set replaces the
+complete generated package module set atomically; no generated body, package
+state, initializer, compatibility wrapper, or fallback for the selected
+package may survive. References keep the ordinary package assembly path and
+source-facing contract.
+
+For callable exports, the surface join is signature-exact rather than
+name-only. Certification compares the selected Go signature, every selected
+target projection, and the checked authored TypeScript parameter/result types.
+It records the resulting projection fingerprint in compilation evidence before
+any caller is emitted. For example, a Go `Read(*int) int` and an authored
+`Read(number): number` uniquely select `pointee-value`; generated `Read(&x)`
+therefore becomes `Read(x)`, while a call through an existing pointer reads its
+current value with the ordinary nil-dereference behavior. An authored scalar
+signature is rejected when the Go contract requires an observable write.
 
 The authored module set contains exactly one executable package assembly.
 Surviving imports of its public exports are rebound to that assembly in the

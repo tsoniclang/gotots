@@ -58,6 +58,20 @@ func CountOrder(left, right Count) (bool, bool, bool, bool, bool, bool) {
 		left >= right
 }
 
+func CountIsZero(value Count) bool {
+	return value == 0
+}
+
+func ConvertedCountIsZero(value Count) bool {
+	shortConverted := int32(value)
+	return shortConverted == 0
+}
+
+func DeclaredConvertedCountIsZero(value Count) bool {
+	var declaredConverted = int32(value)
+	return declaredConverted == 0
+}
+
 func LabelFromString(value string) Label {
 	return Label(value)
 }
@@ -265,4 +279,16 @@ func CountMapLookup(
 ) (Label, bool) {
 	value, ok := values[key]
 	return value, ok
+}
+
+func CountAnyRoundTrip(value Count) (Count, bool) {
+	boxed := any(value)
+	result, ok := boxed.(Count)
+	return result, ok
+}
+
+func CountAnyRejectsOther(value Count) bool {
+	boxed := any(value)
+	_, ok := boxed.(Other)
+	return !ok
 }

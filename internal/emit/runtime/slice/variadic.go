@@ -2,7 +2,7 @@ package slice
 
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
-func (b builder) appendSliceMethod() tsgo.MethodDeclaration {
+func (b builder) appendSliceMethod(sharedGrowth bool) tsgo.MethodDeclaration {
 	source := b.id("source")
 	values := b.factory.NewExpression(
 		b.id("Array"),
@@ -57,38 +57,6 @@ func (b builder) appendSliceMethod() tsgo.MethodDeclaration {
 			b.thisProperty(MemberName(MemberCapacity)),
 		)),
 	}, true)
-	initialCapacity := b.factory.ConditionalExpression(
-		b.binary(
-			b.thisProperty(MemberName(MemberCapacity)),
-			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-			b.number("0"),
-		),
-		b.factory.QuestionToken(),
-		b.number("1"),
-		b.factory.ColonToken(),
-		b.binary(
-			b.thisProperty(MemberName(MemberCapacity)),
-			tsgo.BinaryOperatorAsteriskToken,
-			b.number("2"),
-		),
-	)
-	growCapacity := b.factory.WhileStatement(
-		b.binary(
-			b.id("nextCapacity"),
-			tsgo.BinaryOperatorLessThanToken,
-			b.id("newLength"),
-		),
-		b.factory.Block([]tsgo.Statement{
-			b.factory.ExpressionStatement(b.assign(
-				b.id("nextCapacity"),
-				b.binary(
-					b.id("nextCapacity"),
-					tsgo.BinaryOperatorAsteriskToken,
-					b.number("2"),
-				),
-			)),
-		}, true),
-	)
 	backing := b.factory.NewExpression(
 		b.id("Array"),
 		[]tsgo.TypeNode{b.typeT()},
@@ -121,15 +89,7 @@ func (b builder) appendSliceMethod() tsgo.MethodDeclaration {
 			),
 		),
 	)
-	return b.method(
-		nil,
-		MemberName(MemberAppendSlice),
-		nil,
-		[]tsgo.ParameterDeclaration{
-			b.parameter("zero", b.typeT()),
-			b.parameter("source", b.sliceType()),
-		},
-		b.sliceType(),
+	statements := []tsgo.Statement{
 		b.variable(tsgo.NodeFlagsConst, "values", values),
 		capture,
 		b.variable(tsgo.NodeFlagsConst, "newLength", newLength),
@@ -156,8 +116,36 @@ func (b builder) appendSliceMethod() tsgo.MethodDeclaration {
 			reuse,
 			nil,
 		),
-		b.variable(tsgo.NodeFlagsLet, "nextCapacity", initialCapacity),
-		growCapacity,
+	}
+	if sharedGrowth {
+		statements = append(
+			statements,
+			b.variable(
+				tsgo.NodeFlagsConst,
+				"nextCapacity",
+				b.call(
+					b.id(b.className),
+					StorageGrownCapacityMember,
+					b.thisProperty(MemberName(MemberCapacity)),
+					b.id("newLength"),
+				),
+			),
+		)
+	} else {
+		statements = append(
+			statements,
+			b.variable(
+				tsgo.NodeFlagsLet,
+				"nextCapacity",
+				b.initialGrowthCapacity(
+					b.thisProperty(MemberName(MemberCapacity)),
+				),
+			),
+			b.growCapacityLoop(b.id("newLength")),
+		)
+	}
+	statements = append(
+		statements,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"backing",
@@ -179,5 +167,16 @@ func (b builder) appendSliceMethod() tsgo.MethodDeclaration {
 			b.id("newLength"),
 			b.id("nextCapacity"),
 		)),
+	)
+	return b.method(
+		nil,
+		MemberName(MemberAppendSlice),
+		nil,
+		[]tsgo.ParameterDeclaration{
+			b.parameter("zero", b.typeT()),
+			b.parameter("source", b.sliceType()),
+		},
+		b.sliceType(),
+		statements...,
 	)
 }

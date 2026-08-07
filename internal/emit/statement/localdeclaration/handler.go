@@ -15,6 +15,7 @@ type binding struct {
 	sourceName      *ast.Ident
 	object          *types.Var
 	sourceType      types.Type
+	sourceValue     ast.Expr
 	value           api.ExpressionEmission
 	omitInitializer bool
 }
@@ -130,10 +131,15 @@ func emitSpec(
 				return nil, nil, err
 			}
 		}
+		var sourceValue ast.Expr
+		if len(source.Values) != 0 {
+			sourceValue = source.Values[index]
+		}
 		bindings = append(bindings, binding{
 			sourceName:      sourceName,
 			object:          object,
 			sourceType:      objectType,
+			sourceValue:     sourceValue,
 			value:           value,
 			omitInitializer: callableZero,
 		})
@@ -264,8 +270,17 @@ func localVariableDeclaration(
 	}
 	var targetType tsgo.TypeNode
 	requests := value.Requests()
-	if !selected &&
-		context.Values().RequiresExplicitType(context, binding.sourceType) {
+	requiresInferenceAnnotation, err :=
+		context.Values().RequiresInitializerTypeAnnotation(
+			context,
+			binding.sourceValue,
+			binding.sourceType,
+		)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if !selected && (requiresInferenceAnnotation ||
+		context.Values().RequiresExplicitType(context, binding.sourceType)) {
 		represented, err := children.RepresentedType(
 			context.WithRole(api.RoleLocalType),
 			sourceName,

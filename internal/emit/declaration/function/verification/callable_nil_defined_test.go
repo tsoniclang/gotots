@@ -26,7 +26,7 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 		"| undefined",
 		"new Transform(",
 		"= value.$value;",
-		`GoPanic.raiseRuntime("call of nil function")`,
+		`?? GoPanic.raiseRuntime("call of nil function")`,
 		"GoPointer.cell<",
 		"return value.$value === undefined;",
 		"return !(value.$value === undefined);",
@@ -52,8 +52,8 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	nilCall := printedFunction(t, printed, "NilCallOrder")
 	callee := strings.Index(nilCall, "const __gotots_callee_")
 	argument := strings.Index(nilCall, "const __gotots_argument_")
-	guard := strings.Index(nilCall, `GoPanic.raiseRuntime("call of nil function")`)
-	call := strings.LastIndex(nilCall, "__gotots_callee_")
+	guard := strings.Index(nilCall, `?? GoPanic.raiseRuntime("call of nil function")`)
+	call := strings.LastIndex(nilCall, ")(__gotots_argument_")
 	if callee < 0 || argument < 0 || guard < 0 || call < 0 ||
 		!(callee < argument && argument < guard && guard < call) {
 		t.Fatalf("nil call order is not callee -> arguments -> guard -> direct call:\n%s", nilCall)
@@ -64,8 +64,8 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	nilVoidCall := printedFunction(t, printed, "NilVoidCallOrder")
 	voidCallee := strings.Index(nilVoidCall, "const __gotots_callee_")
 	voidArgument := strings.Index(nilVoidCall, "const __gotots_argument_")
-	voidGuard := strings.Index(nilVoidCall, `GoPanic.raiseRuntime("call of nil function")`)
-	voidCall := strings.LastIndex(nilVoidCall, "__gotots_callee_")
+	voidGuard := strings.Index(nilVoidCall, `?? GoPanic.raiseRuntime("call of nil function")`)
+	voidCall := strings.LastIndex(nilVoidCall, ")(__gotots_argument_")
 	if voidCallee < 0 || voidArgument < 0 || voidGuard < 0 || voidCall < 0 ||
 		!(voidCallee < voidArgument &&
 			voidArgument < voidGuard &&
@@ -270,17 +270,30 @@ func TestCallableNilGuardMutationsFailOwningEvidence(t *testing.T) {
 		printed := readFile(t, sourcePath)
 		function := printedFunction(t, printed, "NilCallOrder")
 		argumentStart := strings.Index(function, "const __gotots_argument_")
-		guardStart := strings.Index(function, "if (__gotots_callee_")
-		returnStart := strings.LastIndex(function, "return __gotots_callee_")
-		if argumentStart < 0 || guardStart < 0 || returnStart < 0 ||
-			!(argumentStart < guardStart && guardStart < returnStart) {
+		returnStart := strings.LastIndex(function, "return (__gotots_callee_")
+		if argumentStart < 0 || returnStart < 0 || argumentStart >= returnStart {
 			t.Fatalf("nil-call mutation cannot locate owning statements:\n%s", function)
 		}
-		guard := function[guardStart:returnStart]
-		withoutGuard := function[:guardStart] + function[returnStart:]
-		mutatedFunction := withoutGuard[:argumentStart] +
-			guard +
-			withoutGuard[argumentStart:]
+		returnEnd := strings.Index(function[returnStart:], ";")
+		if returnEnd < 0 {
+			t.Fatalf("nil-call mutation cannot locate return terminator:\n%s", function)
+		}
+		returnEnd += returnStart + 1
+		returnStatement := function[returnStart:returnEnd]
+		callBoundary := strings.LastIndex(returnStatement, ")(__gotots_argument_")
+		if callBoundary < 0 {
+			t.Fatalf("nil-call mutation cannot locate guarded callee:\n%s", function)
+		}
+		guardedCallee := strings.TrimPrefix(
+			returnStatement[:callBoundary+1],
+			"return ",
+		)
+		mutatedFunction := function[:argumentStart] +
+			"const __gotots_guarded_mutation = " + guardedCallee + ";\n    " +
+			function[argumentStart:returnStart] +
+			"return __gotots_guarded_mutation" +
+			returnStatement[callBoundary+1:] +
+			function[returnEnd:]
 		writeFile(
 			t,
 			sourcePath,
@@ -319,12 +332,28 @@ try {
 		sourcePath := materializedSourcePath(t, artifacts, "source.ts")
 		printed := readFile(t, sourcePath)
 		function := printedFunction(t, printed, "NilCallOrder")
-		guardStart := strings.Index(function, "if (__gotots_callee_")
-		returnStart := strings.LastIndex(function, "return __gotots_callee_")
-		if guardStart < 0 || returnStart < 0 || guardStart >= returnStart {
+		returnStart := strings.LastIndex(function, "return (__gotots_callee_")
+		if returnStart < 0 {
 			t.Fatalf("nil-call mutation cannot locate guard:\n%s", function)
 		}
-		mutatedFunction := function[:guardStart] + function[returnStart:]
+		returnEnd := strings.Index(function[returnStart:], ";")
+		if returnEnd < 0 {
+			t.Fatalf("nil-call mutation cannot locate return terminator:\n%s", function)
+		}
+		returnEnd += returnStart + 1
+		returnStatement := function[returnStart:returnEnd]
+		callBoundary := strings.LastIndex(returnStatement, ")(__gotots_argument_")
+		const checkPrefix = "return ("
+		const guardSuffix = ` ?? GoPanic.raiseRuntime("call of nil function")`
+		guardBoundary := strings.Index(returnStatement, guardSuffix)
+		if callBoundary < 0 || guardBoundary < 0 ||
+			!strings.HasPrefix(returnStatement, checkPrefix) {
+			t.Fatalf("nil-call mutation cannot locate guarded callee:\n%s", function)
+		}
+		nonNilCallee := returnStatement[len(checkPrefix):guardBoundary]
+		mutatedFunction := function[:returnStart] +
+			"return " + nonNilCallee + returnStatement[callBoundary+1:] +
+			function[returnEnd:]
 		writeFile(
 			t,
 			sourcePath,

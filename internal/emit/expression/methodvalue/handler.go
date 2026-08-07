@@ -102,7 +102,19 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arguments := targetSignature.ParameterReferences(context.Factory())
+	sourceArguments := targetSignature.ParameterReferences(context.Factory())
+	selectedABI, _ := context.ResolveCallableABI(owner)
+	arguments, projectionBefore, projectionRequests, err :=
+		callable.ProjectArguments(
+			context,
+			source,
+			methodSignature,
+			sourceArguments,
+			selectedABI,
+		)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	receiverName, err := context.Names().Temporary(
 		api.TemporaryReceiverValue,
 	)
@@ -131,6 +143,14 @@ func Emit(
 		children,
 		context.Factory().Identifier(receiverName),
 		arguments,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	call, err = api.NewExpressionEmission(
+		append(projectionBefore, call.Before()...),
+		call.Value(),
+		api.CombineRequests(projectionRequests, call.Requests()),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -186,13 +206,35 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	deferredArguments, deferredProjectionBefore,
+		deferredProjectionRequests, err := callable.ProjectArguments(
+		context,
+		source,
+		methodSignature,
+		sourceArguments,
+		selectedABI,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	deferredCall, err := invocation.InvokeDeferred(
 		context,
 		children,
 		source,
 		context.Factory().Identifier(receiverName),
-		arguments,
+		deferredArguments,
 		context.Factory().Identifier(callable.RecoveryAuthorityName),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	deferredCall, err = api.NewExpressionEmission(
+		append(deferredProjectionBefore, deferredCall.Before()...),
+		deferredCall.Value(),
+		api.CombineRequests(
+			deferredProjectionRequests,
+			deferredCall.Requests(),
+		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -245,6 +287,7 @@ func Emit(
 			targetSignature.Requests(),
 			call.Requests(),
 			deferredCall.Requests(),
+			deferredProjectionRequests,
 			recoveryRequests,
 			registry.Requests(),
 			sourceRequests,

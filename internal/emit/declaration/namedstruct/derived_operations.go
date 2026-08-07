@@ -117,26 +117,13 @@ func emitDerivedValueOperation(
 		result = context.Factory().KeywordTypeNode(
 			tsgo.KeywordTypeSyntaxKindVoidKeyword,
 		)
-		for _, field := range fields {
-			if field.blank {
-				continue
-			}
-			body = append(body, assignmentStatement(
-				context,
-				context.Factory().PropertyAccessExpression(
-					property(context, "$target", derivedStorageMember),
-					nil,
-					context.Factory().Identifier(field.name),
-					tsgo.NodeFlagsNone,
-				),
-				context.Factory().PropertyAccessExpression(
-					property(context, "$value", derivedStorageMember),
-					nil,
-					context.Factory().Identifier(field.name),
-					tsgo.NodeFlagsNone,
-				),
-			))
-		}
+		body, requests, err = assignFields(
+			context,
+			fields,
+			property(context, "$target", derivedStorageMember),
+			property(context, "$value", derivedStorageMember),
+			true,
+		)
 	default:
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),

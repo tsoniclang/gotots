@@ -12,6 +12,10 @@ type Container struct {
 	Box Box
 }
 
+type DeepContainer struct {
+	Container Container
+}
+
 type PackageBox struct {
 	Count int32
 }
@@ -125,6 +129,17 @@ func NestedField(value int32) (int32, bool) {
 	container = Container{Box: Box{Count: value + 2}}
 	*pointer++
 	return container.Box.Count, pointer == &container.Box.Count
+}
+
+func DeepField(value int32) (int32, bool) {
+	deep := DeepContainer{Container: Container{Box: Box{Count: value}}}
+	pointer := &deep.Container.Box.Count
+	deep = DeepContainer{
+		Container: Container{Box: Box{Count: value + 2}},
+	}
+	*pointer++
+	return deep.Container.Box.Count,
+		pointer == &deep.Container.Box.Count
 }
 
 func Array(value int32) (int32, bool) {

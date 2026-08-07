@@ -251,9 +251,20 @@ func assertWaveFourArtifactShape(t *testing.T, printed string) {
 			rangeFunction,
 		)
 	}
-	calls := regexp.MustCompile(`__gotots_callee_[0-9]+\(\)`).
-		FindAllString(rangeFunction, -1)
-	if len(calls) != 1 {
+	callee := regexp.MustCompile(
+		`const (__gotots_callee_[0-9]+) = makeArray;`,
+	).FindStringSubmatch(rangeFunction)
+	if len(callee) != 2 {
+		t.Fatalf(
+			"non-constant array range did not capture its callable once:\n%s",
+			rangeFunction,
+		)
+	}
+	guardedCall := regexp.MustCompile(
+		`\(` + regexp.QuoteMeta(callee[1]) +
+			` \?\? GoPanic\.raiseRuntime\("call of nil function"\)\)\(\)`,
+	)
+	if calls := guardedCall.FindAllString(rangeFunction, -1); len(calls) != 1 {
 		t.Fatalf(
 			"non-constant array range evaluates source %d times, want once:\n%s",
 			len(calls),

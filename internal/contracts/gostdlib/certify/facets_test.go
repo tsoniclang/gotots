@@ -2,6 +2,7 @@ package certify
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
@@ -441,34 +442,39 @@ func TestStatefulNamedStructProfileRejectsAbsentCapabilityMember(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mutated := bytes.Replace(
-		source,
-		[]byte(`"export": "IoFsPathErrorOperations",
-      "capabilities": [
-        "make",
-        "storage"
-      ]`),
-		[]byte(`"export": "IoFsPathErrorOperations",
-      "capabilities": [
-        "hash",
-        "storage"
-      ]`),
-		1,
-	)
-	mutated = bytes.Replace(
-		mutated,
-		[]byte(`"operations": [
-        "make",
-        "storage"
-      ]`),
-		[]byte(`"operations": [
-        "hash",
-        "storage"
-      ]`),
-		1,
-	)
-	if bytes.Equal(mutated, source) {
-		t.Fatal("named-struct capability mutation was not applied")
+	var document facetMapDocument
+	if err := json.Unmarshal(source, &document); err != nil {
+		t.Fatal(err)
+	}
+	const pathErrorIdentity = "io/fs|kind=2|receiver=|name=PathError"
+	mutations := 0
+	for index := range document.Facets {
+		facet := &document.Facets[index]
+		if facet.SourceIdentity == pathErrorIdentity &&
+			facet.Kind == gostdlib.FacetNamedStructOperations {
+			facet.Capabilities = append(
+				facet.Capabilities,
+				gostdlib.FacetCapabilityZero,
+			)
+			mutations++
+		}
+	}
+	for index := range document.ProviderStatefulProfiles {
+		profile := &document.ProviderStatefulProfiles[index]
+		if profile.SourceIdentity == pathErrorIdentity {
+			profile.Operations = append(
+				profile.Operations,
+				gostdlib.FacetCapabilityZero,
+			)
+			mutations++
+		}
+	}
+	if mutations != 2 {
+		t.Fatalf("named-struct capability mutation count = %d, want 2", mutations)
+	}
+	mutated, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
 	}
 	facetMap := filepath.Join(t.TempDir(), "facets.json")
 	if err := os.WriteFile(facetMap, mutated, 0o644); err != nil {
@@ -490,7 +496,7 @@ func TestStatefulNamedStructProfileRejectsAbsentCapabilityMember(t *testing.T) {
 		MaximumGoVersion:    "go1.26.4",
 	})
 	if err == nil ||
-		!strings.Contains(err.Error(), "CanonicalPathError.$hash") ||
+		!strings.Contains(err.Error(), "CanonicalPathError.$zero") ||
 		!strings.Contains(err.Error(), "absent") {
 		t.Fatalf("wrong absent capability error = %v", err)
 	}

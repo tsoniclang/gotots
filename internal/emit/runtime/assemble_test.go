@@ -77,7 +77,7 @@ func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
 		t.Fatalf("base pointer definitions = %#v", base)
 	}
 	class, ok := base[0].Statement().(tsgo.ClassDeclaration)
-	if !ok || len(class.Members()) != 18 {
+	if !ok || len(class.Members()) != 20 {
 		t.Fatalf("base pointer owner = %T with unexpected members", base[0].Statement())
 	}
 
@@ -96,7 +96,7 @@ func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
 	projectedClass, ok := withProjection[0].Statement().(tsgo.ClassDeclaration)
 	if len(withProjection) != 2 ||
 		!ok ||
-		len(projectedClass.Members()) != 19 ||
+		len(projectedClass.Members()) != 21 ||
 		withProjection[1].Symbol() != api.RuntimePointerProjection {
 		t.Fatalf("pointer projection definitions = %#v", withProjection)
 	}
@@ -123,6 +123,27 @@ func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
 			"pointer hash definition = %T, want function",
 			withHash[1].Statement(),
 		)
+	}
+}
+
+func TestPointerFieldPathIsAnOptionalClassFeature(t *testing.T) {
+	definitions, err := BuildWithFeatures(
+		tsgo.NewFactory(),
+		api.RuntimeModulePointer,
+		[]api.RuntimeSymbol{api.RuntimePointer},
+		[]api.RuntimeFeature{api.RuntimePointerFieldPath},
+		api.ConcurrencySemanticsDisabled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 1 ||
+		definitions[0].Symbol() != api.RuntimePointer {
+		t.Fatalf("pointer field-path definitions = %#v", definitions)
+	}
+	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
+	if !ok || len(class.Members()) != 21 {
+		t.Fatalf("pointer field-path owner = %#v", definitions[0])
 	}
 }
 
@@ -154,7 +175,7 @@ func TestUnsafePointerRuntimeHasCodecAndMemoryOwner(t *testing.T) {
 	class, ok := definitions[1].Statement().(tsgo.ClassDeclaration)
 	if !ok ||
 		class.Name().Text() != "GoUnsafePointer" ||
-		len(class.Members()) != 15 {
+		len(class.Members()) != 17 {
 		t.Fatalf(
 			"unsafe-pointer definition = %T with unexpected shape",
 			definitions[1].Statement(),

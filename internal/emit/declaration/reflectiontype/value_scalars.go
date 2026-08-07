@@ -46,6 +46,17 @@ func basicValueProperties(
 		return nil, err
 	}
 	scaffold.requests = append(scaffold.requests, zeroRequests...)
+	comparisonZero := zero
+	if model, defined := definedtype.Resolve(sourceType); defined {
+		representation, representationErr := model.Representation(context)
+		if representationErr != nil {
+			return nil, representationErr
+		}
+		if representation.Kind() ==
+			api.DefinedValueRepresentationGeneratedNumeric {
+			comparisonZero = zeroBoxed
+		}
+	}
 	isZero := factory.ArrowFunction(
 		nil,
 		nil,
@@ -62,7 +73,7 @@ func basicValueProperties(
 				factory.BinaryOperatorToken(
 					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
 				),
-				zero,
+				comparisonZero,
 			),
 		)),
 	)

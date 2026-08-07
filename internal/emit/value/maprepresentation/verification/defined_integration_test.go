@@ -12,7 +12,9 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestDefinedMapsUseStableClassValuesAndExecuteDifferentially(t *testing.T) {
+func TestDefinedMapsUseSelectedRepresentationsAndExecuteDifferentially(
+	t *testing.T,
+) {
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
@@ -60,7 +62,9 @@ func TestDefinedMapsUseStableClassValuesAndExecuteDifferentially(t *testing.T) {
 	}
 }
 
-func TestDefinedMapStorageProjectionMutationsFailStrictTypecheck(t *testing.T) {
+func TestNativeDefinedMapKeyNominalityMutationFailsStrictTypecheck(
+	t *testing.T,
+) {
 	loaded := loadDefinedMapProject(t)
 	roots, err := emit.ExportedAPIRoots(loaded)
 	if err != nil {
@@ -81,14 +85,9 @@ func TestDefinedMapStorageProjectionMutationsFailStrictTypecheck(t *testing.T) {
 		replacement string
 	}{
 		{
-			name:        "logical key returned as storage",
-			method:      "$projectKey",
-			replacement: "return $key;",
-		},
-		{
-			name:        "storage key returned as logical",
-			method:      "$reifyKey",
-			replacement: "return $storageKey;",
+			name:        "raw number returned as nominal key",
+			method:      "$copyKey",
+			replacement: "return 0;",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -141,11 +140,9 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		}
 	}
 	for _, required := range []string{
-		"private static $projectKey($key: Count",
-		"return $key.$value;",
-		"private static $reifyKey($storageKey: int32): Count",
-		"return new Count",
-		"($storageKey);",
+		"private static $copyKey($key: Count",
+		"): Count",
+		"return $key;",
 		"lookup(key: Count",
 		"store(key: Count",
 		"value: int32): void",
@@ -182,6 +179,9 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		"export class Alias",
 		"export class PlainAlias",
 		"GoMap.nil<Count",
+		"$projectKey",
+		"$reifyKey",
+		"new Count",
 		"any",
 		"unknown",
 		".call(",

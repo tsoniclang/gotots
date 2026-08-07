@@ -87,6 +87,7 @@ type emitter struct {
 	cooperative    api.CooperativeCallableResolver
 	recovery       api.RecoveryCallableResolver
 	pointer        api.PointerRepresentationResolver
+	callableABI    api.CallableABIResolver
 	external       api.ExternalFunctionResolver
 	goRuntime      api.GoRuntimeContract
 }
@@ -104,6 +105,7 @@ func newEmitter(
 	cooperative api.CooperativeCallableResolver,
 	recovery api.RecoveryCallableResolver,
 	pointer api.PointerRepresentationResolver,
+	callableABI api.CallableABIResolver,
 	external api.ExternalFunctionResolver,
 	goRuntime api.GoRuntimeContract,
 ) *emitter {
@@ -126,6 +128,7 @@ func newEmitter(
 		cooperative:    cooperative,
 		recovery:       recovery,
 		pointer:        pointer,
+		callableABI:    callableABI,
 		external:       external,
 		goRuntime:      goRuntime,
 	}
@@ -590,9 +593,6 @@ func (e *emitter) RepresentedType(
 	return basictype.EmitRepresented(context, source, sourceType)
 }
 
-func (e *emitter) StoreTarget(
-	context api.Context,
-	source ast.Expr,
-) (api.StoreTargetEmission, error) {
+func (e *emitter) StoreTarget(context api.Context, source ast.Expr) (api.StoreTargetEmission, error) {
 	return storetarget.Emit(context, e, source)
 }

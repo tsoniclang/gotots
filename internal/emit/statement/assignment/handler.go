@@ -7,7 +7,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
-	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -48,7 +47,7 @@ func emitCompound(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	if !integervalue.TypeUsesBigInt(context, target.SourceType()) &&
+	if !context.ScalarABI().UsesBigInt(target.SourceType()) &&
 		!target.IsAccessor() &&
 		!target.IsProperty() &&
 		(!target.UsesCanonicalStorage() ||
@@ -344,11 +343,12 @@ func emitDefinitionList(
 			return nil, nil, nil, err
 		}
 	}
-	targetType, typeRequests, err := pointerAnnotation(
+	targetType, typeRequests, err := inferenceAnnotation(
 		context.WithRole(api.RoleLocalType),
 		children,
 		name,
 		contextualType,
+		source.Rhs[0],
 	)
 	if err != nil {
 		return nil, nil, nil, err
@@ -471,6 +471,31 @@ func typedVariableStatement(
 			flags,
 		),
 	)
+}
+
+func inferenceAnnotation(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	sourceType types.Type,
+	initializer ast.Expr,
+) (tsgo.TypeNode, []api.RootRequest, error) {
+	required, err := context.Values().RequiresInitializerTypeAnnotation(
+		context,
+		initializer,
+		sourceType,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !required {
+		return pointerAnnotation(context, children, source, sourceType)
+	}
+	target, err := children.RepresentedType(context, source, sourceType)
+	if err != nil {
+		return nil, nil, err
+	}
+	return target.Value(), target.Requests(), nil
 }
 
 func pointerAnnotation(

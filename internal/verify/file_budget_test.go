@@ -9,6 +9,15 @@ import (
 
 const maximumDirectorySourceFiles = 20
 
+type wallError struct {
+	source string
+	reason string
+}
+
+func (e *wallError) Error() string {
+	return e.source + ": " + e.reason
+}
+
 func directoryFileBudgetError(
 	directory string,
 	sourceSet string,

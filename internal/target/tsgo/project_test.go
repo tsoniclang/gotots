@@ -24,6 +24,10 @@ func TestProjectExportsUseTSGoSymbolsAndDeclarationOwners(t *testing.T) {
   return input.length;
 }
 
+export function Maybe(input: number | undefined): number {
+  return input ?? 0;
+}
+
 export class Box<Left, Right> {
   static Make(value: number): Box {
     return new Box(value);
@@ -118,6 +122,7 @@ void Hidden;
   InvalidEffectCallable,
   Invoke,
   MemberAccess,
+  Maybe,
   NumericAlias,
   Shape,
   SupportContract,
@@ -167,6 +172,26 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 	exports, err := project.Exports(entryPath)
 	if err != nil {
 		t.Fatal(err)
+	}
+	valueExport := projectExportByName(t, exports, "Value")
+	parameterType, err := project.CallableParameterTypeString(valueExport, 0)
+	if err != nil || parameterType != "string" {
+		t.Fatalf("Value parameter type = %q, %v", parameterType, err)
+	}
+	primitive, ok, err := project.CallableParameterPrimitive(valueExport, 0)
+	if err != nil || !ok || primitive.Kind() != ProjectPrimitiveString ||
+		primitive.Optional() {
+		t.Fatalf("Value parameter primitive = %#v, %v, %v", primitive, ok, err)
+	}
+	maybeExport := projectExportByName(t, exports, "Maybe")
+	primitive, ok, err = project.CallableParameterPrimitive(maybeExport, 0)
+	if err != nil || !ok || primitive.Kind() != ProjectPrimitiveNumber ||
+		!primitive.Optional() {
+		t.Fatalf("Maybe parameter primitive = %#v, %v, %v", primitive, ok, err)
+	}
+	returnType, err := project.CallableReturnTypeString(valueExport)
+	if err != nil || returnType != "number" {
+		t.Fatalf("Value return type = %q, %v", returnType, err)
 	}
 	names := make([]string, len(exports))
 	for index, selected := range exports {
@@ -247,6 +272,7 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 			"GenericAsyncCallable",
 			"InvalidEffectCallable",
 			"Invoke",
+			"Maybe",
 			"MemberAccess",
 			"NumericAlias",
 			"RequiredCapabilityView",

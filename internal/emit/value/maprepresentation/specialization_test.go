@@ -355,6 +355,14 @@ type staticSpecializationValues struct {
 	value types.Type
 }
 
+func (staticSpecializationValues) RequiresInitializerTypeAnnotation(
+	api.Context,
+	ast.Expr,
+	types.Type,
+) (bool, error) {
+	return false, nil
+}
+
 func (v staticSpecializationValues) RequiresCustomEquality(
 	api.Context,
 	types.Type,

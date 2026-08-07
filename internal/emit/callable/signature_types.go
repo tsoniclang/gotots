@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -69,20 +70,46 @@ func emitRepresented(
 			requests = append(requests, parameterRequests...)
 			continue
 		}
+		parameterType := parameter.Type()
+		selected, projectedParameter := context.CallableParameterABI(parameter)
+		if projectedParameter &&
+			selected.Projection() == callableabi.ProjectionPointeeValue {
+			pointer, pointerOK := types.Unalias(parameterType).(*types.Pointer)
+			if !pointerOK {
+				return SignatureEmission{}, &api.InvariantError{
+					Role:   parameterRole,
+					Reason: "pointee-value parameter has no pointer source type",
+				}
+			}
+			parameterType = pointer.Elem()
+		}
 		targetType, err := children.RepresentedType(
 			context.WithRole(parameterRole),
 			source,
-			parameter.Type(),
+			parameterType,
 		)
 		if err != nil {
 			return SignatureEmission{}, err
+		}
+		parameterTargetType := targetType.Value()
+		if projectedParameter &&
+			selected.Projection() == callableabi.ProjectionPointeeValue &&
+			selected.NilPolicy() == callableabi.NilPolicyPreserve {
+			parameterTargetType = context.Factory().UnionTypeNode(
+				[]tsgo.TypeNode{
+					parameterTargetType,
+					context.Factory().KeywordTypeNode(
+						tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+					),
+				},
+			)
 		}
 		parameters = append(parameters, context.Factory().ParameterDeclaration(
 			nil,
 			nil,
 			context.Factory().Identifier(name),
 			nil,
-			targetType.Value(),
+			parameterTargetType,
 			nil,
 		))
 		parameterNames = append(parameterNames, name)

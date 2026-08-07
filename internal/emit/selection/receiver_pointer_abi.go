@@ -31,7 +31,7 @@ func valuePointerMethodReceiver(
 			context,
 			method.Origin(),
 			pointer,
-			false,
+			api.PointerRepresentationDemandNone,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -48,24 +48,30 @@ func valuePointerMethodReceiver(
 	)
 	switch {
 	case receiverABI == api.MethodReceiverABIContractDirect:
-		root, expressionErr := children.Expression(
+		target, targetErr := children.StoreTarget(
 			context.
 				WithRole(api.RoleReceiverValue).
 				WithExpectedType(resolved.root),
 			source.X,
 		)
-		if expressionErr != nil {
-			return api.ExpressionEmission{}, expressionErr
+		if targetErr != nil {
+			return api.ExpressionEmission{}, targetErr
 		}
-		receiver, err = projectValue(
+		root, mutableErr := target.MutableValue(
+			context.WithRole(api.RoleReceiverValue),
+			source.X,
+		)
+		if mutableErr != nil {
+			return api.ExpressionEmission{}, mutableErr
+		}
+		receiver, err = projectMutableValue(
 			context,
 			children,
 			source,
 			resolved,
 			root,
 		)
-	case representation.Representation() ==
-		api.PointerRepresentationDirectClass && len(resolved.fields) == 0:
+	case representation.Representation().DirectClass() && len(resolved.fields) == 0:
 		target, targetErr := children.StoreTarget(
 			context.
 				WithRole(api.RoleReceiverValue).
@@ -157,13 +163,12 @@ func adaptPointerMethodReceiver(
 		sourceRepresentation, err := pointertype.Observe(
 			context,
 			effective,
-			false,
+			api.PointerRepresentationDemandNone,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		if sourceRepresentation.Representation() ==
-			api.PointerRepresentationDirectClass {
+		if sourceRepresentation.Representation().DirectClass() {
 			return api.NewExpressionEmission(
 				value.Before(),
 				value.Value(),
@@ -191,22 +196,25 @@ func adaptPointerMethodReceiver(
 		context,
 		declarationOwner,
 		declared,
-		false,
+		api.PointerRepresentationDemandNone,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	sourceDemand := api.PointerRepresentationDemandNone
+	if !target.Representation().DirectClass() {
+		sourceDemand = api.PointerRepresentationDemandStableLocation
 	}
 	sourceRepresentation, err := pointertype.Observe(
 		context,
 		effective,
-		target.Representation() != api.PointerRepresentationDirectClass,
+		sourceDemand,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if target.Representation() == api.PointerRepresentationDirectClass &&
-		sourceRepresentation.Representation() !=
-			api.PointerRepresentationDirectClass {
+	if target.Representation().DirectClass() &&
+		!sourceRepresentation.Representation().DirectClass() {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role: context.Role(),
 			Reason: "pointer receiver occurrence diverged from its " +

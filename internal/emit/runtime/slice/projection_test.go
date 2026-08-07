@@ -28,6 +28,7 @@ func TestRuntimeSliceProjectionPreservesBidirectionalAlias(t *testing.T) {
 			api.RuntimeSliceArrayPointer: {},
 		},
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

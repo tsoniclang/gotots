@@ -80,6 +80,32 @@ func Emit(
 		}
 		representationFacets = append(representationFacets, facet)
 	}
+	representation, err := model.Representation(context)
+	if err != nil {
+		return api.DeclarationEmission{}, true, err
+	}
+	if representation.Kind() == api.DefinedValueRepresentationGeneratedNumeric {
+		if len(genericRequirements) != 0 || model.Type().TypeParams().Len() != 0 {
+			return api.DeclarationEmission{}, true, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "native defined numeric received generic requirements",
+			}
+		}
+		name, modifiers, identityErr := declarationIdentity(context, typeName)
+		if identityErr != nil {
+			return api.DeclarationEmission{}, true, identityErr
+		}
+		return api.DirectDeclaration(
+			context.Factory().EnumDeclaration(
+				modifiers,
+				context.Factory().Identifier(name),
+				[]tsgo.EnumMember{context.Factory().EnumMember(
+					context.Factory().Identifier(definedtype.BrandMember),
+					context.Factory().NumericLiteral("1", tsgo.TokenFlagsNone),
+				)},
+			),
+		), true, nil
+	}
 	parameters, err := genericdeclaration.EnterType(
 		context,
 		source,

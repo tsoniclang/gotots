@@ -132,6 +132,8 @@ func verifyProductionFile(relative string, sourcePath string) error {
 				!strings.HasPrefix(relative, "internal/contracts/externals/certify/") &&
 				!strings.HasPrefix(relative, "internal/contracts/gostdlib/certify/") &&
 				!strings.HasPrefix(relative, "internal/contracts/gostdlib/sourcecontract/") &&
+				!strings.HasPrefix(relative, "internal/contracts/representation/") &&
+				relative != "internal/contracts/sourceimplementation/verify_callable.go" &&
 				relative != "internal/command/roots.go" &&
 				!strings.HasPrefix(relative, "internal/emit/") {
 				return &wallError{
@@ -577,15 +579,6 @@ func layerFor(relative string) int {
 	default:
 		return 0
 	}
-}
-
-type wallError struct {
-	source string
-	reason string
-}
-
-func (e *wallError) Error() string {
-	return e.source + ": " + e.reason
 }
 
 func repositoryRoot(t *testing.T) string {

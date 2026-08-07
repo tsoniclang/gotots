@@ -246,11 +246,13 @@ func EmitDeferred(
 		}
 	}
 	requests = append(requests, contractRequests...)
-	arguments, argumentBefore, argumentRequests, err := emitArguments(
+	selectedABI, _ := context.ResolveCallableABI(directOwner)
+	arguments, argumentBefore, argumentRequests, err := emitArgumentsWithABI(
 		context,
 		children,
 		source,
 		signature,
+		selectedABI,
 		true,
 	)
 	if err != nil {
@@ -342,21 +344,20 @@ func EmitDeferred(
 				),
 			),
 		)
-		ordinaryCall := context.Factory().CallExpression(
+		guarded, guardRequests, guardErr := callable.NilGuardExpression(
+			context,
 			targetCallee,
+		)
+		if guardErr != nil {
+			return api.ExpressionEmission{}, guardErr
+		}
+		ordinaryCall := context.Factory().CallExpression(
+			guarded,
 			nil,
 			nil,
 			arguments,
 			tsgo.NodeFlagsNone,
 		)
-		guarded, guardRequests, guardErr := callable.DetachedNilGuard(
-			context,
-			targetCallee,
-			ordinaryCall,
-		)
-		if guardErr != nil {
-			return api.ExpressionEmission{}, guardErr
-		}
 		deferredCall := context.Factory().CallExpression(
 			context.Factory().Identifier(deferredName),
 			nil,
@@ -382,7 +383,7 @@ func EmitDeferred(
 				context.Factory().Identifier("undefined"),
 			),
 			context.Factory().QuestionToken(),
-			guarded,
+			ordinaryCall,
 			context.Factory().ColonToken(),
 			deferredCall,
 		)

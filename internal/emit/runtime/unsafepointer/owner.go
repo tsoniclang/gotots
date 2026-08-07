@@ -3,12 +3,14 @@ package unsafepointer
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 const (
-	FromName        = "from"
-	ToName          = "to"
-	FromIntegerName = "fromInteger"
-	ToIntegerName   = "toInteger"
-	addressName     = "address"
-	atName          = "at"
+	FromName                = "from"
+	ToName                  = "to"
+	FromIntegerName         = "fromInteger"
+	FromRelativeName        = "fromRelative"
+	ToIntegerName           = "toInteger"
+	addressName             = "address"
+	atName                  = "at"
+	allocationAtAddressName = "allocationAtAddress"
 )
 
 func Build(
@@ -46,6 +48,8 @@ func Build(
 			target.at(),
 			target.from(),
 			target.to(),
+			target.allocationAtAddress(),
+			target.fromRelative(),
 			target.fromInteger(),
 			target.toIntegerNumberOverload(),
 			target.toIntegerBigIntOverload(),

@@ -113,7 +113,12 @@ func (r PackageVariableReference) Expression(
 	)
 }
 
+type ProviderOwnershipNames interface {
+	ProviderOwnedDeclaration(types.Object) (bool, error)
+}
+
 type Names interface {
+	ProviderOwnershipNames
 	Declare(types.Object) (string, error)
 	Parameter(*types.Var, int) (string, error)
 	Result(*types.Var, int) (string, error)

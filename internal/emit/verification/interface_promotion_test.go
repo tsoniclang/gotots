@@ -469,13 +469,20 @@ func TestPromotedPointerInterfaceAdapterPreservesReceiverAddress(
 				"$goInterfaceAdapter_",
 			) || !strings.Contains(
 				artifacts.printed,
-				"GoPointer.objectField<",
+				"Inner__from_promotedpointer.Increment(",
 			) || !strings.Contains(
 				artifacts.printed,
-				"$storageOf(GoPointer.direct<Outer",
+				"GoPointer.direct<Outer__from_promotedpointer>(this.$go$value).Inner",
 			) {
 				t.Fatalf(
-					"promoted pointer adapter lacks typed field-address projection:\n%s",
+					"promoted pointer adapter lacks direct typed receiver projection:\n%s",
+					artifacts.printed,
+				)
+			}
+			if strings.Contains(artifacts.printed, "GoPointer.objectField<Inner") ||
+				strings.Contains(artifacts.printed, "GoPointer<Inner") {
+				t.Fatalf(
+					"promoted stable receiver retained a carrier projection:\n%s",
 					artifacts.printed,
 				)
 			}

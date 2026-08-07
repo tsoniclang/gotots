@@ -330,6 +330,52 @@ requires it. Operations project to the underlying family and wrap the result
 through one type owner. Public generated names remain readable; internal
 operation artifacts are not source declarations.
 
+A source-owned, non-generic defined type whose underlying type is `int8`,
+`uint8`, `int16`, `uint16`, `int32`, or `uint32` and whose value and pointer
+method sets are both empty uses one native numeric-enum representation. The
+enum is the nominal TypeScript type and its value member is the statically
+typed no-op used by conversions and operation results:
+
+```go
+type NodeFlags uint32
+
+func Add(left, right NodeFlags) NodeFlags { return left + right }
+```
+
+```ts
+export enum NodeFlags { $goType = 1 }
+
+export function Add(left: NodeFlags, right: NodeFlags): NodeFlags {
+  return (left + right) * NodeFlags.$goType;
+}
+```
+
+This representation keeps unrelated defined numeric types non-assignable
+without allocating a wrapper per value. It is selected from `go/types`
+identity, underlying kind, generic arity, and complete method sets; source
+spelling and package identity never select it. Generic types, method-bearing
+types, profile-dependent native-width integers, strings, booleans, floats,
+complex values, and all other defined families retain their exact existing
+representation. Type-representation demands whose storage is already the enum
+value consume no class marker or auxiliary carrier.
+
+A conversion from that enum representation to an ordinary basic type is a
+runtime identity operation. When it initializes an inference-owned target
+declaration, the declaration carries the exact converted type so TypeScript
+does not retain the nominal source enum:
+
+```go
+position := int32(node.Pos())
+```
+
+```ts
+let position: int32 = node.Pos();
+```
+
+No coercion, wrapper, or annotation on unrelated locals is emitted. Explicitly
+typed declarations already carry their selected type; non-declaration uses are
+checked by their parent context.
+
 ### Structs
 
 ```go
@@ -424,11 +470,52 @@ proves that doing so cannot change Go behavior; uncertainty retains the
 carrier. Representation is selected once and propagated to all users through
 observable facets.
 
+Pointers to represented named structs use the class reference plus `undefined`
+when all observed origins are stable. For example, `func Read(p *Node) int {
+return p.Pos }` receives `Node | undefined`. A local/fresh `*Node` is the class
+object itself and compares/hashes by object identity without a storage facet.
+`func Child(p *Node) *Child { return &p.Child }` can reconstruct a `Child`
+wrapper, so that family selects direct storage identity. Assigning either the
+field or the whole `Node` then recursively updates the demanded child storage,
+and the returned pointer observes the replacement. Certified provider classes
+retain provider object identity.
+
+The pointer-family owner joins closed origin demands. `&local` and `&T{...}`
+already have stable class-object identity. `&pkg.Value`, `&value.Field`, and
+layout-preserving pointer conversion demand stable storage identity.
+`&slice[i]`, `&array[i]`, and a live unsafe byte view are dynamic locations and
+select one canonical typed carrier for every use of that pointer family. For
+example, after `p := &slice[0]; slice[0] = next`, `p` must read `next`; a class
+wrapper detached from the index cannot preserve that behavior. Unsafe mutation
+likewise cannot be confined to an ephemeral boundary carrier because later
+direct reads must observe it. Selection is semantic and type-owned, never an
+escape heuristic or a package-specific override.
+The join treats duplicate and reordered origin observations identically; no
+observations select the family's default. Requirement removal may therefore
+reconstruct a still-reachable artifact without inventing a definition row.
+
 Storage demand is joined back to the declaration of every addressable binding,
 including parameters, locals, named results, range variables, and implicit
 type-switch case bindings. The binding owner emits the carrier; a later address
 or implicit pointer-receiver call may request it, but may never fabricate a
 carrier name at the use site.
+
+Canonical address tokens are created lazily at pointer identity, hash, or
+unsafe boundaries. Constructing, reading, or writing an otherwise ordinary
+carrier does not touch the address-token maps. Field, index, and representation
+views compose the parent's active typed access functions instead of re-entering
+the public value accessor. An unsafe boundary replaces those active functions
+on only the exposed carrier while retaining its original raw storage access.
+Nested selectors whose address remains in one carrier representation lower to
+one root-linked location with typed direct property projections. For example,
+`&outer.middle.value` reads and writes `root.middle.value` through the current
+root storage and derives the lazy identity `root -> middle -> value`; it does
+not allocate nested field-location carriers. A stable direct named-struct child
+uses its existing class storage instead. A representation boundary ends the
+projection and starts a new exact location segment. Encountering a
+carrier-rooted flat segment records the typed pointer field-path runtime
+feature; programs without such a segment do not emit the supporting class
+member.
 
 ### Interfaces
 
@@ -718,6 +805,25 @@ export async function Consume(
 The source still has one parameter. No synchronous/cooperative public variants,
 hidden effect parameters, or runtime Promise tests exist.
 
+Every possibly nil function value is evaluated once, its arguments are then
+evaluated in source order, and one generic runtime check returns the identical
+statically typed callable or raises Go's nil-function runtime panic:
+
+```go
+result := callback(argument())
+```
+
+```ts
+const callee = callback;
+const value = argument();
+const result = (callee ?? GoPanic.raiseRuntime("call of nil function"))(value);
+```
+
+The nullish check adds no helper call, source ABI parameter, cast, dynamic
+dispatch, or result adaptation. Statically non-nil declarations and literals
+call directly. A conditional, assertion, or alternate nil-call path is
+forbidden.
+
 `go f(args)` captures/copies immediately and schedules one closure. `select`
 evaluates operands once, chooses a ready case fairly, commits once, and
 cancels every other registration. Receive assignment targets are evaluated
@@ -833,25 +939,62 @@ exactly one entry or remain an explicit obligation.
 ### Certified Source-Package Implementations
 
 A project-selected source implementation replaces a coherent package contract,
-not isolated identifiers. It exports the same generated package-assembly names
-and TypeScript types, including demanded storage and operation facets. Callsites
-remain ordinary imports and calls; no policy, bridge, digest, or implementation
-selector is added to a Go callable.
+not isolated identifiers. It exports the exact selected package-assembly names
+and satisfies every target type demanded by generated consumers. Both the
+ordinary generated target set and the installed target set must pass strict
+TypeScript checking under the same final project configuration.
+Package-private storage and operation implementation may differ inside a
+declared equivalence envelope;
+that freedom does not extend to a source-visible callable ABI or to any type a
+selected consumer requires. Callsites remain ordinary imports and calls; no
+policy, bridge, digest, or implementation selector is added to a Go callable.
+
+The checked authored signature may select a closed representation projection
+without a configuration entry. Given:
+
+```go
+// package fast
+func Read(value *int) int
+
+func Use() int {
+    current := 41
+    return fast.Read(&current)
+}
+```
+
+and the certified implementation:
+
+```ts
+export function Read(value: number): number {
+    return value;
+}
+```
+
+the callable ABI owner proves that the source parameter is read-only at this
+replacement boundary, selects `pointee-value`, and emits the caller as
+`Read(current)`. If the argument is an existing `*int`, the caller emits its
+current pointee value and preserves Go's nil-dereference failure. The manual
+function does not receive or mutate a hidden cell. A Go function whose visible
+contract writes through the pointer cannot use this plain `number` signature;
+it remains a location unless an explicit write-back projection is added to the
+closed language model.
 
 For an internal hash package, Go source such as:
 
 ```go
-hash := xxh3.HashString128(text)
+hash := fasthash.Sum128(text)
 if hash == previous { reuse() }
 ```
 
 may be backed by a certified fast deterministic TypeScript hash when the
 selected product proves the numeric hash is not otherwise observed. The target
-still calls `HashString128(text)`, receives the exact generated `Uint128`
-surface, and compares through its normal equality operation. The translated
-unsafe-pointer hash body is absent. If the same value is printed, persisted,
-sent over a protocol, or checked against XXH3 vectors, that envelope is invalid
-and an exact implementation is required.
+still calls `Sum128(text)`, receives the exact generated result surface, and
+compares through its normal equality operation. The translated original body
+is absent. If the same value is printed, persisted, sent over a protocol, or
+checked against specified vectors, that envelope is invalid and an exact
+implementation is required. Concrete packages, implementation sources, and
+product evidence belong to the consuming project, never the GoToTS
+distribution.
 
 Package replacement is selected only from the resolved project's certified
 implementation set. Translation handlers never branch on import path,

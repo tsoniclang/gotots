@@ -314,19 +314,21 @@ func (b builder) regionMemoryStatements(
 		)),
 		b.factory.ExpressionStatement(b.assign(
 			readBytes,
-			b.regionReadArrow(backing, totalLength),
+			b.regionReadArrow(backing),
 		)),
 		b.factory.ExpressionStatement(b.assign(
 			writeBytes,
-			b.regionWriteArrow(backing, totalLength),
+			b.regionWriteArrow(backing),
 		)),
 	}
 }
 
-func (b builder) regionReadArrow(
-	backing tsgo.Expression,
-	totalLength tsgo.Expression,
-) tsgo.ArrowFunction {
+func (b builder) regionReadArrow(backing tsgo.Expression) tsgo.ArrowFunction {
+	first := b.id("first")
+	last := b.id("last")
+	offset := b.id("offset")
+	length := b.id("length")
+	codecSize := b.property(b.id("codec"), "size")
 	return b.factory.ArrowFunction(
 		nil,
 		nil,
@@ -339,33 +341,73 @@ func (b builder) regionReadArrow(
 		b.factory.Block([]tsgo.Statement{
 			b.variable(
 				tsgo.NodeFlagsConst,
+				"first",
+				b.numberType(),
+				b.call(
+					b.id("Math"),
+					"floor",
+					b.binary(offset, tsgo.BinaryOperatorSlashToken, codecSize),
+				),
+			),
+			b.variable(
+				tsgo.NodeFlagsConst,
+				"last",
+				b.numberType(),
+				b.call(
+					b.id("Math"),
+					"ceil",
+					b.binary(
+						b.binary(offset, tsgo.BinaryOperatorPlusToken, length),
+						tsgo.BinaryOperatorSlashToken,
+						codecSize,
+					),
+				),
+			),
+			b.variable(
+				tsgo.NodeFlagsConst,
 				"bytes",
 				b.byteArrayType(),
 				b.factory.NewExpression(
 					b.id("Uint8Array"),
 					nil,
-					[]tsgo.Expression{totalLength},
+					[]tsgo.Expression{b.binary(
+						b.binary(last, tsgo.BinaryOperatorMinusToken, first),
+						tsgo.BinaryOperatorAsteriskToken,
+						codecSize,
+					)},
 				),
 			),
-			b.regionCodecLoop(backing, b.id("bytes"), false),
+			b.regionCodecLoop(backing, b.id("bytes"), first, last, false),
+			b.variable(
+				tsgo.NodeFlagsConst,
+				"start",
+				b.numberType(),
+				b.binary(
+					offset,
+					tsgo.BinaryOperatorMinusToken,
+					b.binary(first, tsgo.BinaryOperatorAsteriskToken, codecSize),
+				),
+			),
 			b.factory.ReturnStatement(b.call(
 				b.id("bytes"),
 				"slice",
-				b.id("offset"),
+				b.id("start"),
 				b.binary(
-					b.id("offset"),
+					b.id("start"),
 					tsgo.BinaryOperatorPlusToken,
-					b.id("length"),
+					length,
 				),
 			)),
 		}, true),
 	)
 }
 
-func (b builder) regionWriteArrow(
-	backing tsgo.Expression,
-	totalLength tsgo.Expression,
-) tsgo.ArrowFunction {
+func (b builder) regionWriteArrow(backing tsgo.Expression) tsgo.ArrowFunction {
+	first := b.id("first")
+	last := b.id("last")
+	offset := b.id("offset")
+	replacement := b.id("replacement")
+	codecSize := b.property(b.id("codec"), "size")
 	return b.factory.ArrowFunction(
 		nil,
 		nil,
@@ -378,22 +420,64 @@ func (b builder) regionWriteArrow(
 		b.factory.Block([]tsgo.Statement{
 			b.variable(
 				tsgo.NodeFlagsConst,
+				"first",
+				b.numberType(),
+				b.call(
+					b.id("Math"),
+					"floor",
+					b.binary(offset, tsgo.BinaryOperatorSlashToken, codecSize),
+				),
+			),
+			b.variable(
+				tsgo.NodeFlagsConst,
+				"last",
+				b.numberType(),
+				b.call(
+					b.id("Math"),
+					"ceil",
+					b.binary(
+						b.binary(
+							offset,
+							tsgo.BinaryOperatorPlusToken,
+							b.property(replacement, "length"),
+						),
+						tsgo.BinaryOperatorSlashToken,
+						codecSize,
+					),
+				),
+			),
+			b.variable(
+				tsgo.NodeFlagsConst,
 				"bytes",
 				b.byteArrayType(),
 				b.factory.NewExpression(
 					b.id("Uint8Array"),
 					nil,
-					[]tsgo.Expression{totalLength},
+					[]tsgo.Expression{b.binary(
+						b.binary(last, tsgo.BinaryOperatorMinusToken, first),
+						tsgo.BinaryOperatorAsteriskToken,
+						codecSize,
+					)},
 				),
 			),
-			b.regionCodecLoop(backing, b.id("bytes"), false),
+			b.regionCodecLoop(backing, b.id("bytes"), first, last, false),
+			b.variable(
+				tsgo.NodeFlagsConst,
+				"start",
+				b.numberType(),
+				b.binary(
+					offset,
+					tsgo.BinaryOperatorMinusToken,
+					b.binary(first, tsgo.BinaryOperatorAsteriskToken, codecSize),
+				),
+			),
 			b.factory.ExpressionStatement(b.call(
 				b.id("bytes"),
 				"set",
-				b.id("replacement"),
-				b.id("offset"),
+				replacement,
+				b.id("start"),
 			)),
-			b.regionCodecLoop(backing, b.id("bytes"), true),
+			b.regionCodecLoop(backing, b.id("bytes"), first, last, true),
 		}, true),
 	)
 }
@@ -401,11 +485,13 @@ func (b builder) regionWriteArrow(
 func (b builder) regionCodecLoop(
 	backing tsgo.Expression,
 	bytes tsgo.Expression,
+	first tsgo.Expression,
+	last tsgo.Expression,
 	decode bool,
 ) tsgo.ForStatement {
 	index := b.id("index")
 	offset := b.binary(
-		index,
+		b.binary(index, tsgo.BinaryOperatorMinusToken, first),
 		tsgo.BinaryOperatorAsteriskToken,
 		b.property(b.id("codec"), "size"),
 	)
@@ -435,11 +521,11 @@ func (b builder) regionCodecLoop(
 				index,
 				nil,
 				nil,
-				b.number("0"),
+				first,
 			)},
 			tsgo.NodeFlagsLet,
 		),
-		b.binary(index, tsgo.BinaryOperatorLessThanToken, b.property(backing, "length")),
+		b.binary(index, tsgo.BinaryOperatorLessThanToken, last),
 		b.factory.PostfixUnaryExpression(
 			index,
 			tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken,

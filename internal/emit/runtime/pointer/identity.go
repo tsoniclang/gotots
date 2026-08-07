@@ -6,7 +6,7 @@ func (b builder) logicalProperty() tsgo.PropertyDeclaration {
 	identityType := b.factory.FunctionTypeNode(
 		nil,
 		[]tsgo.ParameterDeclaration{
-			b.parameter("value", b.typeL()),
+			b.parameter("v", b.typeL()),
 		},
 		b.typeL(),
 	)
@@ -14,9 +14,8 @@ func (b builder) logicalProperty() tsgo.PropertyDeclaration {
 		[]tsgo.ModifierLike{
 			b.factory.DeclareKeyword(),
 			b.factory.PrivateKeyword(),
-			b.factory.ReadonlyKeyword(),
 		},
-		b.id("logical"),
+		b.id("type"),
 		nil,
 		identityType,
 		nil,
@@ -74,12 +73,25 @@ func (b builder) childrenProperty() tsgo.PropertyDeclaration {
 	)
 }
 
+func (b builder) resolvedAddressProperty() tsgo.PropertyDeclaration {
+	return b.factory.PropertyDeclaration(
+		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
+		b.id("$go$resolvedAddress"),
+		b.factory.QuestionToken(),
+		b.objectType(),
+		nil,
+	)
+}
+
 func (b builder) constructor() tsgo.ConstructorDeclaration {
 	privateReadonly := []tsgo.ModifierLike{
 		b.factory.PrivateKeyword(),
 		b.factory.ReadonlyKeyword(),
 	}
-	readonly := []tsgo.ModifierLike{b.factory.ReadonlyKeyword()}
+	accessModifiers := privateReadonly
+	if b.capabilities.UnsafeMemory {
+		accessModifiers = []tsgo.ModifierLike{b.factory.PrivateKeyword()}
+	}
 	readType := b.factory.FunctionTypeNode(nil, nil, b.typeS())
 	writeType := b.factory.FunctionTypeNode(
 		nil,
@@ -90,15 +102,15 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 	)
 	parameters := []tsgo.ParameterDeclaration{
 		b.factory.ParameterDeclaration(
-			readonly,
+			privateReadonly,
 			nil,
-			b.id(AddressName),
+			b.id("$go$getAddress"),
 			nil,
-			b.objectType(),
+			b.factory.FunctionTypeNode(nil, nil, b.objectType()),
 			nil,
 		),
 		b.factory.ParameterDeclaration(
-			privateReadonly,
+			accessModifiers,
 			nil,
 			b.id("read"),
 			nil,
@@ -106,7 +118,7 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 			nil,
 		),
 		b.factory.ParameterDeclaration(
-			privateReadonly,
+			accessModifiers,
 			nil,
 			b.id("write"),
 			nil,
@@ -119,8 +131,8 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 			privateReadonly,
 			nil,
 			b.id(RegionName),
-			nil,
-			b.optionalRegionType(b.typeS()),
+			b.factory.QuestionToken(),
+			b.regionType(b.typeS()),
 			nil,
 		))
 	}
@@ -130,6 +142,36 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 		parameters,
 		nil,
 		b.factory.Block(nil, true),
+	)
+}
+
+func (b builder) addressGetter() tsgo.GetAccessorDeclaration {
+	resolved := b.property(
+		b.factory.ThisExpression(),
+		"$go$resolvedAddress",
+	)
+	return b.factory.GetAccessorDeclaration(
+		nil,
+		b.id(AddressName),
+		nil,
+		nil,
+		b.objectType(),
+		b.factory.Block([]tsgo.Statement{b.factory.ReturnStatement(
+			b.binary(
+				resolved,
+				tsgo.BinaryOperatorQuestionQuestionEqualsToken,
+				b.factory.CallExpression(
+					b.property(
+						b.factory.ThisExpression(),
+						"$go$getAddress",
+					),
+					nil,
+					nil,
+					nil,
+					tsgo.NodeFlagsNone,
+				),
+			),
+		)}, true),
 	)
 }
 
@@ -185,10 +227,9 @@ func (b builder) childMethod() tsgo.MethodDeclaration {
 	childrenProperty := b.property(b.id(b.className), "children")
 	return b.method(
 		[]tsgo.ModifierLike{
-			b.factory.PrivateKeyword(),
 			b.factory.StaticKeyword(),
 		},
-		"child",
+		ChildName,
 		nil,
 		[]tsgo.ParameterDeclaration{
 			b.parameter("parent", b.objectType()),

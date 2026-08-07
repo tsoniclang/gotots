@@ -16,7 +16,7 @@ func TestGenericCallableTransportUsesOneAwaitableABI(t *testing.T) {
 	for _, required := range []string{
 		"export async function Apply$kernel<T>(",
 		"predicate: (($0: T) => Awaitable<bool>) | undefined",
-		"return await __gotots_callee_",
+		"return await (__gotots_callee_",
 	} {
 		if !strings.Contains(apply, required) {
 			t.Fatalf("canonical generic callable lacks %q:\n%s", required, apply)

@@ -153,6 +153,36 @@ func UnsafePointerOffset(value *[8]byte) uint32 {
 	return *(*uint32)(unsafe.Pointer(base + 2))
 }
 
+func UnsafePointerInlineOffset(value *[8]byte) uint32 {
+	return *(*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(value)) + 2))
+}
+
+var unsafePointerOffsetTrace int
+
+func tracedUnsafePointer(value *[8]byte) unsafe.Pointer {
+	unsafePointerOffsetTrace = unsafePointerOffsetTrace*10 + 1
+	return unsafe.Pointer(value)
+}
+
+func tracedUnsafeOffset() uintptr {
+	unsafePointerOffsetTrace = unsafePointerOffsetTrace*10 + 2
+	return 2
+}
+
+func UnsafePointerInlineOffsetOrdered(value *[8]byte) uint32 {
+	unsafePointerOffsetTrace = 0
+	return *(*uint32)(unsafe.Pointer(uintptr(tracedUnsafePointer(value)) + tracedUnsafeOffset()))
+}
+
+func UnsafePointerOffsetTrace() int {
+	return unsafePointerOffsetTrace
+}
+
+func UnsafePointerInlineNilOffset() bool {
+	var value unsafe.Pointer
+	return unsafe.Pointer(uintptr(value)+0) == nil
+}
+
 func UnsafePointerSafeThenUnsafe(value *uint32) byte {
 	bytes := (*[4]byte)(unsafe.Pointer(value))
 	*value = 0x11223344

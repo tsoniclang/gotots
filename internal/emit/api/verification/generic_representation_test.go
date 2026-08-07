@@ -103,7 +103,7 @@ func TestGenericRepresentationRequestCarriesExactFacetIdentity(t *testing.T) {
 	}
 }
 
-func TestPointerRepresentationSelectionRequiresCanonicalDefinitionAndDemand(
+func TestPointerRepresentationSelectionJoinsOriginDemands(
 	t *testing.T,
 ) {
 	sourcePackage := types.NewPackage(
@@ -136,32 +136,91 @@ func TestPointerRepresentationSelectionRequiresCanonicalDefinitionAndDemand(
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition, err := NewPointerRepresentationRequirement(artifact, false)
+	definition, err := NewPointerRepresentationRequirement(
+		artifact,
+		PointerRepresentationDemandNone,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	demand, err := NewPointerRepresentationRequirement(artifact, true)
+	demand, err := NewPointerRepresentationRequirement(
+		artifact,
+		PointerRepresentationDemandDynamicLocation,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SelectPointerRepresentation(artifact, nil); err == nil {
-		t.Fatal("missing pointer definition was accepted")
+	selected, err := SelectPointerRepresentation(artifact, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := SelectPointerRepresentation(
+	if selected != PointerRepresentationDirectClass {
+		t.Fatalf("empty pointer representation = %v", selected)
+	}
+	selected, err = SelectPointerRepresentation(
 		artifact,
 		[]DeclarationRequirement{definition, definition},
-	); err == nil {
-		t.Fatal("duplicate pointer definition was accepted")
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
-	selected, err := SelectPointerRepresentation(
+	if selected != PointerRepresentationDirectClass {
+		t.Fatalf("repeated baseline representation = %v", selected)
+	}
+	stable, err := NewPointerRepresentationRequirement(
 		artifact,
-		[]DeclarationRequirement{definition, demand},
+		PointerRepresentationDemandStableLocation,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err = SelectPointerRepresentation(
+		artifact,
+		[]DeclarationRequirement{stable, definition, stable},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selected != PointerRepresentationDirectClassStorageIdentity {
+		t.Fatalf("stable pointer representation = %v", selected)
+	}
+	selected, err = SelectPointerRepresentation(
+		artifact,
+		[]DeclarationRequirement{demand, stable, definition, demand},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if selected != PointerRepresentationCarrierCanonical {
 		t.Fatalf("demanded pointer representation = %v", selected)
+	}
+	foreign, err := NewContractGeneratedArtifact(
+		GeneratedArtifactPointerRepresentation,
+		types.NewPointer(named),
+		"foreign-pointer-contract",
+		"$foreignPointer",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreignDemand, err := NewPointerRepresentationRequirement(
+		foreign,
+		PointerRepresentationDemandDynamicLocation,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SelectPointerRepresentation(
+		artifact,
+		[]DeclarationRequirement{definition, foreignDemand},
+	); err == nil {
+		t.Fatal("foreign pointer demand was accepted")
+	}
+	if PointerRepresentationDemandNone != 1 ||
+		PointerRepresentationDemandStableLocation != 2 ||
+		PointerRepresentationDemandDynamicLocation != 3 ||
+		PointerRepresentationDirectClassStorageIdentity != 4 {
+		t.Fatal("pointer representation demand IDs changed")
 	}
 }
 

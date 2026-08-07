@@ -77,6 +77,7 @@ type Context struct {
 	factory                      tsgo.Factory
 	names                        Names
 	values                       Values
+	pointeeValues                PointeeValues
 	pointerNames                 PointerRepresentationNames
 	pointerValues                PointerRepresentationValues
 	stableAssignments            StableAssignmentValues
@@ -117,6 +118,7 @@ type Context struct {
 	cooperativeResolver          CooperativeCallableResolver
 	recoveryResolver             RecoveryCallableResolver
 	externalFunctionResolver     ExternalFunctionResolver
+	callableABI                  CallableABIResolver
 	callableFacet                CallableFacet
 	cooperative                  bool
 	staticallySelectedCallable   bool
@@ -270,6 +272,7 @@ func NewContext(
 	}
 	pointerNames, _ := names.(PointerRepresentationNames)
 	pointerValues, _ := values.(PointerRepresentationValues)
+	pointeeValues, _ := values.(PointeeValues)
 	stableAssignments, _ := values.(StableAssignmentValues)
 	containerStorage, _ := values.(ContainerStorageValues)
 	scalar, err := NewScalarABIFromSizes(integer, typesSizes)
@@ -286,6 +289,7 @@ func NewContext(
 		factory:           factory,
 		names:             names,
 		values:            values,
+		pointeeValues:     pointeeValues,
 		pointerNames:      pointerNames,
 		pointerValues:     pointerValues,
 		stableAssignments: stableAssignments,
@@ -458,14 +462,6 @@ func (c Context) Names() Names {
 
 func (c Context) Values() Values {
 	return c.values
-}
-
-func (c Context) PointerRepresentationNames() PointerRepresentationNames {
-	return c.pointerNames
-}
-
-func (c Context) PointerRepresentationValues() PointerRepresentationValues {
-	return c.pointerValues
 }
 
 func (c Context) StableAssignments() StableAssignmentValues {

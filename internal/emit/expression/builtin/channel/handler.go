@@ -348,7 +348,7 @@ func emitMeasure(
 		member,
 		channel,
 	)
-	if err != nil || !integervalue.TypeUsesBigInt(context, resultType) {
+	if err != nil || !context.ScalarABI().UsesBigInt(resultType) {
 		return target, err
 	}
 	return api.NewExpressionEmission(

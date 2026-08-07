@@ -27,7 +27,9 @@ func fromProviderScalar(
 	if err != nil {
 		return api.ExpressionEmission{}, true, false, err
 	}
-	if defined && representation != api.DefinedValueRepresentationGeneratedWrapper {
+	if defined &&
+		representation != api.DefinedValueRepresentationGeneratedWrapper &&
+		representation != api.DefinedValueRepresentationGeneratedNumeric {
 		return value, true, false, nil
 	}
 	provider, ok := context.ProviderScalarABI()
@@ -69,7 +71,9 @@ func toProviderScalar(
 	if err != nil {
 		return api.ExpressionEmission{}, true, false, err
 	}
-	if defined && representation != api.DefinedValueRepresentationGeneratedWrapper {
+	if defined &&
+		representation != api.DefinedValueRepresentationGeneratedWrapper &&
+		representation != api.DefinedValueRepresentationGeneratedNumeric {
 		return value, true, false, nil
 	}
 	if defined {

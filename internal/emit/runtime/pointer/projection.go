@@ -53,7 +53,13 @@ func (b builder) fieldMethod() tsgo.MethodDeclaration {
 	typeO := b.typeReference("PS")
 	typeK := b.typeReference("K")
 	valueType := b.factory.IndexedAccessTypeNode(typeO, typeK)
-	parentValue := b.property(b.id("parent"), CellValueName)
+	parentValue := b.factory.CallExpression(
+		b.property(b.id("parent"), "read"),
+		nil,
+		nil,
+		nil,
+		tsgo.NodeFlagsNone,
+	)
 	field := b.factory.ElementAccessExpression(
 		parentValue,
 		nil,
@@ -62,7 +68,7 @@ func (b builder) fieldMethod() tsgo.MethodDeclaration {
 	)
 	address := b.call(
 		b.id(b.className),
-		"child",
+		ChildName,
 		b.property(b.id("parent"), AddressName),
 		b.id("key"),
 	)
@@ -104,7 +110,7 @@ func (b builder) objectFieldMethod() tsgo.MethodDeclaration {
 		tsgo.NodeFlagsNone,
 	)
 	root := b.call(b.id(b.className), "root", b.id("owner"))
-	address := b.call(b.id(b.className), "child", root, b.id("key"))
+	address := b.call(b.id(b.className), ChildName, root, b.id("key"))
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		ObjectFieldName,
@@ -193,7 +199,7 @@ func (b builder) elementMethod() tsgo.MethodDeclaration {
 				typeS,
 				b.call(
 					b.id(b.className),
-					"child",
+					ChildName,
 					b.call(b.id(b.className), "root", backing),
 					index,
 				),
@@ -250,7 +256,13 @@ func (b builder) indexMethod() tsgo.MethodDeclaration {
 		DereferenceName,
 		b.id("parent"),
 	)
-	selectedValue := b.property(b.id("selected"), CellValueName)
+	selectedValue := b.factory.CallExpression(
+		b.property(b.id("selected"), "read"),
+		nil,
+		nil,
+		nil,
+		tsgo.NodeFlagsNone,
+	)
 	numericIndex := b.factory.CallExpression(
 		api.TargetIntrinsicNumber.Expression(b.factory),
 		nil,
@@ -288,7 +300,7 @@ func (b builder) indexMethod() tsgo.MethodDeclaration {
 				typeS,
 				b.call(
 					b.id(b.className),
-					"child",
+					ChildName,
 					b.property(b.id("selected"), AddressName),
 					b.id("numericIndex"),
 				),
@@ -309,21 +321,29 @@ func (b builder) projectMethod() tsgo.MethodDeclaration {
 		b.id("fromSource"),
 		nil,
 		nil,
-		[]tsgo.Expression{b.property(pointer, CellValueName)},
+		[]tsgo.Expression{b.factory.CallExpression(
+			b.property(pointer, "read"),
+			nil,
+			nil,
+			nil,
+			tsgo.NodeFlagsNone,
+		)},
 		tsgo.NodeFlagsNone,
 	)
-	write := b.factory.BinaryExpression(
+	write := b.factory.CallExpression(
+		b.property(pointer, "write"),
 		nil,
-		b.property(pointer, CellValueName),
 		nil,
-		b.factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
-		b.factory.CallExpression(
-			b.id("toSource"),
-			nil,
-			nil,
-			[]tsgo.Expression{b.id("next")},
-			tsgo.NodeFlagsNone,
-		),
+		[]tsgo.Expression{
+			b.factory.CallExpression(
+				b.id("toSource"),
+				nil,
+				nil,
+				[]tsgo.Expression{b.id("next")},
+				tsgo.NodeFlagsNone,
+			),
+		},
+		tsgo.NodeFlagsNone,
 	)
 	converter := func(
 		name string,

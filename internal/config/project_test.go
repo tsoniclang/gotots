@@ -60,6 +60,36 @@ func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
 	}
 }
 
+func TestLoadSelectsExternalImplementationBundlesFromCLI(t *testing.T) {
+	projectDirectory := t.TempDir()
+	externalBundle := filepath.Join(t.TempDir(), "fast", "contract.json")
+	path := filepath.Join(projectDirectory, "gotots.json")
+	writeProjectConfig(t, path, `{
+  "schemaVersion": 1,
+  "distribution": {"root": "distribution"},
+  "source": {"root": "source", "package": ".", "mode": "main"},
+  "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
+  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "providers": {"standardLibrary": false, "externals": false},
+  "implementations": {"bundles": ["local/contract.json"]},
+  "output": {"directory": "output"}
+}
+`)
+	project, err := Load(Request{
+		ConfigPath: path,
+		Overrides: Overrides{
+			ImplementationSet:     true,
+			ImplementationBundles: []string{externalBundle},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := project.ImplementationBundles(); !slices.Equal(got, []string{externalBundle}) {
+		t.Fatalf("implementation bundles = %v", got)
+	}
+}
+
 func TestLoadRejectsUnknownFieldAndVersion(t *testing.T) {
 	for name, source := range map[string]string{
 		"unknown": `{"schemaVersion":1,"surprise":true}`,

@@ -72,6 +72,36 @@ func projectValue(
 	return current, nil
 }
 
+func projectMutableValue(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	resolved path,
+	root api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	current := root
+	currentType := resolved.root
+	for _, field := range resolved.fields {
+		var err error
+		current, currentType, err = projectMutableFieldValue(
+			context,
+			children,
+			source,
+			currentType,
+			current,
+			field,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	if !types.Identical(currentType, resolved.effective) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return current, nil
+}
+
 func projectFieldValue(
 	context api.Context,
 	children api.ChildEmitter,
@@ -160,6 +190,93 @@ func projectFieldValue(
 	return current, field.Type(), nil
 }
 
+func projectMutableFieldValue(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	currentType types.Type,
+	current api.ExpressionEmission,
+	field *types.Var,
+) (api.ExpressionEmission, types.Type, error) {
+	var err error
+	if _, _, _, pointer := pointerType(currentType); pointer {
+		current, currentType, err = dereferenceValue(
+			context,
+			children,
+			source,
+			currentType,
+			current,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, nil, err
+		}
+	}
+	if !fieldInType(currentType, field) {
+		return api.ExpressionEmission{}, nil,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	current, err = joinNominalFieldCallableABI(
+		context,
+		currentType,
+		field,
+		current,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
+	}
+	target, selected, err := namedstructstorage.FieldTarget(
+		context.WithRole(api.RoleStructField),
+		source,
+		currentType,
+		field,
+		current,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
+	}
+	if !selected {
+		target, selected, err = providerboundary.StructFieldStoreTarget(
+			context.WithRole(api.RoleStructField),
+			children,
+			source,
+			currentType,
+			field,
+			current,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, nil, err
+		}
+	}
+	if selected {
+		current, err = target.MutableValue(
+			context.WithRole(api.RoleStructField),
+			source,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, nil, err
+		}
+		return current, field.Type(), nil
+	}
+	name, err := context.Names().Member(field)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
+	}
+	current, err = api.NewExpressionEmission(
+		current.Before(),
+		context.Factory().PropertyAccessExpression(
+			current.Value(),
+			nil,
+			context.Factory().Identifier(name),
+			tsgo.NodeFlagsNone,
+		),
+		current.Requests(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
+	}
+	return current, field.Type(), nil
+}
+
 func joinNominalFieldCallableABI(
 	context api.Context,
 	container types.Type,
@@ -212,7 +329,11 @@ func dereferenceValue(
 	); handled || err != nil {
 		return logical, element, err
 	}
-	representation, err := pointertype.Observe(context, raw, false)
+	representation, err := pointertype.Observe(
+		context,
+		raw,
+		api.PointerRepresentationDemandNone,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
@@ -228,8 +349,7 @@ func dereferenceValue(
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
-	if representation.Representation() ==
-		api.PointerRepresentationDirectClass {
+	if representation.Representation().DirectClass() {
 		logical, err := api.NewExpressionEmission(
 			value.Before(),
 			pointerruntime.Direct(

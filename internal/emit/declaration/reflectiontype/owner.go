@@ -205,6 +205,16 @@ func metadataExpression(
 		))
 		requests = append(requests, dynamicType.Requests()...)
 	}
+	methodProperties, methodRequests, err := methodSetMetadata(
+		context,
+		names,
+		sourceType,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	properties = append(properties, methodProperties...)
+	requests = append(requests, methodRequests...)
 	for _, relation := range []struct {
 		name      string
 		typeValue types.Type

@@ -95,6 +95,9 @@ func main() {
 	a, b, c = values.CountUnary(count)
 	fmt.Println(values.IntFromCount(a), values.IntFromCount(b), values.IntFromCount(c))
 	fmt.Println(values.CountOrder(count, values.CountFromInt(3)))
+	fmt.Println(values.CountIsZero(values.CountZero()), values.CountIsZero(count))
+	fmt.Println(values.ConvertedCountIsZero(values.CountZero()), values.ConvertedCountIsZero(count))
+	fmt.Println(values.DeclaredConvertedCountIsZero(values.CountZero()), values.DeclaredConvertedCountIsZero(count))
 	left := values.LabelFromString("a")
 	right := values.LabelFromString("z")
 	fmt.Println(values.StringFromLabel(values.LabelJoin(left, right)))
@@ -150,6 +153,12 @@ func main() {
 		values.StringFromLabel(missing),
 		ok,
 	)
+	roundTrip, roundTripOK := values.CountAnyRoundTrip(count)
+	fmt.Println(
+		values.IntFromCount(roundTrip),
+		roundTripOK,
+		values.CountAnyRejectsOther(count),
+	)
 }
 `)
 	return runDefinedCommand(
@@ -178,6 +187,9 @@ console.log(values.CountArithmetic(count, values.CountFromInt(3)).map(value => S
 console.log(values.CountBits(count, values.CountFromInt(3)).map(value => String(values.IntFromCount(value))).join(" "));
 console.log(values.CountUnary(count).map(value => String(values.IntFromCount(value))).join(" "));
 console.log(values.CountOrder(count, values.CountFromInt(3)).join(" "));
+console.log(String(values.CountIsZero(values.CountZero())), String(values.CountIsZero(count)));
+console.log(String(values.ConvertedCountIsZero(values.CountZero())), String(values.ConvertedCountIsZero(count)));
+console.log(String(values.DeclaredConvertedCountIsZero(values.CountZero())), String(values.DeclaredConvertedCountIsZero(count)));
 const left = values.LabelFromString("a");
 const right = values.LabelFromString("z");
 console.log(values.StringFromLabel(values.LabelJoin(left, right)));
@@ -226,6 +238,8 @@ console.log(
 );
 const [found, missing, ok] = values.CountMapValues();
 console.log(values.StringFromLabel(found), values.StringFromLabel(missing), String(ok));
+const [roundTrip, roundTripOK] = values.CountAnyRoundTrip(count);
+console.log(String(values.IntFromCount(roundTrip)), String(roundTripOK), String(values.CountAnyRejectsOther(count)));
 `
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeDefinedFile(t, runnerPath, runner)

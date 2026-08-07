@@ -24,13 +24,16 @@ func pointerValueProperties(
 	scaffold *locationScaffold,
 ) ([]tsgo.ObjectLiteralElementLike, error) {
 	factory := scaffold.factory
-	observation, err := pointertype.Observe(context, sourceType, false)
+	observation, err := pointertype.Observe(
+		context,
+		sourceType,
+		api.PointerRepresentationDemandNone,
+	)
 	if err != nil {
 		return nil, err
 	}
 	scaffold.requests = append(scaffold.requests, observation.Requests()...)
-	directClass := observation.Representation() ==
-		api.PointerRepresentationDirectClass
+	directClass := observation.Representation().DirectClass()
 	named, namedOK := types.Unalias(pointee).(*types.Named)
 	_, structOK := types.Unalias(pointee).Underlying().(*types.Struct)
 	if !directClass || !namedOK || named.Obj() == nil || !structOK {

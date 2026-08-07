@@ -128,11 +128,6 @@ func UsesBigInt(
 	return ok && representation == api.IntegerCarrierBigInt
 }
 
-func TypeUsesBigInt(context api.Context, sourceType types.Type) bool {
-	carrier, ok := Describe(context.TypesSizes(), sourceType)
-	return ok && UsesBigInt(context.IntegerRepresentation(), carrier)
-}
-
 func FormatConstant(
 	representation api.IntegerRepresentation,
 	carrier Carrier,

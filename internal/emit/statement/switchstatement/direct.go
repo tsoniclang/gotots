@@ -45,12 +45,19 @@ func emitDirect(
 	targetLabel string,
 ) (api.StatementEmission, error) {
 	operationContext := context
+	nativeNumeric := false
 	if tag.wrapped {
 		var err error
 		operationContext, err = tag.model.OperationContext(context)
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
+		representation, representationErr := tag.model.Representation(context)
+		if representationErr != nil {
+			return api.StatementEmission{}, representationErr
+		}
+		nativeNumeric = representation.Kind() ==
+			api.DefinedValueRepresentationGeneratedNumeric
 	}
 	targetClauses := make(
 		[]tsgo.CaseOrDefaultClause,
@@ -74,7 +81,7 @@ func emitDirect(
 		for index, expression := range clause.expressions {
 			value := expression.Value()
 			expressionRequests := expression.Requests()
-			if tag.wrapped {
+			if tag.wrapped && !nativeNumeric {
 				facts, constant := context.TypesInfo().TypeAndValue(
 					clause.source.List[index],
 				)
@@ -135,7 +142,7 @@ func emitDirect(
 		}
 	}
 	tagTarget := tag.target
-	if tag.wrapped {
+	if tag.wrapped && !nativeNumeric {
 		var err error
 		tagTarget, err = tag.model.Project(
 			context.WithRole(api.RoleSwitchTag),

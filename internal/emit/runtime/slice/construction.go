@@ -89,16 +89,9 @@ func (b builder) makeMethod() tsgo.MethodDeclaration {
 		[]tsgo.TypeNode{b.typeT()},
 		[]tsgo.Expression{b.id("resolvedCapacity")},
 	)
-	resolvedCapacity := b.factory.ConditionalExpression(
-		b.binary(
-			b.id("capacity"),
-			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-			b.factory.NullLiteral(),
-		),
-		b.factory.QuestionToken(),
+	resolvedCapacity := b.resolvedCapacity(
+		b.id("capacity"),
 		b.id("numericLength"),
-		b.factory.ColonToken(),
-		b.toNumber(b.id("capacity")),
 	)
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},

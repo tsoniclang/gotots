@@ -216,7 +216,8 @@ func (m Model) Project(
 		return api.ExpressionEmission{}, err
 	}
 	switch representation.Kind() {
-	case api.DefinedValueRepresentationProviderCanonical:
+	case api.DefinedValueRepresentationProviderCanonical,
+		api.DefinedValueRepresentationGeneratedNumeric:
 		return value, nil
 	case api.DefinedValueRepresentationProviderOperations:
 		operations, ok := representation.Operations()
@@ -283,6 +284,29 @@ func (m Model) Wrap(
 	switch representation.Kind() {
 	case api.DefinedValueRepresentationProviderCanonical:
 		return value, nil
+	case api.DefinedValueRepresentationGeneratedNumeric:
+		reference, err := context.Names().Reference(m.typeName)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			value.Before(),
+			context.Factory().BinaryExpression(
+				nil,
+				value.Value(),
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorAsteriskToken,
+				),
+				context.Factory().PropertyAccessExpression(
+					reference.Expression(context.Factory()),
+					nil,
+					context.Factory().Identifier(BrandMember),
+					tsgo.NodeFlagsNone,
+				),
+			),
+			api.CombineRequests(value.Requests(), reference.Requests()),
+		)
 	case api.DefinedValueRepresentationProviderOperations:
 		operations, ok := representation.Operations()
 		if !ok {

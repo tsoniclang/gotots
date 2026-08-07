@@ -2,8 +2,10 @@ package tsgo
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -60,4 +62,61 @@ func Compile(
 		Reason:      reason,
 		Diagnostics: diagnostics,
 	}
+}
+
+func EncodeStrictProjectConfig(
+	distributionRoot string,
+	projectRoot string,
+) ([]byte, error) {
+	if distributionRoot == "" || projectRoot == "" {
+		return nil, fmt.Errorf("encode TS-Go project config: root is absent")
+	}
+	providerPath := func(parts ...string) (string, error) {
+		target := filepath.Join(append([]string{distributionRoot}, parts...)...)
+		relative, err := filepath.Rel(projectRoot, target)
+		if err != nil {
+			return "", err
+		}
+		result := filepath.ToSlash(relative)
+		if result != "." && len(result) > 0 && result[0] != '.' {
+			result = "./" + result
+		}
+		return result, nil
+	}
+	standardLibrary, err := providerPath("gostdlib", "dist", "src", "*.d.ts")
+	if err != nil {
+		return nil, fmt.Errorf("encode TS-Go project config: %w", err)
+	}
+	externals, err := providerPath("externals", "dist", "src", "*.d.ts")
+	if err != nil {
+		return nil, fmt.Errorf("encode TS-Go project config: %w", err)
+	}
+	document := map[string]any{
+		"compilerOptions": map[string]any{
+			"target":           "ES2022",
+			"module":           "NodeNext",
+			"moduleResolution": "NodeNext",
+			"paths": map[string][]string{
+				"@gotots/runtime/*.js":   {"./runtime/*.ts"},
+				"@gotots/gostdlib/*.js":  {standardLibrary},
+				"@gotots/externals/*.js": {externals},
+			},
+			"strict":                           true,
+			"exactOptionalPropertyTypes":       true,
+			"noUncheckedIndexedAccess":         true,
+			"noImplicitOverride":               true,
+			"noFallthroughCasesInSwitch":       true,
+			"forceConsistentCasingInFileNames": true,
+			"skipLibCheck":                     false,
+			"types":                            []string{},
+			"noEmit":                           true,
+		},
+		"include": []string{"**/*.ts"},
+		"exclude": []string{"node_modules", "out"},
+	}
+	payload, err := json.MarshalIndent(document, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("encode TS-Go project config: %w", err)
+	}
+	return append(payload, '\n'), nil
 }

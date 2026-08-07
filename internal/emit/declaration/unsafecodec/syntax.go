@@ -170,7 +170,7 @@ func (b *builder) integerZero() (tsgo.Expression, error) {
 
 func (b *builder) convertInteger(value tsgo.Expression) tsgo.Expression {
 	intrinsic := api.TargetIntrinsicNumber
-	if integervalue.TypeUsesBigInt(b.context, types.Typ[types.Uintptr]) {
+	if b.context.ScalarABI().UsesBigInt(types.Typ[types.Uintptr]) {
 		intrinsic = api.TargetIntrinsicBigInt
 	}
 	return b.call(intrinsic.Expression(b.factory), nil, value)

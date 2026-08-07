@@ -20,6 +20,13 @@ No milestone may introduce a temporary semantic IR, hidden source ABI,
 compatibility shim, corpus-specific override, or implementation that a later
 milestone is expected to discard.
 
+Callable representation work lands as one vertical capability: the closed
+projection contract, automatic and authored-signature evidence, the canonical
+signature facet, every definition/reference consumer, superseded-path deletion,
+artifact inspection, differential and mutation proof, and measured product
+delta. A direct-call-only rewrite or a package-specific manual-call adaptation
+is not a deliverable.
+
 ## 0. Native Target And Loader
 
 Install:
@@ -311,8 +318,8 @@ Performance work proceeds in measured owner order:
    semantic digest;
 2. add one certified source-package implementation owner and prove atomic
    generated-package replacement through pinned TS-Go AST;
-3. select the fast internal-hash implementation only under its product-proved
-   equivalence envelope and reprofile the generated compiler;
+3. prove concrete implementation bundles and product equivalence evidence are
+   owned by the consuming project rather than shipped as GoToTS policy;
 4. fix the next measured generic runtime or representation owner, deleting the
    superseded path before advancing.
 

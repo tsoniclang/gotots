@@ -58,12 +58,22 @@ func main() {
 		func(artifacts renderedArtifacts) {
 			for _, required := range []string{
 				"GoPointer.cell(new DefinedText",
-				"new DefinedCount__from_reflectvalue(instance.value)",
-				"GoPointer.cell(new DefinedCount__from_reflectvalue(0).$value)",
+				"instance.value * DefinedCount__from_reflectvalue.$goType",
+				"GoPointer.cell(0 * DefinedCount__from_reflectvalue.$goType)",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
-					t.Fatalf("defined scalar reflection artifact lacks %q", required)
+					t.Fatalf(
+						"defined scalar reflection artifact lacks %q:\n%s",
+						required,
+						artifacts.printed,
+					)
 				}
+			}
+			if strings.Contains(
+				artifacts.printed,
+				"new DefinedCount__from_reflectvalue(",
+			) {
+				t.Fatal("native numeric reflection artifact restored a wrapper")
 			}
 		},
 	)

@@ -294,16 +294,18 @@ func (owner Owner) Hash(
 		representation, err := owner.PointerRepresentation(
 			context,
 			pointer,
-			false,
+			api.PointerRepresentationDemandNone,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		if representation.Representation() ==
-			api.PointerRepresentationDirectClass {
-			return directObjectHash(
+		if representation.Representation().DirectClass() {
+			return owner.directClassPointerHash(
 				context,
+				source,
+				pointer.Elem(),
 				value,
+				representation.UsesStorageIdentity(),
 				representation.Requests(),
 			)
 		}

@@ -41,7 +41,6 @@ func TestBuildCreatesOneNonErasedPanicCarrierAndRecoveryAuthority(t *testing.T) 
 			t.Fatalf("panic method %d does not throw exactly once", index)
 		}
 	}
-
 	recoveryTarget, err := Build(
 		factory,
 		api.RuntimeRecovery,

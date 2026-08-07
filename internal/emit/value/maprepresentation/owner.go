@@ -305,7 +305,25 @@ func Make(
 	))
 }
 
-func storageKeyType(sourceType types.Type) types.Type {
+func storageKeyType(
+	context api.Context,
+	sourceType types.Type,
+) (types.Type, error) {
+	if model, ok := definedtype.ResolveBasic(sourceType); ok {
+		representation, err := model.Representation(context)
+		if err != nil {
+			return nil, err
+		}
+		if representation.Kind() ==
+			api.DefinedValueRepresentationGeneratedNumeric {
+			return sourceType, nil
+		}
+		return model.Underlying(), nil
+	}
+	return sourceType, nil
+}
+
+func underlyingStorageKeyType(sourceType types.Type) types.Type {
 	if model, ok := definedtype.ResolveBasic(sourceType); ok {
 		return model.Underlying()
 	}
@@ -339,10 +357,14 @@ func EmitStorageKeyType(
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
+	storageType, err := storageKeyType(context, sourceType)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
 	return children.RepresentedType(
 		operationContext.WithRole(api.RoleStorageType),
 		source,
-		storageKeyType(sourceType),
+		storageType,
 	)
 }
 

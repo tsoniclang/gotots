@@ -7,7 +7,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
-	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	integeroperand "github.com/tsoniclang/gotots/internal/emit/value/integer/operand"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -118,13 +117,17 @@ func (a RuntimeArray) EmitStoreTarget(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewContainerStorageAccessorStoreTargetEmission(
+	target, err := api.NewContainerStorageAccessorStoreTargetEmission(
 		targetReceiver,
 		arraymember.Get.Name(),
 		arraymember.Set.Name(),
 		[]api.ExpressionEmission{index},
 		a.ElementType(),
 	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	return target, nil
 }
 
 func (a RuntimeArray) EmitLength(
@@ -168,7 +171,7 @@ func (a RuntimeArray) Measure(
 		stored.Value(),
 		arraymember.Length,
 	))
-	if integervalue.TypeUsesBigInt(context, types.Typ[types.Int]) {
+	if context.ScalarABI().UsesBigInt(types.Typ[types.Int]) {
 		target = context.Factory().CallExpression(
 			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,

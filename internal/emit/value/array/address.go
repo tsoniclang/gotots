@@ -40,7 +40,7 @@ func (a RuntimeArray) Address(
 	elementRepresentation, err := pointertype.Observe(
 		context,
 		types.NewPointer(a.ElementType()),
-		true,
+		api.PointerRepresentationDemandDynamicLocation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -65,7 +65,7 @@ func (a RuntimeArray) Address(
 	arrayRepresentation, err := pointertype.Observe(
 		context,
 		types.NewPointer(a.SourceType()),
-		true,
+		api.PointerRepresentationDemandStableLocation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

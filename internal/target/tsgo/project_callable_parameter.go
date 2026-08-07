@@ -5,6 +5,106 @@ import (
 	"slices"
 )
 
+type ProjectPrimitiveKind uint8
+
+const (
+	ProjectPrimitiveInvalid ProjectPrimitiveKind = iota
+	ProjectPrimitiveString
+	ProjectPrimitiveNumber
+	ProjectPrimitiveBoolean
+	ProjectPrimitiveBigInt
+)
+
+const (
+	typeFlagString  uint32 = 1 << 5
+	typeFlagNumber  uint32 = 1 << 6
+	typeFlagBigInt  uint32 = 1 << 7
+	typeFlagBoolean uint32 = 1 << 8
+)
+
+type ProjectPrimitiveParameter struct {
+	kind     ProjectPrimitiveKind
+	optional bool
+}
+
+func (p ProjectPrimitiveParameter) Kind() ProjectPrimitiveKind { return p.kind }
+func (p ProjectPrimitiveParameter) Optional() bool             { return p.optional }
+
+func (p *ProjectInspection) CallableParameterPrimitive(
+	target projectCallable,
+	parameter int,
+) (ProjectPrimitiveParameter, bool, error) {
+	if p == nil || target == nil {
+		return ProjectPrimitiveParameter{}, false, &ProjectInspectionError{
+			Operation: "callable parameter primitive",
+			Reason:    "target is absent",
+		}
+	}
+	signature, err := p.singleCallSignature(target, target.callableSubject())
+	if err != nil {
+		return ProjectPrimitiveParameter{}, false, err
+	}
+	if parameter < 0 || parameter >= len(signature.Parameters) {
+		return ProjectPrimitiveParameter{}, false, &ProjectInspectionError{
+			Operation: "callable parameter primitive",
+			Reason:    "parameter is outside the callable signature",
+		}
+	}
+	parameterType, err := p.projectSymbolType(
+		signature.Parameters[parameter],
+		"callable parameter primitive",
+	)
+	if err != nil {
+		return ProjectPrimitiveParameter{}, false, err
+	}
+	optional := false
+	if parameterType.Flags&typeFlagUnion != 0 {
+		members, err := p.compositeTypes(parameterType.ID)
+		if err != nil {
+			return ProjectPrimitiveParameter{}, false, err
+		}
+		var value *typeResponse
+		for index := range members {
+			member := &members[index]
+			if member.Flags&typeFlagUndefined != 0 {
+				if optional {
+					return ProjectPrimitiveParameter{}, false, nil
+				}
+				optional = true
+				continue
+			}
+			if value != nil {
+				return ProjectPrimitiveParameter{}, false, nil
+			}
+			value = member
+		}
+		if !optional || value == nil {
+			return ProjectPrimitiveParameter{}, false, nil
+		}
+		parameterType = *value
+	}
+	kind := projectPrimitiveKind(parameterType.Flags)
+	if kind == ProjectPrimitiveInvalid {
+		return ProjectPrimitiveParameter{}, false, nil
+	}
+	return ProjectPrimitiveParameter{kind: kind, optional: optional}, true, nil
+}
+
+func projectPrimitiveKind(flags uint32) ProjectPrimitiveKind {
+	switch {
+	case flags&typeFlagString != 0:
+		return ProjectPrimitiveString
+	case flags&typeFlagNumber != 0:
+		return ProjectPrimitiveNumber
+	case flags&typeFlagBoolean != 0:
+		return ProjectPrimitiveBoolean
+	case flags&typeFlagBigInt != 0:
+		return ProjectPrimitiveBigInt
+	default:
+		return ProjectPrimitiveInvalid
+	}
+}
+
 func (p *ProjectInspection) CallableTypeParameterCount(
 	target projectCallable,
 ) (int, error) {
@@ -119,6 +219,93 @@ func (p *ProjectInspection) CallableParameterTypeIdentity(
 		return ProjectTypeIdentity{}, err
 	}
 	return p.projectTypeIdentity(parameterType.ID)
+}
+
+func (p *ProjectInspection) CallableParameterTypeString(
+	target projectCallable,
+	parameter int,
+) (string, error) {
+	if p == nil || target == nil {
+		return "", &ProjectInspectionError{
+			Operation: "callable parameter type",
+			Reason:    "target is absent",
+		}
+	}
+	signature, err := p.singleCallSignature(target, target.callableSubject())
+	if err != nil {
+		return "", err
+	}
+	if parameter < 0 || parameter >= len(signature.Parameters) {
+		return "", &ProjectInspectionError{
+			Operation: "callable parameter type",
+			Reason: fmt.Sprintf(
+				"%s parameter %d is outside %d parameters",
+				target.callableSubject(),
+				parameter,
+				len(signature.Parameters),
+			),
+		}
+	}
+	parameterType, err := p.projectSymbolType(
+		signature.Parameters[parameter],
+		"callable parameter type",
+	)
+	if err != nil {
+		return "", err
+	}
+	return p.projectTypeString(parameterType.ID, "callable parameter type")
+}
+
+func (p *ProjectInspection) CallableReturnTypeString(
+	target projectCallable,
+) (string, error) {
+	if p == nil || target == nil {
+		return "", &ProjectInspectionError{
+			Operation: "callable return type",
+			Reason:    "target is absent",
+		}
+	}
+	signature, err := p.singleCallSignature(target, target.callableSubject())
+	if err != nil {
+		return "", err
+	}
+	result, err := p.signatureReturn(signature.ID, target.callableSubject())
+	if err != nil {
+		return "", err
+	}
+	return p.projectTypeString(result.ID, "callable return type")
+}
+
+func (p *ProjectInspection) projectTypeString(
+	typeID uint32,
+	operation string,
+) (string, error) {
+	if typeID == 0 {
+		return "", &ProjectInspectionError{
+			Operation: operation,
+			Reason:    "type is absent",
+		}
+	}
+	var result string
+	if err := requestProjectJSON(
+		p.client,
+		"typeToString",
+		typeToStringParams{
+			Snapshot: p.snapshot,
+			Project:  p.project,
+			Type:     typeID,
+		},
+		&result,
+	); err != nil {
+		return "", err
+	}
+	if result == "" {
+		return "", &ProjectInspectionError{
+			Operation: operation,
+			Reason:    "type string is absent",
+		}
+	}
+	return result, nil
 }
 
 func (p *ProjectInspection) CallableParameterTypeArguments(

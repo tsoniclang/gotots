@@ -4,9 +4,9 @@ import (
 	"go/ast"
 	"go/types"
 
+	representationcontract "github.com/tsoniclang/gotots/internal/contracts/representation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
-	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -87,27 +87,10 @@ func SupportsInteger(sizes types.Sizes, sourceType types.Type) bool {
 }
 
 func PrimitiveAlias(
-	sizes types.Sizes,
+	_ types.Sizes,
 	sourceType types.Type,
 ) (api.PrimitiveAlias, bool) {
-	if sourceType != nil {
-		if basic, ok := types.Unalias(sourceType).(*types.Basic); ok {
-			switch basic.Kind() {
-			case types.Bool:
-				return api.PrimitiveBool, true
-			case types.String:
-				return api.PrimitiveString, true
-			}
-		}
-	}
-	if floatCarrier, ok := floatvalue.Describe(sourceType); ok {
-		return floatCarrier.Alias(), true
-	}
-	carrier, ok := integervalue.Describe(sizes, sourceType)
-	if !ok {
-		return api.PrimitiveInvalid, false
-	}
-	return carrier.Alias(), true
+	return representationcontract.PrimitiveAliasFor(sourceType)
 }
 
 func SupportsString(sourceType types.Type) bool {

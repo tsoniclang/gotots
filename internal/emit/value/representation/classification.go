@@ -48,13 +48,13 @@ func ownsFreshValue(context api.Context, source ast.Node) bool {
 func (owner Owner) PointerRepresentation(
 	context api.Context,
 	pointer *types.Pointer,
-	carrierDemand bool,
+	demand api.PointerRepresentationDemand,
 ) (api.PointerRepresentationObservation, error) {
 	return owner.pointerRepresentation(
 		context,
 		nil,
 		pointer,
-		carrierDemand,
+		demand,
 	)
 }
 
@@ -62,7 +62,7 @@ func (owner Owner) SourcePointerRepresentation(
 	context api.Context,
 	sourceOwner types.Object,
 	pointer *types.Pointer,
-	carrierDemand bool,
+	demand api.PointerRepresentationDemand,
 ) (api.PointerRepresentationObservation, error) {
 	if sourceOwner == nil {
 		return api.PointerRepresentationObservation{}, &api.InvariantError{
@@ -74,7 +74,7 @@ func (owner Owner) SourcePointerRepresentation(
 		context,
 		sourceOwner,
 		pointer,
-		carrierDemand,
+		demand,
 	)
 }
 
@@ -82,7 +82,7 @@ func (owner Owner) pointerRepresentation(
 	context api.Context,
 	sourceOwner types.Object,
 	pointer *types.Pointer,
-	carrierDemand bool,
+	demand api.PointerRepresentationDemand,
 ) (api.PointerRepresentationObservation, error) {
 	if pointer == nil {
 		return api.PointerRepresentationObservation{}, &api.InvariantError{
@@ -129,7 +129,7 @@ func (owner Owner) pointerRepresentation(
 	observation, err := resolver.ObservePointerRepresentation(
 		context.ArtifactOwner(),
 		reference.Artifact(),
-		carrierDemand,
+		demand,
 	)
 	if err != nil {
 		return api.PointerRepresentationObservation{}, err

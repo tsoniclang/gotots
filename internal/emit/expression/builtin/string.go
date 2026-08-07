@@ -7,7 +7,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
-	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -64,7 +63,7 @@ func emitStringLength(
 		context.Factory().Identifier("length"),
 		tsgo.NodeFlagsNone,
 	))
-	if integervalue.TypeUsesBigInt(context, context.TypesInfo().TypeOf(source)) {
+	if context.ScalarABI().UsesBigInt(context.TypesInfo().TypeOf(source)) {
 		length = context.Factory().CallExpression(
 			api.TargetIntrinsicBigInt.Expression(context.Factory()),
 			nil,

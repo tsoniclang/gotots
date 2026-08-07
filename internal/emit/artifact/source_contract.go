@@ -72,6 +72,10 @@ func sourceBindingPresent(
 			if statement.Name() != nil && statement.Name().Text() == name {
 				return true
 			}
+		case tsgo.EnumDeclaration:
+			if statement.Name() != nil && statement.Name().Text() == name {
+				return true
+			}
 		case tsgo.InterfaceDeclaration:
 			if statement.Name() != nil && statement.Name().Text() == name {
 				return true

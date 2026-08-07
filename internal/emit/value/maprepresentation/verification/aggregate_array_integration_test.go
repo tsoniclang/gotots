@@ -218,6 +218,10 @@ func (aggregateNames) DefinedValueRepresentation(
 	)
 }
 
+func (aggregateNames) ProviderOwnedDeclaration(types.Object) (bool, error) {
+	return false, nil
+}
+
 func (aggregateNames) TypeReference(
 	object types.Object,
 ) (api.NameReference, error) {

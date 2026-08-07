@@ -186,15 +186,16 @@ func emit(
 		return api.ExpressionEmission{}, err
 	}
 	var profileRequests []api.RootRequest
-	if provider, direct := calleeObject(
+	directFunction, direct := calleeObject(
 		context.TypesInfo(),
 		source.Fun,
-	); direct {
+	)
+	if direct {
 		target, selected, requests, err := emitProviderProfileFunction(
 			context,
 			children,
 			source,
-			provider,
+			directFunction,
 			signature,
 			discarded,
 			detached,
@@ -233,11 +234,13 @@ func emit(
 	}
 	guardNil := !static &&
 		!callable.StaticallyNonNil(context.TypesInfo(), source.Fun)
-	arguments, argumentBefore, argumentRequests, err := emitArguments(
+	selectedABI, _ := context.ResolveCallableABI(directFunction)
+	arguments, argumentBefore, argumentRequests, err := emitArgumentsWithABI(
 		context,
 		children,
 		source,
 		signature,
+		selectedABI,
 		guardNil || detached,
 	)
 	if err != nil {
@@ -298,24 +301,13 @@ func emit(
 	before = append(before, argumentBefore...)
 	var guardRequests []api.RootRequest
 	if guardNil {
-		if detached {
-			targetCallee, guardRequests, err =
-				callable.DetachedNilGuard(
-					context,
-					targetCallee,
-					targetCallee,
-				)
-			if err != nil {
-				return api.ExpressionEmission{}, err
-			}
-		} else {
-			guard, requests, guardErr :=
-				callable.NilGuard(context, targetCallee)
-			if guardErr != nil {
-				return api.ExpressionEmission{}, guardErr
-			}
-			before = append(before, guard)
-			guardRequests = requests
+		targetCallee, guardRequests, err =
+			callable.NilGuardExpression(
+				context,
+				targetCallee,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
 		}
 	}
 	call := context.Factory().CallExpression(
@@ -351,22 +343,19 @@ func emit(
 			target,
 		)
 	}
-	if provider, direct := calleeObject(
-		context.TypesInfo(),
-		source.Fun,
-	); direct {
+	if direct {
 		if detached {
 			return cooperativecall.DetachedSourceCall(
 				context,
 				source,
-				provider,
+				directFunction,
 				target,
 			)
 		}
 		target, err := cooperativecall.SourceCall(
 			context,
 			source,
-			provider,
+			directFunction,
 			target,
 		)
 		if err != nil || discarded || !providerBoundary {
