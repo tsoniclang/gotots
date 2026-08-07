@@ -97,6 +97,10 @@ export interface RuntimeValueOperations {
 
 const pointerDescriptors: Array<[Type, () => Type]> = [];
 
+let pointerTypeFactory:
+  | ((element: Type) => Type | undefined)
+  | undefined;
+
 // recordPointerDescriptor remembers one pointer-kind descriptor with its
 // lazy element thunk; the thunk is never called during registration so
 // forward descriptor references stay valid.
@@ -116,7 +120,19 @@ export function pointerDescriptorFor(element: Type): Type | undefined {
       return entry[0];
     }
   }
-  return undefined;
+  const created = pointerTypeFactory?.(element);
+  if (created !== undefined) {
+    pointerDescriptors.push([created, () => element]);
+  }
+  return created;
+}
+
+// bindRuntimePointerTypeFactory installs the canonical runtime-type owner for
+// pointer descriptors that are composed from a dynamically flowing Type.
+export function bindRuntimePointerTypeFactory(
+  factory: (element: Type) => Type | undefined,
+): void {
+  pointerTypeFactory = factory;
 }
 
 const operationsByType = new Map<Type, RuntimeValueOperations>();

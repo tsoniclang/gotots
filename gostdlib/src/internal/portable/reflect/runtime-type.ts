@@ -28,6 +28,7 @@ import {
 import { ProviderError } from "../../runtime/error.js";
 import {
   bindRuntimeTypeResolver,
+  bindRuntimePointerTypeFactory,
   recordPointerDescriptor,
 } from "./runtime-value.js";
 
@@ -68,7 +69,13 @@ export interface RuntimeTypeMetadata {
   readonly methods?: () => readonly RuntimeMethodMetadata[];
   readonly inputs?: () => readonly Type[];
   readonly outputs?: () => readonly Type[];
+  readonly methodTokens?: readonly object[];
+  readonly pointerMethodTokens?: readonly object[];
+  readonly pointerInheritsMethods?: bool;
 }
+
+const providerPointerSize: uint64 = 8n;
+const providerPointerAlign: int64 = 8n;
 
 const runtimeTypeDynamicType = Object.freeze({ comparable: true });
 const runtimeTypesByDynamicType = new Map<
@@ -80,13 +87,15 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   readonly $go$type = runtimeTypeDynamicType;
   readonly $go$methods: ReadonlySet<object>;
   readonly $go$formatString = true;
+  private readonly sourceMethodTokens: ReadonlySet<object>;
 
   constructor(
     private readonly metadata: RuntimeTypeMetadata,
-    methodTokens: readonly object[],
+    private readonly runtimeTypeContract: readonly object[],
   ) {
     super();
-    this.$go$methods = new Set(methodTokens);
+    this.$go$methods = new Set(runtimeTypeContract);
+    this.sourceMethodTokens = new Set(metadata.methodTokens ?? []);
   }
 
   $go$implements(contract: readonly object[]): boolean {
@@ -216,7 +225,15 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   }
 
   Implements(target: Type | undefined): bool {
-    return this.identical(target);
+    if (!(target instanceof RuntimeType) || target.metadata.kind !== 20n) {
+      return invalidTypeOperation(this.metadata.text, "Implements");
+    }
+    for (const token of target.sourceMethodTokens) {
+      if (!this.sourceMethodTokens.has(token)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   In(index: int64): Type | undefined { return sequenceAt(this.inputs(), index, "In"); }
@@ -313,6 +330,27 @@ export class RuntimeType extends GoInterfaceValue implements Type {
     return target instanceof RuntimeType &&
       this.metadata.identity === target.metadata.identity;
   }
+
+  pointerType(): Type {
+    const pointerMethods = this.metadata.pointerInheritsMethods
+      ? [
+          ...this.sourceMethodTokens,
+          ...(this.metadata.pointerMethodTokens ?? []),
+        ]
+      : [...(this.metadata.pointerMethodTokens ?? [])];
+    return new RuntimeType(
+      {
+        identity: `pointer(${this.metadata.identity})`,
+        kind: 22n,
+        text: `*${this.metadata.text}`,
+        size: providerPointerSize,
+        align: providerPointerAlign,
+        elem: () => this,
+        methodTokens: pointerMethods,
+      },
+      this.runtimeTypeContract,
+    );
+  }
 }
 
 export function createRuntimeType(
@@ -339,6 +377,10 @@ export function runtimeTypeOf(
 
 bindRuntimeTypeResolver((value: GoInterfaceValue): Type | undefined =>
   runtimeTypesByDynamicType.get(value.$go$type),
+);
+
+bindRuntimePointerTypeFactory((element: Type): Type | undefined =>
+  element instanceof RuntimeType ? element.pointerType() : undefined,
 );
 
 function materializeField(

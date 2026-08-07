@@ -317,6 +317,9 @@ ESM for:
 - `ValueOf`, nil/invalid/addressable/settable state, pointer `Elem`, fields,
   indexes, maps, scalar projections, mutation, zero, and interface recovery;
 - reflective map/slice/pointer construction and iterator behavior;
+- dynamic `PointerTo` composition with no source-level `*T`, canonical repeated
+  lookup, repeated pointer depth, and value-versus-pointer method-set
+  implementation checks;
 - open generic `TypeFor[T]` through exact private capability or
   concretization, with unchanged source value arity.
 
