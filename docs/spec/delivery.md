@@ -13,7 +13,7 @@ For each construct family:
 2. observe the focused test fail at the owning unsupported boundary;
 3. implement the highest shared semantic owner;
 4. delete any superseded path in the same change;
-5. prove canonical AST, finalized-fact totality, and exact source occurrences;
+5. prove canonical AST, finalized-fact totality, and exact-node ownership;
 6. run focused target-AST, strict, differential, and mutation proof;
 7. inspect canonical and executable artifacts and cost;
 8. run broader gates before checkpointing.
@@ -42,9 +42,10 @@ Install:
 - architecture walls.
 
 Exit: a minimal valid package prints canonical strict ESM only through pinned
-TS-Go; TSTS finalizes every selected marker fact and occurrence; the selected
-target produces strict executable output. A schema mutation, ambient
-build-profile drift, text emitter, spelling-selected marker, source reread, or
+TS-Go; TSTS finalizes every selected marker fact on its exact AST node; the
+selected target directly transforms the TS-Go-contract AST and produces strict
+executable output. A schema mutation, ambient build-profile drift, second
+parser, range join, text emitter, spelling-selected marker, source reread, or
 duplicate artifact owner fails.
 
 ## 1. Core Direct Emission

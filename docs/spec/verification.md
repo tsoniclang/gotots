@@ -8,7 +8,7 @@ Every construct family is test-first and closes through independent evidence:
 2. a focused test observed failing at the owning unsupported boundary;
 3. exact TS-Go AST shape assertions;
 4. strict canonical-source checking and total finalized marker facts;
-5. exact target-AST occurrence joins and target transformation assertions;
+5. exact-node target-AST transformation assertions;
 6. strict executable-target typechecking;
 7. Go-versus-target differential execution where executable;
 8. an independent structural/semantic comparison;
@@ -32,7 +32,7 @@ Every checkpoint runs, in dependency order:
 7. `go test -count=1 ./...`;
 8. race tests for materially concurrent compiler/runtime owners;
 9. representative TS-Go encode/print and strict canonical-source checks;
-10. TSTS fact totality and exact authored-occurrence joins;
+10. TSTS fact totality and exact AST-node ownership;
 11. selected-target AST transform and strict output checks;
 12. applicable differential/runtime and artifact-size gates.
 
@@ -88,19 +88,14 @@ Broad walls reject:
 
 ## Marker And Target Boundary Proof
 
-Every canonical marker occurrence exact-joins one finalized TSTS fact selected
-by provider declaration identity. The fact supplies one normalized source
-occurrence over the exact immutable checked document. Authored locations use
-UTF-16 code-unit offsets from the first authored token through an exclusive
-end; synthetic facts are explicitly non-authored.
-
-The selected target parses the supplied document text, indexes its own AST, and
-requires exactly one node with the occurrence range and fact-specific expected
-syntax kind. Tests cover nested calls, multiple calls on one line, comments,
-multiline syntax, CRLF, BMP and non-BMP text, overlays, synthetic facts, and
-zero/duplicate/wrong-kind failures. Mutations shift either endpoint, change the
-kind, reread different filesystem bytes, classify a local same-spelled call, or
-omit one selected fact; each must fail at its sole owner.
+Every canonical marker occurrence owns one finalized TSTS fact selected by
+provider declaration identity and keyed to the exact node in the checked
+TS-Go-contract AST. The selected target transforms that same AST; it never
+builds or joins a second tree. Tests cover nested calls, multiple calls on one
+line, comments, multiline syntax, CRLF, BMP and non-BMP text, overlays, and
+synthetic nodes. Mutations substitute a different node, duplicate or omit one
+selected fact, classify a local same-spelled call, reparse source, or introduce
+a range join; each must fail at its sole owner.
 
 For typed pointers, focused proof covers `addressOf`, `allocatePointer`,
 `loadPointer`, and `storePointer`; nil, alias identity, mutation through two

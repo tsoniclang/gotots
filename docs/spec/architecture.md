@@ -22,17 +22,18 @@ Canonical output is consumed through a separate exact target boundary:
 
 ```text
 immutable canonical text
-    -> TSTS finalized semantic facts and normalized authored occurrences
-    -> target-owned parser and AST
-    -> exact occurrence join by document + UTF-16 range + syntax kind
-    -> target-owned transformation, printer, and runtime
+    -> TSTS checking, TS-Go-contract AST, and finalized facts on exact nodes
+    -> target-owned transformation of that same TS-Go-contract AST
+    -> stable printer boundary and target runtime
 ```
 
 The target boundary is not a second Go semantic model. TSTS selects marker
 facts by canonical declaration identity. Targets consume those facts and must
-not recognize marker spelling, scan source text, reread files, or re-enter the
-checker. The first TypeScript target uses the `typescript` package's parser,
-factory, transformer, and printer; it does not depend on a TSTS printer API.
+not recognize marker spelling, scan source text, join source ranges, reparse,
+reread files, or re-enter the checker. The first TypeScript target transforms
+the checked TS-Go-contract AST directly. Bootstrap printing uses the pinned
+TS-Go decoder/factory/printer through a framed adapter; a later TSTS-native
+printer may replace that adapter without changing target semantics.
 
 Handlers may inspect the current Go node, its ancestors, the selected package
 graph, and existing checker evidence. They may create typed TS-Go AST nodes and
@@ -64,8 +65,9 @@ rerun the checker.
 | provider/generated conversion | generated static facade for the selected Go callable or type |
 | target AST shape and ordering | pinned TS-Go schema and generated protocol bindings |
 | target-neutral marker identity and fact meaning | shared Tsonic/TSTS contract |
-| exact checked source snapshot and authored occurrence | finalized TSTS source program |
-| executable representation, target AST, printing, and target runtime | selected target |
+| exact checked source snapshot, AST node, and marker fact | finalized TSTS source program |
+| executable representation, target AST transformation, and target runtime | selected target |
+| bootstrap TypeScript printing | pinned TS-Go printer adapter |
 
 One fact may have many references but one producer. A second workaround in the
 same semantic class reopens its owner.

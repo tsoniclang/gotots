@@ -72,11 +72,12 @@ IR, operation graph, whole-program plan, handwritten target tree, local
 formatter, or target-text fallback inside GoToTS.
 
 Target lowering is a separate compilation boundary, not a hidden GoToTS IR.
-TSTS checks the exact immutable canonical text and finalizes typed marker facts
-with authored occurrences. A target parses that supplied text into its own AST,
-exact-joins each fact by document, UTF-16 token range, and expected syntax kind,
-then transforms and prints target code. It must not reread files, recognize
-marker spellings, re-enter the checker, or infer Go meaning.
+TSTS checks the exact immutable canonical text, retains its TS-Go-contract AST,
+and finalizes typed marker facts on exact AST nodes. A target transforms that
+same AST and submits the result to the stable printer boundary. It must not
+reparse, join source ranges, reread files, recognize marker spellings, re-enter
+the checker, or infer Go meaning. Bootstrap printing uses pinned TS-Go; a later
+TSTS-native printer may replace it without changing target semantics.
 
 This does not prohibit ordinary compiler coordination. Deterministic names,
 scope builders, imports, target declaration assemblies, diagnostics, references

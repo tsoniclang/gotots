@@ -38,10 +38,11 @@ calls selected from `@tsonic/core` by exact declaration identity. Those marker
 contracts are shared Tsonic authority, not copied GoToTS declarations.
 
 Executable target code is a separate consumer artifact. TSTS checks the exact
-immutable canonical source and finalizes marker facts and authored source
-occurrences. A selected target consumes those facts without spelling lookup or
-checker re-entry. GoToTS does not import a target plugin or target runtime, and
-the target does not reinterpret Go source.
+immutable canonical source, retains its TS-Go-contract AST, and finalizes
+marker facts on exact AST nodes. A selected target transforms that same AST
+without spelling lookup, source-range joining, reparsing, or checker re-entry.
+GoToTS does not import a target plugin or target runtime, and the target does
+not reinterpret Go source.
 
 The compilation architecture is deliberately direct:
 
@@ -53,8 +54,9 @@ selected Go packages
     -> pinned TS-Go printNode using its real decoder/factory/printer
     -> canonical strict ESM Tsonic-flavored TypeScript
 
-canonical source plus finalized TSTS facts and exact source occurrences
-    -> selected target-owned AST lowering
+canonical TS-Go AST plus finalized TSTS facts on exact nodes
+    -> selected target-owned TS-Go AST transformation
+    -> pinned TS-Go bootstrap printer, later replaceable by TSTS printing
     -> executable target artifact
 ```
 
