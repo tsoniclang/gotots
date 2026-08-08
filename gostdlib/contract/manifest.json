@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "77bcc254ceb9691cde29ef622e737e10ac07239c98cc3ce1ea555c2cba893645",
+  "providerDigest": "db9607d3c6b53bf0bc7758667ca272e80056e8cdd8b1e8b8c3acbafc5f37aefc",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -9193,7 +9193,7 @@
           "targetFingerprint": "2e7497c92fa1105364cb0f5119df74a2a4f506aceddd44e650ef267075d62972",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/regexp/regexp.ts#Regexp@181"
+            "src/internal/portable/regexp/regexp.ts#Regexp@210"
           ]
         },
         {
@@ -9209,10 +9209,10 @@
           "targetFingerprint": "5f227b6f8758ff8e5bd2d0c2a28f5ce36ffd2d05da4da983554c12e97c70f45e",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/regexp/regexp.ts#requireRegexp@1679"
+            "src/internal/portable/regexp/regexp.ts#requireRegexp@1786"
           ],
           "implementationSites": [
-            "src/internal/portable/regexp/regexp.ts#FindStringSubmatch@324"
+            "src/internal/portable/regexp/regexp.ts#FindStringSubmatch@391"
           ]
         },
         {
@@ -9228,10 +9228,10 @@
           "targetFingerprint": "07317af8a923c94fa30c80c6ba3cc14fdf3713bbfe1f27b30647ea34b61636d1",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/regexp/regexp.ts#requireRegexp@1679"
+            "src/internal/portable/regexp/regexp.ts#requireRegexp@1786"
           ],
           "implementationSites": [
-            "src/internal/portable/regexp/regexp.ts#MatchString@423"
+            "src/internal/portable/regexp/regexp.ts#MatchString@490"
           ]
         },
         {
@@ -9247,10 +9247,10 @@
           "targetFingerprint": "786195a1003824f4ec011ae2f5d7835bd99b8f925e53472c8f0ad604e735fe1d",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/regexp/regexp.ts#requireRegexp@1679"
+            "src/internal/portable/regexp/regexp.ts#requireRegexp@1786"
           ],
           "implementationSites": [
-            "src/internal/portable/regexp/regexp.ts#ReplaceAllString@459"
+            "src/internal/portable/regexp/regexp.ts#ReplaceAllString@526"
           ]
         },
         {
@@ -9272,10 +9272,10 @@
           "targetFingerprint": "de173efb7e7e08ff7a90831b359a1694499ac7ff9bffeede3d0471cb0716f816",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/regexp/regexp.ts#requireRegexp@1679"
+            "src/internal/portable/regexp/regexp.ts#requireRegexp@1786"
           ],
           "implementationSites": [
-            "src/internal/portable/regexp/regexp.ts#ReplaceAllStringFunc@512"
+            "src/internal/portable/regexp/regexp.ts#ReplaceAllStringFunc@579"
           ]
         },
         {
@@ -9292,10 +9292,10 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/host-integer.ts#integerFromHost@69",
-            "src/internal/portable/regexp/regexp.ts#requireRegexp@1679"
+            "src/internal/portable/regexp/regexp.ts#requireRegexp@1786"
           ],
           "implementationSites": [
-            "src/internal/portable/regexp/regexp.ts#Split@618"
+            "src/internal/portable/regexp/regexp.ts#Split@685"
           ]
         },
         {
@@ -9311,12 +9311,12 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/regexp/regexp.ts#createRegexp@131",
-            "src/internal/portable/regexp/regexp.ts#regexpErrorMessage@2055",
+            "src/internal/portable/regexp/regexp.ts#regexpErrorMessage@2162",
             "src/internal/portable/regexp/syntax.ts#translatePattern@57",
             "src/internal/runtime/error.ts#ProviderError@16"
           ],
           "implementationSites": [
-            "src/internal/portable/regexp/regexp.ts#Compile@1552"
+            "src/internal/portable/regexp/regexp.ts#Compile@1659"
           ]
         },
         {
@@ -9331,10 +9331,10 @@
           "targetFingerprint": "55a61b319d6bcd58ec38ae9d49e54d9aaefaec468df197ead01c40d56fd1e6ca",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/regexp/regexp.ts#Compile@1552"
+            "src/internal/portable/regexp/regexp.ts#Compile@1659"
           ],
           "implementationSites": [
-            "src/internal/portable/regexp/regexp.ts#MustCompile@1622"
+            "src/internal/portable/regexp/regexp.ts#MustCompile@1729"
           ]
         }
       ]
@@ -24838,7 +24838,7 @@
           ],
           "canonicalResults": null,
           "implementationSites": [
-            "src/internal/portable/regexp/regexp.ts#RegexpReplaceAllStringFuncCanonical@144"
+            "src/internal/portable/regexp/regexp.ts#RegexpReplaceAllStringFuncCanonical@173"
           ],
           "callableParameters": [
             {
@@ -24851,7 +24851,22 @@
           "targetFingerprint": "1429c9f4ddc46e45743c4aecfd07bced3ab655da1c64ffed4dc1dc3e0f9fb425"
         }
       ],
-      "facets": []
+      "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "regexp|kind=2|receiver=|name=Regexp",
+          "capabilities": [
+            "assign",
+            "copy"
+          ],
+          "export": "RegexpValueOperations",
+          "implementationOwner": "src/internal/facets/provider-regexp.ts",
+          "targetFingerprint": "1af1abf98027d6452f0aa4347b7cf4ce65cf537c4c1e02293c0d9ba8ada51f93",
+          "implementationSites": [
+            "src/internal/facets/provider-regexp.ts#RegexpValueOperations@26"
+          ]
+        }
+      ]
     },
     {
       "specifier": "@gotots/gostdlib/internal/facets/provider-runtime-pprof.js",
@@ -27823,6 +27838,14 @@
         "src/internal/facets/provider-context.ts#ContextWithCancelCanonical@1274",
         "src/internal/node/os/signal/notify.ts#selectedSignalsAsync@660",
         "src/internal/node/os/signal/notify.ts#startNotificationAsync@337"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-regexp.ts#RegexpValueOperations@26",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/regexp/regexp.ts#regexpRepresentationAssign@1637",
+        "src/internal/portable/regexp/regexp.ts#regexpRepresentationCopy@1619"
       ]
     },
     {
@@ -30953,7 +30976,15 @@
       ]
     },
     {
-      "identity": "src/internal/portable/regexp/regexp.ts#RegexpReplaceAllStringFuncCanonical@144",
+      "identity": "src/internal/portable/regexp/regexp.ts#RegexpReplaceAllStringFuncCanonical@173",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/regexp/regexp.ts#assignRegexpRepresentation@157",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/regexp/regexp.ts#copyRegexpRepresentation@144",
       "disposition": "implemented"
     },
     {
@@ -30961,14 +30992,28 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/regexp/regexp.ts#regexpErrorMessage@2055",
+      "identity": "src/internal/portable/regexp/regexp.ts#regexpErrorMessage@2162",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/utf8/codec.ts#fromHostString@934"
       ]
     },
     {
-      "identity": "src/internal/portable/regexp/regexp.ts#requireRegexp@1679",
+      "identity": "src/internal/portable/regexp/regexp.ts#regexpRepresentationAssign@1637",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/regexp/regexp.ts#assignRegexpRepresentation@157"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/regexp/regexp.ts#regexpRepresentationCopy@1619",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/regexp/regexp.ts#copyRegexpRepresentation@144"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/regexp/regexp.ts#requireRegexp@1786",
       "disposition": "implemented"
     },
     {
@@ -34441,5 +34486,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "ba9238fc2fd308ac3f1b6b92eeb4b6cdafaf84a7aa498807af98b97f9cd93cfb"
+  "manifestDigest": "f348a6c75261e7b9053fa2928367c903341efda7c3920c02b14ae97dba591d35"
 }

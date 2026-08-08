@@ -11,6 +11,7 @@ func TestReflectProviderStructAssignmentCanonicalizesWithNativeEvidence(t *testi
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -95,8 +96,14 @@ func ProviderAssignments() string {
 	timerActiveTargetStopped, timerActiveTargetPanicked := stopTimer(timerActiveTarget)
 	timerSourceStopped, timerSourcePanicked := stopTimer(timerSource)
 
+	regexpSource := regexp.MustCompile("^source$")
+	regexpTarget := regexp.MustCompile("^target$")
+	*regexpTarget = *regexpSource
+	regexpAssigned := regexpTarget.MatchString("source") &&
+		!regexpTarget.MatchString("target")
+
 	return fmt.Sprintf(
-		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t",
+		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t regexp=%t",
 		parseTarget.Layout,
 		parseTarget.Value,
 		parseTarget.LayoutElem,
@@ -115,6 +122,7 @@ func ProviderAssignments() string {
 		timerActiveTargetPanicked,
 		timerSourceStopped,
 		timerSourcePanicked,
+		regexpAssigned,
 	)
 }
 `
@@ -146,6 +154,7 @@ func main() {
 				"TimeTimerOperations.$copy",
 				"SyncMutexOperations.$copy",
 				"StringsBuilderOperations.$copy",
+				"RegexpValueOperations.$assign",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					relevant := make([]string, 0)

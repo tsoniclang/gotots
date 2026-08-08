@@ -39,6 +39,8 @@ type ReplacementPlan = {
 };
 
 let createRegexp: (pattern: CompiledPattern) => Regexp;
+let copyRegexpRepresentation: (source: Regexp) => Regexp;
+let assignRegexpRepresentation: (target: Regexp, source: Regexp) => void;
 let replaceAllStringFuncCooperative: (
   receiver: Regexp | undefined,
   source: gostring,
@@ -46,7 +48,7 @@ let replaceAllStringFuncCooperative: (
 ) => Promise<gostring>;
 
 export class Regexp {
-  readonly #pattern: CompiledPattern;
+  #pattern: CompiledPattern;
 
   private constructor(pattern: CompiledPattern) {
     this.#pattern = pattern;
@@ -54,6 +56,10 @@ export class Regexp {
 
   static {
     createRegexp = (pattern: CompiledPattern): Regexp => new Regexp(pattern);
+    copyRegexpRepresentation = (source): Regexp => new Regexp(source.#pattern);
+    assignRegexpRepresentation = (target, source): void => {
+      target.#pattern = source.#pattern;
+    };
     replaceAllStringFuncCooperative = async (
       receiver,
       source,
@@ -257,6 +263,14 @@ export class Regexp {
 }
 
 export { replaceAllStringFuncCooperative as ReplaceAllStringFuncCooperative };
+
+export function regexpRepresentationCopy(source: Regexp): Regexp {
+  return copyRegexpRepresentation(source);
+}
+
+export function regexpRepresentationAssign(target: Regexp, source: Regexp): void {
+  assignRegexpRepresentation(target, source);
+}
 
 export function Compile(expression: gostring): [Regexp | undefined, GoError | undefined] {
   try {

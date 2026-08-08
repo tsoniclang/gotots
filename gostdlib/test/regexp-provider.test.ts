@@ -7,6 +7,7 @@ import {
   MustCompile,
   Regexp,
 } from "../src/regexp.js";
+import { RegexpValueOperations } from "../src/internal/facets/provider-regexp.js";
 import { sliceValues } from "../src/internal/runtime/slice.js";
 
 test("regexp compiles selected RE2 forms and returns submatches", () => {
@@ -54,6 +55,20 @@ test("regexp Split and compile failures follow Go result shapes", () => {
   assert.equal(regexp, undefined);
   assert.notEqual(failure, undefined);
   assert.throws(() => MustCompile("("));
+});
+
+test("regexp value operations preserve independent Go assignment targets", () => {
+  const source = MustCompile("^source$");
+  const target = MustCompile("^target$");
+  const copied = RegexpValueOperations.$copy(source);
+
+  RegexpValueOperations.$assign(target, source);
+
+  assert.notEqual(copied, source);
+  assert.notEqual(target, source);
+  assert.equal(Regexp.MatchString(copied, "source"), true);
+  assert.equal(Regexp.MatchString(target, "source"), true);
+  assert.equal(Regexp.MatchString(target, "target"), false);
 });
 
 function goText(value: string): string {

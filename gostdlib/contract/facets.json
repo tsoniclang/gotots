@@ -1951,6 +1951,17 @@
     },
     {
       "kind": "named-struct-operations",
+      "sourceIdentity": "regexp|kind=2|receiver=|name=Regexp",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-regexp.js",
+      "sourcePath": "src/internal/facets/provider-regexp.ts",
+      "export": "RegexpValueOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
       "sourceIdentity": "reflect|kind=2|receiver=|name=MapIter",
       "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
       "sourcePath": "src/internal/facets/named-reflect.ts",
