@@ -105,6 +105,15 @@ func projectProviderSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, true, false, err
 	}
+	providerType, err = providerSliceElementStorageType(
+		providerContext,
+		children,
+		element,
+		providerType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, false, err
+	}
 	fromProvider, fromChanged, err := providerSliceElementConversion(
 		context,
 		providerContext,
@@ -218,6 +227,35 @@ func projectProviderSlice(
 		),
 	)
 	return target, true, err == nil, err
+}
+
+func providerSliceElementStorageType(
+	context api.Context,
+	children api.ChildEmitter,
+	element types.Type,
+	defaultType api.TypeEmission,
+) (api.TypeEmission, error) {
+	pointer, ok := types.Unalias(element).(*types.Pointer)
+	if !ok || !directProviderPointerObject(pointer.Elem()) {
+		return defaultType, nil
+	}
+	direct, err := children.RepresentedType(
+		context.WithRole(api.RoleSliceElementType),
+		nil,
+		pointer.Elem(),
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return api.DirectType(
+		context.Factory().UnionTypeNode([]tsgo.TypeNode{
+			direct.Value(),
+			context.Factory().KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+			),
+		}),
+		direct.Requests()...,
+	), nil
 }
 
 func providerSliceElementConversion(

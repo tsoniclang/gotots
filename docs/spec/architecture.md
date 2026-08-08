@@ -1173,25 +1173,31 @@ state, initializer, compatibility wrapper, or fallback for the selected
 package may survive. References keep the ordinary package assembly path and
 source-facing contract.
 
-Replacement uses two isolated compilation sessions, not a filter over an
-assembled file list and not rollback within one mutable graph. The first
-session settles the ordinary canonical program solely for certification. It
-captures the complete ordinary target set plus immutable observable contracts
-for selected-package source artifacts; the implementation facet, dependency
-edges, declaration requirements, builders, registries, and scheduler state are
-not transferable. That session is then discarded.
+Replacement uses two compilation sessions, not a filter over an assembled file
+list and not rollback within one mutable graph. The first session settles the
+ordinary canonical program solely for certification. It captures the complete
+ordinary target set, immutable observable contracts for selected-package
+source artifacts, and each contract artifact's exact outgoing support
+requirements and observable dependency edges. The deterministic name and
+generated-support identity registry is transferred as the one identity owner
+from the completed first session to the final session. The sessions never use
+it concurrently. Artifact revisions, liveness, builders, placement, requirement
+scheduler state, and emitted declarations are not transferable. The first
+session's remaining state is then discarded.
 
-A fresh final session starts with empty naming, artifact, requirement,
-representation, and target-builder state. When a final consumer requests a
+A fresh final session starts with empty artifact, liveness, requirement,
+representation, placement, and target-builder state after taking ownership of
+the one canonical name/support-identity registry. When a final consumer requests a
 selected-package source artifact, the source owner publishes the captured
-observable contract with no body, storage, initializer, class contribution,
-dependency, or target declaration. Selected-package source code is never
-traversed for body translation in this session. The shared checked program may
-be read only to index top-level declaration identity, reserve canonical names,
-and locate a captured source owner; none of those operations emits a request or
-representation. Therefore only demands originating in the final graph can
-create shared support artifacts. All selected source-implementation bundles
-form one replacement transaction. After final quiescence, every public
+observable contract with no body, storage, initializer, class contribution, or
+target declaration and reinstalls only that contract's captured outgoing
+support requirements and observable dependency edges. Selected-package source
+code is never traversed for body translation in this session. The shared
+checked program may be read only to index top-level declaration identity and
+locate a captured source owner; neither operation emits a request or
+representation. Therefore only requirements consumed by the final graph can
+materialize shared support artifacts. All selected source-implementation
+bundles form one replacement transaction. After final quiescence, every public
 consumer is rebound while the complete final file set still consists only of
 compiler-owned, inspectable TS-Go ASTs. Only after every bundle has been
 rebound may the compiler remove all selected generated package module sets and
@@ -1200,12 +1206,15 @@ rebinding another is forbidden: an authored official source file is an output
 artifact, not input to a later compiler transformation. The first session's
 ordinary target set remains certification evidence. For example, `ErrOverflow` retains its
 exact value contract without generated storage, while a private `worker`
-reflection descriptor requested only by the discarded ordinary implementation
-cannot enter the final graph. A genuine final consumer of a private type must
-be satisfied by an exact body-free private contract module. Sharing either
-session's mutable state, late import deletion, output-path filtering as
-liveness, same-session withdrawal, and private generated runtime shims are
-forbidden.
+reflection descriptor requested only by a Go body cannot enter the contract
+session or the final graph. A genuine final consumer of a private type must
+be satisfied by an exact body-free private contract module. Transferring either
+session's artifact or liveness state, late import deletion, output-path
+filtering as liveness, same-session withdrawal, and private generated runtime
+shims are forbidden. The transferred registry may retain canonical interned
+contract facts but cannot schedule or materialize output; the final requirement
+scheduler is the sole liveness owner. Sharing either artifact graph, scheduler,
+builder, liveness ledger, or emitted declaration is forbidden.
 
 For callable exports, the surface join is signature-exact rather than
 name-only. GoToTS preserves the selected Go signature in ordinary canonical

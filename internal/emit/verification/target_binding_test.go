@@ -366,3 +366,45 @@ func EmptyHolder() Holder {
 	}
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }
+
+func TestNestedGenericPointerFieldAddressUsesCanonicalStorage(t *testing.T) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/nestedaddress\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package nestedaddress
+
+type Inner[T any] struct { Value T }
+type Outer[T any] struct { Inner *Inner[T] }
+
+func Store(outer *Outer[int], value int) int {
+	location := &outer.Inner.Value
+	*location = value
+	return outer.Inner.Value
+}
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: project,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := emit.NewRoot(program.Roots()[0].Types().Scope().Lookup("Store"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(program, []emit.Root{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	if !strings.Contains(artifacts.printed, "Inner.$storageOf") ||
+		!strings.Contains(artifacts.printed, "Outer.$storageOf") {
+		t.Fatalf("nested pointer field address bypassed canonical storage:\n%s", artifacts.printed)
+	}
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+}

@@ -1048,16 +1048,17 @@ implementation set. Translation handlers never branch on import path,
 package/function spelling, source location, or product identity.
 
 The ordinary generated snapshot is certification evidence, not final
-ownership. It is produced in an isolated session. The fresh final session may
-read only immutable selected-package observable contracts from that snapshot;
-it cannot read the ordinary session's implementation facets, dependencies,
-requirements, registries, builders, or generated declarations. For example,
-if an unexported `worker` type causes the ordinary implementation to request a
-shared reflection adapter, that adapter disappears with the ordinary session.
-It is not reconstructed in the final session unless a genuine final consumer
-requests the private type. Such a consumer requires an exact body-free private
-contract module; a private value dependency remains an error. The final
-session never emits a selected-package body and never attempts to infer
+ownership. It is produced in a contract-only first session for every selected
+package. The final session takes sole ownership of the deterministic canonical
+name and generated-support identity registry, plus each selected source
+artifact's immutable observable contract, outgoing support requirements, and
+observable dependency edges. It cannot read an implementation facet, builder, placement,
+artifact revision, liveness ledger, scheduler queue, or generated declaration
+from the first session. For example, an unexported `worker` used only by the Go
+body cannot create a requirement because selected bodies are not traversed in
+the contract session. A genuine final consumer of a private type requires an
+exact body-free private contract module; a private value dependency remains an
+error. The final session never emits a selected-package body and never infers
 liveness by retracting already-emitted output.
 
 Generated value support that is part of an exported declaration's observable

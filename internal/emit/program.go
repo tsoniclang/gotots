@@ -73,7 +73,7 @@ type programSession struct {
 	sourceImplementations         *sourceimplementation.Certificate
 	externalFunctions             map[*types.Func]ExternalFunctionObligation
 	externalFunctionBindings      map[*types.Func]api.ExternalFunctionTarget
-	sourceImplementationContracts map[api.ArtifactOwner]artifactstate.Contract
+	sourceImplementationContracts map[api.ArtifactOwner]sourceImplementationContract
 	sourceImplementationTargets   []sourceimplementation.Target
 	sealed                        bool
 }
@@ -147,7 +147,11 @@ func CompileWithOptions(
 		if captureErr != nil {
 			return ProgramEmission{}, captureErr
 		}
-		session, err = newProgramSession(source, options)
+		session, err = newProgramSessionWithRegistry(
+			source,
+			options,
+			inputs.registry,
+		)
 		if err != nil {
 			return ProgramEmission{}, err
 		}
@@ -270,6 +274,14 @@ func newProgramSession(
 	source *load.Program,
 	options Options,
 ) (*programSession, error) {
+	return newProgramSessionWithRegistry(source, options, nil)
+}
+
+func newProgramSessionWithRegistry(
+	source *load.Program,
+	options Options,
+	registry *emitnaming.Registry,
+) (*programSession, error) {
 	scalar, err := programScalarABI(source, options.IntegerRepresentation)
 	if err != nil {
 		return nil, err
@@ -295,14 +307,16 @@ func newProgramSession(
 	if err != nil {
 		return nil, err
 	}
-	registry := emitnaming.NewRegistry()
-	if err := registry.IndexCompilationTargets(
-		source.Packages(),
-		source.EnvironmentPackages(),
-		options.StandardLibrary,
-		externalModules,
-	); err != nil {
-		return nil, err
+	if registry == nil {
+		registry = emitnaming.NewRegistry()
+		if err := registry.IndexCompilationTargets(
+			source.Packages(),
+			source.EnvironmentPackages(),
+			options.StandardLibrary,
+			externalModules,
+		); err != nil {
+			return nil, err
+		}
 	}
 	goRuntime, err := gocontract.Resolve(source)
 	if err != nil {

@@ -383,3 +383,31 @@ func (g *Graph) ExportedBindings(
 	}
 	return record.contract.ExportedBindings()
 }
+
+func (g *Graph) Dependencies(
+	owner api.ArtifactOwner,
+) ([]api.ArtifactDependency, bool) {
+	record := g.records[owner]
+	if record == nil {
+		return nil, false
+	}
+	dependencies := make(
+		[]api.ArtifactDependency,
+		0,
+		len(record.dependencies),
+	)
+	for dependency := range record.dependencies {
+		dependencies = append(dependencies, dependency)
+	}
+	sort.Slice(dependencies, func(left, right int) bool {
+		order := g.compare(
+			dependencies[left].Provider(),
+			dependencies[right].Provider(),
+		)
+		if order != 0 {
+			return order < 0
+		}
+		return dependencies[left].Facet() < dependencies[right].Facet()
+	})
+	return dependencies, true
+}

@@ -11,7 +11,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -125,12 +124,61 @@ export function Sum(value: string): number { return value.length; }
 	}
 	options := DefaultOptions()
 	options.SourceImplementations = certificate
+	contractSession, err := newProgramSession(program, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputs, err := captureSourceImplementationInputs(contractSession, roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fastPackage := program.PackageByPath("example.test/app/fast")
+	readerOwner := api.MustSourceArtifactOwner(
+		fastPackage.Types().Scope().Lookup("Reader"),
+	)
+	readerContract, ok := inputs.contracts[readerOwner]
+	if !ok {
+		t.Fatal("source implementation Reader contract is absent")
+	}
+	hasMethodToken := false
+	for _, requirement := range readerContract.requirements {
+		if requirement.Kind() == api.DeclarationRequirementInterfaceMethodToken {
+			hasMethodToken = true
+			break
+		}
+	}
+	if !hasMethodToken {
+		t.Fatal("source implementation Reader discarded its method-token requirement")
+	}
+	mutatedContracts := make(
+		map[api.ArtifactOwner]sourceImplementationContract,
+		len(inputs.contracts),
+	)
+	for owner, contract := range inputs.contracts {
+		mutatedContracts[owner] = contract
+	}
+	readerContract.requirements = nil
+	mutatedContracts[readerOwner] = readerContract
+	mutationSession, err := newProgramSessionWithRegistry(
+		program,
+		options,
+		inputs.registry,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutationSession.sourceImplementationContracts = mutatedContracts
+	mutationSession.sourceImplementationTargets = inputs.targets
+	if _, err := compileProgramSession(mutationSession, roots, options); err == nil ||
+		!strings.Contains(err.Error(), "dependency provider was not published") {
+		t.Fatalf("dropped source-implementation support mutation error = %v", err)
+	}
 	missingContractSession, err := newProgramSession(program, options)
 	if err != nil {
 		t.Fatal(err)
 	}
 	missingContractSession.sourceImplementationContracts =
-		make(map[api.ArtifactOwner]artifactstate.Contract)
+		make(map[api.ArtifactOwner]sourceImplementationContract)
 	if err := missingContractSession.requireProgramRoots(roots); err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +190,6 @@ export function Sum(value: string): number { return value.length; }
 	if err != nil {
 		t.Fatal(err)
 	}
-	fastPackage := program.PackageByPath("example.test/app/fast")
 	assemblyPath, err := output.PackageAssemblyPath(fastPackage)
 	if err != nil {
 		t.Fatal(err)

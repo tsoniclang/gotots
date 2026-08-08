@@ -25,8 +25,15 @@ func sourceImplementationForPackage(
 }
 
 type sourceImplementationInputs struct {
-	contracts map[api.ArtifactOwner]artifactstate.Contract
+	contracts map[api.ArtifactOwner]sourceImplementationContract
 	targets   []sourceimplementation.Target
+	registry  *emitnaming.Registry
+}
+
+type sourceImplementationContract struct {
+	contract     artifactstate.Contract
+	dependencies []api.ArtifactDependency
+	requirements []api.DeclarationRequirement
 }
 
 func captureSourceImplementationInputs(
@@ -59,14 +66,18 @@ func captureSourceImplementationInputs(
 	if err != nil {
 		return sourceImplementationInputs{}, err
 	}
-	return sourceImplementationInputs{contracts: contracts, targets: targets}, nil
+	return sourceImplementationInputs{
+		contracts: contracts,
+		targets:   targets,
+		registry:  session.registry,
+	}, nil
 }
 
 func (s *programSession) captureSourceImplementationContracts() (
-	map[api.ArtifactOwner]artifactstate.Contract,
+	map[api.ArtifactOwner]sourceImplementationContract,
 	error,
 ) {
-	result := make(map[api.ArtifactOwner]artifactstate.Contract)
+	result := make(map[api.ArtifactOwner]sourceImplementationContract)
 	for _, owner := range s.artifacts.Owners() {
 		object, sourceOwned := owner.Source()
 		if !sourceOwned || object.Pkg() == nil {
@@ -83,7 +94,18 @@ func (s *programSession) captureSourceImplementationContracts() (
 		if err != nil {
 			return nil, err
 		}
-		result[owner] = contract
+		dependencies, exists := s.artifacts.Dependencies(owner)
+		if !exists {
+			return nil, &ScheduleError{
+				Object: owner.Name(),
+				Reason: "source-implementation artifact dependencies are absent",
+			}
+		}
+		result[owner] = sourceImplementationContract{
+			contract:     contract,
+			dependencies: dependencies,
+			requirements: s.requirements.consumedBy(owner),
+		}
 	}
 	for _, implementation := range s.sourceImplementations.Implementations() {
 		sourcePackage := s.source.PackageByPath(implementation.PackagePath())
@@ -199,7 +221,17 @@ func (s *programSession) emitSourceImplementationContract(
 			Reason: "source-implementation observable contract is absent",
 		}
 	}
-	if err := s.commitArtifactRevision(owner, contract, nil, nil); err != nil {
+	for _, dependency := range contract.dependencies {
+		if err := s.prepareArtifactDependency(dependency); err != nil {
+			return true, err
+		}
+	}
+	if err := s.commitArtifactRevision(
+		owner,
+		contract.contract,
+		contract.dependencies,
+		contract.requirements,
+	); err != nil {
 		return true, err
 	}
 	if _, variable := object.(*types.Var); variable {

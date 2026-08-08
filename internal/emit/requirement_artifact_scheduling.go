@@ -244,6 +244,22 @@ func (s *declarationRequirementScheduler) appliedFor(
 	return requirements
 }
 
+func (s *declarationRequirementScheduler) consumedBy(
+	owner api.ArtifactOwner,
+) []api.DeclarationRequirement {
+	selected := s.byConsumer[owner]
+	requirements := make(
+		[]api.DeclarationRequirement,
+		0,
+		len(selected),
+	)
+	for requirement := range selected {
+		requirements = append(requirements, requirement)
+	}
+	sortDeclarationRequirements(requirements)
+	return requirements
+}
+
 func (s *declarationRequirementScheduler) replace(
 	consumer api.ArtifactOwner,
 	requirements []api.DeclarationRequirement,

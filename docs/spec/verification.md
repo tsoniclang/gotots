@@ -826,11 +826,13 @@ rebinds both consumer sets, removes both generated package module sets, and
 installs both authored assemblies. A mutation that installs the first authored
 official AST before rebinding the second must fail the lifecycle gate; the
 compiler may never traverse an authored output artifact as transformation
-input. Required mutations share a registry or artifact graph across
-sessions, copy an implementation facet or dependency into the final snapshot,
-emit one selected-package source body, omit a demanded observable contract,
-retain one ordinary generated support declaration, or install replacement only
-after final assembly. Each fails at the lifecycle, contract,
+input. Required mutations replace the canonical identity registry between
+sessions, share an artifact graph, copy an implementation facet or
+non-observable dependency into the final snapshot, drop one captured outgoing
+support requirement, emit one selected-package source body, omit a demanded
+observable contract, retain one unrequested ordinary generated support
+declaration, or install replacement only after final assembly. Each fails at
+the lifecycle, contract,
 final-membership, private-value, or strict-consumer gate with the exact owner.
 The fixture includes a cross-package assertion against an exported interface:
 the ordinary and installed assemblies must both export the interface type,

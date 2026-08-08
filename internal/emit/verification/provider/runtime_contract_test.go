@@ -379,6 +379,30 @@ console.log(allocation + "|" + latinOffset + "|" + name);
 	)
 }
 
+func TestProviderVariadicSliceProjectsDirectNamedPointers(t *testing.T) {
+	program := loadProviderRuntimeProgram(t)
+	root := mustProviderRoot(
+		t,
+		program.Roots()[0].Types().Scope().Lookup("UnicodeDecimal"),
+	)
+	options := emit.DefaultOptions()
+	options.StandardLibrary = linkedProviderCertificate(t)
+	emission, err := emit.CompileWithOptions(program, []emit.Root{root}, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	rootSource := readProviderRuntimeRootSource(t, emission, workingDirectory)
+	if !strings.Contains(
+		rootSource,
+		"RuntimeSliceProjection<Pointer<unicode__from_gostdlib.RangeTable> | undefined, unicode__from_gostdlib.RangeTable | undefined>",
+	) {
+		t.Fatalf("provider named-pointer slice element retained the product pointer carrier:\n%s", rootSource)
+	}
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+}
+
 func loadProviderRuntimeProgram(t *testing.T) *load.Program {
 	t.Helper()
 	project := t.TempDir()
@@ -432,6 +456,10 @@ func ProviderStructFields() (uint64, int, string) {
 	descriptions := metrics.All()
 	descriptions[0].Name = "changed"
 	return stats.Alloc, table.LatinOffset, descriptions[0].Name
+}
+
+func UnicodeDecimal(value rune) bool {
+	return unicode.In(value, unicode.Nd)
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{

@@ -10,7 +10,6 @@ import (
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
 	"github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func FieldAddress(
@@ -208,46 +207,17 @@ func projectAddress(
 				field,
 			)
 		}
-		current, err = joinNominalFieldCallableABI(
+		current, currentType, err = projectMutableFieldValue(
 			context,
+			children,
+			source,
 			currentType,
-			field,
 			current,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		providerField, providerOwned, err := providerboundary.StructField(
-			context,
-			currentType,
 			field,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		name := ""
-		if providerOwned {
-			name = providerField.Member()
-		} else {
-			name, err = context.Names().Member(field)
-			if err != nil {
-				return api.ExpressionEmission{}, err
-			}
-		}
-		current, err = api.NewExpressionEmission(
-			current.Before(),
-			context.Factory().PropertyAccessExpression(
-				current.Value(),
-				nil,
-				context.Factory().Identifier(name),
-				tsgo.NodeFlagsNone,
-			),
-			current.Requests(),
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		currentType = field.Type()
 	}
 	return api.ExpressionEmission{},
 		api.Unsupported(context, api.CategoryExpression, source)
