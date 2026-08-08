@@ -18,6 +18,16 @@ export class UnicodeRange32Operations {
 }
 
 export class UnicodeRangeTableOperations {
+  static $assign(target: RangeTable, source: RangeTable): void {
+    target.R16 = source.R16;
+    target.R32 = source.R32;
+    target.LatinOffset = source.LatinOffset;
+  }
+
+  static $copy(source: RangeTable): RangeTable {
+    return new RangeTable(source.R16, source.R32, source.LatinOffset);
+  }
+
   static $make(
     ranges16: RuntimeSlice<Range16>,
     ranges32: RuntimeSlice<Range32>,

@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "2f532ae8f17254d7b918439a44dcdd01e102228ac63d77949d354db13b2335fe",
+  "providerDigest": "77bcc254ceb9691cde29ef622e737e10ac07239c98cc3ce1ea555c2cba893645",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -20149,6 +20149,8 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "unicode|kind=2|receiver=|name=RangeTable",
           "capabilities": [
+            "assign",
+            "copy",
             "make",
             "storage"
           ],
@@ -20156,7 +20158,7 @@
           "storageExport": "UnicodeRangeTableStorage",
           "implementationOwner": "src/internal/facets/named-unicode.ts",
           "storageImplementationOwner": "src/internal/portable/unicode/ranges.ts",
-          "targetFingerprint": "37f55fb9c55c2eb8fcf6262ddd64f7703b79a2aef33ec5fdc80cff74901ebf86",
+          "targetFingerprint": "e5b0ff352bfe64e280cc794d8d2f1132c66f914e90a82a805dc5948ddb8730c6",
           "storageTargetFingerprint": "b0a24fed096b012f0d0d1fc7ff39b06013cd99cd82e141f595369688958c426d",
           "implementationSites": [
             "src/internal/facets/named-unicode.ts#UnicodeRangeTableOperations@104"
@@ -26822,6 +26824,9 @@
       "identity": "src/internal/facets/named-unicode.ts#UnicodeRangeTableOperations@104",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/unicode/ranges.ts#LatinOffset@140",
+        "src/internal/portable/unicode/ranges.ts#R16@106",
+        "src/internal/portable/unicode/ranges.ts#R32@123",
         "src/unicode.ts#RangeTable@77"
       ]
     },
@@ -33028,6 +33033,10 @@
       "disposition": "implemented"
     },
     {
+      "identity": "src/internal/portable/unicode/ranges.ts#LatinOffset@140",
+      "disposition": "implemented"
+    },
+    {
       "identity": "src/internal/portable/unicode/ranges.ts#Lo@46",
       "disposition": "implemented"
     },
@@ -34432,5 +34441,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "d81d1933e785b2d29228ac31f66523e1ba26923ade25d029c05b9be458b5652e"
+  "manifestDigest": "ba9238fc2fd308ac3f1b6b92eeb4b6cdafaf84a7aa498807af98b97f9cd93cfb"
 }

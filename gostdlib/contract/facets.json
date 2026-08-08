@@ -2068,6 +2068,8 @@
       "sourcePath": "src/internal/facets/named-unicode.ts",
       "export": "UnicodeRangeTableOperations",
       "capabilities": [
+        "assign",
+        "copy",
         "make",
         "storage"
       ],
