@@ -21,13 +21,12 @@ import (
 
 func (s *programSession) replaceSourceImplementations(
 	files []TargetFile,
+	generatedContracts []sourceimplementation.Target,
 ) ([]TargetFile, error) {
 	if s.sourceImplementations == nil {
-		return files, nil
-	}
-	generatedContracts, err := sourceImplementationTargets(files)
-	if err != nil {
-		return nil, err
+		return nil, &ScheduleError{
+			Reason: "source implementation replacement has no certificate",
+		}
 	}
 	replaced := slices.Clone(files)
 	contractPackages := make(
@@ -308,13 +307,14 @@ func (s *programSession) packageStateFile(
 		return TargetFile{}, err
 	}
 	requirements.observe(placement)
-	sort.Slice(builder.storage, func(left, right int) bool {
-		return builder.storage[left].variable.Name() <
-			builder.storage[right].variable.Name()
+	storage := slices.Clone(builder.storage)
+	sort.Slice(storage, func(left, right int) bool {
+		return storage[left].variable.Name() <
+			storage[right].variable.Name()
 	})
-	fields := make([]tsgo.PropertyDeclaration, 0, len(builder.storage))
-	for _, storage := range builder.storage {
-		fields = append(fields, storage.field)
+	fields := make([]tsgo.PropertyDeclaration, 0, len(storage))
+	for _, item := range storage {
+		fields = append(fields, item.field)
 	}
 	declarations, err := packagevariable.StateDeclarations(s.factory, fields)
 	if err != nil {

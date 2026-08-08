@@ -45,35 +45,37 @@ type RuntimePackage struct {
 type declarationSite = declarationindex.Site
 
 type programSession struct {
-	source                   *load.Program
-	factory                  tsgo.Factory
-	scalar                   api.ScalarABI
-	providerScalar           api.ScalarABI
-	evaluationOrder          api.EvaluationOrder
-	concurrency              api.ConcurrencySemantics
-	registry                 *emitnaming.Registry
-	scheduler                *scheduler
-	requirements             *declarationRequirementScheduler
-	artifacts                *artifactstate.Graph
-	sites                    map[types.Object]declarationSite
-	emitters                 map[*load.Package]*emitter
-	builders                 map[string]*targetFileBuilder
-	packageBuilders          map[*load.Package]*packageTargetBuilder
-	packageExports           *packageExportScheduler
-	environmentBuilders      map[*load.Package]*environmentContractBuilder
-	packageInitializations   *packageInitializationScheduler
-	genericOperations        map[genericOperationIdentity]*api.GenericOperationContract
-	genericConcretizations   map[genericConcretizationIdentity]*api.GenericConcretization
-	classMembers             map[*types.Func]classMemberContribution
-	goRuntime                *gocontract.Contract
-	runtimePackage           RuntimePackage
-	compareArtifactOwners    func(api.ArtifactOwner, api.ArtifactOwner) int
-	requirementRemovalOwner  api.ArtifactOwner
-	standardLibrary          *gostdlibcertify.Certificate
-	sourceImplementations    *sourceimplementation.Certificate
-	externalFunctions        map[*types.Func]ExternalFunctionObligation
-	externalFunctionBindings map[*types.Func]api.ExternalFunctionTarget
-	sealed                   bool
+	source                        *load.Program
+	factory                       tsgo.Factory
+	scalar                        api.ScalarABI
+	providerScalar                api.ScalarABI
+	evaluationOrder               api.EvaluationOrder
+	concurrency                   api.ConcurrencySemantics
+	registry                      *emitnaming.Registry
+	scheduler                     *scheduler
+	requirements                  *declarationRequirementScheduler
+	artifacts                     *artifactstate.Graph
+	sites                         map[types.Object]declarationSite
+	emitters                      map[*load.Package]*emitter
+	builders                      map[string]*targetFileBuilder
+	packageBuilders               map[*load.Package]*packageTargetBuilder
+	packageExports                *packageExportScheduler
+	environmentBuilders           map[*load.Package]*environmentContractBuilder
+	packageInitializations        *packageInitializationScheduler
+	genericOperations             map[genericOperationIdentity]*api.GenericOperationContract
+	genericConcretizations        map[genericConcretizationIdentity]*api.GenericConcretization
+	classMembers                  map[*types.Func]classMemberContribution
+	goRuntime                     *gocontract.Contract
+	runtimePackage                RuntimePackage
+	compareArtifactOwners         func(api.ArtifactOwner, api.ArtifactOwner) int
+	requirementRemovalOwner       api.ArtifactOwner
+	standardLibrary               *gostdlibcertify.Certificate
+	sourceImplementations         *sourceimplementation.Certificate
+	externalFunctions             map[*types.Func]ExternalFunctionObligation
+	externalFunctionBindings      map[*types.Func]api.ExternalFunctionTarget
+	sourceImplementationContracts map[api.ArtifactOwner]artifactstate.Contract
+	sourceImplementationTargets   []sourceimplementation.Target
+	sealed                        bool
 }
 
 type targetDeclaration struct {
@@ -119,15 +121,15 @@ func CompileWithOptions(
 		return ProgramEmission{},
 			&ScheduleError{Reason: "emission roots are empty"}
 	}
-	session, err := newProgramSession(source, options)
-	if err != nil {
-		return ProgramEmission{}, err
-	}
 	for _, root := range roots {
 		if !root.valid() {
 			return ProgramEmission{},
 				&ScheduleError{Reason: "emission root is invalid"}
 		}
+	}
+	session, err := newProgramSession(source, options)
+	if err != nil {
+		return ProgramEmission{}, err
 	}
 	orderedRoots := slices.Clone(roots)
 	sort.Slice(orderedRoots, func(left, right int) bool {
@@ -137,86 +139,22 @@ func CompileWithOptions(
 			session.compareArtifactOwners,
 		) < 0
 	})
-	for _, root := range orderedRoots {
-		if err := session.requireRoot(root); err != nil {
+	if options.SourceImplementations != nil {
+		inputs, captureErr := captureSourceImplementationInputs(
+			session,
+			orderedRoots,
+		)
+		if captureErr != nil {
+			return ProgramEmission{}, captureErr
+		}
+		session, err = newProgramSession(source, options)
+		if err != nil {
 			return ProgramEmission{}, err
 		}
+		session.sourceImplementationContracts = inputs.contracts
+		session.sourceImplementationTargets = inputs.targets
 	}
-	for {
-		if object, ok := session.scheduler.next(); ok {
-			if err := session.emit(object); err != nil {
-				return ProgramEmission{}, err
-			}
-			continue
-		}
-		if owner, requirements, removed, ok :=
-			session.requirements.nextBatch(); ok {
-			if err := session.applyDeclarationRequirements(
-				owner,
-				requirements,
-				removed,
-			); err != nil {
-				return ProgramEmission{}, err
-			}
-			continue
-		}
-		if dirty := session.artifacts.DirtyBatch(); len(dirty) != 0 {
-			for _, object := range dirty {
-				if err := session.reconstructScheduledArtifact(object); err != nil {
-					return ProgramEmission{}, err
-				}
-			}
-			continue
-		}
-		if sourcePackage, ok := session.packageInitializations.next(); ok {
-			if err := session.emitPackageInitialization(sourcePackage); err != nil {
-				return ProgramEmission{}, err
-			}
-			continue
-		}
-		if session.requirements.finalizeRemovals() {
-			continue
-		}
-		if builders := session.packageExports.nextBatch(); len(builders) != 0 {
-			for _, builder := range builders {
-				if err := session.publishPackageExports(builder); err != nil {
-					return ProgramEmission{}, err
-				}
-			}
-			continue
-		}
-		break
-	}
-	obligations, err := session.environmentObligations()
-	if err != nil {
-		return ProgramEmission{}, err
-	}
-	if err := session.verifyProviderClosure(obligations); err != nil {
-		return ProgramEmission{}, err
-	}
-	files, err := session.targetFiles()
-	if err != nil {
-		return ProgramEmission{}, err
-	}
-	if err := session.verifyRootObligations(orderedRoots, files); err != nil {
-		return ProgramEmission{}, err
-	}
-	profile, err := session.environmentProfile(options)
-	if err != nil {
-		return ProgramEmission{}, err
-	}
-	dependencies, err := selectedPackageDependencies(options, session.runtimePackage)
-	if err != nil {
-		return ProgramEmission{}, err
-	}
-	return ProgramEmission{
-		files:                       files,
-		environmentObligations:      obligations,
-		environmentProfile:          profile,
-		externalFunctionObligations: session.externalFunctionObligations(),
-		runtimePackage:              session.runtimePackage,
-		packageDependencies:         dependencies,
-	}, nil
+	return compileProgramSession(session, orderedRoots, options)
 }
 
 func selectedPackageDependencies(
@@ -503,6 +441,9 @@ func (s *programSession) emit(object types.Object) error {
 	site, ok := s.sites[object]
 	if !ok {
 		return s.emitEnvironmentObject(object)
+	}
+	if emitted, err := s.emitSourceImplementationContract(object, site); emitted || err != nil {
+		return err
 	}
 	if variable, ok := object.(*types.Var); ok {
 		return s.emitPackageStorage(variable, site)

@@ -587,19 +587,3 @@ func (p RuntimePackage) Manifest() []byte {
 func (p RuntimePackage) Fingerprint() string {
 	return p.assembled.Fingerprint()
 }
-
-func (f TargetFile) OutputPath() string {
-	return f.outputPath
-}
-
-func (f TargetFile) PackageName() string {
-	return f.packageName
-}
-
-func (f TargetFile) SourceFile() tsgo.SourceFile {
-	return f.sourceFile
-}
-
-func (f TargetFile) Kind() TargetFileKind {
-	return f.kind
-}

@@ -1167,6 +1167,34 @@ state, initializer, compatibility wrapper, or fallback for the selected
 package may survive. References keep the ordinary package assembly path and
 source-facing contract.
 
+Replacement uses two isolated compilation sessions, not a filter over an
+assembled file list and not rollback within one mutable graph. The first
+session settles the ordinary canonical program solely for certification. It
+captures the complete ordinary target set plus immutable observable contracts
+for selected-package source artifacts; the implementation facet, dependency
+edges, declaration requirements, builders, registries, and scheduler state are
+not transferable. That session is then discarded.
+
+A fresh final session starts with empty naming, artifact, requirement,
+representation, and target-builder state. When a final consumer requests a
+selected-package source artifact, the source owner publishes the captured
+observable contract with no body, storage, initializer, class contribution,
+dependency, or target declaration. Selected-package source code is never
+traversed for body translation in this session. The shared checked program may
+be read only to index top-level declaration identity, reserve canonical names,
+and locate a captured source owner; none of those operations emits a request or
+representation. Therefore only demands originating in the final graph can
+create shared support artifacts. The authored package is installed
+atomically after final quiescence, while the first session's ordinary target
+set remains certification evidence. For example, `ErrOverflow` retains its
+exact value contract without generated storage, while a private `worker`
+reflection descriptor requested only by the discarded ordinary implementation
+cannot enter the final graph. A genuine final consumer of a private type must
+be satisfied by an exact body-free private contract module. Sharing either
+session's mutable state, late import deletion, output-path filtering as
+liveness, same-session withdrawal, and private generated runtime shims are
+forbidden.
+
 For callable exports, the surface join is signature-exact rather than
 name-only. GoToTS preserves the selected Go signature in ordinary canonical
 callers and binds the authored module by exact export identity. TSTS is the one
@@ -1213,6 +1241,11 @@ demand-created associated representation binding required to use it across a
 package boundary. For example, `type Item struct { Value int }` exports only
 `Item` until a reached pointer or container operation materializes
 `Item$Storage`; the assembly then exports both from the same defining module.
+An exported non-generic Go interface always publishes its canonical runtime
+contract and guard with the type (`Reader`, `Reader$contract`, and
+`Reader$is`), because cross-package type assertions and reflection observe
+those value bindings. A selected authored package must implement that same
+closed public ABI; consumers never import the retired source module for them.
 Private kernels, temporaries, and undemanded representation facets are never
 published. The declaration handler owns this set; the package assembly does
 not infer it from spelling or scan printed statements.

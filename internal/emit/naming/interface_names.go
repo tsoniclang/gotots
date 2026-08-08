@@ -504,7 +504,7 @@ func (n *File) namedInterfaceContract(
 	}
 	contract, err := n.derivedSourceReference(
 		typeName,
-		"$contract",
+		api.InterfaceContractSuffix,
 		api.ArtifactFacetValueSurface,
 	)
 	if err != nil {
@@ -512,7 +512,7 @@ func (n *File) namedInterfaceContract(
 	}
 	guard, err := n.derivedSourceReference(
 		typeName,
-		"$is",
+		api.InterfaceGuardSuffix,
 		api.ArtifactFacetValueSurface,
 	)
 	if err != nil {

@@ -143,6 +143,32 @@ func Result() int32 { return PackageValue }
 		session.artifacts.HasPending() {
 		t.Fatal("package initializer did not converge in the existing fixed point")
 	}
+	if len(builder.storage) < 2 {
+		t.Fatal("package-state purity fixture has fewer than two storage owners")
+	}
+	lastStorage := len(builder.storage) - 1
+	builder.storage[0], builder.storage[lastStorage] =
+		builder.storage[lastStorage], builder.storage[0]
+	for index, storage := range builder.storage {
+		builder.storageByObject[storage.variable] = index
+	}
+	storageOrder := make([]api.ArtifactOwner, len(builder.storage))
+	storageIndices := make(map[*types.Var]int, len(builder.storageByObject))
+	for index, storage := range builder.storage {
+		storageOrder[index] = storage.owner
+	}
+	for variable, index := range builder.storageByObject {
+		storageIndices[variable] = index
+	}
+	if _, err := session.assembleTargetFiles(); err != nil {
+		t.Fatal(err)
+	}
+	for index, storage := range builder.storage {
+		if storage.owner != storageOrder[index] ||
+			builder.storageByObject[storage.variable] != storageIndices[storage.variable] {
+			t.Fatal("target assembly mutated package storage identity")
+		}
+	}
 	files, err := session.targetFiles()
 	if err != nil {
 		t.Fatal(err)
@@ -416,7 +442,10 @@ func demandDerived(values []Derived) *Derived {
 	}
 	if got := packageExportBindings(builder.exportStatements); !equalStrings(
 		got,
-		[]string{"Box", "Box$Storage", "Derived", "Writer"},
+		[]string{
+			"Box", "Box$Storage", "Derived",
+			"Writer", "Writer$contract", "Writer$is",
+		},
 	) {
 		t.Fatalf("initial assembly exports = %v", got)
 	}
@@ -425,7 +454,7 @@ func demandDerived(values []Derived) *Derived {
 	)
 	if !ok || !equalStrings(
 		writerBindings,
-		[]string{"Writer"},
+		[]string{"Writer", "Writer$contract", "Writer$is"},
 	) {
 		t.Fatalf("committed Writer export surface = %v, %t", writerBindings, ok)
 	}
@@ -453,6 +482,8 @@ func demandDerived(values []Derived) *Derived {
 		"Derived",
 		"Derived$Storage",
 		"Writer",
+		"Writer$contract",
+		"Writer$is",
 	}
 	contractBindings, ok := session.artifacts.ExportedBindings(
 		api.MustSourceArtifactOwner(box),

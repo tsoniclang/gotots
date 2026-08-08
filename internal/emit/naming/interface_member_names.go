@@ -190,11 +190,11 @@ func (n *File) interfaceContractImports(
 }
 
 func interfaceContractName(base string) string {
-	return base + "$contract"
+	return base + api.InterfaceContractSuffix
 }
 
 func interfaceGuardName(base string) string {
-	return base + "$is"
+	return base + api.InterfaceGuardSuffix
 }
 
 func namedInterface(

@@ -1,6 +1,7 @@
 package interfacetype
 
 import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -17,7 +18,7 @@ func contractDeclaration(
 		factory.VariableDeclarationList(
 			[]tsgo.VariableDeclaration{
 				factory.VariableDeclaration(
-					factory.Identifier(name+"$contract"),
+					factory.Identifier(name+api.InterfaceContractSuffix),
 					nil,
 					readonlyObjectArray(factory),
 					factory.CallExpression(
@@ -53,7 +54,7 @@ func guardDeclaration(
 	return factory.FunctionDeclaration(
 		modifiers,
 		nil,
-		factory.Identifier(name+"$is"),
+		factory.Identifier(name+api.InterfaceGuardSuffix),
 		typeParameters,
 		[]tsgo.ParameterDeclaration{
 			factory.ParameterDeclaration(
@@ -111,7 +112,7 @@ func guardDeclaration(
 							nil,
 							nil,
 							[]tsgo.Expression{
-								factory.Identifier(name + "$contract"),
+								factory.Identifier(name + api.InterfaceContractSuffix),
 							},
 							tsgo.NodeFlagsNone,
 						),

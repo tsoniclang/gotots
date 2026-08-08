@@ -1047,6 +1047,27 @@ Package replacement is selected only from the resolved project's certified
 implementation set. Translation handlers never branch on import path,
 package/function spelling, source location, or product identity.
 
+The ordinary generated snapshot is certification evidence, not final
+ownership. It is produced in an isolated session. The fresh final session may
+read only immutable selected-package observable contracts from that snapshot;
+it cannot read the ordinary session's implementation facets, dependencies,
+requirements, registries, builders, or generated declarations. For example,
+if an unexported `worker` type causes the ordinary implementation to request a
+shared reflection adapter, that adapter disappears with the ordinary session.
+It is not reconstructed in the final session unless a genuine final consumer
+requests the private type. Such a consumer requires an exact body-free private
+contract module; a private value dependency remains an error. The final
+session never emits a selected-package body and never attempts to infer
+liveness by retracting already-emitted output.
+
+Generated value support that is part of an exported declaration's observable
+ABI remains public through the package assembly. In particular, an exported
+non-generic interface's runtime contract and guard are package bindings, so a
+cross-package assertion imports `Reader$contract` and `Reader$is` from the
+same assembly that owns `Reader`. A source implementation provides and
+certifies those bindings; retaining an import of its generated source file is
+not an admissible private dependency.
+
 ## Failure
 
 Translation fails at the owning occurrence when:

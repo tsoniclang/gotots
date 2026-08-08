@@ -269,6 +269,12 @@ func (s *programSession) applyDeclarationRequirements(
 	if !owner.Valid() {
 		return &ScheduleError{Reason: "declaration requirement owner is invalid"}
 	}
+	if accepted, err := s.acceptSourceImplementationRequirements(
+		owner,
+		requirements,
+	); accepted {
+		return err
+	}
 	if removed {
 		if s.requirementRemovalOwner.Valid() {
 			return &ScheduleError{

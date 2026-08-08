@@ -71,6 +71,17 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, true, err
 	}
+	if moduleExport && len(parameters.Nodes()) == 0 {
+		target, err := api.NewDeclarationEmissionWithAdditionalPackageBindings(
+			statements,
+			requests,
+			[]string{
+				name + api.InterfaceContractSuffix,
+				name + api.InterfaceGuardSuffix,
+			},
+		)
+		return target, true, err
+	}
 	target, err := api.NewDeclarationEmission(statements, requests)
 	return target, true, err
 }

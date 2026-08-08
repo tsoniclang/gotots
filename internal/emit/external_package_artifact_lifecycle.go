@@ -24,6 +24,190 @@ func sourceImplementationForPackage(
 	return certificate.ForPackage(sourcePackage)
 }
 
+type sourceImplementationInputs struct {
+	contracts map[api.ArtifactOwner]artifactstate.Contract
+	targets   []sourceimplementation.Target
+}
+
+func captureSourceImplementationInputs(
+	session *programSession,
+	roots []Root,
+) (sourceImplementationInputs, error) {
+	if session == nil || session.sourceImplementations == nil {
+		return sourceImplementationInputs{}, &ScheduleError{
+			Reason: "source-implementation certification session is absent",
+		}
+	}
+	if err := session.requireProgramRoots(roots); err != nil {
+		return sourceImplementationInputs{}, err
+	}
+	if err := session.settle(); err != nil {
+		return sourceImplementationInputs{}, err
+	}
+	if err := session.verifyTargetFilesSettled(); err != nil {
+		return sourceImplementationInputs{}, err
+	}
+	files, err := session.assembleTargetFiles()
+	if err != nil {
+		return sourceImplementationInputs{}, err
+	}
+	targets, err := sourceImplementationTargets(files)
+	if err != nil {
+		return sourceImplementationInputs{}, err
+	}
+	contracts, err := session.captureSourceImplementationContracts()
+	if err != nil {
+		return sourceImplementationInputs{}, err
+	}
+	return sourceImplementationInputs{contracts: contracts, targets: targets}, nil
+}
+
+func (s *programSession) captureSourceImplementationContracts() (
+	map[api.ArtifactOwner]artifactstate.Contract,
+	error,
+) {
+	result := make(map[api.ArtifactOwner]artifactstate.Contract)
+	for _, owner := range s.artifacts.Owners() {
+		object, sourceOwned := owner.Source()
+		if !sourceOwned || object.Pkg() == nil {
+			continue
+		}
+		sourcePackage := s.source.PackageForTypes(object.Pkg())
+		if _, selected := sourceImplementationForPackage(
+			s.sourceImplementations,
+			sourcePackage,
+		); !selected {
+			continue
+		}
+		contract, err := s.artifacts.ObservableContract(owner)
+		if err != nil {
+			return nil, err
+		}
+		result[owner] = contract
+	}
+	for _, implementation := range s.sourceImplementations.Implementations() {
+		sourcePackage := s.source.PackageByPath(implementation.PackagePath())
+		if sourcePackage == nil || s.packageBuilders[sourcePackage] == nil {
+			return nil, sourceImplementationError(
+				implementation.PackagePath(),
+				&ScheduleError{Reason: "selected package was not materialized for certification"},
+			)
+		}
+	}
+	return result, nil
+}
+
+func (s *programSession) sourceImplementationContract(
+	owner api.ArtifactOwner,
+) bool {
+	if s.sourceImplementationContracts == nil {
+		return false
+	}
+	_, ok := s.sourceImplementationContracts[owner]
+	return ok
+}
+
+func (s *programSession) sourceImplementationOwner(
+	owner api.ArtifactOwner,
+) bool {
+	if s.sourceImplementationContracts == nil {
+		return false
+	}
+	object, sourceOwned := owner.Source()
+	if !sourceOwned || object.Pkg() == nil {
+		return false
+	}
+	_, selected := sourceImplementationForPackage(
+		s.sourceImplementations,
+		s.source.PackageForTypes(object.Pkg()),
+	)
+	return selected
+}
+
+func (s *programSession) acceptSourceImplementationRequirements(
+	owner api.ArtifactOwner,
+	requirements []api.DeclarationRequirement,
+) (bool, error) {
+	if !s.sourceImplementationOwner(owner) {
+		return false, nil
+	}
+	if !s.sourceImplementationContract(owner) {
+		return true, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "source-implementation observable contract is absent",
+		}
+	}
+	for _, requirement := range requirements {
+		if !requirement.Valid() || requirement.Owner() != owner {
+			return true, &ScheduleError{
+				Object: owner.Name(),
+				Reason: "source-implementation contract batch has mixed or invalid ownership",
+			}
+		}
+		if !s.requirements.wasApplied(requirement) {
+			return true, &ScheduleError{
+				Object: owner.Name(),
+				Reason: "source-implementation contract requirement was not accepted by its owner",
+			}
+		}
+	}
+	s.artifacts.DiscardDirty(owner)
+	return true, nil
+}
+
+func (s *programSession) acceptSourceImplementationReconstruction(
+	owner api.ArtifactOwner,
+) (bool, error) {
+	if !s.sourceImplementationOwner(owner) {
+		return false, nil
+	}
+	if !s.sourceImplementationContract(owner) {
+		return true, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "source-implementation observable contract is absent",
+		}
+	}
+	s.artifacts.DiscardDirty(owner)
+	return true, nil
+}
+
+func (s *programSession) emitSourceImplementationContract(
+	object types.Object,
+	site declarationSite,
+) (bool, error) {
+	if s.sourceImplementationContracts == nil {
+		return false, nil
+	}
+	owner := api.MustSourceArtifactOwner(object)
+	contract, selected := s.sourceImplementationContracts[owner]
+	_, packageSelected := sourceImplementationForPackage(
+		s.sourceImplementations,
+		site.Source,
+	)
+	if !packageSelected {
+		if selected {
+			return true, &ScheduleError{
+				Object: object.Name(),
+				Reason: "source-implementation contract belongs to an unselected package",
+			}
+		}
+		return false, nil
+	}
+	if !selected {
+		return true, &ScheduleError{
+			Object: object.Name(),
+			Reason: "source-implementation observable contract is absent",
+		}
+	}
+	if err := s.commitArtifactRevision(owner, contract, nil, nil); err != nil {
+		return true, err
+	}
+	if _, variable := object.(*types.Var); variable {
+		return true, nil
+	}
+	return true, s.recordPackageExport(s.packageBuilders[site.Source], object)
+}
+
 func sourcePackageRequiresInitialization(sourcePackage *load.Package) bool {
 	if sourcePackage == nil || sourcePackage.Types() == nil ||
 		sourcePackage.TypesInfo() == nil {
@@ -317,12 +501,11 @@ func (s *programSession) retireCompilationGeneratedArtifact(
 		}
 	}
 	index, exists := builder.indexByOwner[owner]
-	if !exists || index != 0 ||
-		len(builder.declarations) != 1 ||
-		builder.declarations[0].owner != owner {
+	if !exists || index < 0 || index >= len(builder.declarations) ||
+		builder.declarations[index].owner != owner {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "retired generated artifact has no exact materialized target file",
+			Reason: "retired generated artifact has no exact materialized declaration",
 		}
 	}
 	contract, err := artifactstate.ProjectCoverageContract(s.factory, nil)
@@ -333,7 +516,16 @@ func (s *programSession) retireCompilationGeneratedArtifact(
 		return err
 	}
 	s.artifacts.DiscardDirty(owner)
-	delete(s.builders, artifact.OutputPath())
+	removed, err := s.removeTargetDeclaration(owner)
+	if err != nil {
+		return err
+	}
+	if !removed {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "retired generated artifact declaration survived",
+		}
+	}
 	return nil
 }
 

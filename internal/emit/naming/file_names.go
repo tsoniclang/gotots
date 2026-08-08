@@ -345,6 +345,17 @@ func (n *File) PackageVariable(
 	if err := n.requireUse(variable, environmentcontract.UseDemandState); err != nil {
 		return api.PackageVariableReference{}, err
 	}
+	var requests []api.RootRequest
+	if target.sourceOwned() && n.artifactOwner.Valid() {
+		request, err := api.NewArtifactDependencyRequest(
+			variable,
+			api.ArtifactFacetValueSurface,
+		)
+		if err != nil {
+			return api.PackageVariableReference{}, err
+		}
+		requests = append(requests, request)
+	}
 	targetPath := binding.statePath
 	stateName := "$state"
 	if variable.Parent() != n.packageScope {
@@ -359,6 +370,7 @@ func (n *File) PackageVariable(
 		return api.NewPackageVariableReference(
 			stateName,
 			binding.fieldName,
+			requests...,
 		)
 	}
 	modulePath, err := output.ModuleSpecifier(n.targetPath, targetPath)
@@ -375,10 +387,11 @@ func (n *File) PackageVariable(
 	if err != nil {
 		return api.PackageVariableReference{}, err
 	}
+	requests = append(requests, request)
 	return api.NewPackageVariableReference(
 		stateName,
 		binding.fieldName,
-		request,
+		requests...,
 	)
 }
 
@@ -571,21 +584,4 @@ func (n *File) Temporary(kind api.TemporaryKind) (string, error) {
 		}
 		return candidate, nil
 	}
-}
-
-func (n *File) ModuleExport(object types.Object) (bool, error) {
-	if object == nil {
-		return false, &api.NameError{Reason: "declaration object is nil"}
-	}
-	binding, ok := n.owner.byObject[object]
-	if !ok && n.owner.registry != nil {
-		binding, ok = n.owner.registry.byObject[object]
-	}
-	if !ok {
-		return false, &api.NameError{
-			Name:   object.Name(),
-			Reason: "object has no emitted declaration",
-		}
-	}
-	return binding.moduleExport, nil
 }

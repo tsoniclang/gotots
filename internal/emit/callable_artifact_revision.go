@@ -570,6 +570,9 @@ func eagerDeclarationDependencies(
 func (s *programSession) reconstructScheduledArtifact(
 	owner api.ArtifactOwner,
 ) error {
+	if accepted, err := s.acceptSourceImplementationReconstruction(owner); accepted {
+		return err
+	}
 	if _, ok := owner.PackageAssembly(); ok {
 		return s.reconstructPackageExports(owner)
 	}

@@ -12,6 +12,8 @@ const (
 	StructStorageOfMember         = "$storageOf"
 	StructFromStorageMember       = "$fromStorage"
 	StructStorageTypeSuffix       = "$Storage"
+	InterfaceContractSuffix       = "$contract"
+	InterfaceGuardSuffix          = "$is"
 	ProviderBridgeFromMember      = "$from"
 	ProviderBridgeToMember        = "$to"
 	ProviderProfileContractSuffix = "$ProviderContract"

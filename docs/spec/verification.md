@@ -815,6 +815,23 @@ target then lowers and strict-typechecks both complete executable sets with one
 final module-resolution configuration. The installed check proves all selected
 consumer requirements; TSTS exact-joins callable source signatures in that
 canonical check.
+
+The final-artifact gate additionally proves session isolation. A fixture with
+a public package value and an unrelated private type must retain the public
+observable contract while producing no selected-package storage/body and no
+adapter/helper requested only by the ordinary implementation. A second fixture
+with a genuine final private-type consumer must retain exactly its body-free
+private contract. Required mutations share a registry or artifact graph across
+sessions, copy an implementation facet or dependency into the final snapshot,
+emit one selected-package source body, omit a demanded observable contract,
+retain one ordinary generated support declaration, or install replacement only
+after final assembly. Each fails at the lifecycle, contract,
+final-membership, private-value, or strict-consumer gate with the exact owner.
+The fixture includes a cross-package assertion against an exported interface:
+the ordinary and installed assemblies must both export the interface type,
+runtime contract, and guard; the final consumer must import the bindings only
+from the installed assembly. Omitting either runtime binding, retaining its
+generated source-module import, or accepting a private value shim fails.
 Display-oriented checker strings, parameter spellings, and replacement-private
 storage layouts are forbidden as package-contract equality evidence. Required
 mutations alter a Go

@@ -326,6 +326,86 @@ func compareDeclarationRequirements(
 	}
 }
 
+func (s *programSession) settle() error {
+	for {
+		if object, ok := s.scheduler.next(); ok {
+			if err := s.emit(object); err != nil {
+				return err
+			}
+			continue
+		}
+		if owner, requirements, removed, ok := s.requirements.nextBatch(); ok {
+			if err := s.applyDeclarationRequirements(
+				owner,
+				requirements,
+				removed,
+			); err != nil {
+				return err
+			}
+			continue
+		}
+		if dirty := s.artifacts.DirtyBatch(); len(dirty) != 0 {
+			for _, object := range dirty {
+				if err := s.reconstructScheduledArtifact(object); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		if sourcePackage, ok := s.packageInitializations.next(); ok {
+			if err := s.emitPackageInitialization(sourcePackage); err != nil {
+				return err
+			}
+			continue
+		}
+		if s.requirements.finalizeRemovals() {
+			continue
+		}
+		if builders := s.packageExports.nextBatch(); len(builders) != 0 {
+			for _, builder := range builders {
+				if err := s.publishPackageExports(builder); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		return nil
+	}
+}
+
+func (s *programSession) removeTargetDeclaration(
+	owner api.ArtifactOwner,
+) (bool, error) {
+	removed := false
+	for outputPath, builder := range s.builders {
+		index, exists := builder.indexByOwner[owner]
+		if !exists {
+			continue
+		}
+		if removed || index < 0 || index >= len(builder.declarations) ||
+			builder.declarations[index].owner != owner {
+			return false, &ScheduleError{
+				Object: owner.Name(),
+				Reason: "target declaration ownership is inconsistent",
+			}
+		}
+		removed = true
+		builder.declarations = append(
+			builder.declarations[:index],
+			builder.declarations[index+1:]...,
+		)
+		delete(builder.byOwner, owner)
+		delete(builder.indexByOwner, owner)
+		for declarationIndex := index; declarationIndex < len(builder.declarations); declarationIndex++ {
+			builder.indexByOwner[builder.declarations[declarationIndex].owner] = declarationIndex
+		}
+		if len(builder.declarations) == 0 {
+			delete(s.builders, outputPath)
+		}
+	}
+	return removed, nil
+}
+
 func compareCallableControlRequirements(
 	left api.DeclarationRequirement,
 	right api.DeclarationRequirement,

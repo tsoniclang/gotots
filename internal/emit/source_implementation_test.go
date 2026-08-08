@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -21,6 +23,7 @@ func TestSourceImplementationAtomicallyReplacesGeneratedPackage(t *testing.T) {
 	writeSourceImplementationFixture(t, filepath.Join(root, "fast", "fast.go"), `package fast
 func Sum(value string) int { return len(value) * 100 }
 func Read(value *int) int { return *value }
+type Reader interface { Read() int }
 `)
 	writeSourceImplementationFixture(t, filepath.Join(root, "main.go"), `package app
 import "example.test/app/fast"
@@ -29,6 +32,7 @@ func Value() int {
 	return fast.Sum("abcd") + fast.Read(&current)
 }
 func ReadExisting(current *int) int { return fast.Read(current) }
+func IsReader(value any) bool { _, ok := value.(fast.Reader); return ok }
 `)
 	implementationRoot := filepath.Join(root, "implementation")
 	writeSourceImplementationPointerContract(t, implementationRoot)
@@ -38,6 +42,14 @@ import { loadPointer } from "@tsonic/core/lang.js";
 export function Read(input: Pointer<number> | undefined): number {
   if (input === undefined) throw new Error("nil pointer");
   return loadPointer(input);
+}
+interface InterfaceValue {
+  $go$implements(contract: readonly object[]): boolean;
+}
+export interface Reader extends InterfaceValue { Read(): number; }
+export const Reader$contract: readonly object[] = Object.freeze([]);
+export function Reader$is(value: InterfaceValue | undefined): value is Reader {
+  return value !== undefined && value.$go$implements(Reader$contract);
 }
 export function Sum(value: string): number { return value.length; }
 `
@@ -75,7 +87,7 @@ export function Sum(value: string): number { return value.length; }
 			PreservedObservables: []string{"determinism", "public result shape"},
 			Evidence:             []string{"consumer output differential"},
 		},
-		Exports: []string{"Read", "Sum"},
+		Exports: []string{"Read", "Reader", "Reader$contract", "Reader$is", "Sum"},
 	}
 	payload, err := json.MarshalIndent(contract, "", "  ")
 	if err != nil {
@@ -113,6 +125,19 @@ export function Sum(value: string): number { return value.length; }
 	}
 	options := DefaultOptions()
 	options.SourceImplementations = certificate
+	missingContractSession, err := newProgramSession(program, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	missingContractSession.sourceImplementationContracts =
+		make(map[api.ArtifactOwner]artifactstate.Contract)
+	if err := missingContractSession.requireProgramRoots(roots); err != nil {
+		t.Fatal(err)
+	}
+	if err := missingContractSession.settle(); err == nil ||
+		!strings.Contains(err.Error(), "source-implementation observable contract is absent") {
+		t.Fatalf("missing observable-contract mutation error = %v", err)
+	}
 	emission, err := CompileWithOptions(program, roots, options)
 	if err != nil {
 		t.Fatal(err)
@@ -142,6 +167,7 @@ export function Sum(value: string): number { return value.length; }
 	selected := 0
 	addressedCaller := false
 	identityPointerCaller := false
+	interfaceGuardCaller := false
 	var callerArtifacts strings.Builder
 	for _, file := range emission.Files() {
 		if file.OutputPath() != assemblyPath {
@@ -158,11 +184,31 @@ export function Sum(value: string): number { return value.length; }
 			if strings.Contains(printed, "Read__from_fast(current)") {
 				identityPointerCaller = true
 			}
+			if strings.Contains(printed, "Reader$is") {
+				interfaceGuardCaller = true
+			}
 			if strings.Contains(printed, "GoPointer") {
 				t.Fatalf("caller retained the retired pointer runtime:\n%s", printed)
 			}
 			if _, generated := generatedPaths[file.OutputPath()]; generated {
 				t.Fatalf("generated package file survived: %s", file.OutputPath())
+			}
+			for generatedPath := range generatedPaths {
+				modulePath, moduleErr := output.ModuleSpecifier(
+					file.OutputPath(),
+					generatedPath,
+				)
+				if moduleErr != nil {
+					t.Fatal(moduleErr)
+				}
+				if strings.Contains(printed, `"`+modulePath+`"`) {
+					t.Fatalf(
+						"final artifact %s retained selected-package implementation dependency %s:\n%s",
+						file.OutputPath(),
+						modulePath,
+						printed,
+					)
+				}
 			}
 			continue
 		}
@@ -188,17 +234,26 @@ export function Sum(value: string): number { return value.length; }
 	if !identityPointerCaller {
 		t.Fatalf("existing pointer caller did not preserve pointer identity:\n%s", callerArtifacts.String())
 	}
+	if !interfaceGuardCaller {
+		t.Fatalf("interface runtime guard did not survive through the package assembly:\n%s", callerArtifacts.String())
+	}
 
 	writeSourceImplementationFixture(t, filepath.Join(implementationRoot, "package.ts"), `import type { Pointer } from "@tsonic/core/types.js";
 import { loadPointer } from "@tsonic/core/lang.js";
-export function Extra(): number { return 0; }
 export function Read(value: Pointer<number> | undefined): number {
   if (value === undefined) throw new Error("nil pointer");
   return loadPointer(value);
 }
+interface InterfaceValue {
+  $go$implements(contract: readonly object[]): boolean;
+}
+export interface Reader extends InterfaceValue { Read(): number; }
+export const Reader$contract: readonly object[] = Object.freeze([]);
 export function Sum(value: string): number { return value.length; }
 `)
-	contract.Exports = []string{"Extra", "Read", "Sum"}
+	contract.Exports = []string{
+		"Read", "Reader", "Reader$contract", "Sum",
+	}
 	payload, err = json.MarshalIndent(contract, "", "  ")
 	if err != nil {
 		t.Fatal(err)
@@ -218,8 +273,8 @@ export function Sum(value: string): number { return value.length; }
 	}
 	options.SourceImplementations = mutated
 	if _, err := CompileWithOptions(program, roots, options); err == nil ||
-		!strings.Contains(err.Error(), "generated exports") {
-		t.Fatalf("generated-surface mutation error = %v", err)
+		!strings.Contains(err.Error(), "private value dependency") {
+		t.Fatalf("missing interface-guard mutation error = %v", err)
 	}
 }
 
@@ -235,6 +290,7 @@ func TestSourceImplementationOwnsPrivateStateAndInitialization(t *testing.T) {
 import "unsafe"
 
 var private = unsafe.Pointer(new(int))
+var Public = 7
 
 type State struct {
 	private unsafe.Pointer
@@ -251,7 +307,7 @@ func Sum(value string) int { return len(value) * 100 }
 
 import "example.test/app/fast"
 
-func Value() int { return fast.Sum("abcd") + fast.NewState(1).Value }
+func Value() int { return fast.Sum("abcd") + fast.NewState(1).Value + fast.Public }
 `)
 	implementationRoot := filepath.Join(root, "implementation")
 	writeSourceImplementationFixture(
@@ -261,6 +317,7 @@ func Value() int { return fast.Sum("abcd") + fast.NewState(1).Value }
   public constructor(public Value: number) {}
 }
 export function $initialize(): void {}
+export const $state = { Public: 7 };
 export function NewState(value: number): State { return new State(value); }
 export function Sum(value: string): number { return value.length; }
 `,
@@ -295,7 +352,7 @@ export function Sum(value: string): number { return value.length; }
 		Envelope: sourceimplementation.EnvelopeDocument{
 			Kind: sourceimplementation.EnvelopeExact,
 		},
-		Exports: []string{"$initialize", "NewState", "State", "Sum"},
+		Exports: []string{"$initialize", "$state", "NewState", "State", "Sum"},
 	}
 	payload, err := json.MarshalIndent(contract, "", "  ")
 	if err != nil {
