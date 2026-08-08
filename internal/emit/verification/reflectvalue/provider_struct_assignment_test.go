@@ -117,9 +117,13 @@ func ProviderAssignments() string {
 		"77XQ====" &&
 		string(base32.HexEncoding.AppendEncode(nil, []byte{0xff, 0xef})) ==
 			"VVNG===="
+	replacerSource := *strings.NewReplacer("a", "source")
+	replacerTarget := *strings.NewReplacer("a", "target")
+	replacerTarget = replacerSource
+	replacerAssigned := replacerTarget.Replace("a") == "source"
 
 	return fmt.Sprintf(
-		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t regexp=%t url=%t base32=%t",
+		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t regexp=%t url=%t base32=%t replacer=%t",
 		parseTarget.Layout,
 		parseTarget.Value,
 		parseTarget.LayoutElem,
@@ -141,6 +145,7 @@ func ProviderAssignments() string {
 		regexpAssigned,
 		urlAssigned,
 		base32Assigned,
+		replacerAssigned,
 	)
 }
 `
@@ -175,6 +180,7 @@ func main() {
 				"RegexpValueOperations.$assign",
 				"NetUrlURLOperations.$assign",
 				"Base32EncodingOperations.$assign",
+				"StringsReplacerOperations.$assign",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					relevant := make([]string, 0)

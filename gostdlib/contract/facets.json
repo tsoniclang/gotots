@@ -2278,6 +2278,17 @@
     },
     {
       "kind": "named-struct-operations",
+      "sourceIdentity": "strings|kind=2|receiver=|name=Replacer",
+      "specifier": "@gotots/gostdlib/internal/facets/named-strings.js",
+      "sourcePath": "src/internal/facets/named-strings.ts",
+      "export": "StringsReplacerOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
       "sourceIdentity": "strings|kind=2|receiver=|name=Reader",
       "specifier": "@gotots/gostdlib/internal/facets/named-strings.js",
       "sourcePath": "src/internal/facets/named-strings.ts",

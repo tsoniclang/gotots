@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "47870c8e3a233a08eff4dea46fa8c759491df25f271fcab85186c147be90474d",
+  "providerDigest": "34527df261a1aa6781607747e4afd73816086f5468f084bc256b78d43d76630c",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -13039,7 +13039,7 @@
           "targetFingerprint": "a16d8430c61c20d7e8d34ad422df8387cb4e386bda79d58bc749f31c01457a1f",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/strings/replacer.ts#Replacer@55"
+            "src/internal/portable/strings/replacer.ts#Replacer@84"
           ]
         },
         {
@@ -13234,10 +13234,10 @@
           "targetFingerprint": "3e54d081763e4d35850a32fdbc5b20cafe1dee6db39dbf5a70815a939b3dc811",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/strings/replacer.ts#replacePairs@242"
+            "src/internal/portable/strings/replacer.ts#replacePairs@355"
           ],
           "implementationSites": [
-            "src/internal/portable/strings/replacer.ts#Replace@109"
+            "src/internal/portable/strings/replacer.ts#Replace@182"
           ]
         },
         {
@@ -13717,7 +13717,7 @@
             "src/internal/portable/strings/replacer.ts#createReplacer@43"
           ],
           "implementationSites": [
-            "src/internal/portable/strings/replacer.ts#NewReplacer@151"
+            "src/internal/portable/strings/replacer.ts#NewReplacer@224"
           ]
         },
         {
@@ -19713,7 +19713,7 @@
           "targetFingerprint": "4332531aea8487bc07baad2ce7318cf5ddfbf29bab5cc0ed128c9698d9015bfa",
           "storageTargetFingerprint": "81d80387430ddb838a6dd41165cf820f29ac0b25865329e1ab28c1ed6d339de6",
           "implementationSites": [
-            "src/internal/facets/named-strings.ts#StringsBuilderOperations@40"
+            "src/internal/facets/named-strings.ts#StringsBuilderOperations@51"
           ]
         },
         {
@@ -19729,7 +19729,21 @@
           "implementationOwner": "src/internal/facets/named-strings.ts",
           "targetFingerprint": "2f3380e05d947c753536e0db4f765d284b3fe25337e3ca596ca77f3aaa794b76",
           "implementationSites": [
-            "src/internal/facets/named-strings.ts#StringsReaderOperations@128"
+            "src/internal/facets/named-strings.ts#StringsReaderOperations@139"
+          ]
+        },
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "strings|kind=2|receiver=|name=Replacer",
+          "capabilities": [
+            "assign",
+            "copy"
+          ],
+          "export": "StringsReplacerOperations",
+          "implementationOwner": "src/internal/facets/named-strings.ts",
+          "targetFingerprint": "0940aab3bcde6f16d7153508aa5739a8ddba7236cdcc8c72a2af4be30fae2dbf",
+          "implementationSites": [
+            "src/internal/facets/named-strings.ts#StringsReplacerOperations@223"
           ]
         }
       ]
@@ -26668,7 +26682,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-strings.ts#StringsBuilderOperations@40",
+      "identity": "src/internal/facets/named-strings.ts#StringsBuilderOperations@51",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/strings/builder.ts#builderRepresentationAssign@675",
@@ -26677,13 +26691,21 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-strings.ts#StringsReaderOperations@128",
+      "identity": "src/internal/facets/named-strings.ts#StringsReaderOperations@139",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/strings/reader.ts#readerRepresentationAssign@546",
         "src/internal/portable/strings/reader.ts#readerRepresentationCopy@568",
         "src/internal/portable/strings/reader.ts#readerRepresentationEqual@586",
         "src/internal/portable/strings/reader.ts#readerRepresentationHash@608"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/named-strings.ts#StringsReplacerOperations@223",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/strings/replacer.ts#replacerRepresentationAssign@333",
+        "src/internal/portable/strings/replacer.ts#replacerRepresentationCopy@315"
       ]
     },
     {
@@ -32292,14 +32314,36 @@
       ]
     },
     {
+      "identity": "src/internal/portable/strings/replacer.ts#assignReplacer@71",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/strings/replacer.ts#copyReplacer@58",
+      "disposition": "implemented"
+    },
+    {
       "identity": "src/internal/portable/strings/replacer.ts#createReplacer@43",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/strings/replacer.ts#replacePairs@242",
+      "identity": "src/internal/portable/strings/replacer.ts#replacePairs@355",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/utf8/codec.ts#runeBoundaries@789"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/strings/replacer.ts#replacerRepresentationAssign@333",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/strings/replacer.ts#assignReplacer@71"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/strings/replacer.ts#replacerRepresentationCopy@315",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/strings/replacer.ts#copyReplacer@58"
       ]
     },
     {
@@ -34552,5 +34596,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "1764b0d1848b362b8c703627b189ba347c6f804ad71b4cfd70b688ca91c69a13"
+  "manifestDigest": "7673511a90a3b9569662824c424b25cbfce26deeed251235c1db8eaa4be5f60e"
 }
