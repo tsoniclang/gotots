@@ -1973,6 +1973,8 @@
       "sourcePath": "src/internal/facets/named-time.ts",
       "export": "TimeTickerOperations",
       "capabilities": [
+        "assign",
+        "copy",
         "storage"
       ],
       "storageExport": "TimeTickerStorage"

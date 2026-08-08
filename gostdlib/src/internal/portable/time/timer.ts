@@ -20,6 +20,8 @@ let assignTimerRepresentation: (target: Timer, source: Timer) => void;
 let copyTimerRepresentation: (source: Timer) => Timer;
 let equalTimerRepresentation: (left: Timer, right: Timer) => bool;
 let hashTimerRepresentation: (source: Timer) => number;
+let assignTickerRepresentation: (target: Ticker, source: Ticker) => void;
+let copyTickerRepresentation: (source: Ticker) => Ticker;
 
 export class Timer {
   C: GoReceiveChannel<Time> | undefined;
@@ -128,42 +130,84 @@ export function timerRepresentationHash(source: Timer): number {
 }
 
 export class Ticker {
-  readonly #channel = new ProviderChannel<Time>(
-    () => new Time(),
-    (value) => value,
-    1,
-  );
-  readonly C: GoReceiveChannel<Time> = this.#channel;
-  #handle: ClockHandle | undefined;
-  #stopped = false;
+  C: GoReceiveChannel<Time>;
+  #runtime: TickerRuntime | undefined;
+  #initialized = false;
 
-  constructor(private readonly duration: Duration) {
+  constructor(duration?: Duration) {
+    const channel = new ProviderChannel<Time>(
+      () => new Time(),
+      (value) => value,
+      1,
+    );
+    this.C = channel;
+    if (duration === undefined) {
+      return;
+    }
     if (duration.Nanoseconds() <= 0n) {
       GoPanic.raiseRuntime("non-positive interval for NewTicker");
     }
-    this.#schedule();
+    this.#initialized = true;
+    this.#runtime = {
+      channel,
+      duration,
+      handle: undefined,
+      stopped: false,
+    };
+    scheduleTicker(this.#runtime);
+  }
+
+  static {
+    assignTickerRepresentation = (target: Ticker, source: Ticker): void => {
+      target.C = source.C;
+      target.#runtime = source.#runtime;
+      target.#initialized = source.#initialized;
+    };
+    copyTickerRepresentation = (source: Ticker): Ticker => {
+      const result = new Ticker();
+      assignTickerRepresentation(result, source);
+      return result;
+    };
   }
 
   static Stop(receiver: Ticker | undefined): void {
     if (receiver === undefined) {
       GoPanic.raiseRuntime("Ticker.Stop called with nil receiver");
     }
-    receiver.#stopped = true;
-    if (receiver.#handle !== undefined) {
-      cancelSchedule(receiver.#handle);
-      receiver.#handle = undefined;
+    if (!receiver.#initialized || receiver.#runtime === undefined) {
+      return;
+    }
+    receiver.#runtime.stopped = true;
+    if (receiver.#runtime.handle !== undefined) {
+      cancelSchedule(receiver.#runtime.handle);
+      receiver.#runtime.handle = undefined;
     }
   }
+}
 
-  #schedule(): void {
-    this.#handle = schedule(delay(this.duration), () => {
-      this.#handle = undefined;
-      if (!this.#stopped) {
-        this.#channel.offer(Now());
-        this.#schedule();
-      }
-    });
-  }
+interface TickerRuntime {
+  readonly channel: ProviderChannel<Time>;
+  readonly duration: Duration;
+  handle: ClockHandle | undefined;
+  stopped: boolean;
+}
+
+function scheduleTicker(runtime: TickerRuntime): void {
+  runtime.handle = schedule(delay(runtime.duration), () => {
+    runtime.handle = undefined;
+    if (!runtime.stopped) {
+      runtime.channel.offer(Now());
+      scheduleTicker(runtime);
+    }
+  });
+}
+
+export function tickerRepresentationAssign(target: Ticker, source: Ticker): void {
+  assignTickerRepresentation(target, source);
+}
+
+export function tickerRepresentationCopy(source: Ticker): Ticker {
+  return copyTickerRepresentation(source);
 }
 
 export function After(d: Duration): GoReceiveChannel<Time> {

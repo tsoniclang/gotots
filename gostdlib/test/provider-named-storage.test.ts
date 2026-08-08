@@ -67,6 +67,12 @@ test("provider named-struct storage capabilities preserve exact values", (): voi
     TimeTimerOperations.$storageOf(timer),
   ), timer);
   const ticker = NewTicker(new Duration(1_000_000_000n));
+  const copiedTicker = TimeTickerOperations.$copy(ticker);
+  const assignedTicker = new Ticker();
+  TimeTickerOperations.$assign(assignedTicker, ticker);
+  assert.notEqual(copiedTicker, ticker);
+  assert.equal(copiedTicker.C, ticker.C);
+  assert.equal(assignedTicker.C, ticker.C);
   assert.equal(TimeTickerOperations.$fromStorage(
     TimeTickerOperations.$storageOf(ticker),
   ), ticker);

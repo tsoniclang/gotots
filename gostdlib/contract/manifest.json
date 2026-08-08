@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "8ac2817cb47e9bb23176812e9328d0145e37f1ecc129453500ec0dbd18b399be",
+  "providerDigest": "b9cc488b9e3da375a33ef0976f44f57d2e260a829fcae9e791e68c01320bdba4",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -1403,7 +1403,7 @@
             "src/internal/portable/time/time.ts#Before@795",
             "src/internal/portable/time/time.ts#Now@2679",
             "src/internal/portable/time/time.ts#Sub@858",
-            "src/internal/portable/time/timer.ts#After@980"
+            "src/internal/portable/time/timer.ts#After@1218"
           ],
           "implementationSites": [
             "src/internal/portable/context/context.ts#WithTimeout@1177"
@@ -15950,10 +15950,11 @@
           "dependencies": [
             "src/internal/portable/concurrency/channel.ts#ProviderChannel@70",
             "src/internal/portable/time/duration.ts#Nanoseconds@64",
-            "src/internal/portable/time/time.ts#Time@155"
+            "src/internal/portable/time/time.ts#Time@155",
+            "src/internal/portable/time/timer.ts#scheduleTicker@1118"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Ticker@779"
+            "src/internal/portable/time/timer.ts#Ticker@808"
           ]
         },
         {
@@ -15998,7 +15999,7 @@
             "src/internal/portable/time/time.ts#Time@155"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Timer@154"
+            "src/internal/portable/time/timer.ts#Timer@183"
           ]
         },
         {
@@ -16036,7 +16037,7 @@
             "src/internal/node/time/clock.ts#cancelSchedule@69"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Stop@864"
+            "src/internal/portable/time/timer.ts#Stop@1007"
           ]
         },
         {
@@ -16053,10 +16054,10 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/concurrency/channel.ts#discard@397",
-            "src/internal/portable/time/timer.ts#requireTimer@1165"
+            "src/internal/portable/time/timer.ts#requireTimer@1403"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Reset@503"
+            "src/internal/portable/time/timer.ts#Reset@532"
           ]
         },
         {
@@ -16072,10 +16073,10 @@
           "targetFingerprint": "0d238d27060fbf73b4304acb28a4cb551f28e24e8ef2241e416e10bb110473ec",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/time/timer.ts#requireTimer@1165"
+            "src/internal/portable/time/timer.ts#requireTimer@1403"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Stop@458"
+            "src/internal/portable/time/timer.ts#Stop@487"
           ]
         },
         {
@@ -16526,11 +16527,11 @@
           "targetFingerprint": "c710c278e1c77eaa108adde6d6fa325be40d84cb4b062a08bef638cfb559c36e",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/time/timer.ts#C@159",
-            "src/internal/portable/time/timer.ts#Timer@154"
+            "src/internal/portable/time/timer.ts#C@188",
+            "src/internal/portable/time/timer.ts#Timer@183"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#After@980"
+            "src/internal/portable/time/timer.ts#After@1218"
           ]
         },
         {
@@ -16551,10 +16552,10 @@
           "targetFingerprint": "a5735b1e6967f433c6cd3e37409f73bce80a43a864c90fa036d49f2bca3918d6",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/time/timer.ts#Timer@154"
+            "src/internal/portable/time/timer.ts#Timer@183"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#AfterFunc@1023"
+            "src/internal/portable/time/timer.ts#AfterFunc@1261"
           ]
         },
         {
@@ -16569,10 +16570,10 @@
           "targetFingerprint": "8aff7792a2fdfb767e7eba9f746903558e6fad3916c1543059e4016321c0868e",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/time/timer.ts#Ticker@779"
+            "src/internal/portable/time/timer.ts#Ticker@808"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#NewTicker@1075"
+            "src/internal/portable/time/timer.ts#NewTicker@1313"
           ]
         },
         {
@@ -16587,10 +16588,10 @@
           "targetFingerprint": "121d1a7dfeb7405c0560946bd25804baf0a5a6ec07f667125608de2eb0be1c2f",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/time/timer.ts#Timer@154"
+            "src/internal/portable/time/timer.ts#Timer@183"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#NewTimer@1093"
+            "src/internal/portable/time/timer.ts#NewTimer@1331"
           ]
         },
         {
@@ -16699,7 +16700,7 @@
             "src/internal/portable/time/timer.ts#delay@74"
           ],
           "implementationSites": [
-            "src/internal/portable/time/timer.ts#Sleep@1111"
+            "src/internal/portable/time/timer.ts#Sleep@1349"
           ]
         },
         {
@@ -20011,7 +20012,7 @@
           "implementationOwner": "src/internal/facets/named-time.ts",
           "targetFingerprint": "e9bf903bb20c910166b214d911daeca0d3b242eb04a796d726f75814a2bfb4fd",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeDurationValueOperations@60"
+            "src/internal/facets/named-time.ts#TimeDurationValueOperations@64"
           ]
         },
         {
@@ -20032,23 +20033,25 @@
           "targetFingerprint": "0cfcd699144d44ff4629aaf587abd00cf62d242cb62d97be0f73897501592577",
           "storageTargetFingerprint": "0073fa4b3eb74a306e23ebb7ab0bdb7521fd7cca4bf809a74d9bf84b9936b3fb",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeParseErrorOperations@241"
+            "src/internal/facets/named-time.ts#TimeParseErrorOperations@245"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "time|kind=2|receiver=|name=Ticker",
           "capabilities": [
+            "assign",
+            "copy",
             "storage"
           ],
           "export": "TimeTickerOperations",
           "storageExport": "TimeTickerStorage",
           "implementationOwner": "src/internal/facets/named-time.ts",
           "storageImplementationOwner": "src/internal/portable/time/timer.ts",
-          "targetFingerprint": "2a47d53a0009db9f8f33495b6b0dec62ffeff09b8d32e3ea02d7c4f02e13732c",
+          "targetFingerprint": "05e1f32107eb28d92c3a4ce8379387d3cadf8c4621b43892a32ab0b27719d25f",
           "storageTargetFingerprint": "ff82ffc641b89e7eb9413ff94611f8168916664a889bd2c1e13d2cade827fb49",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeTickerOperations@589"
+            "src/internal/facets/named-time.ts#TimeTickerOperations@593"
           ]
         },
         {
@@ -20069,7 +20072,7 @@
           "targetFingerprint": "1687252c7f0649c1fca7c0127fcb38be63562720dc20e8c83d909f2fdba37641",
           "storageTargetFingerprint": "3d8b77335909e153cd0f673722375d108cffbb8619bf6c3b8a291365d387accc",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeOperations@108"
+            "src/internal/facets/named-time.ts#TimeOperations@112"
           ]
         },
         {
@@ -20089,7 +20092,7 @@
           "targetFingerprint": "87a2932998d32e79fb0d30b66232e27803800558d43e17ec46f0dd5216db4f60",
           "storageTargetFingerprint": "cc81f3a16b51b1c1e42c31a3703fff179dddee41376be109e64f8df3ad372470",
           "implementationSites": [
-            "src/internal/facets/named-time.ts#TimeTimerOperations@630"
+            "src/internal/facets/named-time.ts#TimeTimerOperations@674"
           ]
         }
       ]
@@ -26723,7 +26726,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-time.ts#TimeDurationValueOperations@60",
+      "identity": "src/internal/facets/named-time.ts#TimeDurationValueOperations@64",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/time/duration.ts#Nanoseconds@64",
@@ -26731,7 +26734,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-time.ts#TimeOperations@108",
+      "identity": "src/internal/facets/named-time.ts#TimeOperations@112",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/time/time.ts#timeRepresentationAssign@2622",
@@ -26742,7 +26745,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-time.ts#TimeParseErrorOperations@241",
+      "identity": "src/internal/facets/named-time.ts#TimeParseErrorOperations@245",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/time/parse-error.ts#Layout@88",
@@ -26754,17 +26757,21 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-time.ts#TimeTickerOperations@589",
-      "disposition": "implemented"
-    },
-    {
-      "identity": "src/internal/facets/named-time.ts#TimeTimerOperations@630",
+      "identity": "src/internal/facets/named-time.ts#TimeTickerOperations@593",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/time/timer.ts#timerRepresentationAssign@699",
-        "src/internal/portable/time/timer.ts#timerRepresentationCopy@721",
-        "src/internal/portable/time/timer.ts#timerRepresentationEqual@739",
-        "src/internal/portable/time/timer.ts#timerRepresentationHash@762"
+        "src/internal/portable/time/timer.ts#tickerRepresentationAssign@1178",
+        "src/internal/portable/time/timer.ts#tickerRepresentationCopy@1200"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/named-time.ts#TimeTimerOperations@674",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/time/timer.ts#timerRepresentationAssign@728",
+        "src/internal/portable/time/timer.ts#timerRepresentationCopy@750",
+        "src/internal/portable/time/timer.ts#timerRepresentationEqual@768",
+        "src/internal/portable/time/timer.ts#timerRepresentationHash@791"
       ]
     },
     {
@@ -27357,7 +27364,7 @@
         "src/internal/portable/time/time.ts#Before@795",
         "src/internal/portable/time/time.ts#Now@2679",
         "src/internal/portable/time/time.ts#Sub@858",
-        "src/internal/portable/time/timer.ts#After@980"
+        "src/internal/portable/time/timer.ts#After@1218"
       ]
     },
     {
@@ -28128,7 +28135,7 @@
       "identity": "src/internal/facets/recovery-value.ts#TimeTickerStop@217",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/time/timer.ts#Stop@864",
+        "src/internal/portable/time/timer.ts#Stop@1007",
         "src/time.ts#Ticker@56"
       ]
     },
@@ -29489,6 +29496,10 @@
       "disposition": "implemented"
     },
     {
+      "identity": "src/internal/portable/concurrency/channel.ts#capacity@144",
+      "disposition": "implemented"
+    },
+    {
       "identity": "src/internal/portable/concurrency/channel.ts#close@350",
       "disposition": "implemented",
       "dependencies": [
@@ -29496,8 +29507,20 @@
       ]
     },
     {
+      "identity": "src/internal/portable/concurrency/channel.ts#copy@131",
+      "disposition": "implemented"
+    },
+    {
       "identity": "src/internal/portable/concurrency/channel.ts#discard@397",
       "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/concurrency/channel.ts#offer@250",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/concurrency/channel.ts#capacity@144",
+        "src/internal/portable/concurrency/channel.ts#copy@131"
+      ]
     },
     {
       "identity": "src/internal/portable/concurrency/channel.ts#zero@122",
@@ -32742,11 +32765,19 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/time/timer.ts#C@159",
+      "identity": "src/internal/portable/time/timer.ts#C@188",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#assignTickerRepresentation@157",
       "disposition": "implemented"
     },
     {
       "identity": "src/internal/portable/time/timer.ts#assignTimerRepresentation@99",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#copyTickerRepresentation@173",
       "disposition": "implemented"
     },
     {
@@ -32770,32 +32801,56 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/time/timer.ts#requireTimer@1165",
+      "identity": "src/internal/portable/time/timer.ts#requireTimer@1403",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/time/timer.ts#timerRepresentationAssign@699",
+      "identity": "src/internal/portable/time/timer.ts#scheduleTicker@1118",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/node/time/clock.ts#schedule@40",
+        "src/internal/portable/concurrency/channel.ts#offer@250",
+        "src/internal/portable/time/time.ts#Now@2679",
+        "src/internal/portable/time/timer.ts#delay@74"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#tickerRepresentationAssign@1178",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/time/timer.ts#assignTickerRepresentation@157"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#tickerRepresentationCopy@1200",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/time/timer.ts#copyTickerRepresentation@173"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/time/timer.ts#timerRepresentationAssign@728",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/time/timer.ts#assignTimerRepresentation@99"
       ]
     },
     {
-      "identity": "src/internal/portable/time/timer.ts#timerRepresentationCopy@721",
+      "identity": "src/internal/portable/time/timer.ts#timerRepresentationCopy@750",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/time/timer.ts#copyTimerRepresentation@115"
       ]
     },
     {
-      "identity": "src/internal/portable/time/timer.ts#timerRepresentationEqual@739",
+      "identity": "src/internal/portable/time/timer.ts#timerRepresentationEqual@768",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/time/timer.ts#equalTimerRepresentation@128"
       ]
     },
     {
-      "identity": "src/internal/portable/time/timer.ts#timerRepresentationHash@762",
+      "identity": "src/internal/portable/time/timer.ts#timerRepresentationHash@791",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/time/timer.ts#hashTimerRepresentation@145"
@@ -34311,5 +34366,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "10746102f14bc7f861acfadb2150858e0e4a0682ed8473afc72c05633317f66b"
+  "manifestDigest": "c8cd5529adc8926611d47bf794f151ee8a5069965df3c4f7983b09fbf0fb3e05"
 }
