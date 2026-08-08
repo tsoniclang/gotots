@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "b9cc488b9e3da375a33ef0976f44f57d2e260a829fcae9e791e68c01320bdba4",
+  "providerDigest": "4f98531b40145c3f7a63d1b778ef93dde4f5a6e1b92ddd86d976980b4d20e9b2",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -19461,7 +19461,21 @@
           "implementationOwner": "src/internal/facets/named-os.ts",
           "targetFingerprint": "93db1a9c870fc98ad078698309edfd71320e54a8fb47ce6dffdfde1a7ae7bdee",
           "implementationSites": [
-            "src/internal/facets/named-os.ts#OsFileOperations@21"
+            "src/internal/facets/named-os.ts#OsFileOperations@23"
+          ]
+        },
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "os|kind=2|receiver=|name=Process",
+          "capabilities": [
+            "assign",
+            "copy"
+          ],
+          "export": "OsProcessOperations",
+          "implementationOwner": "src/internal/facets/named-os.ts",
+          "targetFingerprint": "4e65efa14dd28bfec296ad7be6594db96b352298d2ac2e9fe5b0aa075c86630c",
+          "implementationSites": [
+            "src/internal/facets/named-os.ts#OsProcessOperations@118"
           ]
         }
       ]
@@ -26422,13 +26436,21 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-os.ts#OsFileOperations@21",
+      "identity": "src/internal/facets/named-os.ts#OsFileOperations@23",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/node/os/file.ts#assignFileValue@202",
         "src/internal/node/os/file.ts#fileValueEqual@250",
         "src/internal/node/os/file.ts#fileValueHash@279",
         "src/os.ts#File@252"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/named-os.ts#OsProcessOperations@118",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/os.ts#Pid@414",
+        "src/os.ts#Process@407"
       ]
     },
     {
@@ -33617,6 +33639,10 @@
       ]
     },
     {
+      "identity": "src/os.ts#Pid@414",
+      "disposition": "implemented"
+    },
+    {
       "identity": "src/os.ts#newFile@1019",
       "disposition": "implemented",
       "dependencies": [
@@ -34366,5 +34392,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "c8cd5529adc8926611d47bf794f151ee8a5069965df3c4f7983b09fbf0fb3e05"
+  "manifestDigest": "620185b9b5d74808e1502f8a738a397b615e9c14f3e815ba76c27d1c549e5c37"
 }

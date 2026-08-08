@@ -1901,6 +1901,17 @@
     },
     {
       "kind": "named-struct-operations",
+      "sourceIdentity": "os|kind=2|receiver=|name=Process",
+      "specifier": "@gotots/gostdlib/internal/facets/named-os.js",
+      "sourcePath": "src/internal/facets/named-os.ts",
+      "export": "OsProcessOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
       "sourceIdentity": "os/exec|kind=2|receiver=|name=Cmd",
       "specifier": "@gotots/gostdlib/internal/facets/named-os-exec.js",
       "sourcePath": "src/internal/facets/named-os-exec.ts",
