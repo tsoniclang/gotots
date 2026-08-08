@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
+	rawpointermarker "github.com/tsoniclang/gotots/internal/emit/marker/rawpointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
@@ -118,6 +119,14 @@ func (owner Owner) Equal(
 	}
 	if structType, ok := isAnonymousStruct(sourceType); ok {
 		return anonymousStructEqual(context, source, structType, left, right)
+	}
+	if rawPointerValue(sourceType) {
+		return rawpointermarker.Operation(
+			context,
+			tsoniccore.SymbolEqualRawPointer,
+			api.DirectExpression(left),
+			api.DirectExpression(right),
+		)
 	}
 	if _, ok := primitive(context, sourceType); ok {
 		return api.DirectExpression(context.Factory().BinaryExpression(

@@ -540,11 +540,27 @@ GoToTS, and must exact-join the finalized TSTS facts for every transformed
 occurrence. The unoptimized/native-target build consumes the pointer facts
 directly.
 
-`unsafe.Pointer`, raw-address arithmetic, reinterpretation, and
-pointer/integer conversion require a separate accepted raw-pointer marker
-contract. Until that contract exists, canonical output rejects the exact
-unsafe occurrence with a typed diagnostic; safe typed pointers are not lowered
-through the legacy JavaScript virtual-address representation.
+Opaque `unsafe.Pointer` identity uses the accepted target-neutral contract:
+
+```go
+pointer := unsafe.Pointer(&value)
+same := pointer == unsafe.Pointer(&value)
+lookup[pointer] = true
+```
+
+```ts
+const pointer: RawPointer | undefined = bindRawPointer(addressOf(value));
+const same = equalRawPointer(pointer, bindRawPointer(addressOf(value)));
+lookup.store(pointer, true); // the map key facet uses hashRawPointer
+```
+
+Nil remains `undefined`. A certified provider raw-pointer result is bound by
+its opaque object identity before entering generated code. Raw-address
+arithmetic, reinterpretation, raw-pointer-to-typed-pointer conversion,
+pointer/integer conversion, and provider raw-pointer inputs remain exact typed
+boundaries. Canonical output never exposes or fabricates an address, and safe
+typed pointers are not lowered through a legacy JavaScript virtual-address
+representation.
 
 ### Interfaces
 

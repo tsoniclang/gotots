@@ -461,12 +461,19 @@ Node-oriented carrier.
 ### Unsafe Pointer Memory
 
 Raw addresses are a different semantic class from typed locations. The shared
-contract does not yet define raw-address identity, offsets, reinterpretation,
-or pointer/integer conversion. GoToTS therefore emits no substitute virtual
-address, JavaScript cast, or target-specific codec in canonical source. It
-rejects the exact reached unsafe occurrence until one accepted target-neutral
-raw-pointer contract owns the class. Safe pointer semantics are never routed
-through a legacy raw-memory implementation to keep a corpus compiling.
+contract owns only opaque raw-pointer identity: `RawPointer`,
+`bindRawPointer`, `equalRawPointer`, and `hashRawPointer`. GoToTS may convert a
+safe typed pointer or a certified provider raw-pointer result to that identity,
+preserve `undefined` as nil, copy or box it, and use the canonical equality and
+hash operations. The marker and its target runtime expose no address or
+pointee.
+
+Offsets, reinterpretation, raw-pointer-to-typed-pointer conversion,
+pointer/integer conversion, and raw pointer input to a provider remain typed
+boundaries until separately accepted contracts own those operations. GoToTS
+emits no substitute virtual address, JavaScript cast, identity extraction, or
+target-specific codec in canonical source. Safe pointer semantics are never
+routed through a legacy raw-memory implementation to keep a corpus compiling.
 
 Maps use one canonical generated `GoMap<K,V>` runtime type because JavaScript
 `Map` does not preserve Go key equality, zero-on-miss, comma-ok, copy, or

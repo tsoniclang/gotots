@@ -132,6 +132,9 @@ func (m Model) Family() Family {
 }
 
 func (m Model) NilCapable() bool {
+	if basic, ok := m.Basic(); ok && basic.Kind() == types.UnsafePointer {
+		return true
+	}
 	return m.family == FamilySlice ||
 		m.family == FamilyPointer ||
 		m.family == FamilyCallable ||

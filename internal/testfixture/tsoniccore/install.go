@@ -61,6 +61,18 @@ func fixtureFiles() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	bindRawPointer, err := exportName(corecontract.SymbolBindRawPointer)
+	if err != nil {
+		return nil, err
+	}
+	equalRawPointer, err := exportName(corecontract.SymbolEqualRawPointer)
+	if err != nil {
+		return nil, err
+	}
+	hashRawPointer, err := exportName(corecontract.SymbolHashRawPointer)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]string{
 		"package.json": `{
   "type": "module",
@@ -74,6 +86,10 @@ func fixtureFiles() (map[string]string, error) {
 export interface Pointer<T> {
   readonly [pointerBrand]: (value: T) => T;
 }
+declare const rawPointerBrand: unique symbol;
+export interface RawPointer {
+  readonly [rawPointerBrand]: void;
+}
 `,
 		"types.js": "export {};\n",
 		"lang.d.ts": fmt.Sprintf(`import type { Pointer } from "./types.js";
@@ -86,7 +102,10 @@ export declare function %[6]s<T>(pointer: Pointer<T> | undefined): number;
 export declare function %[7]s<F, T>(pointer: Pointer<F>, fromSource: (value: F) => T, toSource: (value: T) => F): Pointer<T>;
 export declare function %[7]s<F, T>(pointer: Pointer<F> | undefined, fromSource: (value: F) => T, toSource: (value: T) => F): Pointer<T> | undefined;
 export declare function %[8]s<T>(identity: object, read: () => T, write: (value: T) => void): Pointer<T>;
-`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer),
+export declare function %[9]s(identity: object): import("./types.js").RawPointer;
+export declare function %[10]s(left: import("./types.js").RawPointer | undefined, right: import("./types.js").RawPointer | undefined): boolean;
+export declare function %[11]s(pointer: import("./types.js").RawPointer | undefined): number;
+`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer),
 		"lang.js": fmt.Sprintf(`const unsupported = (name) => {
   throw new Error("resolution-only Tsonic core fixture executed " + name);
 };
@@ -98,7 +117,10 @@ export const %[5]s = () => unsupported("%[5]s");
 export const %[6]s = () => unsupported("%[6]s");
 export const %[7]s = () => unsupported("%[7]s");
 export const %[8]s = () => unsupported("%[8]s");
-`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer),
+export const %[9]s = () => unsupported("%[9]s");
+export const %[10]s = () => unsupported("%[10]s");
+export const %[11]s = () => unsupported("%[11]s");
+`, addressOf, allocatePointer, loadPointer, storePointer, equalPointer, hashPointer, projectPointer, bindPointer, bindRawPointer, equalRawPointer, hashRawPointer),
 	}, nil
 }
 

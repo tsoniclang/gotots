@@ -30,10 +30,20 @@ func TestResolutionFixtureIsCompleteAndFailsOnExecution(t *testing.T) {
 		"hashPointer",
 		"projectPointer",
 		"bindPointer",
+		"bindRawPointer",
+		"equalRawPointer",
+		"hashRawPointer",
 	} {
 		if !strings.Contains(string(declarations), "function "+name) ||
 			!strings.Contains(string(runtime), `unsupported("`+name+`")`) {
 			t.Fatalf("resolution fixture lacks %s", name)
 		}
+	}
+	types, err := os.ReadFile(filepath.Join(module, "types.d.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(types), "interface RawPointer") {
+		t.Fatal("resolution fixture lacks RawPointer")
 	}
 }

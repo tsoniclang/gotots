@@ -235,7 +235,7 @@ Each type/value family has focused differentials and mutations:
 | arrays | length, zero, value copy, index/address, nested elements |
 | slices | nil, make, append, capacity, overlap copy, slicing, bounds, element storage |
 | pointers | canonical marker facts, nil, alias, read/store, equality, local/field/index addresses, target flow lowering |
-| unsafe pointers | typed unsupported boundary until the accepted raw-pointer contract exists |
+| unsafe pointers | opaque bind/nil/copy/interface/equality/hash/map identity; reinterpretation, arithmetic, pointer/integer, and provider-input boundaries |
 | maps | nil, set/get/comma-ok/delete/clear, key equality/hash, zero-on-miss, iteration |
 | strings | bytes/runes, indexing, range, slicing, conversions |
 | defined types | identity, native methodless fixed-width numerics, projection/wrap, methods, nil-capable families |
@@ -280,13 +280,22 @@ operation. Removing either annotation must produce the pinned strict
 TypeScript diagnostic; adding runtime coercion or annotating ordinary direct
 numeric declarations fails the artifact-shape gate.
 
-Unsafe-pointer proof currently asserts the typed boundary. Fixtures cover
-`unsafe.Pointer`, offset arithmetic, reinterpretation, and pointer/integer
-conversion and require a diagnostic carrying the exact Go occurrence and
-selected source/target types. A mutation that emits the former virtual-address
-runtime, a JavaScript cast, a fabricated target-neutral fact, or a generic
-throwing placeholder must fail. Exact runtime proof resumes only after a shared
-raw-pointer contract is separately accepted.
+Unsafe-pointer proof separates opaque identity from raw memory. Differential
+fixtures convert the same and different typed locations to `unsafe.Pointer`,
+cover nil, copies, interface boxing, equality, hashing, and map keys, and exact-
+join the emitted canonical raw-pointer marker facts. Provider fixtures prove
+that repeated certified provider identities bind to the same raw identity and
+that nil remains nil. Target fixtures lower nested safe/raw marker calls in one
+AST pass and prove that a local same-spelled function is untouched.
+
+Separate negative fixtures cover offset arithmetic, reinterpretation,
+raw-pointer-to-typed-pointer conversion, pointer/integer conversion, and raw
+pointer input to a provider. They require a diagnostic carrying the exact Go
+occurrence and selected source/target types. Mutations that restore the former
+virtual-address runtime, use JavaScript equality or object hashing directly,
+expose the provider identity, emit a cast, select by spelling, or fabricate a
+target-neutral fact must fail. Broad searches prove that no legacy raw-memory
+carrier or alternate raw-pointer route remains.
 
 ## Struct, Receiver, And Embedding Proof
 

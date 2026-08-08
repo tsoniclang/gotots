@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
+	rawpointermarker "github.com/tsoniclang/gotots/internal/emit/marker/rawpointer"
 	runtimecomplex "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
@@ -55,6 +56,9 @@ func supportsHash(
 		return true
 	}
 	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok {
+		if basic.Kind() == types.UnsafePointer {
+			return true
+		}
 		if basic.Info()&types.IsUntyped != 0 ||
 			basic.Info()&(types.IsBoolean|
 				types.IsInteger|
@@ -220,6 +224,13 @@ func (owner Owner) Hash(
 			source,
 			structType,
 			value,
+		)
+	}
+	if rawPointerValue(sourceType) {
+		return rawpointermarker.Operation(
+			context,
+			tsoniccore.SymbolHashRawPointer,
+			api.DirectExpression(value),
 		)
 	}
 	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok {

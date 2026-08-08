@@ -15,6 +15,10 @@ const (
 	SymbolHashPointer
 	SymbolProjectPointer
 	SymbolBindPointer
+	SymbolRawPointer
+	SymbolBindRawPointer
+	SymbolEqualRawPointer
+	SymbolHashRawPointer
 )
 
 type Phase uint8
@@ -67,6 +71,18 @@ func Resolve(symbol Symbol) (Declaration, error) {
 		return value("projectPointer"), nil
 	case SymbolBindPointer:
 		return value("bindPointer"), nil
+	case SymbolRawPointer:
+		return Declaration{
+			module: "@tsonic/core/types.js",
+			export: "RawPointer",
+			phase:  PhaseType,
+		}, nil
+	case SymbolBindRawPointer:
+		return value("bindRawPointer"), nil
+	case SymbolEqualRawPointer:
+		return value("equalRawPointer"), nil
+	case SymbolHashRawPointer:
+		return value("hashRawPointer"), nil
 	default:
 		return Declaration{}, fmt.Errorf(
 			"resolve Tsonic core symbol: invalid symbol %d",

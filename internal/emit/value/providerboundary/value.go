@@ -86,6 +86,14 @@ func fromProviderValueWithPolicy(
 	if err != nil || pointer {
 		return converted, changed, err
 	}
+	converted, rawPointer, changed, err := fromProviderRawPointer(
+		context,
+		sourceType,
+		value,
+	)
+	if err != nil || rawPointer {
+		return converted, changed, err
+	}
 	converted, scalar, changed, err := fromProviderScalar(
 		context,
 		sourceType,
@@ -249,6 +257,14 @@ func toProviderValueWithPolicy(
 		leafPolicy,
 	)
 	if err != nil || pointer {
+		return converted, changed, err
+	}
+	converted, rawPointer, changed, err := toProviderRawPointer(
+		context,
+		sourceType,
+		value,
+	)
+	if err != nil || rawPointer {
 		return converted, changed, err
 	}
 	converted, scalar, changed, err := toProviderScalar(

@@ -144,7 +144,73 @@ func TestConversionTargetSpellingDoesNotSelectSemantics(t *testing.T) {
 	}
 }
 
-func TestRawUnsafePointerConversionsFailAtTheTypedBoundary(t *testing.T) {
+func TestOpaqueRawPointerIdentityEmitsCanonicalMarkers(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(directory, "go.mod"),
+		[]byte("module example.com/rawidentity\n\ngo 1.26.4\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(directory, "source.go"),
+		[]byte(`package conversion
+
+import "unsafe"
+
+func Bind(value *int32) unsafe.Pointer { return unsafe.Pointer(value) }
+func Nil() unsafe.Pointer { return nil }
+func Same(left, right unsafe.Pointer) bool { return left == right }
+func Lookup(pointer unsafe.Pointer) bool {
+	values := map[unsafe.Pointer]bool{pointer: true}
+	return values[pointer]
+}
+`),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roots []emit.Root
+	for _, name := range []string{"Bind", "Nil", "Same", "Lookup"} {
+		root, rootErr := emit.NewRoot(loaded.Types().Scope().Lookup(name))
+		if rootErr != nil {
+			t.Fatal(rootErr)
+		}
+		roots = append(roots, root)
+	}
+	emission, err := emit.Compile(loaded.Program(), roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	strictTypecheckEmission(t, emission)
+	_, _, printed := printConversions(t, t.TempDir(), emission)
+	for _, required := range []string{
+		`import type { RawPointer } from "@tsonic/core/types.js"`,
+		`bindRawPointer`,
+		`equalRawPointer`,
+		`hashRawPointer`,
+		`RawPointer | undefined`,
+	} {
+		if !strings.Contains(printed, required) {
+			t.Fatalf("raw-pointer identity output lacks %q:\n%s", required, printed)
+		}
+	}
+	for _, forbidden := range []string{"GoUnsafePointer", "GoPointer", " as unknown", " as any"} {
+		if strings.Contains(printed, forbidden) {
+			t.Fatalf("raw-pointer identity output retains %q:\n%s", forbidden, printed)
+		}
+	}
+}
+
+func TestRawPointerMemoryConversionsFailAtTheTypedBoundary(t *testing.T) {
 	for _, testCase := range []struct {
 		name     string
 		source   string
@@ -175,7 +241,7 @@ func Convert(value *int32) uintptr {
 			category: api.CategoryExpression,
 		},
 		{
-			name: "raw pointer signature",
+			name: "integer to raw pointer",
 			source: `package boundary
 
 import "unsafe"
@@ -184,7 +250,7 @@ func Convert(value uintptr) unsafe.Pointer {
 	return unsafe.Pointer(value)
 }
 `,
-			category: api.CategoryType,
+			category: api.CategoryExpression,
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {

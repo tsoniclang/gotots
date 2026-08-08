@@ -11,6 +11,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestEveryRuntimeNumericConversionCellPrintsAndStrictTypechecks(
@@ -122,6 +123,9 @@ func strictTypecheckEmission(
 ) int {
 	t.Helper()
 	workingDirectory := t.TempDir()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
 	if err != nil {
 		t.Fatal(err)

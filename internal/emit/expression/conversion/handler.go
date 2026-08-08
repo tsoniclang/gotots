@@ -12,11 +12,11 @@ import (
 	complexconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/complex"
 	floatconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/float"
 	pointerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/pointer"
+	rawpointerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/rawpointer"
 	slicearrayconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/slicearray"
 	stringconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/stringvalue"
 	structconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/structvalue"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
@@ -76,11 +76,6 @@ func Emit(
 		return target, true, err
 	}
 	sourceType := operandFacts.Type
-	if basictype.SupportsUnsafePointer(sourceType) ||
-		basictype.SupportsUnsafePointer(targetType) {
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
 	if isUntypedNil(sourceType) {
 		target, err := context.Values().Zero(
 			context.WithRole(api.RoleConversionOperand),
@@ -159,11 +154,6 @@ func Apply(
 		!types.ConvertibleTo(sourceType, targetType) {
 		return api.ExpressionEmission{}, false, nil
 	}
-	if basictype.SupportsUnsafePointer(sourceType) ||
-		basictype.SupportsUnsafePointer(targetType) {
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
 	var err error
 	if target, handled, interfaceErr := interfacevalue.Convert(
 		context,
@@ -173,6 +163,15 @@ func Apply(
 		operandValue,
 	); handled {
 		return target, true, interfaceErr
+	}
+	if target, handled, rawPointerErr := rawpointerconversion.Convert(
+		context,
+		source,
+		sourceType,
+		targetType,
+		operandValue,
+	); handled {
+		return target, true, rawPointerErr
 	}
 	if types.Identical(sourceType, targetType) {
 		if _, ok := callable.Signature(targetType); ok {

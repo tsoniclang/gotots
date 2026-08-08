@@ -6,6 +6,7 @@ import (
 
 	representationcontract "github.com/tsoniclang/gotots/internal/contracts/representation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	rawpointermarker "github.com/tsoniclang/gotots/internal/emit/marker/rawpointer"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 )
@@ -24,11 +25,7 @@ func EmitRepresented(
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
 	if SupportsUnsafePointer(sourceType) {
-		return api.TypeEmission{}, api.Unsupported(
-			context,
-			api.CategoryType,
-			source,
-		)
+		return rawpointermarker.Type(context, true)
 	}
 	if _, ok := complexvalue.Describe(sourceType); ok {
 		return complexvalue.EmitType(context, source, sourceType)
