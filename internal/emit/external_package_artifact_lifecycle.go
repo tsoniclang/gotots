@@ -66,10 +66,14 @@ func captureSourceImplementationInputs(
 	if err != nil {
 		return sourceImplementationInputs{}, err
 	}
+	registry, err := session.registry.TransferCanonicalIdentity()
+	if err != nil {
+		return sourceImplementationInputs{}, err
+	}
 	return sourceImplementationInputs{
 		contracts: contracts,
 		targets:   targets,
-		registry:  session.registry,
+		registry:  registry,
 	}, nil
 }
 

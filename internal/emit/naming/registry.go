@@ -205,6 +205,8 @@ type Target struct {
 }
 
 type Registry struct {
+	transferReady                       bool
+	finalSessionClaimed                 bool
 	provider                            standardLibraryProvider
 	providerImportNameByModule          map[string]string
 	byObject                            map[types.Object]targetBinding
@@ -251,6 +253,35 @@ type Registry struct {
 	reflectionValueDemands              map[string]struct{}
 	reflectionValueContracts            map[string]struct{}
 	reflectionTypeNames                 map[string]string
+}
+
+func (r *Registry) TransferCanonicalIdentity() (*Registry, error) {
+	if r == nil || r.transferReady || r.finalSessionClaimed {
+		return nil, &api.NameError{
+			Reason: "canonical identity registry transfer is invalid",
+		}
+	}
+	r.providerInterfaceCapabilityDemands =
+		make(map[string]providerInterfaceCapabilityBinding)
+	r.providerInterfaceBridgesByContract = make(map[string]map[string]struct{})
+	r.interfaceAdaptersByContract = make(map[string]map[string]struct{})
+	r.interfaceContractDemands =
+		make(map[string]map[string]interfaceContractDemand)
+	r.interfaceReflectionDemands = make(map[string]interfaceReflectionDemand)
+	r.reflectionValueDemands = make(map[string]struct{})
+	r.reflectionValueContracts = make(map[string]struct{})
+	r.transferReady = true
+	return r, nil
+}
+
+func (r *Registry) ClaimFinalSession() error {
+	if r == nil || !r.transferReady || r.finalSessionClaimed {
+		return &api.NameError{
+			Reason: "canonical identity registry final-session claim is invalid",
+		}
+	}
+	r.finalSessionClaimed = true
+	return nil
 }
 
 func NewRegistry() *Registry {

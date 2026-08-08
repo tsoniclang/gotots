@@ -1223,6 +1223,13 @@ signature, placement, and lexical anchor, and the registry returns its one
 canonical artifact. Equality of Go wrapper pointers is not evidence. The same
 stable key with any differing semantic field fails closed.
 
+Before ownership transfer, the registry deletes every first-session
+observation set: interface transitions, adapter/bridge reachability,
+provider-capability demands, reflection demands, and value-operation demands.
+Those are liveness inputs, not identity facts, and the final session must
+derive them only from its own consumers. Transfer and final-session claim are
+each single-use operations.
+
 For callable exports, the surface join is signature-exact rather than
 name-only. GoToTS preserves the selected Go signature in ordinary canonical
 callers and binds the authored module by exact export identity. TSTS is the one

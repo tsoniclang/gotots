@@ -839,6 +839,11 @@ package. Recreating its semantically identical concretization in the final
 session must reuse the transferred canonical artifact. Mutations retain the
 stable key while changing one type argument, signature, placement, or lexical
 anchor; each must fail the registry join rather than create a sibling artifact.
+The transfer fixture seeds every observation class, preserves representative
+canonical name/type facts, and proves that transfer clears all observations.
+A repeated transfer or second final-session claim must fail. A mutation that
+retains one first-session interface or reflection observation must either fail
+the exact final graph or be caught as an undemanded generated artifact.
 The fixture includes a cross-package assertion against an exported interface:
 the ordinary and installed assemblies must both export the interface type,
 runtime contract, and guard; the final consumer must import the bindings only

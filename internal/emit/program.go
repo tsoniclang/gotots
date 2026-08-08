@@ -282,6 +282,11 @@ func newProgramSessionWithRegistry(
 	options Options,
 	registry *emitnaming.Registry,
 ) (*programSession, error) {
+	if registry != nil {
+		if err := registry.ClaimFinalSession(); err != nil {
+			return nil, err
+		}
+	}
 	scalar, err := programScalarABI(source, options.IntegerRepresentation)
 	if err != nil {
 		return nil, err
