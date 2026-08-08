@@ -14,6 +14,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
 
 func TestNamedStructSyntheticBindingsAndReceiverCopyHaveExactShape(
@@ -261,6 +262,9 @@ func strictTypecheck(
 		"--noEmit",
 	}
 	arguments = append(arguments, targetPaths...)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		return err
+	}
 	return tsgo.Compile(ctx, repositoryRoot(), workingDirectory, arguments)
 }
 

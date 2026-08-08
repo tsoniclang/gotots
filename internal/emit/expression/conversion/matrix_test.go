@@ -11,6 +11,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
@@ -164,6 +165,9 @@ func strictTypecheckEmission(
 		"--noEmit",
 	}
 	arguments = append(arguments, paths...)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	if err := tsgo.Compile(
 		ctx,
 		repositoryRoot(),

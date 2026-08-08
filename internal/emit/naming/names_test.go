@@ -484,7 +484,7 @@ func TestPrimitiveAliasImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing
 	if len(requests) != 1 ||
 		requests[0].ExportedName() != "int32" ||
 		requests[0].LocalName() != expectedLocal ||
-		requests[0].ModulePath() != "../../runtime/scalars.js" {
+		requests[0].ModulePath() != "@gotots/runtime/scalars.js" {
 		t.Fatalf("primitive request = %#v", requests)
 	}
 	alias, ok := requests[0].PrimitiveAlias()
@@ -542,7 +542,7 @@ func TestRuntimeImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing.T) {
 	if len(requests) != 1 ||
 		requests[0].ExportedName() != "goStringIndex" ||
 		requests[0].LocalName() != expectedLocal ||
-		requests[0].ModulePath() != "../../runtime/string.js" {
+		requests[0].ModulePath() != "@gotots/runtime/string.js" {
 		t.Fatalf("runtime request = %#v", requests)
 	}
 	symbol, ok := requests[0].RuntimeSymbol()

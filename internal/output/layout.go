@@ -292,6 +292,24 @@ func ModuleSpecifier(fromSourcePath string, toSourcePath string) (string, error)
 	return relative, nil
 }
 
+func RuntimeModuleSpecifier(runtimeSourcePath string) (string, error) {
+	if err := validateSourcePath(runtimeSourcePath); err != nil {
+		return "", err
+	}
+	relative, ok := strings.CutPrefix(
+		runtimeSourcePath,
+		RuntimePackageRootPath+"/",
+	)
+	if !ok || relative == "" {
+		return "", &PathError{
+			Source: runtimeSourcePath,
+			Reason: "source module is outside the runtime package",
+		}
+	}
+	return RuntimePackageName + "/" +
+		strings.TrimSuffix(relative, ".ts") + ".js", nil
+}
+
 func moduleRelativePackage(sourcePackage *load.Package) (string, error) {
 	if sourcePackage.Path() == sourcePackage.ModulePath() {
 		return "_root", nil

@@ -11,6 +11,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
@@ -466,6 +467,9 @@ func typecheckDefined(
 	}
 	arguments = append(arguments, paths...)
 	arguments = append(arguments, runnerPath)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		return err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	return tsgo.Compile(

@@ -14,6 +14,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
 
 func TestGenericAppendSpreadTypeFamiliesExecuteDifferentially(t *testing.T) {
@@ -146,6 +147,9 @@ func typecheck(t *testing.T, directory string, paths []string) {
 		"--outDir", filepath.Join(directory, "out"),
 	}
 	arguments = append(arguments, paths...)
+	if err := runtimefixture.InstallResolution(directory, filepath.Join(directory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := tsgo.Compile(

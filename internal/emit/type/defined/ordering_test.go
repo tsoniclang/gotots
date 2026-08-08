@@ -10,6 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
@@ -150,6 +151,9 @@ console.log(String(values.IntFromCount(values.CountArrayCompoundOrder())));
 	}
 	arguments = append(arguments, artifacts.paths...)
 	arguments = append(arguments, runnerPath)
+	if err := runtimefixture.InstallResolution(workingDirectory, outputDirectory); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := tsgo.Compile(

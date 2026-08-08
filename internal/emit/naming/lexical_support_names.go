@@ -297,8 +297,7 @@ func (n *File) constantProjectionImportName(
 
 func (n *File) Primitive(alias api.PrimitiveAlias) (api.NameReference, error) {
 	if existing := n.primitives[alias]; existing != "" {
-		modulePath, err := output.ModuleSpecifier(
-			n.targetPath,
+		modulePath, err := output.RuntimeModuleSpecifier(
 			output.ScalarSupportPath,
 		)
 		if err != nil {
@@ -331,8 +330,7 @@ func (n *File) Primitive(alias api.PrimitiveAlias) (api.NameReference, error) {
 	}
 	n.importNames[localName] = struct{}{}
 	n.primitives[alias] = localName
-	modulePath, err := output.ModuleSpecifier(
-		n.targetPath,
+	modulePath, err := output.RuntimeModuleSpecifier(
 		output.ScalarSupportPath,
 	)
 	if err != nil {
@@ -380,8 +378,7 @@ func (n *File) Runtime(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	modulePath, err := output.ModuleSpecifier(
-		n.targetPath,
+	modulePath, err := output.RuntimeModuleSpecifier(
 		contract.OutputPath(),
 	)
 	if err != nil {

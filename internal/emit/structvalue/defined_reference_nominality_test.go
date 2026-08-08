@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
@@ -91,6 +92,9 @@ func typecheckStructuralFiles(directory string, paths []string) error {
 		"--noEmit",
 	}
 	arguments = append(arguments, paths...)
+	if err := runtimefixture.InstallResolution(directory, filepath.Join(directory, "out")); err != nil {
+		return err
+	}
 	return tsgo.Compile(
 		ctx,
 		repositoryRoot(),

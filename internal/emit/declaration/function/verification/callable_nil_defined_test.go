@@ -11,6 +11,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
@@ -535,6 +536,12 @@ func typecheckMaterializedTypeScript(
 	runnerPath string,
 ) error {
 	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		return err
+	}
+	if err := runtimefixture.InstallResolution(
+		workingDirectory,
+		filepath.Join(workingDirectory, "out"),
+	); err != nil {
 		return err
 	}
 	arguments := []string{

@@ -1,6 +1,6 @@
-import type { bool, int32 } from "../../../runtime/scalars.js";
+import type { bool, int32 } from "@gotots/runtime/scalars.js";
 import type { Pointer } from "@tsonic/core/types.js";
-import { GoPanic } from "../../../runtime/panic.js";
+import { GoPanic } from "@gotots/runtime/panic.js";
 import { addressOf, loadPointer } from "@tsonic/core/lang.js";
 export class Point {
     declare private readonly $goType: void;

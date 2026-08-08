@@ -19,6 +19,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
@@ -152,9 +153,9 @@ func assertPrimitiveImportDeclaration(
 		t.Fatalf("first target statement = %T, want tsgo.ImportDeclaration", statement)
 	}
 	module, ok := declaration.ModuleSpecifier().(tsgo.StringLiteral)
-	if !ok || module.Text() != "../../../runtime/scalars.js" {
+	if !ok || module.Text() != "@gotots/runtime/scalars.js" {
 		t.Fatalf(
-			"type import module = %T, want ../../../runtime/scalars.js",
+			"type import module = %T, want @gotots/runtime/scalars.js",
 			declaration.ModuleSpecifier(),
 		)
 	}
@@ -394,6 +395,12 @@ func executeMaterializedTypeScript(
 		t.Fatal(err)
 	}
 	outputDirectory := filepath.Join(workingDirectory, "out")
+	if err := runtimefixture.InstallResolution(
+		workingDirectory,
+		outputDirectory,
+	); err != nil {
+		t.Fatal(err)
+	}
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",

@@ -1118,6 +1118,12 @@ source digests, but excludes output/report paths.
 The output contract is canonical strict ESM source. Project assembly writes a
 root `package.json` with `type: module` and the exact selected physical package
 dependencies (`@gotots/runtime` and any selected certified providers).
+Every generated module outside the runtime package imports runtime declarations
+through the canonical `@gotots/runtime/*.js` package identity, never through a
+relative path. Runtime-package modules may use relative imports within that one
+package. This keeps generated source and certified provider implementations on
+one nominal TypeScript identity even when the installed package is a symlink to
+the emitted runtime directory.
 `@tsonic/core` is omitted because TSTS supplies that authoritative virtual
 module rather than resolving a physical package. Top-level await is never made
 valid by rewriting generated modules as CommonJS. GoToTS prints and seals that

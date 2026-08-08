@@ -1,4 +1,4 @@
-import type { int32 } from "../../../runtime/scalars.js";
+import type { int32 } from "@gotots/runtime/scalars.js";
 export function Classify(value: int32): int32 {
     let result = 0;
     {

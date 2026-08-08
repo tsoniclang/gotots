@@ -14,6 +14,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
 
 func TestStringFamilyCreatesExactTargetTrees(t *testing.T) {
@@ -440,6 +441,9 @@ func compileTypeScript(t *testing.T, directory string, targetPaths []string) {
 		"--outDir", filepath.Join(directory, "out"),
 	}
 	arguments = append(arguments, targetPaths...)
+	if err := runtimefixture.InstallResolution(directory, filepath.Join(directory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	if err := tsgo.Compile(ctx, repositoryRoot(), directory, arguments); err != nil {
 		t.Fatal(err)
 	}
