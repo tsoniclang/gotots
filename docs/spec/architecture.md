@@ -1191,8 +1191,12 @@ the one canonical name/support-identity registry. When a final consumer requests
 selected-package source artifact, the source owner publishes the captured
 observable contract with no body, storage, initializer, class contribution, or
 target declaration and reinstalls only that contract's captured outgoing
-support requirements and observable dependency edges. Selected-package source
-code is never traversed for body translation in this session. The shared
+support requirements and observable dependency edges. A dependency whose
+provider belongs to any selected replacement package is satisfied by that
+authored package transaction and is not replayed as a generated source edge;
+generated support and source dependencies outside the replacement set remain
+exact. Selected-package source code is never traversed for body translation in
+this session. The shared
 checked program may be read only to index top-level declaration identity and
 locate a captured source owner; neither operation emits a request or
 representation. Therefore only requirements consumed by the final graph can

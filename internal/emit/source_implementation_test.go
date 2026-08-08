@@ -20,9 +20,12 @@ func TestSourceImplementationAtomicallyReplacesGeneratedPackage(t *testing.T) {
 	root := t.TempDir()
 	writeSourceImplementationFixture(t, filepath.Join(root, "go.mod"), "module example.test/app\n\ngo 1.26.4\n")
 	writeSourceImplementationFixture(t, filepath.Join(root, "fast", "fast.go"), `package fast
-func Sum(value string) int { return len(value) * 100 }
+func Sum(value string) int { return helper(value) * 100 }
 func Read(value *int) int { return *value }
 type Reader interface { Read() int }
+`)
+	writeSourceImplementationFixture(t, filepath.Join(root, "fast", "helper.go"), `package fast
+func helper(value string) int { return len(value) }
 `)
 	writeSourceImplementationFixture(t, filepath.Join(root, "main.go"), `package app
 import "example.test/app/fast"
@@ -135,6 +138,38 @@ export function Sum(value: string): number { return value.length; }
 		t.Fatal(err)
 	}
 	fastPackage := program.PackageByPath("example.test/app/fast")
+	sumOwner := api.MustSourceArtifactOwner(
+		fastPackage.Types().Scope().Lookup("Sum"),
+	)
+	helper := fastPackage.Types().Scope().Lookup("helper")
+	helperDependency, err := api.NewArtifactDependency(
+		api.MustSourceArtifactOwner(helper),
+		api.ArtifactFacetImplementation,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	valueDependency, err := api.NewArtifactDependency(
+		api.MustSourceArtifactOwner(
+			program.PackageByPath("example.test/app").Types().Scope().Lookup("Value"),
+		),
+		api.ArtifactFacetImplementation,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retained := contractSession.sourceImplementationDependencies(
+		[]api.ArtifactDependency{helperDependency, valueDependency},
+	)
+	if len(retained) != 1 || retained[0] != valueDependency {
+		t.Fatal("source-implementation dependency filter lost its ownership boundary")
+	}
+	for _, dependency := range inputs.contracts[sumOwner].dependencies {
+		object, sourceOwned := dependency.Provider().Source()
+		if sourceOwned && object.Pkg() == fastPackage.Types() {
+			t.Fatalf("captured Sum retained selected-package dependency %s", object.Name())
+		}
+	}
 	readerOwner := api.MustSourceArtifactOwner(
 		fastPackage.Types().Scope().Lookup("Reader"),
 	)

@@ -834,6 +834,11 @@ observable contract, retain one unrequested ordinary generated support
 declaration, or install replacement only after final assembly. Each fails at
 the lifecycle, contract,
 final-membership, private-value, or strict-consumer gate with the exact owner.
+The replacement capture fixture feeds a selected-package implementation edge
+through the dependency filter and proves it is absent, while generated support
+requirements remain and an unselected-package dependency survives the same
+filter. Retaining the selected edge must fail because the final graph has no
+generated implementation facet for an authored declaration.
 The two-session fixture also reaches a generic call outside the replaced
 package. Recreating its semantically identical concretization in the final
 session must reuse the transferred canonical artifact. Mutations retain the

@@ -105,6 +105,7 @@ func (s *programSession) captureSourceImplementationContracts() (
 				Reason: "source-implementation artifact dependencies are absent",
 			}
 		}
+		dependencies = s.sourceImplementationDependencies(dependencies)
 		result[owner] = sourceImplementationContract{
 			contract:     contract,
 			dependencies: dependencies,
@@ -121,6 +122,26 @@ func (s *programSession) captureSourceImplementationContracts() (
 		}
 	}
 	return result, nil
+}
+
+func (s *programSession) sourceImplementationDependencies(
+	dependencies []api.ArtifactDependency,
+) []api.ArtifactDependency {
+	result := make([]api.ArtifactDependency, 0, len(dependencies))
+	for _, dependency := range dependencies {
+		object, sourceOwned := dependency.Provider().Source()
+		if sourceOwned && object.Pkg() != nil {
+			sourcePackage := s.source.PackageForTypes(object.Pkg())
+			if _, selected := sourceImplementationForPackage(
+				s.sourceImplementations,
+				sourcePackage,
+			); selected {
+				continue
+			}
+		}
+		result = append(result, dependency)
+	}
+	return result
 }
 
 func (s *programSession) sourceImplementationContract(
