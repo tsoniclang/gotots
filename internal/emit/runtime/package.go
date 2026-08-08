@@ -507,11 +507,6 @@ func packageSourceFile(
 	}, nil
 }
 
-type packageExport struct {
-	Types   string `json:"types"`
-	Default string `json:"default"`
-}
-
 type packageMetadata struct {
 	IntegerRepresentation string `json:"integerRepresentation"`
 	NativeIntegerBits     uint8  `json:"nativeIntegerBits"`
@@ -519,12 +514,12 @@ type packageMetadata struct {
 }
 
 type packageDocument struct {
-	Name    string                   `json:"name"`
-	Version string                   `json:"version"`
-	Private bool                     `json:"private"`
-	Type    string                   `json:"type"`
-	GoToTS  packageMetadata          `json:"gotots"`
-	Exports map[string]packageExport `json:"exports"`
+	Name    string            `json:"name"`
+	Version string            `json:"version"`
+	Private bool              `json:"private"`
+	Type    string            `json:"type"`
+	GoToTS  packageMetadata   `json:"gotots"`
+	Exports map[string]string `json:"exports"`
 }
 
 func packageManifest(
@@ -532,7 +527,7 @@ func packageManifest(
 	concurrency api.ConcurrencySemantics,
 	files []PackageFile,
 ) ([]byte, string, error) {
-	exports := make(map[string]packageExport, len(files))
+	exports := make(map[string]string, len(files))
 	for _, file := range files {
 		relative, ok := strings.CutPrefix(
 			file.outputPath,
@@ -556,10 +551,7 @@ func packageManifest(
 				Reason: "runtime package contains duplicate module " + subpath,
 			}
 		}
-		exports[subpath] = packageExport{
-			Types:   "./" + base + ".d.ts",
-			Default: "./" + base + ".js",
-		}
+		exports[subpath] = "./" + base + ".js"
 	}
 	document := packageDocument{
 		Name:    targetoutput.RuntimePackageName,

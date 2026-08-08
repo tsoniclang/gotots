@@ -27,7 +27,7 @@ func StateField(
 	if err != nil {
 		return nil, nil, err
 	}
-	target, err := children.RepresentedType(
+	target, err := context.Values().StorageType(
 		context.WithRole(api.RolePackageVariableType),
 		nil,
 		variable.Type(),

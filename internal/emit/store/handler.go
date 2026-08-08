@@ -412,7 +412,7 @@ func packageVariable(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewStoreTargetEmission(
+	return api.NewCanonicalStorageTargetEmission(
 		reference.Expression(context.Factory()),
 		variable.Type(),
 		reference.Requests(),

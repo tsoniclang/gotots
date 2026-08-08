@@ -243,6 +243,15 @@ func Result() int32 { return Global.Value }
 			storage.field.Type(),
 		)
 	}
+	name, ok := reference.TypeName().(tsgo.Identifier)
+	if !ok || !strings.HasSuffix(name.Text(), api.StructStorageTypeSuffix) {
+		t.Fatalf(
+			"generic package storage type name = %T/%v, want *%s",
+			reference.TypeName(),
+			reference.TypeName(),
+			api.StructStorageTypeSuffix,
+		)
+	}
 	if got := len(reference.TypeArguments()); got != 1 ||
 		got != boxTypeParameters {
 		t.Fatalf(

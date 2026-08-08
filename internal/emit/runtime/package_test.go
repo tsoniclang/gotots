@@ -57,10 +57,7 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 			IntegerRepresentation string `json:"integerRepresentation"`
 			NativeIntegerBits     uint8  `json:"nativeIntegerBits"`
 		} `json:"gotots"`
-		Exports map[string]struct {
-			Types   string `json:"types"`
-			Default string `json:"default"`
-		} `json:"exports"`
+		Exports map[string]string `json:"exports"`
 	}
 	if err := json.Unmarshal(assembled.Manifest(), &manifest); err != nil {
 		t.Fatal(err)
@@ -82,8 +79,7 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 		)
 	}
 	scalar := manifest.Exports["./scalars.js"]
-	if scalar.Types != "./scalars.d.ts" ||
-		scalar.Default != "./scalars.js" {
+	if scalar != "./scalars.js" {
 		t.Fatalf("scalar package export = %#v", scalar)
 	}
 	if assembled.Fingerprint() == "" {

@@ -1236,6 +1236,10 @@ Each Go package emits deterministic ESM modules plus one package assembly.
 Mutable package variables live in one state module. Checker
 `types.Info.InitOrder` and the package import graph determine package and
 program initialization order; target import order does not.
+Each state field carries the value's storage representation, not its public
+value wrapper. Reads, writes, initialization, and addresses use the same
+storage projection owner, so a later-demanded struct storage facet revises the
+state declaration and every dependent artifact together.
 Compiler-supplied `//go:embed` values initialize their owning package storage
 before source initializers through the same package-state assignment path.
 String payload materialization preserves every Go byte, including NUL and
@@ -1260,6 +1264,12 @@ Generated support is GoToTS-owned under `runtime/` and demand-created. The
 same physical runtime package is linked into generated code and `gostdlib`,
 so class identity, panic carriers, maps, slices, pointers, channels, and
 interface tokens are unique.
+
+The runtime package manifest maps each public `.js` subpath directly to that
+same `.js` path. This one stage-neutral export lets NodeNext resolve the
+corresponding `.ts` file while canonical source is being checked and the
+co-located `.d.ts` declaration after JavaScript emission. A manifest must not
+name declarations that do not yet exist in the canonical source tree.
 
 Every target file is built from exact generated bindings for the pinned TS-Go
 external AST protocol. The encoder validates required fields and discriminants.

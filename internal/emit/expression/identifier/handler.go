@@ -54,6 +54,15 @@ func Emit(
 			reference.Expression(context.Factory()),
 			reference.Requests()...,
 		)
+		target, err = context.Values().FromStorage(
+			context,
+			source,
+			variable.Type(),
+			target,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		if !reference.ProviderBoundary() {
 			return target, nil
 		}

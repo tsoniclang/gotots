@@ -138,22 +138,31 @@ func packageVariable(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	logicalType, err := children.RepresentedType(
-		context.WithRole(api.RoleUnaryOperand),
+	storageType, err := context.Values().StorageType(
+		context.WithRole(api.RoleStorageType),
 		source,
 		variableType,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return pointermarker.Operation(
+	address, err := pointermarker.Operation(
 		context,
 		tsoniccore.SymbolAddressOf,
-		[]api.TypeEmission{logicalType},
+		[]api.TypeEmission{storageType},
 		[]api.ExpressionEmission{api.DirectExpression(
 			target.Expression(context.Factory()),
 			target.Requests()...,
 		)},
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return context.Values().ProjectStoragePointer(
+		context.WithRole(api.RoleUnaryOperand),
+		source,
+		variableType,
+		address,
 	)
 }
 
