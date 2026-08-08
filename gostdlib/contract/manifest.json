@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "4f98531b40145c3f7a63d1b778ef93dde4f5a6e1b92ddd86d976980b4d20e9b2",
+  "providerDigest": "2f532ae8f17254d7b918439a44dcdd01e102228ac63d77949d354db13b2335fe",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -4949,9 +4949,9 @@
           "targetFingerprint": "5c8916254517eb2a630c2a2c8d65eed587a5e7544baa664ff6293e385b1730db",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/math/big.ts#floatState@885",
-            "src/internal/portable/math/big.ts#integerFloat64@1153",
-            "src/internal/portable/math/big.ts#requireFloat@818"
+            "src/internal/portable/math/big.ts#floatState@1011",
+            "src/internal/portable/math/big.ts#integerFloat64@1279",
+            "src/internal/portable/math/big.ts#requireFloat@944"
           ],
           "implementationSites": [
             "src/internal/portable/math/big.ts#Float64@495"
@@ -4971,12 +4971,12 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/math/big.ts#accuracyExact@48",
-            "src/internal/portable/math/big.ts#bitLength@943",
-            "src/internal/portable/math/big.ts#floatState@885",
-            "src/internal/portable/math/big.ts#intValue@848",
-            "src/internal/portable/math/big.ts#requireFloat@818",
-            "src/internal/portable/math/big.ts#requireInt@788",
-            "src/internal/portable/math/big.ts#roundToPrecision@964"
+            "src/internal/portable/math/big.ts#bitLength@1069",
+            "src/internal/portable/math/big.ts#floatState@1011",
+            "src/internal/portable/math/big.ts#intValue@974",
+            "src/internal/portable/math/big.ts#requireFloat@944",
+            "src/internal/portable/math/big.ts#requireInt@914",
+            "src/internal/portable/math/big.ts#roundToPrecision@1090"
           ],
           "implementationSites": [
             "src/internal/portable/math/big.ts#SetInt@548"
@@ -4999,9 +4999,9 @@
             "src/internal/portable/math/big.ts#accuracyAbove@56",
             "src/internal/portable/math/big.ts#accuracyBelow@39",
             "src/internal/portable/math/big.ts#accuracyExact@48",
-            "src/internal/portable/math/big.ts#floatState@885",
-            "src/internal/portable/math/big.ts#requireFloat@818",
-            "src/internal/portable/math/big.ts#roundToPrecision@964"
+            "src/internal/portable/math/big.ts#floatState@1011",
+            "src/internal/portable/math/big.ts#requireFloat@944",
+            "src/internal/portable/math/big.ts#roundToPrecision@1090"
           ],
           "implementationSites": [
             "src/internal/portable/math/big.ts#SetPrec@648"
@@ -5020,12 +5020,12 @@
           "targetFingerprint": "53a5a0b4d203d21caea25983054b5c49bac934843731c8237248cbd78bc53b8d",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/math/big.ts#absolute@923",
-            "src/internal/portable/math/big.ts#intValue@848",
+            "src/internal/portable/math/big.ts#absolute@1049",
+            "src/internal/portable/math/big.ts#intValue@974",
             "src/internal/portable/math/big.ts#intValues@64",
-            "src/internal/portable/math/big.ts#modularInverse@1344",
-            "src/internal/portable/math/big.ts#modularPower@1242",
-            "src/internal/portable/math/big.ts#requireInt@788"
+            "src/internal/portable/math/big.ts#modularInverse@1470",
+            "src/internal/portable/math/big.ts#modularPower@1368",
+            "src/internal/portable/math/big.ts#requireInt@914"
           ],
           "implementationSites": [
             "src/internal/portable/math/big.ts#Exp@134"
@@ -5044,9 +5044,9 @@
           "targetFingerprint": "910a5707f0f1947061ae73cba313894c6b16f5c68c13581ac7d78e19d523fe4b",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/math/big.ts#intValue@848",
-            "src/internal/portable/math/big.ts#integerFloat64@1153",
-            "src/internal/portable/math/big.ts#requireInt@788"
+            "src/internal/portable/math/big.ts#intValue@974",
+            "src/internal/portable/math/big.ts#integerFloat64@1279",
+            "src/internal/portable/math/big.ts#requireInt@914"
           ],
           "implementationSites": [
             "src/internal/portable/math/big.ts#Float64@333"
@@ -5066,8 +5066,8 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/math/big.ts#intValues@64",
-            "src/internal/portable/math/big.ts#parseInteger@1466",
-            "src/internal/portable/math/big.ts#requireInt@788"
+            "src/internal/portable/math/big.ts#parseInteger@1592",
+            "src/internal/portable/math/big.ts#requireInt@914"
           ],
           "implementationSites": [
             "src/internal/portable/math/big.ts#SetString@364"
@@ -5086,8 +5086,8 @@
           "targetFingerprint": "6b54c2ef9f519fbd1510b88a52ae284409b94c2dcf2bb5192246abc0240e0aa8",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/math/big.ts#intValue@848",
-            "src/internal/portable/math/big.ts#requireInt@788"
+            "src/internal/portable/math/big.ts#intValue@974",
+            "src/internal/portable/math/big.ts#requireInt@914"
           ],
           "implementationSites": [
             "src/internal/portable/math/big.ts#String@439"
@@ -19363,13 +19363,15 @@
           "implementationOwner": "src/internal/facets/named-math-big.ts",
           "targetFingerprint": "9675a0f6d4cebe16d7ae35abcc308422dd1164f687ffd4e548a4a026abf78ede",
           "implementationSites": [
-            "src/internal/facets/named-math-big.ts#MathBigAccuracyValueOperations@21"
+            "src/internal/facets/named-math-big.ts#MathBigAccuracyValueOperations@34"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "math/big|kind=2|receiver=|name=Float",
           "capabilities": [
+            "assign",
+            "copy",
             "storage",
             "zero"
           ],
@@ -19377,16 +19379,18 @@
           "storageExport": "MathBigFloatStorage",
           "implementationOwner": "src/internal/facets/named-math-big.ts",
           "storageImplementationOwner": "src/internal/portable/math/big.ts",
-          "targetFingerprint": "1dcabf609b1a510e583e78094465e90d1a1afb7f03ebf59af7fac08b1a8830b1",
+          "targetFingerprint": "f37b63f7bd9bbad69026db281517e752f5eb44a2033372acbf2733f674cb5d54",
           "storageTargetFingerprint": "bebe684d28ab78d7298c6fc558363c7f7c6c464a73e8edcef00b7c29213109ad",
           "implementationSites": [
-            "src/internal/facets/named-math-big.ts#MathBigFloatOperations@67"
+            "src/internal/facets/named-math-big.ts#MathBigFloatOperations@80"
           ]
         },
         {
           "kind": "named-struct-operations",
           "sourceIdentity": "math/big|kind=2|receiver=|name=Int",
           "capabilities": [
+            "assign",
+            "copy",
             "storage",
             "zero"
           ],
@@ -19394,10 +19398,10 @@
           "storageExport": "MathBigIntStorage",
           "implementationOwner": "src/internal/facets/named-math-big.ts",
           "storageImplementationOwner": "src/internal/portable/math/big.ts",
-          "targetFingerprint": "d5b264f9b34e35e14a31267cd41bf2e345b30000fd408506db86b08652d39df0",
+          "targetFingerprint": "5b5f5bea6c4a2446ee78c3a699ac04eb79b84a4a28733be2c8faebdd4502be11",
           "storageTargetFingerprint": "ffd32712d5dce0bc877547aa12cd517e46935c9c49d215e0041e29334bba48a1",
           "implementationSites": [
-            "src/internal/facets/named-math-big.ts#MathBigIntOperations@121"
+            "src/internal/facets/named-math-big.ts#MathBigIntOperations@174"
           ]
         }
       ]
@@ -26389,7 +26393,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-math-big.ts#MathBigAccuracyValueOperations@21",
+      "identity": "src/internal/facets/named-math-big.ts#MathBigAccuracyValueOperations@34",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/math/big.ts#value@106",
@@ -26397,16 +26401,20 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-math-big.ts#MathBigFloatOperations@67",
+      "identity": "src/internal/facets/named-math-big.ts#MathBigFloatOperations@80",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/math/big.ts#floatRepresentationAssign@836",
+        "src/internal/portable/math/big.ts#floatRepresentationCopy@885",
         "src/math/big.ts#Float@8"
       ]
     },
     {
-      "identity": "src/internal/facets/named-math-big.ts#MathBigIntOperations@121",
+      "identity": "src/internal/facets/named-math-big.ts#MathBigIntOperations@174",
       "disposition": "implemented",
       "dependencies": [
+        "src/internal/portable/math/big.ts#intRepresentationAssign@788",
+        "src/internal/portable/math/big.ts#intRepresentationCopy@815",
         "src/math/big.ts#Int@10"
       ]
     },
@@ -30526,7 +30534,7 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/math/big.ts#absolute@923",
+      "identity": "src/internal/portable/math/big.ts#absolute@1049",
       "disposition": "implemented"
     },
     {
@@ -30542,18 +30550,34 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/math/big.ts#bitLength@943",
+      "identity": "src/internal/portable/math/big.ts#bitLength@1069",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/math/big.ts#absolute@923"
+        "src/internal/portable/math/big.ts#absolute@1049"
       ]
     },
     {
-      "identity": "src/internal/portable/math/big.ts#digitValue@1880",
+      "identity": "src/internal/portable/math/big.ts#digitValue@2006",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/math/big.ts#floatState@885",
+      "identity": "src/internal/portable/math/big.ts#floatRepresentationAssign@836",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/math/big.ts#floatState@1011",
+        "src/internal/portable/math/big.ts#floatValues@76"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/math/big.ts#floatRepresentationCopy@885",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/math/big.ts#Float@468",
+        "src/internal/portable/math/big.ts#floatRepresentationAssign@836"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/math/big.ts#floatState@1011",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/math/big.ts#floatValues@76"
@@ -30564,7 +30588,23 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/math/big.ts#intValue@848",
+      "identity": "src/internal/portable/math/big.ts#intRepresentationAssign@788",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/math/big.ts#intValue@974",
+        "src/internal/portable/math/big.ts#intValues@64"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/math/big.ts#intRepresentationCopy@815",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/math/big.ts#Int@114",
+        "src/internal/portable/math/big.ts#intValue@974"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/math/big.ts#intValue@974",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/math/big.ts#intValues@64"
@@ -30575,7 +30615,7 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/math/big.ts#integerFloat64@1153",
+      "identity": "src/internal/portable/math/big.ts#integerFloat64@1279",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/math/big.ts#Accuracy@99",
@@ -30585,38 +30625,38 @@
       ]
     },
     {
-      "identity": "src/internal/portable/math/big.ts#modularInverse@1344",
+      "identity": "src/internal/portable/math/big.ts#modularInverse@1470",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/math/big.ts#modularPower@1242",
+      "identity": "src/internal/portable/math/big.ts#modularPower@1368",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/math/big.ts#parseInteger@1466",
+      "identity": "src/internal/portable/math/big.ts#parseInteger@1592",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
-        "src/internal/portable/math/big.ts#digitValue@1880"
+        "src/internal/portable/math/big.ts#digitValue@2006"
       ]
     },
     {
-      "identity": "src/internal/portable/math/big.ts#requireFloat@818",
+      "identity": "src/internal/portable/math/big.ts#requireFloat@944",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/math/big.ts#requireInt@788",
+      "identity": "src/internal/portable/math/big.ts#requireInt@914",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/math/big.ts#roundToPrecision@964",
+      "identity": "src/internal/portable/math/big.ts#roundToPrecision@1090",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/math/big.ts#absolute@923",
+        "src/internal/portable/math/big.ts#absolute@1049",
         "src/internal/portable/math/big.ts#accuracyAbove@56",
         "src/internal/portable/math/big.ts#accuracyBelow@39",
         "src/internal/portable/math/big.ts#accuracyExact@48",
-        "src/internal/portable/math/big.ts#bitLength@943"
+        "src/internal/portable/math/big.ts#bitLength@1069"
       ]
     },
     {
@@ -34392,5 +34432,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "620185b9b5d74808e1502f8a738a397b615e9c14f3e815ba76c27d1c549e5c37"
+  "manifestDigest": "d81d1933e785b2d29228ac31f66523e1ba26923ade25d029c05b9be458b5652e"
 }

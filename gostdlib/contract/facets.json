@@ -1858,6 +1858,8 @@
       "sourcePath": "src/internal/facets/named-math-big.ts",
       "export": "MathBigFloatOperations",
       "capabilities": [
+        "assign",
+        "copy",
         "storage",
         "zero"
       ],
@@ -1870,6 +1872,8 @@
       "sourcePath": "src/internal/facets/named-math-big.ts",
       "export": "MathBigIntOperations",
       "capabilities": [
+        "assign",
+        "copy",
         "storage",
         "zero"
       ],

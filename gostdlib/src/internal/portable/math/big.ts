@@ -142,6 +142,29 @@ export function NewInt(value: int64): Int | undefined {
   return new Int(value);
 }
 
+export function intRepresentationAssign(target: Int, source: Int): void {
+  intValues.set(target, intValue(source));
+}
+
+export function intRepresentationCopy(source: Int): Int {
+  return new Int(intValue(source));
+}
+
+export function floatRepresentationAssign(target: Float, source: Float): void {
+  const state = floatState(source);
+  floatValues.set(target, {
+    value: state.value,
+    precision: state.precision,
+    accuracy: state.accuracy,
+  });
+}
+
+export function floatRepresentationCopy(source: Float): Float {
+  const target = new Float();
+  floatRepresentationAssign(target, source);
+  return target;
+}
+
 function requireInt(value: Int | undefined): Int {
   if (value === undefined) {
     GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");

@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { Accuracy, Float, Int, NewInt } from "../src/math/big.js";
+import {
+  MathBigFloatOperations,
+  MathBigIntOperations,
+} from "../src/internal/facets/named-math-big.js";
 
 test("math/big parses and formats selected integer bases", (): void => {
   const receiver = new Int();
@@ -34,4 +38,25 @@ test("math/big Float selected methods retain receiver identity", (): void => {
   assert.equal(Float.SetPrec(receiver, 256n), receiver);
   assert.equal(Float.SetInt(receiver, NewInt(42n)), receiver);
   assert.deepEqual(Float.Float64(receiver), [42, new Accuracy(0)]);
+});
+
+test("math/big value operations preserve independent Go struct copies", (): void => {
+  const integer = NewInt(41n);
+  assert.ok(integer !== undefined);
+  const copiedInteger = MathBigIntOperations.$copy(integer);
+  const assignedInteger = new Int();
+  MathBigIntOperations.$assign(assignedInteger, integer);
+  Int.SetString(integer, "99", 10n);
+  assert.equal(Int.String(copiedInteger), "41");
+  assert.equal(Int.String(assignedInteger), "41");
+
+  const floating = new Float();
+  Float.SetPrec(floating, 64n);
+  Float.SetInt(floating, NewInt(17n));
+  const copiedFloat = MathBigFloatOperations.$copy(floating);
+  const assignedFloat = new Float();
+  MathBigFloatOperations.$assign(assignedFloat, floating);
+  Float.SetInt(floating, NewInt(23n));
+  assert.equal(Float.Float64(copiedFloat)[0], 17);
+  assert.equal(Float.Float64(assignedFloat)[0], 17);
 });
