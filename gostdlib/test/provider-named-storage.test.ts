@@ -53,6 +53,21 @@ test("provider named-struct storage capabilities preserve exact values", (): voi
   ), floating);
 
   const url = new URL();
+  url.Scheme = "https";
+  url.Host = "source.example";
+  url.Path = "/path";
+  const copiedURL = NetUrlURLOperations.$copy(url);
+  const assignedURL = new URL();
+  NetUrlURLOperations.$assign(assignedURL, url);
+  assert.notEqual(copiedURL, url);
+  assert.deepEqual(
+    [copiedURL.Scheme, copiedURL.Host, copiedURL.Path],
+    ["https", "source.example", "/path"],
+  );
+  assert.deepEqual(
+    [assignedURL.Scheme, assignedURL.Host, assignedURL.Path],
+    ["https", "source.example", "/path"],
+  );
   assert.equal(NetUrlURLOperations.$fromStorage(
     NetUrlURLOperations.$storageOf(url),
   ), url);

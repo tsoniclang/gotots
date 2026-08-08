@@ -10,6 +10,7 @@ func TestReflectProviderStructAssignmentCanonicalizesWithNativeEvidence(t *testi
 
 import (
 	"fmt"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
@@ -101,9 +102,16 @@ func ProviderAssignments() string {
 	*regexpTarget = *regexpSource
 	regexpAssigned := regexpTarget.MatchString("source") &&
 		!regexpTarget.MatchString("target")
+	urlSource, _ := url.Parse("https://source.example/path?q=1")
+	urlTarget, _ := url.Parse("https://target.example/old")
+	*urlTarget = *urlSource
+	urlAssigned := urlTarget.Scheme == "https" &&
+		urlTarget.Host == "source.example" &&
+		urlTarget.Path == "/path" &&
+		urlTarget.RawQuery == "q=1"
 
 	return fmt.Sprintf(
-		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t regexp=%t",
+		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t regexp=%t url=%t",
 		parseTarget.Layout,
 		parseTarget.Value,
 		parseTarget.LayoutElem,
@@ -123,6 +131,7 @@ func ProviderAssignments() string {
 		timerSourceStopped,
 		timerSourcePanicked,
 		regexpAssigned,
+		urlAssigned,
 	)
 }
 `
@@ -155,6 +164,7 @@ func main() {
 				"SyncMutexOperations.$copy",
 				"StringsBuilderOperations.$copy",
 				"RegexpValueOperations.$assign",
+				"NetUrlURLOperations.$assign",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					relevant := make([]string, 0)

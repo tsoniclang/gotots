@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "db9607d3c6b53bf0bc7758667ca272e80056e8cdd8b1e8b8c3acbafc5f37aefc",
+  "providerDigest": "9607096f300ec90e473bf1f1ee2dfa8cef9f3467dce2de3fe413b1c8ef0e3eca",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -19414,13 +19414,15 @@
           "kind": "named-struct-operations",
           "sourceIdentity": "net/url|kind=2|receiver=|name=URL",
           "capabilities": [
+            "assign",
+            "copy",
             "storage"
           ],
           "export": "NetUrlURLOperations",
           "storageExport": "NetUrlURLStorage",
           "implementationOwner": "src/internal/facets/named-net-url.ts",
           "storageImplementationOwner": "src/net/url.ts",
-          "targetFingerprint": "42ea8904f8422c533d57d5d87c64aa1693424f59e2ded78a1d76cc64cc92e419",
+          "targetFingerprint": "37933a108f88abc8c660051bf591841800af29bd62968b0eb47d1b0c061a4a89",
           "storageTargetFingerprint": "b3205d2dc9990c3f196868e5d950de03959d8ffe2df7787288d39854cdbc6ee6",
           "implementationSites": [
             "src/internal/facets/named-net-url.ts#NetUrlURLOperations@16"
@@ -26437,7 +26439,21 @@
     },
     {
       "identity": "src/internal/facets/named-net-url.ts#NetUrlURLOperations@16",
-      "disposition": "implemented"
+      "disposition": "implemented",
+      "dependencies": [
+        "src/net/url.ts#ForceQuery@144",
+        "src/net/url.ts#Fragment@124",
+        "src/net/url.ts#Host@114",
+        "src/net/url.ts#OmitHost@149",
+        "src/net/url.ts#Opaque@102",
+        "src/net/url.ts#Path@119",
+        "src/net/url.ts#RawFragment@139",
+        "src/net/url.ts#RawPath@134",
+        "src/net/url.ts#RawQuery@129",
+        "src/net/url.ts#Scheme@97",
+        "src/net/url.ts#URL@92",
+        "src/net/url.ts#User@107"
+      ]
     },
     {
       "identity": "src/internal/facets/named-os-exec.ts#OsExecCmdOperations@10",
@@ -34486,5 +34502,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "f348a6c75261e7b9053fa2928367c903341efda7c3920c02b14ae97dba591d35"
+  "manifestDigest": "d1866f3b18d67e22719fea5f7d42dabac525dae9b468de1a1af4ebd38f0146f9"
 }

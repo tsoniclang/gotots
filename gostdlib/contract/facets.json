@@ -1886,6 +1886,8 @@
       "sourcePath": "src/internal/facets/named-net-url.ts",
       "export": "NetUrlURLOperations",
       "capabilities": [
+        "assign",
+        "copy",
         "storage"
       ],
       "storageExport": "NetUrlURLStorage"
