@@ -4,9 +4,9 @@ import (
 	"go/ast"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -15,7 +15,6 @@ func valuePointerMethodReceiver(
 	children api.ChildEmitter,
 	source *ast.SelectorExpr,
 	resolved path,
-	method *types.Func,
 	declared types.Type,
 	receiverABI api.MethodReceiverABI,
 ) (api.ExpressionEmission, error) {
@@ -25,6 +24,14 @@ func valuePointerMethodReceiver(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if receiverABI == api.MethodReceiverABISourceRepresentation {
+		if len(resolved.fields) == 0 {
+			return children.Address(
+				context.
+					WithRole(api.RoleReceiverValue).
+					WithExpectedType(declared),
+				source.X,
+			)
+		}
 		return addressSource(context, children, source, resolved)
 	}
 	if receiverABI != api.MethodReceiverABIContractDirect {
@@ -112,8 +119,8 @@ func methodABIReceiver(
 
 func adaptPointerMethodReceiver(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
-	declarationOwner types.Object,
 	declared *types.Pointer,
 	effective *types.Pointer,
 	receiverABI api.MethodReceiverABI,
@@ -124,29 +131,11 @@ func adaptPointerMethodReceiver(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if receiverABI == api.MethodReceiverABIContractDirect {
-		sourceRepresentation, err := pointertype.Observe(
-			context,
-			effective,
-			api.PointerRepresentationDemandNone,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if sourceRepresentation.Representation().DirectClass() {
-			return api.NewExpressionEmission(
-				value.Before(),
-				value.Value(),
-				api.CombineRequests(
-					value.Requests(),
-					sourceRepresentation.Requests(),
-				),
-			)
-		}
 		return projectContractDirectReceiver(
 			context,
+			children,
 			source,
 			effective.Elem(),
-			sourceRepresentation,
 			value,
 		)
 	}
@@ -161,9 +150,9 @@ func adaptPointerMethodReceiver(
 
 func projectContractDirectReceiver(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	element types.Type,
-	representation api.PointerRepresentationObservation,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	name, err := context.Names().Temporary(api.TemporaryReceiverValue)
@@ -171,29 +160,22 @@ func projectContractDirectReceiver(
 		return api.ExpressionEmission{}, err
 	}
 	identifier := context.Factory().Identifier(name)
-	storage := api.DirectExpression(
-		context.Factory().PropertyAccessExpression(
-			identifier,
-			nil,
-			context.Factory().Identifier(pointerruntime.CellValueName),
-			tsgo.NodeFlagsNone,
-		),
-	)
-	logical, err := context.ContainerStorage().FromPointerStorage(
+	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleReceiverValue),
 		source,
 		element,
-		representation,
-		storage,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if len(logical.Before()) != 0 {
-		return api.ExpressionEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "contract-direct receiver projection has nested prerequisites",
-		}
+	loaded, err := pointermarker.Operation(
+		context,
+		tsoniccore.SymbolLoadPointer,
+		[]api.TypeEmission{targetElement},
+		[]api.ExpressionEmission{api.DirectExpression(identifier)},
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	before := append(
 		value.Before(),
@@ -231,12 +213,11 @@ func projectContractDirectReceiver(
 				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
 			),
 			context.Factory().ColonToken(),
-			logical.Value(),
+			loaded.Value(),
 		),
 		api.CombineRequests(
 			value.Requests(),
-			logical.Requests(),
-			representation.Requests(),
+			loaded.Requests(),
 		),
 	)
 }

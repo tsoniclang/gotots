@@ -30,16 +30,23 @@ func requireProviderStateOperations(
 	for _, operation := range operations {
 		required := alias + ".$" + operation + "("
 		if !strings.Contains(printed, required) {
+			relevant := make([]string, 0)
+			for _, line := range strings.Split(printed, "\n") {
+				if strings.Contains(line, alias) {
+					relevant = append(relevant, line)
+				}
+			}
 			t.Fatalf(
-				"provider closure artifact lacks %s operation %q",
+				"provider closure artifact lacks %s operation %q:\n%s",
 				representation,
 				required,
+				strings.Join(relevant, "\n"),
 			)
 		}
 	}
 }
 
-func TestReachedProviderReflectionClosureMatchesGo(t *testing.T) {
+func TestReachedProviderReflectionClosureCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -172,7 +179,7 @@ func main() {
 	fmt.Println(fixture.ProviderReflectionClosure())
 }
 `
-	runReflectDifferentialInspect(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		"ProviderReflectionClosure",
@@ -205,7 +212,6 @@ func main() {
 				t,
 				artifacts.printed,
 				"named_io_fs.CanonicalPathError",
-				"assign",
 				"copy",
 				"equal",
 				"hash",

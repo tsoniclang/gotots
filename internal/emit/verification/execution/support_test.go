@@ -17,6 +17,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func loadDemandProgram(t *testing.T) *load.Program {
@@ -96,6 +97,13 @@ func runProgram(t *testing.T, directory, name string, arguments ...string) strin
 	return string(output)
 }
 
+func requireNativeGoEvidence(t *testing.T, output string) {
+	t.Helper()
+	if output == "" {
+		t.Fatal("native Go fixture produced no evidence")
+	}
+}
+
 func writeProgramFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -120,6 +128,9 @@ func waveThreeTypecheck(
 	paths []string,
 ) {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
@@ -165,6 +176,9 @@ func materializeArtifacts(
 	workingDirectory string,
 ) waveFourArtifacts {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
 	if err != nil {
 		t.Fatal(err)

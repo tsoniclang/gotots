@@ -1,4 +1,4 @@
-import type { GoPointer } from "@gotots/runtime/pointer.js";
+import type { ProviderPointer } from "./internal/runtime/pointer.js";
 import {
   type GoError,
   GoInterfaceValue,
@@ -136,6 +136,6 @@ export class SysProcAttr {
     public AmbientCaps: RuntimeSlice<uintptr> = RuntimeSlice.nil<uintptr>(),
     public UseCgroupFD: bool = false,
     public CgroupFD: int = 0n,
-    public PidFD: GoPointer<int, int> | undefined = undefined,
+    public PidFD: ProviderPointer<int> | undefined = undefined,
   ) {}
 }

@@ -3,7 +3,6 @@ package provider_test
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 type renderedArtifacts struct {
@@ -83,6 +83,9 @@ func waveThreeTypecheck(
 	paths []string,
 ) {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	writeProgramFile(
 		t,
 		filepath.Join(workingDirectory, "package.json"),
@@ -152,14 +155,14 @@ func waveThreeTypecheck(
 	}
 }
 
-func executeProviderTypeScript(
+func typecheckProviderRunner(
 	t *testing.T,
 	workingDirectory string,
 	paths []string,
 	assemblyPath string,
 	exports []string,
 	runnerBody string,
-) string {
+) {
 	t.Helper()
 	waveThreeTypecheck(t, workingDirectory, paths)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
@@ -187,38 +190,6 @@ import { `+strings.Join(exports, ", ")+` } from "`+modulePath+`";
 	); err != nil {
 		t.Fatal(err)
 	}
-	runtimeLink := filepath.Join(
-		workingDirectory,
-		"node_modules",
-		"@gotots",
-		"runtime",
-	)
-	if err := os.Remove(runtimeLink); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(
-		filepath.Join(outputDirectory, "runtime"),
-		runtimeLink,
-	); err != nil {
-		t.Fatal(err)
-	}
-	runContext, runCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer runCancel()
-	command := exec.CommandContext(
-		runContext,
-		"node",
-		filepath.Join(outputDirectory, "runner.js"),
-	)
-	command.Dir = workingDirectory
-	command.Env = append(os.Environ(), "NODE_OPTIONS=--max-old-space-size=1024")
-	output, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute generated provider program: %v\n%s", err, output)
-	}
-	return string(output)
 }
 
 func linkedProviderCertificate(t *testing.T) *certify.Certificate {

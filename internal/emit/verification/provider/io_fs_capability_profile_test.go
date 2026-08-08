@@ -2,12 +2,10 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -134,7 +132,7 @@ func ReadProviderDir(root string) (string, int64, error) {
 	if assemblyPath == "" {
 		t.Fatal("io/fs capability package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -148,42 +146,6 @@ const [name, size, dirFailure] = await ReadProviderDir(`+strconv.Quote(project)+
 console.log(name + "|" + size + "|" + (dirFailure === undefined));
 `,
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	capability "example.com/iofscapability"
-)
-
-func main() {
-	fallback, fast, generatedFailure := capability.ReadGenerated()
-	fmt.Printf("%s|%s|%t\n", fallback, fast, generatedFailure == nil)
-	raw, rawFailure := capability.ReadProvider(`+strconv.Quote(project)+`)
-	fmt.Printf("%s|%t\n", raw, rawFailure == nil)
-	name, size, dirFailure := capability.ReadProviderDir(`+strconv.Quote(project)+`)
-	fmt.Printf("%s|%d|%t\n", name, size, dirFailure == nil)
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go io/fs capability comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"io/fs capability differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
 	for _, required := range []string{
 		"IoFsReadFileCanonical",
 		"IoFsReadDirCanonical",

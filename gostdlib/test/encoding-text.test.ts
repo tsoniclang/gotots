@@ -20,6 +20,7 @@ import {
   NewEncoder,
   state,
 } from "../src/encoding/base64.js";
+import { Base64EncodingOperations } from "../src/internal/facets/provider-encoding-base64.js";
 import { EncodeToString as EncodeHex } from "../src/encoding/hex.js";
 import { sliceValues } from "../src/internal/runtime/slice.js";
 import type { Writer } from "../src/io.js";
@@ -44,6 +45,18 @@ test("base64 standard encoding round-trips bytes and rejects corrupt input", () 
   assert.equal(trailingFailure?.Error(), "illegal base64 data at input byte 4");
   const [, shortFailure] = Encoding.DecodeString(encoding, "Zg");
   assert.equal(shortFailure?.Error(), "illegal base64 data at input byte 0");
+});
+
+test("base64 representation assignment preserves identity and copies state", () => {
+  const standard = requireEncoding(state.StdEncoding);
+  const url = requireEncoding(state.URLEncoding);
+  const target = Base64EncodingOperations.$copy(standard);
+
+  Base64EncodingOperations.$assign(target, url);
+
+  const source = RuntimeSlice.literal([0xff, 0xef]);
+  assert.equal(Encoding.EncodeToString(target, source), "_-8=");
+  assert.equal(Encoding.EncodeToString(standard, source), "/+8=");
 });
 
 test("base64 stream encoder flushes trailing bytes on Close", () => {

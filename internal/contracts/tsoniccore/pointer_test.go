@@ -15,6 +15,9 @@ func TestPointerContractIsPinned(t *testing.T) {
 		{SymbolLoadPointer, "@tsonic/core/lang.js", "loadPointer", PhaseValue},
 		{SymbolStorePointer, "@tsonic/core/lang.js", "storePointer", PhaseValue},
 		{SymbolEqualPointer, "@tsonic/core/lang.js", "equalPointer", PhaseValue},
+		{SymbolHashPointer, "@tsonic/core/lang.js", "hashPointer", PhaseValue},
+		{SymbolProjectPointer, "@tsonic/core/lang.js", "projectPointer", PhaseValue},
+		{SymbolBindPointer, "@tsonic/core/lang.js", "bindPointer", PhaseValue},
 	}
 	for _, test := range tests {
 		declaration, err := Resolve(test.symbol)

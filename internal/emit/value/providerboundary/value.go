@@ -73,6 +73,19 @@ func fromProviderValueWithPolicy(
 			"provider boundary leaf policy is invalid",
 		)
 	}
+	converted, pointer, changed, err := fromProviderPointer(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		profile,
+		sourceType,
+		value,
+		leafPolicy,
+	)
+	if err != nil || pointer {
+		return converted, changed, err
+	}
 	converted, scalar, changed, err := fromProviderScalar(
 		context,
 		sourceType,
@@ -224,6 +237,19 @@ func toProviderValueWithPolicy(
 			context,
 			"provider boundary leaf policy is invalid",
 		)
+	}
+	converted, pointer, changed, err := toProviderPointer(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		profile,
+		sourceType,
+		value,
+		leafPolicy,
+	)
+	if err != nil || pointer {
+		return converted, changed, err
 	}
 	converted, scalar, changed, err := toProviderScalar(
 		context,

@@ -2,55 +2,39 @@ package callableabi
 
 import "testing"
 
-func TestCallableProjectionIsClosedAndFingerprintIsStructural(t *testing.T) {
+func TestCallableParameterContractIsIdentityPreservingAndStructural(t *testing.T) {
 	identityKey, err := PackageFunctionIdentity("example.test/fast", "Read")
 	if err != nil {
 		t.Fatal(err)
 	}
-	pointee, err := NewParameter(
-		ProjectionPointeeValue,
-		NilPolicyRejectAtBoundary,
-		"number",
-	)
+	pointer, err := NewParameter("Pointer<number> | undefined")
 	if err != nil {
 		t.Fatal(err)
 	}
-	selected, err := New(identityKey, []Parameter{pointee})
+	selected, err := New(identityKey, []Parameter{pointer}, "number")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !selected.Valid() || selected.Fingerprint() == "" || selected.Parameters()[0].Projection() != ProjectionPointeeValue {
-		t.Fatalf("invalid callable projection: %#v", selected)
+	if !selected.Valid() || selected.Fingerprint() == "" || selected.Parameters()[0].Projection() != ProjectionIdentity {
+		t.Fatalf("invalid callable parameter contract: %#v", selected)
 	}
-	identity, err := NewParameter(
-		ProjectionIdentity,
-		NilPolicyNotApplicable,
-		"GoPointer<number, number> | undefined",
-	)
+	changed, err := NewParameter("Pointer<bigint> | undefined")
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := New(identityKey, []Parameter{identity})
+	other, err := New(identityKey, []Parameter{changed}, "number")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if selected.Fingerprint() == other.Fingerprint() {
-		t.Fatal("projection mutation did not change the callable fingerprint")
+		t.Fatal("target-type mutation did not change the callable fingerprint")
 	}
-	preserved, err := NewParameter(
-		ProjectionPointeeValue,
-		NilPolicyPreserve,
-		"number | undefined",
-	)
+	changedResult, err := New(identityKey, []Parameter{pointer}, "string")
 	if err != nil {
 		t.Fatal(err)
 	}
-	preservedCallable, err := New(identityKey, []Parameter{preserved})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if selected.Fingerprint() == preservedCallable.Fingerprint() {
-		t.Fatal("nil-policy mutation did not change the callable fingerprint")
+	if selected.Fingerprint() == changedResult.Fingerprint() {
+		t.Fatal("result-type mutation did not change the callable fingerprint")
 	}
 }
 

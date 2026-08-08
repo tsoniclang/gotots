@@ -95,24 +95,6 @@ func emitArgumentsWithABI(
 			return nil, nil, nil,
 				api.Unsupported(context, api.CategoryExpression, source)
 		}
-		if selected, ok := callableABI.Parameter(index); ok &&
-			selected.Projection() == callableabi.ProjectionPointeeValue {
-			target, err := emitPointeeValueArgument(
-				context,
-				children,
-				argument,
-				signature.Params().At(index).Type(),
-				selected,
-			)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-			if len(target.Before()) != 0 {
-				requiresCapture = true
-			}
-			emissions = append(emissions, target)
-			continue
-		}
 		target, err := children.Expression(
 			context.
 				WithRole(api.RoleCallArgument).

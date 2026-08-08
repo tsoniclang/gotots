@@ -170,7 +170,9 @@ func New() Value { return Value{Count: 1} }
 	if contract == nil ||
 		contract.Kind() != PackageExternalContract ||
 		len(contract.Files()) != 0 ||
-		contract.ExternalContractKey() == "" {
+		contract.ExternalContractKey() == "" ||
+		contract.ModulePath() != "example.com/dependency" ||
+		contract.ModuleVersion() != "v1.2.3" {
 		t.Fatalf("external contract = %#v", contract)
 	}
 	if program.EnvironmentForTypes(contract.Types()) != contract {

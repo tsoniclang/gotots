@@ -209,7 +209,6 @@ func TestBuildRejectsSiblingRuntimeSymbols(t *testing.T) {
 	for _, symbol := range []api.RuntimeSymbol{
 		api.RuntimeInvalid,
 		api.RuntimeStringIndex,
-		api.RuntimePointer,
 		api.RuntimeArray,
 		api.RuntimeSlice,
 	} {

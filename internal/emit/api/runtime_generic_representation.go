@@ -9,36 +9,6 @@ import (
 )
 
 type RuntimeSymbol = runtimecontract.RuntimeSymbol
-type RuntimeFeature = runtimecontract.RuntimeFeature
-
-const (
-	RuntimeFeatureInvalid   = runtimecontract.RuntimeFeatureInvalid
-	RuntimePointerFieldPath = runtimecontract.RuntimePointerFieldPath
-)
-
-func RuntimeFeatureModule(
-	feature RuntimeFeature,
-) (RuntimeModule, bool) {
-	return runtimecontract.RuntimeFeatureModule(feature)
-}
-
-func NewRuntimeFeatureRequest(feature RuntimeFeature) (RootRequest, error) {
-	if _, ok := RuntimeFeatureModule(feature); !ok {
-		return RootRequest{}, &RootRequestError{Reason: "runtime feature is invalid"}
-	}
-	owner := RootRequestOwner{
-		kind: RootRequestRuntimeFeature, runtimeFeature: feature,
-	}
-	return RootRequest{payload: &rootRequestPayload{owner: owner}}, nil
-}
-
-func (r RootRequest) RuntimeFeature() (RuntimeFeature, bool) {
-	if r.payload == nil || r.payload.owner.kind != RootRequestRuntimeFeature ||
-		r.payload.owner.runtimeFeature == RuntimeFeatureInvalid {
-		return RuntimeFeatureInvalid, false
-	}
-	return r.payload.owner.runtimeFeature, true
-}
 
 const (
 	RuntimeInvalid                    = runtimecontract.RuntimeInvalid
@@ -49,11 +19,6 @@ const (
 	RuntimeStringEncodeRune           = runtimecontract.RuntimeStringEncodeRune
 	RuntimeStringDecodeRune           = runtimecontract.RuntimeStringDecodeRune
 	RuntimeDenseIndex                 = runtimecontract.RuntimeDenseIndex
-	RuntimePointer                    = runtimecontract.RuntimePointer
-	RuntimePointerHash                = runtimecontract.RuntimePointerHash
-	RuntimePointerRegion              = runtimecontract.RuntimePointerRegion
-	RuntimePointerUnsafeMemory        = runtimecontract.RuntimePointerUnsafeMemory
-	RuntimePointerProjection          = runtimecontract.RuntimePointerProjection
 	RuntimeArray                      = runtimecontract.RuntimeArray
 	RuntimeArrayAllocate              = runtimecontract.RuntimeArrayAllocate
 	RuntimeArrayView                  = runtimecontract.RuntimeArrayView
@@ -64,9 +29,6 @@ const (
 	RuntimeContainerStorageToken      = runtimecontract.RuntimeContainerStorageToken
 	RuntimeContainerStoredValue       = runtimecontract.RuntimeContainerStoredValue
 	RuntimeContainerStorageType       = runtimecontract.RuntimeContainerStorageType
-	RuntimePointerTypeToken           = runtimecontract.RuntimePointerTypeToken
-	RuntimePointerRepresentedValue    = runtimecontract.RuntimePointerRepresentedValue
-	RuntimePointerType                = runtimecontract.RuntimePointerType
 	RuntimeSlice                      = runtimecontract.RuntimeSlice
 	RuntimeSliceAddress               = runtimecontract.RuntimeSliceAddress
 	RuntimeSliceStorage               = runtimecontract.RuntimeSliceStorage
@@ -135,13 +97,7 @@ const (
 	RuntimeScheduler                  = runtimecontract.RuntimeScheduler
 	RuntimeSelectReady                = runtimecontract.RuntimeSelectReady
 	RuntimeSelectAttempt              = runtimecontract.RuntimeSelectAttempt
-	RuntimeUnsafeCodec                = runtimecontract.RuntimeUnsafeCodec
-	RuntimeUnsafePointer              = runtimecontract.RuntimeUnsafePointer
 	RuntimeUnsafeString               = runtimecontract.RuntimeUnsafeString
-	RuntimeUnsafeSlice                = runtimecontract.RuntimeUnsafeSlice
-	RuntimeUnsafeStringData           = runtimecontract.RuntimeUnsafeStringData
-	RuntimeUnsafeSliceData            = runtimecontract.RuntimeUnsafeSliceData
-	RuntimeUnsafeSliceHeader          = runtimecontract.RuntimeUnsafeSliceHeader
 	RuntimeAwaitable                  = runtimecontract.RuntimeAwaitable
 )
 
@@ -150,7 +106,6 @@ type RuntimeModule = runtimecontract.RuntimeModule
 const (
 	RuntimeModuleInvalid          = runtimecontract.RuntimeModuleInvalid
 	RuntimeModuleString           = runtimecontract.RuntimeModuleString
-	RuntimeModulePointer          = runtimecontract.RuntimeModulePointer
 	RuntimeModuleArray            = runtimecontract.RuntimeModuleArray
 	RuntimeModuleSlice            = runtimecontract.RuntimeModuleSlice
 	RuntimeModuleMap              = runtimecontract.RuntimeModuleMap
@@ -163,7 +118,6 @@ const (
 	RuntimeModuleInterfaceValue   = runtimecontract.RuntimeModuleInterfaceValue
 	RuntimeModulePanicNil         = runtimecontract.RuntimeModulePanicNil
 	RuntimeModuleChannel          = runtimecontract.RuntimeModuleChannel
-	RuntimeModuleUnsafePointer    = runtimecontract.RuntimeModuleUnsafePointer
 	RuntimeModuleDenseIndex       = runtimecontract.RuntimeModuleDenseIndex
 	RuntimeModuleUnsafe           = runtimecontract.RuntimeModuleUnsafe
 	RuntimeModuleStruct           = runtimecontract.RuntimeModuleStruct

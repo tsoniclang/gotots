@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
@@ -92,7 +93,6 @@ func AssemblePackage(
 	scalar api.ScalarABI,
 	concurrency api.ConcurrencySemantics,
 	requested map[api.RuntimeSymbol]struct{},
-	features []api.RuntimeFeature,
 	aliases []api.PrimitiveAlias,
 ) (Package, error) {
 	if !scalar.Valid() {
@@ -121,25 +121,7 @@ func AssemblePackage(
 	if err != nil {
 		return Package{}, err
 	}
-	features = slices.Clone(features)
-	slices.Sort(features)
-	featuresByModule := make(map[api.RuntimeModule][]api.RuntimeFeature)
-	for index, feature := range features {
-		module, ok := api.RuntimeFeatureModule(feature)
-		if !ok {
-			return Package{}, &AssemblyError{
-				Reason: "runtime package feature is invalid",
-			}
-		}
-		if index != 0 && feature == features[index-1] {
-			return Package{}, &AssemblyError{
-				Module: module,
-				Reason: "runtime package feature is duplicated",
-			}
-		}
-		featuresByModule[module] = append(featuresByModule[module], feature)
-	}
-	if len(closed) == 0 && len(aliases) == 0 && len(features) == 0 {
+	if len(closed) == 0 && len(aliases) == 0 {
 		return Package{}, nil
 	}
 	byModule := make(map[api.RuntimeModule][]api.RuntimeSymbol)
@@ -165,14 +147,6 @@ func AssemblePackage(
 	for module := range byModule {
 		modules = append(modules, module)
 	}
-	for module := range featuresByModule {
-		if len(byModule[module]) == 0 {
-			return Package{}, &AssemblyError{
-				Module: module,
-				Reason: "runtime feature has no selected owner symbol",
-			}
-		}
-	}
 	sort.Slice(modules, func(left, right int) bool {
 		return modules[left] < modules[right]
 	})
@@ -180,11 +154,10 @@ func AssemblePackage(
 	statements := make([]tsgo.Statement, 0, len(aliases)+1)
 	if symbols := byModule[api.RuntimeModuleScalar]; len(symbols) != 0 {
 		slices.Sort(symbols)
-		definitions, err := BuildWithFeatures(
+		definitions, err := Build(
 			factory,
 			api.RuntimeModuleScalar,
 			symbols,
-			featuresByModule[api.RuntimeModuleScalar],
 			concurrency,
 		)
 		if err != nil {
@@ -229,11 +202,10 @@ func AssemblePackage(
 		}
 		symbols := byModule[module]
 		slices.Sort(symbols)
-		definitions, err := BuildWithFeatures(
+		definitions, err := Build(
 			factory,
 			module,
 			symbols,
-			featuresByModule[module],
 			concurrency,
 		)
 		if err != nil {
@@ -433,6 +405,66 @@ func moduleImports(
 				modulePath,
 				dependency,
 				dependencyContract.ExportedName(),
+			)
+			if err != nil {
+				return nil, err
+			}
+			if err := placement.Apply([]api.RootRequest{request}); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if module == api.RuntimeModuleSlice &&
+		(slices.Contains(symbols, api.RuntimeSliceAddress) ||
+			slices.Contains(symbols, api.RuntimeSliceArrayPointer)) {
+		for _, symbol := range []tsoniccore.Symbol{
+			tsoniccore.SymbolPointer,
+			tsoniccore.SymbolAddressOf,
+			tsoniccore.SymbolProjectPointer,
+		} {
+			declaration, err := tsoniccore.Resolve(symbol)
+			if err != nil {
+				return nil, err
+			}
+			phase := api.ImportPhaseValue
+			if declaration.Phase() == tsoniccore.PhaseType {
+				phase = api.ImportPhaseType
+			}
+			request, err := api.NewImportRequest(
+				factory,
+				phase,
+				declaration.Module(),
+				declaration.Export(),
+				declaration.Export(),
+			)
+			if err != nil {
+				return nil, err
+			}
+			if err := placement.Apply([]api.RootRequest{request}); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if module == api.RuntimeModulePanicNil &&
+		slices.Contains(symbols, api.RuntimePanicNilValue) {
+		for _, symbol := range []tsoniccore.Symbol{
+			tsoniccore.SymbolPointer,
+			tsoniccore.SymbolAllocatePointer,
+		} {
+			declaration, err := tsoniccore.Resolve(symbol)
+			if err != nil {
+				return nil, err
+			}
+			phase := api.ImportPhaseValue
+			if declaration.Phase() == tsoniccore.PhaseType {
+				phase = api.ImportPhaseType
+			}
+			request, err := api.NewImportRequest(
+				factory,
+				phase,
+				declaration.Module(),
+				declaration.Export(),
+				declaration.Export(),
 			)
 			if err != nil {
 				return nil, err

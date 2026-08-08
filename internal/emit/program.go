@@ -12,6 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
+	externalfunction "github.com/tsoniclang/gotots/internal/emit/externalfunction"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
@@ -297,7 +298,7 @@ func newProgramSession(
 	if err != nil {
 		return nil, err
 	}
-	externalBindings, externalModules, err := resolveExternalFunctionProvider(
+	externalBindings, externalModules, err := externalfunction.Resolve(
 		source,
 		sites,
 		options.ExternalProvider,
@@ -354,6 +355,12 @@ func newProgramSession(
 		externalFunctionBindings: externalBindings,
 	}
 	for _, sourcePackage := range source.Packages() {
+		implementationContract := false
+		if options.SourceImplementations != nil {
+			_, implementationContract = options.SourceImplementations.ForPackage(
+				sourcePackage,
+			)
+		}
 		session.emitters[sourcePackage] = newEmitter(
 			sourcePackage,
 			session.factory,
@@ -368,8 +375,8 @@ func newProgramSession(
 			session,
 			session,
 			session,
-			session,
 			goRuntime,
+			implementationContract,
 		)
 	}
 	orderedSites := make([]declarationSite, 0, len(sites))
@@ -509,7 +516,7 @@ func (s *programSession) applyRootRequests(
 	placementRequests := make([]api.RootRequest, 0, len(requests))
 	err := api.WalkUniqueRootRequestPayloads(requests, func(request api.RootRequest) error {
 		switch request.Kind() {
-		case api.RootRequestImport, api.RootRequestRuntimeFeature:
+		case api.RootRequestImport:
 			placementRequests = append(placementRequests, request)
 		case api.RootRequestDeclarationRequirement:
 			requirement, ok := request.DeclarationRequirement()

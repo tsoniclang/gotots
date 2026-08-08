@@ -4,9 +4,10 @@ import (
 	"go/ast"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
@@ -200,36 +201,24 @@ func pointerArrayStorage(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	storageType, err := context.Values().StorageType(
+	guarded, err := pointermarker.Guard(context, value)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	loaded, err := pointermarker.Operation(
+		context,
+		tsoniccore.SymbolLoadPointer,
+		[]api.TypeEmission{logicalType},
+		[]api.ExpressionEmission{guarded},
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return context.Values().ToStorage(
 		context.WithRole(api.RoleStorageType),
 		source.X,
 		elementType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	reference, err := context.Names().Runtime(
-		api.RuntimePointer,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.NewExpressionEmission(
-		value.Before(),
-		pointerruntime.CellValue(
-			context.Factory(),
-			reference.Name(),
-			logicalType.Value(),
-			storageType.Value(),
-			value.Value(),
-		),
-		api.CombineRequests(
-			value.Requests(),
-			logicalType.Requests(),
-			storageType.Requests(),
-			reference.Requests(),
-		),
+		loaded,
 	)
 }
 

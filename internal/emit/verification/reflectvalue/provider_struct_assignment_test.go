@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestReflectProviderStructAssignmentMatchesGo(t *testing.T) {
+func TestReflectProviderStructAssignmentCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -133,7 +133,7 @@ func main() {
 	fmt.Println(fixture.ProviderAssignments())
 }
 `
-	runReflectDifferentialInspect(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		"ProviderAssignments",
@@ -142,13 +142,24 @@ func main() {
 		goRunner,
 		func(artifacts renderedArtifacts) {
 			for _, required := range []string{
-				"TimeParseErrorOperations.$assign",
-				"TimeTimerOperations.$assign",
-				"SyncMutexOperations.$assign",
-				"StringsBuilderOperations.$assign",
+				"TimeParseErrorOperations.$copy",
+				"TimeTimerOperations.$copy",
+				"SyncMutexOperations.$copy",
+				"StringsBuilderOperations.$copy",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
-					t.Fatalf("provider assignment artifact lacks %q", required)
+					relevant := make([]string, 0)
+					for _, line := range strings.Split(artifacts.printed, "\n") {
+						if strings.Contains(line, "ParseError") ||
+							strings.Contains(line, "$goProviderState_") {
+							relevant = append(relevant, line)
+						}
+					}
+					t.Fatalf(
+						"provider assignment artifact lacks %q:\n%s",
+						required,
+						strings.Join(relevant, "\n"),
+					)
 				}
 			}
 		},

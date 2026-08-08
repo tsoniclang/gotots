@@ -32,7 +32,6 @@ type DeclarationRequirement struct {
 	genericParameter       *types.TypeParam
 	genericFacet           GenericRepresentationFacet
 	typeRepresentation     TypeRepresentationFacet
-	pointerDemand          PointerRepresentationDemand
 	concretizationDeferred bool
 	enclosing              ast.Node
 	callable               ast.Node
@@ -214,17 +213,6 @@ func NewReflectionTypeRequirement(
 		GeneratedArtifactReflectionType,
 		DeclarationRequirementReflectionType,
 		"reflection type",
-	)
-}
-
-func NewUnsafeCodecRequirement(
-	artifact *GeneratedArtifact,
-) (DeclarationRequirement, error) {
-	return newGeneratedDefinitionRequirement(
-		artifact,
-		GeneratedArtifactUnsafeCodec,
-		DeclarationRequirementUnsafeCodec,
-		"unsafe codec",
 	)
 }
 

@@ -567,7 +567,9 @@ func layerFor(relative string) int {
 	switch {
 	case strings.HasPrefix(relative, "internal/load/"),
 		strings.HasPrefix(relative, "internal/contracts/"),
-		strings.HasPrefix(relative, "internal/target/tsgo/"):
+		strings.HasPrefix(relative, "internal/testfixture/"),
+		strings.HasPrefix(relative, "internal/target/tsgo/"),
+		strings.HasPrefix(relative, "internal/target/tsgoprinter/"):
 		return 10
 	case strings.HasPrefix(relative, "internal/output/"),
 		strings.HasPrefix(relative, "internal/emit/api/"):

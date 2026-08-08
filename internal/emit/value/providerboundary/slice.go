@@ -135,8 +135,18 @@ func projectProviderSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, true, false, err
 	}
-	storageChanged := context.Values().RequiresStorageProjection(context, element) !=
-		providerContext.Values().RequiresStorageProjection(providerContext, element)
+	productStorage, err := context.Values().RequiresStorageProjection(context, element)
+	if err != nil {
+		return api.ExpressionEmission{}, true, false, err
+	}
+	providerStorage, err := providerContext.Values().RequiresStorageProjection(
+		providerContext,
+		element,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, false, err
+	}
+	storageChanged := productStorage != providerStorage
 	if !fromChanged && !toChanged && !storageChanged {
 		return value, true, false, nil
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"go/ast"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -139,6 +141,86 @@ func TestConversionTargetSpellingDoesNotSelectSemantics(t *testing.T) {
 			before,
 			after,
 		)
+	}
+}
+
+func TestRawUnsafePointerConversionsFailAtTheTypedBoundary(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		source   string
+		category api.Category
+	}{
+		{
+			name: "typed pointer round trip",
+			source: `package boundary
+
+import "unsafe"
+
+func Convert(value *int32) *int32 {
+	return (*int32)(unsafe.Pointer(value))
+}
+`,
+			category: api.CategoryExpression,
+		},
+		{
+			name: "pointer to integer",
+			source: `package boundary
+
+import "unsafe"
+
+func Convert(value *int32) uintptr {
+	return uintptr(unsafe.Pointer(value))
+}
+`,
+			category: api.CategoryExpression,
+		},
+		{
+			name: "raw pointer signature",
+			source: `package boundary
+
+import "unsafe"
+
+func Convert(value uintptr) unsafe.Pointer {
+	return unsafe.Pointer(value)
+}
+`,
+			category: api.CategoryType,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			directory := t.TempDir()
+			if err := os.WriteFile(
+				filepath.Join(directory, "go.mod"),
+				[]byte("module example.com/boundary\n\ngo 1.26.4\n"),
+				0o600,
+			); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(
+				filepath.Join(directory, "source.go"),
+				[]byte(testCase.source),
+				0o600,
+			); err != nil {
+				t.Fatal(err)
+			}
+			loaded, err := load.One(context.Background(), load.Request{
+				Directory: directory,
+				Pattern:   ".",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			root, err := emit.NewRoot(loaded.Types().Scope().Lookup("Convert"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = emit.Compile(loaded.Program(), []emit.Root{root})
+			var unsupported *api.UnsupportedError
+			if !errors.As(err, &unsupported) ||
+				unsupported.Category != testCase.category {
+				t.Fatalf("raw-pointer boundary error = %#v", err)
+			}
+		})
 	}
 }
 

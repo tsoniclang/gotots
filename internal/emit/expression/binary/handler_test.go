@@ -496,7 +496,7 @@ func (unusedValues) SupportsHash(api.Context, types.Type) bool {
 	panic("unused")
 }
 
-func (unusedValues) RequiresStorageProjection(api.Context, types.Type) bool {
+func (unusedValues) RequiresStorageProjection(api.Context, types.Type) (bool, error) {
 	panic("unused")
 }
 

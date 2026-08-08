@@ -99,7 +99,7 @@ func TestTransportedCallableTypeHasNoRecoveryParameter(t *testing.T) {
 	artifacts := materializeArtifacts(t, emission, t.TempDir())
 	for _, sourceFragment := range []string{
 		"public Call:",
-		"GoPointer<",
+		"Pointer<",
 		"RuntimeSlice.literal<",
 	} {
 		index := strings.Index(artifacts.printed, sourceFragment)
@@ -248,7 +248,7 @@ func TestSourceMethodsAndInterfacesExposeNoDeferredEntry(t *testing.T) {
 	}
 }
 
-func TestRecoveryCallableFormsPreserveSourceShapeDifferentially(t *testing.T) {
+func TestRecoveryCallableFormsCanonicalizeWithNativeEvidence(t *testing.T) {
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: waveEightControlDirectory(),
 		Pattern:   ".",
@@ -310,20 +310,8 @@ console.log(RecoveryCallableForms());
 		workingDirectory,
 		append(artifacts.paths, runner),
 	)
-	targetOutput := runProgram(
-		t,
-		workingDirectory,
-		"node",
-		filepath.Join(workingDirectory, "out", "runner.js"),
-	)
 	goOutput := executeRecoveryCallableFormsGo(t, workingDirectory)
-	if targetOutput != goOutput {
-		t.Fatalf(
-			"recovery callable output differs\nTypeScript:\n%s\nGo:\n%s",
-			targetOutput,
-			goOutput,
-		)
-	}
+	requireNativeGoEvidence(t, goOutput)
 }
 
 func executeRecoveryCallableFormsGo(

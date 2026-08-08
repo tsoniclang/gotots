@@ -3,8 +3,8 @@ package reflectiontype
 import (
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -26,62 +26,45 @@ func pointerCellValueProperties(
 	}
 	scaffold.requests = append(scaffold.requests, sliceAdapter.Requests()...)
 	scaffold.requests = append(scaffold.requests, descriptor.Requests()...)
-	representation, err := pointertype.Observe(
-		context,
-		types.NewPointer(pointee),
-		api.PointerRepresentationDemandNone,
-	)
+	loadPointer, err := context.Names().TsonicCore(tsoniccore.SymbolLoadPointer)
 	if err != nil {
 		return nil, err
 	}
-	cellValue := memberAccess(factory, "instance", "value")
-	cellRead, err := context.ContainerStorage().FromPointerStorage(
-		context,
+	storePointer, err := context.Names().TsonicCore(tsoniccore.SymbolStorePointer)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, loadPointer.Requests()...)
+	scaffold.requests = append(scaffold.requests, storePointer.Requests()...)
+	cellRead := factory.CallExpression(
+		loadPointer.Expression(factory),
 		nil,
-		pointee,
-		representation,
-		api.DirectExpression(cellValue),
-	)
-	if err != nil {
-		return nil, err
-	}
-	cellWrite, err := context.ContainerStorage().ToPointerStorage(
-		context,
 		nil,
-		pointee,
-		representation,
-		api.DirectExpression(guardedForeignPayload(
-			scaffold,
-			sliceAdapter,
-			"Value.Set",
-		)),
+		[]tsgo.Expression{factory.Identifier("instance")},
+		tsgo.NodeFlagsNone,
 	)
-	if err != nil {
-		return nil, err
-	}
-	if len(cellRead.Before()) != 0 || len(cellWrite.Before()) != 0 {
-		return nil, &api.GeneratedArtifactShapeError{
-			Artifact: pointee.String(),
-			Reason:   "reflection pointer cell conversion has prerequisites",
-		}
-	}
-	scaffold.requests = append(scaffold.requests, cellRead.Requests()...)
-	scaffold.requests = append(scaffold.requests, cellWrite.Requests()...)
 	location := locationLiteral(scaffold, locationCallbacks{
 		descriptor: descriptor,
 		settable:   true,
 		get: factory.NewExpression(
 			sliceAdapter.Expression(factory),
 			nil,
-			[]tsgo.Expression{cellRead.Value()},
+			[]tsgo.Expression{cellRead},
 		),
 		set: factory.Block([]tsgo.Statement{
-			factory.ExpressionStatement(factory.BinaryExpression(
+			factory.ExpressionStatement(factory.CallExpression(
+				storePointer.Expression(factory),
 				nil,
-				cellValue,
 				nil,
-				factory.BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
-				cellWrite.Value(),
+				[]tsgo.Expression{
+					factory.Identifier("instance"),
+					guardedForeignPayload(
+						scaffold,
+						sliceAdapter,
+						"Value.Set",
+					),
+				},
+				tsgo.NodeFlagsNone,
 			)),
 		}, true),
 	})
@@ -144,36 +127,25 @@ func pointerCellValueProperties(
 				Reason:   "reflection pointer zero is absent",
 			}
 		}
-		storedZero, storageErr := context.ContainerStorage().ToPointerStorage(
-			context,
-			nil,
-			pointee,
-			representation,
-			logicalZero,
-		)
-		if storageErr != nil {
-			return nil, storageErr
-		}
-		if len(storedZero.Before()) != 0 {
+		if len(logicalZero.Before()) != 0 {
 			return nil, &api.GeneratedArtifactShapeError{
 				Artifact: pointee.String(),
 				Reason:   "reflection pointer zero has prerequisites",
 			}
 		}
-		runtimePointer, pointerErr := context.Names().Runtime(
-			api.RuntimePointer,
-			api.ImportPhaseValue,
+		allocatePointer, pointerErr := context.Names().TsonicCore(
+			tsoniccore.SymbolAllocatePointer,
 		)
 		if pointerErr != nil {
 			return nil, pointerErr
 		}
 		scaffold.requests = append(
 			scaffold.requests,
-			runtimePointer.Requests()...,
+			allocatePointer.Requests()...,
 		)
 		scaffold.requests = append(
 			scaffold.requests,
-			storedZero.Requests()...,
+			logicalZero.Requests()...,
 		)
 		properties = append(properties, expressionProperty(
 			factory,
@@ -192,15 +164,10 @@ func pointerCellValueProperties(
 						scaffold.adapter.Expression(factory),
 						nil,
 						[]tsgo.Expression{factory.CallExpression(
-							factory.PropertyAccessExpression(
-								runtimePointer.Expression(factory),
-								nil,
-								factory.Identifier("cell"),
-								tsgo.NodeFlagsNone,
-							),
+							allocatePointer.Expression(factory),
 							nil,
 							nil,
-							[]tsgo.Expression{storedZero.Value()},
+							[]tsgo.Expression{logicalZero.Value()},
 							tsgo.NodeFlagsNone,
 						)},
 					),

@@ -39,7 +39,7 @@ func main() {
 	fmt.Println(fixture.DerivedFieldFacts())
 }
 `
-	runReflectDifferentialProjectInspect(
+	verifyReflectCanonicalProjectInspect(
 		t,
 		source,
 		"DerivedFieldFacts",

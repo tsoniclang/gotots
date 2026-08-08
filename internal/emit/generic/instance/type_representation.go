@@ -57,8 +57,6 @@ func materializedRepresentationFacet(
 		return api.TypeRepresentationStorage, true
 	case api.GenericRepresentationContainerStorage:
 		return api.TypeRepresentationContainerStorage, true
-	case api.GenericRepresentationPointer:
-		return api.TypeRepresentationPointer, true
 	default:
 		return api.TypeRepresentationInvalid, false
 	}

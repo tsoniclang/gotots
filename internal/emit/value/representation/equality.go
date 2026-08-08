@@ -58,17 +58,6 @@ func (owner Owner) Equal(
 	if panicNilRuntimeValue(context, sourceType) {
 		return panicNilEqual(context), nil
 	}
-	if unsafePointerValue(sourceType) {
-		return api.DirectExpression(context.Factory().BinaryExpression(
-			nil,
-			left,
-			nil,
-			context.Factory().BinaryOperatorToken(
-				tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-			),
-			right,
-		)), nil
-	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		operationContext, err := defined.OperationContext(context)
 		if err != nil {
@@ -88,7 +77,7 @@ func (owner Owner) Equal(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		result, err := (Owner{}).Equal(
+		result, err := owner.Equal(
 			operationContext.WithRole(api.RoleDefinedValue),
 			source,
 			defined.Underlying(),

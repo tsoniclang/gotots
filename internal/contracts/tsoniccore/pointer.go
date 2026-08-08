@@ -12,6 +12,9 @@ const (
 	SymbolLoadPointer
 	SymbolStorePointer
 	SymbolEqualPointer
+	SymbolHashPointer
+	SymbolProjectPointer
+	SymbolBindPointer
 )
 
 type Phase uint8
@@ -58,6 +61,12 @@ func Resolve(symbol Symbol) (Declaration, error) {
 		return value("storePointer"), nil
 	case SymbolEqualPointer:
 		return value("equalPointer"), nil
+	case SymbolHashPointer:
+		return value("hashPointer"), nil
+	case SymbolProjectPointer:
+		return value("projectPointer"), nil
+	case SymbolBindPointer:
+		return value("bindPointer"), nil
 	default:
 		return Declaration{}, fmt.Errorf(
 			"resolve Tsonic core symbol: invalid symbol %d",

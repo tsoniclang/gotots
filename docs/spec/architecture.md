@@ -813,6 +813,21 @@ representation fields stay direct and acquire no adapter. The compiler may not
 create a shadow struct, duplicate field state, infer a field from spelling, or
 let the provider carrier leak into generated source semantics.
 
+Direct source implementations have one certified pointer ABI. A pointer to a
+named Go struct is the provider object itself: its object identity is the Go
+location, reads observe that object, and writes use the struct's certified
+stable-assignment operation so existing aliases observe whole-value
+replacement. Every other pointee uses the provider-owned
+`ProviderPointer<T> { value: T }` carrier from the runtime contract. Provider
+source imports that carrier, never canonical Tsonic markers. At the generated
+boundary, a provider result becomes one canonical `bindPointer` marker over
+the provider identity plus exact read and write closures; nil remains
+`undefined`. A canonical named-struct pointer input is loaded and passed as
+the provider object. A canonical non-object pointer input is a typed
+unsupported boundary until shared Tsonic owns an exact inverse external-
+location transport contract. A detached wrapper, cast, identity cache, or
+package-specific pointer rule is forbidden.
+
 For example, under the product `number` profile and the provider `bigint`
 profile, Go `runtime.MemStats.Alloc uint64` is observed as a generated `number`
 but stored in the provider object as `bigint`. Reading performs the checked
@@ -1124,13 +1139,16 @@ field except `schemaVersion` has one registered CLI counterpart, including
 repeatable `--tag` and `--implementation-bundle` flags.
 
 A certified source implementation owns one exact source package's final target
-module set. Certification joins canonical Go module, package, version,
+module set. GoToTS certification joins canonical Go module, package, version,
 selected build and compilation profiles, exact export identities, callable ABI
 projections, implementation source digests, and the equivalence envelope. It
-strict-typechecks both the complete ordinary generated target set and the
-complete installed target set under the same final module-resolution and
-strictness contract. The installed check is the authoritative proof that every
-selected generated consumer accepts the replacement. TypeScript display text,
+strict-typechecks the authored implementation project and structurally inspects
+the complete ordinary and installed target sets, but it does not pretend those
+canonical sets are executable without finalized marker facts. TSTS strictly
+checks the complete installed canonical source against its authoritative marker
+modules; the selected target then strictly checks every generated consumer
+against the lowered implementation. That target check is the authoritative
+proof that consumers accept the replacement. TypeScript display text,
 parameter names, and package-private representation shape are not semantic
 package contracts and must not be compared as if they were. Selection is
 settled once before target files are sealed. The final file set replaces the

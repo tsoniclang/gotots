@@ -10,6 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestEnvironmentContractsPrintAndStrictTypecheckWithoutImplementations(
@@ -100,18 +101,13 @@ type UnsafePair struct {
 	Last  byte
 }
 
-func UnsafeRuntime(
+func UnsafeText(
 	bytes []byte,
-	text string,
-) (string, []byte, *byte, *byte) {
-	var pointer *byte
-	if len(bytes) != 0 {
-		pointer = &bytes[0]
+) string {
+	if len(bytes) == 0 {
+		return ""
 	}
-	return unsafe.String(pointer, len(bytes)),
-		unsafe.Slice(pointer, len(bytes)),
-		unsafe.StringData(text),
-		unsafe.SliceData(bytes)
+	return unsafe.String(&bytes[0], len(bytes))
 }
 
 func UnsafeConstants() (uintptr, uintptr, uintptr) {
@@ -148,7 +144,7 @@ func NativeUint16(value []byte) uint16 {
 		"EmptyLocalPool",
 		"ImportLocalPool",
 		"ExportLocalPool",
-		"UnsafeRuntime",
+		"UnsafeText",
 		"UnsafeConstants",
 		"RuneBoundary",
 		"NativeUint16",
@@ -219,11 +215,8 @@ func NativeUint16(value []byte) uint16 {
 		"export declare const Context$contract",
 		"export declare function Context$is",
 		"export declare class Pool",
-		"export declare function Pool_Get($receiver: GoPointer<Pool",
+		"export declare function Pool_Get($receiver: Pointer<Pool>",
 		"export function goUnsafeString<",
-		"export function goUnsafeSlice<",
-		"export function goUnsafeStringData<",
-		"export function goUnsafeSliceData<",
 		"export declare const RuneSelf$uint8",
 		"littleEndian: littleEndian;",
 		".littleEndian",
@@ -289,6 +282,9 @@ func NativeUint16(value []byte) uint16 {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	if err := tsgo.Compile(
 		ctx,
 		repositoryRoot(),

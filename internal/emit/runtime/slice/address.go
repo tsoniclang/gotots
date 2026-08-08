@@ -6,25 +6,14 @@ import (
 )
 
 func (b builder) addressMethod() tsgo.MethodDeclaration {
-	typeL := b.factory.TypeReferenceNode(b.id("L"), nil)
-	pointerType := b.factory.TypeReferenceNode(
-		b.id(b.pointerName),
-		[]tsgo.TypeNode{typeL, b.typeT()},
-	)
 	return b.method(
 		nil,
 		MemberName(MemberAddress),
-		[]tsgo.TypeParameterDeclaration{b.factory.TypeParameterDeclaration(
-			nil,
-			b.id("L"),
-			nil,
-			nil,
-			nil,
-		)},
+		nil,
 		[]tsgo.ParameterDeclaration{
 			b.parameter("index", b.integerInputType()),
 		},
-		pointerType,
+		b.pointerType(b.typeT()),
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"numericIndex",
@@ -49,44 +38,32 @@ func (b builder) addressMethod() tsgo.MethodDeclaration {
 			nil,
 		),
 		b.returnStatement(b.factory.CallExpression(
-			b.property(b.id(b.pointerName), "element"),
+			b.id(b.addressName),
 			nil,
-			[]tsgo.TypeNode{typeL, b.typeT()},
-			[]tsgo.Expression{b.factory.ArrayLiteralExpression(
-				[]tsgo.Expression{
-					b.id("backing"),
-					b.add(
-						b.thisProperty("offset"),
-						b.id("numericIndex"),
-					),
-				},
-				false,
-			)},
+			[]tsgo.TypeNode{b.typeT()},
+			[]tsgo.Expression{
+				b.backingElement(b.id("backing"), b.id("numericIndex")),
+			},
 			tsgo.NodeFlagsNone,
 		)),
 	)
 }
 
-func (b projectionBuilder) addressMethod() tsgo.MethodDeclaration {
-	typeL := b.typeReference("L")
-	sourcePointer := b.factory.CallExpression(
-		b.property(b.source(), MemberName(MemberAddress)),
-		nil,
-		[]tsgo.TypeNode{typeL},
-		[]tsgo.Expression{b.id("index")},
-		tsgo.NodeFlagsNone,
+func (b builder) pointerType(element tsgo.TypeNode) tsgo.TypeReferenceNode {
+	return b.factory.TypeReferenceNode(
+		b.id(b.pointerName),
+		[]tsgo.TypeNode{element},
 	)
+}
+
+func (b projectionBuilder) addressMethod() tsgo.MethodDeclaration {
+	targetType := b.typeReference("T")
 	projected := b.factory.CallExpression(
 		b.id(b.pointerProject),
 		nil,
-		[]tsgo.TypeNode{
-			typeL,
-			b.typeReference("F"),
-			typeL,
-			b.typeReference("T"),
-		},
+		[]tsgo.TypeNode{b.typeReference("F"), targetType},
 		[]tsgo.Expression{
-			sourcePointer,
+			b.call(b.source(), MemberName(MemberAddress), b.id("index")),
 			b.thisProperty("fromSource"),
 			b.thisProperty("toSource"),
 		},
@@ -97,11 +74,11 @@ func (b projectionBuilder) addressMethod() tsgo.MethodDeclaration {
 		nil,
 		b.id(MemberName(MemberAddress)),
 		nil,
-		[]tsgo.TypeParameterDeclaration{b.typeParameter("L")},
+		nil,
 		[]tsgo.ParameterDeclaration{
 			b.parameter(nil, "index", b.integerInputType()),
 		},
-		b.pointerType(typeL, b.typeReference("T")),
+		b.pointerType(targetType),
 		b.factory.Block([]tsgo.Statement{b.returnStatement(projected)}, true),
 	)
 }
@@ -175,27 +152,19 @@ func BuildAddress(
 	className string,
 	pointerName string,
 ) tsgo.FunctionDeclaration {
-	logicalParameter := typeParameter(factory, "L")
-	storageParameter := typeParameter(factory, "S")
+	typeT := typeReference(factory, "T")
 	sliceType := factory.TypeReferenceNode(
 		factory.Identifier(className),
-		[]tsgo.TypeNode{typeReference(factory, "S")},
+		[]tsgo.TypeNode{typeT},
 	)
 	pointerType := factory.TypeReferenceNode(
 		factory.Identifier(pointerName),
-		[]tsgo.TypeNode{
-			typeReference(factory, "L"),
-			typeReference(factory, "S"),
-		},
+		[]tsgo.TypeNode{typeT},
 	)
 	indexType := factory.UnionTypeNode(
 		[]tsgo.TypeNode{
-			factory.KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindNumberKeyword,
-			),
-			factory.KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindBigIntKeyword,
-			),
+			factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword),
+			factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBigIntKeyword),
 		},
 	)
 	result := factory.CallExpression(
@@ -206,7 +175,7 @@ func BuildAddress(
 			tsgo.NodeFlagsNone,
 		),
 		nil,
-		[]tsgo.TypeNode{typeReference(factory, "L")},
+		nil,
 		[]tsgo.Expression{factory.Identifier("index")},
 		tsgo.NodeFlagsNone,
 	)
@@ -214,10 +183,7 @@ func BuildAddress(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		nil,
 		factory.Identifier(functionName),
-		[]tsgo.TypeParameterDeclaration{
-			logicalParameter,
-			storageParameter,
-		},
+		[]tsgo.TypeParameterDeclaration{typeParameter(factory, "T")},
 		[]tsgo.ParameterDeclaration{
 			factory.ParameterDeclaration(
 				nil,
@@ -264,14 +230,14 @@ func typeParameter(
 func parameter(
 	factory tsgo.Factory,
 	name string,
-	targetType tsgo.TypeNode,
+	typeNode tsgo.TypeNode,
 ) tsgo.ParameterDeclaration {
 	return factory.ParameterDeclaration(
 		nil,
 		nil,
 		factory.Identifier(name),
 		nil,
-		targetType,
+		typeNode,
 		nil,
 	)
 }

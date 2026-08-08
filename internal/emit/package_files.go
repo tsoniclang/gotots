@@ -195,13 +195,17 @@ func (e *emitter) context(names api.Names) (api.Context, error) {
 	if e.providerScalar.Valid() {
 		context = context.WithProviderScalarABI(e.providerScalar)
 	}
-	return context.
+	context = context.
 		WithGenericCallableResolver(e.generic).
 		WithCooperativeCallableResolver(e.cooperative).
 		WithRecoveryCallableResolver(e.recovery).
 		WithCallableABIResolver(e.callableABI).
 		WithExternalFunctionResolver(e.external).
-		WithGoRuntimeContract(e.goRuntime), nil
+		WithGoRuntimeContract(e.goRuntime)
+	if e.implementationContract {
+		context = context.WithSourceImplementationContract()
+	}
+	return context, nil
 }
 
 func (e *emitter) fileContext(
@@ -405,7 +409,7 @@ func (s *programSession) packageAssemblyFile(
 			s.factory.ExpressionStatement(call),
 		)
 	}
-	if len(initialization) != 0 {
+	if len(initialization) != 0 || builder.implementationInit {
 		cooperative, err := s.packageInitializationIsCooperative(builder)
 		if err != nil {
 			return TargetFile{}, err
@@ -492,7 +496,8 @@ func deferredConstantPackageExport(
 }
 
 func (b *packageTargetBuilder) hasInitializationWork() bool {
-	return len(b.constantInitialization) != 0 ||
+	return b.implementationInit ||
+		len(b.constantInitialization) != 0 ||
 		len(b.storage) != 0 ||
 		len(b.initialization) != 0 ||
 		len(b.initFunctions) != 0

@@ -87,6 +87,7 @@ type Requirements struct {
 	profiles          []Profile
 	providerProfile   Profile
 	providerModule    string
+	pointerModule     string
 	nativeIntegerBits uint8
 	aliases           []Entry
 	symbols           []Entry
@@ -119,6 +120,13 @@ func (r Requirements) ProviderScalarModule() string {
 	return r.providerModule
 }
 
+func (r Requirements) ProviderPointerModule() string {
+	if !r.valid {
+		return ""
+	}
+	return r.pointerModule
+}
+
 func (r Requirements) NativeIntegerBits() uint8 {
 	if !r.valid {
 		return 0
@@ -145,6 +153,7 @@ type document struct {
 	IntegerRepresentations        []string        `json:"integerRepresentations"`
 	ProviderIntegerRepresentation string          `json:"providerIntegerRepresentation"`
 	ProviderScalarModule          string          `json:"providerScalarModule"`
+	ProviderPointerModule         string          `json:"providerPointerModule"`
 	NativeIntegerBits             uint8           `json:"nativeIntegerBits"`
 	PrimitiveAliases              []entryDocument `json:"primitiveAliases"`
 	RuntimeSymbols                []entryDocument `json:"runtimeSymbols"`
@@ -164,9 +173,9 @@ func Decode(data []byte) (Requirements, error) {
 		}
 		return Requirements{}, contractError("decode: " + err.Error())
 	}
-	if source.SchemaVersion != 2 {
+	if source.SchemaVersion != 3 {
 		return Requirements{}, contractError(fmt.Sprintf(
-			"schema version %d is not 2",
+			"schema version %d is not 3",
 			source.SchemaVersion,
 		))
 	}
@@ -187,6 +196,13 @@ func Decode(data []byte) (Requirements, error) {
 		return Requirements{}, contractError(fmt.Sprintf(
 			"provider scalar module %q is invalid",
 			source.ProviderScalarModule,
+		))
+	}
+	if !validProviderSupportModule(source.ProviderPointerModule) ||
+		source.ProviderPointerModule == source.ProviderScalarModule {
+		return Requirements{}, contractError(fmt.Sprintf(
+			"provider pointer module %q is invalid",
+			source.ProviderPointerModule,
 		))
 	}
 	if source.NativeIntegerBits != 32 && source.NativeIntegerBits != 64 {
@@ -210,6 +226,7 @@ func Decode(data []byte) (Requirements, error) {
 		profiles:          profiles,
 		providerProfile:   providerProfile,
 		providerModule:    source.ProviderScalarModule,
+		pointerModule:     source.ProviderPointerModule,
 		nativeIntegerBits: source.NativeIntegerBits,
 		aliases:           aliases,
 		symbols:           symbols,
@@ -218,6 +235,10 @@ func Decode(data []byte) (Requirements, error) {
 }
 
 func validProviderScalarModule(source string) bool {
+	return validProviderSupportModule(source)
+}
+
+func validProviderSupportModule(source string) bool {
 	return strings.HasPrefix(source, "./internal/") &&
 		strings.HasSuffix(source, ".js") &&
 		!strings.Contains(source, "\\") &&

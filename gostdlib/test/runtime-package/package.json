@@ -37,10 +37,6 @@
       "types": "./panic.d.ts",
       "default": "./panic.js"
     },
-    "./pointer.js": {
-      "types": "./pointer.d.ts",
-      "default": "./pointer.js"
-    },
     "./scalars.js": {
       "types": "./scalars.d.ts",
       "default": "./scalars.js"
@@ -52,10 +48,6 @@
     "./struct.js": {
       "types": "./struct.d.ts",
       "default": "./struct.js"
-    },
-    "./unsafe-pointer.js": {
-      "types": "./unsafe-pointer.d.ts",
-      "default": "./unsafe-pointer.js"
     }
   }
 }

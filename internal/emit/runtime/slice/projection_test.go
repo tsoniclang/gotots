@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestRuntimeSliceProjectionPreservesBidirectionalAlias(t *testing.T) {
@@ -27,7 +28,6 @@ func TestRuntimeSliceProjectionPreservesBidirectionalAlias(t *testing.T) {
 			api.RuntimeSliceAddress:      {},
 			api.RuntimeSliceArrayPointer: {},
 		},
-		nil,
 		nil,
 	)
 	if err != nil {
@@ -69,7 +69,8 @@ func TestRuntimeSliceProjectionPreservesBidirectionalAlias(t *testing.T) {
 		"this.source.set(index, this.toSource(value))",
 		"this.source.slice(low, high, max)",
 		"this.source.append(this.sourceZero, converted)",
-		"goPointerProject<L, F, L, T>",
+		"projectPointer<F, T>",
+		"projectPointer<T | undefined, GoArray<T, N>>",
 		"projected slice has no contiguous target representation",
 	} {
 		if !strings.Contains(sliceSource, fragment) {
@@ -78,12 +79,9 @@ func TestRuntimeSliceProjectionPreservesBidirectionalAlias(t *testing.T) {
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import {
-  goSliceArrayPointer,
   RuntimeSlice,
   RuntimeSliceProjection,
 } from "./runtime/slice.js";
-import { goSliceAddress } from "./runtime/slice.js";
-import { GoPointer } from "./runtime/pointer.js";
 
 const source = RuntimeSlice.make<bigint>(2, 4, 0n);
 source.set(0, 1n);
@@ -100,11 +98,6 @@ target.set(1, 7);
 console.log(source.get(1), alias.get(0));
 source.set(1, 9n);
 console.log(target.get(1), alias.get(0));
-const targetPointer = goSliceAddress<number, number>(target, 1);
-const sourcePointer = goSliceAddress<number, bigint>(source, 1);
-console.log(GoPointer.equal(targetPointer, sourcePointer));
-targetPointer.value = 21;
-console.log(source.get(1));
 
 const reused = target.append(0, [5]);
 console.log(reused.length, source.slice(0, 3, null).get(2));
@@ -126,14 +119,16 @@ const nilTarget = new RuntimeSliceProjection<bigint, number>(
   0,
 );
 console.log(nilTarget.isNil(), nilTarget.length, nilTarget.capacity);
-console.log(goSliceArrayPointer<number, number, 0>(nilTarget, 0) === undefined);
 try {
-  goSliceArrayPointer<number, number, 1>(target, 1);
+  target.$arrayLocation(1);
 } catch {
   console.log("projected-contiguous-unsupported");
 }
 `)
 	targetPaths = append(targetPaths, runnerPath)
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	writeFile(
 		t,
 		filepath.Join(workingDirectory, "package.json"),
@@ -146,7 +141,7 @@ try {
 		"node",
 		filepath.Join(workingDirectory, "out", "runner.js"),
 	)
-	const expected = "7n 7\n9 9\ntrue\n21n\n3 5n\n5 8 7 1n\n2 1 21\n2 13n 21n\ntrue 0 0\ntrue\nprojected-contiguous-unsupported\n"
+	const expected = "7n 7\n9 9\n3 5n\n5 8 7 1n\n2 1 9\n2 13n 9n\ntrue 0 0\nprojected-contiguous-unsupported\n"
 	if output != expected {
 		t.Fatalf("projected slice output = %q, want %q", output, expected)
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestMapValuesCreateTypedTargetAST(t *testing.T) {
@@ -402,6 +403,9 @@ func strictTypecheckResult(
 	workingDirectory string,
 	runnerPath string,
 ) error {
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		return err
+	}
 	outputDirectory := filepath.Join(workingDirectory, "out")
 	arguments := []string{
 		"--target", "es2022",

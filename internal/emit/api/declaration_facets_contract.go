@@ -113,14 +113,12 @@ const (
 	DeclarationRequirementValueReceiverCopy                  DeclarationRequirementKind = 19
 	DeclarationRequirementGenericRepresentation              DeclarationRequirementKind = 20
 	DeclarationRequirementInterfaceMethodCallable            DeclarationRequirementKind = 21
-	DeclarationRequirementPointerRepresentation              DeclarationRequirementKind = 22
 	DeclarationRequirementProviderInterfaceBridge            DeclarationRequirementKind = 23
 	DeclarationRequirementProviderStatefulRepresentation     DeclarationRequirementKind = 24
 	DeclarationRequirementDeferredCallableRegistry           DeclarationRequirementKind = 25
 	DeclarationRequirementGenericConcretization              DeclarationRequirementKind = 26
 	DeclarationRequirementTypeRepresentation                 DeclarationRequirementKind = 27
 	DeclarationRequirementReflectionType                     DeclarationRequirementKind = 28
-	DeclarationRequirementUnsafeCodec                        DeclarationRequirementKind = 29
 	DeclarationRequirementProviderInterfaceCapability        DeclarationRequirementKind = 30
 	DeclarationRequirementProviderProfileInterfaceCapability DeclarationRequirementKind = 31
 	DeclarationRequirementReflectionValueOperations          DeclarationRequirementKind = 32
@@ -145,14 +143,12 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementValueReceiverCopy ||
 		k == DeclarationRequirementGenericRepresentation ||
 		k == DeclarationRequirementInterfaceMethodCallable ||
-		k == DeclarationRequirementPointerRepresentation ||
 		k == DeclarationRequirementProviderInterfaceBridge ||
 		k == DeclarationRequirementProviderStatefulRepresentation ||
 		k == DeclarationRequirementDeferredCallableRegistry ||
 		k == DeclarationRequirementGenericConcretization ||
 		k == DeclarationRequirementTypeRepresentation ||
 		k == DeclarationRequirementReflectionType ||
-		k == DeclarationRequirementUnsafeCodec ||
 		k == DeclarationRequirementProviderInterfaceCapability ||
 		k == DeclarationRequirementProviderProfileInterfaceCapability ||
 		k == DeclarationRequirementReflectionValueOperations

@@ -97,6 +97,16 @@ synthetic nodes. Mutations substitute a different node, duplicate or omit one
 selected fact, classify a local same-spelled call, reparse source, or introduce
 a range join; each must fail at its sole owner.
 
+GoToTS strict-typechecks canonical marker-bearing TypeScript against the
+resolution-only declaration contract but never executes that module's
+JavaScript. A direct Go-versus-Node differential remains valid only for an
+artifact proven to contain no canonical marker call. For marker-bearing
+artifacts, GoToTS records native-Go evidence and canonical AST/typecheck
+evidence; TSTS fact finalization plus the selected target's lowering and
+runtime differential is the sole executable proof. A test that executes a
+resolution-only marker body, treats a no-op marker implementation as behavior,
+or reports canonical-only evidence as a runtime differential must fail review.
+
 For typed pointers, focused proof covers `addressOf`, `allocatePointer`,
 `loadPointer`, `storePointer`, and `equalPointer`; nil, alias identity, mutation
 through two aliases, argument/return transport, fresh allocation, and pointer equality;
@@ -784,11 +794,13 @@ strict TypeScript project. It exact-joins exported identities, binds the build
 and compilation profiles, parses every authored module through pinned TS-Go,
 rebinds public generated imports to the package assembly, proves each residual
 private contract module body-free and exact by imported name, and inspects the
-final target file set. Before checker evidence is trusted, the complete ordinary
-generated target set and the complete installed target set are independently
-strict-typechecked with the same final module-resolution configuration. The
-installed check proves all selected consumer requirements; callable source
-signatures and projections are joined separately by the callable ABI owner.
+final target file set. GoToTS strictly checks the authored implementation
+project and structurally exact-joins the complete ordinary and installed target
+sets. TSTS then strictly checks the installed canonical source with its
+authoritative virtual marker modules, exact-joins marker facts, and delegates to
+the selected target's complete executable-output check. That final target check
+proves all selected consumer requirements; callable source signatures and
+projections are joined separately by the callable ABI owner.
 Display-oriented checker strings, parameter spellings, and replacement-private
 storage layouts are forbidden as package-contract equality evidence. Required
 mutations alter a Go
@@ -810,6 +822,21 @@ callable-signature facet and its callers remain unchanged.
 The final broad search rejects any source-implementation name-only surface
 join, package/function projection condition, pointer-scalarization config field,
 caller allowlist, text patch, unchecked cast, or duplicate signature store.
+
+The provider pointer contract is independently certified as exactly one
+writable `ProviderPointer<T>.value: T` member plus one
+`providerPointer<T>(T): ProviderPointer<T>` factory, and its module identity is
+part of the runtime-contract digest. Mutations remove either declaration,
+change the value or factory type, add a member, make the value readonly in the
+strict provider project, or redirect the module; each must fail at its owning
+contract or strict-typecheck gate. Generated fixtures cover nil and non-nil
+named-struct and scalar results and must contain `bindPointer` with one captured
+provider identity and exact getter/setter closures. Mutations return a raw
+provider object, replace stable assignment with rebinding, drop the setter, or
+use a detached scalar cell; strict canonical checking or the selected target's
+differential must fail. Broad searches prove provider source imports no
+canonical marker module and GoToTS provider verification executes no
+resolution-only marker JavaScript.
 
 Pointer-target mutation tests require complete-flow lowering: changing one
 definition without every reference, scalarizing one of two aliases, dropping a

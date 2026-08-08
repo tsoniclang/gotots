@@ -15,9 +15,7 @@ import (
 	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
 	storagefacetruntime "github.com/tsoniclang/gotots/internal/emit/runtime/storagefacet"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
-	unsafecodecruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafecodec"
 	unsaferuntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafeoperation"
-	unsafepointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/unsafepointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -56,16 +54,6 @@ func Build(
 	symbols []api.RuntimeSymbol,
 	concurrency api.ConcurrencySemantics,
 ) ([]Definition, error) {
-	return BuildWithFeatures(factory, module, symbols, nil, concurrency)
-}
-
-func BuildWithFeatures(
-	factory tsgo.Factory,
-	module api.RuntimeModule,
-	symbols []api.RuntimeSymbol,
-	features []api.RuntimeFeature,
-	concurrency api.ConcurrencySemantics,
-) ([]Definition, error) {
 	if module == api.RuntimeModuleInvalid {
 		return nil, &AssemblyError{Reason: "runtime module is invalid"}
 	}
@@ -74,23 +62,6 @@ func BuildWithFeatures(
 	}
 	if !concurrency.Valid() {
 		return nil, &AssemblyError{Reason: "runtime concurrency profile is invalid"}
-	}
-	seenFeatures := make(map[api.RuntimeFeature]struct{}, len(features))
-	for _, feature := range features {
-		featureModule, ok := api.RuntimeFeatureModule(feature)
-		if !ok || featureModule != module {
-			return nil, &AssemblyError{
-				Module: module,
-				Reason: "runtime feature has foreign module ownership",
-			}
-		}
-		if _, duplicate := seenFeatures[feature]; duplicate {
-			return nil, &AssemblyError{
-				Module: module,
-				Reason: "runtime feature is duplicated",
-			}
-		}
-		seenFeatures[feature] = struct{}{}
 	}
 	if module == api.RuntimeModuleScalar {
 		if len(symbols) != 1 || symbols[0] != api.RuntimeAwaitable {
@@ -207,13 +178,6 @@ func BuildWithFeatures(
 			return nil, err
 		}
 		return []Definition{definition}, nil
-	}
-	if module == api.RuntimeModulePointer {
-		return buildPointer(
-			factory,
-			symbols,
-			slices.Contains(features, api.RuntimePointerFieldPath),
-		)
 	}
 	if module == api.RuntimeModuleArray {
 		if symbols[0] != api.RuntimeArray {
@@ -433,69 +397,6 @@ func BuildWithFeatures(
 	}
 	if module == api.RuntimeModuleChannel {
 		return buildChannel(factory, symbols)
-	}
-	if module == api.RuntimeModuleUnsafePointer {
-		if len(symbols) != 2 ||
-			symbols[0] != api.RuntimeUnsafeCodec ||
-			symbols[1] != api.RuntimeUnsafePointer {
-			return nil, &AssemblyError{
-				Module: module,
-				Reason: "unsafe-pointer runtime requires codec before pointer",
-			}
-		}
-		codecContract, err := api.RuntimeContract(api.RuntimeUnsafeCodec)
-		if err != nil {
-			return nil, err
-		}
-		pointerContract, err := api.RuntimeContract(api.RuntimeUnsafePointer)
-		if err != nil {
-			return nil, err
-		}
-		goPointerContract, err := api.RuntimeContract(api.RuntimePointer)
-		if err != nil {
-			return nil, err
-		}
-		pointerMemoryContract, err := api.RuntimeContract(
-			api.RuntimePointerUnsafeMemory,
-		)
-		if err != nil {
-			return nil, err
-		}
-		panicContract, err := api.RuntimeContract(api.RuntimePanic)
-		if err != nil {
-			return nil, err
-		}
-		denseIndexContract, err := api.RuntimeContract(api.RuntimeDenseIndex)
-		if err != nil {
-			return nil, err
-		}
-		codecDefinition, err := NewDefinition(
-			api.RuntimeUnsafeCodec,
-			unsafecodecruntime.Build(
-				factory,
-				codecContract.ExportedName(),
-				panicContract.ExportedName(),
-			),
-		)
-		if err != nil {
-			return nil, err
-		}
-		pointerDefinition, err := NewDefinition(
-			api.RuntimeUnsafePointer,
-			unsafepointerruntime.Build(
-				factory,
-				pointerContract.ExportedName(),
-				codecContract.ExportedName(),
-				panicContract.ExportedName(),
-				goPointerContract.ExportedName(),
-				pointerMemoryContract.ExportedName(),
-				denseIndexContract.ExportedName(),
-			),
-		)
-		if err != nil {
-			return nil, err
-		}
-		return []Definition{codecDefinition, pointerDefinition}, nil
 	}
 	if module == api.RuntimeModuleUnsafe {
 		definitions := make([]Definition, 0, len(symbols))

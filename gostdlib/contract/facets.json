@@ -1767,6 +1767,17 @@
     },
     {
       "kind": "named-struct-operations",
+      "sourceIdentity": "encoding/base64|kind=2|receiver=|name=Encoding",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
+      "export": "Base64EncodingOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
       "sourceIdentity": "encoding/binary|kind=2|receiver=|name=bigEndian",
       "specifier": "@gotots/gostdlib/internal/facets/named-encoding-binary.js",
       "sourcePath": "src/internal/facets/named-encoding-binary.ts",
@@ -1889,6 +1900,28 @@
         "zero"
       ],
       "storageExport": "RuntimeMemStatsStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "runtime/pprof|kind=2|receiver=|name=Profile",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/named-runtime-pprof.ts",
+      "export": "RuntimePprofProfileOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=MapIter",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectMapIterOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
     },
     {
       "kind": "named-struct-operations",

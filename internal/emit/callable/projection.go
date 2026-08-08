@@ -16,62 +16,7 @@ func AdaptProjectedSourceValue(
 	provider *types.Func,
 	target api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	selected, ok := context.ResolveCallableABI(provider)
-	if !ok || !hasProjectedParameter(selected) {
-		return target, nil
-	}
-	signature, ok := provider.Type().(*types.Signature)
-	if !ok || signature.Recv() != nil {
-		return api.ExpressionEmission{}, api.Unsupported(
-			context,
-			api.CategoryExpression,
-			source,
-		)
-	}
-	adapter, err := EmitAdapter(context, children, source, signature)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	arguments, before, projectionRequests, err := ProjectArguments(
-		context,
-		source,
-		signature,
-		adapter.ParameterReferences(context.Factory()),
-		selected,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	requests := api.CombineRequests(
-		target.Requests(),
-		adapter.Requests(),
-		projectionRequests,
-	)
-	if len(before) != 0 {
-		return api.ExpressionEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "callable value projection produced evaluation prerequisites",
-		}
-	}
-	call := context.Factory().CallExpression(
-		target.Value(),
-		nil,
-		nil,
-		arguments,
-		tsgo.NodeFlagsNone,
-	)
-	return api.NewExpressionEmission(
-		target.Before(),
-		context.Factory().ArrowFunction(
-			nil,
-			nil,
-			adapter.Parameters(),
-			adapter.Result(),
-			context.Factory().EqualsGreaterThanToken(),
-			call,
-		),
-		requests,
-	)
+	return target, nil
 }
 
 func ProjectArguments(
@@ -90,10 +35,7 @@ func ProjectArguments(
 			Reason: "callable argument projection cardinality differs",
 		}
 	}
-	projectedArguments := append([]tsgo.Expression(nil), arguments...)
-	var before []tsgo.Statement
-	var requests []api.RootRequest
-	for index := range projectedArguments {
+	for index := range arguments {
 		parameter, ok := selected.Parameter(index)
 		if !ok {
 			return nil, nil, nil, &api.InvariantError{
@@ -101,37 +43,12 @@ func ProjectArguments(
 				Reason: "callable argument projection is absent",
 			}
 		}
-		switch parameter.Projection() {
-		case callableabi.ProjectionIdentity:
-		case callableabi.ProjectionPointeeValue:
-			projected, err := context.PointeeValues().ProjectedPointee(
-				context.WithRole(api.RoleCallArgument),
-				source,
-				signature.Params().At(index).Type(),
-				api.DirectExpression(projectedArguments[index]),
-				parameter.NilPolicy(),
-			)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-			before = append(before, projected.Before()...)
-			projectedArguments[index] = projected.Value()
-			requests = api.CombineRequests(requests, projected.Requests())
-		default:
+		if parameter.Projection() != callableabi.ProjectionIdentity {
 			return nil, nil, nil, &api.InvariantError{
 				Role:   context.Role(),
-				Reason: "callable value uses an unsupported parameter projection",
+				Reason: "callable parameter is not identity-preserving",
 			}
 		}
 	}
-	return projectedArguments, before, requests, nil
-}
-
-func hasProjectedParameter(selected callableabi.Callable) bool {
-	for _, parameter := range selected.Parameters() {
-		if parameter.Projection() != callableabi.ProjectionIdentity {
-			return true
-		}
-	}
-	return false
+	return arguments, nil, nil, nil
 }

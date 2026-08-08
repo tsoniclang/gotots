@@ -153,7 +153,7 @@ func TestBuildCreatesExactFixedWidthFunctions(t *testing.T) {
 func TestBuildRejectsSymbolsOwnedByOtherRuntimeModules(t *testing.T) {
 	for _, symbols := range [][]api.RuntimeSymbol{
 		nil,
-		{api.RuntimePointer},
+		{api.RuntimeStringIndex},
 		{api.RuntimeIntegerDivide, api.RuntimeIntegerDivide},
 	} {
 		if _, err := Build(

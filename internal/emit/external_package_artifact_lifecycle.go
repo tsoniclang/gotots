@@ -1,216 +1,48 @@
 package emit
 
 import (
-	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
-	"github.com/tsoniclang/gotots/internal/contracts/externals"
-	externalcertify "github.com/tsoniclang/gotots/internal/contracts/externals/certify"
-	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
+	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"go/ast"
 	"go/types"
-	"slices"
 	"sort"
 )
 
-type indexedExternalFunction struct {
-	function *types.Func
-	site     declarationSite
-	contract environmentcontract.ObjectContract
+func sourceImplementationForPackage(
+	certificate *sourceimplementation.Certificate,
+	sourcePackage *load.Package,
+) (sourceimplementation.Implementation, bool) {
+	if certificate == nil {
+		return sourceimplementation.Implementation{}, false
+	}
+	return certificate.ForPackage(sourcePackage)
 }
 
-func resolveExternalFunctionProvider(
-	source *load.Program,
-	sites map[types.Object]declarationSite,
-	provider *externalcertify.Certificate,
-	standardLibrary *gostdlibcertify.Certificate,
-	providerScalar api.ScalarABI,
-) (map[*types.Func]api.ExternalFunctionTarget, []string, error) {
-	resolved := make(map[*types.Func]api.ExternalFunctionTarget)
-	if provider == nil {
-		return resolved, nil, nil
+func sourcePackageRequiresInitialization(sourcePackage *load.Package) bool {
+	if sourcePackage == nil || sourcePackage.Types() == nil ||
+		sourcePackage.TypesInfo() == nil {
+		return false
 	}
-	if err := validateExternalProviderProfile(
-		source,
-		provider,
-		standardLibrary,
-		providerScalar,
-	); err != nil {
-		return nil, nil, err
+	for _, name := range sourcePackage.Types().Scope().Names() {
+		if _, variable := sourcePackage.Types().Scope().Lookup(name).(*types.Var); variable {
+			return true
+		}
 	}
-	bindings := provider.Bindings()
-	requested := externalFunctionIdentities(bindings)
-	byIdentity, err := indexExternalFunctions(sites, requested)
-	if err != nil {
-		return nil, nil, err
-	}
-	modules := make([]string, 0)
-	for _, binding := range bindings {
-		owner, selected := byIdentity[binding.SourceIdentity()]
-		if !selected {
-			continue
-		}
-		if err := validateExternalSourceBinding(owner, binding); err != nil {
-			return nil, nil, err
-		}
-		target, module, err := externalFunctionTarget(
-			owner,
-			binding,
-			byIdentity,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		if _, duplicate := resolved[owner.function]; duplicate {
-			return nil, nil, &ExternalFunctionBindingError{
-				Identity: binding.SourceIdentity(),
-				Reason:   "certificate binding is duplicated",
+	for _, sourceFile := range sourcePackage.Files() {
+		for _, declaration := range sourceFile.Syntax().Decls {
+			function, ok := declaration.(*ast.FuncDecl)
+			if ok && declarationindex.IsPackageInitializer(function) {
+				return true
 			}
 		}
-		resolved[owner.function] = target
-		if module != "" {
-			modules = append(modules, module)
-		}
 	}
-	sort.Strings(modules)
-	return resolved, slices.Compact(modules), nil
-}
-
-func validateExternalProviderProfile(
-	source *load.Program,
-	provider *externalcertify.Certificate,
-	standardLibrary *gostdlibcertify.Certificate,
-	providerScalar api.ScalarABI,
-) error {
-	if source == nil || !provider.Valid() {
-		return &ExternalFunctionBindingError{Reason: "provider certificate is invalid"}
-	}
-	if standardLibrary == nil || !standardLibrary.Valid() ||
-		provider.StandardLibraryDigest() != standardLibrary.ManifestDigest() {
-		return &ExternalFunctionBindingError{
-			Reason: "provider and standard-library certificates do not exact-join",
-		}
-	}
-	selectedProfile, ok := provider.BuildProfile()
-	if !ok {
-		return &ExternalFunctionBindingError{Reason: "provider build profile is absent"}
-	}
-	selectedKey, err := environmentcontract.ToolchainKey(selectedProfile)
-	if err != nil {
-		return err
-	}
-	sourceKey, err := environmentcontract.ToolchainKey(source.BuildProfile())
-	if err != nil {
-		return err
-	}
-	if selectedKey != sourceKey || provider.Backend() != "node" ||
-		!providerScalar.Valid() ||
-		provider.ProviderIntegerRepresentation() !=
-			providerScalar.IntegerRepresentation().String() {
-		return &ExternalFunctionBindingError{
-			Reason: "provider target profile does not match compilation",
-		}
-	}
-	return nil
-}
-
-func indexExternalFunctions(
-	sites map[types.Object]declarationSite,
-	requested map[string]struct{},
-) (map[string]indexedExternalFunction, error) {
-	result := make(map[string]indexedExternalFunction)
-	for object, site := range sites {
-		function, ok := object.(*types.Func)
-		if !ok || function != function.Origin() {
-			continue
-		}
-		contract, err := environmentcontract.Describe(function)
-		if err != nil {
-			return nil, err
-		}
-		if _, selected := requested[contract.Identity()]; !selected {
-			continue
-		}
-		if _, duplicate := result[contract.Identity()]; duplicate {
-			return nil, &ExternalFunctionBindingError{
-				Identity: contract.Identity(),
-				Reason:   "selected source identity is duplicated",
-			}
-		}
-		result[contract.Identity()] = indexedExternalFunction{
-			function: function,
-			site:     site,
-			contract: contract,
-		}
-	}
-	return result, nil
-}
-
-func externalFunctionIdentities(bindings []externals.Binding) map[string]struct{} {
-	result := make(map[string]struct{}, len(bindings)*2)
-	for _, binding := range bindings {
-		result[binding.SourceIdentity()] = struct{}{}
-		if identity, _, _, ok := binding.SourceTarget(); ok {
-			result[identity] = struct{}{}
-		}
-	}
-	return result
-}
-
-func validateExternalSourceBinding(
-	owner indexedExternalFunction,
-	binding externals.Binding,
-) error {
-	declaration, ok := owner.site.Declaration.(*ast.FuncDecl)
-	if !ok || declaration.Body != nil ||
-		owner.contract.Signature() != binding.SourceSignature() ||
-		owner.site.Source.ModulePath() != binding.SourceModulePath() ||
-		owner.site.Source.ModuleVersion() != binding.SourceModuleVersion() {
-		return &ExternalFunctionBindingError{
-			Identity: binding.SourceIdentity(),
-			Reason:   "certificate does not match the selected bodyless declaration",
-		}
-	}
-	return nil
-}
-
-func externalFunctionTarget(
-	owner indexedExternalFunction,
-	binding externals.Binding,
-	byIdentity map[string]indexedExternalFunction,
-) (api.ExternalFunctionTarget, string, error) {
-	switch binding.TargetKind() {
-	case externals.TargetModule:
-		module, export, _, _, ok := binding.ModuleTarget()
-		if !ok {
-			break
-		}
-		target, err := api.NewExternalModuleFunctionTarget(module, export)
-		return target, module, err
-	case externals.TargetSource:
-		identity, signature, _, ok := binding.SourceTarget()
-		implementation, found := byIdentity[identity]
-		declaration, bodyOwner := implementation.site.Declaration.(*ast.FuncDecl)
-		if !ok || !found || !bodyOwner || declaration.Body == nil ||
-			implementation.contract.Signature() != signature ||
-			implementation.function.Pkg() != owner.function.Pkg() ||
-			!types.Identical(implementation.function.Type(), owner.function.Type()) {
-			return api.ExternalFunctionTarget{}, "", &ExternalFunctionBindingError{
-				Identity: binding.SourceIdentity(),
-				Reason:   "portable source implementation is absent or incompatible",
-			}
-		}
-		target, err := api.NewExternalSourceFunctionTarget(implementation.function)
-		return target, "", err
-	}
-	return api.ExternalFunctionTarget{}, "", &ExternalFunctionBindingError{
-		Identity: binding.SourceIdentity(),
-		Reason:   "certificate target is invalid",
-	}
+	return false
 }
 
 func (s *programSession) emitPackageInitializer(

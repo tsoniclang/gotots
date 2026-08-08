@@ -2,11 +2,9 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -91,7 +89,7 @@ func Results() (bool, bool, bool, bool, bool, bool) {
 	if assemblyPath == "" {
 		t.Fatal("error protocol package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -100,39 +98,6 @@ func Results() (bool, bool, bool, bool, bool, bool) {
 		`console.log(Results().map(String).join(" "));
 `,
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	protocols "example.com/errorprotocols"
-)
-
-func main() {
-	a, b, c, d, e, f := protocols.Results()
-	fmt.Println(a, b, c, d, e, f)
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go error-protocol comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"errors.Is differential:\nGo:\n%s\nTypeScript:\n%s\nArtifacts:\n%s",
-			sourceOutput,
-			targetOutput,
-			artifacts.printed,
-		)
-	}
 	for _, required := range []string{
 		"ErrorsIsDirect",
 		"readonly comparable: boolean",
@@ -233,7 +198,7 @@ func Result() bool {
 	if assemblyPath == "" {
 		t.Fatal("cooperative error package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -241,35 +206,6 @@ func Result() bool {
 		[]string{"Result"},
 		"console.log(await Result());\n",
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	protocol "example.com/asyncerrorprotocol"
-)
-
-func main() { fmt.Println(protocol.Result()) }
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute cooperative Go error comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"cooperative errors.Is differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
 	for _, required := range []string{
 		"ErrorsIsCanonical",
 		"async Is(",
@@ -351,7 +287,7 @@ func Result() bool {
 	if assemblyPath == "" {
 		t.Fatal("cooperative Error package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -359,35 +295,6 @@ func Result() bool {
 		[]string{"Result"},
 		"console.log(await Result());\n",
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	comparison "example.com/asyncerrormethod"
-)
-
-func main() { fmt.Println(comparison.Result()) }
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute cooperative Error comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"cooperative Error errors.Is differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
 	for _, required := range []string{
 		"ErrorsIsCanonical",
 		"async Error(",

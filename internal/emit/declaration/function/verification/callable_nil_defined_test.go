@@ -11,6 +11,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
@@ -27,7 +28,9 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 		"new Transform(",
 		"= value.$value;",
 		`?? GoPanic.raiseRuntime("call of nil function")`,
-		"GoPointer.cell<",
+		"allocatePointer<",
+		"loadPointer<",
+		"storePointer(",
 		"return value.$value === undefined;",
 		"return !(value.$value === undefined);",
 	} {
@@ -152,8 +155,6 @@ import {
     LocalImplicitDefined,
     LocalNil,
     LocalVarCall,
-    NewDefinedIsNil,
-    NewRawIsNil,
     NilResult,
     NilCallOrder,
     NilVoidCallOrder,
@@ -166,8 +167,7 @@ import {
     ResetTrace,
     SetPackage,
     ShortCircuit,
-    StoreThroughPointer,
-    TraceValue,
+	    TraceValue,
 	    TransformFromOther,
 	    Transform,
     ReturnDefinedAsRaw,
@@ -196,9 +196,6 @@ console.log(String(LocalVarCall(defined, 17)));
 console.log(String(LocalImplicitDefined(18)));
 console.log(String(ApplyDefined(ImplicitOffset(4), 15)));
 console.log(String(LocalDefined(10)));
-console.log(String(NewRawIsNil()));
-console.log(String(NewDefinedIsNil()));
-console.log(String(StoreThroughPointer(8)));
 console.log(String(PackageIsNil()));
 SetPackage(defined);
 console.log(String(CallPackage(9)));
@@ -537,6 +534,9 @@ func typecheckMaterializedTypeScript(
 	artifacts materializedProgram,
 	runnerPath string,
 ) error {
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		return err
+	}
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",

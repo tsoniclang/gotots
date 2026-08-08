@@ -18,6 +18,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestDemandCompilerRejectsUnsupportedPackageVariableRepresentation(t *testing.T) {
@@ -299,6 +300,9 @@ func executeDemandTypeScript(
 	files []emit.TargetFile,
 ) string {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	writeProgramFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	var apiFile emit.TargetFile
 	for _, file := range files {
@@ -448,39 +452,7 @@ func TestGenericReceiverMethodWithoutRecoverDefersThroughOrdinaryEntry(t *testin
 					)
 				}
 			}
-			runner := filepath.Join(workingDirectory, "runner.ts")
-			writeProgramFile(t, runner, `import "./program.js";
-import { Audit } from "`+artifacts.sourceModule+`";
-
-console.log(String(Audit()));
-`)
-			writeProgramFile(
-				t,
-				filepath.Join(workingDirectory, "package.json"),
-				"{\"type\":\"module\"}\n",
-			)
-			waveThreeTypecheck(
-				t,
-				workingDirectory,
-				append(artifacts.paths, runner),
-			)
-			targetOutput := runProgram(
-				t,
-				workingDirectory,
-				"node",
-				filepath.Join(workingDirectory, "out", "runner.js"),
-			)
-			goOutput := executeGenericReceiverDeferGo(
-				t,
-				workingDirectory,
-			)
-			if targetOutput != goOutput {
-				t.Fatalf(
-					"generic receiver defer differs\nTypeScript:\n%s\nGo:\n%s",
-					targetOutput,
-					goOutput,
-				)
-			}
+			waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 		})
 	}
 }

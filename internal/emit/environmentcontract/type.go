@@ -319,7 +319,6 @@ func structDeclaration(
 	markers, err := typefacet.Build(
 		context,
 		typeName.Type(),
-		classType,
 		storageType,
 		representationFacets,
 		true,

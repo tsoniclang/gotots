@@ -132,6 +132,11 @@ func (s *programSession) RequireUse(
 			// never demand a provider body.
 			route = environmentidentity.RouteGeneratedFacet
 		}
+		if function, isFunction := object.(*types.Func); isFunction {
+			if _, linked := s.externalFunctionBindings[function.Origin()]; linked {
+				route = environmentidentity.RouteProvider
+			}
+		}
 		if !route.Valid() {
 			// A selected constant's value is projected exactly from checker
 			// evidence; it never demands a provider body, so a missing
@@ -223,7 +228,8 @@ func (s *programSession) verifyProviderClosure(
 	}
 	roots := make([]environmentcontract.ClosureRoot, 0, len(obligations))
 	for _, obligation := range obligations {
-		if obligation.Route() != environmentidentity.RouteProvider {
+		if obligation.Route() != environmentidentity.RouteProvider ||
+			obligation.PackageKind() != load.PackageStandardLibraryContract {
 			continue
 		}
 		roots = append(roots, environmentcontract.ClosureRoot{
@@ -364,8 +370,8 @@ func (s *programSession) requireEnvironmentPackage(
 		s,
 		s,
 		s,
-		s,
 		s.goRuntime,
+		false,
 	)
 	context, err := targetEmitter.targetContext(nil, outputPath)
 	if err != nil {

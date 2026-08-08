@@ -63,130 +63,6 @@ func TestErrorRuntimeContractFollowsConcurrencyProfile(t *testing.T) {
 	}
 }
 
-func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
-	base, err := Build(
-		tsgo.NewFactory(),
-		api.RuntimeModulePointer,
-		[]api.RuntimeSymbol{api.RuntimePointer},
-		api.ConcurrencySemanticsDisabled,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(base) != 1 || base[0].Symbol() != api.RuntimePointer {
-		t.Fatalf("base pointer definitions = %#v", base)
-	}
-	class, ok := base[0].Statement().(tsgo.ClassDeclaration)
-	if !ok || len(class.Members()) != 20 {
-		t.Fatalf("base pointer owner = %T with unexpected members", base[0].Statement())
-	}
-
-	withProjection, err := Build(
-		tsgo.NewFactory(),
-		api.RuntimeModulePointer,
-		[]api.RuntimeSymbol{
-			api.RuntimePointer,
-			api.RuntimePointerProjection,
-		},
-		api.ConcurrencySemanticsDisabled,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	projectedClass, ok := withProjection[0].Statement().(tsgo.ClassDeclaration)
-	if len(withProjection) != 2 ||
-		!ok ||
-		len(projectedClass.Members()) != 21 ||
-		withProjection[1].Symbol() != api.RuntimePointerProjection {
-		t.Fatalf("pointer projection definitions = %#v", withProjection)
-	}
-
-	withHash, err := Build(
-		tsgo.NewFactory(),
-		api.RuntimeModulePointer,
-		[]api.RuntimeSymbol{
-			api.RuntimePointer,
-			api.RuntimePointerHash,
-		},
-		api.ConcurrencySemanticsDisabled,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(withHash) != 2 ||
-		withHash[0].Symbol() != api.RuntimePointer ||
-		withHash[1].Symbol() != api.RuntimePointerHash {
-		t.Fatalf("pointer hash definitions = %#v", withHash)
-	}
-	if _, ok := withHash[1].Statement().(tsgo.FunctionDeclaration); !ok {
-		t.Fatalf(
-			"pointer hash definition = %T, want function",
-			withHash[1].Statement(),
-		)
-	}
-}
-
-func TestPointerFieldPathIsAnOptionalClassFeature(t *testing.T) {
-	definitions, err := BuildWithFeatures(
-		tsgo.NewFactory(),
-		api.RuntimeModulePointer,
-		[]api.RuntimeSymbol{api.RuntimePointer},
-		[]api.RuntimeFeature{api.RuntimePointerFieldPath},
-		api.ConcurrencySemanticsDisabled,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(definitions) != 1 ||
-		definitions[0].Symbol() != api.RuntimePointer {
-		t.Fatalf("pointer field-path definitions = %#v", definitions)
-	}
-	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
-	if !ok || len(class.Members()) != 21 {
-		t.Fatalf("pointer field-path owner = %#v", definitions[0])
-	}
-}
-
-func TestUnsafePointerRuntimeHasCodecAndMemoryOwner(t *testing.T) {
-	definitions, err := Build(
-		tsgo.NewFactory(),
-		api.RuntimeModuleUnsafePointer,
-		[]api.RuntimeSymbol{
-			api.RuntimeUnsafeCodec,
-			api.RuntimeUnsafePointer,
-		},
-		api.ConcurrencySemanticsDisabled,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(definitions) != 2 ||
-		definitions[0].Symbol() != api.RuntimeUnsafeCodec ||
-		definitions[1].Symbol() != api.RuntimeUnsafePointer {
-		t.Fatalf("unsafe-pointer definitions = %#v", definitions)
-	}
-	codec, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
-	if !ok || codec.Name().Text() != "GoUnsafeCodec" || len(codec.Members()) != 8 {
-		t.Fatalf(
-			"unsafe-codec definition = %T with unexpected shape",
-			definitions[0].Statement(),
-		)
-	}
-	class, ok := definitions[1].Statement().(tsgo.ClassDeclaration)
-	if !ok ||
-		class.Name().Text() != "GoUnsafePointer" ||
-		len(class.Members()) != 17 {
-		t.Fatalf(
-			"unsafe-pointer definition = %T with unexpected shape",
-			definitions[1].Statement(),
-		)
-	}
-	if len(class.Modifiers()) != 1 ||
-		class.Modifiers()[0].Kind() != tsgo.SyntaxKindExportKeyword {
-		t.Fatal("unsafe-pointer class is not one exported runtime definition")
-	}
-}
-
 func TestEmptyStructRuntimeHasOneExactNominalOwner(t *testing.T) {
 	definitions, err := Build(
 		tsgo.NewFactory(),
@@ -210,13 +86,9 @@ func TestEmptyStructRuntimeHasOneExactNominalOwner(t *testing.T) {
 	}
 }
 
-func TestUnsafeRuntimeExactJoinsFourIntrinsicDefinitions(t *testing.T) {
+func TestUnsafeRuntimeExactJoinsStringIntrinsicDefinition(t *testing.T) {
 	symbols := []api.RuntimeSymbol{
 		api.RuntimeUnsafeString,
-		api.RuntimeUnsafeSlice,
-		api.RuntimeUnsafeStringData,
-		api.RuntimeUnsafeSliceData,
-		api.RuntimeUnsafeSliceHeader,
 	}
 	definitions, err := Build(
 		tsgo.NewFactory(),
@@ -312,7 +184,7 @@ func TestArrayRuntimeAssemblyRejectsMissingDuplicateAndWrongDefinitions(
 	if _, err := Build(
 		factory,
 		api.RuntimeModuleArray,
-		[]api.RuntimeSymbol{api.RuntimePointer},
+		[]api.RuntimeSymbol{api.RuntimeStringIndex},
 		api.ConcurrencySemanticsDisabled,
 	); err == nil {
 		t.Fatal("wrong-module runtime symbol passed array assembly")

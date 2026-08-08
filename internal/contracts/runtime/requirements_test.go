@@ -7,10 +7,11 @@ import (
 )
 
 const validRuntimeRequirements = `{
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "integerRepresentations": ["number", "fixed64-bigint", "bigint"],
   "providerIntegerRepresentation": "bigint",
   "providerScalarModule": "./internal/scalars.js",
+  "providerPointerModule": "./internal/runtime/pointer.js",
   "nativeIntegerBits": 64,
   "primitiveAliases": [{"id": 4, "export": "int32", "providerCarrier": "number"}],
   "runtimeSymbols": [{"id": 300, "export": "RuntimeSlice"}]
@@ -27,6 +28,7 @@ func TestDecodeRetainsImmutableRuntimeRequirements(t *testing.T) {
 		!requirements.AllowsProfile(ProfileBigInt) ||
 		requirements.ProviderProfile() != ProfileBigInt ||
 		requirements.ProviderScalarModule() != "./internal/scalars.js" ||
+		requirements.ProviderPointerModule() != "./internal/runtime/pointer.js" ||
 		requirements.NativeIntegerBits() != 64 {
 		t.Fatal("runtime profile admission is invalid")
 	}
@@ -52,7 +54,7 @@ func TestDecodeRetainsImmutableRuntimeRequirements(t *testing.T) {
 func TestDecodeRejectsRuntimeRequirementMutations(t *testing.T) {
 	tests := map[string]string{
 		"old schema": strings.Replace(
-			validRuntimeRequirements, `"schemaVersion": 2`, `"schemaVersion": 1`, 1,
+			validRuntimeRequirements, `"schemaVersion": 3`, `"schemaVersion": 2`, 1,
 		),
 		"missing provider profile": strings.Replace(
 			validRuntimeRequirements,
@@ -76,6 +78,18 @@ func TestDecodeRejectsRuntimeRequirementMutations(t *testing.T) {
 			validRuntimeRequirements,
 			`"./internal/scalars.js"`,
 			`"../foreign.js"`,
+			1,
+		),
+		"missing provider pointer module": strings.Replace(
+			validRuntimeRequirements,
+			`  "providerPointerModule": "./internal/runtime/pointer.js",`+"\n",
+			"",
+			1,
+		),
+		"duplicate provider support module": strings.Replace(
+			validRuntimeRequirements,
+			`"./internal/runtime/pointer.js"`,
+			`"./internal/scalars.js"`,
 			1,
 		),
 		"invalid native width": strings.Replace(

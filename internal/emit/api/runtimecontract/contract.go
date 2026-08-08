@@ -72,41 +72,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimePanic,
 		), nil
-	case RuntimePointer:
-		return runtimeContract(
-			RuntimeModulePointer,
-			"runtime/pointer.ts",
-			"GoPointer",
-			true,
-			RuntimePanic,
-			RuntimeDenseIndex,
-		), nil
-	case RuntimePointerHash:
-		return runtimeContract(
-			RuntimeModulePointer,
-			"runtime/pointer.ts",
-			"goPointerHash",
-			false,
-			RuntimePointer,
-			RuntimeMapHash,
-		), nil
-	case RuntimePointerRegion:
-		return runtimeContract(
-			RuntimeModulePointer,
-			"runtime/pointer.ts",
-			"goPointerRegion",
-			false,
-			RuntimePointer,
-			RuntimePanic,
-		), nil
-	case RuntimePointerProjection:
-		return runtimeContract(
-			RuntimeModulePointer,
-			"runtime/pointer.ts",
-			"goPointerProject",
-			false,
-			RuntimePointer,
-		), nil
 	case RuntimeArray:
 		return runtimeContract(
 			RuntimeModuleArray,
@@ -186,30 +151,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			true,
 			RuntimeContainerStoredValue,
 		), nil
-	case RuntimePointerTypeToken:
-		return runtimeContract(
-			RuntimeModuleStorage,
-			"runtime/storage.ts",
-			"$goPointerType",
-			true,
-		), nil
-	case RuntimePointerRepresentedValue:
-		return runtimeContract(
-			RuntimeModuleStorage,
-			"runtime/storage.ts",
-			"GoPointerRepresentedValue",
-			true,
-			RuntimePointerTypeToken,
-		), nil
-	case RuntimePointerType:
-		return runtimeContract(
-			RuntimeModuleStorage,
-			"runtime/storage.ts",
-			"GoPointerType",
-			true,
-			RuntimePointerRepresentedValue,
-			RuntimePointer,
-		), nil
 	case RuntimeSlice:
 		return runtimeContract(
 			RuntimeModuleSlice,
@@ -226,7 +167,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goSliceAddress",
 			false,
 			RuntimeSlice,
-			RuntimePointer,
 		), nil
 	case RuntimeSliceStorage:
 		return runtimeContract(
@@ -243,7 +183,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"RuntimeSliceProjection",
 			true,
 			RuntimeSlice,
-			RuntimePointerProjection,
 		), nil
 	case RuntimeSliceArrayPointer:
 		return runtimeContract(
@@ -252,7 +191,6 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goSliceArrayPointer",
 			false,
 			RuntimeSlice,
-			RuntimePointer,
 			RuntimeArray,
 			RuntimeArrayView,
 		), nil

@@ -6,33 +6,16 @@ import (
 )
 
 type builder struct {
-	factory           tsgo.Factory
-	pointerName       string
-	pointerRegionName string
-	sliceName         string
-	sliceRegionName   string
-	denseIndexName    string
-	unsafeSliceName   string
+	factory   tsgo.Factory
+	sliceName string
+	panicName string
 }
 
 func Build(factory tsgo.Factory, symbol api.RuntimeSymbol) (tsgo.Statement, error) {
-	pointer, err := api.RuntimeContract(api.RuntimePointer)
-	if err != nil {
-		return nil, err
-	}
-	pointerRegion, err := api.RuntimeContract(api.RuntimePointerRegion)
-	if err != nil {
-		return nil, err
+	if symbol != api.RuntimeUnsafeString {
+		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}
 	slice, err := api.RuntimeContract(api.RuntimeSlice)
-	if err != nil {
-		return nil, err
-	}
-	sliceRegion, err := api.RuntimeContract(api.RuntimeSliceRegion)
-	if err != nil {
-		return nil, err
-	}
-	denseIndex, err := api.RuntimeContract(api.RuntimeDenseIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -40,33 +23,16 @@ func Build(factory tsgo.Factory, symbol api.RuntimeSymbol) (tsgo.Statement, erro
 	if err != nil {
 		return nil, err
 	}
-	unsafeSlice, err := api.RuntimeContract(api.RuntimeUnsafeSlice)
+	panicContract, err := api.RuntimeContract(api.RuntimePanic)
 	if err != nil {
 		return nil, err
 	}
 	b := builder{
-		factory:           factory,
-		pointerName:       pointer.ExportedName(),
-		pointerRegionName: pointerRegion.ExportedName(),
-		sliceName:         slice.ExportedName(),
-		sliceRegionName:   sliceRegion.ExportedName(),
-		denseIndexName:    denseIndex.ExportedName(),
-		unsafeSliceName:   unsafeSlice.ExportedName(),
+		factory:   factory,
+		sliceName: slice.ExportedName(),
+		panicName: panicContract.ExportedName(),
 	}
-	switch symbol {
-	case api.RuntimeUnsafeString:
-		return b.stringFunction(contract.ExportedName()), nil
-	case api.RuntimeUnsafeSlice:
-		return b.sliceFunction(contract.ExportedName()), nil
-	case api.RuntimeUnsafeStringData:
-		return b.stringDataFunction(contract.ExportedName()), nil
-	case api.RuntimeUnsafeSliceData:
-		return b.sliceDataFunction(contract.ExportedName()), nil
-	case api.RuntimeUnsafeSliceHeader:
-		return b.sliceHeaderFunction(contract.ExportedName()), nil
-	default:
-		return nil, &api.RuntimeSymbolError{Symbol: symbol}
-	}
+	return b.stringFunction(contract.ExportedName()), nil
 }
 
 func (b builder) id(name string) tsgo.Identifier {
@@ -78,8 +44,6 @@ func (b builder) typeReference(name string, arguments ...tsgo.TypeNode) tsgo.Typ
 }
 
 func (b builder) typeI() tsgo.TypeNode { return b.typeReference("I") }
-func (b builder) typeL() tsgo.TypeNode { return b.typeReference("L") }
-func (b builder) typeS() tsgo.TypeNode { return b.typeReference("S") }
 
 func (b builder) numberType() tsgo.TypeNode {
 	return b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindNumberKeyword)
@@ -95,21 +59,6 @@ func (b builder) integerType() tsgo.TypeNode {
 
 func (b builder) stringType() tsgo.TypeNode {
 	return b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword)
-}
-
-func (b builder) undefinedType() tsgo.TypeNode {
-	return b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindUndefinedKeyword)
-}
-
-func (b builder) pointerType(logical, storage tsgo.TypeNode) tsgo.TypeNode {
-	return b.typeReference(b.pointerName, logical, storage)
-}
-
-func (b builder) optionalPointerType(logical, storage tsgo.TypeNode) tsgo.TypeNode {
-	return b.factory.UnionTypeNode([]tsgo.TypeNode{
-		b.pointerType(logical, storage),
-		b.undefinedType(),
-	})
 }
 
 func (b builder) sliceType(storage tsgo.TypeNode) tsgo.TypeNode {
@@ -143,20 +92,6 @@ func (b builder) call(
 	)
 }
 
-func (b builder) directCall(
-	name string,
-	typeArguments []tsgo.TypeNode,
-	arguments ...tsgo.Expression,
-) tsgo.CallExpression {
-	return b.factory.CallExpression(
-		b.id(name),
-		nil,
-		typeArguments,
-		arguments,
-		tsgo.NodeFlagsNone,
-	)
-}
-
 func (b builder) globalCall(
 	name string,
 	arguments ...tsgo.Expression,
@@ -183,33 +118,6 @@ func (b builder) variable(flags tsgo.NodeFlags, name string, target tsgo.TypeNod
 
 func (b builder) number(value string) tsgo.NumericLiteral {
 	return b.factory.NumericLiteral(value, tsgo.TokenFlagsNone)
-}
-
-func (b builder) undefined() tsgo.VoidExpression {
-	return b.factory.VoidExpression(b.number("0"))
-}
-
-func (b builder) regionType(storage tsgo.TypeNode) tsgo.TypeNode {
-	return b.factory.TypeOperatorNode(
-		tsgo.TypeOperatorNodeOperatorKindReadonlyKeyword,
-		b.factory.TupleTypeNode([]tsgo.TypeNode{
-			b.factory.ArrayTypeNode(storage),
-			b.numberType(),
-		}),
-	)
-}
-
-func (b builder) optionalRegionType(storage tsgo.TypeNode) tsgo.TypeNode {
-	return b.factory.UnionTypeNode([]tsgo.TypeNode{b.regionType(storage), b.undefinedType()})
-}
-
-func (b builder) pointerRegion(logical, storage tsgo.TypeNode, pointer, length tsgo.Expression) tsgo.CallExpression {
-	return b.directCall(
-		b.pointerRegionName,
-		[]tsgo.TypeNode{logical, storage},
-		pointer,
-		length,
-	)
 }
 
 func (b builder) loop(limit tsgo.Expression, statements ...tsgo.Statement) tsgo.ForStatement {

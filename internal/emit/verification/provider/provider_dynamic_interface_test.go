@@ -2,12 +2,10 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -96,7 +94,7 @@ func Result(path string) (bool, string) {
 		t.Fatal("provider dynamic-interface package assembly is absent")
 	}
 	missing := filepath.Join(project, "absent")
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -106,37 +104,4 @@ func Result(path string) (bool, string) {
 			strconv.Quote(missing)+
 			");\nconsole.log(missing + \" \" + message);\n",
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	fixture "example.com/providerunwrap"
-)
-
-func main() {
-	missing, message := fixture.Result(`+strconv.Quote(missing)+`)
-	fmt.Println(missing, message)
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go provider-interface comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"provider dynamic-interface differential:\nGo:\n%s\nTypeScript:\n%s\nArtifacts:\n%s",
-			sourceOutput,
-			targetOutput,
-			artifacts.printed,
-		)
-	}
 }

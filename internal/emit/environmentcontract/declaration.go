@@ -6,6 +6,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
+	functiondeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/function"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -101,6 +102,16 @@ func callableContractDeclaration(
 	}
 	parameters := target.Parameters()
 	requests := target.Requests()
+	linkedTarget, linked, err := context.ResolveExternalFunction(function)
+	if err != nil {
+		return nil, nil, err
+	}
+	if linked && linkedTarget.Kind() != api.ExternalFunctionTargetModule {
+		return nil, nil, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "environment external function selected a non-module target",
+		}
+	}
 	if signature.Recv() != nil {
 		receiver, err := children.RepresentedType(
 			context.WithRole(api.RoleReceiverType),
@@ -124,14 +135,31 @@ func callableContractDeclaration(
 	if err != nil {
 		return nil, nil, err
 	}
+	modifiers := exportDeclare(context)
+	var body tsgo.Block
+	if linked {
+		linkedBody, bodyErr := functiondeclaration.EmitLinkedExternalBody(
+			context,
+			children,
+			function,
+			linkedTarget,
+			target,
+		)
+		if bodyErr != nil {
+			return nil, nil, bodyErr
+		}
+		modifiers = []tsgo.ModifierLike{context.Factory().ExportKeyword()}
+		body = linkedBody.Value()
+		requests = api.CombineRequests(requests, linkedBody.Requests())
+	}
 	declarations := []tsgo.Statement{context.Factory().FunctionDeclaration(
-		exportDeclare(context),
+		modifiers,
 		nil,
 		context.Factory().Identifier(name),
 		generic.parameters,
 		parameters,
 		target.Result(),
-		nil,
+		body,
 	)}
 	if recovery {
 		recoveryParameter, recoveryRequests, recoveryErr :=
@@ -139,10 +167,25 @@ func callableContractDeclaration(
 		if recoveryErr != nil {
 			return nil, nil, recoveryErr
 		}
+		deferredBody := body
+		if linked {
+			linkedBody, bodyErr := functiondeclaration.EmitLinkedExternalBody(
+				context,
+				children,
+				function,
+				linkedTarget,
+				target,
+			)
+			if bodyErr != nil {
+				return nil, nil, bodyErr
+			}
+			deferredBody = linkedBody.Value()
+			requests = api.CombineRequests(requests, linkedBody.Requests())
+		}
 		declarations = append(
 			declarations,
 			context.Factory().FunctionDeclaration(
-				exportDeclare(context),
+				modifiers,
 				nil,
 				context.Factory().Identifier(name+api.DeferredEntrySuffix),
 				generic.parameters,
@@ -151,7 +194,7 @@ func callableContractDeclaration(
 					parameters...,
 				),
 				target.Result(),
-				nil,
+				deferredBody,
 			),
 		)
 		requests = api.CombineRequests(requests, recoveryRequests)

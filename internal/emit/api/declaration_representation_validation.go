@@ -31,10 +31,6 @@ func (r DeclarationRequirement) Valid() bool {
 		r.typeRepresentation != TypeRepresentationInvalid {
 		return false
 	}
-	if r.kind != DeclarationRequirementPointerRepresentation &&
-		r.pointerDemand != PointerRepresentationDemandInvalid {
-		return false
-	}
 	if r.kind != DeclarationRequirementGenericConcretization &&
 		r.concretizationDeferred {
 		return false
@@ -236,8 +232,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementReflectionType,
 		DeclarationRequirementReflectionValueOperations:
 		return r.validGeneratedDefinition(GeneratedArtifactReflectionType)
-	case DeclarationRequirementUnsafeCodec:
-		return r.validGeneratedDefinition(GeneratedArtifactUnsafeCodec)
 	case DeclarationRequirementGenericCapability:
 		return r.operation == NamedStructOperationInvalid &&
 			r.typeName == nil &&
@@ -284,10 +278,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementCallableABI:
 		return r.validGeneratedDefinition(
 			GeneratedArtifactCallableABI,
-		)
-	case DeclarationRequirementPointerRepresentation:
-		return r.pointerDemand.Valid() && r.validGeneratedDefinition(
-			GeneratedArtifactPointerRepresentation,
 		)
 	case DeclarationRequirementProviderInterfaceBridge:
 		return r.validGeneratedDefinition(

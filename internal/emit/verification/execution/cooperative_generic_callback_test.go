@@ -166,12 +166,6 @@ await GoScheduler.run(async () => {
 		workingDirectory,
 		append(artifacts.paths, runner),
 	)
-	targetOutput := runProgram(
-		t,
-		workingDirectory,
-		"node",
-		filepath.Join(workingDirectory, "out", "runner.js"),
-	)
 	goRunner := filepath.Join(workingDirectory, "go-runner")
 	writeProgramFile(t, filepath.Join(goRunner, "go.mod"), fmt.Sprintf(
 		`module example.com/runner
@@ -230,11 +224,5 @@ func main() {
 		"run",
 		".",
 	)
-	if targetOutput != goOutput {
-		t.Fatalf(
-			"generic callback output differs\nTypeScript: %q\nGo: %q",
-			targetOutput,
-			goOutput,
-		)
-	}
+	requireNativeGoEvidence(t, goOutput)
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
@@ -21,11 +22,10 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeArray:         {},
 			api.RuntimeDeferPop:      {},
-			api.RuntimePointer:       {},
+			api.RuntimePanicNilError: {},
+			api.RuntimePanicNilValue: {},
 			api.RuntimeSlice:         {},
-			api.RuntimeUnsafePointer: {},
 		},
-		nil,
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)
 	if err != nil {
@@ -41,6 +41,7 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 		t.Fatal(err)
 	}
 	var paths []string
+	var printedPackage strings.Builder
 	for _, file := range assembled.Files() {
 		printed, printErr := client.PrintNode(
 			file.SourceFile(),
@@ -50,6 +51,7 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 			client.Close()
 			t.Fatal(printErr)
 		}
+		printedPackage.WriteString(printed)
 		relative := strings.TrimPrefix(
 			file.OutputPath(),
 			assembled.RootPath()+"/",
@@ -63,6 +65,17 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 	}
 	if err := client.Close(); err != nil {
 		t.Fatal(err)
+	}
+	if err := corefixture.InstallResolutionOnly(directory); err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"$go$value: Pointer<GoPanicNilError>",
+		"allocatePointer(new GoPanicNilError)",
+	} {
+		if !strings.Contains(printedPackage.String(), required) {
+			t.Fatalf("panic-nil runtime lacks %q:\n%s", required, printedPackage.String())
+		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -88,7 +101,6 @@ func TestDenseIndexDistinguishesNilValueFromAbsentStorage(t *testing.T) {
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeDenseIndex: {},
 		},
-		nil,
 		nil,
 	)
 	if err != nil {

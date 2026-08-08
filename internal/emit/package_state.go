@@ -65,6 +65,8 @@ type packageInitFunction struct {
 
 type packageTargetBuilder struct {
 	sourcePackage          *load.Package
+	sourceImplementation   bool
+	implementationInit     bool
 	assemblyOwner          api.ArtifactOwner
 	statePath              string
 	assemblyPath           string
@@ -155,8 +157,15 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 	if err != nil {
 		return err
 	}
+	_, sourceImplementation := sourceImplementationForPackage(
+		s.sourceImplementations,
+		sourcePackage,
+	)
 	builder := &packageTargetBuilder{
-		sourcePackage:      sourcePackage,
+		sourcePackage:        sourcePackage,
+		sourceImplementation: sourceImplementation,
+		implementationInit: sourceImplementation &&
+			sourcePackageRequiresInitialization(sourcePackage),
 		assemblyOwner:      assemblyOwner,
 		statePath:          statePath,
 		assemblyPath:       assemblyPath,
@@ -194,6 +203,10 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 		if err := s.requirePackage(dependency); err != nil {
 			return err
 		}
+	}
+	if builder.sourceImplementation {
+		s.packageInitializations.enqueue(sourcePackage)
+		return nil
 	}
 
 	scope := sourcePackage.Types().Scope()
@@ -472,6 +485,9 @@ func (s *programSession) emitPackageInitialization(
 			Object: sourcePackage.Path(),
 			Reason: "package initialization has no assembly owner",
 		}
+	}
+	if builder.sourceImplementation {
+		return nil
 	}
 	expectedStorage := 0
 	scope := sourcePackage.Types().Scope()

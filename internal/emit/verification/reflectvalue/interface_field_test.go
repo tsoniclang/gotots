@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestReflectInterfaceFieldLocationMatchesGo(t *testing.T) {
+func TestReflectInterfaceFieldLocationCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -105,7 +105,7 @@ func main() {
 	fmt.Println(fixture.InterfaceFieldFacts())
 }
 `
-	runReflectDifferentialInspect(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		"InterfaceFieldFacts",
@@ -127,7 +127,7 @@ func main() {
 	)
 }
 
-func TestReflectProviderInterfaceFieldLocationMatchesGo(t *testing.T) {
+func TestReflectProviderInterfaceFieldCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -162,7 +162,7 @@ func main() {
 	fmt.Println(fixture.ProviderInterfaceFieldFacts())
 }
 `
-	runReflectDifferentialInspect(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		"ProviderInterfaceFieldFacts",

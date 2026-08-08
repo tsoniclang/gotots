@@ -181,7 +181,6 @@ func emitDerivedClass(
 		markers, err = typefacet.Build(
 			context,
 			sourceType,
-			classType,
 			storageType,
 			representationFacets,
 			false,

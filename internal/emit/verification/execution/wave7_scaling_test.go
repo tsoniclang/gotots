@@ -510,10 +510,11 @@ var waveSevenTailBounds = map[string]struct {
 }{
 	"capability":    {bytes: 2_000, nodes: 400},
 	"generic-alias": {bytes: 500, nodes: 100},
-	// The generic pointer-equality fixture selects RuntimeSlice.address and
-	// $view. The complete demanded class measures 6,280 bytes/1,289 nodes;
-	// the full TS-Go corpus already selected the same unchanged class.
-	"generic-class": {bytes: 6_500, nodes: 1_500},
+	// The canonical-pointer fixture selects RuntimeSlice.address and $view.
+	// Its marker-bearing class measures 6,878 bytes/1,403 nodes; the bound
+	// leaves less than two percent byte headroom while retaining the stricter
+	// independent node bound.
+	"generic-class": {bytes: 7_000, nodes: 1_500},
 	// The 2,500-byte bound includes explicit storage-facet conversion
 	// capabilities. GenericIteratorCopy measures 2,341 bytes/304 nodes; the
 	// prior one-facet ABI could not represent its T-backed struct field.

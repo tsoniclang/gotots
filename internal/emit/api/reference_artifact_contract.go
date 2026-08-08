@@ -168,10 +168,6 @@ type ReflectionNames interface {
 	ReflectionValueType(types.Type, *types.TypeName) (NameReference, error)
 }
 
-type UnsafeCodecNames interface {
-	UnsafeCodec(types.Type) (NameReference, error)
-}
-
 func NewProviderStatefulProfileCandidate(
 	profile gostdlib.ProviderStatefulProfile,
 	typeArguments []types.Type,
@@ -484,8 +480,7 @@ func (o *GeneratedArtifact) Valid() bool {
 			o.anchor.Parent() != o.anchor.Pkg().Scope()
 	case GeneratedArtifactPlacementContract:
 		return (o.kind == GeneratedArtifactCallableABI ||
-			o.kind == GeneratedArtifactInterfaceMethodCallable ||
-			o.kind == GeneratedArtifactPointerRepresentation) &&
+			o.kind == GeneratedArtifactInterfaceMethodCallable) &&
 			o.outputPath == "" &&
 			!o.lexicalOwner.Valid() &&
 			o.anchor == nil
@@ -536,9 +531,6 @@ func validGeneratedArtifactType(
 	case GeneratedArtifactGenericConcretization:
 		source, ok := types.Unalias(sourceType).(*types.Signature)
 		return ok && source != nil
-	case GeneratedArtifactPointerRepresentation:
-		_, ok := types.Unalias(sourceType).(*types.Pointer)
-		return ok
 	case GeneratedArtifactProviderInterfaceBridge:
 		source, ok := types.Unalias(sourceType).(*types.Named)
 		if !ok || source.Obj() == nil {
@@ -554,8 +546,6 @@ func validGeneratedArtifactType(
 		_, interfaceType := source.Underlying().(*types.Interface)
 		return !interfaceType
 	case GeneratedArtifactReflectionType:
-		return sourceType != nil && !ContainsGenericTypeParameter(sourceType)
-	case GeneratedArtifactUnsafeCodec:
 		return sourceType != nil && !ContainsGenericTypeParameter(sourceType)
 	default:
 		return false

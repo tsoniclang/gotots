@@ -194,16 +194,7 @@ type deferredCallableRegistryBinding struct {
 	name  string
 }
 
-type pointerRepresentationBinding struct {
-	owner *api.GeneratedArtifact
-}
-
 type reflectionTypeBinding struct {
-	owner *api.GeneratedArtifact
-	name  string
-}
-
-type unsafeCodecBinding struct {
 	owner *api.GeneratedArtifact
 	name  string
 }
@@ -256,13 +247,10 @@ type Registry struct {
 	callableABINames                    map[string]string
 	deferredCallableRegistries          map[string]deferredCallableRegistryBinding
 	deferredCallableRegistryNames       map[string]string
-	pointerRepresentations              map[string]pointerRepresentationBinding
 	reflectionTypes                     map[string]reflectionTypeBinding
 	reflectionValueDemands              map[string]struct{}
 	reflectionValueContracts            map[string]struct{}
 	reflectionTypeNames                 map[string]string
-	unsafeCodecs                        map[string]unsafeCodecBinding
-	unsafeCodecNames                    map[string]string
 }
 
 func NewRegistry() *Registry {
@@ -308,13 +296,10 @@ func NewRegistry() *Registry {
 		callableABINames:                    make(map[string]string),
 		deferredCallableRegistries:          make(map[string]deferredCallableRegistryBinding),
 		deferredCallableRegistryNames:       make(map[string]string),
-		pointerRepresentations:              make(map[string]pointerRepresentationBinding),
 		reflectionTypes:                     make(map[string]reflectionTypeBinding),
 		reflectionValueDemands:              make(map[string]struct{}),
 		reflectionValueContracts:            make(map[string]struct{}),
 		reflectionTypeNames:                 make(map[string]string),
-		unsafeCodecs:                        make(map[string]unsafeCodecBinding),
-		unsafeCodecNames:                    make(map[string]string),
 	}
 }
 
@@ -423,14 +408,8 @@ func (r *Registry) GeneratedArtifact(
 	case api.GeneratedArtifactDeferredCallableRegistry:
 		binding, ok := r.deferredCallableRegistries[artifactKey]
 		return binding.owner, ok && binding.owner != nil
-	case api.GeneratedArtifactPointerRepresentation:
-		binding, ok := r.pointerRepresentations[artifactKey]
-		return binding.owner, ok && binding.owner != nil
 	case api.GeneratedArtifactReflectionType:
 		binding, ok := r.reflectionTypes[artifactKey]
-		return binding.owner, ok && binding.owner != nil
-	case api.GeneratedArtifactUnsafeCodec:
-		binding, ok := r.unsafeCodecs[artifactKey]
 		return binding.owner, ok && binding.owner != nil
 	default:
 		return nil, false
@@ -497,16 +476,8 @@ func (r *Registry) GeneratedArtifacts(
 		for _, binding := range r.deferredCallableRegistries {
 			artifacts = append(artifacts, binding.owner)
 		}
-	case api.GeneratedArtifactPointerRepresentation:
-		for _, binding := range r.pointerRepresentations {
-			artifacts = append(artifacts, binding.owner)
-		}
 	case api.GeneratedArtifactReflectionType:
 		for _, binding := range r.reflectionTypes {
-			artifacts = append(artifacts, binding.owner)
-		}
-	case api.GeneratedArtifactUnsafeCodec:
-		for _, binding := range r.unsafeCodecs {
 			artifacts = append(artifacts, binding.owner)
 		}
 	}

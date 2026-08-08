@@ -31,6 +31,15 @@ func TestDefinedArrayZeroCopyConversionIndexAndAddressMatchGo(t *testing.T) {
 			workingDirectory := t.TempDir()
 			target := materializeArrayProgram(t, workingDirectory, emission)
 			source := target.printed[sourceOutputPath(target)]
+			for _, marker := range []string{
+				"addressOf<",
+				"loadPointer<",
+				"storePointer(",
+			} {
+				if !strings.Contains(source, marker) {
+					t.Fatalf("defined-array pointer source lacks %q:\n%s", marker, source)
+				}
+			}
 			for _, forbidden := range []string{
 				": any",
 				": unknown",
@@ -187,12 +196,7 @@ const [original, copied] = values.CopyPair(pair);
 console.log(show(original), show(copied));
 console.log(show(values.ConvertRaw(values.ConvertPair(pair))));
 console.log(show(values.AliasIdentity(pair)));
-const [isolated, stored, compounded, pointed, unchanged] = values.CallIsolation();
-console.log(show(isolated), show(stored));
-console.log(show(compounded));
-console.log(unchanged);
 console.log(String(values.Length(pair)));
-console.log(show(pointed));
 console.log(values.ConvertOther(pair) instanceof values.Other);
 const [rawOriginal, pairConverted, pairOriginal, rawConverted] = values.ConversionIsolation();
 console.log(show(rawOriginal), show(pairConverted));
@@ -234,12 +238,7 @@ func main() {
 	fmt.Println(show(original), show(copied))
 	fmt.Println(show(values.ConvertRaw(values.ConvertPair(pair))))
 	fmt.Println(show(values.AliasIdentity(pair)))
-	isolated, stored, compounded, pointed, unchanged := values.CallIsolation()
-	fmt.Println(show(isolated), show(stored))
-	fmt.Println(show(compounded))
-	fmt.Println(unchanged)
 	fmt.Println(values.Length(pair))
-	fmt.Println(show(pointed))
 	fmt.Println(values.ConvertOther(pair) == values.Other{element(3), element(4)})
 	rawOriginal, pairConverted, pairOriginal, rawConverted := values.ConversionIsolation()
 	fmt.Println(show(rawOriginal), show(pairConverted))

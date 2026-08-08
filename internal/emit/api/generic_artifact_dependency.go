@@ -27,18 +27,6 @@ func (c Context) CallableParameterABI(
 	return callableabi.Parameter{}, false
 }
 
-func (c Context) PointeeValues() PointeeValues {
-	return c.pointeeValues
-}
-
-func (c Context) PointerRepresentationNames() PointerRepresentationNames {
-	return c.pointerNames
-}
-
-func (c Context) PointerRepresentationValues() PointerRepresentationValues {
-	return c.pointerValues
-}
-
 type GenericOperationConsumer uint8
 
 const (

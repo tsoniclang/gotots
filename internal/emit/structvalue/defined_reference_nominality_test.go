@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestDefinedReferenceFamiliesRetainNominalIdentity(t *testing.T) {
@@ -77,6 +78,9 @@ void secondPointer;
 }
 
 func typecheckStructuralFiles(directory string, paths []string) error {
+	if err := corefixture.InstallResolutionOnly(directory); err != nil {
+		return err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	arguments := []string{

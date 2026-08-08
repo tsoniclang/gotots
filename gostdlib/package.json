@@ -76,6 +76,10 @@
       "types": "./dist/src/internal/scalars.d.ts",
       "default": "./dist/src/internal/scalars.js"
     },
+    "./internal/runtime/pointer.js": {
+      "types": "./dist/src/internal/runtime/pointer.d.ts",
+      "default": "./dist/src/internal/runtime/pointer.js"
+    },
     "./internal/facets/generic-cmp-kernel.js": {
       "types": "./dist/src/internal/facets/generic-cmp-kernel.d.ts",
       "default": "./dist/src/internal/facets/generic-cmp-kernel.js"
@@ -131,6 +135,10 @@
     "./internal/facets/named-runtime-metrics.js": {
       "types": "./dist/src/internal/facets/named-runtime-metrics.d.ts",
       "default": "./dist/src/internal/facets/named-runtime-metrics.js"
+    },
+    "./internal/facets/named-runtime-pprof.js": {
+      "types": "./dist/src/internal/facets/named-runtime-pprof.d.ts",
+      "default": "./dist/src/internal/facets/named-runtime-pprof.js"
     },
     "./internal/facets/named-runtime.js": {
       "types": "./dist/src/internal/facets/named-runtime.d.ts",

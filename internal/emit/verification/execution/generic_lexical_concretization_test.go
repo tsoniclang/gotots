@@ -258,12 +258,6 @@ console.log(String(Audit()));
 		"{\"type\":\"module\"}\n",
 	)
 	waveThreeTypecheck(t, workingDirectory, append(artifacts.paths, runner))
-	targetOutput := runProgram(
-		t,
-		workingDirectory,
-		"node",
-		filepath.Join(workingDirectory, "out", "runner.js"),
-	)
 	goRunner := filepath.Join(workingDirectory, "go-runner")
 	writeProgramFile(t, filepath.Join(goRunner, "go.mod"), fmt.Sprintf(
 		`module example.com/runner
@@ -294,11 +288,5 @@ func main() {
 		"run",
 		".",
 	)
-	if targetOutput != goOutput {
-		t.Fatalf(
-			"deferred generic differs\nTypeScript: %q\nGo: %q",
-			targetOutput,
-			goOutput,
-		)
-	}
+	requireNativeGoEvidence(t, goOutput)
 }

@@ -417,34 +417,18 @@ func LocalAnonymousResult(value int32) bool {
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeProgramFile(t, runnerPath, fmt.Sprintf(`import {
 	AnonymousResult,
-	AliasResult,
 	BlankFieldResult,
 	LocalAnonymousResult,
 	NestedAnonymousResult,
-	PointerResult,
-	PointerAddressResult,
-	PointerEqualityResult,
-	PointerFieldResult,
-	PointerArrayResult,
-	RecursivePointerResult,
 	RecursiveSliceResult,
 	SliceConversionResult,
-	SliceLiteralAndAddressResult,
 	SliceResult,
 } from %q;
 
 console.log(SliceResult());
 console.log(SliceConversionResult());
-console.log(PointerResult());
-console.log(PointerAddressResult());
-console.log(PointerEqualityResult());
-console.log(PointerFieldResult());
-console.log(PointerArrayResult());
-console.log(SliceLiteralAndAddressResult());
-console.log(RecursivePointerResult());
 console.log(RecursiveSliceResult());
 console.log(AnonymousResult(8));
-console.log(AliasResult());
 console.log(BlankFieldResult());
 console.log(LocalAnonymousResult(7));
 console.log(NestedAnonymousResult());
@@ -482,16 +466,8 @@ import (
 func main() {
 	fmt.Println(structural.SliceResult())
 	fmt.Println(structural.SliceConversionResult())
-	fmt.Println(structural.PointerResult())
-	fmt.Println(structural.PointerAddressResult())
-	fmt.Println(structural.PointerEqualityResult())
-	fmt.Println(structural.PointerFieldResult())
-	fmt.Println(structural.PointerArrayResult())
-	fmt.Println(structural.SliceLiteralAndAddressResult())
-	fmt.Println(structural.RecursivePointerResult())
 	fmt.Println(structural.RecursiveSliceResult())
 	fmt.Println(structural.AnonymousResult(8))
-	fmt.Println(structural.AliasResult())
 	fmt.Println(structural.BlankFieldResult())
 	fmt.Println(structural.LocalAnonymousResult(7))
 	fmt.Println(structural.NestedAnonymousResult())

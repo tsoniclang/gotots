@@ -13,7 +13,6 @@ import type {
   uint64,
   uintptr,
 } from "@gotots/gostdlib/internal/scalars.js";
-import type { GoUnsafePointer } from "@gotots/runtime/unsafe-pointer.js";
 
 import { hostInteger } from "./internal/host-integer.js";
 
@@ -23,6 +22,7 @@ import {
 } from "./internal/portable/reflect/struct-tag.js";
 import { ProviderError } from "./internal/runtime/error.js";
 import { providerPlaceholder } from "./internal/runtime/placeholder.js";
+import type { ProviderRawPointer } from "./internal/runtime/raw-pointer.js";
 import {
   pointerDescriptorFor,
   resolveRuntimeType,
@@ -667,7 +667,7 @@ export abstract class Value {
     }
     return operation(this.source);
   }
-  UnsafePointer(): GoUnsafePointer | undefined {
+  UnsafePointer(): ProviderRawPointer | undefined {
     const operation = this.operations()?.unsafePointer;
     if (operation === undefined || this.source === undefined) {
       return this.operationPanic("UnsafePointer");
@@ -725,9 +725,15 @@ class MapIterator {
   position = -1;
 
   constructor(
-    readonly keys: readonly GoInterfaceValue[],
-    readonly valueAt: (key: GoInterfaceValue) => GoInterfaceValue | undefined,
+    public keys: readonly GoInterfaceValue[],
+    public valueAt: (key: GoInterfaceValue) => GoInterfaceValue | undefined,
   ) {}
+
+  $copy(): MapIterator {
+    const result = new MapIterator(this.keys, this.valueAt);
+    result.position = this.position;
+    return result;
+  }
 
   currentKey(): GoInterfaceValue {
     const key = this.keys[this.position];

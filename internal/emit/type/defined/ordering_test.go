@@ -10,6 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestAccessorCompoundPreserveGoOrderExecutesDifferentially(t *testing.T) {
@@ -136,6 +137,9 @@ console.log(String(values.IntFromCount(values.CountArrayCompoundOrder())));
 		filepath.Join(workingDirectory, "package.json"),
 		"{\"type\":\"module\"}\n",
 	)
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	outputDirectory := filepath.Join(workingDirectory, "order-out")
 	arguments := []string{
 		"--target", "es2022",

@@ -8,7 +8,6 @@ import (
 	mapindexexpression "github.com/tsoniclang/gotots/internal/emit/expression/mapindex"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
@@ -145,53 +144,11 @@ func emitPointerArrayIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	targetElement, err := children.RepresentedType(
-		context.WithRole(api.RoleIndexOperand),
-		source,
-		elementType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	storageType, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		elementType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	runtime, err := context.Names().Runtime(
-		api.RuntimePointer,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	stored, err := api.NewExpressionEmission(
-		address.Before(),
-		pointerruntime.CellValue(
-			context.Factory(),
-			runtime.Name(),
-			targetElement.Value(),
-			storageType.Value(),
-			address.Value(),
-		),
-		api.CombineRequests(
-			address.Requests(),
-			targetElement.Requests(),
-			storageType.Requests(),
-			runtime.Requests(),
-		),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return context.Values().FromStorage(
+	return context.Values().Pointee(
 		context,
 		source,
-		elementType,
-		stored,
+		types.NewPointer(elementType),
+		address,
 	)
 }
 

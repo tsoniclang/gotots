@@ -9,10 +9,11 @@ import (
 
 func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
 	contract, err := runtimecontract.Decode([]byte(`{
-	  "schemaVersion": 2,
+	  "schemaVersion": 3,
 	  "integerRepresentations": ["number", "fixed64-bigint", "bigint"],
 	  "providerIntegerRepresentation": "bigint",
 	  "providerScalarModule": "./internal/scalars.js",
+	  "providerPointerModule": "./internal/runtime/pointer.js",
 	  "nativeIntegerBits": 64,
 	  "primitiveAliases": [
 	    {"id": 4, "export": "int32", "providerCarrier": "number"}
@@ -60,28 +61,31 @@ func TestPackageRequirementsResolveOnlyClosedRuntimeIdentities(t *testing.T) {
 func TestPackageRequirementsRejectIdentityMutations(t *testing.T) {
 	for _, source := range []string{
 		`{
-		  "schemaVersion": 2,
+		  "schemaVersion": 3,
 		  "integerRepresentations": ["number", "bigint"],
 		  "providerIntegerRepresentation": "bigint",
 		  "providerScalarModule": "./internal/scalars.js",
+		  "providerPointerModule": "./internal/runtime/pointer.js",
 		  "nativeIntegerBits": 64,
 		  "primitiveAliases": [{"id": 4, "export": "uint32", "providerCarrier": "number"}],
 		  "runtimeSymbols": [{"id": 300, "export": "RuntimeSlice"}]
 		}`,
 		`{
-		  "schemaVersion": 2,
+		  "schemaVersion": 3,
 		  "integerRepresentations": ["number", "bigint"],
 		  "providerIntegerRepresentation": "bigint",
 		  "providerScalarModule": "./internal/scalars.js",
+		  "providerPointerModule": "./internal/runtime/pointer.js",
 		  "nativeIntegerBits": 64,
 		  "primitiveAliases": [{"id": 4, "export": "int32", "providerCarrier": "number"}],
 		  "runtimeSymbols": [{"id": 300, "export": "GoSlice"}]
 		}`,
 		`{
-		  "schemaVersion": 2,
+		  "schemaVersion": 3,
 		  "integerRepresentations": ["number", "number"],
 		  "providerIntegerRepresentation": "number",
 		  "providerScalarModule": "./internal/scalars.js",
+		  "providerPointerModule": "./internal/runtime/pointer.js",
 		  "nativeIntegerBits": 64,
 		  "primitiveAliases": [{"id": 4, "export": "int32", "providerCarrier": "number"}],
 		  "runtimeSymbols": [{"id": 300, "export": "RuntimeSlice"}]

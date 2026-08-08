@@ -253,12 +253,6 @@ func (s *programSession) prepareDeclarationRequirement(
 			return err
 		}
 	}
-	if generated, generatedOwned := owner.Generated(); generatedOwned &&
-		generated.Kind() == api.GeneratedArtifactPointerRepresentation {
-		if err := s.ensurePointerRepresentationBaseline(generated); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

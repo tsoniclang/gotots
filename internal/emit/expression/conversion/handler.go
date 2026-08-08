@@ -15,8 +15,8 @@ import (
 	slicearrayconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/slicearray"
 	stringconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/stringvalue"
 	structconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/structvalue"
-	unsafepointerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/unsafepointer"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
@@ -76,6 +76,11 @@ func Emit(
 		return target, true, err
 	}
 	sourceType := operandFacts.Type
+	if basictype.SupportsUnsafePointer(sourceType) ||
+		basictype.SupportsUnsafePointer(targetType) {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	if isUntypedNil(sourceType) {
 		target, err := context.Values().Zero(
 			context.WithRole(api.RoleConversionOperand),
@@ -107,22 +112,6 @@ func Emit(
 			return api.ExpressionEmission{}, true, err
 		}
 		return target, true, nil
-	}
-	if err := unsafepointerconversion.Prepare(
-		context,
-		sourceType,
-		targetType,
-	); err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	if target, handled, offsetErr := unsafepointerconversion.EmitClosedOffset(
-		context,
-		children,
-		source,
-		sourceType,
-		targetType,
-	); handled {
-		return target, true, offsetErr
 	}
 	operandExpected := operandFacts.Type
 	if _, interfaceTarget := interfacetype.Resolve(targetType); interfaceTarget {
@@ -170,6 +159,11 @@ func Apply(
 		!types.ConvertibleTo(sourceType, targetType) {
 		return api.ExpressionEmission{}, false, nil
 	}
+	if basictype.SupportsUnsafePointer(sourceType) ||
+		basictype.SupportsUnsafePointer(targetType) {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	var err error
 	if target, handled, interfaceErr := interfacevalue.Convert(
 		context,
@@ -184,16 +178,6 @@ func Apply(
 		if _, ok := callable.Signature(targetType); ok {
 			return operandValue, true, nil
 		}
-	}
-	if target, handled, unsafeErr := unsafepointerconversion.Convert(
-		context,
-		children,
-		source,
-		sourceType,
-		targetType,
-		operandValue,
-	); handled {
-		return target, true, unsafeErr
 	}
 	if target, handled, pointerErr := pointerconversion.Convert(
 		context,

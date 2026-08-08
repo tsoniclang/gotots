@@ -37,45 +37,20 @@ func emitUnsafeBuiltin(
 		)
 		return target, true, err
 	case kind.Runtime():
-		signature, ok := context.TypesInfo().TypeOf(source.Fun).(*types.Signature)
-		if !ok || signature == nil {
-			return api.ExpressionEmission{},
-				true,
-				api.Unsupported(
-					context,
-					api.CategoryExpression,
-					source,
-				)
+		if kind == unsafeoperation.String {
+			target, err := emitUnsafeString(
+				context,
+				children,
+				source,
+				discarded,
+			)
+			return target, true, err
 		}
-		if err := validateResults(
+		return api.ExpressionEmission{}, true, api.Unsupported(
 			context,
+			api.CategoryExpression,
 			source,
-			signature,
-			discarded,
-		); err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
-		arguments, before, requests, err := emitArguments(
-			context,
-			children,
-			source,
-			signature,
-			false,
 		)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
-		target, err := emitUnsafeRuntimeCall(
-			context,
-			children,
-			source,
-			kind,
-			signature,
-			arguments,
-			before,
-			requests,
-		)
-		return target, true, err
 	default:
 		return api.ExpressionEmission{}, false, nil
 	}

@@ -101,6 +101,13 @@ func channelTransfer() int32 {
 	return int32(receivedRaw[0] + receivedNamed[0])
 }
 
+func PointerExercise() int32 {
+	number := int32(9)
+	cell := asCell(&number)
+	changeCell(cell)
+	return *cell
+}
+
 func Exercise() int32 {
 	bytes := Bytes{1}
 	changeBytes(bytes)
@@ -113,10 +120,6 @@ func Exercise() int32 {
 	rawCounts := map[string]int32{"value": 7}
 	namedCounts := asCounts(rawCounts)
 	namedCounts["value"]++
-
-	number := int32(9)
-	cell := asCell(&number)
-	changeCell(cell)
 
 	callback := Callback(func(value int32) int32 { return value + 10 })
 	rawCallbackResult := call(callback)
@@ -133,7 +136,6 @@ func Exercise() int32 {
 		int32(rawBytes[0]) +
 		counts["value"] +
 		rawCounts["value"] +
-		*cell +
 		rawCallbackResult +
 		namedCallbackResult +
 		pair[0] +

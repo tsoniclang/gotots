@@ -492,13 +492,6 @@ func (o *GeneratedArtifact) ReflectionType() (
 	return o.sourceType, o.reflectionType, true
 }
 
-func (o *GeneratedArtifact) UnsafeCodecType() (types.Type, bool) {
-	if o == nil || o.kind != GeneratedArtifactUnsafeCodec {
-		return nil, false
-	}
-	return o.sourceType, o.sourceType != nil
-}
-
 func (o *GeneratedArtifact) GenericCapability() (
 	*types.Signature,
 	GenericOperationSelection,
@@ -540,14 +533,6 @@ func (o *GeneratedArtifact) GenericConcretization() (
 		return nil, false
 	}
 	return o.concretization, true
-}
-
-func (o *GeneratedArtifact) PointerRepresentation() (*types.Pointer, bool) {
-	if o == nil || o.kind != GeneratedArtifactPointerRepresentation {
-		return nil, false
-	}
-	source, ok := types.Unalias(o.sourceType).(*types.Pointer)
-	return source, ok
 }
 
 func (o *GeneratedArtifact) ProviderInterfaceBridgeType() (*types.Named, bool) {

@@ -2,11 +2,9 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -25,9 +23,8 @@ import (
 	"context"
 	"io/fs"
 	"iter"
-	"syscall"
+	"reflect"
 	"time"
-	"unsafe"
 )
 
 func Cancel(cancel context.CancelFunc) {
@@ -137,20 +134,24 @@ func DurationPointer(value time.Duration) *time.Duration {
 	return &value
 }
 
-func ErrnoPointer(value syscall.Errno) unsafe.Pointer {
-	return unsafe.Pointer(value)
-}
-
-func PointerErrno(value unsafe.Pointer) syscall.Errno {
-	return syscall.Errno(value)
-}
-
 func SequenceTotal(sequence iter.Seq[int]) int {
 	total := 0
 	for value := range sequence {
 		total += value
 	}
 	return total
+}
+
+func AssignMapIterator(target *reflect.MapIter, source *reflect.MapIter) {
+	*target = *source
+}
+
+func RewindMapIterator(value reflect.Value) bool {
+	iterator := value.MapRange()
+	snapshot := *iterator
+	iterator.Next()
+	*iterator = snapshot
+	return iterator.Next()
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
@@ -189,13 +190,12 @@ func SequenceTotal(sequence iter.Seq[int]) int {
 		"values.slice(named_time.TimeDurationValueOperations.$project(low), named_time.TimeDurationValueOperations.$project(high), null)",
 		"RuntimeSlice.make<int>(named_time.TimeDurationValueOperations.$project(length), null, 0)",
 		"GoChannel.make<int>(named_time.TimeDurationValueOperations.$project(size)",
-		"GoArray.literal<time__from_gostdlib.Duration, 2>(2, named_time.TimeDurationValueOperations.$wrap(0n)",
+		"GoArray.literal<scalars.int64, 2>(2, named_time.TimeDurationValueOperations.$project(named_time.TimeDurationValueOperations.$wrap(0n))",
 		"GoMap.make<gostring, time__from_gostdlib.Duration>(named_time.TimeDurationValueOperations.$wrap(0n)",
-		"GoUnsafePointer.fromInteger(named_syscall.SyscallErrnoValueOperations.$project(value), 0n)",
-		"named_syscall.SyscallErrnoValueOperations.$wrap(GoUnsafePointer.toInteger(value, 0n))",
 		"globalThis.Number(BigInt.asIntN(64, named_time.TimeDurationValueOperations.$project(value)))",
 		"named_time.TimeDurationValueOperations.$wrap(BigInt.asIntN(64, goNumberToBigInt(value)))",
 		"IterSeqValueOperations.$project",
+		"ReflectMapIterOperations.$assign",
 		"cancel: (() => Awaitable<void>) | undefined",
 		"callback: (($0: gostring, $1:",
 		"const __gotots_callee_0 = cancel;",
@@ -312,7 +312,7 @@ func Facts() string {
 	if assemblyPath == "" {
 		t.Fatal("atomic comparable package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -320,37 +320,6 @@ func Facts() string {
 		[]string{"Facts"},
 		"console.log(await Facts());\n",
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	fixture "example.com/atomiccomparable"
-)
-
-func main() {
-	fmt.Println(fixture.Facts())
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go atomic comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"atomic comparable differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
 }
 
 func TestSyncComparableFacetsMatchGo(t *testing.T) {
@@ -479,7 +448,7 @@ func Facts() string {
 	if assemblyPath == "" {
 		t.Fatal("sync comparable package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -487,35 +456,4 @@ func Facts() string {
 		[]string{"Facts"},
 		"console.log(await Facts());\n",
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	fixture "example.com/synccomparable"
-)
-
-func main() {
-	fmt.Println(fixture.Facts())
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go sync comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"sync comparable differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
 }

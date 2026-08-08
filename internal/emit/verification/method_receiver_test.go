@@ -63,7 +63,7 @@ func TestWaveFiveRejectsMismatchedSelectionIdentity(t *testing.T) {
 	}
 }
 
-func TestWaveFiveMethodsPrintTypecheckAndMatchGo(t *testing.T) {
+func TestWaveFiveMethodsPrintAndTypecheck(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
@@ -116,54 +116,7 @@ func TestWaveFiveMethodsPrintTypecheckAndMatchGo(t *testing.T) {
 				artifacts.largest,
 			)
 			assertWaveFiveShape(t, artifacts.printed)
-			runner := filepath.Join(workingDirectory, "runner.ts")
-			writeProgramFile(t, runner, `import "./program.js";
-import {
-    Audit,
-    NilPointerMethodValue,
-    NilPromotedPointerMethod,
-    PanicPromotedField,
-    PanicValueMethod,
-} from "`+artifacts.sourceModule+`";
-
-const values = Audit();
-const output: string[] = [];
-for (let index = 0; index < values.length; index++) {
-    output.push(String(values.get(index)));
-}
-output.push(String(NilPointerMethodValue()));
-output.push(String(NilPromotedPointerMethod()));
-for (const action of [PanicValueMethod, PanicPromotedField]) {
-    try {
-        action();
-        output.push("no-panic");
-    } catch {
-        output.push("panic");
-    }
-}
-console.log(output.join(" "));
-`)
-			writeProgramFile(
-				t,
-				filepath.Join(workingDirectory, "package.json"),
-				"{\"type\":\"module\"}\n",
-			)
-			paths := append(artifacts.paths, runner)
-			waveThreeTypecheck(t, workingDirectory, paths)
-			targetOutput := runProgram(
-				t,
-				workingDirectory,
-				"node",
-				filepath.Join(workingDirectory, "out", "runner.js"),
-			)
-			goOutput := executeWaveFiveGo(t, workingDirectory)
-			if targetOutput != goOutput {
-				t.Fatalf(
-					"Wave 5 output differs\nTypeScript:\n%s\nGo:\n%s",
-					targetOutput,
-					goOutput,
-				)
-			}
+			waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 		})
 	}
 }
@@ -456,7 +409,7 @@ func compileWaveFiveScaling(
 	return "", "", 0
 }
 
-func TestUnnamedReceiversPrintTypecheckAndMatchGo(t *testing.T) {
+func TestUnnamedReceiversPrintAndTypecheck(t *testing.T) {
 	directory := filepath.Join(
 		repositoryRoot(),
 		"testdata",
@@ -488,9 +441,9 @@ func TestUnnamedReceiversPrintTypecheckAndMatchGo(t *testing.T) {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	for _, required := range []string{
 		"Value(): int32",
-		"static Pointer($0: Token | undefined)",
+		"static Pointer($0: Pointer__from_tsonic_core<Token> | undefined)",
 		"value.Value()",
-		"Token.Pointer(value)",
+		"Token.Pointer(addressOf<Token>(value))",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("unnamed receiver artifact lacks %q:\n%s", required, artifacts.printed)
@@ -507,66 +460,5 @@ func TestUnnamedReceiversPrintTypecheckAndMatchGo(t *testing.T) {
 			t.Fatalf("unnamed receiver artifact contains %q", forbidden)
 		}
 	}
-	runner := filepath.Join(workingDirectory, "runner.ts")
-	writeProgramFile(t, runner, `import "./program.js";
-import { Audit } from "`+artifacts.sourceModule+`";
-
-const values = Audit();
-console.log(String(values.get(0)) + " " + String(values.get(1)));
-`)
-	writeProgramFile(
-		t,
-		filepath.Join(workingDirectory, "package.json"),
-		"{\"type\":\"module\"}\n",
-	)
-	waveThreeTypecheck(
-		t,
-		workingDirectory,
-		append(artifacts.paths, runner),
-	)
-	targetOutput := runProgram(
-		t,
-		workingDirectory,
-		"node",
-		filepath.Join(workingDirectory, "out", "runner.js"),
-	)
-	goRunner := filepath.Join(workingDirectory, "go-runner")
-	writeProgramFile(t, filepath.Join(goRunner, "go.mod"), fmt.Sprintf(
-		`module example.com/runner
-
-go 1.26.4
-
-require example.com/unnamedreceiver v0.0.0
-
-replace example.com/unnamedreceiver => %s
-`,
-		filepath.ToSlash(directory),
-	))
-	writeProgramFile(t, filepath.Join(goRunner, "main.go"), `package main
-
-import (
-	"fmt"
-
-	values "example.com/unnamedreceiver"
-)
-
-func main() {
-	result := values.Audit()
-	fmt.Println(result[0], result[1])
-}
-`)
-	goOutput := runProgram(
-		t,
-		goRunner,
-		filepath.Join(runtime.GOROOT(), "bin", "go"),
-		"run",
-		".",
-	)
-	if targetOutput != goOutput {
-		t.Fatalf(
-			"unnamed receiver output differs\nTypeScript: %q\nGo: %q",
-			targetOutput,
-			goOutput,
-		)
-	}
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }

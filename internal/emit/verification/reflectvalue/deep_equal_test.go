@@ -2,11 +2,11 @@ package reflectvalue_test
 
 import "testing"
 
-// TestReflectDeepEqualMatchesGo proves the deep comparison and projection
+// TestReflectDeepEqualCanonicalizesWithNativeEvidence covers deep comparison and projection
 // tail of the reflection family: DeepEqual over structs, slices, maps,
 // pointers, distinct types, and nil; Interface returning an exact copy of
 // a located struct; and Indirect unwrapping pointers.
-func TestReflectDeepEqualMatchesGo(t *testing.T) {
+func TestReflectDeepEqualCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -67,7 +67,7 @@ func main() {
 	fmt.Println(fixture.Compare())
 }
 `
-	runReflectDifferential(
+	verifyReflectCanonical(
 		t,
 		source,
 		"Compare",

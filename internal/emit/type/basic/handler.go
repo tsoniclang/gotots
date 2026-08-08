@@ -8,7 +8,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(context api.Context, source ast.Expr) (api.TypeEmission, error) {
@@ -25,27 +24,11 @@ func EmitRepresented(
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
 	if SupportsUnsafePointer(sourceType) {
-		reference, err := context.Names().Runtime(
-			api.RuntimeUnsafePointer,
-			api.ImportPhaseType,
+		return api.TypeEmission{}, api.Unsupported(
+			context,
+			api.CategoryType,
+			source,
 		)
-		if err != nil {
-			return api.TypeEmission{}, err
-		}
-		return api.DirectType(
-			context.Factory().UnionTypeNode(
-				[]tsgo.TypeNode{
-					context.Factory().TypeReferenceNode(
-						reference.EntityName(context.Factory()),
-						nil,
-					),
-					context.Factory().KeywordTypeNode(
-						tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-					),
-				},
-			),
-			reference.Requests()...,
-		), nil
 	}
 	if _, ok := complexvalue.Describe(sourceType); ok {
 		return complexvalue.EmitType(context, source, sourceType)

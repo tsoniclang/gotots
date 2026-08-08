@@ -2,13 +2,13 @@ package reflectvalue_test
 
 import "testing"
 
-// TestReflectSliceReshapeMatchesGo proves the addressable slice value
+// TestReflectSliceReshapeCanonicalizesWithNativeEvidence covers the addressable slice value
 // family: Elem over a pointer-to-slice storage cell, SetLen re-slicing,
 // Grow preserving length while extending capacity, Bytes aliasing, and
 // SetBytes replacing the whole header through original storage. Capacity
 // is asserted only where the product growth profile provably agrees with
 // the Go growth policy.
-func TestReflectSliceReshapeMatchesGo(t *testing.T) {
+func TestReflectSliceReshapeCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -51,7 +51,7 @@ func main() {
 	fmt.Println(fixture.Reshape())
 }
 `
-	runReflectDifferential(
+	verifyReflectCanonical(
 		t,
 		source,
 		"Reshape",

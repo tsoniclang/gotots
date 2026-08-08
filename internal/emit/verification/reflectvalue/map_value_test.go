@@ -2,13 +2,13 @@ package reflectvalue_test
 
 import "testing"
 
-// TestReflectMapOperationsMatchGo proves the map value family: MapRange
+// TestReflectMapOperationsCanonicalizeWithNativeEvidence covers MapRange
 // iteration, SetMapIndex insertion and lookup, zero-Value results for
 // missing keys, MakeMap over a MapOf descriptor composition, and
 // SetIterKey/SetIterValue through addressable destinations. Every
 // observation is independent of map iteration order, which Go itself
 // randomizes.
-func TestReflectMapOperationsMatchGo(t *testing.T) {
+func TestReflectMapOperationsCanonicalizeWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -69,7 +69,7 @@ func main() {
 	fmt.Println(fixture.Merge())
 }
 `
-	runReflectDifferential(
+	verifyReflectCanonical(
 		t,
 		source,
 		"Merge",

@@ -555,7 +555,7 @@ func TestPlacementRuntimeSymbolsAreExactAndSorted(t *testing.T) {
 	factory := tsgo.NewFactory()
 	placement := targetplacement.New()
 	for _, symbol := range []api.RuntimeSymbol{
-		api.RuntimePointer,
+		api.RuntimeArray,
 		api.RuntimeStringSlice,
 		api.RuntimeStringIndex,
 		api.RuntimeStringSlice,
@@ -582,7 +582,7 @@ func TestPlacementRuntimeSymbolsAreExactAndSorted(t *testing.T) {
 	expected := []api.RuntimeSymbol{
 		api.RuntimeStringIndex,
 		api.RuntimeStringSlice,
-		api.RuntimePointer,
+		api.RuntimeArray,
 	}
 	if !slices.Equal(actual, expected) {
 		t.Fatalf("runtime symbols = %v, want %v", actual, expected)

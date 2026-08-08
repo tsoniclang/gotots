@@ -198,30 +198,6 @@ func compareDeclarationRequirements(
 			return 0
 		}
 	}
-	if left.Kind() == api.DeclarationRequirementPointerRepresentation {
-		leftArtifact, leftDemand, leftOK := left.PointerRepresentation()
-		rightArtifact, rightDemand, rightOK := right.PointerRepresentation()
-		switch {
-		case !leftOK && rightOK:
-			return -1
-		case leftOK && !rightOK:
-			return 1
-		}
-		if order := compareGeneratedArtifacts(
-			leftArtifact,
-			rightArtifact,
-		); order != 0 {
-			return order
-		}
-		switch {
-		case leftDemand < rightDemand:
-			return -1
-		case leftDemand > rightDemand:
-			return 1
-		default:
-			return 0
-		}
-	}
 	if left.Kind() == api.DeclarationRequirementInterfaceAdapter {
 		leftArtifact, _, leftKey, leftDemand :=
 			left.InterfaceAdapterContract()
@@ -411,10 +387,8 @@ func artifactKinds(kind api.DeclarationRequirementKind) bool {
 		kind == api.DeclarationRequirementInterfaceDynamicTypeToken ||
 		kind == api.DeclarationRequirementGenericCapability ||
 		kind == api.DeclarationRequirementCallableABI ||
-		kind == api.DeclarationRequirementPointerRepresentation ||
 		kind == api.DeclarationRequirementReflectionType ||
-		kind == api.DeclarationRequirementReflectionValueOperations ||
-		kind == api.DeclarationRequirementUnsafeCodec
+		kind == api.DeclarationRequirementReflectionValueOperations
 }
 
 func compareGeneratedArtifacts(

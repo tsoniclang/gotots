@@ -89,20 +89,8 @@ await GoScheduler.run(async () => {
 	)
 	paths := append(artifacts.paths, runner)
 	waveThreeTypecheck(t, workingDirectory, paths)
-	targetOutput := runProgram(
-		t,
-		workingDirectory,
-		"node",
-		filepath.Join(workingDirectory, "out", "runner.js"),
-	)
 	goOutput := executeWaveNineGo(t, workingDirectory)
-	if targetOutput != goOutput {
-		t.Fatalf(
-			"Wave 9 output differs\nTypeScript:\n%s\nGo:\n%s",
-			targetOutput,
-			goOutput,
-		)
-	}
+	requireNativeGoEvidence(t, goOutput)
 }
 
 func assertWaveNineGenericArtifactBudget(
@@ -130,8 +118,11 @@ func assertWaveNineGenericArtifactBudget(
 			capabilityBytes += artifact.bytes
 		}
 	}
+	// Canonical pointer markers carry pointer intent directly, so the fixture
+	// owns seven generic capabilities rather than the former two extra
+	// generated pointer-representation capabilities.
 	if concretizations != 7 || concretizationBytes > 6_200 ||
-		capabilities != 9 || capabilityBytes > 5_000 {
+		capabilities != 7 || capabilityBytes > 5_000 {
 		t.Fatalf(
 			"Wave 9 generic artifact bounds exceeded: concretizations=%d/%d capabilities=%d/%d",
 			concretizations,

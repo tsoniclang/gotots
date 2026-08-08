@@ -63,9 +63,6 @@ type Context struct {
 	factory                      tsgo.Factory
 	names                        Names
 	values                       Values
-	pointeeValues                PointeeValues
-	pointerNames                 PointerRepresentationNames
-	pointerValues                PointerRepresentationValues
 	stableAssignments            StableAssignmentValues
 	containerStorage             ContainerStorageValues
 	scalar                       ScalarABI
@@ -113,6 +110,16 @@ type Context struct {
 	genericParameterOwner        types.Object
 	iteratorRangeControls        []IteratorRangeControl
 	valueReceiver                *ValueReceiverBinding
+	sourceImplementationContract bool
+}
+
+func (c Context) WithSourceImplementationContract() Context {
+	c.sourceImplementationContract = true
+	return c
+}
+
+func (c Context) SourceImplementationContract() bool {
+	return c.sourceImplementationContract
 }
 
 func (c Context) GenericParameterOwner() (types.Object, bool) {
@@ -230,9 +237,6 @@ func NewContext(
 	case !concurrency.Valid():
 		return Context{}, &ContextError{Reason: "concurrency semantics are invalid"}
 	}
-	pointerNames, _ := names.(PointerRepresentationNames)
-	pointerValues, _ := values.(PointerRepresentationValues)
-	pointeeValues, _ := values.(PointeeValues)
 	stableAssignments, _ := values.(StableAssignmentValues)
 	containerStorage, _ := values.(ContainerStorageValues)
 	scalar, err := NewScalarABIFromSizes(integer, typesSizes)
@@ -249,9 +253,6 @@ func NewContext(
 		factory:           factory,
 		names:             names,
 		values:            values,
-		pointeeValues:     pointeeValues,
-		pointerNames:      pointerNames,
-		pointerValues:     pointerValues,
 		stableAssignments: stableAssignments,
 		containerStorage:  containerStorage,
 		scalar:            scalar,

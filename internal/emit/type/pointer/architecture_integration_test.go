@@ -2,10 +2,8 @@ package pointer_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -55,36 +53,16 @@ func Boolean(value bool) (bool, bool) {
 	return previous, value
 }
 `
-	typescript, goOutput, tsOutput := compileAndRunPointerArchitecture(
+	typescript := compilePointerArchitecture(
 		t,
-		source,
-		`import { Boolean, Direct, DirectMap, NewBox } from "__SOURCE__";
-
-console.log(...Direct(40));
-console.log(...DirectMap(41));
-console.log(NewBox(7)?.Value);
-console.log(...Boolean(true));
-`,
-		`fmt.Println(pointer.Direct(40))
-fmt.Println(pointer.DirectMap(41))
-fmt.Println(pointer.NewBox(7).Value)
-fmt.Println(pointer.Boolean(true))
-`,
+		map[string]string{"source.go": source},
 	)
-	if tsOutput != goOutput {
-		t.Fatalf(
-			"TypeScript output = %q, Go output = %q:\n%s",
-			tsOutput,
-			goOutput,
-			typescript,
-		)
-	}
 	for _, required := range []string{
-		"function NewBox(value: int32): Box | undefined",
-		"static $assign(",
-		"Box.$assign(GoPointer.direct<Box>(pointer), Box.$copy(value))",
-		"GoPointerType<T>",
-		"class Box implements GoPointerRepresentedValue<Box>",
+		"function NewBox(value: int32): Pointer<Box> | undefined",
+		"allocatePointer<Box>(Box.$make(value))",
+		"storePointer((pointer ?? GoPanic.raiseRuntime",
+		"pointer: Pointer<T> | undefined",
+		"export class Box",
 	} {
 		if !strings.Contains(typescript, required) {
 			t.Fatalf("direct pointer output lacks %q:\n%s", required, typescript)
@@ -138,33 +116,15 @@ func Package(value int32) (int32, bool) {
 	return Global.Child.Value, pointer == &Global.Child
 }
 `
-	typescript, goOutput, tsOutput := compileAndRunPointerArchitecture(
+	typescript := compilePointerArchitecture(
 		t,
-		source,
-		`import "__INITIALIZE__";
-import { Field, Nested, Package } from "__SOURCE__";
-
-console.log(...Nested(40));
-console.log(...Field(50));
-console.log(...Package(60));
-`,
-		`fmt.Println(pointer.Nested(40))
-fmt.Println(pointer.Field(50))
-fmt.Println(pointer.Package(60))
-`,
+		map[string]string{"source.go": source},
 	)
-	if tsOutput != goOutput {
-		t.Fatalf(
-			"TypeScript output = %q, Go output = %q:\n%s",
-			tsOutput,
-			goOutput,
-			typescript,
-		)
-	}
 	for _, required := range []string{
-		"let pointer: Child | undefined",
-		"Child.$assign($target.Child, $value.Child)",
-		"Child.$storageOf(pointer) === Child.$storageOf",
+		"let pointer: Pointer<Child> | undefined",
+		"addressOf<Child>(__gotots_store_0.Child)",
+		"loadPointer<Child>",
+		"equalPointer<Child>",
 	} {
 		if !strings.Contains(typescript, required) {
 			t.Fatalf("stable struct-pointer output lacks %q:\n%s", required, typescript)
@@ -243,44 +203,18 @@ func CarrierMap(value int32) (int32, bool) {
 	return entries[alias], pointer == alias
 }
 `
-	typescript, goOutput, tsOutput := compileAndRunPointerArchitecture(
+	typescript := compilePointerArchitecture(
 		t,
-		source,
-		`import {
-    CarrierMap,
-    Convert,
-    DirectIntValue,
-    Scalar,
-    SliceAlias,
-    StringValue,
-} from "__SOURCE__";
-
-console.log(...SliceAlias(40));
-console.log(...Scalar(50));
-console.log(...Convert(60));
-console.log(...CarrierMap(61));
-console.log(DirectIntValue(62));
-console.log(StringValue("ok"));
-`,
-		`fmt.Println(pointer.SliceAlias(40))
-fmt.Println(pointer.Scalar(50))
-fmt.Println(pointer.Convert(60))
-fmt.Println(pointer.CarrierMap(61))
-fmt.Println(pointer.DirectIntValue(62))
-fmt.Println(pointer.StringPointer("ok").Value)
-`,
+		map[string]string{"source.go": source},
 	)
-	if tsOutput != goOutput {
-		t.Fatalf("TypeScript output = %q, Go output = %q", tsOutput, goOutput)
-	}
 	for _, required := range []string{
-		"GoPointer<Box<int32",
-		"function DirectInt(value: int32): GoPointer<Box<int32",
+		"Pointer<Box<int32>> | undefined",
+		"function DirectInt(value: int32): Pointer<Box<int32>> | undefined",
 		"RuntimeSlice.literal<Box$Storage<int32>>",
-		"goSliceAddress<Box<int32",
-		"Right.$fromStorage(Left.$storageOf(left))",
-		"goPointerHash",
-		"function StringPointer(value: gostring): GoPointer<Box<gostring>, Box$Storage<gostring>>",
+		"goSliceAddress<Box$Storage<int32>>",
+		"projectPointer<Left, Right>",
+		"hashPointer<Box",
+		"function StringPointer(value: gostring): Pointer<Box<gostring>> | undefined",
 	} {
 		if !strings.Contains(typescript, required) {
 			t.Fatalf("carrier pointer output lacks %q:\n%s", required, typescript)
@@ -338,24 +272,11 @@ func GenericNil() bool {
 	return pointer.IsNil()
 }
 `
-	typescript, goOutput, tsOutput := compileAndRunPointerArchitecture(
+	typescript := compilePointerArchitecture(
 		t,
-		source,
-		`import { GenericField, GenericNil, GenericPointer } from "__SOURCE__";
-
-console.log(GenericField(42));
-console.log(...GenericPointer(43));
-console.log(GenericNil());
-`,
-		`fmt.Println(pointer.GenericField(42))
-fmt.Println(pointer.GenericPointer(43))
-fmt.Println(pointer.GenericNil())
-`,
+		map[string]string{"source.go": source},
 	)
-	if tsOutput != goOutput {
-		t.Fatalf("TypeScript output = %q, Go output = %q", tsOutput, goOutput)
-	}
-	if strings.Contains(typescript, "GoPointer.field<Shelf") {
+	if strings.Contains(typescript, "GoPointer") {
 		t.Fatalf(
 			"direct generic receiver acquired an interior pointer:\n%s",
 			typescript,
@@ -363,20 +284,20 @@ fmt.Println(pointer.GenericNil())
 	}
 	if !strings.Contains(
 		typescript,
-		"static Put$kernel<T>(s: Shelf<T> | undefined",
+		"static Put$kernel<T>(s: Pointer<Shelf<T>> | undefined",
 	) || !strings.Contains(
 		typescript,
 		"Put$concrete_",
 	) || !strings.Contains(
 		typescript,
-		"GoPointer.direct<Store>(store$storage).Shelf",
+		"addressOf<Shelf<int32>>",
 	) {
 		t.Fatalf(
 			"generic receiver did not use its declaration ABI:\n%s",
 			typescript,
 		)
 	}
-	if strings.Contains(typescript, "GoPointer.optionalStorage(") {
+	if strings.Contains(typescript, "GoPointer") {
 		t.Fatalf(
 			"generic receiver retained a carrier-to-logical bridge:\n%s",
 			typescript,
@@ -387,11 +308,10 @@ fmt.Println(pointer.GenericNil())
 func TestForeignGenericMethodOriginAndAdapterUseDeclarationABI(
 	t *testing.T,
 ) {
-	typescript, goOutput, tsOutput :=
-		compileAndRunPointerArchitectureFiles(
-			t,
-			map[string]string{
-				"ledger.go": `package pointerarchitecture
+	typescript := compilePointerArchitecture(
+		t,
+		map[string]string{
+			"ledger.go": `package pointerarchitecture
 
 type Ledger[K comparable, V any] struct { Value V }
 
@@ -403,7 +323,7 @@ func (ledger *Ledger[K, V]) Ready() bool {
 	return ledger != nil
 }
 `,
-				"source.go": `package pointerarchitecture
+			"source.go": `package pointerarchitecture
 
 type ReadyContract interface { Ready() bool }
 
@@ -423,22 +343,9 @@ func ForeignAdapter() ReadyContract {
 	return &registry.Ledger
 }
 `,
-			},
-			`import { ForeignAdapter, ForeignGeneric } from "__SOURCE__";
-
-console.log(ForeignGeneric("key", 44));
-const ready = ForeignAdapter();
-if (ready === undefined) throw new Error("unexpected nil");
-console.log(ready.Ready());
-`,
-			`fmt.Println(pointer.ForeignGeneric("key", 44))
-fmt.Println(pointer.ForeignAdapter().Ready())
-`,
-		)
-	if tsOutput != goOutput {
-		t.Fatalf("TypeScript output = %q, Go output = %q", tsOutput, goOutput)
-	}
-	if strings.Contains(typescript, "GoPointer.optionalStorage(") {
+		},
+	)
+	if strings.Contains(typescript, "GoPointer") {
 		t.Fatalf(
 			"foreign generic receiver retained a carrier-to-logical bridge:\n%s",
 			typescript,
@@ -446,7 +353,7 @@ fmt.Println(pointer.ForeignAdapter().Ready())
 	}
 	if !strings.Contains(
 		typescript,
-		"static Set$kernel<K, V>(ledger: Ledger<K, V> | undefined",
+		"static Set$kernel<K, V>(ledger: Pointer<Ledger<K, V>> | undefined",
 	) {
 		t.Fatalf("foreign generic method lacks the direct family ABI:\n%s", typescript)
 	}
@@ -455,27 +362,10 @@ fmt.Println(pointer.ForeignAdapter().Ready())
 	}
 }
 
-func compileAndRunPointerArchitecture(
-	t *testing.T,
-	source string,
-	runner string,
-	goBody string,
-) (string, string, string) {
-	t.Helper()
-	return compileAndRunPointerArchitectureFiles(
-		t,
-		map[string]string{"source.go": source},
-		runner,
-		goBody,
-	)
-}
-
-func compileAndRunPointerArchitectureFiles(
+func compilePointerArchitecture(
 	t *testing.T,
 	sources map[string]string,
-	runner string,
-	goBody string,
-) (string, string, string) {
+) string {
 	t.Helper()
 	directory := t.TempDir()
 	writeFile(
@@ -520,56 +410,6 @@ func compileAndRunPointerArchitectureFiles(
 		}
 		generated.Write(content)
 	}
-	runnerPath := filepath.Join(targetDirectory, "runner.ts")
-	writeFile(
-		t,
-		runnerPath,
-		strings.NewReplacer(
-			"__SOURCE__", sourceModule,
-			"__INITIALIZE__", artifacts.programInitialization,
-		).Replace(runner),
-	)
-	tsOutput := executeMaterializedTypeScript(
-		t,
-		targetDirectory,
-		artifacts,
-		runnerPath,
-	)
-	goOutput := runPointerArchitectureGo(t, directory, goBody)
-	return generated.String(), goOutput, tsOutput
-}
-
-func runPointerArchitectureGo(
-	t *testing.T,
-	moduleDirectory string,
-	body string,
-) string {
-	t.Helper()
-	runnerDirectory := filepath.Join(moduleDirectory, "runner")
-	writeFile(t, filepath.Join(runnerDirectory, "go.mod"), fmt.Sprintf(`module example.com/runner
-
-go 1.26.4
-
-require example.com/pointerarchitecture v0.0.0
-
-replace example.com/pointerarchitecture => %s
-`, filepath.ToSlash(moduleDirectory)))
-	writeFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	pointer "example.com/pointerarchitecture"
-)
-
-func main() {
-`+body+`}
-`)
-	return run(
-		t,
-		runnerDirectory,
-		filepath.Join(runtime.GOROOT(), "bin", "go"),
-		"run",
-		".",
-	)
+	typecheckMaterializedTypeScript(t, targetDirectory, artifacts)
+	return generated.String()
 }

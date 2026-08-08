@@ -27,7 +27,7 @@ func TestCallableABIIsOwnedBySignatureFacet(t *testing.T) {
 	providerOwner := api.MustSourceArtifactOwner(function)
 	consumerOwner := api.MustSourceArtifactOwner(consumer)
 	graph := NewGraph(compareArtifactTestObjects)
-	initial := callableABITestContract(t, callableabi.NilPolicyRejectAtBoundary)
+	initial := callableABITestContract(t, "Pointer<number> | undefined")
 	if err := graph.AdmitCallableABI(providerOwner, initial); err != nil {
 		t.Fatal(err)
 	}
@@ -65,8 +65,8 @@ func TestCallableABIIsOwnedBySignatureFacet(t *testing.T) {
 	if graph.HasPending() {
 		t.Fatal("identical callable signature dirtied its consumer")
 	}
-	preserved := callableABITestContract(t, callableabi.NilPolicyPreserve)
-	if err := graph.AdmitCallableABI(providerOwner, preserved); err != nil {
+	revised := callableABITestContract(t, "Pointer<bigint> | undefined")
+	if err := graph.AdmitCallableABI(providerOwner, revised); err != nil {
 		t.Fatal(err)
 	}
 	after := graph.records[providerOwner].contract
@@ -74,14 +74,14 @@ func TestCallableABIIsOwnedBySignatureFacet(t *testing.T) {
 		artifactFacetBytes(before, api.ArtifactFacetCallableSignature),
 		artifactFacetBytes(after, api.ArtifactFacetCallableSignature),
 	) {
-		t.Fatal("projection revision did not change the callable-signature facet")
+		t.Fatal("target-type revision did not change the callable-signature facet")
 	}
 	dirty, ok := graph.NextDirty()
 	if !ok || dirty != consumerOwner {
 		t.Fatalf("dirty consumer = %v, %t; want Use", dirty, ok)
 	}
 	selected, ok := graph.CallableABI(providerOwner)
-	if !ok || selected.Fingerprint() != preserved.Fingerprint() {
+	if !ok || selected.Fingerprint() != revised.Fingerprint() {
 		t.Fatal("graph did not retain the revised canonical callable ABI")
 	}
 }
@@ -101,14 +101,10 @@ func callableABIFacetContract(
 
 func callableABITestContract(
 	t *testing.T,
-	nilPolicy callableabi.NilPolicy,
+	targetType string,
 ) callableabi.Callable {
 	t.Helper()
-	parameter, err := callableabi.NewParameter(
-		callableabi.ProjectionPointeeValue,
-		nilPolicy,
-		"number",
-	)
+	parameter, err := callableabi.NewParameter(targetType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,6 +118,7 @@ func callableABITestContract(
 	selected, err := callableabi.New(
 		identity,
 		[]callableabi.Parameter{parameter},
+		"number",
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -47,14 +47,17 @@ func emitCompound(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
+	requiresStorageProjection, err := context.Values().RequiresStorageProjection(
+		context,
+		target.SourceType(),
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
 	if !context.ScalarABI().UsesBigInt(target.SourceType()) &&
 		!target.IsAccessor() &&
 		!target.IsProperty() &&
-		(!target.UsesCanonicalStorage() ||
-			!context.Values().RequiresStorageProjection(
-				context,
-				target.SourceType(),
-			)) &&
+		(!target.UsesCanonicalStorage() || !requiresStorageProjection) &&
 		source.Tok == token.ADD_ASSIGN &&
 		basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) &&
 		types.AssignableTo(

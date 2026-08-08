@@ -33,6 +33,8 @@ func TestPanicNilAndRuntimeFaultHaveDistinctDynamicIdentities(t *testing.T) {
 		"GoPanicNilValue",
 		"GoRuntimePanicValue",
 		"GoInterfaceValue",
+		"Pointer",
+		"allocatePointer",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -72,6 +74,8 @@ func nilErrorTarget(
 		"GoPanicNilValue",
 		"GoRuntimePanicValue",
 		"GoInterfaceValue",
+		"Pointer",
+		"allocatePointer",
 	)
 	if err != nil {
 		t.Fatal(err)

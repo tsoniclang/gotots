@@ -76,7 +76,7 @@ func TestSourceScalarAliasesPreserveNestedGoIdentities(t *testing.T) {
 		),
 	)
 	actual := sourceScalarAliases(source)
-	expected := []string{"int64", "uint8", "int", "bool", "bool"}
+	expected := []string{"int64", "uint8", "int", "bool"}
 	if !slicesEqual(actual, expected) {
 		t.Fatalf("scalar aliases = %v, want %v", actual, expected)
 	}

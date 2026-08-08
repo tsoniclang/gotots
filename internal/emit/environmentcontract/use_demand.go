@@ -30,10 +30,8 @@ func RequirementUseDemand(
 		api.DeclarationRequirementGenericRepresentation,
 		api.DeclarationRequirementAnonymousStruct,
 		api.DeclarationRequirementAnonymousInterface,
-		api.DeclarationRequirementPointerRepresentation,
 		api.DeclarationRequirementMapSpecialization,
 		api.DeclarationRequirementValueReceiverCopy,
-		api.DeclarationRequirementUnsafeCodec,
 		api.DeclarationRequirementNamedStructOperation,
 		api.DeclarationRequirementProviderStatefulRepresentation:
 		return environmentidentity.UseDemandTypeContract

@@ -14,6 +14,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestScalarSlicesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
@@ -318,6 +319,9 @@ func materialize(
 
 func typecheck(t *testing.T, workingDirectory string, paths []string) {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	arguments := []string{

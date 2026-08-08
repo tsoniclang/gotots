@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
-	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -28,27 +27,10 @@ func Address(
 		return api.ExpressionEmission{}, err
 	}
 	values := ordered.Values()
-	logical, err := children.RepresentedType(
-		context.WithRole(api.RoleSliceElement),
-		source,
-		element,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	representation, err := pointertype.Observe(
-		context,
-		types.NewPointer(element),
-		api.PointerRepresentationDemandDynamicLocation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	storage, err := context.ContainerStorage().PointerStorageType(
+	storage, err := context.ContainerStorage().ContainerStorageType(
 		context.WithRole(api.RoleStorageType),
 		source,
 		element,
-		representation,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -63,19 +45,26 @@ func Address(
 	target := context.Factory().CallExpression(
 		context.Factory().Identifier(runtime.Name()),
 		nil,
-		[]tsgo.TypeNode{logical.Value(), storage.Value()},
+		[]tsgo.TypeNode{storage.Value()},
 		values,
 		tsgo.NodeFlagsNone,
 	)
-	return api.NewExpressionEmission(
+	storagePointer, err := api.NewExpressionEmission(
 		ordered.Before(),
 		target,
 		api.CombineRequests(
 			ordered.Requests(),
-			logical.Requests(),
 			storage.Requests(),
-			representation.Requests(),
 			runtime.Requests(),
 		),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return context.Values().ProjectStoragePointer(
+		context,
+		source,
+		element,
+		storagePointer,
 	)
 }

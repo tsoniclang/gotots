@@ -22,7 +22,7 @@ func emitExternalBody(
 		return api.BlockEmission{}, err
 	}
 	if linked {
-		return emitLinkedExternalBody(
+		return EmitLinkedExternalBody(
 			context,
 			children,
 			function,
@@ -61,7 +61,7 @@ func emitExternalBody(
 	), nil
 }
 
-func emitLinkedExternalBody(
+func EmitLinkedExternalBody(
 	context api.Context,
 	children api.ChildEmitter,
 	function *types.Func,

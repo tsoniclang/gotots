@@ -37,26 +37,6 @@ type ContainerStorageValues interface {
 		types.Type,
 		ExpressionEmission,
 	) (ExpressionEmission, error)
-	PointerStorageType(
-		Context,
-		ast.Node,
-		types.Type,
-		PointerRepresentationObservation,
-	) (TypeEmission, error)
-	ToPointerStorage(
-		Context,
-		ast.Node,
-		types.Type,
-		PointerRepresentationObservation,
-		ExpressionEmission,
-	) (ExpressionEmission, error)
-	FromPointerStorage(
-		Context,
-		ast.Node,
-		types.Type,
-		PointerRepresentationObservation,
-		ExpressionEmission,
-	) (ExpressionEmission, error)
 }
 
 func NewStableIdentityStoreTargetEmission(

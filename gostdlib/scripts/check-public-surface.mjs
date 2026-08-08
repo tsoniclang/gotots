@@ -56,7 +56,10 @@ const facetExports = contractManifest.facetModules
     return modulePath;
   })
   .sort();
-const supportExports = [runtimeContract.providerScalarModule];
+const supportExports = [
+  runtimeContract.providerPointerModule,
+  runtimeContract.providerScalarModule,
+];
 if (
   supportExports.some((modulePath) =>
     typeof modulePath !== "string" ||

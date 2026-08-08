@@ -8,28 +8,26 @@ import (
 type RuntimeModule uint8
 
 const (
-	RuntimeModuleInvalid RuntimeModule = iota
-	RuntimeModuleString
-	RuntimeModulePointer
-	RuntimeModuleArray
-	RuntimeModuleSlice
-	RuntimeModuleMap
-	RuntimeModulePanic
-	RuntimeModuleInteger
-	RuntimeModuleFloat
-	RuntimeModuleComplex
-	RuntimeModuleConversion
-	RuntimeModuleInterface
-	RuntimeModuleInterfaceValue
-	RuntimeModulePanicNil
-	RuntimeModuleChannel
-	RuntimeModuleUnsafePointer
-	RuntimeModuleDenseIndex
-	RuntimeModuleUnsafe
-	RuntimeModuleStruct
-	RuntimeModuleStorage
-	RuntimeModuleDeferredRegistry
-	RuntimeModuleScalar
+	RuntimeModuleInvalid          RuntimeModule = 0
+	RuntimeModuleString           RuntimeModule = 1
+	RuntimeModuleArray            RuntimeModule = 3
+	RuntimeModuleSlice            RuntimeModule = 4
+	RuntimeModuleMap              RuntimeModule = 5
+	RuntimeModulePanic            RuntimeModule = 6
+	RuntimeModuleInteger          RuntimeModule = 7
+	RuntimeModuleFloat            RuntimeModule = 8
+	RuntimeModuleComplex          RuntimeModule = 9
+	RuntimeModuleConversion       RuntimeModule = 10
+	RuntimeModuleInterface        RuntimeModule = 11
+	RuntimeModuleInterfaceValue   RuntimeModule = 12
+	RuntimeModulePanicNil         RuntimeModule = 13
+	RuntimeModuleChannel          RuntimeModule = 14
+	RuntimeModuleDenseIndex       RuntimeModule = 16
+	RuntimeModuleUnsafe           RuntimeModule = 17
+	RuntimeModuleStruct           RuntimeModule = 18
+	RuntimeModuleStorage          RuntimeModule = 19
+	RuntimeModuleDeferredRegistry RuntimeModule = 20
+	RuntimeModuleScalar           RuntimeModule = 21
 )
 
 func runtimeContract(
@@ -53,83 +51,14 @@ func unsafeRuntimeContract(
 ) (RuntimeSymbolContract, bool) {
 	var contract RuntimeSymbolContract
 	switch symbol {
-	case RuntimePointerUnsafeMemory:
-		contract = runtimeContract(
-			RuntimeModulePointer,
-			"runtime/pointer.ts",
-			"goPointerUnsafeMemory",
-			false,
-			RuntimePointerRegion,
-		)
-	case RuntimeUnsafeCodec:
-		contract = runtimeContract(
-			RuntimeModuleUnsafePointer,
-			"runtime/unsafe-pointer.ts",
-			"GoUnsafeCodec",
-			true,
-			RuntimePanic,
-		)
-	case RuntimeUnsafePointer:
-		contract = runtimeContract(
-			RuntimeModuleUnsafePointer,
-			"runtime/unsafe-pointer.ts",
-			"GoUnsafePointer",
-			true,
-			RuntimePanic,
-			RuntimeUnsafeCodec,
-			RuntimePointer,
-			RuntimePointerUnsafeMemory,
-			RuntimeDenseIndex,
-		)
 	case RuntimeUnsafeString:
 		contract = runtimeContract(
 			RuntimeModuleUnsafe,
 			"runtime/unsafe.ts",
 			"goUnsafeString",
 			false,
-			RuntimePointerRegion,
-			RuntimePointer,
-			RuntimeDenseIndex,
-		)
-	case RuntimeUnsafeSlice:
-		contract = runtimeContract(
-			RuntimeModuleUnsafe,
-			"runtime/unsafe.ts",
-			"goUnsafeSlice",
-			false,
-			RuntimePointerRegion,
-			RuntimePointer,
-			RuntimeSliceRegion,
 			RuntimeSlice,
-		)
-	case RuntimeUnsafeStringData:
-		contract = runtimeContract(
-			RuntimeModuleUnsafe,
-			"runtime/unsafe.ts",
-			"goUnsafeStringData",
-			false,
-			RuntimePointerRegion,
-			RuntimePointer,
-		)
-	case RuntimeUnsafeSliceData:
-		contract = runtimeContract(
-			RuntimeModuleUnsafe,
-			"runtime/unsafe.ts",
-			"goUnsafeSliceData",
-			false,
-			RuntimePointerRegion,
-			RuntimePointer,
-			RuntimeSliceRegion,
-			RuntimeSlice,
-		)
-	case RuntimeUnsafeSliceHeader:
-		contract = runtimeContract(
-			RuntimeModuleUnsafe,
-			"runtime/unsafe.ts",
-			"goUnsafeSliceHeader",
-			false,
-			RuntimeUnsafeSlice,
-			RuntimeSlice,
+			RuntimePanic,
 		)
 	default:
 		return RuntimeSymbolContract{}, false

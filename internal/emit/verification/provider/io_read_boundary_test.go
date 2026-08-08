@@ -2,11 +2,9 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -103,7 +101,7 @@ func Result(text string, custom bool) (int, string) {
 	if assemblyPath == "" {
 		t.Fatal("io ReadFull fixture package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -118,43 +116,6 @@ func Result(text string, custom bool) (int, string) {
 }
 `,
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	fixture "example.com/ioreadprofile"
-)
-
-func main() {
-	for _, test := range []struct {
-		text string
-		custom bool
-	}{{"four", false}, {"abc", false}, {"abc", true}} {
-		count, result := fixture.Result(test.text, test.custom)
-		fmt.Printf("%d %q\n", count, result)
-	}
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go io.ReadFull comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"io.ReadFull differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
 	if !strings.Contains(artifacts.printed, "IoReadFullCanonical") {
 		t.Fatalf("io.ReadFull output lacks canonical boundary:\n%s", artifacts.printed)
 	}

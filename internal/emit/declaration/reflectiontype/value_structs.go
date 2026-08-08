@@ -4,9 +4,9 @@ import (
 	"go/types"
 	"strconv"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
-	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -24,19 +24,9 @@ func pointerValueProperties(
 	scaffold *locationScaffold,
 ) ([]tsgo.ObjectLiteralElementLike, error) {
 	factory := scaffold.factory
-	observation, err := pointertype.Observe(
-		context,
-		sourceType,
-		api.PointerRepresentationDemandNone,
-	)
-	if err != nil {
-		return nil, err
-	}
-	scaffold.requests = append(scaffold.requests, observation.Requests()...)
-	directClass := observation.Representation().DirectClass()
 	named, namedOK := types.Unalias(pointee).(*types.Named)
 	_, structOK := types.Unalias(pointee).Underlying().(*types.Struct)
-	if !directClass || !namedOK || named.Obj() == nil || !structOK {
+	if !namedOK || named.Obj() == nil || !structOK {
 		return []tsgo.ObjectLiteralElementLike{
 			pointerZeroProperty(scaffold),
 		}, nil
@@ -51,6 +41,16 @@ func pointerValueProperties(
 	}
 	scaffold.requests = append(scaffold.requests, elemAdapter.Requests()...)
 	scaffold.requests = append(scaffold.requests, descriptor.Requests()...)
+	loadPointer, err := context.Names().TsonicCore(tsoniccore.SymbolLoadPointer)
+	if err != nil {
+		return nil, err
+	}
+	storePointer, err := context.Names().TsonicCore(tsoniccore.SymbolStorePointer)
+	if err != nil {
+		return nil, err
+	}
+	scaffold.requests = append(scaffold.requests, loadPointer.Requests()...)
+	scaffold.requests = append(scaffold.requests, storePointer.Requests()...)
 	copied, err := context.Values().Transfer(
 		context.WithRole(api.RoleStructCopyField),
 		nil,
@@ -66,33 +66,11 @@ func pointerValueProperties(
 	if err != nil {
 		return nil, err
 	}
-	assignReference, err := context.Names().NamedStructOperation(
-		named.Origin().Obj(),
-		api.NamedStructOperationAssign,
-	)
-	if err != nil {
-		return nil, err
-	}
-	assignMember, err := api.NamedStructOperationMemberName(
-		api.NamedStructOperationAssign,
-	)
-	if err != nil {
-		return nil, err
-	}
 	scaffold.requests = append(scaffold.requests, copied.Requests()...)
-	scaffold.requests = append(
-		scaffold.requests,
-		assignReference.Requests()...,
-	)
 	assignments := append([]tsgo.Statement(nil), copied.Before()...)
 	assignments = append(assignments, factory.ExpressionStatement(
 		factory.CallExpression(
-			factory.PropertyAccessExpression(
-				assignReference.Expression(factory),
-				nil,
-				factory.Identifier(assignMember),
-				tsgo.NodeFlagsNone,
-			),
+			storePointer.Expression(factory),
 			nil,
 			nil,
 			[]tsgo.Expression{
@@ -108,7 +86,13 @@ func pointerValueProperties(
 		get: factory.NewExpression(
 			elemAdapter.Expression(factory),
 			nil,
-			[]tsgo.Expression{factory.Identifier("instance")},
+			[]tsgo.Expression{factory.CallExpression(
+				loadPointer.Expression(factory),
+				nil,
+				nil,
+				[]tsgo.Expression{factory.Identifier("instance")},
+				tsgo.NodeFlagsNone,
+			)},
 		),
 		set: factory.Block(assignments, true),
 	})

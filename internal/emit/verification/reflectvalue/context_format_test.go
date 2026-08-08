@@ -2,10 +2,10 @@ package reflectvalue_test
 
 import "testing"
 
-// TestContextFormattingMatchesGo proves the context chain formatting
+// TestContextFormattingCanonicalizesWithNativeEvidence covers context chain formatting
 // family: Background, TODO, and WithCancel chains print their exact Go
 // spellings through the ordinary fmt path.
-func TestContextFormattingMatchesGo(t *testing.T) {
+func TestContextFormattingCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -41,7 +41,7 @@ func main() {
 	fmt.Println(fixture.Describe())
 }
 `
-	runReflectDifferential(
+	verifyReflectCanonical(
 		t,
 		source,
 		"Describe",

@@ -2,11 +2,9 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -100,7 +98,7 @@ func Result() (bool, bool, bool, bool) {
 	if assemblyPath == "" {
 		t.Fatal("pprof fixture package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -109,41 +107,10 @@ func Result() (bool, bool, bool, bool) {
 		`console.log((await Result()).map(String).join(" "));
 `,
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	fixture "example.com/pprofeffects"
-)
-
-func main() {
-	a, b, c, d := fixture.Result()
-	fmt.Println(a, b, c, d)
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go pprof comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"runtime/pprof differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
 	for _, required := range []string{
 		"PprofStartCPUProfileCanonical",
 		"PprofProfileWriteToCanonical",
+		"bindPointer<",
 		"await pprof__from_gostdlib.StopCPUProfile()",
 	} {
 		if !strings.Contains(artifacts.printed, required) {

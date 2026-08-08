@@ -408,16 +408,18 @@ func TestExpressionNewPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	artifacts := materializeExportedProgram(t, project.loaded, workingDirectory)
 	source := readMaterializedSource(t, artifacts, "source.ts")
 	for _, fragment := range []string{
-		"GoPointer.cell<int32, int32>",
-		"return Box.$copy(value);",
-		"return makeBox();",
+		"allocatePointer<int32>(value)",
+		"allocatePointer<Box>(Box.$copy(value))",
+		"allocatePointer<Box>(makeBox())",
+		"loadPointer<int32>",
 	} {
 		if !strings.Contains(source, fragment) {
 			t.Fatalf("expression-form new output lacks %q:\n%s", fragment, source)
 		}
 	}
 	for _, forbidden := range []string{
-		"GoPointer<Box",
+		"GoPointer",
+		"runtime/pointer",
 		"Box$Storage",
 		".call(",
 		".apply(",
@@ -429,9 +431,9 @@ func TestExpressionNewPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		}
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Use } from "`+artifacts.module(t, "source.ts")+`";
+	writeFile(t, runnerPath, `import { Value } from "`+artifacts.module(t, "source.ts")+`";
 
-console.log(Use());
+console.log(Value());
 `)
 	targetOutput := executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
 	goOutput := runExpressionNewGo(t, project.directory)
@@ -471,6 +473,10 @@ type Box struct {
 
 func makeBox() Box {
 	return Box{Value: 8}
+}
+
+func Value() int32 {
+	return makeBox().Value
 }
 
 func NewScalar(value int32) *int32 {
@@ -530,7 +536,7 @@ import (
 )
 
 func main() {
-	fmt.Println(expressionnew.Use())
+	fmt.Println(expressionnew.Value())
 }
 `)
 	return run(t, workingDirectory, "go", "run", ".")

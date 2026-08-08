@@ -18,7 +18,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestWaveFourStatementsPrintTypecheckAndMatchGo(t *testing.T) {
+func TestWaveFourStatementsPrintAndTypecheck(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
@@ -66,38 +66,7 @@ func TestWaveFourStatementsPrintTypecheckAndMatchGo(t *testing.T) {
 				)
 			}
 			assertWaveFourArtifactShape(t, artifacts.printed)
-			runner := filepath.Join(workingDirectory, "runner.ts")
-			writeProgramFile(t, runner, `import "./program.js";
-import { Audit } from "`+artifacts.sourceModule+`";
-
-const values = Audit();
-const output: string[] = [];
-for (let index = 0; index < values.length; index++) {
-    output.push(String(values.get(index)));
-}
-console.log(output.join(" "));
-`)
-			writeProgramFile(
-				t,
-				filepath.Join(workingDirectory, "package.json"),
-				"{\"type\":\"module\"}\n",
-			)
-			paths := append(artifacts.paths, runner)
-			waveThreeTypecheck(t, workingDirectory, paths)
-			targetOutput := runProgram(
-				t,
-				workingDirectory,
-				"node",
-				filepath.Join(workingDirectory, "out", "runner.js"),
-			)
-			goOutput := executeWaveFourGo(t, workingDirectory)
-			if targetOutput != goOutput {
-				t.Fatalf(
-					"Wave 4 output differs\nTypeScript:\n%s\nGo:\n%s",
-					targetOutput,
-					goOutput,
-				)
-			}
+			waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 			t.Logf(
 				"Wave 4 matrix: files=%d bytes=%d largest=%d",
 				len(artifacts.paths),

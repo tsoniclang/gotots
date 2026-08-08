@@ -71,7 +71,7 @@ func TestBuildEmitsOnlyTheDemandedStringDefinition(t *testing.T) {
 func TestBuildRejectsNonStringSymbol(t *testing.T) {
 	for _, symbols := range [][]api.RuntimeSymbol{
 		nil,
-		{api.RuntimePointer},
+		{api.RuntimeArray},
 		{api.RuntimeStringMax, api.RuntimeStringMax},
 	} {
 		_, err := stringruntime.Build(

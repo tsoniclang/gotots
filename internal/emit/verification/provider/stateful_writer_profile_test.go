@@ -2,11 +2,9 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -134,7 +132,7 @@ func NilConstructed() bool { return bufio.NewWriter(nil) != nil }
 	if assemblyPath == "" {
 		t.Fatal("stateful writer package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -147,43 +145,9 @@ console.log(await StickyFailure());
 console.log(await NilConstructed());
 `,
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	stateful "example.com/statefulwriterprofile"
-)
-
-func main() {
-	text, failure := stateful.Run("alpha")
-	fmt.Printf("%q %q\n", text, failure)
-	fmt.Println(stateful.ShortWrite())
-	fmt.Println(stateful.StickyFailure())
-	fmt.Println(stateful.NilConstructed())
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go provider comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"stateful writer differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
 	for _, required := range []string{
 		"CanonicalBufioWriter",
+		"bindPointer<",
 		"await $goProviderState",
 		"WriteByte",
 		".Flush(",

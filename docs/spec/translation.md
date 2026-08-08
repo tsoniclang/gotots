@@ -254,6 +254,39 @@ zero-on-miss. The index expression does not decide this alone.
 
 ## Types And Values
 
+### Source-Implementation Pointers
+
+Provider TypeScript uses a direct ABI that is independent of the product's
+canonical marker contract. For example, a provider implementation of:
+
+```go
+func Parse(text string) *Entry
+func Increment(value *int)
+```
+
+has source-implementation shapes equivalent to:
+
+```ts
+export function Parse(text: gostring): Entry | undefined;
+export function Increment(value: ProviderPointer<int> | undefined): void;
+```
+
+`Entry` is the location for `*Entry`; the scalar location is the certified
+`{ value: int }` carrier. A generated result boundary emits canonical intent:
+
+```ts
+const raw = provider.Parse(text);
+return raw === undefined
+  ? undefined
+  : bindPointer(raw, () => raw, value => EntryOperations.$assign(raw, value));
+```
+
+For `*int`, the closures read and write `raw.value`. This is canonical
+Tsonic-flavored TypeScript; GoToTS typechecks it but does not execute marker
+calls. TSTS finalizes the exact marker facts and the selected target lowers
+them before runtime execution. Provider source itself never imports or calls
+`bindPointer`, `loadPointer`, or `storePointer`.
+
 ### Basic Types
 
 Go basic identities map to GoToTS-owned aliases over TypeScript primitives.
@@ -938,9 +971,11 @@ exactly one entry or remain an explicit obligation.
 
 A project-selected source implementation replaces a coherent package contract,
 not isolated identifiers. It exports the exact selected package-assembly names
-and satisfies every target type demanded by generated consumers. Both the
-ordinary generated target set and the installed target set must pass strict
-TypeScript checking under the same final project configuration.
+and satisfies every target type demanded by generated consumers. GoToTS checks
+the authored project and structural replacement contract. TSTS strictly checks
+the installed canonical source with authoritative marker modules; the selected
+target strictly checks the complete lowered consumer graph. No bare GoToTS
+checker fabricates marker declarations to approximate either gate.
 Package-private storage and operation implementation may differ inside a
 declared equivalence envelope;
 that freedom does not extend to a source-visible callable ABI or to any type a

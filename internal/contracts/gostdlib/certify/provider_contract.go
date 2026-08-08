@@ -159,6 +159,7 @@ func readProviderPackage(config resolvedConfig) (packageDocument, error) {
 func verifyPackageModules(
 	document packageDocument,
 	providerScalarSubpath string,
+	providerPointerSubpath string,
 	seeds []moduleSeed,
 	facets []facetSeed,
 	profiles []providerCallableProfileSeed,
@@ -169,15 +170,31 @@ func verifyPackageModules(
 	expected := make(
 		map[string]packageExport,
 		len(seeds)+len(facets)+len(profiles)+len(statefulProfiles)+
-			len(providerInterfaces)+len(providerCapabilities)+1,
+			len(providerInterfaces)+len(providerCapabilities)+2,
 	)
-	providerScalarBase := strings.TrimSuffix(
-		strings.TrimPrefix(providerScalarSubpath, "./"),
-		".js",
-	)
-	expected[providerScalarSubpath] = packageExport{
-		Types:   "./dist/src/" + providerScalarBase + ".d.ts",
-		Default: "./dist/src/" + providerScalarBase + ".js",
+	for _, support := range []string{
+		providerScalarSubpath,
+		providerPointerSubpath,
+	} {
+		base := strings.TrimSuffix(strings.TrimPrefix(support, "./"), ".js")
+		if support == "" {
+			return certifyError(
+				"verify package exports",
+				support,
+				"provider support module is absent",
+			)
+		}
+		if _, duplicate := expected[support]; duplicate {
+			return certifyError(
+				"verify package exports",
+				support,
+				"provider support module is duplicated",
+			)
+		}
+		expected[support] = packageExport{
+			Types:   "./dist/src/" + base + ".d.ts",
+			Default: "./dist/src/" + base + ".js",
+		}
 	}
 	for _, seed := range seeds {
 		subpath, ok := providerSubpath(seed.Specifier)

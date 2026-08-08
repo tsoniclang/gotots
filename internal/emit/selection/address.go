@@ -180,7 +180,7 @@ func projectAddress(
 ) (api.ExpressionEmission, error) {
 	current := root
 	currentType := resolved.root
-	for _, field := range resolved.fields {
+	for index, field := range resolved.fields {
 		var err error
 		if _, _, _, pointer := pointerType(currentType); pointer {
 			current, currentType, err = loadAddressParent(
@@ -197,6 +197,16 @@ func projectAddress(
 		if !fieldInType(currentType, field) {
 			return api.ExpressionEmission{},
 				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		if index == len(resolved.fields)-1 {
+			return addressField(
+				context,
+				children,
+				source,
+				currentType,
+				current,
+				field,
+			)
 		}
 		current, err = joinNominalFieldCallableABI(
 			context,
@@ -239,23 +249,118 @@ func projectAddress(
 		}
 		currentType = field.Type()
 	}
-	if !types.Identical(currentType, resolved.effective) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	targetType, err := children.RepresentedType(
-		context.WithRole(api.RoleUnaryOperand),
-		source,
-		resolved.effective,
+	return api.ExpressionEmission{},
+		api.Unsupported(context, api.CategoryExpression, source)
+}
+
+func addressField(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	receiverType types.Type,
+	receiver api.ExpressionEmission,
+	field *types.Var,
+) (api.ExpressionEmission, error) {
+	receiver, err := joinNominalFieldCallableABI(
+		context,
+		receiverType,
+		field,
+		receiver,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return pointermarker.Operation(
+	providerAddress, providerOwned, err := providerboundary.AddressStructField(
+		context.WithRole(api.RoleUnaryOperand),
+		children,
+		source,
+		receiverType,
+		field,
+		receiver,
+	)
+	if err != nil || providerOwned {
+		return providerAddress, err
+	}
+	target, _, err := namedstructstorage.FieldTarget(
+		context.WithRole(api.RoleUnaryOperand),
+		source,
+		receiverType,
+		field,
+		receiver,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if !target.Valid() {
+		name, nameErr := context.Names().Member(field)
+		if nameErr != nil {
+			return api.ExpressionEmission{}, nameErr
+		}
+		target, err = api.NewPropertyStoreTargetEmission(
+			context.Factory(),
+			receiver,
+			name,
+			field.Type(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	if target.IsAccessor() {
+		return api.ExpressionEmission{}, api.Unsupported(
+			context,
+			api.CategoryExpression,
+			source,
+		)
+	}
+	target, err = target.CaptureLocation(context)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	logicalType, err := children.RepresentedType(
+		context.WithRole(api.RoleUnaryOperand),
+		source,
+		field.Type(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	addressType := logicalType
+	if target.UsesCanonicalStorage() {
+		addressType, err = context.Values().StorageType(
+			context.WithRole(api.RoleStorageType),
+			source,
+			field.Type(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	address, err := pointermarker.Operation(
 		context,
 		tsoniccore.SymbolAddressOf,
-		[]api.TypeEmission{targetType},
-		[]api.ExpressionEmission{current},
+		[]api.TypeEmission{addressType},
+		[]api.ExpressionEmission{api.DirectExpression(
+			target.Value(),
+			target.Requests()...,
+		)},
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	address, err = api.NewExpressionEmission(
+		append(target.Before(), address.Before()...),
+		address.Value(),
+		address.Requests(),
+	)
+	if err != nil || !target.UsesCanonicalStorage() {
+		return address, err
+	}
+	return context.Values().ProjectStoragePointer(
+		context.WithRole(api.RoleUnaryOperand),
+		source,
+		field.Type(),
+		address,
 	)
 }
 

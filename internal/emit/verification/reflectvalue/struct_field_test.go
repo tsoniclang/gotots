@@ -2,12 +2,12 @@ package reflectvalue_test
 
 import "testing"
 
-// TestReflectStructFieldMutationMatchesGo proves the addressable value
+// TestReflectStructFieldMutationCanonicalizesWithNativeEvidence covers the addressable value
 // location model: pointer Elem, struct NumField/Field, settability, field
 // mutation through original storage, IsZero, and SetString all match Go
 // exactly — the exact shape of the TS-Go compiler-options merge that first
 // blocked the generated product.
-func TestReflectStructFieldMutationMatchesGo(t *testing.T) {
+func TestReflectStructFieldMutationCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -63,7 +63,7 @@ func main() {
 	fmt.Println(fixture.Merge())
 }
 `
-	runReflectDifferential(
+	verifyReflectCanonical(
 		t,
 		source,
 		"Merge",

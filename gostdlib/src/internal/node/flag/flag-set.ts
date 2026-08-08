@@ -1,6 +1,5 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import { GoPointer } from "@gotots/runtime/pointer.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   Awaitable,
@@ -9,6 +8,10 @@ import type {
   int64,
 } from "@gotots/gostdlib/internal/scalars.js";
 import { ProviderError } from "../../runtime/error.js";
+import {
+  providerPointer,
+  type ProviderPointer,
+} from "../../runtime/pointer.js";
 import { sliceValues } from "../../runtime/slice.js";
 
 export interface ErrorHandlingValue {
@@ -21,12 +24,12 @@ export interface FlagSetValue {
 
 interface BooleanBinding {
   readonly kind: "boolean";
-  readonly pointer: GoPointer<bool, bool>;
+  readonly pointer: ProviderPointer<bool>;
 }
 
 interface StringBinding {
   readonly kind: "string";
-  readonly pointer: GoPointer<gostring, gostring>;
+  readonly pointer: ProviderPointer<gostring>;
 }
 
 interface FlagSetState {
@@ -54,9 +57,9 @@ export function booleanFlag(
   receiver: FlagSetValue | undefined,
   name: gostring,
   value: bool,
-): GoPointer<bool, bool> {
+): ProviderPointer<bool> {
   const state = requireFlagSet(receiver);
-  const pointer = GoPointer.cell<bool, bool>(value);
+  const pointer = providerPointer(value);
   add(state, name, {
     kind: "boolean",
     pointer,
@@ -68,9 +71,9 @@ export function stringFlag(
   receiver: FlagSetValue | undefined,
   name: gostring,
   value: gostring,
-): GoPointer<gostring, gostring> {
+): ProviderPointer<gostring> {
   const state = requireFlagSet(receiver);
-  const pointer = GoPointer.cell<gostring, gostring>(value);
+  const pointer = providerPointer(value);
   add(state, name, {
     kind: "string",
     pointer,

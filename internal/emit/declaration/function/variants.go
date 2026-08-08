@@ -220,7 +220,9 @@ func emitCallableVariant(
 		return callableVariantEmission{}, err
 	}
 	var body api.BlockEmission
-	if source.Body == nil {
+	if context.SourceImplementationContract() {
+		body, err = sourceImplementationContractBody(context, function)
+	} else if source.Body == nil {
 		body, err = emitExternalBody(
 			context,
 			children,
@@ -242,7 +244,7 @@ func emitCallableVariant(
 		return callableVariantEmission{}, err
 	}
 	var deferredBody api.BlockEmission
-	deferred := source.Body != nil &&
+	deferred := !context.SourceImplementationContract() && source.Body != nil &&
 		context.CallableControlFor(source).Recovery()
 	if deferred {
 		deferredBody, err = callable.EmitBody(
@@ -260,7 +262,7 @@ func emitCallableVariant(
 			return callableVariantEmission{}, err
 		}
 	}
-	if source.Body != nil && valueReceiver && copySelected {
+	if !context.SourceImplementationContract() && source.Body != nil && valueReceiver && copySelected {
 		body, err = prependValueReceiverCopy(
 			context,
 			children,

@@ -281,15 +281,23 @@ func wrapEnvironmentPackage(
 			Reason:  "environment package lacks coherent contract evidence",
 		}
 	}
+	modulePath := ""
+	moduleVersion := ""
+	if selected.Module != nil {
+		modulePath = selected.Module.Path
+		moduleVersion = selected.Module.Version
+	}
 	return &Package{
-		path:         selected.PkgPath,
-		name:         selected.Name,
-		contractKey:  contractKey,
-		kind:         kind,
-		fileSet:      selected.Fset,
-		typesPackage: selected.Types,
-		typesInfo:    &types.Info{},
-		typesSizes:   selected.TypesSizes,
+		path:          selected.PkgPath,
+		name:          selected.Name,
+		modulePath:    modulePath,
+		moduleVersion: moduleVersion,
+		contractKey:   contractKey,
+		kind:          kind,
+		fileSet:       selected.Fset,
+		typesPackage:  selected.Types,
+		typesInfo:     &types.Info{},
+		typesSizes:    selected.TypesSizes,
 	}, nil
 }
 

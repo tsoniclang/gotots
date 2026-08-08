@@ -353,6 +353,15 @@ type staticSpecializationValues struct {
 	value types.Type
 }
 
+func (staticSpecializationValues) Pointee(
+	api.Context,
+	ast.Node,
+	types.Type,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
 func (staticSpecializationValues) RequiresInitializerTypeAnnotation(
 	api.Context,
 	ast.Expr,
@@ -392,8 +401,8 @@ func (v staticSpecializationValues) SupportsHash(
 func (staticSpecializationValues) RequiresStorageProjection(
 	api.Context,
 	types.Type,
-) bool {
-	return false
+) (bool, error) {
+	return false, nil
 }
 
 func (v staticSpecializationValues) StorageType(
@@ -431,6 +440,15 @@ func (v staticSpecializationValues) ToStorage(
 }
 
 func (v staticSpecializationValues) FromStorage(
+	_ api.Context,
+	_ ast.Node,
+	_ types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	return value, nil
+}
+
+func (v staticSpecializationValues) ProjectStoragePointer(
 	_ api.Context,
 	_ ast.Node,
 	_ types.Type,
@@ -543,44 +561,5 @@ func (v staticSpecializationValues) Equal(
 				staticField(context, right, "y"),
 			),
 		),
-	), nil
-}
-
-func (v staticSpecializationValues) Hash(
-	context api.Context,
-	_ ast.Node,
-	sourceType types.Type,
-	value tsgo.Expression,
-) (api.ExpressionEmission, error) {
-	if sourceType != v.key {
-		panic("unexpected specialization hash type")
-	}
-	abi, err := api.NewScalarABIFromSizes(
-		context.IntegerRepresentation(),
-		context.TypesSizes(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	one, err := api.IntegerLiteral(
-		context.Factory(),
-		abi,
-		api.PrimitiveInt32,
-		"1",
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	hash := tsgo.Expression(context.Factory().BinaryExpression(
-		nil,
-		staticField(context, value, "x"),
-		nil,
-		context.Factory().BinaryOperatorToken(
-			tsgo.BinaryOperatorAmpersandToken,
-		),
-		one,
-	))
-	return api.DirectExpression(
-		hash,
 	), nil
 }

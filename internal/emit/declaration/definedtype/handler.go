@@ -129,12 +129,7 @@ func Emit(
 		return api.DeclarationEmission{}, true, err
 	}
 	typeParameters := parameters.Nodes()
-	logicalArguments := parameters.References()
 	valueType := underlying.Value()
-	classType := context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(name),
-		logicalArguments,
-	)
 	members := []tsgo.ClassElement{
 		context.Factory().PropertyDeclaration(
 			[]tsgo.ModifierLike{
@@ -183,7 +178,6 @@ func Emit(
 		markers, err = typefacet.Build(
 			context,
 			model.Type(),
-			classType,
 			storage.Value(),
 			representationFacets,
 			false,
