@@ -9,6 +9,7 @@ func TestReflectProviderStructAssignmentCanonicalizesWithNativeEvidence(t *testi
 	source := `package reflectvalue
 
 import (
+	"encoding/base32"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -109,9 +110,16 @@ func ProviderAssignments() string {
 		urlTarget.Host == "source.example" &&
 		urlTarget.Path == "/path" &&
 		urlTarget.RawQuery == "q=1"
+	base32Source := *base32.StdEncoding
+	base32Target := *base32.HexEncoding
+	base32Target = base32Source
+	base32Assigned := string(base32Target.AppendEncode(nil, []byte{0xff, 0xef})) ==
+		"77XQ====" &&
+		string(base32.HexEncoding.AppendEncode(nil, []byte{0xff, 0xef})) ==
+			"VVNG===="
 
 	return fmt.Sprintf(
-		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t regexp=%t url=%t",
+		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t regexp=%t url=%t base32=%t",
 		parseTarget.Layout,
 		parseTarget.Value,
 		parseTarget.LayoutElem,
@@ -132,6 +140,7 @@ func ProviderAssignments() string {
 		timerSourcePanicked,
 		regexpAssigned,
 		urlAssigned,
+		base32Assigned,
 	)
 }
 `
@@ -165,6 +174,7 @@ func main() {
 				"StringsBuilderOperations.$copy",
 				"RegexpValueOperations.$assign",
 				"NetUrlURLOperations.$assign",
+				"Base32EncodingOperations.$assign",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					relevant := make([]string, 0)

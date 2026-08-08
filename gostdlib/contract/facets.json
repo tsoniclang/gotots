@@ -1778,6 +1778,17 @@
     },
     {
       "kind": "named-struct-operations",
+      "sourceIdentity": "encoding/base32|kind=2|receiver=|name=Encoding",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base32.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base32.ts",
+      "export": "Base32EncodingOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
       "sourceIdentity": "encoding/base64|kind=2|receiver=|name=Encoding",
       "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
       "sourcePath": "src/internal/facets/provider-encoding-base64.ts",

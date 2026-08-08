@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "9607096f300ec90e473bf1f1ee2dfa8cef9f3467dce2de3fe413b1c8ef0e3eca",
+  "providerDigest": "47870c8e3a233a08eff4dea46fa8c759491df25f271fcab85186c147be90474d",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -1485,7 +1485,7 @@
           "targetFingerprint": "09ec2594df74c7076b18b25a6bab1746ce9254dbf0a4b6e44755bd733f0530c4",
           "disposition": "implemented",
           "implementationSites": [
-            "src/internal/portable/encoding/base32.ts#Encoding@82"
+            "src/internal/portable/encoding/base32.ts#Encoding@111"
           ]
         },
         {
@@ -1531,11 +1531,11 @@
           "targetFingerprint": "fb14fa753ae2fcd1cf1ee0b2eba5cbba7de5cfc4e0ce7e0f1df7fddb8d4d047e",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/encoding/base32.ts#requireEncoding@1233",
+            "src/internal/portable/encoding/base32.ts#requireEncoding@1347",
             "src/internal/runtime/slice.ts#sliceValues@19"
           ],
           "implementationSites": [
-            "src/internal/portable/encoding/base32.ts#AppendDecode@175"
+            "src/internal/portable/encoding/base32.ts#AppendDecode@289"
           ]
         },
         {
@@ -1551,11 +1551,11 @@
           "targetFingerprint": "0b5d29407c76ee075187ac68017e064638d9557ffd0c5fa330b95917c7b7f7ce",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/encoding/base32.ts#requireEncoding@1233",
+            "src/internal/portable/encoding/base32.ts#requireEncoding@1347",
             "src/internal/runtime/slice.ts#sliceValues@19"
           ],
           "implementationSites": [
-            "src/internal/portable/encoding/base32.ts#AppendEncode@247"
+            "src/internal/portable/encoding/base32.ts#AppendEncode@361"
           ]
         },
         {
@@ -1571,10 +1571,10 @@
           "targetFingerprint": "48cca67987566b965d733be00bb526a4e79f2406dd1cdc861fe837058ae2906f",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/encoding/base32.ts#requireEncoding@1233"
+            "src/internal/portable/encoding/base32.ts#requireEncoding@1347"
           ],
           "implementationSites": [
-            "src/internal/portable/encoding/base32.ts#EncodedLen@305"
+            "src/internal/portable/encoding/base32.ts#EncodedLen@419"
           ]
         }
       ]
@@ -21671,6 +21671,26 @@
       "facets": []
     },
     {
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base32.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base32.ts",
+      "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "encoding/base32|kind=2|receiver=|name=Encoding",
+          "capabilities": [
+            "assign",
+            "copy"
+          ],
+          "export": "Base32EncodingOperations",
+          "implementationOwner": "src/internal/facets/provider-encoding-base32.ts",
+          "targetFingerprint": "1a722ae4799da9c56e4351a4b9e56e0ea30030dc254fab895092a16b35b4fe8a",
+          "implementationSites": [
+            "src/internal/facets/provider-encoding-base32.ts#Base32EncodingOperations@19"
+          ]
+        }
+      ]
+    },
+    {
       "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
       "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
       "callableProfiles": [
@@ -27506,6 +27526,14 @@
       "disposition": "implemented"
     },
     {
+      "identity": "src/internal/facets/provider-encoding-base32.ts#Base32EncodingOperations@19",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/encoding/base32.ts#encodingRepresentationAssign@1443",
+        "src/internal/portable/encoding/base32.ts#encodingRepresentationCopy@1425"
+      ]
+    },
+    {
       "identity": "src/internal/facets/provider-encoding-base64.ts#Base64EncodingOperations@81",
       "disposition": "implemented",
       "dependencies": [
@@ -29738,7 +29766,29 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/encoding/base32.ts#requireEncoding@1233",
+      "identity": "src/internal/portable/encoding/base32.ts#assignEncoding@98",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/encoding/base32.ts#copyEncoding@85",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/encoding/base32.ts#encodingRepresentationAssign@1443",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/encoding/base32.ts#assignEncoding@98"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/encoding/base32.ts#encodingRepresentationCopy@1425",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/encoding/base32.ts#copyEncoding@85"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/encoding/base32.ts#requireEncoding@1347",
       "disposition": "implemented"
     },
     {
@@ -34502,5 +34552,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "d1866f3b18d67e22719fea5f7d42dabac525dae9b468de1a1af4ebd38f0146f9"
+  "manifestDigest": "1764b0d1848b362b8c703627b189ba347c6f804ad71b4cfd70b688ca91c69a13"
 }

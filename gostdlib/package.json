@@ -184,6 +184,10 @@
       "types": "./dist/src/internal/facets/provider-encoding-base64.d.ts",
       "default": "./dist/src/internal/facets/provider-encoding-base64.js"
     },
+    "./internal/facets/provider-encoding-base32.js": {
+      "types": "./dist/src/internal/facets/provider-encoding-base32.d.ts",
+      "default": "./dist/src/internal/facets/provider-encoding-base32.js"
+    },
     "./internal/facets/provider-io-read.js": {
       "types": "./dist/src/internal/facets/provider-io-read.d.ts",
       "default": "./dist/src/internal/facets/provider-io-read.js"
