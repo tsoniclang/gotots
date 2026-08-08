@@ -1,9 +1,34 @@
 package emit
 
 import (
+	"go/types"
+
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 )
+
+func sourceArtifactOwnerOrder(
+	sites map[types.Object]declarationSite,
+) func(api.ArtifactOwner, api.ArtifactOwner) int {
+	return func(left api.ArtifactOwner, right api.ArtifactOwner) int {
+		leftObject, leftSource := left.Source()
+		rightObject, rightSource := right.Source()
+		if leftSource && rightSource {
+			leftSite, leftIndexed := sites[leftObject]
+			rightSite, rightIndexed := sites[rightObject]
+			if leftIndexed && rightIndexed {
+				if order := declarationindex.CompareSites(
+					leftSite,
+					rightSite,
+				); order != 0 {
+					return order
+				}
+			}
+		}
+		return emitordering.CompareArtifactOwners(left, right)
+	}
+}
 
 func compareDeclarationRequirements(
 	left api.DeclarationRequirement,

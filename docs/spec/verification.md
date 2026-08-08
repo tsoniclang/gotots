@@ -821,7 +821,12 @@ a public package value and an unrelated private type must retain the public
 observable contract while producing no selected-package storage/body and no
 adapter/helper requested only by the ordinary implementation. A second fixture
 with a genuine final private-type consumer must retain exactly its body-free
-private contract. Required mutations share a registry or artifact graph across
+private contract. A multi-bundle fixture selects at least two source packages,
+rebinds both consumer sets, removes both generated package module sets, and
+installs both authored assemblies. A mutation that installs the first authored
+official AST before rebinding the second must fail the lifecycle gate; the
+compiler may never traverse an authored output artifact as transformation
+input. Required mutations share a registry or artifact graph across
 sessions, copy an implementation facet or dependency into the final snapshot,
 emit one selected-package source body, omit a demanded observable contract,
 retain one ordinary generated support declaration, or install replacement only

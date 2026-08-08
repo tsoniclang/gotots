@@ -331,7 +331,9 @@ Performance work proceeds in measured owner order:
    observable selected-package contracts, discard all mutable session state,
    then settle a fresh final session in which selected-package requests publish
    contracts but never source bodies, storage, initializers, dependencies, or
-   target declarations;
+   target declarations; rebind every selected bundle while all files remain
+   compiler-owned inspectable ASTs, then remove every selected generated module
+   set and install every authored opaque AST as one transaction;
 3. prove concrete implementation bundles and product equivalence evidence are
    owned by the consuming project rather than shipped as GoToTS policy;
 4. place executable-representation optimizations in the selected target, keyed

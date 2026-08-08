@@ -1184,9 +1184,15 @@ traversed for body translation in this session. The shared checked program may
 be read only to index top-level declaration identity, reserve canonical names,
 and locate a captured source owner; none of those operations emits a request or
 representation. Therefore only demands originating in the final graph can
-create shared support artifacts. The authored package is installed
-atomically after final quiescence, while the first session's ordinary target
-set remains certification evidence. For example, `ErrOverflow` retains its
+create shared support artifacts. All selected source-implementation bundles
+form one replacement transaction. After final quiescence, every public
+consumer is rebound while the complete final file set still consists only of
+compiler-owned, inspectable TS-Go ASTs. Only after every bundle has been
+rebound may the compiler remove all selected generated package module sets and
+install all authored opaque TS-Go ASTs. Installing one authored bundle before
+rebinding another is forbidden: an authored official source file is an output
+artifact, not input to a later compiler transformation. The first session's
+ordinary target set remains certification evidence. For example, `ErrOverflow` retains its
 exact value contract without generated storage, while a private `worker`
 reflection descriptor requested only by the discarded ordinary implementation
 cannot enter the final graph. A genuine final consumer of a private type must
@@ -1204,7 +1210,7 @@ types under the authoritative virtual marker modules. For example, Go
 `Read(Pointer<int> | undefined): int`; authored `Read(number): number` is a
 target-specific optimization and is rejected at this canonical boundary.
 
-The authored module set contains exactly one executable package assembly.
+Each authored bundle contains exactly one executable package assembly.
 Surviving imports of its public exports are rebound to that assembly in the
 typed target AST. The set may additionally contain only the finite body-free
 private contract modules still named by generated support artifacts. Each

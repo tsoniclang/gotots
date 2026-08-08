@@ -10,12 +10,11 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
-	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/emit/sourcepackage"
+	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -28,12 +27,19 @@ func (s *programSession) replaceSourceImplementations(
 			Reason: "source implementation replacement has no certificate",
 		}
 	}
-	replaced := slices.Clone(files)
+	type selectedImplementation struct {
+		implementation sourceimplementation.Implementation
+		sourcePackage  *load.Package
+		paths          sourcepackage.Paths
+	}
+	selected := make([]selectedImplementation, 0, len(s.sourceImplementations.Implementations()))
 	contractPackages := make(
 		[]sourceimplementation.PackageTarget,
 		0,
 		len(s.sourceImplementations.Implementations()),
 	)
+	ownedPaths := make(map[string]string)
+	assemblyPaths := make(map[string]string)
 	for _, implementation := range s.sourceImplementations.Implementations() {
 		sourcePackage := s.source.PackageByPath(implementation.PackagePath())
 		paths, err := sourcepackage.ResolvePaths(sourcePackage)
@@ -48,66 +54,98 @@ func (s *programSession) replaceSourceImplementations(
 			return nil, sourceImplementationError(implementation.PackagePath(), err)
 		}
 		contractPackages = append(contractPackages, contractPackage)
-		consumers := make([]sourcepackage.Consumer, len(replaced))
-		for index, file := range replaced {
-			consumers[index] = sourcepackage.Consumer{
-				OutputPath: file.outputPath,
-				SourceFile: file.sourceFile,
+		assemblyPaths[implementation.PackagePath()] = paths.AssemblyPath()
+		selected = append(selected, selectedImplementation{
+			implementation: implementation,
+			sourcePackage:  sourcePackage,
+			paths:          paths,
+		})
+		for _, outputPath := range paths.OwnedPaths() {
+			if owner := ownedPaths[outputPath]; owner != "" {
+				return nil, sourceImplementationError(
+					implementation.PackagePath(),
+					fmt.Errorf("target path %q is also owned by %q", outputPath, owner),
+				)
 			}
+			ownedPaths[outputPath] = implementation.PackagePath()
 		}
+	}
+	replaced := slices.Clone(files)
+	consumers := make([]sourcepackage.Consumer, len(replaced))
+	for index, file := range replaced {
+		consumers[index] = sourcepackage.Consumer{
+			OutputPath: file.outputPath,
+			SourceFile: file.sourceFile,
+		}
+	}
+	for _, replacement := range selected {
+		var err error
 		consumers, err = sourcepackage.RebindConsumers(
 			s.factory,
-			paths,
-			implementation,
+			replacement.paths,
+			replacement.implementation,
 			consumers,
 		)
 		if err != nil {
-			return nil, sourceImplementationError(implementation.PackagePath(), err)
+			return nil, sourceImplementationError(
+				replacement.implementation.PackagePath(),
+				err,
+			)
 		}
-		for index := range replaced {
-			replaced[index].sourceFile = consumers[index].SourceFile
+	}
+	for index := range replaced {
+		replaced[index].sourceFile = consumers[index].SourceFile
+	}
+	assemblyFound := make(map[string]bool, len(selected))
+	filtered := make([]TargetFile, 0, len(replaced))
+	for _, file := range replaced {
+		packagePath := ownedPaths[file.outputPath]
+		if packagePath == "" {
+			filtered = append(filtered, file)
+			continue
 		}
-		filtered := make([]TargetFile, 0, len(replaced))
-		assemblyFound := false
-		for _, file := range replaced {
-			if !paths.Owns(file.outputPath) {
-				filtered = append(filtered, file)
-				continue
-			}
-			if file.outputPath != paths.AssemblyPath() {
-				continue
-			}
-			if assemblyFound || file.kind != TargetFilePackageAssembly {
-				return nil, sourceImplementationError(
-					implementation.PackagePath(),
-					fmt.Errorf("generated package assembly ownership is invalid"),
-				)
-			}
-			assemblyFound = true
+		if file.outputPath != assemblyPaths[packagePath] {
+			continue
 		}
-		if !assemblyFound {
+		if assemblyFound[packagePath] || file.kind != TargetFilePackageAssembly {
+			return nil, sourceImplementationError(
+				packagePath,
+				fmt.Errorf("generated package assembly ownership is invalid"),
+			)
+		}
+		assemblyFound[packagePath] = true
+	}
+	for _, replacement := range selected {
+		implementation := replacement.implementation
+		if !assemblyFound[implementation.PackagePath()] {
 			return nil, sourceImplementationError(
 				implementation.PackagePath(),
 				fmt.Errorf("generated package assembly is absent"),
 			)
 		}
 		filtered = append(filtered, TargetFile{
-			outputPath:  paths.AssemblyPath(),
-			packageName: sourcePackage.Name(),
+			outputPath:  replacement.paths.AssemblyPath(),
+			packageName: replacement.sourcePackage.Name(),
 			sourceFile:  implementation.SourceFile(),
 			kind:        TargetFileSourceImplementation,
 		})
 		for _, module := range implementation.PrivateModules() {
-			outputPath, _ := paths.SourcePath(module.GoFile())
+			outputPath, ok := replacement.paths.SourcePath(module.GoFile())
+			if !ok {
+				return nil, sourceImplementationError(
+					implementation.PackagePath(),
+					fmt.Errorf("private module %q lost its source identity", module.GoFile()),
+				)
+			}
 			filtered = append(filtered, TargetFile{
 				outputPath:  outputPath,
-				packageName: sourcePackage.Name(),
+				packageName: replacement.sourcePackage.Name(),
 				sourceFile:  module.SourceFile(),
 				kind:        TargetFileSourceImplementation,
 			})
 		}
-		replaced = filtered
 	}
+	replaced = filtered
 	installedContracts, err := sourceImplementationTargets(replaced)
 	if err != nil {
 		return nil, err
@@ -143,28 +181,6 @@ func sourceImplementationError(packagePath string, cause error) error {
 	return &ScheduleError{
 		Object: packagePath,
 		Reason: "install source implementation: " + cause.Error(),
-	}
-}
-
-func sourceArtifactOwnerOrder(
-	sites map[types.Object]declarationSite,
-) func(api.ArtifactOwner, api.ArtifactOwner) int {
-	return func(left api.ArtifactOwner, right api.ArtifactOwner) int {
-		leftObject, leftSource := left.Source()
-		rightObject, rightSource := right.Source()
-		if leftSource && rightSource {
-			leftSite, leftIndexed := sites[leftObject]
-			rightSite, rightIndexed := sites[rightObject]
-			if leftIndexed && rightIndexed {
-				if order := declarationindex.CompareSites(
-					leftSite,
-					rightSite,
-				); order != 0 {
-					return order
-				}
-			}
-		}
-		return emitordering.CompareArtifactOwners(left, right)
 	}
 }
 

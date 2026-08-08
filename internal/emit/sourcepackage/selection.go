@@ -72,3 +72,12 @@ func (p Paths) SourcePaths() []string {
 	sort.Strings(result)
 	return result
 }
+
+func (p Paths) OwnedPaths() []string {
+	result := make([]string, 0, len(p.owned))
+	for outputPath := range p.owned {
+		result = append(result, outputPath)
+	}
+	sort.Strings(result)
+	return result
+}
