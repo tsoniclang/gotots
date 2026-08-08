@@ -1901,6 +1901,17 @@
     },
     {
       "kind": "named-struct-operations",
+      "sourceIdentity": "os/exec|kind=2|receiver=|name=Cmd",
+      "specifier": "@gotots/gostdlib/internal/facets/named-os-exec.js",
+      "sourcePath": "src/internal/facets/named-os-exec.ts",
+      "export": "OsExecCmdOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
       "sourceIdentity": "runtime|kind=2|receiver=|name=MemStats",
       "specifier": "@gotots/gostdlib/internal/facets/named-runtime.js",
       "sourcePath": "src/internal/facets/named-runtime.ts",

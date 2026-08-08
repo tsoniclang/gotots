@@ -132,6 +132,10 @@
       "types": "./dist/src/internal/facets/named-os.d.ts",
       "default": "./dist/src/internal/facets/named-os.js"
     },
+    "./internal/facets/named-os-exec.js": {
+      "types": "./dist/src/internal/facets/named-os-exec.d.ts",
+      "default": "./dist/src/internal/facets/named-os-exec.js"
+    },
     "./internal/facets/named-runtime-metrics.js": {
       "types": "./dist/src/internal/facets/named-runtime-metrics.d.ts",
       "default": "./dist/src/internal/facets/named-runtime-metrics.js"

@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "9a4040e45223dcb91c9cc2d6af1fbae26177525dfab6313dd67f594ebc0a664b",
+  "providerDigest": "8ac2817cb47e9bb23176812e9328d0145e37f1ecc129453500ec0dbd18b399be",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -19424,6 +19424,26 @@
       ]
     },
     {
+      "specifier": "@gotots/gostdlib/internal/facets/named-os-exec.js",
+      "sourcePath": "src/internal/facets/named-os-exec.ts",
+      "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "os/exec|kind=2|receiver=|name=Cmd",
+          "capabilities": [
+            "assign",
+            "copy"
+          ],
+          "export": "OsExecCmdOperations",
+          "implementationOwner": "src/internal/facets/named-os-exec.ts",
+          "targetFingerprint": "723460ef6135ccb2132b43dcc9f68b4fe19bdf6091da0762e2588a37b8873df6",
+          "implementationSites": [
+            "src/internal/facets/named-os-exec.ts#OsExecCmdOperations@10"
+          ]
+        }
+      ]
+    },
+    {
       "specifier": "@gotots/gostdlib/internal/facets/named-os.js",
       "sourcePath": "src/internal/facets/named-os.ts",
       "facets": [
@@ -26376,6 +26396,27 @@
     {
       "identity": "src/internal/facets/named-net-url.ts#NetUrlURLOperations@16",
       "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/facets/named-os-exec.ts#OsExecCmdOperations@10",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/os/exec.ts#Args@88",
+        "src/os/exec.ts#Cancel@200",
+        "src/os/exec.ts#Cmd@78",
+        "src/os/exec.ts#Dir@118",
+        "src/os/exec.ts#Env@103",
+        "src/os/exec.ts#Err@192",
+        "src/os/exec.ts#ExtraFiles@147",
+        "src/os/exec.ts#Path@83",
+        "src/os/exec.ts#Process@176",
+        "src/os/exec.ts#ProcessState@184",
+        "src/os/exec.ts#Stderr@139",
+        "src/os/exec.ts#Stdin@123",
+        "src/os/exec.ts#Stdout@131",
+        "src/os/exec.ts#SysProcAttr@168",
+        "src/os/exec.ts#WaitDelay@217"
+      ]
     },
     {
       "identity": "src/internal/facets/named-os.ts#OsFileOperations@21",
@@ -33551,8 +33592,59 @@
       "disposition": "implemented"
     },
     {
+      "identity": "src/os/exec.ts#Cancel@200",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/os/exec.ts#Dir@118",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/os/exec.ts#Env@103",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/os/exec.ts#Err@192",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/os/exec.ts#ExtraFiles@147",
+      "disposition": "implemented"
+    },
+    {
       "identity": "src/os/exec.ts#Path@83",
       "disposition": "implemented"
+    },
+    {
+      "identity": "src/os/exec.ts#Process@176",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/os/exec.ts#ProcessState@184",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/os/exec.ts#Stderr@139",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/os/exec.ts#Stdin@123",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/os/exec.ts#Stdout@131",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/os/exec.ts#SysProcAttr@168",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/os/exec.ts#WaitDelay@217",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/time.ts#Duration@6"
+      ]
     },
     {
       "identity": "src/path.ts#Join@6",
@@ -34219,5 +34311,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "5b2560e931fb70b5a1291e4442bc722fc26a654faede07c55ca56dc5caa236b4"
+  "manifestDigest": "10746102f14bc7f861acfadb2150858e0e4a0682ed8473afc72c05633317f66b"
 }
