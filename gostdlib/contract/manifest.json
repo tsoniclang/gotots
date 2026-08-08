@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "34527df261a1aa6781607747e4afd73816086f5468f084bc256b78d43d76630c",
+  "providerDigest": "1d6773085925ea4e4b49ebeff877173fc82d414d6ec3bc68e30d4404de781af6",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -50,7 +50,7 @@
           "dependencies": [
             "src/bufio.ts#ioState@61",
             "src/bufio.ts#state@548",
-            "src/internal/portable/io/scanner.ts#ProviderScanner@591"
+            "src/internal/portable/io/scanner.ts#ProviderScanner@759"
           ],
           "implementationSites": [
             "src/bufio.ts#Scanner@380"
@@ -176,7 +176,7 @@
           "disposition": "implemented",
           "dependencies": [
             "src/bufio.ts#requireScanner@513",
-            "src/internal/portable/io/scanner.ts#Err@660"
+            "src/internal/portable/io/scanner.ts#Err@828"
           ],
           "implementationSites": [
             "src/bufio.ts#Err@429"
@@ -196,7 +196,7 @@
           "disposition": "implemented",
           "dependencies": [
             "src/bufio.ts#requireScanner@513",
-            "src/internal/portable/io/scanner.ts#Scan@678"
+            "src/internal/portable/io/scanner.ts#Scan@846"
           ],
           "implementationSites": [
             "src/bufio.ts#Scan@459"
@@ -216,7 +216,7 @@
           "disposition": "implemented",
           "dependencies": [
             "src/bufio.ts#requireScanner@513",
-            "src/internal/portable/io/scanner.ts#Text@749"
+            "src/internal/portable/io/scanner.ts#Text@917"
           ],
           "implementationSites": [
             "src/bufio.ts#Text@486"
@@ -20409,7 +20409,7 @@
             "io|kind=2|receiver=|name=Reader"
           ],
           "implementationSites": [
-            "src/internal/facets/provider-bufio-scanner.ts#NewScannerCanonical@361"
+            "src/internal/facets/provider-bufio-scanner.ts#NewScannerCanonical@676"
           ],
           "interfaces": [
             {
@@ -20513,6 +20513,10 @@
             "go:universe|error",
             "io|kind=2|receiver=|name=Reader"
           ],
+          "operations": [
+            "assign",
+            "copy"
+          ],
           "fields": [],
           "methods": [
             {
@@ -20547,13 +20551,28 @@
             }
           ],
           "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
-          "targetFingerprint": "a2cb0bbe3c9b93a0ab013496681749e366a25e4b7ad5eef13dac2b8978d98cbf",
+          "targetFingerprint": "c64cd2462a38cbd92af27641a5c4d581ae507ba04ed71b11ff51a51e8548bb38",
           "implementationSites": [
             "src/internal/facets/provider-bufio-scanner.ts#CanonicalBufioScanner@50"
           ]
         }
       ],
-      "facets": []
+      "facets": [
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+          "capabilities": [
+            "assign",
+            "copy"
+          ],
+          "export": "BufioScannerOperations",
+          "implementationOwner": "src/internal/facets/provider-bufio-scanner.ts",
+          "targetFingerprint": "bc8a8f9339a2d454d894385c4ee1030a1666dda0f16a0a91b762d2bff85f6de7",
+          "implementationSites": [
+            "src/internal/facets/provider-bufio-scanner.ts#BufioScannerOperations@583"
+          ]
+        }
+      ]
     },
     {
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
@@ -27019,36 +27038,61 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-bufio-scanner.ts#CanonicalBufioScanner@50",
+      "identity": "src/internal/facets/provider-bufio-scanner.ts#$assign@245",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/provider-bufio-scanner.ts#requireScanner@509",
-        "src/internal/facets/provider-bufio-scanner.ts#requireSource@476",
-        "src/internal/portable/io/scanner.ts#AcceptRead@398",
-        "src/internal/portable/io/scanner.ts#Err@162",
-        "src/internal/portable/io/scanner.ts#Next@187",
-        "src/internal/portable/io/scanner.ts#ScannerState@86",
-        "src/internal/portable/io/scanner.ts#Text@176"
+        "src/internal/portable/io/scanner.ts#copy@178"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-bufio-scanner.ts#NewScannerCanonical@361",
+      "identity": "src/internal/facets/provider-bufio-scanner.ts#$copy@172",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/facets/provider-bufio-scanner.ts#CanonicalBufioScanner@50",
-        "src/internal/facets/provider-bufio-scanner.ts#requireFailure@443"
+        "src/internal/portable/io/scanner.ts#copy@178"
       ]
     },
     {
-      "identity": "src/internal/facets/provider-bufio-scanner.ts#requireFailure@443",
+      "identity": "src/internal/facets/provider-bufio-scanner.ts#BufioScannerOperations@583",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-bufio-scanner.ts#$assign@245",
+        "src/internal/facets/provider-bufio-scanner.ts#$copy@172",
+        "src/internal/facets/provider-bufio-scanner.ts#CanonicalBufioScanner@50"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-bufio-scanner.ts#CanonicalBufioScanner@50",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-bufio-scanner.ts#requireScanner@824",
+        "src/internal/facets/provider-bufio-scanner.ts#requireSource@791",
+        "src/internal/portable/io/scanner.ts#AcceptRead@554",
+        "src/internal/portable/io/scanner.ts#Err@276",
+        "src/internal/portable/io/scanner.ts#Next@301",
+        "src/internal/portable/io/scanner.ts#ScannerState@86",
+        "src/internal/portable/io/scanner.ts#Text@290",
+        "src/internal/portable/io/scanner.ts#copy@178"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-bufio-scanner.ts#NewScannerCanonical@676",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/facets/provider-bufio-scanner.ts#CanonicalBufioScanner@50",
+        "src/internal/facets/provider-bufio-scanner.ts#requireFailure@758"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/provider-bufio-scanner.ts#requireFailure@758",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-bufio-scanner.ts#requireScanner@509",
+      "identity": "src/internal/facets/provider-bufio-scanner.ts#requireScanner@824",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/provider-bufio-scanner.ts#requireSource@476",
+      "identity": "src/internal/facets/provider-bufio-scanner.ts#requireSource@791",
       "disposition": "implemented"
     },
     {
@@ -30495,56 +30539,56 @@
       ]
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#AcceptRead@398",
+      "identity": "src/internal/portable/io/scanner.ts#AcceptRead@554",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
-        "src/internal/portable/io/scanner.ts#badReadCount@132",
-        "src/internal/portable/io/scanner.ts#noProgress@153"
+        "src/internal/portable/io/scanner.ts#badReadCount@134",
+        "src/internal/portable/io/scanner.ts#noProgress@155"
       ]
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#Err@162",
+      "identity": "src/internal/portable/io/scanner.ts#Err@276",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#Err@660",
+      "identity": "src/internal/portable/io/scanner.ts#Err@828",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/io/scanner.ts#Err@162"
+        "src/internal/portable/io/scanner.ts#Err@276"
       ]
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#Next@187",
+      "identity": "src/internal/portable/io/scanner.ts#Next@301",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/io/scanner.ts#eof@146",
-        "src/internal/portable/io/scanner.ts#scanLine@788",
-        "src/internal/portable/io/scanner.ts#scannerReadBuffer@764",
-        "src/internal/portable/io/scanner.ts#tooLong@139",
+        "src/internal/portable/io/scanner.ts#eof@148",
+        "src/internal/portable/io/scanner.ts#scanLine@956",
+        "src/internal/portable/io/scanner.ts#scannerReadBuffer@932",
+        "src/internal/portable/io/scanner.ts#tooLong@141",
         "src/internal/runtime/interface.ts#goInterfaceEqual@10"
       ]
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#ProviderScanner@591",
+      "identity": "src/internal/portable/io/scanner.ts#ProviderScanner@759",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/io/scanner.ts#AcceptRead@398",
-        "src/internal/portable/io/scanner.ts#Err@162",
-        "src/internal/portable/io/scanner.ts#Next@187",
+        "src/internal/portable/io/scanner.ts#AcceptRead@554",
+        "src/internal/portable/io/scanner.ts#Err@276",
+        "src/internal/portable/io/scanner.ts#Next@301",
         "src/internal/portable/io/scanner.ts#ScannerState@86",
-        "src/internal/portable/io/scanner.ts#Text@176",
-        "src/internal/portable/io/scanner.ts#requireSource@883"
+        "src/internal/portable/io/scanner.ts#Text@290",
+        "src/internal/portable/io/scanner.ts#requireSource@1051"
       ]
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#Scan@678",
+      "identity": "src/internal/portable/io/scanner.ts#Scan@846",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/io/scanner.ts#AcceptRead@398",
-        "src/internal/portable/io/scanner.ts#Next@187",
-        "src/internal/portable/io/scanner.ts#requireSource@883",
-        "src/internal/portable/io/scanner.ts#source@619"
+        "src/internal/portable/io/scanner.ts#AcceptRead@554",
+        "src/internal/portable/io/scanner.ts#Next@301",
+        "src/internal/portable/io/scanner.ts#requireSource@1051",
+        "src/internal/portable/io/scanner.ts#source@787"
       ]
     },
     {
@@ -30552,52 +30596,63 @@
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
-        "src/internal/portable/io/scanner.ts#scanLine@788",
-        "src/internal/portable/io/scanner.ts#scannerReadBuffer@764",
+        "src/internal/portable/io/scanner.ts#scanLine@956",
+        "src/internal/portable/io/scanner.ts#scannerReadBuffer@932",
         "src/internal/runtime/interface.ts#goInterfaceEqual@10"
       ]
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#Text@176",
+      "identity": "src/internal/portable/io/scanner.ts#Text@290",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#Text@749",
+      "identity": "src/internal/portable/io/scanner.ts#Text@917",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/io/scanner.ts#Text@176"
+        "src/internal/portable/io/scanner.ts#Text@290"
       ]
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#badReadCount@132",
+      "identity": "src/internal/portable/io/scanner.ts#badReadCount@134",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#eof@146",
+      "identity": "src/internal/portable/io/scanner.ts#copy@178",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/io/scanner.ts#ScannerState@86",
+        "src/internal/portable/io/scanner.ts#badReadCount@134",
+        "src/internal/portable/io/scanner.ts#eof@148",
+        "src/internal/portable/io/scanner.ts#noProgress@155",
+        "src/internal/portable/io/scanner.ts#tooLong@141"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/io/scanner.ts#eof@148",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#noProgress@153",
+      "identity": "src/internal/portable/io/scanner.ts#noProgress@155",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#requireSource@883",
+      "identity": "src/internal/portable/io/scanner.ts#requireSource@1051",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#scanLine@788",
+      "identity": "src/internal/portable/io/scanner.ts#scanLine@956",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#scannerReadBuffer@764",
+      "identity": "src/internal/portable/io/scanner.ts#scannerReadBuffer@932",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#source@619",
+      "identity": "src/internal/portable/io/scanner.ts#source@787",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/io/scanner.ts#tooLong@139",
+      "identity": "src/internal/portable/io/scanner.ts#tooLong@141",
       "disposition": "implemented"
     },
     {
@@ -34596,5 +34651,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "7673511a90a3b9569662824c424b25cbfce26deeed251235c1db8eaa4be5f60e"
+  "manifestDigest": "acdbf016bd90e2fa05976af5bac215e9a2bc7c34a2fcb43bcd67e5a1e061cffc"
 }

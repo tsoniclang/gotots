@@ -17,16 +17,52 @@ export class CanonicalBufioScanner<
   Failure extends GoInterfaceValue,
   Source extends CanonicalReader<Failure>,
 > {
-  readonly #state: ScannerState<Failure>;
+  #badReadCount: Failure;
+  #eof: Failure;
+  #noProgress: Failure;
+  #source: Source | undefined;
+  #state: ScannerState<Failure>;
+  #tooLong: Failure;
 
   constructor(
-    private readonly source: Source | undefined,
+    source: Source | undefined,
     badReadCount: Failure,
     tooLong: Failure,
     eof: Failure,
     noProgress: Failure,
   ) {
+    this.#badReadCount = badReadCount;
+    this.#tooLong = tooLong;
+    this.#eof = eof;
+    this.#noProgress = noProgress;
+    this.#source = source;
     this.#state = new ScannerState(badReadCount, tooLong, eof, noProgress);
+  }
+
+  static $copy<Failure extends GoInterfaceValue, Source extends CanonicalReader<Failure>>(
+    source: CanonicalBufioScanner<Failure, Source>,
+  ): CanonicalBufioScanner<Failure, Source> {
+    const target = new CanonicalBufioScanner(
+      source.#source,
+      source.#badReadCount,
+      source.#tooLong,
+      source.#eof,
+      source.#noProgress,
+    );
+    target.#state = source.#state.copy();
+    return target;
+  }
+
+  static $assign<Failure extends GoInterfaceValue, Source extends CanonicalReader<Failure>>(
+    target: CanonicalBufioScanner<Failure, Source>,
+    source: CanonicalBufioScanner<Failure, Source>,
+  ): void {
+    target.#badReadCount = source.#badReadCount;
+    target.#tooLong = source.#tooLong;
+    target.#eof = source.#eof;
+    target.#noProgress = source.#noProgress;
+    target.#source = source.#source;
+    target.#state = source.#state.copy();
   }
 
   static Err<Failure extends GoInterfaceValue, Source extends CanonicalReader<Failure>>(
@@ -57,13 +93,34 @@ export class CanonicalBufioScanner<
       if (step.kind === "result") {
         return step.value;
       }
-      const [count, failure] = await requireSource(this.source).Read(step.target);
+      const [count, failure] = await requireSource(this.#source).Read(step.target);
       this.#state.AcceptRead(step.target, count, failure);
     }
   }
 
   Text(): gostring {
     return this.#state.Text();
+  }
+}
+
+export class BufioScannerOperations {
+  static $copy<
+    Failure extends GoInterfaceValue,
+    Source extends CanonicalReader<Failure>,
+  >(
+    source: CanonicalBufioScanner<Failure, Source>,
+  ): CanonicalBufioScanner<Failure, Source> {
+    return CanonicalBufioScanner.$copy(source);
+  }
+
+  static $assign<
+    Failure extends GoInterfaceValue,
+    Source extends CanonicalReader<Failure>,
+  >(
+    target: CanonicalBufioScanner<Failure, Source>,
+    source: CanonicalBufioScanner<Failure, Source>,
+  ): void {
+    CanonicalBufioScanner.$assign(target, source);
   }
 }
 

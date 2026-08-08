@@ -1,6 +1,7 @@
 package reflectvalue_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -9,6 +10,7 @@ func TestReflectProviderStructAssignmentCanonicalizesWithNativeEvidence(t *testi
 	source := `package reflectvalue
 
 import (
+	"bufio"
 	"encoding/base32"
 	"fmt"
 	"net/url"
@@ -121,9 +123,15 @@ func ProviderAssignments() string {
 	replacerTarget := *strings.NewReplacer("a", "target")
 	replacerTarget = replacerSource
 	replacerAssigned := replacerTarget.Replace("a") == "source"
+	scannerSource := bufio.NewScanner(strings.NewReader("one\ntwo\n"))
+	scannerTarget := bufio.NewScanner(strings.NewReader("target\n"))
+	*scannerTarget = *scannerSource
+	scannerTargetFirst := scannerTarget.Scan() && scannerTarget.Text() == "one"
+	scannerSourceExhausted := !scannerSource.Scan()
+	scannerTargetSecond := scannerTarget.Scan() && scannerTarget.Text() == "two"
 
 	return fmt.Sprintf(
-		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t regexp=%t url=%t base32=%t replacer=%t",
+		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t regexp=%t url=%t base32=%t replacer=%t scanner=%t/%t/%t",
 		parseTarget.Layout,
 		parseTarget.Value,
 		parseTarget.LayoutElem,
@@ -146,6 +154,9 @@ func ProviderAssignments() string {
 		urlAssigned,
 		base32Assigned,
 		replacerAssigned,
+		scannerTargetFirst,
+		scannerSourceExhausted,
+		scannerTargetSecond,
 	)
 }
 `
@@ -196,6 +207,12 @@ func main() {
 						strings.Join(relevant, "\n"),
 					)
 				}
+			}
+			if !regexp.MustCompile(
+				`\$goProviderState_[0-9a-f]+\.\$assign`,
+			).MatchString(artifacts.printed) ||
+				!strings.Contains(artifacts.printed, "CanonicalBufioScanner") {
+				t.Fatalf("scanner assignment lacks its canonical provider state operation")
 			}
 		},
 	)

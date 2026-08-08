@@ -1455,6 +1455,10 @@
       "typeArguments": [
         "go:universe|error",
         "io|kind=2|receiver=|name=Reader"
+      ],
+      "operations": [
+        "assign",
+        "copy"
       ]
     },
     {
@@ -1738,6 +1742,17 @@
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-reader.js",
       "sourcePath": "src/internal/facets/provider-bufio-reader.ts",
       "export": "BufioReaderOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "BufioScannerOperations",
       "capabilities": [
         "assign",
         "copy"

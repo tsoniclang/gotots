@@ -11,11 +11,13 @@ type ScannerStep =
   | { readonly kind: "read"; readonly target: RuntimeSlice<uint8> };
 
 export class ScannerState<Failure extends GoInterfaceValue> {
-  readonly #buffer: uint8[] = [];
+  #buffer: uint8[];
   #done = false;
   #emptyReads = 0;
+  #end = 0;
   #failure: Failure | undefined;
   #pendingFailure: Failure | undefined;
+  #start = 0;
   #token: gostring = "";
 
   constructor(
@@ -23,7 +25,28 @@ export class ScannerState<Failure extends GoInterfaceValue> {
     private readonly tooLong: Failure,
     private readonly eof: Failure,
     private readonly noProgress: Failure,
-  ) {}
+    buffer: uint8[] = [],
+  ) {
+    this.#buffer = buffer;
+  }
+
+  copy(): ScannerState<Failure> {
+    const target = new ScannerState(
+      this.badReadCount,
+      this.tooLong,
+      this.eof,
+      this.noProgress,
+      this.#buffer,
+    );
+    target.#done = this.#done;
+    target.#emptyReads = this.#emptyReads;
+    target.#end = this.#end;
+    target.#failure = this.#failure;
+    target.#pendingFailure = this.#pendingFailure;
+    target.#start = this.#start;
+    target.#token = this.#token;
+    return target;
+  }
 
   Err(): Failure | undefined {
     return this.#failure;
@@ -38,14 +61,16 @@ export class ScannerState<Failure extends GoInterfaceValue> {
       return { kind: "result", value: false };
     }
     for (;;) {
-      const newline = this.#buffer.indexOf(0x0a);
-      if (newline >= 0) {
-        this.#token = scanLine(this.#buffer.splice(0, newline + 1), true);
+      const newline = this.#buffer.indexOf(0x0a, this.#start);
+      if (newline >= this.#start && newline < this.#end) {
+        this.#token = scanLine(this.#buffer.slice(this.#start, newline + 1), true);
+        this.#start = newline + 1;
         return { kind: "result", value: true };
       }
       if (this.#pendingFailure !== undefined) {
-        if (this.#buffer.length > 0) {
-          this.#token = scanLine(this.#buffer.splice(0), false);
+        if (this.#start < this.#end) {
+          this.#token = scanLine(this.#buffer.slice(this.#start, this.#end), false);
+          this.#start = this.#end;
           return { kind: "result", value: true };
         }
         this.#done = true;
@@ -54,7 +79,7 @@ export class ScannerState<Failure extends GoInterfaceValue> {
         }
         return { kind: "result", value: false };
       }
-      if (this.#buffer.length >= 64 * 1024) {
+      if (this.#end - this.#start >= 64 * 1024) {
         this.#failure = this.tooLong;
         this.#done = true;
         return { kind: "result", value: false };
@@ -75,8 +100,9 @@ export class ScannerState<Failure extends GoInterfaceValue> {
     }
     const hostCount = hostInteger(count);
     for (let index = 0; index < hostCount; index += 1) {
-      this.#buffer.push(target.get(index));
+      this.#buffer[this.#end + index] = target.get(index);
     }
+    this.#end += hostCount;
     if (failure !== undefined) {
       this.#pendingFailure = failure;
     }
