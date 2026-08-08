@@ -1052,14 +1052,20 @@ ownership. It is produced in a contract-only first session for every selected
 package. The final session takes sole ownership of the deterministic canonical
 name and generated-support identity registry, plus each selected source
 artifact's immutable observable contract, outgoing support requirements, and
-observable dependency edges. It cannot read an implementation facet, builder, placement,
-artifact revision, liveness ledger, scheduler queue, or generated declaration
-from the first session. For example, an unexported `worker` used only by the Go
-body cannot create a requirement because selected bodies are not traversed in
-the contract session. A genuine final consumer of a private type requires an
-exact body-free private contract module; a private value dependency remains an
-error. The final session never emits a selected-package body and never infers
-liveness by retracting already-emitted output.
+observable dependency edges. It cannot read an implementation facet, builder,
+placement, artifact revision, liveness ledger, scheduler queue, or generated
+declaration from the first session. For example, an unexported `worker` used
+only by the Go body cannot create a requirement because selected bodies are not
+traversed in the contract session. A genuine final consumer of a private type
+requires an exact body-free private contract module; a private value dependency
+remains an error. The final session never emits a selected-package body and
+never infers liveness by retracting already-emitted output.
+
+When the final session recreates a demanded generic concretization, it joins
+the transferred canonical artifact by stable generic key and exact owner,
+arguments, signature, placement, and lexical anchor. A newly allocated but
+semantically identical checker wrapper reuses that artifact; pointer identity
+between compilation-session wrappers is never required.
 
 Generated value support that is part of an exported declaration's observable
 ABI remains public through the package assembly. In particular, an exported

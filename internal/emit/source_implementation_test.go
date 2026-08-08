@@ -32,6 +32,8 @@ func Value() int {
 }
 func ReadExisting(current *int) int { return fast.Read(current) }
 func IsReader(value any) bool { _, ok := value.(fast.Reader); return ok }
+func identity[T any](value T) T { return value }
+func GenericValue() int { return identity(42) }
 `)
 	implementationRoot := filepath.Join(root, "implementation")
 	writeSourceImplementationPointerContract(t, implementationRoot)

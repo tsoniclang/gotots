@@ -834,6 +834,11 @@ observable contract, retain one unrequested ordinary generated support
 declaration, or install replacement only after final assembly. Each fails at
 the lifecycle, contract,
 final-membership, private-value, or strict-consumer gate with the exact owner.
+The two-session fixture also reaches a generic call outside the replaced
+package. Recreating its semantically identical concretization in the final
+session must reuse the transferred canonical artifact. Mutations retain the
+stable key while changing one type argument, signature, placement, or lexical
+anchor; each must fail the registry join rather than create a sibling artifact.
 The fixture includes a cross-package assertion against an exported interface:
 the ordinary and installed assemblies must both export the interface type,
 runtime contract, and guard; the final consumer must import the bindings only

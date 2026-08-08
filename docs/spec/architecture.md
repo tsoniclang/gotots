@@ -1216,6 +1216,13 @@ contract facts but cannot schedule or materialize output; the final requirement
 scheduler is the sole liveness owner. Sharing either artifact graph, scheduler,
 builder, liveness ledger, or emitted declaration is forbidden.
 
+Registry transfer preserves semantic identity, not allocation identity. A
+generated contract fact recreated by the final session exact-joins the
+registry's existing fact by stable key, source owner, type arguments,
+signature, placement, and lexical anchor, and the registry returns its one
+canonical artifact. Equality of Go wrapper pointers is not evidence. The same
+stable key with any differing semantic field fails closed.
+
 For callable exports, the surface join is signature-exact rather than
 name-only. GoToTS preserves the selected Go signature in ordinary canonical
 callers and binds the authored module by exact export identity. TSTS is the one

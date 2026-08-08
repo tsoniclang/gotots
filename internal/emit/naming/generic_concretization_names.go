@@ -229,8 +229,15 @@ func (n *File) GenericConcretization(
 	if err != nil {
 		return api.GenericConcretizationReference{}, err
 	}
+	canonical, ok := binding.owner.GenericConcretization()
+	if !ok {
+		return api.GenericConcretizationReference{}, &api.NameError{
+			Name:   binding.name,
+			Reason: "generic concretization canonical binding is invalid",
+		}
+	}
 	return api.NewGenericConcretizationReference(
-		concretization,
+		canonical,
 		reference.Name(),
 		reference.Requests()...,
 	)
@@ -275,10 +282,7 @@ func (r *Registry) internGenericConcretization(
 	artifactKey := concretization.Key()
 	if existing, ok := r.genericConcretizations[artifactKey]; ok {
 		selected, valid := existing.owner.GenericConcretization()
-		if !valid || selected != concretization ||
-			existing.owner.Placement() != concretization.Placement() ||
-			existing.owner.LexicalOwner() != concretization.LexicalOwner() ||
-			existing.owner.LexicalAnchor() != concretization.LexicalAnchor() {
+		if !valid || !selected.Identical(concretization) {
 			return genericConcretizationBinding{}, &api.NameError{
 				Name:   existing.name,
 				Reason: "generic concretization key joined non-identical artifacts",
