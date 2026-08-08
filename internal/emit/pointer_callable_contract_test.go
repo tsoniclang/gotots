@@ -10,10 +10,10 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestPointerCallableABIPreservesSourceContractAndDirectCallers(
+func TestCanonicalPointerCallablePreservesDefinitionAndDirectCallers(
 	t *testing.T,
 ) {
-	target, _ := compileCallableABIFixture(t, "example.test/automatic", `package automatic
+	target := compilePointerCallableFixture(t, "example.test/pointercall", `package pointercall
 
 func Read(value *int) int { return *value }
 
@@ -28,11 +28,6 @@ func Value() int {
 	return Read(&current)
 }
 
-func ConditionalValue() int {
-	current := 41
-	return ReadThenCompute(&current)
-}
-
 func Existing(value *int) int { return Read(value) }
 
 func ThroughValue(value *int) int {
@@ -43,29 +38,29 @@ func ThroughValue(value *int) int {
 func Deferred(value *int) {
 	defer Read(value)
 }
-
-	`)
+`)
 	for _, required := range []string{
 		"export function Read(value: Pointer<int> | undefined): int",
 		"return loadPointer<int>((value ?? GoPanic.raiseRuntime",
 		"export function ReadThenCompute(value: Pointer<int> | undefined): int",
 		"return Read(addressOf<int>(current));",
 		"return Read(value);",
+		"(($0: Pointer<int> | undefined) => int)",
 		"Read(__gotots_argument_",
 	} {
 		if !strings.Contains(target, required) {
-			t.Fatalf("pointer callable ABI lacks %q:\n%s", required, target)
+			t.Fatalf("canonical pointer callable lacks %q:\n%s", required, target)
 		}
 	}
 	for _, forbidden := range []string{"GoPointer", "runtime/pointer", "Read(value: int): int"} {
 		if strings.Contains(target, forbidden) {
-			t.Fatalf("pointer callable ABI contains obsolete route %q:\n%s", forbidden, target)
+			t.Fatalf("canonical pointer callable contains obsolete route %q:\n%s", forbidden, target)
 		}
 	}
 }
 
-func TestMutatingPointerMethodRetainsLocationABI(t *testing.T) {
-	target, _ := compileCallableABIFixture(t, "example.test/mutatingmethod", `package mutatingmethod
+func TestMutatingPointerMethodPreservesLocationContract(t *testing.T) {
+	target := compilePointerCallableFixture(t, "example.test/mutatingmethod", `package mutatingmethod
 
 type Counter struct{}
 
@@ -87,8 +82,8 @@ func Apply(counter Counter, value *int) {
 	}
 }
 
-func TestPointerCallableABICoversMethodConsumers(t *testing.T) {
-	target, _ := compileCallableABIFixture(t, "example.test/methodabi", `package methodabi
+func TestCanonicalPointerCallableCoversMethodConsumers(t *testing.T) {
+	target := compilePointerCallableFixture(t, "example.test/methodcall", `package methodcall
 
 type Reader struct{}
 
@@ -129,24 +124,24 @@ func ThroughInterface(value *int) int {
 	for _, required := range []string{
 		"Read(value: Pointer<int> | undefined): int",
 		"return receiver.Read(addressOf<int>(current));",
-		"receiver.Read(value)",
+		"return receiver.Read(value);",
 		"this.$go$value.Read($argument0)",
 		"goInterfaceNonNil<Contract>(__gotots_receiver_2).Read(__gotots_argument_3)",
 	} {
 		if !strings.Contains(target, required) {
-			t.Fatalf("method callable ABI lacks %q:\n%s", required, target)
+			t.Fatalf("pointer method callable lacks %q:\n%s", required, target)
 		}
 	}
 	if strings.Contains(target, "GoPointer") || strings.Contains(target, "runtime/pointer") {
-		t.Fatalf("method pointer ABI retained the obsolete pointer runtime:\n%s", target)
+		t.Fatalf("canonical pointer method retained the obsolete pointer runtime:\n%s", target)
 	}
 }
 
-func compileCallableABIFixture(
+func compilePointerCallableFixture(
 	t *testing.T,
 	module string,
 	sourceText string,
-) (string, *load.Program) {
+) string {
 	t.Helper()
 	root := t.TempDir()
 	writeSourceImplementationFixture(
@@ -191,5 +186,5 @@ func compileCallableABIFixture(
 		}
 		source.WriteString(printed)
 	}
-	return source.String(), program
+	return source.String()
 }

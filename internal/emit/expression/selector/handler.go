@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	methodexpression "github.com/tsoniclang/gotots/internal/emit/expression/methodexpression"
@@ -101,16 +100,6 @@ func Emit(
 		reference.Requests()...,
 	)
 	if function, ok := object.(*types.Func); ok {
-		target, err = callable.AdaptProjectedSourceValue(
-			context,
-			children,
-			source,
-			function,
-			target,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
 		if reference.ProviderBoundary() {
 			return providerboundary.FromProviderSourceCallable(
 				context,
@@ -120,9 +109,8 @@ func Emit(
 				target,
 			)
 		}
-		return cooperativecall.AdaptSourceValue(
+		return cooperativecall.TransportSourceValue(
 			context,
-			children,
 			source,
 			function,
 			target,

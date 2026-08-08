@@ -229,6 +229,10 @@ func InvokeIntPredicate(predicate func(int32) bool) bool {
 	return predicate(7)
 }
 
+func NamedSynchronousApply() bool {
+	return InvokeIntPredicate(IsSeven)
+}
+
 func GenericProfileWithNamedCallback[T any](
 	value T,
 	predicate func(T) bool,

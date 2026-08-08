@@ -360,11 +360,17 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 		"identity$concrete_",
 		"let methodValue: (() => Awaitable<int32>) | undefined",
 		"await goInterfaceNonNil<Reader>(",
-		"async ($argument0: GoReceiveChannel<int32> | undefined): Promise<int32>",
+		"[receiveOne, synchronousOne]",
 	} {
 		if !strings.Contains(transport, required) {
 			t.Fatalf("Transport lacks %q:\n%s", required, transport)
 		}
+	}
+	if strings.Contains(
+		transport,
+		"async ($argument0: GoReceiveChannel<int32> | undefined): Promise<int32>",
+	) {
+		t.Fatalf("synchronous callable transport retained an async wrapper:\n%s", transport)
 	}
 	if concretizations := strings.Count(
 		transport,

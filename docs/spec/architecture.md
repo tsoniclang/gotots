@@ -1147,15 +1147,15 @@ repeatable `--tag` and `--implementation-bundle` flags.
 
 A certified source implementation owns one exact source package's final target
 module set. GoToTS certification joins canonical Go module, package, version,
-selected build and compilation profiles, exact export identities, callable ABI
-projections, implementation source digests, and the equivalence envelope. It
-strict-typechecks the authored implementation project and structurally inspects
-the complete ordinary and installed target sets, but it does not pretend those
-canonical sets are executable without finalized marker facts. TSTS strictly
-checks the complete installed canonical source against its authoritative marker
-modules; the selected target then strictly checks every generated consumer
-against the lowered implementation. That target check is the authoritative
-proof that consumers accept the replacement. TypeScript display text,
+selected build and compilation profiles, exact export identities,
+implementation source digests, and the equivalence envelope. It
+strict-typechecks the authored implementation project and structurally joins
+the complete ordinary and installed canonical sets without inventing marker
+declarations. TSTS checks both immutable canonical sets with its authoritative
+marker modules and finalized facts. The selected target then lowers and
+strict-typechecks both executable sets under one final module-resolution and
+strictness contract. The installed target check is the authoritative proof
+that every generated consumer accepts the replacement. TypeScript display text,
 parameter names, and package-private representation shape are not semantic
 package contracts and must not be compared as if they were. Selection is
 settled once before target files are sealed. The final file set replaces the
@@ -1165,10 +1165,11 @@ package may survive. References keep the ordinary package assembly path and
 source-facing contract.
 
 For callable exports, the surface join is signature-exact rather than
-name-only. Certification compares the selected Go signature, its canonical
-TypeScript mapping, and the checked authored TypeScript parameter/result types.
-It records the resulting signature fingerprint in compilation evidence before
-any caller is emitted. For example, Go `Read(*int) int` requires authored
+name-only. GoToTS preserves the selected Go signature in ordinary canonical
+callers and binds the authored module by exact export identity. TSTS is the one
+owner that compares the generated and authored canonical parameter/result
+types under the authoritative virtual marker modules. For example, Go
+`Read(*int) int` requires authored
 `Read(Pointer<int> | undefined): int`; authored `Read(number): number` is a
 target-specific optimization and is rejected at this canonical boundary.
 

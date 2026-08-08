@@ -3,32 +3,11 @@ package api
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"go/types"
 	"slices"
 )
-
-type CallableABIResolver interface {
-	ResolveCallableABI(*types.Func) (callableabi.Callable, bool)
-}
-
-func (c Context) WithCallableABIResolver(
-	resolver CallableABIResolver,
-) Context {
-	c.callableABI = resolver
-	return c
-}
-
-func (c Context) ResolveCallableABI(
-	function *types.Func,
-) (callableabi.Callable, bool) {
-	if c.callableABI == nil || function == nil {
-		return callableabi.Callable{}, false
-	}
-	return c.callableABI.ResolveCallableABI(function)
-}
 
 const ProviderProfileCapabilitySuffix = "$Capability$"
 

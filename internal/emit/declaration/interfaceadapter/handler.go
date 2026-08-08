@@ -306,17 +306,6 @@ func emitMethod(
 		return nil, nil, nil, methodStageError(MethodStageContract, err)
 	}
 	sourceArguments := target.ParameterReferences(context.Factory())
-	ordinaryArguments, projectionBefore, projectionRequests, err :=
-		projectMethodArguments(
-			context,
-			signature,
-			method,
-			sourceArguments,
-			!interfaceDispatch,
-		)
-	if err != nil {
-		return nil, nil, nil, methodStageError(MethodStageInvocation, err)
-	}
 	var call api.ExpressionEmission
 	if interfaceDispatch {
 		call, err = interfaceoperation.Apply(
@@ -326,7 +315,7 @@ func emitMethod(
 			dispatchType,
 			receiver,
 			method,
-			ordinaryArguments,
+			sourceArguments,
 			nil,
 			nil,
 		)
@@ -338,7 +327,7 @@ func emitMethod(
 			context,
 			children,
 			receiver.Value(),
-			ordinaryArguments,
+			sourceArguments,
 		)
 		if err != nil {
 			return nil, nil, nil, methodStageError(
@@ -347,16 +336,9 @@ func emitMethod(
 			)
 		}
 		call, err = api.NewExpressionEmission(
-			append(
-				append(receiver.Before(), projectionBefore...),
-				call.Before()...,
-			),
+			append(receiver.Before(), call.Before()...),
 			call.Value(),
-			api.CombineRequests(
-				receiver.Requests(),
-				projectionRequests,
-				call.Requests(),
-			),
+			api.CombineRequests(receiver.Requests(), call.Requests()),
 		)
 		if err != nil {
 			return nil, nil, nil, methodStageError(MethodStageInvocation, err)
@@ -443,17 +425,6 @@ func emitMethod(
 		return nil, nil, nil, methodStageError(MethodStageABI, err)
 	}
 	var deferredCall api.ExpressionEmission
-	deferredArguments, deferredProjectionBefore,
-		deferredProjectionRequests, err := projectMethodArguments(
-		context,
-		signature,
-		method,
-		sourceArguments,
-		!interfaceDispatch,
-	)
-	if err != nil {
-		return nil, nil, nil, methodStageError(MethodStageInvocation, err)
-	}
 	if interfaceDispatch {
 		deferredCall, err = interfaceoperation.ApplyDeferred(
 			context,
@@ -464,7 +435,7 @@ func emitMethod(
 			method,
 			signature,
 			contractCooperative,
-			deferredArguments,
+			sourceArguments,
 			context.Factory().Identifier(callable.RecoveryAuthorityName),
 		)
 	} else {
@@ -473,7 +444,7 @@ func emitMethod(
 			children,
 			nil,
 			receiver.Value(),
-			deferredArguments,
+			sourceArguments,
 			context.Factory().Identifier(
 				callable.RecoveryAuthorityName,
 			),
@@ -485,16 +456,9 @@ func emitMethod(
 			)
 		}
 		deferredCall, err = api.NewExpressionEmission(
-			append(
-				append(receiver.Before(), deferredProjectionBefore...),
-				deferredCall.Before()...,
-			),
+			append(receiver.Before(), deferredCall.Before()...),
 			deferredCall.Value(),
-			api.CombineRequests(
-				receiver.Requests(),
-				deferredProjectionRequests,
-				deferredCall.Requests(),
-			),
+			api.CombineRequests(receiver.Requests(), deferredCall.Requests()),
 		)
 	}
 	if err != nil {
@@ -549,8 +513,6 @@ func emitMethod(
 		target.Requests(),
 		call.Requests(),
 		deferredCall.Requests(),
-		projectionRequests,
-		deferredProjectionRequests,
 		recoveryRequests,
 		deferredSupportRequests,
 		recoveryObservationRequests,

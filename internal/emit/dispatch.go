@@ -86,7 +86,6 @@ type emitter struct {
 	generic                api.GenericCallableResolver
 	cooperative            api.CooperativeCallableResolver
 	recovery               api.RecoveryCallableResolver
-	callableABI            api.CallableABIResolver
 	external               api.ExternalFunctionResolver
 	goRuntime              api.GoRuntimeContract
 	implementationContract bool
@@ -104,7 +103,6 @@ func newEmitter(
 	generic api.GenericCallableResolver,
 	cooperative api.CooperativeCallableResolver,
 	recovery api.RecoveryCallableResolver,
-	callableABI api.CallableABIResolver,
 	external api.ExternalFunctionResolver,
 	goRuntime api.GoRuntimeContract,
 	implementationContract bool,
@@ -127,7 +125,6 @@ func newEmitter(
 		generic:                generic,
 		cooperative:            cooperative,
 		recovery:               recovery,
-		callableABI:            callableABI,
 		external:               external,
 		goRuntime:              goRuntime,
 		implementationContract: implementationContract,
