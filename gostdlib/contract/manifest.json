@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "3a5353c87d8cc7965644d60e10c606c7a0d114e20ab54a0467267df3c978c1f0",
+  "providerDigest": "9a4040e45223dcb91c9cc2d6af1fbae26177525dfab6313dd67f594ebc0a664b",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -2284,7 +2284,7 @@
           "targetFingerprint": "9580b0a2b3e77339947fd03092ce60eb2d921b597be0d76d853a64033abcb0dd",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/node/flag/flag-set.ts#booleanFlag@221"
+            "src/internal/node/flag/flag-set.ts#booleanFlag@279"
           ],
           "implementationSites": [
             "src/flag.ts#Bool@95"
@@ -2303,7 +2303,7 @@
           "targetFingerprint": "06c1b129fed400ee48914f37ae6b88f7473eca1ac5bbef7b4bff0fce94ef1d8e",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/node/flag/flag-set.ts#parseFlags@341"
+            "src/internal/node/flag/flag-set.ts#parseFlags@399"
           ],
           "implementationSites": [
             "src/flag.ts#Parse@139"
@@ -2322,7 +2322,7 @@
           "targetFingerprint": "9535a0be52477ce01b44ba257b25c394c0a9f085d522c5f7ada28ca1ac98702a",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/node/flag/flag-set.ts#stringFlag@281"
+            "src/internal/node/flag/flag-set.ts#stringFlag@339"
           ],
           "implementationSites": [
             "src/flag.ts#String@171"
@@ -19094,7 +19094,21 @@
           "implementationOwner": "src/internal/facets/named-flag.ts",
           "targetFingerprint": "43af8c5c791433966d093c28fd269a17b77b0556ad43072cdc06dcfb9da221db",
           "implementationSites": [
-            "src/internal/facets/named-flag.ts#FlagErrorHandlingValueOperations@17"
+            "src/internal/facets/named-flag.ts#FlagErrorHandlingValueOperations@89"
+          ]
+        },
+        {
+          "kind": "named-struct-operations",
+          "sourceIdentity": "flag|kind=2|receiver=|name=FlagSet",
+          "capabilities": [
+            "assign",
+            "copy"
+          ],
+          "export": "FlagSetValueOperations",
+          "implementationOwner": "src/internal/facets/named-flag.ts",
+          "targetFingerprint": "4047f48a18a3518a89bb847eec51da6a5a4435f1c428897e528eb97077125873",
+          "implementationSites": [
+            "src/internal/facets/named-flag.ts#FlagSetValueOperations@26"
           ]
         }
       ]
@@ -26248,11 +26262,19 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/facets/named-flag.ts#FlagErrorHandlingValueOperations@17",
+      "identity": "src/internal/facets/named-flag.ts#FlagErrorHandlingValueOperations@89",
       "disposition": "implemented",
       "dependencies": [
         "src/flag.ts#ErrorHandling@50",
         "src/flag.ts#value@57"
+      ]
+    },
+    {
+      "identity": "src/internal/facets/named-flag.ts#FlagSetValueOperations@26",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/flag.ts#FlagSet@77",
+        "src/internal/node/flag/flag-set.ts#assignFlagSet@221"
       ]
     },
     {
@@ -28142,15 +28164,23 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/node/flag/flag-set.ts#add@825",
+      "identity": "src/internal/node/flag/flag-set.ts#add@883",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/node/flag/flag-set.ts#booleanFlag@221",
+      "identity": "src/internal/node/flag/flag-set.ts#assignFlagSet@221",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/flag/flag-set.ts#add@825",
-        "src/internal/node/flag/flag-set.ts#requireFlagSet@752",
+        "src/internal/node/flag/flag-set.ts#requireFlagSet@810",
+        "src/internal/node/flag/flag-set.ts#states@156"
+      ]
+    },
+    {
+      "identity": "src/internal/node/flag/flag-set.ts#booleanFlag@279",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/node/flag/flag-set.ts#add@883",
+        "src/internal/node/flag/flag-set.ts#requireFlagSet@810",
         "src/internal/runtime/pointer.ts#providerPointer@15"
       ]
     },
@@ -28159,7 +28189,7 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/node/flag/flag-set.ts#failure@879",
+      "identity": "src/internal/node/flag/flag-set.ts#failure@937",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16"
@@ -28173,21 +28203,21 @@
       ]
     },
     {
-      "identity": "src/internal/node/flag/flag-set.ts#parseBoolean@692",
+      "identity": "src/internal/node/flag/flag-set.ts#parseBoolean@750",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/node/flag/flag-set.ts#parseFlags@341",
+      "identity": "src/internal/node/flag/flag-set.ts#parseFlags@399",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/flag/flag-set.ts#failure@879",
-        "src/internal/node/flag/flag-set.ts#parseBoolean@692",
-        "src/internal/node/flag/flag-set.ts#requireFlagSet@752",
+        "src/internal/node/flag/flag-set.ts#failure@937",
+        "src/internal/node/flag/flag-set.ts#parseBoolean@750",
+        "src/internal/node/flag/flag-set.ts#requireFlagSet@810",
         "src/internal/runtime/slice.ts#sliceValues@19"
       ]
     },
     {
-      "identity": "src/internal/node/flag/flag-set.ts#requireFlagSet@752",
+      "identity": "src/internal/node/flag/flag-set.ts#requireFlagSet@810",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/node/flag/flag-set.ts#continueOnError@169",
@@ -28199,11 +28229,11 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/node/flag/flag-set.ts#stringFlag@281",
+      "identity": "src/internal/node/flag/flag-set.ts#stringFlag@339",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/node/flag/flag-set.ts#add@825",
-        "src/internal/node/flag/flag-set.ts#requireFlagSet@752",
+        "src/internal/node/flag/flag-set.ts#add@883",
+        "src/internal/node/flag/flag-set.ts#requireFlagSet@810",
         "src/internal/runtime/pointer.ts#providerPointer@15"
       ]
     },
@@ -34189,5 +34219,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "2b611953cfcb49bc9d8b4f95639e9524db920260846b5698b7528779803aebe5"
+  "manifestDigest": "5b2560e931fb70b5a1291e4442bc722fc26a654faede07c55ca56dc5caa236b4"
 }

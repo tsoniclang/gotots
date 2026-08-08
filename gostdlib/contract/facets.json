@@ -1547,6 +1547,17 @@
       ]
     },
     {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "flag|kind=2|receiver=|name=FlagSet",
+      "specifier": "@gotots/gostdlib/internal/facets/named-flag.js",
+      "sourcePath": "src/internal/facets/named-flag.ts",
+      "export": "FlagSetValueOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
       "kind": "defined-value-operations",
       "sourceIdentity": "internal/abi|kind=2|receiver=|name=Kind",
       "specifier": "@gotots/gostdlib/internal/facets/named-internal-abi.js",

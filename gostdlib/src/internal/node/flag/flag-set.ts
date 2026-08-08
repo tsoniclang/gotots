@@ -53,6 +53,19 @@ export function initializeFlagSet(
   });
 }
 
+export function assignFlagSet(
+  target: FlagSetValue,
+  source: FlagSetValue,
+): void {
+  target.Usage = source.Usage;
+  const sourceState = requireFlagSet(source);
+  states.set(target, {
+    name: sourceState.name,
+    errorHandling: sourceState.errorHandling,
+    bindings: sourceState.bindings,
+  });
+}
+
 export function booleanFlag(
   receiver: FlagSetValue | undefined,
   name: gostring,
