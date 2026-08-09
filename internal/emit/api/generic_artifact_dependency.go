@@ -565,3 +565,13 @@ func (r NameReference) MemberExpression(
 		tsgo.NodeFlagsNone,
 	), nil
 }
+
+func operationOwnerFunction(
+	operation *GenericOperationContract,
+) (*types.Func, bool) {
+	if operation == nil {
+		return nil, false
+	}
+	function, ok := operation.Owner().(*types.Func)
+	return function, ok && function != nil && function.Origin() == function
+}

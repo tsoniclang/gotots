@@ -515,3 +515,18 @@ func compareGeneratedArtifacts(
 		return 0
 	}
 }
+
+func canonicalDeclarationRequirements(
+	requirements []api.DeclarationRequirement,
+) []api.DeclarationRequirement {
+	unique := make(map[api.DeclarationRequirement]struct{}, len(requirements))
+	for _, requirement := range requirements {
+		unique[requirement] = struct{}{}
+	}
+	result := make([]api.DeclarationRequirement, 0, len(unique))
+	for requirement := range unique {
+		result = append(result, requirement)
+	}
+	sortDeclarationRequirements(result)
+	return result
+}
