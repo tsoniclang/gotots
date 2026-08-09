@@ -390,7 +390,7 @@ func emitMethod(
 	}
 	var modifiers []tsgo.ModifierLike
 	resultType := target.Result()
-	if providerCooperative {
+	if contractCooperative {
 		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}
@@ -503,7 +503,7 @@ func emitMethod(
 		signature,
 		target,
 		resultType,
-		providerCooperative,
+		contractCooperative,
 		contracts,
 	)
 	if err != nil {
