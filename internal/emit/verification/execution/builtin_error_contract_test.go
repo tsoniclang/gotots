@@ -2,6 +2,7 @@ package emit_test
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -87,13 +88,33 @@ func Message(failure error) string {
 			artifacts.printed,
 		)
 	}
-	if count := strings.Count(
-		artifacts.printed,
-		"async Error(): Promise<gostring>",
-	); count < 2 {
+	var synchronousAdapters int
+	var cooperativeAdapters int
+	for _, path := range artifacts.paths {
+		if !strings.Contains(
+			filepath.ToSlash(path),
+			"/support/interfaces/adapters/",
+		) {
+			continue
+		}
+		content, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		synchronousAdapters += strings.Count(
+			string(content),
+			"\n    Error(): gostring",
+		)
+		cooperativeAdapters += strings.Count(
+			string(content),
+			"\n    async Error(): Promise<gostring>",
+		)
+	}
+	if synchronousAdapters != 1 || cooperativeAdapters != 1 {
 		t.Fatalf(
-			"source error adapters did not converge on one Go-shaped cooperative contract: count=%d\n%s",
-			count,
+			"source error adapter effects = sync %d, cooperative %d, want one each:\n%s",
+			synchronousAdapters,
+			cooperativeAdapters,
 			artifacts.printed,
 		)
 	}
