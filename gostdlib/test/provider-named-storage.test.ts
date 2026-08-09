@@ -9,7 +9,7 @@ import { Float, Int } from "../src/math/big.js";
 import { URL } from "../src/net/url.js";
 import { MemStats } from "../src/runtime.js";
 import { Duration, NewTicker, Ticker, Timer } from "../src/time.js";
-import { Range16, Range32 } from "../src/unicode.js";
+import { Range16, Range32, RangeTable } from "../src/unicode.js";
 import {
   IoFsPathErrorOperations,
 } from "../src/internal/facets/named-io-fs.js";
@@ -53,6 +53,21 @@ test("provider named-struct storage capabilities preserve exact values", (): voi
   ), floating);
 
   const url = new URL();
+  url.Scheme = "https";
+  url.Host = "source.example";
+  url.Path = "/path";
+  const copiedURL = NetUrlURLOperations.$copy(url);
+  const assignedURL = new URL();
+  NetUrlURLOperations.$assign(assignedURL, url);
+  assert.notEqual(copiedURL, url);
+  assert.deepEqual(
+    [copiedURL.Scheme, copiedURL.Host, copiedURL.Path],
+    ["https", "source.example", "/path"],
+  );
+  assert.deepEqual(
+    [assignedURL.Scheme, assignedURL.Host, assignedURL.Path],
+    ["https", "source.example", "/path"],
+  );
   assert.equal(NetUrlURLOperations.$fromStorage(
     NetUrlURLOperations.$storageOf(url),
   ), url);
@@ -67,6 +82,12 @@ test("provider named-struct storage capabilities preserve exact values", (): voi
     TimeTimerOperations.$storageOf(timer),
   ), timer);
   const ticker = NewTicker(new Duration(1_000_000_000n));
+  const copiedTicker = TimeTickerOperations.$copy(ticker);
+  const assignedTicker = new Ticker();
+  TimeTickerOperations.$assign(assignedTicker, ticker);
+  assert.notEqual(copiedTicker, ticker);
+  assert.equal(copiedTicker.C, ticker.C);
+  assert.equal(assignedTicker.C, ticker.C);
   assert.equal(TimeTickerOperations.$fromStorage(
     TimeTickerOperations.$storageOf(ticker),
   ), ticker);
@@ -75,6 +96,16 @@ test("provider named-struct storage capabilities preserve exact values", (): voi
   const ranges16 = RuntimeSlice.literal<Range16>([]);
   const ranges32 = RuntimeSlice.literal<Range32>([]);
   const table = UnicodeRangeTableOperations.$make(ranges16, ranges32, 0n);
+  const copiedTable = UnicodeRangeTableOperations.$copy(table);
+  const assignedTable = new RangeTable();
+  UnicodeRangeTableOperations.$assign(assignedTable, table);
+  assert.notEqual(copiedTable, table);
+  assert.equal(copiedTable.R16, table.R16);
+  assert.equal(copiedTable.R32, table.R32);
+  assert.equal(copiedTable.LatinOffset, table.LatinOffset);
+  assert.equal(assignedTable.R16, table.R16);
+  assert.equal(assignedTable.R32, table.R32);
+  assert.equal(assignedTable.LatinOffset, table.LatinOffset);
   assert.equal(UnicodeRangeTableOperations.$fromStorage(
     UnicodeRangeTableOperations.$storageOf(table),
   ), table);

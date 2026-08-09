@@ -26,6 +26,10 @@ func TestNativePrintNodeRoundTrip(t *testing.T) {
 	})
 
 	processID := client.command.Process.Pid
+	encoded, err := EncodeSourceFile(representativeSourceFile())
+	if err != nil {
+		t.Fatal(err)
+	}
 	var printed string
 	for range 2 {
 		actual, err := client.PrintNode(representativeSourceFile(), PrintOptions{})
@@ -41,6 +45,13 @@ func TestNativePrintNodeRoundTrip(t *testing.T) {
 		}
 		printed = actual
 	}
+	printedEncoded, err := client.PrintEncodedSourceFile(encoded, PrintOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if printedEncoded != printed {
+		t.Fatalf("encoded source printed %q, want %q", printedEncoded, printed)
+	}
 
 	outputPath := filepath.Join(workingDirectory, "answer.ts")
 	if err := os.WriteFile(outputPath, []byte(printed), 0o644); err != nil {
@@ -55,6 +66,20 @@ func TestNativePrintNodeRoundTrip(t *testing.T) {
 		[]string{"--noEmit", "--strict", outputPath},
 	); err != nil {
 		t.Fatalf("strict TS-Go typecheck: %v", err)
+	}
+}
+
+func TestPrintEncodedSourceFileRejectsWrongProtocol(t *testing.T) {
+	client := &Client{}
+	for _, payload := range [][]byte{
+		nil,
+		make([]byte, headerSize),
+	} {
+		_, err := client.PrintEncodedSourceFile(payload, PrintOptions{})
+		var clientError *ClientError
+		if !errors.As(err, &clientError) {
+			t.Fatalf("error = %v, want ClientError", err)
+		}
 	}
 }
 

@@ -5,7 +5,9 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -216,6 +218,74 @@ func StructFieldStoreTarget(
 	return target, true, err
 }
 
+func AddressStructField(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	ownerType types.Type,
+	field *types.Var,
+	receiver api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	selected, providerOwned, err := StructField(context, ownerType, field)
+	if err != nil || !providerOwned {
+		return api.ExpressionEmission{}, providerOwned, err
+	}
+	providerContext, err := providerRepresentationContext(context, nil)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	providerStorage, err := providerContext.Values().StorageType(
+		providerContext.WithRole(api.RoleStorageType),
+		source,
+		field.Type(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	raw, err := api.NewPropertyStoreTargetEmission(
+		context.Factory(),
+		receiver,
+		selected.Member(),
+		field.Type(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	raw, err = raw.CaptureLocation(context)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	address, err := pointermarker.Operation(
+		context,
+		tsoniccore.SymbolAddressOf,
+		[]api.TypeEmission{providerStorage},
+		[]api.ExpressionEmission{api.DirectExpression(
+			raw.Value(),
+			raw.Requests()...,
+		)},
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	address, err = api.NewExpressionEmission(
+		append(raw.Before(), address.Before()...),
+		address.Value(),
+		address.Requests(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	projected, err := ProjectStructFieldPointer(
+		context,
+		providerContext,
+		children,
+		source,
+		field.Type(),
+		address,
+	)
+	return projected, true, err
+}
+
 func ProjectStructFieldPointer(
 	context api.Context,
 	providerContext api.Context,
@@ -248,22 +318,23 @@ func ProjectStructFieldPointer(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	storageChanged := context.Values().RequiresStorageProjection(context, fieldType) ||
-		providerContext.Values().RequiresStorageProjection(providerContext, fieldType)
-	if !fromChanged && !toChanged && !storageChanged {
-		return pointer, nil
-	}
-	productLogical, err := children.RepresentedType(context, source, fieldType)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	providerLogical, err := children.RepresentedType(
-		providerContext,
-		source,
+	productStorageRequired, err := context.Values().RequiresStorageProjection(
+		context,
 		fieldType,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	providerStorageRequired, err := providerContext.Values().RequiresStorageProjection(
+		providerContext,
+		fieldType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	storageChanged := productStorageRequired || providerStorageRequired
+	if !fromChanged && !toChanged && !storageChanged {
+		return pointer, nil
 	}
 	productStorage, err := context.Values().StorageType(context, source, fieldType)
 	if err != nil {
@@ -277,26 +348,13 @@ func ProjectStructFieldPointer(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	runtime, err := context.Names().Runtime(
-		api.RuntimePointerProjection,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.NewExpressionEmission(
-		pointer.Before(),
-		context.Factory().CallExpression(
-			context.Factory().Identifier(runtime.Name()),
-			nil,
-			[]tsgo.TypeNode{
-				providerLogical.Value(),
-				providerStorage.Value(),
-				productLogical.Value(),
-				productStorage.Value(),
-			},
-			[]tsgo.Expression{
-				pointer.Value(),
+	return pointermarker.Operation(
+		context,
+		tsoniccore.SymbolProjectPointer,
+		[]api.TypeEmission{providerStorage, productStorage},
+		[]api.ExpressionEmission{
+			pointer,
+			api.DirectExpression(
 				conversionArrow(
 					context,
 					"$providerField",
@@ -304,6 +362,9 @@ func ProjectStructFieldPointer(
 					productStorage.Value(),
 					fromProvider,
 				),
+				fromProvider.Requests()...,
+			),
+			api.DirectExpression(
 				conversionArrow(
 					context,
 					"$productField",
@@ -311,19 +372,9 @@ func ProjectStructFieldPointer(
 					providerStorage.Value(),
 					toProvider,
 				),
-			},
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(
-			pointer.Requests(),
-			productLogical.Requests(),
-			providerLogical.Requests(),
-			productStorage.Requests(),
-			providerStorage.Requests(),
-			fromProvider.Requests(),
-			toProvider.Requests(),
-			runtime.Requests(),
-		),
+				toProvider.Requests()...,
+			),
+		},
 	)
 }
 

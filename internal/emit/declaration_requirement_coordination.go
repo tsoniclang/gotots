@@ -1,9 +1,34 @@
 package emit
 
 import (
+	"go/types"
+
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 )
+
+func sourceArtifactOwnerOrder(
+	sites map[types.Object]declarationSite,
+) func(api.ArtifactOwner, api.ArtifactOwner) int {
+	return func(left api.ArtifactOwner, right api.ArtifactOwner) int {
+		leftObject, leftSource := left.Source()
+		rightObject, rightSource := right.Source()
+		if leftSource && rightSource {
+			leftSite, leftIndexed := sites[leftObject]
+			rightSite, rightIndexed := sites[rightObject]
+			if leftIndexed && rightIndexed {
+				if order := declarationindex.CompareSites(
+					leftSite,
+					rightSite,
+				); order != 0 {
+					return order
+				}
+			}
+		}
+		return emitordering.CompareArtifactOwners(left, right)
+	}
+}
 
 func compareDeclarationRequirements(
 	left api.DeclarationRequirement,
@@ -33,20 +58,6 @@ func compareDeclarationRequirements(
 			return 0
 		default:
 			return emitordering.CompareObjects(leftMethod, rightMethod)
-		}
-	}
-	if left.Kind() == api.DeclarationRequirementAddressableStorage {
-		_, leftVariable, leftOK := left.AddressableStorage()
-		_, rightVariable, rightOK := right.AddressableStorage()
-		switch {
-		case !leftOK && rightOK:
-			return -1
-		case leftOK && !rightOK:
-			return 1
-		case !leftOK:
-			return 0
-		default:
-			return emitordering.CompareObjects(leftVariable, rightVariable)
 		}
 	}
 	if left.Kind() == api.DeclarationRequirementConstantProjection {
@@ -212,30 +223,6 @@ func compareDeclarationRequirements(
 			return 0
 		}
 	}
-	if left.Kind() == api.DeclarationRequirementPointerRepresentation {
-		leftArtifact, leftDemand, leftOK := left.PointerRepresentation()
-		rightArtifact, rightDemand, rightOK := right.PointerRepresentation()
-		switch {
-		case !leftOK && rightOK:
-			return -1
-		case leftOK && !rightOK:
-			return 1
-		}
-		if order := compareGeneratedArtifacts(
-			leftArtifact,
-			rightArtifact,
-		); order != 0 {
-			return order
-		}
-		switch {
-		case leftDemand < rightDemand:
-			return -1
-		case leftDemand > rightDemand:
-			return 1
-		default:
-			return 0
-		}
-	}
 	if left.Kind() == api.DeclarationRequirementInterfaceAdapter {
 		leftArtifact, _, leftKey, leftDemand :=
 			left.InterfaceAdapterContract()
@@ -364,6 +351,86 @@ func compareDeclarationRequirements(
 	}
 }
 
+func (s *programSession) settle() error {
+	for {
+		if object, ok := s.scheduler.next(); ok {
+			if err := s.emit(object); err != nil {
+				return err
+			}
+			continue
+		}
+		if owner, requirements, removed, ok := s.requirements.nextBatch(); ok {
+			if err := s.applyDeclarationRequirements(
+				owner,
+				requirements,
+				removed,
+			); err != nil {
+				return err
+			}
+			continue
+		}
+		if dirty := s.artifacts.DirtyBatch(); len(dirty) != 0 {
+			for _, object := range dirty {
+				if err := s.reconstructScheduledArtifact(object); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		if sourcePackage, ok := s.packageInitializations.next(); ok {
+			if err := s.emitPackageInitialization(sourcePackage); err != nil {
+				return err
+			}
+			continue
+		}
+		if s.requirements.finalizeRemovals() {
+			continue
+		}
+		if builders := s.packageExports.nextBatch(); len(builders) != 0 {
+			for _, builder := range builders {
+				if err := s.publishPackageExports(builder); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		return nil
+	}
+}
+
+func (s *programSession) removeTargetDeclaration(
+	owner api.ArtifactOwner,
+) (bool, error) {
+	removed := false
+	for outputPath, builder := range s.builders {
+		index, exists := builder.indexByOwner[owner]
+		if !exists {
+			continue
+		}
+		if removed || index < 0 || index >= len(builder.declarations) ||
+			builder.declarations[index].owner != owner {
+			return false, &ScheduleError{
+				Object: owner.Name(),
+				Reason: "target declaration ownership is inconsistent",
+			}
+		}
+		removed = true
+		builder.declarations = append(
+			builder.declarations[:index],
+			builder.declarations[index+1:]...,
+		)
+		delete(builder.byOwner, owner)
+		delete(builder.indexByOwner, owner)
+		for declarationIndex := index; declarationIndex < len(builder.declarations); declarationIndex++ {
+			builder.indexByOwner[builder.declarations[declarationIndex].owner] = declarationIndex
+		}
+		if len(builder.declarations) == 0 {
+			delete(s.builders, outputPath)
+		}
+	}
+	return removed, nil
+}
+
 func compareCallableControlRequirements(
 	left api.DeclarationRequirement,
 	right api.DeclarationRequirement,
@@ -425,10 +492,8 @@ func artifactKinds(kind api.DeclarationRequirementKind) bool {
 		kind == api.DeclarationRequirementInterfaceDynamicTypeToken ||
 		kind == api.DeclarationRequirementGenericCapability ||
 		kind == api.DeclarationRequirementCallableABI ||
-		kind == api.DeclarationRequirementPointerRepresentation ||
 		kind == api.DeclarationRequirementReflectionType ||
-		kind == api.DeclarationRequirementReflectionValueOperations ||
-		kind == api.DeclarationRequirementUnsafeCodec
+		kind == api.DeclarationRequirementReflectionValueOperations
 }
 
 func compareGeneratedArtifacts(
@@ -449,4 +514,19 @@ func compareGeneratedArtifacts(
 	default:
 		return 0
 	}
+}
+
+func canonicalDeclarationRequirements(
+	requirements []api.DeclarationRequirement,
+) []api.DeclarationRequirement {
+	unique := make(map[api.DeclarationRequirement]struct{}, len(requirements))
+	for _, requirement := range requirements {
+		unique[requirement] = struct{}{}
+	}
+	result := make([]api.DeclarationRequirement, 0, len(unique))
+	for requirement := range unique {
+		result = append(result, requirement)
+	}
+	sortDeclarationRequirements(result)
+	return result
 }

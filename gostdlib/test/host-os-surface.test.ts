@@ -86,9 +86,12 @@ test("host OS modules expose only selected clean Go names", () => {
   assert.notEqual(os.O_TRUNC, 0);
 });
 
-test("public declarations expose only the certified provider scalar support module", () => {
-  const scalarModule = "@gotots/gostdlib/internal/scalars.js";
-  let scalarImports = 0;
+test("public declarations expose only certified provider support modules", () => {
+  const supportModules = [
+    "@gotots/gostdlib/internal/scalars.js",
+    "./internal/runtime/pointer.js",
+  ] as const;
+  const importCounts = new Map(supportModules.map((module) => [module, 0]));
   for (const path of [
     "../src/flag.d.ts",
     "../src/os.d.ts",
@@ -97,14 +100,23 @@ test("public declarations expose only the certified provider scalar support modu
     "../src/syscall.d.ts",
   ]) {
     const declaration = readFileSync(new URL(path, import.meta.url), "utf8");
-    scalarImports += declaration.split(scalarModule).length - 1;
+    let publicDeclaration = declaration;
+    for (const module of supportModules) {
+      importCounts.set(
+        module,
+        (importCounts.get(module) ?? 0) + declaration.split(module).length - 1,
+      );
+      publicDeclaration = publicDeclaration.replaceAll(module, "");
+    }
     assert.equal(
-      declaration.replaceAll(scalarModule, "").includes("/internal/"),
+      publicDeclaration.includes("/internal/"),
       false,
       path,
     );
   }
-  assert.ok(scalarImports > 0);
+  for (const [module, count] of importCounts) {
+    assert.ok(count > 0, module);
+  }
 });
 
 function staticMembers(value: Function): string[] {

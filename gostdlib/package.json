@@ -76,6 +76,10 @@
       "types": "./dist/src/internal/scalars.d.ts",
       "default": "./dist/src/internal/scalars.js"
     },
+    "./internal/runtime/pointer.js": {
+      "types": "./dist/src/internal/runtime/pointer.d.ts",
+      "default": "./dist/src/internal/runtime/pointer.js"
+    },
     "./internal/facets/generic-cmp-kernel.js": {
       "types": "./dist/src/internal/facets/generic-cmp-kernel.d.ts",
       "default": "./dist/src/internal/facets/generic-cmp-kernel.js"
@@ -128,9 +132,17 @@
       "types": "./dist/src/internal/facets/named-os.d.ts",
       "default": "./dist/src/internal/facets/named-os.js"
     },
+    "./internal/facets/named-os-exec.js": {
+      "types": "./dist/src/internal/facets/named-os-exec.d.ts",
+      "default": "./dist/src/internal/facets/named-os-exec.js"
+    },
     "./internal/facets/named-runtime-metrics.js": {
       "types": "./dist/src/internal/facets/named-runtime-metrics.d.ts",
       "default": "./dist/src/internal/facets/named-runtime-metrics.js"
+    },
+    "./internal/facets/named-runtime-pprof.js": {
+      "types": "./dist/src/internal/facets/named-runtime-pprof.d.ts",
+      "default": "./dist/src/internal/facets/named-runtime-pprof.js"
     },
     "./internal/facets/named-runtime.js": {
       "types": "./dist/src/internal/facets/named-runtime.d.ts",
@@ -171,6 +183,10 @@
     "./internal/facets/provider-encoding-base64.js": {
       "types": "./dist/src/internal/facets/provider-encoding-base64.d.ts",
       "default": "./dist/src/internal/facets/provider-encoding-base64.js"
+    },
+    "./internal/facets/provider-encoding-base32.js": {
+      "types": "./dist/src/internal/facets/provider-encoding-base32.d.ts",
+      "default": "./dist/src/internal/facets/provider-encoding-base32.js"
     },
     "./internal/facets/provider-io-read.js": {
       "types": "./dist/src/internal/facets/provider-io-read.d.ts",

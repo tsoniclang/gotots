@@ -96,7 +96,6 @@ type DeclarationRequirementKind uint8
 const (
 	DeclarationRequirementInvalid                            DeclarationRequirementKind = 0
 	DeclarationRequirementNamedStructOperation               DeclarationRequirementKind = 1
-	DeclarationRequirementAddressableStorage                 DeclarationRequirementKind = 2
 	DeclarationRequirementConstantProjection                 DeclarationRequirementKind = 3
 	DeclarationRequirementLocalConstantProjection            DeclarationRequirementKind = 4
 	DeclarationRequirementGenericOperation                   DeclarationRequirementKind = 5
@@ -114,14 +113,12 @@ const (
 	DeclarationRequirementValueReceiverCopy                  DeclarationRequirementKind = 19
 	DeclarationRequirementGenericRepresentation              DeclarationRequirementKind = 20
 	DeclarationRequirementInterfaceMethodCallable            DeclarationRequirementKind = 21
-	DeclarationRequirementPointerRepresentation              DeclarationRequirementKind = 22
 	DeclarationRequirementProviderInterfaceBridge            DeclarationRequirementKind = 23
 	DeclarationRequirementProviderStatefulRepresentation     DeclarationRequirementKind = 24
 	DeclarationRequirementDeferredCallableRegistry           DeclarationRequirementKind = 25
 	DeclarationRequirementGenericConcretization              DeclarationRequirementKind = 26
 	DeclarationRequirementTypeRepresentation                 DeclarationRequirementKind = 27
 	DeclarationRequirementReflectionType                     DeclarationRequirementKind = 28
-	DeclarationRequirementUnsafeCodec                        DeclarationRequirementKind = 29
 	DeclarationRequirementProviderInterfaceCapability        DeclarationRequirementKind = 30
 	DeclarationRequirementProviderProfileInterfaceCapability DeclarationRequirementKind = 31
 	DeclarationRequirementReflectionValueOperations          DeclarationRequirementKind = 32
@@ -129,7 +126,6 @@ const (
 
 func (k DeclarationRequirementKind) Valid() bool {
 	return k == DeclarationRequirementNamedStructOperation ||
-		k == DeclarationRequirementAddressableStorage ||
 		k == DeclarationRequirementConstantProjection ||
 		k == DeclarationRequirementLocalConstantProjection ||
 		k == DeclarationRequirementGenericOperation ||
@@ -147,14 +143,12 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementValueReceiverCopy ||
 		k == DeclarationRequirementGenericRepresentation ||
 		k == DeclarationRequirementInterfaceMethodCallable ||
-		k == DeclarationRequirementPointerRepresentation ||
 		k == DeclarationRequirementProviderInterfaceBridge ||
 		k == DeclarationRequirementProviderStatefulRepresentation ||
 		k == DeclarationRequirementDeferredCallableRegistry ||
 		k == DeclarationRequirementGenericConcretization ||
 		k == DeclarationRequirementTypeRepresentation ||
 		k == DeclarationRequirementReflectionType ||
-		k == DeclarationRequirementUnsafeCodec ||
 		k == DeclarationRequirementProviderInterfaceCapability ||
 		k == DeclarationRequirementProviderProfileInterfaceCapability ||
 		k == DeclarationRequirementReflectionValueOperations
@@ -280,28 +274,6 @@ func GenericDeclarationOrigin(owner types.Object) types.Object {
 		}
 	}
 	return nil
-}
-
-func validAddressableStorageOwner(
-	owner ArtifactOwner,
-	variable *types.Var,
-) bool {
-	if !owner.Valid() ||
-		variable == nil ||
-		variable.IsField() ||
-		variable.Pkg() == nil ||
-		owner.Package() != variable.Pkg() {
-		return false
-	}
-	if source, ok := owner.Source(); ok {
-		_, callable := source.(*types.Func)
-		return callable
-	}
-	_, initializer, ok := owner.PackageInitializer()
-	return ok &&
-		variable.Pos().IsValid() &&
-		variable.Pos() >= initializer.Rhs.Pos() &&
-		variable.Pos() <= initializer.Rhs.End()
 }
 
 func validLexicalNamedStructOwner(

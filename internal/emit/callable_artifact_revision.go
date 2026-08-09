@@ -315,7 +315,6 @@ func callableContractFacet(
 	}
 	return facet.InterfaceMethod()
 }
-
 func (s *programSession) consumeArtifactRequests(
 	consumer api.ArtifactOwner,
 	requests []api.RootRequest,
@@ -333,8 +332,6 @@ func (s *programSession) consumeArtifactRequests(
 		func(request api.RootRequest) error {
 			switch request.Kind() {
 			case api.RootRequestImport:
-				return placement.Apply([]api.RootRequest{request})
-			case api.RootRequestRuntimeFeature:
 				return placement.Apply([]api.RootRequest{request})
 			case api.RootRequestDeclarationRequirement:
 				requirement, ok := request.DeclarationRequirement()
@@ -362,38 +359,8 @@ func (s *programSession) consumeArtifactRequests(
 				if _, duplicate := dependencies[dependency]; duplicate {
 					return nil
 				}
-				sourceObject, sourceProvider := dependency.Provider().Source()
-				if sourceProvider {
-					_, sourceProvider = s.sites[sourceObject]
-					sourceProvider = sourceProvider ||
-						s.environmentArtifactSource(sourceObject)
-				}
-				generated, generatedProvider := dependency.Provider().Generated()
-				if generatedProvider {
-					generatedProvider =
-						s.validateGeneratedArtifact(generated) == nil &&
-							(generated.Placement() ==
-								api.GeneratedArtifactPlacementCompilation ||
-								generated.Placement() ==
-									api.GeneratedArtifactPlacementContract)
-				}
-				if !sourceProvider && !generatedProvider {
-					return &ScheduleError{
-						Object: dependency.Provider().Name(),
-						Reason: "artifact dependency provider has no reconstructible declaration",
-					}
-				}
-				if sourceProvider {
-					if err := s.RequireUse(
-						sourceObject,
-						environmentcontract.ArtifactFacetUseDemand(
-							dependency.Facet(),
-							sourceObject,
-						),
-						gostdlib.NoUseSelection(),
-					); err != nil {
-						return err
-					}
+				if err := s.prepareArtifactDependency(dependency); err != nil {
+					return err
 				}
 				dependencies[dependency] = struct{}{}
 			default:
@@ -442,19 +409,41 @@ func (s *programSession) consumeArtifactRequests(
 		nil
 }
 
-func canonicalDeclarationRequirements(
-	requirements []api.DeclarationRequirement,
-) []api.DeclarationRequirement {
-	unique := make(map[api.DeclarationRequirement]struct{}, len(requirements))
-	for _, requirement := range requirements {
-		unique[requirement] = struct{}{}
+func (s *programSession) prepareArtifactDependency(
+	dependency api.ArtifactDependency,
+) error {
+	sourceObject, sourceProvider := dependency.Provider().Source()
+	if sourceProvider {
+		_, sourceProvider = s.sites[sourceObject]
+		sourceProvider = sourceProvider ||
+			s.environmentArtifactSource(sourceObject)
 	}
-	result := make([]api.DeclarationRequirement, 0, len(unique))
-	for requirement := range unique {
-		result = append(result, requirement)
+	generated, generatedProvider := dependency.Provider().Generated()
+	if generatedProvider {
+		generatedProvider =
+			s.validateGeneratedArtifact(generated) == nil &&
+				(generated.Placement() ==
+					api.GeneratedArtifactPlacementCompilation ||
+					generated.Placement() ==
+						api.GeneratedArtifactPlacementContract)
 	}
-	sortDeclarationRequirements(result)
-	return result
+	if !sourceProvider && !generatedProvider {
+		return &ScheduleError{
+			Object: dependency.Provider().Name(),
+			Reason: "artifact dependency provider has no reconstructible declaration",
+		}
+	}
+	if !sourceProvider {
+		return nil
+	}
+	return s.RequireUse(
+		sourceObject,
+		environmentcontract.ArtifactFacetUseDemand(
+			dependency.Facet(),
+			sourceObject,
+		),
+		gostdlib.NoUseSelection(),
+	)
 }
 
 func (s *programSession) commitArtifactRevision(
@@ -572,6 +561,9 @@ func eagerDeclarationDependencies(
 func (s *programSession) reconstructScheduledArtifact(
 	owner api.ArtifactOwner,
 ) error {
+	if accepted, err := s.acceptSourceImplementationReconstruction(owner); accepted {
+		return err
+	}
 	if _, ok := owner.PackageAssembly(); ok {
 		return s.reconstructPackageExports(owner)
 	}

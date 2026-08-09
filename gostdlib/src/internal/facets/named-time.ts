@@ -9,6 +9,8 @@ import {
   Timer,
 } from "../../time.js";
 import {
+  tickerRepresentationAssign,
+  tickerRepresentationCopy,
   timerRepresentationAssign,
   timerRepresentationCopy,
   timerRepresentationEqual,
@@ -132,6 +134,14 @@ export class TimeParseErrorOperations {
 export type TimeTickerStorage = Ticker;
 
 export class TimeTickerOperations {
+  static $assign(target: Ticker, source: Ticker): void {
+    tickerRepresentationAssign(target, source);
+  }
+
+  static $copy(source: Ticker): Ticker {
+    return tickerRepresentationCopy(source);
+  }
+
   static $storageOf(source: Ticker): TimeTickerStorage {
     return source;
   }

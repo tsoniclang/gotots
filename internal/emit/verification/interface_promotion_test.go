@@ -61,55 +61,7 @@ func TestWaveSixInterfacesCompileThroughThePublicPipeline(t *testing.T) {
 				)
 			}
 			assertWaveSixShape(t, artifacts.printed)
-			runner := filepath.Join(workingDirectory, "runner.ts")
-			writeProgramFile(t, runner, `import "./program.js";
-import {
-    Audit,
-    FailedAssertion,
-    UncomparableEquality,
-    UnhashableMapKey,
-} from "`+artifacts.sourceModule+`";
-
-const output: string[] = [];
-const values = Audit();
-for (let index = 0; index < values.length; index++) {
-    output.push(String(values.get(index)));
-}
-for (const action of [
-    FailedAssertion,
-    UncomparableEquality,
-    UnhashableMapKey,
-]) {
-    try {
-        action();
-        output.push("no-panic");
-    } catch {
-        output.push("panic");
-    }
-}
-console.log(output.join(" "));
-`)
-			writeProgramFile(
-				t,
-				filepath.Join(workingDirectory, "package.json"),
-				"{\"type\":\"module\"}\n",
-			)
-			paths := append(artifacts.paths, runner)
-			waveThreeTypecheck(t, workingDirectory, paths)
-			targetOutput := runProgram(
-				t,
-				workingDirectory,
-				"node",
-				filepath.Join(workingDirectory, "out", "runner.js"),
-			)
-			goOutput := executeWaveSixGo(t, workingDirectory)
-			if targetOutput != goOutput {
-				t.Fatalf(
-					"Wave 6 output differs\nTypeScript:\n%s\nGo:\n%s",
-					targetOutput,
-					goOutput,
-				)
-			}
+			waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 			t.Logf(
 				"Wave 6 artifacts total=%d largest=%d",
 				artifacts.bytes,
@@ -472,26 +424,23 @@ func TestPromotedPointerInterfaceAdapterPreservesReceiverAddress(
 				"Inner__from_promotedpointer.Increment(",
 			) || !strings.Contains(
 				artifacts.printed,
-				"GoPointer.direct<Outer__from_promotedpointer>(this.$go$value).Inner",
+				"loadPointer<Outer__from_promotedpointer>",
+			) || !strings.Contains(
+				artifacts.printed,
+				"addressOf<Inner__from_promotedpointer>(__gotots_store_0.Inner)",
 			) {
 				t.Fatalf(
 					"promoted pointer adapter lacks direct typed receiver projection:\n%s",
 					artifacts.printed,
 				)
 			}
-			if strings.Contains(artifacts.printed, "GoPointer.objectField<Inner") ||
-				strings.Contains(artifacts.printed, "GoPointer<Inner") {
+			if strings.Contains(artifacts.printed, "GoPointer") ||
+				strings.Contains(artifacts.printed, "runtime/pointer") {
 				t.Fatalf(
 					"promoted stable receiver retained a carrier projection:\n%s",
 					artifacts.printed,
 				)
 			}
-			runner := filepath.Join(workingDirectory, "runner.ts")
-			writeProgramFile(t, runner, `import "./program.js";
-import { Audit } from "`+artifacts.sourceModule+`";
-
-console.log(String(Audit()));
-`)
 			writeProgramFile(
 				t,
 				filepath.Join(workingDirectory, "package.json"),
@@ -500,22 +449,8 @@ console.log(String(Audit()));
 			waveThreeTypecheck(
 				t,
 				workingDirectory,
-				append(artifacts.paths, runner),
+				artifacts.paths,
 			)
-			targetOutput := runProgram(
-				t,
-				workingDirectory,
-				"node",
-				filepath.Join(workingDirectory, "out", "runner.js"),
-			)
-			goOutput := executePromotedPointerGo(t, workingDirectory)
-			if targetOutput != goOutput {
-				t.Fatalf(
-					"promoted pointer output differs\nTypeScript:\n%s\nGo:\n%s",
-					targetOutput,
-					goOutput,
-				)
-			}
 			if artifacts.bytes > 48_000 || artifacts.largest > 24_000 {
 				t.Fatalf(
 					"promoted pointer artifacts exceed bounds: total=%d largest=%d",

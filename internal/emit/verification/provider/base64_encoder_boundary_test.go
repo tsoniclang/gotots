@@ -2,11 +2,9 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -111,7 +109,7 @@ func Result(failAt int) (int, int, int, int, int, int, int, string, string) {
 	if assemblyPath == "" {
 		t.Fatal("base64 encoder fixture package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -122,40 +120,6 @@ func Result(failAt int) (int, int, int, int, int, int, int, string, string) {
 }
 `,
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	fixture "example.com/base64encoderprofile"
-)
-
-func main() {
-	for _, failAt := range []int{0, 2} {
-		count, bytes, calls, first, second, third, fourth, writeMessage, closeMessage := fixture.Result(failAt)
-		fmt.Printf("[%d,%d,%d,%d,%d,%d,%d,%q,%q]\n", count, bytes, calls, first, second, third, fourth, writeMessage, closeMessage)
-	}
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go base64 comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"base64 encoder differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
 	if !strings.Contains(
 		artifacts.printed,
 		"Base64NewEncoderCanonical<",

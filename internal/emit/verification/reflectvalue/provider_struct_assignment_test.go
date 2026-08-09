@@ -1,16 +1,21 @@
 package reflectvalue_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
 
-func TestReflectProviderStructAssignmentMatchesGo(t *testing.T) {
+func TestReflectProviderStructAssignmentCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
+	"bufio"
+	"encoding/base32"
 	"fmt"
+	"net/url"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -95,8 +100,38 @@ func ProviderAssignments() string {
 	timerActiveTargetStopped, timerActiveTargetPanicked := stopTimer(timerActiveTarget)
 	timerSourceStopped, timerSourcePanicked := stopTimer(timerSource)
 
+	regexpSource := regexp.MustCompile("^source$")
+	regexpTarget := regexp.MustCompile("^target$")
+	*regexpTarget = *regexpSource
+	regexpAssigned := regexpTarget.MatchString("source") &&
+		!regexpTarget.MatchString("target")
+	urlSource, _ := url.Parse("https://source.example/path?q=1")
+	urlTarget, _ := url.Parse("https://target.example/old")
+	*urlTarget = *urlSource
+	urlAssigned := urlTarget.Scheme == "https" &&
+		urlTarget.Host == "source.example" &&
+		urlTarget.Path == "/path" &&
+		urlTarget.RawQuery == "q=1"
+	base32Source := *base32.StdEncoding
+	base32Target := *base32.HexEncoding
+	base32Target = base32Source
+	base32Assigned := string(base32Target.AppendEncode(nil, []byte{0xff, 0xef})) ==
+		"77XQ====" &&
+		string(base32.HexEncoding.AppendEncode(nil, []byte{0xff, 0xef})) ==
+			"VVNG===="
+	replacerSource := *strings.NewReplacer("a", "source")
+	replacerTarget := *strings.NewReplacer("a", "target")
+	replacerTarget = replacerSource
+	replacerAssigned := replacerTarget.Replace("a") == "source"
+	scannerSource := bufio.NewScanner(strings.NewReader("one\ntwo\n"))
+	scannerTarget := bufio.NewScanner(strings.NewReader("target\n"))
+	*scannerTarget = *scannerSource
+	scannerTargetFirst := scannerTarget.Scan() && scannerTarget.Text() == "one"
+	scannerSourceExhausted := !scannerSource.Scan()
+	scannerTargetSecond := scannerTarget.Scan() && scannerTarget.Text() == "two"
+
 	return fmt.Sprintf(
-		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t",
+		"parse=%q/%q/%q/%q/%q mutex=%t builder=%q/%t/%t/%t/%q timer=%t/%t/%t/%t/%t/%t/%t regexp=%t url=%t base32=%t replacer=%t scanner=%t/%t/%t",
 		parseTarget.Layout,
 		parseTarget.Value,
 		parseTarget.LayoutElem,
@@ -115,6 +150,13 @@ func ProviderAssignments() string {
 		timerActiveTargetPanicked,
 		timerSourceStopped,
 		timerSourcePanicked,
+		regexpAssigned,
+		urlAssigned,
+		base32Assigned,
+		replacerAssigned,
+		scannerTargetFirst,
+		scannerSourceExhausted,
+		scannerTargetSecond,
 	)
 }
 `
@@ -133,7 +175,7 @@ func main() {
 	fmt.Println(fixture.ProviderAssignments())
 }
 `
-	runReflectDifferentialInspect(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		"ProviderAssignments",
@@ -142,14 +184,35 @@ func main() {
 		goRunner,
 		func(artifacts renderedArtifacts) {
 			for _, required := range []string{
-				"TimeParseErrorOperations.$assign",
-				"TimeTimerOperations.$assign",
-				"SyncMutexOperations.$assign",
-				"StringsBuilderOperations.$assign",
+				"TimeParseErrorOperations.$copy",
+				"TimeTimerOperations.$copy",
+				"SyncMutexOperations.$copy",
+				"StringsBuilderOperations.$copy",
+				"RegexpValueOperations.$assign",
+				"NetUrlURLOperations.$assign",
+				"Base32EncodingOperations.$assign",
+				"StringsReplacerOperations.$assign",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
-					t.Fatalf("provider assignment artifact lacks %q", required)
+					relevant := make([]string, 0)
+					for _, line := range strings.Split(artifacts.printed, "\n") {
+						if strings.Contains(line, "ParseError") ||
+							strings.Contains(line, "$goProviderState_") {
+							relevant = append(relevant, line)
+						}
+					}
+					t.Fatalf(
+						"provider assignment artifact lacks %q:\n%s",
+						required,
+						strings.Join(relevant, "\n"),
+					)
 				}
+			}
+			if !regexp.MustCompile(
+				`\$goProviderState_[0-9a-f]+\.\$assign`,
+			).MatchString(artifacts.printed) ||
+				!strings.Contains(artifacts.printed, "CanonicalBufioScanner") {
+				t.Fatalf("scanner assignment lacks its canonical provider state operation")
 			}
 		},
 	)

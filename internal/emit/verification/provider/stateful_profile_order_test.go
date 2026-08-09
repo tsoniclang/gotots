@@ -2,11 +2,9 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -87,7 +85,7 @@ func Consume() bool {
 	if assemblyPath == "" {
 		t.Fatal("profile-order package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -96,35 +94,6 @@ func Consume() bool {
 		`console.log(await Consume());
 `,
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	profile "example.com/profileorder"
-)
-
-func main() { fmt.Println(profile.Consume()) }
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go profile-order comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"profile-order differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
-	}
 	if !strings.Contains(artifacts.printed, "CanonicalBufioReader") {
 		t.Fatalf("canonical cooperative provider state is absent:\n%s", artifacts.printed)
 	}

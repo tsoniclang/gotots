@@ -23,15 +23,8 @@ func TestCallableControlUsesOneCanonicalArtifactOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	context, err = context.WithAddressableStorage(
-		MustSourceArtifactOwner(firstObject),
-		nil,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	if context.ArtifactOwner() != MustSourceArtifactOwner(firstObject) {
-		t.Fatal("addressable storage did not install the canonical artifact owner")
+		t.Fatal("context lost the canonical artifact owner")
 	}
 	_, err = context.WithCallableControls(
 		MustSourceArtifactOwner(secondObject),

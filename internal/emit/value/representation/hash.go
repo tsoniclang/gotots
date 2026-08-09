@@ -4,8 +4,11 @@ import (
 	"go/ast"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
+	rawpointermarker "github.com/tsoniclang/gotots/internal/emit/marker/rawpointer"
 	runtimecomplex "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
@@ -43,9 +46,6 @@ func supportsHash(
 	if panicNilRuntimeValue(context, sourceType) {
 		return true
 	}
-	if unsafePointerValue(sourceType) {
-		return true
-	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		visiting[sourceType] = true
 		result := supportsHash(context, defined.Underlying(), visiting)
@@ -56,6 +56,9 @@ func supportsHash(
 		return true
 	}
 	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok {
+		if basic.Kind() == types.UnsafePointer {
+			return true
+		}
 		if basic.Info()&types.IsUntyped != 0 ||
 			basic.Info()&(types.IsBoolean|
 				types.IsInteger|
@@ -99,9 +102,13 @@ func supportsHash(
 		}
 		return true
 	}
-	_, structType, ok := namedStruct(sourceType)
+	typeName, structType, ok := namedStruct(sourceType)
 	if !ok || !types.Comparable(sourceType) {
 		return false
+	}
+	providerOwned, err := context.Names().ProviderOwnedDeclaration(typeName)
+	if err == nil && providerOwned {
+		return true
 	}
 	visiting[sourceType] = true
 	defer delete(visiting, sourceType)
@@ -171,47 +178,6 @@ func (owner Owner) Hash(
 	if panicNilRuntimeValue(context, sourceType) {
 		return panicNilHash(context), nil
 	}
-	if unsafePointerValue(sourceType) {
-		reference, err := context.Names().Runtime(
-			api.RuntimeMapHash,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		undefined := context.Factory().Identifier("undefined")
-		return api.DirectExpression(
-			context.Factory().ConditionalExpression(
-				context.Factory().BinaryExpression(
-					nil,
-					value,
-					nil,
-					context.Factory().BinaryOperatorToken(
-						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-					),
-					undefined,
-				),
-				context.Factory().QuestionToken(),
-				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
-				context.Factory().ColonToken(),
-				context.Factory().CallExpression(
-					context.Factory().PropertyAccessExpression(
-						reference.Expression(context.Factory()),
-						nil,
-						context.Factory().Identifier(
-							mapruntime.HashObjectMember,
-						),
-						tsgo.NodeFlagsNone,
-					),
-					nil,
-					nil,
-					[]tsgo.Expression{value},
-					tsgo.NodeFlagsNone,
-				),
-			),
-			reference.Requests()...,
-		), nil
-	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		operationContext, err := defined.OperationContext(context)
 		if err != nil {
@@ -260,6 +226,13 @@ func (owner Owner) Hash(
 			value,
 		)
 	}
+	if rawPointerValue(sourceType) {
+		return rawpointermarker.Operation(
+			context,
+			tsoniccore.SymbolHashRawPointer,
+			api.DirectExpression(value),
+		)
+	}
 	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok {
 		member, valid := hashMember(context, basic)
 		if !valid {
@@ -290,45 +263,21 @@ func (owner Owner) Hash(
 		), nil
 	}
 	if pointerValue(sourceType) {
-		pointer, _, _ := pointertype.Resolve(sourceType)
-		representation, err := owner.PointerRepresentation(
+		_, element, _ := pointertype.Resolve(sourceType)
+		targetElement, err := owner.children.RepresentedType(
+			context.WithRole(api.RoleMapKey),
+			source,
+			element,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return pointermarker.Operation(
 			context,
-			pointer,
-			api.PointerRepresentationDemandNone,
+			tsoniccore.SymbolHashPointer,
+			[]api.TypeEmission{targetElement},
+			[]api.ExpressionEmission{api.DirectExpression(value)},
 		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if representation.Representation().DirectClass() {
-			return owner.directClassPointerHash(
-				context,
-				source,
-				pointer.Elem(),
-				value,
-				representation.UsesStorageIdentity(),
-				representation.Requests(),
-			)
-		}
-		reference, err := context.Names().Runtime(
-			api.RuntimePointerHash,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.DirectExpression(
-			context.Factory().CallExpression(
-				reference.Expression(context.Factory()),
-				nil,
-				nil,
-				[]tsgo.Expression{value},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(
-				reference.Requests(),
-				representation.Requests(),
-			)...,
-		), nil
 	}
 	if channelValue(sourceType) {
 		reference, err := context.Names().Runtime(

@@ -15,6 +15,22 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+func (f TargetFile) OutputPath() string {
+	return f.outputPath
+}
+
+func (f TargetFile) PackageName() string {
+	return f.packageName
+}
+
+func (f TargetFile) SourceFile() tsgo.SourceFile {
+	return f.sourceFile
+}
+
+func (f TargetFile) Kind() TargetFileKind {
+	return f.kind
+}
+
 func programScalarABI(
 	source *load.Program,
 	integer api.IntegerRepresentation,
@@ -99,17 +115,103 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 	if s.sealed {
 		return nil, &ScheduleError{Reason: "target files were sealed more than once"}
 	}
+	if err := s.verifyTargetFilesSettled(); err != nil {
+		return nil, err
+	}
+	ordinary, err := s.assembleTargetFiles()
+	if err != nil {
+		return nil, err
+	}
+	files := ordinary
+	if s.sourceImplementations != nil {
+		if len(s.sourceImplementationTargets) == 0 ||
+			s.sourceImplementationContracts == nil {
+			return nil, &ScheduleError{
+				Reason: "source-implementation certification inputs are absent",
+			}
+		}
+		files, err = s.replaceSourceImplementations(
+			ordinary,
+			s.sourceImplementationTargets,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+	s.sealed = true
+	sort.Slice(files, func(left, right int) bool {
+		return files[left].outputPath < files[right].outputPath
+	})
+	return files, nil
+}
+
+func compileProgramSession(
+	session *programSession,
+	roots []Root,
+	options Options,
+) (ProgramEmission, error) {
+	if err := session.requireProgramRoots(roots); err != nil {
+		return ProgramEmission{}, err
+	}
+	if err := session.settle(); err != nil {
+		return ProgramEmission{}, err
+	}
+	files, err := session.targetFiles()
+	if err != nil {
+		return ProgramEmission{}, err
+	}
+	obligations, err := session.environmentObligations()
+	if err != nil {
+		return ProgramEmission{}, err
+	}
+	if err := session.verifyProviderClosure(obligations); err != nil {
+		return ProgramEmission{}, err
+	}
+	if err := session.verifyRootObligations(roots, files); err != nil {
+		return ProgramEmission{}, err
+	}
+	profile, err := session.environmentProfile(options)
+	if err != nil {
+		return ProgramEmission{}, err
+	}
+	dependencies, err := selectedPackageDependencies(options, session.runtimePackage)
+	if err != nil {
+		return ProgramEmission{}, err
+	}
+	return ProgramEmission{
+		files:                       files,
+		environmentObligations:      obligations,
+		environmentProfile:          profile,
+		externalFunctionObligations: session.externalFunctionObligations(),
+		runtimePackage:              session.runtimePackage,
+		packageDependencies:         dependencies,
+	}, nil
+}
+
+func (s *programSession) requireProgramRoots(roots []Root) error {
+	for _, root := range roots {
+		if err := s.requireRoot(root); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *programSession) verifyTargetFilesSettled() error {
 	if s.scheduler.hasPending() ||
 		s.packageExports.hasPending() ||
 		s.requirements.hasPending() ||
 		s.artifacts.HasPending() ||
 		s.packageInitializations.hasPending() {
-		return nil, &ScheduleError{Reason: "target files sealed with pending work"}
+		return &ScheduleError{Reason: "target files sealed with pending work"}
 	}
 	if err := s.artifacts.VerifyClosure(); err != nil {
-		return nil, err
+		return err
 	}
-	s.sealed = true
+	return nil
+}
+
+func (s *programSession) assembleTargetFiles() ([]TargetFile, error) {
 	paths := make([]string, 0, len(s.builders))
 	for outputPath := range s.builders {
 		paths = append(paths, outputPath)
@@ -192,7 +294,6 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		s.scalar,
 		s.concurrency,
 		requirements.runtimeSymbols,
-		requirements.features(),
 		requirements.aliases(),
 	)
 	if err != nil {
@@ -206,13 +307,6 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 			kind:       TargetFileSupport,
 		})
 	}
-	files, err = s.replaceSourceImplementations(files)
-	if err != nil {
-		return nil, err
-	}
-	sort.Slice(files, func(left, right int) bool {
-		return files[left].outputPath < files[right].outputPath
-	})
 	return files, nil
 }
 
@@ -313,7 +407,6 @@ func (s *programSession) programInitializationFile(
 type targetRequirements struct {
 	primitiveAliases         map[api.PrimitiveAlias]struct{}
 	runtimeSymbols           map[api.RuntimeSymbol]struct{}
-	runtimeFeatures          map[api.RuntimeFeature]struct{}
 	certifiedProviderModules map[string]struct{}
 	selectedProviderModules  map[string]struct{}
 }
@@ -322,7 +415,6 @@ func (s *programSession) newTargetRequirements() *targetRequirements {
 	result := &targetRequirements{
 		primitiveAliases:         make(map[api.PrimitiveAlias]struct{}),
 		runtimeSymbols:           make(map[api.RuntimeSymbol]struct{}),
-		runtimeFeatures:          make(map[api.RuntimeFeature]struct{}),
 		certifiedProviderModules: make(map[string]struct{}),
 		selectedProviderModules:  make(map[string]struct{}),
 	}
@@ -341,9 +433,6 @@ func (r *targetRequirements) observe(placement *targetplacement.Owner) {
 	}
 	for _, symbol := range placement.RuntimeSymbols() {
 		r.runtimeSymbols[symbol] = struct{}{}
-	}
-	for _, feature := range placement.RuntimeFeatures() {
-		r.runtimeFeatures[feature] = struct{}{}
 	}
 	for _, request := range placement.Requests() {
 		module := request.ModulePath()
@@ -397,15 +486,6 @@ func (r *targetRequirements) aliases() []api.PrimitiveAlias {
 	}
 	slices.Sort(aliases)
 	return aliases
-}
-
-func (r *targetRequirements) features() []api.RuntimeFeature {
-	features := make([]api.RuntimeFeature, 0, len(r.runtimeFeatures))
-	for feature := range r.runtimeFeatures {
-		features = append(features, feature)
-	}
-	slices.Sort(features)
-	return features
 }
 
 func (s *programSession) packageInitializationOrder() (

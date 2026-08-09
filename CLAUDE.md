@@ -30,12 +30,19 @@ reopens its shared owner.
 `docs/spec/` is authoritative. GoToTS is a general Go-to-TypeScript compiler;
 no acceptance corpus receives privileged behavior.
 
-GoToTS is a standalone project. It has no build, runtime, semantic,
-verification, configuration, or release dependency on an unrelated compiler,
-transpiler, target, or product. An independently useful idea may be adopted
-only as GoToTS-owned source or generated output with standalone TypeScript
-semantics. The originating project is never imported, invoked, or treated as a
-truth owner.
+GoToTS is an independently buildable general compiler. It owns every Go
+semantic decision and never invokes Tsonic or a target compiler to rediscover
+Go meaning. Its canonical output contract is strict ESM Tsonic-flavored
+TypeScript: ordinary TypeScript plus public target-neutral marker types and
+calls selected from `@tsonic/core` by exact declaration identity. Those marker
+contracts are shared Tsonic authority, not copied GoToTS declarations.
+
+Executable target code is a separate consumer artifact. TSTS checks the exact
+immutable canonical source, retains its TS-Go-contract AST, and finalizes
+marker facts on exact AST nodes. A selected target transforms that same AST
+without spelling lookup, source-range joining, reparsing, or checker re-entry.
+GoToTS does not import a target plugin or target runtime, and the target does
+not reinterpret Go source.
 
 The compilation architecture is deliberately direct:
 
@@ -45,7 +52,12 @@ selected Go packages
     -> one context-aware emission walk
     -> typed generated bindings for the official TS-Go AST protocol
     -> pinned TS-Go printNode using its real decoder/factory/printer
-    -> strict ESM TypeScript
+    -> canonical strict ESM Tsonic-flavored TypeScript
+
+canonical TS-Go AST plus finalized TSTS facts on exact nodes
+    -> selected target-owned TS-Go AST transformation
+    -> pinned TS-Go bootstrap printer, later replaceable by TSTS printing
+    -> executable target artifact
 ```
 
 There is no custom source inventory artifact, semantic IR, operation graph,
@@ -117,13 +129,16 @@ representation of the source program.
   propagate. Reconstruction replaces the complete pre-seal artifact and its
   dependency/request set transactionally. Text patching, mutable-node sharing,
   spelling keys, unconditional rescans, and non-convergent cycles are forbidden.
-- Generated output must remain standalone strict ESM. Generated primitive
-  aliases, support declarations, and runtime helpers are emitted and owned by
-  GoToTS; they never import an unrelated compiler or target project.
-- A borrowed marker or declaration is admissible only when GoToTS emits and
-  owns it locally and its ordinary TypeScript meaning is complete. A no-op
-  marker must never stand in for missing Go zero, copy, call, type, or runtime
-  semantics.
+- Canonical output remains strict ESM and may import only accepted public
+  target-neutral marker declarations from `@tsonic/core`; it never imports a
+  target plugin or target runtime. Go-specific support declarations and
+  runtime behavior remain GoToTS-owned unless a shared marker contract exactly
+  owns that semantic class.
+- A marker is admissible only when exact `go/types` evidence selects its
+  canonical provider declaration, TSTS finalizes the corresponding typed fact,
+  and every selected target either lowers that fact or rejects it explicitly.
+  Marker spelling, a local same-named declaration, or a no-op JavaScript body
+  never establishes semantics.
 
 ## Environment Ownership
 

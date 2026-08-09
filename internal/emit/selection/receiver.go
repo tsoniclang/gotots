@@ -55,7 +55,7 @@ func methodReceiver(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	declared := signature.Recv().Type()
-	abiReceiver, receiverABI, err := methodABIReceiver(
+	_, receiverABI, err := methodABIReceiver(
 		context,
 		method,
 		resolved.effective,
@@ -73,8 +73,7 @@ func methodReceiver(
 			children,
 			source,
 			resolved,
-			method,
-			abiReceiver,
+			declared,
 			receiverABI,
 		)
 		return receiver, method, err
@@ -166,7 +165,6 @@ func methodSetReceiver(
 			source,
 			resolved,
 			root,
-			false,
 		)
 	}
 	if receiverABI == api.MethodReceiverABIContractDirect {
@@ -200,8 +198,8 @@ func methodSetReceiver(
 		types.Identical(declaredElement, effectiveElement):
 		return adaptPointerMethodReceiver(
 			context,
+			children,
 			source,
-			method.Origin(),
 			abiPointer,
 			effectiveRaw,
 			receiverABI,
@@ -284,7 +282,6 @@ func MethodExpressionReceiver(
 			source,
 			resolved,
 			root,
-			false,
 		)
 		return receiver, method, err
 	}
@@ -319,8 +316,8 @@ func MethodExpressionReceiver(
 		types.Identical(declaredElement, effectiveElement):
 		value, err = adaptPointerMethodReceiver(
 			context,
+			children,
 			source,
-			method.Origin(),
 			abiPointer,
 			effectiveRaw,
 			receiverABI,

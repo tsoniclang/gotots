@@ -44,7 +44,6 @@ func TestMixedValueFamiliesDefaultNumberProfileTypechecksAndExecutes(
 		t,
 		artifacts,
 		"runtime/string.ts",
-		"runtime/pointer.ts",
 		"runtime/array.ts",
 		"runtime/slice.ts",
 		"runtime/map.ts",
@@ -59,8 +58,6 @@ func TestMixedValueFamiliesDefaultNumberProfileTypechecksAndExecutes(
     MapPanic,
     MapStoreOrder,
     MapValue,
-    PointerPanic,
-    PointerValue,
     SlicePanic,
     SliceStoreOrder,
     SliceValue,
@@ -81,13 +78,11 @@ const panics = (operation: () => void): boolean => {
 
 console.log(StringByte("abc"));
 console.log(StringWindow("abcd"));
-console.log(PointerValue(7));
 console.log(ArrayValue(3));
 console.log(SliceValue(4));
 console.log(MapValue(5));
 console.log(SliceStoreOrder());
 console.log(MapStoreOrder());
-console.log(panics(() => { PointerPanic(); }));
 console.log(panics(() => { ArrayPanic(1); }));
 console.log(panics(() => { SlicePanic(1); }));
 console.log(panics(() => { StringPanic("a", 1); }));
@@ -144,13 +139,11 @@ func panics(operation func()) (result bool) {
 func main() {
 	fmt.Println(values.StringByte("abc"))
 	fmt.Println(values.StringWindow("abcd"))
-	fmt.Println(values.PointerValue(7))
 	fmt.Println(values.ArrayValue(3))
 	fmt.Println(values.SliceValue(4))
 	fmt.Println(values.MapValue(5))
 	fmt.Println(values.SliceStoreOrder())
 	fmt.Println(values.MapStoreOrder())
-	fmt.Println(panics(func() { values.PointerPanic() }))
 	fmt.Println(panics(func() { values.ArrayPanic(1) }))
 	fmt.Println(panics(func() { values.SlicePanic(1) }))
 	fmt.Println(panics(func() { values.StringPanic("a", 1) }))

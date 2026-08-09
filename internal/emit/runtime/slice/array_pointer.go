@@ -82,19 +82,26 @@ func BuildArrayPointer(
 	functionName string,
 	sliceName string,
 	pointerName string,
+	addressName string,
+	projectName string,
 	arrayName string,
 	arrayViewName string,
 ) tsgo.FunctionDeclaration {
-	typeL := typeReference(factory, "L")
 	typeT := typeReference(factory, "T")
 	typeN := typeReference(factory, "N")
+	optionalT := factory.UnionTypeNode([]tsgo.TypeNode{
+		typeT,
+		factory.KeywordTypeNode(
+			tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+		),
+	})
 	arrayType := factory.TypeReferenceNode(
 		factory.Identifier(arrayName),
 		[]tsgo.TypeNode{typeT, typeN},
 	)
 	pointerType := factory.TypeReferenceNode(
 		factory.Identifier(pointerName),
-		[]tsgo.TypeNode{typeL, arrayType},
+		[]tsgo.TypeNode{arrayType},
 	)
 	resultType := factory.UnionTypeNode([]tsgo.TypeNode{
 		pointerType,
@@ -122,16 +129,137 @@ func BuildArrayPointer(
 		},
 		tsgo.NodeFlagsNone,
 	)
-	result := factory.CallExpression(
-		factory.PropertyAccessExpression(
-			factory.Identifier(pointerName),
+	base := factory.CallExpression(
+		factory.Identifier(addressName),
+		nil,
+		[]tsgo.TypeNode{optionalT},
+		[]tsgo.Expression{factory.ElementAccessExpression(
+			locationElement("0"),
 			nil,
-			factory.Identifier("arrayRegion"),
+			locationElement("1"),
+			tsgo.NodeFlagsNone,
+		)},
+		tsgo.NodeFlagsNone,
+	)
+	fromSource := factory.ArrowFunction(
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{parameter(
+			factory,
+			"_source",
+			optionalT,
+		)},
+		arrayType,
+		factory.EqualsGreaterThanToken(),
+		factory.Identifier("view"),
+	)
+	target := factory.Identifier("target")
+	copy := factory.Identifier("copy")
+	index := factory.Identifier("index")
+	copyCall := factory.CallExpression(
+		factory.PropertyAccessExpression(
+			target,
+			nil,
+			factory.Identifier("copy"),
 			tsgo.NodeFlagsNone,
 		),
 		nil,
-		[]tsgo.TypeNode{typeL, typeT, arrayType},
-		[]tsgo.Expression{location, view},
+		nil,
+		nil,
+		tsgo.NodeFlagsNone,
+	)
+	copyElement := factory.CallExpression(
+		factory.PropertyAccessExpression(
+			copy,
+			nil,
+			factory.Identifier("get"),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		[]tsgo.Expression{index},
+		tsgo.NodeFlagsNone,
+	)
+	setElement := factory.CallExpression(
+		factory.PropertyAccessExpression(
+			factory.Identifier("view"),
+			nil,
+			factory.Identifier("set"),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		[]tsgo.Expression{index, copyElement},
+		tsgo.NodeFlagsNone,
+	)
+	toSource := factory.ArrowFunction(
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{parameter(
+			factory,
+			"target",
+			arrayType,
+		)},
+		optionalT,
+		factory.EqualsGreaterThanToken(),
+		factory.Block([]tsgo.Statement{
+			arrayPointerVariable(
+				factory,
+				tsgo.NodeFlagsConst,
+				"copy",
+				copyCall,
+			),
+			factory.ForStatement(
+				factory.VariableDeclarationList(
+					[]tsgo.VariableDeclaration{factory.VariableDeclaration(
+						index,
+						nil,
+						nil,
+						factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+					)},
+					tsgo.NodeFlagsLet,
+				),
+				factory.BinaryExpression(
+					nil,
+					index,
+					nil,
+					factory.BinaryOperatorToken(
+						tsgo.BinaryOperatorLessThanToken,
+					),
+					factory.CallExpression(
+						factory.PropertyAccessExpression(
+							factory.Identifier("globalThis"),
+							nil,
+							factory.Identifier("Number"),
+							tsgo.NodeFlagsNone,
+						),
+						nil,
+						nil,
+						[]tsgo.Expression{factory.Identifier("length")},
+						tsgo.NodeFlagsNone,
+					),
+				),
+				factory.PostfixUnaryExpression(
+					index,
+					tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken,
+				),
+				factory.Block([]tsgo.Statement{
+					factory.ExpressionStatement(setElement),
+				}, true),
+			),
+			factory.ReturnStatement(factory.ElementAccessExpression(
+				locationElement("0"),
+				nil,
+				locationElement("1"),
+				tsgo.NodeFlagsNone,
+			)),
+		}, true),
+	)
+	result := factory.CallExpression(
+		factory.Identifier(projectName),
+		nil,
+		[]tsgo.TypeNode{optionalT, arrayType},
+		[]tsgo.Expression{base, fromSource, toSource},
 		tsgo.NodeFlagsNone,
 	)
 	return factory.FunctionDeclaration(
@@ -139,7 +267,6 @@ func BuildArrayPointer(
 		nil,
 		factory.Identifier(functionName),
 		[]tsgo.TypeParameterDeclaration{
-			typeParameter(factory, "L"),
 			typeParameter(factory, "T"),
 			factory.TypeParameterDeclaration(
 				nil,
@@ -204,6 +331,12 @@ func BuildArrayPointer(
 					),
 				}, true),
 				nil,
+			),
+			arrayPointerVariable(
+				factory,
+				tsgo.NodeFlagsConst,
+				"view",
+				view,
 			),
 			factory.ReturnStatement(result),
 		}, true),

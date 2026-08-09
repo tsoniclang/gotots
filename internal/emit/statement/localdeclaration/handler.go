@@ -252,19 +252,7 @@ func localVariableDeclaration(
 	sourceName := binding.sourceName
 	object := binding.object
 	value := binding.value
-	targetName, selected := context.AddressableStorage().Name(context, object)
-	var err error
-	if !selected {
-		targetName, err = context.Names().Declare(object)
-	} else {
-		value, err = context.AddressableStorage().Cell(
-			context,
-			children,
-			sourceName,
-			binding.sourceType,
-			value,
-		)
-	}
+	targetName, err := context.Names().Declare(object)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -279,8 +267,8 @@ func localVariableDeclaration(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if !selected && (requiresInferenceAnnotation ||
-		context.Values().RequiresExplicitType(context, binding.sourceType)) {
+	if requiresInferenceAnnotation ||
+		context.Values().RequiresExplicitType(context, binding.sourceType) {
 		represented, err := children.RepresentedType(
 			context.WithRole(api.RoleLocalType),
 			sourceName,
@@ -293,7 +281,7 @@ func localVariableDeclaration(
 		requests = append(requests, represented.Requests()...)
 	}
 	var initializer tsgo.Expression = value.Value()
-	if binding.omitInitializer && !selected {
+	if binding.omitInitializer {
 		initializer = nil
 	}
 	return context.Factory().VariableDeclaration(

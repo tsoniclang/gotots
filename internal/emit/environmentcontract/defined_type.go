@@ -35,12 +35,7 @@ func definedDeclaration(
 		return api.DeclarationEmission{}, err
 	}
 	typeParameters := generic.parameters
-	logicalArguments := append([]tsgo.TypeNode(nil), generic.arguments...)
 	valueType := target.Value()
-	classType := context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(name),
-		logicalArguments,
-	)
 	members := []tsgo.ClassElement{
 		context.Factory().PropertyDeclaration(
 			[]tsgo.ModifierLike{
@@ -88,7 +83,6 @@ func definedDeclaration(
 		markers, err = typefacet.Build(
 			context,
 			typeName.Type(),
-			classType,
 			storage.Value(),
 			representationFacets,
 			true,

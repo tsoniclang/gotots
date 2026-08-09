@@ -12,6 +12,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func compileArrayFixture(t *testing.T) emit.ProgramEmission {
@@ -121,6 +123,12 @@ func compileTypeScript(
 	paths []string,
 ) error {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(directory); err != nil {
+		return err
+	}
+	if err := runtimefixture.InstallResolution(directory, filepath.Join(directory, "out")); err != nil {
+		return err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	arguments := []string{

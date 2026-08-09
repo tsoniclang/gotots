@@ -16,10 +16,16 @@ import type { int } from "../src/internal/scalars.js";
 import { integerFromHost } from "../src/internal/host-integer.js";
 
 import {
+  Encoding as Base32Encoding,
+  state as base32State,
+} from "../src/encoding/base32.js";
+import { Base32EncodingOperations } from "../src/internal/facets/provider-encoding-base32.js";
+import {
   Encoding,
   NewEncoder,
   state,
 } from "../src/encoding/base64.js";
+import { Base64EncodingOperations } from "../src/internal/facets/provider-encoding-base64.js";
 import { EncodeToString as EncodeHex } from "../src/encoding/hex.js";
 import { sliceValues } from "../src/internal/runtime/slice.js";
 import type { Writer } from "../src/io.js";
@@ -44,6 +50,30 @@ test("base64 standard encoding round-trips bytes and rejects corrupt input", () 
   assert.equal(trailingFailure?.Error(), "illegal base64 data at input byte 4");
   const [, shortFailure] = Encoding.DecodeString(encoding, "Zg");
   assert.equal(shortFailure?.Error(), "illegal base64 data at input byte 0");
+});
+
+test("base64 representation assignment preserves identity and copies state", () => {
+  const standard = requireEncoding(state.StdEncoding);
+  const url = requireEncoding(state.URLEncoding);
+  const target = Base64EncodingOperations.$copy(standard);
+
+  Base64EncodingOperations.$assign(target, url);
+
+  const source = RuntimeSlice.literal([0xff, 0xef]);
+  assert.equal(Encoding.EncodeToString(target, source), "_-8=");
+  assert.equal(Encoding.EncodeToString(standard, source), "/+8=");
+});
+
+test("base32 representation assignment preserves identity and copies state", () => {
+  const standard = requireBase32Encoding(base32State.StdEncoding);
+  const hexadecimal = requireBase32Encoding(base32State.HexEncoding);
+  const target = Base32EncodingOperations.$copy(standard);
+
+  Base32EncodingOperations.$assign(target, hexadecimal);
+
+  const source = RuntimeSlice.literal([0xff, 0xef]);
+  assert.equal(byteText(Base32Encoding.AppendEncode(target, byteSlice([]), source)), "VVNG====");
+  assert.equal(byteText(Base32Encoding.AppendEncode(standard, byteSlice([]), source)), "77XQ====");
 });
 
 test("base64 stream encoder flushes trailing bytes on Close", () => {
@@ -152,6 +182,16 @@ function requireEncoding(encoding: Encoding | undefined): Encoding {
   assert.notEqual(encoding, undefined);
   if (encoding === undefined) {
     throw new Error("missing standard encoding");
+  }
+  return encoding;
+}
+
+function requireBase32Encoding(
+  encoding: Base32Encoding | undefined,
+): Base32Encoding {
+  assert.notEqual(encoding, undefined);
+  if (encoding === undefined) {
+    throw new Error("missing base32 encoding");
   }
   return encoding;
 }

@@ -2,11 +2,11 @@ package reflectvalue_test
 
 import "testing"
 
-// TestBinaryCodecMatchesGo proves encoding/binary Read and Write over the
+// TestBinaryCodecCanonicalizesWithNativeEvidence covers encoding/binary Read and Write over the
 // completed reflection value model: struct and slice payloads across both
 // byte orders, exact wire bytes, in-place decode through pointers, and
 // the exact Go invalid-type errors for platform-sized integers.
-func TestBinaryCodecMatchesGo(t *testing.T) {
+func TestBinaryCodecCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -84,7 +84,7 @@ func main() {
 	fmt.Println(fixture.Transfer())
 }
 `
-	runReflectDifferential(
+	verifyReflectCanonical(
 		t,
 		source,
 		"Transfer",

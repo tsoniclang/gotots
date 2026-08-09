@@ -28,18 +28,6 @@ func (r DeclarationRequirement) NamedStructOperation() (
 	return r.typeName, r.operation, true
 }
 
-func (r DeclarationRequirement) AddressableStorage() (
-	ArtifactOwner,
-	*types.Var,
-	bool,
-) {
-	if !r.Valid() ||
-		r.kind != DeclarationRequirementAddressableStorage {
-		return ArtifactOwner{}, nil, false
-	}
-	return r.owner, r.variable, true
-}
-
 func (r DeclarationRequirement) ConstantProjection() (
 	*types.Const,
 	types.BasicKind,
@@ -184,13 +172,6 @@ func (r DeclarationRequirement) ReflectionType() (*GeneratedArtifact, bool) {
 	)
 }
 
-func (r DeclarationRequirement) UnsafeCodec() (*GeneratedArtifact, bool) {
-	return r.generatedDefinition(
-		DeclarationRequirementUnsafeCodec,
-		GeneratedArtifactUnsafeCodec,
-	)
-}
-
 func (r DeclarationRequirement) ProviderInterfaceBridge() (
 	*GeneratedArtifact,
 	bool,
@@ -331,7 +312,6 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementInterfaceDynamicTypeToken,
 		DeclarationRequirementGenericCapability,
 		DeclarationRequirementCallableABI,
-		DeclarationRequirementPointerRepresentation,
 		DeclarationRequirementProviderInterfaceBridge,
 		DeclarationRequirementProviderInterfaceCapability,
 		DeclarationRequirementProviderProfileInterfaceCapability,
@@ -339,8 +319,7 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementDeferredCallableRegistry,
 		DeclarationRequirementGenericConcretization,
 		DeclarationRequirementReflectionType,
-		DeclarationRequirementReflectionValueOperations,
-		DeclarationRequirementUnsafeCodec:
+		DeclarationRequirementReflectionValueOperations:
 		return r.generated, true
 	case DeclarationRequirementTypeRepresentation:
 		if r.generated != nil {

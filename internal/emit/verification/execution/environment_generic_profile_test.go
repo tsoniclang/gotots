@@ -10,6 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
 
 func TestEnvironmentGenericCallableContractIsCanonicalAndBodyless(
@@ -109,6 +110,9 @@ func Sum(values []int32, input <-chan int32) int32 {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	if err := tsgo.Compile(
 		ctx,
 		repositoryRoot(),

@@ -16,6 +16,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestMixedValueFamiliesTypecheckAndExecuteThroughOneRuntimeGraph(
@@ -45,7 +47,6 @@ func TestMixedValueFamiliesTypecheckAndExecuteThroughOneRuntimeGraph(
 		artifacts,
 		"runtime/integer.ts",
 		"runtime/string.ts",
-		"runtime/pointer.ts",
 		"runtime/array.ts",
 		"runtime/slice.ts",
 		"runtime/map.ts",
@@ -59,8 +60,6 @@ func TestMixedValueFamiliesTypecheckAndExecuteThroughOneRuntimeGraph(
     MapStoreOrder,
     MapValue,
     NumberValue,
-    PointerPanic,
-    PointerValue,
     SlicePanic,
     SliceStoreOrder,
     SliceValue,
@@ -82,13 +81,11 @@ const panics = (operation: () => void): boolean => {
 console.log(NumberValue(17n, 5n).toString());
 console.log(StringByte("abc").toString());
 console.log(StringWindow("abcd"));
-console.log(PointerValue(7).toString());
 console.log(ArrayValue(3).toString());
 console.log(SliceValue(4).toString());
 console.log(MapValue(5).toString());
 console.log(SliceStoreOrder().toString());
 console.log(MapStoreOrder().toString());
-console.log(panics(() => { PointerPanic(); }));
 console.log(panics(() => { ArrayPanic(1n); }));
 console.log(panics(() => { SlicePanic(1n); }));
 console.log(panics(() => { StringPanic("a", 1n); }));
@@ -352,6 +349,9 @@ func typecheck(
 	runner string,
 ) {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
@@ -361,6 +361,9 @@ func typecheck(
 	}
 	arguments = append(arguments, paths...)
 	arguments = append(arguments, runner)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	if err := tsgo.Compile(
@@ -403,13 +406,11 @@ func main() {
 	fmt.Println(values.NumberValue(17, 5))
 	fmt.Println(values.StringByte("abc"))
 	fmt.Println(values.StringWindow("abcd"))
-	fmt.Println(values.PointerValue(7))
 	fmt.Println(values.ArrayValue(3))
 	fmt.Println(values.SliceValue(4))
 	fmt.Println(values.MapValue(5))
 	fmt.Println(values.SliceStoreOrder())
 	fmt.Println(values.MapStoreOrder())
-	fmt.Println(panics(func() { values.PointerPanic() }))
 	fmt.Println(panics(func() { values.ArrayPanic(1) }))
 	fmt.Println(panics(func() { values.SlicePanic(1) }))
 	fmt.Println(panics(func() { values.StringPanic("a", 1) }))

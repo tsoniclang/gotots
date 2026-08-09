@@ -234,7 +234,6 @@ func TestProviderScalarBoundaryFailsWithoutCertifiedABI(t *testing.T) {
 		tsgo.NewFactory(),
 		scalarBoundaryNames{},
 		scalarBoundaryValues{},
-		scalarBoundaryStorage{},
 		api.IntegerRepresentationNumber,
 		api.EvaluationOrderDirect,
 		api.ConcurrencySemanticsDisabled,
@@ -292,7 +291,6 @@ func scalarBoundaryContextWithNames(
 		tsgo.NewFactory(),
 		names,
 		scalarBoundaryValues{},
-		scalarBoundaryStorage{},
 		product,
 		api.EvaluationOrderDirect,
 		api.ConcurrencySemanticsDisabled,
@@ -397,8 +395,4 @@ func (scalarBoundaryNames) Runtime(
 
 type scalarBoundaryValues struct {
 	api.Values
-}
-
-type scalarBoundaryStorage struct {
-	api.AddressableStorage
 }

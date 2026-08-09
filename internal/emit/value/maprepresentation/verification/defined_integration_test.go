@@ -126,7 +126,8 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		"export type Alias = Values;",
 		"export type PlainAlias = GoMapValue<",
 		"export class Other",
-		"GoPointer.cell<Values, Values>(new Values(GoMap.nil",
+		"Pointer<Values> | undefined = allocatePointer<Values>(new Values(GoMap.nil",
+		"loadPointer<Values>",
 		"let values: Values = new Values(GoMap.make",
 		"let other: Other = new Other(values.$value)",
 		"GoMapValue<Count, int32>",
@@ -278,7 +279,6 @@ func nilWriteFails() (failed bool) {
 }
 
 func main() {
-	fmt.Println(values.ZeroState())
 	fmt.Println(values.MakeAliases())
 	fmt.Println(values.Conversions())
 	fmt.Println(values.NilOperations())
@@ -312,7 +312,6 @@ func executeDefinedMapTypeScript(
     NilOperations,
     NilWrite,
     PlainAliasBehavior,
-    ZeroState,
 } from "`+artifacts.module(t, "source.ts")+`";
 import "./program.js";
 
@@ -323,7 +322,6 @@ function print(...values: Array<number | bigint | boolean>): void {
     console.log(...values.map(show));
 }
 
-print(...ZeroState());
 print(...MakeAliases());
 print(...Conversions());
 print(...NilOperations());

@@ -15,21 +15,50 @@ import (
 func (owner Owner) RequiresStorageProjection(
 	context api.Context,
 	sourceType types.Type,
-) bool {
+) (bool, error) {
 	if panicNilRuntimeValue(context, sourceType) {
-		return false
+		return false, nil
 	}
 	if model, ok := maprepresentation.Source(context, sourceType); ok {
-		return model.Nominal()
+		return model.Nominal(), nil
 	}
-	if _, ok := definedStorageModel(sourceType); ok {
-		return true
+	if defined, ok := definedStorageModel(sourceType); ok {
+		representation, err := defined.Representation(context)
+		if err != nil {
+			return false, err
+		}
+		switch representation.Kind() {
+		case api.DefinedValueRepresentationGeneratedNumeric,
+			api.DefinedValueRepresentationProviderCanonical:
+			return false, nil
+		case api.DefinedValueRepresentationGeneratedWrapper,
+			api.DefinedValueRepresentationProviderOperations:
+			return true, nil
+		default:
+			return false, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "defined storage projection representation is invalid",
+			}
+		}
 	}
 	if _, ok := isAnonymousStruct(sourceType); ok {
-		return true
+		return true, nil
 	}
-	_, _, ok := namedStruct(sourceType)
-	return ok
+	typeName, _, ok := namedStruct(sourceType)
+	if !ok {
+		return false, nil
+	}
+	if context.Names() == nil {
+		return false, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "storage projection has no name owner",
+		}
+	}
+	providerOwned, err := context.Names().ProviderOwnedDeclaration(typeName)
+	if err != nil {
+		return false, err
+	}
+	return !providerOwned, nil
 }
 
 func (owner Owner) StorageType(
@@ -87,6 +116,17 @@ func (owner Owner) StorageType(
 		), nil
 	}
 	if typeName, _, ok := namedStruct(sourceType); ok {
+		required, err := owner.RequiresStorageProjection(context, sourceType)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		if !required {
+			return owner.children.RepresentedType(
+				context,
+				source,
+				sourceType,
+			)
+		}
 		reference, err := context.Names().NamedStructStorage(typeName)
 		if err != nil {
 			return api.TypeEmission{}, err
@@ -187,6 +227,13 @@ func (owner Owner) ToStorage(
 		)
 	}
 	if _, _, ok := namedStruct(sourceType); ok {
+		required, err := owner.RequiresStorageProjection(context, sourceType)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !required {
+			return value, nil
+		}
 		converted, err := owner.namedStructOperationMember(
 			context,
 			source,
@@ -263,6 +310,13 @@ func (owner Owner) FromStorage(
 		)
 	}
 	if _, _, ok := namedStruct(sourceType); ok {
+		required, err := owner.RequiresStorageProjection(context, sourceType)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !required {
+			return value, nil
+		}
 		converted, err := owner.namedStructOperationMember(
 			context,
 			source,

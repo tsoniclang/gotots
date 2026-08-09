@@ -1455,6 +1455,10 @@
       "typeArguments": [
         "go:universe|error",
         "io|kind=2|receiver=|name=Reader"
+      ],
+      "operations": [
+        "assign",
+        "copy"
       ]
     },
     {
@@ -1544,6 +1548,17 @@
       "capabilities": [
         "project",
         "wrap"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "flag|kind=2|receiver=|name=FlagSet",
+      "specifier": "@gotots/gostdlib/internal/facets/named-flag.js",
+      "sourcePath": "src/internal/facets/named-flag.ts",
+      "export": "FlagSetValueOperations",
+      "capabilities": [
+        "assign",
+        "copy"
       ]
     },
     {
@@ -1734,6 +1749,17 @@
     },
     {
       "kind": "named-struct-operations",
+      "sourceIdentity": "bufio|kind=2|receiver=|name=Scanner",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-scanner.js",
+      "sourcePath": "src/internal/facets/provider-bufio-scanner.ts",
+      "export": "BufioScannerOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
       "sourceIdentity": "bufio|kind=2|receiver=|name=Writer",
       "specifier": "@gotots/gostdlib/internal/facets/provider-bufio-writer.js",
       "sourcePath": "src/internal/facets/provider-bufio-writer.ts",
@@ -1760,6 +1786,28 @@
       "specifier": "@gotots/gostdlib/internal/facets/provider-compress-gzip.js",
       "sourcePath": "src/internal/facets/provider-compress-gzip.ts",
       "export": "GzipReaderOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "encoding/base32|kind=2|receiver=|name=Encoding",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base32.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base32.ts",
+      "export": "Base32EncodingOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "encoding/base64|kind=2|receiver=|name=Encoding",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-encoding-base64.js",
+      "sourcePath": "src/internal/facets/provider-encoding-base64.ts",
+      "export": "Base64EncodingOperations",
       "capabilities": [
         "assign",
         "copy"
@@ -1836,6 +1884,8 @@
       "sourcePath": "src/internal/facets/named-math-big.ts",
       "export": "MathBigFloatOperations",
       "capabilities": [
+        "assign",
+        "copy",
         "storage",
         "zero"
       ],
@@ -1848,6 +1898,8 @@
       "sourcePath": "src/internal/facets/named-math-big.ts",
       "export": "MathBigIntOperations",
       "capabilities": [
+        "assign",
+        "copy",
         "storage",
         "zero"
       ],
@@ -1860,6 +1912,8 @@
       "sourcePath": "src/internal/facets/named-net-url.ts",
       "export": "NetUrlURLOperations",
       "capabilities": [
+        "assign",
+        "copy",
         "storage"
       ],
       "storageExport": "NetUrlURLStorage"
@@ -1879,6 +1933,28 @@
     },
     {
       "kind": "named-struct-operations",
+      "sourceIdentity": "os|kind=2|receiver=|name=Process",
+      "specifier": "@gotots/gostdlib/internal/facets/named-os.js",
+      "sourcePath": "src/internal/facets/named-os.ts",
+      "export": "OsProcessOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "os/exec|kind=2|receiver=|name=Cmd",
+      "specifier": "@gotots/gostdlib/internal/facets/named-os-exec.js",
+      "sourcePath": "src/internal/facets/named-os-exec.ts",
+      "export": "OsExecCmdOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
       "sourceIdentity": "runtime|kind=2|receiver=|name=MemStats",
       "specifier": "@gotots/gostdlib/internal/facets/named-runtime.js",
       "sourcePath": "src/internal/facets/named-runtime.ts",
@@ -1889,6 +1965,39 @@
         "zero"
       ],
       "storageExport": "RuntimeMemStatsStorage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "runtime/pprof|kind=2|receiver=|name=Profile",
+      "specifier": "@gotots/gostdlib/internal/facets/named-runtime-pprof.js",
+      "sourcePath": "src/internal/facets/named-runtime-pprof.ts",
+      "export": "RuntimePprofProfileOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "regexp|kind=2|receiver=|name=Regexp",
+      "specifier": "@gotots/gostdlib/internal/facets/provider-regexp.js",
+      "sourcePath": "src/internal/facets/provider-regexp.ts",
+      "export": "RegexpValueOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "reflect|kind=2|receiver=|name=MapIter",
+      "specifier": "@gotots/gostdlib/internal/facets/named-reflect.js",
+      "sourcePath": "src/internal/facets/named-reflect.ts",
+      "export": "ReflectMapIterOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
     },
     {
       "kind": "named-struct-operations",
@@ -1918,6 +2027,8 @@
       "sourcePath": "src/internal/facets/named-time.ts",
       "export": "TimeTickerOperations",
       "capabilities": [
+        "assign",
+        "copy",
         "storage"
       ],
       "storageExport": "TimeTickerStorage"
@@ -1996,6 +2107,8 @@
       "sourcePath": "src/internal/facets/named-unicode.ts",
       "export": "UnicodeRangeTableOperations",
       "capabilities": [
+        "assign",
+        "copy",
         "make",
         "storage"
       ],
@@ -2177,6 +2290,17 @@
         "zero"
       ],
       "storageExport": "SyncAtomicUint64Storage"
+    },
+    {
+      "kind": "named-struct-operations",
+      "sourceIdentity": "strings|kind=2|receiver=|name=Replacer",
+      "specifier": "@gotots/gostdlib/internal/facets/named-strings.js",
+      "sourcePath": "src/internal/facets/named-strings.ts",
+      "export": "StringsReplacerOperations",
+      "capabilities": [
+        "assign",
+        "copy"
+      ]
     },
     {
       "kind": "named-struct-operations",

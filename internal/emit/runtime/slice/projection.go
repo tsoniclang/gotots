@@ -52,7 +52,7 @@ func BuildProjection(
 	if capabilities.Address {
 		members = append(members, builder.addressMethod())
 	}
-	if capabilities.ArrayPointer || capabilities.Region {
+	if capabilities.Address || capabilities.ArrayPointer || capabilities.Region {
 		members = append(members, builder.arrayLocationMethod())
 	}
 	return factory.ClassDeclaration(
@@ -342,12 +342,11 @@ func (b projectionBuilder) sliceType(element string) tsgo.TypeReferenceNode {
 }
 
 func (b projectionBuilder) pointerType(
-	logical tsgo.TypeNode,
-	storage tsgo.TypeNode,
+	element tsgo.TypeNode,
 ) tsgo.TypeReferenceNode {
 	return b.factory.TypeReferenceNode(
 		b.id(b.pointerName),
-		[]tsgo.TypeNode{logical, storage},
+		[]tsgo.TypeNode{element},
 	)
 }
 

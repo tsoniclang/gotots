@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestReflectNewDefinedScalarLocationMatchesGo(t *testing.T) {
+func TestReflectNewDefinedScalarLocationCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -48,7 +48,7 @@ func main() {
 	fmt.Println(fixture.DefinedScalarFacts())
 }
 `
-	runReflectDifferentialInspect(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		"DefinedScalarFacts",
@@ -57,9 +57,9 @@ func main() {
 		goRunner,
 		func(artifacts renderedArtifacts) {
 			for _, required := range []string{
-				"GoPointer.cell(new DefinedText",
-				"instance.value * DefinedCount__from_reflectvalue.$goType",
-				"GoPointer.cell(0 * DefinedCount__from_reflectvalue.$goType)",
+				"allocatePointer(new DefinedText",
+				"loadPointer(instance)",
+				"allocatePointer(0 * DefinedCount__from_reflectvalue.$goType)",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					t.Fatalf(

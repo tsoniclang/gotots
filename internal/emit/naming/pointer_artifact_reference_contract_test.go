@@ -129,45 +129,6 @@ type IntValue interface { Get() int32 }
 	}
 }
 
-func TestPointerRepresentationCanonicalizesGenericNominalFamily(t *testing.T) {
-	sourcePackage := types.NewPackage("example.com/family", "family")
-	parameter := types.NewTypeParam(
-		types.NewTypeName(token.NoPos, sourcePackage, "T", nil),
-		types.NewInterfaceType(nil, nil).Complete(),
-	)
-	typeName := types.NewTypeName(token.NoPos, sourcePackage, "Box", nil)
-	origin := types.NewNamed(
-		typeName,
-		types.NewStruct(
-			[]*types.Var{types.NewField(
-				token.NoPos,
-				sourcePackage,
-				"Value",
-				parameter,
-				false,
-			)},
-			nil,
-		),
-		nil,
-	)
-	origin.SetTypeParams([]*types.TypeParam{parameter})
-	instantiated, err := types.Instantiate(
-		types.NewContext(),
-		origin,
-		[]types.Type{types.Typ[types.Int32]},
-		true,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	declaration := pointerRepresentationFamily(types.NewPointer(origin))
-	occurrence := pointerRepresentationFamily(types.NewPointer(instantiated))
-	if !types.Identical(declaration, occurrence) ||
-		!types.Identical(declaration.Elem(), origin) {
-		t.Fatal("generic nominal pointer family did not converge on its origin")
-	}
-}
-
 func TestCrossPackagePrivateLinkageUsesDefiningModule(t *testing.T) {
 	provider := types.NewPackage("example.com/provider", "provider")
 	consumer := types.NewPackage("example.com/consumer", "consumer")

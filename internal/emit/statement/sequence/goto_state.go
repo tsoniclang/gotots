@@ -307,32 +307,18 @@ func stateGotoPrelude(
 		if err != nil {
 			return nil, nil, err
 		}
-		name, storage := context.AddressableStorage().Name(
-			context,
-			local.object,
-		)
+		name, err := context.Names().Declare(local.object)
 		var targetType tsgo.TypeNode
-		if storage {
-			zero, err = context.AddressableStorage().Cell(
-				context,
-				children,
+		if err == nil {
+			target, targetErr := children.RepresentedType(
+				context.WithRole(api.RoleLocalType),
 				local.source,
 				local.object.Type(),
-				zero,
 			)
-		} else {
-			name, err = context.Names().Declare(local.object)
-			if err == nil {
-				target, targetErr := children.RepresentedType(
-					context.WithRole(api.RoleLocalType),
-					local.source,
-					local.object.Type(),
-				)
-				err = targetErr
-				if targetErr == nil {
-					targetType = target.Value()
-					requests = append(requests, target.Requests()...)
-				}
+			err = targetErr
+			if targetErr == nil {
+				targetType = target.Value()
+				requests = append(requests, target.Requests()...)
 			}
 		}
 		if err != nil {

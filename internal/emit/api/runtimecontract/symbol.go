@@ -11,11 +11,6 @@ const (
 	RuntimeStringEncodeRune           RuntimeSymbol = 5
 	RuntimeStringDecodeRune           RuntimeSymbol = 6
 	RuntimeDenseIndex                 RuntimeSymbol = 90
-	RuntimePointer                    RuntimeSymbol = 100
-	RuntimePointerHash                RuntimeSymbol = 101
-	RuntimePointerRegion              RuntimeSymbol = 102
-	RuntimePointerUnsafeMemory        RuntimeSymbol = 103
-	RuntimePointerProjection          RuntimeSymbol = 104
 	RuntimeArray                      RuntimeSymbol = 200
 	RuntimeArrayAllocate              RuntimeSymbol = 201
 	RuntimeArrayView                  RuntimeSymbol = 202
@@ -26,9 +21,6 @@ const (
 	RuntimeContainerStorageToken      RuntimeSymbol = 253
 	RuntimeContainerStoredValue       RuntimeSymbol = 254
 	RuntimeContainerStorageType       RuntimeSymbol = 255
-	RuntimePointerTypeToken           RuntimeSymbol = 256
-	RuntimePointerRepresentedValue    RuntimeSymbol = 257
-	RuntimePointerType                RuntimeSymbol = 258
 	RuntimeSlice                      RuntimeSymbol = 300
 	RuntimeSliceAddress               RuntimeSymbol = 301
 	RuntimeSliceStorage               RuntimeSymbol = 302
@@ -97,12 +89,6 @@ const (
 	RuntimeScheduler                  RuntimeSymbol = 1105
 	RuntimeSelectReady                RuntimeSymbol = 1106
 	RuntimeSelectAttempt              RuntimeSymbol = 1107
-	RuntimeUnsafeCodec                RuntimeSymbol = 1199
-	RuntimeUnsafePointer              RuntimeSymbol = 1200
 	RuntimeUnsafeString               RuntimeSymbol = 1210
-	RuntimeUnsafeSlice                RuntimeSymbol = 1211
-	RuntimeUnsafeStringData           RuntimeSymbol = 1212
-	RuntimeUnsafeSliceData            RuntimeSymbol = 1213
-	RuntimeUnsafeSliceHeader          RuntimeSymbol = 1214
 	RuntimeAwaitable                  RuntimeSymbol = 1300
 )

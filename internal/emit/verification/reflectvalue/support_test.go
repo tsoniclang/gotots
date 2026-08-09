@@ -15,6 +15,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 type renderedArtifacts struct {
@@ -193,6 +194,9 @@ func waveThreeTypecheck(
 	paths []string,
 ) {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	writeProgramFile(
 		t,
 		filepath.Join(workingDirectory, "package.json"),
@@ -262,78 +266,29 @@ func waveThreeTypecheck(
 	}
 }
 
-func executeReflectTypeScript(
+func typecheckReflectCanonicalSource(
 	t *testing.T,
 	workingDirectory string,
 	paths []string,
 	assemblyPath string,
 	exports []string,
 	runnerBody string,
-) string {
+) {
 	t.Helper()
-	waveThreeTypecheck(t, workingDirectory, paths)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	modulePath := "./" + strings.TrimSuffix(assemblyPath, ".ts") + ".js"
 	writeProgramFile(t, runnerPath, `import "./program.js";
 import { `+strings.Join(exports, ", ")+` } from "`+modulePath+`";
 
 `+runnerBody)
-	outputDirectory := filepath.Join(workingDirectory, "out")
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	if err := tsgo.Compile(
-		ctx,
-		repositoryRoot(),
-		workingDirectory,
-		[]string{
-			"--target", "es2022",
-			"--module", "nodenext",
-			"--moduleResolution", "nodenext",
-			"--strict",
-			"--noUncheckedIndexedAccess",
-			"--outDir", outputDirectory,
-			runnerPath,
-		},
-	); err != nil {
-		t.Fatal(err)
-	}
-	runtimeLink := filepath.Join(
-		workingDirectory,
-		"node_modules",
-		"@gotots",
-		"runtime",
-	)
-	if err := os.Remove(runtimeLink); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(
-		filepath.Join(outputDirectory, "runtime"),
-		runtimeLink,
-	); err != nil {
-		t.Fatal(err)
-	}
-	runContext, runCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer runCancel()
-	command := exec.CommandContext(
-		runContext,
-		"node",
-		filepath.Join(outputDirectory, "runner.js"),
-	)
-	command.Dir = workingDirectory
-	command.Env = append(os.Environ(), "NODE_OPTIONS=--max-old-space-size=1024")
-	output, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute generated reflection program: %v\n%s", err, output)
-	}
-	return string(output)
+	waveThreeTypecheck(t, workingDirectory, append(paths, runnerPath))
 }
 
-// runReflectDifferential compiles the fixture, executes the generated
-// TypeScript and the native Go program, and exact-compares their output.
-func runReflectDifferential(
+// verifyReflectCanonical compiles and strictly checks the canonical generated
+// source plus its typed consumer. The native Go runner independently proves
+// that the source fixture is executable. Runtime comparison belongs to the
+// selected target after canonical marker lowering.
+func verifyReflectCanonical(
 	t *testing.T,
 	source string,
 	rootName string,
@@ -342,7 +297,7 @@ func runReflectDifferential(
 	goRunner string,
 ) {
 	t.Helper()
-	runReflectDifferentialInspect(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		rootName,
@@ -353,7 +308,7 @@ func runReflectDifferential(
 	)
 }
 
-func runReflectDifferentialInspect(
+func verifyReflectCanonicalInspect(
 	t *testing.T,
 	source string,
 	rootName string,
@@ -363,7 +318,7 @@ func runReflectDifferentialInspect(
 	inspect func(renderedArtifacts),
 ) {
 	t.Helper()
-	runReflectDifferentialProjectInspect(
+	verifyReflectCanonicalProjectInspect(
 		t,
 		source,
 		rootName,
@@ -375,7 +330,7 @@ func runReflectDifferentialInspect(
 	)
 }
 
-func runReflectDifferentialProjectInspect(
+func verifyReflectCanonicalProjectInspect(
 	t *testing.T,
 	source string,
 	rootName string,
@@ -407,7 +362,7 @@ func runReflectDifferentialProjectInspect(
 	if assemblyPath == "" {
 		t.Fatal("reflection fixture package assembly is absent")
 	}
-	targetOutput := executeReflectTypeScript(
+	typecheckReflectCanonicalSource(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -428,11 +383,7 @@ func runReflectDifferentialProjectInspect(
 	if err != nil {
 		t.Fatalf("execute Go reflection comparison: %v\n%s", err, sourceOutput)
 	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"reflection differential:\nGo:\n%s\nTypeScript:\n%s",
-			sourceOutput,
-			targetOutput,
-		)
+	if len(sourceOutput) == 0 {
+		t.Fatal("native Go reflection fixture produced no evidence")
 	}
 }

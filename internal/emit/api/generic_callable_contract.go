@@ -307,16 +307,6 @@ func functionType(function *types.Func) (*types.Signature, bool) {
 	return signature, ok
 }
 
-func operationOwnerFunction(
-	operation *GenericOperationContract,
-) (*types.Func, bool) {
-	if operation == nil {
-		return nil, false
-	}
-	function, ok := operation.Owner().(*types.Func)
-	return function, ok && function != nil && function.Origin() == function
-}
-
 type GenericConcretization struct {
 	owner        *types.Func
 	arguments    []types.Type
@@ -532,6 +522,28 @@ func (c *GenericConcretization) LexicalAnchor() *types.TypeName {
 		return nil
 	}
 	return c.anchor
+}
+
+func (c *GenericConcretization) Identical(
+	other *GenericConcretization,
+) bool {
+	if !c.Valid() || !other.Valid() ||
+		c.owner != other.owner ||
+		c.key != other.key ||
+		c.suffix != other.suffix ||
+		c.placement != other.placement ||
+		c.lexicalOwner != other.lexicalOwner ||
+		c.anchor != other.anchor ||
+		!types.Identical(c.signature, other.signature) ||
+		len(c.arguments) != len(other.arguments) {
+		return false
+	}
+	for index, argument := range c.arguments {
+		if !types.Identical(argument, other.arguments[index]) {
+			return false
+		}
+	}
+	return true
 }
 
 func InstantiateGenericCallable(

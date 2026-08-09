@@ -184,6 +184,16 @@ func (c Contract) hasFacet(facet api.ArtifactFacet) bool {
 	return ok
 }
 
+func (c Contract) withoutImplementation() Contract {
+	for facet := api.ArtifactFacetCallableSignature; facet < api.ArtifactFacetCount; facet++ {
+		c.facets[facet] = bytes.Clone(c.facets[facet])
+	}
+	c.exports = slices.Clone(c.exports)
+	c.facets[api.ArtifactFacetImplementation] = nil
+	c.present &^= uint16(1) << api.ArtifactFacetImplementation
+	return c
+}
+
 func validateArtifactContract(
 	owner api.ArtifactOwner,
 	contract Contract,

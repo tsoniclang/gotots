@@ -41,16 +41,6 @@ func Build(
 	); handled {
 		return statement, requests, err
 	}
-	if statement, requests, handled, err := buildPointerCapability(
-		context,
-		children,
-		artifact,
-		modifiers,
-		signature,
-		selection,
-	); handled {
-		return statement, requests, err
-	}
 	if statement, requests, handled, err := buildStorageCapability(
 		context,
 		children,

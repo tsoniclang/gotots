@@ -38,6 +38,13 @@ func EmitExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	requiresStorageProjection, err := context.Values().RequiresStorageProjection(
+		context,
+		target.SourceType(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	var operator tsgo.PostfixUnaryExpressionOperatorKind
 	switch source.Tok {
 	case token.INC:
@@ -52,11 +59,7 @@ func EmitExpression(
 		basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) &&
 		!target.IsAccessor() &&
 		!target.IsProperty() &&
-		(!target.UsesCanonicalStorage() ||
-			!context.Values().RequiresStorageProjection(
-				context,
-				target.SourceType(),
-			)) {
+		(!target.UsesCanonicalStorage() || !requiresStorageProjection) {
 		return api.DirectExpression(
 			context.Factory().PostfixUnaryExpression(
 				target.Value(),

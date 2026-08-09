@@ -32,15 +32,6 @@ func EmitBody(
 	if err != nil {
 		return api.BlockEmission{}, err
 	}
-	parameterPrologue, parameterRequests, err := addressableParameterPrologue(
-		context,
-		children,
-		sourceType,
-		signature,
-	)
-	if err != nil {
-		return api.BlockEmission{}, err
-	}
 	prologue, prologueRequests, namedResults, err := namedResultPrologue(
 		context,
 		children,
@@ -68,7 +59,7 @@ func EmitBody(
 	if err != nil {
 		return api.BlockEmission{}, err
 	}
-	statements := append(parameterPrologue, prologue...)
+	statements := prologue
 	statements = append(statements, body.Value().Statements()...)
 	var guardRequests []api.RootRequest
 	if sourceSignature.Results().Len() != 0 &&
@@ -83,7 +74,6 @@ func EmitBody(
 	return api.DirectBlock(
 		context.Factory().Block(statements, true),
 		api.CombineRequests(
-			parameterRequests,
 			prologueRequests,
 			body.Requests(),
 			guardRequests,
@@ -146,26 +136,20 @@ func namedResultPrologue(
 	for index, sourceName := range names {
 		result := results.At(index)
 		resultType := context.TypesInfo().TypeOfObject(result)
-		targetName, selected := context.AddressableStorage().Name(context, result)
-		if !selected {
-			targetName, err = context.Names().Result(result, index)
-		}
+		targetName, err := context.Names().Result(result, index)
 		if err != nil {
 			return nil, nil, false, err
 		}
-		var declarationType tsgo.TypeNode
-		if !selected {
-			targetType, err := children.RepresentedType(
-				context.WithRole(api.RoleResultType),
-				sourceName,
-				resultType,
-			)
-			if err != nil {
-				return nil, nil, false, err
-			}
-			declarationType = targetType.Value()
-			requests = append(requests, targetType.Requests()...)
+		targetType, err := children.RepresentedType(
+			context.WithRole(api.RoleResultType),
+			sourceName,
+			resultType,
+		)
+		if err != nil {
+			return nil, nil, false, err
 		}
+		declarationType := targetType.Value()
+		requests = append(requests, targetType.Requests()...)
 		zero, err := context.Values().Zero(
 			context.WithRole(api.RoleNamedResultZero),
 			sourceName,
@@ -173,18 +157,6 @@ func namedResultPrologue(
 		)
 		if err != nil {
 			return nil, nil, false, err
-		}
-		if selected {
-			zero, err = context.AddressableStorage().Cell(
-				context,
-				children,
-				sourceName,
-				resultType,
-				zero,
-			)
-			if err != nil {
-				return nil, nil, false, err
-			}
 		}
 		statements = append(statements, zero.Before()...)
 		statements = append(

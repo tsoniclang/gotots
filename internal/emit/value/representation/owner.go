@@ -41,9 +41,6 @@ func (Owner) RequiresCustomEquality(
 	if panicNilRuntimeValue(context, sourceType) {
 		return true
 	}
-	if unsafePointerValue(sourceType) {
-		return true
-	}
 	if _, ok := definedtype.Resolve(sourceType); ok {
 		return true
 	}
@@ -56,7 +53,7 @@ func (Owner) RequiresCustomEquality(
 	if _, ok := isAnonymousStruct(sourceType); ok {
 		return true
 	}
-	if pointerValue(sourceType) {
+	if pointerValue(sourceType) || rawPointerValue(sourceType) {
 		return true
 	}
 	if channelValue(sourceType) {
@@ -82,9 +79,6 @@ func (Owner) RequiresExplicitType(
 	if panicNilRuntimeValue(context, sourceType) {
 		return true
 	}
-	if unsafePointerValue(sourceType) {
-		return true
-	}
 	if model, ok := maprepresentation.Source(
 		context,
 		sourceType,
@@ -94,7 +88,7 @@ func (Owner) RequiresExplicitType(
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		return defined.NilCapable()
 	}
-	return pointerValue(sourceType) ||
+	return pointerValue(sourceType) || rawPointerValue(sourceType) ||
 		callableValue(sourceType) ||
 		channelValue(sourceType)
 }
@@ -149,11 +143,6 @@ func (owner Owner) Zero(
 	}
 	if panicNilRuntimeValue(context, sourceType) {
 		return panicNilZero(context)
-	}
-	if unsafePointerValue(sourceType) {
-		return api.DirectExpression(
-			context.Factory().Identifier("undefined"),
-		), nil
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		operationContext, err := defined.OperationContext(context)
@@ -221,6 +210,13 @@ func (owner Owner) Zero(
 		return api.DirectExpression(literal), nil
 	}
 	if _, _, ok := pointertype.Resolve(sourceType); ok {
+		return api.DirectExpression(
+			context.Factory().VoidExpression(
+				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+			),
+		), nil
+	}
+	if rawPointerValue(sourceType) {
 		return api.DirectExpression(
 			context.Factory().VoidExpression(
 				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
@@ -412,13 +408,6 @@ func (owner Owner) copyExact(
 	if panicNilRuntimeValue(context, sourceType) {
 		return panicNilCopy(context, value)
 	}
-	if unsafePointerValue(sourceType) {
-		return api.NewExpressionEmission(
-			value.Before(),
-			value.Value(),
-			value.Requests(),
-		)
-	}
 	if defined, ok := definedtype.Resolve(sourceType); ok &&
 		defined.Family() != definedtype.FamilyArray {
 		return api.NewExpressionEmission(
@@ -448,6 +437,7 @@ func (owner Owner) copyExact(
 		primitiveOK ||
 		callableValue(sourceType) ||
 		pointerValue(sourceType) ||
+		rawPointerValue(sourceType) ||
 		channelValue(sourceType) ||
 		isScalarSlice(context, sourceType) ||
 		mapValue(context, sourceType) {
@@ -515,17 +505,16 @@ func (Owner) Assign(
 	_, _, structOK := namedStruct(sourceType)
 	_, anonymousStructOK := isAnonymousStruct(sourceType)
 	_, interfaceOK := interfacetype.Resolve(sourceType)
-	unsafePointerOK := unsafePointerValue(sourceType)
 	if !definedOK &&
 		!arrayOK &&
 		!complexOK &&
 		!primitiveOK &&
 		!callableValue(sourceType) &&
 		!pointerValue(sourceType) &&
+		!rawPointerValue(sourceType) &&
 		!channelValue(sourceType) &&
 		!isScalarSlice(context, sourceType) &&
 		!mapValue(context, sourceType) &&
-		!unsafePointerOK &&
 		!interfaceOK &&
 		!anonymousStructOK &&
 		!structOK {

@@ -7,9 +7,11 @@ import { runeBoundaries } from "../utf8/codec.js";
 type Replacement = readonly [gostring, gostring];
 
 let createReplacer: (replacements: readonly Replacement[]) => Replacer;
+let copyReplacer: (source: Replacer) => Replacer;
+let assignReplacer: (target: Replacer, source: Replacer) => void;
 
 export class Replacer {
-  readonly #replacements: readonly Replacement[];
+  #replacements: readonly Replacement[];
 
   private constructor(replacements: readonly Replacement[]) {
     this.#replacements = replacements;
@@ -18,6 +20,11 @@ export class Replacer {
   static {
     createReplacer = (replacements: readonly Replacement[]): Replacer =>
       new Replacer(replacements);
+    copyReplacer = (source: Replacer): Replacer =>
+      new Replacer(source.#replacements);
+    assignReplacer = (target: Replacer, source: Replacer): void => {
+      target.#replacements = source.#replacements;
+    };
   }
 
   static Replace(receiver: Replacer | undefined, text: gostring): gostring {
@@ -37,6 +44,17 @@ export function NewReplacer(values: RuntimeSlice<gostring>): Replacer {
     replacements.push([values.get(index), values.get(index + 1)]);
   }
   return createReplacer(replacements);
+}
+
+export function replacerRepresentationCopy(source: Replacer): Replacer {
+  return copyReplacer(source);
+}
+
+export function replacerRepresentationAssign(
+  target: Replacer,
+  source: Replacer,
+): void {
+  assignReplacer(target, source);
 }
 
 function replacePairs(text: gostring, replacements: readonly Replacement[]): gostring {

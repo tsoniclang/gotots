@@ -4,10 +4,10 @@ import (
 	"go/ast"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
-	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -35,43 +35,6 @@ func Convert(
 			return api.ExpressionEmission{}, true, err
 		}
 	}
-	sourceRepresentation, err := pointertype.Observe(
-		context,
-		sourcePointer,
-		api.PointerRepresentationDemandStableLocation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	targetRepresentation, err := pointertype.Observe(
-		context,
-		targetPointer,
-		api.PointerRepresentationDemandStableLocation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	if sourceRepresentation.Representation().DirectClass() &&
-		targetRepresentation.Representation().DirectClass() {
-		target, err := convertDirectClassPointer(
-			context,
-			source,
-			sourcePointer.Elem(),
-			targetPointer.Elem(),
-			value,
-			api.CombineRequests(
-				sourceRepresentation.Requests(),
-				targetRepresentation.Requests(),
-			),
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, true, err
-		}
-		if targetDefined.Type() != nil {
-			target, err = targetDefined.Wrap(context, target)
-		}
-		return target, true, err
-	}
 	sourceLogical, err := children.RepresentedType(
 		context.WithRole(api.RoleConversionOperand),
 		source.Args[0],
@@ -88,57 +51,53 @@ func Convert(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	sourceStorage, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
+	fromSource, err := convertPointee(
+		context,
 		source,
 		sourcePointer.Elem(),
+		targetPointer.Elem(),
+		"$go$source",
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	targetStorage, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
+	toSource, err := convertPointee(
+		context,
 		source,
 		targetPointer.Elem(),
+		sourcePointer.Elem(),
+		"$go$target",
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	runtime, err := context.Names().Runtime(
-		api.RuntimePointer,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	target, err := api.NewExpressionEmission(
-		value.Before(),
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(pointerruntime.ViewName),
-				tsgo.NodeFlagsNone,
+	target, err := pointermarker.Operation(
+		context,
+		tsoniccore.SymbolProjectPointer,
+		[]api.TypeEmission{sourceLogical, targetLogical},
+		[]api.ExpressionEmission{
+			value,
+			api.DirectExpression(
+				conversionArrow(
+					context,
+					"$go$source",
+					sourceLogical.Value(),
+					targetLogical.Value(),
+					fromSource,
+				),
+				fromSource.Requests()...,
 			),
-			nil,
-			[]tsgo.TypeNode{
-				sourceLogical.Value(),
-				targetLogical.Value(),
-				targetStorage.Value(),
-			},
-			[]tsgo.Expression{value.Value()},
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(
-			value.Requests(),
-			sourceLogical.Requests(),
-			sourceStorage.Requests(),
-			targetLogical.Requests(),
-			targetStorage.Requests(),
-			runtime.Requests(),
-			sourceRepresentation.Requests(),
-			targetRepresentation.Requests(),
-		),
+			api.DirectExpression(
+				conversionArrow(
+					context,
+					"$go$target",
+					targetLogical.Value(),
+					sourceLogical.Value(),
+					toSource,
+				),
+				toSource.Requests()...,
+			),
+		},
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -149,40 +108,18 @@ func Convert(
 	return target, true, err
 }
 
-func convertDirectClassPointer(
+func convertPointee(
 	context api.Context,
 	source ast.Node,
 	sourceElement types.Type,
 	targetElement types.Type,
-	value api.ExpressionEmission,
-	requests []api.RootRequest,
+	parameter string,
 ) (api.ExpressionEmission, error) {
-	before := value.Before()
-	pointer := value.Value()
-	if pointer.Kind() != tsgo.SyntaxKindIdentifier {
-		name, err := context.Names().Temporary(api.TemporaryConversionOperand)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		before = append(before, context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{context.Factory().VariableDeclaration(
-					context.Factory().Identifier(name),
-					nil,
-					nil,
-					pointer,
-				)},
-				tsgo.NodeFlagsConst,
-			),
-		))
-		pointer = context.Factory().Identifier(name)
-	}
 	stored, err := context.Values().ToStorage(
 		context.WithRole(api.RoleConversionOperand),
 		source,
 		sourceElement,
-		api.DirectExpression(pointer),
+		api.DirectExpression(context.Factory().Identifier(parameter)),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -196,35 +133,34 @@ func convertDirectClassPointer(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if len(converted.Before()) != 0 {
-		return api.ExpressionEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "direct pointer conversion produced deferred storage work",
-		}
-	}
-	undefined := context.Factory().Identifier("undefined")
-	return api.NewExpressionEmission(
-		before,
-		context.Factory().ConditionalExpression(
-			context.Factory().BinaryExpression(
-				nil,
-				pointer,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-				),
-				undefined,
-			),
-			context.Factory().QuestionToken(),
-			undefined,
-			context.Factory().ColonToken(),
-			converted.Value(),
-		),
-		api.CombineRequests(
-			value.Requests(),
-			converted.Requests(),
-			requests,
-		),
+	return converted, nil
+}
+
+func conversionArrow(
+	context api.Context,
+	parameter string,
+	sourceType tsgo.TypeNode,
+	targetType tsgo.TypeNode,
+	value api.ExpressionEmission,
+) tsgo.ArrowFunction {
+	statements := append(
+		value.Before(),
+		context.Factory().ReturnStatement(value.Value()),
+	)
+	return context.Factory().ArrowFunction(
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{context.Factory().ParameterDeclaration(
+			nil,
+			nil,
+			context.Factory().Identifier(parameter),
+			nil,
+			sourceType,
+			nil,
+		)},
+		targetType,
+		context.Factory().EqualsGreaterThanToken(),
+		context.Factory().Block(statements, true),
 	)
 }
 

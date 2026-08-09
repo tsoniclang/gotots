@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,7 +27,7 @@ func TestRepositoryArchitectureWalls(t *testing.T) {
 	if string(agents) != string(claude) {
 		t.Fatal("AGENTS.md and CLAUDE.md differ")
 	}
-	if err := verifyStandaloneOwnership(root); err != nil {
+	if err := verifyCompilerDependencyBoundary(root); err != nil {
 		t.Fatal(err)
 	}
 
@@ -405,14 +404,19 @@ func leak(context Context, source Source, value Value) {
 	if layerFor("internal/rogue/rogue.go") != 0 {
 		t.Fatal("unregistered production package received an implicit layer")
 	}
-	unrelatedProduct := "tso" + "nic"
+	tsonic := "tso" + "nic"
+	allowed := "import type { Pointer } from \"@" + tsonic + "/core/lang.js\";"
+	if err := verifyCompilerDependencyText("canonical.ts", []byte(allowed)); err != nil {
+		t.Fatalf("canonical marker dependency was rejected: %v", err)
+	}
 	for _, mutation := range []string{
-		"import type { int64 } from \"@" + unrelatedProduct + "/core\";",
-		"go run github.com/tsoniclang/" + unrelatedProduct,
-		"target language: " + "c" + "sharp",
+		"go run github.com/tsoniclang/" + tsonic,
+		"import { createTsonicPlugin } from \"@" + tsonic + "/target-typescript\";",
+		"import { location } from \"@" + tsonic + "/typescript-runtime\";",
+		"import type { TargetSourceProgram } from \"@" + tsonic + "/tsts\";",
 	} {
-		if err := verifyStandaloneText("mutation.txt", []byte(mutation)); err == nil {
-			t.Fatalf("standalone ownership mutation passed: %q", mutation)
+		if err := verifyCompilerDependencyText("mutation.ts", []byte(mutation)); err == nil {
+			t.Fatalf("compiler dependency mutation passed: %q", mutation)
 		}
 	}
 	externalRoot := t.TempDir()
@@ -423,13 +427,13 @@ func leak(context Context, source Source, value Value) {
 		}
 		if err := os.WriteFile(
 			path,
-			[]byte("type Origin = \""+unrelatedProduct+"\";"),
+			[]byte("import {} from \"@"+tsonic+"/target-typescript\";"),
 			0o644,
 		); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := verifyStandaloneOwnership(externalRoot); err != nil {
+	if err := verifyCompilerDependencyBoundary(externalRoot); err != nil {
 		t.Fatalf("external/generated tree entered ownership wall: %v", err)
 	}
 	ownedPath := filepath.Join(externalRoot, "src", "owned.ts")
@@ -438,13 +442,13 @@ func leak(context Context, source Source, value Value) {
 	}
 	if err := os.WriteFile(
 		ownedPath,
-		[]byte("type Origin = \""+unrelatedProduct+"\";"),
+		[]byte("import {} from \"@"+tsonic+"/target-typescript\";"),
 		0o644,
 	); err != nil {
 		t.Fatal(err)
 	}
-	if err := verifyStandaloneOwnership(externalRoot); err == nil {
-		t.Fatal("repository-owned source escaped standalone ownership wall")
+	if err := verifyCompilerDependencyBoundary(externalRoot); err == nil {
+		t.Fatal("repository-owned source escaped compiler dependency wall")
 	}
 }
 
@@ -506,7 +510,7 @@ func TestBuiltinIdentityResolutionHasOneOwner(t *testing.T) {
 	}
 }
 
-func verifyStandaloneOwnership(root string) error {
+func verifyCompilerDependencyBoundary(root string) error {
 	return filepath.Walk(
 		root,
 		func(sourcePath string, info os.FileInfo, walkErr error) error {
@@ -535,22 +539,24 @@ func verifyStandaloneOwnership(root string) error {
 			if err != nil {
 				return err
 			}
-			return verifyStandaloneText(filepath.ToSlash(relative), source)
+			return verifyCompilerDependencyText(filepath.ToSlash(relative), source)
 		},
 	)
 }
 
-func verifyStandaloneText(relative string, source []byte) error {
-	unrelatedProduct := "tso" + "nic"
-	forbidden := regexp.MustCompile(
-		`(?i)(\b` + regexp.QuoteMeta(unrelatedProduct) +
-			`\b|@` + regexp.QuoteMeta(unrelatedProduct) +
-			`/|\b` + "c" + `sharp\b|` + "c" + `#)`,
-	)
-	if forbidden.MatchString(relative) || forbidden.Match(source) {
-		return &wallError{
-			source: relative,
-			reason: "standalone GoToTS source references an unrelated product or target",
+func verifyCompilerDependencyText(relative string, source []byte) error {
+	sourceText := string(source)
+	for _, forbidden := range []string{
+		"github.com/tsoniclang/" + "tso" + "nic",
+		"@" + "tso" + "nic/target-",
+		"@" + "tso" + "nic/typescript-runtime",
+		"@" + "tso" + "nic/tsts",
+	} {
+		if strings.Contains(sourceText, forbidden) {
+			return &wallError{
+				source: relative,
+				reason: "GoToTS compiler source depends on a downstream checker or target",
+			}
 		}
 	}
 	return nil
@@ -561,7 +567,9 @@ func layerFor(relative string) int {
 	switch {
 	case strings.HasPrefix(relative, "internal/load/"),
 		strings.HasPrefix(relative, "internal/contracts/"),
-		strings.HasPrefix(relative, "internal/target/tsgo/"):
+		strings.HasPrefix(relative, "internal/testfixture/"),
+		strings.HasPrefix(relative, "internal/target/tsgo/"),
+		strings.HasPrefix(relative, "internal/target/tsgoprinter/"):
 		return 10
 	case strings.HasPrefix(relative, "internal/output/"),
 		strings.HasPrefix(relative, "internal/emit/api/"):

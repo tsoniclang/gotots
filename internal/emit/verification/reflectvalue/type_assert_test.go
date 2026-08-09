@@ -2,10 +2,10 @@ package reflectvalue_test
 
 import "testing"
 
-// TestReflectTypeAssertMatchesGo proves reflect.TypeAssert over concrete
+// TestReflectTypeAssertCanonicalizesWithNativeEvidence covers reflect.TypeAssert over concrete
 // scalar, string, and pointer type arguments with both hit and miss
 // outcomes, matching the Go comma-ok semantics exactly.
-func TestReflectTypeAssertMatchesGo(t *testing.T) {
+func TestReflectTypeAssertCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -47,7 +47,7 @@ func main() {
 	fmt.Println(fixture.Assert())
 }
 `
-	runReflectDifferential(
+	verifyReflectCanonical(
 		t,
 		source,
 		"Assert",

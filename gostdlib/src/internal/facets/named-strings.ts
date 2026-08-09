@@ -1,4 +1,4 @@
-import { Builder, Reader } from "../../strings.js";
+import { Builder, Reader, Replacer } from "../../strings.js";
 import {
   builderRepresentationAssign,
   builderRepresentationCopy,
@@ -9,6 +9,10 @@ import {
   readerRepresentationEqual,
   readerRepresentationHash,
 } from "../portable/strings/reader.js";
+import {
+  replacerRepresentationAssign,
+  replacerRepresentationCopy,
+} from "../portable/strings/replacer.js";
 
 export type StringsBuilderStorage = Builder;
 
@@ -49,5 +53,15 @@ export class StringsReaderOperations {
 
   static $hash(source: Reader): number {
     return readerRepresentationHash(source);
+  }
+}
+
+export class StringsReplacerOperations {
+  static $copy(source: Replacer): Replacer {
+    return replacerRepresentationCopy(source);
+  }
+
+  static $assign(target: Replacer, source: Replacer): void {
+    replacerRepresentationAssign(target, source);
   }
 }

@@ -132,7 +132,7 @@ func TestWaveEightCallableABIIsSignatureOwnedAcrossCarriers(t *testing.T) {
 	for _, required := range []string{
 		"public Call: " + abi,
 		"public readonly $value: " + abi,
-		"GoPointer<" + abi + ", " + abi + ">",
+		"Pointer<" + abi + ">",
 		"RuntimeSlice.literal<" + abi + ">",
 	} {
 		if !strings.Contains(artifacts.printed, required) {

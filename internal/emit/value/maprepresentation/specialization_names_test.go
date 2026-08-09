@@ -4,6 +4,7 @@ import (
 	"go/types"
 
 	gostdlib "github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
@@ -306,6 +307,12 @@ func (staticSpecializationNames) Runtime(
 	default:
 		panic("unexpected runtime symbol")
 	}
+}
+
+func (staticSpecializationNames) TsonicCore(
+	tsoniccore.Symbol,
+) (api.NameReference, error) {
+	panic("unused")
 }
 
 func (staticSpecializationNames) ExternalProviderFunction(

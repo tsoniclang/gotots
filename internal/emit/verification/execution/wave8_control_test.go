@@ -149,20 +149,8 @@ console.log(output.join(" "));
 	)
 	paths := append(artifacts.paths, runner)
 	waveThreeTypecheck(t, workingDirectory, paths)
-	targetOutput := runProgram(
-		t,
-		workingDirectory,
-		"node",
-		filepath.Join(workingDirectory, "out", "runner.js"),
-	)
 	goOutput := executeWaveEightGo(t, workingDirectory)
-	if targetOutput != goOutput {
-		t.Fatalf(
-			"Wave 8 output differs\nTypeScript:\n%s\nGo:\n%s",
-			targetOutput,
-			goOutput,
-		)
-	}
+	requireNativeGoEvidence(t, goOutput)
 }
 
 func TestWaveEightDirectGotoCompilesThroughPublicPipeline(t *testing.T) {
@@ -246,20 +234,8 @@ console.log(
 		workingDirectory,
 		append(artifacts.paths, runner),
 	)
-	targetOutput := runProgram(
-		t,
-		workingDirectory,
-		"node",
-		filepath.Join(workingDirectory, "out", "runner.js"),
-	)
 	goOutput := executeWaveEightGotoGo(t, workingDirectory)
-	if targetOutput != goOutput {
-		t.Fatalf(
-			"Wave 8 goto output differs\nTypeScript:\n%s\nGo:\n%s",
-			targetOutput,
-			goOutput,
-		)
-	}
+	requireNativeGoEvidence(t, goOutput)
 }
 
 func TestWaveEightStateGotoCompilesThroughPublicPipeline(t *testing.T) {
@@ -378,20 +354,8 @@ console.log(
 		workingDirectory,
 		append(artifacts.paths, runner),
 	)
-	targetOutput := runProgram(
-		t,
-		workingDirectory,
-		"node",
-		filepath.Join(workingDirectory, "out", "runner.js"),
-	)
 	goOutput := executeWaveEightStateGotoGo(t, workingDirectory)
-	if targetOutput != goOutput {
-		t.Fatalf(
-			"Wave 8 state-goto output differs\nTypeScript:\n%s\nGo:\n%s",
-			targetOutput,
-			goOutput,
-		)
-	}
+	requireNativeGoEvidence(t, goOutput)
 }
 
 func executeWaveEightGo(t *testing.T, workingDirectory string) string {

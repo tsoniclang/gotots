@@ -3,6 +3,7 @@ import type { gostring, int64, uint64 } from "@gotots/gostdlib/internal/scalars.
 import {
   ChanDir,
   Kind,
+  MapIter,
   StructField,
   StructTag,
   Value,
@@ -80,6 +81,21 @@ export class ReflectStructFieldOperations {
       Index: source.Index,
       Anonymous: source.Anonymous,
     });
+  }
+}
+
+export class ReflectMapIterOperations {
+  static $copy(source: MapIter): MapIter {
+    return source.$copy();
+  }
+
+  static $assign(target: MapIter, source: MapIter): void {
+    if (target === source) {
+      return;
+    }
+    target.position = source.position;
+    target.keys = source.keys;
+    target.valueAt = source.valueAt;
   }
 }
 

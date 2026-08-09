@@ -6,6 +6,8 @@ import type { Awaitable, int, uint8 } from "@gotots/gostdlib/internal/scalars.js
 import {
   Base64EncoderState,
   Encoding,
+  encodingRepresentationAssign,
+  encodingRepresentationCopy,
   runBase64EncoderAsync,
 } from "../portable/encoding/base64.js";
 import { ProviderInterfaceValue } from "../portable/io/value.js";
@@ -16,6 +18,16 @@ export type {
   CanonicalError,
   CanonicalWriter,
 } from "./provider-io-contract.js";
+
+export class Base64EncodingOperations {
+  static $copy(source: Encoding): Encoding {
+    return encodingRepresentationCopy(source);
+  }
+
+  static $assign(target: Encoding, source: Encoding): void {
+    encodingRepresentationAssign(target, source);
+  }
+}
 
 export interface CanonicalWriteCloser<Failure extends GoInterfaceValue>
   extends GoInterfaceValue {

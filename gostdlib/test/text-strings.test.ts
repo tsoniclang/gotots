@@ -11,6 +11,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
+import { StringsReplacerOperations } from "../src/internal/facets/named-strings.js";
 import { sliceValues } from "../src/internal/runtime/slice.js";
 
 import {
@@ -184,6 +185,17 @@ test("strings named types expose clean static receiver operations", () => {
   const replacer = NewReplacer(RuntimeSlice.literal(["", "X", "a", "Y"]));
   assert.equal(Replacer.Replace(replacer, "a"), "XYX");
   assert.throws(() => NewReplacer(RuntimeSlice.literal(["old"])));
+});
+
+test("Replacer value operations preserve shallow Go assignment", () => {
+  const source = NewReplacer(RuntimeSlice.literal(["a", "source"]));
+  const originalTarget = NewReplacer(RuntimeSlice.literal(["a", "target"]));
+  const target = StringsReplacerOperations.$copy(originalTarget);
+
+  StringsReplacerOperations.$assign(target, source);
+
+  assert.equal(Replacer.Replace(target, "a"), "source");
+  assert.equal(Replacer.Replace(originalTarget, "a"), "target");
 });
 
 test("strings Lines yields newline-preserving single-use values", async () => {

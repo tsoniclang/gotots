@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	SchemaVersion = 2
-	PackageName   = "@gotots/externals"
+	SchemaVersion  = 2
+	PackageName    = "@gotots/externals"
+	PackageVersion = "0.0.0"
 )
 
 type TargetKind string

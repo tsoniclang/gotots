@@ -1,7 +1,6 @@
 package command
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -49,15 +48,24 @@ func programDigest(program *load.Program) (string, error) {
 }
 
 func writeEmission(
-	ctx context.Context,
 	project config.Project,
 	emission emit.ProgramEmission,
 	semanticDigest string,
 ) (int, error) {
-	outputDirectory := project.OutputDirectory()
-	if err := os.MkdirAll(outputDirectory, 0o755); err != nil {
-		return 0, commandError("create output", err.Error())
-	}
+	return writeOutputTransaction(
+		project.OutputDirectory(),
+		func(outputDirectory string) (int, error) {
+			return writeEmissionTo(project, emission, semanticDigest, outputDirectory)
+		},
+	)
+}
+
+func writeEmissionTo(
+	project config.Project,
+	emission emit.ProgramEmission,
+	semanticDigest string,
+	outputDirectory string,
+) (int, error) {
 	client, err := tsgo.StartClient(project.DistributionRoot(), outputDirectory)
 	if err != nil {
 		return 0, err
@@ -90,7 +98,7 @@ func writeEmission(
 		paths = append(paths, runtimePackage.ManifestPath())
 	}
 	sort.Strings(paths)
-	packageDocument, err := encodeProjectPackage()
+	packageDocument, err := encodeProjectPackage(emission.PackageDependencies())
 	if err != nil {
 		return 0, err
 	}
@@ -98,23 +106,8 @@ func writeEmission(
 		return 0, err
 	}
 	paths = append(paths, projectPackageName)
-	tsconfig, err := encodeTSConfig(project, outputDirectory)
-	if err != nil {
-		return 0, err
-	}
-	if err := writeTargetFile(outputDirectory, "tsconfig.json", tsconfig); err != nil {
-		return 0, err
-	}
-	paths = append(paths, "tsconfig.json")
+	paths = append(paths, buildManifestName)
 	sort.Strings(paths)
-	if err := tsgo.Compile(
-		ctx,
-		project.DistributionRoot(),
-		outputDirectory,
-		[]string{"--noEmit", "-p", filepath.Join(outputDirectory, "tsconfig.json")},
-	); err != nil {
-		return 0, err
-	}
 	manifest, err := encodeBuildManifest(semanticDigest, paths)
 	if err != nil {
 		return 0, err
@@ -125,30 +118,30 @@ func writeEmission(
 	return len(paths), nil
 }
 
-func encodeProjectPackage() ([]byte, error) {
+func encodeProjectPackage(dependencies []emit.PackageDependency) ([]byte, error) {
 	document := struct {
-		Private bool   `json:"private"`
-		Type    string `json:"type"`
+		Private      bool              `json:"private"`
+		Type         string            `json:"type"`
+		Dependencies map[string]string `json:"dependencies"`
 	}{
-		Private: true,
-		Type:    "module",
+		Private:      true,
+		Type:         "module",
+		Dependencies: make(map[string]string, len(dependencies)),
+	}
+	for _, dependency := range dependencies {
+		if dependency.Name() == "" || dependency.Version() == "" {
+			return nil, commandError("encode package", "dependency identity is incomplete")
+		}
+		if _, duplicate := document.Dependencies[dependency.Name()]; duplicate {
+			return nil, commandError("encode package", "dependency is duplicated")
+		}
+		document.Dependencies[dependency.Name()] = dependency.Version()
 	}
 	payload, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
 		return nil, commandError("encode package", err.Error())
 	}
 	return append(payload, '\n'), nil
-}
-
-func encodeTSConfig(project config.Project, outputDirectory string) ([]byte, error) {
-	payload, err := tsgo.EncodeStrictProjectConfig(
-		project.DistributionRoot(),
-		outputDirectory,
-	)
-	if err != nil {
-		return nil, commandError("encode tsconfig", err.Error())
-	}
-	return payload, nil
 }
 
 func writeTargetFile(root string, relative string, payload []byte) error {

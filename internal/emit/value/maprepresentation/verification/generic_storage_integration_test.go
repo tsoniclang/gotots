@@ -54,16 +54,16 @@ type Entry[K comparable, V Cloneable[V]] struct {
 	value V
 }
 
-func NewHolder[K comparable, V Cloneable[V]]() *Holder[K, V] {
-	return &Holder[K, V]{values: make(map[K]V)}
+func NewHolder[K comparable, V Cloneable[V]]() Holder[K, V] {
+	return Holder[K, V]{values: make(map[K]V)}
 }
 
-func (holder *Holder[K, V]) RoundTrip(key K, value V) *Entry[K, V] {
+func (holder Holder[K, V]) RoundTrip(key K, value V) Entry[K, V] {
 	holder.values[key] = value
-	return &Entry[K, V]{key: key, value: holder.values[key]}
+	return Entry[K, V]{key: key, value: holder.values[key]}
 }
 
-func (entry *Entry[K, V]) Value() V {
+func (entry Entry[K, V]) Value() V {
 	return entry.value
 }
 `)

@@ -17,6 +17,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
 
 func TestSafeIntegerConstantPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
@@ -91,6 +92,12 @@ console.log(Small());
 `)
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	outputDirectory := filepath.Join(workingDirectory, "out")
+	if err := runtimefixture.InstallResolution(
+		workingDirectory,
+		outputDirectory,
+	); err != nil {
+		t.Fatal(err)
+	}
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
@@ -199,6 +206,12 @@ console.log(render(WideIncrement(9007199254740993n)));
 `)
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	outputDirectory := filepath.Join(workingDirectory, "out")
+	if err := runtimefixture.InstallResolution(
+		workingDirectory,
+		outputDirectory,
+	); err != nil {
+		t.Fatal(err)
+	}
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",

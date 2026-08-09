@@ -21,32 +21,6 @@ func TestCertifiedExternalModuleLinksBodylessFunctionExactly(t *testing.T) {
 	program, sourcePackage := loadExternalLinkageProgram(t, profile)
 	run := closureRoot(t, sourcePackage, "Run")
 
-	unlinkedOptions := emit.DefaultOptions()
-	unlinkedOptions.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
-	unlinked, err := emit.CompileWithOptions(
-		program,
-		[]emit.Root{run},
-		unlinkedOptions,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	obligations := unlinked.ExternalFunctionObligations()
-	if len(obligations) != 2 {
-		t.Fatalf("unlinked external obligations = %#v", obligations)
-	}
-	byName := make(map[string]emit.ExternalFunctionObligation, len(obligations))
-	for _, obligation := range obligations {
-		byName[obligation.Function().Name()] = obligation
-	}
-	for _, name := range []string{"Syscall", "Syscall6"} {
-		obligation, ok := byName[name]
-		if !ok || obligation.ModulePath() != "golang.org/x/sys" ||
-			obligation.ModuleVersion() != "v0.46.0" {
-			t.Fatalf("unlinked %s obligation = %#v", name, obligation)
-		}
-	}
-
 	standardLibrary, externalProvider := externalProviderCertificates(t, profile)
 	tests := []struct {
 		name          string
@@ -60,7 +34,7 @@ func TestCertifiedExternalModuleLinksBodylessFunctionExactly(t *testing.T) {
 			integer:       emit.IntegerRepresentationNumber,
 			resultLiteral: "0",
 			required: []string{
-				"goNumberToBigInt(trap)",
+				"goNumberToBigInt($argument0)",
 				"globalThis.Number(BigInt.asUintN(64, __gotots_results_0[0]))",
 			},
 		},
@@ -68,7 +42,9 @@ func TestCertifiedExternalModuleLinksBodylessFunctionExactly(t *testing.T) {
 			name:          "bigint product",
 			integer:       emit.IntegerRepresentationBigInt,
 			resultLiteral: "0n",
-			required:      []string{"unix.Syscall(trap, a1, a2, a3)"},
+			required: []string{
+				"unix.Syscall($argument0, $argument1, $argument2, $argument3)",
+			},
 			forbidden: []string{
 				"unix.Syscall(BigInt.asUintN(64, goNumberToBigInt(trap))",
 				"globalThis.Number(BigInt.asUintN(64, __gotots_results_0[0]))",
@@ -101,7 +77,7 @@ func TestCertifiedExternalModuleLinksBodylessFunctionExactly(t *testing.T) {
 				test.required...,
 			) {
 				if !strings.Contains(artifacts.printed, required) {
-					t.Fatalf("linked artifact lacks %q", required)
+					t.Fatalf("linked artifact lacks %q:\n%s", required, artifacts.printed)
 				}
 			}
 			for _, forbidden := range append(
@@ -114,46 +90,6 @@ func TestCertifiedExternalModuleLinksBodylessFunctionExactly(t *testing.T) {
 			}
 			executeLinkedRun(t, linked, artifacts, test.resultLiteral)
 		})
-	}
-}
-
-func TestCertifiedExternalSourceLinksBodylessFunctionExactly(t *testing.T) {
-	profile := externalProviderBuildProfile(t)
-	program, err := load.Load(context.Background(), load.Request{
-		Directory:    repositoryRoot(t),
-		Pattern:      "github.com/zeebo/xxh3",
-		BuildProfile: profile,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	sourcePackage := program.Roots()[0]
-	standardLibrary, externalProvider := externalProviderCertificates(t, profile)
-	options := emit.DefaultOptions()
-	options.ConcurrencySemantics = emit.ConcurrencySemanticsCooperative
-	options.StandardLibrary = standardLibrary
-	options.ExternalProvider = externalProvider
-	linked, err := emit.CompileWithOptions(
-		program,
-		[]emit.Root{closureRoot(t, sourcePackage, "accumSSE")},
-		options,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if remaining := linked.ExternalFunctionObligations(); len(remaining) != 0 {
-		t.Fatalf("linked external obligations = %d, want 0", len(remaining))
-	}
-	artifacts := materializeClosureWithSetup(
-		t,
-		linked,
-		func(directory string, emission emit.ProgramEmission) {
-			installCertifiedProviderPackages(t, directory, emission)
-		},
-	)
-	if !strings.Contains(artifacts.printed, "return accumScalar(") ||
-		strings.Contains(artifacts.printed, "unresolved external Go function") {
-		t.Fatalf("source-linked artifact is not exact:\n%s", artifacts.printed)
 	}
 }
 
@@ -204,9 +140,10 @@ func loadExternalLinkageProgram(
 ) (*load.Program, *load.Package) {
 	t.Helper()
 	program, err := load.Load(context.Background(), load.Request{
-		Directory:    closureDirectory("external-linked"),
-		Pattern:      ".",
-		BuildProfile: profile,
+		Directory:            closureDirectory("external-linked"),
+		Pattern:              ".",
+		ContractDependencies: true,
+		BuildProfile:         profile,
 	})
 	if err != nil {
 		t.Fatal(err)

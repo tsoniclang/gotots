@@ -74,22 +74,21 @@ import (
 )
 
 type emitter struct {
-	source         *load.Package
-	factory        tsgo.Factory
-	names          *emitnaming.Owner
-	values         api.Values
-	scalar         api.ScalarABI
-	providerScalar api.ScalarABI
-	order          api.EvaluationOrder
-	concurrency    api.ConcurrencySemantics
-	observer       emitnaming.EnvironmentObserver
-	generic        api.GenericCallableResolver
-	cooperative    api.CooperativeCallableResolver
-	recovery       api.RecoveryCallableResolver
-	pointer        api.PointerRepresentationResolver
-	callableABI    api.CallableABIResolver
-	external       api.ExternalFunctionResolver
-	goRuntime      api.GoRuntimeContract
+	source                 *load.Package
+	factory                tsgo.Factory
+	names                  *emitnaming.Owner
+	values                 api.Values
+	scalar                 api.ScalarABI
+	providerScalar         api.ScalarABI
+	order                  api.EvaluationOrder
+	concurrency            api.ConcurrencySemantics
+	observer               emitnaming.EnvironmentObserver
+	generic                api.GenericCallableResolver
+	cooperative            api.CooperativeCallableResolver
+	recovery               api.RecoveryCallableResolver
+	external               api.ExternalFunctionResolver
+	goRuntime              api.GoRuntimeContract
+	implementationContract bool
 }
 
 func newEmitter(
@@ -104,10 +103,9 @@ func newEmitter(
 	generic api.GenericCallableResolver,
 	cooperative api.CooperativeCallableResolver,
 	recovery api.RecoveryCallableResolver,
-	pointer api.PointerRepresentationResolver,
-	callableABI api.CallableABIResolver,
 	external api.ExternalFunctionResolver,
 	goRuntime api.GoRuntimeContract,
+	implementationContract bool,
 ) *emitter {
 	var typesInfo *types.Info
 	var packageScope *types.Scope
@@ -116,21 +114,20 @@ func newEmitter(
 		packageScope = source.Types().Scope()
 	}
 	target := &emitter{
-		source:         source,
-		factory:        factory,
-		names:          emitnaming.NewOwner(packageScope, typesInfo, registry),
-		scalar:         scalar,
-		providerScalar: providerScalar,
-		order:          order,
-		concurrency:    concurrency,
-		observer:       observer,
-		generic:        generic,
-		cooperative:    cooperative,
-		recovery:       recovery,
-		pointer:        pointer,
-		callableABI:    callableABI,
-		external:       external,
-		goRuntime:      goRuntime,
+		source:                 source,
+		factory:                factory,
+		names:                  emitnaming.NewOwner(packageScope, typesInfo, registry),
+		scalar:                 scalar,
+		providerScalar:         providerScalar,
+		order:                  order,
+		concurrency:            concurrency,
+		observer:               observer,
+		generic:                generic,
+		cooperative:            cooperative,
+		recovery:               recovery,
+		external:               external,
+		goRuntime:              goRuntime,
+		implementationContract: implementationContract,
 	}
 	target.values = representation.NewOwner(target)
 	return target
@@ -279,10 +276,7 @@ func (e *emitter) Expression(
 	}
 }
 
-func (e *emitter) IntegerConstant(
-	context api.Context,
-	source ast.Expr,
-) (api.ExpressionEmission, error) {
+func (e *emitter) IntegerConstant(context api.Context, source ast.Expr) (api.ExpressionEmission, error) {
 	return integerliteral.Emit(context, e, source)
 }
 

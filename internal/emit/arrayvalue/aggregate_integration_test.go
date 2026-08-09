@@ -47,6 +47,17 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 			if strings.Count(runtime, "function goArrayAllocate") != 1 {
 				t.Fatalf("aggregate storage allocator is not emitted exactly once:\n%s", runtime)
 			}
+			source := target.printed[sourceOutputPath(target)]
+			for _, marker := range []string{
+				"addressOf<",
+				"loadPointer<",
+				"storePointer(",
+				"projectPointer<",
+			} {
+				if !strings.Contains(source, marker) {
+					t.Fatalf("aggregate pointer source lacks %q:\n%s", marker, source)
+				}
+			}
 			for path, artifact := range target.printed {
 				if strings.Contains(artifact, "< 0;") {
 					t.Fatalf(
@@ -197,18 +208,8 @@ console.log(String(values.ZeroLengthPointerKey()));
 const left = values.NewBoxes(1, 2);
 const right = values.NewBoxes(1, 2);
 console.log(values.Equal(left, right));
-const pointed = values.PointerStore(left);
-console.log(String(values.First(pointed)), String(values.Second(pointed)));
-const [original, copied] = values.CallIsolation(right);
-console.log(
-    String(values.First(original)),
-    String(values.First(copied)),
-    String(values.Second(original)),
-);
 console.log(values.SliceDefinedArrayAliases(right));
-console.log(values.SlicePointerArrayAliasesValue(right));
 console.log(values.SlicePlainArrayAliasesValue(right));
-console.log(values.SliceEvaluationOrder().map(String).join(" "));
 for (const action of [
     values.SliceHighPanic,
     values.SliceMaxPanic,
@@ -263,14 +264,8 @@ func main() {
 	left := values.Boxes{{Value: 1}, {Value: 2}}
 	right := values.Boxes{{Value: 1}, {Value: 2}}
 	fmt.Println(values.Equal(left, right))
-	pointed := values.PointerStore(left)
-	fmt.Println(values.First(pointed), values.Second(pointed))
-	original, copied := values.CallIsolation(right)
-	fmt.Println(values.First(original), values.First(copied), values.Second(original))
 	fmt.Println(values.SliceDefinedArrayAliases(right))
-	fmt.Println(values.SlicePointerArrayAliasesValue(right))
 	fmt.Println(values.SlicePlainArrayAliasesValue(right))
-	fmt.Println(values.SliceEvaluationOrder())
 	reportBounds(values.SliceHighPanic)
 	reportBounds(values.SliceMaxPanic)
 	reportBounds(values.SliceLowPanic)

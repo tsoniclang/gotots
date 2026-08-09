@@ -206,7 +206,6 @@ func emitStructClass(
 		markers, err = typefacet.Build(
 			context,
 			sourceType,
-			classType,
 			layout.storageType,
 			representationFacets,
 			false,
@@ -349,6 +348,9 @@ func derivedFields(
 	result := make([]field, 0, structType.NumFields())
 	for index := range structType.NumFields() {
 		object := structType.Field(index)
+		if context.SourceImplementationContract() && !object.Exported() {
+			continue
+		}
 		if !object.Exported() && object.Pkg() != typeName.Pkg() {
 			continue
 		}
@@ -391,7 +393,12 @@ func fields(
 					sourceField,
 				)
 			}
-			object := structType.Field(fieldIndex)
+			objectIndex := fieldIndex
+			object := structType.Field(objectIndex)
+			fieldIndex++
+			if context.SourceImplementationContract() && !object.Exported() {
+				continue
+			}
 			sourceType := context.TypesInfo().TypeOf(sourceField.Type)
 			if !object.Embedded() ||
 				sourceType == nil ||
@@ -412,7 +419,6 @@ func fields(
 				object:     object,
 				name:       name,
 			})
-			fieldIndex++
 			continue
 		}
 		sourceType := context.TypesInfo().TypeOf(sourceField.Type)
@@ -424,7 +430,12 @@ func fields(
 					sourceName,
 				)
 			}
-			object := structType.Field(fieldIndex)
+			objectIndex := fieldIndex
+			object := structType.Field(objectIndex)
+			fieldIndex++
+			if context.SourceImplementationContract() && !object.Exported() {
+				continue
+			}
 			if object.Embedded() ||
 				context.TypesInfo().DefOf(sourceName) != object ||
 				sourceType == nil ||
@@ -436,7 +447,7 @@ func fields(
 				)
 			}
 			blank := object.Name() == "_"
-			name := fmt.Sprintf("$blank%d", fieldIndex)
+			name := fmt.Sprintf("$blank%d", objectIndex)
 			if !blank {
 				var err error
 				name, err = context.Names().Member(object)
@@ -451,7 +462,6 @@ func fields(
 				name:       name,
 				blank:      blank,
 			})
-			fieldIndex++
 		}
 	}
 	if fieldIndex != structType.NumFields() {

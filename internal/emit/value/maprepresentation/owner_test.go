@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -32,7 +31,6 @@ func TestNilRejectsOpenGenericMapOutsideGenericOperationOwner(
 			key:   parameter,
 			value: types.Typ[types.Int32],
 		},
-		storage.Owner{},
 		api.IntegerRepresentationNumber,
 		api.EvaluationOrderPreserveGo,
 		api.ConcurrencySemanticsDisabled,

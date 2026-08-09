@@ -4,9 +4,9 @@ import (
 	"go/ast"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -15,28 +15,26 @@ func valuePointerMethodReceiver(
 	children api.ChildEmitter,
 	source *ast.SelectorExpr,
 	resolved path,
-	method *types.Func,
 	declared types.Type,
 	receiverABI api.MethodReceiverABI,
 ) (api.ExpressionEmission, error) {
-	pointer, _, _, ok := pointerType(declared)
+	_, _, _, ok := pointerType(declared)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	var representation api.PointerRepresentationObservation
 	if receiverABI == api.MethodReceiverABISourceRepresentation {
-		var err error
-		representation, err = pointertype.ObserveSource(
-			context,
-			method.Origin(),
-			pointer,
-			api.PointerRepresentationDemandNone,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
+		if len(resolved.fields) == 0 {
+			return children.Address(
+				context.
+					WithRole(api.RoleReceiverValue).
+					WithExpectedType(declared),
+				source.X,
+			)
 		}
-	} else if receiverABI != api.MethodReceiverABIContractDirect {
+		return addressSource(context, children, source, resolved)
+	}
+	if receiverABI != api.MethodReceiverABIContractDirect {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "method receiver ABI is invalid",
@@ -46,63 +44,36 @@ func valuePointerMethodReceiver(
 		receiver api.ExpressionEmission
 		err      error
 	)
-	switch {
-	case receiverABI == api.MethodReceiverABIContractDirect:
-		target, targetErr := children.StoreTarget(
-			context.
-				WithRole(api.RoleReceiverValue).
-				WithExpectedType(resolved.root),
-			source.X,
-		)
-		if targetErr != nil {
-			return api.ExpressionEmission{}, targetErr
-		}
-		root, mutableErr := target.MutableValue(
-			context.WithRole(api.RoleReceiverValue),
-			source.X,
-		)
-		if mutableErr != nil {
-			return api.ExpressionEmission{}, mutableErr
-		}
-		receiver, err = projectMutableValue(
-			context,
-			children,
-			source,
-			resolved,
-			root,
-		)
-	case representation.Representation().DirectClass() && len(resolved.fields) == 0:
-		target, targetErr := children.StoreTarget(
-			context.
-				WithRole(api.RoleReceiverValue).
-				WithExpectedType(resolved.root),
-			source.X,
-		)
-		if targetErr != nil {
-			return api.ExpressionEmission{}, targetErr
-		}
-		receiver, err = target.MutableValue(
-			context.WithRole(api.RoleReceiverValue),
-			source.X,
-		)
-	default:
-		receiver, err = addressSource(
-			context,
-			children,
-			source,
-			resolved,
-		)
+	target, targetErr := children.StoreTarget(
+		context.
+			WithRole(api.RoleReceiverValue).
+			WithExpectedType(resolved.root),
+		source.X,
+	)
+	if targetErr != nil {
+		return api.ExpressionEmission{}, targetErr
 	}
+	root, mutableErr := target.MutableValue(
+		context.WithRole(api.RoleReceiverValue),
+		source.X,
+	)
+	if mutableErr != nil {
+		return api.ExpressionEmission{}, mutableErr
+	}
+	receiver, err = projectMutableValue(
+		context,
+		children,
+		source,
+		resolved,
+		root,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	return api.NewExpressionEmission(
 		receiver.Before(),
 		receiver.Value(),
-		api.CombineRequests(
-			receiver.Requests(),
-			representation.Requests(),
-		),
+		receiver.Requests(),
 	)
 }
 
@@ -148,8 +119,8 @@ func methodABIReceiver(
 
 func adaptPointerMethodReceiver(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
-	declarationOwner types.Object,
 	declared *types.Pointer,
 	effective *types.Pointer,
 	receiverABI api.MethodReceiverABI,
@@ -160,29 +131,11 @@ func adaptPointerMethodReceiver(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if receiverABI == api.MethodReceiverABIContractDirect {
-		sourceRepresentation, err := pointertype.Observe(
-			context,
-			effective,
-			api.PointerRepresentationDemandNone,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if sourceRepresentation.Representation().DirectClass() {
-			return api.NewExpressionEmission(
-				value.Before(),
-				value.Value(),
-				api.CombineRequests(
-					value.Requests(),
-					sourceRepresentation.Requests(),
-				),
-			)
-		}
 		return projectContractDirectReceiver(
 			context,
+			children,
 			source,
 			effective.Elem(),
-			sourceRepresentation,
 			value,
 		)
 	}
@@ -192,51 +145,14 @@ func adaptPointerMethodReceiver(
 			Reason: "method receiver ABI is invalid",
 		}
 	}
-	target, err := pointertype.ObserveSource(
-		context,
-		declarationOwner,
-		declared,
-		api.PointerRepresentationDemandNone,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	sourceDemand := api.PointerRepresentationDemandNone
-	if !target.Representation().DirectClass() {
-		sourceDemand = api.PointerRepresentationDemandStableLocation
-	}
-	sourceRepresentation, err := pointertype.Observe(
-		context,
-		effective,
-		sourceDemand,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if target.Representation().DirectClass() &&
-		!sourceRepresentation.Representation().DirectClass() {
-		return api.ExpressionEmission{}, &api.InvariantError{
-			Role: context.Role(),
-			Reason: "pointer receiver occurrence diverged from its " +
-				"declaration-family ABI",
-		}
-	}
-	return api.NewExpressionEmission(
-		value.Before(),
-		value.Value(),
-		api.CombineRequests(
-			value.Requests(),
-			target.Requests(),
-			sourceRepresentation.Requests(),
-		),
-	)
+	return value, nil
 }
 
 func projectContractDirectReceiver(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	element types.Type,
-	representation api.PointerRepresentationObservation,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	name, err := context.Names().Temporary(api.TemporaryReceiverValue)
@@ -244,29 +160,22 @@ func projectContractDirectReceiver(
 		return api.ExpressionEmission{}, err
 	}
 	identifier := context.Factory().Identifier(name)
-	storage := api.DirectExpression(
-		context.Factory().PropertyAccessExpression(
-			identifier,
-			nil,
-			context.Factory().Identifier(pointerruntime.CellValueName),
-			tsgo.NodeFlagsNone,
-		),
-	)
-	logical, err := context.ContainerStorage().FromPointerStorage(
+	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleReceiverValue),
 		source,
 		element,
-		representation,
-		storage,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if len(logical.Before()) != 0 {
-		return api.ExpressionEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "contract-direct receiver projection has nested prerequisites",
-		}
+	loaded, err := pointermarker.Operation(
+		context,
+		tsoniccore.SymbolLoadPointer,
+		[]api.TypeEmission{targetElement},
+		[]api.ExpressionEmission{api.DirectExpression(identifier)},
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	before := append(
 		value.Before(),
@@ -304,12 +213,11 @@ func projectContractDirectReceiver(
 				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
 			),
 			context.Factory().ColonToken(),
-			logical.Value(),
+			loaded.Value(),
 		),
 		api.CombineRequests(
 			value.Requests(),
-			logical.Requests(),
-			representation.Requests(),
+			loaded.Requests(),
 		),
 	)
 }

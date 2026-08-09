@@ -19,7 +19,6 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeStringIndex: {},
 		},
-		nil,
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)
 	if err != nil {
@@ -58,10 +57,7 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 			IntegerRepresentation string `json:"integerRepresentation"`
 			NativeIntegerBits     uint8  `json:"nativeIntegerBits"`
 		} `json:"gotots"`
-		Exports map[string]struct {
-			Types   string `json:"types"`
-			Default string `json:"default"`
-		} `json:"exports"`
+		Exports map[string]string `json:"exports"`
 	}
 	if err := json.Unmarshal(assembled.Manifest(), &manifest); err != nil {
 		t.Fatal(err)
@@ -83,8 +79,7 @@ func TestAssemblePackageOwnsExactGeneratedRuntimeSurface(t *testing.T) {
 		)
 	}
 	scalar := manifest.Exports["./scalars.js"]
-	if scalar.Types != "./scalars.d.ts" ||
-		scalar.Default != "./scalars.js" {
+	if scalar != "./scalars.js" {
 		t.Fatalf("scalar package export = %#v", scalar)
 	}
 	if assembled.Fingerprint() == "" {
@@ -98,7 +93,6 @@ func TestAssemblePackageRejectsDuplicateAliases(t *testing.T) {
 		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsDisabled,
 		nil,
-		nil,
 		[]api.PrimitiveAlias{
 			api.PrimitiveInt32,
 			api.PrimitiveInt32,
@@ -109,48 +103,12 @@ func TestAssemblePackageRejectsDuplicateAliases(t *testing.T) {
 	}
 }
 
-func TestAssemblePackageRequiresOneRuntimeFeatureOwner(t *testing.T) {
-	for _, testCase := range []struct {
-		name     string
-		symbols  map[api.RuntimeSymbol]struct{}
-		features []api.RuntimeFeature
-	}{
-		{
-			name:     "missing owner",
-			features: []api.RuntimeFeature{api.RuntimePointerFieldPath},
-		},
-		{
-			name:    "duplicate feature",
-			symbols: map[api.RuntimeSymbol]struct{}{api.RuntimePointer: {}},
-			features: []api.RuntimeFeature{
-				api.RuntimePointerFieldPath,
-				api.RuntimePointerFieldPath,
-			},
-		},
-	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			_, err := AssemblePackage(
-				tsgo.NewFactory(),
-				testScalarABI(t, api.IntegerRepresentationNumber),
-				api.ConcurrencySemanticsDisabled,
-				testCase.symbols,
-				testCase.features,
-				nil,
-			)
-			if err == nil {
-				t.Fatal("invalid runtime feature ownership was accepted")
-			}
-		})
-	}
-}
-
 func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
 	factory := tsgo.NewFactory()
 	without, err := AssemblePackage(
 		factory,
 		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsCooperative,
-		nil,
 		nil,
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)
@@ -168,7 +126,6 @@ func TestAwaitableSupportIsEmittedOnlyWhenRequested(t *testing.T) {
 		testScalarABI(t, api.IntegerRepresentationNumber),
 		api.ConcurrencySemanticsCooperative,
 		map[api.RuntimeSymbol]struct{}{api.RuntimeAwaitable: {}},
-		nil,
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)
 	if err != nil {
@@ -222,7 +179,7 @@ func TestDefinitionsRejectJoinMutations(t *testing.T) {
 	factory := tsgo.NewFactory()
 	index := runtimeDefinition(t, factory, api.RuntimeStringIndex)
 	slice := runtimeDefinition(t, factory, api.RuntimeStringSlice)
-	pointer := runtimeDefinition(t, factory, api.RuntimePointer)
+	array := runtimeDefinition(t, factory, api.RuntimeArray)
 	tests := []struct {
 		name        string
 		requested   []api.RuntimeSymbol
@@ -231,7 +188,7 @@ func TestDefinitionsRejectJoinMutations(t *testing.T) {
 		{"missing", []api.RuntimeSymbol{api.RuntimeStringIndex, api.RuntimeStringSlice}, []Definition{index}},
 		{"duplicate", []api.RuntimeSymbol{api.RuntimeStringIndex}, []Definition{index, index}},
 		{"extra", []api.RuntimeSymbol{api.RuntimeStringIndex}, []Definition{index, slice}},
-		{"wrong module", []api.RuntimeSymbol{api.RuntimePointer}, []Definition{pointer}},
+		{"wrong module", []api.RuntimeSymbol{api.RuntimeArray}, []Definition{array}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

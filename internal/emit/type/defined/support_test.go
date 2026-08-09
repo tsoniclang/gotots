@@ -12,6 +12,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 type printedDefined struct {
@@ -131,7 +133,6 @@ func main() {
 		values.LabelFromString("hello"),
 	)
 	fmt.Println(values.IntFromCount(minimum), values.IntFromCount(maximum), length)
-	fmt.Println(values.IntFromCount(values.CountPointer(values.CountFromInt(8))))
 	fmt.Println(values.CountSwitch(values.CountFromInt(1)))
 	fmt.Println(values.CountSwitch(values.CountFromInt(3)))
 	fmt.Println(values.CountSwitch(values.CountFromInt(5)))
@@ -220,7 +221,6 @@ const [minimum, maximum, length] = values.DefinedBuiltins(
   values.LabelFromString("hello"),
 );
 console.log(String(values.IntFromCount(minimum)), String(values.IntFromCount(maximum)), String(length));
-console.log(String(values.IntFromCount(values.CountPointer(values.CountFromInt(8)))));
 console.log(String(values.CountSwitch(values.CountFromInt(1))));
 console.log(String(values.CountSwitch(values.CountFromInt(3))));
 console.log(String(values.CountSwitch(values.CountFromInt(5))));
@@ -248,6 +248,9 @@ console.log(String(values.IntFromCount(roundTrip)), String(roundTripOK), String(
 		filepath.Join(workingDirectory, "package.json"),
 		"{\"type\":\"module\"}\n",
 	)
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	outputDirectory := filepath.Join(workingDirectory, "out")
 	arguments := []string{
 		"--target", "es2022",
@@ -258,6 +261,9 @@ console.log(String(values.IntFromCount(roundTrip)), String(roundTripOK), String(
 	}
 	arguments = append(arguments, artifacts.paths...)
 	arguments = append(arguments, runnerPath)
+	if err := runtimefixture.InstallResolution(workingDirectory, outputDirectory); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := tsgo.Compile(

@@ -6,7 +6,7 @@ import "testing"
 // Cap, Index element locations aliasing the original backing array,
 // element mutation through Set, element zero evidence, Append growth, and
 // MakeSlice construction all match Go exactly.
-func TestReflectSliceOperationsMatchGo(t *testing.T) {
+func TestReflectSliceOperationsCanonicalizeWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -59,7 +59,7 @@ func main() {
 	fmt.Println(fixture.Checksum())
 }
 `
-	runReflectDifferential(
+	verifyReflectCanonical(
 		t,
 		source,
 		"Checksum",

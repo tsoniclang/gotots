@@ -9,6 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
 
 func loadConstantRoots(t *testing.T) *load.Package {
@@ -89,6 +90,9 @@ func typecheckProgram(t *testing.T, emission emit.ProgramEmission) {
 		"--strict",
 	}
 	arguments = append(arguments, targetPaths...)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := tsgo.Compile(ctx, repositoryRoot(), workingDirectory, arguments); err != nil {

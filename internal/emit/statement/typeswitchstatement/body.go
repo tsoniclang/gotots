@@ -85,34 +85,16 @@ func emitCaseBody(
 		targetName := name
 		var targetType tsgo.TypeNode
 		flags := tsgo.NodeFlagsLet
-		if storageName, addressable := context.AddressableStorage().Name(
-			context,
-			binding,
-		); addressable {
-			targetName = storageName
-			flags = tsgo.NodeFlagsConst
-			initial, err = context.AddressableStorage().Cell(
-				context.WithRole(api.RoleTypeSwitchBinding),
-				children,
-				clause,
-				binding.Type(),
-				initial,
-			)
-			if err != nil {
-				return nil, nil, err
-			}
-		} else {
-			represented, typeErr := children.RepresentedType(
-				context.WithRole(api.RoleTypeSwitchBinding),
-				clause,
-				binding.Type(),
-			)
-			if typeErr != nil {
-				return nil, nil, typeErr
-			}
-			targetType = represented.Value()
-			requests = append(requests, represented.Requests()...)
+		represented, typeErr := children.RepresentedType(
+			context.WithRole(api.RoleTypeSwitchBinding),
+			clause,
+			binding.Type(),
+		)
+		if typeErr != nil {
+			return nil, nil, typeErr
 		}
+		targetType = represented.Value()
+		requests = append(requests, represented.Requests()...)
 		statements = append(statements, initial.Before()...)
 		statements = append(
 			statements,

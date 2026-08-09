@@ -1,5 +1,7 @@
-import type { bool, int32 } from "../../../runtime/scalars.js";
-import { GoPointer } from "../../../runtime/pointer.js";
+import type { bool, int32 } from "@gotots/runtime/scalars.js";
+import type { Pointer } from "@tsonic/core/types.js";
+import { GoPanic } from "@gotots/runtime/panic.js";
+import { addressOf, loadPointer } from "@tsonic/core/lang.js";
 export class Point {
     declare private readonly $goType: void;
     private constructor(public X: int32, public Visible: bool) {
@@ -80,14 +82,14 @@ export class Empty {
 export function NewBox(value: int32): Box {
     return Box.$make(Point.$make(value, true), value > 0);
 }
-export function Snapshot(value: Box | undefined): Point {
-    return Point.$copy(GoPointer.direct<Box>(value).Point);
+export function Snapshot(value: Pointer<Box> | undefined): Point {
+    return Point.$copy(loadPointer<Box>((value ?? GoPanic.raiseRuntime("invalid memory address or nil pointer dereference"))).Point);
 }
 export function ReturnSnapshotResult(): int32 {
-    let value$storage = NewBox(1);
-    let snapshot = Snapshot(value$storage);
-    value$storage.Point.X = 2;
-    return snapshot.X * 10 + Box.$copy(value$storage).Point.X;
+    let value = NewBox(1);
+    let snapshot = Snapshot(addressOf<Box>(value));
+    value.Point.X = 2;
+    return snapshot.X * 10 + value.Point.X;
 }
 export function ZeroIsFresh(): bool {
     let left = Box.$zero();

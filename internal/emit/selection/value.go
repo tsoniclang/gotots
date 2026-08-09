@@ -6,10 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
-	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
-	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/emit/value/namedstructstorage"
 	"github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -308,105 +305,13 @@ func dereferenceValue(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, types.Type, error) {
-	raw, element, defined, ok := pointerType(sourceType)
-	if !ok {
-		return api.ExpressionEmission{}, nil,
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	if defined {
-		model, _ := definedtype.ResolvePointer(sourceType)
-		var err error
-		value, err = model.Project(context, value)
-		if err != nil {
-			return api.ExpressionEmission{}, nil, err
-		}
-	}
-	if logical, handled, err := genericpointer.Load(
+	return loadAddressParent(
 		context,
+		children,
 		source,
-		element,
+		sourceType,
 		value,
-	); handled || err != nil {
-		return logical, element, err
-	}
-	representation, err := pointertype.Observe(
-		context,
-		raw,
-		api.PointerRepresentationDemandNone,
 	)
-	if err != nil {
-		return api.ExpressionEmission{}, nil, err
-	}
-	targetElement, err := children.RepresentedType(
-		context.WithRole(api.RoleFieldReceiver),
-		source,
-		element,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, nil, err
-	}
-	runtime, err := pointerRuntime(context)
-	if err != nil {
-		return api.ExpressionEmission{}, nil, err
-	}
-	if representation.Representation().DirectClass() {
-		logical, err := api.NewExpressionEmission(
-			value.Before(),
-			pointerruntime.Direct(
-				context.Factory(),
-				runtime.Name(),
-				targetElement.Value(),
-				value.Value(),
-			),
-			api.CombineRequests(
-				value.Requests(),
-				targetElement.Requests(),
-				runtime.Requests(),
-				representation.Requests(),
-			),
-		)
-		return logical, element, err
-	}
-	storage, err := context.ContainerStorage().PointerStorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		element,
-		representation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, nil, err
-	}
-	stored, err := api.NewExpressionEmission(
-		value.Before(),
-		pointerruntime.CellValue(
-			context.Factory(),
-			runtime.Name(),
-			targetElement.Value(),
-			storage.Value(),
-			value.Value(),
-		),
-		api.CombineRequests(
-			value.Requests(),
-			targetElement.Requests(),
-			storage.Requests(),
-			runtime.Requests(),
-			representation.Requests(),
-		),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, nil, err
-	}
-	logical, err := context.ContainerStorage().FromPointerStorage(
-		context.WithRole(api.RoleFieldReceiver),
-		source,
-		element,
-		representation,
-		stored,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, nil, err
-	}
-	return logical, element, nil
 }
 
 func pointerType(
@@ -439,11 +344,4 @@ func fieldInType(sourceType types.Type, field *types.Var) bool {
 		}
 	}
 	return false
-}
-
-func pointerRuntime(context api.Context) (api.NameReference, error) {
-	return context.Names().Runtime(
-		api.RuntimePointer,
-		api.ImportPhaseValue,
-	)
 }

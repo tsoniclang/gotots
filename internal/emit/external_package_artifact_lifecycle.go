@@ -1,217 +1,287 @@
 package emit
 
 import (
-	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
-	"github.com/tsoniclang/gotots/internal/contracts/externals"
-	externalcertify "github.com/tsoniclang/gotots/internal/contracts/externals/certify"
-	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
+	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
-	emitstorage "github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"go/ast"
 	"go/types"
-	"slices"
-	"sort"
 )
 
-type indexedExternalFunction struct {
-	function *types.Func
-	site     declarationSite
-	contract environmentcontract.ObjectContract
+func sourceImplementationForPackage(
+	certificate *sourceimplementation.Certificate,
+	sourcePackage *load.Package,
+) (sourceimplementation.Implementation, bool) {
+	if certificate == nil {
+		return sourceimplementation.Implementation{}, false
+	}
+	return certificate.ForPackage(sourcePackage)
 }
 
-func resolveExternalFunctionProvider(
-	source *load.Program,
-	sites map[types.Object]declarationSite,
-	provider *externalcertify.Certificate,
-	standardLibrary *gostdlibcertify.Certificate,
-	providerScalar api.ScalarABI,
-) (map[*types.Func]api.ExternalFunctionTarget, []string, error) {
-	resolved := make(map[*types.Func]api.ExternalFunctionTarget)
-	if provider == nil {
-		return resolved, nil, nil
+type sourceImplementationInputs struct {
+	contracts map[api.ArtifactOwner]sourceImplementationContract
+	targets   []sourceimplementation.Target
+	registry  *emitnaming.Registry
+}
+
+type sourceImplementationContract struct {
+	contract     artifactstate.Contract
+	dependencies []api.ArtifactDependency
+	requirements []api.DeclarationRequirement
+}
+
+func captureSourceImplementationInputs(
+	session *programSession,
+	roots []Root,
+) (sourceImplementationInputs, error) {
+	if session == nil || session.sourceImplementations == nil {
+		return sourceImplementationInputs{}, &ScheduleError{
+			Reason: "source-implementation certification session is absent",
+		}
 	}
-	if err := validateExternalProviderProfile(
-		source,
-		provider,
-		standardLibrary,
-		providerScalar,
-	); err != nil {
-		return nil, nil, err
+	if err := session.requireProgramRoots(roots); err != nil {
+		return sourceImplementationInputs{}, err
 	}
-	bindings := provider.Bindings()
-	requested := externalFunctionIdentities(bindings)
-	byIdentity, err := indexExternalFunctions(sites, requested)
+	if err := session.settle(); err != nil {
+		return sourceImplementationInputs{}, err
+	}
+	if err := session.verifyTargetFilesSettled(); err != nil {
+		return sourceImplementationInputs{}, err
+	}
+	files, err := session.assembleTargetFiles()
 	if err != nil {
-		return nil, nil, err
+		return sourceImplementationInputs{}, err
 	}
-	modules := make([]string, 0)
-	for _, binding := range bindings {
-		owner, selected := byIdentity[binding.SourceIdentity()]
-		if !selected {
+	targets, err := sourceImplementationTargets(files)
+	if err != nil {
+		return sourceImplementationInputs{}, err
+	}
+	contracts, err := session.captureSourceImplementationContracts()
+	if err != nil {
+		return sourceImplementationInputs{}, err
+	}
+	registry, err := session.registry.TransferCanonicalIdentity()
+	if err != nil {
+		return sourceImplementationInputs{}, err
+	}
+	return sourceImplementationInputs{
+		contracts: contracts,
+		targets:   targets,
+		registry:  registry,
+	}, nil
+}
+
+func (s *programSession) captureSourceImplementationContracts() (
+	map[api.ArtifactOwner]sourceImplementationContract,
+	error,
+) {
+	result := make(map[api.ArtifactOwner]sourceImplementationContract)
+	for _, owner := range s.artifacts.Owners() {
+		object, sourceOwned := owner.Source()
+		if !sourceOwned || object.Pkg() == nil {
 			continue
 		}
-		if err := validateExternalSourceBinding(owner, binding); err != nil {
-			return nil, nil, err
-		}
-		target, module, err := externalFunctionTarget(
-			owner,
-			binding,
-			byIdentity,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		if _, duplicate := resolved[owner.function]; duplicate {
-			return nil, nil, &ExternalFunctionBindingError{
-				Identity: binding.SourceIdentity(),
-				Reason:   "certificate binding is duplicated",
-			}
-		}
-		resolved[owner.function] = target
-		if module != "" {
-			modules = append(modules, module)
-		}
-	}
-	sort.Strings(modules)
-	return resolved, slices.Compact(modules), nil
-}
-
-func validateExternalProviderProfile(
-	source *load.Program,
-	provider *externalcertify.Certificate,
-	standardLibrary *gostdlibcertify.Certificate,
-	providerScalar api.ScalarABI,
-) error {
-	if source == nil || !provider.Valid() {
-		return &ExternalFunctionBindingError{Reason: "provider certificate is invalid"}
-	}
-	if standardLibrary == nil || !standardLibrary.Valid() ||
-		provider.StandardLibraryDigest() != standardLibrary.ManifestDigest() {
-		return &ExternalFunctionBindingError{
-			Reason: "provider and standard-library certificates do not exact-join",
-		}
-	}
-	selectedProfile, ok := provider.BuildProfile()
-	if !ok {
-		return &ExternalFunctionBindingError{Reason: "provider build profile is absent"}
-	}
-	selectedKey, err := environmentcontract.ToolchainKey(selectedProfile)
-	if err != nil {
-		return err
-	}
-	sourceKey, err := environmentcontract.ToolchainKey(source.BuildProfile())
-	if err != nil {
-		return err
-	}
-	if selectedKey != sourceKey || provider.Backend() != "node" ||
-		!providerScalar.Valid() ||
-		provider.ProviderIntegerRepresentation() !=
-			providerScalar.IntegerRepresentation().String() {
-		return &ExternalFunctionBindingError{
-			Reason: "provider target profile does not match compilation",
-		}
-	}
-	return nil
-}
-
-func indexExternalFunctions(
-	sites map[types.Object]declarationSite,
-	requested map[string]struct{},
-) (map[string]indexedExternalFunction, error) {
-	result := make(map[string]indexedExternalFunction)
-	for object, site := range sites {
-		function, ok := object.(*types.Func)
-		if !ok || function != function.Origin() {
+		sourcePackage := s.source.PackageForTypes(object.Pkg())
+		if _, selected := sourceImplementationForPackage(
+			s.sourceImplementations,
+			sourcePackage,
+		); !selected {
 			continue
 		}
-		contract, err := environmentcontract.Describe(function)
+		contract, err := s.artifacts.ObservableContract(owner)
 		if err != nil {
 			return nil, err
 		}
-		if _, selected := requested[contract.Identity()]; !selected {
-			continue
-		}
-		if _, duplicate := result[contract.Identity()]; duplicate {
-			return nil, &ExternalFunctionBindingError{
-				Identity: contract.Identity(),
-				Reason:   "selected source identity is duplicated",
+		dependencies, exists := s.artifacts.Dependencies(owner)
+		if !exists {
+			return nil, &ScheduleError{
+				Object: owner.Name(),
+				Reason: "source-implementation artifact dependencies are absent",
 			}
 		}
-		result[contract.Identity()] = indexedExternalFunction{
-			function: function,
-			site:     site,
-			contract: contract,
+		dependencies = s.sourceImplementationDependencies(dependencies)
+		result[owner] = sourceImplementationContract{
+			contract:     contract,
+			dependencies: dependencies,
+			requirements: s.requirements.consumedBy(owner),
+		}
+	}
+	for _, implementation := range s.sourceImplementations.Implementations() {
+		sourcePackage := s.source.PackageByPath(implementation.PackagePath())
+		if sourcePackage == nil || s.packageBuilders[sourcePackage] == nil {
+			return nil, sourceImplementationError(
+				implementation.PackagePath(),
+				&ScheduleError{Reason: "selected package was not materialized for certification"},
+			)
 		}
 	}
 	return result, nil
 }
 
-func externalFunctionIdentities(bindings []externals.Binding) map[string]struct{} {
-	result := make(map[string]struct{}, len(bindings)*2)
-	for _, binding := range bindings {
-		result[binding.SourceIdentity()] = struct{}{}
-		if identity, _, _, ok := binding.SourceTarget(); ok {
-			result[identity] = struct{}{}
+func (s *programSession) sourceImplementationDependencies(
+	dependencies []api.ArtifactDependency,
+) []api.ArtifactDependency {
+	result := make([]api.ArtifactDependency, 0, len(dependencies))
+	for _, dependency := range dependencies {
+		object, sourceOwned := dependency.Provider().Source()
+		if sourceOwned && object.Pkg() != nil {
+			sourcePackage := s.source.PackageForTypes(object.Pkg())
+			if _, selected := sourceImplementationForPackage(
+				s.sourceImplementations,
+				sourcePackage,
+			); selected {
+				continue
+			}
 		}
+		result = append(result, dependency)
 	}
 	return result
 }
 
-func validateExternalSourceBinding(
-	owner indexedExternalFunction,
-	binding externals.Binding,
-) error {
-	declaration, ok := owner.site.Declaration.(*ast.FuncDecl)
-	if !ok || declaration.Body != nil ||
-		owner.contract.Signature() != binding.SourceSignature() ||
-		owner.site.Source.ModulePath() != binding.SourceModulePath() ||
-		owner.site.Source.ModuleVersion() != binding.SourceModuleVersion() {
-		return &ExternalFunctionBindingError{
-			Identity: binding.SourceIdentity(),
-			Reason:   "certificate does not match the selected bodyless declaration",
-		}
+func (s *programSession) sourceImplementationContract(
+	owner api.ArtifactOwner,
+) bool {
+	if s.sourceImplementationContracts == nil {
+		return false
 	}
-	return nil
+	_, ok := s.sourceImplementationContracts[owner]
+	return ok
 }
 
-func externalFunctionTarget(
-	owner indexedExternalFunction,
-	binding externals.Binding,
-	byIdentity map[string]indexedExternalFunction,
-) (api.ExternalFunctionTarget, string, error) {
-	switch binding.TargetKind() {
-	case externals.TargetModule:
-		module, export, _, _, ok := binding.ModuleTarget()
-		if !ok {
-			break
+func (s *programSession) sourceImplementationOwner(
+	owner api.ArtifactOwner,
+) bool {
+	if s.sourceImplementationContracts == nil {
+		return false
+	}
+	object, sourceOwned := owner.Source()
+	if !sourceOwned || object.Pkg() == nil {
+		return false
+	}
+	_, selected := sourceImplementationForPackage(
+		s.sourceImplementations,
+		s.source.PackageForTypes(object.Pkg()),
+	)
+	return selected
+}
+
+func (s *programSession) acceptSourceImplementationRequirements(
+	owner api.ArtifactOwner,
+	requirements []api.DeclarationRequirement,
+) (bool, error) {
+	if !s.sourceImplementationOwner(owner) {
+		return false, nil
+	}
+	if !s.sourceImplementationContract(owner) {
+		return true, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "source-implementation observable contract is absent",
 		}
-		target, err := api.NewExternalModuleFunctionTarget(module, export)
-		return target, module, err
-	case externals.TargetSource:
-		identity, signature, _, ok := binding.SourceTarget()
-		implementation, found := byIdentity[identity]
-		declaration, bodyOwner := implementation.site.Declaration.(*ast.FuncDecl)
-		if !ok || !found || !bodyOwner || declaration.Body == nil ||
-			implementation.contract.Signature() != signature ||
-			implementation.function.Pkg() != owner.function.Pkg() ||
-			!types.Identical(implementation.function.Type(), owner.function.Type()) {
-			return api.ExternalFunctionTarget{}, "", &ExternalFunctionBindingError{
-				Identity: binding.SourceIdentity(),
-				Reason:   "portable source implementation is absent or incompatible",
+	}
+	for _, requirement := range requirements {
+		if !requirement.Valid() || requirement.Owner() != owner {
+			return true, &ScheduleError{
+				Object: owner.Name(),
+				Reason: "source-implementation contract batch has mixed or invalid ownership",
 			}
 		}
-		target, err := api.NewExternalSourceFunctionTarget(implementation.function)
-		return target, "", err
+		if !s.requirements.wasApplied(requirement) {
+			return true, &ScheduleError{
+				Object: owner.Name(),
+				Reason: "source-implementation contract requirement was not accepted by its owner",
+			}
+		}
 	}
-	return api.ExternalFunctionTarget{}, "", &ExternalFunctionBindingError{
-		Identity: binding.SourceIdentity(),
-		Reason:   "certificate target is invalid",
+	s.artifacts.DiscardDirty(owner)
+	return true, nil
+}
+
+func (s *programSession) acceptSourceImplementationReconstruction(
+	owner api.ArtifactOwner,
+) (bool, error) {
+	if !s.sourceImplementationOwner(owner) {
+		return false, nil
 	}
+	if !s.sourceImplementationContract(owner) {
+		return true, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "source-implementation observable contract is absent",
+		}
+	}
+	s.artifacts.DiscardDirty(owner)
+	return true, nil
+}
+
+func (s *programSession) emitSourceImplementationContract(
+	object types.Object,
+	site declarationSite,
+) (bool, error) {
+	if s.sourceImplementationContracts == nil {
+		return false, nil
+	}
+	owner := api.MustSourceArtifactOwner(object)
+	contract, selected := s.sourceImplementationContracts[owner]
+	_, packageSelected := sourceImplementationForPackage(
+		s.sourceImplementations,
+		site.Source,
+	)
+	if !packageSelected {
+		if selected {
+			return true, &ScheduleError{
+				Object: object.Name(),
+				Reason: "source-implementation contract belongs to an unselected package",
+			}
+		}
+		return false, nil
+	}
+	if !selected {
+		return true, &ScheduleError{
+			Object: object.Name(),
+			Reason: "source-implementation observable contract is absent",
+		}
+	}
+	for _, dependency := range contract.dependencies {
+		if err := s.prepareArtifactDependency(dependency); err != nil {
+			return true, err
+		}
+	}
+	if err := s.commitArtifactRevision(
+		owner,
+		contract.contract,
+		contract.dependencies,
+		contract.requirements,
+	); err != nil {
+		return true, err
+	}
+	if _, variable := object.(*types.Var); variable {
+		return true, nil
+	}
+	return true, s.recordPackageExport(s.packageBuilders[site.Source], object)
+}
+func sourcePackageRequiresInitialization(sourcePackage *load.Package) bool {
+	if sourcePackage == nil || sourcePackage.Types() == nil ||
+		sourcePackage.TypesInfo() == nil {
+		return false
+	}
+	for _, name := range sourcePackage.Types().Scope().Names() {
+		if _, variable := sourcePackage.Types().Scope().Lookup(name).(*types.Var); variable {
+			return true
+		}
+	}
+	for _, sourceFile := range sourcePackage.Files() {
+		for _, declaration := range sourceFile.Syntax().Decls {
+			function, ok := declaration.(*ast.FuncDecl)
+			if ok && declarationindex.IsPackageInitializer(function) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (s *programSession) emitPackageInitializer(
@@ -336,15 +406,6 @@ func (s *programSession) buildPackageInitializerRevision(
 	context, err := emitnaming.WithLexicalTypeRequirements(
 		builder.assemblyContext.WithArtifactOwner(owner),
 		site.Declaration,
-		owner,
-		requirements,
-	)
-	if err != nil {
-		return artifactRevision{}, err
-	}
-	context, err = emitstorage.ApplyRequirements(
-		context,
-		initializer.Rhs,
 		owner,
 		requirements,
 	)
@@ -495,12 +556,11 @@ func (s *programSession) retireCompilationGeneratedArtifact(
 		}
 	}
 	index, exists := builder.indexByOwner[owner]
-	if !exists || index != 0 ||
-		len(builder.declarations) != 1 ||
-		builder.declarations[0].owner != owner {
+	if !exists || index < 0 || index >= len(builder.declarations) ||
+		builder.declarations[index].owner != owner {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "retired generated artifact has no exact materialized target file",
+			Reason: "retired generated artifact has no exact materialized declaration",
 		}
 	}
 	contract, err := artifactstate.ProjectCoverageContract(s.factory, nil)
@@ -511,42 +571,15 @@ func (s *programSession) retireCompilationGeneratedArtifact(
 		return err
 	}
 	s.artifacts.DiscardDirty(owner)
-	delete(s.builders, artifact.OutputPath())
+	removed, err := s.removeTargetDeclaration(owner)
+	if err != nil {
+		return err
+	}
+	if !removed {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "retired generated artifact declaration survived",
+		}
+	}
 	return nil
-}
-
-type packageExportScheduler struct {
-	pending map[*packageTargetBuilder]struct{}
-}
-
-func newPackageExportScheduler() *packageExportScheduler {
-	return &packageExportScheduler{
-		pending: make(map[*packageTargetBuilder]struct{}),
-	}
-}
-
-func (s *packageExportScheduler) enqueue(builder *packageTargetBuilder) {
-	if builder == nil {
-		panic("package export builder is nil")
-	}
-	s.pending[builder] = struct{}{}
-}
-
-func (s *packageExportScheduler) nextBatch() []*packageTargetBuilder {
-	if len(s.pending) == 0 {
-		return nil
-	}
-	builders := make([]*packageTargetBuilder, 0, len(s.pending))
-	for builder := range s.pending {
-		builders = append(builders, builder)
-	}
-	clear(s.pending)
-	sort.Slice(builders, func(left, right int) bool {
-		return builders[left].assemblyPath < builders[right].assemblyPath
-	})
-	return builders
-}
-
-func (s *packageExportScheduler) hasPending() bool {
-	return len(s.pending) != 0
 }

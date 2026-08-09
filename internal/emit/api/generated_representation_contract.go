@@ -48,23 +48,21 @@ func (c Context) GoRuntimeType(sourceType types.Type) GoRuntimeType {
 type GeneratedArtifactKind uint8
 
 const (
-	GeneratedArtifactInvalid GeneratedArtifactKind = iota
-	GeneratedArtifactAnonymousStruct
-	GeneratedArtifactMapSpecialization
-	GeneratedArtifactInterfaceAdapter
-	GeneratedArtifactAnonymousInterface
-	GeneratedArtifactInterfaceMethodToken
-	GeneratedArtifactInterfaceDynamicTypeToken
-	GeneratedArtifactGenericCapability
-	GeneratedArtifactCallableABI
-	GeneratedArtifactInterfaceMethodCallable
-	GeneratedArtifactPointerRepresentation
-	GeneratedArtifactProviderInterfaceBridge
-	GeneratedArtifactProviderStatefulRepresentation
-	GeneratedArtifactDeferredCallableRegistry
-	GeneratedArtifactGenericConcretization
-	GeneratedArtifactReflectionType
-	GeneratedArtifactUnsafeCodec
+	GeneratedArtifactInvalid                        GeneratedArtifactKind = 0
+	GeneratedArtifactAnonymousStruct                GeneratedArtifactKind = 1
+	GeneratedArtifactMapSpecialization              GeneratedArtifactKind = 2
+	GeneratedArtifactInterfaceAdapter               GeneratedArtifactKind = 3
+	GeneratedArtifactAnonymousInterface             GeneratedArtifactKind = 4
+	GeneratedArtifactInterfaceMethodToken           GeneratedArtifactKind = 5
+	GeneratedArtifactInterfaceDynamicTypeToken      GeneratedArtifactKind = 6
+	GeneratedArtifactGenericCapability              GeneratedArtifactKind = 7
+	GeneratedArtifactCallableABI                    GeneratedArtifactKind = 8
+	GeneratedArtifactInterfaceMethodCallable        GeneratedArtifactKind = 9
+	GeneratedArtifactProviderInterfaceBridge        GeneratedArtifactKind = 11
+	GeneratedArtifactProviderStatefulRepresentation GeneratedArtifactKind = 12
+	GeneratedArtifactDeferredCallableRegistry       GeneratedArtifactKind = 13
+	GeneratedArtifactGenericConcretization          GeneratedArtifactKind = 14
+	GeneratedArtifactReflectionType                 GeneratedArtifactKind = 15
 )
 
 func (k GeneratedArtifactKind) Valid() bool {
@@ -77,13 +75,11 @@ func (k GeneratedArtifactKind) Valid() bool {
 		k == GeneratedArtifactGenericCapability ||
 		k == GeneratedArtifactCallableABI ||
 		k == GeneratedArtifactInterfaceMethodCallable ||
-		k == GeneratedArtifactPointerRepresentation ||
 		k == GeneratedArtifactProviderInterfaceBridge ||
 		k == GeneratedArtifactProviderStatefulRepresentation ||
 		k == GeneratedArtifactDeferredCallableRegistry ||
 		k == GeneratedArtifactGenericConcretization ||
-		k == GeneratedArtifactReflectionType ||
-		k == GeneratedArtifactUnsafeCodec
+		k == GeneratedArtifactReflectionType
 }
 
 type GeneratedArtifactPlacement uint8
@@ -244,8 +240,7 @@ func NewContractGeneratedArtifact(
 	targetName string,
 ) (*GeneratedArtifact, error) {
 	if (kind != GeneratedArtifactCallableABI &&
-		kind != GeneratedArtifactInterfaceMethodCallable &&
-		kind != GeneratedArtifactPointerRepresentation) ||
+		kind != GeneratedArtifactInterfaceMethodCallable) ||
 		!validGeneratedArtifactType(kind, sourceType) ||
 		artifact == "" ||
 		targetName == "" {
@@ -410,139 +405,6 @@ func NewLexicalGenericCapabilityArtifact(
 		anchor:       anchor,
 		generic:      selection,
 	}, nil
-}
-
-type PointerRepresentation uint8
-
-const (
-	PointerRepresentationInvalid                    PointerRepresentation = 0
-	PointerRepresentationDirectClass                PointerRepresentation = 1
-	PointerRepresentationCarrierLogical             PointerRepresentation = 2
-	PointerRepresentationCarrierCanonical           PointerRepresentation = 3
-	PointerRepresentationDirectClassStorageIdentity PointerRepresentation = 4
-)
-
-func (r PointerRepresentation) Valid() bool {
-	return r == PointerRepresentationDirectClass ||
-		r == PointerRepresentationCarrierLogical ||
-		r == PointerRepresentationCarrierCanonical ||
-		r == PointerRepresentationDirectClassStorageIdentity
-}
-
-func (r PointerRepresentation) DirectClass() bool {
-	return r == PointerRepresentationDirectClass ||
-		r == PointerRepresentationDirectClassStorageIdentity
-}
-
-func (r PointerRepresentation) UsesStorageIdentity() bool {
-	return r == PointerRepresentationDirectClassStorageIdentity
-}
-
-func (r PointerRepresentation) String() string {
-	switch r {
-	case PointerRepresentationDirectClass:
-		return "direct-class"
-	case PointerRepresentationCarrierLogical:
-		return "carrier-logical"
-	case PointerRepresentationCarrierCanonical:
-		return "carrier-canonical"
-	case PointerRepresentationDirectClassStorageIdentity:
-		return "direct-class-storage-identity"
-	default:
-		return "invalid"
-	}
-}
-
-type PointerRepresentationReference struct {
-	artifact *GeneratedArtifact
-	requests []RootRequest
-}
-
-func NewPointerRepresentationReference(artifact *GeneratedArtifact, requests ...RootRequest) (PointerRepresentationReference, error) {
-	if _, ok := artifact.PointerRepresentation(); !ok {
-		return PointerRepresentationReference{}, &RootRequestError{
-			Reason: "pointer-representation reference is invalid",
-		}
-	}
-	if err := validateReferenceRequests(requests); err != nil {
-		return PointerRepresentationReference{}, &RootRequestError{
-			Reason: "pointer-representation reference request is invalid",
-		}
-	}
-	return PointerRepresentationReference{
-		artifact: artifact,
-		requests: slices.Clone(requests),
-	}, nil
-}
-
-func (r PointerRepresentationReference) Artifact() *GeneratedArtifact {
-	return r.artifact
-}
-
-func (r PointerRepresentationReference) Requests() []RootRequest {
-	return slices.Clone(r.requests)
-}
-
-type PointerRepresentationObservation struct {
-	representation PointerRepresentation
-	requests       []RootRequest
-}
-
-func NewPointerRepresentationObservation(representation PointerRepresentation, requests ...RootRequest) (PointerRepresentationObservation, error) {
-	if !representation.Valid() {
-		return PointerRepresentationObservation{}, &RootRequestError{
-			Reason: "pointer-representation observation is invalid",
-		}
-	}
-	if err := validateReferenceRequests(requests); err != nil {
-		return PointerRepresentationObservation{}, &RootRequestError{
-			Reason: "pointer-representation observation request is invalid",
-		}
-	}
-	return PointerRepresentationObservation{
-		representation: representation,
-		requests:       slices.Clone(requests),
-	}, nil
-}
-
-func (o PointerRepresentationObservation) Representation() PointerRepresentation {
-	return o.representation
-}
-
-func (o PointerRepresentationObservation) UsesStorageIdentity() bool {
-	return o.representation.UsesStorageIdentity()
-}
-
-func (o PointerRepresentationObservation) Requests() []RootRequest {
-	return slices.Clone(o.requests)
-}
-
-type PointerRepresentationDemand uint8
-
-const (
-	PointerRepresentationDemandInvalid PointerRepresentationDemand = iota
-	PointerRepresentationDemandNone
-	PointerRepresentationDemandStableLocation
-	PointerRepresentationDemandDynamicLocation
-)
-
-func (d PointerRepresentationDemand) Valid() bool {
-	return d == PointerRepresentationDemandNone ||
-		d == PointerRepresentationDemandStableLocation ||
-		d == PointerRepresentationDemandDynamicLocation
-}
-
-func (d PointerRepresentationDemand) String() string {
-	switch d {
-	case PointerRepresentationDemandNone:
-		return "none"
-	case PointerRepresentationDemandStableLocation:
-		return "stable-location"
-	case PointerRepresentationDemandDynamicLocation:
-		return "dynamic-location"
-	default:
-		return "invalid"
-	}
 }
 
 type GeneratedArtifactError struct {

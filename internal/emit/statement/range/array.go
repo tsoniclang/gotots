@@ -4,8 +4,9 @@ import (
 	"go/ast"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
@@ -226,40 +227,18 @@ func pointerArrayElement(
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
-	storageType, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
-		source.X,
-		array.SourceType(),
+	guarded, err := pointermarker.Guard(
+		context,
+		api.DirectExpression(pointer),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
-	runtime, err := context.Names().Runtime(
-		api.RuntimePointer,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, nil, err
-	}
-	stored := api.DirectExpression(
-		pointerruntime.CellValue(
-			context.Factory(),
-			runtime.Name(),
-			logicalType.Value(),
-			storageType.Value(),
-			pointer,
-		),
-		api.CombineRequests(
-			logicalType.Requests(),
-			storageType.Requests(),
-			runtime.Requests(),
-		)...,
-	)
-	restored, err := context.Values().FromStorage(
-		context.WithRole(api.RoleRangeValue),
-		source,
-		array.SourceType(),
-		stored,
+	loaded, err := pointermarker.Operation(
+		context,
+		tsoniccore.SymbolLoadPointer,
+		[]api.TypeEmission{logicalType},
+		[]api.ExpressionEmission{guarded},
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
@@ -267,14 +246,14 @@ func pointerArrayElement(
 	element, err := array.RangeElement(
 		context,
 		source,
-		restored.Value(),
+		loaded.Value(),
 		index,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, nil, err
 	}
 	return element, api.CombineRequests(
-		restored.Requests(),
+		loaded.Requests(),
 		element.Requests(),
 	), nil
 }

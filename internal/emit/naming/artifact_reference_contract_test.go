@@ -44,8 +44,10 @@ func TestArtifactReferencesRecordExactConsumedFacet(t *testing.T) {
 		types.Typ[types.Int],
 		constant.MakeInt64(1),
 	)
+	variable := types.NewVar(token.Pos(4), sourcePackage, "State", types.Typ[types.Int])
+	sourcePackage.Scope().Insert(variable)
 	registry := NewRegistry()
-	for _, object := range []types.Object{function, typeName, value} {
+	for _, object := range []types.Object{function, typeName, value, variable} {
 		if err := registry.reserve(object, targetBinding{
 			name:         object.Name(),
 			sourceFile:   sourceFile,
@@ -55,6 +57,11 @@ func TestArtifactReferencesRecordExactConsumedFacet(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
+	}
+	registry.packageVariables[variable] = packageVariableBinding{
+		fieldName:    "State",
+		statePath:    "packages/current/state.ts",
+		assemblyPath: "packages/current/package.ts",
 	}
 	names := testFileNames(
 		t,
@@ -150,6 +157,21 @@ func TestArtifactReferencesRecordExactConsumedFacet(t *testing.T) {
 				t.Fatalf("dependencies = %#v", dependencies)
 			}
 		})
+	}
+	variableReference, err := names.PackageVariable(variable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var variableDependencies []api.ArtifactDependency
+	for _, request := range variableReference.Requests() {
+		if dependency, ok := request.ArtifactDependency(); ok {
+			variableDependencies = append(variableDependencies, dependency)
+		}
+	}
+	if len(variableDependencies) != 1 ||
+		variableDependencies[0].Provider() != api.MustSourceArtifactOwner(variable) ||
+		variableDependencies[0].Facet() != api.ArtifactFacetValueSurface {
+		t.Fatalf("package-variable dependencies = %#v", variableDependencies)
 	}
 }
 

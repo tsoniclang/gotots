@@ -37,26 +37,6 @@ type ContainerStorageValues interface {
 		types.Type,
 		ExpressionEmission,
 	) (ExpressionEmission, error)
-	PointerStorageType(
-		Context,
-		ast.Node,
-		types.Type,
-		PointerRepresentationObservation,
-	) (TypeEmission, error)
-	ToPointerStorage(
-		Context,
-		ast.Node,
-		types.Type,
-		PointerRepresentationObservation,
-		ExpressionEmission,
-	) (ExpressionEmission, error)
-	FromPointerStorage(
-		Context,
-		ast.Node,
-		types.Type,
-		PointerRepresentationObservation,
-		ExpressionEmission,
-	) (ExpressionEmission, error)
 }
 
 func NewStableIdentityStoreTargetEmission(
@@ -469,9 +449,6 @@ const (
 	GenericOperationNilEqual                 = genericoperation.GenericOperationNilEqual
 	GenericOperationToStorage                = genericoperation.GenericOperationToStorage
 	GenericOperationFromStorage              = genericoperation.GenericOperationFromStorage
-	GenericOperationPointerCell              = genericoperation.GenericOperationPointerCell
-	GenericOperationPointerLoad              = genericoperation.GenericOperationPointerLoad
-	GenericOperationPointerStore             = genericoperation.GenericOperationPointerStore
 	GenericOperationToContainerStorage       = genericoperation.GenericOperationToContainerStorage
 	GenericOperationFromContainerStorage     = genericoperation.GenericOperationFromContainerStorage
 	GenericOperationIndexAddress             = genericoperation.GenericOperationIndexAddress
@@ -538,13 +515,6 @@ func SelectGenericConstraintMethod(
 		}
 	}
 	return selection, err
-}
-
-func GenericPointerOperationElement(
-	selection GenericOperationSelection,
-	signature *types.Signature,
-) (types.Type, bool) {
-	return genericoperation.GenericPointerOperationElement(selection, signature)
 }
 
 func GenericStorageOperationType(

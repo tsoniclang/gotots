@@ -14,6 +14,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
 
 func TestComplexWidthsAreNominalUnderStrictTypeScript(t *testing.T) {
@@ -36,6 +37,9 @@ console.log(invalid);
 	}
 	arguments = append(arguments, targetPaths...)
 	arguments = append(arguments, path)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := tsgo.Compile(

@@ -1,5 +1,4 @@
 import type { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
-import type { GoUnsafePointer } from "@gotots/runtime/unsafe-pointer.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
 import type {
   bool,
@@ -11,6 +10,7 @@ import type {
 } from "@gotots/gostdlib/internal/scalars.js";
 
 import type { Type } from "../../../reflect.js";
+import type { ProviderRawPointer } from "../../runtime/raw-pointer.js";
 
 // RuntimeValueLocation is one addressable typed view over original Go
 // storage: reads box the current value and writes reach the represented
@@ -92,7 +92,7 @@ export interface RuntimeValueOperations {
   readonly cloned?: (box: GoInterfaceValue) => GoInterfaceValue;
   readonly unsafePointer?: (
     box: GoInterfaceValue,
-  ) => GoUnsafePointer | undefined;
+  ) => ProviderRawPointer | undefined;
 }
 
 const pointerDescriptors: Array<[Type, () => Type]> = [];

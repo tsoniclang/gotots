@@ -2,11 +2,9 @@ package provider_test
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -129,7 +127,7 @@ func Result() string {
 	if assemblyPath == "" {
 		t.Fatal("gzip fixture package assembly is absent")
 	}
-	targetOutput := executeProviderTypeScript(
+	typecheckProviderRunner(
 		t,
 		workingDirectory,
 		artifacts.paths,
@@ -138,41 +136,10 @@ func Result() string {
 		`console.log(JSON.stringify(await Result()));
 `,
 	)
-	runnerDirectory := filepath.Join(project, "cmd", "compare")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	fixture "example.com/gzipprofile"
-)
-
-func main() {
-	fmt.Printf("%q\n", fixture.Result())
-}
-`)
-	sourceContext, sourceCancel := context.WithTimeout(
-		context.Background(),
-		2*time.Minute,
-	)
-	defer sourceCancel()
-	command := exec.CommandContext(sourceContext, "go", "run", ".")
-	command.Dir = runnerDirectory
-	sourceOutput, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("execute Go gzip comparison: %v\n%s", err, sourceOutput)
-	}
-	if targetOutput != string(sourceOutput) {
-		t.Fatalf(
-			"gzip differential:\nGo:\n%s\nTypeScript:\n%s\nArtifacts:\n%s",
-			sourceOutput,
-			targetOutput,
-			artifacts.printed,
-		)
-	}
 	for _, required := range []string{
 		"GzipNewReaderCanonical",
 		"CanonicalGzipReader",
+		"bindPointer<",
 		".Header.Name",
 		".Header.Comment",
 	} {

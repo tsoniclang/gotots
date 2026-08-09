@@ -11,6 +11,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
 
 type renderedArtifacts struct {
@@ -95,6 +96,9 @@ func waveThreeTypecheck(
 		"--outDir", filepath.Join(workingDirectory, "out"),
 	}
 	arguments = append(arguments, paths...)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	if err := tsgo.Compile(

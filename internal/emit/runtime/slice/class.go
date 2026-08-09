@@ -13,6 +13,7 @@ type builder struct {
 	panicName      string
 	denseIndexName string
 	pointerName    string
+	addressName    string
 }
 
 type Capabilities struct {
@@ -37,6 +38,7 @@ func Build(
 		panicName,
 		denseIndexName,
 		"",
+		"",
 		Capabilities{},
 	)
 }
@@ -47,6 +49,7 @@ func BuildWithCapabilities(
 	panicName string,
 	denseIndexName string,
 	pointerName string,
+	addressName string,
 	capabilities Capabilities,
 ) tsgo.ClassDeclaration {
 	target := builder{
@@ -55,6 +58,7 @@ func BuildWithCapabilities(
 		panicName:      panicName,
 		denseIndexName: denseIndexName,
 		pointerName:    pointerName,
+		addressName:    addressName,
 	}
 	members := []tsgo.ClassElement{target.constructor()}
 	members = append(
@@ -84,7 +88,7 @@ func BuildWithCapabilities(
 	if capabilities.Address {
 		members = append(members, target.addressMethod())
 	}
-	if capabilities.ArrayPointer || capabilities.Region {
+	if capabilities.Address || capabilities.ArrayPointer || capabilities.Region {
 		members = append(members, target.arrayLocationMethod())
 	}
 	if capabilities.ArrayView || capabilities.Region {

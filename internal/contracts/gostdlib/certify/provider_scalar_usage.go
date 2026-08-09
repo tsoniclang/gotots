@@ -90,10 +90,94 @@ func verifyProviderScalarContract(
 	return nil
 }
 
+func verifyProviderPointerContract(
+	config resolvedConfig,
+	project *tsgo.ProjectInspection,
+	requirements runtimecontract.Requirements,
+) error {
+	pointerPath := providerPointerSourcePath(requirements)
+	exports, err := project.Exports(filepath.Join(
+		config.providerRoot,
+		filepath.FromSlash(pointerPath),
+	))
+	if err != nil {
+		return err
+	}
+	if len(exports) != 2 {
+		return certifyError(
+			"verify provider pointer",
+			pointerPath,
+			fmt.Sprintf("provider exports %d declarations, want 2", len(exports)),
+		)
+	}
+	seenType := false
+	seenFactory := false
+	for _, target := range exports {
+		switch target.Name() {
+		case "ProviderPointer":
+			value, ok := target.TypeMember("value")
+			if target.TypeParameterCount() != 1 ||
+				target.DeclaredTypeString() != "ProviderPointer<T>" ||
+				!ok || !value.Visible() || value.TypeString() != "T" ||
+				len(target.TypeMembers()) != 1 {
+				return certifyError(
+					"verify provider pointer",
+					target.Name(),
+					"pointer type must expose exactly one mutable T-valued member named value",
+				)
+			}
+			seenType = true
+		case "providerPointer":
+			parameterCount, countErr := project.CallableParameterCount(target)
+			if countErr != nil {
+				return countErr
+			}
+			parameterType, parameterErr := project.CallableParameterTypeString(target, 0)
+			if parameterErr != nil {
+				return parameterErr
+			}
+			resultType, resultErr := project.CallableReturnTypeString(target)
+			if resultErr != nil {
+				return resultErr
+			}
+			if target.TypeParameterCount() != 1 || parameterCount != 1 ||
+				parameterType != "T" || resultType != "ProviderPointer<T>" {
+				return certifyError(
+					"verify provider pointer",
+					target.Name(),
+					"pointer factory must have signature <T>(value: T) => ProviderPointer<T>",
+				)
+			}
+			seenFactory = true
+		default:
+			return certifyError(
+				"verify provider pointer",
+				target.Name(),
+				"export has no runtime-contract owner",
+			)
+		}
+	}
+	if !seenType || !seenFactory {
+		return certifyError(
+			"verify provider pointer",
+			pointerPath,
+			"pointer type or factory is absent",
+		)
+	}
+	return nil
+}
+
 func providerScalarSourcePath(
 	requirements runtimecontract.Requirements,
 ) string {
 	module := strings.TrimPrefix(requirements.ProviderScalarModule(), "./")
+	return "src/" + strings.TrimSuffix(module, ".js") + ".ts"
+}
+
+func providerPointerSourcePath(
+	requirements runtimecontract.Requirements,
+) string {
+	module := strings.TrimPrefix(requirements.ProviderPointerModule(), "./")
 	return "src/" + strings.TrimSuffix(module, ".js") + ".ts"
 }
 
@@ -328,8 +412,7 @@ func sourceScalarAliases(source types.Type) []string {
 			return []string{alias}
 		}
 	case *types.Pointer:
-		element := sourceScalarAliases(selected.Elem())
-		return append(slices.Clone(element), element...)
+		return sourceScalarAliases(selected.Elem())
 	case *types.Slice:
 		return sourceScalarAliases(selected.Elem())
 	case *types.Array:

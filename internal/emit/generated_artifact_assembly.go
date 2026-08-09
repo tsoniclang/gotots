@@ -29,8 +29,7 @@ func (s *programSession) validateGeneratedArtifact(
 		api.GeneratedArtifactInterfaceMethodToken,
 		api.GeneratedArtifactInterfaceDynamicTypeToken,
 		api.GeneratedArtifactProviderInterfaceBridge,
-		api.GeneratedArtifactReflectionType,
-		api.GeneratedArtifactUnsafeCodec:
+		api.GeneratedArtifactReflectionType:
 		return s.validateRepresentationArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
 		return s.validateGenericCapabilityArtifact(artifact)
@@ -39,8 +38,6 @@ func (s *programSession) validateGeneratedArtifact(
 	case api.GeneratedArtifactCallableABI,
 		api.GeneratedArtifactInterfaceMethodCallable:
 		return s.validateCallableContractArtifact(artifact)
-	case api.GeneratedArtifactPointerRepresentation:
-		return s.validatePointerRepresentationArtifact(artifact)
 	case api.GeneratedArtifactProviderStatefulRepresentation:
 		return s.validateProviderStatefulArtifact(artifact)
 	case api.GeneratedArtifactDeferredCallableRegistry:
@@ -67,8 +64,7 @@ func (s *programSession) reconstructGeneratedArtifact(
 		api.GeneratedArtifactInterfaceMethodToken,
 		api.GeneratedArtifactInterfaceDynamicTypeToken,
 		api.GeneratedArtifactProviderInterfaceBridge,
-		api.GeneratedArtifactReflectionType,
-		api.GeneratedArtifactUnsafeCodec:
+		api.GeneratedArtifactReflectionType:
 		err = s.reconstructRepresentationArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
 		err = s.reconstructGenericCapabilityArtifact(artifact)
@@ -77,8 +73,6 @@ func (s *programSession) reconstructGeneratedArtifact(
 	case api.GeneratedArtifactCallableABI,
 		api.GeneratedArtifactInterfaceMethodCallable:
 		err = s.reconstructCallableContractArtifact(artifact)
-	case api.GeneratedArtifactPointerRepresentation:
-		err = s.reconstructPointerRepresentationArtifact(artifact)
 	case api.GeneratedArtifactProviderStatefulRepresentation:
 		err = s.reconstructProviderStatefulArtifact(artifact)
 	case api.GeneratedArtifactDeferredCallableRegistry:

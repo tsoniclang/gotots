@@ -5,11 +5,11 @@ import (
 	"testing"
 )
 
-// TestDynamicPointerTypeCompositionMatchesGo proves that PointerTo composes
+// TestDynamicPointerTypeCompositionCanonicalizesWithNativeEvidence covers PointerTo
 // one canonical descriptor from a runtime-flowing Type without requiring a
 // statically mentioned pointer type. It also proves value- and pointer-method
 // implementation sets and repeated pointer composition.
-func TestDynamicPointerTypeCompositionMatchesGo(t *testing.T) {
+func TestDynamicPointerTypeCompositionCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -58,7 +58,7 @@ func main() {
 	fmt.Println(fixture.DynamicPointerFacts())
 }
 `
-	runReflectDifferentialInspect(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		"DynamicPointerFacts",

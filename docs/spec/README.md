@@ -17,22 +17,23 @@ They cannot override this specification. Requirements use **must** and
 ## Mission
 
 Given a valid selected Go project, toolchain, build configuration, explicit
-compilation profile, and environment contracts, GoToTS produces
-deterministic, readable, strict ESM TypeScript with observable behavior defined
-by that profile. Any intentional departure from Go semantics is named in the
-profile and may not be described as exact.
+compilation profile, and environment contracts, GoToTS produces deterministic,
+readable, strict ESM Tsonic-flavored TypeScript. The canonical artifact retains
+Go intent through ordinary TypeScript and accepted target-neutral marker
+contracts. A selected target separately lowers that checked artifact to its
+executable representation. Any intentional departure from Go semantics is
+named in the target profile and may not be described as exact.
 
 It is a general Go compiler. `typescript-go` is an acceptance corpus, not a
 production dependency, language authority, package-name exception, or source
 of privileged translation rules.
 
-GoToTS is a standalone project. Apart from the pinned TS-Go toolchain explicitly
-owned below for TypeScript AST construction, printing, compilation, and
-typechecking, it has no build, runtime, semantic, verification, configuration,
-or release dependency on another transpiler, target compiler, or product. An
-independently useful idea may be adopted only as GoToTS-owned source or
-generated output with standalone TypeScript semantics; the originating project
-is never imported, invoked, or treated as a truth owner.
+GoToTS is independently buildable and owns every Go semantic decision. Apart
+from the pinned TS-Go toolchain used for TypeScript AST construction and
+printing, it never invokes another compiler to analyze Go. Its canonical output
+may import accepted public marker declarations from `@tsonic/core`; GoToTS does
+not copy those declarations or import a target plugin/runtime. TSTS and the
+selected target are downstream consumers, not Go semantic truth owners.
 
 ## One Compilation Model
 
@@ -53,7 +54,13 @@ pinned TS-Go printNode API
 (real TS-Go decoder, node factory, and printer)
         |
         v
-strict TypeScript modules
+canonical strict Tsonic-flavored TypeScript modules
+        |
+        v
+TSTS finalized marker facts plus exact authored occurrences
+        |
+        v
+selected target-owned AST lowering and executable artifact
 ```
 
 The source program is represented only by the selected Go AST and its
@@ -61,8 +68,16 @@ The source program is represented only by the selected Go AST and its
 values generated from TS-Go's official external AST protocol. The pinned TS-Go
 process decodes those values into its real AST nodes and prints them with its
 real printer. There is no compiler-defined source inventory artifact, semantic
-IR, operation graph, whole-program plan, lowering IR, handwritten target tree,
-local formatter, or target-text fallback between them.
+IR, operation graph, whole-program plan, handwritten target tree, local
+formatter, or target-text fallback inside GoToTS.
+
+Target lowering is a separate compilation boundary, not a hidden GoToTS IR.
+TSTS checks the exact immutable canonical text, retains its TS-Go-contract AST,
+and finalizes typed marker facts on exact AST nodes. A target transforms that
+same AST and submits the result to the stable printer boundary. It must not
+reparse, join source ranges, reread files, recognize marker spellings, re-enter
+the checker, or infer Go meaning. Bootstrap printing uses pinned TS-Go; a later
+TSTS-native printer may replace it without changing target semantics.
 
 This does not prohibit ordinary compiler coordination. Deterministic names,
 scope builders, imports, target declaration assemblies, diagnostics, references
@@ -166,9 +181,10 @@ static form nor a finite exact concretization, compilation fails explicitly.
   deduplicated declaration requirements, requests, dependencies, and canonical
   observable contract. It is not a source model or IR.
 - **generated support module:** a GoToTS-owned TypeScript module containing
-  deduplicated type aliases or behaviorally real runtime operations required by
-  generated files. It is constructed through TS-Go AST like every other output
-  file and has no external compiler dependency.
+  deduplicated Go-language aliases or behaviorally real Go runtime operations
+  required by generated files. It is constructed through TS-Go AST like every
+  other output file. Target-neutral semantics already owned by `@tsonic/core`
+  use that canonical marker declaration instead of a copied support API.
 - **source-facing contract:** the target callable or type surface corresponding
   to one selected Go declaration. Its value and type-parameter shape obeys
   Source-Shape Conservation even when generated modules import a private
@@ -178,15 +194,20 @@ static form nor a finite exact concretization, compilation fails explicitly.
   because its body needs representation-dependent operations that TypeScript
   cannot express over the open type parameter. It carries no operation
   dictionary and is keyed by Go identity plus exact type arguments.
-- **representation rule:** the direct rule choosing the TypeScript shape
-  required by the selected profile for a Go type, method, interface, value, or
-  operation.
-- **compilation profile:** the immutable compilation-wide selection of every
-  semantic tradeoff axis. The initial axes are integer representation
-  (`number`, `fixed64-bigint`, or `bigint`), evaluation order (`direct` or
-  `preserve-go`), and concurrency semantics (`disabled` or explicitly selected
-  `cooperative`).
-  Generated files in one compilation cannot mix selections.
+- **canonical representation rule:** the direct rule choosing the ordinary
+  TypeScript shape or accepted target-neutral marker that exactly records one
+  Go type, method, interface, value, or operation before target lowering.
+- **target lowering rule:** a target-owned, fact-driven transformation from a
+  canonical marker occurrence to that target's executable representation. It
+  cannot change the source-facing contract or rediscover semantics by spelling.
+- **compilation profile:** the immutable compilation-wide selection of Go
+  semantic tradeoff axes retained in canonical source. Target representation
+  and optimization choices belong to a separate target profile. Canonical
+  files in one compilation cannot mix selections.
+- **target profile:** the selected downstream target and its immutable
+  representation/optimization policy. It consumes finalized facts and may not
+  alter canonical source contracts or Go behavior outside a named equivalence
+  envelope.
 - **Go build profile:** the loader-owned selected toolchain identity, `GOOS`,
   `GOARCH`, `CGO_ENABLED`, and sorted build tags. The default is the explicitly
   materialized host profile, not ambient shell state. Cross-target selection
@@ -269,12 +290,14 @@ behavior.
 - Generated code uses no `any`/`unknown` recovery, dynamic semantic lookup,
   `.call`, `.apply`, `.bind`, dynamic import, prototype patch, or source-text
   patching.
-- Generated primitive aliases, support declarations, and runtime operations
-  are defined within the generated product. No unrelated compiler, transpiler,
-  target plugin, or product participates in translation or verification.
-- A marker-like declaration is valid only when GoToTS emits and owns it and its
-  ordinary TypeScript meaning is complete. A no-op marker cannot substitute for
-  Go zeroing, copying, dispatch, type identity, or runtime behavior.
+- Go-specific aliases, support declarations, and runtime operations are defined
+  within the generated product. Accepted target-neutral semantics import their
+  canonical `@tsonic/core` declarations. GoToTS never imports a target plugin or
+  target runtime.
+- A marker is valid only when exact Go evidence selects its canonical provider
+  declaration, TSTS emits the corresponding finalized fact, and the selected
+  target consumes that fact. A local same-spelled function or no-op runtime body
+  cannot substitute for semantics.
 - Correct behavior within the declared profile, strict static typing,
   maintainable source shape, generated size, typecheck cost, generation cost,
   and runtime cost are simultaneous acceptance dimensions.

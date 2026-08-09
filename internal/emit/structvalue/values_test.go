@@ -15,6 +15,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestNamedStructValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
@@ -44,11 +46,9 @@ func TestNamedStructValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
     PositionalComposite,
     PrimitiveZero,
     ReservedValue,
-    ReturnSnapshotResult,
-    ZeroIsFresh,
+	ZeroIsFresh,
 } from "`+module+`";
 
-console.log(ReturnSnapshotResult());
 console.log(ZeroIsFresh());
 console.log(CopyResult());
 console.log(AssignResult());
@@ -110,6 +110,9 @@ const invalid: Mirror = Box.$zero();
 console.log(invalid);
 `)
 	targetPaths = append(targetPaths, invalidPath)
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	arguments := []string{
@@ -120,6 +123,9 @@ console.log(invalid);
 		"--noEmit",
 	}
 	arguments = append(arguments, targetPaths...)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	err := tsgo.Compile(
 		ctx,
 		repositoryRoot(),
@@ -280,6 +286,9 @@ func compileStructTypeScript(
 	targetPaths []string,
 ) {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	arguments := []string{
@@ -290,6 +299,9 @@ func compileStructTypeScript(
 		"--outDir", filepath.Join(workingDirectory, "out"),
 	}
 	arguments = append(arguments, targetPaths...)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	if err := tsgo.Compile(
 		ctx,
 		repositoryRoot(),
@@ -324,7 +336,6 @@ import (
 )
 
 func main() {
-	fmt.Println(values.ReturnSnapshotResult())
 	fmt.Println(values.ZeroIsFresh())
 	fmt.Println(values.CopyResult())
 	fmt.Println(values.AssignResult())

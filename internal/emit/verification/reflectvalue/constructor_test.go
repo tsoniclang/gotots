@@ -7,7 +7,7 @@ import "testing"
 // descriptor composition, Convert between scalar kinds, typed scalar Sets
 // through addressable locations, SetZero, CanInt classification, and Addr
 // round-tripping back to the located value.
-func TestReflectConstructorsAndSetsMatchGo(t *testing.T) {
+func TestReflectConstructorsAndSetsCanonicalizeWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -63,7 +63,7 @@ func main() {
 	fmt.Println(fixture.Build())
 }
 `
-	runReflectDifferential(
+	verifyReflectCanonical(
 		t,
 		source,
 		"Build",

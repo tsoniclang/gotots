@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "integerRepresentations": [
     "number",
     "fixed64-bigint",
@@ -7,6 +7,7 @@
   ],
   "providerIntegerRepresentation": "bigint",
   "providerScalarModule": "./internal/scalars.js",
+  "providerPointerModule": "./internal/runtime/pointer.js",
   "nativeIntegerBits": 64,
   "primitiveAliases": [
     {
@@ -87,10 +88,6 @@
   ],
   "runtimeSymbols": [
     {
-      "id": 100,
-      "export": "GoPointer"
-    },
-    {
       "id": 200,
       "export": "GoArray"
     },
@@ -145,10 +142,6 @@
     {
       "id": 1101,
       "export": "GoReceiveChannel"
-    },
-    {
-      "id": 1200,
-      "export": "GoUnsafePointer"
     },
     {
       "id": 1300,

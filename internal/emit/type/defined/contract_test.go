@@ -11,6 +11,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestRecursiveStructWithCallableKeepsNativeClassShape(t *testing.T) {
@@ -28,7 +30,7 @@ func Identity(value Node) Node { return value }
 	}
 	for _, required := range []string{
 		"export class Node {",
-		"public Next: Node | undefined",
+		"public Next: Pointer<Node> | undefined",
 		"public Visit: (() => void) | undefined",
 	} {
 		if !strings.Contains(target, required) {
@@ -40,6 +42,9 @@ func Identity(value Node) Node { return value }
 	}
 	if strings.Contains(target, "$go$recovery") {
 		t.Fatalf("source callable field exposes recovery authority:\n%s", target)
+	}
+	if strings.Contains(target, "GoPointer") || strings.Contains(target, "runtime/pointer") {
+		t.Fatalf("recursive native class retains the obsolete pointer runtime:\n%s", target)
 	}
 }
 
@@ -450,6 +455,9 @@ func typecheckDefined(
 	paths []string,
 	runnerPath string,
 ) error {
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		return err
+	}
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
@@ -459,6 +467,9 @@ func typecheckDefined(
 	}
 	arguments = append(arguments, paths...)
 	arguments = append(arguments, runnerPath)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		return err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	return tsgo.Compile(

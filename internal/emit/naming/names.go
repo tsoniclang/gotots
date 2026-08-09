@@ -21,6 +21,23 @@ type Owner struct {
 	registry            *Registry
 }
 
+func (n *File) ModuleExport(object types.Object) (bool, error) {
+	if object == nil {
+		return false, &api.NameError{Reason: "declaration object is nil"}
+	}
+	binding, ok := n.owner.byObject[object]
+	if !ok && n.owner.registry != nil {
+		binding, ok = n.owner.registry.byObject[object]
+	}
+	if !ok {
+		return false, &api.NameError{
+			Name:   object.Name(),
+			Reason: "object has no emitted declaration",
+		}
+	}
+	return binding.moduleExport, nil
+}
+
 func newNameOwner(packageScope *types.Scope, info *types.Info) *Owner {
 	return NewOwner(packageScope, info, NewRegistry())
 }

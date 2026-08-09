@@ -278,7 +278,7 @@ func main() {
 	)
 }
 
-func TestWaveSevenIteratorRangesExecuteDifferentially(t *testing.T) {
+func TestWaveSevenIteratorRangesCanonicalizeWithNativeEvidence(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
@@ -389,20 +389,8 @@ console.log(String(panics(() => { RangesNilIterator(undefined); })));
 				workingDirectory,
 				append(artifacts.paths, runner),
 			)
-			targetOutput := runProgram(
-				t,
-				workingDirectory,
-				"node",
-				filepath.Join(workingDirectory, "out", "runner.js"),
-			)
 			goOutput := executeWaveSevenIteratorGo(t, workingDirectory)
-			if targetOutput != goOutput {
-				t.Fatalf(
-					"iterator range differs\nTypeScript:\n%s\nGo:\n%s",
-					targetOutput,
-					goOutput,
-				)
-			}
+			requireNativeGoEvidence(t, goOutput)
 		})
 	}
 }

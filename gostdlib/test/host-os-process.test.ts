@@ -5,6 +5,7 @@ import { parse, relative, sep } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { integerFromHost } from "../src/internal/host-integer.js";
+import { OsProcessOperations } from "../src/internal/facets/named-os.js";
 import {
   DirFS,
   Executable,
@@ -41,6 +42,16 @@ test("os environment and process facts come from the Node host", () => {
 
 test("os.Args uses the generated entry as Go argument zero", () => {
   assert.deepEqual(sliceValues(state.Args), process.argv.slice(1));
+});
+
+test("Process value operations preserve Go struct assignment", () => {
+  const source = new Process(17n);
+  const target = new Process(3n);
+  OsProcessOperations.$assign(target, source);
+  assert.equal(target.Pid, 17n);
+  const copied = OsProcessOperations.$copy(source);
+  assert.notEqual(copied, source);
+  assert.equal(copied.Pid, 17n);
 });
 
 test("DirFS accepts descendants of a filesystem root", () => {

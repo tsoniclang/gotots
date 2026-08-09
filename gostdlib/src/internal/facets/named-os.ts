@@ -1,4 +1,4 @@
-import { File } from "../../os.js";
+import { File, Process } from "../../os.js";
 import {
   assignFileValue,
   fileValueEqual,
@@ -22,5 +22,15 @@ export class OsFileOperations {
 
   static $hash(source: File): number {
     return fileValueHash(source);
+  }
+}
+
+export class OsProcessOperations {
+  static $copy(source: Process): Process {
+    return new Process(source.Pid);
+  }
+
+  static $assign(target: Process, source: Process): void {
+    target.Pid = source.Pid;
   }
 }

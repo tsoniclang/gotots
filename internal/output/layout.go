@@ -14,6 +14,7 @@ import (
 const (
 	ProgramInitializationPath       = "program.ts"
 	RuntimePackageName              = "@gotots/runtime"
+	RuntimePackageVersion           = "0.0.0"
 	RuntimePackageRootPath          = "runtime"
 	RuntimePackageManifestPath      = "runtime/package.json"
 	ScalarSupportPath               = "runtime/scalars.ts"
@@ -21,7 +22,6 @@ const (
 	InterfaceMethodSupportPath      = "support/interface-methods.ts"
 	InterfaceTypeSupportPath        = "support/interface-types.ts"
 	ReflectionTypeSupportPath       = "support/reflection-types.ts"
-	UnsafeCodecSupportPath          = "support/unsafe-codecs.ts"
 	generatedArtifactShardKeyLength = 2
 )
 
@@ -290,6 +290,24 @@ func ModuleSpecifier(fromSourcePath string, toSourcePath string) (string, error)
 		relative = "./" + relative
 	}
 	return relative, nil
+}
+
+func RuntimeModuleSpecifier(runtimeSourcePath string) (string, error) {
+	if err := validateSourcePath(runtimeSourcePath); err != nil {
+		return "", err
+	}
+	relative, ok := strings.CutPrefix(
+		runtimeSourcePath,
+		RuntimePackageRootPath+"/",
+	)
+	if !ok || relative == "" {
+		return "", &PathError{
+			Source: runtimeSourcePath,
+			Reason: "source module is outside the runtime package",
+		}
+	}
+	return RuntimePackageName + "/" +
+		strings.TrimSuffix(relative, ".ts") + ".js", nil
 }
 
 func moduleRelativePackage(sourcePackage *load.Package) (string, error) {

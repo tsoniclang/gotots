@@ -254,6 +254,39 @@ zero-on-miss. The index expression does not decide this alone.
 
 ## Types And Values
 
+### Source-Implementation Pointers
+
+Provider TypeScript uses a direct ABI that is independent of the product's
+canonical marker contract. For example, a provider implementation of:
+
+```go
+func Parse(text string) *Entry
+func Increment(value *int)
+```
+
+has source-implementation shapes equivalent to:
+
+```ts
+export function Parse(text: gostring): Entry | undefined;
+export function Increment(value: ProviderPointer<int> | undefined): void;
+```
+
+`Entry` is the location for `*Entry`; the scalar location is the certified
+`{ value: int }` carrier. A generated result boundary emits canonical intent:
+
+```ts
+const raw = provider.Parse(text);
+return raw === undefined
+  ? undefined
+  : bindPointer(raw, () => raw, value => EntryOperations.$assign(raw, value));
+```
+
+For `*int`, the closures read and write `raw.value`. This is canonical
+Tsonic-flavored TypeScript; GoToTS typechecks it but does not execute marker
+calls. TSTS finalizes the exact marker facts and the selected target lowers
+them before runtime execution. Provider source itself never imports or calls
+`bindPointer`, `loadPointer`, or `storePointer`.
+
 ### Basic Types
 
 Go basic identities map to GoToTS-owned aliases over TypeScript primitives.
@@ -454,68 +487,80 @@ It does not emit per-site classes such as `GoMap$9e138...`.
 
 ### Pointers
 
-`&x` identifies a location. `*p` reads or writes it and preserves nil
-panic. The compiler uses direct values where no location identity can be
-observed and introduces one carrier at the highest exact addressable owner
-where aliasing/mutation requires it.
+`&x` identifies a typed location. `*p` reads or writes it and preserves nil
+panic. Canonical output records that intent with the accepted neutral pointer
+contract; it does not preselect a JavaScript carrier or scalarize a pointer:
+
+```ts
+import type { Pointer } from "@tsonic/core/types.js";
+import {
+  addressOf,
+  allocatePointer,
+  equalPointer,
+  loadPointer,
+  storePointer,
+} from "@tsonic/core/lang.js";
+```
 
 ```go
 func Read(p *int) int { return *p }
 func Set(p *int, v int) { *p = v }
 ```
 
-`Set` necessarily consumes a mutable location. `Read` may use a direct
-read-only representation only when every selected boundary and alias fact
-proves that doing so cannot change Go behavior; uncertainty retains the
-carrier. Representation is selected once and propagated to all users through
-observable facets.
+Canonical source has the human-shaped contract:
 
-Pointers to represented named structs use the class reference plus `undefined`
-when all observed origins are stable. For example, `func Read(p *Node) int {
-return p.Pos }` receives `Node | undefined`. A local/fresh `*Node` is the class
-object itself and compares/hashes by object identity without a storage facet.
-`func Child(p *Node) *Child { return &p.Child }` can reconstruct a `Child`
-wrapper, so that family selects direct storage identity. Assigning either the
-field or the whole `Node` then recursively updates the demanded child storage,
-and the returned pointer observes the replacement. Certified provider classes
-retain provider object identity.
+```ts
+function Read(pointer: Pointer<int> | undefined): int {
+  if (pointer === undefined) goPanicNil();
+  return loadPointer(pointer);
+}
 
-The pointer-family owner joins closed origin demands. `&local` and `&T{...}`
-already have stable class-object identity. `&pkg.Value`, `&value.Field`, and
-layout-preserving pointer conversion demand stable storage identity.
-`&slice[i]`, `&array[i]`, and a live unsafe byte view are dynamic locations and
-select one canonical typed carrier for every use of that pointer family. For
-example, after `p := &slice[0]; slice[0] = next`, `p` must read `next`; a class
-wrapper detached from the index cannot preserve that behavior. Unsafe mutation
-likewise cannot be confined to an ephemeral boundary carrier because later
-direct reads must observe it. Selection is semantic and type-owned, never an
-escape heuristic or a package-specific override.
-The join treats duplicate and reordered origin observations identically; no
-observations select the family's default. Requirement removal may therefore
-reconstruct a still-reachable artifact without inventing a definition row.
+function Set(pointer: Pointer<int> | undefined, value: int): void {
+  if (pointer === undefined) goPanicNil();
+  storePointer(pointer, value);
+}
 
-Storage demand is joined back to the declaration of every addressable binding,
-including parameters, locals, named results, range variables, and implicit
-type-switch case bindings. The binding owner emits the carrier; a later address
-or implicit pointer-receiver call may request it, but may never fabricate a
-carrier name at the use site.
+let value: int = 1;
+const pointer = addressOf(value);
+const fresh = allocatePointer<int>(0);
+```
 
-Canonical address tokens are created lazily at pointer identity, hash, or
-unsafe boundaries. Constructing, reading, or writing an otherwise ordinary
-carrier does not touch the address-token maps. Field, index, and representation
-views compose the parent's active typed access functions instead of re-entering
-the public value accessor. An unsafe boundary replaces those active functions
-on only the exposed carrier while retaining its original raw storage access.
-Nested selectors whose address remains in one carrier representation lower to
-one root-linked location with typed direct property projections. For example,
-`&outer.middle.value` reads and writes `root.middle.value` through the current
-root storage and derives the lazy identity `root -> middle -> value`; it does
-not allocate nested field-location carriers. A stable direct named-struct child
-uses its existing class storage instead. A representation boundary ends the
-projection and starts a new exact location segment. Encountering a
-carrier-rooted flat segment records the typed pointer field-path runtime
-feature; programs without such a segment do not emit the supporting class
-member.
+GoToTS owns the explicit nil checks because they are Go behavior. Pointer
+equality uses `equalPointer` over `Pointer<T> | undefined`; raw TypeScript
+`===` is not the canonical source operation because two independently formed
+addresses of the same storage must compare equal.
+Passing, returning, or storing a pointer preserves the same location identity.
+Every marker call is emitted as TS-Go AST and selected by exact semantic
+evidence, never by marker spelling.
+
+The TypeScript target may later transform a complete location flow to a native
+value or one small `{ value: T }` location when that preserves all aliases. A
+target optimization never changes canonical source, is never selected by
+GoToTS, and must exact-join the finalized TSTS facts for every transformed
+occurrence. The unoptimized/native-target build consumes the pointer facts
+directly.
+
+Opaque `unsafe.Pointer` identity uses the accepted target-neutral contract:
+
+```go
+pointer := unsafe.Pointer(&value)
+same := pointer == unsafe.Pointer(&value)
+lookup[pointer] = true
+```
+
+```ts
+const pointer: RawPointer | undefined = bindRawPointer(addressOf(value));
+const same = equalRawPointer(pointer, bindRawPointer(addressOf(value)));
+lookup.store(pointer, true); // the map key facet uses hashRawPointer
+```
+
+Nil remains `undefined`. A certified provider raw-pointer result is bound by
+its opaque object identity before entering generated code. Raw-address
+arithmetic, reinterpretation, raw-pointer-to-typed-pointer conversion,
+pointer/integer conversion, and provider raw-pointer inputs remain exact typed
+boundaries. Canonical output never exposes or fabricates an address, and safe
+typed pointers are not lowered through a legacy JavaScript virtual-address
+representation.
 
 ### Interfaces
 
@@ -667,13 +712,15 @@ func ArrayAddress[T any](first, second T) T {
 ```
 
 The target kernel still has one `T`; it uses `GoContainerStorage<T>` for array
-slots and `GoPointerType<T>` for the element address. If a concrete `Item`
-stores as `Item$Storage`, its class declares
-`GoPointerRepresentedValue<GoPointer<Item, Item$Storage>>`. A scalar or
-identity-represented provider value uses the canonical fallback. No
+slots and `Pointer<T>` for the element address. The canonical indexed-address
+marker carries the exact container, index, logical element type, and location
+semantics, so a concrete `Item` may retain its target-neutral logical type
+while a selected target chooses the storage representation. It does not
+request a generated pointer cell or a generic cell/load/store callable. No
 `T$Storage` or `T$Pointer` parameter is fabricated.
 
-Only the concrete type owner may emit an associated-type marker. Markers are
+Only the concrete type owner may emit a storage associated-type marker. Such
+markers are
 demand-created, type-only, and selected from the canonical representation
 observation. They are not operation capabilities and cannot by themselves
 cause a concretization or private runtime kernel.
@@ -940,17 +987,19 @@ exactly one entry or remain an explicit obligation.
 
 A project-selected source implementation replaces a coherent package contract,
 not isolated identifiers. It exports the exact selected package-assembly names
-and satisfies every target type demanded by generated consumers. Both the
-ordinary generated target set and the installed target set must pass strict
-TypeScript checking under the same final project configuration.
+and satisfies every target type demanded by generated consumers. GoToTS checks
+the authored project and structural replacement contract without fabricating
+marker declarations. TSTS checks both the ordinary generated and installed
+canonical sets with the same authoritative marker modules; the selected target
+lowers and strict-typechecks both executable sets under the same final project
+configuration.
 Package-private storage and operation implementation may differ inside a
 declared equivalence envelope;
 that freedom does not extend to a source-visible callable ABI or to any type a
 selected consumer requires. Callsites remain ordinary imports and calls; no
 policy, bridge, digest, or implementation selector is added to a Go callable.
 
-The checked authored signature may select a closed representation projection
-without a configuration entry. Given:
+The checked authored signature preserves the canonical source contract. Given:
 
 ```go
 // package fast
@@ -962,22 +1011,20 @@ func Use() int {
 }
 ```
 
-and the certified implementation:
+the certified implementation receives the same typed location:
 
 ```ts
-export function Read(value: number): number {
-    return value;
+export function Read(value: Pointer<int> | undefined): int {
+    if (value === undefined) goPanicNil();
+    return loadPointer(value);
 }
 ```
 
-the callable ABI owner proves that the source parameter is read-only at this
-replacement boundary, selects `pointee-value`, and emits the caller as
-`Read(current)`. If the argument is an existing `*int`, the caller emits its
-current pointee value and preserves Go's nil-dereference failure. The manual
-function does not receive or mutate a hidden cell. A Go function whose visible
-contract writes through the pointer cannot use this plain `number` signature;
-it remains a location unless an explicit write-back projection is added to the
-closed language model.
+TSTS joins that authored signature to the canonical generated contract; callers
+pass the pointer operation unchanged. A TypeScript target may later prove the entire flow
+read-only and lower both definition and all calls to `number`. That decision is
+not encoded in a source implementation signature and cannot be inferred by
+GoToTS from the authored body.
 
 For an internal hash package, Go source such as:
 
@@ -999,6 +1046,34 @@ distribution.
 Package replacement is selected only from the resolved project's certified
 implementation set. Translation handlers never branch on import path,
 package/function spelling, source location, or product identity.
+
+The ordinary generated snapshot is certification evidence, not final
+ownership. It is produced in a contract-only first session for every selected
+package. The final session takes sole ownership of the deterministic canonical
+name and generated-support identity registry, plus each selected source
+artifact's immutable observable contract, outgoing support requirements, and
+observable dependency edges. It cannot read an implementation facet, builder,
+placement, artifact revision, liveness ledger, scheduler queue, or generated
+declaration from the first session. For example, an unexported `worker` used
+only by the Go body cannot create a requirement because selected bodies are not
+traversed in the contract session. A genuine final consumer of a private type
+requires an exact body-free private contract module; a private value dependency
+remains an error. The final session never emits a selected-package body and
+never infers liveness by retracting already-emitted output.
+
+When the final session recreates a demanded generic concretization, it joins
+the transferred canonical artifact by stable generic key and exact owner,
+arguments, signature, placement, and lexical anchor. A newly allocated but
+semantically identical checker wrapper reuses that artifact; pointer identity
+between compilation-session wrappers is never required.
+
+Generated value support that is part of an exported declaration's observable
+ABI remains public through the package assembly. In particular, an exported
+non-generic interface's runtime contract and guard are package bindings, so a
+cross-package assertion imports `Reader$contract` and `Reader$is` from the
+same assembly that owns `Reader`. A source implementation provides and
+certifies those bindings; retaining an import of its generated source file is
+not an admissible private dependency.
 
 ## Failure
 

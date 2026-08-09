@@ -32,14 +32,14 @@ type Item struct {
 }
 
 func Facts() string {
-	item := &Item{Value: 7}
-	left := Wrapped[string, *Item]{
-		entry: entry[string, *Item]{Key: "key", Value: item},
+	item := Item{Value: 7}
+	left := Wrapped[string, Item]{
+		entry: entry[string, Item]{Key: "key", Value: item},
 	}
-	right := Wrapped[string, *Item]{
-		entry: entry[string, *Item]{Key: "key", Value: item},
+	right := Wrapped[string, Item]{
+		entry: entry[string, Item]{Key: "key", Value: item},
 	}
-	values := map[Wrapped[string, *Item]]string{left: "found"}
+	values := map[Wrapped[string, Item]]string{left: "found"}
 	if left != right {
 		return "not equal"
 	}

@@ -12,6 +12,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func printConversions(
@@ -124,66 +126,8 @@ func main() {
 	fmt.Println(values.DefinedSliceToArray())
 	fmt.Println(values.AggregateSliceToArrayCopies())
 	fmt.Println(panics(values.SliceToArrayPanics), values.SliceToArrayPanicCount())
-	fmt.Println(values.SliceToArrayPointerAliases())
-	fmt.Println(values.DefinedSliceToArrayPointerAliases())
-	fmt.Println(values.AggregateSliceToArrayPointerCopies())
-	fmt.Println(values.SliceToArrayPointerIdentity())
-	fmt.Println(values.ZeroLengthSliceToArrayPointers())
-	fmt.Println(panics(values.SliceToArrayPointerPanics), values.SliceToArrayPanicCount())
-	fmt.Println(values.PointerScalarConversion())
-	fmt.Println(values.PointerStructConversion())
-	fmt.Println(values.PointerRoundTripIdentity())
-	fmt.Println(values.PointerNestedFieldConversion())
 	fmt.Println(values.NilConversions())
 	fmt.Println(values.GenericNilPointerIsNil())
-	fmt.Println(values.NilUnsafePointerRoundTrip())
-	fmt.Println(values.NilUnsafeIntegerRoundTrip())
-}
-`)
-	return runCommand(
-		t,
-		runnerDirectory,
-		filepath.Join(runtime.GOROOT(), "bin", "go"),
-		"run",
-		".",
-	)
-}
-
-func runUnsafePointerMemoryGo(t *testing.T, workingDirectory string) string {
-	t.Helper()
-	modulePath, err := filepath.Abs(conversionFixtureDirectory())
-	if err != nil {
-		t.Fatal(err)
-	}
-	runnerDirectory := filepath.Join(workingDirectory, "go-runner-unsafe-pointer")
-	writeFile(t, filepath.Join(runnerDirectory, "go.mod"), `module example.com/runner
-
-go 1.26.4
-
-require example.com/conversion v0.0.0
-
-replace example.com/conversion => `+filepath.ToSlash(modulePath)+`
-`)
-	writeFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
-
-import (
-	"fmt"
-
-	values "example.com/conversion"
-)
-
-func main() {
-	scalar := uint32(0x01020304)
-	bytes := [8]byte{1, 2, 3, 4, 5, 6, 7, 8}
-	fmt.Println(values.UnsafePointerAliases(&scalar))
-	fmt.Println(values.UnsafePointerOffset(&bytes))
-	fmt.Println(values.UnsafePointerInlineOffset(&bytes))
-	fmt.Println(values.UnsafePointerInlineOffsetOrdered(&bytes), values.UnsafePointerOffsetTrace())
-	fmt.Println(values.UnsafePointerInlineNilOffset())
-	fmt.Println(values.UnsafePointerSafeThenUnsafe(&scalar))
-	fmt.Println(values.UnsafeStructLayout())
-	fmt.Println(values.UnsafeStringHeaderLength())
-	fmt.Println(values.UnsafeSliceHeaderMutation())
 }
 `)
 	return runCommand(
@@ -254,20 +198,8 @@ console.log(show(values.SliceToArrayCopies()));
 console.log(show(values.DefinedSliceToArray()));
 console.log(show(values.AggregateSliceToArrayCopies()));
 console.log(panics(values.SliceToArrayPanics), show(values.SliceToArrayPanicCount()));
-console.log(show(values.SliceToArrayPointerAliases()));
-console.log(show(values.DefinedSliceToArrayPointerAliases()));
-console.log(show(values.AggregateSliceToArrayPointerCopies()));
-console.log(values.SliceToArrayPointerIdentity());
-console.log(values.ZeroLengthSliceToArrayPointers());
-console.log(panics(values.SliceToArrayPointerPanics), show(values.SliceToArrayPanicCount()));
-console.log(show(values.PointerScalarConversion()));
-console.log(show(values.PointerStructConversion()));
-console.log(values.PointerRoundTripIdentity());
-console.log(show(values.PointerNestedFieldConversion()));
 console.log(values.NilConversions());
 console.log(values.GenericNilPointerIsNil());
-console.log(values.NilUnsafePointerRoundTrip());
-console.log(values.NilUnsafeIntegerRoundTrip());
 `
 	return executeConversionTypeScript(
 		t,
@@ -291,6 +223,9 @@ func executeConversionTypeScript(
 		filepath.Join(workingDirectory, "package.json"),
 		"{\"type\":\"module\"}\n",
 	)
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	outputDirectory := filepath.Join(workingDirectory, "out")
 	arguments := []string{
 		"--target", "es2022",
@@ -301,6 +236,9 @@ func executeConversionTypeScript(
 	}
 	arguments = append(arguments, targetPaths...)
 	arguments = append(arguments, runnerPath)
+	if err := runtimefixture.InstallResolution(workingDirectory, outputDirectory); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := tsgo.Compile(

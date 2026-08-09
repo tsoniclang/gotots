@@ -17,6 +17,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func loadDemandProgram(t *testing.T) *load.Program {
@@ -69,6 +71,9 @@ console.log(Run(1));
 	}
 	arguments = append(arguments, targetPaths...)
 	arguments = append(arguments, runnerPath)
+	if err := runtimefixture.InstallResolution(workingDirectory, outputDirectory); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	if err := tsgo.Compile(
@@ -96,6 +101,13 @@ func runProgram(t *testing.T, directory, name string, arguments ...string) strin
 	return string(output)
 }
 
+func requireNativeGoEvidence(t *testing.T, output string) {
+	t.Helper()
+	if output == "" {
+		t.Fatal("native Go fixture produced no evidence")
+	}
+}
+
 func writeProgramFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -120,6 +132,9 @@ func waveThreeTypecheck(
 	paths []string,
 ) {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
@@ -130,6 +145,9 @@ func waveThreeTypecheck(
 		"--outDir", filepath.Join(workingDirectory, "out"),
 	}
 	arguments = append(arguments, paths...)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	if err := tsgo.Compile(
@@ -165,6 +183,9 @@ func materializeArtifacts(
 	workingDirectory string,
 ) waveFourArtifacts {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
 	if err != nil {
 		t.Fatal(err)
@@ -496,6 +517,9 @@ console.log(`+runCall+`);
 	}
 	arguments = append(arguments, targetPaths...)
 	arguments = append(arguments, runnerPath)
+	if err := runtimefixture.InstallResolution(workingDirectory, outputDirectory); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	if err := tsgo.Compile(

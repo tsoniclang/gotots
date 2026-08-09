@@ -13,7 +13,6 @@ import (
 	interfacetypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
 	providerinterfacebridge "github.com/tsoniclang/gotots/internal/emit/declaration/providerinterfacebridge"
 	reflectiontypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/reflectiontype"
-	unsafecodecdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/unsafecodec"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -88,15 +87,6 @@ func (s *programSession) validateRepresentationArtifact(
 			return &ScheduleError{
 				Object: artifact.TargetName(),
 				Reason: "reflection type has inconsistent source contract",
-			}
-		}
-	case api.GeneratedArtifactUnsafeCodec:
-		source, sourceOK := artifact.UnsafeCodecType()
-		bound, boundOK := binding.UnsafeCodecType()
-		if !sourceOK || !boundOK || !types.Identical(source, bound) {
-			return &ScheduleError{
-				Object: artifact.TargetName(),
-				Reason: "unsafe codec has inconsistent source type",
 			}
 		}
 	default:
@@ -408,12 +398,6 @@ func buildRepresentationArtifact(
 		)
 	case api.GeneratedArtifactReflectionType:
 		return reflectiontypedeclaration.Build(context, artifact)
-	case api.GeneratedArtifactUnsafeCodec:
-		return unsafecodecdeclaration.Build(
-			context,
-			builder.emitter,
-			artifact,
-		)
 	default:
 		return nil, nil, &ScheduleError{
 			Object: artifact.TargetName(),

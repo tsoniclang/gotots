@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -61,20 +62,28 @@ func buildSlice(
 		return nil, err
 	}
 	pointerName := ""
+	addressName := ""
 	pointerProjectName := ""
 	if capabilities.Address {
-		pointerContract, pointerErr := api.RuntimeContract(api.RuntimePointer)
+		pointerContract, pointerErr := tsoniccore.Resolve(tsoniccore.SymbolPointer)
 		if pointerErr != nil {
 			return nil, pointerErr
 		}
-		pointerName = pointerContract.ExportedName()
-		pointerProjectContract, pointerProjectErr := api.RuntimeContract(
-			api.RuntimePointerProjection,
+		pointerName = pointerContract.Export()
+		addressContract, addressErr := tsoniccore.Resolve(
+			tsoniccore.SymbolAddressOf,
+		)
+		if addressErr != nil {
+			return nil, addressErr
+		}
+		addressName = addressContract.Export()
+		pointerProjectContract, pointerProjectErr := tsoniccore.Resolve(
+			tsoniccore.SymbolProjectPointer,
 		)
 		if pointerProjectErr != nil {
 			return nil, pointerProjectErr
 		}
-		pointerProjectName = pointerProjectContract.ExportedName()
+		pointerProjectName = pointerProjectContract.Export()
 	}
 	class, err := NewDefinition(
 		api.RuntimeSlice,
@@ -84,6 +93,7 @@ func buildSlice(
 			panicContract.ExportedName(),
 			denseIndexContract.ExportedName(),
 			pointerName,
+			addressName,
 			capabilities,
 		),
 	)
@@ -147,11 +157,23 @@ func buildSliceOperation(
 	if err != nil {
 		return nil, err
 	}
-	pointerContract, err := api.RuntimeContract(api.RuntimePointer)
+	pointerContract, err := tsoniccore.Resolve(tsoniccore.SymbolPointer)
 	if err != nil {
 		return nil, err
 	}
 	if symbol == api.RuntimeSliceArrayPointer {
+		addressOfContract, err := tsoniccore.Resolve(
+			tsoniccore.SymbolAddressOf,
+		)
+		if err != nil {
+			return nil, err
+		}
+		projectContract, err := tsoniccore.Resolve(
+			tsoniccore.SymbolProjectPointer,
+		)
+		if err != nil {
+			return nil, err
+		}
 		arrayContract, err := api.RuntimeContract(api.RuntimeArray)
 		if err != nil {
 			return nil, err
@@ -164,7 +186,9 @@ func buildSliceOperation(
 			factory,
 			addressContract.ExportedName(),
 			sliceName,
-			pointerContract.ExportedName(),
+			pointerContract.Export(),
+			addressOfContract.Export(),
+			projectContract.Export(),
 			arrayContract.ExportedName(),
 			arrayViewContract.ExportedName(),
 		), nil
@@ -202,6 +226,6 @@ func buildSliceOperation(
 		factory,
 		addressContract.ExportedName(),
 		sliceName,
-		pointerContract.ExportedName(),
+		pointerContract.Export(),
 	), nil
 }

@@ -83,20 +83,28 @@ func TestLayoutRejectsForeignFilesAndSameModuleImports(t *testing.T) {
 	}
 }
 
-func TestScalarSupportPathProducesCanonicalRelativeSpecifier(t *testing.T) {
-	const sourcePath = "modules/example/package/source.ts"
+func TestRuntimeModuleSpecifierUsesCanonicalPackageIdentity(t *testing.T) {
 	if ScalarSupportPath != "runtime/scalars.ts" {
 		t.Fatalf("scalar support path = %q, want runtime/scalars.ts", ScalarSupportPath)
 	}
-	specifier, err := ModuleSpecifier(sourcePath, ScalarSupportPath)
+	specifier, err := RuntimeModuleSpecifier(ScalarSupportPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if specifier != "../../../runtime/scalars.js" {
+	if specifier != "@gotots/runtime/scalars.js" {
 		t.Fatalf(
-			"scalar support specifier = %q, want ../../../runtime/scalars.js",
+			"scalar support specifier = %q, want @gotots/runtime/scalars.js",
 			specifier,
 		)
+	}
+	for _, invalid := range []string{
+		"scalars.ts",
+		"support/scalars.ts",
+		"runtime/../support/scalars.ts",
+	} {
+		if _, err := RuntimeModuleSpecifier(invalid); err == nil {
+			t.Fatalf("non-runtime source %q was accepted", invalid)
+		}
 	}
 }
 

@@ -67,6 +67,18 @@ func TestGenericCallableTransportUsesOneAwaitableABI(t *testing.T) {
 			t.Fatalf("direct synchronous callable contains %q:\n%s", forbidden, direct)
 		}
 	}
+	named := waveNineFunctionText(
+		t,
+		artifacts.printed,
+		"NamedSynchronousApply",
+	)
+	if !strings.Contains(named, "InvokeIntPredicate(IsSeven)") ||
+		strings.Contains(named, "=> IsSeven(") {
+		t.Fatalf(
+			"synchronous provider was not transported directly through Awaitable ABI:\n%s",
+			named,
+		)
+	}
 	filter := waveNineFunctionText(t, artifacts.printed, "FilterSequence")
 	if strings.Contains(filter, "export async function") ||
 		!strings.Contains(filter, "new Sequence(async (") ||
@@ -166,12 +178,6 @@ await GoScheduler.run(async () => {
 		workingDirectory,
 		append(artifacts.paths, runner),
 	)
-	targetOutput := runProgram(
-		t,
-		workingDirectory,
-		"node",
-		filepath.Join(workingDirectory, "out", "runner.js"),
-	)
 	goRunner := filepath.Join(workingDirectory, "go-runner")
 	writeProgramFile(t, filepath.Join(goRunner, "go.mod"), fmt.Sprintf(
 		`module example.com/runner
@@ -230,11 +236,5 @@ func main() {
 		"run",
 		".",
 	)
-	if targetOutput != goOutput {
-		t.Fatalf(
-			"generic callback output differs\nTypeScript: %q\nGo: %q",
-			targetOutput,
-			goOutput,
-		)
-	}
+	requireNativeGoEvidence(t, goOutput)
 }

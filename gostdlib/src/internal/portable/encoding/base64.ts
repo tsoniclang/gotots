@@ -18,10 +18,12 @@ const standardAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01
 const urlAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 let createEncoding: (alphabet: gostring, padding: number) => Encoding;
+let copyEncoding: (source: Encoding) => Encoding;
+let assignEncoding: (target: Encoding, source: Encoding) => void;
 
 export class Encoding {
-  readonly #alphabet: gostring;
-  readonly #padding: number;
+  #alphabet: gostring;
+  #padding: number;
   readonly #decode = new Map<number, number>();
 
   private constructor(
@@ -38,6 +40,19 @@ export class Encoding {
   static {
     createEncoding = (alphabet: gostring, padding: number): Encoding =>
       new Encoding(alphabet, padding);
+    copyEncoding = (source: Encoding): Encoding =>
+      new Encoding(source.#alphabet, source.#padding);
+    assignEncoding = (target: Encoding, source: Encoding): void => {
+      if (target === source) {
+        return;
+      }
+      target.#alphabet = source.#alphabet;
+      target.#padding = source.#padding;
+      target.#decode.clear();
+      for (const [input, output] of source.#decode) {
+        target.#decode.set(input, output);
+      }
+    };
   }
 
   static DecodeString(
@@ -204,6 +219,17 @@ export class Encoding {
     }
     return { next: sourceIndex, output, failure: trailingFailure };
   }
+}
+
+export function encodingRepresentationCopy(source: Encoding): Encoding {
+  return copyEncoding(source);
+}
+
+export function encodingRepresentationAssign(
+  target: Encoding,
+  source: Encoding,
+): void {
+  assignEncoding(target, source);
 }
 
 type DecodedQuantum = {

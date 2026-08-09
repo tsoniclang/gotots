@@ -15,6 +15,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 type materializedProgram struct {
@@ -97,24 +99,27 @@ func (p materializedProgram) module(t *testing.T, base string) string {
 	return module
 }
 
-func executeMaterializedTypeScript(
+func typecheckMaterializedTypeScript(
 	t *testing.T,
 	workingDirectory string,
 	artifacts materializedProgram,
-	runnerPath string,
-) string {
+) {
 	t.Helper()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	outputDirectory := filepath.Join(workingDirectory, "out")
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
 		"--moduleResolution", "nodenext",
 		"--strict",
-		"--outDir", outputDirectory,
+		"--noEmit",
 	}
 	arguments = append(arguments, artifacts.targetPaths...)
-	arguments = append(arguments, runnerPath)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := tsgo.Compile(
@@ -125,7 +130,6 @@ func executeMaterializedTypeScript(
 	); err != nil {
 		t.Fatal(err)
 	}
-	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
 }
 
 func compileTemporaryFunctionSource(t *testing.T, source string) error {

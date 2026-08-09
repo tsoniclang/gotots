@@ -4,7 +4,6 @@ import (
 	"go/ast"
 	"go/types"
 
-	"github.com/tsoniclang/gotots/internal/contracts/callableabi"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -16,31 +15,8 @@ func emitArguments(
 	signature *types.Signature,
 	captureAll bool,
 ) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	return emitArgumentsWithABI(
-		context,
-		children,
-		source,
-		signature,
-		callableabi.Callable{},
-		captureAll,
-	)
-}
-
-func emitArgumentsWithABI(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.CallExpr,
-	signature *types.Signature,
-	callableABI callableabi.Callable,
-	captureAll bool,
-) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	projected := callableABI.Valid()
 	if len(source.Args) == 1 {
 		if results, ok := context.TypesInfo().TypeOf(source.Args[0]).(*types.Tuple); ok {
-			if projected {
-				return nil, nil, nil,
-					api.Unsupported(context, api.CategoryExpression, source)
-			}
 			if signature.Variadic() {
 				return emitVariadicMultipleArgument(
 					context,
@@ -70,10 +46,6 @@ func emitArgumentsWithABI(
 		}
 	}
 	if signature.Variadic() {
-		if projected {
-			return nil, nil, nil,
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
 		return emitVariadicArguments(
 			context,
 			children,
@@ -94,24 +66,6 @@ func emitArgumentsWithABI(
 			!types.AssignableTo(argumentType, signature.Params().At(index).Type()) {
 			return nil, nil, nil,
 				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		if selected, ok := callableABI.Parameter(index); ok &&
-			selected.Projection() == callableabi.ProjectionPointeeValue {
-			target, err := emitPointeeValueArgument(
-				context,
-				children,
-				argument,
-				signature.Params().At(index).Type(),
-				selected,
-			)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-			if len(target.Before()) != 0 {
-				requiresCapture = true
-			}
-			emissions = append(emissions, target)
-			continue
 		}
 		target, err := children.Expression(
 			context.

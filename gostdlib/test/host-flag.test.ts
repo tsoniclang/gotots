@@ -6,6 +6,7 @@ import {
   FlagSet,
   NewFlagSet,
 } from "../src/flag.js";
+import { FlagSetValueOperations } from "../src/internal/facets/named-flag.js";
 
 test("FlagSet parses selected boolean and string flags through Go pointers", () => {
   const flags = NewFlagSet("provider", ContinueOnError);
@@ -43,4 +44,32 @@ test("FlagSet duplicate definitions preserve Go panic behavior", () => {
   assert.ok(flags !== undefined);
   FlagSet.String(flags, "output", "", "output path");
   assert.throws(() => FlagSet.String(flags, "output", "", "again"));
+});
+
+test("FlagSet value operations preserve shallow Go struct assignment", () => {
+  const source = NewFlagSet("source", ContinueOnError);
+  const target = NewFlagSet("target", ContinueOnError);
+  assert.ok(source !== undefined);
+  assert.ok(target !== undefined);
+  const output = FlagSet.String(source, "output", "default", "output path");
+  assert.ok(output !== undefined);
+  const usage = (): void => {};
+  source.Usage = usage;
+
+  FlagSetValueOperations.$assign(target, source);
+  assert.equal(target.Usage, usage);
+  assert.equal(
+    FlagSet.Parse(target, RuntimeSlice.literal(["--output=assigned"])),
+    undefined,
+  );
+  assert.equal(output.value, "assigned");
+
+  const copied = FlagSetValueOperations.$copy(source);
+  assert.notEqual(copied, source);
+  assert.equal(copied.Usage, usage);
+  assert.equal(
+    FlagSet.Parse(copied, RuntimeSlice.literal(["--output=copied"])),
+    undefined,
+  );
+  assert.equal(output.value, "copied");
 });

@@ -89,20 +89,6 @@ func EmitSelectedReceive(
 		requests = append(requests, selected.Requests()...)
 		if target.declaration {
 			targetValue := selected.Value()
-			if target.storage {
-				cell, err := context.AddressableStorage().Cell(
-					context,
-					children,
-					target.identifier,
-					target.sourceType,
-					api.DirectExpression(targetValue),
-				)
-				if err != nil {
-					return api.StatementEmission{}, err
-				}
-				targetValue = cell.Value()
-				requests = append(requests, cell.Requests()...)
-			}
 			targetType, typeRequests, err := pointerAnnotation(
 				context.WithRole(api.RoleLocalType),
 				children,
@@ -111,10 +97,6 @@ func EmitSelectedReceive(
 			)
 			if err != nil {
 				return api.StatementEmission{}, err
-			}
-			if target.storage {
-				targetType = nil
-				typeRequests = nil
 			}
 			before = append(before, typedVariableStatement(
 				context,

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestReflectBlankStructFieldsMatchGo(t *testing.T) {
+func TestReflectBlankStructFieldsCanonicalizeWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -63,7 +63,7 @@ func main() {
 	fmt.Println(fixture.BlankFieldFacts())
 }
 `
-	runReflectDifferentialInspect(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		"BlankFieldFacts",

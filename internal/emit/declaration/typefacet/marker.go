@@ -29,7 +29,6 @@ func (e Emission) Requests() []api.RootRequest {
 func Build(
 	context api.Context,
 	sourceType types.Type,
-	logicalType tsgo.TypeNode,
 	storageType tsgo.TypeNode,
 	facets []api.TypeRepresentationFacet,
 	ambient bool,
@@ -59,76 +58,6 @@ func Build(
 		}
 		seen[facet] = struct{}{}
 		targetType := storageType
-		if facet == api.TypeRepresentationContainerStorage {
-			values := context.PointerRepresentationValues()
-			if values == nil {
-				return Emission{}, &api.InvariantError{
-					Role:   context.Role(),
-					Reason: "container-storage marker has no pointer-representation owner",
-				}
-			}
-			observation, err := values.PointerRepresentation(
-				context,
-				types.NewPointer(sourceType),
-				api.PointerRepresentationDemandNone,
-			)
-			if err != nil {
-				return Emission{}, err
-			}
-			requests = append(requests, observation.Requests()...)
-			if observation.Representation() !=
-				api.PointerRepresentationCarrierCanonical {
-				continue
-			}
-		} else if facet == api.TypeRepresentationPointer {
-			values := context.PointerRepresentationValues()
-			if values == nil {
-				return Emission{}, &api.InvariantError{
-					Role:   context.Role(),
-					Reason: "pointer marker has no pointer-representation owner",
-				}
-			}
-			observation, err := values.PointerRepresentation(
-				context,
-				types.NewPointer(sourceType),
-				api.PointerRepresentationDemandNone,
-			)
-			if err != nil {
-				return Emission{}, err
-			}
-			requests = append(requests, observation.Requests()...)
-			switch observation.Representation() {
-			case api.PointerRepresentationDirectClass,
-				api.PointerRepresentationDirectClassStorageIdentity:
-				targetType = logicalType
-			case api.PointerRepresentationCarrierLogical:
-				continue
-			case api.PointerRepresentationCarrierCanonical:
-				pointer, pointerErr := context.Names().Runtime(
-					api.RuntimePointer,
-					api.ImportPhaseType,
-				)
-				if pointerErr != nil {
-					return Emission{}, pointerErr
-				}
-				if logicalType == nil || storageType == nil {
-					return Emission{}, &api.InvariantError{
-						Role:   context.Role(),
-						Reason: "canonical pointer marker has incomplete target types",
-					}
-				}
-				targetType = context.Factory().TypeReferenceNode(
-					pointer.EntityName(context.Factory()),
-					[]tsgo.TypeNode{logicalType, storageType},
-				)
-				requests = append(requests, pointer.Requests()...)
-			default:
-				return Emission{}, &api.InvariantError{
-					Role:   context.Role(),
-					Reason: "pointer marker representation is invalid",
-				}
-			}
-		}
 		if targetType == nil {
 			return Emission{}, &api.InvariantError{
 				Role:   context.Role(),
@@ -214,9 +143,6 @@ func runtimeSymbols(
 	case api.TypeRepresentationContainerStorage:
 		return api.RuntimeContainerStorageToken,
 			api.RuntimeContainerStoredValue
-	case api.TypeRepresentationPointer:
-		return api.RuntimePointerTypeToken,
-			api.RuntimePointerRepresentedValue
 	default:
 		panic("validated type-representation facet is unhandled")
 	}

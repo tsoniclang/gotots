@@ -4,10 +4,10 @@ import (
 	"go/ast"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	genericpointer "github.com/tsoniclang/gotots/internal/emit/generic/pointer"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -112,8 +112,6 @@ func dereference(
 	}
 	return canonicalPointerTarget(
 		context,
-		children,
-		source,
 		pointer,
 		element,
 	)
@@ -162,8 +160,6 @@ func pointerArrayIndex(
 	}
 	return canonicalPointerTarget(
 		context,
-		children,
-		source,
 		pointer,
 		element,
 	)
@@ -171,120 +167,31 @@ func pointerArrayIndex(
 
 func canonicalPointerTarget(
 	context api.Context,
-	children api.ChildEmitter,
-	source ast.Node,
 	pointer api.ExpressionEmission,
 	element types.Type,
 ) (api.StoreTargetEmission, error) {
-	if target, handled, err := genericpointer.StoreTarget(
-		context,
-		source,
-		element,
-		pointer,
-	); handled || err != nil {
-		return target, err
-	}
-	representation, err := pointertype.Observe(
-		context,
-		types.NewPointer(element),
-		api.PointerRepresentationDemandNone,
-	)
+	guarded, err := pointermarker.Guard(context, pointer)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	if representation.Representation().DirectClass() {
-		logical, err := children.RepresentedType(
-			context.WithRole(api.RoleAssignmentTarget),
-			source,
-			element,
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		runtime, err := context.Names().Runtime(
-			api.RuntimePointer,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		location, err := api.NewExpressionEmission(
-			pointer.Before(),
-			pointerruntime.Direct(
-				context.Factory(),
-				runtime.Name(),
-				logical.Value(),
-				pointer.Value(),
-			),
-			api.CombineRequests(
-				pointer.Requests(),
-				logical.Requests(),
-				runtime.Requests(),
-				representation.Requests(),
-			),
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		return api.NewStableIdentityStoreTargetEmission(location, element)
-	}
-	storageType, err := context.ContainerStorage().PointerStorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		element,
-		representation,
-	)
+	getter, err := context.Names().TsonicCore(tsoniccore.SymbolLoadPointer)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	targetElement, err := children.RepresentedType(
-		context.WithRole(api.RoleAssignmentTarget),
-		source,
-		element,
-	)
+	setter, err := context.Names().TsonicCore(tsoniccore.SymbolStorePointer)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	reference, err := context.Names().Runtime(
-		api.RuntimePointer,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.StoreTargetEmission{}, err
-	}
-	receiver, err := api.NewExpressionEmission(
-		pointer.Before(),
-		pointerruntime.Dereference(
-			context.Factory(),
-			reference.Name(),
-			targetElement.Value(),
-			storageType.Value(),
-			pointer.Value(),
+	return api.NewFunctionStoreTargetEmission(
+		api.DirectExpression(
+			getter.Expression(context.Factory()),
+			getter.Requests()...,
 		),
-		api.CombineRequests(
-			pointer.Requests(),
-			targetElement.Requests(),
-			storageType.Requests(),
-			reference.Requests(),
-			representation.Requests(),
+		api.DirectExpression(
+			setter.Expression(context.Factory()),
+			setter.Requests()...,
 		),
-	)
-	if err != nil {
-		return api.StoreTargetEmission{}, err
-	}
-	if representation.Representation() ==
-		api.PointerRepresentationCarrierCanonical {
-		return api.NewCanonicalStoragePropertyStoreTargetEmission(
-			context.Factory(),
-			receiver,
-			pointerruntime.CellValueName,
-			element,
-		)
-	}
-	return api.NewPropertyStoreTargetEmission(
-		context.Factory(),
-		receiver,
-		pointerruntime.CellValueName,
+		[]api.ExpressionEmission{guarded},
 		element,
 	)
 }
@@ -429,12 +336,6 @@ func identifier(
 		object.Parent() == object.Pkg().Scope() {
 		return packageVariable(context, object)
 	}
-	if selected, ok, err := context.AddressableStorage().StoreTarget(
-		context,
-		object,
-	); ok || err != nil {
-		return selected, err
-	}
 	if receiver, ok := context.ValueReceiver(object); ok {
 		request, err := receiver.CopyRequest()
 		if err != nil {
@@ -511,49 +412,9 @@ func packageVariable(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	representation, err := pointertype.Observe(
-		context,
-		types.NewPointer(variable.Type()),
-		api.PointerRepresentationDemandNone,
-	)
-	if err != nil {
-		return api.StoreTargetEmission{}, err
-	}
-	if representation.Representation().DirectClass() {
-		logical, err := context.Values().FromStorage(
-			context.WithRole(api.RoleAssignmentTarget),
-			nil,
-			variable.Type(),
-			api.DirectExpression(
-				reference.Expression(context.Factory()),
-				reference.Requests()...,
-			),
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		logical, err = api.NewExpressionEmission(
-			logical.Before(),
-			logical.Value(),
-			api.CombineRequests(
-				logical.Requests(),
-				representation.Requests(),
-			),
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		return api.NewStableIdentityStoreTargetEmission(
-			logical,
-			variable.Type(),
-		)
-	}
 	return api.NewCanonicalStorageTargetEmission(
 		reference.Expression(context.Factory()),
 		variable.Type(),
-		api.CombineRequests(
-			reference.Requests(),
-			representation.Requests(),
-		),
+		reference.Requests(),
 	)
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestEveryRuntimeNumericConversionCellPrintsAndStrictTypechecks(
@@ -122,6 +124,9 @@ func strictTypecheckEmission(
 ) int {
 	t.Helper()
 	workingDirectory := t.TempDir()
+	if err := corefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
 	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
 	if err != nil {
 		t.Fatal(err)
@@ -160,6 +165,9 @@ func strictTypecheckEmission(
 		"--noEmit",
 	}
 	arguments = append(arguments, paths...)
+	if err := runtimefixture.InstallResolution(workingDirectory, filepath.Join(workingDirectory, "out")); err != nil {
+		t.Fatal(err)
+	}
 	if err := tsgo.Compile(
 		ctx,
 		repositoryRoot(),

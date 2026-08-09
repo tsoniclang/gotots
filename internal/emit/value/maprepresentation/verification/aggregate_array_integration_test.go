@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -146,7 +146,6 @@ func productionAggregateContext(
 		tsgo.NewFactory(),
 		&aggregateNames{},
 		representation.Owner{},
-		storage.Owner{},
 		integer,
 		api.EvaluationOrderPreserveGo,
 		api.ConcurrencySemanticsDisabled,
@@ -499,6 +498,12 @@ func (aggregateNames) Runtime(
 		return api.NameReference{}, err
 	}
 	return api.NewNameReference(contract.ExportedName())
+}
+
+func (aggregateNames) TsonicCore(
+	tsoniccore.Symbol,
+) (api.NameReference, error) {
+	panic("unused")
 }
 
 func (aggregateNames) ExternalProviderFunction(

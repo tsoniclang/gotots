@@ -18,6 +18,8 @@ func Build(
 	valueName string,
 	runtimeValueName string,
 	interfaceValueName string,
+	pointerName string,
+	allocatePointerName string,
 ) (tsgo.Statement, error) {
 	switch symbol {
 	case api.RuntimePanicNilError:
@@ -29,6 +31,8 @@ func Build(
 			errorName,
 			runtimeValueName,
 			interfaceValueName,
+			pointerName,
+			allocatePointerName,
 		), nil
 	default:
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
@@ -100,8 +104,15 @@ func panicNilValue(
 	errorName string,
 	runtimeValueName string,
 	interfaceValueName string,
+	pointerName string,
+	allocatePointerName string,
 ) tsgo.ClassDeclaration {
-	errorType := factory.TypeReferenceNode(factory.Identifier(errorName), nil)
+	errorType := factory.TypeReferenceNode(
+		factory.Identifier(pointerName),
+		[]tsgo.TypeNode{
+			factory.TypeReferenceNode(factory.Identifier(errorName), nil),
+		},
+	)
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
@@ -133,6 +144,7 @@ func panicNilValue(
 				factory,
 				className,
 				errorName,
+				allocatePointerName,
 			),
 			panicNilGuard(
 				factory,
@@ -191,11 +203,20 @@ func panicNilCreate(
 	factory tsgo.Factory,
 	className string,
 	errorName string,
+	allocatePointerName string,
 ) tsgo.MethodDeclaration {
-	payload := factory.NewExpression(
-		factory.Identifier(errorName),
+	payload := factory.CallExpression(
+		factory.Identifier(allocatePointerName),
 		nil,
 		nil,
+		[]tsgo.Expression{
+			factory.NewExpression(
+				factory.Identifier(errorName),
+				nil,
+				nil,
+			),
+		},
+		tsgo.NodeFlagsNone,
 	)
 	return factory.MethodDeclaration(
 		[]tsgo.ModifierLike{factory.StaticKeyword()},

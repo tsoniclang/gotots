@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
@@ -51,17 +50,21 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		target, err := context.Values().FromStorage(
+		target := api.DirectExpression(
+			reference.Expression(context.Factory()),
+			reference.Requests()...,
+		)
+		target, err = context.Values().FromStorage(
 			context,
 			source,
 			variable.Type(),
-			api.DirectExpression(
-				reference.Expression(context.Factory()),
-				reference.Requests()...,
-			),
+			target,
 		)
-		if err != nil || !reference.ProviderBoundary() {
-			return target, err
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if !reference.ProviderBoundary() {
+			return target, nil
 		}
 		target, _, err = providerboundary.FromProviderValue(
 			context,
@@ -74,15 +77,6 @@ func Emit(
 		return target, err
 	}
 	if variable, ok := object.(*types.Var); ok {
-		if selected, exists, err := context.AddressableStorage().Read(
-			context,
-			variable,
-		); exists || err != nil {
-			if err != nil {
-				return api.ExpressionEmission{}, err
-			}
-			return selected, nil
-		}
 		if receiver, ok := context.ValueReceiver(variable); ok {
 			value := receiver.Value()
 			var requests []api.RootRequest
@@ -106,16 +100,6 @@ func Emit(
 		reference.Requests()...,
 	)
 	if function, ok := object.(*types.Func); ok {
-		target, err = callable.AdaptProjectedSourceValue(
-			context,
-			children,
-			source,
-			function,
-			target,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
 		if reference.ProviderBoundary() {
 			return providerboundary.FromProviderSourceCallable(
 				context,
@@ -125,9 +109,8 @@ func Emit(
 				target,
 			)
 		}
-		return cooperativecall.AdaptSourceValue(
+		return cooperativecall.TransportSourceValue(
 			context,
-			children,
 			source,
 			function,
 			target,

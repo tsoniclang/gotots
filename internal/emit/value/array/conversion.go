@@ -3,7 +3,9 @@ package array
 import (
 	"go/ast"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
@@ -181,6 +183,20 @@ func (a RuntimeArray) PointerFromSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	arrayRuntime, err := context.Names().Runtime(
+		api.RuntimeArray,
+		api.ImportPhaseType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	storageType := api.DirectType(
+		context.Factory().TypeReferenceNode(
+			arrayRuntime.EntityName(context.Factory()),
+			typeArguments,
+		),
+		api.CombineRequests(typeRequests, arrayRuntime.Requests())...,
+	)
 	runtime, err := context.Names().Runtime(
 		api.RuntimeSliceArrayPointer,
 		api.ImportPhaseValue,
@@ -188,13 +204,12 @@ func (a RuntimeArray) PointerFromSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
+	pointer, err := api.NewExpressionEmission(
 		operand.Before(),
 		context.Factory().CallExpression(
 			context.Factory().Identifier(runtime.Name()),
 			nil,
 			[]tsgo.TypeNode{
-				logical.Value(),
 				typeArguments[0],
 				typeArguments[1],
 			},
@@ -206,10 +221,82 @@ func (a RuntimeArray) PointerFromSlice(
 		),
 		api.CombineRequests(
 			operand.Requests(),
-			logical.Requests(),
 			typeRequests,
 			runtime.Requests(),
 		),
+	)
+	if err != nil || !a.nominal {
+		return pointer, err
+	}
+	fromSource, err := a.wrap(
+		context.WithRole(api.RoleConversionOperand),
+		api.DirectExpression(context.Factory().Identifier("$go$source")),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	toSource, err := a.storage(
+		context.WithRole(api.RoleConversionOperand),
+		api.DirectExpression(context.Factory().Identifier("$go$target")),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return pointermarker.Operation(
+		context,
+		tsoniccore.SymbolProjectPointer,
+		[]api.TypeEmission{storageType, logical},
+		[]api.ExpressionEmission{
+			pointer,
+			api.DirectExpression(
+				arrayPointerProjection(
+					context,
+					"$go$source",
+					storageType.Value(),
+					logical.Value(),
+					fromSource,
+				),
+				fromSource.Requests()...,
+			),
+			api.DirectExpression(
+				arrayPointerProjection(
+					context,
+					"$go$target",
+					logical.Value(),
+					storageType.Value(),
+					toSource,
+				),
+				toSource.Requests()...,
+			),
+		},
+	)
+}
+
+func arrayPointerProjection(
+	context api.Context,
+	parameter string,
+	input tsgo.TypeNode,
+	output tsgo.TypeNode,
+	value api.ExpressionEmission,
+) tsgo.ArrowFunction {
+	statements := append(
+		value.Before(),
+		context.Factory().ReturnStatement(value.Value()),
+	)
+	return context.Factory().ArrowFunction(
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{context.Factory().ParameterDeclaration(
+			nil,
+			nil,
+			context.Factory().Identifier(parameter),
+			nil,
+			input,
+			nil,
+		)},
+		output,
+		context.Factory().EqualsGreaterThanToken(),
+		context.Factory().Block(statements, true),
 	)
 }
 

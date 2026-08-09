@@ -20,8 +20,7 @@ func Build(
 	}
 	switch symbol {
 	case api.RuntimeStorageTypeToken,
-		api.RuntimeContainerStorageToken,
-		api.RuntimePointerTypeToken:
+		api.RuntimeContainerStorageToken:
 		return tokenDeclaration(factory, contract.ExportedName()), nil
 	case api.RuntimeStoredValue:
 		token, tokenErr := api.RuntimeContract(api.RuntimeStorageTypeToken)
@@ -37,16 +36,6 @@ func Build(
 		token, tokenErr := api.RuntimeContract(
 			api.RuntimeContainerStorageToken,
 		)
-		if tokenErr != nil {
-			return nil, tokenErr
-		}
-		return valueContract(
-			factory,
-			contract.ExportedName(),
-			token.ExportedName(),
-		), nil
-	case api.RuntimePointerRepresentedValue:
-		token, tokenErr := api.RuntimeContract(api.RuntimePointerTypeToken)
 		if tokenErr != nil {
 			return nil, tokenErr
 		}
@@ -78,27 +67,6 @@ func Build(
 			contract.ExportedName(),
 			value.ExportedName(),
 			valueType(factory),
-		), nil
-	case api.RuntimePointerType:
-		value, valueErr := api.RuntimeContract(
-			api.RuntimePointerRepresentedValue,
-		)
-		if valueErr != nil {
-			return nil, valueErr
-		}
-		pointer, pointerErr := api.RuntimeContract(api.RuntimePointer)
-		if pointerErr != nil {
-			return nil, pointerErr
-		}
-		logical := valueType(factory)
-		return nonDistributiveProjectionAlias(
-			factory,
-			contract.ExportedName(),
-			value.ExportedName(),
-			factory.TypeReferenceNode(
-				factory.Identifier(pointer.ExportedName()),
-				[]tsgo.TypeNode{logical, logical},
-			),
 		), nil
 	default:
 		return nil, &api.InvariantError{

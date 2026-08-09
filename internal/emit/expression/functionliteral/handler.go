@@ -110,9 +110,8 @@ func Emit(
 	if staticallySelected {
 		return ordinary, nil
 	}
-	ordinary, err = cooperativecall.AdaptLiteralValue(
+	ordinary, err = cooperativecall.TransportLiteralValue(
 		context,
-		children,
 		source,
 		ordinary,
 	)

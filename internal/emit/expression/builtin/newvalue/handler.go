@@ -6,9 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -47,14 +45,6 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	targetElement, err := children.RepresentedType(
-		context.WithRole(api.RoleCallArgument),
-		source.Args[0],
-		element,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	zero, err := context.Values().Zero(
 		context.WithRole(api.RoleCallArgument),
 		source.Args[0],
@@ -67,76 +57,5 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	representation, err := pointertype.Observe(
-		context,
-		pointer,
-		api.PointerRepresentationDemandNone,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if representation.Representation().DirectClass() {
-		return api.NewExpressionEmission(
-			zero.Before(),
-			zero.Value(),
-			api.CombineRequests(
-				zero.Requests(),
-				representation.Requests(),
-			),
-		)
-	}
-	storageType, err := context.ContainerStorage().PointerStorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		element,
-		representation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	stored, err := context.ContainerStorage().ToPointerStorage(
-		context.WithRole(api.RoleCallArgument),
-		source,
-		element,
-		representation,
-		zero,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if len(stored.Before()) != 0 {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	reference, err := context.Names().Runtime(
-		api.RuntimePointer,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.DirectExpression(
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				reference.Expression(context.Factory()),
-				nil,
-				context.Factory().Identifier(pointerruntime.CellName),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			[]tsgo.TypeNode{
-				targetElement.Value(),
-				storageType.Value(),
-			},
-			[]tsgo.Expression{stored.Value()},
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(
-			targetElement.Requests(),
-			storageType.Requests(),
-			stored.Requests(),
-			reference.Requests(),
-			representation.Requests(),
-		)...,
-	), nil
+	return allocate(context, children, source, element, zero)
 }

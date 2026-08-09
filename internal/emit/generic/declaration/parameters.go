@@ -289,17 +289,6 @@ func EmitOperationParameters(
 		if targetErr != nil {
 			return nil, nil, targetErr
 		}
-		if !handled {
-			target, handled, targetErr = emitPointerOperationType(
-				context,
-				children,
-				source,
-				operation,
-			)
-			if targetErr != nil {
-				return nil, nil, targetErr
-			}
-		}
 		if !handled && operation.Operation() ==
 			api.GenericOperationConstraintMethod {
 			facet, facetErr :=

@@ -2,12 +2,11 @@ package array
 
 import (
 	"go/ast"
-	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
+	pointermarker "github.com/tsoniclang/gotots/internal/emit/marker/pointer"
+	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -19,42 +18,15 @@ func (a RuntimeArray) Address(
 	index api.ExpressionEmission,
 	checkNil bool,
 ) (api.ExpressionEmission, error) {
-	ordered, err := expressionoperands.Preserve(
+	parentValue, indexValue, before, requests, err := captureAddressOperands(
 		context,
-		api.TemporaryAddressOperand,
-		expressionoperands.Present(parent),
-		expressionoperands.Present(index),
+		parent,
+		index,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	values := ordered.Values()
-	elementLogical, err := children.RepresentedType(
-		context.WithRole(api.RoleArrayElement),
-		source,
-		a.ElementType(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementRepresentation, err := pointertype.Observe(
-		context,
-		types.NewPointer(a.ElementType()),
-		api.PointerRepresentationDemandDynamicLocation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementStorage, err := context.ContainerStorage().PointerStorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		a.ElementType(),
-		elementRepresentation,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	arrayLogical, err := a.EmitType(
+	logical, err := a.EmitType(
 		context.WithRole(api.RoleArrayReceiver),
 		children,
 		source,
@@ -62,69 +34,192 @@ func (a RuntimeArray) Address(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arrayRepresentation, err := pointertype.Observe(
+	parentPointer := api.DirectExpression(parentValue)
+	if checkNil {
+		parentPointer, err = pointermarker.Guard(context, parentPointer)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	loaded, err := pointermarker.Operation(
 		context,
-		types.NewPointer(a.SourceType()),
-		api.PointerRepresentationDemandStableLocation,
+		tsoniccore.SymbolLoadPointer,
+		[]api.TypeEmission{logical},
+		[]api.ExpressionEmission{parentPointer},
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arrayStorage, err := context.ContainerStorage().PointerStorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		a.SourceType(),
-		arrayRepresentation,
+	parentValue, before, requests, err = captureAddressValue(
+		context,
+		loaded,
+		before,
+		api.CombineRequests(requests, logical.Requests()),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	runtime, err := context.Names().Runtime(
-		api.RuntimePointer,
+	stored, err := a.storage(
+		context.WithRole(api.RoleArrayReceiver),
+		api.DirectExpression(parentValue),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	storedValue, before, requests, err := captureAddressValue(
+		context,
+		stored,
+		before,
+		requests,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	before = append(before, context.Factory().ExpressionStatement(callMember(
+		context,
+		storedValue,
+		arraymember.Get,
+		indexValue,
+	)))
+	locationReference, err := context.Names().Runtime(
+		api.RuntimeArrayLocation,
 		api.ImportPhaseValue,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	parentValue := values[0]
-	if checkNil {
-		parentValue = pointerruntime.Dereference(
-			context.Factory(),
-			runtime.Name(),
-			arrayLogical.Value(),
-			arrayStorage.Value(),
-			parentValue,
+	location, before, requests, err := captureAddressValue(
+		context,
+		api.DirectExpression(
+			context.Factory().CallExpression(
+				locationReference.Expression(context.Factory()),
+				nil,
+				nil,
+				[]tsgo.Expression{storedValue},
+				tsgo.NodeFlagsNone,
+			),
+			locationReference.Requests()...,
+		),
+		before,
+		requests,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	storageType, err := context.ContainerStorage().ContainerStorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		a.ElementType(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	locationPart := func(index string) tsgo.ElementAccessExpression {
+		return context.Factory().ElementAccessExpression(
+			location,
+			nil,
+			context.Factory().NumericLiteral(index, tsgo.TokenFlagsNone),
+			tsgo.NodeFlagsNone,
 		)
 	}
-	target := context.Factory().CallExpression(
-		context.Factory().PropertyAccessExpression(
-			context.Factory().Identifier(runtime.Name()),
-			nil,
-			context.Factory().Identifier(pointerruntime.IndexName),
-			tsgo.NodeFlagsNone,
-		),
+	numericIndex := context.Factory().CallExpression(
+		api.TargetIntrinsicNumber.Expression(context.Factory()),
 		nil,
-		[]tsgo.TypeNode{
-			elementLogical.Value(),
-			elementStorage.Value(),
-			arrayLogical.Value(),
-			arrayStorage.Value(),
-		},
-		[]tsgo.Expression{parentValue, values[1]},
+		nil,
+		[]tsgo.Expression{indexValue},
 		tsgo.NodeFlagsNone,
 	)
+	storageLocation := context.Factory().ElementAccessExpression(
+		locationPart("0"),
+		nil,
+		context.Factory().BinaryExpression(
+			nil,
+			locationPart("1"),
+			nil,
+			context.Factory().BinaryOperatorToken(
+				tsgo.BinaryOperatorPlusToken,
+			),
+			numericIndex,
+		),
+		tsgo.NodeFlagsNone,
+	)
+	storagePointer, err := pointermarker.Operation(
+		context,
+		tsoniccore.SymbolAddressOf,
+		[]api.TypeEmission{storageType},
+		[]api.ExpressionEmission{api.DirectExpression(storageLocation)},
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	projected, err := context.Values().ProjectStoragePointer(
+		context,
+		source,
+		a.ElementType(),
+		storagePointer,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	return api.NewExpressionEmission(
-		ordered.Before(),
-		target,
+		append(before, projected.Before()...),
+		projected.Value(),
 		api.CombineRequests(
-			ordered.Requests(),
-			elementLogical.Requests(),
-			elementStorage.Requests(),
-			elementRepresentation.Requests(),
-			arrayLogical.Requests(),
-			arrayStorage.Requests(),
-			arrayRepresentation.Requests(),
-			runtime.Requests(),
+			requests,
+			storageType.Requests(),
+			projected.Requests(),
 		),
 	)
+}
+
+func captureAddressOperands(
+	context api.Context,
+	parent api.ExpressionEmission,
+	index api.ExpressionEmission,
+) (tsgo.Expression, tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
+	parentValue, before, requests, err := captureAddressValue(
+		context,
+		parent,
+		nil,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	indexValue, before, requests, err := captureAddressValue(
+		context,
+		index,
+		before,
+		requests,
+	)
+	return parentValue, indexValue, before, requests, err
+}
+
+func captureAddressValue(
+	context api.Context,
+	value api.ExpressionEmission,
+	before []tsgo.Statement,
+	requests []api.RootRequest,
+) (tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
+	name, err := context.Names().Temporary(api.TemporaryAddressOperand)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	before = append(before, value.Before()...)
+	before = append(before, context.Factory().VariableStatement(
+		nil,
+		context.Factory().VariableDeclarationList(
+			[]tsgo.VariableDeclaration{context.Factory().VariableDeclaration(
+				context.Factory().Identifier(name),
+				nil,
+				nil,
+				value.Value(),
+			)},
+			tsgo.NodeFlagsConst,
+		),
+	))
+	return context.Factory().Identifier(name),
+		before,
+		api.CombineRequests(requests, value.Requests()),
+		nil
 }

@@ -12,10 +12,10 @@ import (
 	complexconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/complex"
 	floatconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/float"
 	pointerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/pointer"
+	rawpointerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/rawpointer"
 	slicearrayconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/slicearray"
 	stringconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/stringvalue"
 	structconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/structvalue"
-	unsafepointerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/unsafepointer"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
@@ -108,22 +108,6 @@ func Emit(
 		}
 		return target, true, nil
 	}
-	if err := unsafepointerconversion.Prepare(
-		context,
-		sourceType,
-		targetType,
-	); err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	if target, handled, offsetErr := unsafepointerconversion.EmitClosedOffset(
-		context,
-		children,
-		source,
-		sourceType,
-		targetType,
-	); handled {
-		return target, true, offsetErr
-	}
 	operandExpected := operandFacts.Type
 	if _, interfaceTarget := interfacetype.Resolve(targetType); interfaceTarget {
 		operandExpected = interfacevalue.DynamicType(operandExpected)
@@ -180,20 +164,19 @@ func Apply(
 	); handled {
 		return target, true, interfaceErr
 	}
-	if types.Identical(sourceType, targetType) {
-		if _, ok := callable.Signature(targetType); ok {
-			return operandValue, true, nil
-		}
-	}
-	if target, handled, unsafeErr := unsafepointerconversion.Convert(
+	if target, handled, rawPointerErr := rawpointerconversion.Convert(
 		context,
-		children,
 		source,
 		sourceType,
 		targetType,
 		operandValue,
 	); handled {
-		return target, true, unsafeErr
+		return target, true, rawPointerErr
+	}
+	if types.Identical(sourceType, targetType) {
+		if _, ok := callable.Signature(targetType); ok {
+			return operandValue, true, nil
+		}
 	}
 	if target, handled, pointerErr := pointerconversion.Convert(
 		context,

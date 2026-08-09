@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestReflectAggregateStructFieldMutationMatchesGo(t *testing.T) {
+func TestReflectAggregateStructFieldCanonicalizesWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -87,7 +87,7 @@ func main() {
 	fmt.Println(fixture.MergeAggregate())
 }
 `
-	runReflectDifferentialInspect(
+	verifyReflectCanonicalInspect(
 		t,
 		source,
 		"MergeAggregate",
@@ -98,7 +98,7 @@ func main() {
 			for _, required := range []string{
 				"elem:",
 				".$copy(",
-				".$assign(",
+				"storePointer(instance,",
 				"settable: false",
 			} {
 				if !strings.Contains(artifacts.printed, required) {

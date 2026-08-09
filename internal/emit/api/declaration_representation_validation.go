@@ -31,10 +31,6 @@ func (r DeclarationRequirement) Valid() bool {
 		r.typeRepresentation != TypeRepresentationInvalid {
 		return false
 	}
-	if r.kind != DeclarationRequirementPointerRepresentation &&
-		r.pointerDemand != PointerRepresentationDemandInvalid {
-		return false
-	}
 	if r.kind != DeclarationRequirementGenericConcretization &&
 		r.concretizationDeferred {
 		return false
@@ -60,7 +56,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementValueReceiverCopy:
 		if r.operation != NamedStructOperationInvalid ||
 			r.typeName != nil ||
-			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
 			r.generated != nil ||
@@ -78,7 +73,6 @@ func (r DeclarationRequirement) Valid() bool {
 		if r.operation != NamedStructOperationInvalid ||
 			r.typeName == nil ||
 			r.classMethod == nil ||
-			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
 			r.generated != nil ||
@@ -95,7 +89,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementNamedStructOperation:
 		if !r.operation.Valid() ||
 			r.typeName == nil ||
-			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
 			r.generated != nil ||
@@ -108,23 +101,9 @@ func (r DeclarationRequirement) Valid() bool {
 			return sourceType == r.typeName
 		}
 		return validLexicalNamedStructOwner(r.owner, r.typeName)
-	case DeclarationRequirementAddressableStorage:
-		if r.operation != NamedStructOperationInvalid ||
-			r.typeName != nil ||
-			r.variable == nil ||
-			r.variable.IsField() ||
-			r.constant != nil ||
-			r.projection != types.Invalid ||
-			r.generated != nil ||
-			r.anonymousDemand != AnonymousStructDemandInvalid ||
-			r.mapDemand != MapSpecializationDemandInvalid {
-			return false
-		}
-		return validAddressableStorageOwner(r.owner, r.variable)
 	case DeclarationRequirementConstantProjection:
 		if r.operation != NamedStructOperationInvalid ||
 			r.typeName != nil ||
-			r.variable != nil ||
 			r.constant != nil ||
 			!validConstantProjection(r.projection) ||
 			r.generated != nil ||
@@ -138,7 +117,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementLocalConstantProjection:
 		if r.operation != NamedStructOperationInvalid ||
 			r.typeName != nil ||
-			r.variable != nil ||
 			r.constant == nil ||
 			!validConstantProjection(r.projection) ||
 			r.generated != nil ||
@@ -152,7 +130,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementGenericOperation:
 		if r.operation != NamedStructOperationInvalid ||
 			r.typeName != nil ||
-			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
 			r.generated != nil ||
@@ -169,7 +146,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementGenericConcretization:
 		if r.operation != NamedStructOperationInvalid ||
 			r.typeName != nil ||
-			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
 			r.generated == nil ||
@@ -184,7 +160,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementGenericRepresentation:
 		if r.operation != NamedStructOperationInvalid ||
 			r.typeName != nil ||
-			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
 			r.generated != nil ||
@@ -207,7 +182,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementAnonymousStruct:
 		return r.operation == NamedStructOperationInvalid &&
 			r.typeName == nil &&
-			r.variable == nil &&
 			r.constant == nil &&
 			r.projection == types.Invalid &&
 			r.generated.Valid() &&
@@ -218,7 +192,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementMapSpecialization:
 		return r.operation == NamedStructOperationInvalid &&
 			r.typeName == nil &&
-			r.variable == nil &&
 			r.constant == nil &&
 			r.projection == types.Invalid &&
 			r.generated.Valid() &&
@@ -259,12 +232,9 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementReflectionType,
 		DeclarationRequirementReflectionValueOperations:
 		return r.validGeneratedDefinition(GeneratedArtifactReflectionType)
-	case DeclarationRequirementUnsafeCodec:
-		return r.validGeneratedDefinition(GeneratedArtifactUnsafeCodec)
 	case DeclarationRequirementGenericCapability:
 		return r.operation == NamedStructOperationInvalid &&
 			r.typeName == nil &&
-			r.variable == nil &&
 			r.constant == nil &&
 			r.projection == types.Invalid &&
 			r.generated.Valid() &&
@@ -277,7 +247,6 @@ func (r DeclarationRequirement) Valid() bool {
 		if !r.owner.Valid() ||
 			r.operation != NamedStructOperationInvalid ||
 			r.typeName != nil ||
-			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
 			r.generated != nil ||
@@ -310,10 +279,6 @@ func (r DeclarationRequirement) Valid() bool {
 		return r.validGeneratedDefinition(
 			GeneratedArtifactCallableABI,
 		)
-	case DeclarationRequirementPointerRepresentation:
-		return r.pointerDemand.Valid() && r.validGeneratedDefinition(
-			GeneratedArtifactPointerRepresentation,
-		)
 	case DeclarationRequirementProviderInterfaceBridge:
 		return r.validGeneratedDefinition(
 			GeneratedArtifactProviderInterfaceBridge,
@@ -321,7 +286,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementProviderInterfaceCapability:
 		return r.operation == NamedStructOperationInvalid &&
 			r.typeName == nil &&
-			r.variable == nil &&
 			r.constant == nil &&
 			r.projection == types.Invalid &&
 			r.generated.Valid() &&
@@ -335,7 +299,6 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementProviderProfileInterfaceCapability:
 		if r.operation != NamedStructOperationInvalid ||
 			r.typeName != nil ||
-			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
 			!r.generated.Valid() ||
@@ -380,7 +343,6 @@ func (r DeclarationRequirement) validGeneratedDefinition(
 ) bool {
 	return r.operation == NamedStructOperationInvalid &&
 		r.typeName == nil &&
-		r.variable == nil &&
 		r.constant == nil &&
 		r.projection == types.Invalid &&
 		r.generated.Valid() &&
@@ -555,7 +517,6 @@ func (r DeclarationRequirement) validTypeRepresentation() bool {
 	if !r.owner.Valid() ||
 		!r.typeRepresentation.Valid() ||
 		r.operation != NamedStructOperationInvalid ||
-		r.variable != nil ||
 		r.constant != nil ||
 		r.projection != types.Invalid ||
 		r.anonymousDemand != AnonymousStructDemandInvalid ||

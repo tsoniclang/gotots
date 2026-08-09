@@ -218,7 +218,8 @@ func assertProviderInterfaceAdapterRecoveryABI(
 	printed := materializeArtifacts(t, emission, t.TempDir()).printed
 	for _, required := range []string{
 		"BinaryBigEndianString(this.$go$value, $go$recovery)",
-		"OsFileWrite(this.$go$value, $argument0, $go$recovery)",
+		"recovery_io.OsFileWrite(",
+		"loadPointer<os.File>",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("provider adapter lacks recovery facet %q:\n%s", required, printed)
@@ -249,12 +250,13 @@ func assertProviderReceiverProjection(
 	t.Helper()
 	printed := materializeArtifacts(t, emission, t.TempDir()).printed
 	for _, stored := range []string{
-		"Mutex.Lock(GoPointer.direct<ProviderState>(state).Mutex)",
-		"Builder.Len(GoPointer.direct<ProviderState>(state).Builder)",
-		"Builder.Grow(builder$storage",
-		"Builder.WriteString(builder$storage",
-		"Builder.WriteRune(builder$storage",
-		"Builder.String(builder$storage",
+		"sync__from_gostdlib.Mutex.Lock(",
+		"strings__from_gostdlib.Builder.Len(",
+		"strings__from_gostdlib.Builder.Grow(",
+		"strings__from_gostdlib.Builder.WriteString(",
+		"strings__from_gostdlib.Builder.WriteRune(",
+		"strings__from_gostdlib.Builder.String(",
+		"loadPointer<ProviderState>",
 	} {
 		if !strings.Contains(printed, stored) {
 			t.Fatalf("stored provider receiver lacks %q:\n%s", stored, printed)
@@ -268,9 +270,7 @@ func assertProviderReceiverProjection(
 		}
 	}
 	for _, bypass := range []string{
-		"Mutex.Lock(GoPointer.objectField",
-		"SyncMutexUnlock(GoPointer.objectField",
-		"Builder.Len(GoPointer.objectField",
+		"GoPointer.",
 		"await strings__from_gostdlib.Builder.Len(",
 		"SyncMutexOperations.$fromStorage(__gotots_receiver_",
 		"StringsBuilderOperations.$fromStorage(__gotots_receiver_",
@@ -325,9 +325,9 @@ func Use(mutex *sync.Mutex, builder *strings.Builder) int {
 	}
 	printed := materializeArtifacts(t, emission, t.TempDir()).printed
 	for _, direct := range []string{
-		"Mutex.Lock(mutex)",
-		"SyncMutexUnlock(__gotots_receiver_0",
-		"Builder.Len(builder)",
+		"Mutex.Lock(__gotots_receiver_0 === void 0 ? void 0 : loadPointer<sync__from_gostdlib.Mutex>(__gotots_receiver_0))",
+		"recovery_sync.SyncMutexUnlock(",
+		"Builder.Len(__gotots_receiver_3 === void 0 ? void 0 : loadPointer<strings__from_gostdlib.Builder>(__gotots_receiver_3))",
 	} {
 		if !strings.Contains(printed, direct) {
 			t.Fatalf("direct provider receiver lacks %q:\n%s", direct, printed)

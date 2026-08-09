@@ -1,5 +1,3 @@
-import type { GoPointer } from "@gotots/runtime/pointer.js";
-import type { GoUnsafePointer } from "@gotots/runtime/unsafe-pointer.js";
 import type {
   bool,
   int32,
@@ -8,6 +6,8 @@ import type {
   uint8,
   uintptr,
 } from "@gotots/gostdlib/internal/scalars.js";
+import type { ProviderRawPointer } from "./runtime/raw-pointer.js";
+import type { ProviderPointer } from "./runtime/pointer.js";
 
 export class Kind {
   constructor(readonly value: uint8) {}
@@ -27,8 +27,8 @@ export class TypeOff {
 
 type EqualFunction =
   | ((
-      argument0: GoUnsafePointer | undefined,
-      argument1: GoUnsafePointer | undefined,
+      argument0: ProviderRawPointer | undefined,
+      argument1: ProviderRawPointer | undefined,
     ) => bool)
   | undefined;
 
@@ -41,7 +41,7 @@ export class Type {
   FieldAlign_: uint8;
   Kind_: Kind;
   Equal: EqualFunction;
-  GCData: GoPointer<uint8, uint8> | undefined;
+  GCData: ProviderPointer<uint8> | undefined;
   Str: NameOff;
   PtrToThis: TypeOff;
 
@@ -54,7 +54,7 @@ export class Type {
     FieldAlign_: uint8;
     Kind_: Kind;
     Equal: EqualFunction;
-    GCData: GoPointer<uint8, uint8> | undefined;
+    GCData: ProviderPointer<uint8> | undefined;
     Str: NameOff;
     PtrToThis: TypeOff;
   }) {

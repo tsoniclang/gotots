@@ -6,7 +6,7 @@ import "testing"
 // model over scalar kinds: ValueOf, Kind, Type identity, scalar reads,
 // validity, and the invalid-versus-typed-nil distinction all match Go
 // exactly through the generated value-operation metadata.
-func TestReflectValueScalarReadsMatchGo(t *testing.T) {
+func TestReflectValueScalarReadsCanonicalizeWithNativeEvidence(t *testing.T) {
 	source := `package reflectvalue
 
 import (
@@ -53,7 +53,7 @@ func main() {
 	fmt.Println(fixture.Facts())
 }
 `
-	runReflectDifferential(
+	verifyReflectCanonical(
 		t,
 		source,
 		"Facts",

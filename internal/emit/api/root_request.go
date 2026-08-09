@@ -15,7 +15,6 @@ const (
 	RootRequestImport
 	RootRequestDeclarationRequirement
 	RootRequestArtifactDependency
-	RootRequestRuntimeFeature
 )
 
 type PlacementScope uint8
@@ -58,7 +57,6 @@ type RootRequestOwner struct {
 	exportedName           string
 	declarationRequirement DeclarationRequirement
 	artifactDependency     ArtifactDependency
-	runtimeFeature         RuntimeFeature
 }
 
 type rootRequestPayload struct {
@@ -239,17 +237,6 @@ func newDeclarationRequirementRequest(
 	}}
 }
 
-func NewAddressableStorageRequest(
-	owner ArtifactOwner,
-	variable *types.Var,
-) (RootRequest, error) {
-	requirement, err := NewAddressableStorageRequirement(owner, variable)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return newDeclarationRequirementRequest(requirement), nil
-}
-
 func NewCallableControlRequest(
 	owner ArtifactOwner,
 	enclosing ast.Node,
@@ -417,13 +404,6 @@ func NewReflectionTypeRequest(
 	return generatedDefinitionRequest(requirement, err)
 }
 
-func NewUnsafeCodecRequest(
-	artifact *GeneratedArtifact,
-) (RootRequest, error) {
-	requirement, err := NewUnsafeCodecRequirement(artifact)
-	return generatedDefinitionRequest(requirement, err)
-}
-
 func NewProviderInterfaceBridgeRequest(
 	artifact *GeneratedArtifact,
 ) (RootRequest, error) {
@@ -462,8 +442,6 @@ func (r RootRequest) LegalScope() PlacementScope {
 	switch r.payload.owner.kind {
 	case RootRequestImport:
 		return ScopeFileImports
-	case RootRequestRuntimeFeature:
-		return ScopeCompilationSupport
 	case RootRequestDeclarationRequirement:
 		artifact, ok := r.payload.owner.declarationRequirement.GeneratedArtifact()
 		if ok && (artifact.Placement() == GeneratedArtifactPlacementCompilation ||
@@ -485,7 +463,7 @@ func (r RootRequest) Execution() ExecutionConstraint {
 		return ExecutionInvalid
 	}
 	switch r.payload.owner.kind {
-	case RootRequestImport, RootRequestDeclarationRequirement, RootRequestRuntimeFeature:
+	case RootRequestImport, RootRequestDeclarationRequirement:
 		return ExecutionStatic
 	default:
 		return ExecutionInvalid

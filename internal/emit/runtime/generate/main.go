@@ -68,7 +68,6 @@ func main() {
 		scalar,
 		concurrency,
 		requirements.RuntimeSymbols(),
-		nil,
 		requirements.PrimitiveAliases(),
 	)
 	if err != nil {

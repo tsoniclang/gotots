@@ -1,6 +1,6 @@
 import type { GoError } from "@gotots/runtime/interface-value.js";
-import type { GoPointer } from "@gotots/runtime/pointer.js";
 import type { RuntimeSlice } from "@gotots/runtime/slice.js";
+import type { ProviderPointer } from "./internal/runtime/pointer.js";
 import type {
   Awaitable,
   bool,
@@ -28,7 +28,7 @@ export class FlagSet {
     name: gostring,
     value: bool,
     usage: gostring,
-  ): GoPointer<bool, bool> | undefined {
+  ): ProviderPointer<bool> | undefined {
     void usage;
     return booleanFlag(receiver, name, value);
   }
@@ -45,7 +45,7 @@ export class FlagSet {
     name: gostring,
     value: gostring,
     usage: gostring,
-  ): GoPointer<gostring, gostring> | undefined {
+  ): ProviderPointer<gostring> | undefined {
     void usage;
     return stringFlag(receiver, name, value);
   }

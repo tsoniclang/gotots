@@ -11,9 +11,11 @@ const hexadecimalAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
 const standardPadding = 0x3d;
 
 let createEncoding: (alphabet: gostring) => Encoding;
+let copyEncoding: (source: Encoding) => Encoding;
+let assignEncoding: (target: Encoding, source: Encoding) => void;
 
 export class Encoding {
-  readonly #alphabet: gostring;
+  #alphabet: gostring;
   readonly #decode = new Map<uint8, uint8>();
 
   private constructor(alphabet: gostring) {
@@ -25,6 +27,17 @@ export class Encoding {
 
   static {
     createEncoding = (alphabet: gostring): Encoding => new Encoding(alphabet);
+    copyEncoding = (source: Encoding): Encoding => new Encoding(source.#alphabet);
+    assignEncoding = (target: Encoding, source: Encoding): void => {
+      if (target === source) {
+        return;
+      }
+      target.#alphabet = source.#alphabet;
+      target.#decode.clear();
+      for (const [input, output] of source.#decode) {
+        target.#decode.set(input, output);
+      }
+    };
   }
 
   static AppendDecode(
@@ -189,4 +202,15 @@ export function standardEncoding(): Encoding {
 
 export function hexadecimalEncoding(): Encoding {
   return createEncoding(hexadecimalAlphabet);
+}
+
+export function encodingRepresentationCopy(source: Encoding): Encoding {
+  return copyEncoding(source);
+}
+
+export function encodingRepresentationAssign(
+  target: Encoding,
+  source: Encoding,
+): void {
+  assignEncoding(target, source);
 }

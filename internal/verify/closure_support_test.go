@@ -15,6 +15,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
+	tsoniccorefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func closureDirectory(relative string) string {
@@ -167,6 +169,12 @@ func materializeClosureWithSetup(
 	}
 	if setup != nil {
 		setup(workingDirectory, emission)
+	}
+	if err := tsoniccorefixture.InstallResolutionOnly(workingDirectory); err != nil {
+		t.Fatal(err)
+	}
+	if err := runtimefixture.InstallResolution(workingDirectory, workingDirectory); err != nil {
+		t.Fatal(err)
 	}
 	if err := tsgo.Compile(
 		ctx,

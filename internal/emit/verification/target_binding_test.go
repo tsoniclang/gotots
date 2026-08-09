@@ -343,7 +343,7 @@ func EmptyHolder() Holder {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	if !strings.Contains(
 		artifacts.printed,
-		"public Box: Box<int> | undefined",
+		"public Box: Pointer<Box<int>> | undefined",
 	) {
 		t.Fatalf(
 			"alias to generic instantiation was not canonicalized:\n%s",
@@ -352,7 +352,8 @@ func EmptyHolder() Holder {
 	}
 	for _, forbidden := range []string{
 		"Box<int64>",
-		"GoPointer<Box<int>",
+		"GoPointer",
+		"runtime/pointer",
 		"Box$Storage<int>",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
@@ -362,6 +363,48 @@ func EmptyHolder() Holder {
 				artifacts.printed,
 			)
 		}
+	}
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
+}
+
+func TestNestedGenericPointerFieldAddressUsesCanonicalStorage(t *testing.T) {
+	project := t.TempDir()
+	writeProgramFile(
+		t,
+		filepath.Join(project, "go.mod"),
+		"module example.com/nestedaddress\n\ngo 1.26.4\n",
+	)
+	writeProgramFile(t, filepath.Join(project, "source.go"), `package nestedaddress
+
+type Inner[T any] struct { Value T }
+type Outer[T any] struct { Inner *Inner[T] }
+
+func Store(outer *Outer[int], value int) int {
+	location := &outer.Inner.Value
+	*location = value
+	return outer.Inner.Value
+}
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: project,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := emit.NewRoot(program.Roots()[0].Types().Scope().Lookup("Store"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(program, []emit.Root{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	if !strings.Contains(artifacts.printed, "Inner.$storageOf") ||
+		!strings.Contains(artifacts.printed, "Outer.$storageOf") {
+		t.Fatalf("nested pointer field address bypassed canonical storage:\n%s", artifacts.printed)
 	}
 	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }

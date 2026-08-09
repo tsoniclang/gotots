@@ -50,18 +50,7 @@ func emitGotoDefinition(
 	if err != nil {
 		return api.StatementEmission{}, true, err
 	}
-	targetName, storage := context.AddressableStorage().Name(context, object)
-	if storage {
-		value, err = context.AddressableStorage().Cell(
-			context,
-			children,
-			name,
-			targetType,
-			value,
-		)
-	} else {
-		targetName, err = context.Names().Declare(object)
-	}
+	targetName, err := context.Names().Declare(object)
 	if err != nil {
 		return api.StatementEmission{}, true, err
 	}

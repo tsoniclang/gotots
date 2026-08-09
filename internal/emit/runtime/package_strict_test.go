@@ -11,6 +11,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
 )
 
 func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
@@ -21,11 +22,10 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeArray:         {},
 			api.RuntimeDeferPop:      {},
-			api.RuntimePointer:       {},
+			api.RuntimePanicNilError: {},
+			api.RuntimePanicNilValue: {},
 			api.RuntimeSlice:         {},
-			api.RuntimeUnsafePointer: {},
 		},
-		nil,
 		[]api.PrimitiveAlias{api.PrimitiveInt32},
 	)
 	if err != nil {
@@ -41,6 +41,7 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 		t.Fatal(err)
 	}
 	var paths []string
+	var printedPackage strings.Builder
 	for _, file := range assembled.Files() {
 		printed, printErr := client.PrintNode(
 			file.SourceFile(),
@@ -50,6 +51,7 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 			client.Close()
 			t.Fatal(printErr)
 		}
+		printedPackage.WriteString(printed)
 		relative := strings.TrimPrefix(
 			file.OutputPath(),
 			assembled.RootPath()+"/",
@@ -63,6 +65,17 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 	}
 	if err := client.Close(); err != nil {
 		t.Fatal(err)
+	}
+	if err := corefixture.InstallResolutionOnly(directory); err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"$go$value: Pointer<GoPanicNilError>",
+		"allocatePointer(new GoPanicNilError)",
+	} {
+		if !strings.Contains(printedPackage.String(), required) {
+			t.Fatalf("panic-nil runtime lacks %q:\n%s", required, printedPackage.String())
+		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -80,6 +93,154 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 	}
 }
 
+func TestCanonicalRuntimePackageManifestResolvesEveryBuildStage(t *testing.T) {
+	assembled, err := AssemblePackage(
+		tsgo.NewFactory(),
+		testScalarABI(t, api.IntegerRepresentationNumber),
+		api.ConcurrencySemanticsDisabled,
+		nil,
+		[]api.PrimitiveAlias{api.PrimitiveInt32},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory := t.TempDir()
+	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	packageRoot := filepath.Join(
+		directory,
+		"node_modules",
+		"@gotots",
+		"runtime",
+	)
+	if err := os.MkdirAll(packageRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	client, err := tsgo.StartClient(root, directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sourcePaths []string
+	for _, file := range assembled.Files() {
+		printed, printErr := client.PrintNode(
+			file.SourceFile(),
+			tsgo.PrintOptions{},
+		)
+		if printErr != nil {
+			client.Close()
+			t.Fatal(printErr)
+		}
+		relative := strings.TrimPrefix(
+			file.OutputPath(),
+			assembled.RootPath()+"/",
+		)
+		target := filepath.Join(packageRoot, filepath.FromSlash(relative))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			client.Close()
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, []byte(printed), 0o644); err != nil {
+			client.Close()
+			t.Fatal(err)
+		}
+		sourcePaths = append(sourcePaths, target)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(packageRoot, "package.json"),
+		assembled.Manifest(),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(directory, "main.ts"),
+		[]byte("import type { int32 } from \"@gotots/runtime/scalars.js\";\nconst value: int32 = 1;\nvoid value;\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(directory, "package.json"),
+		[]byte(`{"type":"module"}`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if err := tsgo.Compile(ctx, root, directory, []string{
+		"--target", "es2022",
+		"--module", "nodenext",
+		"--moduleResolution", "nodenext",
+		"--strict",
+		"--noEmit",
+		"main.ts",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	published := filepath.Join(directory, "published-runtime")
+	arguments := []string{
+		"--target", "es2022",
+		"--module", "nodenext",
+		"--moduleResolution", "nodenext",
+		"--strict",
+		"--declaration",
+		"--rootDir", packageRoot,
+		"--outDir", published,
+	}
+	arguments = append(arguments, sourcePaths...)
+	if err := tsgo.Compile(ctx, root, directory, arguments); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(published, "package.json"),
+		assembled.Manifest(),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	consumer := filepath.Join(directory, "published-consumer")
+	consumerPackageParent := filepath.Join(consumer, "node_modules", "@gotots")
+	if err := os.MkdirAll(consumerPackageParent, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(
+		published,
+		filepath.Join(consumerPackageParent, "runtime"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(consumer, "main.ts"),
+		[]byte("import type { int32 } from \"@gotots/runtime/scalars.js\";\nconst value: int32 = 1;\nvoid value;\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(consumer, "package.json"),
+		[]byte(`{"type":"module"}`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := tsgo.Compile(ctx, root, consumer, []string{
+		"--target", "es2022",
+		"--module", "nodenext",
+		"--moduleResolution", "nodenext",
+		"--strict",
+		"--noEmit",
+		"main.ts",
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDenseIndexDistinguishesNilValueFromAbsentStorage(t *testing.T) {
 	assembled, err := AssemblePackage(
 		tsgo.NewFactory(),
@@ -88,7 +249,6 @@ func TestDenseIndexDistinguishesNilValueFromAbsentStorage(t *testing.T) {
 		map[api.RuntimeSymbol]struct{}{
 			api.RuntimeDenseIndex: {},
 		},
-		nil,
 		nil,
 	)
 	if err != nil {

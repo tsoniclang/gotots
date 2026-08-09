@@ -258,14 +258,14 @@ func TestGeneratedArtifactDomainsArePinned(t *testing.T) {
 		GeneratedArtifactGenericCapability != 7 ||
 		GeneratedArtifactCallableABI != 8 ||
 		GeneratedArtifactInterfaceMethodCallable != 9 ||
-		GeneratedArtifactPointerRepresentation != 10 ||
 		GeneratedArtifactProviderInterfaceBridge != 11 ||
 		GeneratedArtifactProviderStatefulRepresentation != 12 ||
 		GeneratedArtifactDeferredCallableRegistry != 13 ||
 		GeneratedArtifactGenericConcretization != 14 ||
 		GeneratedArtifactReflectionType != 15 ||
-		GeneratedArtifactUnsafeCodec != 16 ||
 		GeneratedArtifactInvalid.Valid() ||
+		GeneratedArtifactKind(10).Valid() ||
+		GeneratedArtifactKind(16).Valid() ||
 		GeneratedArtifactKind(17).Valid() {
 		t.Fatal("generated-artifact kind IDs drifted")
 	}

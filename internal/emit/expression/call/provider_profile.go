@@ -223,6 +223,15 @@ func emitProviderProfileInvocation(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		raw, err = context.Values().FromStorage(
+			context,
+			source,
+			variable.Type(),
+			raw,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		canonical, err := providerboundary.CanonicalProfileValue(
 			profileContext,
 			children,

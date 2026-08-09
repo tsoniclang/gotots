@@ -9,53 +9,15 @@
     "concurrencySemantics": "disabled"
   },
   "exports": {
-    "./array.js": {
-      "types": "./array.d.ts",
-      "default": "./array.js"
-    },
-    "./channel.js": {
-      "types": "./channel.d.ts",
-      "default": "./channel.js"
-    },
-    "./complex.js": {
-      "types": "./complex.d.ts",
-      "default": "./complex.js"
-    },
-    "./dense-index.js": {
-      "types": "./dense-index.d.ts",
-      "default": "./dense-index.js"
-    },
-    "./interface-value.js": {
-      "types": "./interface-value.d.ts",
-      "default": "./interface-value.js"
-    },
-    "./map.js": {
-      "types": "./map.d.ts",
-      "default": "./map.js"
-    },
-    "./panic.js": {
-      "types": "./panic.d.ts",
-      "default": "./panic.js"
-    },
-    "./pointer.js": {
-      "types": "./pointer.d.ts",
-      "default": "./pointer.js"
-    },
-    "./scalars.js": {
-      "types": "./scalars.d.ts",
-      "default": "./scalars.js"
-    },
-    "./slice.js": {
-      "types": "./slice.d.ts",
-      "default": "./slice.js"
-    },
-    "./struct.js": {
-      "types": "./struct.d.ts",
-      "default": "./struct.js"
-    },
-    "./unsafe-pointer.js": {
-      "types": "./unsafe-pointer.d.ts",
-      "default": "./unsafe-pointer.js"
-    }
+    "./array.js": "./array.js",
+    "./channel.js": "./channel.js",
+    "./complex.js": "./complex.js",
+    "./dense-index.js": "./dense-index.js",
+    "./interface-value.js": "./interface-value.js",
+    "./map.js": "./map.js",
+    "./panic.js": "./panic.js",
+    "./scalars.js": "./scalars.js",
+    "./slice.js": "./slice.js",
+    "./struct.js": "./struct.js"
   }
 }

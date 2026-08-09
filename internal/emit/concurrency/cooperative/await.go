@@ -132,9 +132,8 @@ func valueCall(
 	return await(context, source, target, propagate, generated)
 }
 
-func AdaptSourceValue(
+func TransportSourceValue(
 	context api.Context,
-	children api.ChildEmitter,
 	source ast.Expr,
 	provider *types.Func,
 	target api.ExpressionEmission,
@@ -143,18 +142,16 @@ func AdaptSourceValue(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return adaptProviderValue(
+	return transportProviderValue(
 		context,
-		children,
 		source,
 		facet,
 		target,
 	)
 }
 
-func AdaptLiteralValue(
+func TransportLiteralValue(
 	context api.Context,
-	children api.ChildEmitter,
 	source *ast.FuncLit,
 	target api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
@@ -162,9 +159,8 @@ func AdaptLiteralValue(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return adaptProviderValue(
+	return transportProviderValue(
 		context,
-		children,
 		source,
 		facet,
 		target,
@@ -318,9 +314,8 @@ func facetCall(
 	return await(context, source, target, propagate, false)
 }
 
-func adaptProviderValue(
+func transportProviderValue(
 	context api.Context,
-	children api.ChildEmitter,
 	source ast.Expr,
 	provider api.CallableFacet,
 	target api.ExpressionEmission,
@@ -333,7 +328,7 @@ func adaptProviderValue(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	providerCooperative, abiCooperative, contractRequests, err :=
+	_, _, contractRequests, err :=
 		providerContract(context, provider, signature)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -342,22 +337,10 @@ func adaptProviderValue(
 		target.Requests(),
 		contractRequests,
 	)
-	target, err = api.NewExpressionEmission(
+	return api.NewExpressionEmission(
 		target.Before(),
 		target.Value(),
 		requests,
-	)
-	if err != nil ||
-		providerCooperative ||
-		!abiCooperative {
-		return target, err
-	}
-	return adaptSynchronousProvider(
-		context,
-		children,
-		source,
-		signature,
-		target,
 	)
 }
 
@@ -426,70 +409,6 @@ func observeABI(
 	}
 	observation, err := context.ObserveCooperativeCallable(facet)
 	return reference, observation, err
-}
-
-func adaptSynchronousProvider(
-	context api.Context,
-	children api.ChildEmitter,
-	source ast.Expr,
-	signature *types.Signature,
-	target api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	capturedName, err := context.Names().Temporary(api.TemporaryCallCallee)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	targetSignature, err := callable.EmitAdapter(
-		context,
-		children,
-		source,
-		signature,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	before := append(
-		target.Before(),
-		context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{
-					context.Factory().VariableDeclaration(
-						context.Factory().Identifier(capturedName),
-						nil,
-						nil,
-						target.Value(),
-					),
-				},
-				tsgo.NodeFlagsConst,
-			),
-		),
-	)
-	call := context.Factory().CallExpression(
-		context.Factory().Identifier(capturedName),
-		nil,
-		nil,
-		targetSignature.ParameterReferences(context.Factory()),
-		tsgo.NodeFlagsNone,
-	)
-	return api.NewExpressionEmission(
-		before,
-		context.Factory().ArrowFunction(
-			[]tsgo.ModifierLike{context.Factory().AsyncKeyword()},
-			nil,
-			targetSignature.Parameters(),
-			callable.PromiseResult(
-				context.Factory(),
-				targetSignature.Result(),
-			),
-			context.Factory().EqualsGreaterThanToken(),
-			call,
-		),
-		api.CombineRequests(
-			target.Requests(),
-			targetSignature.Requests(),
-		),
-	)
 }
 
 func await(

@@ -50,6 +50,7 @@ func TestAggregateSliceOperationsPrintTypecheckAndMatchGo(t *testing.T) {
 				"const resolvedCapacity = globalThis.Number(capacity ?? numericLength);",
 				"const nextCapacity = RuntimeSlice.$grownCapacity(this.capacity, newLength);",
 				"return this.slice(0, length, null);",
+				"return addressOf<T>(backing[this.offset + numericIndex]);",
 			} {
 				if !strings.Contains(printed.runtime, shared) {
 					t.Fatalf("aggregate slice runtime lacks shared operation %q:\n%s", shared, printed.runtime)
@@ -88,7 +89,6 @@ console.log(values.AppendSpreadCopiesValues());
 console.log(values.AppendSpreadOverlapSnapshotsValues());
 console.log(values.CopyDistinctCopiesValues());
 console.log(values.CopyOverlapSnapshotsValues());
-console.log(values.AddressTargetsBackingElement());
 console.log(values.ArrayElementsCopyOnAppend());
 console.log(values.ElidedNestedLiterals());
 `)
@@ -245,7 +245,6 @@ func main() {
 	fmt.Println(values.AppendSpreadOverlapSnapshotsValues())
 	fmt.Println(values.CopyDistinctCopiesValues())
 	fmt.Println(values.CopyOverlapSnapshotsValues())
-	fmt.Println(values.AddressTargetsBackingElement())
 	fmt.Println(values.ArrayElementsCopyOnAppend())
 	fmt.Println(values.ElidedNestedLiterals())
 }

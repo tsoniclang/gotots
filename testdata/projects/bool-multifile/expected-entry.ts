@@ -1,4 +1,4 @@
-import type { bool } from "../../../runtime/scalars.js";
+import type { bool } from "@gotots/runtime/scalars.js";
 import { flip } from "./logic.js";
 export function Run(input: bool): bool {
     return flip(input);

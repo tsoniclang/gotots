@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	externalfunction "github.com/tsoniclang/gotots/internal/emit/externalfunction"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/load"
 	"go/ast"
@@ -403,17 +404,7 @@ type ExternalFunctionObligation struct {
 	buildProfile  load.BuildProfile
 }
 
-type ExternalFunctionBindingError struct {
-	Identity string
-	Reason   string
-}
-
-func (e *ExternalFunctionBindingError) Error() string {
-	if e.Identity == "" {
-		return "link external Go function: " + e.Reason
-	}
-	return "link external Go function " + e.Identity + ": " + e.Reason
-}
+type ExternalFunctionBindingError = externalfunction.BindingError
 
 func (o ExternalFunctionObligation) Identity() string {
 	return o.identity

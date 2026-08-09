@@ -22,63 +22,14 @@ func (owner Owner) ContainerStorageType(
 			api.RuntimeContainerStorageType,
 		)
 	}
-	selection, err := owner.PointerRepresentation(
-		context,
-		types.NewPointer(sourceType),
-		api.PointerRepresentationDemandNone,
-	)
+	required, err := owner.RequiresStorageProjection(context, sourceType)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
-	return owner.PointerStorageType(
-		context,
-		source,
-		sourceType,
-		selection,
-	)
-}
-
-func (owner Owner) PointerStorageType(
-	context api.Context,
-	source ast.Node,
-	sourceType types.Type,
-	selection api.PointerRepresentationObservation,
-) (api.TypeEmission, error) {
-	if !selection.Representation().Valid() {
-		return api.TypeEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "pointer storage representation is invalid",
-		}
+	if !required {
+		return owner.children.RepresentedType(context, source, sourceType)
 	}
-	if selection.Representation() ==
-		api.PointerRepresentationCarrierCanonical {
-		storage, err := owner.StorageType(context, source, sourceType)
-		if err != nil {
-			return api.TypeEmission{}, err
-		}
-		return api.DirectType(
-			storage.Value(),
-			api.CombineRequests(
-				storage.Requests(),
-				selection.Requests(),
-			)...,
-		), nil
-	}
-	logical, err := owner.children.RepresentedType(
-		context,
-		source,
-		sourceType,
-	)
-	if err != nil {
-		return api.TypeEmission{}, err
-	}
-	return api.DirectType(
-		logical.Value(),
-		api.CombineRequests(
-			logical.Requests(),
-			selection.Requests(),
-		)...,
-	), nil
+	return owner.StorageType(context, source, sourceType)
 }
 
 func (owner Owner) ToContainerStorage(
@@ -97,52 +48,14 @@ func (owner Owner) ToContainerStorage(
 			[]api.ExpressionEmission{value},
 		)
 	}
-	selection, err := owner.PointerRepresentation(
-		context,
-		types.NewPointer(sourceType),
-		api.PointerRepresentationDemandNone,
-	)
+	required, err := owner.RequiresStorageProjection(context, sourceType)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return owner.ToPointerStorage(
-		context,
-		source,
-		sourceType,
-		selection,
-		value,
-	)
-}
-
-func (owner Owner) ToPointerStorage(
-	context api.Context,
-	source ast.Node,
-	sourceType types.Type,
-	selection api.PointerRepresentationObservation,
-	value api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	if !selection.Representation().Valid() {
-		return api.ExpressionEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "pointer storage representation is invalid",
-		}
+	if !required {
+		return value, nil
 	}
-	var err error
-	if selection.Representation() ==
-		api.PointerRepresentationCarrierCanonical {
-		value, err = owner.ToStorage(context, source, sourceType, value)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
-	return api.NewExpressionEmission(
-		value.Before(),
-		value.Value(),
-		api.CombineRequests(
-			value.Requests(),
-			selection.Requests(),
-		),
-	)
+	return owner.ToStorage(context, source, sourceType, value)
 }
 
 func (owner Owner) FromContainerStorage(
@@ -161,50 +74,12 @@ func (owner Owner) FromContainerStorage(
 			[]api.ExpressionEmission{value},
 		)
 	}
-	selection, err := owner.PointerRepresentation(
-		context,
-		types.NewPointer(sourceType),
-		api.PointerRepresentationDemandNone,
-	)
+	required, err := owner.RequiresStorageProjection(context, sourceType)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return owner.FromPointerStorage(
-		context,
-		source,
-		sourceType,
-		selection,
-		value,
-	)
-}
-
-func (owner Owner) FromPointerStorage(
-	context api.Context,
-	source ast.Node,
-	sourceType types.Type,
-	selection api.PointerRepresentationObservation,
-	value api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	if !selection.Representation().Valid() {
-		return api.ExpressionEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "pointer storage representation is invalid",
-		}
+	if !required {
+		return value, nil
 	}
-	var err error
-	if selection.Representation() ==
-		api.PointerRepresentationCarrierCanonical {
-		value, err = owner.FromStorage(context, source, sourceType, value)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
-	return api.NewExpressionEmission(
-		value.Before(),
-		value.Value(),
-		api.CombineRequests(
-			value.Requests(),
-			selection.Requests(),
-		),
-	)
+	return owner.FromStorage(context, source, sourceType, value)
 }

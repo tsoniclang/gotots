@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"github.com/tsoniclang/gotots/internal/contracts/tsoniccore"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	panicnilruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panicnil"
@@ -79,6 +80,16 @@ func buildPanic(
 		return definitions, nil
 	}
 	if module == api.RuntimeModulePanicNil {
+		pointerContract, err := tsoniccore.Resolve(tsoniccore.SymbolPointer)
+		if err != nil {
+			return nil, err
+		}
+		allocatePointerContract, err := tsoniccore.Resolve(
+			tsoniccore.SymbolAllocatePointer,
+		)
+		if err != nil {
+			return nil, err
+		}
 		errorContract, err := api.RuntimeContract(api.RuntimePanicNilError)
 		if err != nil {
 			return nil, err
@@ -113,6 +124,8 @@ func buildPanic(
 				valueContract.ExportedName(),
 				runtimeValueContract.ExportedName(),
 				interfaceValueContract.ExportedName(),
+				pointerContract.Export(),
+				allocatePointerContract.Export(),
 			)
 			if err != nil {
 				return nil, err

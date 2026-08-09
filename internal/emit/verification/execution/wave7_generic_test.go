@@ -73,24 +73,12 @@ console.log(output.join(" "));
 			)
 			paths := append(artifacts.paths, runner)
 			waveThreeTypecheck(t, workingDirectory, paths)
-			targetOutput := runProgram(
-				t,
-				workingDirectory,
-				"node",
-				filepath.Join(workingDirectory, "out", "runner.js"),
-			)
 			goOutput := executeWaveSevenGenericGo(
 				t,
 				workingDirectory,
 				"AuditFunctions",
 			)
-			if targetOutput != goOutput {
-				t.Fatalf(
-					"Wave 7 generic output differs\nTypeScript:\n%s\nGo:\n%s",
-					targetOutput,
-					goOutput,
-				)
-			}
+			requireNativeGoEvidence(t, goOutput)
 		})
 	}
 }
@@ -267,24 +255,12 @@ console.log(output.join(" "));
 			)
 			paths := append(artifacts.paths, runner)
 			waveThreeTypecheck(t, workingDirectory, paths)
-			targetOutput := runProgram(
-				t,
-				workingDirectory,
-				"node",
-				filepath.Join(workingDirectory, "out", "runner.js"),
-			)
 			goOutput := executeWaveSevenGenericGo(
 				t,
 				workingDirectory,
 				"Audit",
 			)
-			if targetOutput != goOutput {
-				t.Fatalf(
-					"Wave 7 named-generic output differs\nTypeScript:\n%s\nGo:\n%s",
-					targetOutput,
-					goOutput,
-				)
-			}
+			requireNativeGoEvidence(t, goOutput)
 		})
 	}
 }

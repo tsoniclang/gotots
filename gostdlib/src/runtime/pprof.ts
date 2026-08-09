@@ -12,7 +12,7 @@ import { ProviderError } from "../internal/runtime/error.js";
 import { byteSlice } from "../internal/runtime/slice.js";
 
 export class Profile {
-  readonly [ProfileNameKey]: gostring;
+  [ProfileNameKey]: gostring;
 
   constructor(name: gostring) {
     this[ProfileNameKey] = name;
