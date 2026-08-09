@@ -184,19 +184,17 @@ func emitDeferredLiteral(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	abiCooperative := false
 	var abiRequests []api.RootRequest
 	if transported {
-		abiCooperative, abiRequests, err =
+		_, abiRequests, err =
 			cooperativecall.ValueContract(context, signature)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
 	}
-	cooperative := providerCooperative || abiCooperative
 	var modifiers []tsgo.ModifierLike
 	resultType := targetSignature.Result()
-	if cooperative {
+	if providerCooperative {
 		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}

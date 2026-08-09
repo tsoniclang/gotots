@@ -98,12 +98,16 @@ func emitDeferredBody(
 	if err != nil {
 		return api.BlockEmission{}, err
 	}
+	deferStack, deferStackRequests, err := deferStackDeclaration(
+		context,
+		stackName,
+		recoveryReference.Name(),
+	)
+	if err != nil {
+		return api.BlockEmission{}, err
+	}
 	statements := []tsgo.Statement{
-		deferStackDeclaration(
-			context,
-			stackName,
-			recoveryReference.Name(),
-		),
+		deferStack,
 		activePanicDeclaration(
 			context,
 			panicName,
@@ -150,6 +154,7 @@ func emitDeferredBody(
 			panicReference.Requests(),
 			recoveryReference.Requests(),
 			deferPopReference.Requests(),
+			deferStackRequests,
 			finalRequests,
 		)...,
 	), nil
@@ -159,16 +164,20 @@ func deferStackDeclaration(
 	context api.Context,
 	stackName string,
 	recoveryName string,
-) tsgo.VariableStatement {
+) (tsgo.VariableStatement, []api.RootRequest, error) {
 	recoveryType := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(recoveryName),
 		nil,
 	)
-	var resultType tsgo.TypeNode = context.Factory().KeywordTypeNode(
+	resultType := api.DirectType(context.Factory().KeywordTypeNode(
 		tsgo.KeywordTypeSyntaxKindVoidKeyword,
-	)
+	))
 	if context.IsCooperative() {
-		resultType = PromiseResult(context.Factory(), resultType)
+		var err error
+		resultType, err = IndirectResult(context, resultType.Value())
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	callableType := context.Factory().FunctionTypeNode(
 		nil,
@@ -182,7 +191,7 @@ func deferStackDeclaration(
 				nil,
 			),
 		},
-		resultType,
+		resultType.Value(),
 	)
 	return variableStatement(
 		context,
@@ -190,7 +199,7 @@ func deferStackDeclaration(
 		stackName,
 		context.Factory().ArrayTypeNode(callableType),
 		context.Factory().ArrayLiteralExpression(nil, false),
-	)
+	), resultType.Requests(), nil
 }
 
 func activePanicDeclaration(

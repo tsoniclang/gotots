@@ -189,7 +189,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	_, abiCooperative, contractRequests, err :=
+	providerCooperative, _, contractRequests, err :=
 		cooperativecall.GenericValueContract(
 			context,
 			callableFacet,
@@ -210,7 +210,7 @@ func Emit(
 	sourceArguments := target.SourceParameterReferences(context.Factory())
 	var modifiers []tsgo.ModifierLike
 	resultType := target.Result()
-	if abiCooperative {
+	if providerCooperative {
 		modifiers = []tsgo.ModifierLike{
 			context.Factory().AsyncKeyword(),
 		}
@@ -235,7 +235,7 @@ func Emit(
 		sourceArguments,
 		contract,
 		signature,
-		abiCooperative,
+		providerCooperative,
 		nil,
 		api.DeferredGenericRecoveryInvalid,
 	)
@@ -288,7 +288,7 @@ func Emit(
 		sourceArguments,
 		contract,
 		signature,
-		abiCooperative,
+		providerCooperative,
 		recoveryValue,
 		recoveryPlacement,
 	)
