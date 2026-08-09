@@ -15,27 +15,10 @@ func TestDenseIndexUsesCheckedPresenceNarrowing(t *testing.T) {
 		"GoPanic",
 	)
 	members := class.Members()
-	if len(members) != 2 {
-		t.Fatalf("dense-index members = %d, want two", len(members))
+	if len(members) != 1 {
+		t.Fatalf("dense-index members = %d, want one", len(members))
 	}
-	present := members[0].(tsgo.MethodDeclaration)
-	if present.Name().(tsgo.Identifier).Text() != "present" {
-		t.Fatalf("presence owner = %v, want present", present.Name())
-	}
-	if _, ok := present.Type().(tsgo.TypePredicateNode); !ok {
-		t.Fatalf("presence result = %T, want TypePredicateNode", present.Type())
-	}
-	presentReturn := present.Body().(tsgo.Block).
-		Statements()[0].(tsgo.ReturnStatement).
-		Expression().(tsgo.BinaryExpression)
-	if presentReturn.OperatorToken().Kind() != tsgo.SyntaxKindInKeyword {
-		t.Fatalf(
-			"presence operator = %v, want in",
-			presentReturn.OperatorToken().Kind(),
-		)
-	}
-
-	get := members[1].(tsgo.MethodDeclaration)
+	get := members[0].(tsgo.MethodDeclaration)
 	statements := get.Body().(tsgo.Block).Statements()
 	if len(statements) != 3 {
 		t.Fatalf("dense get statements = %d, want value/check/return", len(statements))
@@ -46,13 +29,15 @@ func TestDenseIndexUsesCheckedPresenceNarrowing(t *testing.T) {
 	if _, ok := value.(tsgo.ElementAccessExpression); !ok {
 		t.Fatalf("dense get value = %T, want ElementAccessExpression", value)
 	}
-	condition := statements[1].(tsgo.IfStatement).Expression()
-	if _, ok := condition.(tsgo.PrefixUnaryExpression); !ok {
-		t.Fatalf("dense get check = %T, want checked negated predicate", condition)
+	condition := statements[1].(tsgo.IfStatement).
+		Expression().(tsgo.PrefixUnaryExpression).
+		Operand().(tsgo.BinaryExpression)
+	if condition.OperatorToken().Kind() != tsgo.SyntaxKindInKeyword {
+		t.Fatalf("dense get check = %v, want direct in guard", condition.OperatorToken().Kind())
 	}
 	if _, ok := statements[2].(tsgo.ReturnStatement).
-		Expression().(tsgo.Identifier); !ok {
-		t.Fatal("dense get does not return the narrowed value")
+		Expression().(tsgo.AsExpression); !ok {
+		t.Fatal("dense get does not return the presence-checked value")
 	}
 }
 

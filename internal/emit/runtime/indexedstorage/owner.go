@@ -6,8 +6,7 @@ import (
 )
 
 const (
-	getMember     = "get"
-	presentMember = "present"
+	getMember = "get"
 )
 
 func Build(
@@ -21,8 +20,7 @@ func Build(
 		nil,
 		nil,
 		[]tsgo.ClassElement{
-			presentMethod(factory),
-			getMethod(factory, className, panicName),
+			getMethod(factory, panicName),
 		},
 	)
 }
@@ -47,81 +45,18 @@ func Element(
 	)
 }
 
-func presentMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
-	typeT := factory.TypeReferenceNode(factory.Identifier("T"), nil)
-	return factory.MethodDeclaration(
-		[]tsgo.ModifierLike{
-			factory.PrivateKeyword(),
-			factory.StaticKeyword(),
-		},
-		nil,
-		factory.Identifier(presentMember),
-		nil,
-		[]tsgo.TypeParameterDeclaration{typeParameter(factory)},
-		[]tsgo.ParameterDeclaration{
-			parameter(factory, "values", readonlyArray(factory, typeT)),
-			parameter(
-				factory,
-				"index",
-				factory.KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindNumberKeyword,
-				),
-			),
-			parameter(
-				factory,
-				"value",
-				factory.UnionTypeNode([]tsgo.TypeNode{
-					typeT,
-					factory.KeywordTypeNode(
-						tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-					),
-				}),
-			),
-		},
-		factory.TypePredicateNode(
-			nil,
-			factory.Identifier("value"),
-			typeT,
-		),
-		factory.Block(
-			[]tsgo.Statement{factory.ReturnStatement(
-				factory.BinaryExpression(
-					nil,
-					factory.Identifier("index"),
-					nil,
-					factory.BinaryOperatorToken(
-						tsgo.BinaryOperatorInKeyword,
-					),
-					factory.Identifier("values"),
-				),
-			)},
-			true,
-		),
-	)
-}
-
 func getMethod(
 	factory tsgo.Factory,
-	className string,
 	panicName string,
 ) tsgo.MethodDeclaration {
 	typeT := factory.TypeReferenceNode(factory.Identifier("T"), nil)
 	value := factory.Identifier("value")
-	present := factory.CallExpression(
-		factory.PropertyAccessExpression(
-			factory.Identifier(className),
-			nil,
-			factory.Identifier(presentMember),
-			tsgo.NodeFlagsNone,
-		),
+	present := factory.BinaryExpression(
 		nil,
+		factory.Identifier("index"),
 		nil,
-		[]tsgo.Expression{
-			factory.Identifier("values"),
-			factory.Identifier("index"),
-			value,
-		},
-		tsgo.NodeFlagsNone,
+		factory.BinaryOperatorToken(tsgo.BinaryOperatorInKeyword),
+		factory.Identifier("values"),
 	)
 	return factory.MethodDeclaration(
 		[]tsgo.ModifierLike{
@@ -179,7 +114,7 @@ func getMethod(
 					)),
 					nil,
 				),
-				factory.ReturnStatement(value),
+				factory.ReturnStatement(factory.AsExpression(value, typeT)),
 			},
 			true,
 		),
