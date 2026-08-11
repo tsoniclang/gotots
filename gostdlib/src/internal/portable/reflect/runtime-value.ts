@@ -135,15 +135,20 @@ export function bindRuntimePointerTypeFactory(
   pointerTypeFactory = factory;
 }
 
-const operationsByType = new Map<Type, RuntimeValueOperations>();
+interface RuntimeValueOperationRegistration {
+  readonly factory: () => RuntimeValueOperations;
+  value?: RuntimeValueOperations;
+}
 
-// registerRuntimeValueOperations binds one generated value-operation record
-// to its canonical runtime type descriptor.
+const operationsByType = new Map<Type, RuntimeValueOperationRegistration>();
+
+// registerRuntimeValueOperations binds one deferred generated value-operation
+// record to its canonical runtime type descriptor.
 export function registerRuntimeValueOperations(
   type: Type,
-  operations: RuntimeValueOperations,
+  factory: () => RuntimeValueOperations,
 ): void {
-  operationsByType.set(type, operations);
+  operationsByType.set(type, { factory });
 }
 
 // runtimeValueOperations resolves the generated value-operation record of
@@ -151,7 +156,15 @@ export function registerRuntimeValueOperations(
 export function runtimeValueOperations(
   type: Type | undefined,
 ): RuntimeValueOperations | undefined {
-  return type === undefined ? undefined : operationsByType.get(type);
+  if (type === undefined) {
+    return undefined;
+  }
+  const registration = operationsByType.get(type);
+  if (registration === undefined) {
+    return undefined;
+  }
+  registration.value ??= registration.factory();
+  return registration.value;
 }
 
 let typeResolver:

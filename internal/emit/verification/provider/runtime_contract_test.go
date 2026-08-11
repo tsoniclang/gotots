@@ -45,6 +45,15 @@ func TestReflectTypeForUsesCanonicalGeneratedMetadata(t *testing.T) {
 		workingDirectory,
 		output.ReflectionTypeSupportPath,
 	)
+	for _, required := range []string{".$create(() => ({"} {
+		if !strings.Contains(reflectionSource, required) {
+			t.Fatalf(
+				"reflection metadata lacks lazy constructor %q:\n%s",
+				required,
+				reflectionSource,
+			)
+		}
+	}
 	if strings.Contains(artifacts.printed, ".TypeFor<") {
 		t.Fatalf("TypeFor retained an erased TypeScript generic call:\n%s", artifacts.printed)
 	}

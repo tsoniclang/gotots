@@ -241,7 +241,10 @@ func valueOperationsStatement(
 		nil,
 		[]tsgo.Expression{
 			factory.Identifier(descriptorName),
-			factory.ObjectLiteralExpression(properties, true),
+			deferred(
+				factory,
+				factory.ObjectLiteralExpression(properties, true),
+			),
 		},
 		tsgo.NodeFlagsNone,
 	))

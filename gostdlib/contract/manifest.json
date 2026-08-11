@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "5a65aff8fe748fa6dac24e5583b81eaae1b8b10d7afe8d4b29d05d2b2da39336",
+  "providerDigest": "70dabe52c314c24672505ba5637b71ae31280434699e5929ad4c19099c7d0ade",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -8187,7 +8187,7 @@
           "targetFingerprint": "1a81dac895989847e935d9b4537e2e367a776ed346eabe0a0a0117e6adb462df",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@755",
+            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@776",
             "src/internal/runtime/error.ts#ProviderError@16",
             "src/reflect.ts#InterfaceValue@4031",
             "src/reflect.ts#convertedBox@1326",
@@ -8962,7 +8962,7 @@
           "targetFingerprint": "daf0d75b33b08283a176d1187a7f640fe013e634ccb499f0d344ac0cae5af20a",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@755",
+            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@776",
             "src/internal/runtime/error.ts#ProviderError@16",
             "src/reflect.ts#InterfaceValue@4031",
             "src/reflect.ts#Map@405",
@@ -8984,7 +8984,7 @@
           "targetFingerprint": "a44d3d97838ff8f31beefc333f2b36ba4a5fd67661d644c9b9473024588d3628",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@755",
+            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@776",
             "src/internal/runtime/error.ts#ProviderError@16",
             "src/reflect.ts#InterfaceValue@4031",
             "src/reflect.ts#Slice@435",
@@ -9025,7 +9025,7 @@
           "disposition": "implemented",
           "dependencies": [
             "src/internal/portable/reflect/runtime-value.ts#pointerDescriptorFor@621",
-            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@755",
+            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@776",
             "src/internal/runtime/error.ts#ProviderError@16",
             "src/reflect.ts#InterfaceValue@4031"
           ],
@@ -9166,7 +9166,7 @@
           "targetFingerprint": "174b23afd9a5686c94d361308df395d5b06c59004c4cc0cc0aa55083c57f3b44",
           "disposition": "implemented",
           "dependencies": [
-            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@755",
+            "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@776",
             "src/internal/runtime/error.ts#ProviderError@16",
             "src/reflect.ts#InterfaceValue@4031"
           ],
@@ -20097,7 +20097,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "3685fdc431feb6351351544f64e8c81425418d6f4b6cbb669ea16e29e6efecfb",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectChanDirValueOperations@140"
+            "src/internal/facets/named-reflect.ts#ReflectChanDirValueOperations@154"
           ]
         },
         {
@@ -20111,7 +20111,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "39c7d8263631208234bf7e7632f6f8991041966ca73c39ddc46ccc55bfbfbfbc",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectKindValueOperations@180"
+            "src/internal/facets/named-reflect.ts#ReflectKindValueOperations@194"
           ]
         },
         {
@@ -20125,7 +20125,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "665302f15c37a3e94fc11550f9a0f9099dc69d8bf97e2fa02b9a919585b06ace",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@319"
+            "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@333"
           ]
         },
         {
@@ -20138,7 +20138,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "655f556dcff1bdb1ab6962cb7ec073b61f11513adcaf806a94aa558daee489a8",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectStructFieldOperations@260"
+            "src/internal/facets/named-reflect.ts#ReflectStructFieldOperations@274"
           ]
         },
         {
@@ -20152,7 +20152,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "14402617fb0554922561a161c68467d2d46e4d496847016afd2a9a545ceb1d01",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectStructTagValueOperations@220"
+            "src/internal/facets/named-reflect.ts#ReflectStructTagValueOperations@234"
           ]
         },
         {
@@ -20163,9 +20163,9 @@
           ],
           "export": "ReflectTypeMetadataOperations",
           "implementationOwner": "src/internal/facets/named-reflect.ts",
-          "targetFingerprint": "e68274289551406d1f264a6f9a116e988c5c9ed3c7eb2a14ab26f0770ab1254d",
+          "targetFingerprint": "d0852ba274ff709b3bbdede5bc7b1033487d896c8e88e13db7a54fe56761f70c",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectTypeMetadataOperations@65"
+            "src/internal/facets/named-reflect.ts#ReflectTypeMetadataOperations@67"
           ]
         },
         {
@@ -20179,7 +20179,7 @@
           "implementationOwner": "src/internal/facets/named-reflect.ts",
           "targetFingerprint": "6ae4cc3e3fe90bfb3e5ebf47e761961af56706273f0742e49c13e7514029c26f",
           "implementationSites": [
-            "src/internal/facets/named-reflect.ts#ReflectValueOperations@410"
+            "src/internal/facets/named-reflect.ts#ReflectValueOperations@424"
           ]
         }
       ]
@@ -27144,14 +27144,14 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#InvalidValue@394",
+      "identity": "src/internal/facets/named-reflect.ts#InvalidValue@408",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#Value@474"
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectChanDirValueOperations@140",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectChanDirValueOperations@154",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#ChanDir@113",
@@ -27159,7 +27159,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectKindValueOperations@180",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectKindValueOperations@194",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#Kind@128",
@@ -27167,7 +27167,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@319",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectMapIterOperations@333",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#$copy@4237",
@@ -27177,7 +27177,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectStructFieldOperations@260",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectStructFieldOperations@274",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#Anonymous@4744",
@@ -27191,7 +27191,7 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectStructTagValueOperations@220",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectStructTagValueOperations@234",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#StructTag@4867",
@@ -27199,19 +27199,19 @@
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectTypeMetadataOperations@65",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectTypeMetadataOperations@67",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#createRuntimeType@2568",
-        "src/internal/portable/reflect/runtime-type.ts#runtimeTypeOf@2642",
-        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@731"
+        "src/internal/portable/reflect/runtime-type.ts#createRuntimeType@2695",
+        "src/internal/portable/reflect/runtime-type.ts#runtimeTypeOf@2773",
+        "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@747"
       ]
     },
     {
-      "identity": "src/internal/facets/named-reflect.ts#ReflectValueOperations@410",
+      "identity": "src/internal/facets/named-reflect.ts#ReflectValueOperations@424",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/facets/named-reflect.ts#InvalidValue@394"
+        "src/internal/facets/named-reflect.ts#InvalidValue@408"
       ]
     },
     {
@@ -31505,30 +31505,30 @@
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#InvalidRuntimeValue@2862",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#InvalidRuntimeValue@2993",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#Value@474"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#RuntimeType@416",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#RuntimeType@430",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
         "src/internal/host-integer.ts#integerFromHost@69",
-        "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@3062",
-        "src/internal/portable/reflect/runtime-type.ts#materializeField@2731",
-        "src/internal/portable/reflect/runtime-type.ts#materializeMethod@2820",
-        "src/internal/portable/reflect/runtime-type.ts#mergeMethodSets@2429",
-        "src/internal/portable/reflect/runtime-type.ts#methodSetIncludes@2318",
-        "src/internal/portable/reflect/runtime-type.ts#providerPointerAlign@374",
-        "src/internal/portable/reflect/runtime-type.ts#providerPointerSize@366",
-        "src/internal/portable/reflect/runtime-type.ts#runtimeTypeDynamicType@388",
-        "src/internal/portable/reflect/runtime-type.ts#sequenceAt@2958",
-        "src/internal/portable/reflect/runtime-type.ts#typeSequence@2998",
-        "src/internal/portable/reflect/runtime-type.ts#zeroMethod@2930",
-        "src/internal/portable/reflect/runtime-type.ts#zeroStructField@2886",
+        "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@3193",
+        "src/internal/portable/reflect/runtime-type.ts#materializeField@2862",
+        "src/internal/portable/reflect/runtime-type.ts#materializeMethod@2951",
+        "src/internal/portable/reflect/runtime-type.ts#mergeMethodSets@2556",
+        "src/internal/portable/reflect/runtime-type.ts#methodSetIncludes@2445",
+        "src/internal/portable/reflect/runtime-type.ts#providerPointerAlign@388",
+        "src/internal/portable/reflect/runtime-type.ts#providerPointerSize@380",
+        "src/internal/portable/reflect/runtime-type.ts#runtimeTypeDynamicType@402",
+        "src/internal/portable/reflect/runtime-type.ts#sequenceAt@3089",
+        "src/internal/portable/reflect/runtime-type.ts#typeSequence@3129",
+        "src/internal/portable/reflect/runtime-type.ts#zeroMethod@3061",
+        "src/internal/portable/reflect/runtime-type.ts#zeroStructField@3017",
         "src/iter.ts#Seq@6",
         "src/reflect.ts#ChanDir@113",
         "src/reflect.ts#Invalid@174",
@@ -31537,30 +31537,30 @@
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#createRuntimeType@2568",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#createRuntimeType@2695",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#RuntimeType@416",
-        "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@403",
+        "src/internal/portable/reflect/runtime-type.ts#RuntimeType@430",
+        "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@417",
         "src/internal/portable/reflect/runtime-value.ts#recordPointerDescriptor@593"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@2881",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@3012",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#InvalidRuntimeValue@2862"
+        "src/internal/portable/reflect/runtime-type.ts#InvalidRuntimeValue@2993"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@3062",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@3193",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/error.ts#ProviderError@16"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#materializeField@2731",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#materializeField@2862",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
@@ -31569,79 +31569,79 @@
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#materializeMethod@2820",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#materializeMethod@2951",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@2881",
+        "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@3012",
         "src/reflect.ts#Method@4605"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#mergeMethodSets@2429",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#mergeMethodSets@2556",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#methodIdentityWidth@382"
+        "src/internal/portable/reflect/runtime-type.ts#methodIdentityWidth@396"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#methodIdentityWidth@382",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#methodIdentityWidth@396",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#methodSetIncludes@2318",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#methodSetIncludes@2445",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#methodIdentityWidth@382"
+        "src/internal/portable/reflect/runtime-type.ts#methodIdentityWidth@396"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#providerPointerAlign@374",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#providerPointerAlign@388",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#providerPointerSize@366",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#providerPointerSize@380",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypeDynamicType@388",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypeDynamicType@402",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypeOf@2642",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypeOf@2773",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@403"
+        "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@417"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@403",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#runtimeTypesByDynamicType@417",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#sequenceAt@2958",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#sequenceAt@3089",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
-        "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@3062"
+        "src/internal/portable/reflect/runtime-type.ts#invalidTypeOperation@3193"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#typeSequence@2998",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#typeSequence@3129",
       "disposition": "implemented",
       "dependencies": [
         "src/iter.ts#Seq@6"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#zeroMethod@2930",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#zeroMethod@3061",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@2881",
+        "src/internal/portable/reflect/runtime-type.ts#invalidRuntimeValue@3012",
         "src/reflect.ts#Method@4605"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-type.ts#zeroStructField@2886",
+      "identity": "src/internal/portable/reflect/runtime-type.ts#zeroStructField@3017",
       "disposition": "implemented",
       "dependencies": [
         "src/reflect.ts#StructField@4709",
@@ -31649,7 +31649,7 @@
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#operationsByType@721",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#operationsByType@737",
       "disposition": "implemented"
     },
     {
@@ -31676,28 +31676,28 @@
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@731",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#registerRuntimeValueOperations@747",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#operationsByType@721"
+        "src/internal/portable/reflect/runtime-value.ts#operationsByType@737"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@835",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@885",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#typeResolver@792"
+        "src/internal/portable/reflect/runtime-value.ts#typeResolver@842"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@755",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@776",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#operationsByType@721"
+        "src/internal/portable/reflect/runtime-value.ts#operationsByType@737"
       ]
     },
     {
-      "identity": "src/internal/portable/reflect/runtime-value.ts#typeResolver@792",
+      "identity": "src/internal/portable/reflect/runtime-value.ts#typeResolver@842",
       "disposition": "implemented"
     },
     {
@@ -34932,8 +34932,8 @@
       "identity": "src/reflect.ts#deepValueEqual@5333",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@835",
-        "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@755",
+        "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@885",
+        "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@776",
         "src/internal/runtime/error.ts#ProviderError@16",
         "src/reflect.ts#Elem@1609",
         "src/reflect.ts#Field@1731",
@@ -35006,7 +35006,7 @@
       "identity": "src/reflect.ts#operations@795",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@755",
+        "src/internal/portable/reflect/runtime-value.ts#runtimeValueOperations@776",
         "src/reflect.ts#resolvedType@736"
       ]
     },
@@ -35018,7 +35018,7 @@
       "identity": "src/reflect.ts#resolvedType@736",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@835",
+        "src/internal/portable/reflect/runtime-value.ts#resolveRuntimeType@885",
         "src/reflect.ts#location@492",
         "src/reflect.ts#source@532",
         "src/reflect.ts#staticType@508"
@@ -35362,5 +35362,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "db4855eaafd6980fc9bdef2839475b67c5792b1e494f1c22c8d3cf70c300432d"
+  "manifestDigest": "4588810afca63760cba985c0bc68ab96a268d860f6bde220217036a06ada31df"
 }
