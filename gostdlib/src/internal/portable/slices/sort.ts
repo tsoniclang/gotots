@@ -1,10 +1,7 @@
 import type { Awaitable, int64 } from "@gotots/gostdlib/internal/scalars.js";
 import { GoDenseIndex } from "@gotots/runtime/dense-index.js";
 import { GoPanic } from "@gotots/runtime/panic.js";
-import {
-  hostInteger,
-  integerFromHost,
-} from "../../host-integer.js";
+import { hostInteger } from "../../host-integer.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import {
@@ -128,7 +125,7 @@ function logicalValues<E, EStorage>(
   for (let index = 0; index < source.length; index += 1) {
     result.push(readElement(
       source,
-      integerFromHost(index),
+      index,
       copyElement,
       fromStorage,
     ));
@@ -146,7 +143,7 @@ function writeSorted<E, EStorage>(
   for (const value of values) {
     storeElement(
       target,
-      integerFromHost(index),
+      index,
       value,
       copyElement,
       toStorage,

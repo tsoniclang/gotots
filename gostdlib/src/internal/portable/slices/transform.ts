@@ -2,7 +2,7 @@ import { GoPanic } from "@gotots/runtime/panic.js";
 import type { Awaitable, bool, int64 } from "@gotots/gostdlib/internal/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
-import { hostInteger, integerFromHost } from "../../host-integer.js";
+import { hostInteger } from "../../host-integer.js";
 
 import { sliceValues } from "../../runtime/slice.js";
 import {
@@ -77,19 +77,19 @@ export async function CompactFunc<S, E, EStorage>(
   }
   for (let duplicate = 1; duplicate < values.length; duplicate += 1) {
     if (await equal(
-      readElement(values, integerFromHost(duplicate), copyElement, fromStorage),
-      readElement(values, integerFromHost(duplicate - 1), copyElement, fromStorage),
+      readElement(values, duplicate, copyElement, fromStorage),
+      readElement(values, duplicate - 1, copyElement, fromStorage),
     )) {
       let write = duplicate;
       for (let read = duplicate + 1; read < values.length; read += 1) {
         if (!await equal(
-          readElement(values, integerFromHost(read), copyElement, fromStorage),
-          readElement(values, integerFromHost(read - 1), copyElement, fromStorage),
+          readElement(values, read, copyElement, fromStorage),
+          readElement(values, read - 1, copyElement, fromStorage),
         )) {
           storeElement(
             values,
-            integerFromHost(write),
-            readElement(values, integerFromHost(read), copyElement, fromStorage),
+            write,
+            readElement(values, read, copyElement, fromStorage),
             copyElement,
             toStorage,
           );
@@ -180,7 +180,7 @@ export async function DeleteFunc<S, E, EStorage>(
     if (!await callPredicate(predicate, value)) {
       storeElement(
         values,
-        integerFromHost(write),
+        write,
         value,
         copyElement,
         toStorage,
@@ -191,7 +191,7 @@ export async function DeleteFunc<S, E, EStorage>(
   for (let index = write; index < values.length; index += 1) {
     storeElement(
       values,
-      integerFromHost(index),
+      index,
       zeroElement(),
       copyElement,
       toStorage,
@@ -217,7 +217,7 @@ export function DeleteFuncSynchronous<S, E, EStorage>(
     if (!callPredicateSynchronous(predicate, value)) {
       storeElement(
         values,
-        integerFromHost(write),
+        write,
         value,
         copyElement,
         toStorage,
@@ -228,7 +228,7 @@ export function DeleteFuncSynchronous<S, E, EStorage>(
   for (let index = write; index < values.length; index += 1) {
     storeElement(
       values,
-      integerFromHost(index),
+      index,
       zeroElement(),
       copyElement,
       toStorage,
@@ -292,7 +292,7 @@ export function Grow<S, E, EStorage>(
   for (let index = 0; index < values.length; index += 1) {
     storeElement(
       result,
-      integerFromHost(index),
+      index,
       fromStorage(values.get(index)),
       copyElement,
       toStorage,
@@ -361,19 +361,19 @@ function compactSynchronous<S, E, EStorage>(
   }
   for (let duplicate = 1; duplicate < values.length; duplicate += 1) {
     if (equal(
-      readElement(values, integerFromHost(duplicate), copyElement, fromStorage),
-      readElement(values, integerFromHost(duplicate - 1), copyElement, fromStorage),
+      readElement(values, duplicate, copyElement, fromStorage),
+      readElement(values, duplicate - 1, copyElement, fromStorage),
     )) {
       let write = duplicate;
       for (let read = duplicate + 1; read < values.length; read += 1) {
         if (!equal(
-          readElement(values, integerFromHost(read), copyElement, fromStorage),
-          readElement(values, integerFromHost(read - 1), copyElement, fromStorage),
+          readElement(values, read, copyElement, fromStorage),
+          readElement(values, read - 1, copyElement, fromStorage),
         )) {
           storeElement(
             values,
-            integerFromHost(write),
-            readElement(values, integerFromHost(read), copyElement, fromStorage),
+            write,
+            readElement(values, read, copyElement, fromStorage),
             copyElement,
             toStorage,
           );
@@ -397,7 +397,7 @@ function clearTail<E, EStorage>(
   for (let index = start; index < values.length; index += 1) {
     storeElement(
       values,
-      integerFromHost(index),
+      index,
       zeroElement(),
       copyElement,
       toStorage,

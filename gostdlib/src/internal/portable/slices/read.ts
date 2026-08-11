@@ -38,7 +38,7 @@ export function BinarySearch<S, E, EStorage>(
     const middle = Math.floor((low + high) / 2);
     const value = readElement(
       values,
-      integerFromHost(middle),
+      middle,
       copyElement,
       fromStorage,
     );
@@ -54,7 +54,7 @@ export function BinarySearch<S, E, EStorage>(
       && orderedCompare(
         less,
         equal,
-        readElement(values, integerFromHost(low), copyElement, fromStorage),
+        readElement(values, low, copyElement, fromStorage),
         target,
       ) === 0n,
   ];
@@ -78,7 +78,7 @@ export async function BinarySearchFunc<S, E, EStorage, Target>(
         compare,
         readElement(
           values,
-          integerFromHost(middle),
+          middle,
           copyElement,
           fromStorage,
         ),
@@ -95,7 +95,7 @@ export async function BinarySearchFunc<S, E, EStorage, Target>(
     low < values.length
       && await callComparison(
         compare,
-        readElement(values, integerFromHost(low), copyElement, fromStorage),
+        readElement(values, low, copyElement, fromStorage),
         target,
       ) === 0n,
   ];
@@ -119,7 +119,7 @@ export function BinarySearchFuncSynchronous<S, E, EStorage, Target>(
         compare,
         readElement(
           values,
-          integerFromHost(middle),
+          middle,
           copyElement,
           fromStorage,
         ),
@@ -136,7 +136,7 @@ export function BinarySearchFuncSynchronous<S, E, EStorage, Target>(
     low < values.length
       && callComparisonSynchronous(
         compare,
-        readElement(values, integerFromHost(low), copyElement, fromStorage),
+        readElement(values, low, copyElement, fromStorage),
         target,
       ) === 0n,
   ];
@@ -158,8 +158,8 @@ export function Compare<S, E, EStorage>(
     const result = orderedCompare(
       less,
       equal,
-      readElement(leftValues, integerFromHost(index), copyElement, fromStorage),
-      readElement(rightValues, integerFromHost(index), copyElement, fromStorage),
+      readElement(leftValues, index, copyElement, fromStorage),
+      readElement(rightValues, index, copyElement, fromStorage),
     );
     if (result !== 0n) {
       return result;
@@ -185,8 +185,8 @@ export async function CompareFunc<S1, S2, E1, E1Storage, E2, E2Storage>(
   for (let index = 0; index < count; index += 1) {
     const result = await callComparison(
       compare,
-      readElement(leftValues, integerFromHost(index), copyLeft, fromLeftStorage),
-      readElement(rightValues, integerFromHost(index), copyRight, fromRightStorage),
+      readElement(leftValues, index, copyLeft, fromLeftStorage),
+      readElement(rightValues, index, copyRight, fromRightStorage),
     );
     if (result !== 0n) {
       return result;
@@ -219,8 +219,8 @@ export function CompareFuncSynchronous<
   for (let index = 0; index < count; index += 1) {
     const result = callComparisonSynchronous(
       compare,
-      readElement(leftValues, integerFromHost(index), copyLeft, fromLeftStorage),
-      readElement(rightValues, integerFromHost(index), copyRight, fromRightStorage),
+      readElement(leftValues, index, copyLeft, fromLeftStorage),
+      readElement(rightValues, index, copyRight, fromRightStorage),
     );
     if (result !== 0n) {
       return result;
@@ -292,8 +292,8 @@ export function Equal<S, E, EStorage>(
   for (let index = 0; index < leftValues.length; index += 1) {
     if (
       !equal(
-        readElement(leftValues, integerFromHost(index), copyElement, fromStorage),
-        readElement(rightValues, integerFromHost(index), copyElement, fromStorage),
+        readElement(leftValues, index, copyElement, fromStorage),
+        readElement(rightValues, index, copyElement, fromStorage),
       )
     ) {
       return false;
@@ -322,8 +322,8 @@ export async function EqualFunc<S1, S2, E1, E1Storage, E2, E2Storage>(
     if (
       !await callEquality(
         equal,
-        readElement(leftValues, integerFromHost(index), copyLeft, fromLeftStorage),
-        readElement(rightValues, integerFromHost(index), copyRight, fromRightStorage),
+        readElement(leftValues, index, copyLeft, fromLeftStorage),
+        readElement(rightValues, index, copyRight, fromRightStorage),
       )
     ) {
       return false;
@@ -359,8 +359,8 @@ export function EqualFuncSynchronous<
     if (
       !callEqualitySynchronous(
         equal,
-        readElement(leftValues, integerFromHost(index), copyLeft, fromLeftStorage),
-        readElement(rightValues, integerFromHost(index), copyRight, fromRightStorage),
+        readElement(leftValues, index, copyLeft, fromLeftStorage),
+        readElement(rightValues, index, copyRight, fromRightStorage),
       )
     ) {
       return false;
@@ -425,7 +425,7 @@ function indexBy<E, EStorage>(
 ): int64 {
   for (let index = 0; index < source.length; index += 1) {
     if (equal(
-      readElement(source, integerFromHost(index), copyElement, fromStorage),
+      readElement(source, index, copyElement, fromStorage),
       target,
     )) {
       return integerFromHost(index);
@@ -446,7 +446,7 @@ async function indexFuncBy<E, EStorage>(
         predicate,
         readElement(
           source,
-          integerFromHost(index),
+          index,
           copyElement,
           fromStorage,
         ),
@@ -470,7 +470,7 @@ function indexFuncBySynchronous<E, EStorage>(
         predicate,
         readElement(
           source,
-          integerFromHost(index),
+          index,
           copyElement,
           fromStorage,
         ),

@@ -1,9 +1,6 @@
 import { GoPanic } from "@gotots/runtime/panic.js";
 import type { Awaitable, bool, int64 } from "@gotots/gostdlib/internal/scalars.js";
-import {
-  hostInteger,
-  integerFromHost,
-} from "../../host-integer.js";
+import { hostInteger } from "../../host-integer.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
 import { Seq } from "../iter/sequence.js";
@@ -66,7 +63,7 @@ export async function AppendSeq<S, E, EStorage>(
   for (let index = 0; index < values.length; index += 1) {
     storeElement(
       result,
-      integerFromHost(index),
+      index,
       fromStorage(values.get(index)),
       copyElement,
       toStorage,
@@ -75,7 +72,7 @@ export async function AppendSeq<S, E, EStorage>(
   for (const [index, value] of appended.entries()) {
     storeElement(
       result,
-      integerFromHost(values.length + index),
+      values.length + index,
       value,
       copyElement,
       toStorage,
@@ -147,7 +144,7 @@ export function Values<S, E, EStorage>(
     }
     for (let index = 0; index < values.length; index += 1) {
       if (!await yieldValue(
-        readElement(values, integerFromHost(index), copyElement, fromStorage),
+        readElement(values, index, copyElement, fromStorage),
       )) {
         return;
       }
@@ -164,7 +161,7 @@ function logicalValues<E, EStorage>(
   for (let index = 0; index < source.length; index += 1) {
     values.push(readElement(
       source,
-      integerFromHost(index),
+      index,
       copyElement,
       fromStorage,
     ));
