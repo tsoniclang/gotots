@@ -14,6 +14,7 @@ import {
   createRuntimeType,
   runtimeTypeOf,
   type RuntimeTypeMetadata,
+  type RuntimeTypeRegistration,
 } from "../portable/reflect/runtime-type.js";
 import {
   registerRuntimeValueOperations,
@@ -22,10 +23,11 @@ import {
 
 export class ReflectTypeMetadataOperations {
   static $create(
-    metadata: RuntimeTypeMetadata,
-    methodTokens: readonly object[],
+    metadata: () => RuntimeTypeMetadata,
+    methodTokens: () => readonly object[],
+    registration?: RuntimeTypeRegistration,
   ): Type {
-    return createRuntimeType(metadata, methodTokens);
+    return createRuntimeType(metadata, methodTokens, registration);
   }
 
   static $typeOf(value: GoInterfaceValue | undefined): Type | undefined {
@@ -34,7 +36,7 @@ export class ReflectTypeMetadataOperations {
 
   static $registerValue(
     type: Type,
-    operations: RuntimeValueOperations,
+    operations: () => RuntimeValueOperations,
   ): void {
     registerRuntimeValueOperations(type, operations);
   }

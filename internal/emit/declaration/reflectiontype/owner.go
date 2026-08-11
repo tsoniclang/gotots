@@ -49,6 +49,26 @@ func Build(
 	if err != nil {
 		return nil, nil, err
 	}
+	registration, registrationRequests, err := registrationExpression(
+		context,
+		names,
+		sourceType,
+		reflectionType,
+		targetType,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	arguments := []tsgo.Expression{
+		deferred(context.Factory(), metadata),
+		deferred(
+			context.Factory(),
+			context.Factory().Identifier(contract.ContractName()),
+		),
+	}
+	if registration != nil {
+		arguments = append(arguments, registration)
+	}
 	initializer := context.Factory().CallExpression(
 		context.Factory().PropertyAccessExpression(
 			operations.Expression(context.Factory()),
@@ -58,10 +78,7 @@ func Build(
 		),
 		nil,
 		nil,
-		[]tsgo.Expression{
-			metadata,
-			context.Factory().Identifier(contract.ContractName()),
-		},
+		arguments,
 		tsgo.NodeFlagsNone,
 	)
 	statement := context.Factory().VariableStatement(
@@ -87,6 +104,7 @@ func Build(
 		contract.Requests(),
 		targetType.Requests(),
 		metadataRequests,
+		registrationRequests,
 	)
 	if names.ReflectionValueOperationsDemanded(artifact.ArtifactKey()) {
 		registration, registrationRequests, handled, valueErr :=
@@ -193,18 +211,6 @@ func metadataExpression(
 		properties = append(properties, booleanProperty(factory, "variadic", true))
 	}
 	var requests []api.RootRequest
-	if interfaceDynamicType(sourceType) {
-		dynamicType, dynamicErr := context.Names().InterfaceDynamicType(sourceType)
-		if dynamicErr != nil {
-			return nil, nil, dynamicErr
-		}
-		properties = append(properties, expressionProperty(
-			factory,
-			"dynamicType",
-			dynamicType.Expression(factory),
-		))
-		requests = append(requests, dynamicType.Requests()...)
-	}
 	methodProperties, methodRequests, err := methodSetMetadata(
 		context,
 		names,
@@ -224,6 +230,11 @@ func metadataExpression(
 	} {
 		if relation.typeValue == nil {
 			continue
+		}
+		if relation.name == "elem" {
+			if _, pointer := types.Unalias(sourceType).Underlying().(*types.Pointer); pointer {
+				continue
+			}
 		}
 		reference, relationErr := names.ReflectionType(
 			relation.typeValue,
