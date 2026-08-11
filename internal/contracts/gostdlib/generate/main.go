@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func main() {
@@ -22,9 +23,11 @@ func main() {
 	runtimeContract := flag.String("runtime", "", "generated runtime contract")
 	tsconfig := flag.String("tsconfig", "", "provider TypeScript project")
 	scratch := flag.String("scratch", "", "bounded certification scratch directory")
-	goBinary := flag.String("go", "go", "selected Go toolchain binary")
-	goos := flag.String("goos", runtime.GOOS, "selected source GOOS")
-	goarch := flag.String("goarch", runtime.GOARCH, "selected source GOARCH")
+	goBinary := flag.String("go", "", "selected Go toolchain binary")
+	tsgoBinary := flag.String("tsgo", "", "selected pinned TS-Go binary")
+	toolCache := flag.String("tool-cache", "", "selected .temp/cache root for sealed tools")
+	goos := flag.String("goos", "", "selected source GOOS")
+	goarch := flag.String("goarch", "", "selected source GOARCH")
 	cgo := flag.Bool("cgo", false, "select cgo-enabled source")
 	tags := flag.String("tags", "", "comma-separated selected build tags")
 	backend := flag.String("backend", "", "provider backend")
@@ -36,9 +39,30 @@ func main() {
 	if *tags != "" {
 		buildTags = strings.Split(*tags, ",")
 	}
-	buildProfile, err := environmentcontract.NewBuildProfile(
-		*goos,
-		*goarch,
+	cacheRoot := *toolCache
+	if cacheRoot == "" {
+		cacheRoot = filepath.Join(*repository, ".temp", "cache", "toolchain")
+	}
+	selectedGo, err := toolchain.ResolveGo(*goBinary, cacheRoot)
+	if err != nil {
+		fail(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, *repository, *tsgoBinary)
+	if err != nil {
+		fail(err)
+	}
+	selectedGOOS := *goos
+	if selectedGOOS == "" {
+		selectedGOOS = selectedGo.DefaultGOOS()
+	}
+	selectedGOARCH := *goarch
+	if selectedGOARCH == "" {
+		selectedGOARCH = selectedGo.DefaultGOARCH()
+	}
+	buildProfile, err := environmentcontract.NewBuildProfileForToolchain(
+		selectedGo.Version(),
+		selectedGOOS,
+		selectedGOARCH,
 		*cgo,
 		buildTags,
 	)
@@ -54,7 +78,8 @@ func main() {
 		RuntimeContractPath: *runtimeContract,
 		TSConfigPath:        *tsconfig,
 		ScratchDirectory:    *scratch,
-		GoBinary:            *goBinary,
+		GoTool:              selectedGo,
+		TSGoTool:            selectedTSGo,
 		BuildProfile:        buildProfile,
 		Backend:             *backend,
 		MinimumGoVersion:    *minimumGo,

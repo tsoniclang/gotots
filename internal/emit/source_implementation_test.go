@@ -14,7 +14,24 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
+
+func sourceImplementationTestTool(t *testing.T, repository string) tsgo.Tool {
+	t.Helper()
+	selectedGo, err := toolchain.ResolveGo(
+		"",
+		filepath.Join(repository, ".temp", "cache", "toolchain-tests"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return selectedTSGo
+}
 
 func TestSourceImplementationAtomicallyReplacesGeneratedPackage(t *testing.T) {
 	root := t.TempDir()
@@ -116,6 +133,7 @@ export function Sum(value: string): number { return value.length; }
 		Program:        program,
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".scratch"),
+		TSGoTool:       sourceImplementationTestTool(t, repository),
 		Compilation: sourceimplementation.CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
 		},
@@ -348,6 +366,7 @@ export function Sum(value: string): number { return value.length; }
 		Program:        program,
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".mutated-scratch"),
+		TSGoTool:       sourceImplementationTestTool(t, repository),
 		Compilation: sourceimplementation.CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
 		},
@@ -460,6 +479,7 @@ export function Sum(value: string): number { return value.length; }
 		Program:        program,
 		ContractPaths:  []string{contractPath},
 		ScratchRoot:    filepath.Join(root, ".scratch"),
+		TSGoTool:       sourceImplementationTestTool(t, repository),
 		Compilation: sourceimplementation.CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
 		},

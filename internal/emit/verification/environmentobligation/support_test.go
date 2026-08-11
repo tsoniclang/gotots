@@ -7,6 +7,8 @@ import (
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func writeProgramFile(t *testing.T, path, content string) {
@@ -22,6 +24,17 @@ func writeProgramFile(t *testing.T, path, content string) {
 func linkedProviderCertificate(t *testing.T) *certify.Certificate {
 	t.Helper()
 	repository := filepath.Join("..", "..", "..", "..")
+	selectedGo, err := toolchain.ResolveGo(
+		"",
+		filepath.Join(t.TempDir(), ".temp", "cache", "toolchain"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	certificate, err := certify.Verify(certify.Config{
 		RepositoryRoot: repository,
 		ProviderRoot:   filepath.Join(repository, "gostdlib"),
@@ -39,7 +52,8 @@ func linkedProviderCertificate(t *testing.T) *certify.Certificate {
 		),
 		TSConfigPath:     filepath.Join(repository, "gostdlib", "tsconfig.json"),
 		ScratchDirectory: t.TempDir(),
-		GoBinary:         "go",
+		GoTool:           selectedGo,
+		TSGoTool:         selectedTSGo,
 		BuildProfile:     linkedProviderBuildProfile(t),
 		Backend:          "node",
 		MinimumGoVersion: "go1.26.4",

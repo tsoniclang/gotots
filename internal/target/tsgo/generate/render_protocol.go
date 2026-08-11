@@ -24,6 +24,7 @@ func renderProtocol(model *schemaModel) ([]byte, error) {
 	fmt.Fprintf(&buffer, "const pinnedToolModule = %q\n", model.manifest.Module)
 	fmt.Fprintf(&buffer, "const pinnedToolPackage = %q\n", model.manifest.ToolPackage)
 	fmt.Fprintf(&buffer, "const pinnedToolVersion = %q\n", model.manifest.ToolVersion)
+	fmt.Fprintf(&buffer, "const pinnedToolSum = %q\n", model.manifest.ToolSum)
 	fmt.Fprintf(&buffer, "const pinnedSchemaRevision = %q\n", model.manifest.Revision)
 	fmt.Fprintf(
 		&buffer,

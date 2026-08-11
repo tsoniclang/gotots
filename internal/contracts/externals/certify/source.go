@@ -40,6 +40,7 @@ func loadSourcePackages(
 			Pattern:              seed.SourcePackage,
 			ContractDependencies: true,
 			BuildProfile:         config.buildProfile,
+			GoTool:               config.goTool,
 		})
 		if err != nil {
 			return nil, certifyError(

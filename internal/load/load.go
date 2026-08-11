@@ -8,6 +8,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 type Request struct {
@@ -22,6 +24,8 @@ type Request struct {
 	Pattern              string
 	ContractDependencies bool
 	BuildProfile         BuildProfile
+	GoTool               toolchain.Go
+	ToolCacheRoot        string
 }
 
 type File struct {
@@ -61,6 +65,7 @@ type Program struct {
 	byTypes             map[*types.Package]*Package
 	environmentByTypes  map[*types.Package]*Package
 	buildProfile        BuildProfile
+	goTool              toolchain.Go
 }
 
 type PackageKind uint8
@@ -113,18 +118,33 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 	if request.Pattern == "" {
 		return nil, &Error{Reason: "pattern is empty"}
 	}
-	buildProfile, err := resolveBuildProfile(request.BuildProfile)
+	selectedGo := request.GoTool
+	var err error
+	if !selectedGo.Valid() {
+		cacheRoot := request.ToolCacheRoot
+		if cacheRoot == "" {
+			cacheRoot = filepath.Join(request.Directory, ".temp", "cache", "toolchain")
+		}
+		selectedGo, err = toolchain.ResolveGo("", cacheRoot)
+		if err != nil {
+			return nil, &Error{Pattern: request.Pattern, Reason: err.Error()}
+		}
+	}
+	buildProfile, err := resolveBuildProfile(
+		request.BuildProfile,
+		selectedGo.Version(),
+		selectedGo.DefaultGOOS(),
+		selectedGo.DefaultGOARCH(),
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	fileSet := token.NewFileSet()
-	loaded, err := packages.Load(&packages.Config{
-		Context:    ctx,
-		Dir:        request.Directory,
-		Fset:       fileSet,
-		Env:        selectedBuildEnvironment(buildProfile),
-		BuildFlags: buildProfile.BuildFlags(),
+	loaded, err := GoPackages(selectedGo, buildProfile, PackageRequest{
+		Context:   ctx,
+		Directory: request.Directory,
+		FileSet:   fileSet,
 		Mode: packages.NeedName |
 			packages.NeedFiles |
 			packages.NeedCompiledGoFiles |
@@ -192,6 +212,7 @@ func Load(ctx context.Context, request Request) (*Program, error) {
 			len(environmentPackages),
 		),
 		buildProfile: buildProfile,
+		goTool:       selectedGo,
 	}
 	toolchainKey := currentToolchainKey(buildProfile)
 	byLoaded := make(map[*packages.Package]*Package, len(sourcePackages))
@@ -468,6 +489,13 @@ func (p *Program) BuildProfile() BuildProfile {
 		return BuildProfile{}
 	}
 	return p.buildProfile
+}
+
+func (p *Program) GoTool() toolchain.Go {
+	if p == nil {
+		return toolchain.Go{}
+	}
+	return p.goTool
 }
 
 func packageProblems(roots []*packages.Package) []string {

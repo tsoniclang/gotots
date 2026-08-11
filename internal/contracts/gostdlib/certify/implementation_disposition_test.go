@@ -18,7 +18,9 @@ import (
 // behavior evidence.
 func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 	repository := filepath.Join("..", "..", "..", "..")
-	buildProfile, err := environmentcontract.NewBuildProfile(
+	selectedGo, selectedTSGo := resolveTestTools(t, repository)
+	buildProfile, err := environmentcontract.NewBuildProfileForToolchain(
+		selectedGo.Version(),
 		"linux",
 		"amd64",
 		false,
@@ -46,7 +48,8 @@ func TestCertificationDerivesImplementationDispositions(t *testing.T) {
 			repository, "gostdlib", "tsconfig.json",
 		),
 		ScratchDirectory: t.TempDir(),
-		GoBinary:         "go",
+		GoTool:           selectedGo,
+		TSGoTool:         selectedTSGo,
 		BuildProfile:     buildProfile,
 		Backend:          "node",
 		MinimumGoVersion: "go1.26.4",

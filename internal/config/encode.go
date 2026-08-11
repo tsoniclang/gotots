@@ -34,6 +34,11 @@ func (p Project) CanonicalJSON() ([]byte, error) {
 		Output struct {
 			Directory string `json:"directory"`
 		} `json:"output"`
+		Tools struct {
+			Go    string `json:"go"`
+			TSGo  string `json:"tsgo"`
+			Cache string `json:"cache"`
+		} `json:"tools"`
 	}{SchemaVersion: SchemaVersion}
 	document.Distribution.Root = p.distributionRoot
 	document.Source.Root = p.sourceRoot
@@ -50,6 +55,9 @@ func (p Project) CanonicalJSON() ([]byte, error) {
 	document.Providers.Externals = p.externals
 	document.Implementations.Bundles = p.ImplementationBundles()
 	document.Output.Directory = p.outputDirectory
+	document.Tools.Go = p.goTool.Path()
+	document.Tools.TSGo = p.tsgoTool.Path()
+	document.Tools.Cache = p.toolCacheRoot
 	payload, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
 		return nil, projectError("encode resolved config", "", err.Error())

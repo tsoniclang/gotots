@@ -117,6 +117,12 @@ func bindDescriptor(
 		flags.Var(newStringValue(&overrides.PackagePattern), descriptor.Flag(), description)
 	case config.OptionSourceRoot:
 		flags.Var(newStringValue(&overrides.SourceRoot), descriptor.Flag(), description)
+	case config.OptionGoExecutable:
+		flags.Var(newStringValue(&overrides.GoExecutable), descriptor.Flag(), description)
+	case config.OptionTSGoExecutable:
+		flags.Var(newStringValue(&overrides.TSGoExecutable), descriptor.Flag(), description)
+	case config.OptionToolCacheRoot:
+		flags.Var(newStringValue(&overrides.ToolCacheRoot), descriptor.Flag(), description)
 	default:
 		return commandError(
 			"bind flags",

@@ -3,8 +3,8 @@ package tsgo
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -29,26 +29,28 @@ func (e *CompilerError) Error() string {
 	return message
 }
 
-func Compile(
+func CompileWithTool(
 	ctx context.Context,
-	moduleDirectory string,
+	tool Tool,
 	workingDirectory string,
 	arguments []string,
 ) error {
 	if ctx == nil {
 		return &CompilerError{Reason: "context is nil"}
 	}
-	toolPath, err := resolvePinnedTool(moduleDirectory)
+	command, err := tool.command(ctx, arguments...)
 	if err != nil {
 		return err
 	}
-	command := exec.CommandContext(ctx, toolPath, arguments...)
 	command.Dir = workingDirectory
-	command.Env = nativeToolEnvironment()
 	output, runErr := command.CombinedOutput()
+	verifyErr := tool.Verify()
 	diagnostics := strings.TrimSpace(string(output))
-	if runErr == nil && diagnostics == "" {
+	if runErr == nil && verifyErr == nil && diagnostics == "" {
 		return nil
+	}
+	if verifyErr != nil {
+		return errors.Join(runErr, verifyErr)
 	}
 	reason := "diagnostics reported with successful process status"
 	if runErr != nil {
@@ -58,10 +60,23 @@ func Compile(
 		}
 	}
 	return &CompilerError{
-		Path:        toolPath,
+		Path:        tool.Path(),
 		Reason:      reason,
 		Diagnostics: diagnostics,
 	}
+}
+
+func Compile(
+	ctx context.Context,
+	moduleDirectory string,
+	workingDirectory string,
+	arguments []string,
+) error {
+	tool, err := ResolveDefaultTool(moduleDirectory)
+	if err != nil {
+		return err
+	}
+	return CompileWithTool(ctx, tool, workingDirectory, arguments)
 }
 
 func EncodeStrictProjectConfig(

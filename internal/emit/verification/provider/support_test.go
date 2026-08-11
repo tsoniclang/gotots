@@ -13,6 +13,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	corefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 type renderedArtifacts struct {
@@ -195,6 +196,17 @@ import { `+strings.Join(exports, ", ")+` } from "`+modulePath+`";
 func linkedProviderCertificate(t *testing.T) *certify.Certificate {
 	t.Helper()
 	repository := repositoryRoot()
+	selectedGo, err := toolchain.ResolveGo(
+		"",
+		filepath.Join(t.TempDir(), ".temp", "cache", "toolchain"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	certificate, err := certify.Verify(certify.Config{
 		RepositoryRoot:      repository,
 		ProviderRoot:        filepath.Join(repository, "gostdlib"),
@@ -204,7 +216,8 @@ func linkedProviderCertificate(t *testing.T) *certify.Certificate {
 		RuntimeContractPath: filepath.Join(repository, "gostdlib", "contract", "runtime.json"),
 		TSConfigPath:        filepath.Join(repository, "gostdlib", "tsconfig.json"),
 		ScratchDirectory:    t.TempDir(),
-		GoBinary:            "go",
+		GoTool:              selectedGo,
+		TSGoTool:            selectedTSGo,
 		BuildProfile:        linkedProviderBuildProfile(t),
 		Backend:             "node",
 		MinimumGoVersion:    "go1.26.4",

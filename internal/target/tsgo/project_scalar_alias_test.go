@@ -199,7 +199,7 @@ func openScalarAliasTestProject(
 	directory string,
 ) *ProjectInspection {
 	t.Helper()
-	client, err := StartClient(repositoryRoot(), directory)
+	client, err := StartClientWithTool(selectedTool(t), directory)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,7 +17,7 @@ const (
 )
 
 type Config struct {
-	ModuleDirectory  string
+	Tool             tsgo.Tool
 	WorkingDirectory string
 	PrintOptions     tsgo.PrintOptions
 }
@@ -41,7 +41,7 @@ func Run(config Config, input io.Reader, output io.Writer) error {
 	if count > maximumFileCount {
 		return fmt.Errorf("read TS-Go AST printer file count: %d exceeds limit", count)
 	}
-	client, err := tsgo.StartClient(config.ModuleDirectory, config.WorkingDirectory)
+	client, err := tsgo.StartClientWithTool(config.Tool, config.WorkingDirectory)
 	if err != nil {
 		return err
 	}

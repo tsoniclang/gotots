@@ -14,11 +14,15 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func main() {
 	contractPath := flag.String("contract", "", "runtime requirement contract")
 	moduleDirectory := flag.String("module", ".", "GoToTS module directory")
+	goBinary := flag.String("go", "", "selected Go executable")
+	tsgoBinary := flag.String("tsgo", "", "selected pinned TS-Go executable")
+	toolCache := flag.String("tool-cache", "", "selected .temp/cache root for sealed tools")
 	outputDirectory := flag.String("output", "", "runtime package output directory")
 	profileName := flag.String("profile", "number", "integer representation")
 	concurrencyName := flag.String(
@@ -86,7 +90,19 @@ func main() {
 			fail(err.Error())
 		}
 	}
-	client, err := tsgo.StartClient(*moduleDirectory, *outputDirectory)
+	cacheRoot := *toolCache
+	if cacheRoot == "" {
+		cacheRoot = filepath.Join(*moduleDirectory, ".temp", "cache", "toolchain")
+	}
+	selectedGo, err := toolchain.ResolveGo(*goBinary, cacheRoot)
+	if err != nil {
+		fail(err.Error())
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, *moduleDirectory, *tsgoBinary)
+	if err != nil {
+		fail(err.Error())
+	}
+	client, err := tsgo.StartClientWithTool(selectedTSGo, *outputDirectory)
 	if err != nil {
 		fail(err.Error())
 	}

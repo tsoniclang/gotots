@@ -81,6 +81,74 @@ Every compilation records an immutable Go build profile:
 - sorted build tags and explicit build flags;
 - module/workspace roots and overlays.
 
+### Exact Tool Authority
+
+The project configuration is the sole selector for both compiler tools.
+`tools.go` selects an optional Go executable, `tools.tsgo` selects an optional
+TS-Go executable, and `tools.cache` selects the project-owned `.temp/cache`
+root used to seal executables, snapshot `GOROOT`, and hold subprocess scratch. The corresponding
+CLI overrides are `--go`, `--tsgo`, and `--tool-cache`. An omitted Go selection
+means the ordinary `go` found for the invocation; an omitted TS-Go selection
+means the pinned tool resolved by that exact selected Go executable in the
+configured distribution module. Selection happens once before loading.
+
+Resolved operational evidence keeps the selected executable paths, sealed
+`GOROOT`, and cache path so users can inspect what ran. Semantic project
+evidence contains no machine path. Its Go identity consists of the selected
+`GOVERSION`, sealed executable digest, and digest of the complete selected
+`GOROOT` contract. Symlinks in that root are admitted only when they resolve
+inside the root and are fingerprinted by normalized root-relative target, so
+relocating the same root does not change identity. The contract includes the
+actual compile/link tools, standard-library source/export inputs, and all
+other root assets that selected Go commands may consume.
+
+`ResolveGo` verifies the selected source executable immediately before and
+after identity discovery, inventories the complete reported root, and copies
+that exact normalized manifest into a content-addressed root under
+`tools.cache`. File bytes, executable modes, empty directories, and normalized
+in-root symlink targets are part of the manifest; escaping links, special
+members, copy drift, and candidate drift fail before publication. An existing
+digest root is reopened only after its manifest and every member exact-join.
+After resolution, commands execute only the sealed executable with `GOROOT`
+pointing at the sealed snapshot; the mutable source root is neither retained
+nor read.
+
+Per-command verification hashes the sealed executable and checks the sealed
+root's opaque handle and small seal document. It never walks or hashes the
+complete root. One complete snapshot verification runs after all compilation
+subprocesses and before the staged output transaction is published. Thus root
+integrity and command cost are simultaneous requirements rather than a choice
+between exactness and repeated whole-toolchain I/O.
+
+The selected Go's reported `GOVERSION`, `GOROOT`, default `GOOS`, and default
+`GOARCH` create the build profile. Because GoToTS directly uses the
+`go/ast` and `go/types` implementation compiled into its executable, admission
+requires that executable's frontend version to equal the selected
+`GOVERSION`; selecting a different command cannot replace the in-process Go
+frontend. Runtime defaults never substitute for the selected tool's reported
+profile. Selected commands receive only the sealed Go directory on `PATH`,
+the selected `GOROOT`, and scratch variables rooted in `tools.cache`.
+`GOTOOLCHAIN` is local and `GOENV` is disabled. A cgo profile fails before
+loading until an exact external-tool contract is explicitly selected; ambient
+C compilers and host `PATH` are never inherited.
+
+`go/packages` runs through one exact self-driver using that same selection,
+profile, build flags, tests setting, and overlay bytes. The public driver JSON
+schema omits `Dir`, `Module`, and `ForTest`; the driver therefore writes those
+facts from the same loaded graph to one request-scoped cache evidence file.
+The consumer exact-joins roots, package identities, files, and import edges
+before attaching the omitted fields. It never launches a non-overlay metadata
+query or constructs a second package universe.
+
+The TS-Go identity binds its sealed executable digest, selected-Go identity,
+build Go version, and one of exactly two pinned forms: the pinned module
+version and checksum, or a clean source build with the pinned module path,
+exact VCS revision, `vcs.modified=false`, and no replacement. A development
+binary without that exact VCS evidence is foreign. AST printing, provider
+certification, source-implementation certification, and strict TypeScript
+compilation all consume the same resolved TS-Go object; none resolves a tool
+again.
+
 Ambient shell values do not silently change selection. The loader uses
 toolchain metadata, not import-path spelling, to distinguish:
 
@@ -1132,8 +1200,9 @@ The resolved project is split before compilation into immutable loader,
 compilation, implementation, and output contracts. Emitters receive only the
 typed compilation and certified implementation contracts; they never read
 JSON, flags, paths, or environment variables. The semantic project digest
-includes build and compilation profiles plus implementation contract and
-source digests, but excludes output/report paths.
+includes the semantic Go and TS-Go identities, build and compilation profiles,
+implementation contract, and source digests. It excludes selected
+executable/cache paths and output/report paths.
 
 The output contract is canonical strict ESM source. Project assembly writes a
 root `package.json` with `type: module` and the exact selected physical package
@@ -1166,12 +1235,14 @@ layout replaces one-module-per-artifact output; it uses no runtime registry,
 dynamic import, bundler dependency, erased lookup, or source-name grouping.
 
 Schema version 1 has the closed top-level sections `distribution`, `source`,
-`go`, `semantics`, `providers`, `implementations`, and `output`.
+`go`, `semantics`, `providers`, `implementations`, `output`, and `tools`.
 `distribution.root` identifies the installed GoToTS distribution that owns the
-pinned TS-Go tool and checked providers; it is operational path evidence and is
-excluded from semantic identity. `source` selects one package pattern and root
-mode. `implementations.bundles` contains exact package-contract paths. Every
-field except `schemaVersion` has one registered CLI counterpart, including
+default pinned TS-Go module context and checked providers; it is operational
+path evidence and is excluded from semantic identity. `tools.go`,
+`tools.tsgo`, and `tools.cache` select the operational tools and cache root.
+`source` selects one package pattern and root mode.
+`implementations.bundles` contains exact package-contract paths. Every field
+except `schemaVersion` has one registered CLI counterpart, including
 repeatable `--tag` and `--implementation-bundle` flags.
 
 A certified source implementation owns one exact source package's final target

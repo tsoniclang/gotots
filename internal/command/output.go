@@ -55,7 +55,14 @@ func writeEmission(
 	return writeOutputTransaction(
 		project.OutputDirectory(),
 		func(outputDirectory string) (int, error) {
-			return writeEmissionTo(project, emission, semanticDigest, outputDirectory)
+			files, err := writeEmissionTo(project, emission, semanticDigest, outputDirectory)
+			if err != nil {
+				return 0, err
+			}
+			if err := project.GoTool().VerifyComplete(); err != nil {
+				return 0, err
+			}
+			return files, nil
 		},
 	)
 }
@@ -66,7 +73,7 @@ func writeEmissionTo(
 	semanticDigest string,
 	outputDirectory string,
 ) (int, error) {
-	client, err := tsgo.StartClient(project.DistributionRoot(), outputDirectory)
+	client, err := tsgo.StartClientWithTool(project.TSGoTool(), outputDirectory)
 	if err != nil {
 		return 0, err
 	}
