@@ -118,9 +118,8 @@ func assertWaveNineGenericArtifactBudget(
 			capabilityBytes += artifact.bytes
 		}
 	}
-	// Canonical pointer markers carry pointer intent directly, so the fixture
-	// owns seven generic capabilities rather than the former two extra
-	// generated pointer-representation capabilities.
+	// Canonical pointer markers eliminate the former two generated pointer-
+	// representation capabilities, leaving seven capabilities in this fixture.
 	if concretizations != 7 || concretizationBytes > 6_200 ||
 		capabilities != 7 || capabilityBytes > 5_000 {
 		t.Fatalf(
