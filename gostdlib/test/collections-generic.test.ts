@@ -58,6 +58,7 @@ const lessValue = <T extends number | string>(left: T, right: T): boolean => (
 );
 const sliceValue = <T>(source: RuntimeSlice<T>): RuntimeSlice<T> => source;
 const zeroNumber = (): number => 0;
+const zeroString = (): string => "";
 
 test("slices search and comparison operations are generic", async (): Promise<void> => {
   const source = RuntimeSlice.literal([1, 3, 3, 8]);
@@ -167,8 +168,24 @@ test("slices search and comparison operations are generic", async (): Promise<vo
 
 test("slices transformations preserve order and nilness", async (): Promise<void> => {
   const source = RuntimeSlice.literal([1, 1, 2, 2, 3]);
-  assert.deepEqual(values(Compact(source)), [1, 2, 3]);
+  assert.deepEqual(values(Compact(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    equalValue,
+    copyValue,
+    copyValue,
+    zeroNumber,
+    source,
+  )), [1, 2, 3]);
+  assert.deepEqual(values(source), [1, 2, 3, 0, 0]);
   assert.deepEqual(values(await CompactFunc(
+    sliceValue,
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    zeroString,
     RuntimeSlice.literal(["A", "a", "B"]),
     (left, right): boolean => left.toLowerCase() === right.toLowerCase(),
   )), ["A", "B"]);

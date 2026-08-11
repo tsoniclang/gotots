@@ -530,6 +530,22 @@ Provider source inspection rejects
 recursive subarray sorting, iterator-per-merge allocation, native sorting of
 an `Awaitable` comparator, and runtime Promise inspection.
 
+The same proof closes every selected generic provider kernel whose only
+possible suspension source is its callback: `slices.BinarySearchFunc`,
+`CompareFunc`, `ContainsFunc`, `EqualFunc`, `IndexFunc`, `CompactFunc`,
+`DeleteFunc`, and `maps.EqualFunc`. For each identity, the synchronous kernel
+is compared with both the canonical kernel and the selected Go toolchain for
+result values, callback order and short-circuiting, nil-call panic behavior,
+and observable mutation. `CompactFunc` additionally proves Go's current-before-
+previous callback order, in-place backing-store mutation, returned reslice,
+and zeroed tail. Direct synchronous callbacks must select each synchronous
+kernel; an open callback must retain its canonical kernel. Removing one pair
+is caught by the generated-artifact join, while changing projection, callback
+index, effect, source identity, or capability is caught by contract
+certification. Iterator/sequence APIs remain canonical because their sequence,
+not only their callback, may suspend; a synchronous callback alone is not
+evidence for a synchronous outer kernel.
+
 The certifier independently derives a total directional obligation multiset
 over every provider callable. It recursively records inward interface-method and
 callable-value effects by source parameter root, including nested callbacks,

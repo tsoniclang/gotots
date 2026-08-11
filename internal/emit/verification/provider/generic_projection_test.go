@@ -138,6 +138,48 @@ func SortRecovering(source []string) {
 	slices.SortFunc(source, compareRecovering)
 }
 
+func BinarySearchDirect(source []string, target string) (int, bool) {
+	return slices.BinarySearchFunc(source, target, strings.Compare)
+}
+
+func CompareDirect(left, right []string) int {
+	return slices.CompareFunc(left, right, strings.Compare)
+}
+
+func ContainsDirect(source []string) bool {
+	return slices.ContainsFunc(source, func(value string) bool {
+		return len(value) > 2
+	})
+}
+
+func EqualDirect(left, right []string) bool {
+	return slices.EqualFunc(left, right, strings.EqualFold)
+}
+
+func IndexDirect(source []string) int {
+	return slices.IndexFunc(source, func(value string) bool {
+		return len(value) > 2
+	})
+}
+
+func CompactDirect(source []string) []string {
+	return slices.CompactFunc(source, strings.EqualFold)
+}
+
+func DeleteDirect(source []string) []string {
+	return slices.DeleteFunc(source, func(value string) bool {
+		return len(value) > 2
+	})
+}
+
+func MapsEqualDirect(left, right map[string]string) bool {
+	return maps.EqualFunc(left, right, strings.EqualFold)
+}
+
+func ContainsOpen(source []string, predicate func(string) bool) bool {
+	return slices.ContainsFunc(source, predicate)
+}
+
 func GenericCloneValue[T any]() func([]T) []T {
 	return slices.Clone[[]T, T]
 }
@@ -201,6 +243,15 @@ func TimeAddress() time.Time {
 			mustProviderRoot(t, scope.Lookup("SortOpen")),
 			mustProviderRoot(t, scope.Lookup("SortCooperative")),
 			mustProviderRoot(t, scope.Lookup("SortRecovering")),
+			mustProviderRoot(t, scope.Lookup("BinarySearchDirect")),
+			mustProviderRoot(t, scope.Lookup("CompareDirect")),
+			mustProviderRoot(t, scope.Lookup("ContainsDirect")),
+			mustProviderRoot(t, scope.Lookup("EqualDirect")),
+			mustProviderRoot(t, scope.Lookup("IndexDirect")),
+			mustProviderRoot(t, scope.Lookup("CompactDirect")),
+			mustProviderRoot(t, scope.Lookup("DeleteDirect")),
+			mustProviderRoot(t, scope.Lookup("MapsEqualDirect")),
+			mustProviderRoot(t, scope.Lookup("ContainsOpen")),
 			mustProviderRoot(t, scope.Lookup("GenericCloneValue")),
 			mustProviderRoot(t, scope.Lookup("CompareValue")),
 			mustProviderRoot(t, scope.Lookup("DeferredCompare")),
@@ -229,6 +280,15 @@ func TimeAddress() time.Time {
 		"GenericAddress$kernel<T>",
 		"SlicesSortFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
 		"SlicesSortStableFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
+		"SlicesBinarySearchFuncSynchronousKernel<",
+		"SlicesCompareFuncSynchronousKernel<",
+		"SlicesContainsFuncSynchronousKernel<",
+		"SlicesEqualFuncSynchronousKernel<",
+		"SlicesIndexFuncSynchronousKernel<",
+		"SlicesCompactFuncSynchronousKernel<",
+		"SlicesDeleteFuncSynchronousKernel<",
+		"MapsEqualFuncSynchronousKernel<",
+		"SlicesContainsFuncKernel<",
 		"export function SortDirect(source: RuntimeSlice<gostring>): void",
 		"export function SortStableDirect(source: RuntimeSlice<gostring>): void",
 		"export function SortNamed(source: RuntimeSlice<gostring>): void",
@@ -239,6 +299,15 @@ func TimeAddress() time.Time {
 		"export async function SortOpen(",
 		"export async function SortCooperative(",
 		"export function SortRecovering(source: RuntimeSlice<gostring>): void",
+		"export function BinarySearchDirect(",
+		"export function CompareDirect(",
+		"export function ContainsDirect(",
+		"export function EqualDirect(",
+		"export function IndexDirect(",
+		"export function CompactDirect(",
+		"export function DeleteDirect(",
+		"export function MapsEqualDirect(",
+		"export async function ContainsOpen(",
 		"Pointer<T>",
 		"addressOf<GoArray<GoContainerStorage<T>, 1>>(values)",
 		"BigInt.asIntN(64, goNumberToBigInt(count))",
@@ -260,6 +329,21 @@ func TimeAddress() time.Time {
 		"export async function SortLocal(",
 		"export async function SortGenericNamed(",
 		"export async function SortRecovering(",
+		"export async function BinarySearchDirect(",
+		"export async function CompareDirect(",
+		"export async function ContainsDirect(",
+		"export async function EqualDirect(",
+		"export async function IndexDirect(",
+		"export async function CompactDirect(",
+		"export async function DeleteDirect(",
+		"export async function MapsEqualDirect(",
+		"SlicesBinarySearchFuncKernel<RuntimeSlice<gostring>",
+		"SlicesCompareFuncKernel<RuntimeSlice<gostring>",
+		"SlicesEqualFuncKernel<RuntimeSlice<gostring>",
+		"SlicesIndexFuncKernel<RuntimeSlice<gostring>",
+		"SlicesCompactFuncKernel<RuntimeSlice<gostring>",
+		"SlicesDeleteFuncKernel<RuntimeSlice<gostring>",
+		"MapsEqualFuncKernel<GoMapValue<gostring, gostring>",
 	} {
 		if strings.Contains(printed, superseded) {
 			t.Fatalf("provider generic projection retained %q:\n%s", superseded, printed)

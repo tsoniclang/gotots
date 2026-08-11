@@ -5,11 +5,16 @@ import { RuntimeSlice } from "@gotots/runtime/slice.js";
 import { hostInteger, integerFromHost } from "../../host-integer.js";
 
 import { sliceValues } from "../../runtime/slice.js";
-import { callEquality, callPredicate } from "./read.js";
+import {
+  callPredicate,
+  callPredicateSynchronous,
+} from "./read.js";
 import {
   type Convert,
   type CopyValue,
+  type EqualValue,
   type FromContainerStorage,
+  readElement,
   storeElement,
   type ToContainerStorage,
   type Zero,
@@ -17,6 +22,8 @@ import {
 
 type Predicate<T> = ((value: T) => Awaitable<bool>) | undefined;
 type Equality<T> = ((left: T, right: T) => Awaitable<bool>) | undefined;
+type SynchronousPredicate<T> = ((value: T) => bool) | undefined;
+type SynchronousEquality<T> = ((left: T, right: T) => bool) | undefined;
 
 export function Clip<T>(source: RuntimeSlice<T>): RuntimeSlice<T> {
   return source.slice(0, source.length, source.length);
@@ -28,27 +35,101 @@ export function Clone<T>(source: RuntimeSlice<T>): RuntimeSlice<T> {
     : RuntimeSlice.literal(sliceValues(source));
 }
 
-export function Compact<T>(source: RuntimeSlice<T>): RuntimeSlice<T> {
-  return compactBy(source, (left, right): bool => left === right);
+export function Compact<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
+  copyElement: CopyValue<E>,
+  equal: EqualValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  zeroElement: Zero<E>,
+  source: S,
+): S {
+  const values = toSlice(source);
+  return compactSynchronous(
+    fromSlice,
+    copyElement,
+    equal,
+    fromStorage,
+    toStorage,
+    zeroElement,
+    source,
+    values,
+  );
 }
 
-export async function CompactFunc<T>(
-  source: RuntimeSlice<T>,
-  equal: Equality<T>,
-): Promise<RuntimeSlice<T>> {
-  if (source.length < 2) {
+export async function CompactFunc<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  zeroElement: Zero<E>,
+  source: S,
+  equal: Equality<E>,
+): Promise<S> {
+  const values = toSlice(source);
+  if (values.length < 2) {
     return source;
   }
-  let previous = source.get(0);
-  const values: T[] = [previous];
-  for (let index = 1; index < source.length; index += 1) {
-    const value = source.get(index);
-    if (!await callEquality(equal, previous, value)) {
-      values.push(value);
-      previous = value;
+  if (equal === undefined) {
+    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
+  }
+  for (let duplicate = 1; duplicate < values.length; duplicate += 1) {
+    if (await equal(
+      readElement(values, integerFromHost(duplicate), copyElement, fromStorage),
+      readElement(values, integerFromHost(duplicate - 1), copyElement, fromStorage),
+    )) {
+      let write = duplicate;
+      for (let read = duplicate + 1; read < values.length; read += 1) {
+        if (!await equal(
+          readElement(values, integerFromHost(read), copyElement, fromStorage),
+          readElement(values, integerFromHost(read - 1), copyElement, fromStorage),
+        )) {
+          storeElement(
+            values,
+            integerFromHost(write),
+            readElement(values, integerFromHost(read), copyElement, fromStorage),
+            copyElement,
+            toStorage,
+          );
+          write += 1;
+        }
+      }
+      clearTail(values, write, copyElement, toStorage, zeroElement);
+      return fromSlice(values.slice(0, write, null));
     }
   }
-  return resultLike(source, values);
+  return source;
+}
+
+export function CompactFuncSynchronous<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  zeroElement: Zero<E>,
+  source: S,
+  equal: SynchronousEquality<E>,
+): S {
+  const values = toSlice(source);
+  if (values.length < 2) {
+    return source;
+  }
+  if (equal === undefined) {
+    GoPanic.raiseRuntime("invalid memory address or nil pointer dereference");
+  }
+  return compactSynchronous(
+    fromSlice,
+    copyElement,
+    equal,
+    fromStorage,
+    toStorage,
+    zeroElement,
+    source,
+    values,
+  );
 }
 
 export function Concat<T>(
@@ -97,6 +178,43 @@ export async function DeleteFunc<S, E, EStorage>(
   for (let read = 0; read < values.length; read += 1) {
     const value = fromStorage(values.get(read));
     if (!await callPredicate(predicate, value)) {
+      storeElement(
+        values,
+        integerFromHost(write),
+        value,
+        copyElement,
+        toStorage,
+      );
+      write += 1;
+    }
+  }
+  for (let index = write; index < values.length; index += 1) {
+    storeElement(
+      values,
+      integerFromHost(index),
+      zeroElement(),
+      copyElement,
+      toStorage,
+    );
+  }
+  return fromSlice(values.slice(0, write, null));
+}
+
+export function DeleteFuncSynchronous<S, E, EStorage>(
+  toSlice: Convert<S, RuntimeSlice<EStorage>>,
+  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
+  copyElement: CopyValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  zeroElement: Zero<E>,
+  source: S,
+  predicate: SynchronousPredicate<E>,
+): S {
+  const values = toSlice(source);
+  let write = 0;
+  for (let read = 0; read < values.length; read += 1) {
+    const value = fromStorage(values.get(read));
+    if (!callPredicateSynchronous(predicate, value)) {
       storeElement(
         values,
         integerFromHost(write),
@@ -228,23 +346,63 @@ export function Reverse<T>(source: RuntimeSlice<T>): void {
   }
 }
 
-function compactBy<T>(
-  source: RuntimeSlice<T>,
-  equal: (left: T, right: T) => bool,
-): RuntimeSlice<T> {
-  if (source.length < 2) {
+function compactSynchronous<S, E, EStorage>(
+  fromSlice: Convert<RuntimeSlice<EStorage>, S>,
+  copyElement: CopyValue<E>,
+  equal: EqualValue<E>,
+  fromStorage: FromContainerStorage<E, EStorage>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  zeroElement: Zero<E>,
+  source: S,
+  values: RuntimeSlice<EStorage>,
+): S {
+  if (values.length < 2) {
     return source;
   }
-  let previous = source.get(0);
-  const values: T[] = [previous];
-  for (let index = 1; index < source.length; index += 1) {
-    const value = source.get(index);
-    if (!equal(previous, value)) {
-      values.push(value);
-      previous = value;
+  for (let duplicate = 1; duplicate < values.length; duplicate += 1) {
+    if (equal(
+      readElement(values, integerFromHost(duplicate), copyElement, fromStorage),
+      readElement(values, integerFromHost(duplicate - 1), copyElement, fromStorage),
+    )) {
+      let write = duplicate;
+      for (let read = duplicate + 1; read < values.length; read += 1) {
+        if (!equal(
+          readElement(values, integerFromHost(read), copyElement, fromStorage),
+          readElement(values, integerFromHost(read - 1), copyElement, fromStorage),
+        )) {
+          storeElement(
+            values,
+            integerFromHost(write),
+            readElement(values, integerFromHost(read), copyElement, fromStorage),
+            copyElement,
+            toStorage,
+          );
+          write += 1;
+        }
+      }
+      clearTail(values, write, copyElement, toStorage, zeroElement);
+      return fromSlice(values.slice(0, write, null));
     }
   }
-  return resultLike(source, values);
+  return source;
+}
+
+function clearTail<E, EStorage>(
+  values: RuntimeSlice<EStorage>,
+  start: number,
+  copyElement: CopyValue<E>,
+  toStorage: ToContainerStorage<E, EStorage>,
+  zeroElement: Zero<E>,
+): void {
+  for (let index = start; index < values.length; index += 1) {
+    storeElement(
+      values,
+      integerFromHost(index),
+      zeroElement(),
+      copyElement,
+      toStorage,
+    );
+  }
 }
 
 function resultLike<T>(

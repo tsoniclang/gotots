@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "fe5a8e89093cf8f72e3afa637d219b3a0646b55d648c1a8d5850b4c5aa3a686c",
+  "providerDigest": "3eedf252be578a073fa98faf51c84bb08e19d647d21a82407400dac2632daf5c",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -10624,6 +10624,117 @@
               "facet": "logical"
             }
           ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "equal",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                },
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "bool"
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "to-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "zero",
+              "parameters": [],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            }
+          ],
           "sourceSignature": "func[S ~[]E, E comparable](s S) S|params=s|results=",
           "sourceLocation": "slices/slices.go:369:6",
           "implementationOwner": "src/slices.ts",
@@ -10650,6 +10761,99 @@
             {
               "typeParameter": 1,
               "facet": "logical"
+            }
+          ],
+          "genericOperations": [
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ],
+              "results": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "convert",
+              "parameters": [
+                {
+                  "kind": "slice",
+                  "element": {
+                    "kind": "type-parameter",
+                    "typeParameter": 1
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 0
+                }
+              ]
+            },
+            {
+              "kind": "copy",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "from-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "to-container-storage",
+              "parameters": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
+            },
+            {
+              "kind": "zero",
+              "parameters": [],
+              "results": [
+                {
+                  "kind": "type-parameter",
+                  "typeParameter": 1
+                }
+              ]
             }
           ],
           "callableParameters": [
@@ -17652,7 +17856,7 @@
           "implementationOwner": "src/internal/portable/maps/operations.ts",
           "targetFingerprint": "c76c25f2b2286ce2b3a55acb35a8de2c480bda3ed635e4f6a64b824516268b8b",
           "implementationSites": [
-            "src/internal/portable/maps/operations.ts#MapsCloneKernel@232"
+            "src/internal/portable/maps/operations.ts#MapsCloneKernel@255"
           ]
         },
         {
@@ -17684,7 +17888,7 @@
           "implementationOwner": "src/internal/portable/maps/operations.ts",
           "targetFingerprint": "ab714f9ac91f870fc8fb8e83f663cb7e95049057b2f2b50cef19832721e8d7f6",
           "implementationSites": [
-            "src/internal/portable/maps/operations.ts#MapsCopyKernel@116"
+            "src/internal/portable/maps/operations.ts#MapsCopyKernel@139"
           ]
         },
         {
@@ -17716,7 +17920,7 @@
           "implementationOwner": "src/internal/portable/maps/operations.ts",
           "targetFingerprint": "9b9e3296e169df43ef027e4dbaf3123ac00b76fc65f955fe42d778412ff81f84",
           "implementationSites": [
-            "src/internal/portable/maps/operations.ts#MapsEqualKernel@376"
+            "src/internal/portable/maps/operations.ts#MapsEqualKernel@399"
           ]
         },
         {
@@ -17758,7 +17962,49 @@
           "implementationOwner": "src/internal/portable/maps/operations.ts",
           "targetFingerprint": "e5738c3b7dcd46a450d7953a768d01885e2af5ff15bcd8f74574e6745709435d",
           "implementationSites": [
-            "src/internal/portable/maps/operations.ts#MapsEqualFuncKernel@529"
+            "src/internal/portable/maps/operations.ts#MapsEqualFuncKernel@552"
+          ]
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "maps|kind=4|receiver=|name=EqualFunc",
+          "capabilities": [
+            "synchronous-kernel"
+          ],
+          "export": "MapsEqualFuncSynchronousKernel",
+          "effect": "sync",
+          "callableParameters": [
+            {
+              "parameter": 2,
+              "effect": "sync"
+            }
+          ],
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 4,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/maps/operations.ts",
+          "targetFingerprint": "b5566cc58c400b6062b4ae63e705f07dffb2705cd4f7b032c7ed9eb39f5d2dd0",
+          "implementationSites": [
+            "src/internal/portable/maps/operations.ts#MapsEqualFuncSynchronousKernel@728"
           ]
         },
         {
@@ -17786,7 +18032,7 @@
           "implementationOwner": "src/internal/portable/maps/operations.ts",
           "targetFingerprint": "3b78438f5fb582ac400cf23f4ef03d237f45e93aa8b130aebcb994963c532175",
           "implementationSites": [
-            "src/internal/portable/maps/operations.ts#MapsKeysKernel@705"
+            "src/internal/portable/maps/operations.ts#MapsKeysKernel@899"
           ]
         },
         {
@@ -17814,7 +18060,7 @@
           "implementationOwner": "src/internal/portable/maps/operations.ts",
           "targetFingerprint": "0a86f9e57df9851e14afa8563ae6b80e03f3039910fb9e62521e5bb0f77e92d7",
           "implementationSites": [
-            "src/internal/portable/maps/operations.ts#MapsValuesKernel@817"
+            "src/internal/portable/maps/operations.ts#MapsValuesKernel@1011"
           ]
         }
       ]
@@ -17876,7 +18122,7 @@
           "implementationOwner": "src/internal/portable/slices/read.ts",
           "targetFingerprint": "30173e6c908ae26bf5101236a2c1a89f50d6eaf239edce88e8f507e5edd5b275",
           "implementationSites": [
-            "src/internal/portable/slices/read.ts#SlicesBinarySearchKernel@128"
+            "src/internal/portable/slices/read.ts#SlicesBinarySearchKernel@191"
           ]
         },
         {
@@ -17914,7 +18160,45 @@
           "implementationOwner": "src/internal/portable/slices/read.ts",
           "targetFingerprint": "e29bdee449a1215dff23f33b0e118eb0256fd01178ea324e0251343a69cca3c5",
           "implementationSites": [
-            "src/internal/portable/slices/read.ts#SlicesBinarySearchFuncKernel@323"
+            "src/internal/portable/slices/read.ts#SlicesBinarySearchFuncKernel@386"
+          ]
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=BinarySearchFunc",
+          "capabilities": [
+            "synchronous-kernel"
+          ],
+          "export": "SlicesBinarySearchFuncSynchronousKernel",
+          "effect": "sync",
+          "callableParameters": [
+            {
+              "parameter": 2,
+              "effect": "sync"
+            }
+          ],
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "8cf6f864bd68c5ff7545fc1aaab686fc5ed1873aaff745d63f2752f3bc9443e3",
+          "implementationSites": [
+            "src/internal/portable/slices/read.ts#SlicesBinarySearchFuncSynchronousKernel@576"
           ]
         },
         {
@@ -17934,7 +18218,7 @@
           "implementationOwner": "src/internal/portable/slices/transform.ts",
           "targetFingerprint": "02099230b72f132eed33770dbac7cfe576ea66dfe6fb7de17411045f1e8b5ffa",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesClipKernel@114"
+            "src/internal/portable/slices/transform.ts#SlicesClipKernel@156"
           ]
         },
         {
@@ -17954,7 +18238,7 @@
           "implementationOwner": "src/internal/portable/slices/transform.ts",
           "targetFingerprint": "3f9f2c1fc14fc6348bece97235df436cd4b291d7fc73babe53520e920f2dceee",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesCloneKernel@149"
+            "src/internal/portable/slices/transform.ts#SlicesCloneKernel@191"
           ]
         },
         {
@@ -17991,14 +18275,22 @@
           "effect": "sync",
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
             }
           ],
           "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "cc0435ba8511a9fc51d26110affa200e1c2137ae76ef3411a3b23859afb9851b",
+          "targetFingerprint": "0f82cf1023eb478c9a0b249217b11beb7b63ffe1ea63e89bc7ce0d7727905a4d",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesCompactKernel@197"
+            "src/internal/portable/slices/transform.ts#SlicesCompactKernel@239"
           ]
         },
         {
@@ -18017,14 +18309,56 @@
           ],
           "genericTypeArguments": [
             {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
               "typeParameter": 1,
               "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
             }
           ],
           "implementationOwner": "src/internal/portable/slices/transform.ts",
-          "targetFingerprint": "eb71e34718a0fc32007ee0f136a15c79596b2ebb6a95ff5922690d74efba425a",
+          "targetFingerprint": "ffde4ce0a62d3e5eaa6a34cd24799168a49a6ae2b7337d6381e2c525025c8a01",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesCompactFuncKernel@237"
+            "src/internal/portable/slices/transform.ts#SlicesCompactFuncKernel@343"
+          ]
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=CompactFunc",
+          "capabilities": [
+            "synchronous-kernel"
+          ],
+          "export": "SlicesCompactFuncSynchronousKernel",
+          "effect": "sync",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "sync"
+            }
+          ],
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "a942d62403fcba47cdad92df2f09b4057511f436eb11b2ef3e85ec28b817f0c2",
+          "implementationSites": [
+            "src/internal/portable/slices/transform.ts#SlicesCompactFuncSynchronousKernel@619"
           ]
         },
         {
@@ -18052,7 +18386,7 @@
           "implementationOwner": "src/internal/portable/slices/read.ts",
           "targetFingerprint": "ff5541032c6a6160c2a1faa11924e0bc6af07ab3b0a68276705068aaeb5711bd",
           "implementationSites": [
-            "src/internal/portable/slices/read.ts#SlicesCompareKernel@513"
+            "src/internal/portable/slices/read.ts#SlicesCompareKernel@760"
           ]
         },
         {
@@ -18098,7 +18432,53 @@
           "implementationOwner": "src/internal/portable/slices/read.ts",
           "targetFingerprint": "834825312352b96bbf85e7a7f7840db9b1f889d696306076f3b365311d4561d3",
           "implementationSites": [
-            "src/internal/portable/slices/read.ts#SlicesCompareFuncKernel@678"
+            "src/internal/portable/slices/read.ts#SlicesCompareFuncKernel@925"
+          ]
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=CompareFunc",
+          "capabilities": [
+            "synchronous-kernel"
+          ],
+          "export": "SlicesCompareFuncSynchronousKernel",
+          "effect": "sync",
+          "callableParameters": [
+            {
+              "parameter": 2,
+              "effect": "sync"
+            }
+          ],
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "container-storage"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "27bbdae6f7a378e503dbb239f960e3357f19ecd7f311357353dbb3e99aa4ea7a",
+          "implementationSites": [
+            "src/internal/portable/slices/read.ts#SlicesCompareFuncSynchronousKernel@1123"
           ]
         },
         {
@@ -18118,7 +18498,7 @@
           "implementationOwner": "src/internal/portable/slices/transform.ts",
           "targetFingerprint": "8fe44ae2b5e4a7a8a4830bc5410302a6c3dc8ab3e1e5df9653c60ba8a0f184f6",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesConcatKernel@361"
+            "src/internal/portable/slices/transform.ts#SlicesConcatKernel@748"
           ]
         },
         {
@@ -18146,7 +18526,7 @@
           "implementationOwner": "src/internal/portable/slices/read.ts",
           "targetFingerprint": "0d1f66cf634d0643960b6b0b9d42903e61a4ef545f3000103533395bd4cecf08",
           "implementationSites": [
-            "src/internal/portable/slices/read.ts#SlicesContainsKernel@876"
+            "src/internal/portable/slices/read.ts#SlicesContainsKernel@1316"
           ]
         },
         {
@@ -18180,7 +18560,41 @@
           "implementationOwner": "src/internal/portable/slices/read.ts",
           "targetFingerprint": "370102fc8a16488d9d39fe399edbc4eda2d71e9d7d20324a15986ca83fad71d3",
           "implementationSites": [
-            "src/internal/portable/slices/read.ts#SlicesContainsFuncKernel@950"
+            "src/internal/portable/slices/read.ts#SlicesContainsFuncKernel@1390"
+          ]
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=ContainsFunc",
+          "capabilities": [
+            "synchronous-kernel"
+          ],
+          "export": "SlicesContainsFuncSynchronousKernel",
+          "effect": "sync",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "sync"
+            }
+          ],
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "df717306bd67f234c07b66a8d85337ea88266f2ded12c81452d25c0553970a3a",
+          "implementationSites": [
+            "src/internal/portable/slices/read.ts#SlicesContainsFuncSynchronousKernel@1464"
           ]
         },
         {
@@ -18200,7 +18614,7 @@
           "implementationOwner": "src/internal/portable/slices/transform.ts",
           "targetFingerprint": "f9fe06a01e5f4fa47e5c8a1b0f2a4f057785894d7d5c0e71fc8b2f9984ae8c9d",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesDeleteKernel@479"
+            "src/internal/portable/slices/transform.ts#SlicesDeleteKernel@866"
           ]
         },
         {
@@ -18234,7 +18648,41 @@
           "implementationOwner": "src/internal/portable/slices/transform.ts",
           "targetFingerprint": "54a2f13ec1399a5de61f712c0c5be5b32611ebf798d86ee8a0e642a8fae57497",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesDeleteFuncKernel@571"
+            "src/internal/portable/slices/transform.ts#SlicesDeleteFuncKernel@958"
+          ]
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=DeleteFunc",
+          "capabilities": [
+            "synchronous-kernel"
+          ],
+          "export": "SlicesDeleteFuncSynchronousKernel",
+          "effect": "sync",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "sync"
+            }
+          ],
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/transform.ts",
+          "targetFingerprint": "0433787094a130bc39be1e7601614bd2f8d64c177958a551fa3a1088d36eba14",
+          "implementationSites": [
+            "src/internal/portable/slices/transform.ts#SlicesDeleteFuncSynchronousKernel@1163"
           ]
         },
         {
@@ -18262,7 +18710,7 @@
           "implementationOwner": "src/internal/portable/slices/read.ts",
           "targetFingerprint": "e5b3bcab6ea93ec050d653411af696fab4815edb227f8c12158d46dfc56a1fab",
           "implementationSites": [
-            "src/internal/portable/slices/read.ts#SlicesEqualKernel@1024"
+            "src/internal/portable/slices/read.ts#SlicesEqualKernel@1533"
           ]
         },
         {
@@ -18308,7 +18756,53 @@
           "implementationOwner": "src/internal/portable/slices/read.ts",
           "targetFingerprint": "ba444113e490f2e3f387b9b7dc7785950e1bc773ba3e257f37bd6de7c111f6bb",
           "implementationSites": [
-            "src/internal/portable/slices/read.ts#SlicesEqualFuncKernel@1163"
+            "src/internal/portable/slices/read.ts#SlicesEqualFuncKernel@1672"
+          ]
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=EqualFunc",
+          "capabilities": [
+            "synchronous-kernel"
+          ],
+          "export": "SlicesEqualFuncSynchronousKernel",
+          "effect": "sync",
+          "callableParameters": [
+            {
+              "parameter": 2,
+              "effect": "sync"
+            }
+          ],
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 2,
+              "facet": "container-storage"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 3,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "31d707db049894c0b08af83a3f411453a492ed2322ab587ccbcf27c519630b95",
+          "implementationSites": [
+            "src/internal/portable/slices/read.ts#SlicesEqualFuncSynchronousKernel@1853"
           ]
         },
         {
@@ -18336,7 +18830,7 @@
           "implementationOwner": "src/internal/portable/slices/transform.ts",
           "targetFingerprint": "668fca9e61468eb079e3ac7f6f030609c989f68f8a314e9db0f0f1398d405f7f",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesGrowKernel@867"
+            "src/internal/portable/slices/transform.ts#SlicesGrowKernel@1454"
           ]
         },
         {
@@ -18364,7 +18858,7 @@
           "implementationOwner": "src/internal/portable/slices/read.ts",
           "targetFingerprint": "a7f12025e7a61482e2b3c25951504a88243c24f03898a1f9209824f47b0b9ff3",
           "implementationSites": [
-            "src/internal/portable/slices/read.ts#SlicesIndexKernel@1344"
+            "src/internal/portable/slices/read.ts#SlicesIndexKernel@2029"
           ]
         },
         {
@@ -18398,7 +18892,41 @@
           "implementationOwner": "src/internal/portable/slices/read.ts",
           "targetFingerprint": "c42e66baad8acde8631c91297d5bc9b2a898ad1ed1989cfe4604d7e265d82ef5",
           "implementationSites": [
-            "src/internal/portable/slices/read.ts#SlicesIndexFuncKernel@1415"
+            "src/internal/portable/slices/read.ts#SlicesIndexFuncKernel@2100"
+          ]
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=IndexFunc",
+          "capabilities": [
+            "synchronous-kernel"
+          ],
+          "export": "SlicesIndexFuncSynchronousKernel",
+          "effect": "sync",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "sync"
+            }
+          ],
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/read.ts",
+          "targetFingerprint": "56c132013e3fc83a824a8da0be769115f667608b9aea1c44b5792dbd3be8fc6d",
+          "implementationSites": [
+            "src/internal/portable/slices/read.ts#SlicesIndexFuncSynchronousKernel@2170"
           ]
         },
         {
@@ -18418,7 +18946,7 @@
           "implementationOwner": "src/internal/portable/slices/transform.ts",
           "targetFingerprint": "04bebdece358fe9af32a44380ef833b4ba24b9525644323c5f90caea098aa4ac",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesInsertKernel@776"
+            "src/internal/portable/slices/transform.ts#SlicesInsertKernel@1363"
           ]
         },
         {
@@ -18438,7 +18966,7 @@
           "implementationOwner": "src/internal/portable/slices/transform.ts",
           "targetFingerprint": "9eb3d0a6b450399009dcda29f764ccd868935fcec9f011ccc03ee2db6e0d90ea",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesRepeatKernel@1170"
+            "src/internal/portable/slices/transform.ts#SlicesRepeatKernel@1757"
           ]
         },
         {
@@ -18458,7 +18986,7 @@
           "implementationOwner": "src/internal/portable/slices/transform.ts",
           "targetFingerprint": "88e9b3dcc58f8b4b9777c1eef506a45e7262cde92680b924041d0344a1a7ee3a",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesReplaceKernel@1291"
+            "src/internal/portable/slices/transform.ts#SlicesReplaceKernel@1878"
           ]
         },
         {
@@ -18478,7 +19006,7 @@
           "implementationOwner": "src/internal/portable/slices/transform.ts",
           "targetFingerprint": "ee244be77869b65f00f128c22a8cd7c1fc0f10851cb1c0ec5fb57a40cc9554dd",
           "implementationSites": [
-            "src/internal/portable/slices/transform.ts#SlicesReverseKernel@1386"
+            "src/internal/portable/slices/transform.ts#SlicesReverseKernel@1973"
           ]
         },
         {
@@ -30736,40 +31264,51 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/maps/operations.ts#MapsCloneKernel@232",
+      "identity": "src/internal/portable/maps/operations.ts#MapsCloneKernel@255",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/maps/operations.ts#MapsCopyKernel@116",
+      "identity": "src/internal/portable/maps/operations.ts#MapsCopyKernel@139",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/maps/operations.ts#MapsEqualFuncKernel@529",
+      "identity": "src/internal/portable/maps/operations.ts#MapsEqualFuncKernel@552",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/maps/operations.ts#callEquality@934"
+        "src/internal/portable/maps/operations.ts#callEquality@1128"
       ]
     },
     {
-      "identity": "src/internal/portable/maps/operations.ts#MapsEqualKernel@376",
+      "identity": "src/internal/portable/maps/operations.ts#MapsEqualFuncSynchronousKernel@728",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/maps/operations.ts#callEqualitySynchronous@1183"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/maps/operations.ts#MapsEqualKernel@399",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/maps/operations.ts#MapsKeysKernel@705",
+      "identity": "src/internal/portable/maps/operations.ts#MapsKeysKernel@899",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/iter/sequence.ts#Seq@50"
       ]
     },
     {
-      "identity": "src/internal/portable/maps/operations.ts#MapsValuesKernel@817",
+      "identity": "src/internal/portable/maps/operations.ts#MapsValuesKernel@1011",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/iter/sequence.ts#Seq@50"
       ]
     },
     {
-      "identity": "src/internal/portable/maps/operations.ts#callEquality@934",
+      "identity": "src/internal/portable/maps/operations.ts#callEquality@1128",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/maps/operations.ts#callEqualitySynchronous@1183",
       "disposition": "implemented"
     },
     {
@@ -31579,16 +32118,25 @@
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#SlicesBinarySearchFuncKernel@323",
+      "identity": "src/internal/portable/slices/read.ts#SlicesBinarySearchFuncKernel@386",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
         "src/internal/portable/slices/capabilities.ts#readElement@145",
-        "src/internal/portable/slices/read.ts#callComparison@1768"
+        "src/internal/portable/slices/read.ts#callComparison@2604"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#SlicesBinarySearchKernel@128",
+      "identity": "src/internal/portable/slices/read.ts#SlicesBinarySearchFuncSynchronousKernel@576",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/host-integer.ts#integerFromHost@69",
+        "src/internal/portable/slices/capabilities.ts#readElement@145",
+        "src/internal/portable/slices/read.ts#callComparisonSynchronous@2753"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/read.ts#SlicesBinarySearchKernel@191",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
@@ -31597,17 +32145,27 @@
       ]
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#SlicesCompareFuncKernel@678",
+      "identity": "src/internal/portable/slices/read.ts#SlicesCompareFuncKernel@925",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
         "src/internal/portable/slices/capabilities.ts#compareLengths@450",
         "src/internal/portable/slices/capabilities.ts#readElement@145",
-        "src/internal/portable/slices/read.ts#callComparison@1768"
+        "src/internal/portable/slices/read.ts#callComparison@2604"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#SlicesCompareKernel@513",
+      "identity": "src/internal/portable/slices/read.ts#SlicesCompareFuncSynchronousKernel@1123",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/host-integer.ts#integerFromHost@69",
+        "src/internal/portable/slices/capabilities.ts#compareLengths@450",
+        "src/internal/portable/slices/capabilities.ts#readElement@145",
+        "src/internal/portable/slices/read.ts#callComparisonSynchronous@2753"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/read.ts#SlicesCompareKernel@760",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
@@ -31617,30 +32175,46 @@
       ]
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#SlicesContainsFuncKernel@950",
+      "identity": "src/internal/portable/slices/read.ts#SlicesContainsFuncKernel@1390",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/read.ts#indexFuncBy@1574"
+        "src/internal/portable/slices/read.ts#indexFuncBy@2325"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#SlicesContainsKernel@876",
+      "identity": "src/internal/portable/slices/read.ts#SlicesContainsFuncSynchronousKernel@1464",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/read.ts#indexBy@1485"
+        "src/internal/portable/slices/read.ts#indexFuncBySynchronous@2416"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#SlicesEqualFuncKernel@1163",
+      "identity": "src/internal/portable/slices/read.ts#SlicesContainsKernel@1316",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/slices/read.ts#indexBy@2236"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/read.ts#SlicesEqualFuncKernel@1672",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
         "src/internal/portable/slices/capabilities.ts#readElement@145",
-        "src/internal/portable/slices/read.ts#callEquality@1712"
+        "src/internal/portable/slices/read.ts#callEquality@2548"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#SlicesEqualKernel@1024",
+      "identity": "src/internal/portable/slices/read.ts#SlicesEqualFuncSynchronousKernel@1853",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/host-integer.ts#integerFromHost@69",
+        "src/internal/portable/slices/capabilities.ts#readElement@145",
+        "src/internal/portable/slices/read.ts#callEqualitySynchronous@2702"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/read.ts#SlicesEqualKernel@1533",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
@@ -31648,33 +32222,52 @@
       ]
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#SlicesIndexFuncKernel@1415",
+      "identity": "src/internal/portable/slices/read.ts#SlicesIndexFuncKernel@2100",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/read.ts#indexFuncBy@1574"
+        "src/internal/portable/slices/read.ts#indexFuncBy@2325"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#SlicesIndexKernel@1344",
+      "identity": "src/internal/portable/slices/read.ts#SlicesIndexFuncSynchronousKernel@2170",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/read.ts#indexBy@1485"
+        "src/internal/portable/slices/read.ts#indexFuncBySynchronous@2416"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#callComparison@1768",
+      "identity": "src/internal/portable/slices/read.ts#SlicesIndexKernel@2029",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/slices/read.ts#indexBy@2236"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/read.ts#callComparison@2604",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#callEquality@1712",
+      "identity": "src/internal/portable/slices/read.ts#callComparisonSynchronous@2753",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#callPredicate@1665",
+      "identity": "src/internal/portable/slices/read.ts#callEquality@2548",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#indexBy@1485",
+      "identity": "src/internal/portable/slices/read.ts#callEqualitySynchronous@2702",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/slices/read.ts#callPredicate@2501",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/slices/read.ts#callPredicateSynchronous@2660",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/slices/read.ts#indexBy@2236",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
@@ -31682,12 +32275,21 @@
       ]
     },
     {
-      "identity": "src/internal/portable/slices/read.ts#indexFuncBy@1574",
+      "identity": "src/internal/portable/slices/read.ts#indexFuncBy@2325",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
         "src/internal/portable/slices/capabilities.ts#readElement@145",
-        "src/internal/portable/slices/read.ts#callPredicate@1665"
+        "src/internal/portable/slices/read.ts#callPredicate@2501"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/read.ts#indexFuncBySynchronous@2416",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/host-integer.ts#integerFromHost@69",
+        "src/internal/portable/slices/capabilities.ts#readElement@145",
+        "src/internal/portable/slices/read.ts#callPredicateSynchronous@2660"
       ]
     },
     {
@@ -31828,7 +32430,7 @@
       "identity": "src/internal/portable/slices/sort.ts#sortValues@718",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/read.ts#callComparison@1768"
+        "src/internal/portable/slices/read.ts#callComparison@2604"
       ]
     },
     {
@@ -31844,56 +32446,74 @@
       ]
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesClipKernel@114",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesClipKernel@156",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesCloneKernel@149",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesCloneKernel@191",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/runtime/slice.ts#sliceValues@19"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesCompactFuncKernel@237",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesCompactFuncKernel@343",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/read.ts#callEquality@1712",
-        "src/internal/portable/slices/transform.ts#resultLike@1589"
+        "src/internal/host-integer.ts#integerFromHost@69",
+        "src/internal/portable/slices/capabilities.ts#readElement@145",
+        "src/internal/portable/slices/capabilities.ts#storeElement@199",
+        "src/internal/portable/slices/transform.ts#clearTail@2293"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesCompactKernel@197",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesCompactFuncSynchronousKernel@619",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/transform.ts#compactBy@1466"
+        "src/internal/portable/slices/transform.ts#compactSynchronous@2053"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesConcatKernel@361",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesCompactKernel@239",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/slices/transform.ts#compactSynchronous@2053"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/transform.ts#SlicesConcatKernel@748",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesDeleteFuncKernel@571",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesDeleteFuncKernel@958",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
         "src/internal/portable/slices/capabilities.ts#storeElement@199",
-        "src/internal/portable/slices/read.ts#callPredicate@1665"
+        "src/internal/portable/slices/read.ts#callPredicate@2501"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesDeleteKernel@479",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesDeleteFuncSynchronousKernel@1163",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/host-integer.ts#integerFromHost@69",
+        "src/internal/portable/slices/capabilities.ts#storeElement@199",
+        "src/internal/portable/slices/read.ts#callPredicateSynchronous@2660"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/transform.ts#SlicesDeleteKernel@866",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
-        "src/internal/portable/slices/transform.ts#resultLike@1589",
-        "src/internal/portable/slices/transform.ts#validateRange@1646",
+        "src/internal/portable/slices/transform.ts#resultLike@2369",
+        "src/internal/portable/slices/transform.ts#validateRange@2426",
         "src/internal/runtime/slice.ts#sliceValues@19"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesGrowKernel@867",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesGrowKernel@1454",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
@@ -31902,16 +32522,16 @@
       ]
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesInsertKernel@776",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesInsertKernel@1363",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
-        "src/internal/portable/slices/transform.ts#validateIndex@1705",
+        "src/internal/portable/slices/transform.ts#validateIndex@2485",
         "src/internal/runtime/slice.ts#sliceValues@19"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesRepeatKernel@1170",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesRepeatKernel@1757",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
@@ -31919,36 +32539,47 @@
       ]
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesReplaceKernel@1291",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesReplaceKernel@1878",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
-        "src/internal/portable/slices/transform.ts#resultLike@1589",
-        "src/internal/portable/slices/transform.ts#validateRange@1646",
+        "src/internal/portable/slices/transform.ts#resultLike@2369",
+        "src/internal/portable/slices/transform.ts#validateRange@2426",
         "src/internal/runtime/slice.ts#sliceValues@19"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#SlicesReverseKernel@1386",
+      "identity": "src/internal/portable/slices/transform.ts#SlicesReverseKernel@1973",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#compactBy@1466",
+      "identity": "src/internal/portable/slices/transform.ts#clearTail@2293",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/transform.ts#resultLike@1589"
+        "src/internal/host-integer.ts#integerFromHost@69",
+        "src/internal/portable/slices/capabilities.ts#storeElement@199"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#resultLike@1589",
+      "identity": "src/internal/portable/slices/transform.ts#compactSynchronous@2053",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/host-integer.ts#integerFromHost@69",
+        "src/internal/portable/slices/capabilities.ts#readElement@145",
+        "src/internal/portable/slices/capabilities.ts#storeElement@199",
+        "src/internal/portable/slices/transform.ts#clearTail@2293"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/transform.ts#resultLike@2369",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#validateIndex@1705",
+      "identity": "src/internal/portable/slices/transform.ts#validateIndex@2485",
       "disposition": "implemented"
     },
     {
-      "identity": "src/internal/portable/slices/transform.ts#validateRange@1646",
+      "identity": "src/internal/portable/slices/transform.ts#validateRange@2426",
       "disposition": "implemented"
     },
     {
@@ -34748,5 +35379,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "ba0821f363c88fffca1f47bd17093a351c2a51e1e066665a30c7b57e19f92d05"
+  "manifestDigest": "c24a4b86d01816550ae59f1f95ff1e2a104d5ad76689db4fd92ebe9587cef005"
 }
