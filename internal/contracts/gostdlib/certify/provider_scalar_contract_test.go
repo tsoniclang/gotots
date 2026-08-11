@@ -68,7 +68,8 @@ func TestProviderScalarContractRejectsMissingCertifiedAlias(t *testing.T) {
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	client, err := tsgo.StartClient(repository, providerRoot)
+	_, selectedTSGo := resolveTestTools(t, repository)
+	client, err := tsgo.StartClientWithTool(selectedTSGo, providerRoot)
 	if err != nil {
 		t.Fatal(err)
 	}

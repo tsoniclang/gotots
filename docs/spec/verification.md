@@ -62,6 +62,50 @@ recovery forms remain rejected.
 
 This is a verification inventory, not a production source model.
 
+## Exact Tool Selection Proof
+
+Focused fixtures select an arbitrarily named Go executable and both certified
+TS-Go forms through configuration and CLI overrides. They prove one immutable
+selection reaches package loading, gostdlib and external certification,
+source-implementation certification, strict TypeScript compilation, and AST
+printing. The selected Go's reported version/root/default target—not
+`runtime.Version`, `runtime.GOROOT`, or a later `PATH` lookup—must determine the
+build profile and standard-library contract.
+
+Adversarial mutations change the selected Go bytes during identity discovery,
+the sealed executable after selection, a root-snapshot candidate before
+publication, a reopened snapshot's `compile`, standard-library source, or a
+non-source asset such as `lib/time/zoneinfo.zip`. Each fails at the tool owner.
+Changing the mutable source root after resolution cannot alter a command,
+because only the sealed snapshot remains reachable. Relocated byte-identical
+roots, including absolute in-root symlinks rewritten to the relocated root,
+retain one semantic identity; an escaping symlink or changed root does not. A
+hostile ambient `PATH` and temporary root must not enter a selected subprocess.
+Cgo without an exact external-tool contract fails before loading.
+
+A non-vacuous full-root-walk census records the count immediately after
+selection, then performs repeated Go commands, an overlay-capable
+`go/packages` driver load, TS-Go resolution, and strict TS-Go compilation. The
+count must remain unchanged. The one explicit pre-publication compilation
+boundary must add exactly one complete snapshot verification. Restoring a
+per-command complete-root hash, skipping exact verification when reopening a
+digest root, or publishing a mutated candidate fails this gate.
+
+The exact package-driver proof uses an overlay that introduces a dependency
+absent on disk and enables test variants. It exact-joins roots, packages,
+files, imports, `Dir`, `Module`, and `ForTest` from the one overlay-selected
+graph. Dropped/duplicated evidence, malformed trailing JSON, a second JSON
+value, or any non-overlay metadata route fails.
+
+TS-Go mutations cover a foreign module, wrong module checksum, replaced
+module, development build without exact VCS evidence, wrong revision,
+`vcs.modified=true`, build-Go mismatch, selected-byte drift, and selected-Go
+identity drift. Semantic evidence is searched for selected/cache/GOROOT paths;
+resolved configuration is separately allowed to report those operational
+paths. Broad walls reject hardcoded production `go`, `runtime.GOROOT`, ambient
+tool lookup, provider-local resolver fields, and production calls to a default
+TS-Go resolver.
+
 ## TS-Go Target Proof
 
 The pinned TS-Go schema is copied under `schema/tsgo/`. Generation derives:

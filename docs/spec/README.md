@@ -208,11 +208,15 @@ static form nor a finite exact concretization, compilation fails explicitly.
   representation/optimization policy. It consumes finalized facts and may not
   alter canonical source contracts or Go behavior outside a named equivalence
   envelope.
-- **Go build profile:** the loader-owned selected toolchain identity, `GOOS`,
-  `GOARCH`, `CGO_ENABLED`, and sorted build tags. The default is the explicitly
-  materialized host profile, not ambient shell state. Cross-target selection
-  changes source files, sizes, standard-library contracts, and runtime
-  constants as one atomic choice.
+- **Go build profile:** the loader-owned selected Go identity, `GOOS`,
+  `GOARCH`, `CGO_ENABLED`, and sorted build tags. The identity binds the
+  selected `GOVERSION`, executable bytes, and content-addressed complete
+  `GOROOT` snapshot without persisting machine paths. Commands consume only
+  that sealed snapshot. The selected version must equal the `go/ast` and
+  `go/types` frontend version compiled into GoToTS; defaults still come from
+  the selected Go executable rather than ambient shell state. Cross-target selection changes source
+  files, sizes, standard-library contracts, and runtime constants as one
+  atomic choice.
 - **manual obligation:** an exact generated declaration whose implementation
   must be supplied manually.
 - **standard-library provider:** the GoToTS-owned `@gotots/gostdlib` package.

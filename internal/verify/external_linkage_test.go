@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -14,6 +13,8 @@ import (
 	gostdlibcertify "github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func TestCertifiedExternalModuleLinksBodylessFunctionExactly(t *testing.T) {
@@ -171,6 +172,17 @@ func externalProviderCertificates(
 ) (*gostdlibcertify.Certificate, *externalcertify.Certificate) {
 	t.Helper()
 	repository := repositoryRoot(t)
+	selectedGo, err := toolchain.ResolveGo(
+		"",
+		filepath.Join(t.TempDir(), ".temp", "cache", "toolchain"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	standardLibrary, err := gostdlibcertify.Verify(gostdlibcertify.Config{
 		RepositoryRoot:      repository,
 		ProviderRoot:        filepath.Join(repository, "gostdlib"),
@@ -180,11 +192,12 @@ func externalProviderCertificates(
 		RuntimeContractPath: filepath.Join(repository, "gostdlib", "contract", "runtime.json"),
 		TSConfigPath:        filepath.Join(repository, "gostdlib", "tsconfig.json"),
 		ScratchDirectory:    t.TempDir(),
-		GoBinary:            "go",
+		GoTool:              selectedGo,
+		TSGoTool:            selectedTSGo,
 		BuildProfile:        profile,
 		Backend:             "node",
-		MinimumGoVersion:    runtime.Version(),
-		MaximumGoVersion:    runtime.Version(),
+		MinimumGoVersion:    selectedGo.Version(),
+		MaximumGoVersion:    selectedGo.Version(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -199,6 +212,8 @@ func externalProviderCertificates(
 		StandardLibraryRuntimePath:  filepath.Join(repository, "gostdlib", "contract", "runtime.json"),
 		BuildProfile:                profile,
 		Backend:                     "node",
+		GoTool:                      selectedGo,
+		TSGoTool:                    selectedTSGo,
 	})
 	if err != nil {
 		t.Fatal(err)

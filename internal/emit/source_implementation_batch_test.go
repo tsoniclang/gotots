@@ -65,6 +65,7 @@ func Value() int { return beta.Twice(alpha.Add(20, 1)) }
 		Program:        program,
 		ContractPaths:  []string{alphaContract, betaContract},
 		ScratchRoot:    filepath.Join(root, ".scratch"),
+		TSGoTool:       sourceImplementationTestTool(t, repository),
 		Compilation:    compilation,
 	})
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func TestRunPrintsEveryFramedSourceFile(t *testing.T) {
@@ -30,8 +31,19 @@ func TestRunPrintsEveryFramedSourceFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	selectedGo, err := toolchain.ResolveGo(
+		"",
+		filepath.Join(t.TempDir(), ".temp", "cache", "toolchain"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, moduleDirectory, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := Run(Config{
-		ModuleDirectory:  moduleDirectory,
+		Tool:             selectedTSGo,
 		WorkingDirectory: t.TempDir(),
 	}, &input, &output); err != nil {
 		t.Fatal(err)

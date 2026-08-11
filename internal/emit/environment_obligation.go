@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/types"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"sort"
 	"strconv"
@@ -419,7 +418,7 @@ func environmentSourceLocation(
 	}
 	sourcePath := filepath.ToSlash(position.Filename)
 	if sourcePackage.Kind() == load.PackageStandardLibraryContract {
-		root := filepath.Join(runtime.GOROOT(), "src")
+		root := filepath.Join(sourcePackage.Program().GoTool().Root(), "src")
 		if relative, err := filepath.Rel(root, position.Filename); err == nil &&
 			relative != "." &&
 			!strings.HasPrefix(relative, ".."+string(filepath.Separator)) {

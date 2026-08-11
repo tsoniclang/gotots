@@ -33,6 +33,12 @@ is not a deliverable.
 
 Install:
 
+- one configuration/CLI owner for optional Go and TS-Go executables plus the
+  explicit project cache root;
+- sealed, path-free semantic identities for the exact selected Go,
+  content-addressed complete `GOROOT` snapshot, and pinned TS-Go build;
+- exact selected-tool routing through package loading, provider/source
+  certification, strict compilation, and AST printing;
 - pinned TS-Go schema and generated typed protocol bindings;
 - real `printNode` encode/decode/print round trip;
 - explicit Go build profile and selected package graph;
@@ -41,12 +47,14 @@ Install:
 - root placement and revisable artifact fixed point;
 - architecture walls.
 
-Exit: a minimal valid package prints canonical strict ESM only through pinned
-TS-Go; TSTS finalizes every selected marker fact on its exact AST node; the
-selected target directly transforms the TS-Go-contract AST and produces strict
-executable output. A schema mutation, ambient build-profile drift, second
-parser, range join, text emitter, spelling-selected marker, source reread, or
-duplicate artifact owner fails.
+Exit: a minimal valid package prints canonical strict ESM only through the one
+selected pinned TS-Go; TSTS finalizes every selected marker fact on its exact
+AST node; the selected target directly transforms the TS-Go-contract AST and
+produces strict executable output. Tool/root drift, a foreign TS-Go build,
+non-overlay package metadata, repeated per-command root hashing, ambient
+tool/scratch inheritance, schema
+mutation, ambient build-profile drift, second parser, range join, text emitter,
+spelling-selected marker, source reread, or duplicate artifact owner fails.
 
 ## 1. Core Direct Emission
 

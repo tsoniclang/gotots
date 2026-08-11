@@ -2,18 +2,22 @@ package certify
 
 import (
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	gotool "github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func TestCertificationSeparatesNativeToolingFromSelectedSourceProfile(
 	t *testing.T,
 ) {
-	profile, err := environmentcontract.NewBuildProfile(
+	repository := filepath.Join("..", "..", "..", "..")
+	selectedGo, selectedTSGo := resolveTestTools(t, repository)
+	profile, err := environmentcontract.NewBuildProfileForToolchain(
+		selectedGo.Version(),
 		"js",
 		"wasm",
 		false,
@@ -29,7 +33,8 @@ func TestCertificationSeparatesNativeToolingFromSelectedSourceProfile(
 
 	selected, err := inspectToolchain(resolvedConfig{
 		repositoryRoot: t.TempDir(),
-		goBinary:       filepath.Join(runtime.GOROOT(), "bin", "go"),
+		goTool:         selectedGo,
+		tsgoTool:       selectedTSGo,
 		buildProfile:   profile,
 	})
 	if err != nil {
@@ -48,7 +53,7 @@ func TestCertificationSeparatesNativeToolingFromSelectedSourceProfile(
 		t.Fatalf("selected key = %q, want %q", selected.key, wantKey)
 	}
 	environment := environmentByName(
-		exactGoEnvironment(selected, filepath.Dir(selected.root)),
+		selectedGo.Environment(profile),
 	)
 	for name, want := range map[string]string{
 		"GOOS":        "js",
@@ -68,6 +73,8 @@ func TestCertificationSeparatesNativeToolingFromSelectedSourceProfile(
 
 func TestCertificationRejectsAbsentBuildProfile(t *testing.T) {
 	repository := t.TempDir()
+	projectRoot := filepath.Join("..", "..", "..", "..")
+	selectedGo, selectedTSGo := resolveTestTools(t, projectRoot)
 	_, err := resolveConfig(Config{
 		RepositoryRoot:      repository,
 		ProviderRoot:        repository,
@@ -77,10 +84,11 @@ func TestCertificationRejectsAbsentBuildProfile(t *testing.T) {
 		RuntimeContractPath: filepath.Join(repository, "runtime.json"),
 		TSConfigPath:        filepath.Join(repository, "tsconfig.json"),
 		ScratchDirectory:    filepath.Join(repository, "scratch"),
-		GoBinary:            filepath.Join(runtime.GOROOT(), "bin", "go"),
+		GoTool:              selectedGo,
+		TSGoTool:            selectedTSGo,
 		Backend:             "node",
-		MinimumGoVersion:    runtime.Version(),
-		MaximumGoVersion:    runtime.Version(),
+		MinimumGoVersion:    selectedGo.Version(),
+		MaximumGoVersion:    selectedGo.Version(),
 	})
 	if err == nil || !strings.Contains(err.Error(), "build profile") {
 		t.Fatalf("absent build profile error = %v", err)
@@ -96,4 +104,24 @@ func environmentByName(values []string) map[string]string {
 		}
 	}
 	return result
+}
+
+func resolveTestTools(t *testing.T, repository string) (gotool.Go, tsgo.Tool) {
+	t.Helper()
+	repository, err := filepath.Abs(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedGo, err := gotool.ResolveGo(
+		"",
+		filepath.Join(repository, ".temp", "cache", "toolchain-tests"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return selectedGo, selectedTSGo
 }

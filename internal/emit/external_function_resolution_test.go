@@ -13,12 +13,25 @@ import (
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	externalfunction "github.com/tsoniclang/gotots/internal/emit/externalfunction"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func TestExternalSourceBindingSelectsExactPortableFunction(t *testing.T) {
 	repository := emitRepositoryRoot(t)
+	selectedGo, err := toolchain.ResolveGo(
+		"",
+		filepath.Join(t.TempDir(), ".temp", "cache", "toolchain"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	profile, err := environmentcontract.NewBuildProfileForToolchain(
-		runtime.Version(),
+		selectedGo.Version(),
 		"linux",
 		"amd64",
 		false,
@@ -31,6 +44,7 @@ func TestExternalSourceBindingSelectsExactPortableFunction(t *testing.T) {
 		Directory:    repository,
 		Pattern:      "github.com/zeebo/xxh3",
 		BuildProfile: profile,
+		GoTool:       selectedGo,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -44,11 +58,12 @@ func TestExternalSourceBindingSelectsExactPortableFunction(t *testing.T) {
 		RuntimeContractPath: filepath.Join(repository, "gostdlib", "contract", "runtime.json"),
 		TSConfigPath:        filepath.Join(repository, "gostdlib", "tsconfig.json"),
 		ScratchDirectory:    t.TempDir(),
-		GoBinary:            "go",
+		GoTool:              selectedGo,
+		TSGoTool:            selectedTSGo,
 		BuildProfile:        profile,
 		Backend:             "node",
-		MinimumGoVersion:    runtime.Version(),
-		MaximumGoVersion:    runtime.Version(),
+		MinimumGoVersion:    selectedGo.Version(),
+		MaximumGoVersion:    selectedGo.Version(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -63,6 +78,8 @@ func TestExternalSourceBindingSelectsExactPortableFunction(t *testing.T) {
 		StandardLibraryRuntimePath:  filepath.Join(repository, "gostdlib", "contract", "runtime.json"),
 		BuildProfile:                profile,
 		Backend:                     "node",
+		GoTool:                      selectedGo,
+		TSGoTool:                    selectedTSGo,
 	})
 	if err != nil {
 		t.Fatal(err)

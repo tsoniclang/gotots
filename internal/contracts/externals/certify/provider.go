@@ -17,9 +17,9 @@ import (
 )
 
 func verifyProviderTypecheck(config resolvedConfig) error {
-	err := tsgo.Compile(
+	err := tsgo.CompileWithTool(
 		context.Background(),
-		config.repositoryRoot,
+		config.tsgoTool,
 		config.providerRoot,
 		[]string{"--noEmit", "-p", config.tsConfigPath},
 	)
@@ -136,7 +136,7 @@ func inspectProviderTargets(
 	seeds []bindingSeed,
 	sources map[string]sourcePackage,
 ) (map[string]providerTarget, error) {
-	client, err := tsgo.StartClient(config.repositoryRoot, config.providerRoot)
+	client, err := tsgo.StartClientWithTool(config.tsgoTool, config.providerRoot)
 	if err != nil {
 		return nil, err
 	}

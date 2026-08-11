@@ -128,10 +128,12 @@ type Certificate struct {
 	digest      string
 	repository  string
 	scratch     string
+	tsgoTool    tsgo.Tool
 }
 
 func (c *Certificate) Valid() bool {
-	return c != nil && c.compilation.valid() && c.digest != "" && len(c.byPath) != 0
+	return c != nil && c.compilation.valid() && c.digest != "" &&
+		len(c.byPath) != 0 && c.tsgoTool.Valid()
 }
 
 func (c *Certificate) SupportsCompilation(

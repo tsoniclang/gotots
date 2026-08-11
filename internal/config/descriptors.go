@@ -21,6 +21,9 @@ const (
 	OptionRootMode
 	OptionPackage
 	OptionSourceRoot
+	OptionToolCacheRoot
+	OptionGoExecutable
+	OptionTSGoExecutable
 )
 
 type Descriptor struct {
@@ -51,6 +54,9 @@ var descriptors = []Descriptor{
 	{OptionRootMode, "source.mode", "root-mode", false},
 	{OptionPackage, "source.package", "package", false},
 	{OptionSourceRoot, "source.root", "project-root", false},
+	{OptionToolCacheRoot, "tools.cache", "tool-cache", false},
+	{OptionGoExecutable, "tools.go", "go", false},
+	{OptionTSGoExecutable, "tools.tsgo", "tsgo", false},
 }
 
 func Descriptors() []Descriptor {

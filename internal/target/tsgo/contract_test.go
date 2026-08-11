@@ -27,6 +27,9 @@ func TestPinnedContractMatchesCheckedInInputs(t *testing.T) {
 	if contract.ToolVersion() != "v0.0.0-20260613021236-c78d39e7075b" {
 		t.Fatalf("tool version = %q", contract.ToolVersion())
 	}
+	if contract.ToolSum() != "h1:7QtBEUCBaG56zHPxKKsttutkHxH8A4AmZgXDUOfjOjc=" {
+		t.Fatalf("tool sum = %q", contract.ToolSum())
+	}
 	if pinnedToolModule != contract.Module() ||
 		pinnedToolPackage != contract.ToolPackage() ||
 		pinnedToolVersion != contract.ToolVersion() {

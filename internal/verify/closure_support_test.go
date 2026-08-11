@@ -17,6 +17,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 	tsoniccorefixture "github.com/tsoniclang/gotots/internal/testfixture/tsoniccore"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func closureDirectory(relative string) string {
@@ -29,6 +30,23 @@ func closureDirectory(relative string) string {
 		"wave10",
 		relative,
 	)
+}
+
+func closureTSGoTool(t *testing.T) tsgo.Tool {
+	t.Helper()
+	repository := repositoryRoot(t)
+	selectedGo, err := toolchain.ResolveGo(
+		"",
+		filepath.Join(repository, ".temp", "cache", "toolchain-tests"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return selected
 }
 
 func loadClosurePackage(
@@ -67,6 +85,7 @@ type closureArtifacts struct {
 	printed          string
 	workingDirectory string
 	targetPaths      []string
+	tool             tsgo.Tool
 }
 
 func materializeClosure(
@@ -83,7 +102,8 @@ func materializeClosureWithSetup(
 ) closureArtifacts {
 	t.Helper()
 	workingDirectory := t.TempDir()
-	client, err := tsgo.StartClient(repositoryRoot(t), workingDirectory)
+	selectedTool := closureTSGoTool(t)
+	client, err := tsgo.StartClientWithTool(selectedTool, workingDirectory)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,9 +196,9 @@ func materializeClosureWithSetup(
 	if err := runtimefixture.InstallResolution(workingDirectory, workingDirectory); err != nil {
 		t.Fatal(err)
 	}
-	if err := tsgo.Compile(
+	if err := tsgo.CompileWithTool(
 		ctx,
-		repositoryRoot(t),
+		selectedTool,
 		workingDirectory,
 		arguments,
 	); err != nil {
@@ -187,6 +207,7 @@ func materializeClosureWithSetup(
 	result.printed = printed.String()
 	result.workingDirectory = workingDirectory
 	result.targetPaths = slices.Clone(targetPaths)
+	result.tool = selectedTool
 	return result
 }
 
@@ -220,9 +241,9 @@ func executeLinkedRun(
 	arguments = append(arguments, artifacts.targetPaths...)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	if err := tsgo.Compile(
+	if err := tsgo.CompileWithTool(
 		ctx,
-		repositoryRoot(t),
+		artifacts.tool,
 		artifacts.workingDirectory,
 		arguments,
 	); err != nil {
@@ -281,9 +302,9 @@ func executeExternalClosure(
 	arguments = append(arguments, artifacts.targetPaths...)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	if err := tsgo.Compile(
+	if err := tsgo.CompileWithTool(
 		ctx,
-		repositoryRoot(t),
+		artifacts.tool,
 		artifacts.workingDirectory,
 		arguments,
 	); err != nil {
