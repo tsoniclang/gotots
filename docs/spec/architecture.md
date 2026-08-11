@@ -489,10 +489,26 @@ emits no substitute virtual address, JavaScript cast, identity extraction, or
 target-specific codec in canonical source. Safe pointer semantics are never
 routed through a legacy raw-memory implementation to keep a corpus compiling.
 
-Maps use one canonical generated `GoMap<K,V>` runtime type because JavaScript
-`Map` does not preserve Go key equality, zero-on-miss, comma-ok, copy, or
-iteration semantics for all Go keys. Source-facing variables keep their Go
-names; runtime class names are stable semantic names, never per-site hashes.
+Maps have one representation owner and three storage modes. An exact built-in
+boolean, integer, or string key with a runtime-basic value uses the canonical
+`GoMap<K,V>` runtime. Closed map shapes that need static zero, copy, hash, or
+equality operations use one deduplicated support specialization for each exact
+semantic shape.
+
+A specialization uses native JavaScript `Map` storage only when its selected
+key is an exact built-in boolean, integer, or string. Tuple cells preserve the
+difference between an absent key and a present `undefined` value. All other
+specialized keys use typed hash/equality buckets because JavaScript `Map`
+identity is not Go equality for those classes. Both representations retain the
+same nil, zero-on-miss, comma-ok, copy, mutation, and iteration contracts;
+neither is selected by a source spelling or use site.
+
+Native storage compares the already-selected primitive carrier. Consequently,
+wide integer keys under the `number` profile retain that profile's declared
+precision collision envelope, including `uint64` values immediately above
+`2^53`. Exact fixed-width 64-bit map identity requires `fixed64-bigint` or
+`bigint`; the map owner does not add a hidden hash, conversion, or profile
+override.
 
 ## Structs, Methods, And Embedding
 

@@ -13,7 +13,8 @@ type Storage uint8
 const (
 	StorageInvalid Storage = iota
 	StorageScalar
-	StorageSpecialized
+	StorageNative
+	StorageHashed
 )
 
 type Model struct {
@@ -42,11 +43,12 @@ func Source(
 	if !scalarKey && !context.Values().SupportsHash(context, source.Key()) {
 		return Model{}, false
 	}
-	storage := StorageSpecialized
-	if scalarKey &&
-		types.Identical(source.Key(), underlyingStorageKeyType(source.Key())) &&
-		representedBasic(context, source.Elem()) {
-		storage = StorageScalar
+	storage := StorageHashed
+	if nativeMapKey(context, source.Key()) {
+		storage = StorageNative
+		if representedBasic(context, source.Elem()) {
+			storage = StorageScalar
+		}
 	}
 	return Model{
 		sourceType: sourceType,
@@ -55,6 +57,14 @@ func Source(
 		nominal:    nominal,
 		storage:    storage,
 	}, true
+}
+
+func nativeMapKey(context api.Context, sourceType types.Type) bool {
+	_, direct := directKey(context, sourceType)
+	return direct && types.Identical(
+		sourceType,
+		underlyingStorageKeyType(sourceType),
+	)
 }
 
 func (m Model) Type() types.Type {

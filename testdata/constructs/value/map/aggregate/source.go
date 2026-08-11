@@ -7,6 +7,7 @@ type Box struct {
 
 type BoxMap map[int32]Box
 type BoxMapAlias = BoxMap
+type WideBoxMap map[uint64]Box
 
 type ArrayKey [2]int32
 
@@ -58,6 +59,62 @@ func NamedValueLifecycle() (
 		missingOK,
 		len(values),
 		!deletedOK && nilValues == nil
+}
+
+func WideKeyLifecycle() (
+	int32,
+	int32,
+	int32,
+	int32,
+	int32,
+	int32,
+	bool,
+	bool,
+	bool,
+	bool,
+	bool,
+	bool,
+	int,
+) {
+	const lower uint64 = 9007199254740992
+	const upper uint64 = 9007199254740993
+	const maximum uint64 = 18446744073709551615
+
+	values := make(WideBoxMap, 3)
+	source := Box{Value: 10, Pair: [2]int32{11, 12}}
+	values[lower] = source
+	source.Value = 100
+	source.Pair[0] = 110
+	values[upper] = Box{Value: 20, Pair: [2]int32{21, 22}}
+	values[maximum] = Box{Value: 30, Pair: [2]int32{31, 32}}
+
+	lowerValue, lowerOK := values[lower]
+	lowerValue.Value = 90
+	lowerValue.Pair[0] = 91
+	lowerAgain := values[lower]
+	upperValue, upperOK := values[upper]
+	maximumValue, maximumOK := values[maximum]
+	_, missingOK := values[9007199254740994]
+	values[upper] = Box{Value: 25, Pair: [2]int32{26, 27}}
+	updated := values[upper]
+
+	delete(values, lower)
+	_, upperAfterDeleteOK := values[upper]
+	delete(values, maximum)
+	_, maximumAfterDeleteOK := values[maximum]
+	return lowerValue.Value,
+		lowerAgain.Value,
+		lowerAgain.Pair[0],
+		upperValue.Value,
+		maximumValue.Value,
+		updated.Value,
+		lowerOK,
+		upperOK,
+		maximumOK,
+		missingOK,
+		upperAfterDeleteOK,
+		maximumAfterDeleteOK,
+		len(values)
 }
 
 func ArrayKeyLifecycle() (int32, bool, int, bool) {

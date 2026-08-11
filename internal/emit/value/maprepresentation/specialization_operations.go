@@ -13,7 +13,7 @@ const (
 	specializationFindOperation       = "$find"
 )
 
-func (b specializationBuilder) build() []tsgo.ClassElement {
+func (b specializationBuilder) buildHashed() []tsgo.ClassElement {
 	members := []tsgo.ClassElement{
 		b.constructor(),
 		b.operationMethod(

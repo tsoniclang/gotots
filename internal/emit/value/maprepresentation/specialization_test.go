@@ -79,18 +79,6 @@ func testStaticSpecialization(
 class GoPanic {
     static raiseRuntime(message: string): never { throw new Error(message); }
 }
-class GoDenseIndex {
-    private static present<T>(values: readonly T[], index: number, value: T | undefined): value is T {
-        return index in values;
-    }
-    static get<T>(values: readonly T[], index: number): T {
-        const value = values[index];
-        if (!GoDenseIndex.present(values, index, value)) {
-            GoPanic.raiseRuntime("dense storage index is absent");
-        }
-        return value;
-    }
-}
 class Box {
     constructor(public value: number) {}
 }
@@ -178,6 +166,7 @@ func TestStaticSpecializationRejectsStoredSemanticCallbacks(t *testing.T) {
 	if err := validateSpecialization(
 		api.RoleMapReceiver,
 		mutated,
+		StorageHashed,
 		false,
 	); err == nil {
 		t.Fatal("stored hash callback mutation passed the specialization gate")
@@ -196,7 +185,7 @@ func assertStaticSpecializationArtifact(t *testing.T, source string) {
 		"StaticMap.$equal(entry[0], key)",
 		"StaticMap.$copyKey(key)",
 		"StaticMap.$copyValue(value)",
-		"GoDenseIndex.get(bucket, index)",
+		"for (const entry of bucket)",
 	} {
 		if !strings.Contains(source, required) {
 			t.Fatalf("specialization lacks %q:\n%s", required, source)
@@ -230,6 +219,7 @@ func assertStaticSpecializationArtifact(t *testing.T, source string) {
 		".call(",
 		".apply(",
 		".bind(",
+		"GoDenseIndex",
 	} {
 		if strings.Contains(source, forbidden) {
 			t.Fatalf("specialization contains %q:\n%s", forbidden, source)
@@ -278,6 +268,7 @@ func compileAndRunSpecialization(t *testing.T, source string) string {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	typecheckStarted := time.Now()
 	if err := tsgo.Compile(
 		ctx,
 		specializationRepositoryRoot(),
@@ -292,14 +283,28 @@ func compileAndRunSpecialization(t *testing.T, source string) string {
 			sourcePath,
 		},
 	); err != nil {
-		t.Fatal(err)
+		t.Fatalf("%v\n%s", err, source)
 	}
+	typecheckDuration := time.Since(typecheckStarted)
 	command := exec.Command("node", filepath.Join(directory, "out", "specialization.js"))
 	command.Dir = directory
+	runtimeStarted := time.Now()
 	output, err := command.CombinedOutput()
+	runtimeDuration := time.Since(runtimeStarted)
 	if err != nil {
-		t.Fatalf("specialization execution failed: %v\n%s", err, output)
+		t.Fatalf(
+			"specialization execution failed: %v\n%s\n%s",
+			err,
+			output,
+			source,
+		)
 	}
+	t.Logf(
+		"specialization source-bytes=%d strict-typecheck=%s runtime=%s",
+		len(source),
+		typecheckDuration.Round(time.Millisecond),
+		runtimeDuration.Round(time.Millisecond),
+	)
 	return string(output)
 }
 

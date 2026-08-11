@@ -474,16 +474,26 @@ requires them.
 
 ### Maps
 
-One `GoMap<K,V>` runtime preserves nil behavior, key equality/hash, zero on
-miss, comma-ok, deletion, clear, assignment copy, and iteration contract.
-Generated source uses ordinary names:
+Map representation is selected once from the exact closed key and value
+types. A map with an exact built-in boolean, integer, or string key and a
+runtime-basic value uses the canonical `GoMap<K,V>` owner. A map that needs
+static zero, copy, hash, or equality operations uses one deduplicated support
+specialization for its semantic shape, never one class per use site.
 
-```ts
-const counts = GoMap.make<gostring, int>();
-counts.set("a", 1);
-```
+When the selected key storage is an exact built-in boolean, integer, or string
+key, a specialized map stores tuple cells in a native JavaScript `Map`. The
+cell distinguishes a present `undefined` value from an absent key. Defined,
+floating-point, complex, pointer, interface, and aggregate keys retain the
+typed hash/equality bucket representation. Both paths preserve nil behavior,
+zero on miss, comma-ok, deletion, clear, assignment copy, and the iteration
+envelope through the same Go-shaped map contract.
 
-It does not emit per-site classes such as `GoMap$9e138...`.
+Native key equality is exact only within the selected primitive carrier. In
+the `number` profile, wide integer keys retain the declared precision tradeoff:
+for example, `uint64(9007199254740992)` and `uint64(9007199254740993)` have the
+same JavaScript `number` key. A product requiring exact `int64` or `uint64` map
+identity must select `fixed64-bigint` or `bigint`; native map storage neither
+hides the collision nor changes the compilation profile.
 
 ### Pointers
 
