@@ -27,7 +27,9 @@ export {
 export {
   Sort as SlicesSortKernel,
   SortFunc as SlicesSortFuncKernel,
+  SortFuncSynchronous as SlicesSortFuncSynchronousKernel,
   SortStableFunc as SlicesSortStableFuncKernel,
+  SortStableFuncSynchronous as SlicesSortStableFuncSynchronousKernel,
 } from "../portable/slices/sort.js";
 export {
   AppendSeq as SlicesAppendSeqKernel,

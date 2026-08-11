@@ -28,6 +28,59 @@ func ToProviderGenericArguments(
 	return target, before, requests, err
 }
 
+func ToProviderGenericArgumentsWithSynchronousParameters(
+	context api.Context,
+	children api.ChildEmitter,
+	contract *types.Tuple,
+	concrete *types.Tuple,
+	arguments []tsgo.Expression,
+	indexes []int,
+) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
+	selected := make(map[int]struct{}, len(indexes))
+	for _, index := range indexes {
+		if index < 0 || concrete == nil || index >= concrete.Len() {
+			return nil, nil, nil, boundaryInvariant(
+				context,
+				"synchronous provider generic parameter index is invalid",
+			)
+		}
+		selected[index] = struct{}{}
+	}
+	target, before, requests, _, err := convertGenericArgumentsIndexed(
+		context,
+		children,
+		contract,
+		concrete,
+		arguments,
+		func(
+			index int,
+			context api.Context,
+			children api.ChildEmitter,
+			contractType types.Type,
+			concreteType types.Type,
+			value api.ExpressionEmission,
+		) (api.ExpressionEmission, bool, error) {
+			if _, ok := selected[index]; ok {
+				return toProviderSynchronousGenericValue(
+					context,
+					children,
+					contractType,
+					concreteType,
+					value,
+				)
+			}
+			return toProviderGenericValue(
+				context,
+				children,
+				contractType,
+				concreteType,
+				value,
+			)
+		},
+	)
+	return target, before, requests, err
+}
+
 func convertGenericArguments(
 	context api.Context,
 	children api.ChildEmitter,
@@ -35,6 +88,48 @@ func convertGenericArguments(
 	concrete *types.Tuple,
 	arguments []tsgo.Expression,
 	convert genericValueConverter,
+) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, bool, error) {
+	return convertGenericArgumentsIndexed(
+		context,
+		children,
+		contract,
+		concrete,
+		arguments,
+		func(
+			_ int,
+			context api.Context,
+			children api.ChildEmitter,
+			contractType types.Type,
+			concreteType types.Type,
+			value api.ExpressionEmission,
+		) (api.ExpressionEmission, bool, error) {
+			return convert(
+				context,
+				children,
+				contractType,
+				concreteType,
+				value,
+			)
+		},
+	)
+}
+
+type indexedGenericValueConverter func(
+	int,
+	api.Context,
+	api.ChildEmitter,
+	types.Type,
+	types.Type,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error)
+
+func convertGenericArgumentsIndexed(
+	context api.Context,
+	children api.ChildEmitter,
+	contract *types.Tuple,
+	concrete *types.Tuple,
+	arguments []tsgo.Expression,
+	convert indexedGenericValueConverter,
 ) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, bool, error) {
 	if contract == nil && concrete == nil && len(arguments) == 0 {
 		return nil, nil, nil, false, nil
@@ -52,6 +147,7 @@ func convertGenericArguments(
 	changed := false
 	for index, argument := range arguments {
 		converted, selected, err := convert(
+			index,
 			context,
 			children,
 			contract.At(index).Type(),
@@ -288,6 +384,7 @@ func toProviderGenericValue(
 			concrete,
 			model,
 			value,
+			genericCallableBoundaryCanonical,
 		)
 	}
 	if genericOpaque(contractType) {
@@ -301,6 +398,34 @@ func toProviderGenericValue(
 		nil,
 		concreteType,
 		value,
+	)
+}
+
+func toProviderSynchronousGenericValue(
+	context api.Context,
+	children api.ChildEmitter,
+	contractType types.Type,
+	concreteType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	contract, concrete, model, callablePair := genericCallablePair(
+		contractType,
+		concreteType,
+	)
+	if !callablePair {
+		return api.ExpressionEmission{}, false, boundaryInvariant(
+			context,
+			"synchronous provider generic parameter is not callable",
+		)
+	}
+	return toProviderGenericCallable(
+		context,
+		children,
+		contract,
+		concrete,
+		model,
+		value,
+		genericCallableBoundarySynchronous,
 	)
 }
 

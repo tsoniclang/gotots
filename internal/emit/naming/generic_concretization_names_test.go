@@ -27,9 +27,22 @@ func TestGenericConcretizationInterningUsesSemanticIdentity(t *testing.T) {
 	owner := types.NewFunc(token.NoPos, types.NewPackage("example.test/p", "p"), "Identity", signature)
 	key := strings.Repeat("a", 64)
 
-	first := newGenericConcretizationForTest(t, owner, types.Typ[types.Int], key)
-	equivalent := newGenericConcretizationForTest(t, owner, types.Typ[types.Int], key)
-	conflicting := newGenericConcretizationForTest(t, owner, types.Typ[types.String], key)
+	first := newGenericConcretizationForTest(
+		t, owner, types.Typ[types.Int], key,
+		api.GenericConcretizationEffectCanonical,
+	)
+	equivalent := newGenericConcretizationForTest(
+		t, owner, types.Typ[types.Int], key,
+		api.GenericConcretizationEffectCanonical,
+	)
+	conflicting := newGenericConcretizationForTest(
+		t, owner, types.Typ[types.String], key,
+		api.GenericConcretizationEffectCanonical,
+	)
+	synchronous := newGenericConcretizationForTest(
+		t, owner, types.Typ[types.Int], key,
+		api.GenericConcretizationEffectSynchronous,
+	)
 	if first == equivalent {
 		t.Fatal("test requires independently allocated concretizations")
 	}
@@ -49,6 +62,9 @@ func TestGenericConcretizationInterningUsesSemanticIdentity(t *testing.T) {
 	if _, err := registry.internGenericConcretization(conflicting); err == nil {
 		t.Fatal("same-key concretizations with different arguments were joined")
 	}
+	if _, err := registry.internGenericConcretization(synchronous); err == nil {
+		t.Fatal("same-key concretizations with different effects were joined")
+	}
 }
 
 func newGenericConcretizationForTest(
@@ -56,6 +72,7 @@ func newGenericConcretizationForTest(
 	owner *types.Func,
 	argument types.Type,
 	key string,
+	effect api.GenericConcretizationEffect,
 ) *api.GenericConcretization {
 	t.Helper()
 	instantiated, err := types.Instantiate(
@@ -71,6 +88,7 @@ func newGenericConcretizationForTest(
 		owner,
 		[]types.Type{argument},
 		instantiated.(*types.Signature),
+		effect,
 		key,
 		"$concrete_"+key[:20],
 		api.GeneratedArtifactPlacementCompilation,

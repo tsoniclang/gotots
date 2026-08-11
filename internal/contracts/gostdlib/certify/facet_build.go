@@ -113,13 +113,25 @@ func buildFacet(
 				"public binding is absent",
 			)
 		}
-		if err := verifyGenericKernelCallableContract(
-			seed.SourceIdentity,
-			binding,
-			effect,
-			callableParameters,
-		); err != nil {
-			return gostdlib.FacetDocument{}, err
+		var contractErr error
+		if seed.Capabilities[0] ==
+			gostdlib.FacetCapabilitySynchronousKernel {
+			contractErr = verifySynchronousGenericKernelCallableContract(
+				seed.SourceIdentity,
+				binding,
+				effect,
+				callableParameters,
+			)
+		} else {
+			contractErr = verifyGenericKernelCallableContract(
+				seed.SourceIdentity,
+				binding,
+				effect,
+				callableParameters,
+			)
+		}
+		if contractErr != nil {
+			return gostdlib.FacetDocument{}, contractErr
 		}
 	}
 	owner, err := singleImplementationOwner(seed.Export, target.ImplementationOwners())
@@ -515,6 +527,48 @@ func verifyRepresentationTargetMembers(
 				"build representation",
 				target.Name(),
 				"representation target has a runtime value member",
+			)
+		}
+	}
+	return nil
+}
+
+func verifySynchronousGenericKernelCallableContract(
+	identity string,
+	binding gostdlib.BindingDocument,
+	effect gostdlib.EffectKind,
+	parameters []gostdlib.ProviderCallableParameterDocument,
+) error {
+	if binding.Kind != gostdlib.BindingFunction {
+		return certifyError(
+			"verify synchronous generic callable kernel",
+			identity,
+			"public binding is not a function",
+		)
+	}
+	if effect != gostdlib.EffectSynchronous || !binding.Effect.MaySuspend() {
+		return certifyError(
+			"verify synchronous generic callable kernel",
+			identity,
+			"kernel does not narrow one cooperative public effect to synchronous",
+		)
+	}
+	if len(parameters) == 0 || len(parameters) != len(binding.CallableParameters) {
+		return certifyError(
+			"verify synchronous generic callable kernel",
+			identity,
+			"kernel callable parameter set does not match the public binding",
+		)
+	}
+	for index, parameter := range parameters {
+		public := binding.CallableParameters[index]
+		if parameter.Parameter != public.Parameter ||
+			parameter.Effect != gostdlib.EffectSynchronous ||
+			!public.Effect.MaySuspend() {
+			return certifyError(
+				"verify synchronous generic callable kernel",
+				identity,
+				"kernel callable parameter does not exactly narrow its public parameter",
 			)
 		}
 	}

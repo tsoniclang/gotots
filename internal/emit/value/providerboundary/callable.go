@@ -20,6 +20,27 @@ func FromProviderSourceCallable(
 	function *types.Func,
 	target api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if context.SynchronousCallableBoundary() {
+		signature, supported, model := callableType(function.Type())
+		if !supported {
+			return api.ExpressionEmission{}, boundaryInvariant(
+				context,
+				"synchronous provider callable is unsupported",
+			)
+		}
+		converted, _, err := fromProviderCallableSelectedWithEffect(
+			context,
+			children,
+			nil,
+			"",
+			nil,
+			signature,
+			model,
+			target,
+			true,
+		)
+		return converted, err
+	}
 	converted, changed, err := FromProviderValue(
 		context,
 		children,
@@ -80,6 +101,30 @@ func fromProviderCallableSelected(
 	signature *types.Signature,
 	model definedtype.Model,
 	source api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	return fromProviderCallableSelectedWithEffect(
+		context,
+		children,
+		owner,
+		ownerBridge,
+		profile,
+		signature,
+		model,
+		source,
+		false,
+	)
+}
+
+func fromProviderCallableSelectedWithEffect(
+	context api.Context,
+	children api.ChildEmitter,
+	owner *types.Named,
+	ownerBridge string,
+	profile []gostdlib.ProviderCallableProfileInterface,
+	signature *types.Signature,
+	model definedtype.Model,
+	source api.ExpressionEmission,
+	synchronous bool,
 ) (api.ExpressionEmission, bool, error) {
 	target, err := callable.EmitABIAdapter(context, children, nil, signature)
 	if err != nil {
@@ -153,12 +198,17 @@ func fromProviderCallableSelected(
 	if err != nil {
 		return api.ExpressionEmission{}, false, err
 	}
-	cooperative, contractRequests, err := providerCallableContract(
-		context,
-		signature,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, false, err
+	cooperative := false
+	var contractRequests []api.RootRequest
+	if !synchronous {
+		var contractErr error
+		cooperative, contractRequests, contractErr = providerCallableContract(
+			context,
+			signature,
+		)
+		if contractErr != nil {
+			return api.ExpressionEmission{}, false, contractErr
+		}
 	}
 	resultType := target.Result()
 	var modifiers []tsgo.ModifierLike

@@ -24,12 +24,42 @@ func (n *File) GenericKernel(
 		return api.NameReference{}, err
 	}
 	if providerOwned {
-		return n.providerGenericKernelReference(owner, selected)
+		return n.providerGenericKernelReference(
+			owner,
+			selected,
+			gostdlib.FacetCapabilityKernel,
+		)
 	}
 	return n.derivedSourceReference(
 		owner,
 		api.GenericKernelSuffix,
 		api.ArtifactFacetCallableSignature,
+	)
+}
+
+func (n *File) SynchronousGenericKernel(
+	owner *types.Func,
+) (api.NameReference, error) {
+	if !validGenericKernelOwner(owner) {
+		return api.NameReference{}, &api.NameError{
+			Reason: "synchronous generic kernel owner is invalid",
+		}
+	}
+	selected, providerOwned, err :=
+		n.owner.registry.ProviderSynchronousGenericKernel(owner)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	if !providerOwned {
+		return api.NameReference{}, &api.NameError{
+			Name:   owner.Name(),
+			Reason: "synchronous generic kernel is not certified",
+		}
+	}
+	return n.providerGenericKernelReference(
+		owner,
+		selected,
+		gostdlib.FacetCapabilitySynchronousKernel,
 	)
 }
 
@@ -48,7 +78,11 @@ func (n *File) DeferredGenericKernel(
 	}
 	if providerOwned {
 		reference, referenceErr :=
-			n.providerGenericKernelReference(owner, selected)
+			n.providerGenericKernelReference(
+				owner,
+				selected,
+				gostdlib.FacetCapabilityKernel,
+			)
 		if referenceErr != nil {
 			return api.DeferredGenericCallableReference{}, referenceErr
 		}
@@ -136,6 +170,7 @@ func validGenericKernelOwner(
 func (n *File) providerGenericKernelReference(
 	owner *types.Func,
 	selected gostdlib.Facet,
+	capability gostdlib.FacetCapability,
 ) (api.NameReference, error) {
 	qualifier, request, err := n.providerImport(
 		selected.ModuleSpecifier(),
@@ -146,7 +181,7 @@ func (n *File) providerGenericKernelReference(
 	}
 	selection, err := gostdlib.NewFacetUseSelection(
 		selected.Kind(),
-		gostdlib.FacetCapabilityKernel,
+		capability,
 	)
 	if err != nil {
 		return api.NameReference{}, err

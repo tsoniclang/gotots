@@ -73,6 +73,7 @@ func Emit(
 			owner,
 			instance.TypeArgs,
 			signature,
+			api.GenericConcretizationEffectCanonical,
 		)
 		if concreteErr != nil {
 			return api.ExpressionEmission{}, true, concreteErr
@@ -185,18 +186,47 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	recoveryObservation, err := context.ObserveRecoveryCallable(callableFacet)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
+	synchronousBoundary := context.SynchronousCallableBoundary()
+	recoverySelected := false
+	var recoveryObservationRequests []api.RootRequest
+	if !synchronousBoundary {
+		recoveryObservation, recoveryErr :=
+			context.ObserveRecoveryCallable(callableFacet)
+		if recoveryErr != nil {
+			return api.ExpressionEmission{}, true, recoveryErr
+		}
+		recoverySelected = recoveryObservation.Recovery()
+		recoveryObservationRequests = recoveryObservation.Requests()
 	}
-	providerCooperative, _, contractRequests, err :=
-		cooperativecall.GenericValueContract(
-			context,
-			callableFacet,
-			signature,
-		)
-	if err != nil {
-		return api.ExpressionEmission{}, true, err
+	providerCooperative := false
+	var contractRequests []api.RootRequest
+	if synchronousBoundary {
+		sourceFacet, facetErr := api.NewSourceCallableFacet(owner)
+		if facetErr != nil {
+			return api.ExpressionEmission{}, true, facetErr
+		}
+		observation, observationErr :=
+			context.ObserveCooperativeCallable(sourceFacet)
+		if observationErr != nil {
+			return api.ExpressionEmission{}, true, observationErr
+		}
+		if observation.Cooperative() {
+			return api.ExpressionEmission{}, true, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "synchronous generic function value may suspend",
+			}
+		}
+		contractRequests = observation.Requests()
+	} else {
+		providerCooperative, _, contractRequests, err =
+			cooperativecall.GenericValueContract(
+				context,
+				callableFacet,
+				signature,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
 	}
 	target, err := callable.EmitABIAdapter(
 		context,
@@ -250,7 +280,7 @@ func Emit(
 		context.Factory().EqualsGreaterThanToken(),
 		callableBody(context.Factory(), signature.Results(), ordinaryCall),
 	)
-	if !recoveryObservation.Recovery() {
+	if !recoverySelected {
 		return api.DirectExpression(
 			ordinary,
 			api.CombineRequests(
@@ -259,7 +289,7 @@ func Emit(
 				mechanicReqs,
 				ordinaryCall.Requests(),
 				contractRequests,
-				recoveryObservation.Requests(),
+				recoveryObservationRequests,
 			)...,
 		), true, nil
 	}
@@ -334,7 +364,7 @@ func Emit(
 			recoveryRequests,
 			registry.Requests(),
 			contractRequests,
-			recoveryObservation.Requests(),
+			recoveryObservationRequests,
 		)...,
 	), true, nil
 }

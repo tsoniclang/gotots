@@ -6,6 +6,23 @@ import (
 	"slices"
 )
 
+type GenericConcretizationEffect uint8
+
+const (
+	GenericConcretizationEffectInvalid     GenericConcretizationEffect = 0
+	GenericConcretizationEffectCanonical   GenericConcretizationEffect = 1
+	GenericConcretizationEffectSynchronous GenericConcretizationEffect = 2
+)
+
+func (e GenericConcretizationEffect) Valid() bool {
+	return e == GenericConcretizationEffectCanonical ||
+		e == GenericConcretizationEffectSynchronous
+}
+
+func (e GenericConcretizationEffect) Synchronous() bool {
+	return e == GenericConcretizationEffectSynchronous
+}
+
 type CallableFacetKind uint8
 
 const (
@@ -311,6 +328,7 @@ type GenericConcretization struct {
 	owner        *types.Func
 	arguments    []types.Type
 	signature    *types.Signature
+	effect       GenericConcretizationEffect
 	key          string
 	suffix       string
 	placement    GeneratedArtifactPlacement
@@ -322,6 +340,7 @@ func NewGenericConcretization(
 	owner *types.Func,
 	arguments []types.Type,
 	signature *types.Signature,
+	effect GenericConcretizationEffect,
 	key string,
 	suffix string,
 	placement GeneratedArtifactPlacement,
@@ -332,6 +351,7 @@ func NewGenericConcretization(
 		owner:        owner,
 		arguments:    slices.Clone(arguments),
 		signature:    signature,
+		effect:       effect,
 		key:          key,
 		suffix:       suffix,
 		placement:    placement,
@@ -349,7 +369,8 @@ func NewGenericConcretization(
 
 func (c *GenericConcretization) Valid() bool {
 	if c == nil || c.owner == nil || c.owner.Origin() != c.owner ||
-		c.key == "" || c.suffix == "" || c.signature == nil {
+		c.key == "" || c.suffix == "" || c.signature == nil ||
+		!c.effect.Valid() {
 		return false
 	}
 	source, ok := c.owner.Type().(*types.Signature)
@@ -400,72 +421,27 @@ func (c *GenericConcretization) Valid() bool {
 	return err == nil && types.Identical(instantiated, c.signature)
 }
 
-func localTypeComponents(sourceType types.Type) []*types.TypeName {
-	seen := make(map[*types.TypeName]struct{})
-	var result []*types.TypeName
-	collectLocalTypeComponents(sourceType, seen, &result)
-	return result
-}
-
-func collectLocalTypeComponents(
-	sourceType types.Type,
-	seen map[*types.TypeName]struct{},
-	result *[]*types.TypeName,
-) {
-	if sourceType == nil {
-		return
+func (c *GenericConcretization) Identical(
+	other *GenericConcretization,
+) bool {
+	if !c.Valid() || !other.Valid() ||
+		c.owner != other.owner ||
+		c.key != other.key ||
+		c.effect != other.effect ||
+		c.suffix != other.suffix ||
+		c.placement != other.placement ||
+		c.lexicalOwner != other.lexicalOwner ||
+		c.anchor != other.anchor ||
+		!types.Identical(c.signature, other.signature) ||
+		len(c.arguments) != len(other.arguments) {
+		return false
 	}
-	sourceType = types.Unalias(sourceType)
-	switch source := sourceType.(type) {
-	case *types.Named:
-		object := source.Obj()
-		if object != nil && object.Pkg() != nil &&
-			object.Parent() != object.Pkg().Scope() {
-			if _, duplicate := seen[object]; !duplicate {
-				seen[object] = struct{}{}
-				*result = append(*result, object)
-			}
-		}
-		for index := range source.TypeArgs().Len() {
-			collectLocalTypeComponents(source.TypeArgs().At(index), seen, result)
-		}
-	case *types.Pointer:
-		collectLocalTypeComponents(source.Elem(), seen, result)
-	case *types.Slice:
-		collectLocalTypeComponents(source.Elem(), seen, result)
-	case *types.Array:
-		collectLocalTypeComponents(source.Elem(), seen, result)
-	case *types.Map:
-		collectLocalTypeComponents(source.Key(), seen, result)
-		collectLocalTypeComponents(source.Elem(), seen, result)
-	case *types.Chan:
-		collectLocalTypeComponents(source.Elem(), seen, result)
-	case *types.Struct:
-		for index := range source.NumFields() {
-			collectLocalTypeComponents(source.Field(index).Type(), seen, result)
-		}
-	case *types.Signature:
-		collectLocalTupleTypeComponents(source.Params(), seen, result)
-		collectLocalTupleTypeComponents(source.Results(), seen, result)
-	case *types.Interface:
-		source = source.Complete()
-		for index := range source.NumMethods() {
-			collectLocalTypeComponents(source.Method(index).Type(), seen, result)
+	for index, argument := range c.arguments {
+		if !types.Identical(argument, other.arguments[index]) {
+			return false
 		}
 	}
-}
-
-func collectLocalTupleTypeComponents(
-	tuple *types.Tuple,
-	seen map[*types.TypeName]struct{},
-	result *[]*types.TypeName,
-) {
-	if tuple == nil {
-		return
-	}
-	for index := range tuple.Len() {
-		collectLocalTypeComponents(tuple.At(index).Type(), seen, result)
-	}
+	return true
 }
 
 func (c *GenericConcretization) Owner() *types.Func {
@@ -487,6 +463,13 @@ func (c *GenericConcretization) Signature() *types.Signature {
 		return nil
 	}
 	return c.signature
+}
+
+func (c *GenericConcretization) Effect() GenericConcretizationEffect {
+	if !c.Valid() {
+		return GenericConcretizationEffectInvalid
+	}
+	return c.effect
 }
 
 func (c *GenericConcretization) Key() string {
@@ -522,28 +505,6 @@ func (c *GenericConcretization) LexicalAnchor() *types.TypeName {
 		return nil
 	}
 	return c.anchor
-}
-
-func (c *GenericConcretization) Identical(
-	other *GenericConcretization,
-) bool {
-	if !c.Valid() || !other.Valid() ||
-		c.owner != other.owner ||
-		c.key != other.key ||
-		c.suffix != other.suffix ||
-		c.placement != other.placement ||
-		c.lexicalOwner != other.lexicalOwner ||
-		c.anchor != other.anchor ||
-		!types.Identical(c.signature, other.signature) ||
-		len(c.arguments) != len(other.arguments) {
-		return false
-	}
-	for index, argument := range c.arguments {
-		if !types.Identical(argument, other.arguments[index]) {
-			return false
-		}
-	}
-	return true
 }
 
 func InstantiateGenericCallable(

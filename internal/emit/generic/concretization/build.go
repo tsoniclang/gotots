@@ -40,12 +40,45 @@ func Build(
 	if err != nil {
 		return nil, nil, err
 	}
-	targetSignature, err := callable.EmitAdapter(
-		context,
-		children,
-		nil,
-		wrapperSignature,
-	)
+	synchronous := concretization.Effect().Synchronous()
+	if synchronous && deferred {
+		return nil, nil, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "synchronous generic concretization has a deferred variant",
+		}
+	}
+	var synchronousParameters []int
+	if synchronous {
+		var available bool
+		synchronousParameters, available, err =
+			context.GenericCallableSynchronousParameters(owner)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !available {
+			return nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "synchronous generic concretization has no certified kernel",
+			}
+		}
+	}
+	var targetSignature callable.SignatureEmission
+	if synchronous {
+		targetSignature, err = callable.EmitAdapterWithSynchronousParameters(
+			context,
+			children,
+			nil,
+			wrapperSignature,
+			synchronousParameters,
+		)
+	} else {
+		targetSignature, err = callable.EmitAdapter(
+			context,
+			children,
+			nil,
+			wrapperSignature,
+		)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -63,13 +96,20 @@ func Build(
 			Reason: "generic concretization operation set is unresolved",
 		}
 	}
-	facet, err := api.NewSourceCallableFacet(owner)
-	if err != nil {
-		return nil, nil, err
-	}
-	observation, err := context.ObserveCooperativeCallable(facet)
-	if err != nil {
-		return nil, nil, err
+	cooperative := false
+	var observationRequests []api.RootRequest
+	if !synchronous {
+		facet, facetErr := api.NewSourceCallableFacet(owner)
+		if facetErr != nil {
+			return nil, nil, facetErr
+		}
+		observation, observationErr :=
+			context.ObserveCooperativeCallable(facet)
+		if observationErr != nil {
+			return nil, nil, observationErr
+		}
+		cooperative = observation.Cooperative()
+		observationRequests = observation.Requests()
 	}
 	capabilities, capabilityRequests, err :=
 		genericinstance.EmitCapabilities(
@@ -95,7 +135,13 @@ func Build(
 				Reason: "generic kernel names are unavailable",
 			}
 		}
-		kernel, nameErr := kernelNames.GenericKernel(owner)
+		var kernel api.NameReference
+		var nameErr error
+		if synchronous {
+			kernel, nameErr = kernelNames.SynchronousGenericKernel(owner)
+		} else {
+			kernel, nameErr = kernelNames.GenericKernel(owner)
+		}
 		if nameErr != nil {
 			return nil, nil, nameErr
 		}
@@ -124,14 +170,26 @@ func Build(
 		var kernelBefore []tsgo.Statement
 		var kernelRequests []api.RootRequest
 		if providerKernelBoundary {
-			kernelArguments, kernelBefore, kernelRequests, err =
-				providerboundary.ToProviderGenericArguments(
-					context,
-					children,
-					declaration.Params(),
-					wrapperSignature.Params(),
-					sourceArguments,
-				)
+			if synchronous {
+				kernelArguments, kernelBefore, kernelRequests, err =
+					providerboundary.ToProviderGenericArgumentsWithSynchronousParameters(
+						context,
+						children,
+						declaration.Params(),
+						wrapperSignature.Params(),
+						sourceArguments,
+						synchronousParameters,
+					)
+			} else {
+				kernelArguments, kernelBefore, kernelRequests, err =
+					providerboundary.ToProviderGenericArguments(
+						context,
+						children,
+						declaration.Params(),
+						wrapperSignature.Params(),
+						sourceArguments,
+					)
+			}
 			if err != nil {
 				return nil, nil, err
 			}
@@ -264,7 +322,7 @@ func Build(
 		}
 	}
 	if providerKernelBoundary {
-		if observation.Cooperative() {
+		if cooperative {
 			call, err = awaitEmission(context, call)
 			if err != nil {
 				return nil, nil, err
@@ -300,7 +358,7 @@ func Build(
 		}
 	}
 	resultType := targetSignature.Result()
-	if observation.Cooperative() {
+	if cooperative {
 		modifiers = append(modifiers, context.Factory().AsyncKeyword())
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}
@@ -353,7 +411,7 @@ func Build(
 		call.Requests(),
 		deferredCall.Requests(),
 		recoveryRequests,
-		observation.Requests(),
+		observationRequests,
 	), nil
 }
 

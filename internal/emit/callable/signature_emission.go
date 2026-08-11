@@ -38,6 +38,74 @@ func EmitAdapter(
 	)
 }
 
+func EmitAdapterWithSynchronousParameters(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+	indexes []int,
+) (SignatureEmission, error) {
+	selected := make(map[int]struct{}, len(indexes))
+	for _, index := range indexes {
+		if index < 0 || signature == nil || index >= signature.Params().Len() {
+			return SignatureEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "synchronous callable parameter index is invalid",
+			}
+		}
+		selected[index] = struct{}{}
+	}
+	return emitRepresentedWithParameterType(
+		context,
+		children,
+		source,
+		signature,
+		api.RoleCallableParameter,
+		api.RoleCallableResult,
+		func(_ *types.Var, index int) (string, error) {
+			return "$argument" + strconv.Itoa(index), nil
+		},
+		false,
+		func(parameter *types.Var, index int) (api.TypeEmission, bool, error) {
+			if _, ok := selected[index]; !ok {
+				return api.TypeEmission{}, false, nil
+			}
+			if signature.Variadic() && index == signature.Params().Len()-1 {
+				return api.TypeEmission{}, false, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "synchronous callable parameter is variadic",
+				}
+			}
+			callableSignature, ok := Signature(parameter.Type())
+			if !ok {
+				return api.TypeEmission{}, false, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "synchronous parameter is not callable",
+				}
+			}
+			target, err := EmitInlineNonNilType(
+				context.WithRole(api.RoleCallableParameter),
+				children,
+				source,
+				callableSignature,
+				false,
+			)
+			if err != nil {
+				return api.TypeEmission{}, false, err
+			}
+			return api.DirectType(
+				context.Factory().UnionTypeNode([]tsgo.TypeNode{
+					target.Value(),
+					context.Factory().KeywordTypeNode(
+						tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+					),
+				}),
+				target.Requests()...,
+			), true, nil
+		},
+	)
+}
+
 func EmitEnvironmentContract(
 	context api.Context,
 	children api.ChildEmitter,

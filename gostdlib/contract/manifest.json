@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 28,
+  "schemaVersion": 29,
   "packageName": "@gotots/gostdlib",
   "packageVersion": "0.0.0",
   "backend": "node",
@@ -13,7 +13,7 @@
     "noasm"
   ],
   "runtimeDigest": "f633f60dc496a7c80e04b30d7de18e719e4f4ac22355103aa2dcf5928e7100e0",
-  "providerDigest": "1d6773085925ea4e4b49ebeff877173fc82d414d6ec3bc68e30d4404de781af6",
+  "providerDigest": "fe5a8e89093cf8f72e3afa637d219b3a0646b55d648c1a8d5850b4c5aa3a686c",
   "modules": [
     {
       "goImportPath": "bufio",
@@ -18506,7 +18506,7 @@
           "implementationOwner": "src/internal/portable/slices/sort.ts",
           "targetFingerprint": "e9bf3eb357893c7ca99adb0b326265525b3e0ff2964102c5f3e05bd52e360e3d",
           "implementationSites": [
-            "src/internal/portable/slices/sort.ts#SlicesSortKernel@89"
+            "src/internal/portable/slices/sort.ts#SlicesSortKernel@117"
           ]
         },
         {
@@ -18540,7 +18540,41 @@
           "implementationOwner": "src/internal/portable/slices/sort.ts",
           "targetFingerprint": "a4344b441d83dd334ca2ab15fe4f94fd26fc595a995c9ca9d8c3a2f365c040ef",
           "implementationSites": [
-            "src/internal/portable/slices/sort.ts#SlicesSortFuncKernel@203"
+            "src/internal/portable/slices/sort.ts#SlicesSortFuncKernel@231"
+          ]
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=SortFunc",
+          "capabilities": [
+            "synchronous-kernel"
+          ],
+          "export": "SlicesSortFuncSynchronousKernel",
+          "effect": "sync",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "sync"
+            }
+          ],
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/sort.ts",
+          "targetFingerprint": "9641b118ff8ad238b6aa1d3ca38c2a9e7ae0f6707695c32ab0daa02c4a487249",
+          "implementationSites": [
+            "src/internal/portable/slices/sort.ts#SlicesSortFuncSynchronousKernel@403"
           ]
         },
         {
@@ -18574,7 +18608,41 @@
           "implementationOwner": "src/internal/portable/slices/sort.ts",
           "targetFingerprint": "233de7468f9aa4e4b3285bbac0fce4695abb8974e9e6571d07d66211ecef39dc",
           "implementationSites": [
-            "src/internal/portable/slices/sort.ts#SlicesSortStableFuncKernel@297"
+            "src/internal/portable/slices/sort.ts#SlicesSortStableFuncKernel@325"
+          ]
+        },
+        {
+          "kind": "generic-callable-kernel",
+          "sourceIdentity": "slices|kind=4|receiver=|name=SortStableFunc",
+          "capabilities": [
+            "synchronous-kernel"
+          ],
+          "export": "SlicesSortStableFuncSynchronousKernel",
+          "effect": "sync",
+          "callableParameters": [
+            {
+              "parameter": 1,
+              "effect": "sync"
+            }
+          ],
+          "genericTypeArguments": [
+            {
+              "typeParameter": 0,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "logical"
+            },
+            {
+              "typeParameter": 1,
+              "facet": "container-storage"
+            }
+          ],
+          "implementationOwner": "src/internal/portable/slices/sort.ts",
+          "targetFingerprint": "da7473d63ef6d20018a03680cafbaa81167c93c6aeaf439a61bc264e3f2f06df",
+          "implementationSites": [
+            "src/internal/portable/slices/sort.ts#SlicesSortStableFuncSynchronousKernel@492"
           ]
         },
         {
@@ -31651,7 +31719,7 @@
       "dependencies": [
         "src/internal/portable/slices/sequence.ts#Collect@486",
         "src/internal/portable/slices/sequence.ts#logicalValues@977",
-        "src/internal/portable/slices/sort.ts#sortValues@528"
+        "src/internal/portable/slices/sort.ts#sortValues@718"
       ]
     },
     {
@@ -31689,42 +31757,67 @@
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#SlicesSortFuncKernel@203",
+      "identity": "src/internal/portable/slices/sort.ts#SlicesSortFuncKernel@231",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/sort.ts#logicalValues@375",
-        "src/internal/portable/slices/sort.ts#sortValues@528",
-        "src/internal/portable/slices/sort.ts#writeSorted@457"
+        "src/internal/portable/slices/sort.ts#logicalValues@565",
+        "src/internal/portable/slices/sort.ts#sortValues@718",
+        "src/internal/portable/slices/sort.ts#writeSorted@647"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#SlicesSortKernel@89",
+      "identity": "src/internal/portable/slices/sort.ts#SlicesSortFuncSynchronousKernel@403",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/slices/sort.ts#logicalValues@565",
+        "src/internal/portable/slices/sort.ts#sortValuesSynchronous@1033",
+        "src/internal/portable/slices/sort.ts#writeSorted@647"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/sort.ts#SlicesSortKernel@117",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#hostInteger@27",
         "src/internal/portable/slices/capabilities.ts#orderedCompare@353",
-        "src/internal/portable/slices/sort.ts#logicalValues@375",
-        "src/internal/portable/slices/sort.ts#writeSorted@457"
+        "src/internal/portable/slices/sort.ts#logicalValues@565",
+        "src/internal/portable/slices/sort.ts#writeSorted@647"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#SlicesSortStableFuncKernel@297",
+      "identity": "src/internal/portable/slices/sort.ts#SlicesSortStableFuncKernel@325",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/sort.ts#SortFunc@203"
+        "src/internal/portable/slices/sort.ts#SortFunc@231"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#SortFunc@203",
+      "identity": "src/internal/portable/slices/sort.ts#SlicesSortStableFuncSynchronousKernel@492",
       "disposition": "implemented",
       "dependencies": [
-        "src/internal/portable/slices/sort.ts#logicalValues@375",
-        "src/internal/portable/slices/sort.ts#sortValues@528",
-        "src/internal/portable/slices/sort.ts#writeSorted@457"
+        "src/internal/portable/slices/sort.ts#SortFuncSynchronous@403"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#logicalValues@375",
+      "identity": "src/internal/portable/slices/sort.ts#SortFunc@231",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/slices/sort.ts#logicalValues@565",
+        "src/internal/portable/slices/sort.ts#sortValues@718",
+        "src/internal/portable/slices/sort.ts#writeSorted@647"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/sort.ts#SortFuncSynchronous@403",
+      "disposition": "implemented",
+      "dependencies": [
+        "src/internal/portable/slices/sort.ts#logicalValues@565",
+        "src/internal/portable/slices/sort.ts#sortValuesSynchronous@1033",
+        "src/internal/portable/slices/sort.ts#writeSorted@647"
+      ]
+    },
+    {
+      "identity": "src/internal/portable/slices/sort.ts#logicalValues@565",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
@@ -31732,14 +31825,18 @@
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#sortValues@528",
+      "identity": "src/internal/portable/slices/sort.ts#sortValues@718",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/portable/slices/read.ts#callComparison@1768"
       ]
     },
     {
-      "identity": "src/internal/portable/slices/sort.ts#writeSorted@457",
+      "identity": "src/internal/portable/slices/sort.ts#sortValuesSynchronous@1033",
+      "disposition": "implemented"
+    },
+    {
+      "identity": "src/internal/portable/slices/sort.ts#writeSorted@647",
       "disposition": "implemented",
       "dependencies": [
         "src/internal/host-integer.ts#integerFromHost@69",
@@ -34651,5 +34748,5 @@
       "disposition": "implemented"
     }
   ],
-  "manifestDigest": "acdbf016bd90e2fa05976af5bac215e9a2bc7c34a2fcb43bcd67e5a1e061cffc"
+  "manifestDigest": "ba0821f363c88fffca1f47bd17093a351c2a51e1e066665a30c7b57e19f92d05"
 }

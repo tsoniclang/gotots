@@ -459,3 +459,71 @@ func WrapGeneratedArtifactError(
 	}
 	return &GeneratedArtifactError{Artifact: artifact, Cause: err}
 }
+
+func localTypeComponents(sourceType types.Type) []*types.TypeName {
+	seen := make(map[*types.TypeName]struct{})
+	var result []*types.TypeName
+	collectLocalTypeComponents(sourceType, seen, &result)
+	return result
+}
+
+func collectLocalTypeComponents(
+	sourceType types.Type,
+	seen map[*types.TypeName]struct{},
+	result *[]*types.TypeName,
+) {
+	if sourceType == nil {
+		return
+	}
+	sourceType = types.Unalias(sourceType)
+	switch source := sourceType.(type) {
+	case *types.Named:
+		object := source.Obj()
+		if object != nil && object.Pkg() != nil &&
+			object.Parent() != object.Pkg().Scope() {
+			if _, duplicate := seen[object]; !duplicate {
+				seen[object] = struct{}{}
+				*result = append(*result, object)
+			}
+		}
+		for index := range source.TypeArgs().Len() {
+			collectLocalTypeComponents(source.TypeArgs().At(index), seen, result)
+		}
+	case *types.Pointer:
+		collectLocalTypeComponents(source.Elem(), seen, result)
+	case *types.Slice:
+		collectLocalTypeComponents(source.Elem(), seen, result)
+	case *types.Array:
+		collectLocalTypeComponents(source.Elem(), seen, result)
+	case *types.Map:
+		collectLocalTypeComponents(source.Key(), seen, result)
+		collectLocalTypeComponents(source.Elem(), seen, result)
+	case *types.Chan:
+		collectLocalTypeComponents(source.Elem(), seen, result)
+	case *types.Struct:
+		for index := range source.NumFields() {
+			collectLocalTypeComponents(source.Field(index).Type(), seen, result)
+		}
+	case *types.Signature:
+		collectLocalTupleTypeComponents(source.Params(), seen, result)
+		collectLocalTupleTypeComponents(source.Results(), seen, result)
+	case *types.Interface:
+		source = source.Complete()
+		for index := range source.NumMethods() {
+			collectLocalTypeComponents(source.Method(index).Type(), seen, result)
+		}
+	}
+}
+
+func collectLocalTupleTypeComponents(
+	tuple *types.Tuple,
+	seen map[*types.TypeName]struct{},
+	result *[]*types.TypeName,
+) {
+	if tuple == nil {
+		return
+	}
+	for index := range tuple.Len() {
+		collectLocalTypeComponents(tuple.At(index).Type(), seen, result)
+	}
+}

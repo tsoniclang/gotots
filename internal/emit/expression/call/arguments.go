@@ -15,8 +15,42 @@ func emitArguments(
 	signature *types.Signature,
 	captureAll bool,
 ) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
+	return emitArgumentsWithSynchronousParameters(
+		context,
+		children,
+		source,
+		signature,
+		captureAll,
+		nil,
+	)
+}
+
+func emitArgumentsWithSynchronousParameters(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	signature *types.Signature,
+	captureAll bool,
+	synchronousParameters []int,
+) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
+	selectedSynchronous := make(map[int]struct{}, len(synchronousParameters))
+	for _, index := range synchronousParameters {
+		if index < 0 || index >= signature.Params().Len() {
+			return nil, nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "synchronous call parameter index is invalid",
+			}
+		}
+		selectedSynchronous[index] = struct{}{}
+	}
 	if len(source.Args) == 1 {
 		if results, ok := context.TypesInfo().TypeOf(source.Args[0]).(*types.Tuple); ok {
+			if len(selectedSynchronous) != 0 {
+				return nil, nil, nil, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "synchronous call parameter came from multiple results",
+				}
+			}
 			if signature.Variadic() {
 				return emitVariadicMultipleArgument(
 					context,
@@ -46,6 +80,12 @@ func emitArguments(
 		}
 	}
 	if signature.Variadic() {
+		if len(selectedSynchronous) != 0 {
+			return nil, nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "synchronous call parameter belongs to a variadic call",
+			}
+		}
 		return emitVariadicArguments(
 			context,
 			children,
@@ -67,12 +107,13 @@ func emitArguments(
 			return nil, nil, nil,
 				api.Unsupported(context, api.CategoryExpression, source)
 		}
-		target, err := children.Expression(
-			context.
-				WithRole(api.RoleCallArgument).
-				WithExpectedType(signature.Params().At(index).Type()),
-			argument,
-		)
+		argumentContext := context.
+			WithRole(api.RoleCallArgument).
+			WithExpectedType(signature.Params().At(index).Type())
+		if _, synchronous := selectedSynchronous[index]; synchronous {
+			argumentContext = argumentContext.WithSynchronousCallableBoundary()
+		}
+		target, err := children.Expression(argumentContext, argument)
 		if err != nil {
 			return nil, nil, nil, err
 		}

@@ -37,8 +37,10 @@ import {
   SlicesReplaceKernel as Replace,
   SlicesReverseKernel as Reverse,
   SlicesSortFuncKernel as SortFunc,
+  SlicesSortFuncSynchronousKernel as SortFuncSynchronous,
   SlicesSortKernel as Sort,
   SlicesSortStableFuncKernel as SortStableFunc,
+  SlicesSortStableFuncSynchronousKernel as SortStableFuncSynchronous,
   SlicesSortedFuncKernel as SortedFunc,
   SlicesSortedKernel as Sorted,
   SlicesValuesKernel as Values,
@@ -236,6 +238,76 @@ test("slices sequence and sorting operations use one typed path", async (): Prom
     (left: number, right: number): bigint => BigInt(right - left),
   );
   assert.deepEqual(values(descending), [3, 2, 1]);
+
+  const canonicalTrace: string[] = [];
+  const synchronousTrace: string[] = [];
+  const canonicalValues = RuntimeSlice.literal([4, 1, 3, 1, 2]);
+  const synchronousValues = RuntimeSlice.literal([4, 1, 3, 1, 2]);
+  await SortStableFunc(
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    canonicalValues,
+    (left: number, right: number): bigint => {
+      canonicalTrace.push(`${left}:${right}`);
+      return BigInt(left - right);
+    },
+  );
+  const synchronousResult = SortStableFuncSynchronous(
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    synchronousValues,
+    (left: number, right: number): bigint => {
+      synchronousTrace.push(`${left}:${right}`);
+      return BigInt(left - right);
+    },
+  );
+  assert.equal(synchronousResult, undefined);
+  assert.deepEqual(values(synchronousValues), values(canonicalValues));
+  assert.deepEqual(synchronousTrace, canonicalTrace);
+
+  let canonicalPanic = "";
+  try {
+    await SortFunc<RuntimeSlice<number>, number, number>(
+      sliceValue,
+      copyValue,
+      copyValue,
+      copyValue,
+      RuntimeSlice.literal([2, 1]),
+      undefined,
+    );
+  } catch (failure: unknown) {
+    canonicalPanic = String(failure);
+  }
+  let synchronousPanic = "";
+  try {
+    SortFuncSynchronous<RuntimeSlice<number>, number, number>(
+      sliceValue,
+      copyValue,
+      copyValue,
+      copyValue,
+      RuntimeSlice.literal([2, 1]),
+      undefined,
+    );
+  } catch (failure: unknown) {
+    synchronousPanic = String(failure);
+  }
+  assert.notEqual(canonicalPanic, "");
+  assert.equal(synchronousPanic, canonicalPanic);
+
+  const synchronousDescending = RuntimeSlice.literal([1, 3, 2]);
+  SortFuncSynchronous(
+    sliceValue,
+    copyValue,
+    copyValue,
+    copyValue,
+    synchronousDescending,
+    (left: number, right: number): bigint => BigInt(right - left),
+  );
+  assert.deepEqual(values(synchronousDescending), [3, 2, 1]);
 
   const asynchronous = RuntimeSlice.literal([6, 1, 5, 2, 4, 3]);
   let comparisonCount = 0;

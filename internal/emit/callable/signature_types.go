@@ -37,6 +37,35 @@ func emitRepresented(
 	parameterName func(*types.Var, int) (string, error),
 	allowTypeParameters bool,
 ) (SignatureEmission, error) {
+	return emitRepresentedWithParameterType(
+		context,
+		children,
+		source,
+		signature,
+		parameterRole,
+		resultRole,
+		parameterName,
+		allowTypeParameters,
+		nil,
+	)
+}
+
+type representedParameterType func(
+	*types.Var,
+	int,
+) (api.TypeEmission, bool, error)
+
+func emitRepresentedWithParameterType(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+	parameterRole api.Role,
+	resultRole api.Role,
+	parameterName func(*types.Var, int) (string, error),
+	allowTypeParameters bool,
+	parameterType representedParameterType,
+) (SignatureEmission, error) {
 	if (!allowTypeParameters && !Supports(signature)) ||
 		signature == nil ||
 		parameterName == nil {
@@ -69,11 +98,21 @@ func emitRepresented(
 			requests = append(requests, parameterRequests...)
 			continue
 		}
-		targetType, err := children.RepresentedType(
-			context.WithRole(parameterRole),
-			source,
-			parameter.Type(),
-		)
+		var targetType api.TypeEmission
+		selected := false
+		if parameterType != nil {
+			targetType, selected, err = parameterType(parameter, index)
+			if err != nil {
+				return SignatureEmission{}, err
+			}
+		}
+		if !selected {
+			targetType, err = children.RepresentedType(
+				context.WithRole(parameterRole),
+				source,
+				parameter.Type(),
+			)
+		}
 		if err != nil {
 			return SignatureEmission{}, err
 		}

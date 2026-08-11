@@ -351,10 +351,24 @@ runtime Promise detection.
 
 Portable algorithms receiving that canonical ABI must preserve it directly.
 They may remove avoidable recursion, allocation, and iterator layers, but they
-must not select a synchronous callback variant or inspect whether a result is a
-Promise. In particular, cooperative generic sorting uses one bounded-work
-iterative merge over two dense buffers and awaits every comparison; native
-`Array.sort` is reserved for an exact synchronous comparator contract.
+must not inspect whether a result is a Promise. The canonical cooperative
+generic path uses one bounded-work iterative merge over two dense buffers and
+awaits every comparison.
+
+A reached private generic concretization may instead select one separately
+certified synchronous provider kernel when every callback argument named by
+that kernel resolves statically to a synchronous callable facet. The effect is
+part of the concretization identity, all call sites and adapters use the same
+exact synchronous contract, and an unresolved, escaped, or cooperative
+callback retains the canonical `Awaitable` path. This is not a public callable
+profile: it adds no source parameter, public overload, runtime result test, or
+spelling-based selection. A direct callback's internal defer/recover envelope
+remains in its ordinary entry and therefore does not require the deferred-call
+registry at this exact ordinary invocation. Native `Array.sort` remains
+reserved for a provider kernel whose exact synchronous contract and observable
+ordering are certified. Captured method values and function variables remain
+on the canonical path; the first captures receiver state and the second may
+have escaped or changed.
 
 Possibly nil indirect calls have one target owner. The emitter captures the
 callee, captures every argument in Go order, then calls
@@ -1019,9 +1033,15 @@ through the selected `DirEntry` profile bridge, while canonical `error` values
 accepted by `errors.Is` preserve generated `Is` and `Unwrap` method sets.
 
 When a private generic kernel transports callbacks, its outer effect and each
-callback parameter effect are exact-joined to the public provider binding.
-The kernel cannot silently narrow an `Awaitable` callback to synchronous,
-duplicate a cooperative implementation, or introduce another public profile.
+callback parameter effect are exact-joined to the public provider binding. A
+second private synchronous kernel is admissible only as a certified narrowing:
+it has the same Go identity, type projection, capability order, and source
+value shape; every direct callback changes from `Awaitable` to synchronous;
+the outer result changes from cooperative to synchronous; and the target
+implementation is independently inspected. Selection belongs to an exact
+private concretization and fails closed to the canonical kernel whenever any
+callback is not statically synchronous. The kernel cannot introduce another
+public profile or use runtime Promise detection.
 
 Compile-only mode emits exact typed throwing placeholders and canonical
 obligations. Linked mode uses certified provider facades. These are explicit

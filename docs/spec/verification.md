@@ -514,10 +514,21 @@ two effects inside one certificate fail before emission.
 
 Portable cooperative sorting is exercised with both synchronous and genuinely
 asynchronous comparators, stable equal-key ordering, empty input with a nil
-comparator, and a comparison-count bound proportional to `n log n`. Provider
-source inspection rejects recursive subarray sorting, iterator-per-merge
-allocation, native sorting of an `Awaitable` comparator, and runtime Promise
-inspection.
+comparator, and a comparison-count bound proportional to `n log n`. The
+separately certified synchronous kernel must produce the same values, panic,
+and comparison trace as the canonical kernel for synchronous comparators while
+returning no Promise. A generated fixture exact-joins a direct synchronous
+callback to the synchronous concretization and retains the canonical path for
+an unresolved, captured-method, or cooperative callback. A direct synchronous
+callback containing defer/recover remains on the synchronous ordinary-entry
+path while its emitted callable retains the recovery envelope. Mutations swap
+either kernel, change a callback effect, omit the effect from concretization
+identity, or classify a function variable or captured method as direct; each
+fails at certification, identity, artifact, strict-typecheck, or differential
+gates.
+Provider source inspection rejects
+recursive subarray sorting, iterator-per-merge allocation, native sorting of
+an `Awaitable` comparator, and runtime Promise inspection.
 
 The certifier independently derives a total directional obligation multiset
 over every provider callable. It recursively records inward interface-method and
@@ -649,8 +660,11 @@ parameter; each fails contract generation at the exact parameter identity.
 
 For every generic provider kernel, certification also exact-joins the kernel's
 outer effect and callback-parameter effects to the public binding document.
-Mutations change either side between synchronous and `Awaitable`, restore a
-separate cooperative kernel, or expose a capability as a public source
+An optional synchronous narrowing exact-joins the same source identity, type
+projection, operations, source arity, and callback indexes while requiring a
+synchronous outer effect and synchronous callback effects. Mutations change
+either side between synchronous and `Awaitable`, pair non-identical callback
+indexes, duplicate either capability, or expose a capability as a public source
 parameter; each fails before emission.
 
 Generic-boundary differentials include concrete and open instances. A

@@ -87,6 +87,7 @@ func emitDeferredGeneric(
 			owner,
 			instance.TypeArgs,
 			signature,
+			api.GenericConcretizationEffectCanonical,
 		)
 		if concreteErr != nil {
 			return api.ExpressionEmission{}, true, concreteErr
