@@ -63,8 +63,25 @@ func Make(value int64) Record {
 			)
 		},
 		func(artifacts renderedArtifacts) {
-			if !strings.Contains(artifacts.printed, ".$storageOf(instance).value") {
-				t.Fatal("derived struct reflection did not use canonical field storage")
+			for _, required := range []string{
+				"export type Derived$Storage = {",
+				"value: int64;",
+				"Derived.$fromStorage(",
+				".$storageOf(instance).value",
+			} {
+				if !strings.Contains(artifacts.printed, required) {
+					t.Fatalf(
+						"derived struct artifact lacks %q:\n%s",
+						required,
+						artifacts.printed,
+					)
+				}
+			}
+			if strings.Contains(artifacts.printed, "new Derived()") {
+				t.Fatalf(
+					"derived struct lost its foreign unexported storage field:\n%s",
+					artifacts.printed,
+				)
 			}
 		},
 	)
