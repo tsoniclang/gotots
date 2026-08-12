@@ -383,15 +383,34 @@ storage conversion, or giving a generic named-object constructor a logical
 field where canonical storage is required must fail strict typechecking or the
 artifact-shape gate.
 
-Source-owned named, anonymous, derived, and generic-storage fixtures exact-join
-every constructor field to its canonical declaration field and assert that
-object properties retain Go source evaluation order. The complete named-struct
-operation enum is mutation-tested one member at a time: demanding one of zero,
-copy, equality, hash, conversion, storage, or assignment must materialize only
-that operation. Broad searches reject source-owned positional `$fieldN`
+Source-owned named, anonymous, and derived fixtures exact-join each public
+constructor parameter to its canonical declaration field, prove direct calls
+allocate no argument object, and prove preserve-Go calls capture reordered
+effects exactly once before declaration-order arguments. Generic canonical
+storage fixtures retain their one required named storage object. The complete
+named-struct operation enum is mutation-tested one member at a time: demanding
+one of zero, copy, equality, hash, conversion, storage, or assignment must
+materialize only that operation. Broad searches reject source-owned `$fieldN`
 parameters and `$make` calls; the only admitted `$make` occurrence is attached
 to a certified provider reference and is covered by a provider-boundary
 fixture.
+
+The generated-name gate enumerates the closed temporary-kind catalog, proves
+that every kind has one distinct prefix, and exact-checks candidates against
+all source, import, and already-generated bindings owned by the file. A
+preserve-Go reordered-literal fixture places the would-be first capture name
+in the enclosing function signature; generated TypeScript must select a
+different binding, strict-typecheck, and remain differential-equal to Go.
+Mutations that omit any namespace from the join, restore a raw source-scope
+counter, duplicate a temporary prefix, or lose the allocated-name set across
+artifact reconstruction must fail at this gate.
+
+A late-demand fixture constructs a struct before taking its address in the
+same Go function. Artifact inspection proves that the final class owns the
+canonical-storage constructor and that the earlier composite was reconstructed
+to pass exactly one typed storage object. Removing the applied-demand resolver,
+the constructor-facet dependency, or reconstruction leaves positional input
+against the storage constructor and must fail strict typechecking.
 
 ## Interface Proof
 

@@ -175,8 +175,7 @@ func (n *File) providerFacetOwner(
 
 func (n *File) allocateProviderImportName(preferred string) string {
 	candidate := preferred
-	for suffix := uint64(0); n.sourceNameExists(candidate) ||
-		n.hasImportName(candidate); suffix++ {
+	for suffix := uint64(0); n.lexicalNameExists(candidate); suffix++ {
 		candidate = preferred + "__from_gostdlib"
 		if suffix != 0 {
 			candidate += "_" + strconv.FormatUint(suffix, 10)

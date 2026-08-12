@@ -443,7 +443,7 @@ func demandDerived(values []Derived) *Derived {
 	if got := packageExportBindings(builder.exportStatements); !equalStrings(
 		got,
 		[]string{
-			"Box", "Box$Storage", "Derived",
+			"Box", "Derived",
 			"Writer", "Writer$contract", "Writer$is",
 		},
 	) {

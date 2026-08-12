@@ -117,8 +117,12 @@ func Run() int32 {
 				if file.PackageName() == "model" {
 					for _, member := range statement.Members() {
 						if constructor, ok := member.(tsgo.ConstructorDeclaration); ok {
-							input := constructor.Parameters()[0].Type().(tsgo.TypeLiteralNode)
-							modelConstructorFields = typeLiteralMemberNames(input)
+							for _, parameter := range constructor.Parameters() {
+								modelConstructorFields = append(
+									modelConstructorFields,
+									targetName(parameter.Name()),
+								)
+							}
 						}
 						method, ok := member.(tsgo.MethodDeclaration)
 						if ok && targetName(method.Name()) == "$copy" {

@@ -243,6 +243,28 @@ func (s *declarationRequirementScheduler) appliedFor(
 	return requirements
 }
 
+func (s *programSession) NamedStructOperationSelected(
+	owner *types.TypeName,
+	operation api.NamedStructOperation,
+) (bool, error) {
+	requirement, err := api.NewNamedStructOperationRequirement(owner, operation)
+	if err != nil {
+		return false, err
+	}
+	return s.requirements.wasApplied(requirement), nil
+}
+
+func (s *programSession) AnonymousStructDemandSelected(
+	artifact *api.GeneratedArtifact,
+	demand api.AnonymousStructDemand,
+) (bool, error) {
+	requirement, err := api.NewAnonymousStructRequirement(artifact, demand)
+	if err != nil {
+		return false, err
+	}
+	return s.requirements.wasApplied(requirement), nil
+}
+
 func (s *declarationRequirementScheduler) consumedBy(
 	owner api.ArtifactOwner,
 ) []api.DeclarationRequirement {

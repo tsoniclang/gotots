@@ -124,7 +124,7 @@ func assertStructOperationWidths(
 	zero := targetMethod(t, class, "$zero")
 	copyMethod := targetMethod(t, class, "$copy")
 	equal := targetMethod(t, class, "$equal")
-	constructorWidth := len(constructor.Parameters()[0].Type().(tsgo.TypeLiteralNode).Members())
+	constructorWidth := len(constructor.Parameters())
 	zeroWidth := constructedFieldCount(zero)
 	copyWidth := constructedFieldCount(copyMethod)
 	equalWidth := equalityLeafCount(
@@ -147,7 +147,7 @@ func assertStructOperationWidths(
 
 func constructedFieldCount(method tsgo.MethodDeclaration) int {
 	result := method.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.NewExpression)
-	return len(result.Arguments()[0].(tsgo.ObjectLiteralExpression).Properties())
+	return len(result.Arguments())
 }
 
 func equalityLeafCount(expression tsgo.Expression) int {

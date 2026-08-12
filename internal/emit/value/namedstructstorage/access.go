@@ -13,10 +13,17 @@ func Selected(
 	sourceType types.Type,
 ) (*types.Named, bool, error) {
 	named, ok := types.Unalias(sourceType).(*types.Named)
-	if !ok ||
-		named.Obj() == nil ||
-		named.TypeParams().Len() == 0 ||
-		named.TypeArgs().Len() != named.TypeParams().Len() {
+	if !ok || named.Obj() == nil {
+		return nil, false, nil
+	}
+	if named.TypeParams().Len() == 0 {
+		selected, err := context.ResolveNamedStructOperation(
+			named.Origin().Obj(),
+			api.NamedStructOperationStorage,
+		)
+		return named, selected, err
+	}
+	if named.TypeArgs().Len() != named.TypeParams().Len() {
 		return nil, false, nil
 	}
 	_, selected, err := context.ResolveGenericNamedStructOperation(

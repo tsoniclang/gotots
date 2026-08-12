@@ -43,7 +43,7 @@ func emitLayout(
 		return layoutEmission{}, err
 	}
 	if !storage {
-		members := directMembers(context, selected)
+		members := []tsgo.ClassElement{directConstructor(context, selected)}
 		return layoutEmission{
 			members:  members,
 			fields:   selected,
@@ -132,75 +132,32 @@ func emitLayoutFields(
 	return result, requests, nil
 }
 
-func directMembers(
+func directConstructor(
 	context api.Context,
 	fields []layoutField,
-) []tsgo.ClassElement {
-	properties := make([]tsgo.ClassElement, 0, len(fields)+1)
-	typeMembers := make([]tsgo.TypeElement, 0, len(fields))
-	assignments := make([]tsgo.Statement, 0, len(fields))
-	input := context.Factory().Identifier("$fields")
+) tsgo.ConstructorDeclaration {
+	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
 	for _, selected := range fields {
-		typeMembers = append(typeMembers,
-			context.Factory().PropertySignatureDeclaration(
-				nil,
-				context.Factory().Identifier(selected.field.name),
-				nil,
-				selected.logicalType,
-				context.Factory().OmittedExpression(),
-			),
-		)
-		if selected.field.blank {
-			continue
+		var modifiers []tsgo.ModifierLike
+		if !selected.field.blank {
+			modifiers = []tsgo.ModifierLike{context.Factory().PublicKeyword()}
 		}
-		properties = append(properties, context.Factory().PropertyDeclaration(
-			[]tsgo.ModifierLike{context.Factory().PublicKeyword()},
+		parameters = append(parameters, context.Factory().ParameterDeclaration(
+			modifiers,
+			nil,
 			context.Factory().Identifier(selected.field.name),
 			nil,
 			selected.logicalType,
 			nil,
 		))
-		assignments = append(assignments, context.Factory().ExpressionStatement(
-			context.Factory().BinaryExpression(
-				nil,
-				context.Factory().PropertyAccessExpression(
-					context.Factory().ThisExpression(),
-					nil,
-					context.Factory().Identifier(selected.field.name),
-					tsgo.NodeFlagsNone,
-				),
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorEqualsToken,
-				),
-				context.Factory().PropertyAccessExpression(
-					input,
-					nil,
-					context.Factory().Identifier(selected.field.name),
-					tsgo.NodeFlagsNone,
-				),
-			),
-		))
 	}
-	var parameters []tsgo.ParameterDeclaration
-	if len(fields) != 0 {
-		parameters = []tsgo.ParameterDeclaration{context.Factory().ParameterDeclaration(
-			nil,
-			nil,
-			input,
-			nil,
-			context.Factory().TypeLiteralNode(typeMembers),
-			nil,
-		)}
-	}
-	constructor := context.Factory().ConstructorDeclaration(
+	return context.Factory().ConstructorDeclaration(
 		[]tsgo.ModifierLike{context.Factory().PublicKeyword()},
 		nil,
 		parameters,
 		nil,
-		context.Factory().Block(assignments, true),
+		context.Factory().Block(nil, true),
 	)
-	return append(properties, constructor)
 }
 
 func storageAlias(

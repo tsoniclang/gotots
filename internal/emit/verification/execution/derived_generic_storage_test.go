@@ -37,9 +37,7 @@ func TestDerivedGenericStorageUsesCanonicalProjection(t *testing.T) {
 		"export type DerivedBox$Storage",
 	)
 	for _, required := range []string{
-		"public Value: int32;",
-		"public constructor($fields: {",
-		"this.Value = $fields.Value;",
+		"public constructor(public Value: int32)",
 	} {
 		if !strings.Contains(concrete, required) {
 			t.Fatalf("concrete derived storage lacks %q:\n%s", required, concrete)

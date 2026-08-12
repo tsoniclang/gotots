@@ -71,8 +71,9 @@ func Emit(
 		)
 	}
 	canonicalStorage := false
-	form := constructionFormNamedObject
+	form := constructionFormDirectPositional
 	var constructorReference api.NameReference
+	var anonymousReference api.NameReference
 	if named != nil {
 		constructorReference, err = context.Names().NamedStructConstructor(
 			named.Origin().Obj(),
@@ -80,13 +81,40 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		form = constructionFormForReference(constructorReference)
 		_, canonicalStorage, err = namedstructstorage.Selected(
 			context,
 			named,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
+		}
+		form = constructionFormForReference(
+			constructorReference,
+			canonicalStorage,
+		)
+	} else {
+		anonymousReference, err = context.Names().AnonymousStruct(
+			structType,
+			api.AnonymousStructDemandDefinition,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if structType.NumFields() != 0 {
+			artifact, artifactErr := anonymousStructArtifact(
+				anonymousReference,
+			)
+			if artifactErr != nil {
+				return api.ExpressionEmission{}, artifactErr
+			}
+			canonicalStorage, err = context.ResolveAnonymousStructDemand(
+				artifact,
+				api.AnonymousStructDemandStorage,
+			)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
 		}
 	}
 	before, requests, fields, err := arrange(
@@ -103,23 +131,14 @@ func Emit(
 		return api.ExpressionEmission{}, err
 	}
 	if named == nil {
-		reference, err := context.Names().AnonymousStruct(
-			structType,
-			api.AnonymousStructDemandDefinition,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		value, typeRequests, err := namedObjectConstruction(
+		value, typeRequests, err := sourceStructConstruction(
 			context,
-			children,
 			source,
-			reference.Expression(context.Factory()),
+			anonymousReference.Expression(context.Factory()),
 			nil,
 			structType,
 			fields,
-			false,
+			canonicalStorage,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -129,7 +148,7 @@ func Emit(
 			value,
 			api.CombineRequests(
 				requests,
-				reference.Requests(),
+				anonymousReference.Requests(),
 				typeRequests,
 			),
 		)
@@ -145,7 +164,7 @@ func Emit(
 				api.NamedStructOperationStorage,
 			)
 		}
-		if err == nil {
+		if err == nil && named.TypeParams().Len() != 0 {
 			typeArguments, requests, err =
 				genericNamedStructTypeArguments(
 					context,
@@ -183,9 +202,8 @@ func Emit(
 			api.CombineRequests(requests, reference.Requests()),
 		)
 	}
-	value, typeRequests, err := namedObjectConstruction(
+	value, typeRequests, err := sourceStructConstruction(
 		context,
-		children,
 		source,
 		reference.Expression(context.Factory()),
 		typeArguments,
@@ -201,6 +219,7 @@ func Emit(
 		value,
 		api.CombineRequests(
 			requests,
+			constructorReference.Requests(),
 			reference.Requests(),
 			typeRequests,
 		),

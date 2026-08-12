@@ -31,7 +31,7 @@ func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 			t.Fatalf("%s has type parameters or heritage clauses", name)
 		}
 		members := class.Members()
-		wantMembers := 2 + fieldCounts[name] + len(operations[name])
+		wantMembers := 2 + len(operations[name])
 		if name == "Box" {
 			wantMembers++
 		}
@@ -40,16 +40,15 @@ func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 		}
 		assertErasedBrand(t, name, members[0])
 		constructor := classConstructor(t, class)
-		if len(constructor.Parameters()) != 1 && fieldCounts[name] != 0 {
-			t.Fatalf("%s constructor parameters = %d, want one", name, len(constructor.Parameters()))
+		if len(constructor.Parameters()) != fieldCounts[name] {
+			t.Fatalf("%s constructor parameters = %d, want %d", name, len(constructor.Parameters()), fieldCounts[name])
 		}
 	}
 
 	reserved := targetClass(t, source, "Reserved")
 	constructor := classConstructor(t, reserved)
-	input := constructor.Parameters()[0].Type().(tsgo.TypeLiteralNode)
-	if got := typeLiteralMemberNames(input)[0]; got != "__go_constructor" {
-		t.Fatalf("reserved constructor field = %q, want collision-safe target name", got)
+	if got := targetName(constructor.Parameters()[0].Name()); got != "__go_constructor" {
+		t.Fatalf("reserved constructor parameter = %q, want collision-safe target name", got)
 	}
 
 }
@@ -99,17 +98,14 @@ func TestNamedStructValuesDefaultToDirectConstruction(t *testing.T) {
 	direct := targetFunction(t, source, "CompositeCalls").
 		Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).
 		Expression().(tsgo.PropertyAccessExpression).Expression().(tsgo.NewExpression)
-	if targetName(direct.Expression()) != "Point" || len(direct.Arguments()) != 1 {
-		t.Fatal("direct constructor is not one named-object new Point")
+	if targetName(direct.Expression()) != "Point" || len(direct.Arguments()) != 2 {
+		t.Fatal("direct constructor is not one source-named positional new Point")
 	}
-	properties := objectAssignments(direct.Arguments()[0].(tsgo.ObjectLiteralExpression))
-	if targetName(properties[0].Name()) != "Visible" ||
-		targetName(properties[0].Initializer().(tsgo.CallExpression).Expression()) != "DirectVisible" {
-		t.Fatal("direct constructor did not preserve source-order Visible")
+	if targetName(direct.Arguments()[0].(tsgo.CallExpression).Expression()) != "DirectX" {
+		t.Fatal("direct constructor did not select declaration-order X")
 	}
-	if targetName(properties[1].Name()) != "X" ||
-		targetName(properties[1].Initializer().(tsgo.CallExpression).Expression()) != "DirectX" {
-		t.Fatal("direct constructor did not preserve source-order X")
+	if targetName(direct.Arguments()[1].(tsgo.CallExpression).Expression()) != "DirectVisible" {
+		t.Fatal("direct constructor did not select declaration-order Visible")
 	}
 }
 
@@ -123,33 +119,32 @@ func TestNamedStructValuesPreserveConstructionOrderWhenSelected(t *testing.T) {
 	))
 	newBox := targetFunction(t, source, "NewBox")
 	statements := newBox.Body().(tsgo.Block).Statements()
-	if len(statements) != 1 {
-		t.Fatalf("NewBox statements = %d, want one source-ordered return", len(statements))
+	if len(statements) != 5 {
+		t.Fatalf("NewBox statements = %d, want four captures and one return", len(statements))
 	}
-	result := statements[0].(tsgo.ReturnStatement).Expression().(tsgo.NewExpression)
-	properties := objectAssignments(result.Arguments()[0].(tsgo.ObjectLiteralExpression))
-	if targetName(properties[0].Name()) != "Active" || targetName(properties[1].Name()) != "Point" {
-		t.Fatal("Box construction does not preserve Go keyed-field order")
+	point := capturedValue(t, statements[3]).(tsgo.NewExpression)
+	if targetName(point.Expression()) != "Point" || len(point.Arguments()) != 2 {
+		t.Fatal("nested Point capture is not direct positional construction")
 	}
-	point := properties[1].Initializer().(tsgo.NewExpression)
-	pointProperties := objectAssignments(point.Arguments()[0].(tsgo.ObjectLiteralExpression))
-	if targetName(pointProperties[0].Name()) != "Visible" ||
-		targetName(pointProperties[1].Name()) != "X" {
-		t.Fatal("nested Point construction does not preserve Go keyed-field order")
+	result := statements[4].(tsgo.ReturnStatement).Expression().(tsgo.NewExpression)
+	if targetName(result.Expression()) != "Box" || len(result.Arguments()) != 2 {
+		t.Fatal("Box construction is not direct declaration-order construction")
 	}
 
 	callStatements := targetFunction(t, source, "CompositeCalls").
 		Body().(tsgo.Block).Statements()
-	if len(callStatements) != 1 {
-		t.Fatalf("CompositeCalls statements = %d, want one ordered return", len(callStatements))
+	if len(callStatements) != 3 {
+		t.Fatalf("CompositeCalls statements = %d, want two captures and one return", len(callStatements))
 	}
-	callValue := callStatements[0].(tsgo.ReturnStatement).Expression().(tsgo.PropertyAccessExpression).Expression().(tsgo.NewExpression)
-	callProperties := objectAssignments(callValue.Arguments()[0].(tsgo.ObjectLiteralExpression))
-	firstCall := callProperties[0].Initializer().(tsgo.CallExpression)
-	secondCall := callProperties[1].Initializer().(tsgo.CallExpression)
+	firstCall := capturedValue(t, callStatements[0]).(tsgo.CallExpression)
+	secondCall := capturedValue(t, callStatements[1]).(tsgo.CallExpression)
 	if targetName(firstCall.Expression()) != "DirectVisible" ||
 		targetName(secondCall.Expression()) != "DirectX" {
 		t.Fatal("preserve-go did not capture call-valued keyed fields in source order")
+	}
+	callValue := callStatements[2].(tsgo.ReturnStatement).Expression().(tsgo.PropertyAccessExpression).Expression().(tsgo.NewExpression)
+	if len(callValue.Arguments()) != 2 {
+		t.Fatal("preserve-go Point construction is not direct positional output")
 	}
 
 	copyResult := targetFunction(t, source, "CopyResult").
@@ -173,14 +168,13 @@ func classConstructor(t *testing.T, class tsgo.ClassDeclaration) tsgo.Constructo
 	return nil
 }
 
-func objectAssignments(source tsgo.ObjectLiteralExpression) []tsgo.PropertyAssignment {
-	result := make([]tsgo.PropertyAssignment, 0, len(source.Properties()))
-	for _, member := range source.Properties() {
-		if property, ok := member.(tsgo.PropertyAssignment); ok {
-			result = append(result, property)
-		}
+func capturedValue(t *testing.T, statement tsgo.Statement) tsgo.Expression {
+	t.Helper()
+	declaration, ok := statement.(tsgo.VariableStatement)
+	if !ok || len(declaration.DeclarationList().Declarations()) != 1 {
+		t.Fatalf("capture statement = %T, want one variable declaration", statement)
 	}
-	return result
+	return declaration.DeclarationList().Declarations()[0].Initializer()
 }
 
 func TestNamedStructValuesUseStaticallySelectedClassOperations(t *testing.T) {
@@ -295,28 +289,28 @@ func TestNamedStructCallArgumentsPlacePrerequisitesInSourceOrder(t *testing.T) {
 	))
 	function := targetFunction(t, source, "CompositeSecondArgument")
 	statements := function.Body().(tsgo.Block).Statements()
-	if len(statements) != 1 {
+	if len(statements) != 7 {
 		t.Fatalf(
-			"CompositeSecondArgument statements = %d, want one ordered call",
+			"CompositeSecondArgument statements = %d, want six captures and one call",
 			len(statements),
 		)
 	}
-	call := statements[0].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)
+	firstCall, ok := capturedValue(t, statements[0]).(tsgo.CallExpression)
+	if !ok || targetName(firstCall.Expression()) != "DirectValue" {
+		t.Fatal("first argument was not evaluated before second-argument prerequisites")
+	}
+	box, ok := capturedValue(t, statements[5]).(tsgo.NewExpression)
+	if !ok || targetName(box.Expression()) != "Box" || len(box.Arguments()) != 2 {
+		t.Fatalf("captured second argument = %T, want direct new Box", capturedValue(t, statements[5]))
+	}
+	call := statements[6].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)
 	if len(call.Arguments()) != 2 {
 		t.Fatalf("CompositeSecondArgument arguments = %d, want two", len(call.Arguments()))
 	}
-	firstCall, ok := call.Arguments()[0].(tsgo.CallExpression)
-	if !ok || targetName(firstCall.Expression()) != "DirectValue" {
-		t.Fatal("first argument is not the source DirectValue call")
-	}
-	box, ok := call.Arguments()[1].(tsgo.NewExpression)
-	if !ok || targetName(box.Expression()) != "Box" {
-		t.Fatalf("second argument = %T, want direct new Box", call.Arguments()[1])
-	}
-	properties := objectAssignments(box.Arguments()[0].(tsgo.ObjectLiteralExpression))
-	if targetName(properties[0].Name()) != "Active" ||
-		targetName(properties[1].Name()) != "Point" {
-		t.Fatal("second argument does not preserve source field order")
+	for index, argument := range call.Arguments() {
+		if _, ok := argument.(tsgo.Identifier); !ok {
+			t.Fatalf("final call argument %d = %T, want captured identifier", index, argument)
+		}
 	}
 }
 

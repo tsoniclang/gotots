@@ -71,6 +71,7 @@ const (
 	TemporaryChannelResult
 	TemporarySelectCase
 	TemporaryRangeReturn
+	temporaryKindLimit
 )
 
 type MethodTargetKind uint8

@@ -60,6 +60,20 @@ Names are reserved by exact `types.Object` identity in deterministic package
 and source order. Target-only collision suffixes are stable and readable.
 Source spelling never acts as semantic identity.
 
+Every generated binding inserted into a source-bearing lexical scope is
+allocated by the file name owner. The owner reserves the portable target
+spellings of every explicit and implicit Go binding in the complete package,
+every selected import alias, and every generated binding already allocated;
+it therefore avoids a source name even when that declaration occurs later or
+inside a descendant scope. For example, a source parameter named
+`__gotots_field_0` forces the first composite-literal capture to use
+`__gotots_field_1` or the next available name. Generated member names use the
+struct member owner under the same no-duplicate rule. A literal target-only
+name is admitted only inside a structurally closed synthetic scope whose owner
+defines the complete binding set and uses the `$` namespace that Go source
+cannot spell. Raw counters are forbidden in scopes that contain authored
+bindings.
+
 A compilation-global artifact keeps an imported derived export unqualified
 when that export is unique in the selected source universe. The naming owner
 preindexes exact declaration identities and adds the package qualifier only
@@ -480,27 +494,25 @@ maps to the source-ordered ordinary shape:
 
 ```ts
 class Point {
-  X: int32;
-  Y: int32;
-
-  constructor(fields: { X: int32; Y: int32 }) {
-    this.X = fields.X;
-    this.Y = fields.Y;
-  }
+  constructor(public X: int32, public Y: int32) {}
 }
 
 function NewPoint(): Point {
-  return new Point({ Y: mark(2), X: mark(1) });
+  const field0 = mark(2);
+  const field1 = mark(1);
+  return new Point(field1, field0);
 }
 ```
 
-The constructor's type contains the complete declaration field set; each call
-keeps the source literal's evaluation order. A temporary is emitted only when
-an expression prerequisite or a provider's positional contract requires it.
-Static `$zero`, `$copy`, `$equal`, `$hash`, `$convert`, `$storageOf`,
-`$fromStorage`, and `$assign` members exist only when their exact semantic use
-requests them. A certified provider may expose a positional `$make` operation;
-ordinary generated structs never gain that compatibility factory.
+The constructor's parameters are the complete declaration field set and create
+the fields directly without an argument-object allocation. Under the
+preserve-Go profile, the call captures only the expressions needed to retain
+source evaluation order before placing arguments in declaration order. The
+direct profile omits those captures by explicit project choice. Static
+`$zero`, `$copy`, `$equal`, `$hash`, `$convert`, `$storageOf`, `$fromStorage`,
+and `$assign` members exist only when their exact semantic use requests them. A
+certified provider may expose a positional `$make` operation; ordinary
+generated structs never gain that compatibility factory.
 
 ### Arrays And Slices
 

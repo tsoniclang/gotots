@@ -13,7 +13,8 @@ type constructionForm uint8
 
 const (
 	constructionFormInvalid constructionForm = iota
-	constructionFormNamedObject
+	constructionFormDirectPositional
+	constructionFormStorageObject
 	constructionFormProviderFacet
 )
 
@@ -45,7 +46,8 @@ func arrange(
 	[]arrangedField,
 	error,
 ) {
-	if form != constructionFormNamedObject &&
+	if form != constructionFormDirectPositional &&
+		form != constructionFormStorageObject &&
 		form != constructionFormProviderFacet {
 		return nil, nil, nil, &api.InvariantError{
 			Role:   context.Role(),
@@ -166,7 +168,7 @@ func arrange(
 			value: zero.Value(),
 		})
 	}
-	if form == constructionFormNamedObject {
+	if form == constructionFormStorageObject {
 		return before, requests, ordered, nil
 	}
 	positional := make([]arrangedField, 0, structType.NumFields())
@@ -194,7 +196,8 @@ func constructionCaptureBoundary(
 			reason = constructionCapturePrerequisite
 			continue
 		}
-		if form == constructionFormProviderFacet &&
+		if (form == constructionFormDirectPositional ||
+			form == constructionFormProviderFacet) &&
 			(element.fieldIndex != index ||
 				structType.Field(element.fieldIndex).Name() == "_") &&
 			context.EvaluationOrder() == api.EvaluationOrderPreserveGo {

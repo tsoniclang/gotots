@@ -9,16 +9,21 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func constructionFormForReference(reference api.NameReference) constructionForm {
+func constructionFormForReference(
+	reference api.NameReference,
+	canonicalStorage bool,
+) constructionForm {
 	if reference.ProviderBoundary() {
 		return constructionFormProviderFacet
 	}
-	return constructionFormNamedObject
+	if canonicalStorage {
+		return constructionFormStorageObject
+	}
+	return constructionFormDirectPositional
 }
 
-func namedObjectConstruction(
+func sourceStructConstruction(
 	context api.Context,
-	children api.ChildEmitter,
 	source ast.Node,
 	reference tsgo.Expression,
 	typeArguments []tsgo.TypeNode,
@@ -39,6 +44,17 @@ func namedObjectConstruction(
 			nil,
 		), nil, nil
 	}
+	if !canonicalStorage {
+		arguments := make([]tsgo.Expression, 0, len(fields))
+		for _, selected := range fields {
+			arguments = append(arguments, selected.value)
+		}
+		return context.Factory().NewExpression(
+			reference,
+			typeArguments,
+			arguments,
+		), nil, nil
+	}
 	properties := make([]tsgo.ObjectLiteralElementLike, 0, len(fields))
 	var requests []api.RootRequest
 	for _, selected := range fields {
@@ -51,23 +67,13 @@ func namedObjectConstruction(
 		if err != nil {
 			return nil, nil, err
 		}
-		fieldType, err := children.RepresentedType(
-			context.WithRole(api.RoleStructFieldType),
+		fieldType, err := context.Values().StorageType(
+			context.WithRole(api.RoleStorageType),
 			source,
 			field.Type(),
 		)
 		if err != nil {
 			return nil, nil, err
-		}
-		if canonicalStorage {
-			fieldType, err = context.Values().StorageType(
-				context.WithRole(api.RoleStorageType),
-				source,
-				field.Type(),
-			)
-			if err != nil {
-				return nil, nil, err
-			}
 		}
 		requests = append(requests, fieldType.Requests()...)
 		properties = append(properties, context.Factory().PropertyAssignment(

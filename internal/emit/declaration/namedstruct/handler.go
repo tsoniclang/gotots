@@ -346,6 +346,9 @@ func derivedFields(
 		if context.SourceImplementationContract() && !object.Exported() {
 			continue
 		}
+		if !object.Exported() && object.Pkg() != typeName.Pkg() {
+			continue
+		}
 		blank := object.Name() == "_"
 		name, err := structconstruction.FieldName(context.Names(), object, index)
 		if err != nil {

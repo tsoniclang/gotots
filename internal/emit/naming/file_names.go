@@ -21,6 +21,7 @@ type File struct {
 	targetPath      string
 	observer        EnvironmentObserver
 	temporaries     map[api.TemporaryKind]uint64
+	generatedNames  map[string]struct{}
 	importNames     map[string]struct{}
 	importAliases   map[types.Object]string
 	derivedImports  map[string]string
@@ -34,8 +35,6 @@ type File struct {
 	artifactFile    *ast.File
 	artifactPath    string
 }
-
-type TemporarySnapshot map[api.TemporaryKind]uint64
 
 func (n *File) sourceReferencePath(
 	object types.Object,
@@ -89,6 +88,7 @@ func (n *Owner) ForFile(
 		targetPath:      targetPath,
 		observer:        observer,
 		temporaries:     make(map[api.TemporaryKind]uint64),
+		generatedNames:  make(map[string]struct{}),
 		importNames:     make(map[string]struct{}),
 		importAliases:   make(map[types.Object]string),
 		derivedImports:  make(map[string]string),
@@ -464,21 +464,6 @@ func (n *File) BeginArtifact(
 	}, nil
 }
 
-func (n *File) SnapshotTemporaries() TemporarySnapshot {
-	snapshot := make(TemporarySnapshot, len(n.temporaries))
-	for kind, value := range n.temporaries {
-		snapshot[kind] = value
-	}
-	return snapshot
-}
-
-func (n *File) RestoreTemporaries(snapshot TemporarySnapshot) {
-	n.temporaries = make(map[api.TemporaryKind]uint64, len(snapshot))
-	for kind, value := range snapshot {
-		n.temporaries[kind] = value
-	}
-}
-
 func valueReferenceFacet(object types.Object) (api.ArtifactFacet, error) {
 	switch object.(type) {
 	case *types.Func, *types.Builtin:
@@ -547,41 +532,9 @@ func (n *File) packageImportQualifier(
 func (n *File) allocateImportName(preferred string, qualifier string) string {
 	base := preferred + "__from_" + qualifier
 	candidate := base
-	for suffix := uint64(1); n.sourceNameExists(candidate) ||
-		n.hasImportName(candidate); suffix++ {
+	for suffix := uint64(1); n.lexicalNameExists(candidate); suffix++ {
 		candidate = base + "_" + strconv.FormatUint(suffix, 10)
 	}
 	n.importNames[candidate] = struct{}{}
 	return candidate
-}
-
-func (n *File) sourceNameExists(name string) bool {
-	return (n.packageScope != nil && n.packageScope.Lookup(name) != nil) ||
-		n.owner.hasSourceName(name)
-}
-
-func (n *File) hasImportName(name string) bool {
-	_, exists := n.importNames[name]
-	return exists
-}
-
-func (n *Owner) hasSourceName(name string) bool {
-	_, exists := n.sourceNameBases[name]
-	return exists
-}
-
-func (n *File) Temporary(kind api.TemporaryKind) (string, error) {
-	prefix, err := api.TemporaryPrefix(kind)
-	if err != nil {
-		return "", err
-	}
-	for {
-		index := n.temporaries[kind]
-		n.temporaries[kind] = index + 1
-		candidate := prefix + strconv.FormatUint(index, 10)
-		if _, reserved := n.owner.sourceNameBases[candidate]; reserved {
-			continue
-		}
-		return candidate, nil
-	}
 }

@@ -59,7 +59,7 @@ func Boolean(value bool) (bool, bool) {
 	)
 	for _, required := range []string{
 		"function NewBox(value: int32): Pointer<Box> | undefined",
-		"allocatePointer<Box>(new Box({",
+		"allocatePointer<Box>(new Box(value))",
 		"storePointer((pointer ?? GoPanic.raiseRuntime",
 		"pointer: Pointer<T> | undefined",
 		"export class Box",
@@ -122,7 +122,7 @@ func Package(value int32) (int32, bool) {
 	)
 	for _, required := range []string{
 		"let pointer: Pointer<Child> | undefined",
-		"addressOf<Child>(__gotots_store_0.Child)",
+		"projectPointer<Child$Storage, Child>(addressOf<Child$Storage>(__gotots_store_0.Child)",
 		"loadPointer<Child>",
 		"equalPointer<Child>",
 	} {

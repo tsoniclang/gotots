@@ -48,12 +48,15 @@ func TestNamedStructSyntheticBindingsAndReceiverCopyHaveExactShape(
 		class := targetClass(t, source, className)
 		assertStaticOperationSequence(t, source, className, nil)
 		constructor := classConstructor(t, class)
-		if len(constructor.Parameters()) != 1 {
-			t.Fatalf("%s constructor parameters = %d, want one named object", className, len(constructor.Parameters()))
+		if len(constructor.Parameters()) != len(expectedFields) {
+			t.Fatalf("%s constructor parameters = %d, want %d", className, len(constructor.Parameters()), len(expectedFields))
 		}
-		input, ok := constructor.Parameters()[0].Type().(tsgo.TypeLiteralNode)
-		if !ok || fmt.Sprint(typeLiteralMemberNames(input)) != fmt.Sprint(expectedFields) {
-			t.Fatalf("%s constructor fields = %v, want %v", className, typeLiteralMemberNames(input), expectedFields)
+		actualFields := make([]string, 0, len(constructor.Parameters()))
+		for _, parameter := range constructor.Parameters() {
+			actualFields = append(actualFields, targetName(parameter.Name()))
+		}
+		if fmt.Sprint(actualFields) != fmt.Sprint(expectedFields) {
+			t.Fatalf("%s constructor fields = %v, want %v", className, actualFields, expectedFields)
 		}
 	}
 }
@@ -112,13 +115,13 @@ func TestLexicalReceiverMutationsFailStrictTypeScript(t *testing.T) {
 	}{
 		{
 			className: "fileRange",
-			useBefore: "public fileRange: Mode;",
-			useAfter:  "public fileRange: fileRange;",
+			useBefore: "public fileRange: Mode",
+			useAfter:  "public fileRange: fileRange",
 		},
 		{
 			className: "derivedRange",
-			useBefore: "public derivedRange: Mode;",
-			useAfter:  "public derivedRange: derivedRange;",
+			useBefore: "public derivedRange: Mode",
+			useAfter:  "public derivedRange: derivedRange",
 		},
 	} {
 		t.Run(testCase.className+"-named-field-binding", func(t *testing.T) {

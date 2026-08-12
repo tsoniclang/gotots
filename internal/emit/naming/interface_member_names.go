@@ -59,8 +59,7 @@ func (n *File) derivedSourceReference(
 		if localName == "" {
 			localName = exportedName
 			if n.owner.registry.sourceBindingNameCollides(binding.name) ||
-				n.sourceNameExists(exportedName) ||
-				n.hasImportName(exportedName) {
+				n.lexicalNameExists(exportedName) {
 				qualifier, qualifierErr := n.packageImportQualifier(object.Pkg())
 				if qualifierErr != nil {
 					return api.NameReference{}, qualifierErr

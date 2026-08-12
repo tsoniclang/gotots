@@ -319,12 +319,10 @@ func (n *File) Primitive(alias api.PrimitiveAlias) (api.NameReference, error) {
 		return api.NameReference{}, err
 	}
 	localName := exportedName
-	if n.sourceNameExists(localName) ||
-		n.hasImportName(localName) {
+	if n.lexicalNameExists(localName) {
 		base := exportedName + "__from_gotots_support"
 		localName = base
-		for suffix := uint64(1); n.sourceNameExists(localName) ||
-			n.hasImportName(localName); suffix++ {
+		for suffix := uint64(1); n.lexicalNameExists(localName); suffix++ {
 			localName = base + "_" + strconv.FormatUint(suffix, 10)
 		}
 	}
@@ -399,12 +397,10 @@ func (n *File) Runtime(
 	}
 	exportedName := contract.ExportedName()
 	localName := exportedName
-	if n.sourceNameExists(localName) ||
-		n.hasImportName(localName) {
+	if n.lexicalNameExists(localName) {
 		base := exportedName + "__from_gotots_runtime"
 		localName = base
-		for suffix := uint64(1); n.sourceNameExists(localName) ||
-			n.hasImportName(localName); suffix++ {
+		for suffix := uint64(1); n.lexicalNameExists(localName); suffix++ {
 			localName = base + "_" + strconv.FormatUint(suffix, 10)
 		}
 	}

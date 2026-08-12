@@ -211,6 +211,7 @@ func (e *emitter) context(names api.Names) (api.Context, error) {
 	}
 	context = context.
 		WithGenericCallableResolver(e.generic).
+		WithDeclarationDemandResolver(e.declarationDemands).
 		WithCooperativeCallableResolver(e.cooperative).
 		WithRecoveryCallableResolver(e.recovery).
 		WithExternalFunctionResolver(e.external).

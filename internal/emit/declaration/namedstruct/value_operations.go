@@ -230,6 +230,7 @@ func zeroMethod(
 			fields,
 			constructionTypes,
 			arguments,
+			canonicalStorage,
 		),
 	))
 	return operationMethod(
@@ -333,6 +334,7 @@ func copyMethod(
 				fields,
 				constructionTypes,
 				arguments,
+				canonicalStorage,
 			),
 		)},
 		capabilities,
@@ -519,9 +521,10 @@ func construct(
 	fields []field,
 	constructionTypes []tsgo.TypeNode,
 	arguments []tsgo.Expression,
+	canonicalStorage bool,
 ) tsgo.NewExpression {
-	var constructorArguments []tsgo.Expression
-	if len(fields) != 0 {
+	constructorArguments := arguments
+	if canonicalStorage && len(fields) != 0 {
 		properties := make([]tsgo.ObjectLiteralElementLike, 0, len(fields))
 		for index, selected := range fields {
 			properties = append(properties, context.Factory().PropertyAssignment(

@@ -107,6 +107,7 @@ func conversionMethod(
 				fields,
 				constructionTypes,
 				arguments,
+				canonicalStorage,
 			),
 		)},
 		capabilities,

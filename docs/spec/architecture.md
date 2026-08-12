@@ -73,14 +73,27 @@ rerun the checker.
 One fact may have many references but one producer. A second workaround in the
 same semantic class reopens its owner.
 
-Source-owned named and anonymous structs have one ordinary named-object
-constructor shape. Composite literals preserve Go source evaluation order in
-the object properties and introduce temporaries only when a child prerequisite
-would otherwise reorder evaluation. Zero, copy, equality, hash, conversion,
-storage, and assignment members are reconstructed only when an exact use
-demands that member. Positional `$make` is not a general struct-construction
-route; it is permitted only as the exact callable facet of a selected certified
-provider boundary.
+Source-owned named and anonymous structs have one ordinary public constructor
+whose parameters use canonical source-field names in declaration order. A
+direct profile calls it without an intermediate object. A preserve-Go profile
+captures only the source expressions needed before declaration-order argument
+placement; a canonical storage representation carries its already-required
+named storage object. Zero, copy, equality, hash, conversion, storage, and
+assignment members are reconstructed only when an exact use demands that
+member. Positional `$make` is not a general struct-construction route; it is
+permitted only as the exact callable facet of a selected certified provider
+boundary.
+
+Canonical-storage demand is selected by the declaration-requirement owner,
+not by encounter order. Every source construction subscribes to the
+constructor surface. If a later address, generic, interface, or representation
+use changes that surface, the artifact scheduler reconstructs every subscribed
+construction and the emitter reads the already-applied storage selection from
+the one requirement ledger. For example, in `value := Record{Value: 4};
+pointer := &value`, the first emission may request an ordinary `new Record(4)`;
+after addressability selects canonical storage, both the class and `value`'s
+owning function are transactionally rebuilt to the storage constructor shape.
+No encounter-order flag or second representation registry is retained.
 
 ## Source Selection
 
