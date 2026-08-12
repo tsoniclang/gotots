@@ -41,6 +41,12 @@ func (staticSpecializationNames) ProviderOwnedDeclaration(
 	return false, nil
 }
 
+func (staticSpecializationNames) EnvironmentOwnedDeclaration(
+	types.Object,
+) (bool, error) {
+	return false, nil
+}
+
 func (staticSpecializationNames) TypeReference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
