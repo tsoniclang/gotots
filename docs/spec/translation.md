@@ -748,6 +748,18 @@ callable is individual, typed, internal, and selected statically; it is not a
 public source parameter or an operation object. An unsupported open export
 fails explicitly.
 
+The concrete `(a, b) => a + b` operation is constructed directly in the
+facade's TS-Go AST. Ordinary exact operations do not become sibling capability
+files. A genuinely shared constraint-method or deferred-callable-registry
+operation may remain a named private artifact because its effect or registry
+contract, rather than a concrete arithmetic expression, owns the behavior.
+
+The examples' `$int` and `$string` suffixes are canonical semantic names, not
+abbreviated hashes. Method concretizations include the receiver, effects such as
+the synchronous callback profile are explicit suffix components, and imports
+are collision-checked against every visible authored, imported, and generated
+binding before the TS-Go AST is sealed.
+
 The same rule covers representation-disjoint builtin forms. For
 `B ~[]byte | ~string`, `append(dst, src...)` requests exactly one internal
 append-spread callable; concrete facades bind either the canonical slice

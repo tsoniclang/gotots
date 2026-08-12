@@ -276,7 +276,7 @@ func TimeAddress() time.Time {
 		"SlicesCloneKernel<GoContainerStorage<T>>($argument0)",
 		"CmpCompareKernel<gostring>(",
 		"SlicesValuesKernel<RuntimeSlice<gostring>, gostring, gostring>(",
-		"ErrorsAsTypeKernel<code__from_providerprojection>($goCapability_",
+		"ErrorsAsTypeKernel<code__from_providerprojection>(($argument0:",
 		"GenericAddress$kernel<T>",
 		"SlicesSortFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
 		"SlicesSortStableFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
@@ -316,6 +316,14 @@ func TimeAddress() time.Time {
 	} {
 		if !strings.Contains(printed, exact) {
 			t.Fatalf("provider generic projection lacks %q:\n%s", exact, printed)
+		}
+	}
+	for _, forbidden := range []string{
+		"$goCapability_",
+		"support/generics/capabilities/",
+	} {
+		if strings.Contains(printed, forbidden) {
+			t.Fatalf("provider generic projection retains %q:\n%s", forbidden, printed)
 		}
 	}
 	for _, superseded := range []string{

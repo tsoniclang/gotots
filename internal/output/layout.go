@@ -190,12 +190,12 @@ func ProviderStatefulRepresentationPath(artifactKey string) (string, error) {
 	return generatedArtifactPath("providers/stateful-representations", artifactKey)
 }
 
-func GenericCapabilityPath(artifactKey string) (string, error) {
-	return generatedArtifactPath("generics/capabilities", artifactKey)
+func GenericCapabilityPath(module string) (string, error) {
+	return semanticGeneratedArtifactPath("generics/capabilities", module)
 }
 
-func GenericConcretizationPath(artifactKey string) (string, error) {
-	return generatedArtifactPath("generics/concretizations", artifactKey)
+func GenericConcretizationPath(module string) (string, error) {
+	return semanticGeneratedArtifactPath("generics/concretizations", module)
 }
 
 func DeferredCallableRegistryPath(artifactKey string) (string, error) {
@@ -230,6 +230,39 @@ func generatedArtifactPath(
 		directory,
 		artifactKey[:generatedArtifactShardKeyLength]+".ts",
 	), nil
+}
+
+func semanticGeneratedArtifactPath(
+	directory string,
+	module string,
+) (string, error) {
+	if module == "" || path.IsAbs(module) {
+		return "", &PathError{
+			Source: module,
+			Reason: "semantic generated artifact module is invalid",
+		}
+	}
+	for _, segment := range strings.Split(module, "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			return "", &PathError{
+				Source: module,
+				Reason: "semantic generated artifact module is invalid",
+			}
+		}
+		for _, character := range segment {
+			if character >= 'a' && character <= 'z' ||
+				character >= 'A' && character <= 'Z' ||
+				character >= '0' && character <= '9' ||
+				character == '_' || character == '$' {
+				continue
+			}
+			return "", &PathError{
+				Source: module,
+				Reason: "semantic generated artifact module is invalid",
+			}
+		}
+	}
+	return path.Join("support", directory, module+".ts"), nil
 }
 
 func packageArtifactPath(

@@ -6,6 +6,7 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/generic/semanticname"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/output"
 )
@@ -325,23 +326,52 @@ func (r *Registry) internGenericConcretization(
 		}
 		return existing, nil
 	}
-	if len(artifactKey) < 20 {
-		return genericConcretizationBinding{}, &api.NameError{
-			Reason: "generic concretization artifact key is invalid",
+	name, err := semanticname.ConcretizationName(
+		concretization.Owner(),
+		concretization.Suffix(),
+	)
+	if err != nil {
+		return genericConcretizationBinding{}, err
+	}
+	module := ""
+	if concretization.Placement() ==
+		api.GeneratedArtifactPlacementCompilation {
+		var moduleErr error
+		module, moduleErr = semanticname.ConcretizationModule(
+			concretization.Owner(),
+		)
+		if moduleErr != nil {
+			return genericConcretizationBinding{}, moduleErr
 		}
 	}
-	name := concretization.Owner().Name() +
-		"$concrete_" + artifactKey[:20]
-	if err := reserveGeneratedName(
+	if err := reserveGenericGeneratedName(
 		r.genericConcretizationNames,
-		name,
+		genericGeneratedNameScope{
+			placement:    concretization.Placement(),
+			lexicalOwner: concretization.LexicalOwner(),
+			anchor:       concretization.LexicalAnchor(),
+			module:       module,
+			name:         name,
+		},
 		artifactKey,
 		"generic concretization",
 	); err != nil {
 		return genericConcretizationBinding{}, err
 	}
+	if concretization.Placement() ==
+		api.GeneratedArtifactPlacementCompilation {
+		if err := reserveGenericConcretizationModule(
+			r.genericConcretizationModules,
+			genericGeneratedModuleScope{
+				placement: concretization.Placement(),
+				module:    module,
+			},
+			concretization.Owner(),
+		); err != nil {
+			return genericConcretizationBinding{}, err
+		}
+	}
 	var owner *api.GeneratedArtifact
-	var err error
 	if concretization.Placement() ==
 		api.GeneratedArtifactPlacementLexical {
 		owner, err = api.NewLexicalGenericConcretizationArtifact(
@@ -350,7 +380,7 @@ func (r *Registry) internGenericConcretization(
 			name,
 		)
 	} else {
-		outputPath, pathErr := output.GenericConcretizationPath(artifactKey)
+		outputPath, pathErr := output.GenericConcretizationPath(module)
 		if pathErr != nil {
 			return genericConcretizationBinding{}, pathErr
 		}

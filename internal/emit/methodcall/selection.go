@@ -149,6 +149,7 @@ func Resolve(
 	if requiresConcretization {
 		capabilities, projectionRequests, err = genericinstance.EmitCapabilities(
 			context,
+			children,
 			source,
 			operationSet,
 			typeArgumentList,

@@ -119,16 +119,16 @@ func assertNamedMapGenericStorageFacets(
 	projectionPath, projection := uniqueArtifactContaining(
 		t,
 		artifacts,
-		"$0: Values__from_genericnamedmap",
+		"$argument0: Values__from_genericnamedmap",
 		"): GoMapValue<gostring, int32>",
-		"return $0.$value;",
+		"return $argument0.$value;",
 	)
 	wrappingPath, wrapping := uniqueArtifactContaining(
 		t,
 		artifacts,
-		"$0: GoMapValue<gostring, int32>",
+		"$argument0: GoMapValue<gostring, int32>",
 		"): Values__from_genericnamedmap",
-		"return new Values__from_genericnamedmap($0);",
+		"return new Values__from_genericnamedmap($argument0);",
 	)
 	for _, testCase := range []struct {
 		name   string
@@ -141,15 +141,15 @@ func assertNamedMapGenericStorageFacets(
 			name:   "logical map returned as storage",
 			path:   projectionPath,
 			source: projection,
-			from:   "return $0.$value;",
-			to:     "return $0;",
+			from:   "return $argument0.$value;",
+			to:     "return $argument0;",
 		},
 		{
 			name:   "storage map returned as logical",
 			path:   wrappingPath,
 			source: wrapping,
-			from:   "return new Values__from_genericnamedmap($0);",
-			to:     "return $0;",
+			from:   "return new Values__from_genericnamedmap($argument0);",
+			to:     "return $argument0;",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {

@@ -108,9 +108,9 @@ func assertGenericMethodAdapterShape(t *testing.T, printed string) {
 	t.Helper()
 	for _, required := range []string{
 		"export function AuditGenericMethodAdapters",
-		"$go$binary_equal_",
+		"$go$binary_equal$",
 		"Same$kernel",
-		"Same$concrete_",
+		"ComparableBox$Same$int32",
 		"=>",
 	} {
 		if !strings.Contains(printed, required) {
@@ -124,7 +124,7 @@ func assertGenericMethodAdapterShape(t *testing.T, printed string) {
 		t.Fatalf("generic method adapter uses dynamic callable APIs:\n%s", printed)
 	}
 	ordinaryKernelCapability := regexp.MustCompile(
-		`\.Same\$kernel\(\$goCapability_[0-9a-f]+`,
+		`\.Same\$kernel\(\(\$argument0: int32, \$argument1: int32\): bool =>`,
 	)
 	if count := len(ordinaryKernelCapability.FindAllString(printed, -1)); count != 1 {
 		t.Fatalf(
@@ -134,7 +134,7 @@ func assertGenericMethodAdapterShape(t *testing.T, printed string) {
 		)
 	}
 	deferredKernelCapability := regexp.MustCompile(
-		`Same\$kernel\$deferred\(\$go\$recovery, \$argument0, \$goCapability_[0-9a-f]+`,
+		`Same\$kernel\$deferred\(`,
 	)
 	if count := len(deferredKernelCapability.FindAllString(printed, -1)); count != 0 {
 		t.Fatalf(
@@ -144,7 +144,7 @@ func assertGenericMethodAdapterShape(t *testing.T, printed string) {
 		)
 	}
 	leakedCapability := regexp.MustCompile(
-		`Same\$concrete_[0-9a-f]+\((?:\$go\$recovery, )?\$goCapability_`,
+		`ComparableBox\$Same\$int32\((?:\$go\$recovery, )?\$go\$`,
 	)
 	if leakedCapability.MatchString(printed) {
 		t.Fatalf("generic method source adapter exposes a capability:\n%s", printed)
@@ -181,8 +181,8 @@ func TestWaveSevenBigIntGenericArithmeticExecutesDifferentially(t *testing.T) {
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	for _, required := range []string{
 		"export function Arithmetic$kernel<T>",
-		"$go$binary_divide_",
-		"$go$binary_remainder_",
+		"$go$binary_divide$",
+		"$go$binary_remainder$",
 		"goIntegerDivide",
 		"goIntegerRemainder",
 	} {

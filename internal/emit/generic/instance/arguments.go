@@ -209,6 +209,7 @@ func emitRepresentationArgument(
 
 func EmitCapabilities(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	operationSet api.GenericOperationSet,
 	arguments api.TypeArgumentList,
@@ -229,6 +230,7 @@ func EmitCapabilities(
 			return nil, nil, err
 		}
 		var (
+			reference         tsgo.Expression
 			referenceName     string
 			referenceRequests []api.RootRequest
 			providerFacet     api.CallableFacet
@@ -269,21 +271,30 @@ func EmitCapabilities(
 				}
 			}
 		} else {
-			reference, referenceErr :=
-				context.Names().GenericCapability(
-					operation.Selection(),
-					signature,
-				)
-			err = referenceErr
-			if err == nil {
-				referenceName = reference.Name()
-				referenceRequests = reference.Requests()
-				if cooperativeCapability {
-					providerFacet, err =
-						api.NewGenericCapabilityCallableFacet(
-							reference.Artifact(),
-						)
+			inline, handled, inlineErr := children.ConcreteGenericOperation(
+				context,
+				operation.Selection(),
+				signature,
+			)
+			err = inlineErr
+			if err == nil && handled {
+				if len(inline.Before()) != 0 {
+					return nil, nil, &api.InvariantError{
+						Role:   context.Role(),
+						Reason: "inline concrete capability has outer statements",
+					}
 				}
+				reference = inline.Value()
+				referenceRequests = inline.Requests()
+			}
+			if err == nil && !handled {
+				referenceName, referenceRequests, providerFacet, err =
+					emitNamedConcreteCapability(
+						context,
+						operation,
+						signature,
+						cooperativeCapability,
+					)
 			}
 		}
 		if err != nil {
@@ -320,9 +331,12 @@ func EmitCapabilities(
 				contractRequests = append(contractRequests, request)
 			}
 		}
+		if reference == nil {
+			reference = context.Factory().Identifier(referenceName)
+		}
 		binding, err := genericabi.Capability[tsgo.Expression](
 			operation,
-			context.Factory().Identifier(referenceName),
+			reference,
 		)
 		if err != nil {
 			return nil, nil, err
@@ -331,4 +345,32 @@ func EmitCapabilities(
 		requests = append(requests, contractRequests...)
 	}
 	return targets, requests, nil
+}
+
+func emitNamedConcreteCapability(
+	context api.Context,
+	operation *api.GenericOperationContract,
+	signature *types.Signature,
+	cooperative bool,
+) (string, []api.RootRequest, api.CallableFacet, error) {
+	if operation.Operation() != api.GenericOperationConstraintMethod {
+		return "", nil, api.CallableFacet{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "ordinary concrete generic operation has no inline emitter",
+		}
+	}
+	reference, err := context.Names().GenericCapability(
+		operation.Selection(),
+		signature,
+	)
+	if err != nil {
+		return "", nil, api.CallableFacet{}, err
+	}
+	var facet api.CallableFacet
+	if cooperative {
+		facet, err = api.NewGenericCapabilityCallableFacet(
+			reference.Artifact(),
+		)
+	}
+	return reference.Name(), reference.Requests(), facet, err
 }

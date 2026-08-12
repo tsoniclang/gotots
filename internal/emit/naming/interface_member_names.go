@@ -11,6 +11,11 @@ import (
 	"go/types"
 )
 
+type generatedArtifactImport struct {
+	artifact *api.GeneratedArtifact
+	exported string
+}
+
 func (n *File) derivedSourceReference(
 	object types.Object,
 	suffix string,
@@ -129,6 +134,23 @@ func (n *File) generatedReference(
 	if artifact.OutputPath() == n.targetPath {
 		return api.NewNameReference(name, requests...)
 	}
+	importIdentity := generatedArtifactImport{
+		artifact: artifact,
+		exported: name,
+	}
+	localName := n.artifactImports[importIdentity]
+	if localName == "" {
+		localName = name
+		if n.lexicalNameExists(localName) {
+			localName = n.allocateImportName(
+				name,
+				generatedArtifactImportQualifier(artifact),
+			)
+		} else {
+			n.importNames[localName] = struct{}{}
+		}
+		n.artifactImports[importIdentity] = localName
+	}
 	modulePath, err := output.ModuleSpecifier(
 		n.targetPath,
 		artifact.OutputPath(),
@@ -141,13 +163,21 @@ func (n *File) generatedReference(
 		phase,
 		modulePath,
 		name,
-		name,
+		localName,
 	)
 	if err != nil {
 		return api.NameReference{}, err
 	}
 	requests = append(requests, request)
-	return api.NewNameReference(name, requests...)
+	return api.NewNameReference(localName, requests...)
+}
+
+func generatedArtifactImportQualifier(artifact *api.GeneratedArtifact) string {
+	if concretization, ok := artifact.GenericConcretization(); ok &&
+		concretization.Owner().Pkg() != nil {
+		return concretization.Owner().Pkg().Name()
+	}
+	return "generated"
 }
 
 func (n *File) interfaceContractImports(

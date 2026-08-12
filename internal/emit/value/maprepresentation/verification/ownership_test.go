@@ -76,7 +76,7 @@ func TestMutationGenericMapTransferCannotBypassProjectionCapability(
 	capabilityCount := 0
 	for _, parameter := range project.Parameters() {
 		name, ok := parameter.Name().(tsgo.Identifier)
-		if !ok || !strings.HasPrefix(name.Text(), "$go$convert_") {
+		if !ok || !strings.HasPrefix(name.Text(), "$go$convert$") {
 			continue
 		}
 		capabilityCount++
@@ -157,9 +157,9 @@ func TestMapRepresentationOwnershipStrictDifferential(t *testing.T) {
 		)
 	}
 	for _, required := range []string{
-		"export function Project$kernel<M, K, V>($go$convert_",
-		"return $go$convert_",
-		"Project$concrete_",
+		"export function Project$kernel<M, K, V>($go$convert$",
+		"return $go$convert$",
+		"Project$",
 	} {
 		if !strings.Contains(sourceArtifact, required) {
 			t.Fatalf(

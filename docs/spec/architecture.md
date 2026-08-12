@@ -765,6 +765,29 @@ first-class operation bag, or runtime selection. Kernel, facade, and operation
 identities derive from Go declaration identity plus exact type arguments, not
 source position or target spelling.
 
+An exact concrete operation is emitted as one typed inline arrow at that facade
+call when no separately shared semantic owner is required. It does not create a
+standalone capability declaration or module. Constraint-method dispatch and a
+transported deferred-callable registry remain named only when their independent
+effect or registry contract is itself the shared owner. Thus `Add[int32]` calls
+its kernel with `(left, right) => left + right`; it does not import a generated
+`$goCapability_*` function. The child-emission boundary owns this operation
+construction for every call, value, method, provider, and nested-generic path;
+the generated-artifact builder rejects an ordinary concrete operation rather
+than recreating the removed standalone route.
+
+Concretization and operation display names are semantic and source-derived. A
+function uses its declaration name, a method also uses its receiver, concrete
+suffixes encode ordered exact Go type arguments plus the selected effect, and
+operation names encode the operation, any selected constraint method, and its
+exact signature. Compilation paths group by defining package and declaration or
+operation family; each declaration module exports its semantically named exact
+instances. Full hashes remain private identity keys only; no digest or
+opaque suffix enters an ordinary TypeScript declaration, import, or generic
+support path. A normalized semantic name or path collision never joins two
+owners: the full private identities are exact-joined at reservation and the
+collision fails before output is sealed.
+
 For example, Go accepts `append(dst, src...)` when `src` has type parameter
 `B ~[]byte | ~string`. TypeScript has no one static append expression over
 both target representations. The function owner requests one internal

@@ -352,6 +352,7 @@ func assertProviderGrowCapabilityABI(
 	emission emit.ProgramEmission,
 ) {
 	t.Helper()
+	const concreteName = "Grow$SliceOf_Named_example_u2e_com_u2f_providercoverage_Cell$Named_example_u2e_com_u2f_providercoverage_Cell"
 	var sourceCallFound bool
 	var kernelCallFound bool
 	for _, file := range emission.Files() {
@@ -361,7 +362,7 @@ func assertProviderGrowCapabilityABI(
 				continue
 			}
 			name := function.Name().Text()
-			if name != "Grow" && !strings.HasPrefix(name, "Grow$concrete_") {
+			if name != "Grow" && name != concreteName {
 				continue
 			}
 			body, ok := function.Body().(tsgo.Block)
@@ -384,8 +385,17 @@ func assertProviderGrowCapabilityABI(
 					)
 				}
 				callee, ok := call.Expression().(tsgo.Identifier)
-				if !ok || !strings.HasPrefix(callee.Text(), "Grow$concrete_") {
-					t.Fatalf("source Grow target = %T", call.Expression())
+				actualName := ""
+				if ok {
+					actualName = callee.Text()
+				}
+				if !ok || actualName != concreteName {
+					t.Fatalf(
+						"source Grow target = %T %q, want %q",
+						call.Expression(),
+						actualName,
+						concreteName,
+					)
 				}
 				sourceCallFound = true
 				continue
@@ -397,7 +407,7 @@ func assertProviderGrowCapabilityABI(
 				)
 			}
 			for index := range 6 {
-				if _, ok := call.Arguments()[index].(tsgo.Identifier); !ok {
+				if _, ok := call.Arguments()[index].(tsgo.ArrowFunction); !ok {
 					t.Fatalf(
 						"Grow capability %d = %T",
 						index,

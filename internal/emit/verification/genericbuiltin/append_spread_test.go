@@ -47,7 +47,8 @@ func TestGenericAppendSpreadTypeFamiliesExecuteDifferentially(t *testing.T) {
 	for _, required := range []string{
 		"append_spread",
 		"appendBytes$kernel",
-		"appendBytes$concrete_",
+		"appendBytes$SliceOf_byte",
+		"appendBytes$string",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("generic append-spread artifact lacks %q:\n%s", required, printed)

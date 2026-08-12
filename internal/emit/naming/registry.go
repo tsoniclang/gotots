@@ -242,9 +242,10 @@ type Registry struct {
 	interfaceContractDemands            map[string]map[string]interfaceContractDemand
 	interfaceReflectionDemands          map[string]interfaceReflectionDemand
 	genericCapabilities                 map[string]genericCapabilityBinding
-	genericCapabilityNames              map[string]string
+	genericCapabilityNames              map[genericGeneratedNameScope]string
 	genericConcretizations              map[string]genericConcretizationBinding
-	genericConcretizationNames          map[string]string
+	genericConcretizationNames          map[genericGeneratedNameScope]string
+	genericConcretizationModules        map[genericGeneratedModuleScope]*types.Func
 	callableABIs                        map[string]callableABIBinding
 	callableABINames                    map[string]string
 	deferredCallableRegistries          map[string]deferredCallableRegistryBinding
@@ -320,9 +321,10 @@ func NewRegistry() *Registry {
 		interfaceContractDemands:            make(map[string]map[string]interfaceContractDemand),
 		interfaceReflectionDemands:          make(map[string]interfaceReflectionDemand),
 		genericCapabilities:                 make(map[string]genericCapabilityBinding),
-		genericCapabilityNames:              make(map[string]string),
+		genericCapabilityNames:              make(map[genericGeneratedNameScope]string),
 		genericConcretizations:              make(map[string]genericConcretizationBinding),
-		genericConcretizationNames:          make(map[string]string),
+		genericConcretizationNames:          make(map[genericGeneratedNameScope]string),
+		genericConcretizationModules:        make(map[genericGeneratedModuleScope]*types.Func),
 		callableABIs:                        make(map[string]callableABIBinding),
 		callableABINames:                    make(map[string]string),
 		deferredCallableRegistries:          make(map[string]deferredCallableRegistryBinding),

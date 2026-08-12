@@ -6,6 +6,7 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	externalfunction "github.com/tsoniclang/gotots/internal/emit/externalfunction"
+	"github.com/tsoniclang/gotots/internal/emit/generic/semanticname"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/load"
 	"go/ast"
@@ -187,13 +188,17 @@ func (s *programSession) ResolveGenericConcretization(
 			Reason: "generic concretization signature differs from its exact instance",
 		}
 	}
+	suffix, err := semanticname.ConcretizationSuffix(selected, effect.Synchronous())
+	if err != nil {
+		return nil, err
+	}
 	concretization, err := api.NewGenericConcretization(
 		owner,
 		selected,
 		signature,
 		effect,
 		key,
-		"$concrete_"+key[:20],
+		suffix,
 		placement,
 		lexicalOwner,
 		anchor,

@@ -30,6 +30,8 @@ func TestGenericCallableTransportUsesOneAwaitableABI(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"$cooperative_",
+		"$goCapability_",
+		"support/generics/capabilities/",
 		"instanceof Promise",
 		".then ===",
 		"$Value =",

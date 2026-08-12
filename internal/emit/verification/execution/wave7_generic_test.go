@@ -134,7 +134,7 @@ func TestInferredGenericFunctionValueUsesIdentifierInstanceEvidence(t *testing.T
 			t.Fatalf("%s wrapper changes source argument cardinality", name)
 		}
 		callee, ok := body.Expression().(tsgo.Identifier)
-		if !ok || !strings.HasPrefix(callee.Text(), "Equal$concrete_") {
+		if !ok || callee.Text() != "Equal$int32" {
 			t.Fatalf("%s wrapper does not call one exact concretization", name)
 		}
 		concreteNames = append(concreteNames, callee.Text())
@@ -224,10 +224,15 @@ func TestWaveSevenGenericNamedTypesCompileThroughPublicPipeline(t *testing.T) {
 				artifacts.printed,
 				"LocalTypeCapability",
 			)
-			if !strings.Contains(local, "function $goCapability_") ||
-				strings.Contains(local, "export function $goCapability_") {
+			if !strings.Contains(
+				local,
+				"function GenericMapValue$Named_example_u2e_com_u2f_wave7generics_entry",
+			) || strings.Contains(
+				local,
+				"export function GenericMapValue$Named_example_u2e_com_u2f_wave7generics_entry",
+			) || !strings.Contains(local, "): GoMapValue<entry, int32> =>") {
 				t.Fatalf(
-					"local-type capability is not lexical and unexported:\n%s",
+					"local-type concretization is not lexical, unexported, and inline:\n%s",
 					local,
 				)
 			}
