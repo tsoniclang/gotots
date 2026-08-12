@@ -5,6 +5,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 const SchemaVersion = 1
@@ -26,6 +28,9 @@ func (m RootMode) Valid() bool {
 
 type Overrides struct {
 	DistributionRoot      *string
+	GoExecutable          *string
+	TSGoExecutable        *string
+	ToolCacheRoot         *string
 	SourceRoot            *string
 	PackagePattern        *string
 	RootMode              *string
@@ -56,6 +61,9 @@ type Project struct {
 	packagePattern        string
 	rootMode              RootMode
 	buildProfile          load.BuildProfile
+	goTool                toolchain.Go
+	tsgoTool              tsgo.Tool
+	toolCacheRoot         string
 	integer               emit.IntegerRepresentation
 	evaluation            emit.EvaluationOrder
 	concurrency           emit.ConcurrencySemantics
@@ -71,6 +79,9 @@ func (p Project) SourceRoot() string                                { return p.s
 func (p Project) PackagePattern() string                            { return p.packagePattern }
 func (p Project) RootMode() RootMode                                { return p.rootMode }
 func (p Project) BuildProfile() load.BuildProfile                   { return p.buildProfile }
+func (p Project) GoTool() toolchain.Go                              { return p.goTool }
+func (p Project) TSGoTool() tsgo.Tool                               { return p.tsgoTool }
+func (p Project) ToolCacheRoot() string                             { return p.toolCacheRoot }
 func (p Project) IntegerRepresentation() emit.IntegerRepresentation { return p.integer }
 func (p Project) EvaluationOrder() emit.EvaluationOrder             { return p.evaluation }
 func (p Project) ConcurrencySemantics() emit.ConcurrencySemantics   { return p.concurrency }

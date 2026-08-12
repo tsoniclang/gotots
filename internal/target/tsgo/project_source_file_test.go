@@ -25,11 +25,7 @@ func TestProjectSourceFileUsesOfficialASTForPrinting(t *testing.T) {
 }
 `)
 
-	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		t.Fatal(err)
-	}
-	client, err := StartClient(root, directory)
+	client, err := StartClientWithTool(selectedTool(t), directory)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,6 +4,7 @@
   "module": "github.com/microsoft/typescript-go",
   "toolPackage": "github.com/microsoft/typescript-go/cmd/tsgo",
   "toolVersion": "v0.0.0-20260613021236-c78d39e7075b",
+  "toolSum": "h1:7QtBEUCBaG56zHPxKKsttutkHxH8A4AmZgXDUOfjOjc=",
   "revision": "c78d39e7075b4fc641b12b1f35d905c54cdc13ef",
   "protocolVersion": 5,
   "files": [

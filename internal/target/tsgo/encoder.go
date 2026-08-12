@@ -42,6 +42,33 @@ func EncodeNode(root Node) ([]byte, error) {
 	return state.finish()
 }
 
+func EncodedSyntaxNodeCount(root Node) (int, error) {
+	encoded, err := EncodeNode(root)
+	if err != nil {
+		return 0, err
+	}
+	if len(encoded) < headerSize {
+		return 0, &EncodeError{Reason: "encoded node header is truncated"}
+	}
+	nodesOffset := int(binary.LittleEndian.Uint32(
+		encoded[headerOffsetNodes:],
+	))
+	if nodesOffset < headerSize ||
+		nodesOffset > len(encoded) ||
+		len(encoded)-nodesOffset < nodeLen ||
+		(len(encoded)-nodesOffset)%nodeLen != 0 {
+		return 0, &EncodeError{Reason: "encoded node table is invalid"}
+	}
+	count := 0
+	for offset := nodesOffset + nodeLen; offset < len(encoded); offset += nodeLen {
+		kind := binary.LittleEndian.Uint32(encoded[offset+nodeOffsetKind:])
+		if kind != kindNodeList {
+			count++
+		}
+	}
+	return count, nil
+}
+
 type encoderState struct {
 	strings        stringTable
 	extendedData   []byte

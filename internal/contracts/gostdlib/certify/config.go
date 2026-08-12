@@ -1,7 +1,6 @@
 package certify
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +8,8 @@ import (
 	"strings"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	gotool "github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 type Config struct {
@@ -20,7 +21,8 @@ type Config struct {
 	RuntimeContractPath string
 	TSConfigPath        string
 	ScratchDirectory    string
-	GoBinary            string
+	GoTool              gotool.Go
+	TSGoTool            tsgo.Tool
 	BuildProfile        environmentcontract.BuildProfile
 	Backend             string
 	MinimumGoVersion    string
@@ -36,7 +38,8 @@ type resolvedConfig struct {
 	runtimeContractPath string
 	tsConfigPath        string
 	scratchDirectory    string
-	goBinary            string
+	goTool              gotool.Go
+	tsgoTool            tsgo.Tool
 	buildProfile        environmentcontract.BuildProfile
 	backend             string
 	minimumGoVersion    string
@@ -68,17 +71,14 @@ type toolchain struct {
 	key     string
 }
 
-type goEnvironment struct {
-	Root    string `json:"GOROOT"`
-	Version string `json:"GOVERSION"`
-}
-
 func resolveConfig(source Config) (resolvedConfig, error) {
 	result := resolvedConfig{
 		buildProfile:     source.BuildProfile,
 		backend:          source.Backend,
 		minimumGoVersion: source.MinimumGoVersion,
 		maximumGoVersion: source.MaximumGoVersion,
+		goTool:           source.GoTool,
+		tsgoTool:         source.TSGoTool,
 	}
 	var err error
 	for name, value := range map[string]*string{
@@ -118,19 +118,10 @@ func resolveConfig(source Config) (resolvedConfig, error) {
 			return resolvedConfig{}, certifyError("configure", name, err.Error())
 		}
 	}
-	if source.GoBinary == "" {
-		return resolvedConfig{}, certifyError("configure", "Go binary", "path is empty")
-	}
-	result.goBinary, err = exec.LookPath(source.GoBinary)
-	if err != nil {
-		return resolvedConfig{}, certifyError("configure", source.GoBinary, err.Error())
-	}
-	result.goBinary, err = filepath.Abs(result.goBinary)
-	if err != nil {
-		return resolvedConfig{}, certifyError("configure", source.GoBinary, err.Error())
-	}
 	if result.backend == "" ||
 		!result.buildProfile.Valid() ||
+		!result.goTool.Valid() || !result.tsgoTool.Valid() ||
+		result.goTool.Version() != result.buildProfile.ToolchainVersion() ||
 		!strings.HasPrefix(result.minimumGoVersion, "go") ||
 		!strings.HasPrefix(result.maximumGoVersion, "go") {
 		return resolvedConfig{}, certifyError(
@@ -162,36 +153,10 @@ func resolveConfig(source Config) (resolvedConfig, error) {
 }
 
 func inspectToolchain(config resolvedConfig) (toolchain, error) {
-	command := exec.Command(
-		config.goBinary,
-		"env",
-		"-json",
-		"GOROOT",
-		"GOVERSION",
-	)
-	command.Dir = config.repositoryRoot
-	command.Env = environmentcontract.HostEnvironment()
-	payload, err := command.Output()
-	if err != nil {
-		return toolchain{}, commandError("inspect toolchain", config.goBinary, err)
-	}
-	var selected goEnvironment
-	decoder := json.NewDecoder(strings.NewReader(string(payload)))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&selected); err != nil {
-		return toolchain{}, certifyError("inspect toolchain", config.goBinary, err.Error())
-	}
-	if selected.Root == "" || selected.Version == "" {
+	if !config.goTool.Valid() || config.goTool.Version() != config.buildProfile.ToolchainVersion() {
 		return toolchain{}, certifyError(
 			"inspect toolchain",
-			config.goBinary,
-			"identity is incomplete",
-		)
-	}
-	if selected.Version != config.buildProfile.ToolchainVersion() {
-		return toolchain{}, certifyError(
-			"inspect toolchain",
-			config.goBinary,
+			config.goTool.Path(),
 			"binary version does not match the selected build profile",
 		)
 	}
@@ -200,8 +165,8 @@ func inspectToolchain(config resolvedConfig) (toolchain, error) {
 		return toolchain{}, err
 	}
 	return toolchain{
-		root:    filepath.Clean(selected.Root),
-		version: selected.Version,
+		root:    config.goTool.Root(),
+		version: config.goTool.Version(),
 		profile: config.buildProfile,
 		key:     key,
 	}, nil

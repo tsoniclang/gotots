@@ -71,7 +71,7 @@ func (c *Certificate) VerifyGeneratedContracts(
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return err
 	}
-	client, err := tsgo.StartClient(c.repository, root)
+	client, err := tsgo.StartClientWithTool(c.tsgoTool, root)
 	if err != nil {
 		return err
 	}

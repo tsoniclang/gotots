@@ -2,11 +2,11 @@ package certify
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"fmt"
 	"go/token"
 	"go/types"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -14,6 +14,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	gotoload "github.com/tsoniclang/gotots/internal/load"
 )
 
 type goSurface struct {
@@ -54,23 +55,23 @@ func loadGoSurface(
 			)
 		}
 	}
-	shim, err := exactGoPath(config)
-	if err != nil {
-		return goSurface{}, err
-	}
-	loaded, err := packages.Load(&packages.Config{
-		Mode: packages.NeedName |
-			packages.NeedFiles |
-			packages.NeedCompiledGoFiles |
-			packages.NeedImports |
-			packages.NeedDeps |
-			packages.NeedTypes |
-			packages.NeedSyntax |
-			packages.NeedTypesSizes,
-		Dir:        config.repositoryRoot,
-		Env:        exactGoEnvironment(selectedToolchain, shim),
-		BuildFlags: selectedToolchain.profile.BuildFlags(),
-	}, ordered...)
+	loaded, err := gotoload.GoPackages(
+		config.goTool,
+		selectedToolchain.profile,
+		gotoload.PackageRequest{
+			Context:   context.Background(),
+			Directory: config.repositoryRoot,
+			Mode: packages.NeedName |
+				packages.NeedFiles |
+				packages.NeedCompiledGoFiles |
+				packages.NeedImports |
+				packages.NeedDeps |
+				packages.NeedTypes |
+				packages.NeedSyntax |
+				packages.NeedTypesSizes,
+		},
+		ordered...,
+	)
 	if err != nil {
 		return goSurface{}, certifyError("load Go surface", strings.Join(ordered, ","), err.Error())
 	}
@@ -273,19 +274,17 @@ func standardPackages(
 ) (map[string]struct{}, error) {
 	arguments := append([]string{"list"}, selectedToolchain.profile.BuildFlags()...)
 	arguments = append(arguments, "std")
-	command := exec.Command(config.goBinary, arguments...)
-	command.Dir = config.repositoryRoot
-	command.Env = exactGoEnvironment(selectedToolchain, filepath.Dir(config.goBinary))
-	output, err := command.StdoutPipe()
+	payload, err := config.goTool.Output(
+		context.Background(),
+		config.repositoryRoot,
+		selectedToolchain.profile,
+		arguments...,
+	)
 	if err != nil {
-		return nil, certifyError("list standard packages", config.goBinary, err.Error())
-	}
-	command.Stderr = os.Stderr
-	if err := command.Start(); err != nil {
-		return nil, certifyError("list standard packages", config.goBinary, err.Error())
+		return nil, certifyError("list standard packages", config.goTool.Path(), err.Error())
 	}
 	result := make(map[string]struct{})
-	scanner := bufio.NewScanner(output)
+	scanner := bufio.NewScanner(bytes.NewReader(payload))
 	for scanner.Scan() {
 		name := strings.TrimSpace(scanner.Text())
 		if name != "" {
@@ -293,45 +292,10 @@ func standardPackages(
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, certifyError("list standard packages", config.goBinary, err.Error())
-	}
-	if err := command.Wait(); err != nil {
-		return nil, commandError("list standard packages", config.goBinary, err)
+		return nil, certifyError("list standard packages", config.goTool.Path(), err.Error())
 	}
 	if len(result) == 0 {
-		return nil, certifyError("list standard packages", config.goBinary, "set is empty")
+		return nil, certifyError("list standard packages", config.goTool.Path(), "set is empty")
 	}
 	return result, nil
-}
-
-func exactGoPath(config resolvedConfig) (string, error) {
-	directory, err := os.MkdirTemp(config.scratchDirectory, "go-toolchain-")
-	if err != nil {
-		return "", certifyError("select Go toolchain", config.scratchDirectory, err.Error())
-	}
-	shim := filepath.Join(directory, "go")
-	if err := os.Symlink(config.goBinary, shim); err != nil {
-		return "", certifyError("select Go toolchain", shim, err.Error())
-	}
-	return directory, nil
-}
-
-func exactGoEnvironment(selectedToolchain toolchain, binaryDirectory string) []string {
-	selected := selectedToolchain.profile.Environment(os.Environ())
-	result := make([]string, 0, len(selected)+3)
-	for _, value := range selected {
-		if strings.HasPrefix(value, "PATH=") ||
-			strings.HasPrefix(value, "GOROOT=") ||
-			strings.HasPrefix(value, "GOTOOLCHAIN=") {
-			continue
-		}
-		result = append(result, value)
-	}
-	result = append(
-		result,
-		"PATH="+binaryDirectory+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"GOROOT="+selectedToolchain.root,
-		"GOTOOLCHAIN=local",
-	)
-	return result
 }

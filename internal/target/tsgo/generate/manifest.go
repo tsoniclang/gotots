@@ -16,6 +16,7 @@ type targetManifest struct {
 	Module          string            `json:"module"`
 	ToolPackage     string            `json:"toolPackage"`
 	ToolVersion     string            `json:"toolVersion"`
+	ToolSum         string            `json:"toolSum"`
 	Revision        string            `json:"revision"`
 	ProtocolVersion int               `json:"protocolVersion"`
 	Files           []json.RawMessage `json:"files"`
@@ -36,7 +37,8 @@ func loadTargetManifest(directory string) (targetManifest, error) {
 	if err := decoder.Decode(&manifest); err != nil {
 		return targetManifest{}, fmt.Errorf("decode manifest.json: %w", err)
 	}
-	if manifest.Module == "" || manifest.ToolPackage == "" || manifest.ToolVersion == "" {
+	if manifest.Module == "" || manifest.ToolPackage == "" ||
+		manifest.ToolVersion == "" || manifest.ToolSum == "" {
 		return targetManifest{}, fmt.Errorf("manifest.json has incomplete tool identity")
 	}
 	if manifest.Revision == "" {

@@ -136,6 +136,9 @@ func assertAggregateMapArtifacts(
 	t.Helper()
 	generatedFiles := 0
 	generatedDefinitions := 0
+	nativeDefinitions := 0
+	hashedDefinitions := 0
+	hashedBucketLoops := 0
 	totalBytes := 0
 	largestBytes := 0
 	largestPath := ""
@@ -157,6 +160,15 @@ func assertAggregateMapArtifacts(
 			t.Fatalf("map specialization shard %s is empty", file.OutputPath())
 		}
 		generatedDefinitions += definitions
+		nativeDefinitions += strings.Count(
+			source,
+			"private readonly values: Map<",
+		)
+		hashedDefinitions += strings.Count(
+			source,
+			"private readonly buckets: Map<number,",
+		)
+		hashedBucketLoops += strings.Count(source, "for (const entry of bucket)")
 		totalBytes += len(source)
 		if len(source) > largestBytes {
 			largestBytes = len(source)
@@ -179,6 +191,7 @@ func assertAggregateMapArtifacts(
 			"private readonly hash",
 			"private readonly equal",
 			"private readonly copyKey",
+			"GoDenseIndex",
 		} {
 			if strings.Contains(source, forbidden) {
 				t.Fatalf(
@@ -190,10 +203,20 @@ func assertAggregateMapArtifacts(
 			}
 		}
 	}
-	if generatedDefinitions != 5 {
+	if generatedDefinitions != 6 {
 		t.Fatalf(
-			"map specialization definitions = %d, want five exact reached shapes",
+			"map specialization definitions = %d, want six exact reached shapes",
 			generatedDefinitions,
+		)
+	}
+	if nativeDefinitions != 2 ||
+		hashedDefinitions != 4 ||
+		hashedBucketLoops != hashedDefinitions*3 {
+		t.Fatalf(
+			"map storage shapes = native:%d hashed:%d typed-bucket-loops:%d, want 2/4/12",
+			nativeDefinitions,
+			hashedDefinitions,
+			hashedBucketLoops,
 		)
 	}
 	anonymous := readFile(

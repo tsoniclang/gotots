@@ -36,18 +36,24 @@ func BuildSpecialization(
 		mapType == nil ||
 		keyType == nil ||
 		storageKeyType == nil ||
-		valueType == nil ||
-		!types.Comparable(mapType.Key()) ||
-		!context.Values().SupportsHash(context, mapType.Key()) {
+		valueType == nil {
 		return Specialization{}, &api.InvariantError{
 			Role:   context.Role(),
-			Reason: "aggregate map specialization contract is invalid",
+			Reason: "map specialization contract is invalid",
+		}
+	}
+	model, represented := Source(context, mapType)
+	if !represented || model.Storage() == StorageScalar {
+		return Specialization{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "map specialization contract is invalid",
 		}
 	}
 	operations, requests, err := specializationOperations(
 		context,
 		source,
 		mapType,
+		model.Storage(),
 	)
 	if err != nil {
 		return Specialization{}, err
@@ -63,13 +69,6 @@ func BuildSpecialization(
 	if err != nil {
 		return Specialization{}, err
 	}
-	denseIndexReference, err := context.Names().Runtime(
-		api.RuntimeDenseIndex,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return Specialization{}, err
-	}
 	builder := specializationBuilder{
 		factory:        context.Factory(),
 		className:      className,
@@ -77,7 +76,6 @@ func BuildSpecialization(
 		storageKeyType: storageKeyType,
 		valueType:      valueType,
 		panicName:      panicReference.Name(),
-		denseIndexName: denseIndexReference.Name(),
 		zero:           operations.zero,
 		hash:           operations.hash,
 		equal:          operations.equal,
@@ -88,10 +86,22 @@ func BuildSpecialization(
 		keyProjection:  operations.keyProjection,
 		members:        memberNames,
 	}
-	members := builder.build()
+	var members []tsgo.ClassElement
+	switch model.Storage() {
+	case StorageNative:
+		members = builder.buildNative()
+	case StorageHashed:
+		members = builder.buildHashed()
+	default:
+		return Specialization{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "map specialization storage is invalid",
+		}
+	}
 	if err := validateSpecialization(
 		context.Role(),
 		members,
+		model.Storage(),
 		operations.keyProjection,
 	); err != nil {
 		return Specialization{}, err
@@ -101,7 +111,6 @@ func BuildSpecialization(
 		requests: api.CombineRequests(
 			requests,
 			panicReference.Requests(),
-			denseIndexReference.Requests(),
 		),
 	}, nil
 }
@@ -168,20 +177,50 @@ func specializationOperations(
 	context api.Context,
 	source ast.Node,
 	mapType *types.Map,
+	storage Storage,
 ) (specializationOperationSet, []api.RootRequest, error) {
-	keyType, err := storageKeyType(context, mapType.Key())
-	if err != nil {
-		return specializationOperationSet{}, nil, err
-	}
-	keyContext, err := storageKeyOperationContext(context, mapType.Key())
-	if err != nil {
-		return specializationOperationSet{}, nil, err
-	}
 	zero, err := context.Values().Zero(
 		context.WithRole(api.RoleMapValue),
 		source,
 		mapType.Elem(),
 	)
+	if err != nil {
+		return specializationOperationSet{}, nil, err
+	}
+	value := context.Factory().Identifier("$value")
+	copyValue, err := context.Values().Transfer(
+		context.WithRole(api.RoleMapValue),
+		nil,
+		mapType.Elem(),
+		mapType.Elem(),
+		api.ValueTransferCopy,
+		api.DirectExpression(value),
+	)
+	if err != nil {
+		return specializationOperationSet{}, nil, err
+	}
+	operations := specializationOperationSet{
+		zero:      operation(zero),
+		copyValue: operation(copyValue),
+	}
+	requests := api.CombineRequests(
+		zero.Requests(),
+		copyValue.Requests(),
+	)
+	if storage == StorageNative {
+		return operations, requests, nil
+	}
+	if storage != StorageHashed {
+		return specializationOperationSet{}, nil, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "map specialization operation storage is invalid",
+		}
+	}
+	keyType, err := storageKeyType(context, mapType.Key())
+	if err != nil {
+		return specializationOperationSet{}, nil, err
+	}
+	keyContext, err := storageKeyOperationContext(context, mapType.Key())
 	if err != nil {
 		return specializationOperationSet{}, nil, err
 	}
@@ -247,36 +286,20 @@ func specializationOperations(
 		projectKeyBody = operation(projectKey)
 		reifyKeyBody = operation(reifyKey)
 	}
-	value := context.Factory().Identifier("$value")
-	copyValue, err := context.Values().Transfer(
-		context.WithRole(api.RoleMapValue),
-		nil,
-		mapType.Elem(),
-		mapType.Elem(),
-		api.ValueTransferCopy,
-		api.DirectExpression(value),
-	)
-	if err != nil {
-		return specializationOperationSet{}, nil, err
-	}
-	return specializationOperationSet{
-			zero:          operation(zero),
-			hash:          operation(hash),
-			equal:         operation(equal),
-			copyKey:       operation(copyKey),
-			copyValue:     operation(copyValue),
-			projectKey:    projectKeyBody,
-			reifyKey:      reifyKeyBody,
-			keyProjection: keyProjection,
-		}, api.CombineRequests(
-			zero.Requests(),
-			hash.Requests(),
-			equal.Requests(),
-			copyKey.Requests(),
-			copyValue.Requests(),
-			projectKey.Requests(),
-			reifyKey.Requests(),
-		), nil
+	operations.hash = operation(hash)
+	operations.equal = operation(equal)
+	operations.copyKey = operation(copyKey)
+	operations.projectKey = projectKeyBody
+	operations.reifyKey = reifyKeyBody
+	operations.keyProjection = keyProjection
+	return operations, api.CombineRequests(
+		requests,
+		hash.Requests(),
+		equal.Requests(),
+		copyKey.Requests(),
+		projectKey.Requests(),
+		reifyKey.Requests(),
+	), nil
 }
 
 func operation(emission api.ExpressionEmission) operationBody {

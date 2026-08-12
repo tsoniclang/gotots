@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func TestRunPrintsResolvedConfigWithoutBuilding(t *testing.T) {
@@ -154,9 +155,9 @@ func TestProjectPackageIsRequiredForTopLevelAwait(t *testing.T) {
 }
 `)
 	arguments := []string{"--noEmit", "-p", filepath.Join(root, "tsconfig.json")}
-	if err := tsgo.Compile(
+	if err := tsgo.CompileWithTool(
 		context.Background(),
-		repositoryRoot(t),
+		selectedTSGoTool(t),
 		root,
 		arguments,
 	); err != nil {
@@ -165,9 +166,9 @@ func TestProjectPackageIsRequiredForTopLevelAwait(t *testing.T) {
 	if err := os.Remove(filepath.Join(root, "package.json")); err != nil {
 		t.Fatal(err)
 	}
-	if err := tsgo.Compile(
+	if err := tsgo.CompileWithTool(
 		context.Background(),
-		repositoryRoot(t),
+		selectedTSGoTool(t),
 		root,
 		arguments,
 	); err == nil || !strings.Contains(err.Error(), "TS1309") {
@@ -182,6 +183,22 @@ func repositoryRoot(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return root
+}
+
+func selectedTSGoTool(t *testing.T) tsgo.Tool {
+	t.Helper()
+	selectedGo, err := toolchain.ResolveGo(
+		"",
+		filepath.Join(repositoryRoot(t), ".temp", "cache", "toolchain-tests"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := tsgo.ResolveTool(selectedGo, repositoryRoot(t), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return selected
 }
 
 func writeCommandFixture(t *testing.T, path string, source string) {

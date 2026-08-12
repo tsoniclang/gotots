@@ -15,7 +15,7 @@ func TestNativePrintNodeRoundTrip(t *testing.T) {
 	t.Setenv("CGO_ENABLED", "1")
 	t.Setenv("GOFLAGS", "-tags=ambientmustnotselect")
 	workingDirectory := t.TempDir()
-	client, err := StartClient(repositoryRoot(), workingDirectory)
+	client, err := StartClientWithTool(selectedTool(t), workingDirectory)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,9 +59,9 @@ func TestNativePrintNodeRoundTrip(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := Compile(
+	if err := CompileWithTool(
 		ctx,
-		repositoryRoot(),
+		selectedTool(t),
 		workingDirectory,
 		[]string{"--noEmit", "--strict", outputPath},
 	); err != nil {

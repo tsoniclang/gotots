@@ -33,6 +33,7 @@ func Build(ctx context.Context, project config.Project) (Report, error) {
 		Directory:    project.SourceRoot(),
 		Pattern:      project.PackagePattern(),
 		BuildProfile: project.BuildProfile(),
+		GoTool:       project.GoTool(),
 	})
 	if err != nil {
 		return Report{}, err
@@ -113,6 +114,7 @@ func certifySourceImplementations(
 			".temp",
 			"source-implementation-certify",
 		),
+		TSGoTool: project.TSGoTool(),
 	})
 }
 
@@ -132,7 +134,8 @@ func certifyProviders(
 		RuntimeContractPath: filepath.Join(root, "gostdlib", "contract", "runtime.json"),
 		TSConfigPath:        filepath.Join(root, "gostdlib", "tsconfig.json"),
 		ScratchDirectory:    filepath.Join(root, ".temp", "gostdlib-certify"),
-		GoBinary:            "go",
+		GoTool:              project.GoTool(),
+		TSGoTool:            project.TSGoTool(),
 		BuildProfile:        project.BuildProfile(),
 		Backend:             "node",
 		MinimumGoVersion:    project.BuildProfile().ToolchainVersion(),
@@ -153,6 +156,8 @@ func certifyProviders(
 		StandardLibraryManifestPath: filepath.Join(root, "gostdlib", "contract", "manifest.json"),
 		StandardLibraryRuntimePath:  filepath.Join(root, "gostdlib", "contract", "runtime.json"),
 		BuildProfile:                project.BuildProfile(),
+		GoTool:                      project.GoTool(),
+		TSGoTool:                    project.TSGoTool(),
 		Backend:                     "node",
 	})
 	if err != nil {

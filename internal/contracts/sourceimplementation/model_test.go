@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func TestVerifySelectsCanonicalPackageAndOfficialSourceFile(t *testing.T) {
@@ -45,6 +45,21 @@ export type DigestView = { value: Digest };
 	  "files": ["package.ts", "private.ts"]
 }
 `)
+	repository, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedGo, err := toolchain.ResolveGo(
+		"",
+		filepath.Join(repository, ".temp", "cache", "toolchain-tests"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	contract := Document{
 		SchemaVersion: SchemaVersion,
 		Package: PackageDocument{
@@ -53,9 +68,9 @@ export type DigestView = { value: Digest };
 			ModuleVersion: "",
 		},
 		Build: BuildDocument{
-			GoVersion:  runtime.Version(),
-			GOOS:       runtime.GOOS,
-			GOARCH:     runtime.GOARCH,
+			GoVersion:  selectedGo.Version(),
+			GOOS:       selectedGo.DefaultGOOS(),
+			GOARCH:     selectedGo.DefaultGOARCH(),
 			CGOEnabled: false,
 		},
 		Compilation: CompilationDocument{
@@ -78,11 +93,8 @@ export type DigestView = { value: Digest };
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: root,
 		Pattern:   ".",
+		GoTool:    selectedGo,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	repository, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +106,7 @@ export type DigestView = { value: Digest };
 		Compilation: CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
 		},
+		TSGoTool: selectedTSGo,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -131,6 +144,7 @@ export const Marker = 1;
 		Compilation: CompilationDocument{
 			Integers: "number", EvaluationOrder: "direct", Concurrency: "disabled",
 		},
+		TSGoTool: selectedTSGo,
 	}); err == nil || !strings.Contains(err.Error(), "is executable or unsupported") {
 		t.Fatalf("executable private-module error = %v", err)
 	}

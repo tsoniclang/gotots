@@ -9,6 +9,8 @@ import (
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/externals"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func TestCheckedExternalProviderCertificateIsReproducible(t *testing.T) {
@@ -74,8 +76,19 @@ func testConfig(t *testing.T) Config {
 		filepath.Dir(sourceFile),
 		"..", "..", "..", "..",
 	))
+	selectedGo, err := toolchain.ResolveGo(
+		"",
+		filepath.Join(repository, ".temp", "cache", "toolchain-tests"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	profile, err := environmentcontract.NewBuildProfileForToolchain(
-		runtime.Version(),
+		selectedGo.Version(),
 		"linux",
 		"amd64",
 		false,
@@ -94,5 +107,7 @@ func testConfig(t *testing.T) Config {
 		StandardLibraryRuntimePath:  filepath.Join(repository, "gostdlib", "contract", "runtime.json"),
 		BuildProfile:                profile,
 		Backend:                     "node",
+		GoTool:                      selectedGo,
+		TSGoTool:                    selectedTSGo,
 	}
 }

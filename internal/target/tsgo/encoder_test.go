@@ -86,6 +86,24 @@ func TestEncoderRejectsMissingSourcePath(t *testing.T) {
 	}
 }
 
+func TestEncodedSyntaxNodeCountExcludesProtocolNodeLists(t *testing.T) {
+	factory := NewFactory()
+	identifierCount, err := EncodedSyntaxNodeCount(factory.Identifier("value"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if identifierCount != 1 {
+		t.Fatalf("identifier syntax nodes = %d, want one", identifierCount)
+	}
+	fileCount, err := EncodedSyntaxNodeCount(representativeSourceFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fileCount != 12 {
+		t.Fatalf("representative source syntax nodes = %d, want 12", fileCount)
+	}
+}
+
 func representativeSourceFile() SourceFile {
 	factory := NewFactory()
 	filePath, err := NewPath("/answer.ts")

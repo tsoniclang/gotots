@@ -24,6 +24,7 @@ import (
 	"errors"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -65,6 +66,118 @@ func DeferredGenericGrow[T any](source []T, count int) {
 
 func SortValues[T any](source []T, compare func(T, T) int) {
 	slices.SortFunc(source, compare)
+}
+
+func SortDirect(source []string) {
+	slices.SortFunc(source, func(left, right string) int {
+		return strings.Compare(left, right)
+	})
+}
+
+func SortStableDirect(source []string) {
+	slices.SortStableFunc(source, func(left, right string) int {
+		return strings.Compare(left, right)
+	})
+}
+
+func SortNamed(source []string) {
+	slices.SortFunc(source, strings.Compare)
+}
+
+func compareLocal(left, right string) int {
+	return strings.Compare(left, right)
+}
+
+func SortLocal(source []string) {
+	slices.SortFunc(source, compareLocal)
+}
+
+func SortGenericNamed(source []string) {
+	slices.SortFunc(source, cmp.Compare[string])
+}
+
+type stringComparer struct{}
+
+func (stringComparer) Compare(left, right string) int {
+	return strings.Compare(left, right)
+}
+
+func SortMethod(source []string) {
+	slices.SortFunc(source, stringComparer{}.Compare)
+}
+
+func SortVariable(source []string) {
+	compare := strings.Compare
+	slices.SortFunc(source, compare)
+}
+
+func SortOpen(source []string, compare func(string, string) int) {
+	slices.SortFunc(source, compare)
+}
+
+func SortCooperative(source []string, ready <-chan struct{}) {
+	slices.SortFunc(source, func(left, right string) int {
+		<-ready
+		return strings.Compare(left, right)
+	})
+}
+
+func compareRecovering(left, right string) (result int) {
+	defer func() {
+		if recover() != nil {
+			result = 0
+		}
+	}()
+	if left == "panic" {
+		panic("comparison")
+	}
+	return strings.Compare(left, right)
+}
+
+func SortRecovering(source []string) {
+	slices.SortFunc(source, compareRecovering)
+}
+
+func BinarySearchDirect(source []string, target string) (int, bool) {
+	return slices.BinarySearchFunc(source, target, strings.Compare)
+}
+
+func CompareDirect(left, right []string) int {
+	return slices.CompareFunc(left, right, strings.Compare)
+}
+
+func ContainsDirect(source []string) bool {
+	return slices.ContainsFunc(source, func(value string) bool {
+		return len(value) > 2
+	})
+}
+
+func EqualDirect(left, right []string) bool {
+	return slices.EqualFunc(left, right, strings.EqualFold)
+}
+
+func IndexDirect(source []string) int {
+	return slices.IndexFunc(source, func(value string) bool {
+		return len(value) > 2
+	})
+}
+
+func CompactDirect(source []string) []string {
+	return slices.CompactFunc(source, strings.EqualFold)
+}
+
+func DeleteDirect(source []string) []string {
+	return slices.DeleteFunc(source, func(value string) bool {
+		return len(value) > 2
+	})
+}
+
+func MapsEqualDirect(left, right map[string]string) bool {
+	return maps.EqualFunc(left, right, strings.EqualFold)
+}
+
+func ContainsOpen(source []string, predicate func(string) bool) bool {
+	return slices.ContainsFunc(source, predicate)
 }
 
 func GenericCloneValue[T any]() func([]T) []T {
@@ -120,6 +233,25 @@ func TimeAddress() time.Time {
 			mustProviderRoot(t, scope.Lookup("GenericGrowValue")),
 			mustProviderRoot(t, scope.Lookup("DeferredGenericGrow")),
 			mustProviderRoot(t, scope.Lookup("SortValues")),
+			mustProviderRoot(t, scope.Lookup("SortDirect")),
+			mustProviderRoot(t, scope.Lookup("SortStableDirect")),
+			mustProviderRoot(t, scope.Lookup("SortNamed")),
+			mustProviderRoot(t, scope.Lookup("SortLocal")),
+			mustProviderRoot(t, scope.Lookup("SortGenericNamed")),
+			mustProviderRoot(t, scope.Lookup("SortMethod")),
+			mustProviderRoot(t, scope.Lookup("SortVariable")),
+			mustProviderRoot(t, scope.Lookup("SortOpen")),
+			mustProviderRoot(t, scope.Lookup("SortCooperative")),
+			mustProviderRoot(t, scope.Lookup("SortRecovering")),
+			mustProviderRoot(t, scope.Lookup("BinarySearchDirect")),
+			mustProviderRoot(t, scope.Lookup("CompareDirect")),
+			mustProviderRoot(t, scope.Lookup("ContainsDirect")),
+			mustProviderRoot(t, scope.Lookup("EqualDirect")),
+			mustProviderRoot(t, scope.Lookup("IndexDirect")),
+			mustProviderRoot(t, scope.Lookup("CompactDirect")),
+			mustProviderRoot(t, scope.Lookup("DeleteDirect")),
+			mustProviderRoot(t, scope.Lookup("MapsEqualDirect")),
+			mustProviderRoot(t, scope.Lookup("ContainsOpen")),
 			mustProviderRoot(t, scope.Lookup("GenericCloneValue")),
 			mustProviderRoot(t, scope.Lookup("CompareValue")),
 			mustProviderRoot(t, scope.Lookup("DeferredCompare")),
@@ -146,6 +278,36 @@ func TimeAddress() time.Time {
 		"SlicesValuesKernel<RuntimeSlice<gostring>, gostring, gostring>(",
 		"ErrorsAsTypeKernel<code__from_providerprojection>($goCapability_",
 		"GenericAddress$kernel<T>",
+		"SlicesSortFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
+		"SlicesSortStableFuncSynchronousKernel<RuntimeSlice<gostring>, gostring, gostring>(",
+		"SlicesBinarySearchFuncSynchronousKernel<",
+		"SlicesCompareFuncSynchronousKernel<",
+		"SlicesContainsFuncSynchronousKernel<",
+		"SlicesEqualFuncSynchronousKernel<",
+		"SlicesIndexFuncSynchronousKernel<",
+		"SlicesCompactFuncSynchronousKernel<",
+		"SlicesDeleteFuncSynchronousKernel<",
+		"MapsEqualFuncSynchronousKernel<",
+		"SlicesContainsFuncKernel<",
+		"export function SortDirect(source: RuntimeSlice<gostring>): void",
+		"export function SortStableDirect(source: RuntimeSlice<gostring>): void",
+		"export function SortNamed(source: RuntimeSlice<gostring>): void",
+		"export function SortLocal(source: RuntimeSlice<gostring>): void",
+		"export function SortGenericNamed(source: RuntimeSlice<gostring>): void",
+		"export async function SortVariable(",
+		"export async function SortMethod(",
+		"export async function SortOpen(",
+		"export async function SortCooperative(",
+		"export function SortRecovering(source: RuntimeSlice<gostring>): void",
+		"export function BinarySearchDirect(",
+		"export function CompareDirect(",
+		"export function ContainsDirect(",
+		"export function EqualDirect(",
+		"export function IndexDirect(",
+		"export function CompactDirect(",
+		"export function DeleteDirect(",
+		"export function MapsEqualDirect(",
+		"export async function ContainsOpen(",
 		"Pointer<T>",
 		"addressOf<GoArray<GoContainerStorage<T>, 1>>(values)",
 		"BigInt.asIntN(64, goNumberToBigInt(count))",
@@ -161,6 +323,27 @@ func TimeAddress() time.Time {
 		"Clone<gostring, int64>(",
 		"SlicesValuesCooperative<",
 		"SlicesValuesFullyCooperative<",
+		"export async function SortDirect(",
+		"export async function SortStableDirect(",
+		"export async function SortNamed(",
+		"export async function SortLocal(",
+		"export async function SortGenericNamed(",
+		"export async function SortRecovering(",
+		"export async function BinarySearchDirect(",
+		"export async function CompareDirect(",
+		"export async function ContainsDirect(",
+		"export async function EqualDirect(",
+		"export async function IndexDirect(",
+		"export async function CompactDirect(",
+		"export async function DeleteDirect(",
+		"export async function MapsEqualDirect(",
+		"SlicesBinarySearchFuncKernel<RuntimeSlice<gostring>",
+		"SlicesCompareFuncKernel<RuntimeSlice<gostring>",
+		"SlicesEqualFuncKernel<RuntimeSlice<gostring>",
+		"SlicesIndexFuncKernel<RuntimeSlice<gostring>",
+		"SlicesCompactFuncKernel<RuntimeSlice<gostring>",
+		"SlicesDeleteFuncKernel<RuntimeSlice<gostring>",
+		"MapsEqualFuncKernel<GoMapValue<gostring, gostring>",
 	} {
 		if strings.Contains(printed, superseded) {
 			t.Fatalf("provider generic projection retained %q:\n%s", superseded, printed)

@@ -22,9 +22,9 @@ func TestCompilerDiagnosticsFailClosedWhenToolExitsSuccessfully(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	err := Compile(
+	err := CompileWithTool(
 		ctx,
-		repositoryRoot(),
+		selectedTool(t),
 		workingDirectory,
 		[]string{"--strict", "--noEmit", sourcePath},
 	)
@@ -47,9 +47,9 @@ func TestCompilerAcceptsSilentStrictSuccess(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := Compile(
+	if err := CompileWithTool(
 		ctx,
-		repositoryRoot(),
+		selectedTool(t),
 		workingDirectory,
 		[]string{"--strict", "--noEmit", sourcePath},
 	); err != nil {

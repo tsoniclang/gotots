@@ -22,6 +22,7 @@ type Contract struct {
 	module          string
 	toolPackage     string
 	toolVersion     string
+	toolSum         string
 	revision        string
 	protocolVersion int
 	files           []ContractFile
@@ -51,6 +52,7 @@ type contractManifest struct {
 	Module          string                 `json:"module"`
 	ToolPackage     string                 `json:"toolPackage"`
 	ToolVersion     string                 `json:"toolVersion"`
+	ToolSum         string                 `json:"toolSum"`
 	Revision        string                 `json:"revision"`
 	ProtocolVersion int                    `json:"protocolVersion"`
 	Files           []contractManifestFile `json:"files"`
@@ -87,6 +89,7 @@ func VerifyPinnedContract(schemaDirectory string) (Contract, error) {
 		module:          manifestValue.Module,
 		toolPackage:     manifestValue.ToolPackage,
 		toolVersion:     manifestValue.ToolVersion,
+		toolSum:         manifestValue.ToolSum,
 		revision:        manifestValue.Revision,
 		protocolVersion: manifestValue.ProtocolVersion,
 		files:           files,
@@ -107,6 +110,10 @@ func (c Contract) ToolPackage() string {
 
 func (c Contract) ToolVersion() string {
 	return c.toolVersion
+}
+
+func (c Contract) ToolSum() string {
+	return c.toolSum
 }
 
 func (c Contract) Revision() string {
@@ -166,8 +173,8 @@ func validateManifest(manifestValue contractManifest) error {
 	if manifestValue.Repository == "" ||
 		manifestValue.Module == "" ||
 		manifestValue.ToolPackage == "" ||
-		manifestValue.ToolVersion == "" {
-		return &ContractError{Reason: "repository, module, toolPackage, and toolVersion are required"}
+		manifestValue.ToolVersion == "" || manifestValue.ToolSum == "" {
+		return &ContractError{Reason: "repository, module, toolPackage, toolVersion, and toolSum are required"}
 	}
 	if !strings.HasPrefix(manifestValue.ToolPackage, manifestValue.Module+"/") {
 		return &ContractError{Reason: "toolPackage is outside module"}
@@ -177,6 +184,9 @@ func validateManifest(manifestValue contractManifest) error {
 	}
 	if !strings.HasSuffix(manifestValue.ToolVersion, "-"+manifestValue.Revision[:12]) {
 		return &ContractError{Reason: "toolVersion does not identify revision"}
+	}
+	if !strings.HasPrefix(manifestValue.ToolSum, "h1:") {
+		return &ContractError{Reason: "toolSum is invalid"}
 	}
 	if manifestValue.ProtocolVersion <= 0 {
 		return &ContractError{Reason: "protocolVersion must be positive"}

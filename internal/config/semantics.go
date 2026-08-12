@@ -5,8 +5,9 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func loadBuildProfile(selected goDocument) (load.BuildProfile, error) {
-	profile, err := load.NewBuildProfile(
+func loadBuildProfile(selected goDocument, toolchainVersion string) (load.BuildProfile, error) {
+	profile, err := load.NewBuildProfileForToolchain(
+		toolchainVersion,
 		*selected.GOOS,
 		*selected.GOARCH,
 		*selected.CGO,

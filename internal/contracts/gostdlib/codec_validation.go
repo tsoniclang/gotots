@@ -81,13 +81,18 @@ func validateFacet(facet FacetDocument, field string) error {
 		}
 	case FacetGenericCallableKernel:
 		if len(facet.Capabilities) != 1 ||
-			facet.Capabilities[0] != FacetCapabilityKernel ||
+			(facet.Capabilities[0] != FacetCapabilityKernel &&
+				facet.Capabilities[0] != FacetCapabilitySynchronousKernel) ||
 			!facet.Effect.Valid() ||
 			len(facet.GenericTypeArguments) == 0 ||
 			facet.StorageExport != "" || facet.RepresentationExport != "" ||
 			facet.StorageImplementationOwner != "" ||
 			facet.StorageTargetFingerprint != "" {
 			return manifestError(field, "generic-kernel facet shape is invalid")
+		}
+		if facet.Capabilities[0] == FacetCapabilitySynchronousKernel &&
+			facet.Effect != EffectSynchronous {
+			return manifestError(field, "synchronous generic-kernel effect is invalid")
 		}
 		if err := validateGenericTypeArguments(
 			facet.GenericTypeArguments,

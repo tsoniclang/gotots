@@ -102,6 +102,7 @@ type Context struct {
 	callableFacet                CallableFacet
 	cooperative                  bool
 	staticallySelectedCallable   bool
+	synchronousCallableBoundary  bool
 	deferredCallableSelection    bool
 	detachedInvocation           bool
 	environmentContract          bool
@@ -280,6 +281,15 @@ func (c Context) WithExpectedType(expectedType types.Type) Context {
 	return c
 }
 
+func (c Context) WithSynchronousCallableBoundary() Context {
+	c.synchronousCallableBoundary = true
+	return c
+}
+
+func (c Context) SynchronousCallableBoundary() bool {
+	return c.synchronousCallableBoundary
+}
+
 func (c Context) WithExpectedResults(expectedResults *types.Tuple) Context {
 	if expectedResults == nil || expectedResults.Len() < 2 {
 		panic("expected result tuple has fewer than two elements")
@@ -293,6 +303,7 @@ func (c Context) EnterFunction(results *types.Tuple) Context {
 	c.functionResults = results
 	c.expectedType = nil
 	c.expectedResults = nil
+	c.synchronousCallableBoundary = false
 	c.breakDepth = 0
 	c.continueDepth = 0
 	c.breakTarget = ""

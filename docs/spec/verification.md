@@ -62,6 +62,50 @@ recovery forms remain rejected.
 
 This is a verification inventory, not a production source model.
 
+## Exact Tool Selection Proof
+
+Focused fixtures select an arbitrarily named Go executable and both certified
+TS-Go forms through configuration and CLI overrides. They prove one immutable
+selection reaches package loading, gostdlib and external certification,
+source-implementation certification, strict TypeScript compilation, and AST
+printing. The selected Go's reported version/root/default target—not
+`runtime.Version`, `runtime.GOROOT`, or a later `PATH` lookup—must determine the
+build profile and standard-library contract.
+
+Adversarial mutations change the selected Go bytes during identity discovery,
+the sealed executable after selection, a root-snapshot candidate before
+publication, a reopened snapshot's `compile`, standard-library source, or a
+non-source asset such as `lib/time/zoneinfo.zip`. Each fails at the tool owner.
+Changing the mutable source root after resolution cannot alter a command,
+because only the sealed snapshot remains reachable. Relocated byte-identical
+roots, including absolute in-root symlinks rewritten to the relocated root,
+retain one semantic identity; an escaping symlink or changed root does not. A
+hostile ambient `PATH` and temporary root must not enter a selected subprocess.
+Cgo without an exact external-tool contract fails before loading.
+
+A non-vacuous full-root-walk census records the count immediately after
+selection, then performs repeated Go commands, an overlay-capable
+`go/packages` driver load, TS-Go resolution, and strict TS-Go compilation. The
+count must remain unchanged. The one explicit pre-publication compilation
+boundary must add exactly one complete snapshot verification. Restoring a
+per-command complete-root hash, skipping exact verification when reopening a
+digest root, or publishing a mutated candidate fails this gate.
+
+The exact package-driver proof uses an overlay that introduces a dependency
+absent on disk and enables test variants. It exact-joins roots, packages,
+files, imports, `Dir`, `Module`, and `ForTest` from the one overlay-selected
+graph. Dropped/duplicated evidence, malformed trailing JSON, a second JSON
+value, or any non-overlay metadata route fails.
+
+TS-Go mutations cover a foreign module, wrong module checksum, replaced
+module, development build without exact VCS evidence, wrong revision,
+`vcs.modified=true`, build-Go mismatch, selected-byte drift, and selected-Go
+identity drift. Semantic evidence is searched for selected/cache/GOROOT paths;
+resolved configuration is separately allowed to report those operational
+paths. Broad walls reject hardcoded production `go`, `runtime.GOROOT`, ambient
+tool lookup, provider-local resolver fields, and production calls to a default
+TS-Go resolver.
+
 ## TS-Go Target Proof
 
 The pinned TS-Go schema is copied under `schema/tsgo/`. Generation derives:
@@ -514,10 +558,37 @@ two effects inside one certificate fail before emission.
 
 Portable cooperative sorting is exercised with both synchronous and genuinely
 asynchronous comparators, stable equal-key ordering, empty input with a nil
-comparator, and a comparison-count bound proportional to `n log n`. Provider
-source inspection rejects recursive subarray sorting, iterator-per-merge
-allocation, native sorting of an `Awaitable` comparator, and runtime Promise
-inspection.
+comparator, and a comparison-count bound proportional to `n log n`. The
+separately certified synchronous kernel must produce the same values, panic,
+and comparison trace as the canonical kernel for synchronous comparators while
+returning no Promise. A generated fixture exact-joins a direct synchronous
+callback to the synchronous concretization and retains the canonical path for
+an unresolved, captured-method, or cooperative callback. A direct synchronous
+callback containing defer/recover remains on the synchronous ordinary-entry
+path while its emitted callable retains the recovery envelope. Mutations swap
+either kernel, change a callback effect, omit the effect from concretization
+identity, or classify a function variable or captured method as direct; each
+fails at certification, identity, artifact, strict-typecheck, or differential
+gates.
+Provider source inspection rejects
+recursive subarray sorting, iterator-per-merge allocation, native sorting of
+an `Awaitable` comparator, and runtime Promise inspection.
+
+The same proof closes every selected generic provider kernel whose only
+possible suspension source is its callback: `slices.BinarySearchFunc`,
+`CompareFunc`, `ContainsFunc`, `EqualFunc`, `IndexFunc`, `CompactFunc`,
+`DeleteFunc`, and `maps.EqualFunc`. For each identity, the synchronous kernel
+is compared with both the canonical kernel and the selected Go toolchain for
+result values, callback order and short-circuiting, nil-call panic behavior,
+and observable mutation. `CompactFunc` additionally proves Go's current-before-
+previous callback order, in-place backing-store mutation, returned reslice,
+and zeroed tail. Direct synchronous callbacks must select each synchronous
+kernel; an open callback must retain its canonical kernel. Removing one pair
+is caught by the generated-artifact join, while changing projection, callback
+index, effect, source identity, or capability is caught by contract
+certification. Iterator/sequence APIs remain canonical because their sequence,
+not only their callback, may suspend; a synchronous callback alone is not
+evidence for a synchronous outer kernel.
 
 The certifier independently derives a total directional obligation multiset
 over every provider callable. It recursively records inward interface-method and
@@ -649,8 +720,11 @@ parameter; each fails contract generation at the exact parameter identity.
 
 For every generic provider kernel, certification also exact-joins the kernel's
 outer effect and callback-parameter effects to the public binding document.
-Mutations change either side between synchronous and `Awaitable`, restore a
-separate cooperative kernel, or expose a capability as a public source
+An optional synchronous narrowing exact-joins the same source identity, type
+projection, operations, source arity, and callback indexes while requiring a
+synchronous outer effect and synchronous callback effects. Mutations change
+either side between synchronous and `Awaitable`, pair non-identical callback
+indexes, duplicate either capability, or expose a capability as a public source
 parameter; each fails before emission.
 
 Generic-boundary differentials include concrete and open instances. A
@@ -927,16 +1001,22 @@ The selected package must contribute one final implementation module, zero
 translated bodies, and zero unresolved raw-pointer boundaries from the removed
 package.
 
-Generated-support topology proof exact-joins full artifact owners and
-definitions after deterministic family sharding. Layout tests prove that two
-full identities with the same first digest byte share one module, different
-bytes or semantic families do not, and malformed identities fail. Product
-evidence reports support definitions separately from physical support modules,
-the largest shard, ESM startup time/RSS, and minimal-compile time/RSS. A
-mutation restoring one physical module per artifact must fail the bounded-
-shard module-count gate, and a mutation merging semantic families must fail
-ownership or strict typechecking. Release evidence additionally compares ESM
-startup against the immediately preceding one-module-per-artifact product.
+Generated-support topology proof exact-joins full internal artifact owners and
+definitions to readable modules grouped by real semantic family and
+source-derived owner. Layout tests prove that artifacts with one semantic
+source owner share its module, different semantic owners do not merge, real
+collisions receive the shortest deterministic readable qualifier, and
+malformed identities fail. Digests may occur in manifests and diagnostics but
+never in ordinary declaration names or module paths.
+
+Product evidence reports support definitions separately from physical support
+modules, the largest semantic module, ESM startup time/RSS, and minimal-compile
+time/RSS. Mutations restoring one physical module per artifact, digest-byte or
+numbered sharding, source-name collision, or cross-family merging fail the
+layout, ownership, source-shape, or strict-typecheck gate. Release evidence
+compares startup and typecheck cost against the immediately preceding layout;
+readability cannot hide an unbounded module, and a cost regression cannot
+restore machine-named source.
 
 Every material checkpoint reports absolute values and parent deltas for:
 

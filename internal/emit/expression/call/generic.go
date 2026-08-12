@@ -43,18 +43,36 @@ func emitGeneric(
 	if err := validateResults(context, source, signature, discarded); err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	arguments, before, argumentRequests, err := emitArguments(
-		context,
-		children,
-		source,
-		signature,
-		detached,
-	)
+	requiresConcretization, err :=
+		context.GenericCallableRequiresConcretization(owner)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	requiresConcretization, err :=
-		context.GenericCallableRequiresConcretization(owner)
+	openConcretization := requiresConcretization &&
+		instance.TypeArgs.ContainsGenericTypeParameter()
+	effectSelection := genericConcretizationEffectSelection{
+		effect: api.GenericConcretizationEffectCanonical,
+	}
+	if requiresConcretization && !openConcretization {
+		effectSelection, err = selectGenericConcretizationEffect(
+			context,
+			source,
+			owner,
+			detached,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+	}
+	arguments, before, argumentRequests, err :=
+		emitArgumentsWithSynchronousParameters(
+			context,
+			children,
+			source,
+			signature,
+			detached,
+			effectSelection.synchronousParameters,
+		)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
@@ -66,8 +84,6 @@ func emitGeneric(
 		mechanicArgs  []tsgo.Expression
 		mechanicReqs  []api.RootRequest
 	)
-	openConcretization := requiresConcretization &&
-		instance.TypeArgs.ContainsGenericTypeParameter()
 	if requiresConcretization && !openConcretization {
 		facet, selectionErr := cooperativecall.SelectGenericClassMethod(
 			context,
@@ -80,6 +96,7 @@ func emitGeneric(
 			owner,
 			instance.TypeArgs,
 			signature,
+			effectSelection.effect,
 		)
 		if concreteErr != nil {
 			return api.ExpressionEmission{}, true, concreteErr
@@ -173,14 +190,26 @@ func emitGeneric(
 	if reference.ProviderBoundary() {
 		var providerBefore []tsgo.Statement
 		var providerRequests []api.RootRequest
-		arguments, providerBefore, providerRequests, err =
-			providerboundary.ToProviderGenericArguments(
-				context,
-				children,
-				contract.Params(),
-				signature.Params(),
-				arguments,
-			)
+		if effectSelection.effect.Synchronous() {
+			arguments, providerBefore, providerRequests, err =
+				providerboundary.ToProviderGenericArgumentsWithSynchronousParameters(
+					context,
+					children,
+					contract.Params(),
+					signature.Params(),
+					arguments,
+					effectSelection.synchronousParameters,
+				)
+		} else {
+			arguments, providerBefore, providerRequests, err =
+				providerboundary.ToProviderGenericArguments(
+					context,
+					children,
+					contract.Params(),
+					signature.Params(),
+					arguments,
+				)
+		}
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
@@ -205,10 +234,14 @@ func emitGeneric(
 			typeRequests,
 			mechanicReqs,
 			argumentRequests,
+			effectSelection.requests,
 		),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
+	}
+	if effectSelection.effect.Synchronous() {
+		return result, true, nil
 	}
 	if detached {
 		result, err = cooperativecall.DetachedGenericCall(

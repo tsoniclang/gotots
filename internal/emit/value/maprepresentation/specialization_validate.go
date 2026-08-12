@@ -10,6 +10,7 @@ import (
 func validateSpecialization(
 	role api.Role,
 	members []tsgo.ClassElement,
+	storage Storage,
 	keyProjection bool,
 ) error {
 	names, err := specializationNames()
@@ -21,24 +22,9 @@ func validateSpecialization(
 			tsgo.SyntaxKindPrivateKeyword,
 			tsgo.SyntaxKindStaticKeyword,
 		},
-		specializationHashOperation: {
-			tsgo.SyntaxKindPrivateKeyword,
-			tsgo.SyntaxKindStaticKeyword,
-		},
-		specializationEqualOperation: {
-			tsgo.SyntaxKindPrivateKeyword,
-			tsgo.SyntaxKindStaticKeyword,
-		},
-		specializationCopyOperation: {
-			tsgo.SyntaxKindPrivateKeyword,
-			tsgo.SyntaxKindStaticKeyword,
-		},
 		specializationCopyValueOperation: {
 			tsgo.SyntaxKindPrivateKeyword,
 			tsgo.SyntaxKindStaticKeyword,
-		},
-		specializationFindOperation: {
-			tsgo.SyntaxKindPrivateKeyword,
 		},
 		names.nilMember:    {tsgo.SyntaxKindStaticKeyword},
 		names.makeMember:   {tsgo.SyntaxKindStaticKeyword},
@@ -51,7 +37,31 @@ func validateSpecialization(
 		names.clear:        nil,
 		names.keys:         nil,
 	}
-	if keyProjection {
+	constructorParameters := []string{"zeroValue", "values"}
+	if storage == StorageHashed {
+		expected[specializationHashOperation] = []tsgo.SyntaxKind{
+			tsgo.SyntaxKindPrivateKeyword,
+			tsgo.SyntaxKindStaticKeyword,
+		}
+		expected[specializationEqualOperation] = []tsgo.SyntaxKind{
+			tsgo.SyntaxKindPrivateKeyword,
+			tsgo.SyntaxKindStaticKeyword,
+		}
+		expected[specializationCopyOperation] = []tsgo.SyntaxKind{
+			tsgo.SyntaxKindPrivateKeyword,
+			tsgo.SyntaxKindStaticKeyword,
+		}
+		expected[specializationFindOperation] = []tsgo.SyntaxKind{
+			tsgo.SyntaxKindPrivateKeyword,
+		}
+		constructorParameters = []string{"zeroValue", "buckets", "count"}
+	} else if storage != StorageNative {
+		return specializationShapeError(role, "storage", fmt.Sprintf("%d", storage))
+	}
+	if storage == StorageNative && keyProjection {
+		return specializationShapeError(role, "native key projection", "true")
+	}
+	if storage == StorageHashed && keyProjection {
 		expected[specializationProjectKeyOperation] = []tsgo.SyntaxKind{
 			tsgo.SyntaxKindPrivateKeyword,
 			tsgo.SyntaxKindStaticKeyword,
@@ -74,7 +84,7 @@ func validateSpecialization(
 		switch member := member.(type) {
 		case tsgo.ConstructorDeclaration:
 			constructors++
-			if !specializationConstructor(member) {
+			if !specializationConstructor(member, constructorParameters) {
 				return specializationShapeError(
 					role,
 					"constructor",
@@ -111,12 +121,13 @@ func validateSpecialization(
 
 func specializationConstructor(
 	source tsgo.ConstructorDeclaration,
+	expected []string,
 ) bool {
 	parameters := source.Parameters()
-	if len(parameters) != 3 {
+	if len(parameters) != len(expected) {
 		return false
 	}
-	for index, expected := range []string{"zeroValue", "buckets", "count"} {
+	for index, expected := range expected {
 		name, ok := specializationName(parameters[index].Name())
 		if !ok || name != expected {
 			return false
@@ -153,7 +164,7 @@ func specializationShapeError(
 	return &api.InvariantError{
 		Role: role,
 		Reason: fmt.Sprintf(
-			"aggregate map specialization %s is invalid: %s",
+			"map specialization %s is invalid: %s",
 			part,
 			value,
 		),

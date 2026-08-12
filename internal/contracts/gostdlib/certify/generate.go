@@ -65,7 +65,7 @@ func Generate(config Config) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := tsgo.StartClient(resolved.repositoryRoot, resolved.providerRoot)
+	client, err := tsgo.StartClientWithTool(resolved.tsgoTool, resolved.providerRoot)
 	if err != nil {
 		return nil, err
 	}

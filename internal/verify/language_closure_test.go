@@ -238,7 +238,13 @@ func TestConstructFixturesCoverSelectedASTUniverse(t *testing.T) {
 		if walkErr != nil {
 			return walkErr
 		}
-		if info.IsDir() || filepath.Ext(sourcePath) != ".go" {
+		if info.IsDir() {
+			if info.Name() == ".temp" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(sourcePath) != ".go" {
 			return nil
 		}
 		file, err := parser.ParseFile(
@@ -330,7 +336,13 @@ func TestConstructFixturesCoverEverySemanticOperator(t *testing.T) {
 		if walkErr != nil {
 			return walkErr
 		}
-		if info.IsDir() || filepath.Ext(sourcePath) != ".go" {
+		if info.IsDir() {
+			if info.Name() == ".temp" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(sourcePath) != ".go" {
 			return nil
 		}
 		file, err := parser.ParseFile(token.NewFileSet(), sourcePath, nil, 0)

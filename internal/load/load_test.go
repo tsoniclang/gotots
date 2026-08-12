@@ -5,9 +5,62 @@ import (
 	"go/ast"
 	"go/types"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
+
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
+
+func TestLoadUsesExactSelectedGoExecutable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture is Unix-only")
+	}
+	realGo, err := exec.LookPath("go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory := t.TempDir()
+	logPath := filepath.Join(directory, "selected-go.log")
+	t.Setenv("GOTOTS_TEST_GO_LOG", logPath)
+	wrapper := filepath.Join(directory, "arbitrary-go-name")
+	source := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$GOTOTS_TEST_GO_LOG\"\nexec " +
+		loadShellQuote(realGo) + " \"$@\"\n"
+	if err := os.WriteFile(wrapper, []byte(source), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	selectedGo, err := toolchain.ResolveGo(
+		wrapper,
+		exactPackageToolCache(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(logPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	projectDirectory := filepath.Join("..", "..", "testdata", "projects", "single-package")
+	program, err := Load(context.Background(), Request{
+		Directory: projectDirectory,
+		Pattern:   ".",
+		GoTool:    selectedGo,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if program.GoTool().Identity() != selectedGo.Identity() {
+		t.Fatal("loaded program lost the selected Go tool identity")
+	}
+	invocations, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(invocations), "list") {
+		t.Fatalf("selected Go executable did not service package loading:\n%s", invocations)
+	}
+}
 
 func TestOneReturnsOneCoherentSyntaxAndTypeGraph(t *testing.T) {
 	projectDirectory := filepath.Join("..", "..", "testdata", "projects", "single-package")
@@ -46,6 +99,10 @@ func TestOneReturnsOneCoherentSyntaxAndTypeGraph(t *testing.T) {
 	if width := loaded.TypesSizes().Sizeof(types.Typ[types.Int]); width != 4 && width != 8 {
 		t.Fatalf("int width = %d bytes, want 4 or 8", width)
 	}
+}
+
+func loadShellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
 func TestOneFailsClosedOnTypeErrors(t *testing.T) {

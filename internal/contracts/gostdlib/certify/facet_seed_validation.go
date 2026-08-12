@@ -316,7 +316,8 @@ func validateFacetSeeds(
 func validateGenericFacetSeedShape(seed facetSeed, key string) error {
 	if seed.Kind == gostdlib.FacetGenericCallableKernel {
 		if len(seed.Capabilities) != 1 ||
-			seed.Capabilities[0] != gostdlib.FacetCapabilityKernel ||
+			(seed.Capabilities[0] != gostdlib.FacetCapabilityKernel &&
+				seed.Capabilities[0] != gostdlib.FacetCapabilitySynchronousKernel) ||
 			len(seed.GenericTypeArguments) == 0 ||
 			seed.Effect != gostdlib.EffectInvalid || seed.StorageExport != "" ||
 			seed.RepresentationExport != "" {

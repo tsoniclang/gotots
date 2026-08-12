@@ -181,6 +181,9 @@ func verifyProductionFile(relative string, sourcePath string) error {
 			return err
 		}
 	}
+	if err := verifyToolSelectionRoute(relative, file, importAliases); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -568,6 +571,7 @@ func layerFor(relative string) int {
 	case strings.HasPrefix(relative, "internal/load/"),
 		strings.HasPrefix(relative, "internal/contracts/"),
 		strings.HasPrefix(relative, "internal/testfixture/"),
+		strings.HasPrefix(relative, "internal/toolchain/"),
 		strings.HasPrefix(relative, "internal/target/tsgo/"),
 		strings.HasPrefix(relative, "internal/target/tsgoprinter/"):
 		return 10
@@ -587,13 +591,4 @@ func layerFor(relative string) int {
 	default:
 		return 0
 	}
-}
-
-func repositoryRoot(t *testing.T) string {
-	t.Helper()
-	root, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return root
 }

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 type Config struct {
@@ -18,6 +20,8 @@ type Config struct {
 	StandardLibraryRuntimePath  string
 	BuildProfile                environmentcontract.BuildProfile
 	Backend                     string
+	GoTool                      toolchain.Go
+	TSGoTool                    tsgo.Tool
 }
 
 type resolvedConfig struct {
@@ -30,6 +34,8 @@ type resolvedConfig struct {
 	standardLibraryRuntimePath  string
 	buildProfile                environmentcontract.BuildProfile
 	backend                     string
+	goTool                      toolchain.Go
+	tsgoTool                    tsgo.Tool
 }
 
 type Error struct {
@@ -54,6 +60,8 @@ func resolveConfig(source Config) (resolvedConfig, error) {
 	result := resolvedConfig{
 		buildProfile: source.BuildProfile,
 		backend:      source.Backend,
+		goTool:       source.GoTool,
+		tsgoTool:     source.TSGoTool,
 	}
 	paths := []struct {
 		name   string
@@ -94,7 +102,9 @@ func resolveConfig(source Config) (resolvedConfig, error) {
 		}
 		*selected.target = absolute
 	}
-	if !result.buildProfile.Valid() || result.backend == "" {
+	if !result.buildProfile.Valid() || result.backend == "" ||
+		!result.goTool.Valid() || !result.tsgoTool.Valid() ||
+		result.goTool.Version() != result.buildProfile.ToolchainVersion() {
 		return resolvedConfig{}, certifyError(
 			"configure",
 			"provider profile",

@@ -8,6 +8,7 @@ import (
 func (b specializationBuilder) foundType() tsgo.TypeNode {
 	return b.factory.UnionTypeNode([]tsgo.TypeNode{
 		b.factory.TupleTypeNode([]tsgo.TypeNode{
+			b.storageEntryType(),
 			b.bucketType(),
 			b.numberType(),
 		}),
@@ -19,7 +20,7 @@ func (b specializationBuilder) findMethod() tsgo.MethodDeclaration {
 	buckets := b.id("buckets")
 	bucket := b.id("bucket")
 	index := b.id("index")
-	entry := b.denseElement(bucket, index)
+	entry := b.id("entry")
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
 		specializationFindOperation,
@@ -30,7 +31,7 @@ func (b specializationBuilder) findMethod() tsgo.MethodDeclaration {
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"buckets",
-			b.storageType(),
+			nil,
 			b.property(b.factory.ThisExpression(), "buckets"),
 		),
 		b.factory.IfStatement(
@@ -41,10 +42,7 @@ func (b specializationBuilder) findMethod() tsgo.MethodDeclaration {
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"bucket",
-			b.factory.UnionTypeNode([]tsgo.TypeNode{
-				b.bucketType(),
-				b.undefinedType(),
-			}),
+			nil,
 			b.call(
 				buckets,
 				"get",
@@ -59,43 +57,33 @@ func (b specializationBuilder) findMethod() tsgo.MethodDeclaration {
 			b.returnBlock(b.id("undefined")),
 			nil,
 		),
-		b.factory.ForStatement(
-			b.factory.VariableDeclarationList(
-				[]tsgo.VariableDeclaration{
-					b.factory.VariableDeclaration(
-						index,
-						nil,
-						nil,
-						b.number("0"),
+		b.variable(
+			tsgo.NodeFlagsLet,
+			"index",
+			nil,
+			b.number("0"),
+		),
+		b.forEntries(
+			bucket,
+			b.factory.IfStatement(
+				b.staticCall(
+					specializationEqualOperation,
+					b.element(entry, b.number("0")),
+					b.id("key"),
+				),
+				b.returnBlock(
+					b.factory.ArrayLiteralExpression(
+						[]tsgo.Expression{entry, bucket, index},
+						false,
 					),
-				},
-				tsgo.NodeFlagsLet,
+				),
+				nil,
 			),
-			b.binary(
-				index,
-				tsgo.BinaryOperatorLessThanToken,
-				b.property(bucket, "length"),
-			),
-			b.factory.PostfixUnaryExpression(
-				index,
-				tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken,
-			),
-			b.factory.Block(
-				[]tsgo.Statement{b.factory.IfStatement(
-					b.staticCall(
-						specializationEqualOperation,
-						b.element(entry, b.number("0")),
-						b.id("key"),
-					),
-					b.returnBlock(
-						b.factory.ArrayLiteralExpression(
-							[]tsgo.Expression{bucket, index},
-							false,
-						),
-					),
-					nil,
-				)},
-				true,
+			b.factory.ExpressionStatement(
+				b.factory.PostfixUnaryExpression(
+					index,
+					tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken,
+				),
 			),
 		),
 		b.factory.ReturnStatement(b.id("undefined")),
@@ -199,10 +187,8 @@ func (b specializationBuilder) lookupOKMethod() tsgo.MethodDeclaration {
 func (b specializationBuilder) foundValue(
 	found tsgo.Expression,
 ) tsgo.Expression {
-	bucket := b.element(found, b.number("0"))
-	index := b.element(found, b.number("1"))
 	return b.element(
-		b.denseElement(bucket, index),
+		b.element(found, b.number("0")),
 		b.number("1"),
 	)
 }
@@ -338,8 +324,8 @@ func panicCall(b specializationBuilder) tsgo.CallExpression {
 
 func (b specializationBuilder) deleteMethod() tsgo.MethodDeclaration {
 	found := b.id("found")
-	bucket := b.element(found, b.number("0"))
-	index := b.element(found, b.number("1"))
+	bucket := b.element(found, b.number("1"))
+	index := b.element(found, b.number("2"))
 	storageKey, keyStatements := b.storageKeyBinding(b.id("key"))
 	hash := b.staticCall(specializationHashOperation, storageKey)
 	return b.methodWithPrefix(

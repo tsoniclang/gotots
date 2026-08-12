@@ -81,6 +81,74 @@ Every compilation records an immutable Go build profile:
 - sorted build tags and explicit build flags;
 - module/workspace roots and overlays.
 
+### Exact Tool Authority
+
+The project configuration is the sole selector for both compiler tools.
+`tools.go` selects an optional Go executable, `tools.tsgo` selects an optional
+TS-Go executable, and `tools.cache` selects the project-owned `.temp/cache`
+root used to seal executables, snapshot `GOROOT`, and hold subprocess scratch. The corresponding
+CLI overrides are `--go`, `--tsgo`, and `--tool-cache`. An omitted Go selection
+means the ordinary `go` found for the invocation; an omitted TS-Go selection
+means the pinned tool resolved by that exact selected Go executable in the
+configured distribution module. Selection happens once before loading.
+
+Resolved operational evidence keeps the selected executable paths, sealed
+`GOROOT`, and cache path so users can inspect what ran. Semantic project
+evidence contains no machine path. Its Go identity consists of the selected
+`GOVERSION`, sealed executable digest, and digest of the complete selected
+`GOROOT` contract. Symlinks in that root are admitted only when they resolve
+inside the root and are fingerprinted by normalized root-relative target, so
+relocating the same root does not change identity. The contract includes the
+actual compile/link tools, standard-library source/export inputs, and all
+other root assets that selected Go commands may consume.
+
+`ResolveGo` verifies the selected source executable immediately before and
+after identity discovery, inventories the complete reported root, and copies
+that exact normalized manifest into a content-addressed root under
+`tools.cache`. File bytes, executable modes, empty directories, and normalized
+in-root symlink targets are part of the manifest; escaping links, special
+members, copy drift, and candidate drift fail before publication. An existing
+digest root is reopened only after its manifest and every member exact-join.
+After resolution, commands execute only the sealed executable with `GOROOT`
+pointing at the sealed snapshot; the mutable source root is neither retained
+nor read.
+
+Per-command verification hashes the sealed executable and checks the sealed
+root's opaque handle and small seal document. It never walks or hashes the
+complete root. One complete snapshot verification runs after all compilation
+subprocesses and before the staged output transaction is published. Thus root
+integrity and command cost are simultaneous requirements rather than a choice
+between exactness and repeated whole-toolchain I/O.
+
+The selected Go's reported `GOVERSION`, `GOROOT`, default `GOOS`, and default
+`GOARCH` create the build profile. Because GoToTS directly uses the
+`go/ast` and `go/types` implementation compiled into its executable, admission
+requires that executable's frontend version to equal the selected
+`GOVERSION`; selecting a different command cannot replace the in-process Go
+frontend. Runtime defaults never substitute for the selected tool's reported
+profile. Selected commands receive only the sealed Go directory on `PATH`,
+the selected `GOROOT`, and scratch variables rooted in `tools.cache`.
+`GOTOOLCHAIN` is local and `GOENV` is disabled. A cgo profile fails before
+loading until an exact external-tool contract is explicitly selected; ambient
+C compilers and host `PATH` are never inherited.
+
+`go/packages` runs through one exact self-driver using that same selection,
+profile, build flags, tests setting, and overlay bytes. The public driver JSON
+schema omits `Dir`, `Module`, and `ForTest`; the driver therefore writes those
+facts from the same loaded graph to one request-scoped cache evidence file.
+The consumer exact-joins roots, package identities, files, and import edges
+before attaching the omitted fields. It never launches a non-overlay metadata
+query or constructs a second package universe.
+
+The TS-Go identity binds its sealed executable digest, selected-Go identity,
+build Go version, and one of exactly two pinned forms: the pinned module
+version and checksum, or a clean source build with the pinned module path,
+exact VCS revision, `vcs.modified=false`, and no replacement. A development
+binary without that exact VCS evidence is foreign. AST printing, provider
+certification, source-implementation certification, and strict TypeScript
+compilation all consume the same resolved TS-Go object; none resolves a tool
+again.
+
 Ambient shell values do not silently change selection. The loader uses
 toolchain metadata, not import-path spelling, to distinguish:
 
@@ -351,10 +419,24 @@ runtime Promise detection.
 
 Portable algorithms receiving that canonical ABI must preserve it directly.
 They may remove avoidable recursion, allocation, and iterator layers, but they
-must not select a synchronous callback variant or inspect whether a result is a
-Promise. In particular, cooperative generic sorting uses one bounded-work
-iterative merge over two dense buffers and awaits every comparison; native
-`Array.sort` is reserved for an exact synchronous comparator contract.
+must not inspect whether a result is a Promise. The canonical cooperative
+generic path uses one bounded-work iterative merge over two dense buffers and
+awaits every comparison.
+
+A reached private generic concretization may instead select one separately
+certified synchronous provider kernel when every callback argument named by
+that kernel resolves statically to a synchronous callable facet. The effect is
+part of the concretization identity, all call sites and adapters use the same
+exact synchronous contract, and an unresolved, escaped, or cooperative
+callback retains the canonical `Awaitable` path. This is not a public callable
+profile: it adds no source parameter, public overload, runtime result test, or
+spelling-based selection. A direct callback's internal defer/recover envelope
+remains in its ordinary entry and therefore does not require the deferred-call
+registry at this exact ordinary invocation. Native `Array.sort` remains
+reserved for a provider kernel whose exact synchronous contract and observable
+ordering are certified. Captured method values and function variables remain
+on the canonical path; the first captures receiver state and the second may
+have escaped or changed.
 
 Possibly nil indirect calls have one target owner. The emitter captures the
 callee, captures every argument in Go order, then calls
@@ -475,10 +557,26 @@ emits no substitute virtual address, JavaScript cast, identity extraction, or
 target-specific codec in canonical source. Safe pointer semantics are never
 routed through a legacy raw-memory implementation to keep a corpus compiling.
 
-Maps use one canonical generated `GoMap<K,V>` runtime type because JavaScript
-`Map` does not preserve Go key equality, zero-on-miss, comma-ok, copy, or
-iteration semantics for all Go keys. Source-facing variables keep their Go
-names; runtime class names are stable semantic names, never per-site hashes.
+Maps have one representation owner and three storage modes. An exact built-in
+boolean, integer, or string key with a runtime-basic value uses the canonical
+`GoMap<K,V>` runtime. Closed map shapes that need static zero, copy, hash, or
+equality operations use one deduplicated support specialization for each exact
+semantic shape.
+
+A specialization uses native JavaScript `Map` storage only when its selected
+key is an exact built-in boolean, integer, or string. Tuple cells preserve the
+difference between an absent key and a present `undefined` value. All other
+specialized keys use typed hash/equality buckets because JavaScript `Map`
+identity is not Go equality for those classes. Both representations retain the
+same nil, zero-on-miss, comma-ok, copy, mutation, and iteration contracts;
+neither is selected by a source spelling or use site.
+
+Native storage compares the already-selected primitive carrier. Consequently,
+wide integer keys under the `number` profile retain that profile's declared
+precision collision envelope, including `uint64` values immediately above
+`2^53`. Exact fixed-width 64-bit map identity requires `fixed64-bigint` or
+`bigint`; the map owner does not add a hidden hash, conversion, or profile
+override.
 
 ## Structs, Methods, And Embedding
 
@@ -1019,9 +1117,15 @@ through the selected `DirEntry` profile bridge, while canonical `error` values
 accepted by `errors.Is` preserve generated `Is` and `Unwrap` method sets.
 
 When a private generic kernel transports callbacks, its outer effect and each
-callback parameter effect are exact-joined to the public provider binding.
-The kernel cannot silently narrow an `Awaitable` callback to synchronous,
-duplicate a cooperative implementation, or introduce another public profile.
+callback parameter effect are exact-joined to the public provider binding. A
+second private synchronous kernel is admissible only as a certified narrowing:
+it has the same Go identity, type projection, capability order, and source
+value shape; every direct callback changes from `Awaitable` to synchronous;
+the outer result changes from cooperative to synchronous; and the target
+implementation is independently inspected. Selection belongs to an exact
+private concretization and fails closed to the canonical kernel whenever any
+callback is not statically synchronous. The kernel cannot introduce another
+public profile or use runtime Promise detection.
 
 Compile-only mode emits exact typed throwing placeholders and canonical
 obligations. Linked mode uses certified provider facades. These are explicit
@@ -1112,8 +1216,9 @@ The resolved project is split before compilation into immutable loader,
 compilation, implementation, and output contracts. Emitters receive only the
 typed compilation and certified implementation contracts; they never read
 JSON, flags, paths, or environment variables. The semantic project digest
-includes build and compilation profiles plus implementation contract and
-source digests, but excludes output/report paths.
+includes the semantic Go and TS-Go identities, build and compilation profiles,
+implementation contract, and source digests. It excludes selected
+executable/cache paths and output/report paths.
 
 The output contract is canonical strict ESM source. Project assembly writes a
 root `package.json` with `type: module` and the exact selected physical package
@@ -1137,21 +1242,30 @@ an artifact from an earlier canonical build.
 
 Compilation-scoped generated support definitions retain their full semantic
 artifact identities, but those identities do not each create a physical ESM
-module. The output owner deterministically coalesces them by semantic family
-and the first byte of the artifact digest, giving at most 256 shards per
-family. A shard is only a placement container: every definition, dependency,
-revision, and observable fingerprint remains keyed by the full artifact
-owner. Lexical artifacts remain with their lexical owner. This bounded static
-layout replaces one-module-per-artifact output; it uses no runtime registry,
-dynamic import, bundler dependency, erased lookup, or source-name grouping.
+module or appear in a physical path. The output owner groups them by real
+semantic family and source-derived owner: normally the defining Go package,
+declaration family, and operation family. A large owner is divided only by a
+real semantic sub-owner already present in the source/type graph, never by a
+digest byte, arbitrary numbered shard, or output-size accident. Lexical
+artifacts remain with their lexical owner.
+
+The physical layout is therefore bounded by selected semantic/source owners,
+not target artifact count. Every definition, dependency, revision, and
+observable fingerprint remains keyed internally by the full artifact owner.
+Readable paths are placement only and never semantic identity. Real path/name
+collisions add the shortest deterministic source-derived qualifier. This
+layout uses no runtime registry, dynamic import, bundler dependency, erased
+lookup, one-module-per-artifact fallback, or hash-named support path.
 
 Schema version 1 has the closed top-level sections `distribution`, `source`,
-`go`, `semantics`, `providers`, `implementations`, and `output`.
+`go`, `semantics`, `providers`, `implementations`, `output`, and `tools`.
 `distribution.root` identifies the installed GoToTS distribution that owns the
-pinned TS-Go tool and checked providers; it is operational path evidence and is
-excluded from semantic identity. `source` selects one package pattern and root
-mode. `implementations.bundles` contains exact package-contract paths. Every
-field except `schemaVersion` has one registered CLI counterpart, including
+default pinned TS-Go module context and checked providers; it is operational
+path evidence and is excluded from semantic identity. `tools.go`,
+`tools.tsgo`, and `tools.cache` select the operational tools and cache root.
+`source` selects one package pattern and root mode.
+`implementations.bundles` contains exact package-contract paths. Every field
+except `schemaVersion` has one registered CLI counterpart, including
 repeatable `--tag` and `--implementation-bundle` flags.
 
 A certified source implementation owns one exact source package's final target

@@ -1,8 +1,6 @@
 import type { bool, int64 } from "@gotots/gostdlib/internal/scalars.js";
 import { RuntimeSlice } from "@gotots/runtime/slice.js";
 
-import { integerFromHost } from "../../host-integer.js";
-
 export type BinaryLess<T> = (left: T, right: T) => bool;
 export type Convert<Source, Target> = (value: Source) => Target;
 export type CopyValue<T> = (value: T) => T;
@@ -16,7 +14,7 @@ export type Zero<T> = () => T;
 
 export function readElement<T, Storage>(
   source: RuntimeSlice<Storage>,
-  index: int64,
+  index: number,
   copy: CopyValue<T>,
   fromStorage: FromContainerStorage<T, Storage>,
 ): T {
@@ -25,7 +23,7 @@ export function readElement<T, Storage>(
 
 export function storeElement<T, Storage>(
   target: RuntimeSlice<Storage>,
-  index: int64,
+  index: number,
   value: T,
   copy: CopyValue<T>,
   toStorage: ToContainerStorage<T, Storage>,
@@ -43,7 +41,7 @@ export function storedValues<T, Storage>(
   for (let index = 0; index < source.length; index += 1) {
     result.push(toStorage(readElement(
       source,
-      integerFromHost(index),
+      index,
       copy,
       fromStorage,
     )));

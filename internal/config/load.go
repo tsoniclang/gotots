@@ -9,8 +9,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
+
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 type document struct {
@@ -22,6 +24,7 @@ type document struct {
 	Providers       providersDocument       `json:"providers"`
 	Implementations implementationsDocument `json:"implementations"`
 	Output          outputDocument          `json:"output"`
+	Tools           toolsDocument           `json:"tools"`
 }
 
 type distributionDocument struct {
@@ -52,6 +55,11 @@ type implementationsDocument struct {
 }
 type outputDocument struct {
 	Directory *string `json:"directory"`
+}
+type toolsDocument struct {
+	Go    *string `json:"go"`
+	TSGo  *string `json:"tsgo"`
+	Cache *string `json:"cache"`
 }
 
 func Load(request Request) (Project, error) {
@@ -101,9 +109,38 @@ func resolve(path string, selected document, overrides Overrides) (Project, erro
 	if !mode.Valid() {
 		return Project{}, projectError("validate config", "source.mode", "value is invalid")
 	}
-	build, err := loadBuildProfile(selected.Go)
+	distributionRoot, err := resolvePath(base, *selected.Distribution.Root)
 	if err != nil {
 		return Project{}, err
+	}
+	toolCacheRoot, err := resolvePath(base, *selected.Tools.Cache)
+	if err != nil {
+		return Project{}, err
+	}
+	goPath, err := resolveOptionalPath(base, *selected.Tools.Go)
+	if err != nil {
+		return Project{}, err
+	}
+	selectedGo, err := toolchain.ResolveGo(goPath, toolCacheRoot)
+	if err != nil {
+		return Project{}, projectError("resolve Go tool", goPath, err.Error())
+	}
+	defaultString(&selected.Go.GOOS, selectedGo.DefaultGOOS())
+	defaultString(&selected.Go.GOARCH, selectedGo.DefaultGOARCH())
+	build, err := loadBuildProfile(selected.Go, selectedGo.Version())
+	if err != nil {
+		return Project{}, err
+	}
+	if err := selectedGo.ValidateProfile(build); err != nil {
+		return Project{}, projectError("validate config", "go.cgo", err.Error())
+	}
+	tsgoPath, err := resolveOptionalPath(base, *selected.Tools.TSGo)
+	if err != nil {
+		return Project{}, err
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, distributionRoot, tsgoPath)
+	if err != nil {
+		return Project{}, projectError("resolve TS-Go tool", tsgoPath, err.Error())
 	}
 	integer, err := parseInteger(*selected.Semantics.Integers)
 	if err != nil {
@@ -114,10 +151,6 @@ func resolve(path string, selected document, overrides Overrides) (Project, erro
 		return Project{}, err
 	}
 	concurrency, err := parseConcurrency(*selected.Semantics.Concurrency)
-	if err != nil {
-		return Project{}, err
-	}
-	distributionRoot, err := resolvePath(base, *selected.Distribution.Root)
 	if err != nil {
 		return Project{}, err
 	}
@@ -150,6 +183,9 @@ func resolve(path string, selected document, overrides Overrides) (Project, erro
 		packagePattern:        *selected.Source.Package,
 		rootMode:              mode,
 		buildProfile:          build,
+		goTool:                selectedGo,
+		tsgoTool:              selectedTSGo,
+		toolCacheRoot:         toolCacheRoot,
 		integer:               integer,
 		evaluation:            evaluation,
 		concurrency:           concurrency,
@@ -165,8 +201,6 @@ func applyDefaults(selected *document) {
 	defaultString(&selected.Source.Root, ".")
 	defaultString(&selected.Source.Package, ".")
 	defaultString(&selected.Source.Mode, string(RootModeMain))
-	defaultString(&selected.Go.GOOS, runtime.GOOS)
-	defaultString(&selected.Go.GOARCH, runtime.GOARCH)
 	if selected.Go.CGO == nil {
 		selected.Go.CGO = boolPointer(false)
 	}
@@ -180,10 +214,16 @@ func applyDefaults(selected *document) {
 		selected.Providers.Externals = boolPointer(false)
 	}
 	defaultString(&selected.Output.Directory, "generated")
+	defaultString(&selected.Tools.Go, "")
+	defaultString(&selected.Tools.TSGo, "")
+	defaultString(&selected.Tools.Cache, filepath.Join(".temp", "cache", "toolchain"))
 }
 
 func applyOverrides(selected *document, overrides Overrides) {
 	applyString(overrides.DistributionRoot, &selected.Distribution.Root)
+	applyString(overrides.GoExecutable, &selected.Tools.Go)
+	applyString(overrides.TSGoExecutable, &selected.Tools.TSGo)
+	applyString(overrides.ToolCacheRoot, &selected.Tools.Cache)
 	applyString(overrides.SourceRoot, &selected.Source.Root)
 	applyString(overrides.PackagePattern, &selected.Source.Package)
 	applyString(overrides.RootMode, &selected.Source.Mode)
@@ -228,6 +268,8 @@ func (p Project) SemanticDigest(evidence EvidenceDigests) (string, error) {
 		Package         string   `json:"package"`
 		Mode            RootMode `json:"mode"`
 		Toolchain       string   `json:"toolchain"`
+		GoTool          string   `json:"goTool"`
+		TSGoTool        string   `json:"tsgoTool"`
 		GOOS            string   `json:"goos"`
 		GOARCH          string   `json:"goarch"`
 		CGO             bool     `json:"cgo"`
@@ -242,6 +284,7 @@ func (p Project) SemanticDigest(evidence EvidenceDigests) (string, error) {
 	}{
 		Schema: SchemaVersion, Package: p.packagePattern, Mode: p.rootMode,
 		Toolchain: p.buildProfile.ToolchainVersion(), GOOS: p.buildProfile.GOOS(),
+		GoTool: p.goTool.Identity().String(), TSGoTool: p.tsgoTool.Identity().String(),
 		GOARCH: p.buildProfile.GOARCH(), CGO: p.buildProfile.CgoEnabled(), Tags: p.buildProfile.Tags(),
 		Integer: p.integer.String(), Evaluation: p.evaluation.String(), Concurrency: p.concurrency.String(),
 		Source: evidence.Source, Implementations: evidence.SourceImplementations,
@@ -263,6 +306,13 @@ func resolvePath(base string, selected string) (string, error) {
 		selected = filepath.Join(base, selected)
 	}
 	return filepath.Clean(selected), nil
+}
+
+func resolveOptionalPath(base string, selected string) (string, error) {
+	if selected == "" {
+		return "", nil
+	}
+	return resolvePath(base, selected)
 }
 
 func resolvePaths(base string, selected []string) ([]string, error) {

@@ -62,7 +62,6 @@ export interface RuntimeTypeMetadata {
   readonly length?: int64;
   readonly chanDir?: int64;
   readonly variadic?: bool;
-  readonly dynamicType?: GoInterfaceValue["$go$type"];
   readonly elem?: () => Type;
   readonly key?: () => Type;
   readonly fields?: readonly RuntimeStructFieldMetadata[];
@@ -72,6 +71,11 @@ export interface RuntimeTypeMetadata {
   readonly methodSet?: gostring;
   readonly pointerMethodSet?: gostring;
   readonly pointerInheritsMethods?: bool;
+}
+
+export interface RuntimeTypeRegistration {
+  readonly dynamicType?: GoInterfaceValue["$go$type"];
+  readonly pointerElement?: () => Type;
 }
 
 const providerPointerSize: uint64 = 8n;
@@ -86,17 +90,36 @@ const runtimeTypesByDynamicType = new Map<
 
 export class RuntimeType extends GoInterfaceValue implements Type {
   readonly $go$type = runtimeTypeDynamicType;
-  readonly $go$methods: ReadonlySet<object>;
   readonly $go$formatString = true;
-  private readonly sourceMethodSet: gostring;
+  private resolvedMetadata?: RuntimeTypeMetadata;
+  private resolvedMethodTokens?: readonly object[];
+  private resolvedMethods?: ReadonlySet<object>;
 
   constructor(
-    private readonly metadata: RuntimeTypeMetadata,
-    private readonly runtimeTypeContract: readonly object[],
+    private readonly metadataFactory: () => RuntimeTypeMetadata,
+    private readonly methodTokenFactory: () => readonly object[],
+    private readonly registration?: RuntimeTypeRegistration,
   ) {
     super();
-    this.$go$methods = new Set(runtimeTypeContract);
-    this.sourceMethodSet = metadata.methodSet ?? "";
+  }
+
+  get $go$methods(): ReadonlySet<object> {
+    this.resolvedMethods ??= new Set(this.methodTokens());
+    return this.resolvedMethods;
+  }
+
+  private get metadata(): RuntimeTypeMetadata {
+    this.resolvedMetadata ??= this.metadataFactory();
+    return this.resolvedMetadata;
+  }
+
+  private get sourceMethodSet(): gostring {
+    return this.metadata.methodSet ?? "";
+  }
+
+  private methodTokens(): readonly object[] {
+    this.resolvedMethodTokens ??= this.methodTokenFactory();
+    return this.resolvedMethodTokens;
   }
 
   $go$implements(contract: readonly object[]): boolean {
@@ -156,7 +179,9 @@ export class RuntimeType extends GoInterfaceValue implements Type {
   }
 
   Elem(): Type | undefined {
-    return this.metadata.elem?.() ?? invalidTypeOperation(this.metadata.text, "Elem");
+    return this.registration?.pointerElement?.() ??
+      this.metadata.elem?.() ??
+      invalidTypeOperation(this.metadata.text, "Elem");
   }
 
   Field(index: int64): StructField {
@@ -338,7 +363,7 @@ export class RuntimeType extends GoInterfaceValue implements Type {
         )
       : (this.metadata.pointerMethodSet ?? "");
     return new RuntimeType(
-      {
+      () => ({
         identity: `pointer(${this.metadata.identity})`,
         kind: 22n,
         text: `*${this.metadata.text}`,
@@ -346,8 +371,8 @@ export class RuntimeType extends GoInterfaceValue implements Type {
         align: providerPointerAlign,
         elem: () => this,
         methodSet: pointerMethods,
-      },
-      this.runtimeTypeContract,
+      }),
+      () => this.methodTokens(),
     );
   }
 }
@@ -409,15 +434,16 @@ function mergeMethodSets(left: gostring, right: gostring): gostring {
 }
 
 export function createRuntimeType(
-  metadata: RuntimeTypeMetadata,
-  methodTokens: readonly object[],
+  metadata: () => RuntimeTypeMetadata,
+  methodTokens: () => readonly object[],
+  registration?: RuntimeTypeRegistration,
 ): Type {
-  const result = new RuntimeType(metadata, methodTokens);
-  if (metadata.dynamicType !== undefined) {
-    runtimeTypesByDynamicType.set(metadata.dynamicType, result);
+  const result = new RuntimeType(metadata, methodTokens, registration);
+  if (registration?.dynamicType !== undefined) {
+    runtimeTypesByDynamicType.set(registration.dynamicType, result);
   }
-  if (metadata.kind === 22n && metadata.elem !== undefined) {
-    recordPointerDescriptor(result, metadata.elem);
+  if (registration?.pointerElement !== undefined) {
+    recordPointerDescriptor(result, registration.pointerElement);
   }
   return result;
 }

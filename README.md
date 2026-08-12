@@ -2,7 +2,7 @@
 
 GoToTS is a general Go-to-TypeScript compiler.
 
-The project is being rebuilt around one direct architecture:
+The project uses one direct architecture:
 
 ```text
 Go AST + go/types

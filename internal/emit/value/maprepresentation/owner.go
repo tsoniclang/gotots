@@ -100,7 +100,7 @@ func Nil(
 			),
 		), nil
 	}
-	if model.Storage() == StorageSpecialized {
+	if model.Storage() != StorageScalar {
 		reference, err := context.Names().MapSpecialization(
 			sourceType,
 			api.MapSpecializationDemandStatic,
@@ -237,7 +237,7 @@ func Make(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if model.Storage() == StorageSpecialized {
+	if model.Storage() != StorageScalar {
 		reference, err := context.Names().MapSpecialization(
 			sourceType,
 			api.MapSpecializationDemandStatic,

@@ -115,6 +115,7 @@ func Resolve(
 			owner,
 			typeArgumentList,
 			selected,
+			api.GenericConcretizationEffectCanonical,
 		)
 		if concreteErr != nil {
 			return Selection{}, concreteErr

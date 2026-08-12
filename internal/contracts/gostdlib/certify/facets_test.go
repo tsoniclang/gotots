@@ -16,7 +16,7 @@ import (
 func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 21,
+	  "schemaVersion": 22,
   "facets": [],
   "genericOperationSets": [
     {
@@ -42,7 +42,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 		t.Fatalf("generic operations = %#v", selected)
 	}
 
-	payload = `{"schemaVersion":21,"facets":[],"genericOperationSets":[
+	payload = `{"schemaVersion":22,"facets":[],"genericOperationSets":[
   {"sourceIdentity":"x","operations":[
     {"kind":"invented","parameters":[],"results":[{"kind":"type-parameter","typeParameter":0}]}
   ]}
@@ -58,7 +58,7 @@ func TestFacetMapOwnsClosedGenericOperationSets(t *testing.T) {
 func TestFacetMapOwnsClosedGenericCallableKernels(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 21,
+	  "schemaVersion": 22,
 	  "facets": [{
 	    "kind":"generic-callable-kernel",
 	    "sourceIdentity":"slices|kind=4|receiver=|name=Grow",
@@ -100,7 +100,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 ) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 21,
+	  "schemaVersion": 22,
   "facets": [],
   "providerStatefulProfiles": [{
     "sourceIdentity": "example.com/source|kind=2|receiver=|name=State",
@@ -153,7 +153,7 @@ func TestStatefulProfileSeparatesInterfaceSetFromTypeArgumentOrder(
 func TestImplementedResultRequiresContractOwner(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facets.json")
 	payload := `{
-	  "schemaVersion": 21,
+	  "schemaVersion": 22,
   "facets": [],
   "providerCallableProfiles": [{
     "sourceIdentity": "example.com/source|kind=4|receiver=|name=Build",
@@ -302,6 +302,7 @@ func TestGenericCallableKernelRejectsProviderArityDrift(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := filepath.Join(repository, "gostdlib")
+	selectedGo, selectedTSGo := resolveTestTools(t, repository)
 	source, err := os.ReadFile(filepath.Join(provider, "contract", "facets.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -328,7 +329,8 @@ func TestGenericCallableKernelRejectsProviderArityDrift(t *testing.T) {
 		RuntimeContractPath: filepath.Join(provider, "contract", "runtime.json"),
 		TSConfigPath:        filepath.Join(provider, "tsconfig.json"),
 		ScratchDirectory:    t.TempDir(),
-		GoBinary:            "go",
+		GoTool:              selectedGo,
+		TSGoTool:            selectedTSGo,
 		BuildProfile:        environmentcontract.DefaultBuildProfile(),
 		Backend:             "node",
 		MinimumGoVersion:    "go1.26.4",
@@ -345,6 +347,7 @@ func TestGenericOperationRejectsCallableParameterArityDrift(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := filepath.Join(repository, "gostdlib")
+	selectedGo, selectedTSGo := resolveTestTools(t, repository)
 	source, err := os.ReadFile(filepath.Join(provider, "contract", "facets.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -375,7 +378,8 @@ func TestGenericOperationRejectsCallableParameterArityDrift(t *testing.T) {
 		RuntimeContractPath: filepath.Join(provider, "contract", "runtime.json"),
 		TSConfigPath:        filepath.Join(provider, "tsconfig.json"),
 		ScratchDirectory:    t.TempDir(),
-		GoBinary:            "go",
+		GoTool:              selectedGo,
+		TSGoTool:            selectedTSGo,
 		BuildProfile:        environmentcontract.DefaultBuildProfile(),
 		Backend:             "node",
 		MinimumGoVersion:    "go1.26.4",
@@ -395,6 +399,7 @@ func TestRepresentationCertificationRejectsNonInterfaceSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := filepath.Join(repository, "gostdlib")
+	selectedGo, selectedTSGo := resolveTestTools(t, repository)
 	source, err := os.ReadFile(filepath.Join(provider, "contract", "facets.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -421,7 +426,8 @@ func TestRepresentationCertificationRejectsNonInterfaceSource(t *testing.T) {
 		RuntimeContractPath: filepath.Join(provider, "contract", "runtime.json"),
 		TSConfigPath:        filepath.Join(provider, "tsconfig.json"),
 		ScratchDirectory:    filepath.Join(t.TempDir(), "certify"),
-		GoBinary:            "go",
+		GoTool:              selectedGo,
+		TSGoTool:            selectedTSGo,
 		BuildProfile:        environmentcontract.DefaultBuildProfile(),
 		Backend:             "node",
 		MinimumGoVersion:    "go1.26.4",
@@ -438,6 +444,7 @@ func TestStatefulNamedStructProfileRejectsAbsentCapabilityMember(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := filepath.Join(repository, "gostdlib")
+	selectedGo, selectedTSGo := resolveTestTools(t, repository)
 	source, err := os.ReadFile(filepath.Join(provider, "contract", "facets.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -489,7 +496,8 @@ func TestStatefulNamedStructProfileRejectsAbsentCapabilityMember(t *testing.T) {
 		RuntimeContractPath: filepath.Join(provider, "contract", "runtime.json"),
 		TSConfigPath:        filepath.Join(provider, "tsconfig.json"),
 		ScratchDirectory:    filepath.Join(t.TempDir(), "certify"),
-		GoBinary:            "go",
+		GoTool:              selectedGo,
+		TSGoTool:            selectedTSGo,
 		BuildProfile:        environmentcontract.DefaultBuildProfile(),
 		Backend:             "node",
 		MinimumGoVersion:    "go1.26.4",

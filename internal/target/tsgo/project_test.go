@@ -154,7 +154,7 @@ export type WrappedFacet<Value = AsyncABI> = [Value][0];
 	writeProjectFile(t, renamedPath, `export { Value as Other } from "./implementation.js";
 `)
 
-	client, err := StartClient(repositoryRoot(), projectDirectory)
+	client, err := StartClientWithTool(selectedTool(t), projectDirectory)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -471,7 +471,7 @@ export class Profile {
   readonly [ProfileNameKey]: string = "profile";
 }
 `)
-	client, err := StartClient(repositoryRoot(), directory)
+	client, err := StartClientWithTool(selectedTool(t), directory)
 	if err != nil {
 		t.Fatal(err)
 	}

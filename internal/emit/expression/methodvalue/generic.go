@@ -36,7 +36,7 @@ func emitGenericMethodValue(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	providerCooperative, cooperative, contractRequests, err :=
+	providerCooperative, _, contractRequests, err :=
 		cooperativecall.GenericValueContract(
 			context,
 			selection.Facet(),
@@ -108,7 +108,7 @@ func emitGenericMethodValue(
 	}
 	var modifiers []tsgo.ModifierLike
 	resultType := targetSignature.Result()
-	if cooperative {
+	if providerCooperative {
 		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}

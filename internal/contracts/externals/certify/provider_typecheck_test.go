@@ -30,6 +30,7 @@ func TestExternalProviderCertificationRejectsTypeDiagnostics(t *testing.T) {
 		repositoryRoot: config.RepositoryRoot,
 		providerRoot:   providerRoot,
 		tsConfigPath:   configPath,
+		tsgoTool:       config.TSGoTool,
 	})
 	if err == nil || !strings.Contains(err.Error(), "TS2322") {
 		t.Fatalf("typecheck error = %v, want TS2322", err)
@@ -40,6 +41,7 @@ func TestExternalProviderCertificationRejectsTypeDiagnostics(t *testing.T) {
 		repositoryRoot: config.RepositoryRoot,
 		providerRoot:   providerRoot,
 		tsConfigPath:   configPath,
+		tsgoTool:       config.TSGoTool,
 	}); err != nil {
 		t.Fatalf("valid provider failed certification: %v", err)
 	}

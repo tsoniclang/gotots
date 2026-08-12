@@ -84,7 +84,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	providerCooperative, abiCooperative, sourceRequests, err :=
+	providerCooperative, _, sourceRequests, err :=
 		cooperativecall.SourceValueContract(
 			context,
 			method,
@@ -164,7 +164,7 @@ func Emit(
 	}
 	var modifiers []tsgo.ModifierLike
 	resultType := targetSignature.Result()
-	if abiCooperative {
+	if providerCooperative {
 		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}

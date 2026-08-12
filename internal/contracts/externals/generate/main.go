@@ -5,11 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
+	"path/filepath"
 	"strings"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	externalcertify "github.com/tsoniclang/gotots/internal/contracts/externals/certify"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func main() {
@@ -22,6 +24,9 @@ func main() {
 	var standardLibraryRuntime string
 	var goos string
 	var goarch string
+	var goBinary string
+	var tsgoBinary string
+	var toolCache string
 	var tags string
 	var backend string
 	var check bool
@@ -44,6 +49,9 @@ func main() {
 	)
 	flag.StringVar(&goos, "goos", "", "selected GOOS")
 	flag.StringVar(&goarch, "goarch", "", "selected GOARCH")
+	flag.StringVar(&goBinary, "go", "", "selected Go executable")
+	flag.StringVar(&tsgoBinary, "tsgo", "", "selected pinned TS-Go executable")
+	flag.StringVar(&toolCache, "tool-cache", "", "selected .temp/cache root for sealed tools")
 	flag.StringVar(&tags, "tags", "", "comma-separated build tags")
 	flag.StringVar(&backend, "backend", "", "provider backend")
 	flag.BoolVar(&check, "check", false, "verify without writing")
@@ -52,8 +60,25 @@ func main() {
 	if tags != "" {
 		selectedTags = strings.Split(tags, ",")
 	}
+	if toolCache == "" {
+		toolCache = filepath.Join(repository, ".temp", "cache", "toolchain")
+	}
+	selectedGo, err := toolchain.ResolveGo(goBinary, toolCache)
+	if err != nil {
+		fatalf("select Go: %v", err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, repository, tsgoBinary)
+	if err != nil {
+		fatalf("select TS-Go: %v", err)
+	}
+	if goos == "" {
+		goos = selectedGo.DefaultGOOS()
+	}
+	if goarch == "" {
+		goarch = selectedGo.DefaultGOARCH()
+	}
 	profile, err := environmentcontract.NewBuildProfileForToolchain(
-		runtime.Version(),
+		selectedGo.Version(),
 		goos,
 		goarch,
 		false,
@@ -72,6 +97,8 @@ func main() {
 		StandardLibraryRuntimePath:  standardLibraryRuntime,
 		BuildProfile:                profile,
 		Backend:                     backend,
+		GoTool:                      selectedGo,
+		TSGoTool:                    selectedTSGo,
 	}
 	generated, err := externalcertify.Generate(config)
 	if err != nil {

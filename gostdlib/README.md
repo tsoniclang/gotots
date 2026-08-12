@@ -11,5 +11,5 @@ import * as os from "@gotots/gostdlib/os.js";
 import * as filepath from "@gotots/gostdlib/path/filepath.js";
 ```
 
-The initial implementation uses Node.js internally. Backend names, contract
+The selected implementation uses Node.js internally. Backend names, contract
 digests, and compiler ABI names are not part of the public API.

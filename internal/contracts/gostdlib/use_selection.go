@@ -73,7 +73,8 @@ func NewFacetUseSelection(
 	case FacetRecoveryCallable:
 		compatible = capability == FacetCapabilityRecovery
 	case FacetGenericCallableKernel:
-		compatible = capability == FacetCapabilityKernel
+		compatible = capability == FacetCapabilityKernel ||
+			capability == FacetCapabilitySynchronousKernel
 	case FacetReflectionTypeOperations:
 		compatible = capability == FacetCapabilityMetadata
 	}

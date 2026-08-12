@@ -15,7 +15,8 @@ func TestStatefulProfileTargetFieldsExactJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := filepath.Join(repository, "gostdlib")
-	client, err := tsgo.StartClient(repository, provider)
+	_, selectedTSGo := resolveTestTools(t, repository)
+	client, err := tsgo.StartClientWithTool(selectedTSGo, provider)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +110,8 @@ func TestStatefulProfileOperationsExactJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := filepath.Join(repository, "gostdlib")
-	client, err := tsgo.StartClient(repository, provider)
+	_, selectedTSGo := resolveTestTools(t, repository)
+	client, err := tsgo.StartClientWithTool(selectedTSGo, provider)
 	if err != nil {
 		t.Fatal(err)
 	}

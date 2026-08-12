@@ -118,9 +118,8 @@ func assertWaveNineGenericArtifactBudget(
 			capabilityBytes += artifact.bytes
 		}
 	}
-	// Canonical pointer markers carry pointer intent directly, so the fixture
-	// owns seven generic capabilities rather than the former two extra
-	// generated pointer-representation capabilities.
+	// Canonical pointer markers eliminate the former two generated pointer-
+	// representation capabilities, leaving seven capabilities in this fixture.
 	if concretizations != 7 || concretizationBytes > 6_200 ||
 		capabilities != 7 || capabilityBytes > 5_000 {
 		t.Fatalf(
@@ -258,10 +257,19 @@ func TestImmediateFunctionLiteralBypassesFirstClassCallableABI(t *testing.T) {
 	}
 	if !strings.Contains(
 		artifacts.printed,
-		"__gotots_defers_0.push(async ($go$recovery: GoRecovery): Promise<void> => {",
+		"__gotots_defers_0.push(($go$recovery: GoRecovery): void => {",
 	) {
 		t.Fatalf(
 			"deferred direct literal lacks its recovery-owned defer envelope:\n%s",
+			artifacts.printed,
+		)
+	}
+	if !strings.Contains(
+		artifacts.printed,
+		"const __gotots_defers_0: (($go$recovery: GoRecovery) => Awaitable<void>)[] = [];",
+	) {
+		t.Fatalf(
+			"cooperative defer stack lacks its canonical Awaitable transport:\n%s",
 			artifacts.printed,
 		)
 	}
@@ -509,7 +517,8 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 	)
 	for _, required := range []string{
 		"export async function cooperativeDeferredRecover(",
-		"Promise<void>",
+		"(($go$recovery: GoRecovery) => Awaitable<void>)[]",
+		"push(($go$recovery: GoRecovery): void =>",
 		"await __gotots_deferred_",
 	} {
 		if !strings.Contains(deferredRecover, required) {
@@ -519,6 +528,12 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 				deferredRecover,
 			)
 		}
+	}
+	if strings.Contains(deferredRecover, "push(async ($go$recovery") {
+		t.Fatalf(
+			"synchronous deferred recover acquired an async wrapper:\n%s",
+			deferredRecover,
+		)
 	}
 	genericConstraint := waveNineFunctionText(
 		t,

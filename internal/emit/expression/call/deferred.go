@@ -470,13 +470,12 @@ func deferredInvocation(
 		requests = append(requests, request)
 		call = context.Factory().AwaitExpression(call)
 	}
-	cooperative := targetCooperative || context.IsCooperative()
 	body := append(invocationBefore, context.Factory().ExpressionStatement(call))
 	var modifiers []tsgo.ModifierLike
 	var resultType tsgo.TypeNode = context.Factory().KeywordTypeNode(
 		tsgo.KeywordTypeSyntaxKindVoidKeyword,
 	)
-	if cooperative {
+	if targetCooperative {
 		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
 		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}
@@ -505,10 +504,6 @@ func deferredNoop(
 	var resultType tsgo.TypeNode = context.Factory().KeywordTypeNode(
 		tsgo.KeywordTypeSyntaxKindVoidKeyword,
 	)
-	if context.IsCooperative() {
-		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
-		resultType = callable.PromiseResult(context.Factory(), resultType)
-	}
 	return api.NewExpressionEmission(
 		nil,
 		context.Factory().ArrowFunction(

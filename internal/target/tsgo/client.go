@@ -3,7 +3,9 @@ package tsgo
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -41,6 +43,7 @@ func (e *RemoteError) Error() string {
 
 type Client struct {
 	mutex     sync.Mutex
+	tool      Tool
 	command   *exec.Cmd
 	stdin     io.WriteCloser
 	stdout    io.ReadCloser
@@ -51,11 +54,11 @@ type Client struct {
 	closed    bool
 }
 
-func StartClient(moduleDirectory string, workingDirectory string) (*Client, error) {
-	toolPath, err := resolvePinnedTool(moduleDirectory)
-	if err != nil {
-		return nil, err
+func StartClientWithTool(tool Tool, workingDirectory string) (*Client, error) {
+	if !tool.Valid() {
+		return nil, &ClientError{Operation: "start", Reason: "TS-Go tool is invalid"}
 	}
+	var err error
 	workingDirectory, err = filepath.Abs(workingDirectory)
 	if err != nil {
 		return nil, &ClientError{Operation: "start", Reason: err.Error()}
@@ -68,9 +71,14 @@ func StartClient(moduleDirectory string, workingDirectory string) (*Client, erro
 		return nil, &ClientError{Operation: "start", Reason: workingDirectory + " is not a directory"}
 	}
 
-	command := exec.Command(toolPath, "--api", "--async", "--cwd", workingDirectory)
-	command.Env = nativeToolEnvironment()
-	client := &Client{command: command}
+	command, err := tool.command(
+		context.Background(),
+		"--api", "--async", "--cwd", workingDirectory,
+	)
+	if err != nil {
+		return nil, err
+	}
+	client := &Client{tool: tool, command: command}
 	command.Stderr = &client.stderr
 	client.stdin, err = command.StdinPipe()
 	if err != nil {
@@ -87,6 +95,13 @@ func StartClient(moduleDirectory string, workingDirectory string) (*Client, erro
 		client.stdin.Close()
 		client.stdout.Close()
 		return nil, &ClientError{Operation: "start", Reason: err.Error()}
+	}
+	if err := tool.Verify(); err != nil {
+		_ = command.Process.Kill()
+		_ = command.Wait()
+		client.stdin.Close()
+		client.stdout.Close()
+		return nil, err
 	}
 	return client, nil
 }
@@ -229,17 +244,20 @@ func (c *Client) Close() error {
 	closeErr := c.stdin.Close()
 	waitErr := c.command.Wait()
 	c.stdout.Close()
+	verifyErr := c.tool.Verify()
+	var result []error
 	if closeErr != nil {
-		return &ClientError{Operation: "close stdin", Reason: closeErr.Error()}
+		result = append(result, &ClientError{Operation: "close stdin", Reason: closeErr.Error()})
 	}
 	if waitErr != nil {
 		reason := waitErr.Error()
 		if stderr := strings.TrimSpace(c.stderr.String()); stderr != "" {
 			reason += ": " + stderr
 		}
-		return &ClientError{Operation: "wait", Reason: reason}
+		result = append(result, &ClientError{Operation: "wait", Reason: reason})
 	}
-	return nil
+	result = append(result, verifyErr)
+	return errors.Join(result...)
 }
 
 type rpcRequest struct {

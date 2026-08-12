@@ -23,6 +23,7 @@ type Config struct {
 	ContractPaths  []string
 	ScratchRoot    string
 	Compilation    CompilationDocument
+	TSGoTool       tsgo.Tool
 }
 
 func VerifyAll(config Config) (
@@ -31,13 +32,13 @@ func VerifyAll(config Config) (
 ) {
 	if config.RepositoryRoot == "" || config.Program == nil ||
 		len(config.ContractPaths) == 0 || config.ScratchRoot == "" ||
-		!config.Compilation.valid() {
+		!config.Compilation.valid() || !config.TSGoTool.Valid() {
 		return nil, &Error{Operation: "configure", Reason: "required input is absent"}
 	}
 	if err := os.MkdirAll(config.ScratchRoot, 0o755); err != nil {
 		return nil, &Error{Operation: "configure", Subject: config.ScratchRoot, Reason: err.Error()}
 	}
-	client, err := tsgo.StartClient(config.RepositoryRoot, config.ScratchRoot)
+	client, err := tsgo.StartClientWithTool(config.TSGoTool, config.ScratchRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +54,7 @@ func VerifyAll(config Config) (
 		byPath:     make(map[string]Implementation),
 		repository: config.RepositoryRoot,
 		scratch:    config.ScratchRoot,
+		tsgoTool:   config.TSGoTool,
 	}
 	if err := certificate.bindCompilation(config.Compilation); err != nil {
 		return nil, err
@@ -145,9 +147,9 @@ func verifyOne(
 	if err != nil {
 		return Implementation{}, err
 	}
-	if err := tsgo.Compile(
+	if err := tsgo.CompileWithTool(
 		context.Background(),
-		config.RepositoryRoot,
+		config.TSGoTool,
 		directory,
 		[]string{"--noEmit", "-p", tsconfigPath},
 	); err != nil {

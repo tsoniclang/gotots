@@ -1,12 +1,18 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
+
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"github.com/tsoniclang/gotots/internal/toolchain"
 )
 
 func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
@@ -17,6 +23,7 @@ func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
   "distribution": {"root": "../distribution"},
   "source": {"root": "../source", "package": "./cmd/app", "mode": "main"},
   "go": {"goos": "linux", "goarch": "amd64", "cgo": false, "tags": ["noasm"]},
+  "tools": `+testToolsDocument(t)+`,
   "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
   "providers": {"standardLibrary": true, "externals": false},
   "implementations": {"bundles": ["implementations/fast/contract.json"]},
@@ -26,12 +33,14 @@ func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
 	integer := "fixed64-bigint"
 	concurrency := "cooperative"
 	output := "alternate"
+	toolCache := filepath.Join(".temp", "cache", "selected-tools")
 	project, err := Load(Request{
 		ConfigPath: filepath.Join(configDirectory, "gotots.json"),
 		Overrides: Overrides{
 			IntegerRepresentation: &integer,
 			ConcurrencySemantics:  &concurrency,
 			OutputDirectory:       &output,
+			ToolCacheRoot:         &toolCache,
 		},
 	})
 	if err != nil {
@@ -50,6 +59,13 @@ func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
 	if got := project.BuildProfile().Tags(); !slices.Equal(got, []string{"noasm"}) {
 		t.Fatalf("build tags = %v", got)
 	}
+	if !project.GoTool().Valid() || !project.TSGoTool().Valid() ||
+		project.BuildProfile().ToolchainVersion() != project.GoTool().Version() {
+		t.Fatal("resolved project did not retain one exact Go and TS-Go selection")
+	}
+	if project.ToolCacheRoot() != filepath.Join(configDirectory, toolCache) {
+		t.Fatalf("tool cache = %q", project.ToolCacheRoot())
+	}
 	if got := project.ImplementationBundles(); !slices.Equal(got, []string{
 		filepath.Join(configDirectory, "implementations", "fast", "contract.json"),
 	}) {
@@ -57,6 +73,60 @@ func TestLoadResolvesStrictProjectAndCLIOverrides(t *testing.T) {
 	}
 	if !project.StandardLibraryEnabled() || project.ExternalsEnabled() {
 		t.Fatal("provider selection differs")
+	}
+}
+
+func TestLoadDefaultsToolsAndBuildProfileFromSelectedGo(t *testing.T) {
+	repository, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "gotots.json")
+	writeProjectConfig(t, path, `{
+  "schemaVersion": 1,
+  "distribution": {"root": `+quoteJSON(t, repository)+`},
+  "source": {"root": ".", "package": ".", "mode": "main"},
+  "go": {"cgo": false, "tags": []},
+  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "providers": {"standardLibrary": false, "externals": false},
+  "implementations": {"bundles": []},
+  "output": {"directory": "generated"}
+}
+`)
+	project, err := Load(Request{ConfigPath: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !project.GoTool().Valid() || !project.TSGoTool().Valid() {
+		t.Fatal("default tool selection is invalid")
+	}
+	if project.BuildProfile().ToolchainVersion() != project.GoTool().Version() ||
+		project.BuildProfile().GOOS() != project.GoTool().DefaultGOOS() ||
+		project.BuildProfile().GOARCH() != project.GoTool().DefaultGOARCH() {
+		t.Fatalf("default build profile did not come from selected Go: %#v", project.BuildProfile())
+	}
+}
+
+func TestLoadRejectsCgoWithoutSelectedExternalToolContract(t *testing.T) {
+	repository, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "gotots.json")
+	writeProjectConfig(t, path, `{
+  "schemaVersion": 1,
+  "distribution": {"root": `+quoteJSON(t, repository)+`},
+  "source": {"root": ".", "package": ".", "mode": "main"},
+  "go": {"cgo": true, "tags": []},
+  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "providers": {"standardLibrary": false, "externals": false},
+  "implementations": {"bundles": []},
+  "output": {"directory": "generated"}
+}
+`)
+	if _, err := Load(Request{ConfigPath: path}); err == nil ||
+		!strings.Contains(err.Error(), "external-tool contract") {
+		t.Fatalf("cgo selection error = %v", err)
 	}
 }
 
@@ -69,6 +139,7 @@ func TestLoadSelectsExternalImplementationBundlesFromCLI(t *testing.T) {
   "distribution": {"root": "distribution"},
   "source": {"root": "source", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
+  "tools": `+testToolsDocument(t)+`,
   "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
   "providers": {"standardLibrary": false, "externals": false},
   "implementations": {"bundles": ["local/contract.json"]},
@@ -132,6 +203,59 @@ func TestSemanticDigestIgnoresOperationalRelocation(t *testing.T) {
 	}
 	if changed == firstDigest {
 		t.Fatal("implementation evidence did not change semantic digest")
+	}
+}
+
+func TestSemanticDigestIncludesSelectedToolBuildIdentity(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture is Unix-only")
+	}
+	realGo, err := exec.LookPath("go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedGo, err := toolchain.ResolveGo(
+		realGo,
+		projectTestToolCache(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := make([]Project, 2)
+	for index := range projects {
+		directory := t.TempDir()
+		wrapper := filepath.Join(directory, "selected-go")
+		source := "#!/bin/sh\n# identity " + string(rune('a'+index)) + "\nexec " +
+			configShellQuote(realGo) + " \"$@\"\n"
+		if err := os.WriteFile(wrapper, []byte(source), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		projects[index] = loadProjectWithTools(
+			t,
+			directory,
+			wrapper,
+			selectedTSGo.Path(),
+		)
+	}
+	evidence := EvidenceDigests{Source: "source-digest"}
+	first, err := projects[0].SemanticDigest(evidence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := projects[1].SemanticDigest(evidence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatal("different selected Go build identities produced one semantic digest")
 	}
 }
 
@@ -207,10 +331,33 @@ func loadMinimalProject(t *testing.T, directory string, output string) Project {
   "distribution": {"root": "distribution"},
   "source": {"root": "source", "package": ".", "mode": "main"},
   "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
+  "tools": `+testToolsDocument(t)+`,
   "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
   "providers": {"standardLibrary": false, "externals": false},
   "implementations": {"bundles": ["implementation.json"]},
   "output": {"directory": "`+output+`"}
+}
+`)
+	project, err := Load(Request{ConfigPath: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return project
+}
+
+func loadProjectWithTools(t *testing.T, directory, goPath, tsgoPath string) Project {
+	t.Helper()
+	path := filepath.Join(directory, "gotots.json")
+	writeProjectConfig(t, path, `{
+  "schemaVersion": 1,
+  "distribution": {"root": "distribution"},
+  "source": {"root": "source", "package": ".", "mode": "main"},
+  "go": {"goos": "`+runtime.GOOS+`", "goarch": "`+runtime.GOARCH+`", "cgo": false, "tags": []},
+  "tools": {"go": `+quoteJSON(t, goPath)+`, "tsgo": `+quoteJSON(t, tsgoPath)+`},
+  "semantics": {"integers": "number", "evaluationOrder": "direct", "concurrency": "disabled"},
+  "providers": {"standardLibrary": false, "externals": false},
+  "implementations": {"bundles": []},
+  "output": {"directory": "generated"}
 }
 `)
 	project, err := Load(Request{ConfigPath: path})
@@ -228,4 +375,50 @@ func writeProjectConfig(t *testing.T, path string, source string) {
 	if err := os.WriteFile(path, []byte(source), 0o600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func testToolsDocument(t *testing.T) string {
+	t.Helper()
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedGo, err := toolchain.ResolveGo(
+		goPath,
+		projectTestToolCache(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedTSGo, err := tsgo.ResolveTool(selectedGo, repository, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return `{"go":` + quoteJSON(t, goPath) + `,"tsgo":` + quoteJSON(t, selectedTSGo.Path()) + `}`
+}
+
+func projectTestToolCache(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(root, ".temp", "cache", "toolchain-tests")
+}
+
+func quoteJSON(t *testing.T, value string) string {
+	t.Helper()
+	payload, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(payload)
+}
+
+func configShellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }

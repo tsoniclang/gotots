@@ -48,6 +48,9 @@ func TestParseArgumentsBindsSemanticAndRepeatedOverrides(t *testing.T) {
 		"--tag", "purego",
 		"--implementation-bundle", "one.json",
 		"--implementation-bundle", "two.json",
+		"--go", "/tools/go-selected",
+		"--tsgo", "/tools/tsgo-selected",
+		"--tool-cache", "/project/.temp/cache/tools",
 		"--standard-library=false",
 		"--externals",
 		"--print-resolved-config",
@@ -64,6 +67,9 @@ func TestParseArgumentsBindsSemanticAndRepeatedOverrides(t *testing.T) {
 		!overrides.ImplementationSet || len(overrides.ImplementationBundles) != 2 ||
 		overrides.StandardLibrary == nil || *overrides.StandardLibrary ||
 		overrides.Externals == nil || !*overrides.Externals ||
+		overrides.GoExecutable == nil || *overrides.GoExecutable != "/tools/go-selected" ||
+		overrides.TSGoExecutable == nil || *overrides.TSGoExecutable != "/tools/tsgo-selected" ||
+		overrides.ToolCacheRoot == nil || *overrides.ToolCacheRoot != "/project/.temp/cache/tools" ||
 		!invocation.PrintResolvedConfig() {
 		t.Fatalf("parsed invocation = %#v", invocation)
 	}
