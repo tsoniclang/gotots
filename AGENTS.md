@@ -37,6 +37,13 @@ TypeScript: ordinary TypeScript plus public target-neutral marker types and
 calls selected from `@tsonic/core` by exact declaration identity. Those marker
 contracts are shared Tsonic authority, not copied GoToTS declarations.
 
+## Coordinated Repository Scope
+
+This workstream may modify only GoToTS and the TypeScript target. Any change to
+TSTS, Tsonic core, another Tsonic target, or any other repository requires the
+user's explicit approval before editing. Read-only inspection may establish a
+published contract; it does not grant change ownership.
+
 Executable target code is a separate consumer artifact. TSTS checks the exact
 immutable canonical source, retains its TS-Go-contract AST, and finalizes
 marker facts on exact AST nodes. A selected target transforms that same AST

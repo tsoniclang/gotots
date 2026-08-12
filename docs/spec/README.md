@@ -185,10 +185,13 @@ static form nor a finite exact concretization, compilation fails explicitly.
   required by generated files. It is constructed through TS-Go AST like every
   other output file. Target-neutral semantics already owned by `@tsonic/core`
   use that canonical marker declaration instead of a copied support API.
-- **source-facing contract:** the target callable or type surface corresponding
-  to one selected Go declaration. Its value and type-parameter shape obeys
-  Source-Shape Conservation even when generated modules import a private
-  concretization or provider facade to implement it.
+- **source-facing contract:** the canonical GoToTS callable or type surface
+  corresponding to one selected Go declaration. Its value and type-parameter
+  shape obeys Source-Shape Conservation even when generated modules import a
+  private concretization or provider facade to implement it. A closed
+  executable target may project its representation only by rewriting every
+  affected producer and consumer while preserving Go parameter cardinality,
+  order, and observable behavior.
 - **concretization:** a private generated definition reconstructed directly
   from one Go generic declaration at one exact reached `go/types.Instance`
   because its body needs representation-dependent operations that TypeScript
@@ -199,15 +202,18 @@ static form nor a finite exact concretization, compilation fails explicitly.
   Go type, method, interface, value, or operation before target lowering.
 - **target lowering rule:** a target-owned, fact-driven transformation from a
   canonical marker occurrence to that target's executable representation. It
-  cannot change the source-facing contract or rediscover semantics by spelling.
+  may project a complete closed executable contract, but it cannot mutate the
+  canonical artifact, add/drop/reorder Go value parameters, change observable
+  Go behavior, or rediscover semantics by spelling.
 - **compilation profile:** the immutable compilation-wide selection of Go
   semantic tradeoff axes retained in canonical source. Target representation
   and optimization choices belong to a separate target profile. Canonical
   files in one compilation cannot mix selections.
 - **target profile:** the selected downstream target and its immutable
   representation/optimization policy. It consumes finalized facts and may not
-  alter canonical source contracts or Go behavior outside a named equivalence
-  envelope.
+  alter canonical source artifacts or Go behavior outside a named equivalence
+  envelope. Any executable type projection requires complete-flow evidence and
+  atomic producer/consumer rewriting.
 - **Go build profile:** the loader-owned selected Go identity, `GOOS`,
   `GOARCH`, `CGO_ENABLED`, and sorted build tags. The identity binds the
   selected `GOVERSION`, executable bytes, and content-addressed complete
@@ -291,6 +297,9 @@ behavior.
   TS-Go's official AST protocol and is printed by pinned TS-Go itself.
 - Definitions are owned once and output growth remains proportional to source
   complexity, not interface implementer count or package count.
+- Ordinary declaration and module names are deterministic, source-derived, and
+  readable. Digests remain artifact/evidence identities; they do not appear in
+  ordinary generated source names or paths.
 - Generated code uses no `any`/`unknown` recovery, dynamic semantic lookup,
   `.call`, `.apply`, `.bind`, dynamic import, prototype patch, or source-text
   patching.

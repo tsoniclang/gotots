@@ -252,111 +252,52 @@ Compile-only is not runtime completion. Runtime completion requires an actual
 generated entry point to execute with expected observable output and error
 behavior.
 
-## Active Source-ABI Replacement
+## Source-ABI Conservation Delivery
 
-The current implementation contains superseded machinery that violates
-Source-Shape Conservation. It is replaced in this dependency order:
+Every source-facing callable is mechanically joined to its selected
+`go/types.Signature`. The accepted implementation has one ordinary source
+entry and only demand-created private implementation artifacts:
 
-### A. Freeze The Gate
+- directly expressible generic bodies remain direct;
+- representation-dependent generic bodies may use reached exact private
+  concretizations, never public operation/capability parameters;
+- recover support may use one private deferred entry while the ordinary source
+  entry remains unchanged;
+- indirect cooperative callables use the one canonical awaitability mapping,
+  while exact direct effects remain fact evidence for a selected target; and
+- provider boundaries use exact static facades whose public calls retain the
+  source arguments.
 
-- mechanically compare every source-facing declaration/call to
-  `go/types.Signature`;
-- add failing examples for generic operation parameters, recovery parameters,
-  provider policy objects, hidden representation type parameters, and public
-  callable-profile variants;
-- add static artifact searches and mutation controls.
-
-### B. Generic Directness
-
-- keep directly expressible generic bodies;
-- install exact reached-instance concretization for representation-dependent
-  bodies;
-- migrate generic functions/methods/values/provider calls;
-- delete operation-parameter propagation, capability ordering, operation
-  objects, and their public/provider ABI fields.
-
-### C. Deferred Entry
-
-- emit ordinary exact source entry plus private recovery entry only where
-  demanded;
-- install typed exact-signature registry for transported function values;
-- migrate direct, method, interface, generic, provider, and asynchronous
-  deferred invocation;
-- delete optional recovery parameters/facets from every source callable and
-  public provider signature.
-
-### D. Canonical Indirect Awaitability
-
-- use one `Awaitable` function/interface result mapping under cooperative
-  mode;
-- unconditionally await indirect calls;
-- retain exact direct callable effects;
-- migrate named callable types, interfaces, adapters, generic nested
-  callables, package state, and environment contracts;
-- delete source/profile variants, public profile exports, hidden `$Value`
-  parameters, and runtime Promise inspection.
-
-### E. Static Provider Facades
-
-- derive the complete directional interface/callback obligation set from the
-  selected Go surface and inspected provider project before emission;
-- exact-join every obligation to the ordinary binding or one private facade,
-  and reject every missing, duplicate, extra, mixed-effect, or result-triggered
-  certificate;
-- make generated calls retain source arguments;
-- generate one typed facade per selected provider boundary;
-- import exact bridges/guards/private kernels statically;
-- migrate stateful types, callbacks, nested interfaces, generic instances, and
-  deferred entries;
-- delete `CanonicalBoundaryPolicy`, runtime policy objects, profile matrices,
-  hand-authored overrides, ordinary-binding fallback, and call-site-first
-  profile discovery.
-
-### F. End-To-End Reproof
-
-- regenerate provider certificates and all affected artifacts;
-- pass source-shape, schema, architecture, strict, differential, mutation,
-  race, and cost gates;
-- broad-search every superseded mechanism;
-- generate, whole-product strict-typecheck, link, and execute TS-Go;
-- checkpoint and push only clean feature-branch evidence.
-
-These outcomes are atomic by owner: each replacement installs the new owner,
-migrates every producer/consumer, and deletes the old path in the same
-checkpoint. A newly observed blocker changes this sequence only when concrete
-evidence invalidates the architecture; its directive must pass WCBUBWHB and
-the review gate first.
+Every new callable family must pass the same source-shape gate before it is
+admitted. Operation dictionaries, recovery parameters, provider policies,
+hidden representation type parameters, public callable-profile variants,
+runtime Promise inspection, call-site-first profile discovery, and source-ABI
+fallbacks are forbidden. A replacement is atomic by owner: it installs the
+new owner, migrates every producer and consumer, and deletes the superseded
+path in one checkpoint.
 
 ## Performance Selection And Source Implementations
 
-Performance work proceeds in measured owner order:
+Performance delivery follows measured ownership rather than corpus rules:
 
-1. add the versioned project config, `-c`/`--config`, immutable resolution, and
-   semantic digest;
-2. add one certified source-package implementation owner and prove atomic
-   generated-package replacement through pinned TS-Go AST: settle one isolated
-   ordinary certification session, capture only its target set and immutable
-   observable selected-package contracts, discard all mutable session state,
-   then settle a fresh final session in which selected-package requests publish
-   contracts but never source bodies, storage, initializers, dependencies, or
-   target declarations; rebind every selected bundle while all files remain
-   compiler-owned inspectable ASTs, then remove every selected generated module
-   set and install every authored opaque AST as one transaction;
-3. prove concrete implementation bundles and product equivalence evidence are
-   owned by the consuming project rather than shipped as GoToTS policy;
-4. place executable-representation optimizations in the selected target, keyed
-   by finalized facts and complete-flow evidence rather than GoToTS call-site
-   rewrites;
-5. fix the next measured Go-language runtime owner, deleting the superseded
-   path before advancing.
+1. the versioned project config, `-c`/`--config`, and CLI overrides resolve to
+   one immutable semantic compilation contract;
+2. canonical GoToTS output chooses the smallest exact target-neutral shape,
+   requests semantic machinery only on demand, and uses readable
+   source-derived declaration/module names;
+3. a certified package-atomic source implementation may replace a package only
+   after independent contract/equivalence proof, with every translated body
+   absent from the installed artifact;
+4. executable-representation optimizations belong to the selected target and
+   consume finalized exact-node facts plus complete-flow evidence; and
+5. the next change is selected from measured source-size, typecheck, memory,
+   startup, or runtime evidence at the highest owner that eliminates the class.
 
-Each item starts with a failing owner-level contract and ends with focused
+Each change starts with a failing owner-level contract and ends with focused
 shape, strict-typecheck, differential/equivalence, mutation, final-artifact,
-and cost evidence. Full generation and runtime jobs are batched at milestone
-boundaries under the repository memory guard. A package implementation is not
-accepted merely because runtime is faster: its final public surface and stated
-observable behavior must be certified, and the translated package files must
-be absent.
+human-source, and cost evidence. Full generation and runtime jobs are batched
+at milestone boundaries under the repository memory guard. Faster runtime
+alone cannot accept a package implementation or representation change.
 
 ## Checkpoint Evidence
 

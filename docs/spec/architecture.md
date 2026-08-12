@@ -1242,13 +1242,20 @@ an artifact from an earlier canonical build.
 
 Compilation-scoped generated support definitions retain their full semantic
 artifact identities, but those identities do not each create a physical ESM
-module. The output owner deterministically coalesces them by semantic family
-and the first byte of the artifact digest, giving at most 256 shards per
-family. A shard is only a placement container: every definition, dependency,
-revision, and observable fingerprint remains keyed by the full artifact
-owner. Lexical artifacts remain with their lexical owner. This bounded static
-layout replaces one-module-per-artifact output; it uses no runtime registry,
-dynamic import, bundler dependency, erased lookup, or source-name grouping.
+module or appear in a physical path. The output owner groups them by real
+semantic family and source-derived owner: normally the defining Go package,
+declaration family, and operation family. A large owner is divided only by a
+real semantic sub-owner already present in the source/type graph, never by a
+digest byte, arbitrary numbered shard, or output-size accident. Lexical
+artifacts remain with their lexical owner.
+
+The physical layout is therefore bounded by selected semantic/source owners,
+not target artifact count. Every definition, dependency, revision, and
+observable fingerprint remains keyed internally by the full artifact owner.
+Readable paths are placement only and never semantic identity. Real path/name
+collisions add the shortest deterministic source-derived qualifier. This
+layout uses no runtime registry, dynamic import, bundler dependency, erased
+lookup, one-module-per-artifact fallback, or hash-named support path.
 
 Schema version 1 has the closed top-level sections `distribution`, `source`,
 `go`, `semantics`, `providers`, `implementations`, `output`, and `tools`.

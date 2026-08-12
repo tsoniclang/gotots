@@ -1001,16 +1001,22 @@ The selected package must contribute one final implementation module, zero
 translated bodies, and zero unresolved raw-pointer boundaries from the removed
 package.
 
-Generated-support topology proof exact-joins full artifact owners and
-definitions after deterministic family sharding. Layout tests prove that two
-full identities with the same first digest byte share one module, different
-bytes or semantic families do not, and malformed identities fail. Product
-evidence reports support definitions separately from physical support modules,
-the largest shard, ESM startup time/RSS, and minimal-compile time/RSS. A
-mutation restoring one physical module per artifact must fail the bounded-
-shard module-count gate, and a mutation merging semantic families must fail
-ownership or strict typechecking. Release evidence additionally compares ESM
-startup against the immediately preceding one-module-per-artifact product.
+Generated-support topology proof exact-joins full internal artifact owners and
+definitions to readable modules grouped by real semantic family and
+source-derived owner. Layout tests prove that artifacts with one semantic
+source owner share its module, different semantic owners do not merge, real
+collisions receive the shortest deterministic readable qualifier, and
+malformed identities fail. Digests may occur in manifests and diagnostics but
+never in ordinary declaration names or module paths.
+
+Product evidence reports support definitions separately from physical support
+modules, the largest semantic module, ESM startup time/RSS, and minimal-compile
+time/RSS. Mutations restoring one physical module per artifact, digest-byte or
+numbered sharding, source-name collision, or cross-family merging fail the
+layout, ownership, source-shape, or strict-typecheck gate. Release evidence
+compares startup and typecheck cost against the immediately preceding layout;
+readability cannot hide an unbounded module, and a cost regression cannot
+restore machine-named source.
 
 Every material checkpoint reports absolute values and parent deltas for:
 
