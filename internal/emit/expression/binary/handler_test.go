@@ -194,13 +194,8 @@ func (unusedNames) DefinedValueRepresentation(
 	)
 }
 
-func (unusedNames) ProviderOwnedDeclaration(types.Object) (bool, error) {
-	return false, nil
-}
-
-func (unusedNames) EnvironmentOwnedDeclaration(types.Object) (bool, error) {
-	return false, nil
-}
+func (unusedNames) ProviderOwnedDeclaration(types.Object) (bool, error)    { return false, nil }
+func (unusedNames) EnvironmentOwnedDeclaration(types.Object) (bool, error) { return false, nil }
 
 func (unusedNames) TypeReference(types.Object) (api.NameReference, error) {
 	panic("unused")
