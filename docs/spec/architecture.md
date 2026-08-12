@@ -540,6 +540,28 @@ one shared runtime location. Canonical source is unchanged in both cases, and a
 native target consumes the same finalized facts without reverse-engineering a
 Node-oriented carrier.
 
+The canonical pointer boundary is fixed before target selection. Its complete
+source contract is:
+
+| Go meaning | canonical TypeScript | finalized exact-node fact |
+|---|---|---|
+| `*T` | `Pointer<T> | undefined` | `PointerFact(pointee, mutability)` |
+| `&storage` | `addressOf<T>(storage)` | address operation plus storage and location identity |
+| `new(T)` | `allocatePointer<T>(zero)` | allocation operation plus fresh location identity |
+| `*pointer` | nil check, then `loadPointer<T>(pointer)` | load operation plus pointer/pointee types |
+| `*pointer = value` | nil check, then `storePointer<T>(pointer, value)` | store operation plus pointer/value types |
+| `left == right` | `equalPointer<T>(left, right)` | equality operation plus both pointer types |
+
+The callable-signature facet conserves every `*T` parameter/result as this
+canonical type, and every direct call, method value/expression, callback,
+interface adapter, deferred entry, provider bridge, and export subscribes to
+that facet. GoToTS does not scalarize a read-only body, add a cell, or change a
+caller. The TypeScript target may do so only from the finalized fact graph and
+only by replacing the complete definition/reference/alias/call component.
+Changing canonical marker identity, operation meaning, source signature, nil
+shape, or location identity is a contract change and fails before target
+planning rather than being adapted by a compatibility route.
+
 ### Unsafe Pointer Memory
 
 Raw addresses are a different semantic class from typed locations. The shared
