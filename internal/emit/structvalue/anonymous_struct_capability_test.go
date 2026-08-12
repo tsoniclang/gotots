@@ -34,7 +34,7 @@ func Value(value struct{ Field int32 }) int32 {
 		t,
 		support,
 		class.Name().Text(),
-		[]string{"$make"},
+		nil,
 	)
 }
 

@@ -84,6 +84,7 @@ type emitter struct {
 	concurrency            api.ConcurrencySemantics
 	observer               emitnaming.EnvironmentObserver
 	generic                api.GenericCallableResolver
+	declarationDemands     api.DeclarationDemandResolver
 	cooperative            api.CooperativeCallableResolver
 	recovery               api.RecoveryCallableResolver
 	external               api.ExternalFunctionResolver
@@ -101,6 +102,7 @@ func newEmitter(
 	concurrency api.ConcurrencySemantics,
 	observer emitnaming.EnvironmentObserver,
 	generic api.GenericCallableResolver,
+	declarationDemands api.DeclarationDemandResolver,
 	cooperative api.CooperativeCallableResolver,
 	recovery api.RecoveryCallableResolver,
 	external api.ExternalFunctionResolver,
@@ -123,6 +125,7 @@ func newEmitter(
 		concurrency:            concurrency,
 		observer:               observer,
 		generic:                generic,
+		declarationDemands:     declarationDemands,
 		cooperative:            cooperative,
 		recovery:               recovery,
 		external:               external,

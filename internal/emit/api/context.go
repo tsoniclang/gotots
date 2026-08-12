@@ -95,6 +95,7 @@ type Context struct {
 	localConstantProjections     map[*types.Const][]types.BasicKind
 	lexicalTypeRequirements      map[*types.TypeName][]DeclarationRequirement
 	genericResolver              GenericCallableResolver
+	declarationDemandResolver    DeclarationDemandResolver
 	genericConsumer              GenericOperationConsumer
 	cooperativeResolver          CooperativeCallableResolver
 	recoveryResolver             RecoveryCallableResolver

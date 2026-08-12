@@ -16,13 +16,23 @@ func emitValueOperation(
 	source ast.Node,
 	className string,
 	classType tsgo.TypeNode,
-	fields []field,
+	fields []layoutField,
 	assembly operationAssembly,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
 	canonicalStorage bool,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	operation := assembly.operation
+	sourceFields := make([]field, 0, len(fields))
+	constructionTypes := make([]tsgo.TypeNode, 0, len(fields))
+	for _, selected := range fields {
+		sourceFields = append(sourceFields, selected.field)
+		constructionType := selected.logicalType
+		if canonicalStorage {
+			constructionType = selected.storageType
+		}
+		constructionTypes = append(constructionTypes, constructionType)
+	}
 	memberName, err := api.NamedStructOperationMemberName(operation)
 	if err != nil {
 		return nil, nil, err
@@ -48,7 +58,8 @@ func emitValueOperation(
 			memberName,
 			className,
 			classType,
-			fields,
+			sourceFields,
+			constructionTypes,
 			capabilities,
 			typeParameters,
 			typeArguments,
@@ -61,7 +72,8 @@ func emitValueOperation(
 			memberName,
 			className,
 			classType,
-			fields,
+			sourceFields,
+			constructionTypes,
 			capabilities,
 			typeParameters,
 			typeArguments,
@@ -74,7 +86,7 @@ func emitValueOperation(
 			source,
 			memberName,
 			classType,
-			fields,
+			sourceFields,
 			capabilities,
 			typeParameters,
 			canonicalStorage,
@@ -85,7 +97,7 @@ func emitValueOperation(
 			source,
 			memberName,
 			classType,
-			fields,
+			sourceFields,
 			capabilities,
 			typeParameters,
 			canonicalStorage,
@@ -98,7 +110,8 @@ func emitValueOperation(
 			memberName,
 			className,
 			classType,
-			fields,
+			sourceFields,
+			constructionTypes,
 			capabilities,
 			typeParameters,
 			typeArguments,
@@ -109,7 +122,7 @@ func emitValueOperation(
 			context,
 			memberName,
 			classType,
-			fields,
+			sourceFields,
 			typeParameters,
 			canonicalStorage,
 		)
@@ -177,6 +190,7 @@ func zeroMethod(
 	className string,
 	classType tsgo.TypeNode,
 	fields []field,
+	constructionTypes []tsgo.TypeNode,
 	capabilities []tsgo.ParameterDeclaration,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
@@ -209,7 +223,15 @@ func zeroMethod(
 		requests = append(requests, value.Requests()...)
 	}
 	body = append(body, context.Factory().ReturnStatement(
-		construct(context, className, typeArguments, arguments),
+		construct(
+			context,
+			className,
+			typeArguments,
+			fields,
+			constructionTypes,
+			arguments,
+			canonicalStorage,
+		),
 	))
 	return operationMethod(
 		context,
@@ -229,6 +251,7 @@ func copyMethod(
 	className string,
 	classType tsgo.TypeNode,
 	fields []field,
+	constructionTypes []tsgo.TypeNode,
 	capabilities []tsgo.ParameterDeclaration,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
@@ -304,7 +327,15 @@ func copyMethod(
 		[]tsgo.ParameterDeclaration{parameter(context, "$source", classType)},
 		classType,
 		[]tsgo.Statement{context.Factory().ReturnStatement(
-			construct(context, className, typeArguments, arguments),
+			construct(
+				context,
+				className,
+				typeArguments,
+				fields,
+				constructionTypes,
+				arguments,
+				canonicalStorage,
+			),
 		)},
 		capabilities,
 		typeParameters,
@@ -487,19 +518,31 @@ func construct(
 	context api.Context,
 	className string,
 	typeArguments []tsgo.TypeNode,
+	fields []field,
+	constructionTypes []tsgo.TypeNode,
 	arguments []tsgo.Expression,
-) tsgo.CallExpression {
-	return context.Factory().CallExpression(
-		context.Factory().PropertyAccessExpression(
-			context.Factory().Identifier(className),
-			nil,
-			context.Factory().Identifier(api.StructMakeMember),
-			tsgo.NodeFlagsNone,
-		),
-		nil,
+	canonicalStorage bool,
+) tsgo.NewExpression {
+	constructorArguments := arguments
+	if canonicalStorage && len(fields) != 0 {
+		properties := make([]tsgo.ObjectLiteralElementLike, 0, len(fields))
+		for index, selected := range fields {
+			properties = append(properties, context.Factory().PropertyAssignment(
+				nil,
+				context.Factory().Identifier(selected.name),
+				nil,
+				constructionTypes[index],
+				arguments[index],
+			))
+		}
+		constructorArguments = []tsgo.Expression{
+			context.Factory().ObjectLiteralExpression(properties, true),
+		}
+	}
+	return context.Factory().NewExpression(
+		context.Factory().Identifier(className),
 		typeArguments,
-		arguments,
-		tsgo.NodeFlagsNone,
+		constructorArguments,
 	)
 }
 

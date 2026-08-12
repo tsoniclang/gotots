@@ -200,7 +200,7 @@ func (s *programSession) buildMapSpecializationRevision(
 	} else {
 		current := names.SnapshotTemporaries()
 		names.RestoreTemporaries(temporaryStart)
-		defer names.RestoreTemporaries(current)
+		defer names.FinishTemporaryReplay(current)
 	}
 	owner := api.MustGeneratedArtifactOwner(artifact)
 	finish, err := names.BeginArtifact(owner, nil, nil, "")
@@ -418,7 +418,7 @@ func (s *programSession) buildGenericCapabilityRevision(
 	} else {
 		current := names.SnapshotTemporaries()
 		names.RestoreTemporaries(temporaryStart)
-		defer names.RestoreTemporaries(current)
+		defer names.FinishTemporaryReplay(current)
 	}
 	owner := api.MustGeneratedArtifactOwner(artifact)
 	finish, err := names.BeginArtifact(owner, nil, nil, "")

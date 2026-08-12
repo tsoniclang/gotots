@@ -257,6 +257,10 @@ func verifyEmissionSource(
 				violation = "invalid production string literal"
 				return false
 			}
+			if relative != "internal/emit/api/artifact_name_contract.go" && strings.HasPrefix(value, "__gotots_") {
+				violation = "generated temporary spelling bypasses the canonical name owner"
+				return false
+			}
 			for _, forbidden := range []string{
 				".apply(",
 				".bind(",
@@ -348,6 +352,7 @@ func leak(node ast.Node) { ast.Inspect(node, func(ast.Node) bool { return true }
 const leak = "value.call(receiver)"
 `,
 		},
+		"raw generated temporary": {relative: "internal/emit/expression/leak.go", source: "package expression\nconst leak = \"__gotots_field_0\"\n"},
 		"runtime throw outside panic owner": {
 			relative: "internal/emit/runtime/array/leak.go",
 			source: `package array

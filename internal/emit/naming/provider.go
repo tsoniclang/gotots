@@ -45,11 +45,10 @@ func (n *File) TsonicCore(symbol tsoniccore.Symbol) (api.NameReference, error) {
 	localName := n.tsonicCore[symbol]
 	if localName == "" {
 		localName = declaration.Export()
-		if n.sourceNameExists(localName) || n.hasImportName(localName) {
+		if n.lexicalNameExists(localName) {
 			base := declaration.Export() + "__from_tsonic_core"
 			localName = base
-			for suffix := uint64(1); n.sourceNameExists(localName) ||
-				n.hasImportName(localName); suffix++ {
+			for suffix := uint64(1); n.lexicalNameExists(localName); suffix++ {
 				localName = base + "_" + strconv.FormatUint(suffix, 10)
 			}
 		}

@@ -128,6 +128,11 @@ representation of the source program.
   spelling lookup, source scans, or runtime semantic dispatch.
 - Definitions are emitted once. References may repeat. All helper and import
   requests are deduplicated by typed ownership, never rendered text.
+- Every generated binding in a source-bearing lexical or member scope is
+  allocated by the canonical name owner against all visible authored,
+  imported, and generated bindings. Counter spelling is not collision proof.
+  Literal target-only names are confined to structurally closed synthetic
+  scopes whose complete binding set is owned and verified locally.
 - Every revisable target artifact is keyed by authoritative Go identity and
   reconstructed only by its semantic owner. References record closed,
   facet-specific dependencies on the provider's canonical observable TS-Go AST

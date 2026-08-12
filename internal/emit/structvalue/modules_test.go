@@ -23,8 +23,12 @@ func TestNamedStructValuesCrossFilesAndPackagesTypecheckAndExecute(t *testing.T)
 	writeProgramFile(t, filepath.Join(projectDirectory, "model", "point.go"), `package model
 
 type Point struct {
-	X int32
+	hidden int32
+	X      int32
 }
+
+func Seed(x, hidden int32) Point { return Point{X: x, hidden: hidden} }
+func Hidden(point Point) int32 { return point.hidden }
 
 func (point Point) WithX(next int32) Point {
 	point.X = next
@@ -40,6 +44,10 @@ type Box struct {
 }
 
 func New(value int32) Box {
+	return Box{Point: model.Seed(value, 3)}
+}
+
+func NewWithZeroHidden(value int32) Box {
 	return Box{Point: model.Point{X: value}}
 }
 
@@ -51,7 +59,10 @@ func Move(box Box, next int32) Box {
 func Run() int32 {
 	original := New(4)
 	changed := Move(original, 9)
-	return changed.Point.X*10 + original.Point.X
+	zeroed := NewWithZeroHidden(2)
+	return changed.Point.X*10000 + original.Point.X*1000 +
+		model.Hidden(changed.Point)*100 + model.Hidden(original.Point)*10 +
+		model.Hidden(zeroed.Point)
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
@@ -83,6 +94,7 @@ func Run() int32 {
 	var targetPaths []string
 	var apiModule string
 	modelCopyMethods := 0
+	var modelConstructorFields []string
 	apiPointDefinitions := 0
 	apiPointImports := 0
 	for _, file := range emission.Files() {
@@ -104,6 +116,14 @@ func Run() int32 {
 				}
 				if file.PackageName() == "model" {
 					for _, member := range statement.Members() {
+						if constructor, ok := member.(tsgo.ConstructorDeclaration); ok {
+							for _, parameter := range constructor.Parameters() {
+								modelConstructorFields = append(
+									modelConstructorFields,
+									targetName(parameter.Name()),
+								)
+							}
+						}
 						method, ok := member.(tsgo.MethodDeclaration)
 						if ok && targetName(method.Name()) == "$copy" {
 							modelCopyMethods++
@@ -136,9 +156,12 @@ func Run() int32 {
 		}
 		if file.Kind() == emit.TargetFileSource &&
 			file.PackageName() == "api" {
-			if !strings.Contains(printed, `import { Point`) ||
-				strings.Count(printed, "export class Point") != 0 {
+			if strings.Count(printed, "export class Point") != 0 {
 				t.Fatal("api module does not reference the one model-owned Point definition")
+			}
+			if !strings.Contains(printed, ".$zero()") ||
+				strings.Contains(printed, ".$make(") {
+				t.Fatal("external inaccessible-field composite bypassed zero-then-visible-field construction")
 			}
 		}
 		if file.Kind() == emit.TargetFilePackageAssembly &&
@@ -150,12 +173,14 @@ func Run() int32 {
 	}
 	if modelCopyMethods != 1 ||
 		apiPointDefinitions != 0 ||
-		apiPointImports != 1 {
+		apiPointImports != 1 ||
+		fmt.Sprint(modelConstructorFields) != "[hidden X]" {
 		t.Fatalf(
-			"Point.$copy ownership = model methods %d, api Point definitions %d, api Point imports %d; want 1/0/1",
+			"Point ownership = copy methods %d, api definitions %d, api imports %d, constructor fields %v; want 1/0/1/[hidden X]",
 			modelCopyMethods,
 			apiPointDefinitions,
 			apiPointImports,
+			modelConstructorFields,
 		)
 	}
 	if apiModule == "" {

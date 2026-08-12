@@ -320,7 +320,7 @@ func (s *programSession) emitPackageInitializer(
 		initializer,
 		site,
 		artifactOwner,
-		nil,
+		emitnaming.TemporarySnapshot{},
 		false,
 	)
 	if err != nil {
@@ -383,7 +383,7 @@ func (s *programSession) buildPackageInitializerRevision(
 	} else {
 		current := names.SnapshotTemporaries()
 		names.RestoreTemporaries(temporaryStart)
-		defer names.RestoreTemporaries(current)
+		defer names.FinishTemporaryReplay(current)
 	}
 	sourcePath, err := targetoutput.SourcePath(
 		site.Source,

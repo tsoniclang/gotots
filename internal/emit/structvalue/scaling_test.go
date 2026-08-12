@@ -120,28 +120,23 @@ func assertStructOperationWidths(
 ) {
 	t.Helper()
 	class := targetClass(t, source, "Record")
-	members := class.Members()
-	constructor := members[1].(tsgo.ConstructorDeclaration)
-	makeMethod := targetMethod(t, class, "$make")
+	constructor := classConstructor(t, class)
 	zero := targetMethod(t, class, "$zero")
 	copyMethod := targetMethod(t, class, "$copy")
 	equal := targetMethod(t, class, "$equal")
 	constructorWidth := len(constructor.Parameters())
-	makeWidth := makeFieldCount(makeMethod)
-	zeroWidth := callArgumentCount(zero)
-	copyWidth := callArgumentCount(copyMethod)
+	zeroWidth := constructedFieldCount(zero)
+	copyWidth := constructedFieldCount(copyMethod)
 	equalWidth := equalityLeafCount(
 		equal.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression(),
 	)
 	if constructorWidth != fieldCount ||
-		makeWidth != fieldCount ||
 		zeroWidth != fieldCount ||
 		copyWidth != fieldCount ||
 		equalWidth != fieldCount {
 		t.Fatalf(
-			"Record widths constructor/make/zero/copy/equal = %d/%d/%d/%d/%d, want %d",
+			"Record widths constructor/zero/copy/equal = %d/%d/%d/%d, want %d",
 			constructorWidth,
-			makeWidth,
 			zeroWidth,
 			copyWidth,
 			equalWidth,
@@ -150,18 +145,8 @@ func assertStructOperationWidths(
 	}
 }
 
-func callArgumentCount(method tsgo.MethodDeclaration) int {
-	result := method.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)
-	return len(result.Arguments())
-}
-
-func makeFieldCount(method tsgo.MethodDeclaration) int {
+func constructedFieldCount(method tsgo.MethodDeclaration) int {
 	result := method.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.NewExpression)
-	if len(result.Arguments()) == 1 {
-		if storage, ok := result.Arguments()[0].(tsgo.ObjectLiteralExpression); ok {
-			return len(storage.Properties())
-		}
-	}
 	return len(result.Arguments())
 }
 

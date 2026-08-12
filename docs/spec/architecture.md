@@ -52,6 +52,7 @@ rerun the checker.
 | Go callable value/type-parameter shape | selected `go/types.Signature` and declaration |
 | target representation of a Go type | one representation owner keyed by canonical Go type identity |
 | zero, copy, equality, hash, conversion, and arithmetic | the corresponding value-family owner |
+| source-owned struct construction and field spelling | named-struct declaration assembly plus the canonical struct-field naming owner |
 | target declaration and later revisions | one declaration assembly keyed by exact Go identity |
 | imports, placement, sealing, and printing | root emitter |
 | cooperative callable effect | callable artifact plus canonical indirect-call ABI |
@@ -71,6 +72,28 @@ rerun the checker.
 
 One fact may have many references but one producer. A second workaround in the
 same semantic class reopens its owner.
+
+Source-owned named and anonymous structs have one ordinary public constructor
+whose parameters use canonical source-field names in declaration order. A
+direct profile calls it without an intermediate object. A preserve-Go profile
+captures only the source expressions needed before declaration-order argument
+placement; a canonical storage representation carries its already-required
+named storage object. Zero, copy, equality, hash, conversion, storage, and
+assignment members are reconstructed only when an exact use demands that
+member. Positional `$make` is not a general struct-construction route; it is
+permitted only as the exact callable facet of a selected certified provider
+boundary.
+
+Canonical-storage demand is selected by the declaration-requirement owner,
+not by encounter order. Every source construction subscribes to the
+constructor surface. If a later address, generic, interface, or representation
+use changes that surface, the artifact scheduler reconstructs every subscribed
+construction and the emitter reads the already-applied storage selection from
+the one requirement ledger. For example, in `value := Record{Value: 4};
+pointer := &value`, the first emission may request an ordinary `new Record(4)`;
+after addressability selects canonical storage, both the class and `value`'s
+owning function are transactionally rebuilt to the storage constructor shape.
+No encounter-order flag or second representation registry is retained.
 
 ## Source Selection
 
@@ -540,6 +563,34 @@ one shared runtime location. Canonical source is unchanged in both cases, and a
 native target consumes the same finalized facts without reverse-engineering a
 Node-oriented carrier.
 
+The canonical pointer boundary is fixed before target selection. Its complete
+source contract is:
+
+| Go meaning | canonical TypeScript | finalized exact-node fact |
+|---|---|---|
+| `*T` | `Pointer<T> | undefined` | `PointerFact(pointee, mutability)` |
+| `&storage` | `addressOf<T>(storage)` | address operation plus storage and location identity |
+| `new(T)` | `allocatePointer<T>(zero)` | allocation operation plus fresh location identity |
+| `*pointer` | nil check, then `loadPointer<T>(pointer)` | load operation plus pointer/pointee types |
+| `*pointer = value` | nil check, then `storePointer<T>(pointer, value)` | store operation plus pointer/value types |
+| `left == right` | `equalPointer<T>(left, right)` | equality operation plus both pointer types |
+| pointer key hashing | `hashPointer<T>(pointer)` | hash operation plus pointer type and identity |
+| certified provider location | `bindPointer<T>(identity, read, write)` | identity/read/write operations plus location identity |
+| exact pointee representation conversion | `projectPointer<S,T>(pointer, fromSource, toSource)` | source/target pointee types plus both projections |
+
+The callable-signature facet conserves every `*T` parameter/result as this
+canonical type, and every direct call, method value/expression, callback,
+interface adapter, deferred entry, provider bridge, and export subscribes to
+that facet. GoToTS does not scalarize a read-only body, add a cell, or change a
+caller. The TypeScript target may do so only from the finalized fact graph and
+only by replacing the complete definition/reference/alias/call component.
+Hashing, binding, and projection are not optimization escape hatches: they
+join the same pointer component and force canonical retention unless the target
+proves their identity, read/write, and conversion observations exact. Changing
+canonical marker identity, operation meaning, source signature, nil
+shape, or location identity is a contract change and fails before target
+planning rather than being adapted by a compatibility route.
+
 ### Unsafe Pointer Memory
 
 Raw addresses are a different semantic class from typed locations. The shared
@@ -917,6 +968,14 @@ zero and copy use the struct's certified provider operations. Equal-
 representation fields stay direct and acquire no adapter. The compiler may not
 create a shadow struct, duplicate field state, infer a field from spelling, or
 let the provider carrier leak into generated source semantics.
+
+A generated named type whose basis is a provider/environment struct derives
+its layout from that bounded contract, not from the provider's complete Go
+underlying struct. Provider-private fields therefore cannot reappear through a
+local `type Local ProviderType` declaration. The same declaration over a
+generated dependency retains every underlying field, including unexported
+fields required by reflection. Environment ownership is an indexed package
+fact; package spelling and field-name filtering are not ownership evidence.
 
 Direct source implementations have one certified pointer ABI. A pointer to a
 named Go struct is the provider object itself: its object identity is the Go

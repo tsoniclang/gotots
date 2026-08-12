@@ -419,7 +419,7 @@ func (s *programSession) buildArtifactRevision(
 	} else {
 		current := names.SnapshotTemporaries()
 		names.RestoreTemporaries(temporaryStart)
-		defer names.RestoreTemporaries(current)
+		defer names.FinishTemporaryReplay(current)
 	}
 	artifactOwner := api.MustSourceArtifactOwner(owner)
 	finish, err := names.BeginArtifact(

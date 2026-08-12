@@ -3,7 +3,6 @@ package emptystruct
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 const (
-	makeMember        = "$make"
 	zeroMember        = "$zero"
 	copyMember        = "$copy"
 	equalMember       = "$equal"
@@ -40,7 +39,6 @@ func Build(factory tsgo.Factory, className string) tsgo.ClassDeclaration {
 		[]tsgo.ClassElement{
 			target.brand(),
 			target.constructor(),
-			target.method(makeMember, nil, classType, returnNew()),
 			target.method(zeroMember, nil, classType, returnNew()),
 			target.method(
 				copyMember,
@@ -106,7 +104,7 @@ func (b builder) brand() tsgo.PropertyDeclaration {
 
 func (b builder) constructor() tsgo.ConstructorDeclaration {
 	return b.factory.ConstructorDeclaration(
-		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
+		[]tsgo.ModifierLike{b.factory.PublicKeyword()},
 		nil,
 		nil,
 		nil,

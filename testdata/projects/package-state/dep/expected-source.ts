@@ -5,12 +5,7 @@ export type Cell$Storage = {
 };
 export class Cell {
     declare private readonly $goType: void;
-    private constructor(private readonly $storage: Cell$Storage) {
-    }
-    public static $make($field0: int32): Cell {
-        return new Cell({
-            Value: $field0
-        });
+    public constructor(private readonly $storage: Cell$Storage) {
     }
     public static $storageOf($source: Cell): Cell$Storage {
         return $source.$storage;
@@ -25,7 +20,9 @@ export class Cell {
         this.$storage.Value = $value;
     }
     static $zero(): Cell {
-        return Cell.$make(0);
+        return new Cell({
+            Value: 0
+        });
     }
 }
 export function mark(value: int32): int32 {
@@ -34,5 +31,5 @@ export function mark(value: int32): int32 {
     return value;
 }
 export function Snapshot(): int32 {
-    return $state.A * 10000 + $state.B * 1000 + $state.Trace * 10 + $state.hidden + $state.__go___proto__ + Cell.$fromStorage($state.Empty).Value + Cell.$fromStorage($state.Filled).Value;
+    return $state.A * 10000 + $state.B * 1000 + $state.Trace * 10 + $state.hidden + $state.__go___proto__ + Cell.$storageOf(Cell.$fromStorage($state.Empty)).Value + Cell.$storageOf(Cell.$fromStorage($state.Filled)).Value;
 }

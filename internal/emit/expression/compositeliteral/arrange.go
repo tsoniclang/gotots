@@ -9,6 +9,28 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+type constructionForm uint8
+
+const (
+	constructionFormInvalid constructionForm = iota
+	constructionFormDirectPositional
+	constructionFormStorageObject
+	constructionFormProviderFacet
+)
+
+type constructionCaptureReason uint8
+
+const (
+	constructionCaptureNone constructionCaptureReason = iota
+	constructionCapturePrerequisite
+	constructionCaptureProviderOrder
+)
+
+type arrangedField struct {
+	index int
+	value tsgo.Expression
+}
+
 func arrange(
 	context api.Context,
 	children api.ChildEmitter,
@@ -17,12 +39,21 @@ func arrange(
 	structType *types.Struct,
 	elements []element,
 	canonicalStorage bool,
+	form constructionForm,
 ) (
 	[]tsgo.Statement,
 	[]api.RootRequest,
-	[]tsgo.Expression,
+	[]arrangedField,
 	error,
 ) {
+	if form != constructionFormDirectPositional &&
+		form != constructionFormStorageObject &&
+		form != constructionFormProviderFacet {
+		return nil, nil, nil, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "struct construction form is invalid",
+		}
+	}
 	if canonicalStorage {
 		elements = append([]element(nil), elements...)
 		for index := range elements {
@@ -83,62 +114,103 @@ func arrange(
 		}
 		zeroByField[fieldIndex] = zero
 	}
-	capture := false
-	for index, element := range elements {
-		reordersSource := element.fieldIndex != index &&
-			context.EvaluationOrder() == api.EvaluationOrderPreserveGo
-		blankField := structType.Field(element.fieldIndex).Name() == "_"
-		if reordersSource || blankField || len(element.value.Before()) != 0 {
-			capture = true
-			break
-		}
-	}
-	if !capture {
-		for _, zero := range zeroByField {
-			if len(zero.Before()) != 0 {
-				capture = true
-				break
-			}
-		}
-	}
+	captureThrough, _ := constructionCaptureBoundary(
+		context,
+		structType,
+		elements,
+		zeroByField,
+		form,
+	)
 	byField := make(map[int]tsgo.Expression, len(elements))
+	ordered := make([]arrangedField, 0, structType.NumFields())
 	var before []tsgo.Statement
 	var requests []api.RootRequest
-	for _, element := range elements {
+	for index, element := range elements {
 		requests = append(requests, element.value.Requests()...)
-		if !capture {
-			byField[element.fieldIndex] = element.value.Value()
-			continue
+		value := element.value.Value()
+		if index <= captureThrough {
+			name, err := context.Names().Temporary(api.TemporaryCompositeField)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			captured := context.Factory().Identifier(name)
+			before = append(before, element.value.Before()...)
+			before = append(before, context.Factory().VariableStatement(
+				nil,
+				context.Factory().VariableDeclarationList(
+					[]tsgo.VariableDeclaration{context.Factory().VariableDeclaration(
+						captured,
+						nil,
+						nil,
+						value,
+					)},
+					tsgo.NodeFlagsConst,
+				),
+			))
+			value = captured
 		}
-		name, err := context.Names().Temporary(api.TemporaryCompositeField)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		before = append(before, element.value.Before()...)
-		before = append(before, context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{context.Factory().VariableDeclaration(
-					context.Factory().Identifier(name),
-					nil,
-					nil,
-					element.value.Value(),
-				)},
-				tsgo.NodeFlagsConst,
-			),
-		))
-		byField[element.fieldIndex] = context.Factory().Identifier(name)
+		byField[element.fieldIndex] = value
+		ordered = append(ordered, arrangedField{
+			index: element.fieldIndex,
+			value: value,
+		})
 	}
-	values := make([]tsgo.Expression, 0, structType.NumFields())
 	for fieldIndex := range structType.NumFields() {
 		if value := byField[fieldIndex]; value != nil {
-			values = append(values, value)
 			continue
 		}
 		zero := zeroByField[fieldIndex]
 		before = append(before, zero.Before()...)
-		values = append(values, zero.Value())
 		requests = append(requests, zero.Requests()...)
+		byField[fieldIndex] = zero.Value()
+		ordered = append(ordered, arrangedField{
+			index: fieldIndex,
+			value: zero.Value(),
+		})
 	}
-	return before, requests, values, nil
+	if form == constructionFormStorageObject {
+		return before, requests, ordered, nil
+	}
+	positional := make([]arrangedField, 0, structType.NumFields())
+	for fieldIndex := range structType.NumFields() {
+		positional = append(positional, arrangedField{
+			index: fieldIndex,
+			value: byField[fieldIndex],
+		})
+	}
+	return before, requests, positional, nil
+}
+
+func constructionCaptureBoundary(
+	context api.Context,
+	structType *types.Struct,
+	elements []element,
+	zeros map[int]api.ExpressionEmission,
+	form constructionForm,
+) (int, constructionCaptureReason) {
+	boundary := -1
+	reason := constructionCaptureNone
+	for index, element := range elements {
+		if len(element.value.Before()) != 0 {
+			boundary = index
+			reason = constructionCapturePrerequisite
+			continue
+		}
+		if (form == constructionFormDirectPositional ||
+			form == constructionFormProviderFacet) &&
+			(element.fieldIndex != index ||
+				structType.Field(element.fieldIndex).Name() == "_") &&
+			context.EvaluationOrder() == api.EvaluationOrderPreserveGo {
+			boundary = index
+			if reason == constructionCaptureNone {
+				reason = constructionCaptureProviderOrder
+			}
+		}
+	}
+	for _, zero := range zeros {
+		if len(zero.Before()) != 0 && len(elements) != 0 {
+			return len(elements) - 1, constructionCapturePrerequisite
+		}
+	}
+	return boundary, reason
 }

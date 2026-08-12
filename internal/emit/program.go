@@ -380,6 +380,7 @@ func newProgramSessionWithRegistry(
 			session,
 			session,
 			session,
+			session,
 			goRuntime,
 			implementationContract,
 		)
@@ -482,7 +483,7 @@ func (s *programSession) emit(object types.Object) error {
 		builder,
 		site,
 		object,
-		nil,
+		emitnaming.TemporarySnapshot{},
 		false,
 	)
 	if err != nil {
