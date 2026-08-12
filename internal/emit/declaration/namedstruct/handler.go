@@ -68,6 +68,7 @@ func emitClass(
 			typeName,
 			source.spec.Type,
 			source.structure,
+			source.basis,
 		)
 		if err != nil {
 			return api.DeclarationEmission{}, err
@@ -332,6 +333,7 @@ func derivedFields(
 	typeName *types.TypeName,
 	source ast.Node,
 	structType *types.Struct,
+	basis types.Type,
 ) ([]field, error) {
 	if typeName == nil || structType == nil {
 		return nil, api.Unsupported(
@@ -340,10 +342,22 @@ func derivedFields(
 			source,
 		)
 	}
+	environmentOwned := false
+	if named, ok := types.Unalias(basis).(*types.Named); ok &&
+		named.Origin().Obj() != nil {
+		var err error
+		environmentOwned, err = context.Names().EnvironmentOwnedDeclaration(
+			named.Origin().Obj(),
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
 	result := make([]field, 0, structType.NumFields())
 	for index := range structType.NumFields() {
 		object := structType.Field(index)
-		if context.SourceImplementationContract() && !object.Exported() {
+		if !object.Exported() &&
+			(context.SourceImplementationContract() || environmentOwned) {
 			continue
 		}
 		blank := object.Name() == "_"

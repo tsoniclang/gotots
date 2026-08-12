@@ -291,6 +291,28 @@ func (n *File) ProviderOwnedDeclaration(
 	return owned, err
 }
 
+// EnvironmentOwnedDeclaration reports whether a declaration is represented
+// by the bounded environment contract rather than generated package syntax.
+func (n *File) EnvironmentOwnedDeclaration(
+	object types.Object,
+) (bool, error) {
+	if object == nil || n == nil || n.owner == nil || n.owner.registry == nil {
+		return false, &api.NameError{
+			Reason: "environment declaration ownership query is invalid",
+		}
+	}
+	binding, ok := n.owner.registry.byObject[object]
+	if !ok {
+		return false, &api.NameError{
+			Name:   object.Name(),
+			Reason: "environment declaration has no target binding",
+		}
+	}
+	return binding.kind == targetBindingEnvironment ||
+		binding.kind == targetBindingProvider ||
+		binding.kind == targetBindingMissingProvider, nil
+}
+
 // reflectionValueOperationsRequest builds the value-operation facet
 // requirement of one interned canonical descriptor.
 func (r *Registry) reflectionValueOperationsRequest(

@@ -154,7 +154,7 @@ type ProviderStatefulProfileCandidate struct {
 }
 
 type ReflectionNames interface {
-	ProviderOwnershipNames
+	DeclarationOwnershipNames
 	ReflectionMethodIdentity(*types.Func) (string, error)
 	ReflectionType(types.Type, *types.TypeName) (NameReference, error)
 	ReflectionOperations(*types.TypeName) (NameReference, error)

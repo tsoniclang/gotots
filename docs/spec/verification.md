@@ -383,6 +383,14 @@ storage conversion, or giving a generic named-object constructor a logical
 field where canonical storage is required must fail strict typechecking or the
 artifact-shape gate.
 
+The derived-layout matrix joins two opposite cases. A generated dependency
+with an unexported underlying field must preserve that field in canonical
+storage and expose it to reflection. A local type derived from an environment
+contract must include only the contract's certified field surface and must not
+print provider-private fields. Mutating either case to share the other's
+ownership decision fails its artifact assertion and differential/typecheck
+gate.
+
 Source-owned named, anonymous, and derived fixtures exact-join each public
 constructor parameter to its canonical declaration field, prove direct calls
 allocate no argument object, and prove preserve-Go calls capture reordered

@@ -969,6 +969,14 @@ representation fields stay direct and acquire no adapter. The compiler may not
 create a shadow struct, duplicate field state, infer a field from spelling, or
 let the provider carrier leak into generated source semantics.
 
+A generated named type whose basis is a provider/environment struct derives
+its layout from that bounded contract, not from the provider's complete Go
+underlying struct. Provider-private fields therefore cannot reappear through a
+local `type Local ProviderType` declaration. The same declaration over a
+generated dependency retains every underlying field, including unexported
+fields required by reflection. Environment ownership is an indexed package
+fact; package spelling and field-name filtering are not ownership evidence.
+
 Direct source implementations have one certified pointer ABI. A pointer to a
 named Go struct is the provider object itself: its object identity is the Go
 location, reads observe that object, and writes use the struct's certified
