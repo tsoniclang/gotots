@@ -379,8 +379,19 @@ Defined-over-generic fixtures cover concrete and generic derived structs.
 Strict artifacts use the basis storage field types, concrete accessors project
 one field directly, and generic selections use canonical storage without
 restoring a logical basis. Restoring `$basis.field`, omitting a required field
-storage conversion, or giving a generic `$make` a logical field parameter must
-fail strict typechecking or the artifact-shape gate.
+storage conversion, or giving a generic named-object constructor a logical
+field where canonical storage is required must fail strict typechecking or the
+artifact-shape gate.
+
+Source-owned named, anonymous, derived, and generic-storage fixtures exact-join
+every constructor field to its canonical declaration field and assert that
+object properties retain Go source evaluation order. The complete named-struct
+operation enum is mutation-tested one member at a time: demanding one of zero,
+copy, equality, hash, conversion, storage, or assignment must materialize only
+that operation. Broad searches reject source-owned positional `$fieldN`
+parameters and `$make` calls; the only admitted `$make` occurrence is attached
+to a certified provider reference and is covered by a provider-boundary
+fixture.
 
 ## Interface Proof
 

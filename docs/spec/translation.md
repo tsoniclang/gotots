@@ -464,6 +464,44 @@ Concrete calls use exact owner qualification. A method value creates a wrapper
 with the receiver-free source signature. No prototype patching or
 `.call/.apply/.bind`.
 
+### Struct Construction And Value Demand
+
+Source-owned structs use declaration names at construction sites. For example:
+
+```go
+type Point struct { X, Y int32 }
+
+func NewPoint() Point {
+    return Point{Y: mark(2), X: mark(1)}
+}
+```
+
+maps to the source-ordered ordinary shape:
+
+```ts
+class Point {
+  X: int32;
+  Y: int32;
+
+  constructor(fields: { X: int32; Y: int32 }) {
+    this.X = fields.X;
+    this.Y = fields.Y;
+  }
+}
+
+function NewPoint(): Point {
+  return new Point({ Y: mark(2), X: mark(1) });
+}
+```
+
+The constructor's type contains the complete declaration field set; each call
+keeps the source literal's evaluation order. A temporary is emitted only when
+an expression prerequisite or a provider's positional contract requires it.
+Static `$zero`, `$copy`, `$equal`, `$hash`, `$convert`, `$storageOf`,
+`$fromStorage`, and `$assign` members exist only when their exact semantic use
+requests them. A certified provider may expose a positional `$make` operation;
+ordinary generated structs never gain that compatibility factory.
+
 ### Arrays And Slices
 
 Arrays have fixed length and Go value-copy semantics. Slices have descriptor

@@ -78,11 +78,16 @@ func TestEmptyStructRuntimeHasOneExactNominalOwner(t *testing.T) {
 		t.Fatalf("empty-struct definitions = %#v", definitions)
 	}
 	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
-	if !ok || class.Name().Text() != "GoEmptyStruct" || len(class.Members()) != 10 {
+	if !ok || class.Name().Text() != "GoEmptyStruct" || len(class.Members()) != 9 {
 		t.Fatalf(
 			"empty-struct owner = %T with unexpected shape",
 			definitions[0].Statement(),
 		)
+	}
+	constructor, ok := class.Members()[1].(tsgo.ConstructorDeclaration)
+	if !ok || len(constructor.Modifiers()) != 1 ||
+		constructor.Modifiers()[0].Kind() != tsgo.SyntaxKindPublicKeyword {
+		t.Fatal("empty-struct owner lacks its one public construction path")
 	}
 }
 

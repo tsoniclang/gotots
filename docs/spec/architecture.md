@@ -52,6 +52,7 @@ rerun the checker.
 | Go callable value/type-parameter shape | selected `go/types.Signature` and declaration |
 | target representation of a Go type | one representation owner keyed by canonical Go type identity |
 | zero, copy, equality, hash, conversion, and arithmetic | the corresponding value-family owner |
+| source-owned struct construction and field spelling | named-struct declaration assembly plus the canonical struct-field naming owner |
 | target declaration and later revisions | one declaration assembly keyed by exact Go identity |
 | imports, placement, sealing, and printing | root emitter |
 | cooperative callable effect | callable artifact plus canonical indirect-call ABI |
@@ -71,6 +72,15 @@ rerun the checker.
 
 One fact may have many references but one producer. A second workaround in the
 same semantic class reopens its owner.
+
+Source-owned named and anonymous structs have one ordinary named-object
+constructor shape. Composite literals preserve Go source evaluation order in
+the object properties and introduce temporaries only when a child prerequisite
+would otherwise reorder evaluation. Zero, copy, equality, hash, conversion,
+storage, and assignment members are reconstructed only when an exact use
+demands that member. Positional `$make` is not a general struct-construction
+route; it is permitted only as the exact callable facet of a selected certified
+provider boundary.
 
 ## Source Selection
 
