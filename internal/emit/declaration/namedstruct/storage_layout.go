@@ -2,7 +2,6 @@ package namedstruct
 
 import (
 	"go/ast"
-	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -11,6 +10,7 @@ import (
 type layoutEmission struct {
 	declarations []tsgo.Statement
 	members      []tsgo.ClassElement
+	fields       []layoutField
 	storageType  tsgo.TypeNode
 	requests     []api.RootRequest
 }
@@ -43,22 +43,12 @@ func emitLayout(
 		return layoutEmission{}, err
 	}
 	if !storage {
-		members := []tsgo.ClassElement{
-			directConstructor(context, selected),
-			makeMethod(
-				context,
-				className,
-				context.Factory().TypeReferenceNode(
-					context.Factory().Identifier(className),
-					typeArguments,
-				),
-				selected,
-				false,
-				typeParameters,
-				typeArguments,
-			),
-		}
-		return layoutEmission{members: members, requests: requests}, nil
+		members := directMembers(context, selected)
+		return layoutEmission{
+			members:  members,
+			fields:   selected,
+			requests: requests,
+		}, nil
 	}
 	if len(storageOperation.capabilities) != 0 {
 		return layoutEmission{}, &api.InvariantError{
@@ -92,6 +82,7 @@ func emitLayout(
 			typeParameters,
 		)},
 		members:     members,
+		fields:      selected,
 		storageType: storageType,
 		requests:    api.CombineRequests(requests, memberRequests),
 	}, nil
@@ -141,99 +132,75 @@ func emitLayoutFields(
 	return result, requests, nil
 }
 
-func directConstructor(
+func directMembers(
 	context api.Context,
 	fields []layoutField,
-) tsgo.ConstructorDeclaration {
-	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
+) []tsgo.ClassElement {
+	properties := make([]tsgo.ClassElement, 0, len(fields)+1)
+	typeMembers := make([]tsgo.TypeElement, 0, len(fields))
+	assignments := make([]tsgo.Statement, 0, len(fields))
+	input := context.Factory().Identifier("$fields")
 	for _, selected := range fields {
-		var modifiers []tsgo.ModifierLike
-		if !selected.field.blank {
-			modifiers = []tsgo.ModifierLike{context.Factory().PublicKeyword()}
+		typeMembers = append(typeMembers,
+			context.Factory().PropertySignatureDeclaration(
+				nil,
+				context.Factory().Identifier(selected.field.name),
+				nil,
+				selected.logicalType,
+				context.Factory().OmittedExpression(),
+			),
+		)
+		if selected.field.blank {
+			continue
 		}
-		parameters = append(parameters, context.Factory().ParameterDeclaration(
-			modifiers,
-			nil,
+		properties = append(properties, context.Factory().PropertyDeclaration(
+			[]tsgo.ModifierLike{context.Factory().PublicKeyword()},
 			context.Factory().Identifier(selected.field.name),
 			nil,
 			selected.logicalType,
 			nil,
 		))
-	}
-	return context.Factory().ConstructorDeclaration(
-		[]tsgo.ModifierLike{context.Factory().PrivateKeyword()},
-		nil,
-		parameters,
-		nil,
-		context.Factory().Block(nil, true),
-	)
-}
-
-func makeMethod(
-	context api.Context,
-	className string,
-	classType tsgo.TypeNode,
-	fields []layoutField,
-	storage bool,
-	typeParameters []tsgo.TypeParameterDeclaration,
-	typeArguments []tsgo.TypeNode,
-) tsgo.MethodDeclaration {
-	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
-	arguments := make([]tsgo.Expression, 0, len(fields))
-	for index, selected := range fields {
-		name := context.Factory().Identifier(
-			"$field" + strconv.Itoa(index),
-		)
-		parameters = append(parameters, context.Factory().ParameterDeclaration(
-			nil,
-			nil,
-			name,
-			nil,
-			selected.logicalType,
-			nil,
+		assignments = append(assignments, context.Factory().ExpressionStatement(
+			context.Factory().BinaryExpression(
+				nil,
+				context.Factory().PropertyAccessExpression(
+					context.Factory().ThisExpression(),
+					nil,
+					context.Factory().Identifier(selected.field.name),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsToken,
+				),
+				context.Factory().PropertyAccessExpression(
+					input,
+					nil,
+					context.Factory().Identifier(selected.field.name),
+					tsgo.NodeFlagsNone,
+				),
+			),
 		))
-		arguments = append(arguments, name)
 	}
-	var value tsgo.Expression = context.Factory().NewExpression(
-		context.Factory().Identifier(className),
-		typeArguments,
-		arguments,
-	)
-	if storage {
-		properties := make([]tsgo.ObjectLiteralElementLike, 0, len(fields))
-		for index, selected := range fields {
-			properties = append(properties, context.Factory().PropertyAssignment(
-				nil,
-				context.Factory().Identifier(selected.field.name),
-				nil,
-				selected.storageType,
-				arguments[index],
-			))
-		}
-		value = context.Factory().NewExpression(
-			context.Factory().Identifier(className),
-			typeArguments,
-			[]tsgo.Expression{
-				context.Factory().ObjectLiteralExpression(properties, true),
-			},
-		)
+	var parameters []tsgo.ParameterDeclaration
+	if len(fields) != 0 {
+		parameters = []tsgo.ParameterDeclaration{context.Factory().ParameterDeclaration(
+			nil,
+			nil,
+			input,
+			nil,
+			context.Factory().TypeLiteralNode(typeMembers),
+			nil,
+		)}
 	}
-	return context.Factory().MethodDeclaration(
-		[]tsgo.ModifierLike{
-			context.Factory().PublicKeyword(),
-			context.Factory().StaticKeyword(),
-		},
+	constructor := context.Factory().ConstructorDeclaration(
+		[]tsgo.ModifierLike{context.Factory().PublicKeyword()},
 		nil,
-		context.Factory().Identifier(api.StructMakeMember),
-		nil,
-		typeParameters,
 		parameters,
-		classType,
-		context.Factory().Block(
-			[]tsgo.Statement{context.Factory().ReturnStatement(value)},
-			true,
-		),
+		nil,
+		context.Factory().Block(assignments, true),
 	)
+	return append(properties, constructor)
 }
 
 func storageAlias(
@@ -277,7 +244,7 @@ func storageMembers(
 	typeArguments []tsgo.TypeNode,
 ) ([]tsgo.ClassElement, []api.RootRequest, error) {
 	constructor := context.Factory().ConstructorDeclaration(
-		[]tsgo.ModifierLike{context.Factory().PrivateKeyword()},
+		[]tsgo.ModifierLike{context.Factory().PublicKeyword()},
 		nil,
 		[]tsgo.ParameterDeclaration{context.Factory().ParameterDeclaration(
 			[]tsgo.ModifierLike{
@@ -293,20 +260,8 @@ func storageMembers(
 		nil,
 		context.Factory().Block(nil, true),
 	)
-	makeMember, makeRequests, err := storageMakeMethod(
-		context,
-		source,
-		className,
-		fields,
-		typeParameters,
-		typeArguments,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
 	members := []tsgo.ClassElement{
 		constructor,
-		makeMember,
 		storageOfMethod(
 			context,
 			className,
@@ -322,7 +277,7 @@ func storageMembers(
 			typeArguments,
 		),
 	}
-	requests := makeRequests
+	var requests []api.RootRequest
 	if len(typeParameters) != 0 {
 		return members, requests, nil
 	}

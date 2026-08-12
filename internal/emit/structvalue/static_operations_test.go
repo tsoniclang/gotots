@@ -11,9 +11,9 @@ import (
 func TestNamedStructValueOperationsAreStaticClassMembers(t *testing.T) {
 	source := structTargetSource(t, compileStructFixture(t))
 	expected := map[string][]string{
-		"Point": {"$make", "$zero", "$copy", "$equal"},
-		"Box":   {"$make", "$zero", "$copy", "$equal"},
-		"Empty": {"$make", "$zero", "$equal"},
+		"Point": {"$zero", "$copy", "$equal"},
+		"Box":   {"$zero", "$copy", "$equal"},
+		"Empty": {"$zero", "$equal"},
 	}
 	for owner, want := range expected {
 		class := targetClass(t, source, owner)
@@ -24,13 +24,7 @@ func TestNamedStructValueOperationsAreStaticClassMembers(t *testing.T) {
 				continue
 			}
 			name := targetName(method.Name())
-			if name == "$make" {
-				if len(method.Modifiers()) != 2 ||
-					method.Modifiers()[0].Kind() != tsgo.SyntaxKindPublicKeyword ||
-					method.Modifiers()[1].Kind() != tsgo.SyntaxKindStaticKeyword {
-					t.Fatalf("%s.%s is not public static", owner, name)
-				}
-			} else if len(method.Modifiers()) != 1 ||
+			if len(method.Modifiers()) != 1 ||
 				method.Modifiers()[0].Kind() != tsgo.SyntaxKindStaticKeyword {
 				t.Fatalf("%s.%s is not exactly static", owner, name)
 			}
@@ -43,9 +37,7 @@ func TestNamedStructValueOperationsAreStaticClassMembers(t *testing.T) {
 	for _, owner := range []string{"Mirror", "Reserved", "Grouped"} {
 		for _, member := range targetClass(t, source, owner).Members() {
 			method, ok := member.(tsgo.MethodDeclaration)
-			if ok &&
-				strings.HasPrefix(targetName(method.Name()), "$") &&
-				targetName(method.Name()) != "$make" {
+			if ok && strings.HasPrefix(targetName(method.Name()), "$") {
 				t.Fatalf("undemanded static operation %s.%s was emitted", owner, targetName(method.Name()))
 			}
 		}

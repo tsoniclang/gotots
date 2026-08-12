@@ -71,7 +71,16 @@ func Emit(
 		)
 	}
 	canonicalStorage := false
+	form := constructionFormNamedObject
+	var constructorReference api.NameReference
 	if named != nil {
+		constructorReference, err = context.Names().NamedStructConstructor(
+			named.Origin().Obj(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		form = constructionFormForReference(constructorReference)
 		_, canonicalStorage, err = namedstructstorage.Selected(
 			context,
 			named,
@@ -80,7 +89,7 @@ func Emit(
 			return api.ExpressionEmission{}, err
 		}
 	}
-	before, requests, values, err := arrange(
+	before, requests, fields, err := arrange(
 		context,
 		children,
 		source,
@@ -88,6 +97,7 @@ func Emit(
 		structType,
 		elements,
 		canonicalStorage,
+		form,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -101,30 +111,40 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		value, typeRequests, err := namedObjectConstruction(
+			context,
+			children,
+			source,
+			reference.Expression(context.Factory()),
+			nil,
+			structType,
+			fields,
+			false,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		return api.NewExpressionEmission(
 			before,
-			context.Factory().CallExpression(
-				context.Factory().PropertyAccessExpression(
-					reference.Expression(context.Factory()),
-					nil,
-					context.Factory().Identifier(api.StructMakeMember),
-					tsgo.NodeFlagsNone,
-				),
-				nil,
-				nil,
-				values,
-				tsgo.NodeFlagsNone,
+			value,
+			api.CombineRequests(
+				requests,
+				reference.Requests(),
+				typeRequests,
 			),
-			api.CombineRequests(requests, reference.Requests()),
 		)
 	}
 	var reference api.NameReference
 	var typeArguments []tsgo.TypeNode
 	if canonicalStorage {
-		reference, err = context.Names().NamedStructOperation(
-			named.Origin().Obj(),
-			api.NamedStructOperationStorage,
-		)
+		if form == constructionFormProviderFacet {
+			reference = constructorReference
+		} else {
+			reference, err = context.Names().NamedStructOperation(
+				named.Origin().Obj(),
+				api.NamedStructOperationStorage,
+			)
+		}
 		if err == nil {
 			typeArguments, requests, err =
 				genericNamedStructTypeArguments(
@@ -136,28 +156,54 @@ func Emit(
 				)
 		}
 	} else {
-		reference, err = context.Names().NamedStructConstructor(
-			named.Origin().Obj(),
+		reference = constructorReference
+	}
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if form == constructionFormProviderFacet {
+		values := make([]tsgo.Expression, 0, len(fields))
+		for _, selected := range fields {
+			values = append(values, selected.value)
+		}
+		return api.NewExpressionEmission(
+			before,
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					reference.Expression(context.Factory()),
+					nil,
+					context.Factory().Identifier(api.StructMakeMember),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				typeArguments,
+				values,
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(requests, reference.Requests()),
 		)
 	}
+	value, typeRequests, err := namedObjectConstruction(
+		context,
+		children,
+		source,
+		reference.Expression(context.Factory()),
+		typeArguments,
+		structType,
+		fields,
+		canonicalStorage,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	return api.NewExpressionEmission(
 		before,
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				reference.Expression(context.Factory()),
-				nil,
-				context.Factory().Identifier(api.StructMakeMember),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			typeArguments,
-			values,
-			tsgo.NodeFlagsNone,
+		value,
+		api.CombineRequests(
+			requests,
+			reference.Requests(),
+			typeRequests,
 		),
-		api.CombineRequests(requests, reference.Requests()),
 	)
 }
 

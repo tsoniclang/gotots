@@ -1,13 +1,13 @@
 package namedstruct
 
 import (
-	"fmt"
 	"go/ast"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	typefacet "github.com/tsoniclang/gotots/internal/emit/declaration/typefacet"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
+	"github.com/tsoniclang/gotots/internal/emit/value/structconstruction"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -72,12 +72,11 @@ func emitClass(
 		if err != nil {
 			return api.DeclarationEmission{}, err
 		}
-		return emitDerivedClass(
+		return emitStructClass(
 			context,
 			children,
-			source.spec,
+			source.spec.Type,
 			typeName.Type(),
-			source.basis,
 			className,
 			fields,
 			operations,
@@ -125,13 +124,9 @@ func EmitAnonymous(
 	for index := range structType.NumFields() {
 		object := structType.Field(index)
 		blank := object.Name() == "_"
-		name := fmt.Sprintf("$blank%d", index)
-		if !blank {
-			var err error
-			name, err = context.Names().Member(object)
-			if err != nil {
-				return api.DeclarationEmission{}, err
-			}
+		name, err := structconstruction.FieldName(context.Names(), object, index)
+		if err != nil {
+			return api.DeclarationEmission{}, err
 		}
 		fields = append(fields, field{
 			source:     nil,
@@ -239,11 +234,11 @@ func emitStructClass(
 			source,
 			className,
 			classType,
-			fields,
+			layout.fields,
 			operation,
 			typeParameters,
 			typeArguments,
-			storageOperation != nil && len(typeParameters) != 0,
+			storageOperation != nil,
 		)
 		if err != nil {
 			return api.DeclarationEmission{}, err
@@ -351,17 +346,10 @@ func derivedFields(
 		if context.SourceImplementationContract() && !object.Exported() {
 			continue
 		}
-		if !object.Exported() && object.Pkg() != typeName.Pkg() {
-			continue
-		}
 		blank := object.Name() == "_"
-		name := fmt.Sprintf("$blank%d", index)
-		if !blank {
-			var err error
-			name, err = context.Names().Member(object)
-			if err != nil {
-				return nil, err
-			}
+		name, err := structconstruction.FieldName(context.Names(), object, index)
+		if err != nil {
+			return nil, err
 		}
 		result = append(result, field{
 			source:     source,
@@ -447,13 +435,11 @@ func fields(
 				)
 			}
 			blank := object.Name() == "_"
-			name := fmt.Sprintf("$blank%d", objectIndex)
-			if !blank {
-				var err error
-				name, err = context.Names().Member(object)
-				if err != nil {
-					return nil, err
-				}
+			name, err := structconstruction.FieldName(
+				context.Names(), object, objectIndex,
+			)
+			if err != nil {
+				return nil, err
 			}
 			result = append(result, field{
 				source:     sourceName,

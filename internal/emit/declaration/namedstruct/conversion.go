@@ -15,6 +15,7 @@ func conversionMethod(
 	className string,
 	classType tsgo.TypeNode,
 	fields []field,
+	constructionTypes []tsgo.TypeNode,
 	capabilities []tsgo.ParameterDeclaration,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
@@ -99,7 +100,14 @@ func conversionMethod(
 		},
 		classType,
 		[]tsgo.Statement{context.Factory().ReturnStatement(
-			construct(context, className, typeArguments, arguments),
+			construct(
+				context,
+				className,
+				typeArguments,
+				fields,
+				constructionTypes,
+				arguments,
+			),
 		)},
 		capabilities,
 		typeParameters,

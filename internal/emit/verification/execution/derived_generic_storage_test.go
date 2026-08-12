@@ -37,10 +37,9 @@ func TestDerivedGenericStorageUsesCanonicalProjection(t *testing.T) {
 		"export type DerivedBox$Storage",
 	)
 	for _, required := range []string{
-		"return new ConcreteBox({",
-		"Value: $field0",
-		"return this.$storage.Value;",
-		"this.$storage.Value = $value;",
+		"public Value: int32;",
+		"public constructor($fields: {",
+		"this.Value = $fields.Value;",
 	} {
 		if !strings.Contains(concrete, required) {
 			t.Fatalf("concrete derived storage lacks %q:\n%s", required, concrete)
@@ -50,6 +49,8 @@ func TestDerivedGenericStorageUsesCanonicalProjection(t *testing.T) {
 		"const $basis",
 		"Box.$fromStorage",
 		"Box.$zero",
+		"$storage",
+		"$make",
 	} {
 		if strings.Contains(concrete, forbidden) {
 			t.Fatalf("concrete derived storage contains %q:\n%s", forbidden, concrete)
@@ -63,8 +64,12 @@ func TestDerivedGenericStorageUsesCanonicalProjection(t *testing.T) {
 	)
 	if !strings.Contains(
 		generic,
-		"public static $make<T>($field0: GoStorage<T>): DerivedBox<T>",
-	) || strings.Contains(generic, "public get Value") {
+		"public constructor(private readonly $storage: DerivedBox$Storage<T>)",
+	) || !strings.Contains(
+		generic,
+		"return new DerivedBox<T>($source);",
+	) || strings.Contains(generic, "public get Value") ||
+		strings.Contains(generic, "$make") {
 		t.Fatalf("generic derived storage is not storage-shaped:\n%s", generic)
 	}
 	if !strings.Contains(

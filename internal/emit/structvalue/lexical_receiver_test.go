@@ -41,30 +41,19 @@ func TestNamedStructSyntheticBindingsAndReceiverCopyHaveExactShape(
 		)
 	}
 
-	for _, className := range []string{"fileRange", "derivedRange"} {
-		makeMethod := targetMethod(t, targetClass(t, source, className), "$make")
-		parameters := makeMethod.Parameters()
-		if len(parameters) != 2 {
-			t.Fatalf("%s.$make parameters = %d, want two", className, len(parameters))
+	for className, expectedFields := range map[string][]string{
+		"fileRange":    {"label", "fileRange"},
+		"derivedRange": {"label", "derivedRange"},
+	} {
+		class := targetClass(t, source, className)
+		assertStaticOperationSequence(t, source, className, nil)
+		constructor := classConstructor(t, class)
+		if len(constructor.Parameters()) != 1 {
+			t.Fatalf("%s constructor parameters = %d, want one named object", className, len(constructor.Parameters()))
 		}
-		if targetName(parameters[0].Name()) != "$field0" ||
-			targetName(parameters[1].Name()) != "$field1" {
-			t.Fatalf(
-				"%s.$make parameters = %q/%q, want $field0/$field1",
-				className,
-				targetName(parameters[0].Name()),
-				targetName(parameters[1].Name()),
-			)
-		}
-		constructed := lastConstructedClass(t, makeMethod)
-		if targetName(constructed.Expression()) != className {
-			t.Fatalf("%s.$make constructs %q", className, targetName(constructed.Expression()))
-		}
-		if className == "fileRange" &&
-			(len(constructed.Arguments()) != 2 ||
-				targetName(constructed.Arguments()[0]) != "$field0" ||
-				targetName(constructed.Arguments()[1]) != "$field1") {
-			t.Fatal("fileRange.$make does not preserve its synthetic binding identities")
+		input, ok := constructor.Parameters()[0].Type().(tsgo.TypeLiteralNode)
+		if !ok || fmt.Sprint(typeLiteralMemberNames(input)) != fmt.Sprint(expectedFields) {
+			t.Fatalf("%s constructor fields = %v, want %v", className, typeLiteralMemberNames(input), expectedFields)
 		}
 	}
 }
@@ -123,33 +112,25 @@ func TestLexicalReceiverMutationsFailStrictTypeScript(t *testing.T) {
 	}{
 		{
 			className: "fileRange",
-			useBefore: "return new fileRange($field0, $field1);",
-			useAfter:  "return new fileRange($field0, fileRange);",
+			useBefore: "public fileRange: Mode;",
+			useAfter:  "public fileRange: fileRange;",
 		},
 		{
 			className: "derivedRange",
-			useBefore: "derivedRange: $field1.$value",
-			useAfter:  "derivedRange: derivedRange.$value",
+			useBefore: "public derivedRange: Mode;",
+			useAfter:  "public derivedRange: derivedRange;",
 		},
 	} {
-		t.Run(testCase.className+"-factory-binding", func(t *testing.T) {
+		t.Run(testCase.className+"-named-field-binding", func(t *testing.T) {
 			workingDirectory, targetPaths, sourcePath :=
 				materializeLexicalMutation(t, emission)
-			mutateTargetSource(
-				t,
-				sourcePath,
-				"public static $make($field0: gostring, $field1: Mode): "+
-					testCase.className+" {",
-				"public static $make($field0: gostring, "+testCase.className+
-					": Mode): "+testCase.className+" {",
-			)
 			mutateTargetSource(
 				t,
 				sourcePath,
 				testCase.useBefore,
 				testCase.useAfter,
 			)
-			assertStrictDiagnostic(t, workingDirectory, targetPaths, "TS2351")
+			assertStrictDiagnostic(t, workingDirectory, targetPaths, "TS2739")
 		})
 	}
 }
@@ -172,23 +153,6 @@ func compileLexicalReceiverFixture(t *testing.T) emit.ProgramEmission {
 		t.Fatal(err)
 	}
 	return emission
-}
-
-func lastConstructedClass(
-	t *testing.T,
-	method tsgo.MethodDeclaration,
-) tsgo.NewExpression {
-	t.Helper()
-	statements := method.Body().(tsgo.Block).Statements()
-	result, ok := statements[len(statements)-1].(tsgo.ReturnStatement)
-	if !ok {
-		t.Fatalf("%s final statement = %T, want return", targetName(method.Name()), statements[len(statements)-1])
-	}
-	constructed, ok := result.Expression().(tsgo.NewExpression)
-	if !ok {
-		t.Fatalf("%s return = %T, want new expression", targetName(method.Name()), result.Expression())
-	}
-	return constructed
 }
 
 func materializeLexicalMutation(
