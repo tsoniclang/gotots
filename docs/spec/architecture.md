@@ -551,6 +551,9 @@ source contract is:
 | `*pointer` | nil check, then `loadPointer<T>(pointer)` | load operation plus pointer/pointee types |
 | `*pointer = value` | nil check, then `storePointer<T>(pointer, value)` | store operation plus pointer/value types |
 | `left == right` | `equalPointer<T>(left, right)` | equality operation plus both pointer types |
+| pointer key hashing | `hashPointer<T>(pointer)` | hash operation plus pointer type and identity |
+| certified provider location | `bindPointer<T>(identity, read, write)` | identity/read/write operations plus location identity |
+| exact pointee representation conversion | `projectPointer<S,T>(pointer, fromSource, toSource)` | source/target pointee types plus both projections |
 
 The callable-signature facet conserves every `*T` parameter/result as this
 canonical type, and every direct call, method value/expression, callback,
@@ -558,7 +561,10 @@ interface adapter, deferred entry, provider bridge, and export subscribes to
 that facet. GoToTS does not scalarize a read-only body, add a cell, or change a
 caller. The TypeScript target may do so only from the finalized fact graph and
 only by replacing the complete definition/reference/alias/call component.
-Changing canonical marker identity, operation meaning, source signature, nil
+Hashing, binding, and projection are not optimization escape hatches: they
+join the same pointer component and force canonical retention unless the target
+proves their identity, read/write, and conversion observations exact. Changing
+canonical marker identity, operation meaning, source signature, nil
 shape, or location identity is a contract change and fails before target
 planning rather than being adapted by a compatibility route.
 

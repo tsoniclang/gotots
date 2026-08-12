@@ -161,11 +161,13 @@ find no target-side marker spelling recognition, filesystem source reread,
 checker re-entry, or second pointer fact store.
 
 The canonical pointer boundary is exact-joined before target optimization.
-Tests enumerate the six rows owned by the architecture table (`*T`, address,
-allocation, load, store, equality), inspect their TS-Go AST nodes, and join each
+Tests enumerate every row owned by the architecture table (`*T`, address,
+allocation, load, store, equality, hash, provider binding, and projection),
+inspect their TS-Go AST nodes, and join each
 source-facing pointer parameter/result and direct caller to the settled
 callable-signature facet. Mutations change one marker identity, operation kind,
-pointee type, source parameter/result, nil union, location identity, or caller
+pointee type, source parameter/result, nil union, location identity, provider
+read/write binding, projection, or caller
 subscription; each must fail at marker finalization, signature conservation, or
 the complete-flow target gate. Canonical GoToTS tests never accept target
 scalarization, a target cell, or an authored scalar signature as evidence for
