@@ -4,79 +4,11 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
-
-func buildIndexAddressCapability(
-	context api.Context,
-	children api.ChildEmitter,
-	artifact *api.GeneratedArtifact,
-	modifiers []tsgo.ModifierLike,
-	signature *types.Signature,
-	selection api.GenericOperationSelection,
-) (tsgo.Statement, []api.RootRequest, bool, error) {
-	receiver, index, element, selected :=
-		api.GenericIndexAddressOperation(selection, signature)
-	if !selected {
-		return nil, nil, false, nil
-	}
-	if !integerType(index) || context.IsCooperative() {
-		return nil, nil, true, shapeError(
-			context,
-			api.GenericOperationIndexAddress,
-		)
-	}
-	signatureRole := api.RoleFileDeclaration
-	if artifact.Placement() == api.GeneratedArtifactPlacementLexical {
-		signatureRole = api.RoleLocalDeclaration
-	}
-	target, err := callable.EmitAdapter(
-		context.WithRole(signatureRole),
-		children,
-		nil,
-		signature,
-	)
-	if err != nil {
-		return nil, nil, true, err
-	}
-	parameters := target.ParameterReferences(context.Factory())
-	value, handled, err := emitIndexAddressValue(
-		context,
-		children,
-		receiver,
-		element,
-		parameters,
-	)
-	if err != nil {
-		return nil, nil, true, err
-	}
-	if !handled {
-		return nil, nil, true, shapeError(
-			context,
-			api.GenericOperationIndexAddress,
-		)
-	}
-	body := append(
-		value.Before(),
-		context.Factory().ReturnStatement(value.Value()),
-	)
-	return context.Factory().FunctionDeclaration(
-			modifiers,
-			nil,
-			context.Factory().Identifier(artifact.TargetName()),
-			nil,
-			target.Parameters(),
-			target.Result(),
-			context.Factory().Block(body, true),
-		), api.CombineRequests(
-			target.Requests(),
-			value.Requests(),
-		), true, nil
-}
 
 func emitIndexAddressValue(
 	context api.Context,

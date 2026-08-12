@@ -132,6 +132,7 @@ func Emit(
 			capabilities, capabilityRequests, capabilityErr :=
 				genericinstance.EmitCapabilities(
 					context,
+					children,
 					source,
 					operationSet,
 					instance.TypeArgs,

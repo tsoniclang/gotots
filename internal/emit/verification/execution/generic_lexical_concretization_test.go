@@ -75,14 +75,14 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 		}
 	}
 	for fragment, source := range map[string]string{
-		"function Twice$concrete_":        callerSource,
-		"function BothEqual$concrete_":    callerSource,
-		"enum Local":                      callerSource,
-		"enum Outer":                      callerSource,
-		"enum Inner":                      callerSource,
-		"function $goCapability_":         callerSource,
-		"function Twice$kernel<T>":        providerSource,
-		"function BothEqual$kernel<A, B>": providerSource,
+		"function Twice$Named_example_u2e_com_u2f_crosslocal_Local":                                                callerSource,
+		"function BothEqual$Named_example_u2e_com_u2f_crosslocal_Outer$Named_example_u2e_com_u2f_crosslocal_Inner": callerSource,
+		"enum Local": callerSource,
+		"enum Outer": callerSource,
+		"enum Inner": callerSource,
+		"($argument0: Local, $argument1: Local): Local =>": callerSource,
+		"function Twice$kernel<T>":                         providerSource,
+		"function BothEqual$kernel<A, B>":                  providerSource,
 	} {
 		if !strings.Contains(source, fragment) {
 			t.Fatalf("source lacks %q:\n%s", fragment, source)
@@ -90,12 +90,15 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 	}
 	if count := strings.Count(
 		callerSource,
-		"function BothEqual$concrete_",
+		"function BothEqual$Named_example_u2e_com_u2f_crosslocal_Outer$Named_example_u2e_com_u2f_crosslocal_Inner",
 	); count != 1 {
 		t.Fatalf("same lexical generic instance emitted %d wrappers, want 1", count)
 	}
 	inner := strings.Index(callerSource, "enum Inner")
-	wrapper := strings.Index(callerSource, "function BothEqual$concrete_")
+	wrapper := strings.Index(
+		callerSource,
+		"function BothEqual$Named_example_u2e_com_u2f_crosslocal_Outer$Named_example_u2e_com_u2f_crosslocal_Inner",
+	)
 	if inner < 0 || wrapper < inner {
 		t.Fatalf(
 			"multi-component wrapper was not placed after its deepest type:\n%s",
@@ -103,7 +106,7 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 		)
 	}
 	if strings.Contains(providerSource, "crosslocal") ||
-		strings.Contains(providerSource, "Twice$concrete_") {
+		strings.Contains(providerSource, "Twice$Named_example_u2e_com") {
 		t.Fatalf(
 			"generic provider acquired a caller-local reverse dependency:\n%s",
 			providerSource,
@@ -204,7 +207,7 @@ func TestDeferredGenericCallablesWithoutRecoverUseOrdinaryEntries(t *testing.T) 
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	for _, required := range []string{
 		"export function store$kernel<T>",
-		"export function store$concrete_",
+		"export function store$int32",
 		"$goDeferred_",
 		".resolve(",
 		"deferred_callable_registry",
@@ -239,9 +242,9 @@ func TestDeferredGenericCallablesWithoutRecoverUseOrdinaryEntries(t *testing.T) 
 		"Audit":    audit,
 		"selected": selected,
 	} {
-		if strings.Contains(source, "$goCapability_") ||
-			strings.Contains(source, "$go$copy_") ||
-			strings.Contains(source, "$go$pointer_") {
+		if strings.Contains(source, "support/generics/capabilities/") ||
+			strings.Contains(source, "$go$copy$") ||
+			strings.Contains(source, "$go$pointer$") {
 			t.Fatalf("source function %s exposes private mechanics:\n%s", name, source)
 		}
 	}

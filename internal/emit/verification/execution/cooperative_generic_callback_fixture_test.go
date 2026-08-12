@@ -4,7 +4,6 @@ import (
 	"context"
 	"go/types"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -57,18 +56,4 @@ func genericCallbackFixture(
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	return directory, workingDirectory, emission, artifacts
-}
-
-func genericConcreteCallName(t *testing.T, source string, owner string) string {
-	t.Helper()
-	marker := owner + "$concrete_"
-	start := strings.Index(source, marker)
-	if start < 0 {
-		t.Fatalf("%s contains no %s call:\n%s", owner, marker, source)
-	}
-	end := strings.IndexByte(source[start:], '(')
-	if end < 0 {
-		t.Fatalf("%s concrete call has no argument list:\n%s", owner, source)
-	}
-	return source[start : start+end]
 }

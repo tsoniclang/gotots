@@ -57,11 +57,11 @@ func TestWaveSevenGenericAssertionsCompileThroughPublicPipeline(t *testing.T) {
 				"export function AssertValue$kernel<T>",
 				"export function MustAssertValue$kernel<T>",
 				"export function TypeSwitchValue$kernel<T>",
-				"export function AssertValue$concrete_",
-				"export function MustAssertValue$concrete_",
-				"export function TypeSwitchValue$concrete_",
-				"$go$interface_assert_",
-				"$go$interface_assert_ok_",
+				"export function AssertValue$int32",
+				"export function MustAssertValue$int32",
+				"export function TypeSwitchValue$int32",
+				"$go$interface_assert$",
+				"$go$interface_assert_ok$",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					t.Fatalf(
@@ -158,12 +158,12 @@ func assertWaveSevenGenericFoundationShape(t *testing.T, printed string) {
 		"export function ZeroFromNew$kernel<",
 		"export function Equal$kernel<",
 		"export function Twice$kernel<",
-		"export function Add$concrete_",
-		"export function Zero$concrete_",
-		"export function ZeroFromNew$concrete_",
-		"export function Equal$concrete_",
-		"export function Twice$concrete_",
-		"export function Identity$concrete_",
+		"export function Add$int32",
+		"export function Zero$int32",
+		"export function ZeroFromNew$int32",
+		"export function Equal$int32",
+		"export function Twice$int32",
+		"export function Identity$int32",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("Wave 7 generic artifacts lack %q:\n%s", required, printed)
@@ -187,19 +187,20 @@ func assertWaveSevenGenericFoundationShape(t *testing.T, printed string) {
 			)
 		}
 	}
-	if strings.Count(printed, "export function Add$concrete_") != 1 {
+	if strings.Count(printed, "export function Add$int32") != 1 {
 		t.Fatalf("generic Add body was duplicated:\n%s", printed)
 	}
 	zeroFromNew := concreteFunctionText(t, printed, "ZeroFromNew")
 	if !strings.Contains(zeroFromNew, "ZeroFromNew$kernel<") ||
-		strings.Contains(zeroFromNew, "return 0") {
+		!strings.Contains(zeroFromNew, "(): int32 =>") ||
+		!strings.Contains(zeroFromNew, "return 0") {
 		t.Fatalf(
-			"generic *new(T) wrapper did not delegate to its declaration-owned kernel:\n%s",
+			"generic *new(T) wrapper did not delegate with one inline zero operation:\n%s",
 			zeroFromNew,
 		)
 	}
 	zeroFromNewKernel := genericKernelText(t, printed, "ZeroFromNew")
-	if !strings.Contains(zeroFromNewKernel, "$go$zero_") ||
+	if !strings.Contains(zeroFromNewKernel, "$go$zero$") ||
 		strings.Contains(zeroFromNewKernel, "return 0") ||
 		strings.Contains(zeroFromNewKernel, "GoPointer") {
 		t.Fatalf(
@@ -222,7 +223,7 @@ func assertWaveSevenGenericFoundationShape(t *testing.T, printed string) {
 		)
 	}
 	sameStorageKernel := genericKernelText(t, printed, "SameSliceStorage")
-	if !strings.Contains(sameStorageKernel, "$go$equal_") ||
+	if !strings.Contains(sameStorageKernel, "$go$equal$") ||
 		strings.Contains(sameStorageKernel, "GoPointer.equal") {
 		t.Fatalf(
 			"generic pointer-equality kernel bypassed its selected capability:\n%s",
@@ -275,7 +276,7 @@ func concreteFunctionText(
 	name string,
 ) string {
 	t.Helper()
-	startMarker := "export function " + name + "$concrete_"
+	startMarker := "export function " + name + "$int32"
 	start := strings.Index(printed, startMarker)
 	if start < 0 {
 		t.Fatalf("Wave 7 artifacts lack concrete function %s", name)

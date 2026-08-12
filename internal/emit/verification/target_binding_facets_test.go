@@ -83,7 +83,7 @@ func TestGenericContainerStorageBindsExactTargetFacets(t *testing.T) {
 		"addressOf<",
 		"loadPointer<",
 		"function ArrayAddress$kernel<T>",
-		"function ArrayAddress$concrete_",
+		"function ArrayAddress$",
 		"RuntimeSlice.literal<Item$Storage>([Item.$storageOf(",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
@@ -115,12 +115,12 @@ func TestGenericContainerStorageBindsExactTargetFacets(t *testing.T) {
 		workingDirectory,
 		artifacts.paths,
 	)
-	if ordinaryBytes > 34_000 ||
-		concretizations != 11 || concretizationBytes > 15_000 ||
-		capabilities != 20 || capabilityBytes > 12_000 ||
-		artifacts.bytes > 58_000 ||
-		artifacts.nodes > 9_000 ||
-		artifacts.largest > 22_000 {
+	if ordinaryBytes > 30_000 ||
+		concretizations != 7 || concretizationBytes > 15_000 ||
+		capabilities != 0 || capabilityBytes != 0 ||
+		artifacts.bytes > 45_000 ||
+		artifacts.nodes > 7_500 ||
+		artifacts.largest > 17_000 {
 		t.Fatalf(
 			"generic container-storage artifact bounds exceeded: ordinary=%d concretizations=%d/%d capabilities=%d/%d total=%d nodes=%d largest=%d",
 			ordinaryBytes,

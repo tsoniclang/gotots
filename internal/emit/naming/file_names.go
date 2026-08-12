@@ -25,6 +25,7 @@ type File struct {
 	importNames     map[string]struct{}
 	importAliases   map[types.Object]string
 	derivedImports  map[string]string
+	artifactImports map[generatedArtifactImport]string
 	projections     map[constantProjectionImport]string
 	primitives      map[api.PrimitiveAlias]string
 	tsonicCore      map[tsoniccore.Symbol]string
@@ -92,6 +93,7 @@ func (n *Owner) ForFile(
 		importNames:     make(map[string]struct{}),
 		importAliases:   make(map[types.Object]string),
 		derivedImports:  make(map[string]string),
+		artifactImports: make(map[generatedArtifactImport]string),
 		projections:     make(map[constantProjectionImport]string),
 		primitives:      make(map[api.PrimitiveAlias]string),
 		tsonicCore:      make(map[tsoniccore.Symbol]string),

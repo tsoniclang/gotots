@@ -114,6 +114,7 @@ func Build(
 	capabilities, capabilityRequests, err :=
 		genericinstance.EmitCapabilities(
 			context,
+			children,
 			nil,
 			operationSet,
 			arguments,

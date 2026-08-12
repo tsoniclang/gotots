@@ -287,7 +287,7 @@ func GenericNil() bool {
 		"static Put$kernel<T>(s: Pointer<Shelf<T>> | undefined",
 	) || !strings.Contains(
 		typescript,
-		"Put$concrete_",
+		"Shelf$Put$int32",
 	) || !strings.Contains(
 		typescript,
 		"addressOf<Shelf<int32>>",

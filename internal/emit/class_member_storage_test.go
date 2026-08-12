@@ -262,12 +262,25 @@ func Result() int32 { return Global.Value }
 			boxStaticRevision,
 		)
 	}
-	if boxStaticRevision <= 1 ||
-		storage.reconstructions != boxStaticRevision-1 {
+	dependencies, ok := session.artifacts.Dependencies(storage.owner)
+	if !ok {
+		t.Fatal("generic package storage has no published dependency record")
+	}
+	staticDependency := false
+	for _, dependency := range dependencies {
+		if dependency.Provider() == api.MustSourceArtifactOwner(box) &&
+			dependency.Facet() == api.ArtifactFacetStaticSurface {
+			staticDependency = true
+			break
+		}
+	}
+	if boxStaticRevision <= 1 || !staticDependency ||
+		storage.reconstructions != 1 {
 		t.Fatalf(
-			"generic package storage reconstructions = %d at provider static revision %d, want every post-publication revision",
+			"generic package storage reconstructions = %d at provider static revision %d with static dependency %t, want one batched reconstruction",
 			storage.reconstructions,
 			boxStaticRevision,
+			staticDependency,
 		)
 	}
 }

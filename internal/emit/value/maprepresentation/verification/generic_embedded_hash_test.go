@@ -66,7 +66,7 @@ func Facts() string {
 		"static $hash<K, V>",
 	)
 	for _, required := range []string{
-		"static $hash<K, V>($go$hash_",
+		"static $hash<K, V>($go$hash$",
 		": ($0: entry<K, V>) => uint32, $source: Wrapped<K, V>): number {",
 		"entry.$fromStorage<K, V>($source.$storage.entry)",
 	} {

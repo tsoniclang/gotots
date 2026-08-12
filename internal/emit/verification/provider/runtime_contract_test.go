@@ -177,7 +177,7 @@ func TestReflectTypeForOpenGenericUsesPrivateCapability(t *testing.T) {
 		"export function ReflectGenericString(): gostring",
 	) || !strings.Contains(
 		artifacts.printed,
-		"export function ReflectGeneric$kernel<T>($go$reflection_type_",
+		"export function ReflectGeneric$kernel<T>($go$reflection_type$",
 	) {
 		t.Fatalf("generic reflection capability crossed its private kernel boundary:\n%s", artifacts.printed)
 	}

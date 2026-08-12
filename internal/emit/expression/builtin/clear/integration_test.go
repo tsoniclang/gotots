@@ -40,7 +40,9 @@ func TestClearBuiltinsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		"values.clear()",
 		"clear()",
 		"export function clearGeneric$kernel<C>",
-		"$go$clear_",
+		"$go$clear$",
+		"export function clearGeneric$SliceOf_Named_example_u2e_com_u2f_clearvalues_Box",
+		"export function clearGeneric$MapOf_int32_To_Named_example_u2e_com_u2f_clearvalues_Box",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("clear artifact lacks %q:\n%s", required, printed)
@@ -48,12 +50,6 @@ func TestClearBuiltinsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	if strings.Contains(printed, "export function clearGeneric<C>") {
 		t.Fatalf("clear artifact restored a public hidden-capability ABI:\n%s", printed)
-	}
-	if count := strings.Count(
-		printed,
-		"export function clearGeneric$concrete_",
-	); count != 2 {
-		t.Fatalf("generic clear concretizations = %d, want map and slice", count)
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeClearFile(t, runnerPath, fmt.Sprintf(`import {

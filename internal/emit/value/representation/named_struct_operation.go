@@ -90,6 +90,7 @@ func (owner Owner) namedStructOperationMember(
 		capabilities, requests, emitErr :=
 			genericinstance.EmitCapabilities(
 				context,
+				owner.children,
 				source,
 				operationSet,
 				api.TypeArgumentsFromGo(named.TypeArgs()),

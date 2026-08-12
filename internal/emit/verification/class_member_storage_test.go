@@ -366,7 +366,7 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 		"Value(): Awaitable<int32>;",
 		"export async function GenericInterfaceAudit(): Promise<int32>",
 		"const __gotots_argument_0 = await goInterfaceNonNil<GenericValue<T>>(__gotots_receiver_0).Value();",
-		"return $go$copy_",
+		"return $go$copy$",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf(

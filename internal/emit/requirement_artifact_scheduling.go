@@ -1,9 +1,8 @@
 package emit
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/generic/semanticname"
 	provideroperation "github.com/tsoniclang/gotots/internal/emit/provideroperation"
 	"go/types"
 	"sort"
@@ -468,9 +467,14 @@ func (s *programSession) internGenericOperation(
 		}
 		return existing, nil
 	}
-	digest := sha256.Sum256([]byte(key))
-	targetName := "$go$" + selection.Operation().Identifier() + "_" +
-		hex.EncodeToString(digest[:10])
+	targetName, err := semanticname.OperationName(
+		selection.Operation().Identifier(),
+		genericOperationMethod(selection),
+		signature,
+	)
+	if err != nil {
+		return nil, err
+	}
 	contract, err := api.NewGenericOperationContract(
 		owner,
 		key,
@@ -484,4 +488,11 @@ func (s *programSession) internGenericOperation(
 	}
 	s.genericOperations[identity] = contract
 	return contract, nil
+}
+
+func genericOperationMethod(
+	selection api.GenericOperationSelection,
+) *types.Func {
+	method, _ := selection.Method()
+	return method
 }

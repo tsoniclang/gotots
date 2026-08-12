@@ -31,25 +31,11 @@ func Build(
 			"generated artifact is not a generic capability",
 		)
 	}
-	if statement, requests, handled, err := buildIndexAddressCapability(
-		context,
-		children,
-		artifact,
-		modifiers,
-		signature,
-		selection,
-	); handled {
-		return statement, requests, err
-	}
-	if statement, requests, handled, err := buildStorageCapability(
-		context,
-		children,
-		artifact,
-		modifiers,
-		signature,
-		selection,
-	); handled {
-		return statement, requests, err
+	if selection.Operation() != api.GenericOperationConstraintMethod {
+		return nil, nil, invariant(
+			context,
+			"ordinary concrete generic operation reached a standalone artifact",
+		)
 	}
 	signatureRole := api.RoleFileDeclaration
 	if artifact.Placement() == api.GeneratedArtifactPlacementLexical {

@@ -6,13 +6,13 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/generic/semanticname"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/output"
 )
 
 const (
-	genericCapabilityTargetNameHexLength = 20
-	callableABITargetNameHexLength       = 20
+	callableABITargetNameHexLength = 20
 )
 
 func (n *File) GenericCapability(
@@ -106,16 +106,32 @@ func (r *Registry) internGenericCapability(
 		}
 		return existing, nil
 	}
-	if len(artifactKey) < genericCapabilityTargetNameHexLength {
-		return genericCapabilityBinding{}, &api.NameError{
-			Reason: "generic-capability artifact key is invalid",
+	name, err := semanticname.OperationName(
+		selection.Operation().Identifier(),
+		selectedMethod(selection),
+		signature,
+	)
+	if err != nil {
+		return genericCapabilityBinding{}, err
+	}
+	module := ""
+	if placement.kind == api.GeneratedArtifactPlacementCompilation {
+		module, err = semanticname.CapabilityModule(
+			selection.Operation().Identifier(),
+		)
+		if err != nil {
+			return genericCapabilityBinding{}, err
 		}
 	}
-	name := "$goCapability_" +
-		artifactKey[len(artifactKey)-genericCapabilityTargetNameHexLength:]
-	if err := reserveGeneratedName(
+	if err := reserveGenericGeneratedName(
 		r.genericCapabilityNames,
-		name,
+		genericGeneratedNameScope{
+			placement:    placement.kind,
+			lexicalOwner: placement.lexicalOwner,
+			anchor:       placement.anchor,
+			module:       module,
+			name:         name,
+		},
 		artifactKey,
 		"generic-capability",
 	); err != nil {
@@ -127,6 +143,7 @@ func (r *Registry) internGenericCapability(
 		artifactKey,
 		name,
 		placement,
+		module,
 	)
 	if err != nil {
 		return genericCapabilityBinding{}, err
@@ -136,12 +153,18 @@ func (r *Registry) internGenericCapability(
 	return binding, nil
 }
 
+func selectedMethod(selection api.GenericOperationSelection) *types.Func {
+	method, _ := selection.Method()
+	return method
+}
+
 func newGenericCapabilityArtifact(
 	selection api.GenericOperationSelection,
 	signature *types.Signature,
 	artifactKey string,
 	name string,
 	placement generatedArtifactPlacement,
+	module string,
 ) (*api.GeneratedArtifact, error) {
 	if placement.kind == api.GeneratedArtifactPlacementLexical {
 		return api.NewLexicalGenericCapabilityArtifact(
@@ -153,7 +176,7 @@ func newGenericCapabilityArtifact(
 			placement.anchor,
 		)
 	}
-	outputPath, err := output.GenericCapabilityPath(artifactKey)
+	outputPath, err := output.GenericCapabilityPath(module)
 	if err != nil {
 		return nil, err
 	}

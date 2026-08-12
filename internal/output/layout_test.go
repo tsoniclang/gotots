@@ -2,7 +2,6 @@ package output
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -128,54 +127,30 @@ func TestProgramInitializationPathProducesCanonicalPackageSpecifier(t *testing.T
 	}
 }
 
-func TestGeneratedArtifactsUseBoundedSemanticFamilyShards(t *testing.T) {
-	firstKey := "ab" + strings.Repeat("0", 62)
-	secondKey := "ab" + strings.Repeat("f", 62)
-	otherKey := "cd" + strings.Repeat("0", 62)
-
-	first, err := GenericCapabilityPath(firstKey)
+func TestGenericArtifactsUseSemanticModules(t *testing.T) {
+	capability, err := GenericCapabilityPath("binary_add")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := GenericCapabilityPath(secondKey)
+	concretization, err := GenericConcretizationPath(
+		"example_u2e_com/math/vector/Add",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := GenericCapabilityPath(otherKey)
-	if err != nil {
-		t.Fatal(err)
+	if capability != "support/generics/capabilities/binary_add.ts" {
+		t.Fatalf("generic capability path = %q", capability)
 	}
-	concretization, err := GenericConcretizationPath(firstKey)
-	if err != nil {
-		t.Fatal(err)
+	if concretization != "support/generics/concretizations/"+
+		"example_u2e_com/math/vector/Add.ts" {
+		t.Fatalf("generic concretization path = %q", concretization)
 	}
-	if first != "support/generics/capabilities/ab.ts" || second != first {
-		t.Fatalf("same-shard capability paths = %q / %q", first, second)
-	}
-	if other != "support/generics/capabilities/cd.ts" || other == first {
-		t.Fatalf("distinct-shard capability path = %q", other)
-	}
-	if concretization != "support/generics/concretizations/ab.ts" ||
-		concretization == first {
-		t.Fatalf("semantic-family shard path = %q", concretization)
-	}
-	shards := make(map[string]struct{})
-	for prefix := range 256 {
-		for suffix := range 2 {
-			key := fmt.Sprintf(
-				"%02x%s",
-				prefix,
-				strings.Repeat(fmt.Sprintf("%x", suffix), 62),
-			)
-			shard, pathErr := GenericCapabilityPath(key)
-			if pathErr != nil {
-				t.Fatal(pathErr)
-			}
-			shards[shard] = struct{}{}
+	for _, invalid := range []string{
+		"", "/absolute", "../escape", "a/../b", "a-b", "a//b",
+	} {
+		if _, pathErr := GenericCapabilityPath(invalid); pathErr == nil {
+			t.Fatalf("invalid semantic module %q was accepted", invalid)
 		}
-	}
-	if len(shards) != 256 {
-		t.Fatalf("512 artifacts used %d shards, want 256", len(shards))
 	}
 }
 

@@ -46,12 +46,11 @@ func TestWaveSevenGenericBodiesAndCapabilitiesScaleByExactContract(
 				measurement.genericBodies,
 			)
 		}
-		if measurement.capabilities != count*2 {
+		if measurement.capabilities != 0 {
 			t.Fatalf(
-				"%dx capability definitions = %d, want %d add/copy signatures; functions=%v",
+				"%dx standalone concrete capability definitions = %d, want zero; functions=%v",
 				count,
 				measurement.capabilities,
-				count*2,
 				measurement.functionNames,
 			)
 		}
@@ -80,7 +79,7 @@ func TestWaveSevenGenericBodiesAndCapabilitiesScaleByExactContract(
 	assertWaveFourLinearDoubling(t, "generic target bytes", targetBytes)
 	assertWaveFourLinearDoubling(t, "generic target AST nodes", targetNodes)
 	t.Logf(
-		"generic scaling instantiations=%v source=%v target=%v nodes=%v body-bytes=%d body-nodes=%d capabilities-per-instance=2",
+		"generic scaling instantiations=%v source=%v target=%v nodes=%v body-bytes=%d body-nodes=%d standalone-capabilities=0",
 		counts,
 		sourceBytes,
 		targetBytes,
@@ -139,6 +138,9 @@ func measureWaveSevenGenericScale(
 	}
 	measurement := waveSevenGenericScale{sourceBytes: len(source)}
 	for _, file := range emission.Files() {
+		if strings.Contains(file.OutputPath(), "support/generics/capabilities/") {
+			measurement.capabilities++
+		}
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
@@ -176,11 +178,6 @@ func measureWaveSevenGenericScale(
 					t,
 					measurement.genericBody,
 				)
-			case strings.HasPrefix(
-				function.Name().Text(),
-				"$goCapability_",
-			):
-				measurement.capabilities++
 			}
 		}
 	}
@@ -290,8 +287,8 @@ func waveSevenRecursiveGenericArtifacts(t *testing.T) map[string][]byte {
 				)
 			}
 			operations := map[string]int{
-				"$go$binary_add_": 0,
-				"$go$copy_":       0,
+				"$go$binary_add$": 0,
+				"$go$copy$":       0,
 			}
 			for index, parameter := range function.Parameters() {
 				identifier, ok := parameter.Name().(tsgo.Identifier)
@@ -385,10 +382,20 @@ func TestWaveSevenGeneratedTailIsEncodedAndBounded(t *testing.T) {
 	identities := make(map[string]struct{})
 	counts := make(map[string]int)
 	for _, file := range emission.Files() {
+		if strings.HasPrefix(
+			file.OutputPath(),
+			"support/generics/",
+		) && strings.Contains(file.OutputPath(), "$concrete_") {
+			t.Fatalf("generic output path exposes hidden identity %q", file.OutputPath())
+		}
 		for _, statement := range file.SourceFile().Statements() {
 			name, kind, selected := waveSevenTailIdentity(statement)
 			if !selected {
 				continue
+			}
+			if strings.Contains(name, "$concrete_") ||
+				strings.Contains(name, "$goCapability_") {
+				t.Fatalf("generic declaration exposes hidden identity %q", name)
 			}
 			identity := file.OutputPath() + "|" + kind + "|" + name
 			if _, duplicate := identities[identity]; duplicate {
@@ -413,6 +420,12 @@ func TestWaveSevenGeneratedTailIsEncodedAndBounded(t *testing.T) {
 			counts[kind]++
 		}
 	}
+	if counts["capability"] != 1 {
+		t.Fatalf(
+			"shared generic capabilities = %d, want only the deferred registry",
+			counts["capability"],
+		)
+	}
 	if len(artifacts) < 20 {
 		t.Fatalf(
 			"generic tail has %d inspected artifacts, want at least 20",
@@ -420,7 +433,7 @@ func TestWaveSevenGeneratedTailIsEncodedAndBounded(t *testing.T) {
 		)
 	}
 	for kind, minimum := range map[string]int{
-		"capability":       5,
+		"capability":       1,
 		"generic-alias":    1,
 		"generic-class":    5,
 		"generic-function": 20,
@@ -508,16 +521,16 @@ var waveSevenTailBounds = map[string]struct {
 	bytes int
 	nodes int
 }{
-	"capability":    {bytes: 2_000, nodes: 400},
+	"capability":    {bytes: 2_400, nodes: 400},
 	"generic-alias": {bytes: 500, nodes: 100},
 	// The canonical-pointer fixture selects RuntimeSlice.address and $view.
 	// Its marker-bearing class measures 6,878 bytes/1,403 nodes; the bound
 	// leaves less than two percent byte headroom while retaining the stricter
 	// independent node bound.
 	"generic-class": {bytes: 7_000, nodes: 1_500},
-	// The 2,500-byte bound includes explicit storage-facet conversion
-	// capabilities. GenericIteratorCopy measures 2,341 bytes/304 nodes; the
-	// prior one-facet ABI could not represent its T-backed struct field.
+	// The bound includes inline storage-facet conversion arrows.
+	// GenericIteratorCopy measures 2,341 bytes/304 nodes; the prior one-facet
+	// ABI could not represent its T-backed struct field.
 	"generic-function": {bytes: 2_500, nodes: 350},
 }
 
@@ -526,7 +539,7 @@ func waveSevenTailIdentity(
 ) (string, string, bool) {
 	switch statement := statement.(type) {
 	case tsgo.FunctionDeclaration:
-		if strings.HasPrefix(statement.Name().Text(), "$goCapability_") {
+		if strings.HasPrefix(statement.Name().Text(), "$go$") {
 			return statement.Name().Text(), "capability", true
 		}
 		if len(statement.TypeParameters()) != 0 {

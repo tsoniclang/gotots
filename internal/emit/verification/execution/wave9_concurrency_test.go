@@ -118,10 +118,10 @@ func assertWaveNineGenericArtifactBudget(
 			capabilityBytes += artifact.bytes
 		}
 	}
-	// Canonical pointer markers eliminate the former two generated pointer-
-	// representation capabilities, leaving seven capabilities in this fixture.
-	if concretizations != 7 || concretizationBytes > 6_200 ||
-		capabilities != 7 || capabilityBytes > 5_000 {
+	// Exact concrete operations are inline. Only the one shared deferred-
+	// callable registry remains a standalone capability in this fixture.
+	if concretizations != 6 || concretizationBytes > 6_200 ||
+		capabilities != 1 || capabilityBytes > 2_400 {
 		t.Fatalf(
 			"Wave 9 generic artifact bounds exceeded: concretizations=%d/%d capabilities=%d/%d",
 			concretizations,
@@ -365,7 +365,7 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 		"RuntimeSlice.literal<(($0: GoReceiveChannel<int32> | undefined) => Awaitable<int32>) | undefined",
 		"mapping.lookup(0)",
 		"let asserted: (($0: GoReceiveChannel<int32> | undefined) => Awaitable<int32>) | undefined",
-		"identity$concrete_",
+		"identity$",
 		"let methodValue: (() => Awaitable<int32>) | undefined",
 		"await goInterfaceNonNil<Reader>(",
 		"[receiveOne, synchronousOne]",
@@ -382,7 +382,7 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 	}
 	if concretizations := strings.Count(
 		transport,
-		"identity$concrete_",
+		"identity$",
 	); concretizations != 2 {
 		t.Fatalf(
 			"Transport uses %d identity concretizations, want callable and slice",
@@ -542,7 +542,7 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 	)
 	for _, required := range []string{
 		"export async function pullConstraint$kernel<",
-		"return await $go$constraint_method_",
+		"return await $go$constraint_method$",
 	} {
 		if !strings.Contains(genericConstraint, required) {
 			t.Fatalf(
@@ -555,7 +555,7 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 	forwardLeaf := waveNineFunctionText(t, printed, "forwardLeaf")
 	for _, required := range []string{
 		"export async function forwardLeaf$kernel<",
-		"return await $go$constraint_method_",
+		"return await $go$constraint_method$",
 	} {
 		if !strings.Contains(forwardLeaf, required) {
 			t.Fatalf(
@@ -582,7 +582,7 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 	for _, required := range []string{
 		"export async function readStatic$kernel<",
 		"($0: T) => Awaitable<int64>",
-		"return await $go$constraint_method_",
+		"return await $go$constraint_method$",
 	} {
 		if !strings.Contains(staticConstraint, required) {
 			t.Fatalf(

@@ -331,6 +331,14 @@ func (s *programSession) validateGenericCapabilityArtifact(
 	return nil
 }
 
+func (e *emitter) ConcreteGenericOperation(
+	context api.Context,
+	selection api.GenericOperationSelection,
+	signature *types.Signature,
+) (api.ExpressionEmission, bool, error) {
+	return genericcapability.Inline(context, e, selection, signature)
+}
+
 func (s *programSession) reconstructGenericCapabilityArtifact(
 	artifact *api.GeneratedArtifact,
 ) error {

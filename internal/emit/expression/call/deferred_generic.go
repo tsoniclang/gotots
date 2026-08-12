@@ -141,6 +141,7 @@ func emitDeferredGeneric(
 			capabilities, capabilityRequests, err =
 				genericinstance.EmitCapabilities(
 					context,
+					children,
 					source,
 					operationSet,
 					instance.TypeArgs,
