@@ -25,19 +25,7 @@ func staticDeferStatements(
 	if len(direct) == 0 {
 		return nil, false
 	}
-	total := 0
-	ast.Inspect(body, func(node ast.Node) bool {
-		if node != body {
-			if _, nestedCallable := node.(*ast.FuncLit); nestedCallable {
-				return false
-			}
-		}
-		if _, deferred := node.(*ast.DeferStmt); deferred {
-			total++
-		}
-		return true
-	})
-	return direct, total == len(direct)
+	return control.ExactDefers(direct)
 }
 
 func emitStaticDeferredBody(

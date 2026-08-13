@@ -18,9 +18,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	control, selected := context.DeferControl()
-	request, err := context.CallableControlRequest(
-		api.CallableControlDefer,
-	)
+	request, err := context.DeferControlRequest(source)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}

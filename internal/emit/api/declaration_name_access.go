@@ -283,6 +283,19 @@ func (r DeclarationRequirement) IteratorReturnControl() (
 	return r.controlRange, true
 }
 
+func (r DeclarationRequirement) DeferControl() (
+	*ast.DeferStmt,
+	bool,
+) {
+	if !r.Valid() ||
+		r.kind != DeclarationRequirementCallableControl ||
+		r.control != CallableControlDefer ||
+		r.controlDefer == nil {
+		return nil, false
+	}
+	return r.controlDefer, true
+}
+
 func (r DeclarationRequirement) generatedDefinition(
 	requirementKind DeclarationRequirementKind,
 	artifactKind GeneratedArtifactKind,

@@ -581,9 +581,11 @@ Artifact inspection separately exact-joins fixed and dynamic defer sites. A
 top-level direct site that executes at most once owns one fixed typed slot and
 no dynamic stack; multiple such slots drain in reverse source order. Loop,
 conditional, and non-structural-goto sites retain the dynamic stack. Mutations
-that classify a repeated/conditional site as fixed, restore a stack for the
-single-entry class, or change the drain order fail shape plus Go/TypeScript
-differential behavior.
+that drop or mis-parent an exact handler-produced site demand, restore a
+recursive AST scan, classify a repeated/conditional site as fixed, restore a
+stack for the single-entry class, or change the drain order fail the callable
+control join, architecture wall, shape gate, or Go/TypeScript differential
+behavior.
 
 Mutations make recovery ambient, pass authority through an ordinary source
 call, forward it one call deeper, omit registry registration, key the registry

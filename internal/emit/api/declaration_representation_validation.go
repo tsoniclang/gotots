@@ -14,7 +14,8 @@ func (r DeclarationRequirement) Valid() bool {
 			r.control != CallableControlInvalid ||
 			r.controlLabel != nil ||
 			r.controlPosition.IsValid() ||
-			r.controlRange != nil) {
+			r.controlRange != nil ||
+			r.controlDefer != nil) {
 		return false
 	}
 	if r.kind != DeclarationRequirementGenericOperation &&
@@ -261,6 +262,7 @@ func (r DeclarationRequirement) Valid() bool {
 			return r.controlLabel != nil &&
 				r.controlPosition.IsValid() &&
 				r.controlRange == nil &&
+				r.controlDefer == nil &&
 				r.callable != nil &&
 				r.controlPosition >= r.callable.Pos() &&
 				r.controlPosition <= r.callable.End()
@@ -268,11 +270,20 @@ func (r DeclarationRequirement) Valid() bool {
 		if r.control == CallableControlIteratorReturn {
 			return r.controlLabel == nil &&
 				!r.controlPosition.IsValid() &&
+				r.controlDefer == nil &&
 				validIteratorReturnRange(r.callable, r.controlRange)
+		}
+		if r.control == CallableControlDefer {
+			return r.controlLabel == nil &&
+				!r.controlPosition.IsValid() &&
+				r.controlRange == nil &&
+				(r.controlDefer == nil ||
+					validDeferControl(r.callable, r.controlDefer))
 		}
 		return r.controlLabel == nil &&
 			!r.controlPosition.IsValid() &&
-			r.controlRange == nil
+			r.controlRange == nil &&
+			r.controlDefer == nil
 	case DeclarationRequirementCooperativeCallable:
 		return r.validCooperativeCallable()
 	case DeclarationRequirementCallableABI:

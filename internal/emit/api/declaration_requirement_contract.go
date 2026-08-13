@@ -39,6 +39,7 @@ type DeclarationRequirement struct {
 	controlLabel           *types.Label
 	controlPosition        token.Pos
 	controlRange           *ast.RangeStmt
+	controlDefer           *ast.DeferStmt
 	callableFacet          CallableFacet
 }
 

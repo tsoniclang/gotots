@@ -901,6 +901,14 @@ dynamic LIFO stack because the number and order of captured calls are runtime
 facts. Both shapes preserve immediate capture and direct-recover authority;
 the compiler never chooses the fixed form from source spelling alone.
 
+Each defer-statement handler contributes its exact source-node identity to the
+enclosing callable's root demand during the normal contextual emission walk.
+The callable uses fixed slots only when that demand set equals the defer
+statements directly present in its body list and goto control is absent.
+Nested, conditional, repeated, missing, additional, or conservatively
+unlocated sites therefore retain the dynamic stack without a recursive AST
+scan.
+
 A callable's ordinary target signature never contains recovery state. If its
 body uses `recover`, its private deferred entry receives the authority:
 

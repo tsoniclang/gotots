@@ -1,8 +1,14 @@
 package emit_test
 
 import (
+	"context"
+	"go/types"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/load"
 )
 
 func waveNineFunctionWithPrefix(
@@ -48,4 +54,52 @@ func waveNineClassMemberText(
 		t.Fatalf("generated class %s member %q has no boundary", className, marker)
 	}
 	return printed[memberStart : memberStart+memberEnd+len("\n    }")]
+}
+
+func genericCallbackFixture(
+	t *testing.T,
+) (string, string, emit.ProgramEmission, waveFourArtifacts) {
+	directory := filepath.Join(
+		repositoryRoot(),
+		"testdata",
+		"constructs",
+		"concurrency",
+		"generic-callback",
+	)
+	directory, err := filepath.Abs(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots, err := emit.ExportedAPIRoots(program.Roots()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedRoots := roots[:0]
+	for _, root := range roots {
+		function, ok := root.Object().(*types.Func)
+		if ok && function.Signature().Recv() == nil &&
+			function.Signature().TypeParams().Len() != 0 {
+			continue
+		}
+		selectedRoots = append(selectedRoots, root)
+	}
+	roots = selectedRoots
+	emission, err := emit.CompileWithOptions(
+		program,
+		roots,
+		waveNineOptions(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	return directory, workingDirectory, emission, artifacts
 }

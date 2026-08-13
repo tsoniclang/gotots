@@ -1,4 +1,4 @@
-package api
+package control
 
 import "go/ast"
 
@@ -7,12 +7,17 @@ type DeferControl struct {
 	static map[*ast.DeferStmt]string
 }
 
+type DeferError struct {
+	Reason string
+}
+
+func (e *DeferError) Error() string {
+	return "build defer control: " + e.Reason
+}
+
 func NewDeferControl(stack string) (DeferControl, error) {
 	if stack == "" {
-		return DeferControl{}, &InvariantError{
-			Role:   RoleBlockStatement,
-			Reason: "defer stack identity is empty",
-		}
+		return DeferControl{}, &DeferError{Reason: "defer stack identity is empty"}
 	}
 	return DeferControl{stack: stack}, nil
 }
@@ -21,25 +26,16 @@ func NewStaticDeferControl(
 	bindings map[*ast.DeferStmt]string,
 ) (DeferControl, error) {
 	if len(bindings) == 0 {
-		return DeferControl{}, &InvariantError{
-			Role:   RoleBlockStatement,
-			Reason: "static defer bindings are empty",
-		}
+		return DeferControl{}, &DeferError{Reason: "static defer bindings are empty"}
 	}
 	selected := make(map[*ast.DeferStmt]string, len(bindings))
 	names := make(map[string]struct{}, len(bindings))
 	for statement, name := range bindings {
 		if statement == nil || statement.Call == nil || name == "" {
-			return DeferControl{}, &InvariantError{
-				Role:   RoleBlockStatement,
-				Reason: "static defer binding is invalid",
-			}
+			return DeferControl{}, &DeferError{Reason: "static defer binding is invalid"}
 		}
 		if _, duplicate := names[name]; duplicate {
-			return DeferControl{}, &InvariantError{
-				Role:   RoleBlockStatement,
-				Reason: "static defer binding name is duplicated",
-			}
+			return DeferControl{}, &DeferError{Reason: "static defer binding name is duplicated"}
 		}
 		selected[statement] = name
 		names[name] = struct{}{}

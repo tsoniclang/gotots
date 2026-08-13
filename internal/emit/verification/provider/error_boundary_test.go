@@ -371,7 +371,7 @@ func Message(failure error) string { return failure.Error() }
 	for _, required := range []string{
 		"async Error(",
 		"errors__from_gostdlib.New(\"provider\")",
-		"implements $goInterface",
+		"extends GoProviderInterfaceBridge<GoError> implements GoInterface",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
 			t.Fatalf("provider error artifact lacks %q:\n%s", required, artifacts.printed)

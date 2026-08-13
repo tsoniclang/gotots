@@ -5,6 +5,8 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+
+	controlcontract "github.com/tsoniclang/gotots/internal/emit/api/control"
 )
 
 type NamedStructOperation uint8
@@ -154,22 +156,15 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementReflectionValueOperations
 }
 
-type CallableControlFacet uint8
+type CallableControlFacet = controlcontract.CallableFacet
 
 const (
-	CallableControlInvalid CallableControlFacet = iota
-	CallableControlDefer
-	CallableControlRecovery
-	CallableControlGoto
-	CallableControlIteratorReturn
+	CallableControlInvalid        = controlcontract.CallableInvalid
+	CallableControlDefer          = controlcontract.CallableDefer
+	CallableControlRecovery       = controlcontract.CallableRecovery
+	CallableControlGoto           = controlcontract.CallableGoto
+	CallableControlIteratorReturn = controlcontract.CallableIteratorReturn
 )
-
-func (f CallableControlFacet) Valid() bool {
-	return f == CallableControlDefer ||
-		f == CallableControlRecovery ||
-		f == CallableControlGoto ||
-		f == CallableControlIteratorReturn
-}
 
 func NewGenericCapabilityRequirement(
 	artifact *GeneratedArtifact,
@@ -446,6 +441,28 @@ func NewCallableControlRequirement(
 	}, nil
 }
 
+func NewDeferControlRequirement(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+	source *ast.DeferStmt,
+) (DeclarationRequirement, error) {
+	if !validCallableControlAnchor(owner, enclosing, callable) ||
+		!validDeferControl(callable, source) {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "defer control requirement is invalid",
+		}
+	}
+	return DeclarationRequirement{
+		owner:        owner,
+		kind:         DeclarationRequirementCallableControl,
+		enclosing:    enclosing,
+		callable:     callable,
+		control:      CallableControlDefer,
+		controlDefer: source,
+	}, nil
+}
+
 func NewIteratorReturnControlRequirement(
 	owner ArtifactOwner,
 	enclosing ast.Node,
@@ -503,6 +520,19 @@ func validIteratorReturnRange(
 		source != nil &&
 		source.X != nil &&
 		source.Body != nil &&
+		source.Pos() >= callable.Pos() &&
+		source.End() <= callable.End()
+}
+
+func validDeferControl(
+	callable ast.Node,
+	source *ast.DeferStmt,
+) bool {
+	return callable != nil &&
+		source != nil &&
+		source.Call != nil &&
+		source.Pos().IsValid() &&
+		source.End() >= source.Pos() &&
 		source.Pos() >= callable.Pos() &&
 		source.End() <= callable.End()
 }

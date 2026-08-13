@@ -859,6 +859,14 @@ no dynamic stack. A defer that may execute repeatedly, conditionally, or under
 non-structural `goto` uses the invocation-local dynamic stack because runtime
 order and multiplicity are then observable.
 
+The ordinary contextual handler for each `defer` records that exact
+`*ast.DeferStmt` identity as callable-control demand. The callable owner may
+choose fixed slots only when those demands exact-join the direct defer
+statements in its body list and no goto control is present. A missing,
+additional, or unlocated demand selects the dynamic stack. The callable owner
+does not rediscover defer sites with a recursive AST walk or a second control
+model.
+
 Both forms select `f`'s private deferred entry when one exists. Transported
 function values use one exact-signature typed deferred-entry registry. A
 recover-capable function/literal registers its ordinary value and private
