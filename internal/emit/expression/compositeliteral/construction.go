@@ -30,14 +30,14 @@ func sourceStructConstruction(
 	structType *types.Struct,
 	fields []arrangedField,
 	canonicalStorage bool,
-) (tsgo.NewExpression, []api.RootRequest, error) {
+) (tsgo.Expression, []api.RootRequest, error) {
 	if structType == nil || len(fields) != structType.NumFields() {
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "named struct construction field set is incomplete",
 		}
 	}
-	if len(fields) == 0 {
+	if len(fields) == 0 && !canonicalStorage {
 		return context.Factory().NewExpression(
 			reference,
 			typeArguments,
@@ -84,11 +84,17 @@ func sourceStructConstruction(
 			selected.value,
 		))
 	}
-	return context.Factory().NewExpression(
-		reference,
+	storage := context.Factory().ObjectLiteralExpression(properties, true)
+	return context.Factory().CallExpression(
+		context.Factory().PropertyAccessExpression(
+			reference,
+			nil,
+			context.Factory().Identifier(api.StructFromStorageMember),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
 		typeArguments,
-		[]tsgo.Expression{
-			context.Factory().ObjectLiteralExpression(properties, true),
-		},
+		[]tsgo.Expression{storage},
+		tsgo.NodeFlagsNone,
 	), requests, nil
 }

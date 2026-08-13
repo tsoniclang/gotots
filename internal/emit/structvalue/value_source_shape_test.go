@@ -193,12 +193,57 @@ func Build() int32 {
 	statements := targetFunction(t, source, "Build").Body().(tsgo.Block).Statements()
 	declaration := statements[0].(tsgo.VariableStatement).
 		DeclarationList().Declarations()[0]
-	construction, ok := declaration.Initializer().(tsgo.NewExpression)
+	construction, ok := declaration.Initializer().(tsgo.CallExpression)
 	if !ok || len(construction.Arguments()) != 1 {
-		t.Fatalf("reconstructed composite = %T, want one storage argument", declaration.Initializer())
+		t.Fatalf("reconstructed composite = %T, want one from-storage argument", declaration.Initializer())
+	}
+	member, ok := construction.Expression().(tsgo.PropertyAccessExpression)
+	if !ok || targetName(member.Expression()) != "Record" ||
+		targetName(member.Name()) != "$fromStorage" {
+		t.Fatal("reconstructed composite did not use the public storage factory")
 	}
 	if _, ok := construction.Arguments()[0].(tsgo.ObjectLiteralExpression); !ok {
 		t.Fatalf("reconstructed composite argument = %T, want storage object", construction.Arguments()[0])
+	}
+
+	workingDirectory := t.TempDir()
+	targetPaths, _ := materializeStructProgramWithGolden(
+		t,
+		workingDirectory,
+		emission,
+		false,
+	)
+	compileStructTypeScript(t, workingDirectory, targetPaths)
+}
+
+func TestEmptyStorageBackedCompositeUsesPublicFactory(t *testing.T) {
+	_, emission := compileValueSourceProgram(t, `package valuesource
+
+type Empty struct{}
+type EmptyPointer *Empty
+
+func Build() Empty {
+	value := Empty{}
+	pointer := EmptyPointer(&value)
+	return *pointer
+}
+`)
+	source := structTargetSource(t, emission)
+	statements := targetFunction(t, source, "Build").Body().(tsgo.Block).Statements()
+	declaration := statements[0].(tsgo.VariableStatement).
+		DeclarationList().Declarations()[0]
+	construction, ok := declaration.Initializer().(tsgo.CallExpression)
+	if !ok || len(construction.Arguments()) != 1 {
+		t.Fatalf("empty composite = %T, want one from-storage argument", declaration.Initializer())
+	}
+	member, ok := construction.Expression().(tsgo.PropertyAccessExpression)
+	if !ok || targetName(member.Expression()) != "Empty" ||
+		targetName(member.Name()) != "$fromStorage" {
+		t.Fatal("empty composite did not use the public storage factory")
+	}
+	object, ok := construction.Arguments()[0].(tsgo.ObjectLiteralExpression)
+	if !ok || len(object.Properties()) != 0 {
+		t.Fatalf("empty composite storage = %T, want empty object", construction.Arguments()[0])
 	}
 
 	workingDirectory := t.TempDir()

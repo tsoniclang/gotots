@@ -508,8 +508,17 @@ The constructor's parameters are the complete declaration field set and create
 the fields directly without an argument-object allocation. Under the
 preserve-Go profile, the call captures only the expressions needed to retain
 source evaluation order before placing arguments in declaration order. The
-direct profile omits those captures by explicit project choice. Static
-`$zero`, `$copy`, `$equal`, `$hash`, `$convert`, `$storageOf`, `$fromStorage`,
+direct profile omits those captures by explicit project choice. If a later
+semantic demand selects canonical storage, every subscribed construction is
+rebuilt to the stable public storage factory instead:
+
+```ts
+return Point.$fromStorage({ X: field1, Y: field0 });
+```
+
+An empty storage-backed value uses `Empty.$fromStorage({})`; neither source
+construction nor a package consumer calls a storage constructor directly.
+Static `$zero`, `$copy`, `$equal`, `$hash`, `$convert`, `$storageOf`, `$fromStorage`,
 and `$assign` members exist only when their exact semantic use requests them. A
 certified provider may expose a positional `$make` operation; ordinary
 generated structs never gain that compatibility factory.

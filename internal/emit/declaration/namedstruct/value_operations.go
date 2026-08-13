@@ -524,7 +524,7 @@ func construct(
 	canonicalStorage bool,
 ) tsgo.NewExpression {
 	constructorArguments := arguments
-	if canonicalStorage && len(fields) != 0 {
+	if canonicalStorage {
 		properties := make([]tsgo.ObjectLiteralElementLike, 0, len(fields))
 		for index, selected := range fields {
 			properties = append(properties, context.Factory().PropertyAssignment(

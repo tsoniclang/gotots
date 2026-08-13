@@ -394,9 +394,12 @@ gate.
 Source-owned named, anonymous, and derived fixtures exact-join each public
 constructor parameter to its canonical declaration field, prove direct calls
 allocate no argument object, and prove preserve-Go calls capture reordered
-effects exactly once before declaration-order arguments. Generic canonical
-storage fixtures retain their one required named storage object. The complete
-named-struct operation enum is mutation-tested one member at a time: demanding
+effects exactly once before declaration-order arguments. Canonical-storage
+fixtures must instead call the class's public `$fromStorage` operation with one
+named storage object; the empty-struct case must pass `{}` and strict-typecheck.
+Generic canonical storage fixtures retain their one required named storage
+object. The complete named-struct operation enum is mutation-tested one member
+at a time: demanding
 one of zero, copy, equality, hash, conversion, storage, or assignment must
 materialize only that operation. Broad searches reject source-owned `$fieldN`
 parameters and `$make` calls; the only admitted `$make` occurrence is attached
@@ -415,10 +418,11 @@ artifact reconstruction must fail at this gate.
 
 A late-demand fixture constructs a struct before taking its address in the
 same Go function. Artifact inspection proves that the final class owns the
-canonical-storage constructor and that the earlier composite was reconstructed
-to pass exactly one typed storage object. Removing the applied-demand resolver,
-the constructor-facet dependency, or reconstruction leaves positional input
-against the storage constructor and must fail strict typechecking.
+canonical-storage surface and that the earlier composite was reconstructed as
+one `$fromStorage` call with exactly one typed storage object. Removing the
+applied-demand resolver, the construction-facet dependency, or reconstruction
+leaves positional input against the storage representation and must fail
+artifact inspection or strict typechecking.
 
 ## Interface Proof
 
