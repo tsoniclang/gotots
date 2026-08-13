@@ -261,11 +261,59 @@ func (n *File) semanticGeneratedTypeName(
 	prefix string,
 	sourceType types.Type,
 ) (string, error) {
-	return semanticGeneratedTypeName(
-		prefix,
+	semanticType, err := semanticname.TypeWithIdentityTokens(
 		sourceType,
-		n.generatedNamedObjectIdentity,
+		n.generatedNamedObjectToken,
+		n.generatedPackageToken,
 	)
+	if err != nil {
+		return "", err
+	}
+	return prefix + semanticType, nil
+}
+
+func (n *File) generatedNamedObjectToken(
+	object *types.TypeName,
+) (string, error) {
+	if n == nil || n.owner == nil || n.owner.registry == nil || object == nil {
+		return "", &api.NameError{
+			Name:   objectName(object),
+			Reason: "generated-artifact named token owner is invalid",
+		}
+	}
+	if object.Pkg() == nil {
+		return semanticname.Identifier(object.Name()), nil
+	}
+	if object.Parent() == object.Pkg().Scope() {
+		qualifier := n.owner.registry.ImportQualifier(object.Pkg())
+		if qualifier == "" {
+			return "", &api.NameError{
+				Name:   object.Name(),
+				Reason: "generated-artifact named token has no package qualifier",
+			}
+		}
+		return qualifier + "$" +
+			semanticname.Identifier(object.Name()), nil
+	}
+	targetName, ok := n.owner.targetNameByObject[object]
+	if !ok || targetName == "" {
+		return "", &api.NameError{
+			Name:   object.Name(),
+			Reason: "generated-artifact local token has no target name",
+		}
+	}
+	return targetName, nil
+}
+
+func (n *File) generatedPackageToken(
+	sourcePackage *types.Package,
+) (string, error) {
+	if n == nil || n.owner == nil || n.owner.registry == nil {
+		return "", &api.NameError{
+			Reason: "generated-artifact package token owner is invalid",
+		}
+	}
+	return n.owner.registry.semanticPackageToken(sourcePackage)
 }
 
 func semanticGeneratedTypeName(

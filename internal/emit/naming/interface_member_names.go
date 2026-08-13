@@ -264,9 +264,12 @@ func (n *File) InterfaceMethodName(method *types.Func) (string, error) {
 	if method.Exported() {
 		return portableIdentifier(method.Name()), nil
 	}
-	return "$go$private$" + semanticname.Identifier(
-		types.Id(method.Pkg(), method.Name()),
-	), nil
+	qualifier, err := n.generatedPackageToken(method.Pkg())
+	if err != nil {
+		return "", err
+	}
+	return "$go$private$" + qualifier + "$" +
+		semanticname.Identifier(method.Name()), nil
 }
 
 func (n *File) MethodTarget(

@@ -44,6 +44,8 @@ func (n *File) GenericCapability(
 		selection,
 		signature,
 		placement,
+		n.generatedNamedObjectToken,
+		n.generatedPackageToken,
 	)
 	if err != nil {
 		return api.GenericCapabilityReference{}, err
@@ -73,12 +75,15 @@ func (r *Registry) internGenericCapability(
 	selection api.GenericOperationSelection,
 	signature *types.Signature,
 	placement generatedArtifactPlacement,
+	namedToken semanticname.NamedTypeToken,
+	packageToken semanticname.PackageToken,
 ) (genericCapabilityBinding, error) {
 	if r == nil ||
 		!selection.Valid() ||
 		signature == nil ||
 		artifactKey == "" ||
-		!placement.kind.Valid() {
+		!placement.kind.Valid() ||
+		namedToken == nil || packageToken == nil {
 		return genericCapabilityBinding{}, &api.NameError{
 			Reason: "generic-capability canonicalization input is invalid",
 		}
@@ -102,10 +107,12 @@ func (r *Registry) internGenericCapability(
 		}
 		return existing, nil
 	}
-	name, err := semanticname.OperationName(
+	name, err := semanticname.OperationNameWithIdentityTokens(
 		selection.Operation().Identifier(),
 		selectedMethod(selection),
 		signature,
+		namedToken,
+		packageToken,
 	)
 	if err != nil {
 		return genericCapabilityBinding{}, err
@@ -245,15 +252,21 @@ func (n *File) callableABI(
 			n.sourceGeneratedNamedObjectIdentity(sourceScope),
 		)
 	}
-	name, err := semanticGeneratedTypeName(
-		"$goCallable$",
+	identityName, err := semanticname.TypeWithLocalIdentity(
 		signature,
 		localIdentity,
 	)
 	if err != nil {
 		return api.CallableABIReference{}, err
 	}
-	digest := sha256.Sum256([]byte("callable-abi|" + name))
+	name, err := n.semanticGeneratedTypeName(
+		"$goCallable$",
+		signature,
+	)
+	if err != nil {
+		return api.CallableABIReference{}, err
+	}
+	digest := sha256.Sum256([]byte("callable-abi|" + identityName))
 	artifactKey := hex.EncodeToString(digest[:])
 	binding, err := n.owner.registry.internCallableABI(
 		artifactKey,

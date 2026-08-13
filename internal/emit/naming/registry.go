@@ -181,8 +181,9 @@ type genericCapabilityBinding struct {
 }
 
 type genericConcretizationBinding struct {
-	owner *api.GeneratedArtifact
-	name  string
+	owner  *api.GeneratedArtifact
+	name   string
+	suffix string
 }
 
 type callableABIBinding struct {
@@ -217,7 +218,7 @@ type Registry struct {
 	assemblyPathByPackage               map[*types.Package]string
 	importQualifierByPackage            map[*types.Package]string
 	anonymousStructs                    map[string]anonymousStructBinding
-	anonymousStructNames                map[string]string
+	anonymousStructNames                map[genericGeneratedNameScope]string
 	mapSpecializations                  map[string]mapSpecializationBinding
 	mapSpecializationNames              map[string]string
 	interfaceAdapters                   map[string]interfaceAdapterBinding
@@ -296,7 +297,7 @@ func NewRegistry() *Registry {
 		assemblyPathByPackage:               make(map[*types.Package]string),
 		importQualifierByPackage:            make(map[*types.Package]string),
 		anonymousStructs:                    make(map[string]anonymousStructBinding),
-		anonymousStructNames:                make(map[string]string),
+		anonymousStructNames:                make(map[genericGeneratedNameScope]string),
 		mapSpecializations:                  make(map[string]mapSpecializationBinding),
 		mapSpecializationNames:              make(map[string]string),
 		interfaceAdapters:                   make(map[string]interfaceAdapterBinding),

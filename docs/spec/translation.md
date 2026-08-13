@@ -770,8 +770,9 @@ are collision-checked against every visible authored, imported, and generated
 binding before the TS-Go AST is sealed.
 
 Compilation-generated types in one closed support family share that family's
-bounded semantic module. Each definition keeps its full injective semantic
-export name. For example, the specialization for
+bounded semantic module. Each definition keeps an injective semantic export
+name whose named components use the package registry's unique readable
+qualifier. For example, the specialization for
 `map[chan int32]map[int32]<-chan int32` is emitted in:
 
 ```text
@@ -785,7 +786,15 @@ free. If `GoMap` is already visible, the caller first uses the full semantic
 export name locally; only a real second collision adds the shortest exact
 source-derived qualifier. A lexical anonymous struct likewise keeps its
 complete `$goStruct$...` name. Artifact digests remain in manifests and
-internal ownership only.
+internal ownership only. A named component such as
+`github.com/microsoft/typescript-go/internal/ast.SourceFile` appears as
+`ast$SourceFile`; its full import path is not copied into every generated
+identifier. Same-spelled local types receive the visibility-aware source name
+already allocated for their lexical scope (`Local`, or `Local__shadow_...`
+when the other binding is visible) and remain distinct through their exact
+private Go-identity keys and lexical placement. Disjoint scopes may reuse the
+same readable name.
+Semantic contracts never carry a pre-rendered TypeScript suffix.
 
 The same rule covers representation-disjoint builtin forms. For
 `B ~[]byte | ~string`, `append(dst, src...)` requests exactly one internal

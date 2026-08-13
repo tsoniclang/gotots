@@ -785,10 +785,13 @@ suffixes encode ordered exact Go type arguments plus the selected effect, and
 operation names encode the operation, any selected constraint method, and its
 exact signature. Compilation paths group by defining package and declaration or
 operation family. Closed runtime families share one bounded support module and
-export every exact generated type under its complete semantic name. Import
+export every exact generated type under an injective semantic name. A named
+type component uses the package registry's globally unique readable qualifier
+plus the Go declaration name (`ast$SourceFile`), not the repeated full import
+path. The full package/type identity remains the private artifact key. Import
 sites use the short local family name (`GoMap`, `GoInterface`,
 `GoInterfaceAdapter`, or the corresponding provider/defer family) when free;
-the canonical lexical name owner uses the complete semantic export or the
+the canonical lexical name owner uses the semantic export or the
 shortest source-derived qualifier only for a real collision. Lexically
 co-located artifacts also use their complete semantic generated names because
 no module boundary disambiguates them. Full hashes remain private identity
@@ -796,6 +799,20 @@ keys only; no digest or opaque suffix enters an ordinary TypeScript
 declaration, import, or generic support path. A normalized semantic name or
 path collision never joins two owners: the full private identities are
 exact-joined at reservation and the collision fails before output is sealed.
+Target spelling is not part of a semantic artifact contract: the semantic
+owner carries exact Go objects, types, effects, and private keys; the canonical
+naming owner derives the readable name only when it knows the complete package
+and lexical collision set. A local type therefore uses its preallocated
+visibility-aware name (`Local`, or `Local__shadow_...` only for a visible
+collision) rather than embedding its lexical identity in the declaration.
+Disjoint scopes may reuse the same readable name while private keys and lexical
+placement keep their artifacts distinct. No earlier stage stores a display suffix for a later naming
+stage to trust. After naming, the returned target reference may carry its
+rendered suffix for another target-name operation in the same call plan; that
+is a naming result, not semantic identity or a second source of truth.
+Restoring a full import path inside every generated identifier is a source-size
+regression even though it remains semantically exact, and fails generated-size
+and largest-line evidence.
 
 For example, Go accepts `append(dst, src...)` when `src` has type parameter
 `B ~[]byte | ~string`. TypeScript has no one static append expression over

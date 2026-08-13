@@ -75,8 +75,8 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 		}
 	}
 	for fragment, source := range map[string]string{
-		"function Twice$Named_example_u2e_com_u2f_crosslocal_Local":                                                callerSource,
-		"function BothEqual$Named_example_u2e_com_u2f_crosslocal_Outer$Named_example_u2e_com_u2f_crosslocal_Inner": callerSource,
+		"function Twice$Named_Local":                 callerSource,
+		"function BothEqual$Named_Outer$Named_Inner": callerSource,
 		"enum Local": callerSource,
 		"enum Outer": callerSource,
 		"enum Inner": callerSource,
@@ -90,14 +90,14 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 	}
 	if count := strings.Count(
 		callerSource,
-		"function BothEqual$Named_example_u2e_com_u2f_crosslocal_Outer$Named_example_u2e_com_u2f_crosslocal_Inner",
+		"function BothEqual$Named_Outer$Named_Inner",
 	); count != 1 {
 		t.Fatalf("same lexical generic instance emitted %d wrappers, want 1", count)
 	}
 	inner := strings.Index(callerSource, "enum Inner")
 	wrapper := strings.Index(
 		callerSource,
-		"function BothEqual$Named_example_u2e_com_u2f_crosslocal_Outer$Named_example_u2e_com_u2f_crosslocal_Inner",
+		"function BothEqual$Named_Outer$Named_Inner",
 	)
 	if inner < 0 || wrapper < inner {
 		t.Fatalf(
@@ -106,7 +106,7 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 		)
 	}
 	if strings.Contains(providerSource, "crosslocal") ||
-		strings.Contains(providerSource, "Twice$Named_example_u2e_com") {
+		strings.Contains(providerSource, "Twice$Named_Local") {
 		t.Fatalf(
 			"generic provider acquired a caller-local reverse dependency:\n%s",
 			providerSource,

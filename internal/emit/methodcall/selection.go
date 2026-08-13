@@ -125,7 +125,7 @@ func Resolve(
 			signature:      concrete,
 			facet:          facet,
 			target:         target,
-			memberSuffix:   concretization.Concretization().Suffix(),
+			memberSuffix:   concretization.Suffix(),
 			concretized:    true,
 			concretization: concretization,
 			requests:       concretization.Requests(),

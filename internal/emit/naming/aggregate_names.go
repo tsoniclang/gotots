@@ -421,7 +421,16 @@ func (r *Registry) internAnonymousStruct(
 		}
 		return existing, nil
 	}
-	if existing := r.anonymousStructNames[name]; existing != "" &&
+	nameScope := genericGeneratedNameScope{
+		placement:    placement.kind,
+		lexicalOwner: placement.lexicalOwner,
+		anchor:       placement.anchor,
+		name:         name,
+	}
+	if placement.kind == api.GeneratedArtifactPlacementCompilation {
+		nameScope.module = output.AnonymousStructSupportPath
+	}
+	if existing := r.anonymousStructNames[nameScope]; existing != "" &&
 		existing != artifactKey {
 		return anonymousStructBinding{}, &api.NameError{
 			Name:   name,
@@ -442,7 +451,7 @@ func (r *Registry) internAnonymousStruct(
 		name:  name,
 	}
 	r.anonymousStructs[artifactKey] = binding
-	r.anonymousStructNames[name] = artifactKey
+	r.anonymousStructNames[nameScope] = artifactKey
 	return binding, nil
 }
 

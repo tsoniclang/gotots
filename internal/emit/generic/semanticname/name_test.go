@@ -41,6 +41,49 @@ func TestConcretizationSuffixIsSemanticAndExact(t *testing.T) {
 	}
 }
 
+func TestNamedTypeTokenCanUseAClosedReadablePackageOwner(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	item := types.NewNamed(
+		types.NewTypeName(token.NoPos, sourcePackage, "Item", nil),
+		types.NewStruct(nil, nil),
+		nil,
+	)
+	name, err := TypeWithIdentityTokens(
+		types.NewSlice(item),
+		func(object *types.TypeName) (string, error) {
+			if object != item.Obj() {
+				t.Fatalf("named token object = %v, want Item", object)
+			}
+			return "model_Type_Item", nil
+		},
+		func(*types.Package) (string, error) { return "model", nil },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "SliceOf_Named_model_Type_Item" {
+		t.Fatalf("semantic name = %q", name)
+	}
+}
+
+func TestNamedTypeTokenRejectsNonIdentifierSpelling(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	item := types.NewNamed(
+		types.NewTypeName(token.NoPos, sourcePackage, "Item", nil),
+		types.NewStruct(nil, nil),
+		nil,
+	)
+	if _, err := TypeWithIdentityTokens(
+		item,
+		func(*types.TypeName) (string, error) {
+			return "model/Item", nil
+		},
+		func(*types.Package) (string, error) { return "model", nil },
+	); err == nil {
+		t.Fatal("invalid named-type token was accepted")
+	}
+}
+
 func TestSemanticIdentifierEscapingIsInjectiveForEscapeLikeSource(t *testing.T) {
 	encodedDot := Identifier(".")
 	literalEscape := Identifier("_u2e_")

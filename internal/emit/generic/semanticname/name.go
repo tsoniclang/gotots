@@ -8,27 +8,15 @@ import (
 	"unicode/utf8"
 )
 
-type LocalNamedIdentity func(*types.TypeName) (string, error)
-
 func ConcretizationSuffix(
 	arguments []types.Type,
 	synchronous bool,
 ) (string, error) {
-	if len(arguments) == 0 {
-		return "", invalid("generic concretization has no type arguments")
-	}
-	parts := make([]string, 0, len(arguments)+1)
-	for _, argument := range arguments {
-		part, err := Type(argument)
-		if err != nil {
-			return "", err
-		}
-		parts = append(parts, part)
-	}
-	if synchronous {
-		parts = append(parts, "synchronous")
-	}
-	return "$" + strings.Join(parts, "$"), nil
+	return concretizationSuffix(
+		arguments,
+		synchronous,
+		typeIdentityResolver{},
+	)
 }
 
 func OperationName(
@@ -36,26 +24,12 @@ func OperationName(
 	method *types.Func,
 	signature *types.Signature,
 ) (string, error) {
-	if operation == "" || signature == nil || signature.Recv() != nil {
-		return "", invalid("generic operation contract is invalid")
-	}
-	contract, err := signatureToken(signature)
-	if err != nil {
-		return "", err
-	}
-	operation, err = operationIdentifier(operation)
-	if err != nil {
-		return "", err
-	}
-	name := "$go$" + operation
-	if method != nil {
-		method = method.Origin()
-		if _, ok := method.Type().(*types.Signature); !ok {
-			return "", invalid("generic operation method is invalid")
-		}
-		name += "$" + identifier(types.Id(method.Pkg(), method.Name()))
-	}
-	return name + "$" + contract, nil
+	return operationName(
+		operation,
+		method,
+		signature,
+		typeIdentityResolver{},
+	)
 }
 
 func CapabilityModule(operation string) (string, error) {
@@ -111,7 +85,7 @@ func ConcretizationName(owner *types.Func, suffix string) (string, error) {
 }
 
 func Type(source types.Type) (string, error) {
-	return typeWithLocalIdentity(source, nil)
+	return typeWithIdentity(source, typeIdentityResolver{})
 }
 
 func TypeWithLocalIdentity(
@@ -121,16 +95,32 @@ func TypeWithLocalIdentity(
 	if localIdentity == nil {
 		return "", invalid("semantic local identity owner is nil")
 	}
-	return typeWithLocalIdentity(source, localIdentity)
+	return typeWithIdentity(source, typeIdentityResolver{
+		localIdentity: localIdentity,
+	})
+}
+
+func TypeWithIdentityTokens(
+	source types.Type,
+	namedToken NamedTypeToken,
+	packageToken PackageToken,
+) (string, error) {
+	if namedToken == nil || packageToken == nil {
+		return "", invalid("semantic identity-token owner is nil")
+	}
+	return typeWithIdentity(source, typeIdentityResolver{
+		namedToken:   namedToken,
+		packageToken: packageToken,
+	})
 }
 
 func Identifier(source string) string {
 	return identifier(source)
 }
 
-func typeWithLocalIdentity(
+func typeWithIdentity(
 	source types.Type,
-	localIdentity LocalNamedIdentity,
+	identity typeIdentityResolver,
 ) (string, error) {
 	if source == nil {
 		return "", invalid("semantic type is nil")
@@ -139,7 +129,7 @@ func typeWithLocalIdentity(
 		types.Unalias(source),
 		make(map[types.Type]struct{}),
 		make(map[*types.TypeParam]int),
-		localIdentity,
+		identity,
 	)
 }
 
@@ -147,14 +137,14 @@ func typeToken(
 	source types.Type,
 	pending map[types.Type]struct{},
 	parameters map[*types.TypeParam]int,
-	localIdentity LocalNamedIdentity,
+	identity typeIdentityResolver,
 ) (string, error) {
 	source = types.Unalias(source)
 	switch selected := source.(type) {
 	case *types.Basic:
 		return identifier(selected.Name()), nil
 	case *types.Named:
-		name, err := namedTypeName(selected.Obj(), localIdentity)
+		name, err := namedTypeName(selected.Obj(), identity)
 		if err != nil {
 			return "", err
 		}
@@ -162,7 +152,7 @@ func typeToken(
 			selected.TypeArgs(),
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 		if err != nil || len(arguments) == 0 {
 			return "Named_" + name, err
@@ -174,7 +164,7 @@ func typeToken(
 			selected.Elem(),
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 	case *types.Slice:
 		return unaryTypeToken(
@@ -182,7 +172,7 @@ func typeToken(
 			selected.Elem(),
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 	case *types.Array:
 		return unaryTypeToken(
@@ -190,14 +180,14 @@ func typeToken(
 			selected.Elem(),
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 	case *types.Map:
 		key, err := typeToken(
 			selected.Key(),
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 		if err != nil {
 			return "", err
@@ -206,7 +196,7 @@ func typeToken(
 			selected.Elem(),
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 		if err != nil {
 			return "", err
@@ -225,25 +215,25 @@ func typeToken(
 			selected.Elem(),
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 	case *types.Signature:
 		return signatureTokenWithPending(
 			selected,
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 	case *types.Struct:
-		return structToken(selected, pending, parameters, localIdentity)
+		return structToken(selected, pending, parameters, identity)
 	case *types.Interface:
-		return interfaceToken(selected, pending, parameters, localIdentity)
+		return interfaceToken(selected, pending, parameters, identity)
 	case *types.Tuple:
 		values, err := tupleTokens(
 			selected,
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 		if err != nil {
 			return "", err
@@ -273,7 +263,7 @@ func typeToken(
 				term.Type(),
 				pending,
 				parameters,
-				localIdentity,
+				identity,
 			)
 			if err != nil {
 				return "", err
@@ -295,7 +285,7 @@ func signatureToken(signature *types.Signature) (string, error) {
 		signature,
 		make(map[types.Type]struct{}),
 		make(map[*types.TypeParam]int),
-		nil,
+		typeIdentityResolver{},
 	)
 }
 
@@ -303,13 +293,13 @@ func signatureTokenWithPending(
 	signature *types.Signature,
 	pending map[types.Type]struct{},
 	parameters map[*types.TypeParam]int,
-	localIdentity LocalNamedIdentity,
+	identity typeIdentityResolver,
 ) (string, error) {
 	parameterTokens, err := tupleTokens(
 		signature.Params(),
 		pending,
 		parameters,
-		localIdentity,
+		identity,
 	)
 	if err != nil {
 		return "", err
@@ -321,7 +311,7 @@ func signatureTokenWithPending(
 		signature.Results(),
 		pending,
 		parameters,
-		localIdentity,
+		identity,
 	)
 	if err != nil {
 		return "", err
@@ -333,7 +323,7 @@ func structToken(
 	structure *types.Struct,
 	pending map[types.Type]struct{},
 	parameters map[*types.TypeParam]int,
-	localIdentity LocalNamedIdentity,
+	identity typeIdentityResolver,
 ) (string, error) {
 	fields := make([]string, 0, structure.NumFields())
 	for index := range structure.NumFields() {
@@ -342,14 +332,21 @@ func structToken(
 			field.Type(),
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 		if err != nil {
 			return "", err
 		}
 		fieldName := field.Name()
 		if !field.Exported() && field.Pkg() != nil {
-			fieldName = field.Pkg().Path() + "." + fieldName
+			fieldName, err = packageObjectName(
+				field.Pkg(),
+				fieldName,
+				identity,
+			)
+			if err != nil {
+				return "", err
+			}
 		}
 		kind := "Field_"
 		if field.Embedded() {
@@ -365,7 +362,7 @@ func interfaceToken(
 	contract *types.Interface,
 	pending map[types.Type]struct{},
 	parameters map[*types.TypeParam]int,
-	localIdentity LocalNamedIdentity,
+	identity typeIdentityResolver,
 ) (string, error) {
 	if _, recursive := pending[contract]; recursive {
 		return "", invalid("recursive anonymous interface has no exact semantic name")
@@ -387,12 +384,20 @@ func interfaceToken(
 			signature,
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 		if err != nil {
 			return "", err
 		}
-		parts = append(parts, "Method_"+identifier(types.Id(method.Pkg(), method.Name()))+"_"+methodType)
+		methodName, err := packageObjectName(
+			method.Pkg(),
+			method.Name(),
+			identity,
+		)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, "Method_"+methodName+"_"+methodType)
 	}
 	slices.Sort(parts)
 	return "Interface_" + joinedOrVoid(parts), nil
@@ -402,7 +407,7 @@ func typeListTokens(
 	list *types.TypeList,
 	pending map[types.Type]struct{},
 	parameters map[*types.TypeParam]int,
-	localIdentity LocalNamedIdentity,
+	identity typeIdentityResolver,
 ) ([]string, error) {
 	if list == nil {
 		return nil, nil
@@ -413,7 +418,7 @@ func typeListTokens(
 			list.At(index),
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 		if err != nil {
 			return nil, err
@@ -427,7 +432,7 @@ func tupleTokens(
 	tuple *types.Tuple,
 	pending map[types.Type]struct{},
 	parameters map[*types.TypeParam]int,
-	localIdentity LocalNamedIdentity,
+	identity typeIdentityResolver,
 ) ([]string, error) {
 	if tuple == nil {
 		return nil, nil
@@ -438,7 +443,7 @@ func tupleTokens(
 			tuple.At(index).Type(),
 			pending,
 			parameters,
-			localIdentity,
+			identity,
 		)
 		if err != nil {
 			return nil, err
@@ -453,20 +458,20 @@ func unaryTypeToken(
 	element types.Type,
 	pending map[types.Type]struct{},
 	parameters map[*types.TypeParam]int,
-	localIdentity LocalNamedIdentity,
+	identity typeIdentityResolver,
 ) (string, error) {
 	value, err := typeToken(
 		element,
 		pending,
 		parameters,
-		localIdentity,
+		identity,
 	)
 	return prefix + value, err
 }
 
 func namedTypeName(
 	object *types.TypeName,
-	localIdentity LocalNamedIdentity,
+	identity typeIdentityResolver,
 ) (string, error) {
 	if object == nil {
 		return "", invalid("semantic named type has no object")
@@ -474,21 +479,47 @@ func namedTypeName(
 	if object.Pkg() == nil {
 		return identifier(object.Name()), nil
 	}
-	if object.Parent() != nil && object.Parent() != object.Pkg().Scope() {
-		if localIdentity == nil {
-			return identifier(object.Pkg().Path()) + "_" +
-				identifier(object.Name()), nil
-		}
-		identity, err := localIdentity(object)
+	if identity.namedToken != nil {
+		token, err := identity.namedToken(object)
 		if err != nil {
 			return "", err
 		}
-		if identity == "" {
+		if !validNamedTypeToken(token) {
+			return "", invalid("semantic named-type token is invalid")
+		}
+		return token, nil
+	}
+	if object.Parent() != nil && object.Parent() != object.Pkg().Scope() {
+		if identity.localIdentity == nil {
+			return identifier(object.Pkg().Path()) + "_" +
+				identifier(object.Name()), nil
+		}
+		localIdentity, err := identity.localIdentity(object)
+		if err != nil {
+			return "", err
+		}
+		if localIdentity == "" {
 			return "", invalid("local semantic named type identity is empty")
 		}
-		return identifier(identity), nil
+		return identifier(localIdentity), nil
 	}
 	return identifier(object.Pkg().Path()) + "_" + identifier(object.Name()), nil
+}
+
+func validNamedTypeToken(token string) bool {
+	if token == "" {
+		return false
+	}
+	for _, value := range token {
+		if value >= 'A' && value <= 'Z' ||
+			value >= 'a' && value <= 'z' ||
+			value >= '0' && value <= '9' ||
+			value == '_' || value == '$' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func receiverName(source types.Type) (string, error) {

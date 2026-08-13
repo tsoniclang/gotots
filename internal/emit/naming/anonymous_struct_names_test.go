@@ -34,6 +34,11 @@ func Distinct() {
 		t.Fatalf("anonymous struct types = %d, want 8", len(structTypes))
 	}
 	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers(
+		[]*types.Package{sourcePackage},
+	); err != nil {
+		t.Fatal(err)
+	}
 	names := testFileNames(
 		t,
 		NewOwner(sourcePackage.Scope(), info, registry),
@@ -145,6 +150,11 @@ func Second() {
 		t.Fatal("spelling-only identity foil is not actually identical")
 	}
 	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers(
+		[]*types.Package{sourcePackage},
+	); err != nil {
+		t.Fatal(err)
+	}
 	var functions []*types.Func
 	var functionDeclarations []*ast.FuncDecl
 	for _, declaration := range sourceFile.Decls {
@@ -193,8 +203,11 @@ func Second() {
 		}
 		references = append(references, reference)
 	}
-	if references[0].Name() == references[1].Name() {
-		t.Fatal("same-spelled local named types unified lexical artifacts")
+	if references[0].Name() != references[1].Name() {
+		t.Fatal("disjoint lexical scopes received needless global name noise")
+	}
+	if len(registry.anonymousStructs) != 2 {
+		t.Fatalf("exact lexical artifacts = %d, want 2", len(registry.anonymousStructs))
 	}
 	for _, binding := range registry.anonymousStructs {
 		if binding.owner.Placement() !=
@@ -250,6 +263,11 @@ func Use() {
 		t.Fatal("named-component identity fixture is incomplete")
 	}
 	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers(
+		[]*types.Package{sourcePackage},
+	); err != nil {
+		t.Fatal(err)
+	}
 	owner := NewOwner(sourcePackage.Scope(), info, registry)
 	if _, err := owner.Reserve(
 		packageType,

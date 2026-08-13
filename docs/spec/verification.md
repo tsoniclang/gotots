@@ -1093,13 +1093,21 @@ package.
 Generated-support topology proof exact-joins full internal artifact owners and
 definitions to readable modules grouped by real semantic family and
 source/type owner. Layout tests prove that every shared closed support family
-retains one common module, every contained definition retains its exact
-injective semantic export name, different semantic owners do not merge, and
+retains one common module, every contained definition retains an injective
+semantic export whose named components use the globally unique package
+qualifier, different semantic owners do not merge, and
 source-owned generic modules retain their exact semantic source owner. At an
 import site the shortest family alias is used only when free; real collisions
 use the full semantic export or the shortest deterministic source-derived
 qualifier. Malformed semantic modules fail. Digests may occur in manifests and
 diagnostics but never in ordinary declaration names or module paths.
+Generated-size evidence also fails if full import paths are repeated inside
+ordinary generated identifiers; a mutation replacing the package qualifier
+with the complete path must exceed the owning source-size/line bound.
+Naming-owner tests include same-named packages, same-spelled local types in
+disjoint lexical scopes, and truly shadowing local types. Mutations that use a semantic contract's private key
+as target spelling, move display suffixes into semantic APIs, or bypass the
+registry qualifier/token owner fail before generated output is sealed.
 
 Product evidence reports support definitions separately from physical support
 modules, the largest semantic module, ESM startup time/RSS, and minimal-compile

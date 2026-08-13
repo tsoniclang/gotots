@@ -467,10 +467,12 @@ func (s *programSession) internGenericOperation(
 		}
 		return existing, nil
 	}
-	targetName, err := semanticname.OperationName(
+	targetName, err := semanticname.OperationNameWithIdentityTokens(
 		selection.Operation().Identifier(),
 		genericOperationMethod(selection),
 		signature,
+		s.semanticNamedTypeToken,
+		s.semanticPackageToken,
 	)
 	if err != nil {
 		return nil, err

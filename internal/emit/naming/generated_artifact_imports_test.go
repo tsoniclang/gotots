@@ -1,6 +1,8 @@
 package naming
 
 import (
+	"go/ast"
+	"go/token"
 	"go/types"
 	"strings"
 	"testing"
@@ -8,6 +10,100 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/output"
 )
+
+func TestGeneratedArtifactNamesUseTheUniqueReadablePackageQualifier(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	object := types.NewTypeName(token.NoPos, sourcePackage, "Item", nil)
+	if existing := sourcePackage.Scope().Insert(object); existing != nil {
+		t.Fatal("type name was already present")
+	}
+	item := types.NewNamed(object, types.NewStruct(nil, nil), nil)
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers([]*types.Package{sourcePackage}); err != nil {
+		t.Fatal(err)
+	}
+	file := &File{owner: &Owner{registry: registry}}
+
+	name, err := file.semanticGeneratedTypeName(
+		"$goReflectType$",
+		types.NewSlice(item),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "$goReflectType$SliceOf_Named_model$Item" {
+		t.Fatalf("generated name = %q", name)
+	}
+	if strings.Contains(name, "example") {
+		t.Fatalf("generated name repeated the full import path: %q", name)
+	}
+}
+
+func TestPrivateMethodNamesUseTheUniqueReadablePackageQualifier(t *testing.T) {
+	firstPackage := types.NewPackage("example.com/first/model", "model")
+	secondPackage := types.NewPackage("example.com/second/model", "model")
+	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers(
+		[]*types.Package{firstPackage, secondPackage},
+	); err != nil {
+		t.Fatal(err)
+	}
+	file := &File{owner: &Owner{registry: registry}}
+	signature := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	first, err := file.InterfaceMethodName(types.NewFunc(
+		token.NoPos,
+		firstPackage,
+		"visit",
+		signature,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := file.InterfaceMethodName(types.NewFunc(
+		token.NoPos,
+		secondPackage,
+		"visit",
+		signature,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != "$go$private$model$visit" ||
+		second != "$go$private$model__package_1$visit" {
+		t.Fatalf("private method names = %q / %q", first, second)
+	}
+	if strings.Contains(first+second, "example") {
+		t.Fatalf("private method names repeat full paths: %q / %q", first, second)
+	}
+}
+
+func TestGeneratedArtifactLocalTokensRespectVisibleShadowing(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	outerScope := types.NewScope(sourcePackage.Scope(), 1, 20, "outer")
+	innerScope := types.NewScope(outerScope, 2, 10, "inner")
+	outer := types.NewTypeName(3, sourcePackage, "Local", nil)
+	inner := types.NewTypeName(4, sourcePackage, "Local", nil)
+	outerScope.Insert(outer)
+	innerScope.Insert(inner)
+	owner := NewOwner(sourcePackage.Scope(), &types.Info{
+		Defs: map[*ast.Ident]types.Object{
+			{Name: "outer"}: outer,
+			{Name: "inner"}: inner,
+		},
+	}, NewRegistry())
+	file := &File{owner: owner}
+	outerName, err := file.generatedNamedObjectToken(outer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	innerName, err := file.generatedNamedObjectToken(inner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outerName == innerName || !strings.Contains(innerName, "__shadow_") {
+		t.Fatalf("visible local tokens = %q / %q", outerName, innerName)
+	}
+}
 
 func TestGeneratedArtifactImportsUseShortestCollisionFreeFamilyName(t *testing.T) {
 	firstName := "$goMap$MapOf_int32_To_string"

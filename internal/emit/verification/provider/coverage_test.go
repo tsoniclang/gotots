@@ -352,7 +352,7 @@ func assertProviderGrowCapabilityABI(
 	emission emit.ProgramEmission,
 ) {
 	t.Helper()
-	const concreteName = "Grow$SliceOf_Named_example_u2e_com_u2f_providercoverage_Cell$Named_example_u2e_com_u2f_providercoverage_Cell"
+	const concreteName = "Grow$SliceOf_Named_providercoverage$Cell$Named_providercoverage$Cell"
 	var sourceCallFound bool
 	var kernelCallFound bool
 	for _, file := range emission.Files() {

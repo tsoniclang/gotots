@@ -308,6 +308,7 @@ func (c Context) IsGotoLocal(variable *types.Var) bool {
 type GenericConcretizationReference struct {
 	concretization *GenericConcretization
 	name           string
+	suffix         string
 	requests       []RootRequest
 }
 
@@ -401,9 +402,10 @@ func (r DeferredGenericCallableReference) CallArguments(
 func NewGenericConcretizationReference(
 	concretization *GenericConcretization,
 	name string,
+	suffix string,
 	requests ...RootRequest,
 ) (GenericConcretizationReference, error) {
-	if !concretization.Valid() || name == "" {
+	if !concretization.Valid() || name == "" || suffix == "" {
 		return GenericConcretizationReference{}, &NameError{
 			Reason: "generic concretization reference is invalid",
 		}
@@ -414,6 +416,7 @@ func NewGenericConcretizationReference(
 	return GenericConcretizationReference{
 		concretization: concretization,
 		name:           name,
+		suffix:         suffix,
 		requests:       slices.Clone(requests),
 	}, nil
 }
@@ -424,6 +427,10 @@ func (r GenericConcretizationReference) Concretization() *GenericConcretization 
 
 func (r GenericConcretizationReference) Name() string {
 	return r.name
+}
+
+func (r GenericConcretizationReference) Suffix() string {
+	return r.suffix
 }
 
 func (r GenericConcretizationReference) Requests() []RootRequest {
