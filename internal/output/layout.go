@@ -2,13 +2,13 @@ package output
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/load"
+	"golang.org/x/mod/module"
 )
 
 const (
@@ -158,9 +158,13 @@ func SourcePath(sourcePackage *load.Package, sourceFile load.File) (string, erro
 	if err != nil {
 		return "", err
 	}
+	moduleOwner, err := semanticModuleKey(sourcePackage)
+	if err != nil {
+		return "", err
+	}
 	return path.Join(
 		"modules",
-		semanticModuleKey(sourcePackage),
+		moduleOwner,
 		packagePath,
 		baseName+".ts",
 	), nil
@@ -282,15 +286,19 @@ func packageArtifactPath(
 	if err != nil {
 		return "", err
 	}
+	moduleOwner, err := semanticModuleKey(sourcePackage)
+	if err != nil {
+		return "", err
+	}
 	return path.Join(
 		"packages",
-		semanticModuleKey(sourcePackage),
+		moduleOwner,
 		packagePath,
 		fileName,
 	), nil
 }
 
-func semanticModuleKey(sourcePackage *load.Package) string {
+func semanticModuleKey(sourcePackage *load.Package) (string, error) {
 	return moduleKey(sourcePackage.ModulePath(), sourcePackage.ModuleVersion())
 }
 
@@ -344,12 +352,26 @@ func RuntimeModuleSpecifier(runtimeSourcePath string) (string, error) {
 }
 
 func moduleRelativePackage(sourcePackage *load.Package) (string, error) {
-	if sourcePackage.Path() == sourcePackage.ModulePath() {
+	escapedPackage, err := module.EscapePath(sourcePackage.Path())
+	if err != nil {
+		return "", &PathError{
+			Source: sourcePackage.Path(),
+			Reason: "package path is not a valid semantic path",
+		}
+	}
+	escapedModule, err := module.EscapePath(sourcePackage.ModulePath())
+	if err != nil {
+		return "", &PathError{
+			Source: sourcePackage.ModulePath(),
+			Reason: "module path is not a valid semantic path",
+		}
+	}
+	if escapedPackage == escapedModule {
 		return "_root", nil
 	}
 	relative, ok := strings.CutPrefix(
-		sourcePackage.Path(),
-		sourcePackage.ModulePath()+"/",
+		escapedPackage,
+		escapedModule+"/",
 	)
 	if !ok || relative == "" || path.Clean(relative) != relative ||
 		strings.HasPrefix(relative, "../") {
@@ -361,9 +383,25 @@ func moduleRelativePackage(sourcePackage *load.Package) (string, error) {
 	return relative, nil
 }
 
-func moduleKey(modulePath string, moduleVersion string) string {
-	digest := sha256.Sum256([]byte(modulePath + "\x00" + moduleVersion))
-	return hex.EncodeToString(digest[:])
+func moduleKey(modulePath string, moduleVersion string) (string, error) {
+	escapedPath, err := module.EscapePath(modulePath)
+	if err != nil {
+		return "", &PathError{
+			Source: modulePath,
+			Reason: "module path is not a valid semantic path",
+		}
+	}
+	if moduleVersion == "" {
+		return escapedPath, nil
+	}
+	escapedVersion, err := module.EscapeVersion(moduleVersion)
+	if err != nil {
+		return "", &PathError{
+			Source: moduleVersion,
+			Reason: "module version is not canonical",
+		}
+	}
+	return escapedPath + "@" + escapedVersion, nil
 }
 
 func validateSourcePath(sourcePath string) error {

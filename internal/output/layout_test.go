@@ -29,25 +29,25 @@ func TestLayoutOwnsCheckoutIndependentModulePackageAndImportPaths(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	const moduleKey = "9dca3bbab95799300693177714a7b8334cb6334dc73709afd3f788dfcab93b6b"
-	if apiPath != "modules/"+moduleKey+"/api/api.ts" {
+	const modulePath = "example.com/demand"
+	if apiPath != "modules/"+modulePath+"/api/api.ts" {
 		t.Fatalf("api path = %q", apiPath)
 	}
-	if servicePath != "modules/"+moduleKey+"/service/service.ts" {
+	if servicePath != "modules/"+modulePath+"/service/service.ts" {
 		t.Fatalf("service path = %q", servicePath)
 	}
 	assemblyPath, err := PackageAssemblyPath(apiPackage)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if assemblyPath != "packages/"+moduleKey+"/api/package.ts" {
+	if assemblyPath != "packages/"+modulePath+"/api/package.ts" {
 		t.Fatalf("assembly path = %q", assemblyPath)
 	}
 	statePath, err := PackageStatePath(apiPackage)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if statePath != "packages/"+moduleKey+"/api/state.ts" {
+	if statePath != "packages/"+modulePath+"/api/state.ts" {
 		t.Fatalf("state path = %q", statePath)
 	}
 	specifer, err := ModuleSpecifier(apiPath, servicePath)
@@ -208,9 +208,31 @@ func TestLayoutIsStableAcrossCheckoutRelocationAndSeparatesModuleVersions(t *tes
 	if relocatedPath != originalPath {
 		t.Fatalf("relocated path = %q, want %q", relocatedPath, originalPath)
 	}
-	if moduleKey("example.com/dependency", "v1.0.0") ==
-		moduleKey("example.com/dependency", "v1.0.1") {
+	firstVersion, err := moduleKey("example.com/dependency", "v1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondVersion, err := moduleKey("example.com/dependency", "v1.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstVersion != "example.com/dependency@v1.0.0" ||
+		secondVersion != "example.com/dependency@v1.0.1" ||
+		firstVersion == secondVersion {
 		t.Fatal("distinct semantic module versions share one output owner")
+	}
+}
+
+func TestModuleOwnerPathIsReadableAndCaseSafe(t *testing.T) {
+	key, err := moduleKey("example.com/Owner/Library", "v1.2.3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if key != "example.com/!owner/!library@v1.2.3" {
+		t.Fatalf("semantic module owner = %q", key)
+	}
+	if strings.ContainsAny(key, "0123456789abcdef") && len(key) == 64 {
+		t.Fatalf("semantic module owner is an opaque digest: %q", key)
 	}
 }
 
