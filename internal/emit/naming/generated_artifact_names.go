@@ -353,8 +353,14 @@ func (n *File) semanticGeneratedMethodName(
 	if err != nil {
 		return "", err
 	}
-	identity := semanticname.Identifier(
-		types.Id(method.Origin().Pkg(), method.Origin().Name()),
-	)
+	method = method.Origin()
+	identity := semanticname.Identifier(method.Name())
+	if !method.Exported() && method.Pkg() != nil {
+		qualifier, qualifierErr := n.generatedPackageToken(method.Pkg())
+		if qualifierErr != nil {
+			return "", qualifierErr
+		}
+		identity = qualifier + "$" + identity
+	}
 	return prefix + identity + "$" + contract, nil
 }

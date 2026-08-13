@@ -1107,7 +1107,8 @@ with the complete path must exceed the owning source-size/line bound.
 Naming-owner tests include same-named packages, same-spelled local types in
 disjoint lexical scopes, and truly shadowing local types. Mutations that use a semantic contract's private key
 as target spelling, move display suffixes into semantic APIs, or bypass the
-registry qualifier/token owner fail before generated output is sealed.
+registry qualifier/token owner—including the unexported interface-method token
+path—fail before generated output is sealed.
 
 Product evidence reports support definitions separately from physical support
 modules, the largest semantic module, ESM startup time/RSS, and minimal-compile

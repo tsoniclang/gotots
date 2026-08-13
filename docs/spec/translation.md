@@ -795,6 +795,8 @@ when the other binding is visible) and remain distinct through their exact
 private Go-identity keys and lexical placement. Disjoint scopes may reuse the
 same readable name.
 Semantic contracts never carry a pre-rendered TypeScript suffix.
+Unexported interface-method member names and token constants use that same
+readable package qualifier; they do not independently encode `types.Id` paths.
 
 The same rule covers representation-disjoint builtin forms. For
 `B ~[]byte | ~string`, `append(dst, src...)` requests exactly one internal

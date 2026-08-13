@@ -75,6 +75,26 @@ func TestPrivateMethodNamesUseTheUniqueReadablePackageQualifier(t *testing.T) {
 	if strings.Contains(first+second, "example") {
 		t.Fatalf("private method names repeat full paths: %q / %q", first, second)
 	}
+	firstToken, err := file.semanticGeneratedMethodName(
+		"$goInterfaceMethod$",
+		types.NewFunc(token.NoPos, firstPackage, "visit", signature),
+		signature,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondToken, err := file.semanticGeneratedMethodName(
+		"$goInterfaceMethod$",
+		types.NewFunc(token.NoPos, secondPackage, "visit", signature),
+		signature,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstToken != "$goInterfaceMethod$model$visit$void_to_void" ||
+		secondToken != "$goInterfaceMethod$model__package_1$visit$void_to_void" {
+		t.Fatalf("private method tokens = %q / %q", firstToken, secondToken)
+	}
 }
 
 func TestGeneratedArtifactLocalTokensRespectVisibleShadowing(t *testing.T) {
