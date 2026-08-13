@@ -9,6 +9,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/output"
 )
 
 func TestAggregateMapUseGrowthKeepsOneStaticShapeOwner(t *testing.T) {
@@ -45,7 +46,7 @@ func TestAggregateMapUseGrowthKeepsOneStaticShapeOwner(t *testing.T) {
 		artifacts := materialize(t, emission, t.TempDir())
 		generated := ""
 		for _, file := range emission.Files() {
-			if !strings.HasPrefix(file.OutputPath(), "support/maps/") {
+			if file.OutputPath() != output.MapSpecializationSupportPath {
 				continue
 			}
 			if generated != "" {
@@ -54,7 +55,7 @@ func TestAggregateMapUseGrowthKeepsOneStaticShapeOwner(t *testing.T) {
 			generated = readFile(t, artifacts.file(t, file.OutputPath()))
 		}
 		if generated == "" ||
-			strings.Count(generated, "export class $goMap_") != 1 {
+			strings.Count(generated, "export class $goMap$") != 1 {
 			t.Fatalf("%d uses emitted no exact static map owner", count)
 		}
 		if canonicalOwner == "" {

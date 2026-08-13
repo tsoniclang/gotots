@@ -26,6 +26,8 @@ const (
 
 type IteratorRangeControl = controlcontract.IteratorRangeControl
 
+type DeferControl = controlcontract.DeferControl
+
 func NewIteratorRangeControl(
 	source *ast.RangeStmt,
 	stateName string,
@@ -42,6 +44,28 @@ func NewIteratorRangeControl(
 		return IteratorRangeControl{}, &InvariantError{
 			Role:   RoleRangeBody,
 			Reason: controlError.Reason,
+		}
+	}
+	return control, err
+}
+
+func NewDeferControl(stack string) (DeferControl, error) {
+	control, err := controlcontract.NewDeferControl(stack)
+	if controlError, ok := err.(*controlcontract.DeferError); ok {
+		return DeferControl{}, &InvariantError{
+			Role: RoleBlockStatement, Reason: controlError.Reason,
+		}
+	}
+	return control, err
+}
+
+func NewStaticDeferControl(
+	bindings map[*ast.DeferStmt]string,
+) (DeferControl, error) {
+	control, err := controlcontract.NewStaticDeferControl(bindings)
+	if controlError, ok := err.(*controlcontract.DeferError); ok {
+		return DeferControl{}, &InvariantError{
+			Role: RoleBlockStatement, Reason: controlError.Reason,
 		}
 	}
 	return control, err

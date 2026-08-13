@@ -57,7 +57,7 @@ func TestReflectTypeForUsesCanonicalGeneratedMetadata(t *testing.T) {
 	if strings.Contains(artifacts.printed, ".TypeFor<") {
 		t.Fatalf("TypeFor retained an erased TypeScript generic call:\n%s", artifacts.printed)
 	}
-	if !strings.Contains(artifacts.printed, "$goReflectType_") {
+	if !strings.Contains(artifacts.printed, "$goReflectType$") {
 		t.Fatalf("TypeFor emitted no canonical runtime-type reference:\n%s", artifacts.printed)
 	}
 	for _, redundant := range []string{
@@ -115,9 +115,24 @@ func TestReflectTypeOfUsesRegisteredCanonicalDynamicType(t *testing.T) {
 	if strings.Contains(artifacts.printed, ".TypeOf(") {
 		t.Fatalf("TypeOf retained a provider placeholder call:\n%s", artifacts.printed)
 	}
+	rootSourcePath := ""
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFileSource &&
+			strings.HasSuffix(file.OutputPath(), "/_root/source.ts") {
+			rootSourcePath = file.OutputPath()
+			break
+		}
+	}
+	reflectionImport, err := output.ModuleSpecifier(
+		rootSourcePath,
+		output.ReflectionTypeSupportPath,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(
 		artifacts.printed,
-		`import "../../../support/reflection-types.js";`,
+		`import "`+reflectionImport+`";`,
 	) {
 		t.Fatalf("TypeOf emitted no static metadata initialization import:\n%s", artifacts.printed)
 	}

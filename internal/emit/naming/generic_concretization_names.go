@@ -24,6 +24,23 @@ type genericGeneratedNameScope struct {
 	name         string
 }
 
+func generatedArtifactNameScope(
+	name string,
+	placement generatedArtifactPlacement,
+	module string,
+) genericGeneratedNameScope {
+	scope := genericGeneratedNameScope{
+		placement:    placement.kind,
+		lexicalOwner: placement.lexicalOwner,
+		anchor:       placement.anchor,
+		name:         name,
+	}
+	if placement.kind == api.GeneratedArtifactPlacementCompilation {
+		scope.module = module
+	}
+	return scope
+}
+
 func reserveGenericGeneratedName(
 	names map[genericGeneratedNameScope]string,
 	scope genericGeneratedNameScope,
@@ -310,8 +327,13 @@ func (n *File) GenericConcretization(
 			Reason: "generic concretization reference is invalid",
 		}
 	}
+	suffix, err := n.genericConcretizationSuffix(concretization)
+	if err != nil {
+		return api.GenericConcretizationReference{}, err
+	}
 	binding, err := n.owner.registry.internGenericConcretization(
 		concretization,
+		suffix,
 	)
 	if err != nil {
 		return api.GenericConcretizationReference{}, err
@@ -339,6 +361,7 @@ func (n *File) GenericConcretization(
 	return api.NewGenericConcretizationReference(
 		canonical,
 		reference.Name(),
+		binding.suffix,
 		reference.Requests()...,
 	)
 }
@@ -351,8 +374,13 @@ func (n *File) DeferredGenericConcretization(
 			Reason: "deferred generic concretization reference is invalid",
 		}
 	}
+	suffix, err := n.genericConcretizationSuffix(concretization)
+	if err != nil {
+		return api.NameReference{}, err
+	}
 	binding, err := n.owner.registry.internGenericConcretization(
 		concretization,
+		suffix,
 	)
 	if err != nil {
 		return api.NameReference{}, err
@@ -373,8 +401,9 @@ func (n *File) DeferredGenericConcretization(
 
 func (r *Registry) internGenericConcretization(
 	concretization *api.GenericConcretization,
+	suffix string,
 ) (genericConcretizationBinding, error) {
-	if r == nil || !concretization.Valid() {
+	if r == nil || !concretization.Valid() || suffix == "" {
 		return genericConcretizationBinding{}, &api.NameError{
 			Reason: "generic concretization canonicalization input is invalid",
 		}
@@ -382,7 +411,8 @@ func (r *Registry) internGenericConcretization(
 	artifactKey := concretization.Key()
 	if existing, ok := r.genericConcretizations[artifactKey]; ok {
 		selected, valid := existing.owner.GenericConcretization()
-		if !valid || !selected.Identical(concretization) {
+		if !valid || !selected.Identical(concretization) ||
+			existing.suffix != suffix {
 			return genericConcretizationBinding{}, &api.NameError{
 				Name:   existing.name,
 				Reason: "generic concretization key joined non-identical artifacts",
@@ -392,7 +422,7 @@ func (r *Registry) internGenericConcretization(
 	}
 	name, err := semanticname.ConcretizationName(
 		concretization.Owner(),
-		concretization.Suffix(),
+		suffix,
 	)
 	if err != nil {
 		return genericConcretizationBinding{}, err
@@ -458,7 +488,27 @@ func (r *Registry) internGenericConcretization(
 	if err != nil {
 		return genericConcretizationBinding{}, err
 	}
-	binding := genericConcretizationBinding{owner: owner, name: name}
+	binding := genericConcretizationBinding{
+		owner:  owner,
+		name:   name,
+		suffix: suffix,
+	}
 	r.genericConcretizations[artifactKey] = binding
 	return binding, nil
+}
+
+func (n *File) genericConcretizationSuffix(
+	concretization *api.GenericConcretization,
+) (string, error) {
+	if n == nil || !concretization.Valid() {
+		return "", &api.NameError{
+			Reason: "generic concretization suffix owner is invalid",
+		}
+	}
+	return semanticname.ConcretizationSuffixWithIdentityTokens(
+		concretization.Arguments(),
+		concretization.Effect().Synchronous(),
+		n.generatedNamedObjectToken,
+		n.generatedPackageToken,
+	)
 }

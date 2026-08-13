@@ -16,6 +16,19 @@ func emitDeferredBody(
 	signature *types.Signature,
 	namedResults bool,
 ) (api.BlockEmission, error) {
+	if defers, ok := staticDeferStatements(
+		source,
+		context.CallableControl(),
+	); ok {
+		return emitStaticDeferredBody(
+			context,
+			children,
+			source,
+			signature,
+			namedResults,
+			defers,
+		)
+	}
 	stackName, err := context.Names().Temporary(api.TemporaryDeferStack)
 	if err != nil {
 		return api.BlockEmission{}, err

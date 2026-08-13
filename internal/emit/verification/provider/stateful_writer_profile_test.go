@@ -148,7 +148,7 @@ console.log(await NilConstructed());
 	for _, required := range []string{
 		"CanonicalBufioWriter",
 		"bindPointer<",
-		"await $goProviderState",
+		"await GoProviderState",
 		"WriteByte",
 		".Flush(",
 	} {

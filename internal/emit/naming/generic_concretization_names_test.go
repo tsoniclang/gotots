@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/generic/semanticname"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -50,21 +49,21 @@ func TestGenericConcretizationInterningUsesSemanticIdentity(t *testing.T) {
 	}
 
 	registry := NewRegistry()
-	canonical, err := registry.internGenericConcretization(first)
+	canonical, err := registry.internGenericConcretization(first, "$int")
 	if err != nil {
 		t.Fatal(err)
 	}
-	rejoined, err := registry.internGenericConcretization(equivalent)
+	rejoined, err := registry.internGenericConcretization(equivalent, "$int")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if rejoined.owner != canonical.owner {
 		t.Fatal("equivalent concretization created a sibling canonical artifact")
 	}
-	if _, err := registry.internGenericConcretization(conflicting); err == nil {
+	if _, err := registry.internGenericConcretization(conflicting, "$string"); err == nil {
 		t.Fatal("same-key concretizations with different arguments were joined")
 	}
-	if _, err := registry.internGenericConcretization(synchronous); err == nil {
+	if _, err := registry.internGenericConcretization(synchronous, "$int$synchronous"); err == nil {
 		t.Fatal("same-key concretizations with different effects were joined")
 	}
 }
@@ -131,11 +130,11 @@ func TestConcreteInstancesShareTheirSemanticOwnerModule(t *testing.T) {
 		api.GenericConcretizationEffectCanonical,
 	)
 	registry := NewRegistry()
-	integerBinding, err := registry.internGenericConcretization(integer)
+	integerBinding, err := registry.internGenericConcretization(integer, "$int")
 	if err != nil {
 		t.Fatal(err)
 	}
-	textBinding, err := registry.internGenericConcretization(text)
+	textBinding, err := registry.internGenericConcretization(text, "$string")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,20 +254,12 @@ func newGenericConcretizationForTest(
 	if err != nil {
 		t.Fatal(err)
 	}
-	suffix, err := semanticname.ConcretizationSuffix(
-		[]types.Type{argument},
-		effect.Synchronous(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	concretization, err := api.NewGenericConcretization(
 		owner,
 		[]types.Type{argument},
 		instantiated.(*types.Signature),
 		effect,
 		key,
-		suffix,
 		api.GeneratedArtifactPlacementCompilation,
 		api.ArtifactOwner{},
 		nil,

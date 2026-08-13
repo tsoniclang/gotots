@@ -209,7 +209,7 @@ func TestWaveTenBodylessFunctionIsExactExternalObligation(t *testing.T) {
 		"export function Read",
 		"buffer: RuntimeSlice<uint8>",
 		"int,",
-		"$goInterface_",
+		"GoInterface | undefined",
 		"GoPanic.raiseRuntime(\"unresolved external Go function ",
 	} {
 		if !strings.Contains(artifacts.printed, required) {

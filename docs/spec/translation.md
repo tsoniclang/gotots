@@ -508,8 +508,17 @@ The constructor's parameters are the complete declaration field set and create
 the fields directly without an argument-object allocation. Under the
 preserve-Go profile, the call captures only the expressions needed to retain
 source evaluation order before placing arguments in declaration order. The
-direct profile omits those captures by explicit project choice. Static
-`$zero`, `$copy`, `$equal`, `$hash`, `$convert`, `$storageOf`, `$fromStorage`,
+direct profile omits those captures by explicit project choice. If a later
+semantic demand selects canonical storage, every subscribed construction is
+rebuilt to the stable public storage factory instead:
+
+```ts
+return Point.$fromStorage({ X: field1, Y: field0 });
+```
+
+An empty storage-backed value uses `Empty.$fromStorage({})`; neither source
+construction nor a package consumer calls a storage constructor directly.
+Static `$zero`, `$copy`, `$equal`, `$hash`, `$convert`, `$storageOf`, `$fromStorage`,
 and `$assign` members exist only when their exact semantic use requests them. A
 certified provider may expose a positional `$make` operation; ordinary
 generated structs never gain that compatibility factory.
@@ -760,6 +769,35 @@ the synchronous callback profile are explicit suffix components, and imports
 are collision-checked against every visible authored, imported, and generated
 binding before the TS-Go AST is sealed.
 
+Compilation-generated types in one closed support family share that family's
+bounded semantic module. Each definition keeps an injective semantic export
+name whose named components use the package registry's unique readable
+qualifier. For example, the specialization for
+`map[chan int32]map[int32]<-chan int32` is emitted in:
+
+```text
+support/maps.ts
+```
+
+It exports
+`$goMap$MapOf_ChannelOf_int32_To_MapOf_int32_To_ReceiveChannelOf_int32`.
+A caller imports that exact export as the short local family name `GoMap` when
+free. If `GoMap` is already visible, the caller first uses the full semantic
+export name locally; only a real second collision adds the shortest exact
+source-derived qualifier. A lexical anonymous struct likewise keeps its
+complete `$goStruct$...` name. Artifact digests remain in manifests and
+internal ownership only. A named component such as
+`github.com/microsoft/typescript-go/internal/ast.SourceFile` appears as
+`ast$SourceFile`; its full import path is not copied into every generated
+identifier. Same-spelled local types receive the visibility-aware source name
+already allocated for their lexical scope (`Local`, or `Local__shadow_...`
+when the other binding is visible) and remain distinct through their exact
+private Go-identity keys and lexical placement. Disjoint scopes may reuse the
+same readable name.
+Semantic contracts never carry a pre-rendered TypeScript suffix.
+Unexported interface-method member names and token constants use that same
+readable package qualifier; they do not independently encode `types.Id` paths.
+
 The same rule covers representation-disjoint builtin forms. For
 `B ~[]byte | ~string`, `append(dst, src...)` requests exactly one internal
 append-spread callable; concrete facades bind either the canonical slice
@@ -875,6 +913,21 @@ func F() (result int) {
 The return stores `1`, deferred arguments/callee were captured when the defer
 statement ran, the deferred literal runs LIFO, and the final result read
 returns `2`.
+
+Because this defer site can execute at most once per invocation, its target
+uses one fixed optional callable slot and invokes it from `finally`. By
+contrast, a defer inside `for` or a conditional/goto-controlled region uses the
+dynamic LIFO stack because the number and order of captured calls are runtime
+facts. Both shapes preserve immediate capture and direct-recover authority;
+the compiler never chooses the fixed form from source spelling alone.
+
+Each defer-statement handler contributes its exact source-node identity to the
+enclosing callable's root demand during the normal contextual emission walk.
+The callable uses fixed slots only when that demand set equals the defer
+statements directly present in its body list and goto control is absent.
+Nested, conditional, repeated, missing, additional, or conservatively
+unlocated sites therefore retain the dynamic stack without a recursive AST
+scan.
 
 A callable's ordinary target signature never contains recovery state. If its
 body uses `recover`, its private deferred entry receives the authority:

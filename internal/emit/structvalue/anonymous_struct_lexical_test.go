@@ -226,8 +226,8 @@ func assertImmediateLexicalDefinitionPair(t *testing.T, block tsgo.Block) {
 	anonymous, anonymousOK := statements[1].(tsgo.ClassDeclaration)
 	if !localOK ||
 		!anonymousOK ||
-		strings.HasPrefix(local.Name().Text(), "$goStruct_") ||
-		!strings.HasPrefix(anonymous.Name().Text(), "$goStruct_") {
+		strings.HasPrefix(local.Name().Text(), "$goStruct$") ||
+		!strings.HasPrefix(anonymous.Name().Text(), "$goStruct$") {
 		t.Fatalf(
 			"lexical definition pair = %T/%T",
 			statements[0],
@@ -261,7 +261,7 @@ func assertGroupedLexicalAnchor(t *testing.T, source tsgo.SourceFile) {
 	}
 	if !strings.HasPrefix(names[0], "Before") ||
 		!strings.HasPrefix(names[1], "Local") ||
-		!strings.HasPrefix(names[2], "$goStruct_") ||
+		!strings.HasPrefix(names[2], "$goStruct$") ||
 		!strings.HasPrefix(names[3], "After") {
 		t.Fatalf("grouped lexical order = %q", names)
 	}

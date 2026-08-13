@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
@@ -46,6 +47,7 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 	first, err := registry.internProviderProfileInterfaceBridge(
 		"go:universe|error",
 		errorType,
+		"$goProviderProfileBridge$Named_error",
 		callable[0].Interfaces(),
 	)
 	if err != nil {
@@ -54,6 +56,7 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 	second, err := registry.internProviderProfileInterfaceBridge(
 		"go:universe|error",
 		errorType,
+		"$goProviderProfileBridge$Named_error",
 		stateful[0].Interfaces(),
 	)
 	if err != nil {
@@ -118,5 +121,212 @@ func TestProviderProfileBridgeIdentityIncludesReachableInterfaceABI(
 	}
 	if !slices.Equal(identities, want) {
 		t.Fatalf("io.Reader profile closure = %q, want %q", identities, want)
+	}
+}
+
+func TestProviderProfileBridgeIdentityIgnoresEquivalentProviderReexports(
+	t *testing.T,
+) {
+	payload, err := os.ReadFile(filepath.Join(
+		"..", "..", "..", "gostdlib", "contract", "manifest.json",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := gostdlib.Parse(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contextProfiles := manifest.ProviderCallableProfiles(
+		"context|kind=4|receiver=|name=WithCancel",
+	)
+	signalProfiles := manifest.ProviderCallableProfiles(
+		"os/signal|kind=4|receiver=|name=NotifyContext",
+	)
+	if len(contextProfiles) != 1 || len(signalProfiles) != 1 {
+		t.Fatalf(
+			"profiles = context %d, os/signal %d",
+			len(contextProfiles),
+			len(signalProfiles),
+		)
+	}
+	contextPackage, err := importer.Default().Import("context")
+	if err != nil {
+		t.Fatal(err)
+	}
+	contextName, ok := contextPackage.Scope().Lookup("Context").(*types.TypeName)
+	if !ok {
+		t.Fatal("context.Context type is absent")
+	}
+	contextType, ok := types.Unalias(contextName.Type()).(*types.Named)
+	if !ok {
+		t.Fatal("context.Context type is not named")
+	}
+
+	registry := NewRegistry()
+	first, err := registry.internProviderProfileInterfaceBridge(
+		"std::context|Context",
+		contextType,
+		"$goProviderProfileBridge$Named_context_Context",
+		contextProfiles[0].Interfaces(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := registry.internProviderProfileInterfaceBridge(
+		"std::context|Context",
+		contextType,
+		"$goProviderProfileBridge$Named_context_Context",
+		signalProfiles[0].Interfaces(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.owner != second.owner || first.name != second.name || first.key != second.key {
+		t.Fatalf(
+			"equivalent context reexports created distinct bridges: %q/%q and %q/%q",
+			first.key,
+			first.name,
+			second.key,
+			second.name,
+		)
+	}
+	const want = "$goProviderProfileBridge$Named_context_Context$Using$" +
+		"context_Context$Awaitable$And$Error$Awaitable"
+	if first.name != want {
+		t.Fatalf("context bridge name = %q, want %q", first.name, want)
+	}
+}
+
+func TestProviderProfileBridgeIdentityDistinguishesMethodEffects(t *testing.T) {
+	payload, err := os.ReadFile(filepath.Join(
+		"..", "..", "..", "gostdlib", "contract", "manifest.json",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := gostdlib.Parse(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	awaitableProfiles := manifest.ProviderCallableProfiles(
+		"bufio|kind=4|receiver=|name=NewReader",
+	)
+	synchronousProfiles := manifest.ProviderCallableProfiles(
+		"errors|kind=4|receiver=|name=Unwrap",
+	)
+	if len(awaitableProfiles) != 1 || len(synchronousProfiles) != 2 {
+		t.Fatalf(
+			"profiles = awaitable %d, errors %d",
+			len(awaitableProfiles),
+			len(synchronousProfiles),
+		)
+	}
+	var synchronous gostdlib.ProviderCallableProfile
+	for _, profile := range synchronousProfiles {
+		selected, ok := profile.Interface(gostdlib.LanguageErrorInterfaceIdentity)
+		if !ok {
+			continue
+		}
+		methods := selected.ProviderInterface().Methods()
+		if len(methods) == 1 && methods[0].Effect() == gostdlib.EffectSynchronous {
+			synchronous = profile
+			break
+		}
+	}
+	if !synchronous.Valid() {
+		t.Fatal("synchronous error profile is absent")
+	}
+	errorName, ok := types.Universe.Lookup("error").(*types.TypeName)
+	if !ok {
+		t.Fatal("predeclared error type is absent")
+	}
+	errorType, ok := types.Unalias(errorName.Type()).(*types.Named)
+	if !ok {
+		t.Fatal("predeclared error type is not named")
+	}
+
+	registry := NewRegistry()
+	awaitable, err := registry.internProviderProfileInterfaceBridge(
+		"go:universe|error",
+		errorType,
+		"$goProviderProfileBridge$Named_error",
+		awaitableProfiles[0].Interfaces(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	direct, err := registry.internProviderProfileInterfaceBridge(
+		"go:universe|error",
+		errorType,
+		"$goProviderProfileBridge$Named_error",
+		synchronous.Interfaces(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if awaitable.owner == direct.owner || awaitable.name == direct.name ||
+		awaitable.key == direct.key {
+		t.Fatalf(
+			"different error effects shared a bridge: %q/%q and %q/%q",
+			awaitable.key,
+			awaitable.name,
+			direct.key,
+			direct.name,
+		)
+	}
+	if !strings.HasSuffix(awaitable.name, "$Error$Awaitable") ||
+		!strings.HasSuffix(direct.name, "$Error$Direct") {
+		t.Fatalf(
+			"effect names are not readable: awaitable=%q direct=%q",
+			awaitable.name,
+			direct.name,
+		)
+	}
+}
+
+func TestProviderProfileBridgeNameIsBoundedBySemanticShape(t *testing.T) {
+	payload, err := os.ReadFile(filepath.Join(
+		"..", "..", "..", "gostdlib", "contract", "manifest.json",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := gostdlib.Parse(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profiles := manifest.ProviderCallableProfiles(
+		"io/fs|kind=4|receiver=|name=ReadDir",
+	)
+	if len(profiles) != 1 {
+		t.Fatalf("io/fs.ReadDir profiles = %d", len(profiles))
+	}
+	fileSystemPackage, err := importer.Default().Import("io/fs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	readDirName, ok := fileSystemPackage.Scope().Lookup("ReadDirFS").(*types.TypeName)
+	if !ok {
+		t.Fatal("io/fs.ReadDirFS type is absent")
+	}
+	readDirType, ok := types.Unalias(readDirName.Type()).(*types.Named)
+	if !ok {
+		t.Fatal("io/fs.ReadDirFS type is not named")
+	}
+
+	registry := NewRegistry()
+	binding, err := registry.internProviderProfileInterfaceBridge(
+		"std::io/fs|ReadDirFS",
+		readDirType,
+		"$goProviderProfileBridge$Named_io_u2f_fs_ReadDirFS",
+		profiles[0].Interfaces(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(binding.name) > 320 || strings.Contains(binding.name, "$Method$") ||
+		strings.Contains(binding.name, "_u7c_kind") {
+		t.Fatalf("provider bridge name is not bounded and readable: %q", binding.name)
 	}
 }

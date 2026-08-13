@@ -41,8 +41,8 @@ func TestClearBuiltinsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		"clear()",
 		"export function clearGeneric$kernel<C>",
 		"$go$clear$",
-		"export function clearGeneric$SliceOf_Named_example_u2e_com_u2f_clearvalues_Box",
-		"export function clearGeneric$MapOf_int32_To_Named_example_u2e_com_u2f_clearvalues_Box",
+		"export function clearGeneric$SliceOf_Named_clearvalues$Box",
+		"export function clearGeneric$MapOf_int32_To_Named_clearvalues$Box",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("clear artifact lacks %q:\n%s", required, printed)

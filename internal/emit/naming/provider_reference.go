@@ -296,9 +296,17 @@ func (n *File) providerCallableProfileCapabilityViews(
 		if err != nil {
 			return nil, err
 		}
+		baseName, err := n.semanticGeneratedTypeName(
+			"$goProviderProfileBridge$",
+			capability.Base(),
+		)
+		if err != nil {
+			return nil, err
+		}
 		binding, err := n.owner.registry.internProviderProfileInterfaceBridge(
 			baseKey,
 			capability.Base(),
+			baseName,
 			profile.Interfaces(),
 		)
 		if err != nil {
@@ -311,9 +319,17 @@ func (n *File) providerCallableProfileCapabilityViews(
 		if err != nil {
 			return nil, err
 		}
+		targetName, err := n.semanticGeneratedTypeName(
+			"$goProviderProfileBridge$",
+			capability.Target(),
+		)
+		if err != nil {
+			return nil, err
+		}
 		targetBinding, err := n.owner.registry.internProviderProfileInterfaceBridge(
 			targetKey,
 			capability.Target(),
+			targetName,
 			profile.Interfaces(),
 		)
 		if err != nil {

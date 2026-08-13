@@ -58,10 +58,15 @@ func (n *File) ReflectionType(
 	if err != nil {
 		return api.NameReference{}, err
 	}
+	name, err := n.semanticGeneratedTypeName("$goReflectType$", sourceType)
+	if err != nil {
+		return api.NameReference{}, err
+	}
 	binding, err := n.owner.registry.internReflectionType(
 		artifactKey,
 		sourceType,
 		reflectionType,
+		name,
 	)
 	if err != nil {
 		return api.NameReference{}, err
@@ -331,9 +336,10 @@ func (r *Registry) internReflectionType(
 	artifactKey string,
 	sourceType types.Type,
 	reflectionType *types.TypeName,
+	name string,
 ) (reflectionTypeBinding, error) {
 	if r == nil || artifactKey == "" || sourceType == nil ||
-		reflectionType == nil {
+		reflectionType == nil || name == "" {
 		return reflectionTypeBinding{}, &api.NameError{
 			Reason: "reflection-type canonicalization input is invalid",
 		}
@@ -348,10 +354,6 @@ func (r *Registry) internReflectionType(
 			}
 		}
 		return existing, nil
-	}
-	name, err := interfaceTargetName("$goReflectType_", artifactKey)
-	if err != nil {
-		return reflectionTypeBinding{}, err
 	}
 	if err := reserveGeneratedName(
 		r.reflectionTypeNames,

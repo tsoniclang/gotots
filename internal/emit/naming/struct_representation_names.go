@@ -4,7 +4,6 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/output"
 	"go/types"
 )
@@ -408,22 +407,7 @@ func (n *File) AnonymousStructStorage(
 	if structType.NumFields() == 0 {
 		return n.Runtime(api.RuntimeEmptyStruct, api.ImportPhaseType)
 	}
-	artifactKey, err := typeidentity.BuildKey(
-		structType,
-		n.generatedNamedObjectIdentity,
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	placement, err := n.generatedArtifactPlacement(structType)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	binding, err := n.owner.registry.internAnonymousStruct(
-		artifactKey,
-		structType,
-		placement,
-	)
+	binding, err := n.anonymousStructBinding(structType)
 	if err != nil {
 		return api.NameReference{}, err
 	}

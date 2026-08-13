@@ -11,6 +11,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/output"
 )
 
 func TestInterfaceAdaptersContainOnlyDemandedContracts(t *testing.T) {
@@ -238,9 +239,9 @@ func interfaceContractDemandAdapter(
 ) string {
 	t.Helper()
 	for _, path := range paths {
-		if !strings.Contains(
+		if !strings.HasSuffix(
 			filepath.ToSlash(path),
-			"/support/interfaces/adapters/",
+			"/"+output.InterfaceAdapterSupportPath,
 		) {
 			continue
 		}
@@ -411,9 +412,9 @@ func TestEmbeddedInterfacePromotionUsesInterfaceDispatch(t *testing.T) {
 func embeddedInterfaceAdapter(t *testing.T, paths []string) string {
 	t.Helper()
 	for _, path := range paths {
-		if !strings.Contains(
+		if !strings.HasSuffix(
 			filepath.ToSlash(path),
-			"/support/interfaces/adapters/",
+			"/"+output.InterfaceAdapterSupportPath,
 		) {
 			continue
 		}

@@ -394,9 +394,12 @@ gate.
 Source-owned named, anonymous, and derived fixtures exact-join each public
 constructor parameter to its canonical declaration field, prove direct calls
 allocate no argument object, and prove preserve-Go calls capture reordered
-effects exactly once before declaration-order arguments. Generic canonical
-storage fixtures retain their one required named storage object. The complete
-named-struct operation enum is mutation-tested one member at a time: demanding
+effects exactly once before declaration-order arguments. Canonical-storage
+fixtures must instead call the class's public `$fromStorage` operation with one
+named storage object; the empty-struct case must pass `{}` and strict-typecheck.
+Generic canonical storage fixtures retain their one required named storage
+object. The complete named-struct operation enum is mutation-tested one member
+at a time: demanding
 one of zero, copy, equality, hash, conversion, storage, or assignment must
 materialize only that operation. Broad searches reject source-owned `$fieldN`
 parameters and `$make` calls; the only admitted `$make` occurrence is attached
@@ -415,10 +418,11 @@ artifact reconstruction must fail at this gate.
 
 A late-demand fixture constructs a struct before taking its address in the
 same Go function. Artifact inspection proves that the final class owns the
-canonical-storage constructor and that the earlier composite was reconstructed
-to pass exactly one typed storage object. Removing the applied-demand resolver,
-the constructor-facet dependency, or reconstruction leaves positional input
-against the storage constructor and must fail strict typechecking.
+canonical-storage surface and that the earlier composite was reconstructed as
+one `$fromStorage` call with exactly one typed storage object. Removing the
+applied-demand resolver, the construction-facet dependency, or reconstruction
+leaves positional input against the storage representation and must fail
+artifact inspection or strict typechecking.
 
 ## Interface Proof
 
@@ -577,6 +581,16 @@ registered private entry. Provider-facet tests prove both certified presence
 and certified absence; absence must not create a public/bridge-wide recovery
 entry or fail an otherwise valid call.
 
+Artifact inspection separately exact-joins fixed and dynamic defer sites. A
+top-level direct site that executes at most once owns one fixed typed slot and
+no dynamic stack; multiple such slots drain in reverse source order. Loop,
+conditional, and non-structural-goto sites retain the dynamic stack. Mutations
+that drop or mis-parent an exact handler-produced site demand, restore a
+recursive AST scan, classify a repeated/conditional site as fixed, restore a
+stack for the single-entry class, or change the drain order fail the callable
+control join, architecture wall, shape gate, or Go/TypeScript differential
+behavior.
+
 Mutations make recovery ambient, pass authority through an ordinary source
 call, forward it one call deeper, omit registry registration, key the registry
 by storage location/spelling, reverse defer order, capture arguments late, or
@@ -716,6 +730,14 @@ For each generated static facade, proof records:
 - every static bridge/guard/private kernel import;
 - effect and exact generic instance;
 - produced facade AST.
+
+Provider-profile bridge identity proof feeds the same source interface through
+two independently certified provider re-exports with different aggregate
+provider fingerprints and requires one bridge artifact. Mutations change one
+transported method effect or member and require distinct artifacts. A broad
+artifact inspection also bounds the readable bridge export name by its compact
+semantic shape; restoring the complete certificate descriptor to every
+identifier must fail the source-size gate.
 
 Scalar-boundary fixtures cross every signedness, fixed-width, and native-width
 class in both directions. Equal product/provider carriers must produce no
@@ -1070,16 +1092,28 @@ package.
 
 Generated-support topology proof exact-joins full internal artifact owners and
 definitions to readable modules grouped by real semantic family and
-source-derived owner. Layout tests prove that artifacts with one semantic
-source owner share its module, different semantic owners do not merge, real
-collisions receive the shortest deterministic readable qualifier, and
-malformed identities fail. Digests may occur in manifests and diagnostics but
-never in ordinary declaration names or module paths.
+source/type owner. Layout tests prove that every shared closed support family
+retains one common module, every contained definition retains an injective
+semantic export whose named components use the globally unique package
+qualifier, different semantic owners do not merge, and
+source-owned generic modules retain their exact semantic source owner. At an
+import site the shortest family alias is used only when free; real collisions
+use the full semantic export or the shortest deterministic source-derived
+qualifier. Malformed semantic modules fail. Digests may occur in manifests and
+diagnostics but never in ordinary declaration names or module paths.
+Generated-size evidence also fails if full import paths are repeated inside
+ordinary generated identifiers; a mutation replacing the package qualifier
+with the complete path must exceed the owning source-size/line bound.
+Naming-owner tests include same-named packages, same-spelled local types in
+disjoint lexical scopes, and truly shadowing local types. Mutations that use a semantic contract's private key
+as target spelling, move display suffixes into semantic APIs, or bypass the
+registry qualifier/token owner—including the unexported interface-method token
+path—fail before generated output is sealed.
 
 Product evidence reports support definitions separately from physical support
 modules, the largest semantic module, ESM startup time/RSS, and minimal-compile
-time/RSS. Mutations restoring one physical module per artifact, digest-byte or
-numbered sharding, source-name collision, or cross-family merging fail the
+time/RSS. Mutations restoring digest-byte or numbered sharding, an opaque
+declaration suffix, source-name collision, or cross-family merging fail the
 layout, ownership, source-shape, or strict-typecheck gate. Release evidence
 compares startup and typecheck cost against the immediately preceding layout;
 readability cannot hide an unbounded module, and a cost regression cannot

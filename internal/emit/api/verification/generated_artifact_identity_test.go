@@ -38,7 +38,7 @@ func TestAnonymousStructRequestCarriesExactGeneratedArtifact(t *testing.T) {
 		GeneratedArtifactAnonymousStruct,
 		sourceType,
 		"artifact",
-		"$goStruct_artifact",
+		"$goStruct$artifact",
 		"support/anonymous-structs.ts",
 	)
 	if err != nil {
@@ -111,7 +111,7 @@ func TestLexicalAnonymousStructRequirementReconstructsSourceOwner(t *testing.T) 
 		GeneratedArtifactAnonymousStruct,
 		sourceType,
 		"artifact",
-		"$goStruct_artifact",
+		"$goStruct$artifact",
 		MustSourceArtifactOwner(owner),
 		anchor,
 	)
@@ -178,7 +178,7 @@ func TestLexicalGeneratedArtifactReconstructsExactPackageInitializer(
 		GeneratedArtifactMapSpecialization,
 		sourceType,
 		"artifact",
-		"$goMap_artifact",
+		"$goMap$artifact",
 		initializerOwner,
 		anchor,
 	)
@@ -210,7 +210,7 @@ func TestGeneratedArtifactRejectsStringOnlyIdentity(t *testing.T) {
 		GeneratedArtifactAnonymousStruct,
 		nil,
 		"artifact",
-		"$goStruct_artifact",
+		"$goStruct$artifact",
 		"support/anonymous-structs.ts",
 	); err == nil {
 		t.Fatal("generated artifact accepted a key without an exact Go type")

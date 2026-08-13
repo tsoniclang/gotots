@@ -47,6 +47,10 @@ func TestWaveEightControlDemandDoesNotRewriteOrdinaryFunction(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			repeatedDefer, err := emit.NewRoot(scope.Lookup("GotoRepeatedDefer"))
+			if err != nil {
+				t.Fatal(err)
+			}
 			ordinary, err := emit.CompileWithOptions(
 				program,
 				[]emit.Root{controlFree},
@@ -57,7 +61,7 @@ func TestWaveEightControlDemandDoesNotRewriteOrdinaryFunction(t *testing.T) {
 			}
 			withControl, err := emit.CompileWithOptions(
 				program,
-				[]emit.Root{controlFree, deferOrder, gotoState},
+				[]emit.Root{controlFree, deferOrder, gotoState, repeatedDefer},
 				testCase.options,
 			)
 			if err != nil {
@@ -102,6 +106,49 @@ func TestWaveEightControlDemandDoesNotRewriteOrdinaryFunction(t *testing.T) {
 						"ordinary ControlFree contains %q:\n%s",
 						forbidden,
 						ordinaryFunction,
+					)
+				}
+			}
+			deferredFunction := targetFunctionText(
+				t,
+				controlArtifacts.printed,
+				"DeferOrder",
+			)
+			for _, forbidden := range []string{
+				".push(",
+				"goDeferPop",
+				"while (",
+			} {
+				if strings.Contains(deferredFunction, forbidden) {
+					t.Fatalf(
+						"single-entry static defer contains %q:\n%s",
+						forbidden,
+						deferredFunction,
+					)
+				}
+			}
+			if !strings.Contains(deferredFunction, "finally {") ||
+				strings.Count(deferredFunction, "__gotots_deferred_") < 2 {
+				t.Fatalf(
+					"single-entry static defer lacks direct slots:\n%s",
+					deferredFunction,
+				)
+			}
+			repeatedFunction := targetFunctionText(
+				t,
+				controlArtifacts.printed,
+				"GotoRepeatedDefer",
+			)
+			for _, required := range []string{
+				".push(",
+				"goDeferPop",
+				"while (",
+			} {
+				if !strings.Contains(repeatedFunction, required) {
+					t.Fatalf(
+						"repeated defer lacks dynamic storage %q:\n%s",
+						required,
+						repeatedFunction,
 					)
 				}
 			}

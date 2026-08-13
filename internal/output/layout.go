@@ -1,28 +1,32 @@
 package output
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/load"
+	"golang.org/x/mod/module"
 )
 
 const (
-	ProgramInitializationPath       = "program.ts"
-	RuntimePackageName              = "@gotots/runtime"
-	RuntimePackageVersion           = "0.0.0"
-	RuntimePackageRootPath          = "runtime"
-	RuntimePackageManifestPath      = "runtime/package.json"
-	ScalarSupportPath               = "runtime/scalars.ts"
-	AnonymousStructSupportPath      = "support/anonymous-structs.ts"
-	InterfaceMethodSupportPath      = "support/interface-methods.ts"
-	InterfaceTypeSupportPath        = "support/interface-types.ts"
-	ReflectionTypeSupportPath       = "support/reflection-types.ts"
-	generatedArtifactShardKeyLength = 2
+	ProgramInitializationPath                 = "program.ts"
+	RuntimePackageName                        = "@gotots/runtime"
+	RuntimePackageVersion                     = "0.0.0"
+	RuntimePackageRootPath                    = "runtime"
+	RuntimePackageManifestPath                = "runtime/package.json"
+	ScalarSupportPath                         = "runtime/scalars.ts"
+	AnonymousStructSupportPath                = "support/anonymous-structs.ts"
+	MapSpecializationSupportPath              = "support/maps.ts"
+	InterfaceAdapterSupportPath               = "support/interface-adapters.ts"
+	AnonymousInterfaceSupportPath             = "support/interface-contracts.ts"
+	InterfaceMethodSupportPath                = "support/interface-methods.ts"
+	InterfaceTypeSupportPath                  = "support/interface-types.ts"
+	ReflectionTypeSupportPath                 = "support/reflection-types.ts"
+	ProviderInterfaceBridgeSupportPath        = "support/provider-interface-bridges.ts"
+	ProviderStatefulRepresentationSupportPath = "support/provider-stateful-representations.ts"
+	DeferredCallableRegistrySupportPath       = "support/deferred-callables.ts"
 )
 
 func EnvironmentContractPath(
@@ -158,9 +162,13 @@ func SourcePath(sourcePackage *load.Package, sourceFile load.File) (string, erro
 	if err != nil {
 		return "", err
 	}
+	moduleOwner, err := semanticModuleKey(sourcePackage)
+	if err != nil {
+		return "", err
+	}
 	return path.Join(
 		"modules",
-		semanticModuleKey(sourcePackage),
+		moduleOwner,
 		packagePath,
 		baseName+".ts",
 	), nil
@@ -174,62 +182,12 @@ func PackageStatePath(sourcePackage *load.Package) (string, error) {
 	return packageArtifactPath(sourcePackage, packageStateFile)
 }
 
-func MapSpecializationPath(artifactKey string) (string, error) {
-	return generatedArtifactPath("maps", artifactKey)
-}
-
-func InterfaceAdapterPath(artifactKey string) (string, error) {
-	return generatedArtifactPath("interfaces/adapters", artifactKey)
-}
-
-func ProviderInterfaceBridgePath(artifactKey string) (string, error) {
-	return generatedArtifactPath("interfaces/provider-bridges", artifactKey)
-}
-
-func ProviderStatefulRepresentationPath(artifactKey string) (string, error) {
-	return generatedArtifactPath("providers/stateful-representations", artifactKey)
-}
-
 func GenericCapabilityPath(module string) (string, error) {
 	return semanticGeneratedArtifactPath("generics/capabilities", module)
 }
 
 func GenericConcretizationPath(module string) (string, error) {
 	return semanticGeneratedArtifactPath("generics/concretizations", module)
-}
-
-func DeferredCallableRegistryPath(artifactKey string) (string, error) {
-	return generatedArtifactPath("callables/deferred", artifactKey)
-}
-
-func AnonymousInterfacePath(artifactKey string) (string, error) {
-	return generatedArtifactPath("interfaces/contracts", artifactKey)
-}
-
-func generatedArtifactPath(
-	directory string,
-	artifactKey string,
-) (string, error) {
-	if len(artifactKey) != sha256.Size*2 {
-		return "", &PathError{
-			Source: artifactKey,
-			Reason: "generated artifact key is invalid",
-		}
-	}
-	for _, character := range artifactKey {
-		if character < '0' || character > '9' &&
-			character < 'a' || character > 'f' {
-			return "", &PathError{
-				Source: artifactKey,
-				Reason: "generated artifact key is invalid",
-			}
-		}
-	}
-	return path.Join(
-		"support",
-		directory,
-		artifactKey[:generatedArtifactShardKeyLength]+".ts",
-	), nil
 }
 
 func semanticGeneratedArtifactPath(
@@ -282,15 +240,19 @@ func packageArtifactPath(
 	if err != nil {
 		return "", err
 	}
+	moduleOwner, err := semanticModuleKey(sourcePackage)
+	if err != nil {
+		return "", err
+	}
 	return path.Join(
 		"packages",
-		semanticModuleKey(sourcePackage),
+		moduleOwner,
 		packagePath,
 		fileName,
 	), nil
 }
 
-func semanticModuleKey(sourcePackage *load.Package) string {
+func semanticModuleKey(sourcePackage *load.Package) (string, error) {
 	return moduleKey(sourcePackage.ModulePath(), sourcePackage.ModuleVersion())
 }
 
@@ -344,12 +306,26 @@ func RuntimeModuleSpecifier(runtimeSourcePath string) (string, error) {
 }
 
 func moduleRelativePackage(sourcePackage *load.Package) (string, error) {
-	if sourcePackage.Path() == sourcePackage.ModulePath() {
+	escapedPackage, err := module.EscapePath(sourcePackage.Path())
+	if err != nil {
+		return "", &PathError{
+			Source: sourcePackage.Path(),
+			Reason: "package path is not a valid semantic path",
+		}
+	}
+	escapedModule, err := module.EscapePath(sourcePackage.ModulePath())
+	if err != nil {
+		return "", &PathError{
+			Source: sourcePackage.ModulePath(),
+			Reason: "module path is not a valid semantic path",
+		}
+	}
+	if escapedPackage == escapedModule {
 		return "_root", nil
 	}
 	relative, ok := strings.CutPrefix(
-		sourcePackage.Path(),
-		sourcePackage.ModulePath()+"/",
+		escapedPackage,
+		escapedModule+"/",
 	)
 	if !ok || relative == "" || path.Clean(relative) != relative ||
 		strings.HasPrefix(relative, "../") {
@@ -361,9 +337,25 @@ func moduleRelativePackage(sourcePackage *load.Package) (string, error) {
 	return relative, nil
 }
 
-func moduleKey(modulePath string, moduleVersion string) string {
-	digest := sha256.Sum256([]byte(modulePath + "\x00" + moduleVersion))
-	return hex.EncodeToString(digest[:])
+func moduleKey(modulePath string, moduleVersion string) (string, error) {
+	escapedPath, err := module.EscapePath(modulePath)
+	if err != nil {
+		return "", &PathError{
+			Source: modulePath,
+			Reason: "module path is not a valid semantic path",
+		}
+	}
+	if moduleVersion == "" {
+		return escapedPath, nil
+	}
+	escapedVersion, err := module.EscapeVersion(moduleVersion)
+	if err != nil {
+		return "", &PathError{
+			Source: moduleVersion,
+			Reason: "module version is not canonical",
+		}
+	}
+	return escapedPath + "@" + escapedVersion, nil
 }
 
 func validateSourcePath(sourcePath string) error {

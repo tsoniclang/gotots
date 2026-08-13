@@ -2,13 +2,10 @@ package naming
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	anonymousstruct "github.com/tsoniclang/gotots/internal/emit/type/anonymousstruct"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/output"
 	"go/types"
 )
-
-const mapTargetNameHexLength = 20
 
 func (n *File) MapSpecialization(
 	sourceType types.Type,
@@ -27,6 +24,10 @@ func (n *File) MapSpecialization(
 	if err != nil {
 		return api.NameReference{}, err
 	}
+	name, err := n.semanticGeneratedTypeName("$goMap$", mapType)
+	if err != nil {
+		return api.NameReference{}, err
+	}
 	placement, err := n.generatedArtifactPlacement(mapType)
 	if err != nil {
 		return api.NameReference{}, err
@@ -34,6 +35,7 @@ func (n *File) MapSpecialization(
 	binding, err := n.owner.registry.internMapSpecialization(
 		artifactKey,
 		mapType,
+		name,
 		placement,
 	)
 	if err != nil {
@@ -46,49 +48,17 @@ func (n *File) MapSpecialization(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	requests := []api.RootRequest{requirement}
-	if binding.owner.Placement() ==
-		api.GeneratedArtifactPlacementLexical {
-		return api.NewNameReference(binding.name, requests...)
-	}
-	if n.artifactOwner.Valid() &&
-		n.artifactOwner != api.MustGeneratedArtifactOwner(binding.owner) {
-		dependency, dependencyError :=
-			api.NewGeneratedArtifactDependencyRequest(
-				binding.owner,
-				mapSpecializationFacet(demand),
-			)
-		if dependencyError != nil {
-			return api.NameReference{}, dependencyError
-		}
-		requests = append(requests, dependency)
-	}
-	if binding.owner.OutputPath() == n.targetPath {
-		return api.NewNameReference(binding.name, requests...)
-	}
-	modulePath, err := output.ModuleSpecifier(
-		n.targetPath,
-		binding.owner.OutputPath(),
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
 	phase := api.ImportPhaseValue
 	if demand == api.MapSpecializationDemandDefinition {
 		phase = api.ImportPhaseType
 	}
-	importRequest, err := api.NewImportRequest(
-		n.factory,
+	return n.generatedReference(
+		binding.owner,
+		binding.name,
+		requirement,
+		mapSpecializationFacet(demand),
 		phase,
-		modulePath,
-		binding.name,
-		binding.name,
 	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	requests = append(requests, importRequest)
-	return api.NewNameReference(binding.name, requests...)
 }
 
 func representedMapType(sourceType types.Type) (*types.Map, bool) {
@@ -112,11 +82,13 @@ func mapSpecializationFacet(
 func (r *Registry) internMapSpecialization(
 	artifactKey string,
 	mapType *types.Map,
+	name string,
 	placement generatedArtifactPlacement,
 ) (mapSpecializationBinding, error) {
 	if r == nil ||
 		mapType == nil ||
 		artifactKey == "" ||
+		name == "" ||
 		!placement.kind.Valid() {
 		return mapSpecializationBinding{}, &api.NameError{
 			Reason: "map-specialization canonicalization input is invalid",
@@ -138,16 +110,15 @@ func (r *Registry) internMapSpecialization(
 		}
 		return existing, nil
 	}
-	name, err := mapSpecializationTargetName(artifactKey)
-	if err != nil {
+	if err := reserveGeneratedScopedName(
+		r.mapSpecializationNames,
+		name,
+		artifactKey,
+		"map-specialization",
+		placement,
+		output.MapSpecializationSupportPath,
+	); err != nil {
 		return mapSpecializationBinding{}, err
-	}
-	if existing := r.mapSpecializationNames[name]; existing != "" &&
-		existing != artifactKey {
-		return mapSpecializationBinding{}, &api.NameError{
-			Name:   name,
-			Reason: "map-specialization target-name prefix collision",
-		}
 	}
 	owner, err := newMapSpecializationArtifact(
 		mapType,
@@ -163,17 +134,7 @@ func (r *Registry) internMapSpecialization(
 		name:  name,
 	}
 	r.mapSpecializations[artifactKey] = binding
-	r.mapSpecializationNames[name] = artifactKey
 	return binding, nil
-}
-
-func mapSpecializationTargetName(artifactKey string) (string, error) {
-	if len(artifactKey) < mapTargetNameHexLength {
-		return "", &api.NameError{
-			Reason: "map-specialization artifact key is invalid",
-		}
-	}
-	return "$goMap_" + artifactKey[:mapTargetNameHexLength], nil
 }
 
 func newMapSpecializationArtifact(
@@ -192,16 +153,12 @@ func newMapSpecializationArtifact(
 			placement.anchor,
 		)
 	}
-	outputPath, err := output.MapSpecializationPath(artifact)
-	if err != nil {
-		return nil, err
-	}
 	return api.NewCompilationGeneratedArtifact(
 		api.GeneratedArtifactMapSpecialization,
 		mapType,
 		artifact,
 		name,
-		outputPath,
+		output.MapSpecializationSupportPath,
 	)
 }
 
@@ -302,6 +259,10 @@ func (n *File) anonymousStructBinding(
 	if err != nil {
 		return anonymousStructBinding{}, err
 	}
+	name, err := n.semanticGeneratedTypeName("$goStruct$", structType)
+	if err != nil {
+		return anonymousStructBinding{}, err
+	}
 	placement, err := n.generatedArtifactPlacement(structType)
 	if err != nil {
 		return anonymousStructBinding{}, err
@@ -309,6 +270,7 @@ func (n *File) anonymousStructBinding(
 	return n.owner.registry.internAnonymousStruct(
 		artifactKey,
 		structType,
+		name,
 		placement,
 	)
 }
@@ -434,11 +396,13 @@ func scopeContainsScope(outer *types.Scope, inner *types.Scope) bool {
 func (r *Registry) internAnonymousStruct(
 	artifactKey string,
 	structType *types.Struct,
+	name string,
 	placement generatedArtifactPlacement,
 ) (anonymousStructBinding, error) {
 	if r == nil ||
 		structType == nil ||
 		artifactKey == "" ||
+		name == "" ||
 		!placement.kind.Valid() {
 		return anonymousStructBinding{}, &api.NameError{
 			Reason: "anonymous-struct canonicalization input is invalid",
@@ -459,16 +423,15 @@ func (r *Registry) internAnonymousStruct(
 		}
 		return existing, nil
 	}
-	name, err := anonymousstruct.TargetName(artifactKey)
-	if err != nil {
+	if err := reserveGeneratedScopedName(
+		r.anonymousStructNames,
+		name,
+		artifactKey,
+		"anonymous-struct",
+		placement,
+		output.AnonymousStructSupportPath,
+	); err != nil {
 		return anonymousStructBinding{}, err
-	}
-	if existing := r.anonymousStructNames[name]; existing != "" &&
-		existing != artifactKey {
-		return anonymousStructBinding{}, &api.NameError{
-			Name:   name,
-			Reason: "anonymous-struct target-name prefix collision",
-		}
 	}
 	owner, err := newAnonymousStructArtifact(
 		structType,
@@ -484,7 +447,6 @@ func (r *Registry) internAnonymousStruct(
 		name:  name,
 	}
 	r.anonymousStructs[artifactKey] = binding
-	r.anonymousStructNames[name] = artifactKey
 	return binding, nil
 }
 

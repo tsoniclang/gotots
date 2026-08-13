@@ -1,11 +1,22 @@
 package naming
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/output"
+)
 
 func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 	registry := NewRegistry()
 	registry.interfaceContracts["retained-contract"] = nil
-	registry.interfaceAdapterNames["retained-artifact"] = "adapter"
+	registry.interfaceAdapterNames[generatedArtifactNameScope(
+		"retained-artifact",
+		generatedArtifactPlacement{
+			kind: api.GeneratedArtifactPlacementCompilation,
+		},
+		output.InterfaceAdapterSupportPath,
+	)] = "adapter"
 	registry.providerInterfaceCapabilityDemands["capability"] =
 		providerInterfaceCapabilityBinding{}
 	registry.providerInterfaceBridgesByContract["provider"] =

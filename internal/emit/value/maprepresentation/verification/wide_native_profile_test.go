@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/output"
 )
 
 func TestWideNativeMapBigIntCarrierProfilesExecuteDifferentially(t *testing.T) {
@@ -114,17 +115,22 @@ func assertWideNativeMapCarrier(
 	}
 	wideDefinitions := 0
 	for _, file := range emission.Files() {
-		if !strings.HasPrefix(file.OutputPath(), "support/maps/") {
+		if file.OutputPath() != output.MapSpecializationSupportPath {
 			continue
 		}
 		source := readFile(t, artifacts.file(t, file.OutputPath()))
 		if !strings.Contains(source, "Map<uint64, [") {
 			continue
 		}
-		wideDefinitions += strings.Count(source, "export class $goMap_")
-		for _, forbidden := range []string{"$hash(", "$equal(", "$find(", "GoDenseIndex"} {
-			if strings.Contains(source, forbidden) {
-				t.Fatalf("wide native map contains %q:\n%s", forbidden, source)
+		for _, classSource := range mapClassSources(source) {
+			if !strings.Contains(classSource, "Map<uint64, [") {
+				continue
+			}
+			wideDefinitions++
+			for _, forbidden := range []string{"$hash(", "$equal(", "$find(", "GoDenseIndex"} {
+				if strings.Contains(classSource, forbidden) {
+					t.Fatalf("wide native map contains %q:\n%s", forbidden, classSource)
+				}
 			}
 		}
 	}

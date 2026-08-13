@@ -1,6 +1,7 @@
 package api
 
 import (
+	controlcontract "github.com/tsoniclang/gotots/internal/emit/api/control"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 	"go/ast"
 	"go/token"
@@ -8,84 +9,7 @@ import (
 	"slices"
 )
 
-type CallableControlDemand struct {
-	deferEnvelope   bool
-	recovery        bool
-	gotoControl     bool
-	iteratorReturns map[*ast.RangeStmt]struct{}
-}
-
-func (d CallableControlDemand) With(
-	facet CallableControlFacet,
-) CallableControlDemand {
-	switch facet {
-	case CallableControlDefer:
-		d.deferEnvelope = true
-	case CallableControlRecovery:
-		d.recovery = true
-	case CallableControlGoto:
-		d.gotoControl = true
-	case CallableControlIteratorReturn:
-		panic("iterator-return control requires an exact range")
-	default:
-		panic("callable-control facet is invalid")
-	}
-	return d
-}
-
-func (d CallableControlDemand) Has(
-	facet CallableControlFacet,
-) bool {
-	switch facet {
-	case CallableControlDefer:
-		return d.deferEnvelope
-	case CallableControlRecovery:
-		return d.recovery
-	case CallableControlGoto:
-		return d.gotoControl
-	case CallableControlIteratorReturn:
-		return len(d.iteratorReturns) != 0
-	default:
-		return false
-	}
-}
-
-func (d CallableControlDemand) Defer() bool {
-	return d.deferEnvelope
-}
-
-func (d CallableControlDemand) Recovery() bool {
-	return d.recovery
-}
-
-func (d CallableControlDemand) Goto() bool {
-	return d.gotoControl
-}
-
-func (d CallableControlDemand) WithIteratorReturn(
-	source *ast.RangeStmt,
-) CallableControlDemand {
-	if source == nil {
-		panic("iterator-return range is nil")
-	}
-	selected := make(
-		map[*ast.RangeStmt]struct{},
-		len(d.iteratorReturns)+1,
-	)
-	for existing := range d.iteratorReturns {
-		selected[existing] = struct{}{}
-	}
-	selected[source] = struct{}{}
-	d.iteratorReturns = selected
-	return d
-}
-
-func (d CallableControlDemand) IteratorReturn(
-	source *ast.RangeStmt,
-) bool {
-	_, selected := d.iteratorReturns[source]
-	return selected
-}
+type CallableControlDemand = controlcontract.CallableDemand
 
 func (c Context) WithCallableControls(
 	owner ArtifactOwner,
@@ -127,7 +51,14 @@ func (c Context) WithCallableControls(
 			}
 		}
 		demand := controls[callable]
-		if facet == CallableControlIteratorReturn {
+		if facet == CallableControlDefer {
+			source, selected := requirement.DeferControl()
+			if selected {
+				controls[callable] = demand.WithDefer(source)
+			} else {
+				controls[callable] = demand.With(facet)
+			}
+		} else if facet == CallableControlIteratorReturn {
 			source, selected := requirement.IteratorReturnControl()
 			if !selected {
 				return Context{}, &InvariantError{
@@ -216,6 +147,17 @@ func (c Context) CallableControlRequest(
 		c.callableEnclosing,
 		c.currentCallable,
 		facet,
+	)
+}
+
+func (c Context) DeferControlRequest(
+	source *ast.DeferStmt,
+) (RootRequest, error) {
+	return NewDeferControlRequest(
+		c.artifactOwner,
+		c.callableEnclosing,
+		c.currentCallable,
+		source,
 	)
 }
 
@@ -366,6 +308,7 @@ func (c Context) IsGotoLocal(variable *types.Var) bool {
 type GenericConcretizationReference struct {
 	concretization *GenericConcretization
 	name           string
+	suffix         string
 	requests       []RootRequest
 }
 
@@ -459,9 +402,10 @@ func (r DeferredGenericCallableReference) CallArguments(
 func NewGenericConcretizationReference(
 	concretization *GenericConcretization,
 	name string,
+	suffix string,
 	requests ...RootRequest,
 ) (GenericConcretizationReference, error) {
-	if !concretization.Valid() || name == "" {
+	if !concretization.Valid() || name == "" || suffix == "" {
 		return GenericConcretizationReference{}, &NameError{
 			Reason: "generic concretization reference is invalid",
 		}
@@ -472,6 +416,7 @@ func NewGenericConcretizationReference(
 	return GenericConcretizationReference{
 		concretization: concretization,
 		name:           name,
+		suffix:         suffix,
 		requests:       slices.Clone(requests),
 	}, nil
 }
@@ -482,6 +427,10 @@ func (r GenericConcretizationReference) Concretization() *GenericConcretization 
 
 func (r GenericConcretizationReference) Name() string {
 	return r.name
+}
+
+func (r GenericConcretizationReference) Suffix() string {
+	return r.suffix
 }
 
 func (r GenericConcretizationReference) Requests() []RootRequest {

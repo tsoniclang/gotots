@@ -126,7 +126,9 @@ deterministically.
 Install:
 
 - Go panic carrier and runtime faults;
-- immediate defer capture, LIFO unwind, named results, panic replacement;
+- immediate defer capture, fixed slots for single-entry direct sites, dynamic
+  LIFO stacks only for repeated/conditional/goto-controlled sites, named
+  results, and panic replacement;
 - ordinary and private deferred entries for direct `recover`;
 - exact-signature typed registry for transported deferred callables;
 - labels, fallthrough, break/continue, and non-structural goto assembly.

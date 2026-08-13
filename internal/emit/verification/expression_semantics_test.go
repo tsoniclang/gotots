@@ -294,8 +294,8 @@ func assertWaveThreeOwnerShapes(t *testing.T, source string) {
 	}
 	tupleSource := source[tupleStart : tupleStart+tupleEnd]
 	for _, required := range []string{
-		"RuntimeSlice.literal<$goInterface_",
-		"[new $goInterfaceAdapter_",
+		"RuntimeSlice.literal<GoInterface",
+		"[new GoInterfaceAdapter",
 		"(__gotots_results_",
 	} {
 		if !strings.Contains(tupleSource, required) {

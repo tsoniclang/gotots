@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/output"
 )
 
 func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
@@ -23,6 +22,8 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	binding, err := adapterFirst.internInterfaceAdapter(
 		strings.Repeat("a", 64),
 		sourceType,
+		"$goInterfaceAdapter$Named_Value",
+		"$goReflectType$Named_Value",
 		placement,
 	)
 	if err != nil {
@@ -100,6 +101,8 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	lateBinding, err := transitionFirst.internInterfaceAdapter(
 		strings.Repeat("b", 64),
 		sourceType,
+		"$goInterfaceAdapter$Named_Value",
+		"$goReflectType$Named_Value",
 		placement,
 	)
 	if err != nil {
@@ -201,11 +204,32 @@ func TestInterfaceDynamicTypeTokenIsCanonicalForLocalGoType(t *testing.T) {
 	}
 	key := strings.Repeat("a", 64)
 	registry := NewRegistry()
-	first, err := registry.internInterfaceDynamicTypeToken(key, localType)
+	function := types.NewFunc(
+		token.Pos(1),
+		sourcePackage,
+		"Use",
+		types.NewSignatureType(nil, nil, nil, nil, nil, false),
+	)
+	placement := generatedArtifactPlacement{
+		kind:         api.GeneratedArtifactPlacementLexical,
+		lexicalOwner: api.MustSourceArtifactOwner(function),
+		anchor:       typeName,
+	}
+	first, err := registry.internInterfaceDynamicTypeToken(
+		key,
+		localType,
+		"$goDynamicType$Named_Local",
+		placement,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := registry.internInterfaceDynamicTypeToken(key, localType)
+	second, err := registry.internInterfaceDynamicTypeToken(
+		key,
+		localType,
+		"$goDynamicType$Named_Local",
+		placement,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,13 +238,14 @@ func TestInterfaceDynamicTypeTokenIsCanonicalForLocalGoType(t *testing.T) {
 		first.name != second.name ||
 		!ok ||
 		selectedType != localType ||
-		first.owner.Placement() != api.GeneratedArtifactPlacementCompilation ||
-		first.owner.OutputPath() != output.InterfaceTypeSupportPath {
+		first.owner.Placement() != api.GeneratedArtifactPlacementLexical ||
+		first.owner.OutputPath() != "" ||
+		first.owner.LexicalAnchor() != typeName {
 		t.Fatalf("canonical dynamic type = %#v / %#v", first, second)
 	}
 }
 
-func TestInterfaceDynamicTypeTokenRejectsTruncatedNameCollision(t *testing.T) {
+func TestInterfaceDynamicTypeTokenRejectsSemanticNameCollision(t *testing.T) {
 	registry := NewRegistry()
 	first := types.NewNamed(
 		types.NewTypeName(token.Pos(1), nil, "First", nil),
@@ -232,21 +257,28 @@ func TestInterfaceDynamicTypeTokenRejectsTruncatedNameCollision(t *testing.T) {
 		types.Typ[types.Int32],
 		nil,
 	)
-	prefix := strings.Repeat("b", interfaceTargetNameHexLength)
 	if _, err := registry.internInterfaceDynamicTypeToken(
-		prefix+strings.Repeat("1", 64-interfaceTargetNameHexLength),
+		strings.Repeat("1", 64),
 		first,
+		"$goDynamicType$Shared",
+		generatedArtifactPlacement{
+			kind: api.GeneratedArtifactPlacementCompilation,
+		},
 	); err != nil {
 		t.Fatal(err)
 	}
 	_, err := registry.internInterfaceDynamicTypeToken(
-		prefix+strings.Repeat("2", 64-interfaceTargetNameHexLength),
+		strings.Repeat("2", 64),
 		second,
+		"$goDynamicType$Shared",
+		generatedArtifactPlacement{
+			kind: api.GeneratedArtifactPlacementCompilation,
+		},
 	)
 	var nameError *api.NameError
 	if !errors.As(err, &nameError) ||
 		nameError.Reason !=
-			"interface-dynamic-type target-name prefix collision" {
+			"interface-dynamic-type semantic name collision" {
 		t.Fatalf("collision error = %#v", err)
 	}
 }

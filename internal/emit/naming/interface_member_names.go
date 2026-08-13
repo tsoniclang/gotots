@@ -4,6 +4,7 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/generic/semanticname"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	"github.com/tsoniclang/gotots/internal/emit/type/methodidentity"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
@@ -134,23 +135,7 @@ func (n *File) generatedReference(
 	if artifact.OutputPath() == n.targetPath {
 		return api.NewNameReference(name, requests...)
 	}
-	importIdentity := generatedArtifactImport{
-		artifact: artifact,
-		exported: name,
-	}
-	localName := n.artifactImports[importIdentity]
-	if localName == "" {
-		localName = name
-		if n.lexicalNameExists(localName) {
-			localName = n.allocateImportName(
-				name,
-				generatedArtifactImportQualifier(artifact),
-			)
-		} else {
-			n.importNames[localName] = struct{}{}
-		}
-		n.artifactImports[importIdentity] = localName
-	}
+	localName := n.generatedArtifactLocalName(artifact, name)
 	modulePath, err := output.ModuleSpecifier(
 		n.targetPath,
 		artifact.OutputPath(),
@@ -177,45 +162,10 @@ func generatedArtifactImportQualifier(artifact *api.GeneratedArtifact) string {
 		concretization.Owner().Pkg() != nil {
 		return concretization.Owner().Pkg().Name()
 	}
+	if artifact != nil && artifact.TargetName() != "" {
+		return artifact.TargetName()
+	}
 	return "generated"
-}
-
-func (n *File) interfaceContractImports(
-	outputPath string,
-	baseName string,
-	qualifier string,
-) ([]api.RootRequest, error) {
-	modulePath, err := output.ModuleSpecifier(n.targetPath, outputPath)
-	if err != nil {
-		return nil, err
-	}
-	exports := []struct {
-		name  string
-		phase api.ImportPhase
-	}{
-		{baseName, api.ImportPhaseType},
-		{interfaceContractName(baseName), api.ImportPhaseValue},
-		{interfaceGuardName(baseName), api.ImportPhaseValue},
-	}
-	requests := make([]api.RootRequest, 0, len(exports))
-	for _, exported := range exports {
-		localName := exported.name
-		if qualifier != "" {
-			localName = n.allocateImportName(exported.name, qualifier)
-		}
-		request, requestErr := api.NewImportRequest(
-			n.factory,
-			exported.phase,
-			modulePath,
-			exported.name,
-			localName,
-		)
-		if requestErr != nil {
-			return nil, requestErr
-		}
-		requests = append(requests, request)
-	}
-	return requests, nil
 }
 
 func interfaceContractName(base string) string {
@@ -314,14 +264,12 @@ func (n *File) InterfaceMethodName(method *types.Func) (string, error) {
 	if method.Exported() {
 		return portableIdentifier(method.Name()), nil
 	}
-	artifactKey, err := methodidentity.BuildKey(
-		method,
-		n.generatedNamedObjectIdentity,
-	)
+	qualifier, err := n.generatedPackageToken(method.Pkg())
 	if err != nil {
 		return "", err
 	}
-	return "$go$private_" + artifactKey[:interfaceTargetNameHexLength], nil
+	return "$go$private$" + qualifier + "$" +
+		semanticname.Identifier(method.Name()), nil
 }
 
 func (n *File) MethodTarget(
@@ -512,10 +460,19 @@ func (n *File) interfaceMethodCallableBinding(
 	if err != nil {
 		return interfaceMethodCallableBinding{}, err
 	}
+	name, err := n.semanticGeneratedMethodName(
+		"$goInterfaceCallable$",
+		method,
+		signature,
+	)
+	if err != nil {
+		return interfaceMethodCallableBinding{}, err
+	}
 	return n.owner.registry.internInterfaceMethodCallable(
 		artifactKey,
 		method,
 		signature,
+		name,
 	)
 }
 
@@ -568,10 +525,19 @@ func (n *File) interfaceMethodTokenBinding(
 	if err != nil {
 		return interfaceMethodTokenBinding{}, err
 	}
+	name, err := n.semanticGeneratedMethodName(
+		"$goInterfaceMethod$",
+		method,
+		signature,
+	)
+	if err != nil {
+		return interfaceMethodTokenBinding{}, err
+	}
 	binding, err := n.owner.registry.internInterfaceMethodToken(
 		artifactKey,
 		method,
 		signature,
+		name,
 		runtime,
 	)
 	if err != nil {

@@ -255,6 +255,24 @@ func NewCallableControlRequest(
 	return newDeclarationRequirementRequest(requirement), nil
 }
 
+func NewDeferControlRequest(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+	source *ast.DeferStmt,
+) (RootRequest, error) {
+	requirement, err := NewDeferControlRequirement(
+		owner,
+		enclosing,
+		callable,
+		source,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
 func NewGotoControlRequest(
 	owner ArtifactOwner,
 	enclosing ast.Node,

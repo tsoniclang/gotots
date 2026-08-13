@@ -172,7 +172,7 @@ func TestMapRepresentationOwnershipStrictDifferential(t *testing.T) {
 	for _, forbidden := range []string{
 		"export function Project<M, K, V>",
 		"M extends GoMapValue",
-		"let values = $goMap_",
+		"let values = GoMap",
 	} {
 		if strings.Contains(sourceArtifact, forbidden) {
 			t.Fatalf(

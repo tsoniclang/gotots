@@ -93,6 +93,69 @@ func TestCallableControlRequiresFullCallableContainment(t *testing.T) {
 	}
 }
 
+func TestDeferControlCarriesEveryExactStatementIdentity(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/control", "control")
+	ownerObject := callableControlFunction(sourcePackage, "Outer", 12)
+	owner := MustSourceArtifactOwner(ownerObject)
+	enclosing := callableControlDeclaration("Outer", 10, 100)
+	first := callableControlDefer("first", 30)
+	second := callableControlDefer("second", 60)
+	requirements := make([]DeclarationRequirement, 0, 2)
+	for _, source := range []*ast.DeferStmt{first, second} {
+		requirement, err := NewDeferControlRequirement(
+			owner,
+			enclosing,
+			enclosing,
+			source,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		selected, ok := requirement.DeferControl()
+		if !ok || selected != source {
+			t.Fatalf("defer identity = %#v", requirement)
+		}
+		requirements = append(requirements, requirement)
+	}
+	context, err := (Context{}).WithCallableControls(
+		owner,
+		enclosing,
+		requirements,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	demand := context.CallableControlFor(enclosing)
+	selected, exact := demand.ExactDefers([]*ast.DeferStmt{first, second})
+	if !exact || len(selected) != 2 || selected[0] != first || selected[1] != second {
+		t.Fatalf("exact defers = %#v, %t", selected, exact)
+	}
+	if _, exact := demand.ExactDefers([]*ast.DeferStmt{first}); exact {
+		t.Fatal("dropped defer statement passed exact control")
+	}
+	partial, err := (Context{}).WithCallableControls(
+		owner,
+		enclosing,
+		requirements[:1],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, exact := partial.CallableControlFor(enclosing).ExactDefers(
+		[]*ast.DeferStmt{first, second},
+	); exact {
+		t.Fatal("missing defer demand passed exact control")
+	}
+	if _, err := NewDeferControlRequirement(
+		owner,
+		enclosing,
+		enclosing,
+		callableControlDefer("late", enclosing.End()+10),
+	); err == nil {
+		t.Fatal("out-of-callable defer acquired control")
+	}
+}
+
 func TestGotoControlCarriesExactLabelUseIdentity(t *testing.T) {
 	sourcePackage := types.NewPackage("example.com/control", "control")
 	ownerObject := callableControlFunction(sourcePackage, "Outer", 12)
@@ -245,6 +308,19 @@ func callableControlLiteral(start token.Pos, end token.Pos) *ast.FuncLit {
 			Params: &ast.FieldList{Opening: start + 4, Closing: start + 5},
 		},
 		Body: &ast.BlockStmt{Lbrace: start + 6, Rbrace: end - 1},
+	}
+}
+
+func callableControlDefer(name string, position token.Pos) *ast.DeferStmt {
+	namePosition := position + token.Pos(len("defer "))
+	leftParen := namePosition + token.Pos(len(name))
+	return &ast.DeferStmt{
+		Defer: position,
+		Call: &ast.CallExpr{
+			Fun:    &ast.Ident{NamePos: namePosition, Name: name},
+			Lparen: leftParen,
+			Rparen: leftParen + 1,
+		},
 	}
 }
 

@@ -71,7 +71,7 @@ func Local(value int32) int32 {
 	localEnum := body[0].(tsgo.EnumDeclaration)
 	anonymousClass := body[1].(tsgo.ClassDeclaration)
 	if !strings.HasPrefix(localEnum.Name().Text(), "Local") ||
-		!strings.HasPrefix(anonymousClass.Name().Text(), "$goStruct_") {
+		!strings.HasPrefix(anonymousClass.Name().Text(), "$goStruct$") {
 		t.Fatalf(
 			"lexical definition order = %q/%q",
 			localEnum.Name().Text(),
@@ -113,15 +113,19 @@ func Nested(enabled bool, value int32) int32 {
 		}
 	}
 	source := structTargetSource(t, emission)
-	anonymousNames := make(map[string]struct{})
+	var anonymousName string
 	for _, name := range []string{"First", "Second"} {
 		function := targetFunctionByName(t, source, name)
 		body := function.Body().(tsgo.Block).Statements()
 		anonymous := body[1].(tsgo.ClassDeclaration)
-		anonymousNames[anonymous.Name().Text()] = struct{}{}
+		if anonymousName == "" {
+			anonymousName = anonymous.Name().Text()
+		} else if anonymous.Name().Text() != anonymousName {
+			t.Fatal("disjoint lexical classes received needless global name noise")
+		}
 	}
-	if len(anonymousNames) != 2 {
-		t.Fatal("same-spelled local type declarations unified generated classes")
+	if !strings.HasPrefix(anonymousName, "$goStruct$") {
+		t.Fatalf("lexical anonymous class name = %q", anonymousName)
 	}
 	nested := targetFunctionByName(t, source, "Nested")
 	nestedBody := nested.Body().(tsgo.Block).Statements()
@@ -134,7 +138,7 @@ func Nested(enabled bool, value int32) int32 {
 		t.Fatalf("nested local type = %T, want enum", thenBlock[0])
 	}
 	if anonymous, ok := thenBlock[1].(tsgo.ClassDeclaration); !ok ||
-		!strings.HasPrefix(anonymous.Name().Text(), "$goStruct_") {
+		!strings.HasPrefix(anonymous.Name().Text(), "$goStruct$") {
 		t.Fatalf("nested anonymous declaration = %T", thenBlock[1])
 	}
 }

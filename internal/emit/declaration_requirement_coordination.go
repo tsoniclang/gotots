@@ -459,6 +459,23 @@ func compareCallableControlRequirements(
 		default:
 			return 0
 		}
+	case leftControl == api.CallableControlDefer:
+		leftDefer, leftOK := left.DeferControl()
+		rightDefer, rightOK := right.DeferControl()
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		case !leftOK:
+			return 0
+		case leftDefer.Pos() < rightDefer.Pos():
+			return -1
+		case leftDefer.Pos() > rightDefer.Pos():
+			return 1
+		default:
+			return 0
+		}
 	case leftControl != api.CallableControlGoto:
 		return 0
 	}

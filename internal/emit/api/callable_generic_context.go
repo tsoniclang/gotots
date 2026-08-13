@@ -403,28 +403,6 @@ func (l ControlLabel) Continuable() bool {
 	return l.continuable
 }
 
-type DeferControl struct {
-	stack string
-}
-
-func NewDeferControl(stack string) (DeferControl, error) {
-	if stack == "" {
-		return DeferControl{}, &InvariantError{
-			Role:   RoleBlockStatement,
-			Reason: "defer stack identity is empty",
-		}
-	}
-	return DeferControl{stack: stack}, nil
-}
-
-func (c DeferControl) Valid() bool {
-	return c.stack != ""
-}
-
-func (c DeferControl) Stack() string {
-	return c.stack
-}
-
 type ReturnControl struct {
 	label        string
 	resultTarget string

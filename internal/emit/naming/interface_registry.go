@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"go/types"
+	"slices"
 	"strings"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
@@ -15,11 +16,15 @@ import (
 func (r *Registry) internInterfaceAdapter(
 	artifactKey string,
 	sourceType types.Type,
+	name string,
+	reflectionName string,
 	placement generatedArtifactPlacement,
 ) (interfaceAdapterBinding, error) {
 	if r == nil ||
 		!interfaceAdapterSource(sourceType) ||
 		artifactKey == "" ||
+		name == "" ||
+		reflectionName == "" ||
 		!placement.kind.Valid() {
 		return interfaceAdapterBinding{}, &api.NameError{
 			Reason: "interface-adapter canonicalization input is invalid",
@@ -41,15 +46,13 @@ func (r *Registry) internInterfaceAdapter(
 		}
 		return existing, nil
 	}
-	name, err := interfaceTargetName("$goInterfaceAdapter_", artifactKey)
-	if err != nil {
-		return interfaceAdapterBinding{}, err
-	}
-	if err := reserveGeneratedName(
+	if err := reserveGeneratedScopedName(
 		r.interfaceAdapterNames,
 		name,
 		artifactKey,
 		"interface-adapter",
+		placement,
+		output.InterfaceAdapterSupportPath,
 	); err != nil {
 		return interfaceAdapterBinding{}, err
 	}
@@ -63,9 +66,10 @@ func (r *Registry) internInterfaceAdapter(
 		return interfaceAdapterBinding{}, err
 	}
 	binding := interfaceAdapterBinding{
-		owner: owner,
-		name:  name,
-		key:   artifactKey,
+		owner:          owner,
+		name:           name,
+		reflectionName: reflectionName,
+		key:            artifactKey,
 	}
 	r.interfaceAdapters[artifactKey] = binding
 	return binding, nil
@@ -74,12 +78,14 @@ func (r *Registry) internInterfaceAdapter(
 func (r *Registry) internAnonymousInterface(
 	artifactKey string,
 	interfaceType *types.Interface,
+	name string,
 	placement generatedArtifactPlacement,
 ) (anonymousInterfaceBinding, error) {
 	if r == nil ||
 		interfaceType == nil ||
 		!interfaceType.Complete().IsMethodSet() ||
 		artifactKey == "" ||
+		name == "" ||
 		!placement.kind.Valid() {
 		return anonymousInterfaceBinding{}, &api.NameError{
 			Reason: "anonymous-interface canonicalization input is invalid",
@@ -101,15 +107,13 @@ func (r *Registry) internAnonymousInterface(
 		}
 		return existing, nil
 	}
-	name, err := interfaceTargetName("$goInterface_", artifactKey)
-	if err != nil {
-		return anonymousInterfaceBinding{}, err
-	}
-	if err := reserveGeneratedName(
+	if err := reserveGeneratedScopedName(
 		r.anonymousInterfaceNames,
 		name,
 		artifactKey,
 		"anonymous-interface",
+		placement,
+		output.AnonymousInterfaceSupportPath,
 	); err != nil {
 		return anonymousInterfaceBinding{}, err
 	}
@@ -130,9 +134,10 @@ func (r *Registry) internAnonymousInterface(
 func (r *Registry) internProviderInterfaceBridge(
 	artifactKey string,
 	sourceType *types.Named,
+	name string,
 ) (providerInterfaceBridgeBinding, error) {
 	if r == nil || sourceType == nil || sourceType.Obj() == nil ||
-		artifactKey == "" {
+		artifactKey == "" || name == "" {
 		return providerInterfaceBridgeBinding{}, &api.NameError{
 			Reason: "provider-interface bridge canonicalization input is invalid",
 		}
@@ -154,10 +159,6 @@ func (r *Registry) internProviderInterfaceBridge(
 		}
 		return existing, nil
 	}
-	name, err := interfaceTargetName("$goProviderInterfaceBridge_", artifactKey)
-	if err != nil {
-		return providerInterfaceBridgeBinding{}, err
-	}
 	if err := reserveGeneratedName(
 		r.providerInterfaceBridgeNames,
 		name,
@@ -166,16 +167,12 @@ func (r *Registry) internProviderInterfaceBridge(
 	); err != nil {
 		return providerInterfaceBridgeBinding{}, err
 	}
-	outputPath, err := output.ProviderInterfaceBridgePath(artifactKey)
-	if err != nil {
-		return providerInterfaceBridgeBinding{}, err
-	}
 	owner, err := api.NewCompilationGeneratedArtifact(
 		api.GeneratedArtifactProviderInterfaceBridge,
 		sourceType,
 		artifactKey,
 		name,
-		outputPath,
+		output.ProviderInterfaceBridgeSupportPath,
 	)
 	if err != nil {
 		return providerInterfaceBridgeBinding{}, err
@@ -192,10 +189,11 @@ func (r *Registry) internProviderInterfaceBridge(
 func (r *Registry) internProviderProfileInterfaceBridge(
 	sourceKey string,
 	sourceType *types.Named,
+	name string,
 	profile []gostdlib.ProviderCallableProfileInterface,
 ) (providerInterfaceBridgeBinding, error) {
 	if r == nil || sourceType == nil || sourceType.Obj() == nil ||
-		sourceKey == "" || len(profile) == 0 {
+		sourceKey == "" || name == "" || len(profile) == 0 {
 		return providerInterfaceBridgeBinding{}, &api.NameError{
 			Reason: "provider-profile bridge canonicalization input is invalid",
 		}
@@ -211,19 +209,14 @@ func (r *Registry) internProviderProfileInterfaceBridge(
 	if err != nil {
 		return providerInterfaceBridgeBinding{}, err
 	}
+	semanticParts, err := providerProfileBridgeSemanticParts(selected)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
 	var descriptor strings.Builder
 	descriptor.WriteString(sourceKey)
-	for _, current := range selected {
-		if !current.Valid() {
-			return providerInterfaceBridgeBinding{}, &api.NameError{
-				Reason: "provider-profile bridge certificate is invalid",
-			}
-		}
-		descriptor.WriteByte(0)
-		descriptor.WriteString(current.SourceIdentity())
-		descriptor.WriteByte(0)
-		descriptor.WriteString(current.TargetFingerprint())
-	}
+	descriptor.WriteByte(0)
+	descriptor.WriteString(strings.Join(semanticParts, "$And$"))
 	digest := sha256.Sum256([]byte(descriptor.String()))
 	artifactKey := hex.EncodeToString(digest[:])
 	if existing, found := r.providerInterfaceBridges[artifactKey]; found {
@@ -237,7 +230,7 @@ func (r *Registry) internProviderProfileInterfaceBridge(
 		}
 		return existing, nil
 	}
-	name, err := interfaceTargetName("$goProviderProfileBridge_", artifactKey)
+	name, err = providerProfileBridgeTargetName(name, selected)
 	if err != nil {
 		return providerInterfaceBridgeBinding{}, err
 	}
@@ -249,16 +242,12 @@ func (r *Registry) internProviderProfileInterfaceBridge(
 	); err != nil {
 		return providerInterfaceBridgeBinding{}, err
 	}
-	outputPath, err := output.ProviderInterfaceBridgePath(artifactKey)
-	if err != nil {
-		return providerInterfaceBridgeBinding{}, err
-	}
 	owner, err := api.NewCompilationProviderProfileBridgeArtifact(
 		sourceType,
 		selected,
 		artifactKey,
 		name,
-		outputPath,
+		output.ProviderInterfaceBridgeSupportPath,
 	)
 	if err != nil {
 		return providerInterfaceBridgeBinding{}, err
@@ -272,6 +261,22 @@ func (r *Registry) internProviderProfileInterfaceBridge(
 	return binding, nil
 }
 
+func providerProfileBridgeTargetName(
+	base string,
+	selected []gostdlib.ProviderCallableProfileInterface,
+) (string, error) {
+	if base == "" || len(selected) == 0 {
+		return "", &api.NameError{
+			Reason: "provider-profile bridge semantic name is invalid",
+		}
+	}
+	parts, err := providerProfileBridgeNameParts(selected)
+	if err != nil {
+		return "", err
+	}
+	return base + "$Using$" + strings.Join(parts, "$And$"), nil
+}
+
 func sameProviderProfileInterfaces(
 	left []gostdlib.ProviderCallableProfileInterface,
 	right []gostdlib.ProviderCallableProfileInterface,
@@ -279,26 +284,27 @@ func sameProviderProfileInterfaces(
 	if len(left) != len(right) {
 		return false
 	}
-	for index := range left {
-		if left[index].SourceIdentity() != right[index].SourceIdentity() ||
-			left[index].TargetFingerprint() != right[index].TargetFingerprint() {
-			return false
-		}
+	leftParts, leftErr := providerProfileBridgeSemanticParts(left)
+	rightParts, rightErr := providerProfileBridgeSemanticParts(right)
+	if leftErr != nil || rightErr != nil {
+		return false
 	}
-	return true
+	return slices.Equal(leftParts, rightParts)
 }
 
 func (r *Registry) internInterfaceMethodToken(
 	artifactKey string,
 	method *types.Func,
 	signature *types.Signature,
+	name string,
 	runtime api.RuntimeSymbol,
 ) (interfaceMethodTokenBinding, error) {
 	if r == nil ||
 		method == nil ||
 		signature == nil ||
 		signature.Recv() != nil ||
-		artifactKey == "" {
+		artifactKey == "" ||
+		name == "" {
 		return interfaceMethodTokenBinding{}, &api.NameError{
 			Reason: "interface-method-token canonicalization input is invalid",
 		}
@@ -318,10 +324,6 @@ func (r *Registry) internInterfaceMethodToken(
 			}
 		}
 		return existing, nil
-	}
-	name, err := interfaceTargetName("$goInterfaceMethod_", artifactKey)
-	if err != nil {
-		return interfaceMethodTokenBinding{}, err
 	}
 	if err := reserveGeneratedName(
 		r.interfaceMethodNames,
@@ -354,12 +356,14 @@ func (r *Registry) internInterfaceMethodCallable(
 	artifactKey string,
 	method *types.Func,
 	signature *types.Signature,
+	name string,
 ) (interfaceMethodCallableBinding, error) {
 	if r == nil ||
 		method == nil ||
 		signature == nil ||
 		signature.Recv() != nil ||
-		artifactKey == "" {
+		artifactKey == "" ||
+		name == "" {
 		return interfaceMethodCallableBinding{}, &api.NameError{
 			Reason: "interface-method callable canonicalization input is invalid",
 		}
@@ -375,13 +379,6 @@ func (r *Registry) internInterfaceMethodCallable(
 			}
 		}
 		return existing, nil
-	}
-	name, err := interfaceTargetName(
-		"$goInterfaceCallable_",
-		artifactKey,
-	)
-	if err != nil {
-		return interfaceMethodCallableBinding{}, err
 	}
 	if err := reserveGeneratedName(
 		r.interfaceMethodCallableNames,
@@ -412,10 +409,14 @@ func (r *Registry) internInterfaceMethodCallable(
 func (r *Registry) internInterfaceDynamicTypeToken(
 	artifactKey string,
 	sourceType types.Type,
+	name string,
+	placement generatedArtifactPlacement,
 ) (interfaceDynamicTypeTokenBinding, error) {
 	if r == nil ||
 		!interfaceAdapterSource(sourceType) ||
-		artifactKey == "" {
+		artifactKey == "" ||
+		name == "" ||
+		!placement.kind.Valid() {
 		return interfaceDynamicTypeTokenBinding{}, &api.NameError{
 			Reason: "interface-dynamic-type canonicalization input is invalid",
 		}
@@ -428,26 +429,29 @@ func (r *Registry) internInterfaceDynamicTypeToken(
 				Reason: "interface-dynamic-type key joined non-identical Go types",
 			}
 		}
+		if !sameGeneratedPlacement(existing.owner, placement) {
+			return interfaceDynamicTypeTokenBinding{}, &api.NameError{
+				Name:   existing.name,
+				Reason: "interface-dynamic-type placement is inconsistent",
+			}
+		}
 		return existing, nil
 	}
-	name, err := interfaceTargetName("$goDynamicType_", artifactKey)
-	if err != nil {
-		return interfaceDynamicTypeTokenBinding{}, err
-	}
-	if err := reserveGeneratedName(
+	if err := reserveGeneratedScopedName(
 		r.interfaceDynamicNames,
 		name,
 		artifactKey,
 		"interface-dynamic-type",
+		placement,
+		output.InterfaceTypeSupportPath,
 	); err != nil {
 		return interfaceDynamicTypeTokenBinding{}, err
 	}
-	owner, err := api.NewCompilationGeneratedArtifact(
-		api.GeneratedArtifactInterfaceDynamicTypeToken,
+	owner, err := newInterfaceDynamicTypeArtifact(
 		sourceType,
 		artifactKey,
 		name,
-		output.InterfaceTypeSupportPath,
+		placement,
 	)
 	if err != nil {
 		return interfaceDynamicTypeTokenBinding{}, err
@@ -457,13 +461,20 @@ func (r *Registry) internInterfaceDynamicTypeToken(
 	return binding, nil
 }
 
-func interfaceTargetName(prefix string, artifactKey string) (string, error) {
-	if len(artifactKey) < interfaceTargetNameHexLength {
-		return "", &api.NameError{
-			Reason: "interface artifact key is invalid",
-		}
-	}
-	return prefix + artifactKey[:interfaceTargetNameHexLength], nil
+func reserveGeneratedScopedName(
+	names map[genericGeneratedNameScope]string,
+	name string,
+	artifactKey string,
+	kind string,
+	placement generatedArtifactPlacement,
+	module string,
+) error {
+	return reserveGenericGeneratedName(
+		names,
+		generatedArtifactNameScope(name, placement, module),
+		artifactKey,
+		kind,
+	)
 }
 
 func reserveGeneratedName(
@@ -475,7 +486,7 @@ func reserveGeneratedName(
 	if existing := names[name]; existing != "" && existing != artifactKey {
 		return &api.NameError{
 			Name:   name,
-			Reason: kind + " target-name prefix collision",
+			Reason: kind + " target-name collision",
 		}
 	}
 	names[name] = artifactKey
@@ -498,16 +509,12 @@ func newInterfaceAdapterArtifact(
 			placement.anchor,
 		)
 	}
-	outputPath, err := output.InterfaceAdapterPath(artifactKey)
-	if err != nil {
-		return nil, err
-	}
 	return api.NewCompilationGeneratedArtifact(
 		api.GeneratedArtifactInterfaceAdapter,
 		sourceType,
 		artifactKey,
 		name,
-		outputPath,
+		output.InterfaceAdapterSupportPath,
 	)
 }
 
@@ -527,16 +534,37 @@ func newAnonymousInterfaceArtifact(
 			placement.anchor,
 		)
 	}
-	outputPath, err := output.AnonymousInterfacePath(artifactKey)
-	if err != nil {
-		return nil, err
-	}
 	return api.NewCompilationGeneratedArtifact(
 		api.GeneratedArtifactAnonymousInterface,
 		interfaceType,
 		artifactKey,
 		name,
-		outputPath,
+		output.AnonymousInterfaceSupportPath,
+	)
+}
+
+func newInterfaceDynamicTypeArtifact(
+	sourceType types.Type,
+	artifactKey string,
+	name string,
+	placement generatedArtifactPlacement,
+) (*api.GeneratedArtifact, error) {
+	if placement.kind == api.GeneratedArtifactPlacementLexical {
+		return api.NewLexicalGeneratedArtifact(
+			api.GeneratedArtifactInterfaceDynamicTypeToken,
+			sourceType,
+			artifactKey,
+			name,
+			placement.lexicalOwner,
+			placement.anchor,
+		)
+	}
+	return api.NewCompilationGeneratedArtifact(
+		api.GeneratedArtifactInterfaceDynamicTypeToken,
+		sourceType,
+		artifactKey,
+		name,
+		output.InterfaceTypeSupportPath,
 	)
 }
 

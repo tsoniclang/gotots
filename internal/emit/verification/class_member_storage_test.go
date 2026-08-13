@@ -105,7 +105,7 @@ func assertClassMemberMethodAST(
 		}
 	}
 	for name := range methods {
-		if strings.HasPrefix(name, "$go$private_") {
+		if strings.HasPrefix(name, "$go$private$") {
 			t.Fatalf("unreached private method %q entered Counter", name)
 		}
 	}
@@ -385,14 +385,14 @@ func TestGenericInterfaceCallableFamilyConverges(t *testing.T) {
 	}
 	if tokens := strings.Count(
 		artifacts.printed,
-		"export const $goInterfaceMethod_",
+		"export const $goInterfaceMethod$",
 	); tokens != 2 {
 		t.Fatalf(
 			"generic interface runtime tokens = %d, want two closed signatures",
 			tokens,
 		)
 	}
-	if strings.Contains(artifacts.printed, "$goInterfaceCallable_") {
+	if strings.Contains(artifacts.printed, "$goInterfaceCallable$") {
 		t.Fatal("contract-only interface callable leaked into TypeScript output")
 	}
 	if strings.Contains(artifacts.printed, "Value(): Promise<T>;") ||

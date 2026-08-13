@@ -2,7 +2,10 @@ module github.com/tsoniclang/gotots
 
 go 1.26.4
 
-require golang.org/x/tools v0.45.0
+require (
+	golang.org/x/mod v0.36.0
+	golang.org/x/tools v0.45.0
+)
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -11,7 +14,6 @@ require (
 	github.com/mackerelio/go-osstat v0.2.7 // indirect
 	github.com/microsoft/typescript-go v0.0.0-20260613021236-c78d39e7075b // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
-	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/term v0.44.0 // indirect

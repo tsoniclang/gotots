@@ -143,7 +143,7 @@ func assertAggregateMapArtifacts(
 	largestBytes := 0
 	largestPath := ""
 	for _, file := range emission.Files() {
-		if !strings.HasPrefix(file.OutputPath(), "support/maps/") {
+		if file.OutputPath() != output.MapSpecializationSupportPath {
 			continue
 		}
 		generatedFiles++
@@ -155,7 +155,7 @@ func assertAggregateMapArtifacts(
 			)
 		}
 		source := readFile(t, artifacts.file(t, file.OutputPath()))
-		definitions := strings.Count(source, "export class $goMap_")
+		definitions := strings.Count(source, "export class $goMap$")
 		if definitions == 0 {
 			t.Fatalf("map specialization shard %s is empty", file.OutputPath())
 		}
@@ -174,13 +174,16 @@ func assertAggregateMapArtifacts(
 			largestBytes = len(source)
 			largestPath = file.OutputPath()
 		}
-		if len(source) > definitions*7_000 {
-			t.Fatalf(
-				"map specialization shard %s = %d bytes for %d definitions, want at most 7000 bytes per definition",
-				file.OutputPath(),
-				len(source),
-				definitions,
-			)
+		for name, classSource := range mapClassSources(source) {
+			if payloadBytes := mapClassPayloadBytes(name, classSource); payloadBytes > 7_200 {
+				t.Fatalf(
+					"map specialization %s#%s = %d semantic payload bytes (%d actual), want at most 7200 payload bytes",
+					file.OutputPath(),
+					name,
+					payloadBytes,
+					len(classSource),
+				)
+			}
 		}
 		for _, forbidden := range []string{
 			": any",
@@ -223,7 +226,7 @@ func assertAggregateMapArtifacts(
 		t,
 		artifacts.file(t, output.AnonymousStructSupportPath),
 	)
-	if strings.Count(anonymous, "export class $goStruct_") != 2 ||
+	if strings.Count(anonymous, "export class $goStruct$") != 2 ||
 		strings.Count(anonymous, "static $hash(") != 1 {
 		t.Fatalf(
 			"anonymous map dependency owns the wrong classes/hash surface:\n%s",

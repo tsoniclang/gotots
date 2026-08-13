@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -33,6 +34,11 @@ func Distinct() {
 		t.Fatalf("anonymous struct types = %d, want 8", len(structTypes))
 	}
 	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers(
+		[]*types.Package{sourcePackage},
+	); err != nil {
+		t.Fatal(err)
+	}
 	names := testFileNames(
 		t,
 		NewOwner(sourcePackage.Scope(), info, registry),
@@ -63,8 +69,8 @@ func Distinct() {
 		}
 	}
 	for _, binding := range registry.anonymousStructs {
-		if len(binding.name) > len("$goStruct_")+20 {
-			t.Fatalf("anonymous struct target name is unbounded: %q", binding.name)
+		if !strings.HasPrefix(binding.name, "$goStruct$Struct_") {
+			t.Fatalf("anonymous struct target name is not semantic: %q", binding.name)
 		}
 	}
 }
@@ -144,6 +150,11 @@ func Second() {
 		t.Fatal("spelling-only identity foil is not actually identical")
 	}
 	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers(
+		[]*types.Package{sourcePackage},
+	); err != nil {
+		t.Fatal(err)
+	}
 	var functions []*types.Func
 	var functionDeclarations []*ast.FuncDecl
 	for _, declaration := range sourceFile.Decls {
@@ -192,8 +203,11 @@ func Second() {
 		}
 		references = append(references, reference)
 	}
-	if references[0].Name() == references[1].Name() {
-		t.Fatal("same-spelled local named types unified lexical artifacts")
+	if references[0].Name() != references[1].Name() {
+		t.Fatal("disjoint lexical scopes received needless global name noise")
+	}
+	if len(registry.anonymousStructs) != 2 {
+		t.Fatalf("exact lexical artifacts = %d, want 2", len(registry.anonymousStructs))
 	}
 	for _, binding := range registry.anonymousStructs {
 		if binding.owner.Placement() !=
@@ -249,6 +263,11 @@ func Use() {
 		t.Fatal("named-component identity fixture is incomplete")
 	}
 	registry := NewRegistry()
+	if err := registry.indexPackageQualifiers(
+		[]*types.Package{sourcePackage},
+	); err != nil {
+		t.Fatal(err)
+	}
 	owner := NewOwner(sourcePackage.Scope(), info, registry)
 	if _, err := owner.Reserve(
 		packageType,
@@ -335,12 +354,29 @@ var Second struct{ Value int64 }
 		t.Fatal(err)
 	}
 	placement := moduleAnonymousStructPlacement()
+	firstName, err := semanticGeneratedTypeName(
+		"$goStruct$",
+		structTypes[0].target,
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondName, err := semanticGeneratedTypeName(
+		"$goStruct$",
+		structTypes[1].target,
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("artifact key", func(t *testing.T) {
 		registry := NewRegistry()
 		if _, err := registry.internAnonymousStruct(
 			firstKey,
 			structTypes[0].target,
+			firstName,
 			placement,
 		); err != nil {
 			t.Fatal(err)
@@ -348,31 +384,30 @@ var Second struct{ Value int64 }
 		if _, err := registry.internAnonymousStruct(
 			firstKey,
 			structTypes[1].target,
+			secondName,
 			placement,
 		); err == nil {
 			t.Fatal("artifact-key collision unified non-identical Go types")
 		}
 	})
 
-	t.Run("target prefix", func(t *testing.T) {
+	t.Run("semantic target name", func(t *testing.T) {
 		registry := NewRegistry()
 		if _, err := registry.internAnonymousStruct(
 			firstKey,
 			structTypes[0].target,
+			firstName,
 			placement,
 		); err != nil {
 			t.Fatal(err)
 		}
-		collision := firstKey[:20] + secondKey[20:]
-		if collision == firstKey {
-			t.Fatal("target-prefix collision fixture is identical")
-		}
 		if _, err := registry.internAnonymousStruct(
-			collision,
+			secondKey,
 			structTypes[1].target,
+			firstName,
 			placement,
 		); err == nil {
-			t.Fatal("target-name prefix collision was accepted")
+			t.Fatal("semantic target-name collision was accepted")
 		}
 	})
 }
@@ -412,6 +447,7 @@ func TestAnonymousStructCrossPackageOwnershipIgnoresFirstEncounter(t *testing.T)
 	firstOwner, err := NewRegistry().internAnonymousStruct(
 		firstKey,
 		firstType,
+		"$goStruct$Struct_Field_Value_int32_Tag__empty_",
 		moduleAnonymousStructPlacement(),
 	)
 	if err != nil {
@@ -420,6 +456,7 @@ func TestAnonymousStructCrossPackageOwnershipIgnoresFirstEncounter(t *testing.T)
 	secondOwner, err := NewRegistry().internAnonymousStruct(
 		secondKey,
 		secondType,
+		"$goStruct$Struct_Field_Value_int32_Tag__empty_",
 		moduleAnonymousStructPlacement(),
 	)
 	if err != nil {

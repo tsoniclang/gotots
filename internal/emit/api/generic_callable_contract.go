@@ -330,7 +330,6 @@ type GenericConcretization struct {
 	signature    *types.Signature
 	effect       GenericConcretizationEffect
 	key          string
-	suffix       string
 	placement    GeneratedArtifactPlacement
 	lexicalOwner ArtifactOwner
 	anchor       *types.TypeName
@@ -342,7 +341,6 @@ func NewGenericConcretization(
 	signature *types.Signature,
 	effect GenericConcretizationEffect,
 	key string,
-	suffix string,
 	placement GeneratedArtifactPlacement,
 	lexicalOwner ArtifactOwner,
 	anchor *types.TypeName,
@@ -353,7 +351,6 @@ func NewGenericConcretization(
 		signature:    signature,
 		effect:       effect,
 		key:          key,
-		suffix:       suffix,
 		placement:    placement,
 		lexicalOwner: lexicalOwner,
 		anchor:       anchor,
@@ -369,7 +366,7 @@ func NewGenericConcretization(
 
 func (c *GenericConcretization) Valid() bool {
 	if c == nil || c.owner == nil || c.owner.Origin() != c.owner ||
-		c.key == "" || c.suffix == "" || c.signature == nil ||
+		c.key == "" || c.signature == nil ||
 		!c.effect.Valid() {
 		return false
 	}
@@ -428,7 +425,6 @@ func (c *GenericConcretization) Identical(
 		c.owner != other.owner ||
 		c.key != other.key ||
 		c.effect != other.effect ||
-		c.suffix != other.suffix ||
 		c.placement != other.placement ||
 		c.lexicalOwner != other.lexicalOwner ||
 		c.anchor != other.anchor ||
@@ -477,13 +473,6 @@ func (c *GenericConcretization) Key() string {
 		return ""
 	}
 	return c.key
-}
-
-func (c *GenericConcretization) Suffix() string {
-	if !c.Valid() {
-		return ""
-	}
-	return c.suffix
 }
 
 func (c *GenericConcretization) Placement() GeneratedArtifactPlacement {
