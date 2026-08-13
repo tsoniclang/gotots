@@ -36,6 +36,35 @@ func Emit(
 		return api.StatementEmission{}, err
 	}
 	statements := deferred.Before()
+	if binding, static := control.StaticBinding(source); static {
+		statements = append(
+			statements,
+			context.Factory().ExpressionStatement(
+				context.Factory().BinaryExpression(
+					nil,
+					context.Factory().Identifier(binding),
+					nil,
+					context.Factory().BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsToken,
+					),
+					deferred.Value(),
+				),
+			),
+		)
+		return api.NewStatementEmission(
+			statements,
+			api.CombineRequests(
+				deferred.Requests(),
+				[]api.RootRequest{request},
+			),
+		)
+	}
+	if control.Stack() == "" {
+		return api.StatementEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "defer statement has no selected storage",
+		}
+	}
 	statements = append(
 		statements,
 		context.Factory().ExpressionStatement(

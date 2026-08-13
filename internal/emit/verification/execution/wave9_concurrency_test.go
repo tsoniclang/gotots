@@ -257,19 +257,19 @@ func TestImmediateFunctionLiteralBypassesFirstClassCallableABI(t *testing.T) {
 	}
 	if !strings.Contains(
 		artifacts.printed,
-		"__gotots_defers_0.push(($go$recovery: GoRecovery): void => {",
+		"__gotots_deferred_0 = ($go$recovery: GoRecovery): void => {",
 	) {
 		t.Fatalf(
-			"deferred direct literal lacks its recovery-owned defer envelope:\n%s",
+			"deferred direct literal lacks its recovery-owned static slot:\n%s",
 			artifacts.printed,
 		)
 	}
 	if !strings.Contains(
 		artifacts.printed,
-		"const __gotots_defers_0: (($go$recovery: GoRecovery) => Awaitable<void>)[] = [];",
+		"let __gotots_deferred_0: (($go$recovery: GoRecovery) => Awaitable<void>) | undefined = undefined;",
 	) {
 		t.Fatalf(
-			"cooperative defer stack lacks its canonical Awaitable transport:\n%s",
+			"cooperative defer slot lacks its canonical Awaitable transport:\n%s",
 			artifacts.printed,
 		)
 	}
