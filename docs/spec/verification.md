@@ -577,6 +577,14 @@ registered private entry. Provider-facet tests prove both certified presence
 and certified absence; absence must not create a public/bridge-wide recovery
 entry or fail an otherwise valid call.
 
+Artifact inspection separately exact-joins fixed and dynamic defer sites. A
+top-level direct site that executes at most once owns one fixed typed slot and
+no dynamic stack; multiple such slots drain in reverse source order. Loop,
+conditional, and non-structural-goto sites retain the dynamic stack. Mutations
+that classify a repeated/conditional site as fixed, restore a stack for the
+single-entry class, or change the drain order fail shape plus Go/TypeScript
+differential behavior.
+
 Mutations make recovery ambient, pass authority through an ordinary source
 call, forward it one call deeper, omit registry registration, key the registry
 by storage location/spelling, reverse defer order, capture arguments late, or
@@ -1070,16 +1078,19 @@ package.
 
 Generated-support topology proof exact-joins full internal artifact owners and
 definitions to readable modules grouped by real semantic family and
-source-derived owner. Layout tests prove that artifacts with one semantic
-source owner share its module, different semantic owners do not merge, real
-collisions receive the shortest deterministic readable qualifier, and
-malformed identities fail. Digests may occur in manifests and diagnostics but
-never in ordinary declaration names or module paths.
+source/type owner. Layout tests prove that every shared closed support family
+retains one common module, every contained definition retains its exact
+injective semantic export name, different semantic owners do not merge, and
+source-owned generic modules retain their exact semantic source owner. At an
+import site the shortest family alias is used only when free; real collisions
+use the full semantic export or the shortest deterministic source-derived
+qualifier. Malformed semantic modules fail. Digests may occur in manifests and
+diagnostics but never in ordinary declaration names or module paths.
 
 Product evidence reports support definitions separately from physical support
 modules, the largest semantic module, ESM startup time/RSS, and minimal-compile
-time/RSS. Mutations restoring one physical module per artifact, digest-byte or
-numbered sharding, source-name collision, or cross-family merging fail the
+time/RSS. Mutations restoring digest-byte or numbered sharding, an opaque
+declaration suffix, source-name collision, or cross-family merging fail the
 layout, ownership, source-shape, or strict-typecheck gate. Release evidence
 compares startup and typecheck cost against the immediately preceding layout;
 readability cannot hide an unbounded module, and a cost regression cannot

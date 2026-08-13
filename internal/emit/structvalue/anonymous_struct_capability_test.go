@@ -75,7 +75,7 @@ func Empty(value struct{}) (struct{}, bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(encoded), "$goStruct_") {
+	if strings.Contains(string(encoded), "$goStruct$") {
 		t.Fatal("empty struct source retained a generated anonymous-struct identity")
 	}
 }

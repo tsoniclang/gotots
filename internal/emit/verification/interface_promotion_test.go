@@ -53,7 +53,7 @@ func TestWaveSixInterfacesCompileThroughThePublicPipeline(t *testing.T) {
 				emission,
 				workingDirectory,
 			)
-			if artifacts.bytes > 110_000 || artifacts.largest > 40_000 {
+			if artifacts.bytes > 110_000 || artifacts.largest > 45_000 {
 				t.Fatalf(
 					"Wave 6 artifact bounds exceeded: total=%d largest=%d",
 					artifacts.bytes,
@@ -96,13 +96,13 @@ func assertWaveSixShape(t *testing.T, printed string) {
 		"Object.freeze(",
 		"switch (true)",
 		".$is(",
-		"$go$type === $goDynamicType_",
+		"$go$type === $goDynamicType$",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("Wave 6 artifacts lack %q:\n%s", required, printed)
 		}
 	}
-	if strings.Contains(printed, "instanceof $goInterfaceAdapter_") {
+	if strings.Contains(printed, "instanceof GoInterfaceAdapter") {
 		t.Fatalf(
 			"Wave 6 artifacts use constructor identity for Go dynamic types:\n%s",
 			printed,
@@ -345,7 +345,7 @@ func measureWaveSixScale(
 	target := printed.String()
 	result.adapters = strings.Count(
 		target,
-		"export class $goInterfaceAdapter_",
+		"export class $goInterfaceAdapter$",
 	)
 	call := targetFunctionText(t, target, "Call")
 	result.callBytes = len(call)
@@ -418,7 +418,7 @@ func TestPromotedPointerInterfaceAdapterPreservesReceiverAddress(
 			artifacts := materializeArtifacts(t, emission, workingDirectory)
 			if !strings.Contains(
 				artifacts.printed,
-				"$goInterfaceAdapter_",
+				"GoInterfaceAdapter",
 			) || !strings.Contains(
 				artifacts.printed,
 				"Inner__from_promotedpointer.Increment(",

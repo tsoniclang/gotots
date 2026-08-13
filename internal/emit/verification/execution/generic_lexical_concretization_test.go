@@ -208,7 +208,7 @@ func TestDeferredGenericCallablesWithoutRecoverUseOrdinaryEntries(t *testing.T) 
 	for _, required := range []string{
 		"export function store$kernel<T>",
 		"export function store$int32",
-		"$goDeferred_",
+		"DeferredCallableRegistry",
 		".resolve(",
 		"deferred_callable_registry",
 	} {

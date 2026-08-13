@@ -5,6 +5,7 @@ import (
 	"context"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -86,8 +87,8 @@ func Zero() struct{ Value int32 } {
 		t.Fatalf("shared anonymous classes = %d, want one", len(classes))
 	}
 	class := classes[0]
-	if len(class.Name().Text()) > len("$goStruct_")+20 {
-		t.Fatalf("anonymous class name is unbounded: %q", class.Name().Text())
+	if !strings.HasPrefix(class.Name().Text(), "$goStruct$Struct_") {
+		t.Fatalf("anonymous class name is not semantic: %q", class.Name().Text())
 	}
 	assertStaticOperationSequence(
 		t,

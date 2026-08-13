@@ -1,5 +1,5 @@
 import type { int32 } from "@gotots/runtime/scalars.js";
-import { Cell, mark } from "../../../modules/30b189d6a1f032298fdb86d2246d93c1095afdffc5c48f3a05e48e2d7fd2d1f6/dep/state.js";
+import { Cell, mark } from "../../../../modules/example.com/package-state/dep/state.js";
 import { $state } from "./state.js";
 export function $initialize(): void {
     $state.A = 0;
@@ -25,5 +25,5 @@ export function $initialize(): void {
         }));
     }
 }
-export { Cell, Cell$Storage, Snapshot } from "../../../modules/30b189d6a1f032298fdb86d2246d93c1095afdffc5c48f3a05e48e2d7fd2d1f6/dep/state.js";
+export { Cell, Cell$Storage, Snapshot } from "../../../../modules/example.com/package-state/dep/state.js";
 export { $state };

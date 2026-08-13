@@ -6,10 +6,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
-	"github.com/tsoniclang/gotots/internal/output"
 )
-
-const interfaceTargetNameHexLength = 20
 
 func (n *File) InterfaceAdapter(
 	sourceType types.Type,
@@ -28,6 +25,20 @@ func (n *File) InterfaceAdapter(
 	if err != nil {
 		return api.NameReference{}, err
 	}
+	name, err := n.semanticGeneratedTypeName(
+		"$goInterfaceAdapter$",
+		sourceType,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	reflectionName, err := n.semanticGeneratedTypeName(
+		"$goReflectType$",
+		sourceType,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
 	placement, err := n.generatedArtifactPlacement(sourceType)
 	if err != nil {
 		return api.NameReference{}, err
@@ -35,6 +46,8 @@ func (n *File) InterfaceAdapter(
 	binding, err := n.owner.registry.internInterfaceAdapter(
 		artifactKey,
 		sourceType,
+		name,
+		reflectionName,
 		placement,
 	)
 	if err != nil {
@@ -113,9 +126,14 @@ func (n *File) InterfaceDynamicType(
 	if err != nil {
 		return api.NameReference{}, err
 	}
+	name, err := n.semanticGeneratedTypeName("$goDynamicType$", sourceType)
+	if err != nil {
+		return api.NameReference{}, err
+	}
 	binding, err := n.owner.registry.internInterfaceDynamicTypeToken(
 		artifactKey,
 		sourceType,
+		name,
 	)
 	if err != nil {
 		return api.NameReference{}, err
@@ -164,9 +182,17 @@ func (n *File) ProviderInterfaceBridge(
 	if err != nil {
 		return api.NameReference{}, true, err
 	}
+	name, err := n.semanticGeneratedTypeName(
+		"$goProviderInterfaceBridge$",
+		named,
+	)
+	if err != nil {
+		return api.NameReference{}, true, err
+	}
 	binding, err := n.owner.registry.internProviderInterfaceBridge(
 		artifactKey,
 		named,
+		name,
 	)
 	if err != nil {
 		return api.NameReference{}, true, err
@@ -221,9 +247,17 @@ func (n *File) ProviderProfileInterfaceBridge(
 	if err != nil {
 		return api.ProviderProfileBridgeReference{}, true, err
 	}
+	name, err := n.semanticGeneratedTypeName(
+		"$goProviderProfileBridge$",
+		named,
+	)
+	if err != nil {
+		return api.ProviderProfileBridgeReference{}, true, err
+	}
 	binding, err := n.owner.registry.internProviderProfileInterfaceBridge(
 		sourceKey,
 		named,
+		name,
 		profile,
 	)
 	if err != nil {
@@ -327,6 +361,13 @@ func (n *File) generatedInterfaceContract(
 	if err != nil {
 		return api.InterfaceContractReference{}, err
 	}
+	name, err := n.semanticGeneratedTypeName(
+		"$goInterface$",
+		interfaceType,
+	)
+	if err != nil {
+		return api.InterfaceContractReference{}, err
+	}
 	placement, err := n.generatedArtifactPlacement(interfaceType)
 	if err != nil {
 		return api.InterfaceContractReference{}, err
@@ -334,6 +375,7 @@ func (n *File) generatedInterfaceContract(
 	binding, err := n.owner.registry.internAnonymousInterface(
 		artifactKey,
 		interfaceType,
+		name,
 		placement,
 	)
 	if err != nil {
@@ -365,14 +407,19 @@ func (n *File) generatedInterfaceContract(
 		}
 		if binding.owner.OutputPath() != n.targetPath {
 			imports, importErr := n.interfaceContractImports(
-				binding.owner.OutputPath(),
+				binding.owner,
 				binding.name,
-				"",
 			)
 			if importErr != nil {
 				return api.InterfaceContractReference{}, importErr
 			}
-			requests = append(requests, imports...)
+			requests = append(requests, imports.requests...)
+			return api.NewInterfaceContractReference(
+				imports.typeName,
+				imports.contractName,
+				imports.guardName,
+				requests...,
+			)
 		}
 	}
 	return api.NewInterfaceContractReference(
@@ -429,6 +476,13 @@ func (n *File) generatedInterfaceType(
 	if err != nil {
 		return api.NameReference{}, err
 	}
+	name, err := n.semanticGeneratedTypeName(
+		"$goInterface$",
+		interfaceType,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
 	placement, err := n.generatedArtifactPlacement(interfaceType)
 	if err != nil {
 		return api.NameReference{}, err
@@ -436,6 +490,7 @@ func (n *File) generatedInterfaceType(
 	binding, err := n.owner.registry.internAnonymousInterface(
 		artifactKey,
 		interfaceType,
+		name,
 		placement,
 	)
 	if err != nil {
@@ -445,45 +500,13 @@ func (n *File) generatedInterfaceType(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	requests := []api.RootRequest{requirement}
-	if binding.owner.Placement() ==
-		api.GeneratedArtifactPlacementLexical {
-		return api.NewNameReference(binding.name, requests...)
-	}
-	if n.artifactOwner.Valid() &&
-		n.artifactOwner != api.MustGeneratedArtifactOwner(binding.owner) {
-		dependency, dependencyErr :=
-			api.NewGeneratedArtifactDependencyRequest(
-				binding.owner,
-				api.ArtifactFacetInstanceTypeSurface,
-			)
-		if dependencyErr != nil {
-			return api.NameReference{}, dependencyErr
-		}
-		requests = append(requests, dependency)
-	}
-	if binding.owner.OutputPath() == n.targetPath {
-		return api.NewNameReference(binding.name, requests...)
-	}
-	modulePath, err := output.ModuleSpecifier(
-		n.targetPath,
-		binding.owner.OutputPath(),
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	importRequest, err := api.NewImportRequest(
-		n.factory,
+	return n.generatedReference(
+		binding.owner,
+		binding.name,
+		requirement,
+		api.ArtifactFacetInstanceTypeSurface,
 		api.ImportPhaseType,
-		modulePath,
-		binding.name,
-		binding.name,
 	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	requests = append(requests, importRequest)
-	return api.NewNameReference(binding.name, requests...)
 }
 
 func (n *File) providerInterfaceContract(typeName *types.TypeName) bool {

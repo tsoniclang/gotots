@@ -57,7 +57,7 @@ func TestReflectTypeForUsesCanonicalGeneratedMetadata(t *testing.T) {
 	if strings.Contains(artifacts.printed, ".TypeFor<") {
 		t.Fatalf("TypeFor retained an erased TypeScript generic call:\n%s", artifacts.printed)
 	}
-	if !strings.Contains(artifacts.printed, "$goReflectType_") {
+	if !strings.Contains(artifacts.printed, "$goReflectType$") {
 		t.Fatalf("TypeFor emitted no canonical runtime-type reference:\n%s", artifacts.printed)
 	}
 	for _, redundant := range []string{

@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -63,8 +64,8 @@ func Distinct() {
 		}
 	}
 	for _, binding := range registry.anonymousStructs {
-		if len(binding.name) > len("$goStruct_")+20 {
-			t.Fatalf("anonymous struct target name is unbounded: %q", binding.name)
+		if !strings.HasPrefix(binding.name, "$goStruct$Struct_") {
+			t.Fatalf("anonymous struct target name is not semantic: %q", binding.name)
 		}
 	}
 }
@@ -335,12 +336,29 @@ var Second struct{ Value int64 }
 		t.Fatal(err)
 	}
 	placement := moduleAnonymousStructPlacement()
+	firstName, err := semanticGeneratedTypeName(
+		"$goStruct$",
+		structTypes[0].target,
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondName, err := semanticGeneratedTypeName(
+		"$goStruct$",
+		structTypes[1].target,
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("artifact key", func(t *testing.T) {
 		registry := NewRegistry()
 		if _, err := registry.internAnonymousStruct(
 			firstKey,
 			structTypes[0].target,
+			firstName,
 			placement,
 		); err != nil {
 			t.Fatal(err)
@@ -348,31 +366,30 @@ var Second struct{ Value int64 }
 		if _, err := registry.internAnonymousStruct(
 			firstKey,
 			structTypes[1].target,
+			secondName,
 			placement,
 		); err == nil {
 			t.Fatal("artifact-key collision unified non-identical Go types")
 		}
 	})
 
-	t.Run("target prefix", func(t *testing.T) {
+	t.Run("semantic target name", func(t *testing.T) {
 		registry := NewRegistry()
 		if _, err := registry.internAnonymousStruct(
 			firstKey,
 			structTypes[0].target,
+			firstName,
 			placement,
 		); err != nil {
 			t.Fatal(err)
 		}
-		collision := firstKey[:20] + secondKey[20:]
-		if collision == firstKey {
-			t.Fatal("target-prefix collision fixture is identical")
-		}
 		if _, err := registry.internAnonymousStruct(
-			collision,
+			secondKey,
 			structTypes[1].target,
+			firstName,
 			placement,
 		); err == nil {
-			t.Fatal("target-name prefix collision was accepted")
+			t.Fatal("semantic target-name collision was accepted")
 		}
 	})
 }
@@ -412,6 +429,7 @@ func TestAnonymousStructCrossPackageOwnershipIgnoresFirstEncounter(t *testing.T)
 	firstOwner, err := NewRegistry().internAnonymousStruct(
 		firstKey,
 		firstType,
+		"$goStruct$Struct_Field_Value_int32_Tag__empty_",
 		moduleAnonymousStructPlacement(),
 	)
 	if err != nil {
@@ -420,6 +438,7 @@ func TestAnonymousStructCrossPackageOwnershipIgnoresFirstEncounter(t *testing.T)
 	secondOwner, err := NewRegistry().internAnonymousStruct(
 		secondKey,
 		secondType,
+		"$goStruct$Struct_Field_Value_int32_Tag__empty_",
 		moduleAnonymousStructPlacement(),
 	)
 	if err != nil {

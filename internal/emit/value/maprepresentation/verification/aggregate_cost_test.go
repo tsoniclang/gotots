@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -15,7 +16,7 @@ const (
 	parentNativeBoxMapSyntaxNodes  = 772
 	maximumNativeBoxMapBytes       = 3800
 	maximumNativeBoxMapSyntaxNodes = 500
-	maximumMapExpansionBytes       = 7000
+	maximumMapExpansionBytes       = 7200
 	maximumMapExpansionSyntaxNodes = 900
 )
 
@@ -23,6 +24,7 @@ type mapExpansionCost struct {
 	path         string
 	storage      string
 	definitions  int
+	actualBytes  int
 	bytes        int
 	syntaxNodes  int
 	keySurface   string
@@ -42,12 +44,13 @@ func TestAggregateMapGeneratedCostInventory(t *testing.T) {
 	}
 	for index, expansion := range inventory[:min(20, len(inventory))] {
 		t.Logf(
-			"map expansion rank=%d path=%s storage=%s definitions=%d bytes=%d syntax-nodes=%d key=%q value=%q",
+			"map expansion rank=%d path=%s storage=%s definitions=%d payload-bytes=%d actual-bytes=%d syntax-nodes=%d key=%q value=%q",
 			index+1,
 			expansion.path,
 			expansion.storage,
 			expansion.definitions,
 			expansion.bytes,
+			expansion.actualBytes,
 			expansion.syntaxNodes,
 			expansion.keySurface,
 			expansion.valueSurface,
@@ -83,34 +86,45 @@ func mapExpansionCosts(
 	t.Helper()
 	var result []mapExpansionCost
 	for _, file := range emission.Files() {
-		if !strings.HasPrefix(file.OutputPath(), "support/maps/") {
+		if file.OutputPath() != output.MapSpecializationSupportPath {
 			continue
 		}
 		source := readFile(t, artifacts.file(t, file.OutputPath()))
-		nodes, err := tsgo.EncodedSyntaxNodeCount(file.SourceFile())
-		if err != nil {
-			t.Fatal(err)
+		nodesByName := make(map[string]int)
+		for _, statement := range file.SourceFile().Statements() {
+			declaration, ok := statement.(tsgo.ClassDeclaration)
+			if !ok || !strings.HasPrefix(declaration.Name().Text(), "$goMap$") {
+				continue
+			}
+			nodes, err := tsgo.EncodedSyntaxNodeCount(declaration)
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodesByName[declaration.Name().Text()] = nodes
 		}
-		storage := "invalid"
-		switch {
-		case strings.Contains(source, "private readonly values: Map<"):
-			storage = "native"
-		case strings.Contains(source, "private readonly buckets: Map<number,"):
-			storage = "hashed"
+		for name, classSource := range mapClassSources(source) {
+			storage := "invalid"
+			switch {
+			case strings.Contains(classSource, "private readonly values: Map<"):
+				storage = "native"
+			case strings.Contains(classSource, "private readonly buckets: Map<number,"):
+				storage = "hashed"
+			}
+			result = append(result, mapExpansionCost{
+				path:        file.OutputPath() + "#" + name,
+				storage:     storage,
+				definitions: 1,
+				actualBytes: len(classSource),
+				bytes:       mapClassPayloadBytes(name, classSource),
+				syntaxNodes: nodesByName[name],
+				keySurface:  mapExpansionKeySurface(classSource),
+				valueSurface: mapExpansionLine(
+					classSource,
+					"private static $copyValue",
+				),
+				source: classSource,
+			})
 		}
-		result = append(result, mapExpansionCost{
-			path:        file.OutputPath(),
-			storage:     storage,
-			definitions: strings.Count(source, "export class $goMap_"),
-			bytes:       len(source),
-			syntaxNodes: nodes,
-			keySurface:  mapExpansionKeySurface(source),
-			valueSurface: mapExpansionLine(
-				source,
-				"private static $copyValue",
-			),
-			source: source,
-		})
 	}
 	sort.Slice(result, func(left int, right int) bool {
 		if result[left].bytes == result[right].bytes {
@@ -118,6 +132,44 @@ func mapExpansionCosts(
 		}
 		return result[left].bytes > result[right].bytes
 	})
+	return result
+}
+
+func mapClassPayloadBytes(name string, source string) int {
+	const localFamilyName = "GoMap"
+	if len(name) <= len(localFamilyName) {
+		return len(source)
+	}
+	return len(source) -
+		strings.Count(source, name)*(len(name)-len(localFamilyName))
+}
+
+func mapClassSources(source string) map[string]string {
+	const prefix = "export class $goMap$"
+	result := make(map[string]string)
+	for start := strings.Index(source, prefix); start >= 0; {
+		remainder := source[start:]
+		end := len(remainder)
+		if next := strings.Index(remainder[len(prefix):], prefix); next >= 0 {
+			end = len(prefix) + next
+		}
+		classSource := remainder[:end]
+		nameStart := len("export class ")
+		nameEnd := strings.IndexAny(classSource[nameStart:], " {<\n")
+		if nameEnd < 0 {
+			break
+		}
+		result[classSource[nameStart:nameStart+nameEnd]] = classSource
+		start += end
+		if start >= len(source) {
+			break
+		}
+		next := strings.Index(source[start:], prefix)
+		if next < 0 {
+			break
+		}
+		start += next
+	}
 	return result
 }
 

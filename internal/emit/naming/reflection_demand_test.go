@@ -221,6 +221,8 @@ func internDemandAdapter(
 	binding, err := registry.internInterfaceAdapter(
 		strings.Repeat(key, 64),
 		sourceType,
+		"$goInterfaceAdapter$"+key,
+		"$goReflectType$"+key,
 		placement,
 	)
 	if err != nil {

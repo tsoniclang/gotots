@@ -281,11 +281,11 @@ func TestRecoveryCallableFormsCanonicalizeWithNativeEvidence(t *testing.T) {
 	}
 	if instances := strings.Count(
 		artifacts.printed,
-		"export const $goDeferred_",
+		"export const $goDeferred$",
 	); instances == 0 {
 		t.Fatal("typed deferred registry instances are absent")
 	}
-	if strings.Contains(artifacts.printed, "export class $goDeferred_") {
+	if strings.Contains(artifacts.printed, "export class DeferredCallableRegistry") {
 		t.Fatal("callable signatures duplicate the deferred registry implementation")
 	}
 	runner := filepath.Join(workingDirectory, "runner.ts")

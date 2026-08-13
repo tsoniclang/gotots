@@ -41,6 +41,16 @@ func TestConcretizationSuffixIsSemanticAndExact(t *testing.T) {
 	}
 }
 
+func TestSemanticIdentifierEscapingIsInjectiveForEscapeLikeSource(t *testing.T) {
+	encodedDot := Identifier(".")
+	literalEscape := Identifier("_u2e_")
+	if encodedDot != "_u2e_" ||
+		literalEscape != "_u5f_u2e_u5f_" ||
+		encodedDot == literalEscape {
+		t.Fatalf("semantic identifiers = %q / %q", encodedDot, literalEscape)
+	}
+}
+
 func TestOperationNameDescribesTheExactContract(t *testing.T) {
 	parameter := types.NewTypeParam(
 		types.NewTypeName(token.NoPos, nil, "T", nil),
@@ -266,6 +276,74 @@ func TestSemanticNameFailuresAreTyped(t *testing.T) {
 	var semanticError *Error
 	if !errors.As(err, &semanticError) || semanticError.Reason == "" {
 		t.Fatalf("semantic name error = %#v", err)
+	}
+}
+
+func TestLocalSemanticTypeNamesRequireAndPreserveExactIdentity(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/model", "model")
+	firstScope := types.NewScope(
+		sourcePackage.Scope(),
+		token.NoPos,
+		token.NoPos,
+		"First",
+	)
+	secondScope := types.NewScope(
+		sourcePackage.Scope(),
+		token.NoPos,
+		token.NoPos,
+		"Second",
+	)
+	firstObject := types.NewTypeName(
+		token.NoPos,
+		sourcePackage,
+		"Local",
+		nil,
+	)
+	secondObject := types.NewTypeName(
+		token.NoPos,
+		sourcePackage,
+		"Local",
+		nil,
+	)
+	if firstScope.Insert(firstObject) != nil ||
+		secondScope.Insert(secondObject) != nil {
+		t.Fatal("local semantic type fixture collided")
+	}
+	first := types.NewNamed(firstObject, types.Typ[types.Int32], nil)
+	second := types.NewNamed(secondObject, types.Typ[types.Int32], nil)
+	firstDisplay, err := Type(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondDisplay, err := Type(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstDisplay != secondDisplay {
+		t.Fatalf("legacy display names = %q / %q", firstDisplay, secondDisplay)
+	}
+	identity := func(object *types.TypeName) (string, error) {
+		switch object {
+		case firstObject:
+			return "example.com/model.First.Local", nil
+		case secondObject:
+			return "example.com/model.Second.Local", nil
+		default:
+			return "", errors.New("foreign local type")
+		}
+	}
+	firstName, err := TypeWithLocalIdentity(first, identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondName, err := TypeWithLocalIdentity(second, identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstName == secondName ||
+		firstName != "Named_example_u2e_com_u2f_model_u2e_First_u2e_Local" ||
+		secondName != "Named_example_u2e_com_u2f_model_u2e_Second_u2e_Local" {
+		t.Fatalf("local semantic names = %q / %q", firstName, secondName)
 	}
 }
 

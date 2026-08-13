@@ -154,6 +154,30 @@ func TestGenericArtifactsUseSemanticModules(t *testing.T) {
 	}
 }
 
+func TestGeneratedArtifactsUseBoundedSemanticFamilyModules(t *testing.T) {
+	want := map[string]string{
+		"map":                        "support/maps.ts",
+		"interface adapter":          "support/interface-adapters.ts",
+		"anonymous interface":        "support/interface-contracts.ts",
+		"provider interface":         "support/provider-interface-bridges.ts",
+		"provider state":             "support/provider-stateful-representations.ts",
+		"deferred callable registry": "support/deferred-callables.ts",
+	}
+	got := map[string]string{
+		"map":                        MapSpecializationSupportPath,
+		"interface adapter":          InterfaceAdapterSupportPath,
+		"anonymous interface":        AnonymousInterfaceSupportPath,
+		"provider interface":         ProviderInterfaceBridgeSupportPath,
+		"provider state":             ProviderStatefulRepresentationSupportPath,
+		"deferred callable registry": DeferredCallableRegistrySupportPath,
+	}
+	for family, expected := range want {
+		if got[family] != expected {
+			t.Fatalf("%s path = %q, want %q", family, got[family], expected)
+		}
+	}
+}
+
 func TestLayoutIsStableAcrossCheckoutRelocationAndSeparatesModuleVersions(t *testing.T) {
 	sourceDirectory := filepath.Join(
 		"..",

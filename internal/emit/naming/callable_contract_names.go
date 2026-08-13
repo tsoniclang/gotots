@@ -11,10 +11,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/output"
 )
 
-const (
-	callableABITargetNameHexLength = 20
-)
-
 func (n *File) GenericCapability(
 	selection api.GenericOperationSelection,
 	signature *types.Signature,
@@ -197,22 +193,7 @@ func (n *File) CallableABI(
 			Reason: "callable ABI signature is invalid",
 		}
 	}
-	signatureKey, err := typeidentity.BuildParameterizedKey(
-		signature,
-		n.generatedNamedObjectIdentity,
-		func(parameter *types.TypeParam) (string, error) {
-			if parameter == nil || parameter.Obj() == nil {
-				return "", &api.NameError{
-					Reason: "callable ABI has an unbound type parameter",
-				}
-			}
-			return n.generatedNamedObjectIdentity(parameter.Obj())
-		},
-	)
-	if err != nil {
-		return api.CallableABIReference{}, err
-	}
-	return n.callableABI(signature, signatureKey, nil)
+	return n.callableABI(signature, nil)
 }
 
 func (n *File) DeferredCallable(
@@ -244,40 +225,40 @@ func (n *File) SourceCallableABI(
 			Reason: "source callable ABI identity is invalid",
 		}
 	}
-	namedIdentity := n.sourceGeneratedNamedObjectIdentity(owner)
-	signatureKey, err := typeidentity.BuildParameterizedKey(
-		signature,
-		namedIdentity,
-		func(parameter *types.TypeParam) (string, error) {
-			if parameter == nil || parameter.Obj() == nil {
-				return "", &api.NameError{
-					Reason: "source callable ABI has an unbound type parameter",
-				}
-			}
-			return namedIdentity(parameter.Obj())
-		},
-	)
-	if err != nil {
-		return api.CallableABIReference{}, err
-	}
 	var sourceScope types.Object
 	if api.ContainsGenericTypeParameter(signature) ||
 		len(typeidentity.LocalComponents(signature)) != 0 {
 		sourceScope = owner
 	}
-	return n.callableABI(signature, signatureKey, sourceScope)
+	return n.callableABI(signature, sourceScope)
 }
 
 func (n *File) callableABI(
 	signature *types.Signature,
-	signatureKey string,
 	sourceScope types.Object,
 ) (api.CallableABIReference, error) {
-	digest := sha256.Sum256([]byte("callable-abi|" + signatureKey))
+	localIdentity := semanticname.LocalNamedIdentity(
+		n.generatedNamedObjectIdentity,
+	)
+	if sourceScope != nil {
+		localIdentity = semanticname.LocalNamedIdentity(
+			n.sourceGeneratedNamedObjectIdentity(sourceScope),
+		)
+	}
+	name, err := semanticGeneratedTypeName(
+		"$goCallable$",
+		signature,
+		localIdentity,
+	)
+	if err != nil {
+		return api.CallableABIReference{}, err
+	}
+	digest := sha256.Sum256([]byte("callable-abi|" + name))
 	artifactKey := hex.EncodeToString(digest[:])
 	binding, err := n.owner.registry.internCallableABI(
 		artifactKey,
 		signature,
+		name,
 	)
 	if err != nil {
 		return api.CallableABIReference{}, err
@@ -349,27 +330,27 @@ func (n *File) sourceGeneratedNamedObjectIdentity(
 func (r *Registry) internCallableABI(
 	artifactKey string,
 	signature *types.Signature,
+	name string,
 ) (callableABIBinding, error) {
 	if r == nil ||
 		len(artifactKey) != sha256.Size*2 ||
 		signature == nil ||
-		signature.Recv() != nil {
+		signature.Recv() != nil ||
+		name == "" {
 		return callableABIBinding{}, &api.NameError{
 			Reason: "callable ABI canonicalization input is invalid",
 		}
 	}
 	if existing, ok := r.callableABIs[artifactKey]; ok {
-		existingSignature, valid := existing.owner.CallableABI()
-		if !valid || !types.Identical(existingSignature, signature) {
+		_, valid := existing.owner.CallableABI()
+		if !valid || existing.name != name {
 			return callableABIBinding{}, &api.NameError{
 				Name:   existing.name,
-				Reason: "callable ABI key joined non-identical signatures",
+				Reason: "callable ABI key joined a different semantic contract",
 			}
 		}
 		return existing, nil
 	}
-	name := "$goCallable_" +
-		artifactKey[len(artifactKey)-callableABITargetNameHexLength:]
 	if err := reserveGeneratedName(
 		r.callableABINames,
 		name,

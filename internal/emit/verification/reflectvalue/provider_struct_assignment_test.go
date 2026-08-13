@@ -197,7 +197,7 @@ func main() {
 					relevant := make([]string, 0)
 					for _, line := range strings.Split(artifacts.printed, "\n") {
 						if strings.Contains(line, "ParseError") ||
-							strings.Contains(line, "$goProviderState_") {
+							strings.Contains(line, "GoProviderState") {
 							relevant = append(relevant, line)
 						}
 					}
@@ -209,7 +209,7 @@ func main() {
 				}
 			}
 			if !regexp.MustCompile(
-				`\$goProviderState_[0-9a-f]+\.\$assign`,
+				`GoProviderState\.\$assign`,
 			).MatchString(artifacts.printed) ||
 				!strings.Contains(artifacts.printed, "CanonicalBufioScanner") {
 				t.Fatalf("scanner assignment lacks its canonical provider state operation")

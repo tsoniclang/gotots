@@ -1,5 +1,5 @@
-import { init } from "../../../modules/f6d94e9e1887a5f5bbdf372dbf368ae6a7af306c630de375a487f84948e943af/sideeffect/a_init.js";
-import { init__shadow_1 } from "../../../modules/f6d94e9e1887a5f5bbdf372dbf368ae6a7af306c630de375a487f84948e943af/sideeffect/z_init.js";
+import { init } from "../../../../modules/example.com/package-initialization/sideeffect/a_init.js";
+import { init__shadow_1 } from "../../../../modules/example.com/package-initialization/sideeffect/z_init.js";
 import { Mark as Mark__from_sink, Pair as Pair__from_sink } from "../sink/package.js";
 import { $state } from "./state.js";
 export function $initialize(): void {

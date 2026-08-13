@@ -760,6 +760,24 @@ the synchronous callback profile are explicit suffix components, and imports
 are collision-checked against every visible authored, imported, and generated
 binding before the TS-Go AST is sealed.
 
+Compilation-generated types in one closed support family share that family's
+bounded semantic module. Each definition keeps its full injective semantic
+export name. For example, the specialization for
+`map[chan int32]map[int32]<-chan int32` is emitted in:
+
+```text
+support/maps.ts
+```
+
+It exports
+`$goMap$MapOf_ChannelOf_int32_To_MapOf_int32_To_ReceiveChannelOf_int32`.
+A caller imports that exact export as the short local family name `GoMap` when
+free. If `GoMap` is already visible, the caller first uses the full semantic
+export name locally; only a real second collision adds the shortest exact
+source-derived qualifier. A lexical anonymous struct likewise keeps its
+complete `$goStruct$...` name. Artifact digests remain in manifests and
+internal ownership only.
+
 The same rule covers representation-disjoint builtin forms. For
 `B ~[]byte | ~string`, `append(dst, src...)` requests exactly one internal
 append-spread callable; concrete facades bind either the canonical slice
@@ -875,6 +893,13 @@ func F() (result int) {
 The return stores `1`, deferred arguments/callee were captured when the defer
 statement ran, the deferred literal runs LIFO, and the final result read
 returns `2`.
+
+Because this defer site can execute at most once per invocation, its target
+uses one fixed optional callable slot and invokes it from `finally`. By
+contrast, a defer inside `for` or a conditional/goto-controlled region uses the
+dynamic LIFO stack because the number and order of captured calls are runtime
+facts. Both shapes preserve immediate capture and direct-recover authority;
+the compiler never chooses the fixed form from source spelling alone.
 
 A callable's ordinary target signature never contains recovery state. If its
 body uses `recover`, its private deferred entry receives the authority:

@@ -10,8 +10,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/output"
 )
 
-const deferredCallableRegistryNameHexLength = 20
-
 func (n *File) DeferredCallableRegistry(
 	signature *types.Signature,
 ) (api.NameReference, error) {
@@ -34,9 +32,14 @@ func (n *File) DeferredCallableRegistry(
 	}
 	digest := sha256.Sum256([]byte("deferred-callable|" + signatureKey))
 	artifactKey := hex.EncodeToString(digest[:])
+	name, err := n.semanticGeneratedTypeName("$goDeferred$", signature)
+	if err != nil {
+		return api.NameReference{}, err
+	}
 	binding, err := n.owner.registry.internDeferredCallableRegistry(
 		artifactKey,
 		signature,
+		name,
 	)
 	if err != nil {
 		return api.NameReference{}, err
@@ -98,12 +101,14 @@ func packageQualifier(source *types.Package) string {
 func (r *Registry) internDeferredCallableRegistry(
 	artifactKey string,
 	signature *types.Signature,
+	name string,
 ) (deferredCallableRegistryBinding, error) {
 	if r == nil ||
 		len(artifactKey) != sha256.Size*2 ||
 		signature == nil ||
 		signature.Recv() != nil ||
-		api.ContainsGenericTypeParameter(signature) {
+		api.ContainsGenericTypeParameter(signature) ||
+		name == "" {
 		return deferredCallableRegistryBinding{}, &api.NameError{
 			Reason: "deferred-callable registry identity is invalid",
 		}
@@ -118,8 +123,6 @@ func (r *Registry) internDeferredCallableRegistry(
 		}
 		return existing, nil
 	}
-	name := "$goDeferred_" +
-		artifactKey[len(artifactKey)-deferredCallableRegistryNameHexLength:]
 	if err := reserveGeneratedName(
 		r.deferredCallableRegistryNames,
 		name,
@@ -128,16 +131,12 @@ func (r *Registry) internDeferredCallableRegistry(
 	); err != nil {
 		return deferredCallableRegistryBinding{}, err
 	}
-	outputPath, err := output.DeferredCallableRegistryPath(artifactKey)
-	if err != nil {
-		return deferredCallableRegistryBinding{}, err
-	}
 	owner, err := api.NewCompilationGeneratedArtifact(
 		api.GeneratedArtifactDeferredCallableRegistry,
 		signature,
 		artifactKey,
 		name,
-		outputPath,
+		output.DeferredCallableRegistrySupportPath,
 	)
 	if err != nil {
 		return deferredCallableRegistryBinding{}, err

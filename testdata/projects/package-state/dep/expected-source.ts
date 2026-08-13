@@ -1,5 +1,5 @@
 import type { int32 } from "@gotots/runtime/scalars.js";
-import { $state } from "../../../packages/30b189d6a1f032298fdb86d2246d93c1095afdffc5c48f3a05e48e2d7fd2d1f6/dep/state.js";
+import { $state } from "../../../../packages/example.com/package-state/dep/state.js";
 export type Cell$Storage = {
     Value: int32;
 };

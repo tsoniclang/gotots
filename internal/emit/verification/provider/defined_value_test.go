@@ -191,7 +191,7 @@ func RewindMapIterator(value reflect.Value) bool {
 		"RuntimeSlice.make<int>(named_time.TimeDurationValueOperations.$project(length), null, 0)",
 		"GoChannel.make<int>(named_time.TimeDurationValueOperations.$project(size)",
 		"GoArray.literal<scalars.int64, 2>(2, named_time.TimeDurationValueOperations.$project(named_time.TimeDurationValueOperations.$wrap(0n))",
-		"GoMap.make<gostring, time__from_gostdlib.Duration>(named_time.TimeDurationValueOperations.$wrap(0n)",
+		"GoMap__from_gotots_runtime.make<gostring, time__from_gostdlib.Duration>(named_time.TimeDurationValueOperations.$wrap(0n)",
 		"globalThis.Number(BigInt.asIntN(64, named_time.TimeDurationValueOperations.$project(value)))",
 		"named_time.TimeDurationValueOperations.$wrap(BigInt.asIntN(64, goNumberToBigInt(value)))",
 		"IterSeqValueOperations.$project",

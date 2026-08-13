@@ -10,6 +10,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/output"
 )
 
 func TestLexicalAggregateMapsCompileAndExecuteDifferentially(t *testing.T) {
@@ -74,7 +75,7 @@ func assertLexicalMapArtifacts(
 	t.Helper()
 	assemblyPath := ""
 	for _, file := range emission.Files() {
-		if strings.HasPrefix(file.OutputPath(), "support/maps/") {
+		if file.OutputPath() == output.MapSpecializationSupportPath {
 			t.Fatalf(
 				"lexical map escaped to support file %s",
 				file.OutputPath(),
@@ -89,17 +90,17 @@ func assertLexicalMapArtifacts(
 	}
 	source := readFile(t, artifacts.file(t, "source.ts"))
 	assembly := readFile(t, artifacts.file(t, assemblyPath))
-	if strings.Count(source, "class $goMap_") != 2 {
+	if strings.Count(source, "class $goMap$") != 2 {
 		t.Fatalf(
 			"source lexical map classes = %d, want two:\n%s",
-			strings.Count(source, "class $goMap_"),
+			strings.Count(source, "class $goMap$"),
 			source,
 		)
 	}
-	if strings.Count(assembly, "class $goMap_") != 1 {
+	if strings.Count(assembly, "class $goMap$") != 1 {
 		t.Fatalf(
 			"initializer lexical map classes = %d, want one:\n%s",
-			strings.Count(assembly, "class $goMap_"),
+			strings.Count(assembly, "class $goMap$"),
 			assembly,
 		)
 	}
@@ -116,13 +117,13 @@ func assertLexicalMapArtifacts(
 		) ||
 		!strings.Contains(
 			source[nestedBlockStart:nestedLiteralStart],
-			"\n        class $goMap_",
+			"\n        class $goMap$",
 		) {
 		t.Fatal("nested-block map class was not inserted after its local type")
 	}
 	if strings.Contains(
 		source[nestedBlockStart:nestedLiteralStart],
-		"{\n    class $goMap_",
+		"{\n    class $goMap$",
 	) {
 		t.Fatal("nested-block map class was hoisted to function scope")
 	}
@@ -150,7 +151,7 @@ func containsLexicalMapClasses(source string) bool {
 	}
 	body := closure[:end]
 	return strings.Contains(body, "class Key") &&
-		strings.Contains(body, "class $goMap_")
+		strings.Contains(body, "class $goMap$")
 }
 
 func executeLexicalMapGo(t *testing.T, workingDirectory string) string {

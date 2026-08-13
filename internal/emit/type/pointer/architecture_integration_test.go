@@ -357,7 +357,7 @@ func ForeignAdapter() ReadyContract {
 	) {
 		t.Fatalf("foreign generic method lacks the direct family ABI:\n%s", typescript)
 	}
-	if !strings.Contains(typescript, "class $goInterfaceAdapter_") {
+	if !strings.Contains(typescript, "class $goInterfaceAdapter$") {
 		t.Fatalf("foreign generic adapter was not emitted:\n%s", typescript)
 	}
 }

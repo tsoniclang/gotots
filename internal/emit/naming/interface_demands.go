@@ -540,6 +540,7 @@ func (r *Registry) interfaceAdapterReflectionRequest(
 		binding.key,
 		sourceType,
 		reflectionType,
+		binding.reflectionName,
 	)
 	if err != nil {
 		return nil, err

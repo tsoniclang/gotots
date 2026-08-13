@@ -94,7 +94,7 @@ func TestGeneratedCallableABIBoundaryOwnsNestedCooperativeDemand(
 		GeneratedArtifactCallableABI,
 		signature,
 		"callback-boundary",
-		"$goCallable_callback_boundary",
+		"$goCallable$callback_boundary",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -224,7 +224,7 @@ func TestInterfaceDynamicTypeRequestCarriesExactGoType(t *testing.T) {
 		GeneratedArtifactInterfaceDynamicTypeToken,
 		sourceType,
 		"artifact",
-		"$goDynamicType_artifact",
+		"$goDynamicType$artifact",
 		"support/interface-types.ts",
 	)
 	if err != nil {
@@ -313,7 +313,7 @@ func TestCallableABIIsContractOnlyCompilationSupport(t *testing.T) {
 		GeneratedArtifactCallableABI,
 		signature,
 		"callable-signature",
-		"$goCallable_signature",
+		"$goCallable$signature",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -332,7 +332,7 @@ func TestCallableABIIsContractOnlyCompilationSupport(t *testing.T) {
 		GeneratedArtifactCallableABI,
 		signature,
 		"callable-signature",
-		"$goCallable_signature",
+		"$goCallable$signature",
 		"support/callable.ts",
 	); err == nil {
 		t.Fatal("callable ABI accepted a materialized support file")
@@ -357,7 +357,7 @@ func TestInterfaceMethodCallableIsContractOnlyCompilationSupport(t *testing.T) {
 		GeneratedArtifactInterfaceMethodCallable,
 		signature,
 		"interface-method",
-		"$goInterfaceCallable_method",
+		"$goInterfaceCallable$method",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -397,14 +397,14 @@ func TestInterfaceMethodCallableIsContractOnlyCompilationSupport(t *testing.T) {
 		GeneratedArtifactInterfaceMethodCallable,
 		openSignature,
 		"open-interface-method",
-		"$goInterfaceCallable_open",
+		"$goInterfaceCallable$open",
 	); err != nil {
 		t.Fatalf("open callable family rejected: %v", err)
 	}
 	if _, err := NewCompilationInterfaceMethodTokenArtifact(
 		openSignature,
 		"open-interface-method",
-		"$goInterfaceMethod_open",
+		"$goInterfaceMethod$open",
 		"support/interface-methods.ts",
 		RuntimeInvalid,
 	); err == nil {

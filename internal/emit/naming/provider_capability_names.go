@@ -62,9 +62,14 @@ func (n *File) providerStatefulRepresentation(
 	if err != nil {
 		return api.NameReference{}, true, err
 	}
+	name, err := n.semanticGeneratedTypeName("$goProviderState$", named)
+	if err != nil {
+		return api.NameReference{}, true, err
+	}
 	binding, err := n.owner.registry.internProviderStatefulRepresentation(
 		artifactKey,
 		named,
+		name,
 	)
 	if err != nil {
 		return api.NameReference{}, true, err
@@ -90,9 +95,10 @@ func (n *File) providerStatefulRepresentation(
 func (r *Registry) internProviderStatefulRepresentation(
 	artifactKey string,
 	sourceType *types.Named,
+	name string,
 ) (providerStatefulRepresentationBinding, error) {
 	if r == nil || sourceType == nil || sourceType.Obj() == nil ||
-		artifactKey == "" {
+		artifactKey == "" || name == "" {
 		return providerStatefulRepresentationBinding{}, &api.NameError{
 			Reason: "provider stateful-representation canonicalization input is invalid",
 		}
@@ -113,10 +119,6 @@ func (r *Registry) internProviderStatefulRepresentation(
 		}
 		return existing, nil
 	}
-	name, err := providerStatefulTargetName(artifactKey)
-	if err != nil {
-		return providerStatefulRepresentationBinding{}, err
-	}
 	if err := reserveGeneratedName(
 		r.providerStatefulRepresentationNames,
 		name,
@@ -125,16 +127,12 @@ func (r *Registry) internProviderStatefulRepresentation(
 	); err != nil {
 		return providerStatefulRepresentationBinding{}, err
 	}
-	outputPath, err := output.ProviderStatefulRepresentationPath(artifactKey)
-	if err != nil {
-		return providerStatefulRepresentationBinding{}, err
-	}
 	owner, err := api.NewCompilationGeneratedArtifact(
 		api.GeneratedArtifactProviderStatefulRepresentation,
 		sourceType,
 		artifactKey,
 		name,
-		outputPath,
+		output.ProviderStatefulRepresentationSupportPath,
 	)
 	if err != nil {
 		return providerStatefulRepresentationBinding{}, err
@@ -142,15 +140,6 @@ func (r *Registry) internProviderStatefulRepresentation(
 	binding := providerStatefulRepresentationBinding{owner: owner, name: name}
 	r.providerStatefulRepresentations[artifactKey] = binding
 	return binding, nil
-}
-
-func providerStatefulTargetName(artifactKey string) (string, error) {
-	if len(artifactKey) < interfaceTargetNameHexLength {
-		return "", &api.NameError{
-			Reason: "provider stateful-representation artifact key is invalid",
-		}
-	}
-	return "$goProviderState_" + artifactKey[:interfaceTargetNameHexLength], nil
 }
 
 func (r *Registry) indexProviderInterfaceCapabilities() error {

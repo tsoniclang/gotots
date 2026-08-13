@@ -117,9 +117,10 @@ type mapSpecializationBinding struct {
 }
 
 type interfaceAdapterBinding struct {
-	owner *api.GeneratedArtifact
-	name  string
-	key   string
+	owner          *api.GeneratedArtifact
+	name           string
+	reflectionName string
+	key            string
 }
 
 type anonymousInterfaceBinding struct {

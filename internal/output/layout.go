@@ -1,7 +1,6 @@
 package output
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -12,17 +11,22 @@ import (
 )
 
 const (
-	ProgramInitializationPath       = "program.ts"
-	RuntimePackageName              = "@gotots/runtime"
-	RuntimePackageVersion           = "0.0.0"
-	RuntimePackageRootPath          = "runtime"
-	RuntimePackageManifestPath      = "runtime/package.json"
-	ScalarSupportPath               = "runtime/scalars.ts"
-	AnonymousStructSupportPath      = "support/anonymous-structs.ts"
-	InterfaceMethodSupportPath      = "support/interface-methods.ts"
-	InterfaceTypeSupportPath        = "support/interface-types.ts"
-	ReflectionTypeSupportPath       = "support/reflection-types.ts"
-	generatedArtifactShardKeyLength = 2
+	ProgramInitializationPath                 = "program.ts"
+	RuntimePackageName                        = "@gotots/runtime"
+	RuntimePackageVersion                     = "0.0.0"
+	RuntimePackageRootPath                    = "runtime"
+	RuntimePackageManifestPath                = "runtime/package.json"
+	ScalarSupportPath                         = "runtime/scalars.ts"
+	AnonymousStructSupportPath                = "support/anonymous-structs.ts"
+	MapSpecializationSupportPath              = "support/maps.ts"
+	InterfaceAdapterSupportPath               = "support/interface-adapters.ts"
+	AnonymousInterfaceSupportPath             = "support/interface-contracts.ts"
+	InterfaceMethodSupportPath                = "support/interface-methods.ts"
+	InterfaceTypeSupportPath                  = "support/interface-types.ts"
+	ReflectionTypeSupportPath                 = "support/reflection-types.ts"
+	ProviderInterfaceBridgeSupportPath        = "support/provider-interface-bridges.ts"
+	ProviderStatefulRepresentationSupportPath = "support/provider-stateful-representations.ts"
+	DeferredCallableRegistrySupportPath       = "support/deferred-callables.ts"
 )
 
 func EnvironmentContractPath(
@@ -178,62 +182,12 @@ func PackageStatePath(sourcePackage *load.Package) (string, error) {
 	return packageArtifactPath(sourcePackage, packageStateFile)
 }
 
-func MapSpecializationPath(artifactKey string) (string, error) {
-	return generatedArtifactPath("maps", artifactKey)
-}
-
-func InterfaceAdapterPath(artifactKey string) (string, error) {
-	return generatedArtifactPath("interfaces/adapters", artifactKey)
-}
-
-func ProviderInterfaceBridgePath(artifactKey string) (string, error) {
-	return generatedArtifactPath("interfaces/provider-bridges", artifactKey)
-}
-
-func ProviderStatefulRepresentationPath(artifactKey string) (string, error) {
-	return generatedArtifactPath("providers/stateful-representations", artifactKey)
-}
-
 func GenericCapabilityPath(module string) (string, error) {
 	return semanticGeneratedArtifactPath("generics/capabilities", module)
 }
 
 func GenericConcretizationPath(module string) (string, error) {
 	return semanticGeneratedArtifactPath("generics/concretizations", module)
-}
-
-func DeferredCallableRegistryPath(artifactKey string) (string, error) {
-	return generatedArtifactPath("callables/deferred", artifactKey)
-}
-
-func AnonymousInterfacePath(artifactKey string) (string, error) {
-	return generatedArtifactPath("interfaces/contracts", artifactKey)
-}
-
-func generatedArtifactPath(
-	directory string,
-	artifactKey string,
-) (string, error) {
-	if len(artifactKey) != sha256.Size*2 {
-		return "", &PathError{
-			Source: artifactKey,
-			Reason: "generated artifact key is invalid",
-		}
-	}
-	for _, character := range artifactKey {
-		if character < '0' || character > '9' &&
-			character < 'a' || character > 'f' {
-			return "", &PathError{
-				Source: artifactKey,
-				Reason: "generated artifact key is invalid",
-			}
-		}
-	}
-	return path.Join(
-		"support",
-		directory,
-		artifactKey[:generatedArtifactShardKeyLength]+".ts",
-	), nil
 }
 
 func semanticGeneratedArtifactPath(

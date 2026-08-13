@@ -46,6 +46,7 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 	first, err := registry.internProviderProfileInterfaceBridge(
 		"go:universe|error",
 		errorType,
+		"$goProviderProfileBridge$Named_error",
 		callable[0].Interfaces(),
 	)
 	if err != nil {
@@ -54,6 +55,7 @@ func TestProviderProfileBridgeIdentityIgnoresUnrelatedCallableInterfaces(
 	second, err := registry.internProviderProfileInterfaceBridge(
 		"go:universe|error",
 		errorType,
+		"$goProviderProfileBridge$Named_error",
 		stateful[0].Interfaces(),
 	)
 	if err != nil {

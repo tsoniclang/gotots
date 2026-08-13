@@ -781,12 +781,18 @@ function uses its declaration name, a method also uses its receiver, concrete
 suffixes encode ordered exact Go type arguments plus the selected effect, and
 operation names encode the operation, any selected constraint method, and its
 exact signature. Compilation paths group by defining package and declaration or
-operation family; each declaration module exports its semantically named exact
-instances. Full hashes remain private identity keys only; no digest or
-opaque suffix enters an ordinary TypeScript declaration, import, or generic
-support path. A normalized semantic name or path collision never joins two
-owners: the full private identities are exact-joined at reservation and the
-collision fails before output is sealed.
+operation family. Closed runtime families share one bounded support module and
+export every exact generated type under its complete semantic name. Import
+sites use the short local family name (`GoMap`, `GoInterface`,
+`GoInterfaceAdapter`, or the corresponding provider/defer family) when free;
+the canonical lexical name owner uses the complete semantic export or the
+shortest source-derived qualifier only for a real collision. Lexically
+co-located artifacts also use their complete semantic generated names because
+no module boundary disambiguates them. Full hashes remain private identity
+keys only; no digest or opaque suffix enters an ordinary TypeScript
+declaration, import, or generic support path. A normalized semantic name or
+path collision never joins two owners: the full private identities are
+exact-joined at reservation and the collision fails before output is sealed.
 
 For example, Go accepts `append(dst, src...)` when `src` has type parameter
 `B ~[]byte | ~string`. TypeScript has no one static append expression over
@@ -845,21 +851,30 @@ A source callable containing `recover` has:
 Both may share a private body implementation. The private entry claims no Go
 source identity and is never exported as the source callable.
 
-A statically known `defer f(args)` captures copied arguments immediately and
-selects `f`'s private deferred entry when one exists. Transported function
-values use one exact-signature typed deferred-entry registry. A recover-capable
-function/literal registers its ordinary value and private deferred entry when
-the value is formed; defer lookup falls back to ordinary invocation when no
-entry exists. Registries are generated only for demanded signatures and use no
-`any`, `unknown`, dynamic properties, or `.call/.apply/.bind`.
+A statically known, single-entry `defer f(args)` outside loops, conditional
+regions, and non-structural-goto assembly captures its callee and copied
+arguments immediately into one fixed typed slot. The enclosing `finally`
+invokes occupied slots directly in reverse source order, so this class creates
+no dynamic stack. A defer that may execute repeatedly, conditionally, or under
+non-structural `goto` uses the invocation-local dynamic stack because runtime
+order and multiplicity are then observable.
+
+Both forms select `f`'s private deferred entry when one exists. Transported
+function values use one exact-signature typed deferred-entry registry. A
+recover-capable function/literal registers its ordinary value and private
+deferred entry when the value is formed; defer lookup falls back to ordinary
+invocation when no entry exists. Registries are generated only for demanded
+signatures and use no `any`, `unknown`, dynamic properties, or
+`.call/.apply/.bind`.
 
 Interface and provider deferred calls use equivalent private adapter/facade
 entries. Source method/function signatures remain unchanged.
 
-The invocation-local defer stack captures values at the statement, drains LIFO
-on return or panic, preserves named-result mutation and panic replacement, and
-awaits only entries whose typed internal contract is Promise-bearing.
-`recover` one call below the deferred entry receives no authority.
+Fixed slots and the invocation-local dynamic defer stack both capture values at
+the statement and drain LIFO on return or panic. They preserve named-result
+mutation and panic replacement, and await only entries whose typed internal
+contract is Promise-bearing. `recover` one call below the deferred entry
+receives no authority.
 
 Native target control is used where structurally exact. Only genuinely
 non-structural `goto` selects a linear statement state machine assembled from
@@ -1323,21 +1338,25 @@ reconstructed through a staged replacement; a successful build cannot retain
 an artifact from an earlier canonical build.
 
 Compilation-scoped generated support definitions retain their full semantic
-artifact identities, but those identities do not each create a physical ESM
-module or appear in a physical path. The output owner groups them by real
-semantic family and source-derived owner: normally the defining Go package,
-declaration family, and operation family. A large owner is divided only by a
-real semantic sub-owner already present in the source/type graph, never by a
-digest byte, arbitrary numbered shard, or output-size accident. Lexical
-artifacts remain with their lexical owner.
+artifact identities. Physical paths expose only semantic family and exact
+source/type ownership. Closed generated-support families whose definitions
+share one runtime contract use one bounded readable family module
+(`support/maps.ts`, `support/interface-adapters.ts`, and their declared
+siblings); every definition in that module keeps its full injective semantic
+export name. Source-owned generic concretizations may use one readable module
+per exact source declaration because that declaration is already the real
+semantic sub-owner. A large owner is divided only by such a real semantic
+sub-owner already present in the source/type graph, never by a digest byte,
+arbitrary numbered shard, or output-size accident. Lexical artifacts remain
+with their lexical owner.
 
 The physical layout is therefore bounded by selected semantic/source owners,
-not target artifact count. Every definition, dependency, revision, and
-observable fingerprint remains keyed internally by the full artifact owner.
-Readable paths are placement only and never semantic identity. Real path/name
-collisions add the shortest deterministic source-derived qualifier. This
-layout uses no runtime registry, dynamic import, bundler dependency, erased
-lookup, one-module-per-artifact fallback, or hash-named support path.
+not digest buckets or arbitrary counters. Every definition, dependency,
+revision, and observable fingerprint remains keyed internally by the full
+artifact owner. Readable paths are placement only and never semantic identity.
+Real path/name collisions add the shortest deterministic source-derived
+qualifier. This layout uses no runtime registry, dynamic import, bundler
+dependency, erased lookup, digest-sharded fallback, or hash-named support path.
 
 Schema version 1 has the closed top-level sections `distribution`, `source`,
 `go`, `semantics`, `providers`, `implementations`, `output`, and `tools`.

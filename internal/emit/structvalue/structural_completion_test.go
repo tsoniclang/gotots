@@ -71,7 +71,7 @@ func Local(value int32) int32 {
 	localEnum := body[0].(tsgo.EnumDeclaration)
 	anonymousClass := body[1].(tsgo.ClassDeclaration)
 	if !strings.HasPrefix(localEnum.Name().Text(), "Local") ||
-		!strings.HasPrefix(anonymousClass.Name().Text(), "$goStruct_") {
+		!strings.HasPrefix(anonymousClass.Name().Text(), "$goStruct$") {
 		t.Fatalf(
 			"lexical definition order = %q/%q",
 			localEnum.Name().Text(),
@@ -134,7 +134,7 @@ func Nested(enabled bool, value int32) int32 {
 		t.Fatalf("nested local type = %T, want enum", thenBlock[0])
 	}
 	if anonymous, ok := thenBlock[1].(tsgo.ClassDeclaration); !ok ||
-		!strings.HasPrefix(anonymous.Name().Text(), "$goStruct_") {
+		!strings.HasPrefix(anonymous.Name().Text(), "$goStruct$") {
 		t.Fatalf("nested anonymous declaration = %T", thenBlock[1])
 	}
 }

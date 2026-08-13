@@ -23,6 +23,8 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	binding, err := adapterFirst.internInterfaceAdapter(
 		strings.Repeat("a", 64),
 		sourceType,
+		"$goInterfaceAdapter$Named_Value",
+		"$goReflectType$Named_Value",
 		placement,
 	)
 	if err != nil {
@@ -100,6 +102,8 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	lateBinding, err := transitionFirst.internInterfaceAdapter(
 		strings.Repeat("b", 64),
 		sourceType,
+		"$goInterfaceAdapter$Named_Value",
+		"$goReflectType$Named_Value",
 		placement,
 	)
 	if err != nil {
@@ -201,11 +205,19 @@ func TestInterfaceDynamicTypeTokenIsCanonicalForLocalGoType(t *testing.T) {
 	}
 	key := strings.Repeat("a", 64)
 	registry := NewRegistry()
-	first, err := registry.internInterfaceDynamicTypeToken(key, localType)
+	first, err := registry.internInterfaceDynamicTypeToken(
+		key,
+		localType,
+		"$goDynamicType$Named_Local",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := registry.internInterfaceDynamicTypeToken(key, localType)
+	second, err := registry.internInterfaceDynamicTypeToken(
+		key,
+		localType,
+		"$goDynamicType$Named_Local",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +232,7 @@ func TestInterfaceDynamicTypeTokenIsCanonicalForLocalGoType(t *testing.T) {
 	}
 }
 
-func TestInterfaceDynamicTypeTokenRejectsTruncatedNameCollision(t *testing.T) {
+func TestInterfaceDynamicTypeTokenRejectsSemanticNameCollision(t *testing.T) {
 	registry := NewRegistry()
 	first := types.NewNamed(
 		types.NewTypeName(token.Pos(1), nil, "First", nil),
@@ -232,21 +244,22 @@ func TestInterfaceDynamicTypeTokenRejectsTruncatedNameCollision(t *testing.T) {
 		types.Typ[types.Int32],
 		nil,
 	)
-	prefix := strings.Repeat("b", interfaceTargetNameHexLength)
 	if _, err := registry.internInterfaceDynamicTypeToken(
-		prefix+strings.Repeat("1", 64-interfaceTargetNameHexLength),
+		strings.Repeat("1", 64),
 		first,
+		"$goDynamicType$Shared",
 	); err != nil {
 		t.Fatal(err)
 	}
 	_, err := registry.internInterfaceDynamicTypeToken(
-		prefix+strings.Repeat("2", 64-interfaceTargetNameHexLength),
+		strings.Repeat("2", 64),
 		second,
+		"$goDynamicType$Shared",
 	)
 	var nameError *api.NameError
 	if !errors.As(err, &nameError) ||
 		nameError.Reason !=
-			"interface-dynamic-type target-name prefix collision" {
+			"interface-dynamic-type target-name collision" {
 		t.Fatalf("collision error = %#v", err)
 	}
 }

@@ -12,38 +12,71 @@ func requireProviderStateOperations(
 	operations ...string,
 ) {
 	t.Helper()
-	alias := ""
+	exported := ""
 	for _, line := range strings.Split(printed, "\n") {
-		if !strings.Contains(line, "export const $goProviderState_") ||
+		if !strings.Contains(line, "export const $goProviderState$") ||
 			!strings.Contains(line, representation) {
 			continue
 		}
 		fields := strings.Fields(line)
 		if len(fields) >= 3 {
-			alias = strings.TrimSuffix(fields[2], ":")
+			exported = strings.TrimSuffix(fields[2], ":")
 			break
 		}
 	}
-	if alias == "" {
+	if exported == "" {
 		t.Fatalf("provider closure artifact lacks state for %q", representation)
 	}
+	aliases := providerStateImportAliases(printed, exported)
 	for _, operation := range operations {
-		required := alias + ".$" + operation + "("
-		if !strings.Contains(printed, required) {
+		found := false
+		for _, alias := range aliases {
+			if strings.Contains(printed, alias+".$"+operation+"(") {
+				found = true
+				break
+			}
+		}
+		if !found {
 			relevant := make([]string, 0)
 			for _, line := range strings.Split(printed, "\n") {
-				if strings.Contains(line, alias) {
-					relevant = append(relevant, line)
+				for _, alias := range aliases {
+					if strings.Contains(line, alias) {
+						relevant = append(relevant, line)
+						break
+					}
 				}
 			}
 			t.Fatalf(
-				"provider closure artifact lacks %s operation %q:\n%s",
+				"provider closure artifact lacks %s operation %q through %v:\n%s",
 				representation,
-				required,
+				operation,
+				aliases,
 				strings.Join(relevant, "\n"),
 			)
 		}
 	}
+}
+
+func providerStateImportAliases(printed string, exported string) []string {
+	result := []string{exported}
+	for _, line := range strings.Split(printed, "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(line), "import {") ||
+			!strings.Contains(line, exported) {
+			continue
+		}
+		open := strings.Index(line, "{")
+		close := strings.LastIndex(line, "}")
+		if open < 0 || close <= open {
+			continue
+		}
+		for _, imported := range strings.Split(line[open+1:close], ",") {
+			fields := strings.Fields(imported)
+			if len(fields) == 3 && fields[0] == exported && fields[1] == "as" {
+				result = append(result, fields[2])
+			}
+		}
+	}
+	return result
 }
 
 func TestReachedProviderReflectionClosureCanonicalizesWithNativeEvidence(t *testing.T) {

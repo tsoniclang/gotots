@@ -10,6 +10,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/output"
 )
 
 func TestDefinedMapsUseSelectedRepresentationsAndExecuteDifferentially(
@@ -207,7 +208,9 @@ func definedKeySpecializationPath(
 	t.Helper()
 	var matches []string
 	for _, path := range artifacts.paths {
-		if strings.Contains(filepath.ToSlash(path), "/support/maps/") {
+		if filepath.ToSlash(path) == filepath.ToSlash(
+			artifacts.file(t, output.MapSpecializationSupportPath),
+		) {
 			matches = append(matches, path)
 		}
 	}

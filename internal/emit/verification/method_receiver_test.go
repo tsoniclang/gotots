@@ -193,7 +193,7 @@ func assertWaveFiveShape(t *testing.T, printed string) {
 		"goPointerHash",
 		"class GoMapHash",
 		"Read($go$recovery",
-		"$goDeferred_",
+		"DeferredCallableRegistry",
 		"GoDeferredRegistry",
 		"deferred-registry.js",
 	} {
