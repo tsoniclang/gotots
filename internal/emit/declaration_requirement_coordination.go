@@ -547,3 +547,39 @@ func canonicalDeclarationRequirements(
 	sortDeclarationRequirements(result)
 	return result
 }
+
+func (s *programSession) installSourceImplementationRequirements() error {
+	if s.sourceImplementationContracts == nil {
+		return nil
+	}
+	if !s.requirements.certified.empty() {
+		return &ScheduleError{
+			Reason: "source-implementation accepted requirements were installed more than once",
+		}
+	}
+	var selected []api.DeclarationRequirement
+	for owner, contract := range s.sourceImplementationContracts {
+		for _, requirement := range contract.acceptedRequirements {
+			if !requirement.Valid() || requirement.Owner() != owner {
+				return &ScheduleError{
+					Object: owner.Name(),
+					Reason: "source-implementation accepted requirement has invalid ownership",
+				}
+			}
+			selected = append(selected, requirement)
+		}
+	}
+	sortDeclarationRequirements(selected)
+	certified := newDeclarationRequirementLedger()
+	for _, requirement := range selected {
+		if certified.contains(requirement) {
+			return &ScheduleError{
+				Object: requirement.Owner().Name(),
+				Reason: "source-implementation accepted requirement is duplicated",
+			}
+		}
+		certified.add(requirement)
+	}
+	s.requirements.certified = certified
+	return nil
+}

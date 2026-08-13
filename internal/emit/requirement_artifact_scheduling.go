@@ -163,6 +163,7 @@ type declarationRequirementScheduler struct {
 	pending       map[api.ArtifactOwner]struct{}
 	removed       map[api.ArtifactOwner]struct{}
 	orphaned      map[api.DeclarationRequirement]struct{}
+	certified     declarationRequirementLedger
 	roots         declarationRequirementLedger
 	byConsumer    map[api.ArtifactOwner]map[api.DeclarationRequirement]struct{}
 	consumers     map[api.DeclarationRequirement]map[api.ArtifactOwner]struct{}
@@ -182,7 +183,8 @@ func newDeclarationRequirementScheduler(
 		orphaned: make(
 			map[api.DeclarationRequirement]struct{},
 		),
-		roots: newDeclarationRequirementLedger(),
+		certified: newDeclarationRequirementLedger(),
+		roots:     newDeclarationRequirementLedger(),
 		byConsumer: make(
 			map[api.ArtifactOwner]map[api.DeclarationRequirement]struct{},
 		),
@@ -242,6 +244,59 @@ func (s *declarationRequirementScheduler) appliedFor(
 	return requirements
 }
 
+func (s *declarationRequirementScheduler) wasSelected(
+	requirement api.DeclarationRequirement,
+) bool {
+	return s.certified.contains(requirement) || s.wasApplied(requirement)
+}
+
+func (s *declarationRequirementScheduler) selectedFor(
+	owner api.ArtifactOwner,
+) []api.DeclarationRequirement {
+	certified, _ := s.certified.forOwner(owner)
+	applied := s.appliedFor(owner)
+	return mergeDeclarationRequirements(certified, applied)
+}
+
+func mergeDeclarationRequirements(
+	left []api.DeclarationRequirement,
+	right []api.DeclarationRequirement,
+) []api.DeclarationRequirement {
+	if len(left) == 0 {
+		return right
+	}
+	if len(right) == 0 {
+		return left
+	}
+	result := make(
+		[]api.DeclarationRequirement,
+		0,
+		len(left)+len(right),
+	)
+	leftIndex := 0
+	rightIndex := 0
+	for leftIndex < len(left) && rightIndex < len(right) {
+		switch order := compareDeclarationRequirements(
+			left[leftIndex],
+			right[rightIndex],
+		); {
+		case order < 0:
+			result = append(result, left[leftIndex])
+			leftIndex++
+		case order > 0:
+			result = append(result, right[rightIndex])
+			rightIndex++
+		default:
+			result = append(result, left[leftIndex])
+			leftIndex++
+			rightIndex++
+		}
+	}
+	result = append(result, left[leftIndex:]...)
+	result = append(result, right[rightIndex:]...)
+	return result
+}
+
 func (s *programSession) NamedStructOperationSelected(
 	owner *types.TypeName,
 	operation api.NamedStructOperation,
@@ -250,32 +305,7 @@ func (s *programSession) NamedStructOperationSelected(
 	if err != nil {
 		return false, err
 	}
-	return s.requirements.wasApplied(requirement), nil
-}
-
-func (s *programSession) settleSourceImplementationRequirements() error {
-	if s.sourceImplementationContracts == nil {
-		return nil
-	}
-	var selected []api.DeclarationRequirement
-	for owner, contract := range s.sourceImplementationContracts {
-		for _, requirement := range contract.acceptedRequirements {
-			if !requirement.Valid() || requirement.Owner() != owner {
-				return &ScheduleError{
-					Object: owner.Name(),
-					Reason: "source-implementation accepted requirement has invalid ownership",
-				}
-			}
-			selected = append(selected, requirement)
-		}
-	}
-	sortDeclarationRequirements(selected)
-	for _, requirement := range selected {
-		if err := s.scheduleDeclarationRequirement(requirement); err != nil {
-			return err
-		}
-	}
-	return s.settle()
+	return s.requirements.wasSelected(requirement), nil
 }
 
 func (s *programSession) AnonymousStructDemandSelected(
@@ -286,7 +316,7 @@ func (s *programSession) AnonymousStructDemandSelected(
 	if err != nil {
 		return false, err
 	}
-	return s.requirements.wasApplied(requirement), nil
+	return s.requirements.wasSelected(requirement), nil
 }
 
 func (s *declarationRequirementScheduler) consumedBy(

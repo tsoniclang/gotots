@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -43,7 +44,7 @@ export declare function loadPointer<T>(pointer: Pointer<T>): T;
 	writeSourceImplementationFixture(t, filepath.Join(module, "lang.js"), "export {};\n")
 }
 
-func assertSourceImplementationStorageReplay(
+func assertSourceImplementationStorageBaseline(
 	t *testing.T,
 	program *load.Program,
 	options Options,
@@ -86,7 +87,7 @@ func assertSourceImplementationStorageReplay(
 			t.Fatal(printErr)
 		}
 		if strings.Contains(printed, "new Pair__from_fast(") {
-			t.Fatalf("accepted storage demand was not replayed before the consumer:\n%s", printed)
+			t.Fatalf("certified storage baseline was not selected by the consumer:\n%s", printed)
 		}
 		storageCall = storageCall || strings.Contains(
 			printed,
@@ -94,6 +95,60 @@ func assertSourceImplementationStorageReplay(
 		)
 	}
 	if !storageCall {
-		t.Fatal("accepted storage demand produced no canonical storage call")
+		t.Fatal("certified storage baseline produced no canonical storage call")
+	}
+}
+
+func assertUncertifiedSourceImplementationRequirementRejected(
+	t *testing.T,
+	program *load.Program,
+	options Options,
+	roots []Root,
+	pairOwner api.ArtifactOwner,
+) {
+	t.Helper()
+	contractSession, err := newProgramSession(program, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputs, err := captureSourceImplementationInputs(contractSession, roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contracts := make(
+		map[api.ArtifactOwner]sourceImplementationContract,
+		len(inputs.contracts),
+	)
+	for owner, contract := range inputs.contracts {
+		contracts[owner] = contract
+	}
+	pairContract, ok := contracts[pairOwner]
+	if !ok {
+		t.Fatal("source implementation Pair contract is absent")
+	}
+	retained := make([]api.DeclarationRequirement, 0, len(pairContract.acceptedRequirements))
+	removed := false
+	for _, requirement := range pairContract.acceptedRequirements {
+		_, operation, namedStruct := requirement.NamedStructOperation()
+		if namedStruct && operation == api.NamedStructOperationStorage {
+			removed = true
+			continue
+		}
+		retained = append(retained, requirement)
+	}
+	if !removed {
+		t.Fatal("source implementation Pair contract has no storage requirement to mutate")
+	}
+	pairContract.acceptedRequirements = retained
+	contracts[pairOwner] = pairContract
+	finalSession, err := newProgramSessionWithRegistry(program, options, inputs.registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalSession.sourceImplementationContracts = contracts
+	finalSession.sourceImplementationTargets = inputs.targets
+	if _, err := compileProgramSession(finalSession, roots, options); err == nil ||
+		!strings.Contains(err.Error(), "source-implementation requirement was not certified") {
+		t.Fatalf("uncertified source-implementation requirement error = %v", err)
 	}
 }

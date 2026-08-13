@@ -313,7 +313,7 @@ func (s *programSession) emitEnvironmentObject(object types.Object) error {
 	target, err := s.buildEnvironmentDeclaration(
 		builder,
 		object,
-		s.requirements.appliedFor(api.MustSourceArtifactOwner(object)),
+		s.requirements.selectedFor(api.MustSourceArtifactOwner(object)),
 	)
 	if err != nil {
 		return err

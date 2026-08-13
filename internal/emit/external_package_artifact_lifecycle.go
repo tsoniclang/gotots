@@ -111,7 +111,7 @@ func (s *programSession) captureSourceImplementationContracts() (
 			contract:             contract,
 			dependencies:         dependencies,
 			outboundRequirements: s.requirements.consumedBy(owner),
-			acceptedRequirements: s.requirements.appliedFor(owner),
+			acceptedRequirements: s.requirements.selectedFor(owner),
 		}
 	}
 	for _, implementation := range s.sourceImplementations.Implementations() {
@@ -187,17 +187,18 @@ func (s *programSession) acceptSourceImplementationRequirements(
 		}
 	}
 	contract := s.sourceImplementationContracts[owner]
-	if !slices.Equal(requirements, contract.acceptedRequirements) {
-		return true, &ScheduleError{
-			Object: owner.Name(),
-			Reason: "source-implementation accepted requirement contract changed",
-		}
-	}
 	for _, requirement := range requirements {
 		if !requirement.Valid() || requirement.Owner() != owner {
 			return true, &ScheduleError{
 				Object: owner.Name(),
 				Reason: "source-implementation contract batch has mixed or invalid ownership",
+			}
+		}
+		if !s.requirements.certified.contains(requirement) ||
+			!slices.Contains(contract.acceptedRequirements, requirement) {
+			return true, &ScheduleError{
+				Object: owner.Name(),
+				Reason: "source-implementation requirement was not certified",
 			}
 		}
 		if !s.requirements.wasApplied(requirement) {
@@ -412,7 +413,7 @@ func (s *programSession) buildPackageInitializerRevision(
 		return artifactRevision{}, err
 	}
 	defer finish()
-	requirements := s.requirements.appliedFor(owner)
+	requirements := s.requirements.selectedFor(owner)
 	context, err := emitnaming.WithLexicalTypeRequirements(
 		builder.assemblyContext.WithArtifactOwner(owner),
 		site.Declaration,

@@ -238,7 +238,14 @@ export function Sum(value: string): number { return value.length; }
 	if !hasStorage {
 		t.Fatal("source implementation Pair discarded its accepted storage demand")
 	}
-	assertSourceImplementationStorageReplay(t, program, options, roots, repository, root)
+	assertSourceImplementationStorageBaseline(t, program, options, roots, repository, root)
+	assertUncertifiedSourceImplementationRequirementRejected(
+		t,
+		program,
+		options,
+		roots,
+		pairOwner,
+	)
 	mutatedContracts := make(
 		map[api.ArtifactOwner]sourceImplementationContract,
 		len(inputs.contracts),
@@ -381,7 +388,7 @@ export function Sum(value: string): number { return value.length; }
 		t.Fatalf("interface runtime guard did not survive through the package assembly:\n%s", callerArtifacts.String())
 	}
 	if !storageLiteralCaller {
-		t.Fatalf("source implementation caller did not replay canonical storage:\n%s", callerArtifacts.String())
+		t.Fatalf("source implementation caller did not select certified canonical storage:\n%s", callerArtifacts.String())
 	}
 
 	writeSourceImplementationFixture(t, filepath.Join(implementationRoot, "package.ts"), `import type { Pointer } from "@tsonic/core/types.js";

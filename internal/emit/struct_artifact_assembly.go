@@ -147,7 +147,7 @@ func (s *programSession) buildAnonymousStructRevision(
 		anonymousstructdeclaration.SelectAnonymousRequirements(
 			context.Role(),
 			artifact,
-			s.requirements.appliedFor(owner),
+			s.requirements.selectedFor(owner),
 		)
 	if err != nil {
 		return artifactRevision{}, err

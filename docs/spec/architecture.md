@@ -1439,15 +1439,18 @@ it concurrently. Artifact revisions, liveness, builders, placement, requirement
 scheduler state, and emitted declarations are not transferable. The first
 session's remaining state is then discarded.
 
-A fresh final session starts with empty artifact, liveness, requirement,
+A fresh final session starts with empty artifact, liveness, applied-requirement,
 representation, placement, and target-builder state after taking ownership of
 the one canonical name/support-identity registry. Before any final consumer is
-emitted, it deterministically schedules and settles the complete captured set
-of accepted selected-package requirements. This restores facts such as a named
-struct's canonical storage representation before an early `T{}` consumer can
-choose a positional constructor. Every later requirement batch must exact-join
-the captured accepted set for its owner; a new, missing, or foreign requirement
-fails instead of changing an authored contract after consumers exist. When a
+emitted, it atomically installs the complete captured set of accepted
+selected-package requirements in a separate immutable certified-selection
+ledger. That ledger answers representation queries such as whether an early
+`T{}` consumer must use canonical storage, but it never queues an owner,
+schedules a declaration, or materializes output. Only requirements discovered
+from final-session consumers enter the liveness scheduler. Every such batch for
+a selected source-implementation owner must be a subset of the certified set;
+a new or foreign requirement fails instead of changing an authored contract,
+while a certified capability unused by the final graph remains inert. When a
 final consumer requests a selected-package source artifact, the source owner
 publishes the captured
 observable contract with no body, storage, initializer, class contribution, or
@@ -1477,9 +1480,11 @@ be satisfied by an exact body-free private contract module. Transferring either
 session's artifact or liveness state, late import deletion, output-path
 filtering as liveness, same-session withdrawal, and private generated runtime
 shims are forbidden. The transferred registry may retain canonical interned
-contract facts but cannot schedule or materialize output; the final requirement
-scheduler is the sole liveness owner. Sharing either artifact graph, scheduler,
-builder, liveness ledger, or emitted declaration is forbidden.
+contract facts but cannot schedule or materialize output. The
+certified-selection ledger owns only immutable replacement capabilities; the
+final requirement scheduler remains the sole liveness owner. Sharing either
+artifact graph, scheduler queue, builder, liveness ledger, or emitted
+declaration is forbidden.
 
 Registry transfer preserves semantic identity, not allocation identity. A
 generated contract fact recreated by the final session exact-joins the
