@@ -1176,8 +1176,13 @@ The ordinary generated snapshot is certification evidence, not final
 ownership. It is produced in a contract-only first session for every selected
 package. The final session takes sole ownership of the deterministic canonical
 name and generated-support identity registry, plus each selected source
-artifact's immutable observable contract, outgoing support requirements, and
-observable dependency edges. It cannot read an implementation facet, builder,
+artifact's immutable observable contract, outgoing support requirements,
+accepted representation requirements, and observable dependency edges. Before
+final roots emit, the accepted requirements settle in canonical order. Thus an
+early `return T{}` uses `T.$fromStorage({...})` whenever the certified ordinary
+contract selected storage, even when the selected-package Go body that created
+the demand is absent from the final session. A later batch must exact-join that
+accepted set. The final session cannot read an implementation facet, builder,
 placement, artifact revision, liveness ledger, scheduler queue, or generated
 declaration from the first session. For example, an unexported `worker` used
 only by the Go body cannot create a requirement because selected bodies are not

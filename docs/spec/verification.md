@@ -1002,6 +1002,14 @@ through the dependency filter and proves it is absent, while generated support
 requirements remain and an unselected-package dependency survives the same
 filter. Retaining the selected edge must fail because the final graph has no
 generated implementation facet for an authored declaration.
+The two-session fixture also makes a later selected-package callable demand
+canonical storage for an exported struct, then compiles only an earlier external
+`return T{}` consumer in the final session. The consumer must call
+`T.$fromStorage({...})`. Omitting the pre-root accepted-requirement replay must
+produce the positional `new T(...)` mutation and fail artifact inspection. A
+foreign captured requirement must fail pre-root ownership validation, and a
+later requirement batch that differs from the captured owner set must fail its
+exact join.
 The two-session fixture also reaches a generic call outside the replaced
 package. Recreating its semantically identical concretization in the final
 session must reuse the transferred canonical artifact. Mutations retain the

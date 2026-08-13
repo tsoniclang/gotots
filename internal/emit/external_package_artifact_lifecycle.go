@@ -11,6 +11,7 @@ import (
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"go/ast"
 	"go/types"
+	"slices"
 )
 
 func sourceImplementationForPackage(
@@ -30,9 +31,10 @@ type sourceImplementationInputs struct {
 }
 
 type sourceImplementationContract struct {
-	contract     artifactstate.Contract
-	dependencies []api.ArtifactDependency
-	requirements []api.DeclarationRequirement
+	contract             artifactstate.Contract
+	dependencies         []api.ArtifactDependency
+	outboundRequirements []api.DeclarationRequirement
+	acceptedRequirements []api.DeclarationRequirement
 }
 
 func captureSourceImplementationInputs(
@@ -106,9 +108,10 @@ func (s *programSession) captureSourceImplementationContracts() (
 		}
 		dependencies = s.sourceImplementationDependencies(dependencies)
 		result[owner] = sourceImplementationContract{
-			contract:     contract,
-			dependencies: dependencies,
-			requirements: s.requirements.consumedBy(owner),
+			contract:             contract,
+			dependencies:         dependencies,
+			outboundRequirements: s.requirements.consumedBy(owner),
+			acceptedRequirements: s.requirements.appliedFor(owner),
 		}
 	}
 	for _, implementation := range s.sourceImplementations.Implementations() {
@@ -183,6 +186,13 @@ func (s *programSession) acceptSourceImplementationRequirements(
 			Reason: "source-implementation observable contract is absent",
 		}
 	}
+	contract := s.sourceImplementationContracts[owner]
+	if !slices.Equal(requirements, contract.acceptedRequirements) {
+		return true, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "source-implementation accepted requirement contract changed",
+		}
+	}
 	for _, requirement := range requirements {
 		if !requirement.Valid() || requirement.Owner() != owner {
 			return true, &ScheduleError{
@@ -254,7 +264,7 @@ func (s *programSession) emitSourceImplementationContract(
 		owner,
 		contract.contract,
 		contract.dependencies,
-		contract.requirements,
+		contract.outboundRequirements,
 	); err != nil {
 		return true, err
 	}

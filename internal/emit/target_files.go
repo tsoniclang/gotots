@@ -150,6 +150,9 @@ func compileProgramSession(
 	roots []Root,
 	options Options,
 ) (ProgramEmission, error) {
+	if err := session.settleSourceImplementationRequirements(); err != nil {
+		return ProgramEmission{}, err
+	}
 	if err := session.requireProgramRoots(roots); err != nil {
 		return ProgramEmission{}, err
 	}

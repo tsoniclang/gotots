@@ -1429,9 +1429,10 @@ source-facing contract.
 Replacement uses two compilation sessions, not a filter over an assembled file
 list and not rollback within one mutable graph. The first session settles the
 ordinary canonical program solely for certification. It captures the complete
-ordinary target set, immutable observable contracts for selected-package
-source artifacts, and each contract artifact's exact outgoing support
-requirements and observable dependency edges. The deterministic name and
+ordinary target set, immutable observable contracts for selected-package source
+artifacts, and each contract artifact's exact outgoing support requirements,
+accepted representation requirements, and observable dependency edges. The
+deterministic name and
 generated-support identity registry is transferred as the one identity owner
 from the completed first session to the final session. The sessions never use
 it concurrently. Artifact revisions, liveness, builders, placement, requirement
@@ -1440,8 +1441,15 @@ session's remaining state is then discarded.
 
 A fresh final session starts with empty artifact, liveness, requirement,
 representation, placement, and target-builder state after taking ownership of
-the one canonical name/support-identity registry. When a final consumer requests a
-selected-package source artifact, the source owner publishes the captured
+the one canonical name/support-identity registry. Before any final consumer is
+emitted, it deterministically schedules and settles the complete captured set
+of accepted selected-package requirements. This restores facts such as a named
+struct's canonical storage representation before an early `T{}` consumer can
+choose a positional constructor. Every later requirement batch must exact-join
+the captured accepted set for its owner; a new, missing, or foreign requirement
+fails instead of changing an authored contract after consumers exist. When a
+final consumer requests a selected-package source artifact, the source owner
+publishes the captured
 observable contract with no body, storage, initializer, class contribution, or
 target declaration and reinstalls only that contract's captured outgoing
 support requirements and observable dependency edges. A dependency whose

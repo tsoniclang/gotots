@@ -3,7 +3,6 @@ package emit
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -40,6 +39,12 @@ func TestSourceImplementationAtomicallyReplacesGeneratedPackage(t *testing.T) {
 func Sum(value string) int { return helper(value) * 100 }
 func Read(value *int) int { return *value }
 type Reader interface { Read() int }
+type Pair struct { Left, Right int }
+func PairValue() Pair { return Pair{} }
+func PairValues() []Pair {
+	values := [1]Pair{{}}
+	return values[:]
+}
 `)
 	writeSourceImplementationFixture(t, filepath.Join(root, "fast", "helper.go"), `package fast
 func helper(value string) int { return len(value) }
@@ -54,6 +59,8 @@ func ReadExisting(current *int) int { return fast.Read(current) }
 func IsReader(value any) bool { _, ok := value.(fast.Reader); return ok }
 func identity[T any](value T) T { return value }
 func GenericValue() int { return identity(42) }
+func AZero() fast.Pair { return fast.Pair{} }
+func ZValues() []fast.Pair { return fast.PairValues() }
 `)
 	implementationRoot := filepath.Join(root, "implementation")
 	writeSourceImplementationPointerContract(t, implementationRoot)
@@ -72,6 +79,11 @@ export const Reader$contract: readonly object[] = Object.freeze([]);
 export function Reader$is(value: InterfaceValue | undefined): value is Reader {
   return value !== undefined && value.$go$implements(Reader$contract);
 }
+export interface Pair$Storage { Left: number; Right: number; }
+export class Pair {
+  public constructor(public Left: number, public Right: number) {}
+}
+export function PairValues(): Pair[] { return [new Pair(0, 0)]; }
 export function Sum(value: string): number { return value.length; }
 `
 	writeSourceImplementationFixture(t, filepath.Join(implementationRoot, "package.ts"), implementationSource)
@@ -108,7 +120,10 @@ export function Sum(value: string): number { return value.length; }
 			PreservedObservables: []string{"determinism", "public result shape"},
 			Evidence:             []string{"consumer output differential"},
 		},
-		Exports: []string{"Read", "Reader", "Reader$contract", "Reader$is", "Sum"},
+		Exports: []string{
+			"Pair", "Pair$Storage", "PairValues", "Read", "Reader",
+			"Reader$contract", "Reader$is", "Sum",
+		},
 	}
 	payload, err := json.MarshalIndent(contract, "", "  ")
 	if err != nil {
@@ -196,7 +211,7 @@ export function Sum(value: string): number { return value.length; }
 		t.Fatal("source implementation Reader contract is absent")
 	}
 	hasMethodToken := false
-	for _, requirement := range readerContract.requirements {
+	for _, requirement := range readerContract.outboundRequirements {
 		if requirement.Kind() == api.DeclarationRequirementInterfaceMethodToken {
 			hasMethodToken = true
 			break
@@ -205,6 +220,25 @@ export function Sum(value: string): number { return value.length; }
 	if !hasMethodToken {
 		t.Fatal("source implementation Reader discarded its method-token requirement")
 	}
+	pairOwner := api.MustSourceArtifactOwner(
+		fastPackage.Types().Scope().Lookup("Pair"),
+	)
+	pairContract, ok := inputs.contracts[pairOwner]
+	if !ok {
+		t.Fatal("source implementation Pair contract is absent")
+	}
+	hasStorage := false
+	for _, requirement := range pairContract.acceptedRequirements {
+		_, operation, selected := requirement.NamedStructOperation()
+		if selected && operation == api.NamedStructOperationStorage {
+			hasStorage = true
+			break
+		}
+	}
+	if !hasStorage {
+		t.Fatal("source implementation Pair discarded its accepted storage demand")
+	}
+	assertSourceImplementationStorageReplay(t, program, options, roots, repository, root)
 	mutatedContracts := make(
 		map[api.ArtifactOwner]sourceImplementationContract,
 		len(inputs.contracts),
@@ -212,7 +246,7 @@ export function Sum(value: string): number { return value.length; }
 	for owner, contract := range inputs.contracts {
 		mutatedContracts[owner] = contract
 	}
-	readerContract.requirements = nil
+	readerContract.outboundRequirements = nil
 	mutatedContracts[readerOwner] = readerContract
 	mutationSession, err := newProgramSessionWithRegistry(
 		program,
@@ -270,6 +304,7 @@ export function Sum(value: string): number { return value.length; }
 	addressedCaller := false
 	identityPointerCaller := false
 	interfaceGuardCaller := false
+	storageLiteralCaller := false
 	var callerArtifacts strings.Builder
 	for _, file := range emission.Files() {
 		if file.OutputPath() != assemblyPath {
@@ -288,6 +323,12 @@ export function Sum(value: string): number { return value.length; }
 			}
 			if strings.Contains(printed, "Reader$is") {
 				interfaceGuardCaller = true
+			}
+			if strings.Contains(printed, "Pair__from_fast.$fromStorage({") {
+				storageLiteralCaller = true
+			}
+			if strings.Contains(printed, "new Pair__from_fast(") {
+				t.Fatalf("source implementation caller used the superseded positional representation:\n%s", printed)
 			}
 			if strings.Contains(printed, "GoPointer") {
 				t.Fatalf("caller retained the retired pointer runtime:\n%s", printed)
@@ -339,6 +380,9 @@ export function Sum(value: string): number { return value.length; }
 	if !interfaceGuardCaller {
 		t.Fatalf("interface runtime guard did not survive through the package assembly:\n%s", callerArtifacts.String())
 	}
+	if !storageLiteralCaller {
+		t.Fatalf("source implementation caller did not replay canonical storage:\n%s", callerArtifacts.String())
+	}
 
 	writeSourceImplementationFixture(t, filepath.Join(implementationRoot, "package.ts"), `import type { Pointer } from "@tsonic/core/types.js";
 import { loadPointer } from "@tsonic/core/lang.js";
@@ -351,10 +395,16 @@ interface InterfaceValue {
 }
 export interface Reader extends InterfaceValue { Read(): number; }
 export const Reader$contract: readonly object[] = Object.freeze([]);
+export interface Pair$Storage { Left: number; Right: number; }
+export class Pair {
+  public constructor(public Left: number, public Right: number) {}
+}
+export function PairValues(): Pair[] { return [new Pair(0, 0)]; }
 export function Sum(value: string): number { return value.length; }
 `)
 	contract.Exports = []string{
-		"Read", "Reader", "Reader$contract", "Sum",
+		"Pair", "Pair$Storage", "PairValues", "Read", "Reader",
+		"Reader$contract", "Sum",
 	}
 	payload, err = json.MarshalIndent(contract, "", "  ")
 	if err != nil {
@@ -523,37 +573,4 @@ export function Sum(value: string): number { return value.length; }
 		return
 	}
 	t.Fatal("source implementation package assembly is absent")
-}
-
-func writeSourceImplementationFixture(t *testing.T, path string, content string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func writeSourceImplementationPointerContract(t *testing.T, root string) {
-	t.Helper()
-	module := filepath.Join(root, "node_modules", "@tsonic", "core")
-	writeSourceImplementationFixture(t, filepath.Join(module, "package.json"), `{
-  "type": "module",
-  "exports": {
-    "./lang.js": "./lang.js",
-    "./types.js": "./types.js"
-  }
-}
-`)
-	writeSourceImplementationFixture(t, filepath.Join(module, "types.d.ts"), `declare const pointerBrand: unique symbol;
-export interface Pointer<T> {
-  readonly [pointerBrand]: (value: T) => T;
-}
-`)
-	writeSourceImplementationFixture(t, filepath.Join(module, "types.js"), "export {};\n")
-	writeSourceImplementationFixture(t, filepath.Join(module, "lang.d.ts"), `import type { Pointer } from "./types.js";
-export declare function loadPointer<T>(pointer: Pointer<T>): T;
-`)
-	writeSourceImplementationFixture(t, filepath.Join(module, "lang.js"), "export {};\n")
 }

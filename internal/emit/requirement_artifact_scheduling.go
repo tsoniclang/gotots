@@ -253,6 +253,31 @@ func (s *programSession) NamedStructOperationSelected(
 	return s.requirements.wasApplied(requirement), nil
 }
 
+func (s *programSession) settleSourceImplementationRequirements() error {
+	if s.sourceImplementationContracts == nil {
+		return nil
+	}
+	var selected []api.DeclarationRequirement
+	for owner, contract := range s.sourceImplementationContracts {
+		for _, requirement := range contract.acceptedRequirements {
+			if !requirement.Valid() || requirement.Owner() != owner {
+				return &ScheduleError{
+					Object: owner.Name(),
+					Reason: "source-implementation accepted requirement has invalid ownership",
+				}
+			}
+			selected = append(selected, requirement)
+		}
+	}
+	sortDeclarationRequirements(selected)
+	for _, requirement := range selected {
+		if err := s.scheduleDeclarationRequirement(requirement); err != nil {
+			return err
+		}
+	}
+	return s.settle()
+}
+
 func (s *programSession) AnonymousStructDemandSelected(
 	artifact *api.GeneratedArtifact,
 	demand api.AnonymousStructDemand,
