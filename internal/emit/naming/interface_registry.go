@@ -4,12 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"go/types"
+	"slices"
 	"strings"
 
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/generic/semanticname"
 	"github.com/tsoniclang/gotots/internal/output"
 )
 
@@ -205,19 +205,14 @@ func (r *Registry) internProviderProfileInterfaceBridge(
 	if err != nil {
 		return providerInterfaceBridgeBinding{}, err
 	}
+	semanticParts, err := providerProfileBridgeSemanticParts(selected)
+	if err != nil {
+		return providerInterfaceBridgeBinding{}, err
+	}
 	var descriptor strings.Builder
 	descriptor.WriteString(sourceKey)
-	for _, current := range selected {
-		if !current.Valid() {
-			return providerInterfaceBridgeBinding{}, &api.NameError{
-				Reason: "provider-profile bridge certificate is invalid",
-			}
-		}
-		descriptor.WriteByte(0)
-		descriptor.WriteString(current.SourceIdentity())
-		descriptor.WriteByte(0)
-		descriptor.WriteString(current.TargetFingerprint())
-	}
+	descriptor.WriteByte(0)
+	descriptor.WriteString(strings.Join(semanticParts, "$And$"))
 	digest := sha256.Sum256([]byte(descriptor.String()))
 	artifactKey := hex.EncodeToString(digest[:])
 	if existing, found := r.providerInterfaceBridges[artifactKey]; found {
@@ -271,16 +266,9 @@ func providerProfileBridgeTargetName(
 			Reason: "provider-profile bridge semantic name is invalid",
 		}
 	}
-	parts := make([]string, 0, len(selected))
-	for _, current := range selected {
-		if !current.Valid() {
-			return "", &api.NameError{
-				Reason: "provider-profile bridge semantic evidence is invalid",
-			}
-		}
-		parts = append(parts, semanticname.Identifier(
-			current.SourceIdentity()+"$"+current.Export(),
-		))
+	parts, err := providerProfileBridgeNameParts(selected)
+	if err != nil {
+		return "", err
 	}
 	return base + "$Using$" + strings.Join(parts, "$And$"), nil
 }
@@ -292,13 +280,12 @@ func sameProviderProfileInterfaces(
 	if len(left) != len(right) {
 		return false
 	}
-	for index := range left {
-		if left[index].SourceIdentity() != right[index].SourceIdentity() ||
-			left[index].TargetFingerprint() != right[index].TargetFingerprint() {
-			return false
-		}
+	leftParts, leftErr := providerProfileBridgeSemanticParts(left)
+	rightParts, rightErr := providerProfileBridgeSemanticParts(right)
+	if leftErr != nil || rightErr != nil {
+		return false
 	}
-	return true
+	return slices.Equal(leftParts, rightParts)
 }
 
 func (r *Registry) internInterfaceMethodToken(

@@ -727,6 +727,14 @@ For each generated static facade, proof records:
 - effect and exact generic instance;
 - produced facade AST.
 
+Provider-profile bridge identity proof feeds the same source interface through
+two independently certified provider re-exports with different aggregate
+provider fingerprints and requires one bridge artifact. Mutations change one
+transported method effect or member and require distinct artifacts. A broad
+artifact inspection also bounds the readable bridge export name by its compact
+semantic shape; restoring the complete certificate descriptor to every
+identifier must fail the source-size gate.
+
 Scalar-boundary fixtures cross every signedness, fixed-width, and native-width
 class in both directions. Equal product/provider carriers must produce no
 conversion AST. Differing carriers must produce the one width-aware static

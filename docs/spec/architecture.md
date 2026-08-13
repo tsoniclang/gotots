@@ -1358,6 +1358,16 @@ sub-owner already present in the source/type graph, never by a digest byte,
 arbitrary numbered shard, or output-size accident. Lexical artifacts remain
 with their lexical owner.
 
+A provider-profile interface bridge is keyed by the exact bridge shape that
+GoToTS emits: source interface identity, selected protocol position, and every
+transported method's member and effect. Provider module/export ownership and
+an aggregate provider-target fingerprint are certification evidence for the
+provider declaration, not facets of that generated bridge. Equivalent
+re-exports therefore reuse one bridge; a changed transported member or effect
+creates a different bridge. The export name uses the source interface plus a
+compact readable profile description. The complete bridge descriptor remains
+the internal key and may not be copied into every identifier.
+
 The physical layout is therefore bounded by selected semantic/source owners,
 not digest buckets or arbitrary counters. Every definition, dependency,
 revision, and observable fingerprint remains keyed internally by the full
