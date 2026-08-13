@@ -110,12 +110,15 @@ func (r *Registry) internMapSpecialization(
 		}
 		return existing, nil
 	}
-	if existing := r.mapSpecializationNames[name]; existing != "" &&
-		existing != artifactKey {
-		return mapSpecializationBinding{}, &api.NameError{
-			Name:   name,
-			Reason: "map-specialization target-name collision",
-		}
+	if err := reserveGeneratedScopedName(
+		r.mapSpecializationNames,
+		name,
+		artifactKey,
+		"map-specialization",
+		placement,
+		output.MapSpecializationSupportPath,
+	); err != nil {
+		return mapSpecializationBinding{}, err
 	}
 	owner, err := newMapSpecializationArtifact(
 		mapType,
@@ -131,7 +134,6 @@ func (r *Registry) internMapSpecialization(
 		name:  name,
 	}
 	r.mapSpecializations[artifactKey] = binding
-	r.mapSpecializationNames[name] = artifactKey
 	return binding, nil
 }
 
@@ -421,21 +423,15 @@ func (r *Registry) internAnonymousStruct(
 		}
 		return existing, nil
 	}
-	nameScope := genericGeneratedNameScope{
-		placement:    placement.kind,
-		lexicalOwner: placement.lexicalOwner,
-		anchor:       placement.anchor,
-		name:         name,
-	}
-	if placement.kind == api.GeneratedArtifactPlacementCompilation {
-		nameScope.module = output.AnonymousStructSupportPath
-	}
-	if existing := r.anonymousStructNames[nameScope]; existing != "" &&
-		existing != artifactKey {
-		return anonymousStructBinding{}, &api.NameError{
-			Name:   name,
-			Reason: "anonymous-struct target-name collision",
-		}
+	if err := reserveGeneratedScopedName(
+		r.anonymousStructNames,
+		name,
+		artifactKey,
+		"anonymous-struct",
+		placement,
+		output.AnonymousStructSupportPath,
+	); err != nil {
+		return anonymousStructBinding{}, err
 	}
 	owner, err := newAnonymousStructArtifact(
 		structType,
@@ -451,7 +447,6 @@ func (r *Registry) internAnonymousStruct(
 		name:  name,
 	}
 	r.anonymousStructs[artifactKey] = binding
-	r.anonymousStructNames[nameScope] = artifactKey
 	return binding, nil
 }
 

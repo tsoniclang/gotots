@@ -130,10 +130,15 @@ func (n *File) InterfaceDynamicType(
 	if err != nil {
 		return api.NameReference{}, err
 	}
+	placement, err := n.generatedArtifactPlacement(sourceType)
+	if err != nil {
+		return api.NameReference{}, err
+	}
 	binding, err := n.owner.registry.internInterfaceDynamicTypeToken(
 		artifactKey,
 		sourceType,
 		name,
+		placement,
 	)
 	if err != nil {
 		return api.NameReference{}, err

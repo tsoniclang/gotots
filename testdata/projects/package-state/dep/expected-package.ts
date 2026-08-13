@@ -20,7 +20,7 @@ export function $initialize(): void {
         $state.hidden = mark(3);
     }
     {
-        $state.Filled = Cell.$storageOf(new Cell({
+        $state.Filled = Cell.$storageOf(Cell.$fromStorage({
             Value: 4
         }));
     }

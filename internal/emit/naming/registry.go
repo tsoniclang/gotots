@@ -220,17 +220,17 @@ type Registry struct {
 	anonymousStructs                    map[string]anonymousStructBinding
 	anonymousStructNames                map[genericGeneratedNameScope]string
 	mapSpecializations                  map[string]mapSpecializationBinding
-	mapSpecializationNames              map[string]string
+	mapSpecializationNames              map[genericGeneratedNameScope]string
 	interfaceAdapters                   map[string]interfaceAdapterBinding
-	interfaceAdapterNames               map[string]string
+	interfaceAdapterNames               map[genericGeneratedNameScope]string
 	anonymousInterfaces                 map[string]anonymousInterfaceBinding
-	anonymousInterfaceNames             map[string]string
+	anonymousInterfaceNames             map[genericGeneratedNameScope]string
 	interfaceMethodCallables            map[string]interfaceMethodCallableBinding
 	interfaceMethodCallableNames        map[string]string
 	interfaceMethodTokens               map[string]interfaceMethodTokenBinding
 	interfaceMethodNames                map[string]string
 	interfaceDynamicTypes               map[string]interfaceDynamicTypeTokenBinding
-	interfaceDynamicNames               map[string]string
+	interfaceDynamicNames               map[genericGeneratedNameScope]string
 	providerInterfaceBridges            map[string]providerInterfaceBridgeBinding
 	providerInterfaceBridgeNames        map[string]string
 	providerInterfaceCapabilities       map[string]map[string]providerInterfaceCapabilityBinding
@@ -299,17 +299,17 @@ func NewRegistry() *Registry {
 		anonymousStructs:                    make(map[string]anonymousStructBinding),
 		anonymousStructNames:                make(map[genericGeneratedNameScope]string),
 		mapSpecializations:                  make(map[string]mapSpecializationBinding),
-		mapSpecializationNames:              make(map[string]string),
+		mapSpecializationNames:              make(map[genericGeneratedNameScope]string),
 		interfaceAdapters:                   make(map[string]interfaceAdapterBinding),
-		interfaceAdapterNames:               make(map[string]string),
+		interfaceAdapterNames:               make(map[genericGeneratedNameScope]string),
 		anonymousInterfaces:                 make(map[string]anonymousInterfaceBinding),
-		anonymousInterfaceNames:             make(map[string]string),
+		anonymousInterfaceNames:             make(map[genericGeneratedNameScope]string),
 		interfaceMethodCallables:            make(map[string]interfaceMethodCallableBinding),
 		interfaceMethodCallableNames:        make(map[string]string),
 		interfaceMethodTokens:               make(map[string]interfaceMethodTokenBinding),
 		interfaceMethodNames:                make(map[string]string),
 		interfaceDynamicTypes:               make(map[string]interfaceDynamicTypeTokenBinding),
-		interfaceDynamicNames:               make(map[string]string),
+		interfaceDynamicNames:               make(map[genericGeneratedNameScope]string),
 		providerInterfaceBridges:            make(map[string]providerInterfaceBridgeBinding),
 		providerInterfaceBridgeNames:        make(map[string]string),
 		providerInterfaceCapabilities:       make(map[string]map[string]providerInterfaceCapabilityBinding),

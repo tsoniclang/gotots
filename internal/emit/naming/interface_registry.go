@@ -46,11 +46,13 @@ func (r *Registry) internInterfaceAdapter(
 		}
 		return existing, nil
 	}
-	if err := reserveGeneratedName(
+	if err := reserveGeneratedScopedName(
 		r.interfaceAdapterNames,
 		name,
 		artifactKey,
 		"interface-adapter",
+		placement,
+		output.InterfaceAdapterSupportPath,
 	); err != nil {
 		return interfaceAdapterBinding{}, err
 	}
@@ -105,11 +107,13 @@ func (r *Registry) internAnonymousInterface(
 		}
 		return existing, nil
 	}
-	if err := reserveGeneratedName(
+	if err := reserveGeneratedScopedName(
 		r.anonymousInterfaceNames,
 		name,
 		artifactKey,
 		"anonymous-interface",
+		placement,
+		output.AnonymousInterfaceSupportPath,
 	); err != nil {
 		return anonymousInterfaceBinding{}, err
 	}
@@ -406,11 +410,13 @@ func (r *Registry) internInterfaceDynamicTypeToken(
 	artifactKey string,
 	sourceType types.Type,
 	name string,
+	placement generatedArtifactPlacement,
 ) (interfaceDynamicTypeTokenBinding, error) {
 	if r == nil ||
 		!interfaceAdapterSource(sourceType) ||
 		artifactKey == "" ||
-		name == "" {
+		name == "" ||
+		!placement.kind.Valid() {
 		return interfaceDynamicTypeTokenBinding{}, &api.NameError{
 			Reason: "interface-dynamic-type canonicalization input is invalid",
 		}
@@ -423,22 +429,29 @@ func (r *Registry) internInterfaceDynamicTypeToken(
 				Reason: "interface-dynamic-type key joined non-identical Go types",
 			}
 		}
+		if !sameGeneratedPlacement(existing.owner, placement) {
+			return interfaceDynamicTypeTokenBinding{}, &api.NameError{
+				Name:   existing.name,
+				Reason: "interface-dynamic-type placement is inconsistent",
+			}
+		}
 		return existing, nil
 	}
-	if err := reserveGeneratedName(
+	if err := reserveGeneratedScopedName(
 		r.interfaceDynamicNames,
 		name,
 		artifactKey,
 		"interface-dynamic-type",
+		placement,
+		output.InterfaceTypeSupportPath,
 	); err != nil {
 		return interfaceDynamicTypeTokenBinding{}, err
 	}
-	owner, err := api.NewCompilationGeneratedArtifact(
-		api.GeneratedArtifactInterfaceDynamicTypeToken,
+	owner, err := newInterfaceDynamicTypeArtifact(
 		sourceType,
 		artifactKey,
 		name,
-		output.InterfaceTypeSupportPath,
+		placement,
 	)
 	if err != nil {
 		return interfaceDynamicTypeTokenBinding{}, err
@@ -446,6 +459,22 @@ func (r *Registry) internInterfaceDynamicTypeToken(
 	binding := interfaceDynamicTypeTokenBinding{owner: owner, name: name}
 	r.interfaceDynamicTypes[artifactKey] = binding
 	return binding, nil
+}
+
+func reserveGeneratedScopedName(
+	names map[genericGeneratedNameScope]string,
+	name string,
+	artifactKey string,
+	kind string,
+	placement generatedArtifactPlacement,
+	module string,
+) error {
+	return reserveGenericGeneratedName(
+		names,
+		generatedArtifactNameScope(name, placement, module),
+		artifactKey,
+		kind,
+	)
 }
 
 func reserveGeneratedName(
@@ -511,6 +540,31 @@ func newAnonymousInterfaceArtifact(
 		artifactKey,
 		name,
 		output.AnonymousInterfaceSupportPath,
+	)
+}
+
+func newInterfaceDynamicTypeArtifact(
+	sourceType types.Type,
+	artifactKey string,
+	name string,
+	placement generatedArtifactPlacement,
+) (*api.GeneratedArtifact, error) {
+	if placement.kind == api.GeneratedArtifactPlacementLexical {
+		return api.NewLexicalGeneratedArtifact(
+			api.GeneratedArtifactInterfaceDynamicTypeToken,
+			sourceType,
+			artifactKey,
+			name,
+			placement.lexicalOwner,
+			placement.anchor,
+		)
+	}
+	return api.NewCompilationGeneratedArtifact(
+		api.GeneratedArtifactInterfaceDynamicTypeToken,
+		sourceType,
+		artifactKey,
+		name,
+		output.InterfaceTypeSupportPath,
 	)
 }
 

@@ -24,6 +24,23 @@ type genericGeneratedNameScope struct {
 	name         string
 }
 
+func generatedArtifactNameScope(
+	name string,
+	placement generatedArtifactPlacement,
+	module string,
+) genericGeneratedNameScope {
+	scope := genericGeneratedNameScope{
+		placement:    placement.kind,
+		lexicalOwner: placement.lexicalOwner,
+		anchor:       placement.anchor,
+		name:         name,
+	}
+	if placement.kind == api.GeneratedArtifactPlacementCompilation {
+		scope.module = module
+	}
+	return scope
+}
+
 func reserveGenericGeneratedName(
 	names map[genericGeneratedNameScope]string,
 	scope genericGeneratedNameScope,

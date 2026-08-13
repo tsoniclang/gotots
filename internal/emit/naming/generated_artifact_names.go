@@ -316,6 +316,24 @@ func (n *File) generatedPackageToken(
 	return n.owner.registry.semanticPackageToken(sourcePackage)
 }
 
+func (r *Registry) semanticPackageToken(
+	sourcePackage *types.Package,
+) (string, error) {
+	if r == nil || sourcePackage == nil {
+		return "", &api.NameError{
+			Reason: "generated-artifact package token owner is invalid",
+		}
+	}
+	qualifier := r.ImportQualifier(sourcePackage)
+	if qualifier == "" {
+		return "", &api.NameError{
+			Name:   sourcePackage.Path(),
+			Reason: "generated-artifact package token is absent",
+		}
+	}
+	return qualifier, nil
+}
+
 func semanticGeneratedTypeName(
 	prefix string,
 	sourceType types.Type,

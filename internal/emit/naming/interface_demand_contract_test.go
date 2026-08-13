@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/output"
 )
 
 func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
@@ -205,10 +204,22 @@ func TestInterfaceDynamicTypeTokenIsCanonicalForLocalGoType(t *testing.T) {
 	}
 	key := strings.Repeat("a", 64)
 	registry := NewRegistry()
+	function := types.NewFunc(
+		token.Pos(1),
+		sourcePackage,
+		"Use",
+		types.NewSignatureType(nil, nil, nil, nil, nil, false),
+	)
+	placement := generatedArtifactPlacement{
+		kind:         api.GeneratedArtifactPlacementLexical,
+		lexicalOwner: api.MustSourceArtifactOwner(function),
+		anchor:       typeName,
+	}
 	first, err := registry.internInterfaceDynamicTypeToken(
 		key,
 		localType,
 		"$goDynamicType$Named_Local",
+		placement,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -217,6 +228,7 @@ func TestInterfaceDynamicTypeTokenIsCanonicalForLocalGoType(t *testing.T) {
 		key,
 		localType,
 		"$goDynamicType$Named_Local",
+		placement,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -226,8 +238,9 @@ func TestInterfaceDynamicTypeTokenIsCanonicalForLocalGoType(t *testing.T) {
 		first.name != second.name ||
 		!ok ||
 		selectedType != localType ||
-		first.owner.Placement() != api.GeneratedArtifactPlacementCompilation ||
-		first.owner.OutputPath() != output.InterfaceTypeSupportPath {
+		first.owner.Placement() != api.GeneratedArtifactPlacementLexical ||
+		first.owner.OutputPath() != "" ||
+		first.owner.LexicalAnchor() != typeName {
 		t.Fatalf("canonical dynamic type = %#v / %#v", first, second)
 	}
 }
@@ -248,6 +261,9 @@ func TestInterfaceDynamicTypeTokenRejectsSemanticNameCollision(t *testing.T) {
 		strings.Repeat("1", 64),
 		first,
 		"$goDynamicType$Shared",
+		generatedArtifactPlacement{
+			kind: api.GeneratedArtifactPlacementCompilation,
+		},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -255,11 +271,14 @@ func TestInterfaceDynamicTypeTokenRejectsSemanticNameCollision(t *testing.T) {
 		strings.Repeat("2", 64),
 		second,
 		"$goDynamicType$Shared",
+		generatedArtifactPlacement{
+			kind: api.GeneratedArtifactPlacementCompilation,
+		},
 	)
 	var nameError *api.NameError
 	if !errors.As(err, &nameError) ||
 		nameError.Reason !=
-			"interface-dynamic-type target-name collision" {
+			"interface-dynamic-type semantic name collision" {
 		t.Fatalf("collision error = %#v", err)
 	}
 }
