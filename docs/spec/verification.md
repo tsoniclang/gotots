@@ -1036,9 +1036,10 @@ type, nil shape, method/callback adapter, or signature dependency; each fails at
 the TSTS join or strict target consumer. A body-only authored change changes the
 implementation digest without changing generated callers.
 
-The final broad search rejects any source-implementation name-only surface
-join, package/function projection condition, pointer-scalarization config field,
-caller allowlist, text patch, unchecked cast, or duplicate signature store.
+The final broad search rejects treating GoToTS's export-identity join as final
+surface acceptance, any second name-only signature gate, package/function
+projection condition, pointer-scalarization config field, caller allowlist,
+text patch, unchecked cast, or duplicate signature store.
 
 The provider pointer contract is independently certified as exactly one
 writable `ProviderPointer<T>.value: T` member plus one

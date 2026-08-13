@@ -129,7 +129,7 @@ func (c *Certificate) VerifyGeneratedContracts(
 		if err != nil {
 			return err
 		}
-		if err := exactJoinPackageExports(
+		if err := joinPackageExportIdentities(
 			implementation,
 			generatedExports,
 			installedExports,
@@ -140,35 +140,35 @@ func (c *Certificate) VerifyGeneratedContracts(
 	return nil
 }
 
-func exactJoinPackageExports(
+func joinPackageExportIdentities(
 	implementation Implementation,
 	generated []tsgo.ProjectExport,
 	installed []tsgo.ProjectExport,
 ) error {
 	expected := implementation.Exports()
-	expectedNames := make([]string, len(expected))
+	expectedIdentities := make([]string, len(expected))
 	for index, export := range expected {
-		expectedNames[index] = export.Name()
+		expectedIdentities[index] = export.Name()
 	}
-	generatedNames := projectExportNames(generated)
-	installedNames := projectExportNames(installed)
-	if !slices.Equal(generatedNames, expectedNames) ||
-		!slices.Equal(installedNames, expectedNames) {
+	generatedIdentities := projectExportIdentities(generated)
+	installedIdentities := projectExportIdentities(installed)
+	if !slices.Equal(generatedIdentities, expectedIdentities) ||
+		!slices.Equal(installedIdentities, expectedIdentities) {
 		return &Error{
 			Operation: "join generated contract",
 			Subject:   implementation.PackagePath(),
 			Reason: fmt.Sprintf(
-				"generated exports %v and installed exports %v differ from %v",
-				generatedNames,
-				installedNames,
-				expectedNames,
+				"generated export identities %v and installed export identities %v differ from %v",
+				generatedIdentities,
+				installedIdentities,
+				expectedIdentities,
 			),
 		}
 	}
 	return nil
 }
 
-func projectExportNames(selected []tsgo.ProjectExport) []string {
+func projectExportIdentities(selected []tsgo.ProjectExport) []string {
 	result := make([]string, len(selected))
 	for index, export := range selected {
 		result[index] = export.Name()

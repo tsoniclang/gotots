@@ -1487,11 +1487,12 @@ Those are liveness inputs, not identity facts, and the final session must
 derive them only from its own consumers. Transfer and final-session claim are
 each single-use operations.
 
-For callable exports, the surface join is signature-exact rather than
+For callable exports, final surface validation is signature-exact rather than
 name-only. GoToTS preserves the selected Go signature in ordinary canonical
-callers and binds the authored module by exact export identity. TSTS is the one
-owner that compares the generated and authored canonical parameter/result
-types under the authoritative virtual marker modules. For example, Go
+callers and first exact-joins the generated, declared, and installed export
+identity sets. TSTS is the one owner that compares the generated and authored
+canonical parameter/result types under the authoritative virtual marker
+modules. For example, Go
 `Read(*int) int` requires authored
 `Read(Pointer<int> | undefined): int`; authored `Read(number): number` is a
 target-specific optimization and is rejected at this canonical boundary.
