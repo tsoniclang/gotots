@@ -68,11 +68,14 @@ it therefore avoids a source name even when that declaration occurs later or
 inside a descendant scope. For example, a source parameter named
 `__gotots_field_0` forces the first composite-literal capture to use
 `__gotots_field_1` or the next available name. Generated member names use the
-struct member owner under the same no-duplicate rule. A literal target-only
-name is admitted only inside a structurally closed synthetic scope whose owner
-defines the complete binding set and uses the `$` namespace that Go source
-cannot spell. Raw counters are forbidden in scopes that contain authored
-bindings.
+struct member owner under the same no-duplicate rule. The owner reserves the
+lowercase member `then`: JavaScript uses that property for Promise assimilation,
+which has no Go-language counterpart. A legal Go field named `then` therefore
+receives the next deterministic collision-safe member name, and every access
+uses that one identity. A literal target-only name is admitted only inside a
+structurally closed synthetic scope whose owner defines the complete binding
+set and uses the `$` namespace that Go source cannot spell. Raw counters are
+forbidden in scopes that contain authored bindings.
 
 A compilation-global artifact keeps an imported derived export unqualified
 when that export is unique in the selected source universe. The naming owner
@@ -645,16 +648,21 @@ representation.
 An interface value is nil or a canonical dynamic-type token plus represented
 payload. Concrete boxing copies value payloads and preserves reference
 payloads. One adapter per reached concrete type/contract exposes only demanded
-methods. Calls are native constant-size member calls; implementer switches are
-forbidden.
+methods. Each adapter extends the canonical interface-value root and calls its
+zero-argument base constructor, so it inherits the one Promise-assimilation
+exclusion rather than redeclaring an incompatible private member. Calls are
+native constant-size member calls; implementer switches are forbidden.
 
-Every canonical interface-value contract also declares the erased nominal
-member `declare private readonly then?: never`. JavaScript therefore cannot
-mistake a generated Go interface value for a Promise-like value when it crosses
-an `async` return boundary, while structural TypeScript values cannot claim the
-guarantee. The declaration emits no JavaScript field. A source Go method named
-`then` is unexported and keeps its package-qualified target member identity; it
-does not occupy JavaScript's Promise-assimilation member.
+Every generated root class, including the canonical interface-value contract,
+declares the erased nominal member
+`declare private readonly then?: never`. JavaScript therefore cannot mistake a
+generated Go value for a Promise-like value when it crosses an `async` return
+boundary, while structural TypeScript values cannot claim the guarantee. The
+declaration emits no JavaScript field. Generated derived classes inherit the
+one root declaration and never redeclare its private member. A source Go method
+named `then` is unexported and keeps its package-qualified target member
+identity; a source field named `then` is deterministically renamed by the
+member-name owner. Neither occupies JavaScript's Promise-assimilation member.
 
 Assertions, comma-ok, type switches, equality, comparability, and map keys use
 typed runtime metadata. No constructor-name test, reflection, spelling table,

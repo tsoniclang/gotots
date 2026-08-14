@@ -2,6 +2,7 @@ package panicruntime
 
 import (
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -13,13 +14,13 @@ func runtimePanicValue(
 	runtimeErrorTokenName string,
 ) tsgo.ClassDeclaration {
 	valueType := factory.TypeReferenceNode(factory.Identifier(valueName), nil)
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
 		nil,
 		[]tsgo.HeritageClause{
 			factory.HeritageClause(
-				tsgo.HeritageClauseTokenKindImplementsKeyword,
+				tsgo.HeritageClauseTokenKindExtendsKeyword,
 				[]tsgo.ExpressionWithTypeArguments{
 					factory.ExpressionWithTypeArguments(
 						factory.Identifier(valueName),
@@ -54,7 +55,15 @@ func runtimePanicValue(
 					),
 				},
 				nil,
-				factory.Block(nil, true),
+				factory.Block([]tsgo.Statement{
+					factory.ExpressionStatement(factory.CallExpression(
+						factory.SuperExpression(),
+						nil,
+						nil,
+						nil,
+						tsgo.NodeFlagsNone,
+					)),
+				}, true),
 			),
 			factory.PropertyDeclaration(
 				[]tsgo.ModifierLike{factory.ReadonlyKeyword()},

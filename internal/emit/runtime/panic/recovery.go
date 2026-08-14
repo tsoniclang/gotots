@@ -1,6 +1,9 @@
 package panicruntime
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 func recovery(
 	factory tsgo.Factory,
@@ -11,7 +14,7 @@ func recovery(
 	panicType := factory.TypeReferenceNode(factory.Identifier(panicName), nil)
 	valueType := factory.TypeReferenceNode(factory.Identifier(valueName), nil)
 	pending := factory.Identifier("pending")
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
 		nil,

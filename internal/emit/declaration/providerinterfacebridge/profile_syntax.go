@@ -3,6 +3,7 @@ package providerinterfacebridge
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -43,7 +44,7 @@ func profileBridgeClass(
 	members []tsgo.ClassElement,
 	modifiers []tsgo.ModifierLike,
 ) tsgo.ClassDeclaration {
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		modifiers,
 		factory.Identifier(name),
 		nil,

@@ -100,6 +100,72 @@ func (value Value) Unused() Value {
 	}
 }
 
+func TestStructFieldCannotOccupyPromiseAssimilationMember(t *testing.T) {
+	emission, err := compileTemporaryStructProgram(t, `package boundary
+
+type Value struct {
+	then func() int
+}
+
+func NewValue(then func() int) Value {
+	return Value{then: then}
+}
+
+func (value *Value) Invoke() int {
+	return value.then()
+}
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	class := targetClass(t, structTargetSource(t, emission), "Value")
+	constructor := classConstructor(t, class)
+	if len(constructor.Parameters()) != 1 {
+		t.Fatalf("Value constructor parameters = %d, want one", len(constructor.Parameters()))
+	}
+	fieldName := targetName(constructor.Parameters()[0].Name())
+	if fieldName == "then" || fieldName == "" {
+		t.Fatalf("callable Go field target name = %q", fieldName)
+	}
+	method := targetMethod(t, class, "Invoke")
+	statements := method.Body().(tsgo.Block).Statements()
+	if len(statements) != 2 {
+		t.Fatalf("Value.Invoke statements = %d, want capture and return", len(statements))
+	}
+	capture, ok := statements[0].(tsgo.VariableStatement)
+	if !ok || len(capture.DeclarationList().Declarations()) != 1 {
+		t.Fatalf("Value.Invoke capture = %T", statements[0])
+	}
+	selected := selectedMemberName(
+		capture.DeclarationList().Declarations()[0].Initializer(),
+	)
+	if selected != fieldName {
+		t.Fatalf(
+			"Value.Invoke capture selects %q, want %q",
+			selected,
+			fieldName,
+		)
+	}
+}
+
+func selectedMemberName(node tsgo.Node) string {
+	switch node := node.(type) {
+	case tsgo.PropertyAccessExpression:
+		return targetName(node.Name())
+	case tsgo.ParenthesizedExpression:
+		return selectedMemberName(node.Expression())
+	case tsgo.BinaryExpression:
+		if name := selectedMemberName(node.Left()); name != "" {
+			return name
+		}
+		return selectedMemberName(node.Right())
+	case tsgo.CallExpression:
+		return selectedMemberName(node.Expression())
+	default:
+		return ""
+	}
+}
+
 func TestSingleStructReturnCopiesBorrowedField(t *testing.T) {
 	emission, err := compileTemporaryStructProgram(t, `package boundary
 

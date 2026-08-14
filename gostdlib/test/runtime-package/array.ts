@@ -38,4 +38,5 @@ export class GoArray<T, N extends number> {
         }
         return offset;
     }
+    declare private readonly then?: never;
 }

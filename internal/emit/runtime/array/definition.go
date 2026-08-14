@@ -3,6 +3,7 @@ package array
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -75,7 +76,7 @@ func BuildWithCapabilities(
 		setMethod(factory, elementType),
 		checkMethod(factory, panicName),
 	)
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(exportedName),
 		typeParameters,

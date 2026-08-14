@@ -3,6 +3,7 @@ package panicnil
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -61,7 +62,7 @@ func panicNilError(
 	factory tsgo.Factory,
 	className string,
 ) tsgo.ClassDeclaration {
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
 		nil,
@@ -113,7 +114,7 @@ func panicNilValue(
 			factory.TypeReferenceNode(factory.Identifier(errorName), nil),
 		},
 	)
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
 		nil,

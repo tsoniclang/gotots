@@ -2,6 +2,7 @@ package interfacevalue
 
 import (
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -11,7 +12,7 @@ func providerBridgeContract(
 ) tsgo.ClassDeclaration {
 	valueType := factory.TypeReferenceNode(factory.Identifier("T"), nil)
 	baseType := factory.TypeReferenceNode(factory.Identifier(valueName), nil)
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword(), factory.AbstractKeyword()},
 		factory.Identifier("GoProviderInterfaceBridge"),
 		[]tsgo.TypeParameterDeclaration{

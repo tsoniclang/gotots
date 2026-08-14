@@ -1,9 +1,6 @@
 export class GoEmptyStruct {
     declare private readonly $go$emptyStruct: void;
-    private constructor() {
-    }
-    static $make(): GoEmptyStruct {
-        return new GoEmptyStruct;
+    public constructor() {
     }
     static $zero(): GoEmptyStruct {
         return new GoEmptyStruct;
@@ -26,4 +23,5 @@ export class GoEmptyStruct {
     static $fromStorage($source: GoEmptyStruct): GoEmptyStruct {
         return $source;
     }
+    declare private readonly then?: never;
 }

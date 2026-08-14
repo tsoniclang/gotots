@@ -92,17 +92,25 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 	if err := tsgo.Compile(ctx, root, directory, arguments); err != nil {
 		t.Fatal(err)
 	}
-	interfaceJavaScript, err := os.ReadFile(
-		filepath.Join(directory, "dist", "interface-value.js"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(interfaceJavaScript), "then") {
-		t.Fatalf(
-			"erased interface then exclusion reached JavaScript:\n%s",
-			interfaceJavaScript,
+	for _, module := range []string{
+		"array.js",
+		"interface-value.js",
+		"panic.js",
+		"slice.js",
+	} {
+		javascript, readErr := os.ReadFile(
+			filepath.Join(directory, "dist", module),
 		)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		if strings.Contains(string(javascript), "then") {
+			t.Fatalf(
+				"erased class Promise exclusion reached %s:\n%s",
+				module,
+				javascript,
+			)
+		}
 	}
 }
 

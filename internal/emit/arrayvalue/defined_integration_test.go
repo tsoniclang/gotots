@@ -92,16 +92,16 @@ func TestDefinedArrayHasOneMinimalNominalTargetClass(t *testing.T) {
 		}
 	}
 	pair := classes["Pair"]
-	if pair == nil || len(pair.Members()) != 2 {
+	if pair == nil || len(pair.Members()) != 3 {
 		t.Fatalf(
-			"Pair members = %d, want brand and constructor only",
+			"Pair members = %d, want brand, constructor, and Promise exclusion",
 			classMemberCount(pair),
 		)
 	}
 	other := classes["Other"]
-	if other == nil || len(other.Members()) != 2 {
+	if other == nil || len(other.Members()) != 3 {
 		t.Fatalf(
-			"unaddressed Other members = %d, want brand and constructor only",
+			"unaddressed Other members = %d, want brand, constructor, and Promise exclusion",
 			classMemberCount(other),
 		)
 	}
@@ -138,11 +138,13 @@ void other;
 		if err != nil {
 			t.Fatal(err)
 		}
-		mutated := strings.ReplaceAll(
-			string(content),
+		mutated := string(content)
+		for _, contract := range []string{
 			"declare private readonly $goType: void;\n",
-			"",
-		)
+			"declare private readonly then?: never;\n",
+		} {
+			mutated = strings.ReplaceAll(mutated, contract, "")
+		}
 		if mutated == string(content) {
 			continue
 		}
@@ -150,10 +152,10 @@ void other;
 		writeFile(t, path, mutated)
 	}
 	if replacements == 0 {
-		t.Fatal("nominality mutation removed no generated brand")
+		t.Fatal("nominality mutation removed no generated class contracts")
 	}
 	if err := compileTypeScript(t, workingDirectory, target.paths); err != nil {
-		t.Fatalf("brand-removal foil did not expose structural identity: %v", err)
+		t.Fatalf("class-contract removal foil did not expose structural identity: %v", err)
 	}
 }
 

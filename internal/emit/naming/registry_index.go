@@ -9,6 +9,7 @@ import (
 	environmentcontract "github.com/tsoniclang/gotots/internal/contracts/environment"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib/certify"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
 )
@@ -235,7 +236,10 @@ func (r *Registry) indexEnvironmentPackage(
 }
 
 func (r *Registry) indexEnvironmentFields(structure *types.Struct) {
-	used := map[string]struct{}{"constructor": {}}
+	used := map[string]struct{}{
+		"constructor": {},
+		typescriptclass.PromiseAssimilationMember: {},
+	}
 	for index := range structure.NumFields() {
 		field := structure.Field(index)
 		name := allocatePackageName(portableIdentifier(field.Name()), used)

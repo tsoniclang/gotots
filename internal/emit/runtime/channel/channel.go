@@ -2,6 +2,7 @@ package channel
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -74,7 +75,7 @@ func (b builder) channelClass() tsgo.ClassDeclaration {
 		b.selectReceiveMethod(),
 		b.compactBufferMethod(),
 	}
-	return b.factory.ClassDeclaration(
+	return typescriptclass.Declaration(b.factory,
 		[]tsgo.ModifierLike{b.factory.ExportKeyword()},
 		b.id(b.channelName),
 		[]tsgo.TypeParameterDeclaration{b.typeParameter()},

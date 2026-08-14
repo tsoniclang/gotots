@@ -15,6 +15,7 @@ export class Point {
     static $equal($left: Point, $right: Point): bool {
         return $left.X === $right.X && $left.Visible === $right.Visible;
     }
+    declare private readonly then?: never;
 }
 export class Box {
     declare private readonly $goType: void;
@@ -29,6 +30,7 @@ export class Box {
     static $equal($left: Box, $right: Box): bool {
         return Point.$equal($left.Point, $right.Point) && $left.Active === $right.Active;
     }
+    declare private readonly then?: never;
     WithX(value: int32): Box {
         let box: Box = Box.$copy(this);
         box.Point.X = value;
@@ -39,16 +41,19 @@ export class Mirror {
     declare private readonly $goType: void;
     public constructor(public Point: Point, public Active: bool) {
     }
+    declare private readonly then?: never;
 }
 export class Reserved {
     declare private readonly $goType: void;
     public constructor(public __go_constructor: int32) {
     }
+    declare private readonly then?: never;
 }
 export class Grouped {
     declare private readonly $goType: void;
     public constructor(public Left: int32, public Right: int32) {
     }
+    declare private readonly then?: never;
 }
 export class Empty {
     declare private readonly $goType: void;
@@ -60,6 +65,7 @@ export class Empty {
     static $equal($left: Empty, $right: Empty): bool {
         return true;
     }
+    declare private readonly then?: never;
 }
 export function NewBox(value: int32): Box {
     return new Box(new Point(value, true), value > 0);

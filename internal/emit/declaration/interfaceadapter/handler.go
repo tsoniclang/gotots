@@ -11,6 +11,7 @@ import (
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -43,7 +44,7 @@ func Build(
 	}
 	runtimeValue, err := context.Names().Runtime(
 		api.RuntimeInterfaceValue,
-		api.ImportPhaseType,
+		api.ImportPhaseValue,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -166,13 +167,13 @@ func Build(
 	classMembers = append(classMembers, methods...)
 	statements := []tsgo.Statement{
 		methodSetDeclaration(context.Factory(), name, tokens),
-		context.Factory().ClassDeclaration(
+		typescriptclass.Declaration(context.Factory(),
 			modifiers,
 			context.Factory().Identifier(name),
 			nil,
 			[]tsgo.HeritageClause{
 				context.Factory().HeritageClause(
-					tsgo.HeritageClauseTokenKindImplementsKeyword,
+					tsgo.HeritageClauseTokenKindExtendsKeyword,
 					[]tsgo.ExpressionWithTypeArguments{
 						context.Factory().ExpressionWithTypeArguments(
 							context.Factory().Identifier(

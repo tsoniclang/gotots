@@ -319,7 +319,7 @@ func assertDefinedClass(
 	class tsgo.ClassDeclaration,
 ) {
 	t.Helper()
-	const wantMembers = 2
+	const wantMembers = 3
 	if kinds := modifierKinds(class.Modifiers()); len(kinds) != 1 ||
 		kinds[0] != tsgo.SyntaxKindExportKeyword ||
 		len(class.TypeParameters()) != 0 ||

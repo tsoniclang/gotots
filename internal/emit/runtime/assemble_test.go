@@ -5,7 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	channelruntime "github.com/tsoniclang/gotots/internal/emit/runtime/channel"
-	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -78,9 +78,20 @@ func TestInterfaceValueContractStaticallyExcludesPromiseAssimilation(t *testing.
 		t.Fatalf("interface-value definitions = %d, want one", len(definitions))
 	}
 	contract := definitions[0].Statement().(tsgo.ClassDeclaration)
-	property, ok := contract.Members()[0].(tsgo.PropertyDeclaration)
-	if !ok || property.Name().(tsgo.Identifier).Text() != interfacecontract.ThenExclusionMember {
-		t.Fatalf("interface-value first member = %T, want then exclusion", contract.Members()[0])
+	var property tsgo.PropertyDeclaration
+	for _, member := range contract.Members() {
+		candidate, ok := member.(tsgo.PropertyDeclaration)
+		if !ok {
+			continue
+		}
+		name, ok := candidate.Name().(tsgo.Identifier)
+		if ok && name.Text() == typescriptclass.PromiseAssimilationMember {
+			property = candidate
+			break
+		}
+	}
+	if property == nil {
+		t.Fatal("interface-value class has no promise assimilation exclusion")
 	}
 	modifiers := property.Modifiers()
 	if len(modifiers) != 3 ||
@@ -110,7 +121,7 @@ func TestEmptyStructRuntimeHasOneExactNominalOwner(t *testing.T) {
 		t.Fatalf("empty-struct definitions = %#v", definitions)
 	}
 	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
-	if !ok || class.Name().Text() != "GoEmptyStruct" || len(class.Members()) != 9 {
+	if !ok || class.Name().Text() != "GoEmptyStruct" || len(class.Members()) != 10 {
 		t.Fatalf(
 			"empty-struct owner = %T with unexpected shape",
 			definitions[0].Statement(),

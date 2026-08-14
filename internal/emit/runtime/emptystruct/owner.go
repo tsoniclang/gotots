@@ -1,6 +1,9 @@
 package emptystruct
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 const (
 	zeroMember        = "$zero"
@@ -31,7 +34,7 @@ func Build(factory tsgo.Factory, className string) tsgo.ClassDeclaration {
 	returnHash := func() tsgo.Expression {
 		return target.factory.NumericLiteral("2166136261", tsgo.TokenFlagsNone)
 	}
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
 		nil,

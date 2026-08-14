@@ -16,6 +16,7 @@ import (
 	namedstruct "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	genericcapability "github.com/tsoniclang/gotots/internal/emit/generic/capability"
 	genericconcretization "github.com/tsoniclang/gotots/internal/emit/generic/concretization"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	maprepresentation "github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -556,7 +557,7 @@ func emitLexicalMapSpecialization(
 		return api.DeclarationEmission{}, err
 	}
 	return api.DirectDeclaration(
-		context.Factory().ClassDeclaration(
+		typescriptclass.Declaration(context.Factory(),
 			nil,
 			context.Factory().Identifier(artifact.TargetName()),
 			nil,

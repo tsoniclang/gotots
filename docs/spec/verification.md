@@ -700,12 +700,22 @@ cancellation, bias source order, treat nil as ready, settle before pending
 Promises, globalize all functions as async, restore callable-profile variants,
 or test a result for Promise shape.
 
-The generated interface-value contract is strict-typechecked with
-`declare private readonly then?: never`, and its emitted JavaScript is inspected
-to prove that the declaration creates no field. A target differential removes
-that nominal member and must retain an otherwise synchronous interface-result
-flow because structural TypeScript permits a hidden callable `then`; restoring
-the member must settle the same flow without runtime Promise inspection.
+An architecture wall permits production class construction only through the
+one generated-class owner, and a non-vacuous mutation restores a raw factory
+call. Every root class is strict-typechecked with exactly one
+`declare private readonly then?: never`; every derived class inherits the
+contract and does not redeclare it. Emitted JavaScript is inspected to prove
+that the declaration creates no field. An adversarial Go struct with a
+lowercase callable field named `then` proves that the member-name owner chooses
+a different stable property and that all accesses use it. A mutation that
+restores one production raw class-factory call, omits the root member, adds it
+again to a derived class, or stops reserving the authored field must fail at
+the architecture, AST-shape, strict-typecheck, or runtime differential gate.
+
+A target differential removes the nominal member and must retain an otherwise
+synchronous generated-value result flow because structural TypeScript permits
+a hidden callable `then`; restoring the member must settle the same flow
+without runtime Promise inspection.
 
 Measurements report queue storage, runtime bytes, call-site AST size,
 typecheck time/RSS, and representative runtime.

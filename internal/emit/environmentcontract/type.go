@@ -6,6 +6,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	typefacet "github.com/tsoniclang/gotots/internal/emit/declaration/typefacet"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -375,7 +376,7 @@ func structDeclaration(
 			generic.parameters,
 			context.Factory().TypeLiteralNode(typeElements(fields)),
 		),
-		context.Factory().ClassDeclaration(
+		typescriptclass.Declaration(context.Factory(),
 			exportDeclare(context),
 			context.Factory().Identifier(name),
 			generic.parameters,

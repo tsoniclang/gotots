@@ -15,8 +15,8 @@ func TestDenseIndexUsesCheckedPresenceNarrowing(t *testing.T) {
 		"GoPanic",
 	)
 	members := class.Members()
-	if len(members) != 1 {
-		t.Fatalf("dense-index members = %d, want one", len(members))
+	if len(members) != 2 {
+		t.Fatalf("dense-index members = %d, want get and Promise exclusion", len(members))
 	}
 	get := members[0].(tsgo.MethodDeclaration)
 	statements := get.Body().(tsgo.Block).Statements()

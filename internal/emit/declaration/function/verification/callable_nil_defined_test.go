@@ -24,6 +24,7 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	for _, required := range []string{
 		"class Transform",
 		"declare private readonly $goType: void;",
+		"declare private readonly then?: never;",
 		"constructor(public readonly $value:",
 		"| undefined",
 		"new Transform(",
@@ -97,9 +98,9 @@ func TestCallableNilAndDefinedTypesCreateExactTargetShapes(t *testing.T) {
 	if transform == nil {
 		t.Fatal("defined callable Transform declaration is absent")
 	}
-	if len(transform.Members()) != 2 {
+	if len(transform.Members()) != 3 {
 		t.Fatalf(
-			"Transform members = %d, want only brand and value constructor",
+			"Transform members = %d, want brand, value constructor, and Promise exclusion",
 			len(transform.Members()),
 		)
 	}
@@ -415,7 +416,11 @@ func TestDefinedCallableErasedBrandMutationIsDetected(t *testing.T) {
 	writeFile(
 		t,
 		sourcePath,
-		strings.ReplaceAll(printed, brand, ""),
+		strings.ReplaceAll(
+			strings.ReplaceAll(printed, brand, ""),
+			"declare private readonly then?: never;\n",
+			"",
+		),
 	)
 	runnerPath := filepath.Join(workingDirectory, "brand.ts")
 	writeFile(t, runnerPath, `import {
@@ -432,7 +437,7 @@ void value;
 		artifacts,
 		runnerPath,
 	); err != nil {
-		t.Fatalf("brand-removal mutation did not erase nominal distinction: %v", err)
+		t.Fatalf("class-contract removal mutation did not erase nominal distinction: %v", err)
 	}
 }
 

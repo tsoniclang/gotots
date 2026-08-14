@@ -12,6 +12,7 @@ import (
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -396,7 +397,7 @@ func (s *programSession) attachClassMemberContributions(
 		}
 		found = true
 		targetMembers := append(class.Members(), members...)
-		result[index] = s.factory.ClassDeclaration(
+		result[index] = typescriptclass.Declaration(s.factory,
 			class.Modifiers(),
 			class.Name(),
 			class.TypeParameters(),

@@ -31,7 +31,8 @@ func Build(first int32, second bool) Record {
 	for _, member := range class.Members() {
 		switch selected := member.(type) {
 		case tsgo.PropertyDeclaration:
-			if targetName(selected.Name()) != "$goType" {
+			name := targetName(selected.Name())
+			if name != "$goType" && name != "then" {
 				t.Fatalf("Record gained separate field declaration %q", targetName(selected.Name()))
 			}
 		case tsgo.ConstructorDeclaration:

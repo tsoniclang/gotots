@@ -2,6 +2,7 @@ package panicruntime
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -103,7 +104,7 @@ func panicCarrier(
 	runtimeValueName string,
 ) tsgo.ClassDeclaration {
 	valueType := factory.TypeReferenceNode(factory.Identifier(valueName), nil)
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
 		nil,

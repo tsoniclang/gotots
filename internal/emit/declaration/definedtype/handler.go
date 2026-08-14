@@ -8,6 +8,7 @@ import (
 	typefacet "github.com/tsoniclang/gotots/internal/emit/declaration/typefacet"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -199,7 +200,7 @@ func Emit(
 		)
 	}
 	return api.DirectDeclaration(
-		context.Factory().ClassDeclaration(
+		typescriptclass.Declaration(context.Factory(),
 			modifiers,
 			context.Factory().Identifier(name),
 			typeParameters,

@@ -6,6 +6,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	gostdlibsource "github.com/tsoniclang/gotots/internal/contracts/gostdlib/sourcecontract"
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -174,7 +175,7 @@ func Build(
 	}
 	members = append(members, capabilityMembers...)
 	requests = append(requests, methodRequests...)
-	declaration := context.Factory().ClassDeclaration(
+	declaration := typescriptclass.Declaration(context.Factory(),
 		modifiers,
 		context.Factory().Identifier(name),
 		nil,

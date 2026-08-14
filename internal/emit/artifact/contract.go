@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -379,21 +380,21 @@ func projectClassContract(
 		}
 	}
 	return map[api.ArtifactFacet]tsgo.Node{
-		api.ArtifactFacetConstructorSurface: factory.ClassDeclaration(
+		api.ArtifactFacetConstructorSurface: typescriptclass.Declaration(factory,
 			class.Modifiers(),
 			class.Name(),
 			class.TypeParameters(),
 			class.HeritageClauses(),
 			constructors,
 		),
-		api.ArtifactFacetInstanceTypeSurface: factory.ClassDeclaration(
+		api.ArtifactFacetInstanceTypeSurface: typescriptclass.Declaration(factory,
 			class.Modifiers(),
 			class.Name(),
 			class.TypeParameters(),
 			class.HeritageClauses(),
 			instance,
 		),
-		api.ArtifactFacetStaticSurface: factory.ClassDeclaration(
+		api.ArtifactFacetStaticSurface: typescriptclass.Declaration(factory,
 			class.Modifiers(),
 			class.Name(),
 			class.TypeParameters(),

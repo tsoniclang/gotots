@@ -61,6 +61,7 @@ export class GoMap<K extends boolean | number | bigint | string, V> {
     keys(): K[] {
         return this.values !== undefined ? Array.from(this.values.keys()) : [];
     }
+    declare private readonly then?: never;
 }
 export class GoMapHash {
     private static readonly objects: WeakMap<object, number> = new WeakMap<object, number>;
@@ -93,6 +94,7 @@ export class GoMapHash {
     static mix(hash: number, next: number): number {
         return Math.imul(hash ^ next, 16777619) >>> 0;
     }
+    declare private readonly then?: never;
 }
 export interface GoMapValue<K, V> {
     lookup(key: K): V;

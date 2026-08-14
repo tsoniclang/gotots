@@ -57,7 +57,15 @@ func constructor(
 			),
 		},
 		nil,
-		factory.Block(nil, true),
+		factory.Block([]tsgo.Statement{
+			factory.ExpressionStatement(factory.CallExpression(
+				factory.SuperExpression(),
+				nil,
+				nil,
+				nil,
+				tsgo.NodeFlagsNone,
+			)),
+		}, true),
 	)
 }
 

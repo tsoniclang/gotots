@@ -56,11 +56,13 @@ void secondPointer;
 		if err != nil {
 			t.Fatal(err)
 		}
-		mutated := strings.ReplaceAll(
-			string(content),
+		mutated := string(content)
+		for _, brand := range []string{
 			"declare private readonly $goType: void;\n",
-			"",
-		)
+			"declare private readonly then?: never;\n",
+		} {
+			mutated = strings.ReplaceAll(mutated, brand, "")
+		}
 		if mutated == string(content) {
 			continue
 		}
@@ -68,13 +70,13 @@ void secondPointer;
 		writeProgramFile(t, path, mutated)
 	}
 	if replacements == 0 {
-		t.Fatal("nominality mutation removed no generated brands")
+		t.Fatal("nominality mutation removed no generated class contracts")
 	}
 	if err := typecheckStructuralFiles(
 		directory,
 		append(paths, runner),
 	); err != nil {
-		t.Fatalf("brand-removal foil did not expose structural assignability: %v", err)
+		t.Fatalf("class-contract removal foil did not expose structural assignability: %v", err)
 	}
 }
 

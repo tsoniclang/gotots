@@ -6,4 +6,5 @@ export class GoDenseIndex {
             GoPanic.raiseRuntime("dense storage index is absent");
         return value as T;
     }
+    declare private readonly then?: never;
 }
