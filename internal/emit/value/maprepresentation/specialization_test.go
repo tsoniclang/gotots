@@ -367,14 +367,6 @@ func (staticSpecializationValues) Pointee(
 	panic("unused")
 }
 
-func (staticSpecializationValues) RequiresInitializerTypeAnnotation(
-	api.Context,
-	ast.Expr,
-	types.Type,
-) (bool, error) {
-	return false, nil
-}
-
 func (v staticSpecializationValues) RequiresCustomEquality(
 	api.Context,
 	types.Type,

@@ -95,15 +95,43 @@ func Emit(
 		if identityErr != nil {
 			return api.DeclarationEmission{}, true, identityErr
 		}
+		underlying, underlyingErr := children.RepresentedType(
+			context.WithRole(api.RoleDefinedUnderlyingType),
+			source.Type,
+			model.Underlying(),
+		)
+		if underlyingErr != nil {
+			return api.DeclarationEmission{}, true, underlyingErr
+		}
+		brandIdentity, brandErr := context.Names().DefinedTypeIdentity(typeName)
+		if brandErr != nil {
+			return api.DeclarationEmission{}, true, brandErr
+		}
+		brand := context.Factory().TypeLiteralNode([]tsgo.TypeElement{
+			context.Factory().PropertySignatureDeclaration(
+				[]tsgo.ModifierLike{context.Factory().ReadonlyKeyword()},
+				context.Factory().Identifier(definedtype.BrandMember),
+				context.Factory().QuestionToken(),
+				context.Factory().LiteralTypeNode(
+					context.Factory().StringLiteral(
+						brandIdentity,
+						tsgo.TokenFlagsNone,
+					),
+				),
+				context.Factory().OmittedExpression(),
+			),
+		})
 		return api.DirectDeclaration(
-			context.Factory().EnumDeclaration(
+			context.Factory().TypeAliasDeclaration(
 				modifiers,
 				context.Factory().Identifier(name),
-				[]tsgo.EnumMember{context.Factory().EnumMember(
-					context.Factory().Identifier(definedtype.BrandMember),
-					context.Factory().NumericLiteral("1", tsgo.TokenFlagsNone),
-				)},
+				nil,
+				context.Factory().IntersectionTypeNode([]tsgo.TypeNode{
+					underlying.Value(),
+					brand,
+				}),
 			),
+			underlying.Requests()...,
 		), true, nil
 	}
 	parameters, err := genericdeclaration.EnterType(

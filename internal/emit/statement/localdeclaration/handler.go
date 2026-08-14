@@ -258,17 +258,7 @@ func localVariableDeclaration(
 	}
 	var targetType tsgo.TypeNode
 	requests := value.Requests()
-	requiresInferenceAnnotation, err :=
-		context.Values().RequiresInitializerTypeAnnotation(
-			context,
-			binding.sourceValue,
-			binding.sourceType,
-		)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	if requiresInferenceAnnotation ||
-		context.Values().RequiresExplicitType(context, binding.sourceType) {
+	if context.Values().RequiresExplicitType(context, binding.sourceType) {
 		represented, err := children.RepresentedType(
 			context.WithRole(api.RoleLocalType),
 			sourceName,

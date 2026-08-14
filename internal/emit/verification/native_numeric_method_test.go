@@ -22,6 +22,11 @@ func TestNativeNumericMethodsPreserveEveryCallableForm(t *testing.T) {
 
 type Flags uint32
 
+const (
+	FlagsOne  Flags = 1
+	FlagsLast Flags = 99
+)
+
 func (flags Flags) Has(mask Flags) bool { return flags&mask != 0 }
 func (flags *Flags) Add(mask Flags) { *flags |= mask }
 func (flags Flags) Deferred() (result Flags) {
@@ -33,6 +38,19 @@ type Tester interface { Has(Flags) bool }
 
 func PointerExpression() func(*Flags, Flags) { return (*Flags).Add }
 
+func OpenSwitch(flags Flags, values []uint32) uint32 {
+	switch flags {
+	case FlagsOne:
+		return 1
+	case FlagsLast:
+		return 2
+	}
+	for _, value := range values {
+		return value
+	}
+	return 0
+}
+
 func Audit() uint32 {
 	flags := Flags(3)
 	score := uint32(0)
@@ -43,7 +61,7 @@ func Audit() uint32 {
 	if value(4) { score += 8 }
 	var contract Tester = flags
 	if contract.Has(2) { score += 4 }
-	return score + uint32(flags)
+	return score + uint32(flags) + OpenSwitch(Flags(3), []uint32{16})
 }
 `)
 	program, err := load.Load(context.Background(), load.Request{
@@ -64,7 +82,8 @@ func Audit() uint32 {
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	for _, required := range []string{
-		"export enum Flags",
+		"export type Flags = uint32 & {",
+		`readonly $goType?: "example.com/numericmethods|Flags";`,
 		"export function Flags_Has(flags: Flags, mask: Flags): bool",
 		"export function Flags_Add(flags: Pointer<Flags> | undefined, mask: Flags): void",
 		"Flags_Has__from_numericmethods(this.$go$value, $argument0)",
@@ -74,9 +93,11 @@ func Audit() uint32 {
 		}
 	}
 	for _, forbidden := range []string{
+		"export enum Flags",
 		"export class Flags",
 		"new Flags(",
 		".$value",
+		"Flags.$goType",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
 			t.Fatalf("native numeric method artifact contains %q:\n%s", forbidden, artifacts.printed)

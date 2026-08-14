@@ -331,15 +331,16 @@ that always emits copy carriers/helpers, uses JavaScript identity for Go map
 keys, drops nil checks, or restores a target non-null assertion must fail.
 
 The native defined-numeric fixture includes value and pointer methods, direct
-calls, method expressions, method values, interface adaptation, and an explicit
-conversion assigned by
-both short declaration and inferred `var`. Its generated declarations must
-carry the converted basic type while the expression remains a runtime identity
-operation. Removing either annotation must produce the pinned strict
-TypeScript diagnostic; adding runtime coercion or annotating ordinary direct
-numeric declarations fails the artifact-shape gate. Restoring the former
-empty-method-set restriction or a class-member method route fails the same
-family gate.
+calls, method expressions, method values, interface adaptation, explicit
+conversion, and a switch whose listed constants do not exhaust the underlying
+numeric domain. Its generated declaration must be an open branded intersection
+alias over the exact selected scalar carrier. Unrelated defined aliases remain
+statically incompatible, while arithmetic stays direct and a cross-brand
+conversion uses only the specified unary `+` brand transition. Replacing the alias with a finite enum must make the
+legal nonmember value fail under the pinned checker; the open switch then
+proves the generated alias preserves subsequent control flow. Adding a
+runtime wrapper or any other coercion, restoring the former empty-method-set restriction, or restoring
+a class-member method route fails the same family gate.
 
 Unsafe-pointer proof separates opaque identity from raw memory. Differential
 fixtures convert the same and different typed locations to `unsafe.Pointer`,

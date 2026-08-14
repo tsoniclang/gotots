@@ -75,11 +75,11 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 		}
 	}
 	for fragment, source := range map[string]string{
-		"function Twice$Named_Local":                 callerSource,
-		"function BothEqual$Named_Outer$Named_Inner": callerSource,
-		"enum Local": callerSource,
-		"enum Outer": callerSource,
-		"enum Inner": callerSource,
+		"function Twice$Named_Local":                       callerSource,
+		"function BothEqual$Named_Outer$Named_Inner":       callerSource,
+		"type Local = int32 & {":                           callerSource,
+		"type Outer = int32 & {":                           callerSource,
+		"type Inner = int32 & {":                           callerSource,
 		"($argument0: Local, $argument1: Local): Local =>": callerSource,
 		"function Twice$kernel<T>":                         providerSource,
 		"function BothEqual$kernel<A, B>":                  providerSource,
@@ -94,7 +94,7 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 	); count != 1 {
 		t.Fatalf("same lexical generic instance emitted %d wrappers, want 1", count)
 	}
-	inner := strings.Index(callerSource, "enum Inner")
+	inner := strings.Index(callerSource, "type Inner = int32 & {")
 	wrapper := strings.Index(
 		callerSource,
 		"function BothEqual$Named_Outer$Named_Inner",

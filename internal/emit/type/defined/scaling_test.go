@@ -103,15 +103,17 @@ func assertDefinedEnumCount(
 	t.Helper()
 	count := 0
 	for _, statement := range source.Statements() {
-		enum, ok := statement.(tsgo.EnumDeclaration)
+		alias, ok := statement.(tsgo.TypeAliasDeclaration)
 		if !ok {
 			continue
 		}
+		if _, ok := alias.Type().(tsgo.IntersectionTypeNode); !ok {
+			continue
+		}
 		count++
-		assertDefinedNumericEnum(t, enum)
 	}
 	if count != want {
-		t.Fatalf("defined scaling enums = %d, want %d", count, want)
+		t.Fatalf("defined scaling aliases = %d, want %d", count, want)
 	}
 }
 

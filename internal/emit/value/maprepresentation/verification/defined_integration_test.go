@@ -63,7 +63,7 @@ func TestDefinedMapsUseSelectedRepresentationsAndExecuteDifferentially(
 	}
 }
 
-func TestNativeDefinedMapKeyNominalityMutationFailsStrictTypecheck(
+func TestDefinedMapKeySignatureMutationFailsStrictTypecheck(
 	t *testing.T,
 ) {
 	loaded := loadDefinedMapProject(t)
@@ -80,34 +80,18 @@ func TestNativeDefinedMapKeyNominalityMutationFailsStrictTypecheck(
 	specializationPath := definedKeySpecializationPath(t, artifacts)
 	original := readFile(t, specializationPath)
 	strictTypecheck(t, artifacts, workingDirectory)
-	for _, testCase := range []struct {
-		name        string
-		method      string
-		replacement string
-	}{
-		{
-			name:        "raw number returned as nominal key",
-			method:      "$copyKey",
-			replacement: "return 0;",
-		},
-	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			mutated := replaceMethodReturn(
-				t,
-				original,
-				testCase.method,
-				testCase.replacement,
-			)
-			writeFile(t, specializationPath, mutated)
-			if err := strictTypecheckResult(
-				artifacts,
-				workingDirectory,
-				"",
-			); err == nil {
-				t.Fatalf("%s mutation passed strict typechecking", testCase.method)
-			}
-			writeFile(t, specializationPath, original)
-		})
+	const signature = "lookup(key: Count"
+	if count := strings.Count(original, signature); count != 1 {
+		t.Fatalf("defined-key lookup signatures = %d, want one", count)
+	}
+	mutated := strings.Replace(original, signature, "lookup(key: boolean", 1)
+	writeFile(t, specializationPath, mutated)
+	if err := strictTypecheckResult(
+		artifacts,
+		workingDirectory,
+		"",
+	); err == nil {
+		t.Fatal("defined-key lookup signature mutation passed strict typechecking")
 	}
 }
 
@@ -221,35 +205,6 @@ func definedKeySpecializationPath(
 		)
 	}
 	return matches[0]
-}
-
-func replaceMethodReturn(
-	t *testing.T,
-	source string,
-	method string,
-	replacement string,
-) string {
-	t.Helper()
-	start := strings.Index(source, "static "+method+"(")
-	if start < 0 {
-		t.Fatalf("specialization method %q is absent", method)
-	}
-	body := strings.Index(source[start:], "{")
-	if body < 0 {
-		t.Fatalf("specialization method %q has no body", method)
-	}
-	body += start
-	returnStart := strings.Index(source[body:], "return ")
-	if returnStart < 0 {
-		t.Fatalf("specialization method %q has no return", method)
-	}
-	returnStart += body
-	returnEnd := strings.Index(source[returnStart:], ";")
-	if returnEnd < 0 {
-		t.Fatalf("specialization method %q return has no terminator", method)
-	}
-	returnEnd += returnStart + 1
-	return source[:returnStart] + replacement + source[returnEnd:]
 }
 
 func executeDefinedMapGo(t *testing.T, workingDirectory string) string {

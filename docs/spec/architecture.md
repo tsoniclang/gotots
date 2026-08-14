@@ -510,23 +510,30 @@ intrinsic expression.
 
 Defined-value representation is selected once from the complete `go/types`
 declaration, never from a use site. Every non-generic source-owned defined
-fixed-width integer uses a nominal TypeScript numeric enum and direct numeric
-storage, including types with value or pointer methods. The enum's one value
-member provides a typed no-op wrap for conversions and operation results,
-eliminating per-value objects without erasing nominality. Methods on this
-representation are module functions with one explicit receiver parameter;
-every direct call, method expression, method value, promoted selection, and
-interface adapter resolves that same source identity. Generic,
+fixed-width integer uses an open branded TypeScript intersection alias over its
+selected scalar carrier and direct numeric storage, including types with value
+or pointer methods. The optional compile-time brand carries the exact package
+and declaration identity, rejects accidental assignment between unrelated Go
+defined types, and adds no runtime object or operation. It deliberately is not
+a TypeScript enum: Go defined integers admit every underlying value, so a
+finite enum would make valid continuation paths unreachable to TypeScript
+control-flow analysis. Ordinary conversions and operation results remain
+direct scalar expressions. A conversion between two distinct branded numeric
+types uses one allocation-free unary `+` at the conversion owner to erase the
+source compile-time brand before the target brand is admitted. Methods on this
+representation are module functions with one
+explicit receiver parameter; every direct call, method expression, method
+value, promoted selection, and interface adapter resolves that same source
+identity. Generic,
 profile-dependent, non-numeric, provider-owned, and otherwise non-identity
 families retain their canonical wrapper or provider representation. All
 consumers query these representation and method-target owners; none infer them
 from target spelling or structural assignability.
 
-When an identity conversion from that nominal enum initializes a target whose
-TypeScript type would otherwise be inferred, the declaration owner emits the
-selected converted basic type annotation. This is a static inference boundary,
-not a second representation or runtime conversion; declarations and contexts
-that already preserve the selected type emit no annotation.
+The Go checker remains the sole validity owner. The optional brand permits raw
+carrier results to flow back into the alias after arithmetic without a cast;
+GoToTS does not attempt to make the generated TypeScript checker reject source
+forms that the selected Go checker already rejected.
 
 Nil-capable values use `undefined` unless their family requires a distinct
 carrier. Zero, copy, equality, hashing, conversion, and mutation are each owned

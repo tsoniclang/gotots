@@ -217,6 +217,10 @@ func (aggregateNames) DefinedValueRepresentation(
 	)
 }
 
+func (aggregateNames) DefinedTypeIdentity(*types.TypeName) (string, error) {
+	panic("unused")
+}
+
 func (aggregateNames) ProviderOwnedDeclaration(types.Object) (bool, error) {
 	return false, nil
 }

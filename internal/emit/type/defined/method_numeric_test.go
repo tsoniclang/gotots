@@ -19,9 +19,10 @@ func Direct(flags, mask Flags) bool { return flags.Has(mask) }
 func Expression() func(Flags, Flags) bool { return Flags.Has }
 func Value(flags Flags) func(Flags) bool { return flags.Has }
 func PointerExpression() func(*Flags, Flags) { return (*Flags).Add }
-`)
+	`)
 	for _, required := range []string{
-		"export enum Flags",
+		"export type Flags = uint32 & {",
+		`readonly $goType?: "example.com/spelling|Flags";`,
 		"export function Flags_Has(flags: Flags, mask: Flags): bool",
 		"export function Flags_Add(flags: Pointer<Flags> | undefined, mask: Flags): void",
 		"return Flags_Has(flags, mask);",
@@ -33,9 +34,11 @@ func PointerExpression() func(*Flags, Flags) { return (*Flags).Add }
 		}
 	}
 	for _, forbidden := range []string{
+		"export enum Flags",
 		"export class Flags",
 		"new Flags(",
 		".$value",
+		"Flags.$goType",
 		"flags.Has(",
 	} {
 		if strings.Contains(target, forbidden) {

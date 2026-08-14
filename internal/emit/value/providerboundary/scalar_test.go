@@ -215,12 +215,12 @@ func TestProviderScalarBoundaryReifiesGeneratedNumericIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wrapped, ok := fromProvider.Value().(tsgo.BinaryExpression)
-	if !changed || !ok ||
-		wrapped.OperatorToken().Kind() != tsgo.SyntaxKindAsteriskToken {
-		t.Fatalf("generated numeric provider result = %T, want nominal wrap", fromProvider.Value())
+	if !changed || fromProvider.Value() != value.Value() {
+		t.Fatalf(
+			"generated numeric provider result = %T, want direct scalar identity",
+			fromProvider.Value(),
+		)
 	}
-	requireProperty(t, wrapped.Right(), "Kind", "$goType")
 }
 
 func TestProviderScalarBoundaryFailsWithoutCertifiedABI(t *testing.T) {

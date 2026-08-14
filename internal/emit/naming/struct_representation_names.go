@@ -68,6 +68,12 @@ func (n *File) DefinedValueRepresentation(
 	}
 }
 
+func (n *File) DefinedTypeIdentity(
+	typeName *types.TypeName,
+) (string, error) {
+	return n.generatedNamedObjectIdentity(typeName)
+}
+
 func generatedNumericDefinedValue(typeName *types.TypeName) bool {
 	if typeName == nil || typeName.IsAlias() {
 		return false

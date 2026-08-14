@@ -222,7 +222,7 @@ func assertImmediateLexicalDefinitionPair(t *testing.T, block tsgo.Block) {
 	if len(statements) < 2 {
 		t.Fatalf("lexical block statements = %d", len(statements))
 	}
-	local, localOK := statements[0].(tsgo.EnumDeclaration)
+	local, localOK := statements[0].(tsgo.TypeAliasDeclaration)
 	anonymous, anonymousOK := statements[1].(tsgo.ClassDeclaration)
 	if !localOK ||
 		!anonymousOK ||
@@ -243,10 +243,10 @@ func assertGroupedLexicalAnchor(t *testing.T, source tsgo.SourceFile) {
 	if len(statements) < 4 {
 		t.Fatalf("grouped lexical statements = %d", len(statements))
 	}
-	before, beforeOK := statements[0].(tsgo.EnumDeclaration)
-	local, localOK := statements[1].(tsgo.EnumDeclaration)
+	before, beforeOK := statements[0].(tsgo.TypeAliasDeclaration)
+	local, localOK := statements[1].(tsgo.TypeAliasDeclaration)
 	anonymous, anonymousOK := statements[2].(tsgo.ClassDeclaration)
-	after, afterOK := statements[3].(tsgo.EnumDeclaration)
+	after, afterOK := statements[3].(tsgo.TypeAliasDeclaration)
 	if !beforeOK || !localOK || !anonymousOK || !afterOK {
 		t.Fatalf(
 			"grouped lexical declarations = %T/%T/%T/%T",

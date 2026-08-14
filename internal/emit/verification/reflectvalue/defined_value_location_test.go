@@ -59,7 +59,7 @@ func main() {
 			for _, required := range []string{
 				"allocatePointer(new DefinedText",
 				"loadPointer(instance)",
-				"allocatePointer(0 * DefinedCount__from_reflectvalue.$goType)",
+				"allocatePointer(0)",
 			} {
 				if !strings.Contains(artifacts.printed, required) {
 					t.Fatalf(
