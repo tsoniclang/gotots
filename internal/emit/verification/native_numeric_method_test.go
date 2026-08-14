@@ -82,8 +82,7 @@ func Audit() uint32 {
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
 	for _, required := range []string{
-		"export type Flags = uint32 & {",
-		`readonly $goType?: "example.com/numericmethods|Flags";`,
+		"export type Flags = uint32;",
 		"export function Flags_Has(flags: Flags, mask: Flags): bool",
 		"export function Flags_Add(flags: Pointer<Flags> | undefined, mask: Flags): void",
 		"Flags_Has__from_numericmethods(this.$go$value, $argument0)",
@@ -98,6 +97,7 @@ func Audit() uint32 {
 		"new Flags(",
 		".$value",
 		"Flags.$goType",
+		"$goType?:",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {
 			t.Fatalf("native numeric method artifact contains %q:\n%s", forbidden, artifacts.printed)

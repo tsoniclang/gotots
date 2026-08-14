@@ -194,10 +194,6 @@ func (unusedNames) DefinedValueRepresentation(
 	)
 }
 
-func (unusedNames) DefinedTypeIdentity(*types.TypeName) (string, error) {
-	panic("unused")
-}
-
 func (unusedNames) ProviderOwnedDeclaration(types.Object) (bool, error)    { return false, nil }
 func (unusedNames) EnvironmentOwnedDeclaration(types.Object) (bool, error) { return false, nil }
 

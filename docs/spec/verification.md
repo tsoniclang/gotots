@@ -333,14 +333,14 @@ keys, drops nil checks, or restores a target non-null assertion must fail.
 The native defined-numeric fixture includes value and pointer methods, direct
 calls, method expressions, method values, interface adaptation, explicit
 conversion, and a switch whose listed constants do not exhaust the underlying
-numeric domain. Its generated declaration must be an open branded intersection
-alias over the exact selected scalar carrier. Unrelated defined aliases remain
-statically incompatible, while arithmetic stays direct and a cross-brand
-conversion uses only the specified unary `+` brand transition. Replacing the alias with a finite enum must make the
-legal nonmember value fail under the pinned checker; the open switch then
-proves the generated alias preserves subsequent control flow. Adding a
-runtime wrapper or any other coercion, restoring the former empty-method-set restriction, or restoring
-a class-member method route fails the same family gate.
+numeric domain. Its generated declaration must be one plain named alias over
+the exact selected scalar carrier; arithmetic and every scalar conversion stay
+direct. Replacing the alias with a finite enum must make the legal nonmember
+value fail under the pinned checker, while replacing it with an intersection
+must fail the frozen full-product target-planning budget. The open switch proves
+the alias preserves subsequent control flow. Adding a runtime wrapper or
+coercion, restoring the former empty-method-set restriction, or restoring a
+class-member method route fails the same family gate.
 
 Unsafe-pointer proof separates opaque identity from raw memory. Differential
 fixtures convert the same and different typed locations to `unsafe.Pointer`,

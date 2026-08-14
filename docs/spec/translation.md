@@ -378,11 +378,10 @@ through one type owner. Public generated names remain readable; internal
 operation artifacts are not source declarations.
 
 A source-owned, non-generic defined type whose underlying type is `int8`,
-`uint8`, `int16`, `uint16`, `int32`, or `uint32` uses one open branded
-intersection alias regardless of its method sets. Go methods do not give
-numeric values object identity. The optional brand is compile-time-only and
-contains the exact declaration identity; ordinary values remain native scalar
-values.
+`uint8`, `int16`, `uint16`, `int32`, or `uint32` uses one plain named scalar
+alias regardless of its method sets. Go methods do not give numeric values
+object identity. The alias declaration and source-facing references retain the
+source identity in the TS-Go AST; ordinary values remain native scalars.
 Methods on this representation are emitted as source functions: a value
 receiver is the first value parameter, while a pointer receiver is the first
 `Pointer<T> | undefined` parameter. Direct method calls, method expressions,
@@ -397,9 +396,7 @@ func Add(left, right NodeFlags) NodeFlags { return left + right }
 ```
 
 ```ts
-export type NodeFlags = uint32 & {
-  readonly $goType?: "example.com/ast|NodeFlags";
-};
+export type NodeFlags = uint32;
 
 export function NodeFlags_Has(flags: NodeFlags, mask: NodeFlags): boolean {
   return (flags & mask) !== 0;
@@ -410,9 +407,9 @@ export function Add(left: NodeFlags, right: NodeFlags): NodeFlags {
 }
 ```
 
-This representation keeps unrelated defined numeric types non-assignable
-without allocating a wrapper per value or restricting the legal underlying
-numeric values. It is selected from `go/types`
+This representation allocates no wrapper and does not restrict the legal
+underlying numeric values. The selected Go checker—not TypeScript structural
+assignability—owns source validity. It is selected from `go/types`
 identity, underlying kind, and generic arity; source spelling and package
 identity never select it. Generic types, profile-dependent native-width
 integers, strings, booleans, floats, complex values, and all other defined
@@ -420,10 +417,8 @@ families retain their exact existing representation. Type-representation
 demands whose storage is already the scalar value consume no class marker or
 auxiliary carrier.
 
-A conversion to an ordinary basic type is a direct scalar expression. A
-conversion between distinct branded numeric types emits one unary `+` to erase
-the source compile-time brand without allocation. Local TypeScript inference
-needs no corrective annotation:
+A conversion to an ordinary basic or another defined numeric type is a direct
+scalar expression. Local TypeScript inference needs no corrective annotation:
 
 ```go
 position := int32(node.Pos())

@@ -103,33 +103,12 @@ func Emit(
 		if underlyingErr != nil {
 			return api.DeclarationEmission{}, true, underlyingErr
 		}
-		brandIdentity, brandErr := context.Names().DefinedTypeIdentity(typeName)
-		if brandErr != nil {
-			return api.DeclarationEmission{}, true, brandErr
-		}
-		brand := context.Factory().TypeLiteralNode([]tsgo.TypeElement{
-			context.Factory().PropertySignatureDeclaration(
-				[]tsgo.ModifierLike{context.Factory().ReadonlyKeyword()},
-				context.Factory().Identifier(definedtype.BrandMember),
-				context.Factory().QuestionToken(),
-				context.Factory().LiteralTypeNode(
-					context.Factory().StringLiteral(
-						brandIdentity,
-						tsgo.TokenFlagsNone,
-					),
-				),
-				context.Factory().OmittedExpression(),
-			),
-		})
 		return api.DirectDeclaration(
 			context.Factory().TypeAliasDeclaration(
 				modifiers,
 				context.Factory().Identifier(name),
 				nil,
-				context.Factory().IntersectionTypeNode([]tsgo.TypeNode{
-					underlying.Value(),
-					brand,
-				}),
+				underlying.Value(),
 			),
 			underlying.Requests()...,
 		), true, nil

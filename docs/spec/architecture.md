@@ -510,18 +510,16 @@ intrinsic expression.
 
 Defined-value representation is selected once from the complete `go/types`
 declaration, never from a use site. Every non-generic source-owned defined
-fixed-width integer uses an open branded TypeScript intersection alias over its
-selected scalar carrier and direct numeric storage, including types with value
-or pointer methods. The optional compile-time brand carries the exact package
-and declaration identity, rejects accidental assignment between unrelated Go
-defined types, and adds no runtime object or operation. It deliberately is not
-a TypeScript enum: Go defined integers admit every underlying value, so a
-finite enum would make valid continuation paths unreachable to TypeScript
-control-flow analysis. Ordinary conversions and operation results remain
-direct scalar expressions. A conversion between two distinct branded numeric
-types uses one allocation-free unary `+` at the conversion owner to erase the
-source compile-time brand before the target brand is admitted. Methods on this
-representation are module functions with one
+fixed-width integer uses a plain named TypeScript alias over its selected
+scalar carrier and direct numeric storage, including types with value or
+pointer methods. The alias declaration and every source-facing type reference
+preserve the Go declaration identity in the TS-Go AST; TypeScript structural
+assignability is deliberately not a second Go type checker. It is neither an
+intersection nor an enum: intersections propagate expensive structural facts
+through the target checker, while finite enums reject legal underlying values
+and can make valid continuation paths unreachable. Conversions and operation
+results remain direct scalar expressions. Methods on this representation are
+module functions with one
 explicit receiver parameter; every direct call, method expression, method
 value, promoted selection, and interface adapter resolves that same source
 identity. Generic,
@@ -530,10 +528,9 @@ families retain their canonical wrapper or provider representation. All
 consumers query these representation and method-target owners; none infer them
 from target spelling or structural assignability.
 
-The Go checker remains the sole validity owner. The optional brand permits raw
-carrier results to flow back into the alias after arithmetic without a cast;
-GoToTS does not attempt to make the generated TypeScript checker reject source
-forms that the selected Go checker already rejected.
+The Go checker remains the sole validity owner. GoToTS does not attempt to make
+the generated TypeScript checker reject source forms that the selected Go
+checker already rejected.
 
 Nil-capable values use `undefined` unless their family requires a distinct
 carrier. Zero, copy, equality, hashing, conversion, and mutation are each owned

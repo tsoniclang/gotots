@@ -116,27 +116,6 @@ func convertPointee(
 	parameter string,
 ) (api.ExpressionEmission, error) {
 	value := api.DirectExpression(context.Factory().Identifier(parameter))
-	sourceDefined, sourceOK := definedtype.ResolveBasic(sourceElement)
-	targetDefined, targetOK := definedtype.ResolveBasic(targetElement)
-	if sourceOK && targetOK && !types.Identical(sourceElement, targetElement) {
-		sourceRepresentation, err := sourceDefined.Representation(context)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		targetRepresentation, err := targetDefined.Representation(context)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if sourceRepresentation.Kind() ==
-			api.DefinedValueRepresentationGeneratedNumeric &&
-			targetRepresentation.Kind() ==
-				api.DefinedValueRepresentationGeneratedNumeric {
-			value, err = sourceDefined.ProjectForConversion(context, value)
-			if err != nil {
-				return api.ExpressionEmission{}, err
-			}
-		}
-	}
 	stored, err := context.Values().ToStorage(
 		context.WithRole(api.RoleConversionOperand),
 		source,

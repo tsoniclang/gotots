@@ -135,7 +135,6 @@ type Names interface {
 	NamedStructConstructor(*types.TypeName) (NameReference, error)
 	NamedStructOperation(*types.TypeName, NamedStructOperation) (NameReference, error)
 	NamedStructStorage(*types.TypeName) (NameReference, error)
-	DefinedTypeIdentity(*types.TypeName) (string, error)
 	ProviderStructField(*types.TypeName, *types.Var) (
 		gostdlib.ProviderStructField,
 		bool,

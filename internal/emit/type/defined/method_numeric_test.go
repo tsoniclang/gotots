@@ -21,8 +21,7 @@ func Value(flags Flags) func(Flags) bool { return flags.Has }
 func PointerExpression() func(*Flags, Flags) { return (*Flags).Add }
 	`)
 	for _, required := range []string{
-		"export type Flags = uint32 & {",
-		`readonly $goType?: "example.com/spelling|Flags";`,
+		"export type Flags = uint32;",
 		"export function Flags_Has(flags: Flags, mask: Flags): bool",
 		"export function Flags_Add(flags: Pointer<Flags> | undefined, mask: Flags): void",
 		"return Flags_Has(flags, mask);",
@@ -39,6 +38,7 @@ func PointerExpression() func(*Flags, Flags) { return (*Flags).Add }
 		"new Flags(",
 		".$value",
 		"Flags.$goType",
+		"$goType?:",
 		"flags.Has(",
 	} {
 		if strings.Contains(target, forbidden) {

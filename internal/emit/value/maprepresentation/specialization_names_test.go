@@ -35,10 +35,6 @@ func (staticSpecializationNames) DefinedValueRepresentation(
 	)
 }
 
-func (staticSpecializationNames) DefinedTypeIdentity(*types.TypeName) (string, error) {
-	panic("unused")
-}
-
 func (staticSpecializationNames) ProviderOwnedDeclaration(
 	types.Object,
 ) (bool, error) {

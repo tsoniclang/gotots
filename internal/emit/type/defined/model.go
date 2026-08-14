@@ -265,27 +265,6 @@ func (m Model) Project(
 	}
 }
 
-func (m Model) ProjectForConversion(
-	context api.Context,
-	value api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	representation, err := m.Representation(context)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if representation.Kind() != api.DefinedValueRepresentationGeneratedNumeric {
-		return m.Project(context, value)
-	}
-	return api.NewExpressionEmission(
-		value.Before(),
-		context.Factory().PrefixUnaryExpression(
-			tsgo.PrefixUnaryExpressionOperatorKindPlusToken,
-			value.Value(),
-		),
-		value.Requests(),
-	)
-}
-
 func (m Model) Construct(
 	context api.Context,
 	value tsgo.Expression,

@@ -2,7 +2,6 @@ package defined_test
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -83,7 +82,7 @@ func Identity(value Cache[CallbackHolder]) Cache[CallbackHolder] {
 	}
 }
 
-func TestFixedWidthDefinedNumericUsesNativeNominalRepresentation(
+func TestFixedWidthDefinedNumericUsesNativeScalarRepresentation(
 	t *testing.T,
 ) {
 	target := compileDefinedSource(t, `package spelling
@@ -96,11 +95,9 @@ func Add(left, right Flags) Flags { return left + right }
 func ToOther(value Flags) Other { return Other(value) }
 	`)
 	for _, required := range []string{
-		"export type Flags = uint32 & {",
-		`readonly $goType?: "example.com/spelling|Flags";`,
-		"export type Other = uint32 & {",
-		`readonly $goType?: "example.com/spelling|Other";`,
-		"return +value;",
+		"export type Flags = uint32;",
+		"export type Other = uint32;",
+		"return value;",
 	} {
 		if !strings.Contains(target, required) {
 			t.Fatalf("native defined numeric lacks %q:\n%s", required, target)
@@ -114,6 +111,7 @@ func ToOther(value Flags) Other { return Other(value) }
 		"new Flags(",
 		"new Other(",
 		".$value",
+		"$goType?:",
 		"Flags.$goType",
 		"Other.$goType",
 	} {
@@ -130,7 +128,7 @@ type Generic[T any] uint32
 
 func (value Methodful) IsZero() bool { return value == 0 }
 `)
-	if !strings.Contains(fallback, "export type Methodful = uint32 & {") ||
+	if !strings.Contains(fallback, "export type Methodful = uint32;") ||
 		!strings.Contains(fallback, "export function Methodful_IsZero(") {
 		t.Fatalf("method-bearing fixed numeric lost native representation:\n%s", fallback)
 	}
@@ -167,7 +165,7 @@ func TestDefinedBasicFamilyHasMinimalNominalShape(t *testing.T) {
 		assertDefinedNumericAlias(
 			t,
 			definedAlias,
-			"example.com/definedbasic|"+name,
+			"int32",
 		)
 		delete(aliases, name)
 	}
@@ -199,60 +197,6 @@ func TestDefinedBasicFamilyHasMinimalNominalShape(t *testing.T) {
 		target.TypeName().(tsgo.Identifier).Text() != "Count" ||
 		len(alias.TypeParameters()) != 0 {
 		t.Fatalf("Alias target = %#v, want direct Count type alias", alias.Type())
-	}
-}
-
-func TestDefinedNominalityGateDetectsErasedRepresentations(t *testing.T) {
-	workingDirectory := t.TempDir()
-	emission := compileDefinedFixture(t, emit.DefaultOptions())
-	artifacts := printDefined(t, workingDirectory, emission)
-	runnerPath := filepath.Join(workingDirectory, "nominality.ts")
-	writeDefinedFile(t, runnerPath, `import * as values from "`+artifacts.sourceModule+`";
-const count: values.Count = values.CountFromInt(1);
-const alias: values.Alias = count;
-const other: values.Other = count;
-void alias;
-void other;
-`)
-	if err := typecheckDefined(
-		workingDirectory,
-		artifacts.paths,
-		runnerPath,
-	); err == nil {
-		t.Fatal("unrelated defined types became structurally assignable")
-	}
-
-	replacements := 0
-	for _, path := range artifacts.paths {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		mutated := string(content)
-		for _, name := range []string{"Count", "Other"} {
-			declaration := "export type " + name + " = int32 & {\n" +
-				"    readonly $goType?: \"example.com/definedbasic|" + name + "\";\n" +
-				"};\n"
-			erased := "export type " + name + " = int32;\n"
-			if strings.Contains(mutated, declaration) {
-				mutated = strings.Replace(mutated, declaration, erased, 1)
-				replacements++
-			}
-		}
-		if mutated == string(content) {
-			continue
-		}
-		writeDefinedFile(t, path, mutated)
-	}
-	if replacements != 2 {
-		t.Fatalf("nominality mutation erased %d aliases, want 2", replacements)
-	}
-	if err := typecheckDefined(
-		workingDirectory,
-		artifacts.paths,
-		runnerPath,
-	); err != nil {
-		t.Fatalf("representation-erasure foil did not expose structural assignability: %v", err)
 	}
 }
 
@@ -357,7 +301,7 @@ func TestLocalDefinedTypeAndAliasUseThePackageOwners(t *testing.T) {
 	assertDefinedNumericAlias(
 		t,
 		definedAlias,
-		"",
+		"int32",
 	)
 	alias, ok := statements[1].(tsgo.TypeAliasDeclaration)
 	if !ok || alias.Name().Text() == "Alias" || len(alias.Modifiers()) != 0 {

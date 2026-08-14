@@ -197,39 +197,20 @@ func Apply(
 	); handled {
 		return target, true, mapErr
 	}
-	targetDefined, wrapsTarget := definedtype.Resolve(targetType)
 	sourceOperationContext := context
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		sourceOperationContext, err = defined.OperationContext(context)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
-		convertBrand := false
-		if wrapsTarget && !types.Identical(sourceType, targetType) {
-			sourceRepresentation, sourceErr := defined.Representation(context)
-			if sourceErr != nil {
-				return api.ExpressionEmission{}, true, sourceErr
-			}
-			targetRepresentation, targetErr := targetDefined.Representation(context)
-			if targetErr != nil {
-				return api.ExpressionEmission{}, true, targetErr
-			}
-			convertBrand = sourceRepresentation.Kind() ==
-				api.DefinedValueRepresentationGeneratedNumeric &&
-				targetRepresentation.Kind() ==
-					api.DefinedValueRepresentationGeneratedNumeric
-		}
-		if convertBrand {
-			operandValue, err = defined.ProjectForConversion(context, operandValue)
-		} else {
-			operandValue, err = defined.Project(context, operandValue)
-		}
+		operandValue, err = defined.Project(context, operandValue)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
 		sourceType = defined.Underlying()
 	}
 	representedTargetType := targetType
+	targetDefined, wrapsTarget := definedtype.Resolve(targetType)
 	targetOperationContext := context
 	if wrapsTarget {
 		targetOperationContext, err = targetDefined.OperationContext(context)

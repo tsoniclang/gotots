@@ -59,12 +59,10 @@ func Continue(flags Flags, values []uint32) uint32 {
 	runner := filepath.Join(workingDirectory, "runner.ts")
 	writeDefinedFile(t, runner, "export {};\n")
 	if err := typecheckDefined(workingDirectory, artifacts.paths, runner); err != nil {
-		t.Fatalf("open branded numeric continuation failed: %v", err)
+		t.Fatalf("open scalar numeric continuation failed: %v", err)
 	}
 
-	const alias = "export type Flags = uint32 & {\n" +
-		"    readonly $goType?: \"example.com/definedbasic|Flags\";\n" +
-		"};\n"
+	const alias = "export type Flags = uint32;\n"
 	const finiteEnum = "export enum Flags {\n" +
 		"    $goType = 1\n" +
 		"}\n"
@@ -97,42 +95,23 @@ func Continue(flags Flags, values []uint32) uint32 {
 func assertDefinedNumericAlias(
 	t *testing.T,
 	alias tsgo.TypeAliasDeclaration,
-	wantIdentity string,
+	wantUnderlying string,
 ) {
 	t.Helper()
 	if len(alias.TypeParameters()) != 0 {
 		t.Fatalf("numeric alias %s acquired type parameters", alias.Name().Text())
 	}
-	intersection, ok := alias.Type().(tsgo.IntersectionTypeNode)
-	if !ok || len(intersection.Types()) != 2 {
-		t.Fatalf("numeric alias %s has target %#v", alias.Name().Text(), alias.Type())
-	}
-	brand, ok := intersection.Types()[1].(tsgo.TypeLiteralNode)
-	if !ok || len(brand.Members()) != 1 {
-		t.Fatalf("numeric alias %s brand = %#v", alias.Name().Text(), intersection.Types()[1])
-	}
-	property, ok := brand.Members()[0].(tsgo.PropertySignatureDeclaration)
-	if !ok || property.Name().(tsgo.Identifier).Text() != "$goType" ||
-		property.PostfixToken() == nil ||
-		property.PostfixToken().Kind() != tsgo.SyntaxKindQuestionToken ||
-		!equalKinds(
-			modifierKinds(property.Modifiers()),
-			[]tsgo.SyntaxKind{tsgo.SyntaxKindReadonlyKeyword},
-		) {
-		t.Fatalf("numeric alias %s brand property = %#v", alias.Name().Text(), brand.Members()[0])
-	}
-	literalType, ok := property.Type().(tsgo.LiteralTypeNode)
+	target, ok := alias.Type().(tsgo.TypeReferenceNode)
 	if !ok {
-		t.Fatalf("numeric alias %s identity type = %#v", alias.Name().Text(), property.Type())
-	}
-	literal, literalOK := literalType.Literal().(tsgo.StringLiteral)
-	if !literalOK || literal.Text() == "" ||
-		(wantIdentity != "" && literal.Text() != wantIdentity) {
 		t.Fatalf(
-			"numeric alias %s identity = %#v, want %q",
+			"numeric alias %s target = %#v, want %q",
 			alias.Name().Text(),
-			property.Type(),
-			wantIdentity,
+			alias.Type(),
+			wantUnderlying,
 		)
+	}
+	name, ok := target.TypeName().(tsgo.Identifier)
+	if !ok || name.Text() != wantUnderlying || len(target.TypeArguments()) != 0 {
+		t.Fatalf("numeric alias %s target = %#v, want %s", alias.Name().Text(), alias.Type(), wantUnderlying)
 	}
 }
