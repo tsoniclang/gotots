@@ -492,6 +492,7 @@ func NewMethodTarget(
 	requests ...RootRequest,
 ) (MethodTarget, error) {
 	if (kind != MethodTargetClassMember &&
+		kind != MethodTargetSourceFunction &&
 		kind != MethodTargetEnvironmentFunction) ||
 		name == "" ||
 		!receiverABI.Valid() {

@@ -14,10 +14,12 @@ export class GoPanic {
     static rethrow(failure: object): never {
         throw failure;
     }
+    declare private readonly then?: never;
 }
-export class GoRuntimePanicValue implements GoInterfaceValue {
+export class GoRuntimePanicValue extends GoInterfaceValue {
     static readonly comparable: boolean = true;
     constructor(public readonly message: string) {
+        super();
     }
     readonly $go$type: {
         readonly comparable: boolean;
@@ -59,4 +61,5 @@ export class GoRecovery {
     recovered(): boolean {
         return this.pending === undefined;
     }
+    declare private readonly then?: never;
 }

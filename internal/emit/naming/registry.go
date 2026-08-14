@@ -352,6 +352,20 @@ func (r *Registry) Target(object types.Object) (Target, bool) {
 	}, true
 }
 
+func (r *Registry) SourceMethodTargetKind(
+	method *types.Func,
+) (api.MethodTargetKind, bool) {
+	if r == nil || method == nil {
+		return api.MethodTargetInvalid, false
+	}
+	method = method.Origin()
+	binding, ok := r.byObject[method]
+	if !ok || binding.kind != targetBindingSource {
+		return api.MethodTargetInvalid, false
+	}
+	return sourceMethodTargetKind(method), true
+}
+
 func (r *Registry) HasProviderCoverageOwner(object types.Object) bool {
 	if r == nil || r.provider == nil || !r.provider.Valid() {
 		return false

@@ -36,7 +36,7 @@ func TestDefinedDeclarationsScaleLinearly(t *testing.T) {
 		sourceBytes[index] = len(source)
 		targetBytes[index] = len(printed)
 		targetNodes[index] = definedEncodedNodeCount(t, encoded)
-		assertDefinedEnumCount(t, target, count)
+		assertDefinedAliasCount(t, target, count)
 	}
 	assertAffineDoubling(t, "source bytes", sourceBytes)
 	assertAffineDoubling(t, "target bytes", targetBytes)
@@ -95,7 +95,7 @@ func compileDefinedScaling(
 	return "", nil
 }
 
-func assertDefinedEnumCount(
+func assertDefinedAliasCount(
 	t *testing.T,
 	source tsgo.SourceFile,
 	want int,
@@ -103,15 +103,14 @@ func assertDefinedEnumCount(
 	t.Helper()
 	count := 0
 	for _, statement := range source.Statements() {
-		enum, ok := statement.(tsgo.EnumDeclaration)
+		_, ok := statement.(tsgo.TypeAliasDeclaration)
 		if !ok {
 			continue
 		}
 		count++
-		assertDefinedNumericEnum(t, enum)
 	}
 	if count != want {
-		t.Fatalf("defined scaling enums = %d, want %d", count, want)
+		t.Fatalf("defined scaling aliases = %d, want %d", count, want)
 	}
 }
 

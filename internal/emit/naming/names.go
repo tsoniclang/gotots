@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -480,6 +481,7 @@ func (n *Owner) preallocateStructMembers(structType *types.Struct) {
 	}
 	used := map[string]struct{}{
 		"constructor": {},
+		typescriptclass.PromiseAssimilationMember: {},
 	}
 	for index := range structType.NumFields() {
 		field := structType.Field(index)

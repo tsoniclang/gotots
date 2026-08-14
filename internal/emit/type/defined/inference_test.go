@@ -1,7 +1,6 @@
 package defined_test
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -9,52 +8,37 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 )
 
-func TestGeneratedNumericConversionAnnotatesInferenceBoundary(t *testing.T) {
+func TestGeneratedNumericConversionNeedsNoInferenceAnnotation(t *testing.T) {
 	workingDirectory := t.TempDir()
 	artifacts := printDefined(
 		t,
 		workingDirectory,
 		compileDefinedFixture(t, emit.DefaultOptions()),
 	)
-	declarations := map[string]string{
-		"let shortConverted: int32 = value;":    "let shortConverted = value;",
-		"let declaredConverted: int32 = value;": "let declaredConverted = value;",
-	}
-	for declaration := range declarations {
+	for _, declaration := range []string{
+		"let shortConverted = value;",
+		"let declaredConverted = value;",
+	} {
 		if !strings.Contains(artifacts.printed, declaration) {
-			t.Fatalf(
-				"generated numeric conversion lacks %q:\n%s",
-				declaration,
-				artifacts.printed,
-			)
+			t.Fatalf("generated numeric conversion lacks %q:\n%s", declaration, artifacts.printed)
 		}
 	}
-	mutations := 0
-	for _, path := range artifacts.paths {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
+	for _, forbidden := range []string{
+		"let shortConverted: int32",
+		"let declaredConverted: int32",
+		"Count.$goType",
+	} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("generated numeric conversion retains %q:\n%s", forbidden, artifacts.printed)
 		}
-		mutated := string(content)
-		for declaration, erased := range declarations {
-			mutated = strings.Replace(mutated, declaration, erased, 1)
-		}
-		if mutated == string(content) {
-			continue
-		}
-		mutations++
-		writeDefinedFile(t, path, mutated)
 	}
-	if mutations != 1 {
-		t.Fatalf("files with inference-annotation mutations = %d, want one", mutations)
-	}
-	runnerPath := filepath.Join(workingDirectory, "inference-mutation.ts")
+	runnerPath := filepath.Join(workingDirectory, "inference.ts")
 	writeDefinedFile(t, runnerPath, "export {};\n")
 	if err := typecheckDefined(
 		workingDirectory,
 		artifacts.paths,
 		runnerPath,
-	); err == nil {
-		t.Fatal("erased generated-numeric inference annotation typechecked")
+	); err != nil {
+		t.Fatalf("direct generated-numeric inference failed: %v", err)
 	}
 }

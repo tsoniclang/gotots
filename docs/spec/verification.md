@@ -295,7 +295,7 @@ Each type/value family has focused differentials and mutations:
 | unsafe pointers | opaque bind/nil/copy/interface/equality/hash/map identity; reinterpretation, arithmetic, pointer/integer, and provider-input boundaries |
 | maps | nil, set/get/comma-ok/delete/clear, key equality/hash, zero-on-miss, iteration |
 | strings | bytes/runes, indexing, range, slicing, conversions |
-| defined types | identity, native methodless fixed-width numerics, projection/wrap, methods, nil-capable families |
+| defined types | identity, native fixed-width numerics with value/pointer methods, projection/wrap, method calls/expressions/values, interfaces, nil-capable families |
 
 Integer-profile proof pins the append-only scalar alias identities, including
 distinct `int`, `uint`, and `uintptr`, and checks their carrier matrix under
@@ -330,12 +330,20 @@ Every test inspects generated source and reports bytes/AST nodes. A mutation
 that always emits copy carriers/helpers, uses JavaScript identity for Go map
 keys, drops nil checks, or restores a target non-null assertion must fail.
 
-The native defined-numeric fixture includes an explicit conversion assigned by
-both short declaration and inferred `var`. Its generated declarations must
-carry the converted basic type while the expression remains a runtime identity
-operation. Removing either annotation must produce the pinned strict
-TypeScript diagnostic; adding runtime coercion or annotating ordinary direct
-numeric declarations fails the artifact-shape gate.
+The native defined-numeric fixture includes value and pointer methods, direct
+calls, method expressions, method values, interface adaptation, explicit
+conversion, and a switch whose listed constants do not exhaust the underlying
+numeric domain. Its generated declaration must be one plain named alias over
+the exact selected scalar carrier; arithmetic and every scalar conversion stay
+direct. Replacing the alias with a finite enum must make the legal nonmember
+value fail under the pinned checker. Replacing the exact scalar alias with an
+intersection must fail the generated-AST shape gate: TypeScript structural
+assignability is not a second owner for Go's already-checked nominal rule.
+Full-product target-planning measurements remain corroborating cost evidence,
+not a causal mutation proof. The open switch proves the alias preserves
+subsequent control flow. Adding a runtime wrapper or coercion, restoring the
+former empty-method-set restriction, or restoring a class-member method route
+fails the same family gate.
 
 Unsafe-pointer proof separates opaque identity from raw memory. Differential
 fixtures convert the same and different typed locations to `unsafe.Pointer`,
@@ -691,6 +699,23 @@ Mutations split direct/select queues, use historical queue storage, omit
 cancellation, bias source order, treat nil as ready, settle before pending
 Promises, globalize all functions as async, restore callable-profile variants,
 or test a result for Promise shape.
+
+An architecture wall permits production class construction only through the
+one generated-class owner, and a non-vacuous mutation restores a raw factory
+call. Every root class is strict-typechecked with exactly one
+`declare private readonly then?: never`; every derived class inherits the
+contract and does not redeclare it. Emitted JavaScript is inspected to prove
+that the declaration creates no field. An adversarial Go struct with a
+lowercase callable field named `then` proves that the member-name owner chooses
+a different stable property and that all accesses use it. A mutation that
+restores one production raw class-factory call, omits the root member, adds it
+again to a derived class, or stops reserving the authored field must fail at
+the architecture, AST-shape, strict-typecheck, or runtime differential gate.
+
+A target differential removes the nominal member and must retain an otherwise
+synchronous generated-value result flow because structural TypeScript permits
+a hidden callable `then`; restoring the member must settle the same flow
+without runtime Promise inspection.
 
 Measurements report queue storage, runtime bytes, call-site AST size,
 typecheck time/RSS, and representative runtime.

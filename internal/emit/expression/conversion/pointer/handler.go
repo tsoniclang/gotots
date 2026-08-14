@@ -115,11 +115,12 @@ func convertPointee(
 	targetElement types.Type,
 	parameter string,
 ) (api.ExpressionEmission, error) {
+	value := api.DirectExpression(context.Factory().Identifier(parameter))
 	stored, err := context.Values().ToStorage(
 		context.WithRole(api.RoleConversionOperand),
 		source,
 		sourceElement,
-		api.DirectExpression(context.Factory().Identifier(parameter)),
+		value,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

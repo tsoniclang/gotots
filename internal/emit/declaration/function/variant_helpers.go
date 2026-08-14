@@ -56,6 +56,7 @@ func emitVariantParameters(
 	genericParameters genericdeclaration.Parameters,
 	targetSignature callable.SignatureEmission,
 	valueReceiver bool,
+	receiverAsParameter bool,
 ) (
 	[]tsgo.ParameterDeclaration,
 	[]api.RootRequest,
@@ -99,7 +100,7 @@ func emitVariantParameters(
 			return nil, nil, err
 		}
 	}
-	if signature.Recv() != nil && !valueReceiver {
+	if signature.Recv() != nil && (!valueReceiver || receiverAsParameter) {
 		receiver, receiverRequests, err := emitReceiver(
 			context,
 			children,

@@ -70,6 +70,7 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, required := range []string{
+		"declare private readonly then?: never",
 		"$go$value: Pointer<GoPanicNilError>",
 		"allocatePointer(new GoPanicNilError)",
 	} {
@@ -85,11 +86,31 @@ func TestCanonicalRuntimePackagePassesUncheckedIndexStrictness(t *testing.T) {
 		"--moduleResolution", "nodenext",
 		"--strict",
 		"--noUncheckedIndexedAccess",
-		"--noEmit",
+		"--outDir", "dist",
 	}
 	arguments = append(arguments, paths...)
 	if err := tsgo.Compile(ctx, root, directory, arguments); err != nil {
 		t.Fatal(err)
+	}
+	for _, module := range []string{
+		"array.js",
+		"interface-value.js",
+		"panic.js",
+		"slice.js",
+	} {
+		javascript, readErr := os.ReadFile(
+			filepath.Join(directory, "dist", module),
+		)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		if strings.Contains(string(javascript), "then") {
+			t.Fatalf(
+				"erased class Promise exclusion reached %s:\n%s",
+				module,
+				javascript,
+			)
+		}
 	}
 }
 

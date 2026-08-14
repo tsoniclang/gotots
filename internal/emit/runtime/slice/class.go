@@ -4,6 +4,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -94,7 +95,7 @@ func BuildWithCapabilities(
 	if capabilities.ArrayView || capabilities.Region {
 		members = append(members, target.arrayViewMethod())
 	}
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
 		[]tsgo.TypeParameterDeclaration{target.typeParameter()},

@@ -24,6 +24,7 @@ export class Cell {
             Value: 0
         });
     }
+    declare private readonly then?: never;
 }
 export function mark(value: int32): int32 {
     $state.Trace = $state.Trace * 10 + value;

@@ -95,4 +95,5 @@ export class RuntimeSlice<T> {
         }
         return count;
     }
+    declare private readonly then?: never;
 }

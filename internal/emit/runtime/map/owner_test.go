@@ -26,8 +26,8 @@ func TestBuildCreatesOneTypedGenericMapClass(t *testing.T) {
 	if len(class.TypeParameters()) != 2 {
 		t.Fatalf("type parameters = %d, want key and value", len(class.TypeParameters()))
 	}
-	if len(class.Members()) != 11 {
-		t.Fatalf("members = %d, want one constructor and ten map operations", len(class.Members()))
+	if len(class.Members()) != 12 {
+		t.Fatalf("members = %d, want constructor, ten map operations, and Promise exclusion", len(class.Members()))
 	}
 }
 
@@ -42,7 +42,7 @@ func TestClearSurfaceBelongsToCompleteMapContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	class := statement.(tsgo.ClassDeclaration)
-	if len(class.Members()) != 11 {
+	if len(class.Members()) != 12 {
 		t.Fatalf("map members = %d, want the complete value contract", len(class.Members()))
 	}
 	method := class.Members()[9].(tsgo.MethodDeclaration)
@@ -62,7 +62,7 @@ func TestKeysSurfaceBelongsToCompleteMapContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	class := statement.(tsgo.ClassDeclaration)
-	if len(class.Members()) != 11 {
+	if len(class.Members()) != 12 {
 		t.Fatalf("map members = %d, want the complete value contract", len(class.Members()))
 	}
 	method := class.Members()[10].(tsgo.MethodDeclaration)
@@ -89,14 +89,14 @@ func TestBuildCreatesOneStaticHashPrimitiveOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	if class.Name().Text() != contract.ExportedName() ||
-		len(class.Members()) != 8 {
+		len(class.Members()) != 9 {
 		t.Fatalf(
 			"hash owner = %q with %d members",
 			class.Name().Text(),
 			len(class.Members()),
 		)
 	}
-	for _, member := range class.Members()[2:] {
+	for _, member := range class.Members()[2:8] {
 		method, ok := member.(tsgo.MethodDeclaration)
 		if !ok {
 			t.Fatalf("hash owner member = %T, want static method", member)
@@ -140,7 +140,7 @@ func TestRuntimeMapMutationGuardsOwnMissingAndNilWriteSemantics(t *testing.T) {
 		t.Fatalf("storage owner = %T, want typed native Map<K,V>", storageTypes[0])
 	}
 	methods := make(map[string]tsgo.MethodDeclaration)
-	for _, member := range class.Members()[1:] {
+	for _, member := range class.Members()[1:11] {
 		method := member.(tsgo.MethodDeclaration)
 		methods[method.Name().(tsgo.Identifier).Text()] = method
 	}

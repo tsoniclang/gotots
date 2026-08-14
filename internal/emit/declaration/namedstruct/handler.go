@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	typefacet "github.com/tsoniclang/gotots/internal/emit/declaration/typefacet"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/emit/value/structconstruction"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -254,7 +255,7 @@ func emitStructClass(
 	}
 	declarations := append(
 		layout.declarations,
-		context.Factory().ClassDeclaration(
+		typescriptclass.Declaration(context.Factory(),
 			modifiers,
 			context.Factory().Identifier(className),
 			typeParameters,

@@ -8,6 +8,7 @@ import (
 	typefacet "github.com/tsoniclang/gotots/internal/emit/declaration/typefacet"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -95,15 +96,22 @@ func Emit(
 		if identityErr != nil {
 			return api.DeclarationEmission{}, true, identityErr
 		}
+		underlying, underlyingErr := children.RepresentedType(
+			context.WithRole(api.RoleDefinedUnderlyingType),
+			source.Type,
+			model.Underlying(),
+		)
+		if underlyingErr != nil {
+			return api.DeclarationEmission{}, true, underlyingErr
+		}
 		return api.DirectDeclaration(
-			context.Factory().EnumDeclaration(
+			context.Factory().TypeAliasDeclaration(
 				modifiers,
 				context.Factory().Identifier(name),
-				[]tsgo.EnumMember{context.Factory().EnumMember(
-					context.Factory().Identifier(definedtype.BrandMember),
-					context.Factory().NumericLiteral("1", tsgo.TokenFlagsNone),
-				)},
+				nil,
+				underlying.Value(),
 			),
+			underlying.Requests()...,
 		), true, nil
 	}
 	parameters, err := genericdeclaration.EnterType(
@@ -192,7 +200,7 @@ func Emit(
 		)
 	}
 	return api.DirectDeclaration(
-		context.Factory().ClassDeclaration(
+		typescriptclass.Declaration(context.Factory(),
 			modifiers,
 			context.Factory().Identifier(name),
 			typeParameters,

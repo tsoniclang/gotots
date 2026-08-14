@@ -9,5 +9,6 @@ export class $PackageState {
     declare Trace: int32;
     declare __go___proto__: int32;
     declare hidden: int32;
+    declare private readonly then?: never;
 }
 export const $state = new $PackageState();

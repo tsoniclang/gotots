@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -30,7 +31,7 @@ func Build(
 }
 
 func (b builder) class() tsgo.ClassDeclaration {
-	return b.factory.ClassDeclaration(
+	return typescriptclass.Declaration(b.factory,
 		[]tsgo.ModifierLike{b.factory.ExportKeyword()},
 		b.id(b.schedulerName),
 		nil,

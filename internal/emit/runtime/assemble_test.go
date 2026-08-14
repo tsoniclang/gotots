@@ -5,6 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	channelruntime "github.com/tsoniclang/gotots/internal/emit/runtime/channel"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -63,6 +64,48 @@ func TestErrorRuntimeContractFollowsConcurrencyProfile(t *testing.T) {
 	}
 }
 
+func TestInterfaceValueContractStaticallyExcludesPromiseAssimilation(t *testing.T) {
+	definitions, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleInterfaceValue,
+		[]api.RuntimeSymbol{api.RuntimeInterfaceValue},
+		api.ConcurrencySemanticsCooperative,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 1 {
+		t.Fatalf("interface-value definitions = %d, want one", len(definitions))
+	}
+	contract := definitions[0].Statement().(tsgo.ClassDeclaration)
+	var property tsgo.PropertyDeclaration
+	for _, member := range contract.Members() {
+		candidate, ok := member.(tsgo.PropertyDeclaration)
+		if !ok {
+			continue
+		}
+		name, ok := candidate.Name().(tsgo.Identifier)
+		if ok && name.Text() == typescriptclass.PromiseAssimilationMember {
+			property = candidate
+			break
+		}
+	}
+	if property == nil {
+		t.Fatal("interface-value class has no promise assimilation exclusion")
+	}
+	modifiers := property.Modifiers()
+	if len(modifiers) != 3 ||
+		modifiers[0].Kind() != tsgo.SyntaxKindDeclareKeyword ||
+		modifiers[1].Kind() != tsgo.SyntaxKindPrivateKeyword ||
+		modifiers[2].Kind() != tsgo.SyntaxKindReadonlyKeyword ||
+		property.PostfixToken() == nil ||
+		property.PostfixToken().Kind() != tsgo.SyntaxKindQuestionToken ||
+		property.Type().Kind() != tsgo.SyntaxKindNeverKeyword ||
+		property.Initializer() != nil {
+		t.Fatalf("interface-value then exclusion = %#v", property)
+	}
+}
+
 func TestEmptyStructRuntimeHasOneExactNominalOwner(t *testing.T) {
 	definitions, err := Build(
 		tsgo.NewFactory(),
@@ -78,7 +121,7 @@ func TestEmptyStructRuntimeHasOneExactNominalOwner(t *testing.T) {
 		t.Fatalf("empty-struct definitions = %#v", definitions)
 	}
 	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
-	if !ok || class.Name().Text() != "GoEmptyStruct" || len(class.Members()) != 9 {
+	if !ok || class.Name().Text() != "GoEmptyStruct" || len(class.Members()) != 10 {
 		t.Fatalf(
 			"empty-struct owner = %T with unexpected shape",
 			definitions[0].Statement(),

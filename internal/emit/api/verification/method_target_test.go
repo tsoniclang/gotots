@@ -64,3 +64,20 @@ func TestMethodTargetRejectsInvalidDomain(t *testing.T) {
 		}
 	}
 }
+
+func TestMethodTargetAcceptsSourceFunction(t *testing.T) {
+	target, err := api.NewMethodTarget(
+		api.MethodTargetSourceFunction,
+		"Flags_Has",
+		api.MethodReceiverABISourceRepresentation,
+		false,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.Kind() != api.MethodTargetSourceFunction ||
+		target.Name() != "Flags_Has" ||
+		target.ProviderBoundary() {
+		t.Fatal("source-function method target lost its exact contract")
+	}
+}

@@ -5,4 +5,5 @@ export class GoComplex128 {
     public static make(real: number, imag: number): GoComplex128 {
         return new GoComplex128(real, imag);
     }
+    declare private readonly then?: never;
 }

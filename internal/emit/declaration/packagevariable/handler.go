@@ -9,6 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -408,7 +409,7 @@ func StateDeclarations(
 		}
 		members = append(members, field)
 	}
-	class := factory.ClassDeclaration(
+	class := typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(StateClassName),
 		nil,

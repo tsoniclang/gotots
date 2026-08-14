@@ -68,11 +68,14 @@ it therefore avoids a source name even when that declaration occurs later or
 inside a descendant scope. For example, a source parameter named
 `__gotots_field_0` forces the first composite-literal capture to use
 `__gotots_field_1` or the next available name. Generated member names use the
-struct member owner under the same no-duplicate rule. A literal target-only
-name is admitted only inside a structurally closed synthetic scope whose owner
-defines the complete binding set and uses the `$` namespace that Go source
-cannot spell. Raw counters are forbidden in scopes that contain authored
-bindings.
+struct member owner under the same no-duplicate rule. The owner reserves the
+lowercase member `then`: JavaScript uses that property for Promise assimilation,
+which has no Go-language counterpart. A legal Go field named `then` therefore
+receives the next deterministic collision-safe member name, and every access
+uses that one identity. A literal target-only name is admitted only inside a
+structurally closed synthetic scope whose owner defines the complete binding
+set and uses the `$` namespace that Go source cannot spell. Raw counters are
+forbidden in scopes that contain authored bindings.
 
 A compilation-global artifact keeps an imported derived export unqualified
 when that export is unique in the selected source universe. The naming owner
@@ -378,50 +381,59 @@ through one type owner. Public generated names remain readable; internal
 operation artifacts are not source declarations.
 
 A source-owned, non-generic defined type whose underlying type is `int8`,
-`uint8`, `int16`, `uint16`, `int32`, or `uint32` and whose value and pointer
-method sets are both empty uses one native numeric-enum representation. The
-enum is the nominal TypeScript type and its value member is the statically
-typed no-op used by conversions and operation results:
+`uint8`, `int16`, `uint16`, `int32`, or `uint32` uses one plain named scalar
+alias regardless of its method sets. Go methods do not give numeric values
+object identity. The alias declaration and source-facing references retain the
+source identity in the TS-Go AST; ordinary values remain native scalars.
+Methods on this representation are emitted as source functions: a value
+receiver is the first value parameter, while a pointer receiver is the first
+`Pointer<T> | undefined` parameter. Direct method calls, method expressions,
+method values, promoted selections, and interface adapters all select that one
+function identity; no wrapper member route remains.
 
 ```go
 type NodeFlags uint32
 
+func (flags NodeFlags) Has(mask NodeFlags) bool { return flags&mask != 0 }
 func Add(left, right NodeFlags) NodeFlags { return left + right }
 ```
 
 ```ts
-export enum NodeFlags { $goType = 1 }
+export type NodeFlags = uint32;
+
+export function NodeFlags_Has(flags: NodeFlags, mask: NodeFlags): boolean {
+  return (flags & mask) !== 0;
+}
 
 export function Add(left: NodeFlags, right: NodeFlags): NodeFlags {
-  return (left + right) * NodeFlags.$goType;
+  return left + right;
 }
 ```
 
-This representation keeps unrelated defined numeric types non-assignable
-without allocating a wrapper per value. It is selected from `go/types`
-identity, underlying kind, generic arity, and complete method sets; source
-spelling and package identity never select it. Generic types, method-bearing
-types, profile-dependent native-width integers, strings, booleans, floats,
-complex values, and all other defined families retain their exact existing
-representation. Type-representation demands whose storage is already the enum
-value consume no class marker or auxiliary carrier.
+This representation allocates no wrapper and does not restrict the legal
+underlying numeric values. The selected Go checker—not TypeScript structural
+assignability—owns source validity. It is selected from `go/types`
+identity, underlying kind, and generic arity; source spelling and package
+identity never select it. Generic types, profile-dependent native-width
+integers, strings, booleans, floats, complex values, and all other defined
+families retain their exact existing representation. Type-representation
+demands whose storage is already the scalar value consume no class marker or
+auxiliary carrier.
 
-A conversion from that enum representation to an ordinary basic type is a
-runtime identity operation. When it initializes an inference-owned target
-declaration, the declaration carries the exact converted type so TypeScript
-does not retain the nominal source enum:
+A conversion to an ordinary basic or another defined numeric type is a direct
+scalar expression. Local TypeScript inference needs no corrective annotation:
 
 ```go
 position := int32(node.Pos())
 ```
 
 ```ts
-let position: int32 = node.Pos();
+let position = node.Pos();
 ```
 
-No coercion, wrapper, or annotation on unrelated locals is emitted. Explicitly
-typed declarations already carry their selected type; non-declaration uses are
-checked by their parent context.
+No wrapper or unrelated annotation is emitted. Explicitly typed declarations
+already carry their selected type; non-declaration uses are checked by their
+parent context.
 
 ### Structs
 
@@ -636,8 +648,21 @@ representation.
 An interface value is nil or a canonical dynamic-type token plus represented
 payload. Concrete boxing copies value payloads and preserves reference
 payloads. One adapter per reached concrete type/contract exposes only demanded
-methods. Calls are native constant-size member calls; implementer switches are
-forbidden.
+methods. Each adapter extends the canonical interface-value root and calls its
+zero-argument base constructor, so it inherits the one Promise-assimilation
+exclusion rather than redeclaring an incompatible private member. Calls are
+native constant-size member calls; implementer switches are forbidden.
+
+Every generated root class, including the canonical interface-value contract,
+declares the erased nominal member
+`declare private readonly then?: never`. JavaScript therefore cannot mistake a
+generated Go value for a Promise-like value when it crosses an `async` return
+boundary, while structural TypeScript values cannot claim the guarantee. The
+declaration emits no JavaScript field. Generated derived classes inherit the
+one root declaration and never redeclare its private member. A source Go method
+named `then` is unexported and keeps its package-qualified target member
+identity; a source field named `then` is deterministically renamed by the
+member-name owner. Neither occupies JavaScript's Promise-assimilation member.
 
 Assertions, comma-ok, type switches, equality, comparability, and map keys use
 typed runtime metadata. No constructor-name test, reflection, spelling table,

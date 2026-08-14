@@ -3,6 +3,7 @@ package mapruntime
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -96,7 +97,7 @@ func Build(
 		clearMethod(factory, members.clear),
 		keysMethod(factory, members.keys),
 	)
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
 		[]tsgo.TypeParameterDeclaration{

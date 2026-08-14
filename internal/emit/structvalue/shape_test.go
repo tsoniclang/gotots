@@ -31,12 +31,18 @@ func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 			t.Fatalf("%s has type parameters or heritage clauses", name)
 		}
 		members := class.Members()
-		wantMembers := 2 + len(operations[name])
+		wantMembers := 3 + len(operations[name])
 		if name == "Box" {
 			wantMembers++
 		}
 		if len(members) != wantMembers {
-			t.Fatalf("%s members = %d, want %d", name, len(members), wantMembers)
+			t.Fatalf(
+				"%s members = %d, want %d: %v",
+				name,
+				len(members),
+				wantMembers,
+				classMemberNames(members),
+			)
 		}
 		assertErasedBrand(t, name, members[0])
 		constructor := classConstructor(t, class)
@@ -51,6 +57,23 @@ func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 		t.Fatalf("reserved constructor parameter = %q, want collision-safe target name", got)
 	}
 
+}
+
+func classMemberNames(members []tsgo.ClassElement) []string {
+	names := make([]string, 0, len(members))
+	for _, member := range members {
+		switch member := member.(type) {
+		case tsgo.ConstructorDeclaration:
+			names = append(names, "constructor")
+		case tsgo.PropertyDeclaration:
+			names = append(names, targetName(member.Name()))
+		case tsgo.MethodDeclaration:
+			names = append(names, targetName(member.Name()))
+		default:
+			names = append(names, "unknown")
+		}
+	}
+	return names
 }
 
 func TestNamedStructOperationsAreUniqueAndOwnedByClass(t *testing.T) {

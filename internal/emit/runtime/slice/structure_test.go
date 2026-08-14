@@ -80,8 +80,8 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 		t.Fatalf("runtime slice declaration = %#v", class)
 	}
 	members := class.Members()
-	if len(members) != 10 {
-		t.Fatalf("runtime slice members = %d, want constructor plus nine core operations", len(members))
+	if len(members) != 11 {
+		t.Fatalf("runtime slice members = %d, want constructor, nine core operations, and Promise exclusion", len(members))
 	}
 	constructor, ok := members[0].(tsgo.ConstructorDeclaration)
 	if !ok {
@@ -103,7 +103,7 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 		t.Fatal("runtime slice constructor does not admit only typed runtime subclasses")
 	}
 	var methods []string
-	for _, member := range members[1:] {
+	for _, member := range members[1:10] {
 		method, ok := member.(tsgo.MethodDeclaration)
 		if !ok {
 			t.Fatalf("runtime slice member = %T, want method", member)

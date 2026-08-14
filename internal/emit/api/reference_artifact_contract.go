@@ -79,6 +79,7 @@ type MethodTargetKind uint8
 const (
 	MethodTargetInvalid MethodTargetKind = iota
 	MethodTargetClassMember
+	MethodTargetSourceFunction
 	MethodTargetEnvironmentFunction
 )
 

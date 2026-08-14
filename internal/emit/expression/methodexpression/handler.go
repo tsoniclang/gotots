@@ -31,7 +31,7 @@ func Emit(
 	); interfaceReceiver {
 		return emitInterface(context, children, source, selected)
 	}
-	method, _ := selectionvalue.DirectMethodExpression(
+	method, direct := selectionvalue.DirectMethodExpression(
 		context,
 		source,
 		selected,
@@ -68,6 +68,25 @@ func Emit(
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if direct {
+		methodTarget, targetErr := context.Names().MethodTarget(method)
+		if targetErr != nil {
+			return api.ExpressionEmission{}, targetErr
+		}
+		if methodTarget.Kind() == api.MethodTargetSourceFunction {
+			reference, referenceErr := context.Names().Reference(method)
+			if referenceErr != nil {
+				return api.ExpressionEmission{}, referenceErr
+			}
+			return api.DirectExpression(
+				reference.Expression(context.Factory()),
+				api.CombineRequests(
+					methodTarget.Requests(),
+					reference.Requests(),
+				)...,
+			), nil
+		}
 	}
 	parameters := targetSignature.ParameterReferences(context.Factory())
 	receiver, method, err := selectionvalue.MethodExpressionReceiver(

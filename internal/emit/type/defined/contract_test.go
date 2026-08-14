@@ -2,7 +2,6 @@ package defined_test
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -83,7 +82,7 @@ func Identity(value Cache[CallbackHolder]) Cache[CallbackHolder] {
 	}
 }
 
-func TestMethodlessFixedWidthDefinedNumericUsesNativeNominalRepresentation(
+func TestFixedWidthDefinedNumericUsesNativeScalarRepresentation(
 	t *testing.T,
 ) {
 	target := compileDefinedSource(t, `package spelling
@@ -94,23 +93,27 @@ type Other uint32
 func FromUint(value uint32) Flags { return Flags(value) }
 func Add(left, right Flags) Flags { return left + right }
 func ToOther(value Flags) Other { return Other(value) }
-`)
+	`)
 	for _, required := range []string{
-		"export enum Flags",
-		"export enum Other",
-		"Flags.$goType",
-		"Other.$goType",
+		"export type Flags = uint32;",
+		"export type Other = uint32;",
+		"return value;",
 	} {
 		if !strings.Contains(target, required) {
 			t.Fatalf("native defined numeric lacks %q:\n%s", required, target)
 		}
 	}
 	for _, forbidden := range []string{
+		"export enum Flags",
+		"export enum Other",
 		"export class Flags",
 		"export class Other",
 		"new Flags(",
 		"new Other(",
 		".$value",
+		"$goType?:",
+		"Flags.$goType",
+		"Other.$goType",
 	} {
 		if strings.Contains(target, forbidden) {
 			t.Fatalf("native defined numeric contains %q:\n%s", forbidden, target)
@@ -125,7 +128,11 @@ type Generic[T any] uint32
 
 func (value Methodful) IsZero() bool { return value == 0 }
 `)
-	for _, name := range []string{"Methodful", "Native", "Wide", "Generic"} {
+	if !strings.Contains(fallback, "export type Methodful = uint32;") ||
+		!strings.Contains(fallback, "export function Methodful_IsZero(") {
+		t.Fatalf("method-bearing fixed numeric lost native representation:\n%s", fallback)
+	}
+	for _, name := range []string{"Native", "Wide", "Generic"} {
 		if !strings.Contains(fallback, "export class "+name) {
 			t.Fatalf("non-native defined numeric %s lost its wrapper:\n%s", name, fallback)
 		}
@@ -136,30 +143,34 @@ func TestDefinedBasicFamilyHasMinimalNominalShape(t *testing.T) {
 	emission := compileDefinedFixture(t, emit.DefaultOptions())
 	source := definedSourceFile(t, emission)
 	classes := make(map[string]tsgo.ClassDeclaration)
-	enums := make(map[string]tsgo.EnumDeclaration)
+	aliases := make(map[string]tsgo.TypeAliasDeclaration)
 	var alias tsgo.TypeAliasDeclaration
 	for _, statement := range source.Statements() {
 		switch statement := statement.(type) {
 		case tsgo.ClassDeclaration:
 			classes[statement.Name().Text()] = statement
-		case tsgo.EnumDeclaration:
-			enums[statement.Name().Text()] = statement
 		case tsgo.TypeAliasDeclaration:
 			if statement.Name().Text() == "Alias" {
 				alias = statement
+			} else {
+				aliases[statement.Name().Text()] = statement
 			}
 		}
 	}
 	for _, name := range []string{"Count", "Other"} {
-		enum := enums[name]
-		if enum == nil {
-			t.Fatalf("defined enum %s is absent", name)
+		definedAlias := aliases[name]
+		if definedAlias == nil {
+			t.Fatalf("defined numeric alias %s is absent", name)
 		}
-		assertDefinedNumericEnum(t, enum)
-		delete(enums, name)
+		assertDefinedNumericAlias(
+			t,
+			definedAlias,
+			"int32",
+		)
+		delete(aliases, name)
 	}
-	if len(enums) != 0 {
-		t.Fatalf("unexpected source enums remain: %v", enums)
+	if len(aliases) != 0 {
+		t.Fatalf("unexpected numeric aliases remain: %v", aliases)
 	}
 	for _, name := range []string{
 		"Label",
@@ -186,64 +197,6 @@ func TestDefinedBasicFamilyHasMinimalNominalShape(t *testing.T) {
 		target.TypeName().(tsgo.Identifier).Text() != "Count" ||
 		len(alias.TypeParameters()) != 0 {
 		t.Fatalf("Alias target = %#v, want direct Count type alias", alias.Type())
-	}
-}
-
-func TestDefinedNominalityGateDetectsErasedRepresentations(t *testing.T) {
-	workingDirectory := t.TempDir()
-	emission := compileDefinedFixture(t, emit.DefaultOptions())
-	artifacts := printDefined(t, workingDirectory, emission)
-	runnerPath := filepath.Join(workingDirectory, "nominality.ts")
-	writeDefinedFile(t, runnerPath, `import * as values from "`+artifacts.sourceModule+`";
-const count: values.Count = values.CountFromInt(1);
-const alias: values.Alias = count;
-const other: values.Other = count;
-void alias;
-void other;
-`)
-	if err := typecheckDefined(
-		workingDirectory,
-		artifacts.paths,
-		runnerPath,
-	); err == nil {
-		t.Fatal("unrelated defined types became structurally assignable")
-	}
-
-	replacements := 0
-	for _, path := range artifacts.paths {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		mutated := strings.ReplaceAll(
-			string(content),
-			"declare private readonly $goType: void;\n",
-			"",
-		)
-		for _, name := range []string{"Count", "Other"} {
-			declaration := "export enum " + name + " {\n    $goType = 1\n}\n"
-			erased := "export type " + name + " = int32;\n" +
-				"export const " + name + ": { readonly $goType: 1 } = { $goType: 1 };\n"
-			if strings.Contains(mutated, declaration) {
-				mutated = strings.Replace(mutated, declaration, erased, 1)
-				replacements++
-			}
-		}
-		if mutated == string(content) {
-			continue
-		}
-		replacements++
-		writeDefinedFile(t, path, mutated)
-	}
-	if replacements == 0 {
-		t.Fatal("nominality mutation erased no generated representation")
-	}
-	if err := typecheckDefined(
-		workingDirectory,
-		artifacts.paths,
-		runnerPath,
-	); err != nil {
-		t.Fatalf("representation-erasure foil did not expose structural assignability: %v", err)
 	}
 }
 
@@ -277,7 +230,7 @@ func TestDefinedLiteralOperationHasNoTransientWrapper(t *testing.T) {
 	if strings.Contains(artifacts.printed, "new Count(") ||
 		!strings.Contains(
 			artifacts.printed,
-			"return (value + 2) * Count.$goType;",
+			"return value + 2;",
 		) {
 		t.Fatalf(
 			"defined literal operation is not direct:\n%s",
@@ -334,17 +287,22 @@ func TestLocalDefinedTypeAndAliasUseThePackageOwners(t *testing.T) {
 	if len(statements) != 5 {
 		t.Fatalf("LocalTypes statements = %d, want 5", len(statements))
 	}
-	enum, ok := statements[0].(tsgo.EnumDeclaration)
+	definedAlias, ok := statements[0].(tsgo.TypeAliasDeclaration)
 	if !ok {
 		t.Fatalf("local defined declaration = %#v", statements[0])
 	}
-	localName := enum.Name().Text()
+	localName := definedAlias.Name().Text()
 	if localName == "Count" {
 		t.Fatal("local defined type collided with the package Count declaration")
 	}
-	if len(enum.Modifiers()) != 0 || len(enum.Members()) != 1 {
-		t.Fatalf("local defined enum has package-level shape: %#v", enum)
+	if len(definedAlias.Modifiers()) != 0 {
+		t.Fatalf("local defined alias has package-level modifiers: %#v", definedAlias)
 	}
+	assertDefinedNumericAlias(
+		t,
+		definedAlias,
+		"int32",
+	)
 	alias, ok := statements[1].(tsgo.TypeAliasDeclaration)
 	if !ok || alias.Name().Text() == "Alias" || len(alias.Modifiers()) != 0 {
 		t.Fatalf("local alias declaration = %#v", statements[1])
@@ -361,7 +319,7 @@ func assertDefinedClass(
 	class tsgo.ClassDeclaration,
 ) {
 	t.Helper()
-	const wantMembers = 2
+	const wantMembers = 3
 	if kinds := modifierKinds(class.Modifiers()); len(kinds) != 1 ||
 		kinds[0] != tsgo.SyntaxKindExportKeyword ||
 		len(class.TypeParameters()) != 0 ||
@@ -409,24 +367,6 @@ func assertDefinedClass(
 	body, ok := constructor.Body().(tsgo.Block)
 	if !ok || len(body.Statements()) != 0 {
 		t.Fatalf("class %s constructor is not empty", class.Name().Text())
-	}
-}
-
-func assertDefinedNumericEnum(
-	t *testing.T,
-	enum tsgo.EnumDeclaration,
-) {
-	t.Helper()
-	if kinds := modifierKinds(enum.Modifiers()); len(kinds) != 1 ||
-		kinds[0] != tsgo.SyntaxKindExportKeyword ||
-		len(enum.Members()) != 1 {
-		t.Fatalf("enum %s has the wrong declaration shape", enum.Name().Text())
-	}
-	member := enum.Members()[0]
-	initializer, ok := member.Initializer().(tsgo.NumericLiteral)
-	if member.Name().(tsgo.Identifier).Text() != "$goType" ||
-		!ok || initializer.Text() != "1" {
-		t.Fatalf("enum %s has the wrong nominal marker", enum.Name().Text())
 	}
 }
 

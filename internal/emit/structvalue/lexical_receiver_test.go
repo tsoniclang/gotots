@@ -17,28 +17,31 @@ import (
 	runtimefixture "github.com/tsoniclang/gotots/internal/testfixture/gototsruntime"
 )
 
-func TestNamedStructSyntheticBindingsAndReceiverCopyHaveExactShape(
+func TestNamedStructSyntheticBindingsAndNativeReceiverHaveExactShape(
 	t *testing.T,
 ) {
 	source := structTargetSource(t, compileLexicalReceiverFixture(t))
-	shift := targetMethod(t, targetClass(t, source, "Mode"), "Shift")
-	statements := shift.Body().(tsgo.Block).Statements()
-	copyStatement, ok := statements[0].(tsgo.VariableStatement)
-	if !ok {
-		t.Fatalf("receiver copy statement = %T, want variable statement", statements[0])
+	shift := targetFunction(t, source, "Mode_Shift")
+	parameters := shift.Parameters()
+	if len(parameters) != 2 {
+		t.Fatalf("native receiver parameters = %d, want 2", len(parameters))
 	}
-	copyDeclaration := copyStatement.DeclarationList().Declarations()[0]
-	copyType, ok := copyDeclaration.Type().(tsgo.TypeReferenceNode)
+	receiverType, ok := parameters[0].Type().(tsgo.TypeReferenceNode)
 	if !ok ||
-		copyType.TypeName().(tsgo.Identifier).Text() != "Mode" ||
-		targetName(copyDeclaration.Name()) != "mode" ||
-		copyDeclaration.Initializer().Kind() != tsgo.SyntaxKindThisKeyword {
+		receiverType.TypeName().(tsgo.Identifier).Text() != "Mode" ||
+		targetName(parameters[0].Name()) != "mode" {
 		t.Fatalf(
-			"receiver copy = name %q, type %T, initializer %T",
-			targetName(copyDeclaration.Name()),
-			copyDeclaration.Type(),
-			copyDeclaration.Initializer(),
+			"native receiver = name %q, type %T",
+			targetName(parameters[0].Name()),
+			parameters[0].Type(),
 		)
+	}
+	for _, statement := range shift.Body().(tsgo.Block).Statements() {
+		if declaration, isVariable := statement.(tsgo.VariableStatement); isVariable &&
+			len(declaration.DeclarationList().Declarations()) != 0 &&
+			targetName(declaration.DeclarationList().Declarations()[0].Name()) == "mode" {
+			t.Fatal("native numeric receiver acquired a redundant copy binding")
+		}
 	}
 
 	for className, expectedFields := range map[string][]string{
@@ -95,7 +98,7 @@ console.log(Audit());
 
 func TestLexicalReceiverMutationsFailStrictTypeScript(t *testing.T) {
 	emission := compileLexicalReceiverFixture(t)
-	t.Run("receiver-copy-type", func(t *testing.T) {
+	t.Run("receiver-parameter-type", func(t *testing.T) {
 		workingDirectory, targetPaths, sourcePath := materializeLexicalMutation(
 			t,
 			emission,
@@ -103,8 +106,8 @@ func TestLexicalReceiverMutationsFailStrictTypeScript(t *testing.T) {
 		mutateTargetSource(
 			t,
 			sourcePath,
-			"let mode: Mode = this;",
-			"let mode = this;",
+			"Mode_Shift(mode: Mode,",
+			"Mode_Shift(mode: string,",
 		)
 		assertStrictDiagnostic(t, workingDirectory, targetPaths, "TS2322")
 	})
@@ -112,16 +115,19 @@ func TestLexicalReceiverMutationsFailStrictTypeScript(t *testing.T) {
 		className string
 		useBefore string
 		useAfter  string
+		code      string
 	}{
 		{
 			className: "fileRange",
 			useBefore: "public fileRange: Mode",
 			useAfter:  "public fileRange: fileRange",
+			code:      "TS2345",
 		},
 		{
 			className: "derivedRange",
 			useBefore: "public derivedRange: Mode",
 			useAfter:  "public derivedRange: derivedRange",
+			code:      "TS2345",
 		},
 	} {
 		t.Run(testCase.className+"-named-field-binding", func(t *testing.T) {
@@ -133,7 +139,7 @@ func TestLexicalReceiverMutationsFailStrictTypeScript(t *testing.T) {
 				testCase.useBefore,
 				testCase.useAfter,
 			)
-			assertStrictDiagnostic(t, workingDirectory, targetPaths, "TS2739")
+			assertStrictDiagnostic(t, workingDirectory, targetPaths, testCase.code)
 		})
 	}
 }

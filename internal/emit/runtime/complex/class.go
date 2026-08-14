@@ -1,6 +1,9 @@
 package complex
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 const (
 	MakeMember = "make"
@@ -16,7 +19,7 @@ func buildClass(
 ) tsgo.ClassDeclaration {
 	target := builder{factory: factory}
 	numberType := target.numberType()
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		target.id(className),
 		nil,

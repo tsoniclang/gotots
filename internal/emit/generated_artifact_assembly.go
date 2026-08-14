@@ -9,6 +9,7 @@ import (
 	genericcapability "github.com/tsoniclang/gotots/internal/emit/generic/capability"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	maprepresentation "github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -268,7 +269,7 @@ func (s *programSession) buildMapSpecializationRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	statement := tsgo.Statement(builder.context.Factory().ClassDeclaration(
+	statement := tsgo.Statement(typescriptclass.Declaration(builder.context.Factory(),
 		[]tsgo.ModifierLike{builder.context.Factory().ExportKeyword()},
 		builder.context.Factory().Identifier(artifact.TargetName()),
 		nil,

@@ -1,6 +1,9 @@
 package slice
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 type projectionBuilder struct {
 	factory        tsgo.Factory
@@ -55,7 +58,7 @@ func BuildProjection(
 	if capabilities.Address || capabilities.ArrayPointer || capabilities.Region {
 		members = append(members, builder.arrayLocationMethod())
 	}
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		builder.id(projectionName),
 		[]tsgo.TypeParameterDeclaration{

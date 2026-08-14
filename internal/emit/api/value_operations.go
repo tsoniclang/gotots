@@ -13,7 +13,6 @@ type Values interface {
 	Pointee(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
 	RequiresCustomEquality(Context, types.Type) bool
 	RequiresExplicitType(Context, types.Type) bool
-	RequiresInitializerTypeAnnotation(Context, ast.Expr, types.Type) (bool, error)
 	RequiresStructuralCopy(Context, types.Type) bool
 	SupportsHash(Context, types.Type) bool
 	RequiresStorageProjection(Context, types.Type) (bool, error)

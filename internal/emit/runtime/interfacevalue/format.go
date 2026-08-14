@@ -3,11 +3,12 @@ package interfacevalue
 import (
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func formatClass(factory tsgo.Factory, panicName string) tsgo.ClassDeclaration {
-	return factory.ClassDeclaration(
+	return typescriptclass.Declaration(factory,
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier("GoInterfaceFormat"),
 		nil,

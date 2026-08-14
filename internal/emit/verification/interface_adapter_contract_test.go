@@ -50,9 +50,22 @@ func TestInterfaceAdaptersContainOnlyDemandedContracts(t *testing.T) {
 	for _, forbidden := range []string{
 		"Value_Unused",
 		"Value_privateUnused",
+		"implements GoInterfaceValue",
 	} {
 		if strings.Contains(valueAdapter, forbidden) {
 			t.Fatalf("Value adapter contains unrelated %s:\n%s", forbidden, valueAdapter)
+		}
+	}
+	for _, required := range []string{
+		"extends GoInterfaceValue",
+		"super();",
+	} {
+		if !strings.Contains(valueAdapter, required) {
+			t.Fatalf(
+				"Value adapter lacks canonical interface inheritance %q:\n%s",
+				required,
+				valueAdapter,
+			)
 		}
 	}
 	otherAdapter := interfaceContractDemandAdapter(

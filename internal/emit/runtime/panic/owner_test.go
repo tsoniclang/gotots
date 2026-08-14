@@ -26,7 +26,7 @@ func TestBuildCreatesOneNonErasedPanicCarrierAndRecoveryAuthority(t *testing.T) 
 	carrier := carrierTarget.(tsgo.ClassDeclaration)
 	if className(carrier) != "GoPanic" ||
 		len(carrier.TypeParameters()) != 0 ||
-		len(carrier.Members()) != 5 {
+		len(carrier.Members()) != 6 {
 		t.Fatalf(
 			"panic class = %q, type parameters %d, members %d",
 			className(carrier),
@@ -56,7 +56,7 @@ func TestBuildCreatesOneNonErasedPanicCarrierAndRecoveryAuthority(t *testing.T) 
 		t.Fatal(err)
 	}
 	recovery := recoveryTarget.(tsgo.ClassDeclaration)
-	if className(recovery) != "GoRecovery" || len(recovery.Members()) != 3 {
+	if className(recovery) != "GoRecovery" || len(recovery.Members()) != 4 {
 		t.Fatalf(
 			"recovery class = %q with %d members",
 			className(recovery),
