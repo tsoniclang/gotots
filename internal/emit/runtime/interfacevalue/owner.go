@@ -286,6 +286,19 @@ func valueContract(
 		[]tsgo.ClassElement{
 			factory.PropertyDeclaration(
 				[]tsgo.ModifierLike{
+					factory.DeclareKeyword(),
+					factory.PrivateKeyword(),
+					factory.ReadonlyKeyword(),
+				},
+				factory.Identifier(interfacecontract.ThenExclusionMember),
+				factory.QuestionToken(),
+				factory.KeywordTypeNode(
+					tsgo.KeywordTypeSyntaxKindNeverKeyword,
+				),
+				nil,
+			),
+			factory.PropertyDeclaration(
+				[]tsgo.ModifierLike{
 					factory.AbstractKeyword(),
 					factory.ReadonlyKeyword(),
 				},

@@ -700,6 +700,13 @@ cancellation, bias source order, treat nil as ready, settle before pending
 Promises, globalize all functions as async, restore callable-profile variants,
 or test a result for Promise shape.
 
+The generated interface-value contract is strict-typechecked with
+`declare private readonly then?: never`, and its emitted JavaScript is inspected
+to prove that the declaration creates no field. A target differential removes
+that nominal member and must retain an otherwise synchronous interface-result
+flow because structural TypeScript permits a hidden callable `then`; restoring
+the member must settle the same flow without runtime Promise inspection.
+
 Measurements report queue storage, runtime bytes, call-site AST size,
 typecheck time/RSS, and representative runtime.
 

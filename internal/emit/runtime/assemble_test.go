@@ -5,6 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	channelruntime "github.com/tsoniclang/gotots/internal/emit/runtime/channel"
+	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -60,6 +61,37 @@ func TestErrorRuntimeContractFollowsConcurrencyProfile(t *testing.T) {
 				t.Fatalf("cooperative Error result = %#v", reference)
 			}
 		})
+	}
+}
+
+func TestInterfaceValueContractStaticallyExcludesPromiseAssimilation(t *testing.T) {
+	definitions, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleInterfaceValue,
+		[]api.RuntimeSymbol{api.RuntimeInterfaceValue},
+		api.ConcurrencySemanticsCooperative,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 1 {
+		t.Fatalf("interface-value definitions = %d, want one", len(definitions))
+	}
+	contract := definitions[0].Statement().(tsgo.ClassDeclaration)
+	property, ok := contract.Members()[0].(tsgo.PropertyDeclaration)
+	if !ok || property.Name().(tsgo.Identifier).Text() != interfacecontract.ThenExclusionMember {
+		t.Fatalf("interface-value first member = %T, want then exclusion", contract.Members()[0])
+	}
+	modifiers := property.Modifiers()
+	if len(modifiers) != 3 ||
+		modifiers[0].Kind() != tsgo.SyntaxKindDeclareKeyword ||
+		modifiers[1].Kind() != tsgo.SyntaxKindPrivateKeyword ||
+		modifiers[2].Kind() != tsgo.SyntaxKindReadonlyKeyword ||
+		property.PostfixToken() == nil ||
+		property.PostfixToken().Kind() != tsgo.SyntaxKindQuestionToken ||
+		property.Type().Kind() != tsgo.SyntaxKindNeverKeyword ||
+		property.Initializer() != nil {
+		t.Fatalf("interface-value then exclusion = %#v", property)
 	}
 }
 

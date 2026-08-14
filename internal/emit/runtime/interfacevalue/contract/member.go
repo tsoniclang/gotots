@@ -1,6 +1,7 @@
 package contract
 
 const (
+	ThenExclusionMember     = "then"
 	DynamicTypeMember       = "$go$type"
 	DynamicTypeComparable   = "comparable"
 	MethodsMember           = "$go$methods"

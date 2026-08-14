@@ -648,6 +648,14 @@ payloads. One adapter per reached concrete type/contract exposes only demanded
 methods. Calls are native constant-size member calls; implementer switches are
 forbidden.
 
+Every canonical interface-value contract also declares the erased nominal
+member `declare private readonly then?: never`. JavaScript therefore cannot
+mistake a generated Go interface value for a Promise-like value when it crosses
+an `async` return boundary, while structural TypeScript values cannot claim the
+guarantee. The declaration emits no JavaScript field. A source Go method named
+`then` is unexported and keeps its package-qualified target member identity; it
+does not occupy JavaScript's Promise-assimilation member.
+
 Assertions, comma-ok, type switches, equality, comparability, and map keys use
 typed runtime metadata. No constructor-name test, reflection, spelling table,
 `any`, or `unknown`.

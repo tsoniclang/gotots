@@ -1,5 +1,6 @@
 import { Awaitable } from "./scalars.js";
 export abstract class GoInterfaceValue {
+    declare private readonly then?: never;
     abstract readonly $go$type: {
         readonly comparable: boolean;
     };
