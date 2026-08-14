@@ -336,11 +336,14 @@ conversion, and a switch whose listed constants do not exhaust the underlying
 numeric domain. Its generated declaration must be one plain named alias over
 the exact selected scalar carrier; arithmetic and every scalar conversion stay
 direct. Replacing the alias with a finite enum must make the legal nonmember
-value fail under the pinned checker, while replacing it with an intersection
-must fail the frozen full-product target-planning budget. The open switch proves
-the alias preserves subsequent control flow. Adding a runtime wrapper or
-coercion, restoring the former empty-method-set restriction, or restoring a
-class-member method route fails the same family gate.
+value fail under the pinned checker. Replacing the exact scalar alias with an
+intersection must fail the generated-AST shape gate: TypeScript structural
+assignability is not a second owner for Go's already-checked nominal rule.
+Full-product target-planning measurements remain corroborating cost evidence,
+not a causal mutation proof. The open switch proves the alias preserves
+subsequent control flow. Adding a runtime wrapper or coercion, restoring the
+former empty-method-set restriction, or restoring a class-member method route
+fails the same family gate.
 
 Unsafe-pointer proof separates opaque identity from raw memory. Differential
 fixtures convert the same and different typed locations to `unsafe.Pointer`,
