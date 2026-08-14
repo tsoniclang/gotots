@@ -1002,6 +1002,17 @@ through the dependency filter and proves it is absent, while generated support
 requirements remain and an unselected-package dependency survives the same
 filter. Retaining the selected edge must fail because the final graph has no
 generated implementation facet for an authored declaration.
+The two-session fixture also makes a later selected-package callable demand
+canonical storage for an exported struct, then compiles only an earlier external
+`return T{}` consumer in the final session. The consumer must call
+`T.$fromStorage({...})`. The certified baseline must create zero pending
+scheduler work and zero declaration batches. Omitting that baseline must
+produce the positional `new T(...)` mutation and fail artifact inspection. A
+foreign or duplicate captured requirement must fail atomic installation without
+changing scheduler state. Removing storage from the certified set while a
+final consumer still demands it must fail the subset join at the exact owner;
+an unused certified capability must remain queryable without materializing its
+owner.
 The two-session fixture also reaches a generic call outside the replaced
 package. Recreating its semantically identical concretization in the final
 session must reuse the transferred canonical artifact. Mutations retain the
@@ -1036,9 +1047,10 @@ type, nil shape, method/callback adapter, or signature dependency; each fails at
 the TSTS join or strict target consumer. A body-only authored change changes the
 implementation digest without changing generated callers.
 
-The final broad search rejects any source-implementation name-only surface
-join, package/function projection condition, pointer-scalarization config field,
-caller allowlist, text patch, unchecked cast, or duplicate signature store.
+The final broad search rejects treating GoToTS's export-identity join as final
+surface acceptance, any second name-only signature gate, package/function
+projection condition, pointer-scalarization config field, caller allowlist,
+text patch, unchecked cast, or duplicate signature store.
 
 The provider pointer contract is independently certified as exactly one
 writable `ProviderPointer<T>.value: T` member plus one

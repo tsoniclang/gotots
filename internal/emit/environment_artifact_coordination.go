@@ -156,7 +156,7 @@ func (s *programSession) reconstructEnvironmentDeclaration(
 	}
 	requirements, err := s.environmentDeclarationRequirements(
 		object,
-		s.requirements.appliedFor(api.MustSourceArtifactOwner(object)),
+		s.requirements.selectedFor(api.MustSourceArtifactOwner(object)),
 	)
 	if err != nil {
 		return err

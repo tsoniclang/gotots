@@ -1176,15 +1176,24 @@ The ordinary generated snapshot is certification evidence, not final
 ownership. It is produced in a contract-only first session for every selected
 package. The final session takes sole ownership of the deterministic canonical
 name and generated-support identity registry, plus each selected source
-artifact's immutable observable contract, outgoing support requirements, and
-observable dependency edges. It cannot read an implementation facet, builder,
-placement, artifact revision, liveness ledger, scheduler queue, or generated
-declaration from the first session. For example, an unexported `worker` used
-only by the Go body cannot create a requirement because selected bodies are not
-traversed in the contract session. A genuine final consumer of a private type
-requires an exact body-free private contract module; a private value dependency
-remains an error. The final session never emits a selected-package body and
-never infers liveness by retracting already-emitted output.
+artifact's immutable observable contract, outgoing support requirements,
+accepted representation requirements, and observable dependency edges. Before
+final roots emit, the accepted requirements are installed in an immutable
+certified-selection ledger. They are query facts, not liveness: installation
+queues no owner, schedules no declaration, and materializes no target artifact.
+Thus an early `return T{}` uses `T.$fromStorage({...})` whenever the certified
+ordinary contract selected storage, even when the selected-package Go body that
+created the demand is absent from the final session. A later requirement batch
+for that owner must be a subset of the certified set; a novel requirement
+fails, while an unused certified capability remains inert. The final session
+cannot read an implementation facet, builder, placement, artifact revision,
+liveness ledger, scheduler queue, or generated declaration from the first
+session. For example, an unexported `worker` used only by the Go body cannot
+create final-session liveness merely because it appeared during certification.
+A genuine final consumer of a private type requires an exact body-free private
+contract module; a private value dependency remains an error. The final session
+never emits a selected-package body and never infers liveness by retracting
+already-emitted output.
 
 When the final session recreates a demanded generic concretization, it joins
 the transferred canonical artifact by stable generic key and exact owner,

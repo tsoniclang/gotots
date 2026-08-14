@@ -1429,19 +1429,30 @@ source-facing contract.
 Replacement uses two compilation sessions, not a filter over an assembled file
 list and not rollback within one mutable graph. The first session settles the
 ordinary canonical program solely for certification. It captures the complete
-ordinary target set, immutable observable contracts for selected-package
-source artifacts, and each contract artifact's exact outgoing support
-requirements and observable dependency edges. The deterministic name and
+ordinary target set, immutable observable contracts for selected-package source
+artifacts, and each contract artifact's exact outgoing support requirements,
+accepted representation requirements, and observable dependency edges. The
+deterministic name and
 generated-support identity registry is transferred as the one identity owner
 from the completed first session to the final session. The sessions never use
 it concurrently. Artifact revisions, liveness, builders, placement, requirement
 scheduler state, and emitted declarations are not transferable. The first
 session's remaining state is then discarded.
 
-A fresh final session starts with empty artifact, liveness, requirement,
+A fresh final session starts with empty artifact, liveness, applied-requirement,
 representation, placement, and target-builder state after taking ownership of
-the one canonical name/support-identity registry. When a final consumer requests a
-selected-package source artifact, the source owner publishes the captured
+the one canonical name/support-identity registry. Before any final consumer is
+emitted, it atomically installs the complete captured set of accepted
+selected-package requirements in a separate immutable certified-selection
+ledger. That ledger answers representation queries such as whether an early
+`T{}` consumer must use canonical storage, but it never queues an owner,
+schedules a declaration, or materializes output. Only requirements discovered
+from final-session consumers enter the liveness scheduler. Every such batch for
+a selected source-implementation owner must be a subset of the certified set;
+a new or foreign requirement fails instead of changing an authored contract,
+while a certified capability unused by the final graph remains inert. When a
+final consumer requests a selected-package source artifact, the source owner
+publishes the captured
 observable contract with no body, storage, initializer, class contribution, or
 target declaration and reinstalls only that contract's captured outgoing
 support requirements and observable dependency edges. A dependency whose
@@ -1469,9 +1480,11 @@ be satisfied by an exact body-free private contract module. Transferring either
 session's artifact or liveness state, late import deletion, output-path
 filtering as liveness, same-session withdrawal, and private generated runtime
 shims are forbidden. The transferred registry may retain canonical interned
-contract facts but cannot schedule or materialize output; the final requirement
-scheduler is the sole liveness owner. Sharing either artifact graph, scheduler,
-builder, liveness ledger, or emitted declaration is forbidden.
+contract facts but cannot schedule or materialize output. The
+certified-selection ledger owns only immutable replacement capabilities; the
+final requirement scheduler remains the sole liveness owner. Sharing either
+artifact graph, scheduler queue, builder, liveness ledger, or emitted
+declaration is forbidden.
 
 Registry transfer preserves semantic identity, not allocation identity. A
 generated contract fact recreated by the final session exact-joins the
@@ -1487,11 +1500,12 @@ Those are liveness inputs, not identity facts, and the final session must
 derive them only from its own consumers. Transfer and final-session claim are
 each single-use operations.
 
-For callable exports, the surface join is signature-exact rather than
+For callable exports, final surface validation is signature-exact rather than
 name-only. GoToTS preserves the selected Go signature in ordinary canonical
-callers and binds the authored module by exact export identity. TSTS is the one
-owner that compares the generated and authored canonical parameter/result
-types under the authoritative virtual marker modules. For example, Go
+callers and first exact-joins the generated, declared, and installed export
+identity sets. TSTS is the one owner that compares the generated and authored
+canonical parameter/result types under the authoritative virtual marker
+modules. For example, Go
 `Read(*int) int` requires authored
 `Read(Pointer<int> | undefined): int`; authored `Read(number): number` is a
 target-specific optimization and is rejected at this canonical boundary.

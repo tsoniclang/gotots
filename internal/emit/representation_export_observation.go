@@ -61,7 +61,7 @@ func (s *programSession) ResolveGenericRepresentationProfile(
 	if _, ok := s.sites[owner]; ok {
 		profile, err := api.SelectGenericRepresentationProfile(
 			owner,
-			s.requirements.appliedFor(api.MustSourceArtifactOwner(owner)),
+			s.requirements.selectedFor(api.MustSourceArtifactOwner(owner)),
 		)
 		return profile, err == nil, err
 	}
@@ -74,7 +74,7 @@ func (s *programSession) ResolveGenericRepresentationProfile(
 	}
 	var requirements []api.DeclarationRequirement
 	if builder := s.environmentBuilders[sourcePackage]; builder != nil {
-		requirements = s.requirements.appliedFor(
+		requirements = s.requirements.selectedFor(
 			api.MustSourceArtifactOwner(owner),
 		)
 	}
@@ -347,7 +347,7 @@ func (s *programSession) ObserveRecoveryCallable(
 	}
 	recovery, err := sourceCallableRecoveryRequirement(
 		function,
-		s.requirements.appliedFor(api.MustSourceArtifactOwner(function)),
+		s.requirements.selectedFor(api.MustSourceArtifactOwner(function)),
 	)
 	if err != nil {
 		return api.RecoveryCallableObservation{}, err

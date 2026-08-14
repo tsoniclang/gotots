@@ -433,7 +433,7 @@ func (s *programSession) buildArtifactRevision(
 	}
 	defer finish()
 
-	requirements := s.requirements.appliedFor(artifactOwner)
+	requirements := s.requirements.selectedFor(artifactOwner)
 	handlerRequirements, selectedMethods, err :=
 		s.partitionClassMethodRequirements(owner, requirements)
 	if err != nil {
