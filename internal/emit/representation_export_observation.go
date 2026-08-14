@@ -92,9 +92,17 @@ func (s *programSession) recordPackageExport(
 	if object == nil || !object.Exported() {
 		return nil
 	}
-	if method, ok := object.(*types.Func); ok &&
-		method.Signature().Recv() != nil {
-		return nil
+	if method, ok := object.(*types.Func); ok && method.Signature().Recv() != nil {
+		target, found := s.registry.SourceMethodTargetKind(method)
+		if !found {
+			return &ScheduleError{
+				Object: object.Name(),
+				Reason: "source method export has no declaration target",
+			}
+		}
+		if target != api.MethodTargetSourceFunction {
+			return nil
+		}
 	}
 	if builder == nil ||
 		object.Pkg() != builder.sourcePackage.Types() {

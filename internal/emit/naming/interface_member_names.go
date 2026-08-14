@@ -293,6 +293,23 @@ func (n *File) MethodTarget(
 	}
 	switch binding.kind {
 	case targetBindingSource:
+		if sourceMethodTargetKind(method) == api.MethodTargetSourceFunction {
+			reference, err := n.reference(
+				method,
+				api.ImportPhaseValue,
+				api.ArtifactFacetCallableSignature,
+			)
+			if err != nil {
+				return api.MethodTarget{}, err
+			}
+			return api.NewMethodTarget(
+				api.MethodTargetSourceFunction,
+				reference.Name(),
+				api.MethodReceiverABISourceRepresentation,
+				false,
+				reference.Requests()...,
+			)
+		}
 		member, err := n.InterfaceMethodName(method)
 		if err != nil {
 			return api.MethodTarget{}, err
@@ -377,6 +394,13 @@ func (n *File) MethodTarget(
 			Reason: "method target has no supported ownership",
 		}
 	}
+}
+
+func sourceMethodTargetKind(method *types.Func) api.MethodTargetKind {
+	if generatedNumericDefinedValue(api.MethodReceiverTypeName(method)) {
+		return api.MethodTargetSourceFunction
+	}
+	return api.MethodTargetClassMember
 }
 
 func (n *File) InterfaceMethodCallable(

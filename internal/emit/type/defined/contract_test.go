@@ -83,7 +83,7 @@ func Identity(value Cache[CallbackHolder]) Cache[CallbackHolder] {
 	}
 }
 
-func TestMethodlessFixedWidthDefinedNumericUsesNativeNominalRepresentation(
+func TestFixedWidthDefinedNumericUsesNativeNominalRepresentation(
 	t *testing.T,
 ) {
 	target := compileDefinedSource(t, `package spelling
@@ -125,7 +125,11 @@ type Generic[T any] uint32
 
 func (value Methodful) IsZero() bool { return value == 0 }
 `)
-	for _, name := range []string{"Methodful", "Native", "Wide", "Generic"} {
+	if !strings.Contains(fallback, "export enum Methodful") ||
+		!strings.Contains(fallback, "export function Methodful_IsZero(") {
+		t.Fatalf("method-bearing fixed numeric lost native representation:\n%s", fallback)
+	}
+	for _, name := range []string{"Native", "Wide", "Generic"} {
 		if !strings.Contains(fallback, "export class "+name) {
 			t.Fatalf("non-native defined numeric %s lost its wrapper:\n%s", name, fallback)
 		}

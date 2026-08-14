@@ -45,7 +45,7 @@ const Value ID = 7
 	printed := printConstantFamily(t, emission)
 	for _, expected := range []string{
 		"export function Value$constant(): ID",
-		"return Value$constant().Value()",
+		"return ID_Value(Value$constant())",
 		"export let Value: ReturnType<typeof Value$constant>",
 		"Value = Value$constant()",
 	} {
@@ -71,10 +71,10 @@ const Value ID = 7
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import "./program.js";
-import { Use, Value } from "`+packageModule+`";
+import { ID_Value, Use, Value } from "`+packageModule+`";
 
 console.log(String(Use()));
-console.log(String(Value.Value()));
+console.log(String(ID_Value(Value)));
 `)
 	targetOutput := executeMaterializedTypeScript(
 		t,
@@ -148,7 +148,7 @@ func Read() uint16 { return defs.Number.Value() }
 	for _, expected := range []string{
 		"export function Number$constant(): ID",
 		"Number$constant as Number$constant__from_defs",
-		"return Number$constant__from_defs().Value()",
+		"return ID_Value__from_defs(Number$constant__from_defs())",
 		"export let Number: ReturnType<typeof Number$constant>",
 		"Number = Number$constant()",
 	} {

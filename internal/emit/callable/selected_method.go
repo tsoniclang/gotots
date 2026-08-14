@@ -146,6 +146,12 @@ func selectedMethodCall(
 			append(prefixArguments, receiver),
 			arguments...,
 		)
+	case api.MethodTargetSourceFunction:
+		callee = context.Factory().Identifier(name)
+		arguments = append(
+			append(prefixArguments, receiver),
+			arguments...,
+		)
 	default:
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),

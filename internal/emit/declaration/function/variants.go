@@ -58,28 +58,18 @@ func emitCallableVariants(
 		return api.DeclarationEmission{}, err
 	}
 	declarations := target.statements
-	var members []tsgo.ClassElement
 	if target.member != nil {
-		members = append([]tsgo.ClassElement{target.member}, members...)
-	}
-	if signature.Recv() != nil {
-		if len(members) != 1 {
-			return api.DeclarationEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "receiver method lost its class-member form",
-			}
-		}
 		return api.ClassMemberAndSupportContributionEmission(
 			api.MethodReceiverTypeName(function),
-			members,
+			[]tsgo.ClassElement{target.member},
 			declarations,
 			api.CombineRequests(target.requests),
 		)
 	}
-	if len(members) != 0 || len(declarations) < 1 {
+	if len(declarations) < 1 {
 		return api.DeclarationEmission{}, &api.InvariantError{
 			Role:   context.Role(),
-			Reason: "free function acquired a class-member form",
+			Reason: "module function has no declaration form",
 		}
 	}
 	return api.NewDeclarationEmission(
@@ -108,6 +98,14 @@ func emitCallableVariant(
 	cooperative bool,
 	kernel bool,
 ) (callableVariantEmission, error) {
+	moduleFunction := signature.Recv() == nil
+	if signature.Recv() != nil {
+		target, targetErr := context.Names().MethodTarget(function)
+		if targetErr != nil {
+			return callableVariantEmission{}, targetErr
+		}
+		moduleFunction = target.Kind() == api.MethodTargetSourceFunction
+	}
 	var (
 		genericParameters genericdeclaration.Parameters
 		err               error
@@ -135,7 +133,7 @@ func emitCallableVariant(
 	context = genericParameters.Context()
 	name := ""
 	supportName := ""
-	if signature.Recv() == nil {
+	if moduleFunction {
 		name, err = context.Names().Declare(function)
 	} else {
 		name, err = context.Names().InterfaceMethodName(function)
@@ -163,6 +161,9 @@ func emitCallableVariant(
 		if err != nil {
 			return callableVariantEmission{}, err
 		}
+		if moduleFunction {
+			copySelected = false
+		}
 		receiverName, nameErr := context.Names().Parameter(
 			signature.Recv(),
 			signature.Params().Len(),
@@ -170,20 +171,28 @@ func emitCallableVariant(
 		if nameErr != nil {
 			return callableVariantEmission{}, nameErr
 		}
+		receiverExpression := tsgo.Expression(context.Factory().ThisExpression())
+		if moduleFunction {
+			receiverExpression = context.Factory().Identifier(receiverName)
+		}
 		context, err = context.WithValueReceiver(
 			function,
-			context.Factory().ThisExpression(),
+			receiverExpression,
 			receiverName,
 			copySelected,
 		)
 		if err != nil {
 			return callableVariantEmission{}, err
 		}
-		deferredReceiverName, err = context.Names().Temporary(
-			api.TemporaryReceiverValue,
-		)
-		if err != nil {
-			return callableVariantEmission{}, err
+		if moduleFunction {
+			deferredReceiverName = receiverName
+		} else {
+			deferredReceiverName, err = context.Names().Temporary(
+				api.TemporaryReceiverValue,
+			)
+			if err != nil {
+				return callableVariantEmission{}, err
+			}
 		}
 		deferredContext, err = deferredContext.WithValueReceiver(
 			function,
@@ -215,6 +224,7 @@ func emitCallableVariant(
 		genericParameters,
 		targetSignature,
 		valueReceiver,
+		moduleFunction && signature.Recv() != nil,
 	)
 	if err != nil {
 		return callableVariantEmission{}, err
@@ -287,7 +297,7 @@ func emitCallableVariant(
 		}
 	}
 	var modifiers []tsgo.ModifierLike
-	if signature.Recv() == nil {
+	if moduleFunction {
 		moduleExport := kernel
 		if !moduleExport {
 			var moduleErr error
@@ -322,7 +332,7 @@ func emitCallableVariant(
 		body.Requests(),
 		deferredBody.Requests(),
 	)
-	if signature.Recv() == nil {
+	if moduleFunction {
 		statements := []tsgo.Statement{
 			context.Factory().FunctionDeclaration(
 				modifiers,

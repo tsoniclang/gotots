@@ -87,8 +87,7 @@ func generatedNumericDefinedValue(typeName *types.TypeName) bool {
 	default:
 		return false
 	}
-	return types.NewMethodSet(named).Len() == 0 &&
-		types.NewMethodSet(types.NewPointer(named)).Len() == 0
+	return true
 }
 
 func (n *File) TypeRepresentation(
