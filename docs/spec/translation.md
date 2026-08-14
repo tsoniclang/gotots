@@ -378,19 +378,29 @@ through one type owner. Public generated names remain readable; internal
 operation artifacts are not source declarations.
 
 A source-owned, non-generic defined type whose underlying type is `int8`,
-`uint8`, `int16`, `uint16`, `int32`, or `uint32` and whose value and pointer
-method sets are both empty uses one native numeric-enum representation. The
-enum is the nominal TypeScript type and its value member is the statically
-typed no-op used by conversions and operation results:
+`uint8`, `int16`, `uint16`, `int32`, or `uint32` uses one native numeric-enum
+representation regardless of its method sets. Go methods do not give numeric
+values object identity. The enum is the nominal TypeScript type and its value
+member is the statically typed no-op used by conversions and operation results.
+Methods on this representation are emitted as source functions: a value
+receiver is the first value parameter, while a pointer receiver is the first
+`Pointer<T> | undefined` parameter. Direct method calls, method expressions,
+method values, promoted selections, and interface adapters all select that one
+function identity; no wrapper member route remains.
 
 ```go
 type NodeFlags uint32
 
+func (flags NodeFlags) Has(mask NodeFlags) bool { return flags&mask != 0 }
 func Add(left, right NodeFlags) NodeFlags { return left + right }
 ```
 
 ```ts
 export enum NodeFlags { $goType = 1 }
+
+export function NodeFlags_Has(flags: NodeFlags, mask: NodeFlags): boolean {
+  return (flags & mask) !== 0;
+}
 
 export function Add(left: NodeFlags, right: NodeFlags): NodeFlags {
   return (left + right) * NodeFlags.$goType;
@@ -399,12 +409,12 @@ export function Add(left: NodeFlags, right: NodeFlags): NodeFlags {
 
 This representation keeps unrelated defined numeric types non-assignable
 without allocating a wrapper per value. It is selected from `go/types`
-identity, underlying kind, generic arity, and complete method sets; source
-spelling and package identity never select it. Generic types, method-bearing
-types, profile-dependent native-width integers, strings, booleans, floats,
-complex values, and all other defined families retain their exact existing
-representation. Type-representation demands whose storage is already the enum
-value consume no class marker or auxiliary carrier.
+identity, underlying kind, and generic arity; source spelling and package
+identity never select it. Generic types, profile-dependent native-width
+integers, strings, booleans, floats, complex values, and all other defined
+families retain their exact existing representation. Type-representation
+demands whose storage is already the enum value consume no class marker or
+auxiliary carrier.
 
 A conversion from that enum representation to an ordinary basic type is a
 runtime identity operation. When it initializes an inference-owned target

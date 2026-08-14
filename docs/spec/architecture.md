@@ -509,15 +509,18 @@ runtime operations; repeated source sites do not duplicate the target
 intrinsic expression.
 
 Defined-value representation is selected once from the complete `go/types`
-declaration, never from a use site. A non-generic source-owned defined
-fixed-width integer with no value or pointer methods uses a nominal TypeScript
-numeric enum and direct numeric storage. The enum's one value member provides a
-typed no-op wrap for conversions and operation results, eliminating per-value
-objects without erasing nominality. Method-bearing, generic,
+declaration, never from a use site. Every non-generic source-owned defined
+fixed-width integer uses a nominal TypeScript numeric enum and direct numeric
+storage, including types with value or pointer methods. The enum's one value
+member provides a typed no-op wrap for conversions and operation results,
+eliminating per-value objects without erasing nominality. Methods on this
+representation are module functions with one explicit receiver parameter;
+every direct call, method expression, method value, promoted selection, and
+interface adapter resolves that same source identity. Generic,
 profile-dependent, non-numeric, provider-owned, and otherwise non-identity
 families retain their canonical wrapper or provider representation. All
-consumers query this one representation owner; none infer it from target
-spelling or structural assignability.
+consumers query these representation and method-target owners; none infer them
+from target spelling or structural assignability.
 
 When an identity conversion from that nominal enum initializes a target whose
 TypeScript type would otherwise be inferred, the declaration owner emits the
