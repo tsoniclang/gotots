@@ -8,6 +8,34 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 )
 
+func (s interfaceContractSelection) valid() bool {
+	if s.sourceType == nil || s.contract == nil ||
+		s.contractKey == "" || s.surfaceKey == "" ||
+		!s.contract.Complete().IsMethodSet() {
+		return false
+	}
+	selected, ok := types.Unalias(s.sourceType).Underlying().(*types.Interface)
+	return ok && selected.Complete().IsMethodSet() &&
+		types.Identical(selected.Complete(), s.contract)
+}
+
+func (s interfaceContractSelection) demandKey() string {
+	if !s.valid() {
+		return ""
+	}
+	return s.contractKey + "\x00" + s.surfaceKey
+}
+
+func sameInterfaceContractSelection(
+	left interfaceContractSelection,
+	right interfaceContractSelection,
+) bool {
+	return left.contractKey == right.contractKey &&
+		left.surfaceKey == right.surfaceKey &&
+		types.Identical(left.sourceType, right.sourceType) &&
+		types.Identical(left.contract, right.contract)
+}
+
 func (n *File) InterfaceAdapter(
 	sourceType types.Type,
 	targetType types.Type,
@@ -66,19 +94,18 @@ func (n *File) InterfaceAdapter(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	var targetKey string
-	var targetInterface *types.Interface
+	var target *interfaceContractSelection
 	if targetType != nil {
-		targetInterface, targetKey, err =
-			n.canonicalInterfaceContract(targetType)
+		selected, contractErr := n.canonicalInterfaceContract(targetType)
+		err = contractErr
 		if err != nil {
 			return api.NameReference{}, err
 		}
+		target = &selected
 	}
 	demands, err := n.owner.registry.interfaceAdapterContractRequests(
 		binding,
-		targetKey,
-		targetInterface,
+		target,
 	)
 	if err != nil {
 		return api.NameReference{}, err
@@ -92,21 +119,17 @@ func (n *File) InterfaceContractDemand(
 	sourceType types.Type,
 	targetType types.Type,
 ) ([]api.RootRequest, error) {
-	sourceInterface, sourceKey, err :=
-		n.canonicalInterfaceContract(sourceType)
+	source, err := n.canonicalInterfaceContract(sourceType)
 	if err != nil {
 		return nil, err
 	}
-	targetInterface, targetKey, err :=
-		n.canonicalInterfaceContract(targetType)
+	target, err := n.canonicalInterfaceContract(targetType)
 	if err != nil {
 		return nil, err
 	}
 	return n.owner.registry.recordInterfaceContractDemand(
-		sourceKey,
-		sourceInterface,
-		targetKey,
-		targetInterface,
+		source,
+		target,
 	)
 }
 
@@ -215,14 +238,14 @@ func (n *File) ProviderInterfaceBridge(
 	if err != nil {
 		return api.NameReference{}, true, err
 	}
-	base, baseKey, err := n.canonicalInterfaceContract(named)
+	base, err := n.canonicalInterfaceContract(named)
 	if err != nil {
 		return api.NameReference{}, true, err
 	}
 	demands, err := n.owner.registry.providerInterfaceBridgeContractRequests(
 		binding,
-		baseKey,
-		base,
+		base.contractKey,
+		base.contract,
 	)
 	if err != nil {
 		return api.NameReference{}, true, err
@@ -299,14 +322,14 @@ func (n *File) ProviderProfileInterfaceBridge(
 			Reason: "provider-profile bridge artifact contract is absent",
 		}
 	}
-	base, baseKey, err := n.canonicalInterfaceContract(named)
+	base, err := n.canonicalInterfaceContract(named)
 	if err != nil {
 		return api.ProviderProfileBridgeReference{}, true, err
 	}
 	demands, err := n.owner.registry.providerInterfaceBridgeContractRequests(
 		binding,
-		baseKey,
-		base,
+		base.contractKey,
+		base.contract,
 	)
 	if err != nil {
 		return api.ProviderProfileBridgeReference{}, true, err

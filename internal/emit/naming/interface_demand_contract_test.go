@@ -14,6 +14,8 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	t *testing.T,
 ) {
 	sourceType, first, second := interfaceDemandTypes()
+	firstDemand := interfaceDemandSelection("first", first)
+	secondDemand := interfaceDemandSelection("second", second)
 	placement := generatedArtifactPlacement{
 		kind: api.GeneratedArtifactPlacementCompilation,
 	}
@@ -31,8 +33,7 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	}
 	firstRequests, err := adapterFirst.interfaceAdapterContractRequests(
 		binding,
-		"first",
-		first,
+		&firstDemand,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -41,10 +42,8 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 		t.Fatalf("first direct demand requests = %d, want 1", len(firstRequests))
 	}
 	secondRequests, err := adapterFirst.recordInterfaceContractDemand(
-		"first",
-		first,
-		"second",
-		second,
+		firstDemand,
+		secondDemand,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -54,10 +53,8 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	}
 	for occurrence := 0; occurrence < 1_000; occurrence++ {
 		repeated, repeatErr := adapterFirst.recordInterfaceContractDemand(
-			"first",
-			first,
-			"second",
-			second,
+			firstDemand,
+			secondDemand,
 		)
 		if repeatErr != nil {
 			t.Fatal(repeatErr)
@@ -72,8 +69,7 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	}
 	repeatedDirect, err := adapterFirst.interfaceAdapterContractRequests(
 		binding,
-		"first",
-		first,
+		&firstDemand,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -87,10 +83,8 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 
 	transitionFirst := NewRegistry()
 	beforeAdapter, err := transitionFirst.recordInterfaceContractDemand(
-		"first",
-		first,
-		"second",
-		second,
+		firstDemand,
+		secondDemand,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -110,8 +104,7 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	}
 	lateRequests, err := transitionFirst.interfaceAdapterContractRequests(
 		lateBinding,
-		"first",
-		first,
+		&firstDemand,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -119,6 +112,65 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	if len(lateRequests) != 2 {
 		t.Fatalf("late adapter closure requests = %d, want 2", len(lateRequests))
 	}
+}
+
+func TestInterfaceTransitionSharesMethodSetWithoutCollapsingTargetSurface(
+	t *testing.T,
+) {
+	_, source, target := interfaceDemandTypes()
+	registry := NewRegistry()
+	firstSource := interfaceDemandSelection("source", source)
+	secondSource := firstSource
+	secondSource.sourceType = namedInterfaceDemandType("SecondSource", source)
+	secondSource.surfaceKey = "second-source"
+	targetDemand := interfaceDemandSelection("target", target)
+
+	if _, err := registry.recordInterfaceContractDemand(
+		firstSource,
+		targetDemand,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := registry.recordInterfaceContractDemand(
+		secondSource,
+		targetDemand,
+	); err != nil {
+		t.Fatal(err)
+	}
+	selected := registry.interfaceContractDemands[firstSource.contractKey]
+	if len(selected) != 1 {
+		t.Fatalf("shared method-set transition count = %d, want one", len(selected))
+	}
+	for _, demand := range selected {
+		if !types.Identical(demand.source, source) ||
+			!sameInterfaceContractSelection(demand.target, targetDemand) {
+			t.Fatal("shared method-set transition lost its exact semantic contract")
+		}
+	}
+}
+
+func interfaceDemandSelection(
+	key string,
+	contract *types.Interface,
+) interfaceContractSelection {
+	return interfaceContractSelection{
+		sourceType:  contract,
+		contract:    contract,
+		contractKey: key,
+		surfaceKey:  key,
+	}
+}
+
+func namedInterfaceDemandType(
+	name string,
+	contract *types.Interface,
+) *types.Named {
+	owner := types.NewPackage("example.com/demand", "demand")
+	return types.NewNamed(
+		types.NewTypeName(token.NoPos, owner, name, nil),
+		contract,
+		nil,
+	)
 }
 
 func interfaceDemandTypes() (types.Type, *types.Interface, *types.Interface) {

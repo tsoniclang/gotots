@@ -13,6 +13,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/contracts/sourceimplementation"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	callablefield "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative/fieldvalue"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
 	externalfunction "github.com/tsoniclang/gotots/internal/emit/externalfunction"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
@@ -65,6 +66,7 @@ type programSession struct {
 	genericOperations             map[genericOperationIdentity]*api.GenericOperationContract
 	genericConcretizations        map[genericConcretizationIdentity]*api.GenericConcretization
 	classMembers                  map[*types.Func]classMemberContribution
+	callableFields                *callablefield.Index
 	goRuntime                     *gocontract.Contract
 	runtimePackage                RuntimePackage
 	compareArtifactOwners         func(api.ArtifactOwner, api.ArtifactOwner) int
@@ -161,6 +163,43 @@ func CompileWithOptions(
 	return compileProgramSession(session, orderedRoots, options)
 }
 
+func CompileFile(
+	sourcePackage *load.Package,
+	sourceFile *ast.File,
+) (ProgramEmission, error) {
+	if sourcePackage == nil || sourcePackage.Program() == nil {
+		return ProgramEmission{}, &ScheduleError{Reason: "source package is nil"}
+	}
+	_, ok := sourcePackage.FileForSyntax(sourceFile)
+	if !ok {
+		return ProgramEmission{}, &ScheduleError{Reason: "source file is not package-owned"}
+	}
+	roots, err := fileRoots(sourcePackage, sourceFile)
+	if err != nil {
+		return ProgramEmission{}, err
+	}
+	return Compile(sourcePackage.Program(), roots)
+}
+
+func fileRoots(
+	sourcePackage *load.Package,
+	sourceFile *ast.File,
+) ([]Root, error) {
+	objects, err := declarationindex.FileObjects(sourcePackage, sourceFile)
+	if err != nil {
+		return nil, err
+	}
+	roots := make([]Root, 0, len(objects))
+	for _, object := range objects {
+		root, err := newRoot(object, RootFileCoverage)
+		if err != nil {
+			return nil, err
+		}
+		roots = append(roots, root)
+	}
+	return roots, nil
+}
+
 func selectedPackageDependencies(
 	options Options,
 	runtimePackage RuntimePackage,
@@ -195,79 +234,6 @@ func selectedPackageDependencies(
 		}
 	}
 	return dependencies, nil
-}
-
-func CompileFile(
-	sourcePackage *load.Package,
-	sourceFile *ast.File,
-) (ProgramEmission, error) {
-	if sourcePackage == nil || sourcePackage.Program() == nil {
-		return ProgramEmission{}, &ScheduleError{Reason: "source package is nil"}
-	}
-	_, ok := sourcePackage.FileForSyntax(sourceFile)
-	if !ok {
-		return ProgramEmission{}, &ScheduleError{Reason: "source file is not package-owned"}
-	}
-	roots, err := fileRoots(sourcePackage, sourceFile)
-	if err != nil {
-		return ProgramEmission{}, err
-	}
-	return Compile(sourcePackage.Program(), roots)
-}
-
-func fileRoots(
-	sourcePackage *load.Package,
-	sourceFile *ast.File,
-) ([]Root, error) {
-	var roots []Root
-	for _, declaration := range sourceFile.Decls {
-		switch declaration := declaration.(type) {
-		case *ast.FuncDecl:
-			if declarationindex.IsPackageInitializer(declaration) {
-				continue
-			}
-			object := sourcePackage.TypesInfo().Defs[declaration.Name]
-			if object == nil {
-				return nil, &ScheduleError{
-					Object: declaration.Name.Name,
-					Reason: "function declaration has no object identity",
-				}
-			}
-			root, err := newRoot(object, RootFileCoverage)
-			if err != nil {
-				return nil, err
-			}
-			roots = append(roots, root)
-		case *ast.GenDecl:
-			for _, spec := range declaration.Specs {
-				switch spec := spec.(type) {
-				case *ast.ValueSpec:
-					for _, name := range spec.Names {
-						object := sourcePackage.TypesInfo().Defs[name]
-						if object == nil || object.Name() == "_" {
-							continue
-						}
-						root, err := newRoot(object, RootFileCoverage)
-						if err != nil {
-							return nil, err
-						}
-						roots = append(roots, root)
-					}
-				case *ast.TypeSpec:
-					object := sourcePackage.TypesInfo().Defs[spec.Name]
-					if object == nil {
-						continue
-					}
-					root, err := newRoot(object, RootFileCoverage)
-					if err != nil {
-						return nil, err
-					}
-					roots = append(roots, root)
-				}
-			}
-		}
-	}
-	return roots, nil
 }
 
 func newProgramSession(
@@ -328,6 +294,7 @@ func newProgramSessionWithRegistry(
 		return nil, err
 	}
 	compareArtifactOwners := sourceArtifactOwnerOrder(sites)
+	callableFields := callablefield.New(source)
 	session := &programSession{
 		source:          source,
 		factory:         tsgo.NewFactory(),
@@ -353,6 +320,7 @@ func newProgramSessionWithRegistry(
 		genericOperations:        make(map[genericOperationIdentity]*api.GenericOperationContract),
 		genericConcretizations:   make(map[genericConcretizationIdentity]*api.GenericConcretization),
 		classMembers:             make(map[*types.Func]classMemberContribution),
+		callableFields:           callableFields,
 		goRuntime:                goRuntime,
 		compareArtifactOwners:    compareArtifactOwners,
 		standardLibrary:          options.StandardLibrary,

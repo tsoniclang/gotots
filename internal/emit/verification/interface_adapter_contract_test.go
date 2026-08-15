@@ -68,6 +68,31 @@ func TestInterfaceAdaptersContainOnlyDemandedContracts(t *testing.T) {
 			)
 		}
 	}
+	classStart := strings.Index(
+		valueAdapter,
+		"class $goInterfaceAdapter$Named_interfacecontractdemand$Value ",
+	)
+	if classStart < 0 {
+		t.Fatalf("Value adapter class header is absent:\n%s", valueAdapter)
+	}
+	classEnd := strings.Index(valueAdapter[classStart:], " {")
+	if classEnd < 0 {
+		t.Fatalf("Value adapter class header is unterminated:\n%s", valueAdapter)
+	}
+	classHeader := valueAdapter[classStart : classStart+classEnd]
+	for _, contract := range []string{
+		"First__from_interfacecontractdemand",
+		"FirstTwin__from_interfacecontractdemand",
+		"Second__from_interfacecontractdemand",
+	} {
+		if !strings.Contains(classHeader, contract) {
+			t.Fatalf(
+				"Value adapter class header lacks exact contract %q: %s",
+				contract,
+				classHeader,
+			)
+		}
+	}
 	otherAdapter := interfaceContractDemandAdapter(
 		t,
 		artifacts.paths,

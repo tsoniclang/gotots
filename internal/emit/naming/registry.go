@@ -167,7 +167,14 @@ type providerStatefulRepresentationBinding struct {
 
 type interfaceContractDemand struct {
 	source *types.Interface
-	target *types.Interface
+	target interfaceContractSelection
+}
+
+type interfaceContractSelection struct {
+	sourceType  types.Type
+	contract    *types.Interface
+	contractKey string
+	surfaceKey  string
 }
 
 type interfaceReflectionDemand struct {
@@ -239,7 +246,7 @@ type Registry struct {
 	providerStatefulRepresentations     map[string]providerStatefulRepresentationBinding
 	providerStatefulRepresentationNames map[string]string
 	providerObjectByIdentity            map[string]types.Object
-	interfaceContracts                  map[string]*types.Interface
+	interfaceContracts                  map[string]map[string]interfaceContractSelection
 	interfaceAdaptersByContract         map[string]map[string]struct{}
 	interfaceContractDemands            map[string]map[string]interfaceContractDemand
 	interfaceReflectionDemands          map[string]interfaceReflectionDemand
@@ -254,7 +261,7 @@ type Registry struct {
 	deferredCallableRegistryNames       map[string]string
 	reflectionTypes                     map[string]reflectionTypeBinding
 	reflectionValueDemands              map[string]struct{}
-	reflectionValueContracts            map[string]struct{}
+	reflectionValueContracts            map[string]interfaceContractSelection
 	reflectionTypeNames                 map[string]string
 }
 
@@ -272,7 +279,7 @@ func (r *Registry) TransferCanonicalIdentity() (*Registry, error) {
 		make(map[string]map[string]interfaceContractDemand)
 	r.interfaceReflectionDemands = make(map[string]interfaceReflectionDemand)
 	r.reflectionValueDemands = make(map[string]struct{})
-	r.reflectionValueContracts = make(map[string]struct{})
+	r.reflectionValueContracts = make(map[string]interfaceContractSelection)
 	r.transferReady = true
 	return r, nil
 }
@@ -318,7 +325,7 @@ func NewRegistry() *Registry {
 		providerStatefulRepresentations:     make(map[string]providerStatefulRepresentationBinding),
 		providerStatefulRepresentationNames: make(map[string]string),
 		providerObjectByIdentity:            make(map[string]types.Object),
-		interfaceContracts:                  make(map[string]*types.Interface),
+		interfaceContracts:                  make(map[string]map[string]interfaceContractSelection),
 		interfaceAdaptersByContract:         make(map[string]map[string]struct{}),
 		interfaceContractDemands:            make(map[string]map[string]interfaceContractDemand),
 		interfaceReflectionDemands:          make(map[string]interfaceReflectionDemand),
@@ -333,7 +340,7 @@ func NewRegistry() *Registry {
 		deferredCallableRegistryNames:       make(map[string]string),
 		reflectionTypes:                     make(map[string]reflectionTypeBinding),
 		reflectionValueDemands:              make(map[string]struct{}),
-		reflectionValueContracts:            make(map[string]struct{}),
+		reflectionValueContracts:            make(map[string]interfaceContractSelection),
 		reflectionTypeNames:                 make(map[string]string),
 	}
 }

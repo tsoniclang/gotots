@@ -40,7 +40,7 @@ func profileBridgeClass(
 	name string,
 	runtimeBase string,
 	payloadType string,
-	implementedType string,
+	implementedTypes []string,
 	members []tsgo.ClassElement,
 	modifiers []tsgo.ModifierLike,
 ) tsgo.ClassDeclaration {
@@ -58,15 +58,7 @@ func profileBridgeClass(
 					),
 				},
 			),
-			factory.HeritageClause(
-				tsgo.HeritageClauseTokenKindImplementsKeyword,
-				[]tsgo.ExpressionWithTypeArguments{
-					factory.ExpressionWithTypeArguments(
-						factory.Identifier(implementedType),
-						nil,
-					),
-				},
-			),
+			implementsHeritage(factory, implementedTypes),
 		},
 		members,
 	)

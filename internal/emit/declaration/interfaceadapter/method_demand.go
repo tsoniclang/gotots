@@ -15,11 +15,12 @@ type demandedMethod struct {
 
 func demandedMethods(
 	sourceType types.Type,
-	contracts []*types.Interface,
+	contracts []Contract,
 ) ([]demandedMethod, error) {
 	methodSet := types.NewMethodSet(sourceType)
 	required := make(map[*types.Func][]*types.Func)
-	for _, contract := range contracts {
+	for _, selected := range contracts {
+		contract := selected.methodSet
 		if contract == nil ||
 			!contract.Complete().IsMethodSet() ||
 			!types.Implements(sourceType, contract) {

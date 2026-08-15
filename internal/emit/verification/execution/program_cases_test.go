@@ -300,8 +300,8 @@ func TestDemandProgramSupportsExplicitPackageVariableRoot(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(fields, ",") != "unsupportedValue" {
-		t.Fatalf("package-state fields = %v, want unsupportedValue", fields)
+	if strings.Join(fields, ",") != "unsupportedValue,then" {
+		t.Fatalf("package-state fields = %v, want unsupportedValue and then", fields)
 	}
 }
 

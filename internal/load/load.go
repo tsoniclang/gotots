@@ -49,10 +49,12 @@ type Package struct {
 	contractKey   string
 	kind          PackageKind
 	files         []File
+	otherFiles    []string
 	fileSet       *token.FileSet
 	typesPackage  *types.Package
 	typesInfo     *types.Info
 	typesSizes    types.Sizes
+	syntaxParents map[ast.Node]ast.Node
 	embeds        map[*types.Var]EmbedValue
 	program       *Program
 }
@@ -365,6 +367,13 @@ func wrapPackage(
 			syntax: selected.Syntax[index],
 		}
 	}
+	syntaxParents, err := buildSyntaxParents(files)
+	if err != nil {
+		return nil, &Error{
+			Pattern: pattern,
+			Reason:  selected.PkgPath + ": " + err.Error(),
+		}
+	}
 	var modulePath string
 	var moduleVersion string
 	if selected.Module != nil {
@@ -385,10 +394,12 @@ func wrapPackage(
 		moduleVersion: moduleVersion,
 		kind:          PackageSource,
 		files:         files,
+		otherFiles:    slices.Clone(selected.OtherFiles),
 		fileSet:       selected.Fset,
 		typesPackage:  selected.Types,
 		typesInfo:     selected.TypesInfo,
 		typesSizes:    selected.TypesSizes,
+		syntaxParents: syntaxParents,
 		embeds:        embeds,
 	}, nil
 }
@@ -429,6 +440,18 @@ func (p *Package) Kind() PackageKind {
 
 func (p *Package) Files() []File {
 	return slices.Clone(p.files)
+}
+
+func (p *Package) OtherFiles() []string {
+	return slices.Clone(p.otherFiles)
+}
+
+func (p *Package) SyntaxParent(source ast.Node) (ast.Node, bool) {
+	if p == nil || source == nil {
+		return nil, false
+	}
+	parent, ok := p.syntaxParents[source]
+	return parent, ok
 }
 
 func (p *Package) FileForSyntax(syntax *ast.File) (File, bool) {

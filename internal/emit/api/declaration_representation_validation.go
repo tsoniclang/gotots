@@ -42,7 +42,12 @@ func (r DeclarationRequirement) Valid() bool {
 	}
 	if r.kind != DeclarationRequirementInterfaceAdapter &&
 		r.kind != DeclarationRequirementProviderInterfaceCapability &&
-		(r.interfaceContract != nil || r.interfaceContractKey != "") {
+		(r.interfaceContractType != nil ||
+			r.interfaceContract != nil || r.interfaceContractKey != "") {
+		return false
+	}
+	if r.kind != DeclarationRequirementInterfaceAdapter &&
+		r.interfaceContractType != nil {
 		return false
 	}
 	if r.kind != DeclarationRequirementProviderProfileInterfaceCapability &&
@@ -207,10 +212,14 @@ func (r DeclarationRequirement) Valid() bool {
 			return false
 		}
 		if r.interfaceContract == nil {
-			return r.interfaceContractKey == ""
+			return r.interfaceContractType == nil &&
+				r.interfaceContractKey == ""
 		}
 		sourceType, ok := r.generated.InterfaceAdapterType()
+		selected, selectedOK := interfaceMethodSet(r.interfaceContractType)
 		return ok &&
+			selectedOK &&
+			types.Identical(selected, r.interfaceContract) &&
 			r.interfaceContractKey != "" &&
 			r.interfaceContract.Complete().IsMethodSet() &&
 			types.Implements(sourceType, r.interfaceContract)
@@ -301,6 +310,7 @@ func (r DeclarationRequirement) Valid() bool {
 			r.projection == types.Invalid &&
 			r.generated.Valid() &&
 			r.generated.Kind() == GeneratedArtifactProviderInterfaceBridge &&
+			r.interfaceContractType == nil &&
 			r.interfaceContract != nil &&
 			r.interfaceContract.Complete().IsMethodSet() &&
 			r.interfaceContractKey != "" &&

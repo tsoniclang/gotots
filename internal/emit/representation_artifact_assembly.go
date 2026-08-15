@@ -195,7 +195,7 @@ func (s *programSession) buildRepresentationArtifactRevision(
 	defer finish()
 	context := builder.context.WithArtifactOwner(owner)
 	requirements := s.requirements.selectedFor(owner)
-	var adapterContracts []*types.Interface
+	var adapterContracts []interfaceadapterdeclaration.Contract
 	var providerCapabilities []providerinterfacebridge.CapabilityContract
 	var providerProfileCapabilities []providerinterfacebridge.ProfileCapabilityContract
 	if artifact.Kind() == api.GeneratedArtifactInterfaceAdapter {
@@ -261,7 +261,7 @@ func buildRepresentationArtifact(
 	builder *targetFileBuilder,
 	context api.Context,
 	artifact *api.GeneratedArtifact,
-	adapterContracts []*types.Interface,
+	adapterContracts []interfaceadapterdeclaration.Contract,
 	providerCapabilities []providerinterfacebridge.CapabilityContract,
 	providerProfileCapabilities []providerinterfacebridge.ProfileCapabilityContract,
 ) ([]tsgo.Statement, []api.RootRequest, error) {

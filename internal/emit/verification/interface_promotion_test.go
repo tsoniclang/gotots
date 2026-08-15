@@ -108,6 +108,12 @@ func assertWaveSixShape(t *testing.T, printed string) {
 			printed,
 		)
 	}
+	if strings.Contains(printed, " implements Local") {
+		t.Fatalf(
+			"function-local interface escaped into file-level adapter heritage:\n%s",
+			printed,
+		)
+	}
 	if got := strings.Count(printed, "    static format"); got != 5 {
 		t.Fatalf(
 			"Wave 6 format truth is not shared exactly once per value class: %d",

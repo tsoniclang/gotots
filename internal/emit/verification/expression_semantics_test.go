@@ -431,6 +431,7 @@ func TestGenericInterfaceValueKeepsTypeArgumentsAndNil(t *testing.T) {
 			artifacts := materializeArtifacts(t, emission, workingDirectory)
 			for _, required := range []string{
 				"Value<int32> | undefined",
+				"extends GoInterfaceValue implements Value__from_genericinterface<int32>",
 				"goInterfaceNonNil<Value<int32>>",
 				".Get()",
 				"($argument0:",

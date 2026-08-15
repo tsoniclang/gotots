@@ -194,14 +194,12 @@ func Build(
 					),
 				},
 			),
-			context.Factory().HeritageClause(
-				tsgo.HeritageClauseTokenKindImplementsKeyword,
-				[]tsgo.ExpressionWithTypeArguments{
-					context.Factory().ExpressionWithTypeArguments(
-						context.Factory().Identifier(canonical.TypeName()),
-						nil,
-					),
-				},
+			implementsHeritage(
+				context.Factory(),
+				implementedContractNames(
+					canonical.TypeName(),
+					selectedCapabilities,
+				),
 			),
 		},
 		members,

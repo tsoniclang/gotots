@@ -9,7 +9,8 @@ import (
 
 func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 	registry := NewRegistry()
-	registry.interfaceContracts["retained-contract"] = nil
+	registry.interfaceContracts["retained-contract"] =
+		map[string]interfaceContractSelection{}
 	registry.interfaceAdapterNames[generatedArtifactNameScope(
 		"retained-artifact",
 		generatedArtifactPlacement{
@@ -28,7 +29,7 @@ func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 	registry.interfaceReflectionDemands["reflection"] =
 		interfaceReflectionDemand{}
 	registry.reflectionValueDemands["value"] = struct{}{}
-	registry.reflectionValueContracts["contract"] = struct{}{}
+	registry.reflectionValueContracts["contract"] = interfaceContractSelection{}
 
 	transferred, err := registry.TransferCanonicalIdentity()
 	if err != nil {

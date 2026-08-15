@@ -9,63 +9,75 @@ import (
 )
 
 func (r *Registry) internInterfaceContract(
-	key string,
-	contract *types.Interface,
-) (*types.Interface, error) {
-	if r == nil ||
-		key == "" ||
-		contract == nil ||
-		!contract.Complete().IsMethodSet() {
-		return nil, &api.NameError{
+	selection interfaceContractSelection,
+) (interfaceContractSelection, error) {
+	if r == nil || !selection.valid() {
+		return interfaceContractSelection{}, &api.NameError{
 			Reason: "interface contract demand is invalid",
 		}
 	}
-	if existing := r.interfaceContracts[key]; existing != nil {
-		if !types.Identical(existing, contract) {
-			return nil, &api.NameError{
+	bySurface := r.interfaceContracts[selection.contractKey]
+	if bySurface == nil {
+		bySurface = make(map[string]interfaceContractSelection)
+		r.interfaceContracts[selection.contractKey] = bySurface
+	}
+	for _, existing := range bySurface {
+		if !types.Identical(existing.contract, selection.contract) {
+			return interfaceContractSelection{}, &api.NameError{
 				Reason: "interface contract key joined non-identical Go types",
+			}
+		}
+	}
+	if existing, ok := bySurface[selection.surfaceKey]; ok {
+		if !sameInterfaceContractSelection(existing, selection) {
+			return interfaceContractSelection{}, &api.NameError{
+				Reason: "interface contract surface key joined non-identical Go types",
 			}
 		}
 		return existing, nil
 	}
-	r.interfaceContracts[key] = contract
-	return contract, nil
+	bySurface[selection.surfaceKey] = selection
+	return selection, nil
 }
 
 func (r *Registry) recordInterfaceContractDemand(
-	sourceKey string,
-	source *types.Interface,
-	targetKey string,
-	target *types.Interface,
+	source interfaceContractSelection,
+	target interfaceContractSelection,
 ) ([]api.RootRequest, error) {
-	if r == nil ||
-		sourceKey == "" ||
-		source == nil ||
-		targetKey == "" ||
-		target == nil {
+	if r == nil || !source.valid() || !target.valid() {
 		return nil, &api.NameError{
 			Reason: "interface transition demand is invalid",
 		}
 	}
-	targets := r.interfaceContractDemands[sourceKey]
+	var err error
+	source, err = r.internInterfaceContract(source)
+	if err != nil {
+		return nil, err
+	}
+	target, err = r.internInterfaceContract(target)
+	if err != nil {
+		return nil, err
+	}
+	targets := r.interfaceContractDemands[source.contractKey]
 	if targets == nil {
 		targets = make(map[string]interfaceContractDemand)
-		r.interfaceContractDemands[sourceKey] = targets
+		r.interfaceContractDemands[source.contractKey] = targets
 	}
-	if existing, ok := targets[targetKey]; ok {
-		if !types.Identical(existing.source, source) ||
-			!types.Identical(existing.target, target) {
+	targetDemandKey := target.demandKey()
+	if existing, ok := targets[targetDemandKey]; ok {
+		if !types.Identical(existing.source, source.contract) ||
+			!sameInterfaceContractSelection(existing.target, target) {
 			return nil, &api.NameError{
 				Reason: "interface transition key joined non-identical Go types",
 			}
 		}
 	} else {
-		targets[targetKey] = interfaceContractDemand{
-			source: source,
+		targets[targetDemandKey] = interfaceContractDemand{
+			source: source.contract,
 			target: target,
 		}
 	}
-	reached := r.interfaceAdaptersByContract[sourceKey]
+	reached := r.interfaceAdaptersByContract[source.contractKey]
 	adapterKeys := make([]string, 0, len(reached))
 	for adapterKey := range reached {
 		adapterKeys = append(adapterKeys, adapterKey)
@@ -85,20 +97,19 @@ func (r *Registry) recordInterfaceContractDemand(
 				Reason: "interface contract reachability has no concrete source type",
 			}
 		}
-		if !types.Implements(sourceType, target) {
+		if !types.Implements(sourceType, target.contract) {
 			continue
 		}
 		selected, err := r.interfaceAdapterContractRequests(
 			binding,
-			targetKey,
-			target,
+			&target,
 		)
 		if err != nil {
 			return nil, err
 		}
 		requests = append(requests, selected...)
 	}
-	bridges := r.providerInterfaceBridgesByContract[sourceKey]
+	bridges := r.providerInterfaceBridgesByContract[source.contractKey]
 	bridgeKeys := make([]string, 0, len(bridges))
 	for bridgeKey := range bridges {
 		bridgeKeys = append(bridgeKeys, bridgeKey)
@@ -113,8 +124,8 @@ func (r *Registry) recordInterfaceContractDemand(
 		}
 		selected, err := r.providerInterfaceBridgeContractRequests(
 			binding,
-			sourceKey,
-			source,
+			source.contractKey,
+			source.contract,
 		)
 		if err != nil {
 			return nil, err
@@ -161,11 +172,16 @@ func (r *Registry) providerInterfaceBridgeContractRequests(
 		if _, duplicate := visited[next.key]; duplicate {
 			continue
 		}
-		contract, err := r.internInterfaceContract(next.key, next.contract)
+		selection, err := r.internInterfaceContract(interfaceContractSelection{
+			sourceType:  next.contract,
+			contract:    next.contract,
+			contractKey: next.key,
+			surfaceKey:  next.key,
+		})
 		if err != nil {
 			return nil, err
 		}
-		next.contract = contract
+		next.contract = selection.contract
 		visited[next.key] = struct{}{}
 		reached := r.providerInterfaceBridgesByContract[next.key]
 		if reached == nil {
@@ -186,7 +202,7 @@ func (r *Registry) providerInterfaceBridgeContractRequests(
 					Reason: "provider-interface demand source identity drifted",
 				}
 			}
-			target := demand.target
+			target := demand.target.contract
 			if types.Implements(baseContract, target) {
 				pending = append(pending, pendingContract{
 					key:      targetKey,
@@ -354,18 +370,17 @@ func (r *Registry) recordInterfaceReflectionDemand(
 // existing adapters here and over later adapters in
 // interfaceAdapterContractRequests, making discovery order irrelevant.
 func (r *Registry) recordReflectionValueContract(
-	sourceKey string,
-	source *types.Interface,
+	source interfaceContractSelection,
 	reflectionType *types.TypeName,
 ) ([]api.RootRequest, error) {
-	contract, err := r.internInterfaceContract(sourceKey, source)
+	source, err := r.internInterfaceContract(source)
 	if err != nil {
 		return nil, err
 	}
-	r.reflectionValueContracts[sourceKey] = struct{}{}
+	r.reflectionValueContracts[source.demandKey()] = source
 	requests, err := r.recordInterfaceReflectionDemand(
-		sourceKey,
-		contract,
+		source.contractKey,
+		source.contract,
 		reflectionType,
 	)
 	if err != nil {
@@ -382,13 +397,12 @@ func (r *Registry) recordReflectionValueContract(
 		}
 		binding := r.interfaceAdapters[key]
 		sourceType, ok := binding.owner.InterfaceAdapterType()
-		if !ok || !types.Implements(sourceType, contract) {
+		if !ok || !types.Implements(sourceType, source.contract) {
 			continue
 		}
 		selected, selectedErr := r.interfaceAdapterContractRequests(
 			binding,
-			sourceKey,
-			contract,
+			&source,
 		)
 		if selectedErr != nil {
 			return nil, selectedErr
@@ -400,8 +414,7 @@ func (r *Registry) recordReflectionValueContract(
 
 func (r *Registry) interfaceAdapterContractRequests(
 	binding interfaceAdapterBinding,
-	directKey string,
-	direct *types.Interface,
+	direct *interfaceContractSelection,
 ) ([]api.RootRequest, error) {
 	if r == nil || binding.owner == nil || binding.key == "" {
 		return nil, &api.NameError{
@@ -414,17 +427,8 @@ func (r *Registry) interfaceAdapterContractRequests(
 			Reason: "interface adapter demand has no concrete source type",
 		}
 	}
-	type pendingContract struct {
-		key      string
-		contract *types.Interface
-	}
-	var pending []pendingContract
+	var pending []interfaceContractSelection
 	if direct == nil {
-		if directKey != "" {
-			return nil, &api.NameError{
-				Reason: "interface adapter has a contract key without a contract",
-			}
-		}
 		if _, reflected := r.reflectionValueDemands[binding.key]; !reflected {
 			return nil, nil
 		}
@@ -434,35 +438,34 @@ func (r *Registry) interfaceAdapterContractRequests(
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			contract := r.interfaceContracts[key]
-			if contract != nil && types.Implements(sourceType, contract) {
-				pending = append(pending, pendingContract{
-					key:      key,
-					contract: contract,
-				})
+			selection := r.reflectionValueContracts[key]
+			if types.Implements(sourceType, selection.contract) {
+				pending = append(pending, selection)
 			}
 		}
 	} else {
-		if directKey == "" || !types.Implements(sourceType, direct) {
+		if !direct.valid() || !types.Implements(sourceType, direct.contract) {
 			return nil, &api.NameError{
 				Reason: "interface adapter does not implement its direct target contract",
 			}
 		}
-		pending = append(pending, pendingContract{
-			key:      directKey,
-			contract: direct,
-		})
+		selected, err := r.internInterfaceContract(*direct)
+		if err != nil {
+			return nil, err
+		}
+		pending = append(pending, selected)
 	}
-	selected := make(map[string]*types.Interface)
+	selected := make(map[string]interfaceContractSelection)
 	visited := make(map[string]struct{})
 	for len(pending) != 0 {
 		next := pending[0]
 		pending = pending[1:]
-		if _, duplicate := visited[next.key]; duplicate {
+		nextKey := next.demandKey()
+		if _, duplicate := visited[nextKey]; duplicate {
 			continue
 		}
-		visited[next.key] = struct{}{}
-		reached := r.interfaceAdaptersByContract[next.key]
+		visited[nextKey] = struct{}{}
+		reached := r.interfaceAdaptersByContract[next.contractKey]
 		if !types.Implements(sourceType, next.contract) {
 			return nil, &api.NameError{
 				Reason: "interface adapter reached a contract it does not implement",
@@ -470,12 +473,12 @@ func (r *Registry) interfaceAdapterContractRequests(
 		}
 		if reached == nil {
 			reached = make(map[string]struct{})
-			r.interfaceAdaptersByContract[next.key] = reached
+			r.interfaceAdaptersByContract[next.contractKey] = reached
 		}
 		reached[binding.key] = struct{}{}
-		selected[next.key] = next.contract
+		selected[nextKey] = next
 
-		targets := r.interfaceContractDemands[next.key]
+		targets := r.interfaceContractDemands[next.contractKey]
 		targetKeys := make([]string, 0, len(targets))
 		for targetKey := range targets {
 			targetKeys = append(targetKeys, targetKey)
@@ -483,11 +486,8 @@ func (r *Registry) interfaceAdapterContractRequests(
 		sort.Strings(targetKeys)
 		for _, targetKey := range targetKeys {
 			target := targets[targetKey].target
-			if types.Implements(sourceType, target) {
-				pending = append(pending, pendingContract{
-					key:      targetKey,
-					contract: target,
-				})
+			if types.Implements(sourceType, target.contract) {
+				pending = append(pending, target)
 			}
 		}
 	}
@@ -500,14 +500,15 @@ func (r *Registry) interfaceAdapterContractRequests(
 	for _, key := range keys {
 		request, err := api.NewInterfaceAdapterContractRequest(
 			binding.owner,
-			selected[key],
+			selected[key].sourceType,
+			selected[key].contract,
 			key,
 		)
 		if err != nil {
 			return nil, err
 		}
 		requests = append(requests, request)
-		if demand, ok := r.interfaceReflectionDemands[key]; ok {
+		if demand, ok := r.interfaceReflectionDemands[selected[key].contractKey]; ok {
 			reflection, reflectionErr := r.interfaceAdapterReflectionRequest(
 				binding,
 				demand.reflectionType,
@@ -566,8 +567,8 @@ func (r *Registry) interfaceAdapterReflectionRequest(
 func (r *Registry) contractDemandsValueOperations(
 	binding interfaceAdapterBinding,
 ) bool {
-	for contractKey := range r.reflectionValueContracts {
-		if reached, ok := r.interfaceAdaptersByContract[contractKey]; ok {
+	for _, contract := range r.reflectionValueContracts {
+		if reached, ok := r.interfaceAdaptersByContract[contract.contractKey]; ok {
 			if _, member := reached[binding.key]; member {
 				return true
 			}

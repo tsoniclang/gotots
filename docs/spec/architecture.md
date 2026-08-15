@@ -460,9 +460,23 @@ spelling-based selection. A direct callback's internal defer/recover envelope
 remains in its ordinary entry and therefore does not require the deferred-call
 registry at this exact ordinary invocation. Native `Array.sort` remains
 reserved for a provider kernel whose exact synchronous contract and observable
-ordering are certified. Captured method values and function variables remain
-on the canonical path; the first captures receiver state and the second may
-have escaped or changed.
+ordering are certified.
+
+A concrete method value or method expression may select that synchronous path
+when `go/types.Selection` identifies one exact non-interface method facet; its
+captured receiver changes the value, not the method's suspension effect. An
+unexported function-valued field may also select it when one compilation-local
+source index accounts for every selected write, no selected source takes the
+field's address, the declaring package has no opaque non-Go implementation,
+and every possible non-nil value resolves through the same callable-effect
+owner to synchronous. The loader records the exact parent of each accepted AST
+node once while it owns the parser graph. The field index iterates the
+checker's exact selection and expression maps and queries that relation; it
+does not recursively walk a body, parse source again, or build another semantic
+graph. Exported fields, interface method values, function variables, stored
+function literals whose creating artifact is not retained by the index,
+unknown writes, packages importing `unsafe` or `C`, opaque implementations,
+and any cooperative candidate retain the canonical path.
 
 Possibly nil indirect calls have one target owner. The emitter captures the
 callee, captures every argument in Go order, then calls
@@ -657,6 +671,20 @@ behavior, value copying, construction, shadowing, and addressability. Otherwise
 the embedded field remains composition and promoted access follows the exact
 selection path. A type may `implements` an interface only as a target
 declaration aid; Go interface satisfaction remains structural and checker-owned.
+That aid must nevertheless be exact: every generated concrete interface adapter
+and provider-interface bridge declares every reached Go-facing TypeScript
+interface surface that is legally referenceable from the generated class
+declaration. Source-owned package-scope named or instantiated interfaces remain
+distinct heritage entries when they remain distinct output types. Function-local
+and anonymous interface surfaces cannot be referenced from a file-level class;
+they retain their ordinary structural contract and are not fabricated, hoisted,
+or replaced by a same-method-set name. A selected target must retain calls whose
+closed family therefore lacks declaration evidence. A provider-routed interface
+instead uses its canonical generated Go-facing contract because the provider's
+implementation-facing ABI is not the type seen by translated Go callers;
+capability growth adds each reached canonical target contract. Heritage never
+selects a method, changes dispatch, or claims that the target program has no
+other structural implementers.
 
 ## Interfaces
 
@@ -673,6 +701,18 @@ Interface calls are O(1) and do not emit implementer switches. Adapter methods
 invoke the exact concrete owner, preserving value-copy and pointer semantics.
 Interfaces carry no `any`, `unknown`, reflective lookup, source-name tests,
 or erased payload recovery.
+
+The adapter/bridge `implements` list is a complete projection of the
+declaration-referenceable subset of the canonical interface-demand graph after
+the normal interface-type naming policy selects the actual Go-facing output
+surfaces. Local and anonymous demands still drive adapter methods and runtime
+contracts but contribute no illegal class heritage. The list is emitted as
+ordinary typed TS-Go AST, has no JavaScript runtime representation, and exists
+so a selected target can consume declared heritage without rediscovering Go
+satisfaction.
+It is not a closed-world certificate: any target optimization that assumes the
+declared implementation set is exhaustive must select and report that separate
+target profile explicitly.
 
 Under the cooperative profile, interface method results use the canonical
 `Awaitable` callable rule. A synchronous concrete method and an asynchronous

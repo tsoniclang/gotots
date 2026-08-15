@@ -3,6 +3,7 @@ package naming
 import (
 	"go/token"
 	"go/types"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -11,6 +12,8 @@ import (
 
 func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 	firstSource, first, second := interfaceDemandTypes()
+	firstDemand := interfaceDemandSelection("first", first)
+	secondDemand := interfaceDemandSelection("second", second)
 	secondSource := namedDemandType("SecondOnly", "Second")
 	lateSource := namedDemandType("LateFirst", "First")
 	reflectionType := reflectionContractType()
@@ -22,8 +25,7 @@ func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 	firstBinding := internDemandAdapter(t, registry, "a", firstSource, placement)
 	firstRequests, err := registry.interfaceAdapterContractRequests(
 		firstBinding,
-		"first",
-		first,
+		&firstDemand,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -35,8 +37,7 @@ func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 	secondBinding := internDemandAdapter(t, registry, "b", secondSource, placement)
 	secondRequests, err := registry.interfaceAdapterContractRequests(
 		secondBinding,
-		"second",
-		second,
+		&secondDemand,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -63,8 +64,7 @@ func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 	lateBinding := internDemandAdapter(t, registry, "c", lateSource, placement)
 	lateRequests, err := registry.interfaceAdapterContractRequests(
 		lateBinding,
-		"first",
-		first,
+		&firstDemand,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +89,7 @@ func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 
 func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 	_, contract, _ := interfaceDemandTypes()
+	demand := interfaceDemandSelection("first", contract)
 	source := namedDemandType("Reflected", "First")
 	reflectionType := reflectionContractType()
 	placement := generatedArtifactPlacement{
@@ -106,7 +107,6 @@ func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 	adapterFirst.reflectionValueDemands[firstBinding.key] = struct{}{}
 	before, err := adapterFirst.interfaceAdapterContractRequests(
 		firstBinding,
-		"",
 		nil,
 	)
 	if err != nil {
@@ -116,8 +116,7 @@ func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 		t.Fatal("reflected adapter acquired an absent interface contract")
 	}
 	after, err := adapterFirst.recordReflectionValueContract(
-		"first",
-		contract,
+		demand,
 		reflectionType,
 	)
 	if err != nil {
@@ -127,8 +126,7 @@ func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 
 	contractFirst := NewRegistry()
 	before, err = contractFirst.recordReflectionValueContract(
-		"first",
-		contract,
+		demand,
 		reflectionType,
 	)
 	if err != nil {
@@ -148,13 +146,57 @@ func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 	)
 	late, err := contractFirst.interfaceAdapterContractRequests(
 		lateBinding,
-		"",
 		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assertReflectionValueJoin(t, "contract-first", late)
+}
+
+func TestReflectionReplaySelectsOnlyObservedExactSurfaces(t *testing.T) {
+	source, contract, _ := interfaceDemandTypes()
+	registry := NewRegistry()
+	placement := generatedArtifactPlacement{
+		kind: api.GeneratedArtifactPlacementCompilation,
+	}
+	binding := internDemandAdapter(t, registry, "a", source, placement)
+	registry.reflectionValueDemands[binding.key] = struct{}{}
+	reflectionType := reflectionContractType()
+
+	for index := 0; index < 2; index++ {
+		selection := interfaceDemandSelection("first", contract)
+		selection.sourceType = namedInterfaceDemandType(
+			"Observed"+strconv.Itoa(index),
+			contract,
+		)
+		selection.surfaceKey = "observed-" + strconv.Itoa(index)
+		if _, err := registry.recordReflectionValueContract(
+			selection,
+			reflectionType,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for index := 0; index < 128; index++ {
+		selection := interfaceDemandSelection("first", contract)
+		selection.sourceType = namedInterfaceDemandType(
+			"Unobserved"+strconv.Itoa(index),
+			contract,
+		)
+		selection.surfaceKey = "unobserved-" + strconv.Itoa(index)
+		if _, err := registry.internInterfaceContract(selection); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	requests, err := registry.interfaceAdapterContractRequests(binding, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count := countAdapterContractRequests(requests); count != 2 {
+		t.Fatalf("observed exact-surface requests = %d, want 2", count)
+	}
 }
 
 func assertReflectionValueJoin(
@@ -249,7 +291,7 @@ func countAdapterContractRequests(requests []api.RootRequest) int {
 		if !ok {
 			continue
 		}
-		_, _, _, contract := requirement.InterfaceAdapterContract()
+		_, _, _, _, contract := requirement.InterfaceAdapterContract()
 		if contract {
 			count++
 		}

@@ -124,13 +124,13 @@ func (n *File) ReflectionTypeOf(
 	}
 	readiness := staticType.Requests()
 	if _, isInterface := types.Unalias(argumentType).Underlying().(*types.Interface); isInterface {
-		contract, key, contractErr := n.canonicalInterfaceContract(argumentType)
+		contract, contractErr := n.canonicalInterfaceContract(argumentType)
 		if contractErr != nil {
 			return api.NameReference{}, contractErr
 		}
 		dynamicReadiness, demandErr := registry.recordInterfaceReflectionDemand(
-			key,
-			contract,
+			contract.contractKey,
+			contract.contract,
 			reflectionType,
 		)
 		if demandErr != nil {
@@ -177,12 +177,11 @@ func (n *File) ReflectionValueOf(
 	}
 	requests := operations.Requests()
 	if _, isInterface := types.Unalias(argumentType).Underlying().(*types.Interface); isInterface {
-		contract, key, contractErr := n.canonicalInterfaceContract(argumentType)
+		contract, contractErr := n.canonicalInterfaceContract(argumentType)
 		if contractErr != nil {
 			return api.NameReference{}, contractErr
 		}
 		dynamicReadiness, demandErr := registry.recordReflectionValueContract(
-			key,
 			contract,
 			reflectionType,
 		)
@@ -246,14 +245,13 @@ func (n *File) ReflectionValueType(
 ) (api.NameReference, error) {
 	var dynamicReadiness []api.RootRequest
 	if _, isInterface := types.Unalias(sourceType).Underlying().(*types.Interface); isInterface {
-		contract, key, contractErr := n.canonicalInterfaceContract(sourceType)
+		contract, contractErr := n.canonicalInterfaceContract(sourceType)
 		if contractErr != nil {
 			return api.NameReference{}, contractErr
 		}
 		var demandErr error
 		dynamicReadiness, demandErr =
 			n.owner.registry.recordReflectionValueContract(
-				key,
 				contract,
 				reflectionType,
 			)

@@ -10,6 +10,11 @@ type Second interface {
 	Shared() int32
 }
 
+type FirstTwin interface {
+	First() int32
+	Shared() int32
+}
+
 type Value struct{}
 
 func (Value) First() int32         { return 1 }
@@ -39,11 +44,16 @@ func inspect(value First) []int32 {
 	}
 }
 
+func inspectTwin(value FirstTwin) int32 {
+	return value.First() + value.Shared()
+}
+
 func Audit() []int32 {
 	var value First = Value{}
 	var broad any = Other{}
+	var twin FirstTwin = Value{}
 	_, concreteOK := broad.(Other)
-	return append(inspect(value), boolValue(concreteOK))
+	return append(inspect(value), boolValue(concreteOK), inspectTwin(twin))
 }
 
 func boolValue(value bool) int32 {
