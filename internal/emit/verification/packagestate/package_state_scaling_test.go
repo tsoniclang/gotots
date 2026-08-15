@@ -48,9 +48,9 @@ func TestPackageStateConstructionScalesWithVariables(t *testing.T) {
 			measurement.wireBytes,
 			measurement.printedBytes,
 		)
-		if measurement.fields != count {
+		if measurement.fields != count+1 {
 			t.Fatalf(
-				"%d variables emitted %d state fields",
+				"%d variables emitted %d state fields including anti-thenability",
 				count,
 				measurement.fields,
 			)

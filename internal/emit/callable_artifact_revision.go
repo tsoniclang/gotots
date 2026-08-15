@@ -1,6 +1,10 @@
 package emit
 
 import (
+	"go/ast"
+	"go/types"
+	"sort"
+
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
@@ -10,8 +14,6 @@ import (
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	providerboundary "github.com/tsoniclang/gotots/internal/emit/value/providerboundary"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
-	"go/types"
-	"sort"
 )
 
 func (s *programSession) ObserveCooperativeCallable(
@@ -23,6 +25,15 @@ func (s *programSession) ObserveCooperativeCallable(
 		&context,
 		facet,
 	)
+}
+
+func (s *programSession) ExactCallableFieldAssignments(
+	field *types.Var,
+) ([]ast.Expr, bool) {
+	if s == nil || s.callableFields == nil {
+		return nil, false
+	}
+	return s.callableFields.Assignments(field)
 }
 
 func (s *programSession) observeCooperativeCallable(

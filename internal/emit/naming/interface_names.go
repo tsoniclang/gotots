@@ -8,6 +8,34 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 )
 
+func (s interfaceContractSelection) valid() bool {
+	if s.sourceType == nil || s.contract == nil ||
+		s.contractKey == "" || s.surfaceKey == "" ||
+		!s.contract.Complete().IsMethodSet() {
+		return false
+	}
+	selected, ok := types.Unalias(s.sourceType).Underlying().(*types.Interface)
+	return ok && selected.Complete().IsMethodSet() &&
+		types.Identical(selected.Complete(), s.contract)
+}
+
+func (s interfaceContractSelection) demandKey() string {
+	if !s.valid() {
+		return ""
+	}
+	return s.contractKey + "\x00" + s.surfaceKey
+}
+
+func sameInterfaceContractSelection(
+	left interfaceContractSelection,
+	right interfaceContractSelection,
+) bool {
+	return left.contractKey == right.contractKey &&
+		left.surfaceKey == right.surfaceKey &&
+		types.Identical(left.sourceType, right.sourceType) &&
+		types.Identical(left.contract, right.contract)
+}
+
 func (n *File) InterfaceAdapter(
 	sourceType types.Type,
 	targetType types.Type,

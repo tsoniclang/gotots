@@ -5,11 +5,70 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 )
+
+func FileObjects(
+	sourcePackage *load.Package,
+	sourceFile *ast.File,
+) ([]types.Object, error) {
+	if sourcePackage == nil || sourcePackage.Program() == nil || sourceFile == nil {
+		return nil, &api.InvariantError{
+			Role:   api.RoleFileDeclaration,
+			Reason: "file-root source is invalid",
+		}
+	}
+	if _, ok := sourcePackage.FileForSyntax(sourceFile); !ok {
+		return nil, &api.InvariantError{
+			Role:   api.RoleFileDeclaration,
+			Reason: "file-root syntax is not package-owned",
+		}
+	}
+	var objects []types.Object
+	for _, declaration := range sourceFile.Decls {
+		switch declaration := declaration.(type) {
+		case *ast.FuncDecl:
+			if IsPackageInitializer(declaration) {
+				continue
+			}
+			object := sourcePackage.TypesInfo().Defs[declaration.Name]
+			if object == nil {
+				return nil, &api.InvariantError{
+					Role:   api.RoleFileDeclaration,
+					Reason: "function declaration has no object identity",
+				}
+			}
+			objects = append(objects, object)
+		case *ast.GenDecl:
+			for _, spec := range declaration.Specs {
+				switch spec := spec.(type) {
+				case *ast.ValueSpec:
+					for _, name := range spec.Names {
+						object := sourcePackage.TypesInfo().Defs[name]
+						if object != nil && object.Name() != "_" {
+							objects = append(objects, object)
+						}
+					}
+				case *ast.TypeSpec:
+					if object := sourcePackage.TypesInfo().Defs[spec.Name]; object != nil {
+						objects = append(objects, object)
+					}
+				}
+			}
+		}
+	}
+	sort.Slice(objects, func(left, right int) bool {
+		if objects[left].Pos() != objects[right].Pos() {
+			return objects[left].Pos() < objects[right].Pos()
+		}
+		return objects[left].Name() < objects[right].Name()
+	})
+	return objects, nil
+}
 
 type Site struct {
 	Object      types.Object

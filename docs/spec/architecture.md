@@ -460,9 +460,23 @@ spelling-based selection. A direct callback's internal defer/recover envelope
 remains in its ordinary entry and therefore does not require the deferred-call
 registry at this exact ordinary invocation. Native `Array.sort` remains
 reserved for a provider kernel whose exact synchronous contract and observable
-ordering are certified. Captured method values and function variables remain
-on the canonical path; the first captures receiver state and the second may
-have escaped or changed.
+ordering are certified.
+
+A concrete method value or method expression may select that synchronous path
+when `go/types.Selection` identifies one exact non-interface method facet; its
+captured receiver changes the value, not the method's suspension effect. An
+unexported function-valued field may also select it when one compilation-local
+source index accounts for every selected write, no selected source takes the
+field's address, the declaring package has no opaque non-Go implementation,
+and every possible non-nil value resolves through the same callable-effect
+owner to synchronous. The loader records the exact parent of each accepted AST
+node once while it owns the parser graph. The field index iterates the
+checker's exact selection and expression maps and queries that relation; it
+does not recursively walk a body, parse source again, or build another semantic
+graph. Exported fields, interface method values, function variables, stored
+function literals whose creating artifact is not retained by the index,
+unknown writes, packages importing `unsafe` or `C`, opaque implementations,
+and any cooperative candidate retain the canonical path.
 
 Possibly nil indirect calls have one target owner. The emitter captures the
 callee, captures every argument in Go order, then calls

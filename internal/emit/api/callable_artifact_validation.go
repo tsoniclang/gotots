@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"go/ast"
 	"go/types"
 	"slices"
 
@@ -157,6 +158,7 @@ type CooperativeCallableResolver interface {
 		Context,
 		CallableFacet,
 	) (CooperativeCallableObservation, error)
+	ExactCallableFieldAssignments(*types.Var) ([]ast.Expr, bool)
 }
 
 type CooperativeCallableObservation struct {
@@ -345,6 +347,17 @@ func (c Context) ObserveCooperativeCallable(
 		c,
 		facet,
 	)
+}
+
+func (c Context) ExactCallableFieldAssignments(
+	field *types.Var,
+) ([]ast.Expr, bool) {
+	if c.cooperativeResolver == nil || field == nil {
+		return nil, false
+	}
+	assignments, exact :=
+		c.cooperativeResolver.ExactCallableFieldAssignments(field)
+	return slices.Clone(assignments), exact
 }
 
 func (c Context) CooperativeRequest() (RootRequest, error) {

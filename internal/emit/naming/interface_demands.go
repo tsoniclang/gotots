@@ -8,6 +8,38 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
+func (r *Registry) internInterfaceContract(
+	selection interfaceContractSelection,
+) (interfaceContractSelection, error) {
+	if r == nil || !selection.valid() {
+		return interfaceContractSelection{}, &api.NameError{
+			Reason: "interface contract demand is invalid",
+		}
+	}
+	bySurface := r.interfaceContracts[selection.contractKey]
+	if bySurface == nil {
+		bySurface = make(map[string]interfaceContractSelection)
+		r.interfaceContracts[selection.contractKey] = bySurface
+	}
+	for _, existing := range bySurface {
+		if !types.Identical(existing.contract, selection.contract) {
+			return interfaceContractSelection{}, &api.NameError{
+				Reason: "interface contract key joined non-identical Go types",
+			}
+		}
+	}
+	if existing, ok := bySurface[selection.surfaceKey]; ok {
+		if !sameInterfaceContractSelection(existing, selection) {
+			return interfaceContractSelection{}, &api.NameError{
+				Reason: "interface contract surface key joined non-identical Go types",
+			}
+		}
+		return existing, nil
+	}
+	bySurface[selection.surfaceKey] = selection
+	return selection, nil
+}
+
 func (r *Registry) recordInterfaceContractDemand(
 	source interfaceContractSelection,
 	target interfaceContractSelection,

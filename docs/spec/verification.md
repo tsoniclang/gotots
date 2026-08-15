@@ -669,13 +669,22 @@ separately certified synchronous kernel must produce the same values, panic,
 and comparison trace as the canonical kernel for synchronous comparators while
 returning no Promise. A generated fixture exact-joins a direct synchronous
 callback to the synchronous concretization and retains the canonical path for
-an unresolved, captured-method, or cooperative callback. A direct synchronous
-callback containing defer/recover remains on the synchronous ordinary-entry
-path while its emitted callable retains the recovery envelope. Mutations swap
-either kernel, change a callback effect, omit the effect from concretization
-identity, or classify a function variable or captured method as direct; each
-fails at certification, identity, artifact, strict-typecheck, or differential
-gates.
+an unresolved, interface-method, open-field, function-variable, or cooperative
+callback. A concrete synchronous method value selects the synchronous path.
+A private function-valued field selects it only when the checker-map index and
+loader-owned exact parent relation account for every selected write and prove
+all possible values synchronous. An architecture mutation that restores a
+second recursive emission walk fails before behavioral tests;
+mutations export the field, take its address, add an unknown or cooperative
+write, add an opaque non-Go package file, or replace the concrete method with
+an interface method, and each must restore the canonical path. A stored
+cooperative function literal created by another artifact also remains
+canonical rather than borrowing the consumer's effect owner. A direct
+synchronous callback containing defer/recover remains on the synchronous
+ordinary-entry path while its emitted callable retains the recovery envelope.
+Mutations swap either kernel, change a callback effect, omit the effect from
+concretization identity, or classify a function variable as direct; each fails
+at certification, identity, artifact, strict-typecheck, or differential gates.
 Provider source inspection rejects
 recursive subarray sorting, iterator-per-merge allocation, native sorting of
 an `Awaitable` comparator, and runtime Promise inspection.
