@@ -211,32 +211,45 @@ func anonymousInterface(sourceType types.Type) (*types.Interface, bool) {
 
 func (n *File) canonicalInterfaceContract(
 	sourceType types.Type,
-) (*types.Interface, string, error) {
+) (interfaceContractSelection, error) {
 	var source *types.Interface
+	var surface types.Type
 	if _, selected, ok := namedInterface(sourceType); ok {
 		source = selected
+		surface = types.Unalias(sourceType)
 	} else {
 		var ok bool
 		source, ok = anonymousInterface(sourceType)
 		if !ok {
-			return nil, "", &api.NameError{
+			return interfaceContractSelection{}, &api.NameError{
 				Name:   types.TypeString(sourceType, nil),
 				Reason: "interface contract demand type is invalid",
 			}
 		}
+		surface = source
 	}
-	key, err := typeidentity.BuildKey(
+	contractKey, err := typeidentity.BuildKey(
 		source,
 		n.generatedNamedObjectIdentity,
 	)
 	if err != nil {
-		return nil, "", err
+		return interfaceContractSelection{}, err
 	}
-	source, err = n.owner.registry.internInterfaceContract(key, source)
+	surfaceKey, err := typeidentity.BuildKey(
+		surface,
+		n.generatedNamedObjectIdentity,
+	)
 	if err != nil {
-		return nil, "", err
+		return interfaceContractSelection{}, err
 	}
-	return source, key, nil
+	return n.owner.registry.internInterfaceContract(
+		interfaceContractSelection{
+			sourceType:  surface,
+			contract:    source,
+			contractKey: contractKey,
+			surfaceKey:  surfaceKey,
+		},
+	)
 }
 
 func interfaceAdapterSource(sourceType types.Type) bool {

@@ -11,6 +11,8 @@ import (
 
 func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 	firstSource, first, second := interfaceDemandTypes()
+	firstDemand := interfaceDemandSelection("first", first)
+	secondDemand := interfaceDemandSelection("second", second)
 	secondSource := namedDemandType("SecondOnly", "Second")
 	lateSource := namedDemandType("LateFirst", "First")
 	reflectionType := reflectionContractType()
@@ -22,8 +24,7 @@ func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 	firstBinding := internDemandAdapter(t, registry, "a", firstSource, placement)
 	firstRequests, err := registry.interfaceAdapterContractRequests(
 		firstBinding,
-		"first",
-		first,
+		&firstDemand,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -35,8 +36,7 @@ func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 	secondBinding := internDemandAdapter(t, registry, "b", secondSource, placement)
 	secondRequests, err := registry.interfaceAdapterContractRequests(
 		secondBinding,
-		"second",
-		second,
+		&secondDemand,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -63,8 +63,7 @@ func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 	lateBinding := internDemandAdapter(t, registry, "c", lateSource, placement)
 	lateRequests, err := registry.interfaceAdapterContractRequests(
 		lateBinding,
-		"first",
-		first,
+		&firstDemand,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +88,7 @@ func TestReflectionDemandFollowsExactInterfaceReachability(t *testing.T) {
 
 func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 	_, contract, _ := interfaceDemandTypes()
+	demand := interfaceDemandSelection("first", contract)
 	source := namedDemandType("Reflected", "First")
 	reflectionType := reflectionContractType()
 	placement := generatedArtifactPlacement{
@@ -106,7 +106,6 @@ func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 	adapterFirst.reflectionValueDemands[firstBinding.key] = struct{}{}
 	before, err := adapterFirst.interfaceAdapterContractRequests(
 		firstBinding,
-		"",
 		nil,
 	)
 	if err != nil {
@@ -116,8 +115,7 @@ func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 		t.Fatal("reflected adapter acquired an absent interface contract")
 	}
 	after, err := adapterFirst.recordReflectionValueContract(
-		"first",
-		contract,
+		demand,
 		reflectionType,
 	)
 	if err != nil {
@@ -127,8 +125,7 @@ func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 
 	contractFirst := NewRegistry()
 	before, err = contractFirst.recordReflectionValueContract(
-		"first",
-		contract,
+		demand,
 		reflectionType,
 	)
 	if err != nil {
@@ -148,7 +145,6 @@ func TestReflectionValueContractJoinIsDiscoveryOrderIndependent(t *testing.T) {
 	)
 	late, err := contractFirst.interfaceAdapterContractRequests(
 		lateBinding,
-		"",
 		nil,
 	)
 	if err != nil {
@@ -249,7 +245,7 @@ func countAdapterContractRequests(requests []api.RootRequest) int {
 		if !ok {
 			continue
 		}
-		_, _, _, contract := requirement.InterfaceAdapterContract()
+		_, _, _, _, contract := requirement.InterfaceAdapterContract()
 		if contract {
 			count++
 		}

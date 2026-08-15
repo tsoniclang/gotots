@@ -23,6 +23,7 @@ type DeclarationRequirement struct {
 	// stable projection key.
 	projection             types.BasicKind
 	generated              *GeneratedArtifact
+	interfaceContractType  types.Type
 	interfaceContract      *types.Interface
 	interfaceContractKey   string
 	providerProfileTarget  *GeneratedArtifact
@@ -135,12 +136,15 @@ func NewInterfaceAdapterRequirement(
 
 func NewInterfaceAdapterContractRequirement(
 	artifact *GeneratedArtifact,
+	contractType types.Type,
 	contract *types.Interface,
 	contractKey string,
 ) (DeclarationRequirement, error) {
+	selected, selectedOK := interfaceMethodSet(contractType)
 	if !artifact.Valid() ||
 		artifact.Kind() != GeneratedArtifactInterfaceAdapter ||
-		contract == nil ||
+		!selectedOK ||
+		!types.Identical(selected, contract) ||
 		!contract.Complete().IsMethodSet() ||
 		contractKey == "" {
 		return DeclarationRequirement{}, &RootRequestError{
@@ -154,12 +158,25 @@ func NewInterfaceAdapterContractRequirement(
 		}
 	}
 	return DeclarationRequirement{
-		owner:                artifact.ReconstructionOwner(),
-		kind:                 DeclarationRequirementInterfaceAdapter,
-		generated:            artifact,
-		interfaceContract:    contract,
-		interfaceContractKey: contractKey,
+		owner:                 artifact.ReconstructionOwner(),
+		kind:                  DeclarationRequirementInterfaceAdapter,
+		generated:             artifact,
+		interfaceContractType: contractType,
+		interfaceContract:     contract,
+		interfaceContractKey:  contractKey,
 	}, nil
+}
+
+func interfaceMethodSet(sourceType types.Type) (*types.Interface, bool) {
+	if sourceType == nil {
+		return nil, false
+	}
+	selected, ok := types.Unalias(sourceType).Underlying().(*types.Interface)
+	if !ok {
+		return nil, false
+	}
+	selected = selected.Complete()
+	return selected, selected.IsMethodSet()
 }
 
 func NewAnonymousInterfaceRequirement(

@@ -383,11 +383,13 @@ func NewInterfaceAdapterRequest(
 
 func NewInterfaceAdapterContractRequest(
 	artifact *GeneratedArtifact,
+	contractType types.Type,
 	contract *types.Interface,
 	contractKey string,
 ) (RootRequest, error) {
 	requirement, err := NewInterfaceAdapterContractRequirement(
 		artifact,
+		contractType,
 		contract,
 		contractKey,
 	)

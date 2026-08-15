@@ -25,7 +25,7 @@ func Build(
 	children api.ChildEmitter,
 	name string,
 	sourceType types.Type,
-	contracts []*types.Interface,
+	contracts []Contract,
 	modifiers []tsgo.ModifierLike,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	if name == "" || sourceType == nil {
@@ -68,10 +68,19 @@ func Build(
 	var support []tsgo.Statement
 	tokens := make([]tsgo.Expression, 0, len(demanded))
 	tokenNames := make(map[string]struct{})
+	implements, implementsRequests, err := contractHeritage(
+		context,
+		children,
+		contracts,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
 	requests := api.CombineRequests(
 		payload.Requests(),
 		runtimeValue.Requests(),
 		dynamicType.Requests(),
+		implementsRequests,
 	)
 	for _, selected := range demanded {
 		targets := make(
@@ -165,25 +174,29 @@ func Build(
 		format,
 	}
 	classMembers = append(classMembers, methods...)
+	heritage := []tsgo.HeritageClause{
+		context.Factory().HeritageClause(
+			tsgo.HeritageClauseTokenKindExtendsKeyword,
+			[]tsgo.ExpressionWithTypeArguments{
+				context.Factory().ExpressionWithTypeArguments(
+					context.Factory().Identifier(
+						runtimeValue.Name(),
+					),
+					nil,
+				),
+			},
+		),
+	}
+	if implements != nil {
+		heritage = append(heritage, implements)
+	}
 	statements := []tsgo.Statement{
 		methodSetDeclaration(context.Factory(), name, tokens),
 		typescriptclass.Declaration(context.Factory(),
 			modifiers,
 			context.Factory().Identifier(name),
 			nil,
-			[]tsgo.HeritageClause{
-				context.Factory().HeritageClause(
-					tsgo.HeritageClauseTokenKindExtendsKeyword,
-					[]tsgo.ExpressionWithTypeArguments{
-						context.Factory().ExpressionWithTypeArguments(
-							context.Factory().Identifier(
-								runtimeValue.Name(),
-							),
-							nil,
-						),
-					},
-				),
-			},
+			heritage,
 			classMembers,
 		),
 	}

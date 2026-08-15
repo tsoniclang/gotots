@@ -159,4 +159,37 @@ console.log(name + "|" + size + "|" + (dirFailure === undefined));
 			t.Fatalf("io/fs capability output lacks %q:\n%s", required, artifacts.printed)
 		}
 	}
+	assertIoFsProfileCapabilityHeritage(t, artifacts.printed)
+}
+
+func assertIoFsProfileCapabilityHeritage(t *testing.T, printed string) {
+	t.Helper()
+	var classHeaders []string
+	for _, line := range strings.Split(printed, "\n") {
+		if strings.Contains(line, "class ") &&
+			strings.Contains(line, " implements ") {
+			classHeaders = append(classHeaders, line)
+		}
+	}
+	for _, contract := range []string{
+		"Method_fs$ReadFile_string_to_SliceOf_byte_Named_error",
+		"Method_fs$ReadDir_string_to_SliceOf_Named_fs$DirEntry_Named_error",
+	} {
+		found := false
+		for _, line := range strings.Split(printed, "\n") {
+			if strings.Contains(line, "class ") &&
+				strings.Contains(line, " implements ") &&
+				strings.Contains(line, contract) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf(
+				"io/fs profile output has no class with exact capability heritage %q:\n%s",
+				contract,
+				strings.Join(classHeaders, "\n"),
+			)
+		}
+	}
 }

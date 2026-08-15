@@ -109,17 +109,20 @@ func (r DeclarationRequirement) InterfaceAdapter() (
 
 func (r DeclarationRequirement) InterfaceAdapterContract() (
 	*GeneratedArtifact,
+	types.Type,
 	*types.Interface,
 	string,
 	bool,
 ) {
 	if !r.Valid() ||
 		r.kind != DeclarationRequirementInterfaceAdapter ||
+		r.interfaceContractType == nil ||
 		r.interfaceContract == nil ||
 		r.interfaceContractKey == "" {
-		return nil, nil, "", false
+		return nil, nil, nil, "", false
 	}
 	return r.generated,
+		r.interfaceContractType,
 		r.interfaceContract,
 		r.interfaceContractKey,
 		true

@@ -206,6 +206,21 @@ type/arity, or move an arm prerequisite outside short-circuit control.
 Every emitted callable claiming a Go source identity is mechanically joined to
 its selected `go/types.Signature`.
 
+Every generated concrete interface adapter and provider-interface bridge is
+also exact-joined to the Go-facing TypeScript surfaces selected from its
+canonical demand graph. For source-owned interfaces, the join compares
+named/instantiated Go type identity, emitted heritage target, type arguments,
+and multiplicity; a structural method-set key is not a substitute. For
+provider-routed interfaces, it compares the exact canonical generated contract
+used by translated callers and every reached capability contract carried by
+that bridge, never the provider's implementation-facing ABI. Fixtures include
+two distinct source-owned named interfaces with the same methods, a generic
+instantiation, generated and provider-profile capability bridges,
+interface-to-interface demand, and reversed discovery order. Mutations drop a
+heritage entry, add an unrelated entry, collapse distinct source-owned
+surfaces, change one type argument, or omit one reached provider capability;
+each must fail before output is sealed.
+
 For each function, literal, concrete method, interface method, function type,
 method value/expression, provider/environment callable, and generic
 concretization, record:

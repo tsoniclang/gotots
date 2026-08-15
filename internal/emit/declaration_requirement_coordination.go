@@ -224,9 +224,9 @@ func compareDeclarationRequirements(
 		}
 	}
 	if left.Kind() == api.DeclarationRequirementInterfaceAdapter {
-		leftArtifact, _, leftKey, leftDemand :=
+		leftArtifact, _, _, leftKey, leftDemand :=
 			left.InterfaceAdapterContract()
-		rightArtifact, _, rightKey, rightDemand :=
+		rightArtifact, _, _, rightKey, rightDemand :=
 			right.InterfaceAdapterContract()
 		if !leftDemand {
 			leftArtifact, _ = left.InterfaceAdapter()

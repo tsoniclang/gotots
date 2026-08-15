@@ -9,7 +9,8 @@ import (
 
 func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 	registry := NewRegistry()
-	registry.interfaceContracts["retained-contract"] = nil
+	registry.interfaceContracts["retained-contract"] =
+		map[string]interfaceContractSelection{}
 	registry.interfaceAdapterNames[generatedArtifactNameScope(
 		"retained-artifact",
 		generatedArtifactPlacement{

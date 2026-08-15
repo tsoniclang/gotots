@@ -166,8 +166,15 @@ type providerStatefulRepresentationBinding struct {
 }
 
 type interfaceContractDemand struct {
-	source *types.Interface
-	target *types.Interface
+	source interfaceContractSelection
+	target interfaceContractSelection
+}
+
+type interfaceContractSelection struct {
+	sourceType  types.Type
+	contract    *types.Interface
+	contractKey string
+	surfaceKey  string
 }
 
 type interfaceReflectionDemand struct {
@@ -239,7 +246,7 @@ type Registry struct {
 	providerStatefulRepresentations     map[string]providerStatefulRepresentationBinding
 	providerStatefulRepresentationNames map[string]string
 	providerObjectByIdentity            map[string]types.Object
-	interfaceContracts                  map[string]*types.Interface
+	interfaceContracts                  map[string]map[string]interfaceContractSelection
 	interfaceAdaptersByContract         map[string]map[string]struct{}
 	interfaceContractDemands            map[string]map[string]interfaceContractDemand
 	interfaceReflectionDemands          map[string]interfaceReflectionDemand
@@ -318,7 +325,7 @@ func NewRegistry() *Registry {
 		providerStatefulRepresentations:     make(map[string]providerStatefulRepresentationBinding),
 		providerStatefulRepresentationNames: make(map[string]string),
 		providerObjectByIdentity:            make(map[string]types.Object),
-		interfaceContracts:                  make(map[string]*types.Interface),
+		interfaceContracts:                  make(map[string]map[string]interfaceContractSelection),
 		interfaceAdaptersByContract:         make(map[string]map[string]struct{}),
 		interfaceContractDemands:            make(map[string]map[string]interfaceContractDemand),
 		interfaceReflectionDemands:          make(map[string]interfaceReflectionDemand),
