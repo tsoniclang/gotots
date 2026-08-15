@@ -207,11 +207,13 @@ Every emitted callable claiming a Go source identity is mechanically joined to
 its selected `go/types.Signature`.
 
 Every generated concrete interface adapter and provider-interface bridge is
-also exact-joined to the Go-facing TypeScript surfaces selected from its
-canonical demand graph. For source-owned interfaces, the join compares
-named/instantiated Go type identity, emitted heritage target, type arguments,
-and multiplicity; a structural method-set key is not a substitute. For
-provider-routed interfaces, it compares the exact canonical generated contract
+also exact-joined to the declaration-referenceable Go-facing TypeScript
+surfaces selected from its canonical demand graph. For source-owned interfaces,
+the join compares named/instantiated Go type identity, emitted heritage target,
+type arguments, and multiplicity; a structural method-set key is not a
+substitute. A function-local or anonymous interface fixture proves that its
+runtime contract remains represented while no illegal file-level heritage
+reference is emitted. For provider-routed interfaces, the join compares the exact canonical generated contract
 used by translated callers and every reached capability contract carried by
 that bridge, never the provider's implementation-facing ABI. Fixtures include
 two distinct source-owned named interfaces with the same methods, a generic

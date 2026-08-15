@@ -166,7 +166,7 @@ type providerStatefulRepresentationBinding struct {
 }
 
 type interfaceContractDemand struct {
-	source interfaceContractSelection
+	source *types.Interface
 	target interfaceContractSelection
 }
 
@@ -261,7 +261,7 @@ type Registry struct {
 	deferredCallableRegistryNames       map[string]string
 	reflectionTypes                     map[string]reflectionTypeBinding
 	reflectionValueDemands              map[string]struct{}
-	reflectionValueContracts            map[string]struct{}
+	reflectionValueContracts            map[string]interfaceContractSelection
 	reflectionTypeNames                 map[string]string
 }
 
@@ -279,7 +279,7 @@ func (r *Registry) TransferCanonicalIdentity() (*Registry, error) {
 		make(map[string]map[string]interfaceContractDemand)
 	r.interfaceReflectionDemands = make(map[string]interfaceReflectionDemand)
 	r.reflectionValueDemands = make(map[string]struct{})
-	r.reflectionValueContracts = make(map[string]struct{})
+	r.reflectionValueContracts = make(map[string]interfaceContractSelection)
 	r.transferReady = true
 	return r, nil
 }
@@ -340,7 +340,7 @@ func NewRegistry() *Registry {
 		deferredCallableRegistryNames:       make(map[string]string),
 		reflectionTypes:                     make(map[string]reflectionTypeBinding),
 		reflectionValueDemands:              make(map[string]struct{}),
-		reflectionValueContracts:            make(map[string]struct{}),
+		reflectionValueContracts:            make(map[string]interfaceContractSelection),
 		reflectionTypeNames:                 make(map[string]string),
 	}
 }

@@ -33,7 +33,7 @@ func (r *Registry) recordInterfaceContractDemand(
 	}
 	targetDemandKey := target.demandKey()
 	if existing, ok := targets[targetDemandKey]; ok {
-		if !sameInterfaceContractSelection(existing.source, source) ||
+		if !types.Identical(existing.source, source.contract) ||
 			!sameInterfaceContractSelection(existing.target, target) {
 			return nil, &api.NameError{
 				Reason: "interface transition key joined non-identical Go types",
@@ -41,7 +41,7 @@ func (r *Registry) recordInterfaceContractDemand(
 		}
 	} else {
 		targets[targetDemandKey] = interfaceContractDemand{
-			source: source,
+			source: source.contract,
 			target: target,
 		}
 	}
@@ -165,7 +165,7 @@ func (r *Registry) providerInterfaceBridgeContractRequests(
 		sort.Strings(targetKeys)
 		for _, targetKey := range targetKeys {
 			demand := targets[targetKey]
-			if !types.Identical(demand.source.contract, next.contract) {
+			if !types.Identical(demand.source, next.contract) {
 				return nil, &api.NameError{
 					Reason: "provider-interface demand source identity drifted",
 				}
@@ -345,7 +345,7 @@ func (r *Registry) recordReflectionValueContract(
 	if err != nil {
 		return nil, err
 	}
-	r.reflectionValueContracts[source.contractKey] = struct{}{}
+	r.reflectionValueContracts[source.demandKey()] = source
 	requests, err := r.recordInterfaceReflectionDemand(
 		source.contractKey,
 		source.contract,
@@ -406,10 +406,9 @@ func (r *Registry) interfaceAdapterContractRequests(
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			for _, selection := range r.interfaceContractSelections(key) {
-				if types.Implements(sourceType, selection.contract) {
-					pending = append(pending, selection)
-				}
+			selection := r.reflectionValueContracts[key]
+			if types.Implements(sourceType, selection.contract) {
+				pending = append(pending, selection)
 			}
 		}
 	} else {
@@ -536,8 +535,8 @@ func (r *Registry) interfaceAdapterReflectionRequest(
 func (r *Registry) contractDemandsValueOperations(
 	binding interfaceAdapterBinding,
 ) bool {
-	for contractKey := range r.reflectionValueContracts {
-		if reached, ok := r.interfaceAdaptersByContract[contractKey]; ok {
+	for _, contract := range r.reflectionValueContracts {
+		if reached, ok := r.interfaceAdaptersByContract[contract.contractKey]; ok {
 			if _, member := reached[binding.key]; member {
 				return true
 			}

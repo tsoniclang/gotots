@@ -659,13 +659,18 @@ selection path. A type may `implements` an interface only as a target
 declaration aid; Go interface satisfaction remains structural and checker-owned.
 That aid must nevertheless be exact: every generated concrete interface adapter
 and provider-interface bridge declares every reached Go-facing TypeScript
-interface surface through which the emitted value can flow. Source-owned named
-or instantiated interfaces remain distinct heritage entries when they remain
-distinct output types. A provider-routed interface instead uses its canonical
-generated Go-facing contract because the provider's implementation-facing ABI
-is not the type seen by translated Go callers; capability growth adds each
-reached canonical target contract. Heritage never selects a method, changes
-dispatch, or claims that the target program has no other structural implementers.
+interface surface that is legally referenceable from the generated class
+declaration. Source-owned package-scope named or instantiated interfaces remain
+distinct heritage entries when they remain distinct output types. Function-local
+and anonymous interface surfaces cannot be referenced from a file-level class;
+they retain their ordinary structural contract and are not fabricated, hoisted,
+or replaced by a same-method-set name. A selected target must retain calls whose
+closed family therefore lacks declaration evidence. A provider-routed interface
+instead uses its canonical generated Go-facing contract because the provider's
+implementation-facing ABI is not the type seen by translated Go callers;
+capability growth adds each reached canonical target contract. Heritage never
+selects a method, changes dispatch, or claims that the target program has no
+other structural implementers.
 
 ## Interfaces
 
@@ -683,11 +688,14 @@ invoke the exact concrete owner, preserving value-copy and pointer semantics.
 Interfaces carry no `any`, `unknown`, reflective lookup, source-name tests,
 or erased payload recovery.
 
-The adapter/bridge `implements` list is a complete projection of the canonical
-interface-demand graph after the normal interface-type naming policy selects
-the actual Go-facing output surfaces. It is emitted as ordinary typed TS-Go
-AST, has no JavaScript runtime representation, and exists so a selected target
-can consume declared heritage without rediscovering Go satisfaction.
+The adapter/bridge `implements` list is a complete projection of the
+declaration-referenceable subset of the canonical interface-demand graph after
+the normal interface-type naming policy selects the actual Go-facing output
+surfaces. Local and anonymous demands still drive adapter methods and runtime
+contracts but contribute no illegal class heritage. The list is emitted as
+ordinary typed TS-Go AST, has no JavaScript runtime representation, and exists
+so a selected target can consume declared heritage without rediscovering Go
+satisfaction.
 It is not a closed-world certificate: any target optimization that assumes the
 declared implementation set is exhaustive must select and report that separate
 target profile explicitly.

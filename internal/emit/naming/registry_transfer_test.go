@@ -29,7 +29,7 @@ func TestRegistryTransferDropsObservationsAndClaimsOnce(t *testing.T) {
 	registry.interfaceReflectionDemands["reflection"] =
 		interfaceReflectionDemand{}
 	registry.reflectionValueDemands["value"] = struct{}{}
-	registry.reflectionValueContracts["contract"] = struct{}{}
+	registry.reflectionValueContracts["contract"] = interfaceContractSelection{}
 
 	transferred, err := registry.TransferCanonicalIdentity()
 	if err != nil {

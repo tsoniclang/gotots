@@ -114,6 +114,41 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	}
 }
 
+func TestInterfaceTransitionSharesMethodSetWithoutCollapsingTargetSurface(
+	t *testing.T,
+) {
+	_, source, target := interfaceDemandTypes()
+	registry := NewRegistry()
+	firstSource := interfaceDemandSelection("source", source)
+	secondSource := firstSource
+	secondSource.sourceType = namedInterfaceDemandType("SecondSource", source)
+	secondSource.surfaceKey = "second-source"
+	targetDemand := interfaceDemandSelection("target", target)
+
+	if _, err := registry.recordInterfaceContractDemand(
+		firstSource,
+		targetDemand,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := registry.recordInterfaceContractDemand(
+		secondSource,
+		targetDemand,
+	); err != nil {
+		t.Fatal(err)
+	}
+	selected := registry.interfaceContractDemands[firstSource.contractKey]
+	if len(selected) != 1 {
+		t.Fatalf("shared method-set transition count = %d, want one", len(selected))
+	}
+	for _, demand := range selected {
+		if !types.Identical(demand.source, source) ||
+			!sameInterfaceContractSelection(demand.target, targetDemand) {
+			t.Fatal("shared method-set transition lost its exact semantic contract")
+		}
+	}
+}
+
 func interfaceDemandSelection(
 	key string,
 	contract *types.Interface,
@@ -124,6 +159,18 @@ func interfaceDemandSelection(
 		contractKey: key,
 		surfaceKey:  key,
 	}
+}
+
+func namedInterfaceDemandType(
+	name string,
+	contract *types.Interface,
+) *types.Named {
+	owner := types.NewPackage("example.com/demand", "demand")
+	return types.NewNamed(
+		types.NewTypeName(token.NoPos, owner, name, nil),
+		contract,
+		nil,
+	)
 }
 
 func interfaceDemandTypes() (types.Type, *types.Interface, *types.Interface) {

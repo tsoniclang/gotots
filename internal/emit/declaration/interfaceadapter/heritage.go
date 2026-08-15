@@ -28,6 +28,9 @@ func contractHeritage(
 				Reason: "interface-adapter heritage contract is invalid",
 			}
 		}
+		if !declarationHeritageSurface(contract.sourceType) {
+			continue
+		}
 		reference, err := context.Names().InterfaceType(contract.sourceType)
 		if err != nil {
 			return nil, nil, err
@@ -57,8 +60,21 @@ func contractHeritage(
 		requests = append(requests, reference.Requests()...)
 		requests = append(requests, argumentRequests...)
 	}
+	if len(implements) == 0 {
+		return nil, nil, nil
+	}
 	return context.Factory().HeritageClause(
 		tsgo.HeritageClauseTokenKindImplementsKeyword,
 		implements,
 	), api.CombineRequests(requests), nil
+}
+
+func declarationHeritageSurface(sourceType types.Type) bool {
+	named, ok := types.Unalias(sourceType).(*types.Named)
+	if !ok {
+		return false
+	}
+	object := named.Obj()
+	return object != nil && object.Pkg() != nil &&
+		object.Parent() == object.Pkg().Scope()
 }

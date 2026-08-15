@@ -2,7 +2,6 @@ package naming
 
 import (
 	"go/types"
-	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
@@ -65,20 +64,4 @@ func sameInterfaceContractSelection(
 		left.surfaceKey == right.surfaceKey &&
 		types.Identical(left.sourceType, right.sourceType) &&
 		types.Identical(left.contract, right.contract)
-}
-
-func (r *Registry) interfaceContractSelections(
-	contractKey string,
-) []interfaceContractSelection {
-	bySurface := r.interfaceContracts[contractKey]
-	keys := make([]string, 0, len(bySurface))
-	for key := range bySurface {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	selected := make([]interfaceContractSelection, 0, len(keys))
-	for _, key := range keys {
-		selected = append(selected, bySurface[key])
-	}
-	return selected
 }
