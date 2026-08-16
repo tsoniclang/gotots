@@ -278,20 +278,46 @@ func EmitType(
 		if err != nil {
 			return api.TypeEmission{}, err
 		}
-		return api.DirectType(
-			context.Factory().UnionTypeNode([]tsgo.TypeNode{
-				target.Value(),
-				context.Factory().KeywordTypeNode(
-					tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-				),
-			}),
-			target.Requests()...,
-		), nil
+		return optionalCallableType(context, target), nil
 	}
 	target, err := EmitNonNilType(context, children, source, signature)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
+	return optionalCallableType(context, target), nil
+}
+
+func EmitSynchronousType(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+) (api.TypeEmission, error) {
+	signature, ok := ValueSignature(signature)
+	if !ok {
+		return api.TypeEmission{}, api.Unsupported(
+			context,
+			api.CategoryType,
+			source,
+		)
+	}
+	target, err := EmitInlineAwaitableType(
+		context,
+		children,
+		source,
+		signature,
+		false,
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return optionalCallableType(context, target), nil
+}
+
+func optionalCallableType(
+	context api.Context,
+	target api.TypeEmission,
+) api.TypeEmission {
 	return api.DirectType(
 		context.Factory().UnionTypeNode([]tsgo.TypeNode{
 			target.Value(),
@@ -300,7 +326,7 @@ func EmitType(
 			),
 		}),
 		target.Requests()...,
-	), nil
+	)
 }
 
 func emitEnvironmentNonNilType(

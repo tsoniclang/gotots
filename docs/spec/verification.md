@@ -682,6 +682,17 @@ cooperative function literal created by another artifact also remains
 canonical rather than borrowing the consumer's effect owner. A direct
 synchronous callback containing defer/recover remains on the synchronous
 ordinary-entry path while its emitted callable retains the recovery envelope.
+The closed-field fixture additionally strict-typechecks the field declaration,
+storage projection, ordinary invocation, detached invocation, deferred
+capture, and synchronous generic argument as one artifact. It proves that all
+source-value surfaces use the same non-`Awaitable` signature while deferred
+recovery transport remains independently canonical. Mutations leave only the
+declaration or only one invocation form canonical, or change one assignment to
+an open value; the first two fail artifact/strict-typecheck/effect gates and
+the last restores the canonical path everywhere. The open-field fixture proves
+the converse.
+Broad search rejects a second field-effect resolver, a callable cast, a
+Promise-result test, and a target-owned repair.
 Mutations swap either kernel, change a callback effect, omit the effect from
 concretization identity, or classify a function variable as direct; each fails
 at certification, identity, artifact, strict-typecheck, or differential gates.

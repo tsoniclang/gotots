@@ -478,6 +478,25 @@ function literals whose creating artifact is not retained by the index,
 unknown writes, packages importing `unsafe` or `C`, opaque implementations,
 and any cooperative candidate retain the canonical path.
 
+That field decision is transactional, not a call-site hint. When the closed
+field is synchronous, its class member, optional storage member, ordinary and
+detached invocations, deferred capture, and reached synchronous generic
+concretizations all use one exact non-`Awaitable` function type. For example,
+`value.compare(left, right)` remains an ordinary synchronous call and
+`slices.SortFunc(values, value.compare)` receives the same synchronous field
+value; the declaration cannot remain `() => Awaitable<R>` while only the
+generic call pretends it is `() => R`. Passing that narrower value to an open
+canonical consumer remains valid because `R` is assignable to `Awaitable<R>`.
+One shared resolver consumes the field index and callable-facet owner; member
+emission and every invocation form consume that decision rather than deriving
+their own. If any required proof is absent, all of those surfaces retain the
+canonical `Awaitable` transport. The compiler never repairs a split decision
+with a cast, wrapper, runtime Promise test, or target-side lowering.
+Deferred capture preserves the narrowed source value, but the independent
+recovery registry may still widen its deferred result to the canonical ABI;
+synchronous value evidence alone does not prove that recovery transport is
+unnecessary.
+
 Possibly nil indirect calls have one target owner. The emitter captures the
 callee, captures every argument in Go order, then calls
 `(callee ?? GoPanic.raiseRuntime("call of nil function"))`. The statically
