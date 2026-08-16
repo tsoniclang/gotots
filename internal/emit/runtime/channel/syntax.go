@@ -16,7 +16,6 @@ type builder struct {
 	selectReadyName   string
 	selectAttemptName string
 	panicName         string
-	denseIndexName    string
 }
 
 func (b builder) id(name string) tsgo.Identifier {
@@ -135,8 +134,11 @@ func (b builder) element(
 func (b builder) denseElement(
 	receiver tsgo.Expression,
 	index tsgo.Expression,
-) tsgo.CallExpression {
-	return b.staticCall(b.denseIndexName, "get", receiver, index)
+) tsgo.NonNullExpression {
+	return b.factory.NonNullExpression(
+		b.element(receiver, index),
+		tsgo.NodeFlagsNone,
+	)
 }
 
 func (b builder) call(

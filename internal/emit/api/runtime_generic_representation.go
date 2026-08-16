@@ -18,7 +18,6 @@ const (
 	RuntimeStringMin                  = runtimecontract.RuntimeStringMin
 	RuntimeStringEncodeRune           = runtimecontract.RuntimeStringEncodeRune
 	RuntimeStringDecodeRune           = runtimecontract.RuntimeStringDecodeRune
-	RuntimeDenseIndex                 = runtimecontract.RuntimeDenseIndex
 	RuntimeArray                      = runtimecontract.RuntimeArray
 	RuntimeArrayAllocate              = runtimecontract.RuntimeArrayAllocate
 	RuntimeArrayView                  = runtimecontract.RuntimeArrayView
@@ -118,7 +117,6 @@ const (
 	RuntimeModuleInterfaceValue   = runtimecontract.RuntimeModuleInterfaceValue
 	RuntimeModulePanicNil         = runtimecontract.RuntimeModulePanicNil
 	RuntimeModuleChannel          = runtimecontract.RuntimeModuleChannel
-	RuntimeModuleDenseIndex       = runtimecontract.RuntimeModuleDenseIndex
 	RuntimeModuleUnsafe           = runtimecontract.RuntimeModuleUnsafe
 	RuntimeModuleStruct           = runtimecontract.RuntimeModuleStruct
 	RuntimeModuleStorage          = runtimecontract.RuntimeModuleStorage

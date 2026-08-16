@@ -117,8 +117,8 @@ func TestGenericContainerStorageBindsExactTargetFacets(t *testing.T) {
 	)
 	if ordinaryBytes > 30_000 ||
 		concretizations != 7 || concretizationBytes > 15_000 ||
-		capabilities != 0 || capabilityBytes != 0 ||
-		artifacts.bytes > 45_000 ||
+		capabilities != 7 || capabilityBytes > 10_000 ||
+		artifacts.bytes > 51_000 ||
 		artifacts.nodes > 7_500 ||
 		artifacts.largest > 17_000 {
 		t.Fatalf(

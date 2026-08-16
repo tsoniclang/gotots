@@ -75,14 +75,14 @@ func TestCrossPackageGenericLocalTypeConcretizesAtCaller(t *testing.T) {
 		}
 	}
 	for fragment, source := range map[string]string{
-		"function Twice$Named_Local":                       callerSource,
-		"function BothEqual$Named_Outer$Named_Inner":       callerSource,
-		"type Local = int32;":                              callerSource,
-		"type Outer = int32;":                              callerSource,
-		"type Inner = int32;":                              callerSource,
-		"($argument0: Local, $argument1: Local): Local =>": callerSource,
-		"function Twice$kernel<T>":                         providerSource,
-		"function BothEqual$kernel<A, B>":                  providerSource,
+		"function Twice$Named_Local":                                     callerSource,
+		"function BothEqual$Named_Outer$Named_Inner":                     callerSource,
+		"type Local = int32;":                                            callerSource,
+		"type Outer = int32;":                                            callerSource,
+		"type Inner = int32;":                                            callerSource,
+		"function $go$binary_add$Named_Local_Named_Local_to_Named_Local": callerSource,
+		"function Twice$kernel<T>":                                       providerSource,
+		"function BothEqual$kernel<A, B>":                                providerSource,
 	} {
 		if !strings.Contains(source, fragment) {
 			t.Fatalf("source lacks %q:\n%s", fragment, source)

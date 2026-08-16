@@ -10,7 +10,6 @@ const (
 	RuntimeStringMin                  RuntimeSymbol = 4
 	RuntimeStringEncodeRune           RuntimeSymbol = 5
 	RuntimeStringDecodeRune           RuntimeSymbol = 6
-	RuntimeDenseIndex                 RuntimeSymbol = 90
 	RuntimeArray                      RuntimeSymbol = 200
 	RuntimeArrayAllocate              RuntimeSymbol = 201
 	RuntimeArrayView                  RuntimeSymbol = 202

@@ -427,7 +427,7 @@ func TestGenericReceiverMethodWithoutRecoverDefersThroughOrdinaryEntry(t *testin
 				"export class Box<T>",
 				"static $go$private$",
 				"export function Box$store$int32",
-				"$kernel<int32>($argument0, ($argument0: int32): int32 =>",
+				"$kernel<int32>($argument0, $go$copy$int32_to_int32, $go$from_storage$int32_to_int32)",
 				"__gotots_deferred_0",
 				"$go$recovery",
 			} {
@@ -440,6 +440,7 @@ func TestGenericReceiverMethodWithoutRecoverDefersThroughOrdinaryEntry(t *testin
 				}
 			}
 			for _, forbidden := range []string{
+				"($argument0: int32): int32 =>",
 				"__gotots_defers_",
 				"export function Box_store(",
 				"$kernel$deferred",

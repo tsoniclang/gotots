@@ -362,7 +362,6 @@ func TestSchedulerRoutesOnlyThroughItsSemanticOwner(t *testing.T) {
 		"goSelectReady",
 		"goSelectAttempt",
 		"GoPanic",
-		"GoDenseIndex",
 	); err == nil {
 		t.Fatal("channel owner accepted RuntimeScheduler")
 	}

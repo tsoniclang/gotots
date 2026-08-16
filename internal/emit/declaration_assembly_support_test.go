@@ -10,48 +10,8 @@ import (
 
 func drainProgramSession(t *testing.T, session *programSession) {
 	t.Helper()
-	for {
-		if object, ok := session.scheduler.next(); ok {
-			if err := session.emit(object); err != nil {
-				t.Fatal(err)
-			}
-			continue
-		}
-		if owner, requirements, removed, ok :=
-			session.requirements.nextBatch(); ok {
-			if err := session.applyDeclarationRequirements(
-				owner,
-				requirements,
-				removed,
-			); err != nil {
-				t.Fatal(err)
-			}
-			continue
-		}
-		if object, ok := session.artifacts.NextDirty(); ok {
-			if err := session.reconstructScheduledArtifact(object); err != nil {
-				t.Fatal(err)
-			}
-			continue
-		}
-		if sourcePackage, ok := session.packageInitializations.next(); ok {
-			if err := session.emitPackageInitialization(sourcePackage); err != nil {
-				t.Fatal(err)
-			}
-			continue
-		}
-		if session.requirements.finalizeRemovals() {
-			continue
-		}
-		if builders := session.packageExports.nextBatch(); len(builders) != 0 {
-			for _, builder := range builders {
-				if err := session.publishPackageExports(builder); err != nil {
-					t.Fatal(err)
-				}
-			}
-			continue
-		}
-		return
+	if err := session.settle(); err != nil {
+		t.Fatal(err)
 	}
 }
 

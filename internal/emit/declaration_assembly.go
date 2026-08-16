@@ -210,6 +210,12 @@ func (s *programSession) prepareDeclarationRequirement(
 		if err := s.validateGeneratedArtifact(artifact); err != nil {
 			return err
 		}
+		if artifact.Kind() == api.GeneratedArtifactGenericCapability &&
+			artifact.Placement() == api.GeneratedArtifactPlacementCompilation {
+			if err := s.ensureGenericCapabilityBaseline(artifact); err != nil {
+				return err
+			}
+		}
 	}
 	owner := requirement.Owner()
 	if sourceOwner, sourceOwned := owner.Source(); sourceOwned {

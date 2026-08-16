@@ -119,15 +119,21 @@ func assertWideNativeMapCarrier(
 			continue
 		}
 		source := readFile(t, artifacts.file(t, file.OutputPath()))
-		if !strings.Contains(source, "Map<uint64, [") {
+		if !strings.Contains(source, "Map<uint64, ") {
 			continue
 		}
 		for _, classSource := range mapClassSources(source) {
-			if !strings.Contains(classSource, "Map<uint64, [") {
+			if !strings.Contains(classSource, "Map<uint64, ") {
 				continue
 			}
 			wideDefinitions++
-			for _, forbidden := range []string{"$hash(", "$equal(", "$find(", "GoDenseIndex"} {
+			for _, forbidden := range []string{
+				"Map<uint64, [",
+				"$hash(",
+				"$equal(",
+				"$find(",
+				"GoDenseIndex",
+			} {
 				if strings.Contains(classSource, forbidden) {
 					t.Fatalf("wide native map contains %q:\n%s", forbidden, classSource)
 				}

@@ -573,9 +573,4 @@ type ChildEmitter interface {
 	IfAlternate(Context, *ast.IfStmt) (StatementEmission, error)
 	Type(Context, ast.Expr) (TypeEmission, error)
 	RepresentedType(Context, ast.Node, types.Type) (TypeEmission, error)
-	ConcreteGenericOperation(
-		Context,
-		GenericOperationSelection,
-		*types.Signature,
-	) (ExpressionEmission, bool, error)
 }

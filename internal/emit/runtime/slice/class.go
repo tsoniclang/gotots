@@ -2,19 +2,17 @@ package slice
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type builder struct {
-	factory        tsgo.Factory
-	className      string
-	panicName      string
-	denseIndexName string
-	pointerName    string
-	addressName    string
+	factory     tsgo.Factory
+	className   string
+	panicName   string
+	pointerName string
+	addressName string
 }
 
 type Capabilities struct {
@@ -31,13 +29,11 @@ func Build(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
-	denseIndexName string,
 ) tsgo.ClassDeclaration {
 	return BuildWithCapabilities(
 		factory,
 		className,
 		panicName,
-		denseIndexName,
 		"",
 		"",
 		Capabilities{},
@@ -48,18 +44,16 @@ func BuildWithCapabilities(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
-	denseIndexName string,
 	pointerName string,
 	addressName string,
 	capabilities Capabilities,
 ) tsgo.ClassDeclaration {
 	target := builder{
-		factory:        factory,
-		className:      className,
-		panicName:      panicName,
-		denseIndexName: denseIndexName,
-		pointerName:    pointerName,
-		addressName:    addressName,
+		factory:     factory,
+		className:   className,
+		panicName:   panicName,
+		pointerName: pointerName,
+		addressName: addressName,
 	}
 	members := []tsgo.ClassElement{target.constructor()}
 	members = append(
@@ -430,12 +424,10 @@ func (b builder) index(
 func (b builder) indexedValue(
 	value tsgo.Expression,
 	index tsgo.Expression,
-) tsgo.CallExpression {
-	return indexedstorage.Element(
-		b.factory,
-		b.denseIndexName,
-		value,
-		index,
+) tsgo.NonNullExpression {
+	return b.factory.NonNullExpression(
+		b.index(value, index),
+		tsgo.NodeFlagsNone,
 	)
 }
 

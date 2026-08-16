@@ -35,15 +35,11 @@ func (b specializationBuilder) buildNative() []tsgo.ClassElement {
 	}
 }
 
-func (b specializationBuilder) nativeCellType() tsgo.TypeNode {
-	return b.factory.TupleTypeNode([]tsgo.TypeNode{b.valueType})
-}
-
 func (b specializationBuilder) nativeStorageType() tsgo.TypeNode {
 	return b.factory.UnionTypeNode([]tsgo.TypeNode{
 		b.factory.TypeReferenceNode(
 			b.id("Map"),
-			[]tsgo.TypeNode{b.storageKeyType, b.nativeCellType()},
+			[]tsgo.TypeNode{b.storageKeyType, b.valueType},
 		),
 		b.undefinedType(),
 	})
@@ -111,7 +107,7 @@ func (b specializationBuilder) nativeMakeMethod() tsgo.MethodDeclaration {
 						b.id("Map"),
 						[]tsgo.TypeNode{
 							b.storageKeyType,
-							b.nativeCellType(),
+							b.valueType,
 						},
 						nil,
 					),
@@ -133,7 +129,6 @@ func (b specializationBuilder) nativeMakeMethod() tsgo.MethodDeclaration {
 
 func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 	values := b.id("values")
-	entry := b.id("entry")
 	return b.method(
 		nil,
 		b.members.lookup,
@@ -146,30 +141,29 @@ func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 			b.property(b.factory.ThisExpression(), "values"),
 		),
 		b.factory.IfStatement(
-			b.undefined(values),
+			b.factory.BinaryExpression(
+				nil,
+				b.undefined(values),
+				nil,
+				b.factory.BinaryOperatorToken(
+					tsgo.BinaryOperatorBarBarToken,
+				),
+				b.factory.PrefixUnaryExpression(
+					tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+					b.call(values, "has", b.id("key")),
+				),
+			),
 			b.returnBlock(b.staticCall(
 				specializationCopyValueOperation,
 				b.property(b.factory.ThisExpression(), "zeroValue"),
 			)),
 			nil,
 		),
-		b.variable(
-			tsgo.NodeFlagsConst,
-			"entry",
-			b.factory.UnionTypeNode([]tsgo.TypeNode{
-				b.nativeCellType(),
-				b.undefinedType(),
-			}),
-			b.call(values, "get", b.id("key")),
-		),
 		b.factory.ReturnStatement(b.staticCall(
 			specializationCopyValueOperation,
-			b.factory.ConditionalExpression(
-				b.undefined(entry),
-				b.factory.QuestionToken(),
-				b.property(b.factory.ThisExpression(), "zeroValue"),
-				b.factory.ColonToken(),
-				b.element(entry, b.number("0")),
+			b.factory.NonNullExpression(
+				b.call(values, "get", b.id("key")),
+				tsgo.NodeFlagsNone,
 			),
 		)),
 	)
@@ -177,7 +171,6 @@ func (b specializationBuilder) nativeLookupMethod() tsgo.MethodDeclaration {
 
 func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 	values := b.id("values")
-	entry := b.id("entry")
 	resultType := b.factory.TupleTypeNode([]tsgo.TypeNode{
 		b.valueType,
 		b.booleanType(),
@@ -206,21 +199,18 @@ func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 			b.property(b.factory.ThisExpression(), "values"),
 		),
 		b.factory.IfStatement(
-			b.undefined(values),
-			b.returnBlock(missing()),
-			nil,
-		),
-		b.variable(
-			tsgo.NodeFlagsConst,
-			"entry",
-			b.factory.UnionTypeNode([]tsgo.TypeNode{
-				b.nativeCellType(),
-				b.undefinedType(),
-			}),
-			b.call(values, "get", b.id("key")),
-		),
-		b.factory.IfStatement(
-			b.undefined(entry),
+			b.factory.BinaryExpression(
+				nil,
+				b.undefined(values),
+				nil,
+				b.factory.BinaryOperatorToken(
+					tsgo.BinaryOperatorBarBarToken,
+				),
+				b.factory.PrefixUnaryExpression(
+					tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+					b.call(values, "has", b.id("key")),
+				),
+			),
 			b.returnBlock(missing()),
 			nil,
 		),
@@ -228,7 +218,10 @@ func (b specializationBuilder) nativeLookupOKMethod() tsgo.MethodDeclaration {
 			[]tsgo.Expression{
 				b.staticCall(
 					specializationCopyValueOperation,
-					b.element(entry, b.number("0")),
+					b.factory.NonNullExpression(
+						b.call(values, "get", b.id("key")),
+						tsgo.NodeFlagsNone,
+					),
 				),
 				b.factory.TrueLiteral(),
 			},
@@ -269,12 +262,9 @@ func (b specializationBuilder) nativeStoreMethod() tsgo.MethodDeclaration {
 			values,
 			"set",
 			b.id("key"),
-			b.factory.ArrayLiteralExpression(
-				[]tsgo.Expression{b.staticCall(
-					specializationCopyValueOperation,
-					b.id("value"),
-				)},
-				false,
+			b.staticCall(
+				specializationCopyValueOperation,
+				b.id("value"),
 			),
 		)),
 	)

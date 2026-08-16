@@ -48,10 +48,17 @@ func TestScalarSlicesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		"export class RuntimeSlice<T>",
 		"GoPanic.raise",
 		"copyWithin",
+		"return backing[this.offset + numericIndex]!;",
 	} {
 		if !strings.Contains(printed.runtime, fragment) {
 			t.Fatalf("runtime module lacks %q:\n%s", fragment, printed.runtime)
 		}
+	}
+	if strings.Contains(printed.runtime, "GoDenseIndex") {
+		t.Fatalf(
+			"dense RuntimeSlice retained a redundant indexed-storage helper:\n%s",
+			printed.runtime,
+		)
 	}
 
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")

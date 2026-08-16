@@ -215,7 +215,6 @@ func TestDependencyClosureIncludesEveryTransitiveOwner(t *testing.T) {
 	}
 	want := map[api.RuntimeSymbol]struct{}{
 		api.RuntimeArray:             {},
-		api.RuntimeDenseIndex:        {},
 		api.RuntimeIntegerDivide:     {},
 		api.RuntimePanic:             {},
 		api.RuntimePanicValue:        {},
@@ -244,8 +243,8 @@ func TestModuleImportsExactDependencyContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(imports) != 2 {
-		t.Fatalf("array runtime imports = %d, want two", len(imports))
+	if len(imports) != 1 {
+		t.Fatalf("array runtime imports = %d, want one", len(imports))
 	}
 	got := make(map[string]string, len(imports))
 	for _, statement := range imports {
@@ -259,8 +258,7 @@ func TestModuleImportsExactDependencyContract(t *testing.T) {
 		got[module.Text()] = bindings[0].Name().Text()
 	}
 	wantImports := map[string]string{
-		"./dense-index.js": "GoDenseIndex",
-		"./panic.js":       "GoPanic",
+		"./panic.js": "GoPanic",
 	}
 	if !maps.Equal(got, wantImports) {
 		t.Fatalf("array runtime imports = %v, want %v", got, wantImports)

@@ -466,6 +466,10 @@ func (n *File) BeginArtifact(
 	}, nil
 }
 
+func (n *File) ArtifactEmissionActive() bool {
+	return n != nil && n.artifactOwner.Valid()
+}
+
 func valueReferenceFacet(object types.Object) (api.ArtifactFacet, error) {
 	switch object.(type) {
 	case *types.Func, *types.Builtin:

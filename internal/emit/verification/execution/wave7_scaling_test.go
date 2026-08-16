@@ -46,11 +46,14 @@ func TestWaveSevenGenericBodiesAndCapabilitiesScaleByExactContract(
 				measurement.genericBodies,
 			)
 		}
-		if measurement.capabilities != 0 {
+		if measurement.capabilityFiles != 2 ||
+			measurement.capabilities != count*2 {
 			t.Fatalf(
-				"%dx standalone concrete capability definitions = %d, want zero; functions=%v",
+				"%dx reusable concrete capabilities = %d files/%d definitions, want 2/%d; functions=%v",
 				count,
+				measurement.capabilityFiles,
 				measurement.capabilities,
+				count*2,
 				measurement.functionNames,
 			)
 		}
@@ -79,7 +82,7 @@ func TestWaveSevenGenericBodiesAndCapabilitiesScaleByExactContract(
 	assertWaveFourLinearDoubling(t, "generic target bytes", targetBytes)
 	assertWaveFourLinearDoubling(t, "generic target AST nodes", targetNodes)
 	t.Logf(
-		"generic scaling instantiations=%v source=%v target=%v nodes=%v body-bytes=%d body-nodes=%d standalone-capabilities=0",
+		"generic scaling instantiations=%v source=%v target=%v nodes=%v body-bytes=%d body-nodes=%d reusable-capabilities-per-type=2",
 		counts,
 		sourceBytes,
 		targetBytes,
@@ -95,6 +98,7 @@ type waveSevenGenericScale struct {
 	targetNodes      int
 	genericBodies    int
 	capabilities     int
+	capabilityFiles  int
 	genericBody      []byte
 	genericBodyText  string
 	genericBodyNodes int
@@ -139,7 +143,7 @@ func measureWaveSevenGenericScale(
 	measurement := waveSevenGenericScale{sourceBytes: len(source)}
 	for _, file := range emission.Files() {
 		if strings.Contains(file.OutputPath(), "support/generics/capabilities/") {
-			measurement.capabilities++
+			measurement.capabilityFiles++
 		}
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
 		if err != nil {
@@ -160,6 +164,9 @@ func measureWaveSevenGenericScale(
 				measurement.functionNames,
 				function.Name().Text(),
 			)
+			if strings.HasPrefix(function.Name().Text(), "$go$") {
+				measurement.capabilities++
+			}
 			switch {
 			case function.Name().Text() == "Add$kernel":
 				measurement.genericBodies++
@@ -420,9 +427,9 @@ func TestWaveSevenGeneratedTailIsEncodedAndBounded(t *testing.T) {
 			counts[kind]++
 		}
 	}
-	if counts["capability"] != 1 {
+	if counts["capability"] != 79 {
 		t.Fatalf(
-			"shared generic capabilities = %d, want only the deferred registry",
+			"reusable generic capabilities = %d, want 79 exact definitions",
 			counts["capability"],
 		)
 	}
@@ -528,9 +535,8 @@ var waveSevenTailBounds = map[string]struct {
 	// leaves less than two percent byte headroom while retaining the stricter
 	// independent node bound.
 	"generic-class": {bytes: 7_000, nodes: 1_500},
-	// The bound includes inline storage-facet conversion arrows.
-	// GenericIteratorCopy measures 2,341 bytes/304 nodes; the prior one-facet
-	// ABI could not represent its T-backed struct field.
+	// GenericIteratorCopy retains only its source facade and named capability
+	// references; the capability definitions live in operation-family files.
 	"generic-function": {bytes: 2_500, nodes: 350},
 }
 
