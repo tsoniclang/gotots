@@ -732,6 +732,20 @@ representations. A mutation that inserts a nested callable below a direct
 callback must either produce a typed nested-path certificate or fail at contract
 generation; observing only the outer function result is not sufficient proof.
 
+Callable-field proof combines one closed unnamed field, one generic field
+initialized from an open function parameter, one defined function-typed field,
+one cooperative provider, one addressed field, and one reflection-demanded
+private field. The closed field's declaration, storage, ordinary/detached call,
+deferred capture, and synchronous generic-kernel argument all use the same
+non-`Awaitable` transport. The generic selected write exact-joins its generic
+declaration and keeps that declaration canonical; the defined function type
+keeps its named wrapper and payload call. Reflection reports the private field
+as non-settable and emits a panic-only setter with no field assignment. The
+combined generated project must strict-typecheck. Mutations that key generic
+writes by selected identity, admit a defined function type, narrow only a call
+site, or restore the unreachable private reflection assignment fail at the
+write-index, artifact-shape, or strict-typecheck owner.
+
 Mutations split direct/select queues, use historical queue storage, omit
 cancellation, bias source order, treat nil as ready, settle before pending
 Promises, globalize all functions as async, restore callable-profile variants,

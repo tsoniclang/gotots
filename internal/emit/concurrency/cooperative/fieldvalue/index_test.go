@@ -170,7 +170,7 @@ func assign(value *holder, callbacks []func()) {
 	}
 }
 
-func TestInstantiatedCallableFieldNeverAppearsUnwritten(t *testing.T) {
+func TestInstantiatedCallableFieldWritesJoinTheirDeclaration(t *testing.T) {
 	project := t.TempDir()
 	writeFile(t, filepath.Join(project, "go.mod"), `module example.com/genericfield
 
@@ -193,6 +193,7 @@ func use(value *holder[int]) func(int) { return value.callback }
 		t.Fatal(err)
 	}
 	source := program.Roots()[0]
+	origin := source.Types().Scope().Lookup("holder").Type().(*types.Named).Underlying().(*types.Struct).Field(0)
 	var selected *types.Var
 	for selector, selection := range source.TypesInfo().Selections {
 		parent, _ := source.SyntaxParent(selector)
@@ -205,9 +206,86 @@ func use(value *holder[int]) func(int) { return value.callback }
 	if selected == nil {
 		t.Fatal("generic field use has no exact go/types selection")
 	}
-	assignments, exact := fieldvalue.New(program).Assignments(selected)
-	if exact && len(assignments) == 0 {
-		t.Fatal("instantiated field was certified as unwritten despite its selected write")
+	index := fieldvalue.New(program)
+	for name, field := range map[string]*types.Var{
+		"declaration": origin,
+		"selected":    selected,
+	} {
+		assignments, exact := index.Assignments(field)
+		if !exact || len(assignments) != 1 || assignments[0] == nil {
+			t.Fatalf(
+				"%s field assignments = (%v, %v), want one canonical write",
+				name,
+				assignments,
+				exact,
+			)
+		}
+	}
+}
+
+func TestDefinedCallableFieldRetainsNamedRepresentation(t *testing.T) {
+	project := t.TempDir()
+	writeFile(t, filepath.Join(project, "go.mod"), `module example.com/namedfield
+
+go 1.26.4
+`)
+	writeFile(t, filepath.Join(project, "source.go"), `package namedfield
+
+type callback func()
+type holder struct { callback callback }
+
+func target() {}
+func assign(value *holder) { value.callback = callback(target) }
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: project,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := program.Roots()[0]
+	field := source.Types().Scope().Lookup("holder").Type().(*types.Named).Underlying().(*types.Struct).Field(0)
+	if _, exact := fieldvalue.New(program).Assignments(field); exact {
+		t.Fatal("defined function type was admitted as plain callable transport")
+	}
+}
+
+func TestForeignExportedFieldDoesNotOpenLocalFieldCensus(t *testing.T) {
+	project := t.TempDir()
+	writeFile(t, filepath.Join(project, "go.mod"), `module example.com/foreignuse
+
+go 1.26.4
+`)
+	if err := os.MkdirAll(filepath.Join(project, "foreign"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(project, "foreign", "foreign.go"), `package foreign
+
+type Holder struct { Callback func() }
+`)
+	writeFile(t, filepath.Join(project, "source.go"), `package foreignuse
+
+import "example.com/foreignuse/foreign"
+
+type holder struct { callback func() }
+
+func target() {}
+func makeHolder() *holder { return &holder{callback: target} }
+func foreignCallback(value foreign.Holder) func() { return value.Callback }
+`)
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: project,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := program.Roots()[0]
+	field := source.Types().Scope().Lookup("holder").Type().(*types.Named).Underlying().(*types.Struct).Field(0)
+	assignments, exact := fieldvalue.New(program).Assignments(field)
+	if !exact || len(assignments) != 1 || assignments[0] == nil {
+		t.Fatalf("local assignments = (%v, %v), want one closed write", assignments, exact)
 	}
 }
 

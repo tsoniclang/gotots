@@ -7,15 +7,18 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/tsoniclang/gotots/internal/emit/type/fieldidentity"
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
 type packageIndex struct {
+	owner       *types.Package
 	closed      bool
 	declared    map[*types.Var]struct{}
 	assignments map[*types.Var][]ast.Expr
 	invalid     map[*types.Var]struct{}
 	addressed   map[*types.Var]struct{}
+	canonical   map[*types.Var]*types.Var
 }
 
 type Index struct {
@@ -32,11 +35,13 @@ func New(program *load.Program) *Index {
 			continue
 		}
 		selected := &packageIndex{
+			owner:       source.Types(),
 			closed:      len(source.OtherFiles()) == 0 && !importsOpaque(source.Types()),
 			declared:    make(map[*types.Var]struct{}),
 			assignments: make(map[*types.Var][]ast.Expr),
 			invalid:     make(map[*types.Var]struct{}),
 			addressed:   make(map[*types.Var]struct{}),
+			canonical:   make(map[*types.Var]*types.Var),
 		}
 		index.packages[source.Types()] = selected
 		if !selected.closed {
@@ -63,23 +68,27 @@ func (p *packageIndex) sortAssignments() {
 
 func (i *Index) Assignments(field *types.Var) ([]ast.Expr, bool) {
 	if i == nil || field == nil || field.Pkg() == nil || field.Exported() ||
-		!functionType(field.Type()) {
+		!plainFunctionType(field.Type()) {
 		return nil, false
 	}
 	selected := i.packages[field.Pkg()]
 	if selected == nil || !selected.closed {
 		return nil, false
 	}
-	if _, invalid := selected.invalid[field]; invalid {
+	declaration := selected.canonical[field]
+	if declaration == nil {
 		return nil, false
 	}
-	if _, addressed := selected.addressed[field]; addressed {
+	if _, invalid := selected.invalid[declaration]; invalid {
 		return nil, false
 	}
-	if _, declared := selected.declared[field]; !declared {
+	if _, addressed := selected.addressed[declaration]; addressed {
 		return nil, false
 	}
-	return slices.Clone(selected.assignments[field]), true
+	if _, declared := selected.declared[declaration]; !declared {
+		return nil, false
+	}
+	return slices.Clone(selected.assignments[declaration]), true
 }
 
 func (p *packageIndex) collect(source *load.Package) {
@@ -90,15 +99,20 @@ func (p *packageIndex) collect(source *load.Package) {
 	info := source.TypesInfo()
 	for _, object := range info.Defs {
 		field, ok := object.(*types.Var)
-		if ok && field.IsField() && functionType(field.Type()) {
+		if ok && field.IsField() && field.Pkg() == p.owner &&
+			!field.Exported() && plainFunctionType(field.Type()) {
 			p.declared[field] = struct{}{}
+			p.canonical[field] = field
 		}
 	}
 	for selector, selection := range info.Selections {
 		field, _ := selection.Obj().(*types.Var)
-		if selection.Kind() == types.FieldVal && field != nil &&
-			functionType(field.Type()) {
-			p.selectedFieldUse(source, selector, field)
+		if selection.Kind() != types.FieldVal || field == nil {
+			continue
+		}
+		declaration, ok := p.declarationField(selection.Recv(), field)
+		if ok {
+			p.selectedFieldUse(source, selector, declaration)
 		}
 	}
 	for expression := range info.Types {
@@ -156,7 +170,8 @@ func (p *packageIndex) compositeLiteral(
 	source *ast.CompositeLit,
 	info *types.Info,
 ) {
-	structure := structType(info.TypeOf(source))
+	container := info.TypeOf(source)
+	structure := structType(container)
 	if structure == nil {
 		return
 	}
@@ -164,17 +179,51 @@ func (p *packageIndex) compositeLiteral(
 		if keyed, ok := element.(*ast.KeyValueExpr); ok {
 			identifier, _ := keyed.Key.(*ast.Ident)
 			field, _ := info.Uses[identifier].(*types.Var)
-			p.record(field, keyed.Value)
+			if declaration, exact := p.declarationField(container, field); exact {
+				p.record(declaration, keyed.Value)
+			}
 			continue
 		}
 		if index < structure.NumFields() {
-			p.record(structure.Field(index), element)
+			field := structure.Field(index)
+			if declaration, exact := p.declarationField(container, field); exact {
+				p.record(declaration, element)
+			}
 		}
 	}
 }
 
+func (p *packageIndex) declarationField(
+	container types.Type,
+	field *types.Var,
+) (*types.Var, bool) {
+	if field == nil || field.Pkg() != p.owner || field.Exported() ||
+		!plainFunctionType(field.Type()) {
+		return nil, false
+	}
+	declaration := field
+	correspondence, resolved, err := fieldidentity.Resolve(container, field)
+	if err != nil {
+		p.closed = false
+		return nil, false
+	}
+	if resolved {
+		declaration = correspondence.DeclarationField()
+	}
+	if declaration == nil || !plainFunctionType(declaration.Type()) {
+		p.closed = false
+		return nil, false
+	}
+	if _, declared := p.declared[declaration]; !declared {
+		p.closed = false
+		return nil, false
+	}
+	p.canonical[field] = declaration
+	return declaration, true
+}
+
 func (p *packageIndex) record(field *types.Var, value ast.Expr) {
-	if field == nil || !functionType(field.Type()) {
+	if field == nil || !plainFunctionType(field.Type()) {
 		return
 	}
 	if value == nil {
@@ -184,11 +233,11 @@ func (p *packageIndex) record(field *types.Var, value ast.Expr) {
 	p.assignments[field] = append(p.assignments[field], value)
 }
 
-func functionType(source types.Type) bool {
+func plainFunctionType(source types.Type) bool {
 	if source == nil {
 		return false
 	}
-	_, ok := source.Underlying().(*types.Signature)
+	_, ok := types.Unalias(source).(*types.Signature)
 	return ok
 }
 

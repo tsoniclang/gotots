@@ -469,12 +469,18 @@ unexported function-valued field may also select it when one compilation-local
 source index accounts for every selected write, no selected source takes the
 field's address, the declaring package has no opaque non-Go implementation,
 and every possible non-nil value resolves through the same callable-effect
-owner to synchronous. The loader records the exact parent of each accepted AST
-node once while it owns the parser graph. The field index iterates the
-checker's exact selection and expression maps and queries that relation; it
-does not recursively walk a body, parse source again, or build another semantic
-graph. Exported fields, interface method values, function variables, stored
-function literals whose creating artifact is not retained by the index,
+owner to synchronous. The field must have an unnamed function type; a defined
+function type retains its canonical named-value representation even when its
+underlying type is a function. Generic selected fields exact-join by
+`go/types` field ordinal and declaration identity before their writes enter the
+index, so a write to `holder[int].callback` is evidence about the one
+`holder[T].callback` declaration and cannot leave a vacuous declaration-keyed
+write set. The loader records the exact parent of each accepted AST node once
+while it owns the parser graph. The field index iterates the checker's exact
+selection and expression maps and queries that relation; it does not recursively
+walk a body, parse source again, or build another semantic graph. Exported
+fields, defined function types, interface method values, function variables,
+stored function literals whose creating artifact is not retained by the index,
 unknown writes, packages importing `unsafe` or `C`, opaque implementations,
 and any cooperative candidate retain the canonical path.
 
@@ -496,6 +502,15 @@ Deferred capture preserves the narrowed source value, but the independent
 recovery registry may still widen its deferred result to the canonical ABI;
 synchronous value evidence alone does not prove that recovery transport is
 unnecessary.
+
+Reflection does not create a hidden exception to that decision. Go reflection
+marks an unexported field non-settable. Its generated descriptor may read and
+box the narrower synchronous value because a synchronous result satisfies the
+canonical `Awaitable` contract, but its setter is the canonical
+unaddressable-value panic and contains no assignment. An exported or otherwise
+reflectively writable field is ineligible for synchronous field transport.
+The compiler must not construct an impossible canonical-to-narrow field write
+and rely on a runtime `settable` flag to make invalid TypeScript unreachable.
 
 Possibly nil indirect calls have one target owner. The emitter captures the
 callee, captures every argument in Go order, then calls
