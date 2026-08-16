@@ -3,9 +3,10 @@ package fieldidentity
 import "go/types"
 
 type Correspondence struct {
-	owner       *types.TypeName
-	declaration types.Type
-	selected    types.Type
+	owner            *types.TypeName
+	declarationField *types.Var
+	declaration      types.Type
+	selected         types.Type
 }
 
 type ResolutionError struct {
@@ -60,10 +61,15 @@ func Resolve(
 		}
 	}
 	return Correspondence{
-		owner:       origin.Obj(),
-		declaration: declarationField.Type(),
-		selected:    selectedField.Type(),
+		owner:            origin.Obj(),
+		declarationField: declarationField,
+		declaration:      declarationField.Type(),
+		selected:         selectedField.Type(),
 	}, true, nil
+}
+
+func (c Correspondence) DeclarationField() *types.Var {
+	return c.declarationField
 }
 
 func (c Correspondence) Parts() (

@@ -682,6 +682,17 @@ cooperative function literal created by another artifact also remains
 canonical rather than borrowing the consumer's effect owner. A direct
 synchronous callback containing defer/recover remains on the synchronous
 ordinary-entry path while its emitted callable retains the recovery envelope.
+The closed-field fixture additionally strict-typechecks the field declaration,
+storage projection, ordinary invocation, detached invocation, deferred
+capture, and synchronous generic argument as one artifact. It proves that all
+source-value surfaces use the same non-`Awaitable` signature while deferred
+recovery transport remains independently canonical. Mutations leave only the
+declaration or only one invocation form canonical, or change one assignment to
+an open value; the first two fail artifact/strict-typecheck/effect gates and
+the last restores the canonical path everywhere. The open-field fixture proves
+the converse.
+Broad search rejects a second field-effect resolver, a callable cast, a
+Promise-result test, and a target-owned repair.
 Mutations swap either kernel, change a callback effect, omit the effect from
 concretization identity, or classify a function variable as direct; each fails
 at certification, identity, artifact, strict-typecheck, or differential gates.
@@ -720,6 +731,20 @@ The same gate distinguishes unnamed direct callbacks from named function-value
 representations. A mutation that inserts a nested callable below a direct
 callback must either produce a typed nested-path certificate or fail at contract
 generation; observing only the outer function result is not sufficient proof.
+
+Callable-field proof combines one closed unnamed field, one generic field
+initialized from an open function parameter, one defined function-typed field,
+one cooperative provider, one addressed field, and one reflection-demanded
+private field. The closed field's declaration, storage, ordinary/detached call,
+deferred capture, and synchronous generic-kernel argument all use the same
+non-`Awaitable` transport. The generic selected write exact-joins its generic
+declaration and keeps that declaration canonical; the defined function type
+keeps its named wrapper and payload call. Reflection reports the private field
+as non-settable and emits a panic-only setter with no field assignment. The
+combined generated project must strict-typecheck. Mutations that key generic
+writes by selected identity, admit a defined function type, narrow only a call
+site, or restore the unreachable private reflection assignment fail at the
+write-index, artifact-shape, or strict-typecheck owner.
 
 Mutations split direct/select queues, use historical queue storage, omit
 cancellation, bias source order, treat nil as ready, settle before pending

@@ -46,6 +46,9 @@ type Other[T any] struct {
 	if owner != pair.Obj() {
 		t.Fatal("field correspondence lost its nominal origin")
 	}
+	if correspondence.DeclarationField() != pair.Underlying().(*types.Struct).Field(1) {
+		t.Fatal("field correspondence lost its declaration object")
+	}
 	if got := types.TypeString(declaration, nil); got != "func(U) T" {
 		t.Fatalf("declaration field type = %s", got)
 	}

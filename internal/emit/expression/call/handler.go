@@ -190,6 +190,16 @@ func emit(
 		context.TypesInfo(),
 		source.Fun,
 	)
+	exactSynchronous := false
+	var exactSynchronousRequests []api.RootRequest
+	if _, literal := directFunctionLiteral(source.Fun); !direct && !literal {
+		var selectionErr error
+		exactSynchronous, exactSynchronousRequests, selectionErr =
+			cooperativecall.ExactSynchronousValue(context, source.Fun)
+		if selectionErr != nil {
+			return api.ExpressionEmission{}, selectionErr
+		}
+	}
 	if direct {
 		target, selected, requests, err := emitProviderProfileFunction(
 			context,
@@ -320,6 +330,7 @@ func emit(
 		argumentRequests,
 		guardRequests,
 		profileRequests,
+		exactSynchronousRequests,
 	)
 	target, err := api.NewExpressionEmission(before, call, requests)
 	if err != nil {
@@ -358,6 +369,19 @@ func emit(
 		)
 		if err != nil || discarded || !providerBoundary {
 			return target, err
+		}
+		return providerboundary.FromProviderResults(
+			context,
+			children,
+			nil,
+			"",
+			signature.Results(),
+			target,
+		)
+	}
+	if exactSynchronous {
+		if discarded || !providerBoundary {
+			return target, nil
 		}
 		return providerboundary.FromProviderResults(
 			context,

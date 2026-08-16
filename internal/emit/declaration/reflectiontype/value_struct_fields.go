@@ -12,6 +12,7 @@ func nonBlankStructFieldCallbacks(
 	context api.Context,
 	sourceType types.Type,
 	field *types.Var,
+	settable bool,
 	scaffold *locationScaffold,
 ) (
 	tsgo.Expression,
@@ -33,6 +34,7 @@ func nonBlankStructFieldCallbacks(
 		context,
 		field,
 		target,
+		settable,
 		scaffold,
 	)
 }
@@ -88,6 +90,7 @@ func storageStructFieldCallbacks(
 	context api.Context,
 	field *types.Var,
 	target api.StoreTargetEmission,
+	settable bool,
 	scaffold *locationScaffold,
 ) (
 	tsgo.Expression,
@@ -110,6 +113,7 @@ func storageStructFieldCallbacks(
 			field,
 			target,
 			read,
+			settable,
 			scaffold,
 		)
 	}
@@ -129,6 +133,13 @@ func storageStructFieldCallbacks(
 		statements = append(statements, factory.ReturnStatement(boxed))
 		get = nil
 		getBlock = factory.Block(statements, true)
+	}
+	if !settable {
+		return get, getBlock, unaddressableFieldSetter(scaffold),
+			api.CombineRequests(
+				fieldAdapter.Requests(),
+				read.Requests(),
+			), nil
 	}
 	copied, err := context.Values().Transfer(
 		context.WithRole(api.RoleStructCopyField),
@@ -171,6 +182,7 @@ func storageInterfaceFieldCallbacks(
 	field *types.Var,
 	target api.StoreTargetEmission,
 	read api.ExpressionEmission,
+	settable bool,
 	scaffold *locationScaffold,
 ) (
 	tsgo.Expression,
@@ -179,6 +191,18 @@ func storageInterfaceFieldCallbacks(
 	[]api.RootRequest,
 	error,
 ) {
+	get := read.Value()
+	var getBlock tsgo.Block
+	if len(read.Before()) != 0 {
+		statements := append([]tsgo.Statement(nil), read.Before()...)
+		statements = append(statements, scaffold.factory.ReturnStatement(get))
+		get = nil
+		getBlock = scaffold.factory.Block(statements, true)
+	}
+	if !settable {
+		return get, getBlock, unaddressableFieldSetter(scaffold),
+			read.Requests(), nil
+	}
 	assigned, contractRequests, err := admittedInterfaceFieldValue(
 		context,
 		field,
@@ -195,14 +219,6 @@ func storageInterfaceFieldCallbacks(
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	get := read.Value()
-	var getBlock tsgo.Block
-	if len(read.Before()) != 0 {
-		statements := append([]tsgo.Statement(nil), read.Before()...)
-		statements = append(statements, scaffold.factory.ReturnStatement(get))
-		get = nil
-		getBlock = scaffold.factory.Block(statements, true)
-	}
 	setStatements := append([]tsgo.Statement(nil), stored.Before()...)
 	setStatements = append(
 		setStatements,
@@ -214,4 +230,14 @@ func storageInterfaceFieldCallbacks(
 			read.Requests(),
 			stored.Requests(),
 		), nil
+}
+
+func unaddressableFieldSetter(scaffold *locationScaffold) tsgo.Block {
+	return scaffold.factory.Block(
+		[]tsgo.Statement{scaffold.factory.ExpressionStatement(runtimePanic(
+			scaffold,
+			"reflect: Value.Set using unaddressable value",
+		))},
+		true,
+	)
 }

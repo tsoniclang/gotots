@@ -393,6 +393,18 @@ func SortClosed(source []string) {
 	slices.SortFunc(source, value.compare)
 }
 
+func CallClosed(left, right string) int { return newClosedComparer().compare(left, right) }
+
+func DeferClosed() {
+	value := newClosedComparer()
+	defer value.compare("left", "right")
+}
+
+func GoClosed() {
+	value := newClosedComparer()
+	go value.compare("left", "right")
+}
+
 type directComparer struct{}
 
 func (directComparer) compare(left, right string) int {
@@ -420,6 +432,13 @@ type openComparer struct {
 func SortOpen(source []string, compare func(string, string) int) {
 	value := &openComparer{compare: compare}
 	slices.SortFunc(source, value.compare)
+}
+
+func CallOpen(
+	value *openComparer,
+	left, right string,
+) int {
+	return value.compare(left, right)
 }
 
 type cooperativeComparer struct {
@@ -500,9 +519,13 @@ func SortInterface(source []string, provider comparer) {
 	var roots []emit.Root
 	for _, name := range []string{
 		"SortClosed",
+		"CallClosed",
+		"DeferClosed",
+		"GoClosed",
 		"SortMethod",
 		"SortExported",
 		"SortOpen",
+		"CallOpen",
 		"SortCooperative",
 		"SortLiteral",
 		"SortAddressed",
@@ -514,7 +537,9 @@ func SortInterface(source []string, provider comparer) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	printed := materializeArtifacts(t, emission, t.TempDir()).printed
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	printed := artifacts.printed
 	for _, synchronous := range []string{
 		"export function SortClosed(",
 		"export function SortMethod(",
@@ -526,6 +551,7 @@ func SortInterface(source []string, provider comparer) {
 	for _, canonical := range []string{
 		"export async function SortExported(",
 		"export async function SortOpen(",
+		"export async function CallOpen(",
 		"export async function SortCooperative(",
 		"export async function SortLiteral(",
 		"export async function SortAddressed(",
@@ -538,4 +564,36 @@ func SortInterface(source []string, provider comparer) {
 	if !strings.Contains(printed, "SlicesSortFuncSynchronousKernel<") {
 		t.Fatalf("closed callback lacks synchronous provider kernel:\n%s", printed)
 	}
+	if !strings.Contains(
+		printed,
+		"public compare: (($0: gostring, $1: gostring) => int) | undefined",
+	) {
+		t.Fatalf("closed callback field lacks synchronous transport:\n%s", printed)
+	}
+	if !strings.Contains(
+		printed,
+		"public compare: (($0: gostring, $1: gostring) => Awaitable<int>) | undefined",
+	) {
+		t.Fatalf("open callback field lost canonical transport:\n%s", printed)
+	}
+	for _, synchronous := range []string{"CallClosed", "GoClosed"} {
+		if !strings.Contains(printed, "export function "+synchronous+"(") ||
+			strings.Contains(printed, "export async function "+synchronous+"(") {
+			t.Fatalf(
+				"closed callback invocation retained cooperative transport in %s:\n%s",
+				synchronous,
+				printed,
+			)
+		}
+	}
+	if !strings.Contains(printed, "export async function DeferClosed(") {
+		t.Fatalf("deferred recovery transport lost its canonical effect:\n%s", printed)
+	}
+	if !strings.Contains(
+		printed,
+		"=> int) | undefined = loadPointer<closedComparer>",
+	) {
+		t.Fatalf("deferred callback capture lost synchronous transport:\n%s", printed)
+	}
+	waveThreeTypecheck(t, workingDirectory, artifacts.paths)
 }

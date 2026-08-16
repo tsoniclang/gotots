@@ -204,15 +204,31 @@ func EmitDeferred(
 			return api.ExpressionEmission{}, err
 		}
 	default:
-		targetType, err := children.RepresentedType(
-			context.WithRole(api.RoleCallCallee),
-			source.Fun,
-			sourceType,
-		)
+		exactSynchronous, exactRequests, selectionErr :=
+			cooperativecall.ExactSynchronousValue(context, source.Fun)
+		if selectionErr != nil {
+			return api.ExpressionEmission{}, selectionErr
+		}
+		var targetType api.TypeEmission
+		if exactSynchronous {
+			targetType, err = callable.EmitSynchronousType(
+				context.WithRole(api.RoleCallCallee),
+				children,
+				source.Fun,
+				signature,
+			)
+		} else {
+			targetType, err = children.RepresentedType(
+				context.WithRole(api.RoleCallCallee),
+				source.Fun,
+				sourceType,
+			)
+		}
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		if _, defined := definedtype.ResolveCallable(sourceType); defined &&
+		if _, defined := definedtype.ResolveCallable(sourceType); !exactSynchronous &&
+			defined &&
 			!providerBoundary {
 			targetType, err = callable.EmitType(
 				context.WithRole(api.RoleCallCallee),
@@ -239,11 +255,16 @@ func EmitDeferred(
 		)
 		targetCallee = context.Factory().Identifier(name)
 		requests = append(requests, targetType.Requests()...)
-		cooperative, contractRequests, err =
+		var valueRequests []api.RootRequest
+		cooperative, valueRequests, err =
 			cooperativecall.ValueContract(context, signature)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		contractRequests = api.CombineRequests(
+			exactRequests,
+			valueRequests,
+		)
 	}
 	requests = append(requests, contractRequests...)
 	arguments, argumentBefore, argumentRequests, err := emitArguments(

@@ -258,13 +258,7 @@ func structValueProperties(
 		var setBlock tsgo.Block
 		if field.Name() == "_" {
 			settable = false
-			setBlock = factory.Block(
-				[]tsgo.Statement{factory.ExpressionStatement(runtimePanic(
-					scaffold,
-					"reflect: Value.Set using unaddressable value",
-				))},
-				true,
-			)
+			setBlock = unaddressableFieldSetter(scaffold)
 			if _, isInterface := types.Unalias(field.Type()).Underlying().(*types.Interface); isInterface {
 				boxedField = factory.Identifier("undefined")
 			} else {
@@ -317,6 +311,7 @@ func structValueProperties(
 					context,
 					sourceType,
 					field,
+					settable,
 					scaffold,
 				)
 			if descriptorErr != nil {
