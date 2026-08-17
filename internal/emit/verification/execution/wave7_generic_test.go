@@ -230,9 +230,9 @@ func TestWaveSevenGenericNamedTypesCompileThroughPublicPipeline(t *testing.T) {
 			) || strings.Contains(
 				local,
 				"export function GenericMapValue$Named_entry",
-			) || !strings.Contains(local, "): GoMapValue<entry, int32> {") {
+			) || !strings.Contains(local, "): GoMapValue<entry, int32> =>") {
 				t.Fatalf(
-					"local-type concretization is not lexical and unexported:\n%s",
+					"local-type concretization is not lexical, unexported, and inline:\n%s",
 					local,
 				)
 			}

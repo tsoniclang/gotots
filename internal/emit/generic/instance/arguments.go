@@ -271,13 +271,31 @@ func EmitCapabilities(
 				}
 			}
 		} else {
-			referenceName, referenceRequests, providerFacet, err =
-				emitNamedConcreteCapability(
-					context,
-					operation,
-					signature,
-					cooperativeCapability,
-				)
+			inline, handled, inlineErr := children.ConcreteGenericOperation(
+				context,
+				operation.Selection(),
+				signature,
+			)
+			err = inlineErr
+			if err == nil && handled {
+				if len(inline.Before()) != 0 {
+					return nil, nil, &api.InvariantError{
+						Role:   context.Role(),
+						Reason: "inline concrete capability has outer statements",
+					}
+				}
+				reference = inline.Value()
+				referenceRequests = inline.Requests()
+			}
+			if err == nil && !handled {
+				referenceName, referenceRequests, providerFacet, err =
+					emitNamedConcreteCapability(
+						context,
+						operation,
+						signature,
+						cooperativeCapability,
+					)
+			}
 		}
 		if err != nil {
 			return nil, nil, err
@@ -335,11 +353,10 @@ func emitNamedConcreteCapability(
 	signature *types.Signature,
 	cooperative bool,
 ) (string, []api.RootRequest, api.CallableFacet, error) {
-	if !operation.Valid() ||
-		operation.Operation() == api.GenericOperationDeferredCallableRegistry {
+	if operation.Operation() != api.GenericOperationConstraintMethod {
 		return "", nil, api.CallableFacet{}, &api.InvariantError{
 			Role:   context.Role(),
-			Reason: "concrete generic operation has no reusable capability owner",
+			Reason: "ordinary concrete generic operation has no inline emitter",
 		}
 	}
 	reference, err := context.Names().GenericCapability(

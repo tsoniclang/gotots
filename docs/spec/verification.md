@@ -533,14 +533,14 @@ The gate exact-joins every concretization to one
 its source-substituted signature. Direct generic bodies remain one definition.
 Concretization count grows with distinct necessary instances, not calls.
 
-The same gate separately counts concrete operation definitions and reusable
-generic-capability files. Every distinct exact zero/copy/arithmetic/comparison/
-conversion/storage/index/slice signature has one canonical capability
-definition, regardless of call count; operation families, rather than exact
-instances, bound the number of compilation-scoped files. Every call, value,
-method, provider, and nested generic path crosses the same concrete-operation
-seam. Mutations rebuilding an operation arrow at each call, duplicating one
-canonical capability definition,
+The same gate separately counts concrete inline operations and standalone
+generic-capability files. Ordinary exact zero/copy/arithmetic/comparison/
+conversion/storage/index/slice operations must contribute zero standalone
+files; only a fixture's explicitly shared constraint-method or deferred
+registry owners may remain. Every call, value, method, provider, and nested
+generic path crosses the same concrete-operation seam, and an ordinary
+operation reaching the generated-artifact builder fails. Mutations restoring
+one concrete capability file,
 replacing a semantic declaration/path with a digest suffix, omitting receiver,
 method, effect, or ordered type arguments from a name, or colliding an import
 with an authored binding fail the AST, layout, naming, or strict-typecheck

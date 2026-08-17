@@ -111,7 +111,7 @@ func assertGenericMethodAdapterShape(t *testing.T, printed string) {
 		"$go$binary_equal$",
 		"Same$kernel",
 		"ComparableBox$Same$int32",
-		"export function $go$binary_equal$int32_int32_to_bool",
+		"=>",
 	} {
 		if !strings.Contains(printed, required) {
 			t.Fatalf("generic method artifact lacks %q:\n%s", required, printed)
@@ -124,7 +124,7 @@ func assertGenericMethodAdapterShape(t *testing.T, printed string) {
 		t.Fatalf("generic method adapter uses dynamic callable APIs:\n%s", printed)
 	}
 	ordinaryKernelCapability := regexp.MustCompile(
-		`\.Same\$kernel\(\$go\$binary_equal\$int32_int32_to_bool,`,
+		`\.Same\$kernel\(\(\$argument0: int32, \$argument1: int32\): bool =>`,
 	)
 	if count := len(ordinaryKernelCapability.FindAllString(printed, -1)); count != 1 {
 		t.Fatalf(

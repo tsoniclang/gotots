@@ -248,8 +248,8 @@ func materializeWaveThreeExpressions(
 	)
 	if result.genericConcretizations != 1 ||
 		result.genericConcretizationBytes > 850 ||
-		result.genericCapabilities != 1 ||
-		result.genericCapabilityBytes > 200 {
+		result.genericCapabilities != 0 ||
+		result.genericCapabilityBytes != 0 {
 		t.Fatalf(
 			"Wave 3 generic artifact bounds exceeded: concretizations=%d/%d capabilities=%d/%d",
 			result.genericConcretizations,

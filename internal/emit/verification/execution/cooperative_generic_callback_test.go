@@ -31,6 +31,7 @@ func TestGenericCallableTransportUsesOneAwaitableABI(t *testing.T) {
 	for _, forbidden := range []string{
 		"$cooperative_",
 		"$goCapability_",
+		"support/generics/capabilities/",
 		"instanceof Promise",
 		".then ===",
 		"$Value =",
@@ -38,12 +39,6 @@ func TestGenericCallableTransportUsesOneAwaitableABI(t *testing.T) {
 		if strings.Contains(artifacts.printed, forbidden) {
 			t.Fatalf("generic callable output retained forbidden %q", forbidden)
 		}
-	}
-	if !strings.Contains(
-		artifacts.printed,
-		"support/generics/capabilities/",
-	) {
-		t.Fatal("generic callable lacks reusable exact capability declarations")
 	}
 	for _, function := range []string{
 		"SynchronousApply",

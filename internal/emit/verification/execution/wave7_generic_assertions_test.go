@@ -192,10 +192,10 @@ func assertWaveSevenGenericFoundationShape(t *testing.T, printed string) {
 	}
 	zeroFromNew := concreteFunctionText(t, printed, "ZeroFromNew")
 	if !strings.Contains(zeroFromNew, "ZeroFromNew$kernel<") ||
-		!strings.Contains(zeroFromNew, "$go$zero$void_to_int32") ||
-		strings.Contains(zeroFromNew, "(): int32 =>") {
+		!strings.Contains(zeroFromNew, "(): int32 =>") ||
+		!strings.Contains(zeroFromNew, "return 0") {
 		t.Fatalf(
-			"generic *new(T) wrapper did not delegate with one reusable zero operation:\n%s",
+			"generic *new(T) wrapper did not delegate with one inline zero operation:\n%s",
 			zeroFromNew,
 		)
 	}

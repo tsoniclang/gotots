@@ -849,17 +849,16 @@ first-class operation bag, or runtime selection. Kernel, facade, and operation
 identities derive from Go declaration identity plus exact type arguments, not
 source position or target spelling.
 
-An exact concrete operation is emitted once as a typed, reusable capability
-declaration keyed by operation identity plus its exact concrete signature.
-Compilation-scoped capabilities are grouped by operation family; capabilities
-whose signatures mention lexical types remain at that lexical owner. Facades
-and open generic calls pass the named function, so repeated calls never rebuild
-closed operation arrows. These declarations remain internal artifact wiring:
-they are not source-facing parameters, operation bags, or runtime-selected
-dictionaries. Thus `Add[int32]` calls its kernel with the canonical named
-`int32` addition capability. The child-emission boundary owns construction for
-every operation kind, and the artifact registry exact-joins all uses to one
-definition.
+An exact concrete operation is emitted as one typed inline arrow at that facade
+call when no separately shared semantic owner is required. It does not create a
+standalone capability declaration or module. Constraint-method dispatch and a
+transported deferred-callable registry remain named only when their independent
+effect or registry contract is itself the shared owner. Thus `Add[int32]` calls
+its kernel with `(left, right) => left + right`; it does not import a generated
+`$goCapability_*` function. The child-emission boundary owns this operation
+construction for every call, value, method, provider, and nested-generic path;
+the generated-artifact builder rejects an ordinary concrete operation rather
+than recreating the removed standalone route.
 
 Concretization and operation display names are semantic and source-derived. A
 function uses its declaration name, a method also uses its receiver, concrete

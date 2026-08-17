@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	builtinoperation "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	clearoperation "github.com/tsoniclang/gotots/internal/emit/expression/builtin/clear"
 	conversionoperation "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
@@ -30,24 +31,21 @@ func Build(
 			"generated artifact is not a generic capability",
 		)
 	}
-	if sourceType, facet, direction, storage :=
-		api.GenericStorageOperationType(selection, signature); storage {
-		return buildStorage(
+	if selection.Operation() != api.GenericOperationConstraintMethod {
+		return nil, nil, invariant(
 			context,
-			children,
-			artifact.TargetName(),
-			modifiers,
-			sourceType,
-			facet,
-			direction,
+			"ordinary concrete generic operation reached a standalone artifact",
 		)
 	}
-	target, modifiers, resultType, err := buildCallableSurface(
-		context,
+	signatureRole := api.RoleFileDeclaration
+	if artifact.Placement() == api.GeneratedArtifactPlacementLexical {
+		signatureRole = api.RoleLocalDeclaration
+	}
+	target, err := callable.EmitAdapter(
+		context.WithRole(signatureRole),
 		children,
+		nil,
 		signature,
-		artifact.Placement(),
-		modifiers,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -73,6 +71,11 @@ func Build(
 			body,
 			context.Factory().ReturnStatement(value.Value()),
 		)
+	}
+	resultType := target.Result()
+	if context.IsCooperative() {
+		modifiers = append(modifiers, context.Factory().AsyncKeyword())
+		resultType = callable.PromiseResult(context.Factory(), resultType)
 	}
 	statement := tsgo.Statement(context.Factory().FunctionDeclaration(
 		modifiers,
@@ -377,26 +380,6 @@ func emitValue(
 		return emitReflectionType(context, operation, signature, arguments)
 	case api.GenericOperationReflectionValue:
 		return emitReflectionValue(context, operation, signature, arguments)
-	case api.GenericOperationIndexAddress:
-		receiver, _, element, selected :=
-			api.GenericIndexAddressOperation(selection, signature)
-		if !selected {
-			return api.ExpressionEmission{}, shapeError(context, operation)
-		}
-		value, handled, err := emitIndexAddressValue(
-			context,
-			children,
-			receiver,
-			element,
-			arguments,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if !handled {
-			return api.ExpressionEmission{}, shapeError(context, operation)
-		}
-		return value, nil
 	case api.GenericOperationConstraintMethod:
 		return emitConstraintMethod(
 			context,

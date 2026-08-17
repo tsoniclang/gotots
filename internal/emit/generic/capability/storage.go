@@ -2,106 +2,22 @@ package capability
 
 import (
 	"go/types"
-	"slices"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericstorage "github.com/tsoniclang/gotots/internal/emit/generic/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-type storageSurface struct {
-	parameter tsgo.ParameterDeclaration
-	result    tsgo.TypeNode
-	requests  []api.RootRequest
-	value     tsgo.Identifier
-}
-
-func buildStorage(
+func inlineStorageCapability(
 	context api.Context,
 	children api.ChildEmitter,
-	name string,
-	modifiers []tsgo.ModifierLike,
-	sourceType types.Type,
-	facet api.GenericRepresentationFacet,
-	direction api.GenericStorageDirection,
-) (tsgo.Statement, []api.RootRequest, error) {
-	surface, err := makeStorageSurface(
-		context,
-		children,
-		name,
-		sourceType,
-		facet,
-		direction,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	result, err := genericstorage.Convert(
-		context.WithRole(api.RoleFunctionBody),
-		nil,
-		sourceType,
-		facet,
-		direction,
-		api.DirectExpression(surface.value),
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	body := append(
-		result.Before(),
-		context.Factory().ReturnStatement(result.Value()),
-	)
-	return storageSurfaceDeclaration(
-			context,
-			name,
-			modifiers,
-			surface,
-			context.Factory().Block(body, true),
-		), api.CombineRequests(
-			surface.requests,
-			result.Requests(),
-		), nil
-}
-
-func buildStorageSurface(
-	context api.Context,
-	children api.ChildEmitter,
-	name string,
-	modifiers []tsgo.ModifierLike,
-	sourceType types.Type,
-	facet api.GenericRepresentationFacet,
-	direction api.GenericStorageDirection,
-) (tsgo.Statement, []api.RootRequest, error) {
-	surface, err := makeStorageSurface(
-		context,
-		children,
-		name,
-		sourceType,
-		facet,
-		direction,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	return storageSurfaceDeclaration(
-		context,
-		name,
-		modifiers,
-		surface,
-		nil,
-	), surface.requests, nil
-}
-
-func makeStorageSurface(
-	context api.Context,
-	children api.ChildEmitter,
-	name string,
-	sourceType types.Type,
-	facet api.GenericRepresentationFacet,
-	direction api.GenericStorageDirection,
-) (storageSurface, error) {
-	if name == "" || sourceType == nil || !facet.Valid() || !direction.Valid() {
-		return storageSurface{}, invariant(context, "generic storage capability is invalid")
+	signature *types.Signature,
+	selection api.GenericOperationSelection,
+) (api.ExpressionEmission, bool, error) {
+	sourceType, facet, direction, ok :=
+		api.GenericStorageOperationType(selection, signature)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
 	}
 	logical, err := children.RepresentedType(
 		context.WithRole(api.RoleParameterType),
@@ -109,7 +25,7 @@ func makeStorageSurface(
 		sourceType,
 	)
 	if err != nil {
-		return storageSurface{}, err
+		return api.ExpressionEmission{}, true, err
 	}
 	storage, err := genericstorage.Type(
 		context.WithRole(api.RoleStorageType),
@@ -118,7 +34,7 @@ func makeStorageSurface(
 		facet,
 	)
 	if err != nil {
-		return storageSurface{}, err
+		return api.ExpressionEmission{}, true, err
 	}
 	parameterType := logical.Value()
 	resultType := storage.Value()
@@ -126,38 +42,43 @@ func makeStorageSurface(
 	if direction == api.GenericStorageDirectionFrom {
 		parameterType, resultType = resultType, parameterType
 	}
-	return storageSurface{
-		parameter: context.Factory().ParameterDeclaration(
+	result, err := genericstorage.Convert(
+		context.WithRole(api.RoleFunctionBody),
+		nil,
+		sourceType,
+		facet,
+		direction,
+		api.DirectExpression(value),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	body := append(
+		result.Before(),
+		context.Factory().ReturnStatement(result.Value()),
+	)
+	return api.DirectExpression(
+		context.Factory().ArrowFunction(
 			nil,
 			nil,
-			value,
-			nil,
-			parameterType,
-			nil,
+			[]tsgo.ParameterDeclaration{
+				context.Factory().ParameterDeclaration(
+					nil,
+					nil,
+					value,
+					nil,
+					parameterType,
+					nil,
+				),
+			},
+			resultType,
+			context.Factory().EqualsGreaterThanToken(),
+			context.Factory().Block(body, true),
 		),
-		result: resultType,
-		requests: api.CombineRequests(
+		api.CombineRequests(
 			logical.Requests(),
 			storage.Requests(),
-		),
-		value: value,
-	}, nil
-}
-
-func storageSurfaceDeclaration(
-	context api.Context,
-	name string,
-	modifiers []tsgo.ModifierLike,
-	surface storageSurface,
-	body tsgo.Block,
-) tsgo.FunctionDeclaration {
-	return context.Factory().FunctionDeclaration(
-		slices.Clone(modifiers),
-		nil,
-		context.Factory().Identifier(name),
-		nil,
-		[]tsgo.ParameterDeclaration{surface.parameter},
-		surface.result,
-		body,
-	)
+			result.Requests(),
+		)...,
+	), true, nil
 }

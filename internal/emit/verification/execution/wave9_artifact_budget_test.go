@@ -30,10 +30,10 @@ func assertWaveNineGenericArtifactBudget(
 			capabilityBytes += artifact.bytes
 		}
 	}
-	// Exact concrete operations and the deferred-callable registry are reusable
-	// declarations grouped into their two operation-family modules.
+	// Exact concrete operations are inline. Only the one shared deferred-
+	// callable registry remains a standalone capability in this fixture.
 	if concretizations != 6 || concretizationBytes > 6_200 ||
-		capabilities != 2 || capabilityBytes > 4_000 {
+		capabilities != 1 || capabilityBytes > 2_700 {
 		t.Fatalf(
 			"Wave 9 generic artifact bounds exceeded: concretizations=%d/%d capabilities=%d/%d",
 			concretizations,
