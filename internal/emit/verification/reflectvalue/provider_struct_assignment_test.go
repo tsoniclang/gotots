@@ -189,6 +189,11 @@ func main() {
 			) {
 				t.Fatalf("provider struct reflection lacks its compact opaque registration")
 			}
+			if !regexp.MustCompile(
+				`(?s)\.\$registerOpaqueStruct\(\s*[^,]+,\s*\(\)\s*=>`,
+			).MatchString(artifacts.printed) {
+				t.Fatalf("provider struct reflection resolves its adapter eagerly")
+			}
 			for _, required := range []string{
 				"TimeParseErrorOperations.$copy",
 				"TimeTimerOperations.$copy",

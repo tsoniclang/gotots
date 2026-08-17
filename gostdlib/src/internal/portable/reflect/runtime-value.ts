@@ -31,6 +31,8 @@ export interface RuntimeValueAdapter<T> {
   ): value is GoInterfaceValue & { readonly $go$value: T };
 }
 
+export type RuntimeValueAdapterResolver<T> = () => RuntimeValueAdapter<T>;
+
 export interface RuntimeStructFieldOperations<T> {
   readonly type: () => Type;
   readonly settable: bool;
@@ -185,11 +187,12 @@ export function registerRuntimeValueOperations(
 
 export function registerRuntimeStructValueOperations<T>(
   type: Type,
-  adapter: RuntimeValueAdapter<T>,
+  resolveAdapter: RuntimeValueAdapterResolver<T>,
   fields: readonly RuntimeStructFieldOperations<T>[],
   clone?: (value: T) => T,
 ): void {
   registerRuntimeValueOperations(type, () => {
+    const adapter = resolveAdapter();
     const fieldCount = BigInt(fields.length);
     const field = (
       box: GoInterfaceValue,
@@ -237,10 +240,11 @@ export function registerRuntimeStructValueOperations<T>(
 
 export function registerRuntimeOpaqueStructValueOperations<T>(
   type: Type,
-  adapter: RuntimeValueAdapter<T>,
+  resolveAdapter: RuntimeValueAdapterResolver<T>,
   unavailableFields: readonly gostring[],
 ): void {
   registerRuntimeValueOperations(type, () => {
+    const adapter = resolveAdapter();
     const fieldCount = BigInt(unavailableFields.length);
     return {
       numField: fieldCount,
@@ -264,10 +268,11 @@ export function registerRuntimeOpaqueStructValueOperations<T>(
 
 export function registerRuntimePointerValueOperations<P>(
   type: Type,
-  adapter: RuntimeValueAdapter<P | undefined>,
+  resolveAdapter: RuntimeValueAdapterResolver<P | undefined>,
   descriptor: RuntimePointerValueOperations<P>,
 ): void {
   registerRuntimeValueOperations(type, () => {
+    const adapter = resolveAdapter();
     const element = descriptor.element;
     const newPointer = descriptor.newPointer;
     const elementOperation = element === undefined

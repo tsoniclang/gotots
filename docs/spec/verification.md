@@ -572,6 +572,16 @@ size gate must fail before output is sealed. Broad artifact searches prove
 that each migrated semantic family has one typed registration route and no
 superseded direct `$registerValue` registration.
 
+Struct, opaque-struct, and pointer registration fixtures prove that adapter
+resolvers are not evaluated at registration, are evaluated exactly once at
+first operation materialization, and remain statically typed. Generated-source
+shape gates require the resolver at every registration. A provider runtime
+fixture recreates a legal indirect ESM cycle, proves that an eager adapter read
+fails during module initialization, and then proves that the lazy registration
+starts and materializes successfully. Mutations passing an adapter eagerly or
+resolving the thunk during registration fail the source-shape, provider-build,
+or runtime-cycle gate.
+
 ## Generic Proof
 
 Fixtures cover:

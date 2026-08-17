@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { GoInterfaceValue } from "@gotots/runtime/interface-value.js";
@@ -80,6 +84,80 @@ test("reflection metadata and value operations materialize exactly on demand", (
   assert.deepEqual([metadataCalls, methodCalls, operationCalls], [1, 1, 1]);
 });
 
+test("lazy adapter registration survives an ESM initialization cycle", () => {
+  const directory = mkdtempSync(join(tmpdir(), "gotots-reflect-cycle-"));
+  const runtimeValueModule = new URL(
+    "../src/internal/portable/reflect/runtime-value.js",
+    import.meta.url,
+  ).href;
+  try {
+    writeFileSync(
+      join(directory, "registration-eager.mjs"),
+      `import { CycleAdapter } from "./adapter-eager.mjs";
+void CycleAdapter;
+`,
+    );
+    writeFileSync(
+      join(directory, "adapter-eager.mjs"),
+      `import "./registration-eager.mjs";
+export class CycleAdapter {}
+`,
+    );
+    writeFileSync(
+      join(directory, "entry-eager.mjs"),
+      `import "./adapter-eager.mjs";
+`,
+    );
+    const eager = spawnSync(process.execPath, [join(directory, "entry-eager.mjs")], {
+      encoding: "utf8",
+    });
+    assert.notEqual(eager.status, 0);
+    assert.match(eager.stderr, /before initialization/);
+
+    writeFileSync(
+      join(directory, "registration.mjs"),
+      `import { CycleAdapter } from "./adapter.mjs";
+import {
+  registerRuntimeStructValueOperations,
+  runtimeValueOperations,
+} from ${JSON.stringify(runtimeValueModule)};
+
+const descriptor = {};
+registerRuntimeStructValueOperations(descriptor, () => CycleAdapter, []);
+
+export function registeredOperations() {
+  return runtimeValueOperations(descriptor);
+}
+`,
+    );
+    writeFileSync(
+      join(directory, "adapter.mjs"),
+      `import { registeredOperations } from "./registration.mjs";
+export class CycleAdapter {
+  static $is() { return true; }
+}
+export function operations() { return registeredOperations(); }
+`,
+    );
+    writeFileSync(
+      join(directory, "entry.mjs"),
+      `import { operations } from "./adapter.mjs";
+if (operations()?.numField !== 0n) {
+  throw new Error("lazy reflection operations were not materialized");
+}
+process.stdout.write("ok\\n");
+`,
+    );
+    const lazy = spawnSync(process.execPath, [join(directory, "entry.mjs")], {
+      encoding: "utf8",
+    });
+    assert.equal(lazy.status, 0, lazy.stderr);
+    assert.equal(lazy.stdout, "ok\n");
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
 test("lazy pointer registration preserves the predeclared descriptor identity", () => {
   const element = createRuntimeType(
     () => metadata("int", 2n),
@@ -125,9 +203,13 @@ test("typed struct registration owns common guards, locations, and copies", () =
   const recordAdapter = valueAdapter<Record>(Object.freeze({ comparable: true }));
   const stringAdapter = valueAdapter<string>(Object.freeze({ comparable: true }));
   const intAdapter = valueAdapter<bigint>(Object.freeze({ comparable: true }));
+  let adapterResolutionCount = 0;
   registerRuntimeStructValueOperations(
     recordDescriptor,
-    recordAdapter,
+    (): typeof recordAdapter => {
+      adapterResolutionCount += 1;
+      return recordAdapter;
+    },
     [
       {
         type: () => stringDescriptor,
@@ -155,8 +237,12 @@ test("typed struct registration owns common guards, locations, and copies", () =
     (record: Record): Record => ({ ...record }),
   );
 
+  assert.equal(adapterResolutionCount, 0);
   const source = new recordAdapter({ name: "before", count: 3n });
   const operations = runtimeValueOperations(recordDescriptor);
+  assert.equal(adapterResolutionCount, 1);
+  assert.equal(runtimeValueOperations(recordDescriptor), operations);
+  assert.equal(adapterResolutionCount, 1);
   assert.equal(operations?.numField, 2n);
   const location = operations?.field?.(source, 0n);
   assert.equal(location?.type(), stringDescriptor);
@@ -205,7 +291,7 @@ test("opaque struct registration preserves exact field obligations", () => {
   const adapter = valueAdapter<Record>(Object.freeze({ comparable: true }));
   registerRuntimeOpaqueStructValueOperations(
     descriptor,
-    adapter,
+    () => adapter,
     ["reflect: field Hidden is unavailable"],
   );
 
@@ -236,7 +322,7 @@ test("typed pointer registration preserves nil and aliased element storage", () 
   const pointerAdapter = valueAdapter<Cell | undefined>(
     Object.freeze({ comparable: true }),
   );
-  registerRuntimePointerValueOperations(pointerDescriptor, pointerAdapter, {
+  registerRuntimePointerValueOperations(pointerDescriptor, () => pointerAdapter, {
     zero: true,
     element: {
       type: () => recordDescriptor,

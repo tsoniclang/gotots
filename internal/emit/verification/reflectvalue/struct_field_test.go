@@ -1,6 +1,7 @@
 package reflectvalue_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -91,6 +92,11 @@ func main() {
 					"struct reflection repeats per-type index dispatch (%d bytes)",
 					len(artifacts.printed),
 				)
+			}
+			if !regexp.MustCompile(
+				`(?s)\.\$registerStruct\(\s*[^,]+,\s*\(\)\s*=>`,
+			).MatchString(artifacts.printed) {
+				t.Fatalf("struct reflection resolves its adapter eagerly")
 			}
 		},
 	)

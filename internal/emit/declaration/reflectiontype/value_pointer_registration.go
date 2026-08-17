@@ -100,7 +100,14 @@ func pointerValueOperationsStatement(
 		nil,
 		[]tsgo.Expression{
 			factory.Identifier(descriptorName),
-			adapter.Expression(factory),
+			factory.ArrowFunction(
+				nil,
+				nil,
+				nil,
+				nil,
+				factory.EqualsGreaterThanToken(),
+				factory.ParenthesizedExpression(adapter.Expression(factory)),
+			),
 			factory.ObjectLiteralExpression(properties, true),
 		},
 		tsgo.NodeFlagsNone,

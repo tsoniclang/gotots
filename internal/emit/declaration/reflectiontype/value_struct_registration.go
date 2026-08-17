@@ -304,7 +304,14 @@ func structRegistrationCall(
 ) tsgo.Statement {
 	arguments := []tsgo.Expression{
 		factory.Identifier(descriptorName),
-		adapter.Expression(factory),
+		factory.ArrowFunction(
+			nil,
+			nil,
+			nil,
+			nil,
+			factory.EqualsGreaterThanToken(),
+			factory.ParenthesizedExpression(adapter.Expression(factory)),
+		),
 		fields,
 	}
 	if clone != nil {

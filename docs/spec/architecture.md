@@ -837,6 +837,14 @@ closures is a source-size and typecheck regression even when behavior remains
 correct. Erasing callback payloads or recovering their types dynamically is
 equally invalid.
 
+Every generated value-operation registration carries its concrete adapter as
+a zero-argument typed resolver. Registration stores that resolver without
+evaluating it; the provider resolves it once when the operation record is first
+materialized. This preserves one canonical adapter while preventing the legal
+`reflection-types` <-> `interface-adapters` ESM cycle from reading a lexical
+class binding during its temporal dead zone. Import reordering, duplicated
+adapters, and eager registration-time resolution are forbidden.
+
 Descriptor definitions are emitted once and use-site references are O(1).
 Metadata growth is linear in reached canonical types plus their actual
 fields/methods; it may not grow by type-pair, call-site, implementer, or package

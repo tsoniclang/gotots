@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -516,6 +517,18 @@ func measureReflectionRegistrations(
 			}
 			if pointers := strings.Count(text, ".$registerPointer("); pointers < count {
 				t.Fatalf("pointer registrations = %d, want at least %d", pointers, count)
+			}
+			lazyStructs := regexp.MustCompile(
+				`(?s)\.\$registerStruct\(\s*[^,]+,\s*\(\)\s*=>`,
+			).FindAllString(text, -1)
+			if len(lazyStructs) != count {
+				t.Fatalf("lazy struct registrations = %d, want %d", len(lazyStructs), count)
+			}
+			lazyPointers := regexp.MustCompile(
+				`(?s)\.\$registerPointer\(\s*[^,]+,\s*\(\)\s*=>`,
+			).FindAllString(text, -1)
+			if len(lazyPointers) < count {
+				t.Fatalf("lazy pointer registrations = %d, want at least %d", len(lazyPointers), count)
 			}
 			for _, forbidden := range []string{
 				"switch (index)",

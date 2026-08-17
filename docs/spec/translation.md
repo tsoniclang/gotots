@@ -790,7 +790,7 @@ typed registration equivalent to:
 ```ts
 ReflectTypeMetadataOperations.$registerStruct(
   $goReflectType_Entry,
-  $goInterfaceAdapter_Entry,
+  () => $goInterfaceAdapter_Entry,
   [{
     type: () => $goReflectType_string,
     settable: true,
@@ -809,6 +809,8 @@ ReflectTypeMetadataOperations.$registerStruct(
 
 The portable provider owns the one adapter guard, field bounds check,
 location wrapper, and clone wrapper used by every such registration. The
+adapter resolver is retained lazily and evaluated only when reflection first
+materializes the operation record, after ESM module initialization. The
 generated callbacks stay statically typed from their concrete adapter; no
 payload cast, source-name lookup, or host reflection is permitted. Provider-
 represented structs use a distinct typed opaque-field registration whose
