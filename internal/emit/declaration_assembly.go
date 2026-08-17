@@ -206,6 +206,14 @@ func (s *programSession) prepareDeclarationRequirement(
 	if !requirement.Valid() {
 		return &ScheduleError{Reason: "declaration requirement is invalid"}
 	}
+	if s.preparedRequirements == nil {
+		s.preparedRequirements = make(
+			map[api.DeclarationRequirement]struct{},
+		)
+	}
+	if _, prepared := s.preparedRequirements[requirement]; prepared {
+		return nil
+	}
 	if artifact, generated := requirement.GeneratedArtifact(); generated {
 		if err := s.validateGeneratedArtifact(artifact); err != nil {
 			return err
@@ -253,6 +261,7 @@ func (s *programSession) prepareDeclarationRequirement(
 			return err
 		}
 	}
+	s.preparedRequirements[requirement] = struct{}{}
 	return nil
 }
 
@@ -393,7 +402,7 @@ type artifactRevision struct {
 	statements        []tsgo.Statement
 	placement         *targetplacement.Owner
 	dependencies      []api.ArtifactDependency
-	requirements      []api.DeclarationRequirement
+	requestRoots      []api.RootRequest
 	eagerDependencies []api.ArtifactOwner
 	contract          artifactstate.Contract
 	classContribution *classMemberContribution
@@ -576,7 +585,7 @@ func (s *programSession) buildArtifactRevision(
 		statements:        statements,
 		placement:         placement,
 		dependencies:      dependencies,
-		requirements:      declarationRequirements,
+		requestRoots:      declarationRequirements,
 		eagerDependencies: eagerDeclarationDependencies(owner, dependencies),
 		contract:          contract,
 		classContribution: contribution,

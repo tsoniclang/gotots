@@ -330,6 +330,15 @@ One declaration assembly owns the complete pre-seal TS-Go AST for one Go
 definition. A later semantic demand may request a revised constructor, member,
 modifier, copy operation, interface adapter, helper import, or callable effect.
 
+Combined root requests are immutable persistent DAGs. The root projects
+placement and dependency leaves for the current artifact while retaining
+declaration subgraphs by exact request-node identity. The liveness scheduler
+reference-counts shared request nodes and separately reference-counts each
+semantic declaration requirement, so a closure used by one thousand
+declarations is stored and prepared once rather than flattened one thousand
+times. Adding or removing the last consumer activates or retires the same exact
+declaration requirements; sharing cannot change liveness.
+
 References subscribe to closed observable facets such as:
 
 - callable signature;
@@ -1511,7 +1520,7 @@ Replacement uses two compilation sessions, not a filter over an assembled file
 list and not rollback within one mutable graph. The first session settles the
 ordinary canonical program solely for certification. It captures the complete
 ordinary target set, immutable observable contracts for selected-package source
-artifacts, and each contract artifact's exact outgoing support requirements,
+artifacts, and each contract artifact's exact outgoing support request graph,
 accepted representation requirements, and observable dependency edges. The
 deterministic name and
 generated-support identity registry is transferred as the one identity owner

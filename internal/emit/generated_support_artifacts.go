@@ -51,7 +51,7 @@ func (s *programSession) reconstructProviderStatefulArtifact(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func (s *programSession) buildProviderStatefulRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
-		requirements:   nextRequirements,
+		requestRoots:   nextRequirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
@@ -282,7 +282,7 @@ func (s *programSession) reconstructGenericConcretizationArtifact(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -364,7 +364,7 @@ func (s *programSession) buildGenericConcretizationRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
-		requirements:   requirements,
+		requestRoots:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
@@ -477,7 +477,7 @@ func (s *programSession) reconstructDeferredCallableRegistry(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -581,7 +581,7 @@ func (s *programSession) buildDeferredCallableRegistryRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
-		requirements:   nextRequirements,
+		requestRoots:   nextRequirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil

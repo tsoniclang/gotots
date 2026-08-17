@@ -573,25 +573,17 @@ func (r RootRequest) DeclarationRequirement() (
 	DeclarationRequirement,
 	bool,
 ) {
-	if r.payload == nil {
+	if r.payload == nil ||
+		r.payload.owner.kind != RootRequestDeclarationRequirement {
 		return DeclarationRequirement{}, false
 	}
-	requirement := r.payload.owner.declarationRequirement
-	if r.payload.owner.kind != RootRequestDeclarationRequirement ||
-		!requirement.Valid() {
-		return DeclarationRequirement{}, false
-	}
-	return requirement, true
+	return r.payload.owner.declarationRequirement, true
 }
 
 func (r RootRequest) ArtifactDependency() (ArtifactDependency, bool) {
-	if r.payload == nil {
+	if r.payload == nil ||
+		r.payload.owner.kind != RootRequestArtifactDependency {
 		return ArtifactDependency{}, false
 	}
-	dependency := r.payload.owner.artifactDependency
-	if r.payload.owner.kind != RootRequestArtifactDependency ||
-		!dependency.Valid() {
-		return ArtifactDependency{}, false
-	}
-	return dependency, true
+	return r.payload.owner.artifactDependency, true
 }

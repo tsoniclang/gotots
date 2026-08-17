@@ -449,6 +449,15 @@ applied-demand resolver, the construction-facet dependency, or reconstruction
 leaves positional input against the storage representation and must fail
 artifact inspection or strict typechecking.
 
+The request-liveness scaling gate attaches one immutable declaration-request
+subgraph to many independently owned artifacts and proves storage remains
+bounded by unique request nodes plus consumer roots, while final-consumer
+removal retires every semantic requirement exactly once. A mixed
+import/declaration graph proves projection preserves the original declaration
+subgraph identity. Mutations that flatten the graph per consumer, rebuild the
+selected subtree, skip the final release, or transfer copied outbound
+requirements instead of certified request roots fail these gates.
+
 ## Interface Proof
 
 The differential matrix covers nil interface, typed nil, value/pointer

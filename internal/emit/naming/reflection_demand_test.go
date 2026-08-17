@@ -275,26 +275,34 @@ func internDemandAdapter(
 
 func countReflectionRequests(requests []api.RootRequest) int {
 	count := 0
-	for _, request := range requests {
+	err := api.WalkRootRequests(requests, func(request api.RootRequest) error {
 		requirement, ok := request.DeclarationRequirement()
 		if ok && requirement.Kind() == api.DeclarationRequirementReflectionType {
 			count++
 		}
+		return nil
+	})
+	if err != nil {
+		return -1
 	}
 	return count
 }
 
 func countAdapterContractRequests(requests []api.RootRequest) int {
 	count := 0
-	for _, request := range requests {
+	err := api.WalkRootRequests(requests, func(request api.RootRequest) error {
 		requirement, ok := request.DeclarationRequirement()
 		if !ok {
-			continue
+			return nil
 		}
 		_, _, _, _, contract := requirement.InterfaceAdapterContract()
 		if contract {
 			count++
 		}
+		return nil
+	})
+	if err != nil {
+		return -1
 	}
 	return count
 }

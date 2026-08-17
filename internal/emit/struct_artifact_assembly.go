@@ -91,7 +91,7 @@ func (s *programSession) reconstructAnonymousStruct(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func (s *programSession) buildAnonymousStructRevision(
 		statements:     statements,
 		placement:      placement,
 		dependencies:   dependencies,
-		requirements:   requirements,
+		requestRoots:   requirements,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil

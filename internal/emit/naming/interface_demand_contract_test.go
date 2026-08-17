@@ -2,6 +2,7 @@ package naming
 
 import (
 	"errors"
+	"fmt"
 	"go/token"
 	"go/types"
 	"strings"
@@ -74,10 +75,10 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(repeatedDirect) != 2 {
+	if countRootRequestPayloads(t, repeatedDirect) != 2 {
 		t.Fatalf(
 			"repeated direct demand closure requests = %d, want 2",
-			len(repeatedDirect),
+			countRootRequestPayloads(t, repeatedDirect),
 		)
 	}
 
@@ -109,8 +110,90 @@ func TestInterfaceContractReachabilityIsIncrementalAndOrderIndependent(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lateRequests) != 2 {
-		t.Fatalf("late adapter closure requests = %d, want 2", len(lateRequests))
+	if countRootRequestPayloads(t, lateRequests) != 2 {
+		t.Fatalf(
+			"late adapter closure requests = %d, want 2",
+			countRootRequestPayloads(t, lateRequests),
+		)
+	}
+}
+
+func countRootRequestPayloads(
+	t *testing.T,
+	requests []api.RootRequest,
+) int {
+	t.Helper()
+	count := 0
+	if err := api.WalkRootRequests(requests, func(api.RootRequest) error {
+		count++
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return count
+}
+
+func TestRepeatedInterfaceDemandSharesOneImmutableClosure(t *testing.T) {
+	sourceType, first, second := interfaceDemandTypes()
+	firstDemand := interfaceDemandSelection("first", first)
+	secondDemand := interfaceDemandSelection("second", second)
+	registry := NewRegistry()
+	placement := generatedArtifactPlacement{
+		kind: api.GeneratedArtifactPlacementCompilation,
+	}
+	const adapterCount = 32
+	for index := 0; index < adapterCount; index++ {
+		binding, err := registry.internInterfaceAdapter(
+			fmt.Sprintf("%064x", index+1),
+			sourceType,
+			fmt.Sprintf("$goInterfaceAdapter$Named_Value%d", index),
+			fmt.Sprintf("$goReflectType$Named_Value%d", index),
+			placement,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := registry.interfaceAdapterContractRequests(
+			binding,
+			&firstDemand,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	firstRequests, err := registry.recordInterfaceContractDemand(
+		firstDemand,
+		secondDemand,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	combined := firstRequests
+	for occurrence := 0; occurrence < 1_000; occurrence++ {
+		repeated, repeatErr := registry.recordInterfaceContractDemand(
+			firstDemand,
+			secondDemand,
+		)
+		if repeatErr != nil {
+			t.Fatal(repeatErr)
+		}
+		combined = api.CombineRequests(combined, repeated)
+	}
+	unique := 0
+	if err := api.WalkUniqueRootRequestPayloads(
+		combined,
+		func(api.RootRequest) error {
+			unique++
+			return nil
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if unique != adapterCount {
+		t.Fatalf(
+			"repeated interface-demand unique requests = %d, want %d",
+			unique,
+			adapterCount,
+		)
 	}
 }
 

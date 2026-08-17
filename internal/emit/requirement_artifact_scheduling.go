@@ -159,16 +159,17 @@ func (q *artifactOwnerPriorityQueue) pop() (api.ArtifactOwner, bool) {
 }
 
 type declarationRequirementScheduler struct {
-	pendingOwners artifactOwnerPriorityQueue
-	pending       map[api.ArtifactOwner]struct{}
-	removed       map[api.ArtifactOwner]struct{}
-	orphaned      map[api.DeclarationRequirement]struct{}
-	certified     declarationRequirementLedger
-	roots         declarationRequirementLedger
-	byConsumer    map[api.ArtifactOwner]map[api.DeclarationRequirement]struct{}
-	consumers     map[api.DeclarationRequirement]map[api.ArtifactOwner]struct{}
-	active        declarationRequirementLedger
-	applied       declarationRequirementLedger
+	pendingOwners   artifactOwnerPriorityQueue
+	pending         map[api.ArtifactOwner]struct{}
+	removed         map[api.ArtifactOwner]struct{}
+	orphaned        map[api.DeclarationRequirement]struct{}
+	certified       declarationRequirementLedger
+	roots           declarationRequirementLedger
+	byConsumer      map[api.ArtifactOwner][]api.RootRequest
+	requestRefs     map[api.RootRequest]uint64
+	requirementRefs map[api.DeclarationRequirement]uint64
+	active          declarationRequirementLedger
+	applied         declarationRequirementLedger
 }
 
 func newDeclarationRequirementScheduler(
@@ -183,16 +184,13 @@ func newDeclarationRequirementScheduler(
 		orphaned: make(
 			map[api.DeclarationRequirement]struct{},
 		),
-		certified: newDeclarationRequirementLedger(),
-		roots:     newDeclarationRequirementLedger(),
-		byConsumer: make(
-			map[api.ArtifactOwner]map[api.DeclarationRequirement]struct{},
-		),
-		consumers: make(
-			map[api.DeclarationRequirement]map[api.ArtifactOwner]struct{},
-		),
-		active:  newDeclarationRequirementLedger(),
-		applied: newDeclarationRequirementLedger(),
+		certified:       newDeclarationRequirementLedger(),
+		roots:           newDeclarationRequirementLedger(),
+		byConsumer:      make(map[api.ArtifactOwner][]api.RootRequest),
+		requestRefs:     make(map[api.RootRequest]uint64),
+		requirementRefs: make(map[api.DeclarationRequirement]uint64),
+		active:          newDeclarationRequirementLedger(),
+		applied:         newDeclarationRequirementLedger(),
 	}
 }
 
@@ -319,75 +317,6 @@ func (s *programSession) AnonymousStructDemandSelected(
 	return s.requirements.wasSelected(requirement), nil
 }
 
-func (s *declarationRequirementScheduler) consumedBy(
-	owner api.ArtifactOwner,
-) []api.DeclarationRequirement {
-	selected := s.byConsumer[owner]
-	requirements := make(
-		[]api.DeclarationRequirement,
-		0,
-		len(selected),
-	)
-	for requirement := range selected {
-		requirements = append(requirements, requirement)
-	}
-	sortDeclarationRequirements(requirements)
-	return requirements
-}
-
-func (s *declarationRequirementScheduler) replace(
-	consumer api.ArtifactOwner,
-	requirements []api.DeclarationRequirement,
-) {
-	next := make(
-		map[api.DeclarationRequirement]struct{},
-		len(requirements),
-	)
-	for _, requirement := range requirements {
-		next[requirement] = struct{}{}
-	}
-	current := s.byConsumer[consumer]
-	for requirement := range current {
-		if _, retained := next[requirement]; retained {
-			continue
-		}
-		owners := s.consumers[requirement]
-		delete(owners, consumer)
-		if len(owners) != 0 {
-			continue
-		}
-		delete(s.consumers, requirement)
-		if s.roots.contains(requirement) {
-			continue
-		}
-		s.orphaned[requirement] = struct{}{}
-	}
-	for requirement := range next {
-		if _, retained := current[requirement]; retained {
-			continue
-		}
-		owners := s.consumers[requirement]
-		if owners == nil {
-			owners = make(map[api.ArtifactOwner]struct{})
-			s.consumers[requirement] = owners
-		}
-		_, orphaned := s.orphaned[requirement]
-		delete(s.orphaned, requirement)
-		wasInactive := !orphaned &&
-			!s.active.contains(requirement)
-		owners[consumer] = struct{}{}
-		if wasInactive {
-			s.active.add(requirement)
-			s.enqueueOwner(requirement.Owner())
-		}
-	}
-	if len(next) == 0 {
-		delete(s.byConsumer, consumer)
-		return
-	}
-	s.byConsumer[consumer] = next
-}
-
 func (s *declarationRequirementScheduler) finalizeRemovals() bool {
 	if len(s.pending) != 0 {
 		panic("declaration requirement removal finalized before additions settled")
@@ -399,7 +328,7 @@ func (s *declarationRequirementScheduler) finalizeRemovals() bool {
 	for requirement := range s.orphaned {
 		delete(s.orphaned, requirement)
 		if s.roots.contains(requirement) ||
-			len(s.consumers[requirement]) != 0 {
+			s.requirementRefs[requirement] != 0 {
 			continue
 		}
 		s.active.remove(requirement)

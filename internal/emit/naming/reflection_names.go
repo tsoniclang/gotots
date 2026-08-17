@@ -197,7 +197,10 @@ func (n *File) ReflectionValueOf(
 		if keyErr != nil {
 			return api.NameReference{}, keyErr
 		}
-		registry.reflectionValueDemands[artifactKey] = struct{}{}
+		if _, exists := registry.reflectionValueDemands[artifactKey]; !exists {
+			registry.reflectionValueDemands[artifactKey] = struct{}{}
+			registry.invalidateInterfaceDemandRequests()
+		}
 		staticType, typeErr := n.ReflectionType(argumentType, reflectionType)
 		if typeErr != nil {
 			return api.NameReference{}, typeErr
@@ -266,7 +269,10 @@ func (n *File) ReflectionValueType(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	n.owner.registry.reflectionValueDemands[artifactKey] = struct{}{}
+	if _, exists := n.owner.registry.reflectionValueDemands[artifactKey]; !exists {
+		n.owner.registry.reflectionValueDemands[artifactKey] = struct{}{}
+		n.owner.registry.invalidateInterfaceDemandRequests()
+	}
 	reference, err := n.ReflectionType(sourceType, reflectionType)
 	if err != nil {
 		return api.NameReference{}, err

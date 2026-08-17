@@ -62,7 +62,7 @@ func TestCertifiedSourceImplementationRequirementDoesNotCreateLiveness(
 	}
 	assertSelectedRequirements(t, scheduler, copyRequirement.Owner(), copyRequirement)
 
-	scheduler.replace(consumer, []api.DeclarationRequirement{equalRequirement})
+	replaceRequirements(t, scheduler, consumer, equalRequirement)
 	if _, _, removed, ok := scheduler.nextBatch(); !ok || removed {
 		t.Fatal("ordinary consumer requirement was not scheduled")
 	}
@@ -73,7 +73,7 @@ func TestCertifiedSourceImplementationRequirementDoesNotCreateLiveness(
 		copyRequirement,
 		equalRequirement,
 	)
-	scheduler.replace(consumer, nil)
+	replaceRequirements(t, scheduler, consumer)
 	if !scheduler.finalizeRemovals() {
 		t.Fatal("ordinary consumer requirement removal was not scheduled")
 	}

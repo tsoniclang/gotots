@@ -44,7 +44,7 @@ type packageStorageRevision struct {
 	statePlacement           *targetplacement.Owner
 	assemblyPlacement        *targetplacement.Owner
 	dependencies             []api.ArtifactDependency
-	requirements             []api.DeclarationRequirement
+	requestRoots             []api.RootRequest
 	contract                 artifactstate.Contract
 }
 
@@ -265,7 +265,7 @@ func (s *programSession) emitPackageStorage(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -370,10 +370,10 @@ func (s *programSession) buildPackageStorageRevision(
 			stateDependencies,
 			assemblyDependencies...,
 		),
-		requirements: canonicalDeclarationRequirements(append(
+		requestRoots: api.CombineRequests(
 			stateRequirements,
-			assemblyRequirements...,
-		)),
+			assemblyRequirements,
+		),
 		contract: contract,
 	}, nil
 }
@@ -435,7 +435,7 @@ func (s *programSession) reconstructPackageStorage(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}

@@ -43,16 +43,10 @@ func TestRequirementRemovalWaitsForQuiescentConsumerDiscovery(
 	scheduler := newDeclarationRequirementScheduler(
 		emitordering.CompareArtifactOwners,
 	)
-	scheduler.replace(
-		firstConsumer,
-		[]api.DeclarationRequirement{copyRequirement},
-	)
+	replaceRequirements(t, scheduler, firstConsumer, copyRequirement)
 	_, _, _, _ = scheduler.nextBatch()
 
-	scheduler.replace(
-		firstConsumer,
-		[]api.DeclarationRequirement{equalRequirement},
-	)
+	replaceRequirements(t, scheduler, firstConsumer, equalRequirement)
 	owner, requirements, removed, ok := scheduler.nextBatch()
 	if !ok ||
 		removed ||
@@ -66,10 +60,7 @@ func TestRequirementRemovalWaitsForQuiescentConsumerDiscovery(
 			ok,
 		)
 	}
-	scheduler.replace(
-		laterConsumer,
-		[]api.DeclarationRequirement{copyRequirement},
-	)
+	replaceRequirements(t, scheduler, laterConsumer, copyRequirement)
 	if scheduler.finalizeRemovals() {
 		t.Fatal("later consumer did not cancel the pending removal")
 	}

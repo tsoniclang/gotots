@@ -211,11 +211,18 @@ export function Sum(value: string): number { return value.length; }
 		t.Fatal("source implementation Reader contract is absent")
 	}
 	hasMethodToken := false
-	for _, requirement := range readerContract.outboundRequirements {
-		if requirement.Kind() == api.DeclarationRequirementInterfaceMethodToken {
-			hasMethodToken = true
-			break
-		}
+	if err := api.WalkRootRequests(
+		readerContract.outboundRequests,
+		func(request api.RootRequest) error {
+			requirement, ok := request.DeclarationRequirement()
+			if ok && requirement.Kind() ==
+				api.DeclarationRequirementInterfaceMethodToken {
+				hasMethodToken = true
+			}
+			return nil
+		},
+	); err != nil {
+		t.Fatal(err)
 	}
 	if !hasMethodToken {
 		t.Fatal("source implementation Reader discarded its method-token requirement")
@@ -253,7 +260,7 @@ export function Sum(value: string): number { return value.length; }
 	for owner, contract := range inputs.contracts {
 		mutatedContracts[owner] = contract
 	}
-	readerContract.outboundRequirements = nil
+	readerContract.outboundRequests = nil
 	mutatedContracts[readerOwner] = readerContract
 	mutationSession, err := newProgramSessionWithRegistry(
 		program,

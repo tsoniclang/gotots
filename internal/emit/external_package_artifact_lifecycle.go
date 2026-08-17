@@ -33,7 +33,7 @@ type sourceImplementationInputs struct {
 type sourceImplementationContract struct {
 	contract             artifactstate.Contract
 	dependencies         []api.ArtifactDependency
-	outboundRequirements []api.DeclarationRequirement
+	outboundRequests     []api.RootRequest
 	acceptedRequirements []api.DeclarationRequirement
 }
 
@@ -110,7 +110,7 @@ func (s *programSession) captureSourceImplementationContracts() (
 		result[owner] = sourceImplementationContract{
 			contract:             contract,
 			dependencies:         dependencies,
-			outboundRequirements: s.requirements.consumedBy(owner),
+			outboundRequests:     s.requirements.consumedRequestsBy(owner),
 			acceptedRequirements: s.requirements.selectedFor(owner),
 		}
 	}
@@ -265,7 +265,7 @@ func (s *programSession) emitSourceImplementationContract(
 		owner,
 		contract.contract,
 		contract.dependencies,
-		contract.outboundRequirements,
+		contract.outboundRequests,
 	); err != nil {
 		return true, err
 	}
@@ -341,7 +341,7 @@ func (s *programSession) emitPackageInitializer(
 		artifactOwner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}
@@ -451,7 +451,7 @@ func (s *programSession) buildPackageInitializerRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	placement, dependencies, requirements, err :=
+	placement, dependencies, requestRoots, err :=
 		s.consumeArtifactRequests(
 			owner,
 			api.CombineRequests(
@@ -470,7 +470,7 @@ func (s *programSession) buildPackageInitializerRevision(
 		statements:     emission.Statements(),
 		placement:      placement,
 		dependencies:   dependencies,
-		requirements:   requirements,
+		requestRoots:   requestRoots,
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
@@ -529,7 +529,7 @@ func (s *programSession) reconstructPackageInitializer(
 		owner,
 		revision.contract,
 		revision.dependencies,
-		revision.requirements,
+		revision.requestRoots,
 	); err != nil {
 		return err
 	}

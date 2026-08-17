@@ -154,7 +154,9 @@ static form nor a finite exact concretization, compilation fails explicitly.
 - **emission result:** typed TS-Go protocol AST values plus explicit root
   requests and diagnostics. It is target output under construction, not an IR.
 - **root request:** a closed typed request for placement, a use-dependent
-  declaration obligation, or an artifact dependency. Only the root consumes it.
+  declaration obligation, or an artifact dependency. Combined requests form an
+  immutable persistent DAG; only the root consumes it, and shared subgraphs are
+  never flattened into per-consumer copies.
 - **placement request:** a typed request to insert an import, declaration,
   helper, temporary, or statement at a legal preferred target scope.
 - **declaration requirement:** a closed typed request, keyed by the

@@ -170,6 +170,13 @@ type interfaceContractDemand struct {
 	target interfaceContractSelection
 }
 
+type interfaceDemandRequestKey struct {
+	kind       uint8
+	sourceKey  string
+	targetKey  string
+	adapterKey string
+}
+
 type interfaceContractSelection struct {
 	sourceType  types.Type
 	contract    *types.Interface
@@ -250,6 +257,7 @@ type Registry struct {
 	interfaceAdaptersByContract         map[string]map[string]struct{}
 	interfaceContractDemands            map[string]map[string]interfaceContractDemand
 	interfaceReflectionDemands          map[string]interfaceReflectionDemand
+	interfaceDemandRequests             map[interfaceDemandRequestKey][]api.RootRequest
 	genericCapabilities                 map[string]genericCapabilityBinding
 	genericCapabilityNames              map[genericGeneratedNameScope]string
 	genericConcretizations              map[string]genericConcretizationBinding
@@ -278,6 +286,9 @@ func (r *Registry) TransferCanonicalIdentity() (*Registry, error) {
 	r.interfaceContractDemands =
 		make(map[string]map[string]interfaceContractDemand)
 	r.interfaceReflectionDemands = make(map[string]interfaceReflectionDemand)
+	r.interfaceDemandRequests = make(
+		map[interfaceDemandRequestKey][]api.RootRequest,
+	)
 	r.reflectionValueDemands = make(map[string]struct{})
 	r.reflectionValueContracts = make(map[string]interfaceContractSelection)
 	r.transferReady = true
@@ -329,6 +340,7 @@ func NewRegistry() *Registry {
 		interfaceAdaptersByContract:         make(map[string]map[string]struct{}),
 		interfaceContractDemands:            make(map[string]map[string]interfaceContractDemand),
 		interfaceReflectionDemands:          make(map[string]interfaceReflectionDemand),
+		interfaceDemandRequests:             make(map[interfaceDemandRequestKey][]api.RootRequest),
 		genericCapabilities:                 make(map[string]genericCapabilityBinding),
 		genericCapabilityNames:              make(map[genericGeneratedNameScope]string),
 		genericConcretizations:              make(map[string]genericConcretizationBinding),

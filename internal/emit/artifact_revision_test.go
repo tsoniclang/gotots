@@ -351,8 +351,8 @@ func TestDeclarationRequirementSchedulerReplacesConsumerRevision(
 	scheduler := newDeclarationRequirementScheduler(
 		emitordering.CompareArtifactOwners,
 	)
-	scheduler.replace(firstConsumer, []api.DeclarationRequirement{requirement})
-	scheduler.replace(secondConsumer, []api.DeclarationRequirement{requirement})
+	replaceRequirements(t, scheduler, firstConsumer, requirement)
+	replaceRequirements(t, scheduler, secondConsumer, requirement)
 	owner, selected, removed, ok := scheduler.nextBatch()
 	if !ok ||
 		removed ||
@@ -361,11 +361,11 @@ func TestDeclarationRequirementSchedulerReplacesConsumerRevision(
 		selected[0] != requirement {
 		t.Fatalf("initial replacement batch = %v %#v %t", owner, selected, ok)
 	}
-	scheduler.replace(firstConsumer, nil)
+	replaceRequirements(t, scheduler, firstConsumer)
 	if scheduler.hasPending() {
 		t.Fatal("shared requirement was removed with one remaining consumer")
 	}
-	scheduler.replace(secondConsumer, nil)
+	replaceRequirements(t, scheduler, secondConsumer)
 	if !scheduler.finalizeRemovals() {
 		t.Fatal("final requirement removal was not scheduled at quiescence")
 	}
@@ -395,14 +395,11 @@ func TestDeclarationRequirementSchedulerReplacesSelfDemand(
 	scheduler := newDeclarationRequirementScheduler(
 		emitordering.CompareArtifactOwners,
 	)
-	scheduler.replace(
-		requirement.Owner(),
-		[]api.DeclarationRequirement{requirement},
-	)
+	replaceRequirements(t, scheduler, requirement.Owner(), requirement)
 	if _, _, removed, ok := scheduler.nextBatch(); !ok || removed {
 		t.Fatal("self demand was not scheduled")
 	}
-	scheduler.replace(requirement.Owner(), nil)
+	replaceRequirements(t, scheduler, requirement.Owner())
 	if !scheduler.finalizeRemovals() {
 		t.Fatal("stale self demand was retained after exact replacement")
 	}

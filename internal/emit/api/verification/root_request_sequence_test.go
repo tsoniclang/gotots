@@ -3,6 +3,8 @@ package api_test
 import (
 	"errors"
 	"fmt"
+	"go/token"
+	"go/types"
 	"testing"
 	"unsafe"
 
@@ -153,6 +155,63 @@ func TestUniqueRootRequestPayloadWalkPreservesDistinctPayloads(t *testing.T) {
 	}
 	if got := fmt.Sprint(localNames); got != "[First Second]" {
 		t.Fatalf("visited local names = %s, want [First Second]", got)
+	}
+}
+
+func TestDeclarationRequestSelectionPreservesSharedSubgraph(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/requests", "requests")
+	typeName := types.NewTypeName(token.Pos(1), sourcePackage, "Value", nil)
+	copyRequirement, err := api.NewNamedStructOperationRequirement(
+		typeName,
+		api.NamedStructOperationCopy,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	equalRequirement, err := api.NewNamedStructOperationRequirement(
+		typeName,
+		api.NamedStructOperationEqual,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	copyRequest, err := api.NewDeclarationRequirementRequest(copyRequirement)
+	if err != nil {
+		t.Fatal(err)
+	}
+	equalRequest, err := api.NewDeclarationRequirementRequest(equalRequirement)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declarations := api.CombineRequests(
+		[]api.RootRequest{copyRequest},
+		[]api.RootRequest{equalRequest},
+	)
+	imports := namedImportRequests(t, "Value")
+	selected, err := api.SelectDeclarationRequests(
+		api.CombineRequests(imports, declarations),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(selected) != 1 || selected[0] != declarations[0] {
+		t.Fatal("declaration selection rebuilt the immutable shared subgraph")
+	}
+	visited := 0
+	if err := api.WalkRootRequests(
+		selected,
+		func(request api.RootRequest) error {
+			if request.Kind() != api.RootRequestDeclarationRequirement {
+				t.Fatalf("selected request kind = %v", request.Kind())
+			}
+			visited++
+			return nil
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if visited != 2 {
+		t.Fatalf("selected declaration requests = %d, want 2", visited)
 	}
 }
 
