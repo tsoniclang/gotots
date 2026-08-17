@@ -88,6 +88,7 @@ const (
 	RuntimeErrorGuard                 = runtimecontract.RuntimeErrorGuard
 	RuntimeInterfaceFormat            = runtimecontract.RuntimeInterfaceFormat
 	RuntimeProviderInterfaceBridge    = runtimecontract.RuntimeProviderInterfaceBridge
+	RuntimeInterfaceAdapterFactory    = runtimecontract.RuntimeInterfaceAdapterFactory
 	RuntimeEmptyStruct                = runtimecontract.RuntimeEmptyStruct
 	RuntimeChannel                    = runtimecontract.RuntimeChannel
 	RuntimeReceiveChannel             = runtimecontract.RuntimeReceiveChannel

@@ -375,3 +375,113 @@ func TestObservableValueContractIgnoresInitializer(t *testing.T) {
 		t.Fatal("variable type change was absent from the value surface")
 	}
 }
+
+func TestConstructableValueContractPartitionsConstructorAndStaticFacets(t *testing.T) {
+	factory := tsgo.NewFactory()
+	makeStatement := func(
+		parameterType tsgo.TypeNode,
+		staticResult tsgo.TypeNode,
+	) tsgo.VariableStatement {
+		return factory.VariableStatement(
+			[]tsgo.ModifierLike{factory.ExportKeyword()},
+			factory.VariableDeclarationList(
+				[]tsgo.VariableDeclaration{factory.VariableDeclaration(
+					factory.Identifier("Adapter"),
+					nil,
+					factory.TypeLiteralNode([]tsgo.TypeElement{
+						factory.ConstructSignatureDeclaration(
+							nil,
+							[]tsgo.ParameterDeclaration{factory.ParameterDeclaration(
+								nil,
+								nil,
+								factory.Identifier("value"),
+								nil,
+								parameterType,
+								nil,
+							)},
+							factory.TypeReferenceNode(
+								factory.Identifier("Instance"),
+								nil,
+							),
+						),
+						factory.MethodSignatureDeclaration(
+							nil,
+							factory.Identifier("is"),
+							nil,
+							nil,
+							nil,
+							staticResult,
+						),
+					}),
+					factory.Identifier("implementation"),
+				)},
+				tsgo.NodeFlagsConst,
+			),
+		)
+	}
+	numberType := factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindNumberKeyword,
+	)
+	stringType := factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindStringKeyword,
+	)
+	booleanType := factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindBooleanKeyword,
+	)
+	baseline, err := ProjectContract(
+		factory,
+		[]tsgo.Statement{makeStatement(numberType, booleanType)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, facet := range []api.ArtifactFacet{
+		api.ArtifactFacetConstructorSurface,
+		api.ArtifactFacetStaticSurface,
+	} {
+		if !baseline.hasFacet(facet) {
+			t.Fatalf("constructable value facet %s is absent", facet)
+		}
+	}
+	constructorChanged, err := ProjectContract(
+		factory,
+		[]tsgo.Statement{makeStatement(stringType, booleanType)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(
+		artifactFacetBytes(baseline, api.ArtifactFacetConstructorSurface),
+		artifactFacetBytes(
+			constructorChanged,
+			api.ArtifactFacetConstructorSurface,
+		),
+	) {
+		t.Fatal("construct signature mutation did not change constructor surface")
+	}
+	assertArtifactFacetEqual(
+		t,
+		baseline,
+		constructorChanged,
+		api.ArtifactFacetStaticSurface,
+	)
+	staticChanged, err := ProjectContract(
+		factory,
+		[]tsgo.Statement{makeStatement(numberType, stringType)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(
+		artifactFacetBytes(baseline, api.ArtifactFacetStaticSurface),
+		artifactFacetBytes(staticChanged, api.ArtifactFacetStaticSurface),
+	) {
+		t.Fatal("static signature mutation did not change static surface")
+	}
+	assertArtifactFacetEqual(
+		t,
+		baseline,
+		staticChanged,
+		api.ArtifactFacetConstructorSurface,
+	)
+}

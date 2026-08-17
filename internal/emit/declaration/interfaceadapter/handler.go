@@ -60,6 +60,35 @@ func Build(
 	if err != nil {
 		return nil, nil, err
 	}
+	if len(demanded) == 0 {
+		adapterFactory, factoryErr := context.Names().Runtime(
+			api.RuntimeInterfaceAdapterFactory,
+			api.ImportPhaseValue,
+		)
+		if factoryErr != nil {
+			return nil, nil, factoryErr
+		}
+		statements, operationRequests, buildErr := buildZeroMethodAdapter(
+			context,
+			name,
+			runtimeValue.Name(),
+			adapterFactory.Name(),
+			dynamicType.Name(),
+			payload.Value(),
+			sourceType,
+			modifiers,
+		)
+		if buildErr != nil {
+			return nil, nil, buildErr
+		}
+		return statements, api.CombineRequests(
+			payload.Requests(),
+			runtimeValue.Requests(),
+			adapterFactory.Requests(),
+			dynamicType.Requests(),
+			operationRequests,
+		), nil
+	}
 	methods := make(
 		[]tsgo.ClassElement,
 		0,

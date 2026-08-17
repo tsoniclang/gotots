@@ -106,6 +106,59 @@ func TestInterfaceValueContractStaticallyExcludesPromiseAssimilation(t *testing.
 	}
 }
 
+func TestInterfaceAdapterFactoryIsDemandOwned(t *testing.T) {
+	factory := tsgo.NewFactory()
+	base, err := Build(
+		factory,
+		api.RuntimeModuleInterfaceValue,
+		[]api.RuntimeSymbol{api.RuntimeInterfaceValue},
+		api.ConcurrencySemanticsDisabled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(base) != 1 {
+		t.Fatalf("base interface runtime definitions = %d, want one", len(base))
+	}
+	class, ok := base[0].Statement().(tsgo.ClassDeclaration)
+	if !ok {
+		t.Fatalf("base interface runtime = %T, want class", base[0].Statement())
+	}
+	for _, member := range class.Members() {
+		method, ok := member.(tsgo.MethodDeclaration)
+		if !ok {
+			continue
+		}
+		name, ok := method.Name().(tsgo.Identifier)
+		if ok && name.Text() == "createGoInterfaceAdapter" {
+			t.Fatal("unrequested adapter factory leaked into interface base")
+		}
+	}
+	withFactory, err := Build(
+		factory,
+		api.RuntimeModuleInterfaceValue,
+		[]api.RuntimeSymbol{
+			api.RuntimeInterfaceValue,
+			api.RuntimeInterfaceAdapterFactory,
+		},
+		api.ConcurrencySemanticsDisabled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(withFactory) != 2 ||
+		withFactory[1].Symbol() != api.RuntimeInterfaceAdapterFactory {
+		t.Fatalf("adapter runtime definitions = %#v", withFactory)
+	}
+	declaration, ok := withFactory[1].Statement().(tsgo.FunctionDeclaration)
+	if !ok || declaration.Name().Text() != "createGoInterfaceAdapter" {
+		t.Fatalf(
+			"adapter factory definition = %T",
+			withFactory[1].Statement(),
+		)
+	}
+}
+
 func TestEmptyStructRuntimeHasOneExactNominalOwner(t *testing.T) {
 	definitions, err := Build(
 		tsgo.NewFactory(),

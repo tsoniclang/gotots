@@ -35,6 +35,12 @@ func BuildValue(
 	switch symbol {
 	case api.RuntimeInterfaceValue:
 		return valueContract(factory, valueName), nil
+	case api.RuntimeInterfaceAdapterFactory:
+		name, err := runtimeName(api.RuntimeInterfaceAdapterFactory)
+		if err != nil {
+			return nil, err
+		}
+		return adapterFactoryFunction(factory, name, valueName), nil
 	case api.RuntimeProviderInterfaceBridge:
 		return providerBridgeContract(factory, valueName), nil
 	case api.RuntimeErrorMethodToken:

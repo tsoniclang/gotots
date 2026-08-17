@@ -161,6 +161,32 @@ func ProjectContract(
 					declaration.Type(),
 					nil,
 				)
+				constructor, static := projectConstructableValueType(
+					factory,
+					declaration.Type(),
+				)
+				if constructor != nil {
+					nodes[api.ArtifactFacetConstructorSurface] = append(
+						nodes[api.ArtifactFacetConstructorSurface],
+						projectVariableSurface(
+							factory,
+							statement,
+							declaration,
+							constructor,
+						),
+					)
+				}
+				if static != nil {
+					nodes[api.ArtifactFacetStaticSurface] = append(
+						nodes[api.ArtifactFacetStaticSurface],
+						projectVariableSurface(
+							factory,
+							statement,
+							declaration,
+							static,
+						),
+					)
+				}
 			}
 			nodes[api.ArtifactFacetValueSurface] = append(
 				nodes[api.ArtifactFacetValueSurface],
@@ -225,6 +251,54 @@ func ProjectContract(
 		}
 	}
 	return contract, nil
+}
+
+func projectConstructableValueType(
+	factory tsgo.Factory,
+	typeNode tsgo.TypeNode,
+) (tsgo.TypeNode, tsgo.TypeNode) {
+	literal, ok := typeNode.(tsgo.TypeLiteralNode)
+	if !ok {
+		return nil, nil
+	}
+	var constructors []tsgo.TypeElement
+	var static []tsgo.TypeElement
+	for _, member := range literal.Members() {
+		if _, ok := member.(tsgo.ConstructSignatureDeclaration); ok {
+			constructors = append(constructors, member)
+		} else {
+			static = append(static, member)
+		}
+	}
+	if len(constructors) == 0 {
+		return nil, nil
+	}
+	constructorType := tsgo.TypeNode(factory.TypeLiteralNode(constructors))
+	var staticType tsgo.TypeNode
+	if len(static) != 0 {
+		staticType = factory.TypeLiteralNode(static)
+	}
+	return constructorType, staticType
+}
+
+func projectVariableSurface(
+	factory tsgo.Factory,
+	statement tsgo.VariableStatement,
+	declaration tsgo.VariableDeclaration,
+	typeNode tsgo.TypeNode,
+) tsgo.VariableStatement {
+	return factory.VariableStatement(
+		statement.Modifiers(),
+		factory.VariableDeclarationList(
+			[]tsgo.VariableDeclaration{factory.VariableDeclaration(
+				declaration.Name(),
+				declaration.ExclamationToken(),
+				typeNode,
+				nil,
+			)},
+			statement.DeclarationList().Flags(),
+		),
+	)
 }
 
 func ProjectCoverageContract(

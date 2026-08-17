@@ -749,6 +749,20 @@ the exact concrete dynamic type. The adapter owns:
 - Go equality/comparability behavior;
 - native constant-size dispatch methods.
 
+The adapter's emitted shape is selected from its exact demanded method set.
+A type with no demanded Go methods uses the one canonical demand-selected
+typed adapter factory; its generated declaration supplies only
+the concrete payload operations and dynamic-type token. It must not repeat a
+class body containing the common constructor, type guard, method-set test,
+equality, hash, and formatting machinery. A type with demanded Go methods
+retains a concrete class only for those named methods and the inheritance
+needed to expose its declaration-referenceable contracts. Both shapes keep
+the same construction and type-guard ABI, so later demand reconstruction
+cannot leave stale call sites. The shared factory is generic and
+statically typed; it performs no erased payload recovery, runtime method
+lookup, source spelling test, or dynamic semantic dispatch. The factory is
+absent unless at least one zero-method adapter requests it.
+
 Interface calls are O(1) and do not emit implementer switches. Adapter methods
 invoke the exact concrete owner, preserving value-copy and pointer semantics.
 Interfaces carry no `any`, `unknown`, reflective lookup, source-name tests,

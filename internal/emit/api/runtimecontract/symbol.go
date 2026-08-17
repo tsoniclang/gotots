@@ -80,6 +80,7 @@ const (
 	RuntimeErrorGuard                 RuntimeSymbol = 1010
 	RuntimeInterfaceFormat            RuntimeSymbol = 1011
 	RuntimeProviderInterfaceBridge    RuntimeSymbol = 1012
+	RuntimeInterfaceAdapterFactory    RuntimeSymbol = 1013
 	RuntimeEmptyStruct                RuntimeSymbol = 1050
 	RuntimeChannel                    RuntimeSymbol = 1100
 	RuntimeReceiveChannel             RuntimeSymbol = 1101

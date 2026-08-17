@@ -698,10 +698,27 @@ representation.
 An interface value is nil or a canonical dynamic-type token plus represented
 payload. Concrete boxing copies value payloads and preserves reference
 payloads. One adapter per reached concrete type/contract exposes only demanded
-methods. Each adapter extends the canonical interface-value root and calls its
-zero-argument base constructor, so it inherits the one Promise-assimilation
-exclusion rather than redeclaring an incompatible private member. Calls are
-native constant-size member calls; implementer switches are forbidden.
+methods. An adapter with demanded Go methods extends the canonical
+interface-value root and calls its zero-argument base constructor. An adapter
+with no demanded Go methods is a typed constructor produced by one canonical
+demand-selected runtime factory:
+
+```ts
+export const IntAdapter = createGoInterfaceAdapter<int32>(
+  intDynamicType,
+  (left, right) => left === right,
+  value => hashInt(value),
+  false,
+  (value, verb, flags, precision) => formatInt(value, verb, flags, precision),
+);
+```
+
+The factory returns a statically typed constructor with the same `new
+Adapter(value)` and `Adapter.$is(value)` ABI as a method-bearing adapter. It
+contains the common box behavior once and does not inspect names or recover an
+erased payload. Both shapes inherit the one Promise-assimilation exclusion
+rather than redeclaring an incompatible private member. Calls are native
+constant-size member calls; implementer switches are forbidden.
 
 Every generated root class, including the canonical interface-value contract,
 declares the erased nominal member

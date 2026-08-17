@@ -13,24 +13,68 @@ func formatStringProperty(
 	factory tsgo.Factory,
 	sourceType types.Type,
 ) tsgo.PropertyDeclaration {
-	basic, ok := formatBasicType(sourceType)
-	initialValue := tsgo.Expression(factory.FalseLiteral())
-	if ok && basic.Kind() == types.String {
-		initialValue = factory.TrueLiteral()
-	}
 	return factory.PropertyDeclaration(
 		[]tsgo.ModifierLike{factory.ReadonlyKeyword()},
 		factory.Identifier(interfacecontract.FormatStringMember),
 		nil,
 		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
-		initialValue,
+		formatStringValue(factory, sourceType),
 	)
+}
+
+func formatStringValue(
+	factory tsgo.Factory,
+	sourceType types.Type,
+) tsgo.Expression {
+	basic, ok := formatBasicType(sourceType)
+	if ok && basic.Kind() == types.String {
+		return factory.TrueLiteral()
+	}
+	return factory.FalseLiteral()
 }
 
 func formatMethod(
 	context api.Context,
 	sourceType types.Type,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
+	body, requests, err := formatOperationBody(
+		context,
+		sourceType,
+		payload(context.Factory(), context.Factory().ThisExpression()),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	factory := context.Factory()
+	return factory.MethodDeclaration(
+		nil,
+		nil,
+		factory.Identifier(interfacecontract.FormatMember),
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{
+			formatParameter(
+				factory,
+				"verb",
+				factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword),
+			),
+			formatParameter(
+				factory,
+				"_flags",
+				factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword),
+			),
+			formatParameter(factory, "precision", formatPrecisionType(factory)),
+		},
+		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword),
+		factory.Block(body, true),
+	), requests, nil
+}
+
+func formatOperationBody(
+	context api.Context,
+	sourceType types.Type,
+	sourceValue tsgo.Expression,
+) ([]tsgo.Statement, []api.RootRequest, error) {
 	helper, err := context.Names().Runtime(
 		api.RuntimeInterfaceFormat,
 		api.ImportPhaseValue,
@@ -59,7 +103,7 @@ func formatMethod(
 			basicOK = false
 		}
 		if basicOK {
-			value, _, _, err = formatValue(context, sourceType)
+			value, _, _, err = formatValue(context, sourceType, sourceValue)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -83,44 +127,20 @@ func formatMethod(
 		arguments,
 		tsgo.NodeFlagsNone,
 	)
-	return factory.MethodDeclaration(
-			nil,
-			nil,
-			factory.Identifier(interfacecontract.FormatMember),
-			nil,
-			nil,
-			[]tsgo.ParameterDeclaration{
-				formatParameter(
-					factory,
-					"verb",
-					factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword),
-				),
-				formatParameter(
-					factory,
-					"_flags",
-					factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword),
-				),
-				formatParameter(factory, "precision", formatPrecisionType(factory)),
-			},
-			factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindStringKeyword),
-			factory.Block(append(
-				value.Before(),
-				factory.ReturnStatement(call),
-			), true),
-		), api.CombineRequests(
-			value.Requests(),
-			helper.Requests(),
-		), nil
+	body := append([]tsgo.Statement(nil), value.Before()...)
+	body = append(body, factory.ReturnStatement(call))
+	return body, api.CombineRequests(
+		value.Requests(),
+		helper.Requests(),
+	), nil
 }
 
 func formatValue(
 	context api.Context,
 	sourceType types.Type,
+	sourceValue tsgo.Expression,
 ) (api.ExpressionEmission, *types.Basic, bool, error) {
-	value := api.DirectExpression(payload(
-		context.Factory(),
-		context.Factory().ThisExpression(),
-	))
+	value := api.DirectExpression(sourceValue)
 	if defined, ok := definedtype.ResolveBasic(sourceType); ok {
 		basic, basicOK := defined.Basic()
 		projected, err := defined.Project(context, value)

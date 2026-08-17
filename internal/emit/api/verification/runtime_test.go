@@ -85,6 +85,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeRuntimeErrorToken, 1004, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "GoRuntimeErrorMethodToken", false, nil},
 		{api.RuntimeInterfaceFormat, 1011, api.RuntimeModuleInterface, "runtime/interface.ts", "GoInterfaceFormat", false, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeProviderInterfaceBridge, 1012, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "GoProviderInterfaceBridge", true, []api.RuntimeSymbol{api.RuntimeInterfaceValue}},
+		{api.RuntimeInterfaceAdapterFactory, 1013, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "createGoInterfaceAdapter", false, []api.RuntimeSymbol{api.RuntimeInterfaceValue}},
 		{api.RuntimeEmptyStruct, 1050, api.RuntimeModuleStruct, "runtime/struct.ts", "GoEmptyStruct", true, nil},
 		{api.RuntimeChannel, 1100, api.RuntimeModuleChannel, "runtime/channel.ts", "GoChannel", true, []api.RuntimeSymbol{api.RuntimeReceiveChannel, api.RuntimeSendChannel, api.RuntimeSelectCase, api.RuntimePanic}},
 		{api.RuntimeReceiveChannel, 1101, api.RuntimeModuleChannel, "runtime/channel.ts", "GoReceiveChannel", true, []api.RuntimeSymbol{api.RuntimeSelectCase}},

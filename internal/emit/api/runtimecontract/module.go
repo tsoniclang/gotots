@@ -297,6 +297,14 @@ func interfaceRuntimeContract(
 			true,
 			RuntimeInterfaceValue,
 		)
+	case RuntimeInterfaceAdapterFactory:
+		contract = runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"createGoInterfaceAdapter",
+			false,
+			RuntimeInterfaceValue,
+		)
 	default:
 		return RuntimeSymbolContract{}, false
 	}
