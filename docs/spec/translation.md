@@ -543,6 +543,32 @@ overlap, nil, and bounds behavior belong to one slice runtime owner. Element
 copy and zero are demanded from the element family only where the operation
 requires them.
 
+An ordinary array literal remains a readable `GoArray.literal` call. A static
+literal with more than 4096 explicit elements must not expand each source
+entry into separate target index and value nodes. When its element is a plain
+8-, 16-, or 32-bit integer represented by `number` and every entry has exact
+checker constant evidence, the array owner emits one demand-generated
+`goArrayPacked` call. Its base-36 payload records exact index/value pairs, so
+keyed sparse literals retain zero-filled holes without constructing an
+expanded target AST:
+
+```go
+var table = [8193]int32{0: -5, 8192: 12 /* plus many constants */}
+```
+
+```ts
+const table = goArrayPacked<int32, 8193>(
+  8193, 0, 4097, "0,-5,...,6bk,c" /* abbreviated one-node payload */,
+);
+```
+
+The fixed readable-node ceiling is a compiler resource-safety invariant, not
+a corpus exception or target optimization switch. Unsupported element
+representations, aggregate values, and nonconstant entries retain their
+existing exact emission path. The decoder validates entry count, safe integer
+syntax, and indexes before publishing the array. It uses no dynamic type
+recovery, filesystem artifact, text patch, or product-specific implementation.
+
 ### Maps
 
 Map representation is selected once from the exact closed key and value

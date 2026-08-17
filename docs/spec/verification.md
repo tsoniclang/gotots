@@ -306,13 +306,24 @@ Each type/value family has focused differentials and mutations:
 | constants | typed/untyped, contextual projection, iota, inherited specs, cross-package, alternate spelling |
 | basic numbers | both profiles, shifts, division/remainder, boundaries, declared number-profile tradeoffs |
 | structs | zero, keyed/unkeyed literals, copy demand, field mutation, nested values |
-| arrays | length, zero, value copy, index/address, nested elements |
+| arrays | length, zero, value copy, index/address, nested elements, bounded static payloads |
 | slices | nil, make, append, capacity, overlap copy, slicing, bounds, element storage |
 | pointers | canonical marker facts, nil, alias, read/store, equality, local/field/index addresses, target flow lowering |
 | unsafe pointers | opaque bind/nil/copy/interface/equality/hash/map identity; reinterpretation, arithmetic, pointer/integer, and provider-input boundaries |
 | maps | nil, set/get/comma-ok/delete/clear, key equality/hash, zero-on-miss, iteration |
 | strings | bytes/runes, indexing, range, slicing, conversions |
 | defined types | identity, native fixed-width numerics with value/pointer methods, projection/wrap, method calls/expressions/values, interfaces, nil-capable families |
+
+Large-static-array proof includes a keyed sparse literal above the 4096-entry
+readable-AST ceiling with negative and unsigned values, zero-filled holes, and
+both integer profiles. Artifact inspection requires one string payload and no
+expanded index/value array nodes; a small literal remains readable and a large
+nonconstant literal retains the ordinary path. Go/TypeScript differential
+execution proves decoded values. Entry-count corruption, malformed digits,
+and an out-of-bounds decoded index must each fail at the packed-array runtime
+gate. A product-scale generation delta reports packed call count, eliminated
+numeric target nodes, source bytes, generation time/RSS, and downstream
+parse/typecheck time/RSS.
 
 Integer-profile proof pins the append-only scalar alias identities, including
 distinct `int`, `uint`, and `uintptr`, and checks their carrier matrix under

@@ -22,6 +22,7 @@ const (
 	RuntimeArrayAllocate              = runtimecontract.RuntimeArrayAllocate
 	RuntimeArrayView                  = runtimecontract.RuntimeArrayView
 	RuntimeArrayLocation              = runtimecontract.RuntimeArrayLocation
+	RuntimeArrayPacked                = runtimecontract.RuntimeArrayPacked
 	RuntimeStorageTypeToken           = runtimecontract.RuntimeStorageTypeToken
 	RuntimeStoredValue                = runtimecontract.RuntimeStoredValue
 	RuntimeStorageType                = runtimecontract.RuntimeStorageType

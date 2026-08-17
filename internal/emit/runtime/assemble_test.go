@@ -167,6 +167,7 @@ func TestAggregateArrayRuntimeAssemblyExactJoinsDemandedOperations(t *testing.T)
 		api.RuntimeArrayAllocate,
 		api.RuntimeArrayView,
 		api.RuntimeArrayLocation,
+		api.RuntimeArrayPacked,
 	}
 	definitions, err := Build(
 		factory,

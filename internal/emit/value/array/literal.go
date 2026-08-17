@@ -16,6 +16,12 @@ type literalElement struct {
 	value api.ExpressionEmission
 }
 
+type literalSourceElement struct {
+	index      int64
+	value      ast.Expr
+	sourceType types.Type
+}
+
 func (a RuntimeArray) EmitLiteral(
 	context api.Context,
 	children api.ChildEmitter,
@@ -31,7 +37,24 @@ func (a RuntimeArray) EmitLiteral(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	elements, err := a.emitLiteralElements(context, children, source)
+	sourceElements, err := a.literalSourceElements(context, source)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	packed, selected, err := a.emitPackedLiteral(
+		context,
+		children,
+		source,
+		sourceElements,
+	)
+	if selected || err != nil {
+		return packed, err
+	}
+	elements, err := a.emitLiteralElements(
+		context,
+		children,
+		sourceElements,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -196,9 +219,52 @@ func (a RuntimeArray) EmitLiteral(
 func (a RuntimeArray) emitLiteralElements(
 	context api.Context,
 	children api.ChildEmitter,
-	source *ast.CompositeLit,
+	sourceElements []literalSourceElement,
 ) ([]literalElement, error) {
-	result := make([]literalElement, 0, len(source.Elts))
+	result := make([]literalElement, 0, len(sourceElements))
+	for _, sourceElement := range sourceElements {
+		value, err := children.Expression(
+			context.
+				WithRole(api.RoleCompositeElement).
+				WithExpectedType(a.ElementType()),
+			sourceElement.value,
+		)
+		if err != nil {
+			return nil, err
+		}
+		value, err = context.Values().Transfer(
+			context.WithRole(api.RoleCompositeElement),
+			sourceElement.value,
+			sourceElement.sourceType,
+			a.ElementType(),
+			api.ValueTransferCopy,
+			value,
+		)
+		if err != nil {
+			return nil, err
+		}
+		value, err = context.ContainerStorage().ToContainerStorage(
+			context.WithRole(api.RoleCompositeElement),
+			sourceElement.value,
+			a.ElementType(),
+			value,
+		)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, literalElement{
+			index: sourceElement.index,
+			value: value,
+		})
+	}
+	return result, nil
+}
+
+func (a RuntimeArray) literalSourceElements(
+	context api.Context,
+	source *ast.CompositeLit,
+) ([]literalSourceElement, error) {
+	result := make([]literalSourceElement, 0, len(source.Elts))
 	next := int64(0)
 	seen := make(map[int64]struct{}, len(source.Elts))
 	for _, sourceElement := range source.Elts {
@@ -244,36 +310,11 @@ func (a RuntimeArray) emitLiteralElements(
 				valueSource,
 			)
 		}
-		value, err := children.Expression(
-			context.
-				WithRole(api.RoleCompositeElement).
-				WithExpectedType(a.ElementType()),
-			valueSource,
-		)
-		if err != nil {
-			return nil, err
-		}
-		value, err = context.Values().Transfer(
-			context.WithRole(api.RoleCompositeElement),
-			valueSource,
-			valueType,
-			a.ElementType(),
-			api.ValueTransferCopy,
-			value,
-		)
-		if err != nil {
-			return nil, err
-		}
-		value, err = context.ContainerStorage().ToContainerStorage(
-			context.WithRole(api.RoleCompositeElement),
-			valueSource,
-			a.ElementType(),
-			value,
-		)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, literalElement{index: index, value: value})
+		result = append(result, literalSourceElement{
+			index:      index,
+			value:      valueSource,
+			sourceType: valueType,
+		})
 		next = index + 1
 	}
 	return result, nil

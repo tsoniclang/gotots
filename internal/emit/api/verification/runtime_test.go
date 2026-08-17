@@ -27,6 +27,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeArrayAllocate, 201, api.RuntimeModuleArray, "runtime/array.ts", "goArrayAllocate", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeArrayView, 202, api.RuntimeModuleArray, "runtime/array.ts", "goArrayView", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeArrayLocation, 203, api.RuntimeModuleArray, "runtime/array.ts", "goArrayLocation", false, []api.RuntimeSymbol{api.RuntimeArray}},
+		{api.RuntimeArrayPacked, 204, api.RuntimeModuleArray, "runtime/array.ts", "goArrayPacked", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeStorageTypeToken, 250, api.RuntimeModuleStorage, "runtime/storage.ts", "$goStorageType", true, nil},
 		{api.RuntimeStoredValue, 251, api.RuntimeModuleStorage, "runtime/storage.ts", "GoStoredValue", true, []api.RuntimeSymbol{api.RuntimeStorageTypeToken}},
 		{api.RuntimeStorageType, 252, api.RuntimeModuleStorage, "runtime/storage.ts", "GoStorage", true, []api.RuntimeSymbol{api.RuntimeStoredValue}},

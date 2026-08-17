@@ -540,6 +540,15 @@ Defaults prefer readable source and no semantic machinery:
 - copy, pointer, interface, map, channel, and runtime support is demanded only
   when a selected occurrence requires it.
 
+Readability is bounded by a hard target-AST resource envelope. In particular,
+an exact large static scalar array is represented by one demand-generated,
+validated packed payload after 4096 explicit entries instead of two unbounded
+target node lists for indexes and values. The array semantic owner consumes
+the same checked element/index census used by normal literal emission and
+chooses the packed form before child target nodes are constructed. Small literals remain
+source-shaped; a product cannot disable or raise the hard ceiling to make an
+out-of-memory compilation appear successful.
+
 GoToTS-owned scalar aliases preserve every selected Go basic identity. In
 particular, `int`, `uint`, and `uintptr` remain distinct aliases rather than
 being rewritten as `int32`/`int64` or `uint32`/`uint64`. Their carrier width is

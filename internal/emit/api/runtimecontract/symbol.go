@@ -14,6 +14,7 @@ const (
 	RuntimeArrayAllocate              RuntimeSymbol = 201
 	RuntimeArrayView                  RuntimeSymbol = 202
 	RuntimeArrayLocation              RuntimeSymbol = 203
+	RuntimeArrayPacked                RuntimeSymbol = 204
 	RuntimeStorageTypeToken           RuntimeSymbol = 250
 	RuntimeStoredValue                RuntimeSymbol = 251
 	RuntimeStorageType                RuntimeSymbol = 252

@@ -96,6 +96,14 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimeArray,
 		), nil
+	case RuntimeArrayPacked:
+		return runtimeContract(
+			RuntimeModuleArray,
+			"runtime/array.ts",
+			"goArrayPacked",
+			false,
+			RuntimeArray,
+		), nil
 	case RuntimeStorageTypeToken:
 		return runtimeContract(
 			RuntimeModuleStorage,
