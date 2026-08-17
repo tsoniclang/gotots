@@ -2,6 +2,7 @@ package array
 
 import (
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
+	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -155,12 +156,17 @@ func element(
 
 func definedElement(
 	factory tsgo.Factory,
+	panicName string,
 	value tsgo.Expression,
 	index tsgo.Expression,
-) tsgo.NonNullExpression {
-	return factory.NonNullExpression(
-		element(factory, value, index),
-		tsgo.NodeFlagsNone,
+	targetType tsgo.TypeNode,
+) tsgo.AsExpression {
+	return indexedstorage.Element(
+		factory,
+		panicName,
+		value,
+		index,
+		targetType,
 	)
 }
 

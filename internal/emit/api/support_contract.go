@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/tsoniclang/gotots/internal/contracts/gostdlib"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	"go/ast"
 	"go/types"
 	"slices"
 )
@@ -501,4 +502,96 @@ func (c Context) ResolveAnonymousStructDemand(
 		artifact,
 		demand,
 	)
+}
+
+func NewIteratorReturnControlRequest(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+	source *ast.RangeStmt,
+) (RootRequest, error) {
+	requirement, err := NewIteratorReturnControlRequirement(
+		owner,
+		enclosing,
+		callable,
+		source,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
+func NewInterfaceAdapterRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceAdapterRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewInterfaceAdapterContractRequest(
+	artifact *GeneratedArtifact,
+	contractType types.Type,
+	contract *types.Interface,
+	contractKey string,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceAdapterContractRequirement(
+		artifact,
+		contractType,
+		contract,
+		contractKey,
+	)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewAnonymousInterfaceRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewAnonymousInterfaceRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewInterfaceMethodTokenRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceMethodTokenRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewInterfaceDynamicTypeTokenRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceDynamicTypeTokenRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewReflectionTypeRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewReflectionTypeRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewProviderInterfaceBridgeRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewProviderInterfaceBridgeRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewProviderStatefulRepresentationRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewProviderStatefulRepresentationRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func generatedDefinitionRequest(
+	requirement DeclarationRequirement,
+	err error,
+) (RootRequest, error) {
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
 }

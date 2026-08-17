@@ -294,12 +294,12 @@ func TestDeclarationRequirementSchedulerDeduplicatesAndUsesClosedOrder(
 	scheduler := newDeclarationRequirementScheduler(
 		emitordering.CompareArtifactOwners,
 	)
-	scheduler.enqueue(secondZero)
-	scheduler.enqueue(firstEqual)
-	scheduler.enqueue(firstCopy)
-	scheduler.enqueue(firstCopy)
+	scheduler.Enqueue(secondZero)
+	scheduler.Enqueue(firstEqual)
+	scheduler.Enqueue(firstCopy)
+	scheduler.Enqueue(firstCopy)
 
-	firstOwner, firstBatch, removed, ok := scheduler.nextBatch()
+	firstOwner, firstBatch, removed, ok := scheduler.NextBatch()
 	if !ok ||
 		removed ||
 		firstOwner != firstCopy.Owner() ||
@@ -308,7 +308,7 @@ func TestDeclarationRequirementSchedulerDeduplicatesAndUsesClosedOrder(
 		firstBatch[1] != firstEqual {
 		t.Fatalf("first requirement batch = %#v, %t", firstBatch, ok)
 	}
-	secondOwner, secondBatch, removed, ok := scheduler.nextBatch()
+	secondOwner, secondBatch, removed, ok := scheduler.NextBatch()
 	if !ok ||
 		removed ||
 		secondOwner != secondZero.Owner() ||
@@ -316,7 +316,7 @@ func TestDeclarationRequirementSchedulerDeduplicatesAndUsesClosedOrder(
 		secondBatch[0] != secondZero {
 		t.Fatalf("second requirement batch = %#v, %t", secondBatch, ok)
 	}
-	if owner, actual, removed, ok := scheduler.nextBatch(); ok ||
+	if owner, actual, removed, ok := scheduler.NextBatch(); ok ||
 		removed ||
 		owner.Valid() ||
 		actual != nil {
@@ -353,7 +353,7 @@ func TestDeclarationRequirementSchedulerReplacesConsumerRevision(
 	)
 	replaceRequirements(t, scheduler, firstConsumer, requirement)
 	replaceRequirements(t, scheduler, secondConsumer, requirement)
-	owner, selected, removed, ok := scheduler.nextBatch()
+	owner, selected, removed, ok := scheduler.NextBatch()
 	if !ok ||
 		removed ||
 		owner != requirement.Owner() ||
@@ -362,20 +362,20 @@ func TestDeclarationRequirementSchedulerReplacesConsumerRevision(
 		t.Fatalf("initial replacement batch = %v %#v %t", owner, selected, ok)
 	}
 	replaceRequirements(t, scheduler, firstConsumer)
-	if scheduler.hasPending() {
+	if scheduler.HasPending() {
 		t.Fatal("shared requirement was removed with one remaining consumer")
 	}
 	replaceRequirements(t, scheduler, secondConsumer)
-	if !scheduler.finalizeRemovals() {
+	if !scheduler.FinalizeRemovals() {
 		t.Fatal("final requirement removal was not scheduled at quiescence")
 	}
-	owner, selected, removed, ok = scheduler.nextBatch()
+	owner, selected, removed, ok = scheduler.NextBatch()
 	if !ok || !removed ||
 		owner != requirement.Owner() ||
 		len(selected) != 0 {
 		t.Fatalf("removal batch = %v %#v %t", owner, selected, ok)
 	}
-	if scheduler.wasApplied(requirement) {
+	if scheduler.WasApplied(requirement) {
 		t.Fatal("removed requirement survived in the applied snapshot")
 	}
 }
@@ -396,16 +396,16 @@ func TestDeclarationRequirementSchedulerReplacesSelfDemand(
 		emitordering.CompareArtifactOwners,
 	)
 	replaceRequirements(t, scheduler, requirement.Owner(), requirement)
-	if _, _, removed, ok := scheduler.nextBatch(); !ok || removed {
+	if _, _, removed, ok := scheduler.NextBatch(); !ok || removed {
 		t.Fatal("self demand was not scheduled")
 	}
 	replaceRequirements(t, scheduler, requirement.Owner())
-	if !scheduler.finalizeRemovals() {
+	if !scheduler.FinalizeRemovals() {
 		t.Fatal("stale self demand was retained after exact replacement")
 	}
-	owner, requirements, removed, ok := scheduler.nextBatch()
+	owner, requirements, removed, ok := scheduler.NextBatch()
 	if !ok || !removed || owner != requirement.Owner() ||
-		len(requirements) != 0 || scheduler.wasApplied(requirement) {
+		len(requirements) != 0 || scheduler.WasApplied(requirement) {
 		t.Fatal("stale self demand survived its replacement revision")
 	}
 }
@@ -434,14 +434,14 @@ func TestDeclarationRequirementSchedulerLookupVisitsOnlySelectedOwner(
 			t.Fatal(err)
 		}
 		owners = append(owners, requirement.Owner())
-		scheduler.enqueue(requirement)
+		scheduler.Enqueue(requirement)
 	}
 	for {
-		if _, _, _, ok := scheduler.nextBatch(); !ok {
+		if _, _, _, ok := scheduler.NextBatch(); !ok {
 			break
 		}
 	}
-	requirements, visits := scheduler.applied.forOwner(owners[ownerCount/2])
+	requirements, visits := scheduler.AppliedForWithWork(owners[ownerCount/2])
 	if len(requirements) != 1 || visits != 1 {
 		t.Fatalf(
 			"selected-owner lookup returned %d requirements after %d visits",
@@ -524,7 +524,7 @@ func TestAnonymousStructDemandsUseExistingArtifactFixedPoint(t *testing.T) {
 		t.Fatalf("anonymous artifact reconstruction = %#v, %t", builder, ok)
 	}
 	if session.artifacts.HasPending() ||
-		session.requirements.hasPending() ||
+		session.requirements.HasPending() ||
 		session.scheduler.hasPending() {
 		t.Fatal("anonymous-struct requirements did not converge")
 	}

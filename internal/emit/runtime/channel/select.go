@@ -108,6 +108,7 @@ func (b builder) selectAttemptBody() tsgo.Block {
 						b.denseElement(
 							b.id("cases"),
 							b.id("index"),
+							b.typeReference(b.caseName),
 						),
 						"ready",
 					),
@@ -134,18 +135,25 @@ func (b builder) selectAttemptBody() tsgo.Block {
 		),
 		b.variable(
 			tsgo.NodeFlagsConst,
+			"readyIndex",
+			b.numberType(),
+			b.staticCall(
+				"Math",
+				"floor",
+				b.multiply(
+					b.staticCall("Math", "random"),
+					b.arrayLength(b.id("ready")),
+				),
+			),
+		),
+		b.variable(
+			tsgo.NodeFlagsConst,
 			"selectedIndex",
 			b.numberType(),
 			b.denseElement(
 				b.id("ready"),
-				b.staticCall(
-					"Math",
-					"floor",
-					b.multiply(
-						b.staticCall("Math", "random"),
-						b.arrayLength(b.id("ready")),
-					),
-				),
+				b.id("readyIndex"),
+				b.numberType(),
 			),
 		),
 		b.variable(
@@ -153,7 +161,11 @@ func (b builder) selectAttemptBody() tsgo.Block {
 			"outcome",
 			b.selectCommitType(),
 			b.methodCall(
-				b.denseElement(b.id("cases"), b.id("selectedIndex")),
+				b.denseElement(
+					b.id("cases"),
+					b.id("selectedIndex"),
+					b.typeReference(b.caseName),
+				),
 				"commit",
 			),
 		),
@@ -342,6 +354,7 @@ func (b builder) selectExecutor() tsgo.ArrowFunction {
 						b.denseElement(
 							b.id("order"),
 							b.id("remaining"),
+							b.numberType(),
 						),
 					),
 					b.expression(b.assign(
@@ -352,6 +365,7 @@ func (b builder) selectExecutor() tsgo.ArrowFunction {
 						b.denseElement(
 							b.id("order"),
 							b.id("swapIndex"),
+							b.numberType(),
 						),
 					)),
 					b.expression(b.assign(
@@ -382,6 +396,7 @@ func (b builder) selectExecutor() tsgo.ArrowFunction {
 						b.denseElement(
 							b.id("order"),
 							b.id("registration"),
+							b.numberType(),
 						),
 					),
 					b.expression(b.methodCall(
@@ -391,6 +406,7 @@ func (b builder) selectExecutor() tsgo.ArrowFunction {
 							b.denseElement(
 								b.id("cases"),
 								b.id("caseIndex"),
+								b.typeReference(b.caseName),
 							),
 							"subscribe",
 							b.selectClaim(b.id("caseIndex")),

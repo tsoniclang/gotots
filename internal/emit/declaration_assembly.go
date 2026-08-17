@@ -190,7 +190,7 @@ func (s *programSession) scheduleDeclarationRequirement(
 	if err := s.prepareDeclarationRequirement(requirement); err != nil {
 		return err
 	}
-	s.requirements.enqueue(requirement)
+	s.requirements.Enqueue(requirement)
 	return nil
 }
 
@@ -318,7 +318,7 @@ func (s *programSession) applyDeclarationRequirements(
 					Reason: "generated-artifact requirement batch has mixed or invalid ownership",
 				}
 			}
-			if !s.requirements.wasApplied(requirement) {
+			if !s.requirements.WasApplied(requirement) {
 				return &ScheduleError{
 					Object: owner.Name(),
 					Reason: "generated-artifact requirement was not accepted by its owner",
@@ -339,7 +339,7 @@ func (s *programSession) applyDeclarationRequirements(
 					Reason: "package initializer requirement batch has mixed or invalid ownership",
 				}
 			}
-			if !s.requirements.wasApplied(requirement) {
+			if !s.requirements.WasApplied(requirement) {
 				return &ScheduleError{
 					Object: owner.Name(),
 					Reason: "package initializer requirement was not accepted by its owner",
@@ -368,7 +368,7 @@ func (s *programSession) applyDeclarationRequirements(
 				Reason: "declaration requirement batch has mixed or invalid ownership",
 			}
 		}
-		if !s.requirements.wasApplied(requirement) {
+		if !s.requirements.WasApplied(requirement) {
 			return &ScheduleError{
 				Object: owner.Name(),
 				Reason: "declaration requirement was not accepted by its owner",
@@ -442,7 +442,7 @@ func (s *programSession) buildArtifactRevision(
 	}
 	defer finish()
 
-	requirements := s.requirements.selectedFor(artifactOwner)
+	requirements := s.requirements.SelectedFor(artifactOwner)
 	handlerRequirements, selectedMethods, err :=
 		s.partitionClassMethodRequirements(owner, requirements)
 	if err != nil {

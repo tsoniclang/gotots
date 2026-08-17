@@ -82,7 +82,7 @@ func (s *programSession) observeCooperativeCallable(
 		}
 	}
 	cooperative := false
-	for _, requirement := range s.requirements.selectedFor(
+	for _, requirement := range s.requirements.SelectedFor(
 		facet.Owner(),
 	) {
 		selected, selectedCooperative :=
@@ -172,7 +172,7 @@ func (s *programSession) reconstructCallableContractArtifact(
 		return err
 	}
 	owner := api.MustGeneratedArtifactOwner(artifact)
-	selected := s.requirements.selectedFor(owner)
+	selected := s.requirements.SelectedFor(owner)
 	if len(selected) == 0 && s.requirementRemovalOwner == owner {
 		contract, err := s.callableContract(false)
 		if err != nil {
@@ -455,7 +455,7 @@ func (s *programSession) commitArtifactRevision(
 	if err := s.commitArtifactContract(owner, contract, dependencies); err != nil {
 		return err
 	}
-	return s.requirements.replace(owner, requestRoots)
+	return s.requirements.Replace(owner, requestRoots)
 }
 
 func (s *programSession) commitArtifactContract(

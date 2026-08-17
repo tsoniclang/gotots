@@ -50,7 +50,7 @@ func (s *programSession) GenericCallableRequiresConcretization(
 	artifactOwner := api.MustSourceArtifactOwner(owner)
 	return api.GenericKernelRequired(
 		owner,
-		s.requirements.selectedFor(artifactOwner),
+		s.requirements.SelectedFor(artifactOwner),
 	)
 }
 
@@ -254,7 +254,7 @@ func (s *programSession) ResolveGenericOperationSet(
 		}
 	}
 	var operations []*api.GenericOperationContract
-	for _, requirement := range s.requirements.selectedFor(
+	for _, requirement := range s.requirements.SelectedFor(
 		api.MustSourceArtifactOwner(owner),
 	) {
 		requirementOwner, operation, generic :=

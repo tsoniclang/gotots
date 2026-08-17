@@ -49,10 +49,9 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 	)
 	for _, source := range []string{valueSource, pointerSource} {
 		for _, required := range []string{
-			"private readonly values: Map<string, ",
+			"private readonly values: Map<string, [",
 			"private static $copyValue",
-			"values.has(key)",
-			"values.set(key, Native",
+			"values.set(key, [",
 			"values.delete(key)",
 			"Array.from(values.keys())",
 		} {
@@ -70,7 +69,6 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 			"GoDenseIndex",
 			"GoMapHash",
 			" as ",
-			"values.set(key, [",
 		} {
 			if strings.Contains(source, forbidden) {
 				t.Fatalf("native-key specialization contains %q:\n%s", forbidden, source)
@@ -79,7 +77,7 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 		store := specializationMethodSource(t, source, "store", "delete")
 		if strings.Contains(store, "values.get(") ||
 			strings.Contains(store, "entry === undefined") ||
-			strings.Count(store, "values.set(key, ") != 1 ||
+			strings.Count(store, "values.set(key, [") != 1 ||
 			strings.Count(store, "$copyValue(value)") != 1 {
 			t.Fatalf("native store is not one copy-and-set operation:\n%s", store)
 		}

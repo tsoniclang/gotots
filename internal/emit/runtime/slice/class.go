@@ -2,6 +2,7 @@ package slice
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -424,10 +425,13 @@ func (b builder) index(
 func (b builder) indexedValue(
 	value tsgo.Expression,
 	index tsgo.Expression,
-) tsgo.NonNullExpression {
-	return b.factory.NonNullExpression(
-		b.index(value, index),
-		tsgo.NodeFlagsNone,
+) tsgo.AsExpression {
+	return indexedstorage.Element(
+		b.factory,
+		b.panicName,
+		value,
+		index,
+		b.typeT(),
 	)
 }
 

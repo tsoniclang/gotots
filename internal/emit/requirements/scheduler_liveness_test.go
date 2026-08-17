@@ -1,4 +1,4 @@
-package emit
+package requirements
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 
 func replaceRequirements(
 	t *testing.T,
-	scheduler *declarationRequirementScheduler,
+	scheduler *Scheduler,
 	consumer api.ArtifactOwner,
 	requirements ...api.DeclarationRequirement,
 ) {
@@ -25,9 +25,31 @@ func replaceRequirements(
 		}
 		requests = append(requests, request)
 	}
-	if err := scheduler.replace(consumer, requests); err != nil {
+	if err := scheduler.Replace(consumer, requests); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func newTestScheduler() *Scheduler {
+	return New(
+		emitordering.CompareArtifactOwners,
+		func(left, right api.DeclarationRequirement) int {
+			if order := emitordering.CompareArtifactOwners(
+				left.Owner(),
+				right.Owner(),
+			); order != 0 {
+				return order
+			}
+			switch {
+			case left.Kind() < right.Kind():
+				return -1
+			case left.Kind() > right.Kind():
+				return 1
+			default:
+				return 0
+			}
+		},
+	)
 }
 
 func TestRequirementSchedulerSharesPersistentRequestClosure(t *testing.T) {
@@ -58,9 +80,7 @@ func TestRequirementSchedulerSharesPersistentRequestClosure(t *testing.T) {
 		requests = append(requests, request)
 	}
 	shared := api.CombineRequests(requests)
-	scheduler := newDeclarationRequirementScheduler(
-		emitordering.CompareArtifactOwners,
-	)
+	scheduler := newTestScheduler()
 	consumers := make([]api.ArtifactOwner, 0, consumerCount)
 	for index := 0; index < consumerCount; index++ {
 		consumer := api.MustSourceArtifactOwner(types.NewFunc(
@@ -70,7 +90,7 @@ func TestRequirementSchedulerSharesPersistentRequestClosure(t *testing.T) {
 			types.NewSignatureType(nil, nil, nil, nil, nil, false),
 		))
 		consumers = append(consumers, consumer)
-		if err := scheduler.replace(consumer, shared); err != nil {
+		if err := scheduler.Replace(consumer, shared); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -89,14 +109,14 @@ func TestRequirementSchedulerSharesPersistentRequestClosure(t *testing.T) {
 		)
 	}
 	for _, consumer := range consumers[:len(consumers)-1] {
-		if err := scheduler.replace(consumer, nil); err != nil {
+		if err := scheduler.Replace(consumer, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if len(scheduler.orphaned) != 0 {
 		t.Fatal("shared closure became orphaned while one consumer remained")
 	}
-	if err := scheduler.replace(consumers[len(consumers)-1], nil); err != nil {
+	if err := scheduler.Replace(consumers[len(consumers)-1], nil); err != nil {
 		t.Fatal(err)
 	}
 	if len(scheduler.orphaned) != requirementCount {
@@ -150,13 +170,11 @@ func TestRequirementSchedulerReplacesAroundSharedSubgraph(t *testing.T) {
 		"Consumer",
 		types.NewSignatureType(nil, nil, nil, nil, nil, false),
 	))
-	scheduler := newDeclarationRequirementScheduler(
-		emitordering.CompareArtifactOwners,
-	)
-	if err := scheduler.replace(consumer, before); err != nil {
+	scheduler := newTestScheduler()
+	if err := scheduler.Replace(consumer, before); err != nil {
 		t.Fatal(err)
 	}
-	if err := scheduler.replace(consumer, after); err != nil {
+	if err := scheduler.Replace(consumer, after); err != nil {
 		t.Fatal(err)
 	}
 	if _, orphaned := scheduler.orphaned[sharedRequirement]; orphaned {

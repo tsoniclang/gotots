@@ -79,10 +79,6 @@ func emitMapValue(
 	}
 	before = append(before, keysBefore...)
 	requests = append(requests, keysRequests...)
-	index, err := rangeIndex(context)
-	if err != nil {
-		return api.StatementEmission{}, err
-	}
 	keyName, err := context.Names().Temporary(api.TemporaryRangeValue)
 	if err != nil {
 		return api.StatementEmission{}, err
@@ -139,22 +135,7 @@ func emitMapValue(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	loopBody := []tsgo.Statement{
-		variable(
-			context,
-			tsgo.NodeFlagsConst,
-			keyValue,
-			context.Factory().NonNullExpression(
-				context.Factory().ElementAccessExpression(
-					keys,
-					nil,
-					index,
-					tsgo.NodeFlagsNone,
-				),
-				tsgo.NodeFlagsNone,
-			),
-		),
-	}
+	var loopBody []tsgo.Statement
 	loopBody = append(loopBody, lookup.Before()...)
 	loopBody = append(
 		loopBody,
@@ -180,34 +161,20 @@ func emitMapValue(
 	)
 	loopBody = append(loopBody, bindings.Statements()...)
 	loopBody = append(loopBody, sourceBody.Value().Statements()...)
-	loop := context.Factory().ForStatement(
+	loop := context.Factory().ForOfStatement(
+		nil,
 		context.Factory().VariableDeclarationList(
 			[]tsgo.VariableDeclaration{
 				context.Factory().VariableDeclaration(
-					index,
+					keyValue,
 					nil,
 					nil,
-					context.Factory().NumericLiteral(
-						"0",
-						tsgo.TokenFlagsNone,
-					),
+					nil,
 				),
 			},
-			tsgo.NodeFlagsLet,
+			tsgo.NodeFlagsConst,
 		),
-		context.Factory().BinaryExpression(
-			nil,
-			index,
-			nil,
-			context.Factory().BinaryOperatorToken(
-				tsgo.BinaryOperatorLessThanToken,
-			),
-			property(context, keys, "length"),
-		),
-		context.Factory().PostfixUnaryExpression(
-			index,
-			tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken,
-		),
+		keys,
 		context.Factory().Block(loopBody, true),
 	)
 	before = append(before, labelTarget(context, targetLabel, loop))

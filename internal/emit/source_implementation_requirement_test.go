@@ -49,21 +49,21 @@ func TestCertifiedSourceImplementationRequirementDoesNotCreateLiveness(
 	if err := session.installSourceImplementationRequirements(); err != nil {
 		t.Fatal(err)
 	}
-	if scheduler.hasPending() {
+	if scheduler.HasPending() {
 		t.Fatal("certified requirement created pending liveness")
 	}
-	if owner, requirements, removed, ok := scheduler.nextBatch(); ok ||
+	if owner, requirements, removed, ok := scheduler.NextBatch(); ok ||
 		removed || owner.Valid() || requirements != nil {
 		t.Fatalf("certified requirement created a scheduler batch: %v %#v", owner, requirements)
 	}
-	if !scheduler.wasSelected(copyRequirement) ||
-		scheduler.wasApplied(copyRequirement) {
+	if !scheduler.WasSelected(copyRequirement) ||
+		scheduler.WasApplied(copyRequirement) {
 		t.Fatal("certified requirement was not queryable without becoming applied liveness")
 	}
 	assertSelectedRequirements(t, scheduler, copyRequirement.Owner(), copyRequirement)
 
 	replaceRequirements(t, scheduler, consumer, equalRequirement)
-	if _, _, removed, ok := scheduler.nextBatch(); !ok || removed {
+	if _, _, removed, ok := scheduler.NextBatch(); !ok || removed {
 		t.Fatal("ordinary consumer requirement was not scheduled")
 	}
 	assertSelectedRequirements(
@@ -74,14 +74,14 @@ func TestCertifiedSourceImplementationRequirementDoesNotCreateLiveness(
 		equalRequirement,
 	)
 	replaceRequirements(t, scheduler, consumer)
-	if !scheduler.finalizeRemovals() {
+	if !scheduler.FinalizeRemovals() {
 		t.Fatal("ordinary consumer requirement removal was not scheduled")
 	}
-	if _, _, removed, ok := scheduler.nextBatch(); !ok || !removed {
+	if _, _, removed, ok := scheduler.NextBatch(); !ok || !removed {
 		t.Fatal("ordinary consumer requirement removal was not applied")
 	}
 	assertSelectedRequirements(t, scheduler, copyRequirement.Owner(), copyRequirement)
-	if !scheduler.wasSelected(copyRequirement) || scheduler.wasApplied(copyRequirement) {
+	if !scheduler.WasSelected(copyRequirement) || scheduler.WasApplied(copyRequirement) {
 		t.Fatal("liveness replacement removed or applied the certified requirement")
 	}
 }
@@ -146,7 +146,7 @@ func TestCertifiedSourceImplementationRequirementsRejectInvalidContracts(
 			if err == nil || !strings.Contains(err.Error(), test.wantFragment) {
 				t.Fatalf("installation error = %v, want %q", err, test.wantFragment)
 			}
-			if scheduler.hasPending() || !scheduler.certified.empty() {
+			if scheduler.HasPending() || !scheduler.CertifiedEmpty() {
 				t.Fatal("failed certified-requirement installation mutated scheduler state")
 			}
 		})
@@ -160,7 +160,7 @@ func assertSelectedRequirements(
 	want ...api.DeclarationRequirement,
 ) {
 	t.Helper()
-	actual := scheduler.selectedFor(owner)
+	actual := scheduler.SelectedFor(owner)
 	if len(actual) != len(want) {
 		t.Fatalf("selected requirements = %#v, want %#v", actual, want)
 	}

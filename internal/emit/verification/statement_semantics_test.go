@@ -193,10 +193,10 @@ func assertWaveFourArtifactShape(t *testing.T, printed string) {
 		}
 	}
 	direct := regexp.MustCompile(
-		`__gotots_range_keys_[0-9]+\[__gotots_range_index_[0-9]+\]!`,
+		`for \(const __gotots_range_value_[0-9]+ of __gotots_range_keys_[0-9]+\)`,
 	)
 	if !direct.MatchString(printed) {
-		t.Fatalf("map range lacks its bounded dense-key read:\n%s", printed)
+		t.Fatalf("map range lacks its direct key iteration:\n%s", printed)
 	}
 	if strings.Contains(printed, "GoDenseIndex.get(__gotots_range_keys_") {
 		t.Fatalf("map range retained its redundant dense-index helper:\n%s", printed)

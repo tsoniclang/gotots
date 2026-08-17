@@ -80,7 +80,7 @@ func TestClassMemberContributionReconstructsTheTypeOwnedClass(t *testing.T) {
 	if err := session.scheduleDeclarationRequirement(requirement); err != nil {
 		t.Fatal(err)
 	}
-	owner, requirements, removed, ok := session.requirements.nextBatch()
+	owner, requirements, removed, ok := session.requirements.NextBatch()
 	if !ok {
 		t.Fatal("class-member attachment requirement was not scheduled")
 	}

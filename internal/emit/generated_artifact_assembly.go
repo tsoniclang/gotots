@@ -213,7 +213,7 @@ func (s *programSession) buildMapSpecializationRevision(
 	err = maprepresentation.ValidateRequirements(
 		api.RoleFileDeclaration,
 		artifact,
-		s.requirements.selectedFor(owner),
+		s.requirements.SelectedFor(owner),
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -439,7 +439,7 @@ func (s *programSession) buildGenericCapabilityRevision(
 	if err := genericcapability.ValidateRequirements(
 		builder.context.Role(),
 		artifact,
-		s.requirements.selectedFor(owner),
+		s.requirements.SelectedFor(owner),
 	); err != nil {
 		return artifactRevision{}, err
 	}

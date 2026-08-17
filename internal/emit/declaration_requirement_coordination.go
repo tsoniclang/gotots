@@ -2,6 +2,7 @@ package emit
 
 import (
 	"go/types"
+	"slices"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	declarationindex "github.com/tsoniclang/gotots/internal/emit/declaration/index"
@@ -359,7 +360,7 @@ func (s *programSession) settle() error {
 			}
 			continue
 		}
-		if owner, requirements, removed, ok := s.requirements.nextBatch(); ok {
+		if owner, requirements, removed, ok := s.requirements.NextBatch(); ok {
 			if err := s.applyDeclarationRequirements(
 				owner,
 				requirements,
@@ -383,7 +384,7 @@ func (s *programSession) settle() error {
 			}
 			continue
 		}
-		if s.requirements.finalizeRemovals() {
+		if s.requirements.FinalizeRemovals() {
 			continue
 		}
 		if builders := s.packageExports.nextBatch(); len(builders) != 0 {
@@ -533,26 +534,11 @@ func compareGeneratedArtifacts(
 	}
 }
 
-func canonicalDeclarationRequirements(
-	requirements []api.DeclarationRequirement,
-) []api.DeclarationRequirement {
-	unique := make(map[api.DeclarationRequirement]struct{}, len(requirements))
-	for _, requirement := range requirements {
-		unique[requirement] = struct{}{}
-	}
-	result := make([]api.DeclarationRequirement, 0, len(unique))
-	for requirement := range unique {
-		result = append(result, requirement)
-	}
-	sortDeclarationRequirements(result)
-	return result
-}
-
 func (s *programSession) installSourceImplementationRequirements() error {
 	if s.sourceImplementationContracts == nil {
 		return nil
 	}
-	if !s.requirements.certified.empty() {
+	if !s.requirements.CertifiedEmpty() {
 		return &ScheduleError{
 			Reason: "source-implementation accepted requirements were installed more than once",
 		}
@@ -569,17 +555,21 @@ func (s *programSession) installSourceImplementationRequirements() error {
 			selected = append(selected, requirement)
 		}
 	}
-	sortDeclarationRequirements(selected)
-	certified := newDeclarationRequirementLedger()
+	slices.SortFunc(selected, compareDeclarationRequirements)
+	seen := make(map[api.DeclarationRequirement]struct{}, len(selected))
 	for _, requirement := range selected {
-		if certified.contains(requirement) {
+		if _, duplicate := seen[requirement]; duplicate {
 			return &ScheduleError{
 				Object: requirement.Owner().Name(),
 				Reason: "source-implementation accepted requirement is duplicated",
 			}
 		}
-		certified.add(requirement)
+		seen[requirement] = struct{}{}
 	}
-	s.requirements.certified = certified
+	if !s.requirements.InstallCertified(selected) {
+		return &ScheduleError{
+			Reason: "source-implementation accepted requirements were installed more than once",
+		}
+	}
 	return nil
 }

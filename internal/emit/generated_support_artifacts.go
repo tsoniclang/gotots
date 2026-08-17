@@ -102,7 +102,7 @@ func (s *programSession) buildProviderStatefulRevision(
 		return artifactRevision{}, err
 	}
 	defer finish()
-	requirements := s.requirements.selectedFor(owner)
+	requirements := s.requirements.SelectedFor(owner)
 	if len(requirements) != 1 {
 		return artifactRevision{}, &ScheduleError{
 			Object: artifact.TargetName(),
@@ -336,7 +336,7 @@ func (s *programSession) buildGenericConcretizationRevision(
 	context := builder.context.WithArtifactOwner(owner)
 	deferred, err := exactGenericConcretizationRequirement(
 		artifact,
-		s.requirements.selectedFor(owner),
+		s.requirements.SelectedFor(owner),
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -528,7 +528,7 @@ func (s *programSession) buildDeferredCallableRegistryRevision(
 		return artifactRevision{}, err
 	}
 	defer finish()
-	requirements := s.requirements.selectedFor(owner)
+	requirements := s.requirements.SelectedFor(owner)
 	definitions := 0
 	for _, requirement := range requirements {
 		if selected, ok := requirement.DeferredCallableRegistry(); ok {

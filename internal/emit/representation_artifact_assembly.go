@@ -194,7 +194,7 @@ func (s *programSession) buildRepresentationArtifactRevision(
 	}
 	defer finish()
 	context := builder.context.WithArtifactOwner(owner)
-	requirements := s.requirements.selectedFor(owner)
+	requirements := s.requirements.SelectedFor(owner)
 	var adapterContracts []interfaceadapterdeclaration.Contract
 	var providerCapabilities []providerinterfacebridge.CapabilityContract
 	var providerProfileCapabilities []providerinterfacebridge.ProfileCapabilityContract

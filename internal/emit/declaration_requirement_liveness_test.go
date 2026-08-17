@@ -9,6 +9,26 @@ import (
 	emitordering "github.com/tsoniclang/gotots/internal/emit/ordering"
 )
 
+func replaceRequirements(
+	t *testing.T,
+	scheduler *declarationRequirementScheduler,
+	consumer api.ArtifactOwner,
+	requirements ...api.DeclarationRequirement,
+) {
+	t.Helper()
+	requests := make([]api.RootRequest, 0, len(requirements))
+	for _, requirement := range requirements {
+		request, err := api.NewDeclarationRequirementRequest(requirement)
+		if err != nil {
+			t.Fatal(err)
+		}
+		requests = append(requests, request)
+	}
+	if err := scheduler.Replace(consumer, requests); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRequirementRemovalWaitsForQuiescentConsumerDiscovery(
 	t *testing.T,
 ) {
@@ -44,10 +64,10 @@ func TestRequirementRemovalWaitsForQuiescentConsumerDiscovery(
 		emitordering.CompareArtifactOwners,
 	)
 	replaceRequirements(t, scheduler, firstConsumer, copyRequirement)
-	_, _, _, _ = scheduler.nextBatch()
+	_, _, _, _ = scheduler.NextBatch()
 
 	replaceRequirements(t, scheduler, firstConsumer, equalRequirement)
-	owner, requirements, removed, ok := scheduler.nextBatch()
+	owner, requirements, removed, ok := scheduler.NextBatch()
 	if !ok ||
 		removed ||
 		owner != copyRequirement.Owner() ||
@@ -61,10 +81,10 @@ func TestRequirementRemovalWaitsForQuiescentConsumerDiscovery(
 		)
 	}
 	replaceRequirements(t, scheduler, laterConsumer, copyRequirement)
-	if scheduler.finalizeRemovals() {
+	if scheduler.FinalizeRemovals() {
 		t.Fatal("later consumer did not cancel the pending removal")
 	}
-	if scheduler.hasPending() {
+	if scheduler.HasPending() {
 		t.Fatal("canceled removal left pending scheduler work")
 	}
 }

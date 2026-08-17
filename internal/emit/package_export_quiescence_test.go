@@ -63,12 +63,12 @@ func use() int32 { return Transform(int32(2)) }
 		t.Fatal("package export projection was not published")
 	}
 	if session.artifacts.HasPending() ||
-		session.requirements.hasPending() ||
+		session.requirements.HasPending() ||
 		session.packageExports.hasPending() {
 		t.Fatal("late generic requirements did not reach quiescence")
 	}
 	transform := scope.Lookup("Transform")
-	if len(session.requirements.appliedFor(sourceArtifactOwner(transform))) == 0 {
+	if len(session.requirements.AppliedFor(sourceArtifactOwner(transform))) == 0 {
 		t.Fatal("late generic declaration acquired no requirements")
 	}
 }

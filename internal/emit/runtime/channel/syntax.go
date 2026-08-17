@@ -2,6 +2,7 @@ package channel
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	indexedstorage "github.com/tsoniclang/gotots/internal/emit/runtime/indexedstorage"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -134,10 +135,14 @@ func (b builder) element(
 func (b builder) denseElement(
 	receiver tsgo.Expression,
 	index tsgo.Expression,
-) tsgo.NonNullExpression {
-	return b.factory.NonNullExpression(
-		b.element(receiver, index),
-		tsgo.NodeFlagsNone,
+	targetType tsgo.TypeNode,
+) tsgo.AsExpression {
+	return indexedstorage.Element(
+		b.factory,
+		b.panicName,
+		receiver,
+		index,
+		targetType,
 	)
 }
 

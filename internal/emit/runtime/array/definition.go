@@ -69,7 +69,7 @@ func BuildWithCapabilities(
 		zeroMethod(factory, exportedName),
 		literalMethod(factory, exportedName, panicName),
 		copyMethod(factory, exportedName, elementType, lengthType),
-		getMethod(factory, elementType),
+		getMethod(factory, elementType, panicName),
 		setMethod(factory, elementType),
 		checkMethod(factory, panicName),
 	)
@@ -312,13 +312,19 @@ func literalMethod(
 					nil,
 					definedElement(
 						factory,
+						panicName,
 						indexes,
 						entry,
+						factory.KeywordTypeNode(
+							tsgo.KeywordTypeSyntaxKindNumberKeyword,
+						),
 					),
 					definedElement(
 						factory,
+						panicName,
 						values,
 						entry,
+						elementType,
 					),
 				)),
 			}, true),
@@ -414,6 +420,7 @@ func copyMethod(
 func getMethod(
 	factory tsgo.Factory,
 	elementType tsgo.TypeNode,
+	panicName string,
 ) tsgo.MethodDeclaration {
 	index := factory.Identifier("index")
 	return runtimeMethod(
@@ -445,6 +452,7 @@ func getMethod(
 			),
 			factory.ReturnStatement(definedElement(
 				factory,
+				panicName,
 				property(factory, factory.ThisExpression(), "$values"),
 				binary(
 					factory,
@@ -452,6 +460,7 @@ func getMethod(
 					tsgo.BinaryOperatorPlusToken,
 					factory.Identifier("offset"),
 				),
+				elementType,
 			)),
 		},
 	)

@@ -255,7 +255,7 @@ func emittedObjectCounts(
 			continue
 		}
 		if owner, requirements, removed, ok :=
-			session.requirements.nextBatch(); ok {
+			session.requirements.NextBatch(); ok {
 			if err := session.applyDeclarationRequirements(
 				owner,
 				requirements,

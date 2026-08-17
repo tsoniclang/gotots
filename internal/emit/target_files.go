@@ -203,7 +203,7 @@ func (s *programSession) requireProgramRoots(roots []Root) error {
 func (s *programSession) verifyTargetFilesSettled() error {
 	if s.scheduler.hasPending() ||
 		s.packageExports.hasPending() ||
-		s.requirements.hasPending() ||
+		s.requirements.HasPending() ||
 		s.artifacts.HasPending() ||
 		s.packageInitializations.hasPending() {
 		return &ScheduleError{Reason: "target files sealed with pending work"}

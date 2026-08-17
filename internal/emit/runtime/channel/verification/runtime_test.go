@@ -39,7 +39,7 @@ func TestChannelAndSchedulerRuntimePrintStrictAndExecute(t *testing.T) {
 		"const order: number[] = [];",
 		"Math.random() * (remaining + 1)",
 		"this.bufferHead >= 64 && this.bufferHead * 2 >= this.buffer.length",
-		"this.buffer[this.bufferHead]!",
+		"this.bufferHead in this.buffer",
 		"this.senders.add(offer)",
 		"this.receivers.add(receive)",
 		"senders.delete(offer)",
@@ -54,6 +54,7 @@ func TestChannelAndSchedulerRuntimePrintStrictAndExecute(t *testing.T) {
 	}
 	if strings.Contains(printed, "nextListener") ||
 		strings.Contains(printed, "GoDenseIndex") ||
+		strings.Contains(printed, "]!") ||
 		strings.Contains(printed, "Map<number, () => void>") ||
 		strings.Contains(printed, "private listeners") ||
 		strings.Contains(printed, "selectSenders") ||
@@ -63,6 +64,9 @@ func TestChannelAndSchedulerRuntimePrintStrictAndExecute(t *testing.T) {
 		strings.Contains(printed, "sendHead") ||
 		strings.Contains(printed, "receiveHead") {
 		t.Fatalf("channel listeners retain historical identity state:\n%s", printed)
+	}
+	if strings.Count(printed, "Math.floor(Math.random() * ready.length)") != 1 {
+		t.Fatalf("ready selection evaluates its random index more than once:\n%s", printed)
 	}
 	sendStart := strings.Index(printed, "private subscribeSelectSend")
 	receiveStart := strings.Index(printed, "private subscribeSelectReceive")
