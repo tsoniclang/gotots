@@ -273,7 +273,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		[]tsgo.ModifierLike{builder.context.Factory().ExportKeyword()},
 		builder.context.Factory().Identifier(artifact.TargetName()),
 		nil,
-		nil,
+		specialization.HeritageClauses(),
 		specialization.Members(),
 	))
 	requests := api.CombineRequests(

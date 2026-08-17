@@ -1,6 +1,7 @@
 package mapruntime
 
 import (
+	"github.com/tsoniclang/gotots/internal/emit/typescriptclass"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -8,18 +9,22 @@ func valueContract(
 	factory tsgo.Factory,
 	name string,
 	members memberNames,
-) tsgo.InterfaceDeclaration {
+) tsgo.ClassDeclaration {
 	keyType := typeName(factory, keyTypeName)
 	valueType := typeName(factory, valueTypeName)
-	return factory.InterfaceDeclaration(
-		[]tsgo.ModifierLike{factory.ExportKeyword()},
+	return typescriptclass.Declaration(
+		factory,
+		[]tsgo.ModifierLike{
+			factory.ExportKeyword(),
+			factory.AbstractKeyword(),
+		},
 		factory.Identifier(name),
 		[]tsgo.TypeParameterDeclaration{
 			typeParameter(factory, keyTypeName),
 			typeParameter(factory, valueTypeName),
 		},
 		nil,
-		[]tsgo.TypeElement{
+		[]tsgo.ClassElement{
 			methodContract(
 				factory,
 				members.lookup,
@@ -101,13 +106,15 @@ func methodContract(
 	name string,
 	parameters []tsgo.ParameterDeclaration,
 	result tsgo.TypeNode,
-) tsgo.MethodSignatureDeclaration {
-	return factory.MethodSignatureDeclaration(
+) tsgo.MethodDeclaration {
+	return factory.MethodDeclaration(
+		[]tsgo.ModifierLike{factory.AbstractKeyword()},
 		nil,
 		factory.Identifier(name),
 		nil,
 		nil,
 		parameters,
 		result,
+		nil,
 	)
 }

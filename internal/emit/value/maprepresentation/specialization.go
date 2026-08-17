@@ -11,8 +11,13 @@ import (
 )
 
 type Specialization struct {
+	heritage []tsgo.HeritageClause
 	members  []tsgo.ClassElement
 	requests []api.RootRequest
+}
+
+func (s Specialization) HeritageClauses() []tsgo.HeritageClause {
+	return slices.Clone(s.heritage)
 }
 
 func (s Specialization) Members() []tsgo.ClassElement {
@@ -69,6 +74,13 @@ func BuildSpecialization(
 	if err != nil {
 		return Specialization{}, err
 	}
+	mapValueReference, err := context.Names().Runtime(
+		api.RuntimeMapValue,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return Specialization{}, err
+	}
 	builder := specializationBuilder{
 		factory:        context.Factory(),
 		className:      className,
@@ -107,10 +119,20 @@ func BuildSpecialization(
 		return Specialization{}, err
 	}
 	return Specialization{
+		heritage: []tsgo.HeritageClause{context.Factory().HeritageClause(
+			tsgo.HeritageClauseTokenKindExtendsKeyword,
+			[]tsgo.ExpressionWithTypeArguments{
+				context.Factory().ExpressionWithTypeArguments(
+					mapValueReference.Expression(context.Factory()),
+					[]tsgo.TypeNode{keyType, valueType},
+				),
+			},
+		)},
 		members: members,
 		requests: api.CombineRequests(
 			requests,
 			panicReference.Requests(),
+			mapValueReference.Requests(),
 		),
 	}, nil
 }

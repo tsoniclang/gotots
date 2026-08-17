@@ -103,7 +103,7 @@ func (b specializationBuilder) constructor() tsgo.ConstructorDeclaration {
 			b.parameterProperty("count", b.numberType(), false),
 		},
 		nil,
-		b.factory.Block(nil, true),
+		b.factory.Block([]tsgo.Statement{b.superCall()}, true),
 	)
 }
 

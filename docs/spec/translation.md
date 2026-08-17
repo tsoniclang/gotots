@@ -559,6 +559,30 @@ typed hash/equality bucket representation. Both paths preserve nil behavior,
 zero on miss, comma-ok, deletion, clear, assignment copy, and the iteration
 envelope through the same Go-shaped map contract.
 
+That common contract is one exported nominal abstract class, not a structural
+interface:
+
+```ts
+abstract class GoMapValue<K, V> {
+  declare private readonly then?: never;
+  abstract lookup(key: K): V;
+  abstract store(key: K, value: V): void;
+  // the remaining map operations are abstract members of this same contract
+}
+
+class GoMap<K, V> extends GoMapValue<K, V> { /* direct implementation */ }
+class MapOfPointToItem extends GoMapValue<Point, Item> { /* specialization */ }
+```
+
+The nominal root is emitted before every same-module subclass, each subclass
+calls `super()`, and the erased private member is inherited exactly once. This
+lets a checked consumer prove that a returned map cannot participate in
+JavaScript Promise assimilation without recognizing `GoMapValue` by spelling.
+A public structural `then?: never` is not substituted: a declaration boundary
+could hide a runtime accessor, so it would not establish the same closed
+contract. The abstract root emits one empty JavaScript class; no map instance
+gains a field or per-operation wrapper from this rule.
+
 Native key equality is exact only within the selected primitive carrier. In
 the `number` profile, wide integer keys retain the declared precision tradeoff:
 for example, `uint64(9007199254740992)` and `uint64(9007199254740993)` have the

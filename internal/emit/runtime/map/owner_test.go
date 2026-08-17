@@ -26,8 +26,75 @@ func TestBuildCreatesOneTypedGenericMapClass(t *testing.T) {
 	if len(class.TypeParameters()) != 2 {
 		t.Fatalf("type parameters = %d, want key and value", len(class.TypeParameters()))
 	}
-	if len(class.Members()) != 12 {
-		t.Fatalf("members = %d, want constructor, ten map operations, and Promise exclusion", len(class.Members()))
+	if len(class.Members()) != 11 {
+		t.Fatalf("members = %d, want constructor and ten map operations", len(class.Members()))
+	}
+	heritage := class.HeritageClauses()
+	if len(heritage) != 1 ||
+		heritage[0].Token() != tsgo.HeritageClauseTokenKindExtendsKeyword {
+		t.Fatalf("map heritage = %#v, want nominal GoMapValue base", heritage)
+	}
+	bases := heritage[0].Types()
+	if len(bases) != 1 ||
+		bases[0].Expression().(tsgo.Identifier).Text() != "GoMapValue" ||
+		len(bases[0].TypeArguments()) != 2 {
+		t.Fatalf("map base = %#v, want GoMapValue<K,V>", bases)
+	}
+	constructor := class.Members()[0].(tsgo.ConstructorDeclaration)
+	body := constructor.Body().(tsgo.Block)
+	if len(body.Statements()) != 1 ||
+		body.Statements()[0].(tsgo.ExpressionStatement).
+			Expression().(tsgo.CallExpression).
+			Expression().Kind() != tsgo.SyntaxKindSuperKeyword {
+		t.Fatalf("map constructor = %#v, want one super() call", body)
+	}
+}
+
+func TestMapValueContractIsNominallyNonThenable(t *testing.T) {
+	statement, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeMapValue,
+		panicClassName(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract, ok := statement.(tsgo.ClassDeclaration)
+	if !ok {
+		t.Fatalf("definition = %T, want abstract ClassDeclaration", statement)
+	}
+	if len(contract.Members()) != 9 {
+		t.Fatalf("members = %d, want eight abstract operations and Promise exclusion", len(contract.Members()))
+	}
+	modifiers := contract.Modifiers()
+	if len(modifiers) != 2 ||
+		modifiers[0].Kind() != tsgo.SyntaxKindExportKeyword ||
+		modifiers[1].Kind() != tsgo.SyntaxKindAbstractKeyword {
+		t.Fatalf("map-value modifiers = %#v, want export abstract", modifiers)
+	}
+	for index, member := range contract.Members()[:8] {
+		method, ok := member.(tsgo.MethodDeclaration)
+		if !ok || method.Body() != nil ||
+			len(method.Modifiers()) != 1 ||
+			method.Modifiers()[0].Kind() != tsgo.SyntaxKindAbstractKeyword {
+			t.Fatalf("map-value operation %d = %#v, want abstract method", index, member)
+		}
+	}
+	property, ok := contract.Members()[8].(tsgo.PropertyDeclaration)
+	if !ok {
+		t.Fatalf("Promise exclusion = %T, want PropertyDeclaration", contract.Members()[8])
+	}
+	modifiers = property.Modifiers()
+	if property.Name().(tsgo.Identifier).Text() != "then" ||
+		len(modifiers) != 3 ||
+		modifiers[0].Kind() != tsgo.SyntaxKindDeclareKeyword ||
+		modifiers[1].Kind() != tsgo.SyntaxKindPrivateKeyword ||
+		modifiers[2].Kind() != tsgo.SyntaxKindReadonlyKeyword ||
+		property.PostfixToken() == nil ||
+		property.PostfixToken().Kind() != tsgo.SyntaxKindQuestionToken ||
+		property.Type().Kind() != tsgo.SyntaxKindNeverKeyword ||
+		property.Initializer() != nil {
+		t.Fatalf("map-value Promise exclusion = %#v", property)
 	}
 }
 
@@ -42,7 +109,7 @@ func TestClearSurfaceBelongsToCompleteMapContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	class := statement.(tsgo.ClassDeclaration)
-	if len(class.Members()) != 12 {
+	if len(class.Members()) != 11 {
 		t.Fatalf("map members = %d, want the complete value contract", len(class.Members()))
 	}
 	method := class.Members()[9].(tsgo.MethodDeclaration)
@@ -62,7 +129,7 @@ func TestKeysSurfaceBelongsToCompleteMapContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	class := statement.(tsgo.ClassDeclaration)
-	if len(class.Members()) != 12 {
+	if len(class.Members()) != 11 {
 		t.Fatalf("map members = %d, want the complete value contract", len(class.Members()))
 	}
 	method := class.Members()[10].(tsgo.MethodDeclaration)

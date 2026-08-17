@@ -163,6 +163,16 @@ func (b specializationBuilder) call(
 	)
 }
 
+func (b specializationBuilder) superCall() tsgo.Statement {
+	return b.factory.ExpressionStatement(b.factory.CallExpression(
+		b.factory.SuperExpression(),
+		nil,
+		nil,
+		nil,
+		tsgo.NodeFlagsNone,
+	))
+}
+
 func (b specializationBuilder) staticCall(
 	name string,
 	arguments ...tsgo.Expression,

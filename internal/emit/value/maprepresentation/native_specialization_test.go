@@ -85,7 +85,7 @@ func TestNativeKeySpecializationExecutesExactMapSemantics(t *testing.T) {
 		}
 	}
 	t.Log("native store work: map-get=0 map-set=1 value-copy=1 semantic-branches=0")
-	typeScriptOutput := compileAndRunSpecialization(t, `class Box {
+	typeScriptOutput := compileAndRunSpecialization(t, mapValueTestContract+`class Box {
     constructor(public value: number) {}
 }
 
@@ -200,7 +200,7 @@ func nativeSpecializationSource(
 		nil,
 		factory.Identifier(className),
 		nil,
-		nil,
+		specialization.HeritageClauses(),
 		specialization.Members(),
 	))
 }

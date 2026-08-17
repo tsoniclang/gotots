@@ -54,7 +54,7 @@ func (b specializationBuilder) nativeConstructor() tsgo.ConstructorDeclaration {
 			b.parameterProperty("values", b.nativeStorageType(), true),
 		},
 		nil,
-		b.factory.Block(nil, true),
+		b.factory.Block([]tsgo.Statement{b.superCall()}, true),
 	)
 }
 

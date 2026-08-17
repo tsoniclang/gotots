@@ -55,7 +55,7 @@ func TestUnnamedArrayKeyOperationsInlineStaticTypedSemantics(t *testing.T) {
 				nil,
 				factory.Identifier("ArrayMap"),
 				nil,
-				nil,
+				specialization.HeritageClauses(),
 				specialization.Members(),
 			)
 			source := printAggregateSpecialization(t, factory, class)

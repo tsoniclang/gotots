@@ -16,6 +16,11 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+const mapValueTestContract = `abstract class GoMapValue<K, V> {
+    declare private readonly then?: never;
+}
+`
+
 func TestStaticSpecializationExecutesCollisionsCopiesAndNilSemantics(
 	t *testing.T,
 ) {
@@ -57,11 +62,31 @@ func testStaticSpecialization(
 			len(specialization.Members()),
 		)
 	}
+	heritage := specialization.HeritageClauses()
+	if len(heritage) != 1 ||
+		heritage[0].Token() != tsgo.HeritageClauseTokenKindExtendsKeyword ||
+		len(heritage[0].Types()) != 1 ||
+		heritage[0].Types()[0].Expression().(tsgo.Identifier).Text() != "GoMapValue" ||
+		len(heritage[0].Types()[0].TypeArguments()) != 2 {
+		t.Fatalf("specialization heritage = %#v, want GoMapValue<Key,Box>", heritage)
+	}
+	heritage[0] = nil
+	if specialization.HeritageClauses()[0] == nil {
+		t.Fatal("specialization heritage leaked mutable backing storage")
+	}
+	constructor := specialization.Members()[0].(tsgo.ConstructorDeclaration)
+	body := constructor.Body().(tsgo.Block)
+	if len(body.Statements()) != 1 ||
+		body.Statements()[0].(tsgo.ExpressionStatement).
+			Expression().(tsgo.CallExpression).
+			Expression().Kind() != tsgo.SyntaxKindSuperKeyword {
+		t.Fatalf("specialization constructor = %#v, want one super() call", body)
+	}
 	class := factory.ClassDeclaration(
 		nil,
 		factory.Identifier("StaticMap"),
 		nil,
-		nil,
+		specialization.HeritageClauses(),
 		specialization.Members(),
 	)
 	printed := printSpecialization(t, factory, class)
@@ -73,7 +98,7 @@ func testStaticSpecialization(
 			len(printed),
 		)
 	}
-	runner := `class Key {
+	runner := mapValueTestContract + `class Key {
     constructor(public x: number, public y: number) {}
 }
 class GoPanic {

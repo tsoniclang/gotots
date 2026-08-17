@@ -347,6 +347,19 @@ Every test inspects generated source and reports bytes/AST nodes. A mutation
 that always emits copy carriers/helpers, uses JavaScript identity for Go map
 keys, drops nil checks, or restores a target non-null assertion must fail.
 
+Map proof additionally requires the common `GoMapValue<K,V>` surface to be one
+nominal abstract class with the canonical private Promise-assimilation
+exclusion. The direct map class and every native/hashed specialization must
+extend that exact root, call `super()` once, and remain assignable through all
+ordinary and generic map signatures. Same-module dependency ordering must emit
+the root before `GoMap`; generated JavaScript must contain only the one empty
+root class and no `then` field. Mutations restore a structural interface, make
+the exclusion public, omit one subclass edge or `super()` call, or sort the
+consumer before its root; each fails at AST shape, strict typecheck, target
+effect settlement, or runtime initialization. The target control retains a
+public structural `readonly then?: never` result, proving that nominal evidence
+rather than member spelling owns the optimization.
+
 The native defined-numeric fixture includes value and pointer methods, direct
 calls, method expressions, method values, interface adaptation, explicit
 conversion, and a switch whose listed constants do not exhaust the underlying

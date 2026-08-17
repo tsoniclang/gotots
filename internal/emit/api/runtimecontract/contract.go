@@ -226,6 +226,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoMap",
 			true,
 			RuntimePanic,
+			RuntimeMapValue,
 		), nil
 	case RuntimeMapHash:
 		return runtimeContract(
